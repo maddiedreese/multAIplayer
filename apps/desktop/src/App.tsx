@@ -91,7 +91,7 @@ import {
   type LocalHistorySettings,
   saveEncryptedHistory
 } from "./lib/localHistory";
-import { loadTeamRoomDefaults, saveTeamRoomDefaults } from "./lib/teamRoomDefaults";
+import { loadTeamRoomDefaults, saveTeamRoomDefaults, teamDefaultsRoomSettings } from "./lib/teamRoomDefaults";
 import { loadOrCreateDeviceIdentity, resetDeviceIdentity, type DeviceIdentity } from "./lib/deviceIdentity";
 import {
   isDeviceKeyTrusted,
@@ -2551,12 +2551,44 @@ export function App() {
     );
   }
 
-  function applyTeamHistoryDefaultsToRoom() {
+  async function applyTeamDefaultsToRoom() {
     if (!hasSelectedRoom) {
-      setSelectedHistoryMessage("Create or join a room before applying team history defaults.");
+      setSelectedHistoryMessage("Create or join a room before applying team defaults.");
       return;
     }
-    updateLocalHistorySettings(teamHistorySettings);
+    const roomId = selectedRoom.id;
+    const teamId = selectedRoom.teamId;
+    const historyDefaults = loadTeamHistorySettings(teamId);
+    const roomDefaults = loadTeamRoomDefaults(teamId);
+    updateLocalHistorySettings(historyDefaults);
+    setInviteApprovalGateForRoom(roomId, roomDefaults.inviteApprovalGate);
+    if (!isActiveHost) {
+      setHistoryMessageForRoom(
+        roomId,
+        "Applied local history and invite defaults. Claim host to apply approval and browser defaults to this room."
+      );
+      return;
+    }
+    setSettingsBusyForRoom(roomId, true);
+    try {
+      const roomSettings = teamDefaultsRoomSettings(roomDefaults);
+      const room = await updateRoomSettings(roomId, {
+        ...roomSettingsActor(),
+        ...roomSettings
+      });
+      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      setBrowserAllowedOriginsDraftForRoom(roomId, roomSettings.browserAllowedOrigins.join("\n"));
+      if (!roomSettings.browserProfilePersistent) {
+        setBrowserStatusByRoom((current) => omitRecordKey(current, roomId));
+      }
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setHistoryMessageForRoom(roomId, "Applied team defaults to this room.");
+      }
+    } catch (error) {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHistoryMessageForRoom(roomId, String(error));
+    } finally {
+      setSettingsBusyForRoom(roomId, false);
+    }
   }
 
   async function clearRoomHistory() {
@@ -4867,7 +4899,7 @@ export function App() {
 	                  />
 	                  <span>Require host approval for new room invites</span>
 	                </label>
-	                <button className="ghost-wide" onClick={applyTeamHistoryDefaultsToRoom} disabled={!hasSelectedRoom}>
+	                <button className="ghost-wide" onClick={applyTeamDefaultsToRoom} disabled={!hasSelectedRoom || settingsBusy}>
 	                  <Check size={15} />
 	                  Apply team default to room
 	                </button>
@@ -5616,9 +5648,9 @@ export function App() {
 	              <strong>Team default</strong>
 	              <span>{teamHistorySettings.enabled ? `${teamHistorySettings.retentionDays} days for new rooms` : "off for new rooms"}</span>
 	            </div>
-	            <button className="ghost-wide" onClick={applyTeamHistoryDefaultsToRoom} disabled={!hasSelectedRoom}>
+	            <button className="ghost-wide" onClick={applyTeamDefaultsToRoom} disabled={!hasSelectedRoom || settingsBusy}>
 	              <Check size={15} />
-	              Apply to room
+	              Apply defaults to room
 	            </button>
 	          </div>
 	          <label className="checkbox-row">

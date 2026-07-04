@@ -4,6 +4,7 @@ import {
   loadTeamRoomDefaults,
   saveTeamRoomDefaults,
   sanitizeTeamRoomDefaults,
+  teamDefaultsRoomSettings,
   teamRoomDefaultsKey
 } from "../src/lib/teamRoomDefaults";
 
@@ -127,6 +128,24 @@ test("team room defaults sanitize invite policy", () => {
     browserProfilePersistent: true,
     inviteApprovalGate: false
   });
+});
+
+test("team defaults room settings include only host-controlled room settings", () => {
+  const defaults = {
+    approvalPolicy: "auto_browser_allowed_sites" as const,
+    browserAllowedOrigins: ["https://github.com", "https://example.com"],
+    browserProfilePersistent: false,
+    inviteApprovalGate: true
+  };
+  const settings = teamDefaultsRoomSettings(defaults);
+
+  assert.deepEqual(settings, {
+    approvalPolicy: "auto_browser_allowed_sites",
+    browserAllowedOrigins: ["https://github.com", "https://example.com"],
+    browserProfilePersistent: false
+  });
+  settings.browserAllowedOrigins.push("https://mutated.example");
+  assert.deepEqual(defaults.browserAllowedOrigins, ["https://github.com", "https://example.com"]);
 });
 
 test("team room defaults drop corrupted storage", () => {

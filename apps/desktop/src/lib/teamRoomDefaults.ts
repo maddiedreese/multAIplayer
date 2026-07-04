@@ -61,6 +61,18 @@ export function sanitizeTeamRoomDefaults(defaults: Partial<TeamRoomDefaults>): T
   };
 }
 
+export function teamDefaultsRoomSettings(defaults: TeamRoomDefaults): Pick<
+  TeamRoomDefaults,
+  "approvalPolicy" | "browserAllowedOrigins" | "browserProfilePersistent"
+> {
+  const sanitized = sanitizeTeamRoomDefaults(defaults);
+  return {
+    approvalPolicy: sanitized.approvalPolicy,
+    browserAllowedOrigins: [...sanitized.browserAllowedOrigins],
+    browserProfilePersistent: sanitized.browserProfilePersistent
+  };
+}
+
 function copyTeamRoomDefaults(defaults: TeamRoomDefaults): TeamRoomDefaults {
   return {
     ...defaults,
