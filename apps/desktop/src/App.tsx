@@ -511,7 +511,7 @@ export function App() {
   const [gitStatusByRoom, setGitStatusByRoom] = useState<Record<string, GitStatusSummary | null>>({});
   const [codexProbe, setCodexProbe] = useState<CodexProbe | null>(null);
   const [terminalLinesByRoom, setTerminalLinesByRoom] = useState<Record<string, string[]>>(initialTerminalLinesByRoom);
-  const [terminalBusy, setTerminalBusy] = useState(false);
+  const [terminalBusyByRoom, setTerminalBusyByRoom] = useState<Record<string, boolean>>({});
   const [terminals, setTerminals] = useState<TerminalSnapshot[]>([]);
   const [terminalRequestsByRoom, setTerminalRequestsByRoom] = useState<Record<string, TerminalCommandRequest[]>>({});
   const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null);
@@ -591,6 +591,7 @@ export function App() {
   const actionsLastChecked = actionsLastCheckedByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const actionsMessage = actionsMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const terminalLines = terminalLinesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
+  const terminalBusy = terminalBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const actionsSummary = useMemo(() => summarizeActionRuns(actionRuns), [actionRuns]);
   const githubWorkflowReadiness = useMemo(() => checkGitHubWorkflowReadiness({
     pushEnabled: gitWorkflowDraft.pushEnabled,
@@ -1363,6 +1364,13 @@ export function App() {
         ...current,
         [roomId]: [...roomLines, ...lines].slice(-maxTerminalActivityLines)
       };
+    });
+  }
+
+  function setTerminalBusyForRoom(roomId: string, busy: boolean) {
+    setTerminalBusyByRoom((current) => {
+      if (busy) return { ...current, [roomId]: true };
+      return omitRecordKey(current, roomId);
     });
   }
 
@@ -2250,6 +2258,7 @@ export function App() {
     setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setPendingAttachmentsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setTerminalLinesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setTerminalBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHistoryMessage("Cleared encrypted local history for this room.");
   }
@@ -2299,6 +2308,7 @@ export function App() {
     setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setPendingAttachmentsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setTerminalLinesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setTerminalBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHistorySettings(loadHistorySettings(selectedRoom.id));
     setSecretWarningVisible(true);
@@ -2855,7 +2865,7 @@ export function App() {
     const room = selectedRoom;
     const roomId = room.id;
     const projectPath = room.projectPath;
-    setTerminalBusy(true);
+    setTerminalBusyForRoom(roomId, true);
     const command = "git status --short";
     appendTerminalLinesForRoom(roomId, [`$ ${command}`]);
     try {
@@ -2869,7 +2879,7 @@ export function App() {
     } catch (error) {
       appendTerminalLinesForRoom(roomId, [String(error)]);
     } finally {
-      setTerminalBusy(false);
+      setTerminalBusyForRoom(roomId, false);
     }
   }
 
@@ -2882,21 +2892,27 @@ export function App() {
       setTerminalError(hostGateMessage);
       return;
     }
-    setTerminalBusy(true);
+    const room = selectedRoom;
+    const roomId = room.id;
+    const name = terminalName.trim();
+    const command = terminalCommand.trim();
+    setTerminalBusyForRoom(roomId, true);
     setTerminalError(null);
     try {
       const snapshot = await startTerminal(
-        selectedRoom.id,
-        terminalName.trim(),
-        selectedRoom.projectPath,
-        terminalCommand.trim()
+        roomId,
+        name,
+        room.projectPath,
+        command
       );
-      setTerminals((current) => upsertTerminal(current, snapshot));
-      setSelectedTerminalId(snapshot.id);
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setTerminals((current) => upsertTerminal(current, snapshot));
+        setSelectedTerminalId(snapshot.id);
+      }
     } catch (error) {
-      setTerminalError(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalError(String(error));
     } finally {
-      setTerminalBusy(false);
+      setTerminalBusyForRoom(roomId, false);
     }
   }
 
@@ -2910,15 +2926,19 @@ export function App() {
       setTerminalError(hostGateMessage);
       return;
     }
-    setTerminalBusy(true);
+    const roomId = selectedRoom.id;
+    const terminalId = selectedTerminalId;
+    setTerminalBusyForRoom(roomId, true);
     setTerminalError(null);
     try {
-      const snapshot = await stopTerminal(selectedTerminalId);
-      setTerminals((current) => upsertTerminal(current, snapshot));
+      const snapshot = await stopTerminal(terminalId);
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setTerminals((current) => upsertTerminal(current, snapshot));
+      }
     } catch (error) {
-      setTerminalError(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalError(String(error));
     } finally {
-      setTerminalBusy(false);
+      setTerminalBusyForRoom(roomId, false);
     }
   }
 
@@ -2933,13 +2953,17 @@ export function App() {
       setTerminalError(hostGateMessage);
       return;
     }
+    const roomId = selectedRoom.id;
+    const terminalId = selectedTerminalId;
     setTerminalError(null);
     try {
-      const snapshot = await writeTerminal(selectedTerminalId, input);
-      setTerminals((current) => upsertTerminal(current, snapshot));
-      setTerminalInput("");
+      const snapshot = await writeTerminal(terminalId, input);
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setTerminals((current) => upsertTerminal(current, snapshot));
+        setTerminalInput("");
+      }
     } catch (error) {
-      setTerminalError(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalError(String(error));
     }
   }
 
@@ -2965,7 +2989,9 @@ export function App() {
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") {
       appendTerminalRequest(room.id, request);
-      setTerminalError("Saved command request locally because the relay is not connected.");
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
+        setTerminalError("Saved command request locally because the relay is not connected.");
+      }
       return;
     }
 
@@ -2993,7 +3019,7 @@ export function App() {
       client.publish({ type: "publish", envelope });
       appendTerminalRequest(room.id, request);
     } catch (error) {
-      setTerminalError(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setTerminalError(String(error));
     }
   }
 
@@ -3006,22 +3032,22 @@ export function App() {
       setTerminalError(hostGateMessage);
       return;
     }
-    setTerminalBusy(true);
-    setTerminalError(null);
     const room = selectedRoom;
+    const roomId = room.id;
+    setTerminalBusyForRoom(roomId, true);
+    setTerminalError(null);
     let approvedRequest: TerminalCommandRequest;
     try {
       approvedRequest = terminalRequestForApprovedRun(request, room.projectPath);
     } catch (error) {
-      setTerminalError(String(error));
-      setTerminalBusy(false);
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalError(String(error));
+      setTerminalBusyForRoom(roomId, false);
       return;
     }
     updateTerminalRequestStatus(room.id, approvedRequest.id, "approved");
     publishRequestStatus("terminal.event", approvedRequest.id, "approved", room).catch((error) => {
-      setTerminalError(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalError(String(error));
     });
-    const roomId = room.id;
     const projectPath = room.projectPath;
     appendTerminalLinesForRoom(roomId, [
       `${approvedRequest.requester} requested: ${approvedRequest.command}`,
@@ -3042,13 +3068,13 @@ export function App() {
         stdout: result.stdout,
         stderr: result.stderr
       }, room).catch((error) => {
-        setTerminalError(String(error));
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalError(String(error));
       });
       const status = await getGitStatus(projectPath);
       setGitStatusForRoom(roomId, status);
     } catch (error) {
       appendTerminalLinesForRoom(roomId, [String(error)]);
-      setTerminalError(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalError(String(error));
       publishTerminalResult(approvedRequest, {
         startedAt,
         finishedAt: new Date().toISOString(),
@@ -3057,10 +3083,10 @@ export function App() {
         stderr: "",
         error: String(error)
       }, room).catch((publishError) => {
-        setTerminalError(String(publishError));
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalError(String(publishError));
       });
     } finally {
-      setTerminalBusy(false);
+      setTerminalBusyForRoom(roomId, false);
     }
   }
 
@@ -3073,9 +3099,10 @@ export function App() {
       setTerminalError(hostGateMessage);
       return;
     }
-    updateTerminalRequestStatus(selectedRoom.id, requestId, "denied");
-    publishRequestStatus("terminal.event", requestId, "denied").catch((error) => {
-      setTerminalError(String(error));
+    const room = selectedRoom;
+    updateTerminalRequestStatus(room.id, requestId, "denied");
+    publishRequestStatus("terminal.event", requestId, "denied", room).catch((error) => {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setTerminalError(String(error));
     });
   }
 
