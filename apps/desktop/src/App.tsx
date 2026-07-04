@@ -1082,9 +1082,11 @@ export function App() {
             });
             if (status === "approved" && envelopeRoom) {
               publishRequestStatus("browser.event", plaintext.id, "approved", envelopeRoom).catch((error) => {
-                setBrowserMessage(String(error));
+                if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, envelopeRoom.id)) setBrowserMessage(String(error));
               });
-              setBrowserMessage(`Auto-approved allowed browser site ${formatBrowserAccessLabel(plaintext.url)}.`);
+              if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, envelopeRoom.id)) {
+                setBrowserMessage(`Auto-approved allowed browser site ${formatBrowserAccessLabel(plaintext.url)}.`);
+              }
             }
           }
           if (message.envelope.kind === "browser.event") {
@@ -1985,14 +1987,17 @@ export function App() {
       setSettingsMessage(roomSettingsGateMessage);
       return;
     }
+    const roomId = selectedRoom.id;
     setSettingsBusy(true);
     setSettingsMessage(null);
     try {
-      const room = await updateRoomSettings(selectedRoom.id, { ...roomSettingsActor(), codexModel: nextModel });
+      const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), codexModel: nextModel });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
-      setSettingsMessage(`Codex model set to ${formatCodexModel(nextModel)}.`);
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setSettingsMessage(`Codex model set to ${formatCodexModel(nextModel)}.`);
+      }
     } catch (error) {
-      setSettingsMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
     } finally {
       setSettingsBusy(false);
     }
@@ -2012,22 +2017,25 @@ export function App() {
       setBrowserMessage("Use one http(s) origin per line, such as https://github.com.");
       return;
     }
+    const roomId = selectedRoom.id;
     setSettingsBusy(true);
     setBrowserMessage(null);
     try {
-      const room = await updateRoomSettings(selectedRoom.id, {
+      const room = await updateRoomSettings(roomId, {
         ...roomSettingsActor(),
         browserAllowedOrigins: normalized
       });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
-      setBrowserAllowedOriginsDraft(normalized.join("\n"));
-      setBrowserMessage(
-        normalized.length
-          ? `Allowed browser sites saved: ${normalized.map(formatBrowserAccessLabel).join(", ")}.`
-          : "Allowed browser site list is empty. Browser requests will require manual approval."
-      );
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setBrowserAllowedOriginsDraft(normalized.join("\n"));
+        setBrowserMessage(
+          normalized.length
+            ? `Allowed browser sites saved: ${normalized.map(formatBrowserAccessLabel).join(", ")}.`
+            : "Allowed browser site list is empty. Browser requests will require manual approval."
+        );
+      }
     } catch (error) {
-      setBrowserMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessage(String(error));
     } finally {
       setSettingsBusy(false);
     }
@@ -2043,24 +2051,27 @@ export function App() {
       return;
     }
     if (browserProfilePersistent === selectedRoom.browserProfilePersistent) return;
+    const roomId = selectedRoom.id;
     setSettingsBusy(true);
     setBrowserMessage(null);
     try {
-      const room = await updateRoomSettings(selectedRoom.id, {
+      const room = await updateRoomSettings(roomId, {
         ...roomSettingsActor(),
         browserProfilePersistent
       });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
       if (!browserProfilePersistent) {
-        setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
+        setBrowserStatusByRoom((current) => omitRecordKey(current, roomId));
       }
-      setBrowserMessage(
-        browserProfilePersistent
-          ? "Browser profile persistence enabled for this room."
-          : "Browser profile will refresh before each approved page opens."
-      );
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setBrowserMessage(
+          browserProfilePersistent
+            ? "Browser profile persistence enabled for this room."
+            : "Browser profile will refresh before each approved page opens."
+        );
+      }
     } catch (error) {
-      setBrowserMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessage(String(error));
     } finally {
       setSettingsBusy(false);
     }
@@ -3058,6 +3069,7 @@ export function App() {
       setBrowserMessage("Browser mode is disabled for this room.");
       return;
     }
+    const roomId = room.id;
     const rawUrl = browserUrl.trim();
     if (!rawUrl) return;
     setBrowserMessage(null);
@@ -3083,11 +3095,13 @@ export function App() {
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") {
       appendBrowserRequest(room.id, request);
-      setBrowserMessage(
-        autoApproved
-          ? `Auto-approved allowed browser site ${formatBrowserAccessLabel(request.url)} locally because the relay is not connected.`
-          : "Saved browser request locally because the relay is not connected."
-      );
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setBrowserMessage(
+          autoApproved
+            ? `Auto-approved allowed browser site ${formatBrowserAccessLabel(request.url)} locally because the relay is not connected.`
+            : "Saved browser request locally because the relay is not connected."
+        );
+      }
       return;
     }
 
@@ -3117,13 +3131,15 @@ export function App() {
       if (autoApproved) {
         await publishRequestStatus("browser.event", request.id, "approved", room);
       }
-      setBrowserMessage(
-        autoApproved
-          ? `Auto-approved allowed browser site ${formatBrowserAccessLabel(request.url)}.`
-          : `Requested browser access to ${formatBrowserAccessLabel(request.url)}.`
-      );
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setBrowserMessage(
+          autoApproved
+            ? `Auto-approved allowed browser site ${formatBrowserAccessLabel(request.url)}.`
+            : `Requested browser access to ${formatBrowserAccessLabel(request.url)}.`
+        );
+      }
     } catch (error) {
-      setBrowserMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessage(String(error));
     }
   }
 
@@ -3169,33 +3185,36 @@ export function App() {
       setBrowserMessage(hostGateMessage);
       return;
     }
+    const room = selectedRoom;
     setBrowserMessage(null);
     try {
       const result = await openBrowserView(
-        selectedRoom.id,
-        selectedRoom.projectPath,
+        room.id,
+        room.projectPath,
         request.url,
-        `${selectedRoom.name} - ${formatBrowserAccessLabel(request.url)}`,
-        selectedRoom.browserProfilePersistent
+        `${room.name} - ${formatBrowserAccessLabel(request.url)}`,
+        room.browserProfilePersistent
       );
       setBrowserStatusByRoom((current) => ({
         ...current,
-        [selectedRoom.id]: {
+        [room.id]: {
           profilePath: result.profilePath,
           downloadsBlocked: result.downloadsBlocked,
           clipboardBlocked: result.clipboardBlocked,
           fileUploadsBlocked: result.fileUploadsBlocked
         }
       }));
-      setBrowserMessage(
-        result.reused
-          ? `Reused isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
-          : selectedRoom.browserProfilePersistent
-            ? `Opened isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
-            : `Opened fresh isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
-      );
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
+        setBrowserMessage(
+          result.reused
+            ? `Reused isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
+            : room.browserProfilePersistent
+              ? `Opened isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
+              : `Opened fresh isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
+        );
+      }
     } catch (error) {
-      setBrowserMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setBrowserMessage(String(error));
     }
   }
 
@@ -3208,19 +3227,22 @@ export function App() {
       setBrowserMessage(hostGateMessage);
       return;
     }
+    const room = selectedRoom;
     setBrowserMessage(null);
     try {
-      const result = await resetBrowserProfile(selectedRoom.id, selectedRoom.projectPath);
+      const result = await resetBrowserProfile(room.id, room.projectPath);
       setBrowserStatusByRoom((current) => ({
         ...current,
-        [selectedRoom.id]: {
+        [room.id]: {
           ...defaultBrowserStatus,
           profilePath: result.profilePath
         }
       }));
-      setBrowserMessage("Reset isolated room browser state. The next approved page opens with a fresh profile.");
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
+        setBrowserMessage("Reset isolated room browser state. The next approved page opens with a fresh profile.");
+      }
     } catch (error) {
-      setBrowserMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setBrowserMessage(String(error));
     }
   }
 
