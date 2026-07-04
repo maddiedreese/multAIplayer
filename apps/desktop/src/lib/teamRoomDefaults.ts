@@ -1,11 +1,20 @@
-import type { ApprovalPolicy } from "@multaiplayer/protocol";
+import {
+  defaultBrowserAllowedOrigins,
+  defaultBrowserProfilePersistent,
+  type ApprovalPolicy
+} from "@multaiplayer/protocol";
+import { normalizeBrowserAllowedOrigins } from "./browserPolicy";
 
 export interface TeamRoomDefaults {
   approvalPolicy: ApprovalPolicy;
+  browserAllowedOrigins: string[];
+  browserProfilePersistent: boolean;
 }
 
 const defaultTeamRoomDefaults: TeamRoomDefaults = {
-  approvalPolicy: "ask_every_turn"
+  approvalPolicy: "ask_every_turn",
+  browserAllowedOrigins: [...defaultBrowserAllowedOrigins],
+  browserProfilePersistent: defaultBrowserProfilePersistent
 };
 
 const approvalPolicies: ApprovalPolicy[] = [
@@ -17,7 +26,7 @@ const approvalPolicies: ApprovalPolicy[] = [
 
 export function loadTeamRoomDefaults(teamId: string): TeamRoomDefaults {
   const stored = localStorage.getItem(teamRoomDefaultsKey(teamId));
-  if (!stored) return defaultTeamRoomDefaults;
+  if (!stored) return copyTeamRoomDefaults(defaultTeamRoomDefaults);
   try {
     return sanitizeTeamRoomDefaults(JSON.parse(stored) as Partial<TeamRoomDefaults>);
   } catch {
@@ -33,10 +42,24 @@ export function saveTeamRoomDefaults(teamId: string, defaults: TeamRoomDefaults)
 }
 
 export function sanitizeTeamRoomDefaults(defaults: Partial<TeamRoomDefaults>): TeamRoomDefaults {
+  const browserAllowedOrigins = defaults.browserAllowedOrigins === undefined
+    ? defaultTeamRoomDefaults.browserAllowedOrigins
+    : normalizeBrowserAllowedOrigins(defaults.browserAllowedOrigins);
   return {
     approvalPolicy: isApprovalPolicy(defaults.approvalPolicy)
       ? defaults.approvalPolicy
-      : defaultTeamRoomDefaults.approvalPolicy
+      : defaultTeamRoomDefaults.approvalPolicy,
+    browserAllowedOrigins: [...(browserAllowedOrigins ?? defaultTeamRoomDefaults.browserAllowedOrigins)],
+    browserProfilePersistent: typeof defaults.browserProfilePersistent === "boolean"
+      ? defaults.browserProfilePersistent
+      : defaultTeamRoomDefaults.browserProfilePersistent
+  };
+}
+
+function copyTeamRoomDefaults(defaults: TeamRoomDefaults): TeamRoomDefaults {
+  return {
+    ...defaults,
+    browserAllowedOrigins: [...defaults.browserAllowedOrigins]
   };
 }
 

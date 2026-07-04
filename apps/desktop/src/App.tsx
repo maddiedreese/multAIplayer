@@ -491,6 +491,12 @@ export function App() {
   const [teamDefaultApprovalPolicy, setTeamDefaultApprovalPolicy] = useState<ApprovalPolicy>(() =>
     loadTeamRoomDefaults(seededTeams[0].id).approvalPolicy
   );
+  const [teamDefaultBrowserAllowedOriginsDraft, setTeamDefaultBrowserAllowedOriginsDraft] = useState(() =>
+    loadTeamRoomDefaults(seededTeams[0].id).browserAllowedOrigins.join("\n")
+  );
+  const [teamDefaultBrowserProfilePersistent, setTeamDefaultBrowserProfilePersistent] = useState(() =>
+    loadTeamRoomDefaults(seededTeams[0].id).browserProfilePersistent
+  );
   const [historyMessagesByRoom, setHistoryMessagesByRoom] = useState<Record<string, string | null>>({});
   const [teamHistoryMessagesByTeam, setTeamHistoryMessagesByTeam] = useState<Record<string, string | null>>({});
   const [newTeamName, setNewTeamName] = useState("");
@@ -1077,8 +1083,11 @@ export function App() {
 
   useEffect(() => {
     if (!selectedTeam) return;
+    const teamRoomDefaults = loadTeamRoomDefaults(selectedTeam);
     setTeamHistorySettings(loadTeamHistorySettings(selectedTeam));
-    setTeamDefaultApprovalPolicy(loadTeamRoomDefaults(selectedTeam).approvalPolicy);
+    setTeamDefaultApprovalPolicy(teamRoomDefaults.approvalPolicy);
+    setTeamDefaultBrowserAllowedOriginsDraft(teamRoomDefaults.browserAllowedOrigins.join("\n"));
+    setTeamDefaultBrowserProfilePersistent(teamRoomDefaults.browserProfilePersistent);
   }, [selectedTeam]);
 
   useEffect(() => {
@@ -1798,12 +1807,17 @@ export function App() {
       return;
     }
     try {
+      const teamDefaults = loadTeamRoomDefaults(plan.teamId);
       const room = await createRoom(
         plan.teamId,
         plan.name,
         plan.projectPath,
-        loadTeamRoomDefaults(plan.teamId).approvalPolicy
-	      );
+        {
+          approvalPolicy: teamDefaults.approvalPolicy,
+          browserAllowedOrigins: teamDefaults.browserAllowedOrigins,
+          browserProfilePersistent: teamDefaults.browserProfilePersistent
+        }
+      );
       upsertRoom(ensureRoomDefaults(room));
       setForgottenRoomIds((current) => withoutSetValue(current, room.id));
       saveHistorySettings(room.id, loadTeamHistorySettings(plan.teamId));
@@ -2470,11 +2484,42 @@ export function App() {
       setSelectedTeamHistoryMessage("Create or select a team before changing team defaults.");
       return;
     }
-    const saved = saveTeamRoomDefaults(selectedTeam, { approvalPolicy });
+    const saved = saveTeamRoomDefaults(selectedTeam, {
+      ...loadTeamRoomDefaults(selectedTeam),
+      approvalPolicy
+    });
     setTeamDefaultApprovalPolicy(saved.approvalPolicy);
+    setTeamDefaultBrowserAllowedOriginsDraft(saved.browserAllowedOrigins.join("\n"));
+    setTeamDefaultBrowserProfilePersistent(saved.browserProfilePersistent);
     setTeamHistoryMessageForTeam(
       selectedTeam,
       `New rooms in this team will default to ${approvalPolicyLabels[saved.approvalPolicy]}.`
+    );
+  }
+
+  function saveTeamDefaultBrowserPolicy() {
+    if (!selectedTeam) {
+      setSelectedTeamHistoryMessage("Create or select a team before changing team defaults.");
+      return;
+    }
+    const browserAllowedOrigins = normalizeBrowserAllowedOrigins(teamDefaultBrowserAllowedOriginsDraft);
+    if (!browserAllowedOrigins) {
+      setSelectedTeamHistoryMessage("Use one http(s) browser origin per line for new rooms, such as https://github.com.");
+      return;
+    }
+    const saved = saveTeamRoomDefaults(selectedTeam, {
+      ...loadTeamRoomDefaults(selectedTeam),
+      browserAllowedOrigins,
+      browserProfilePersistent: teamDefaultBrowserProfilePersistent
+    });
+    setTeamDefaultApprovalPolicy(saved.approvalPolicy);
+    setTeamDefaultBrowserAllowedOriginsDraft(saved.browserAllowedOrigins.join("\n"));
+    setTeamDefaultBrowserProfilePersistent(saved.browserProfilePersistent);
+    setTeamHistoryMessageForTeam(
+      selectedTeam,
+      saved.browserAllowedOrigins.length
+        ? `New rooms will allow ${saved.browserAllowedOrigins.map(formatBrowserAccessLabel).join(", ")} by default.`
+        : "New rooms will start with an empty browser allowlist."
     );
   }
 
@@ -4761,6 +4806,30 @@ export function App() {
 	                    ))}
 	                  </select>
 	                </label>
+	                <label className="checkbox-row">
+	                  <input
+	                    type="checkbox"
+	                    checked={teamDefaultBrowserProfilePersistent}
+	                    disabled={!selectedTeam}
+	                    onChange={(event) => setTeamDefaultBrowserProfilePersistent(event.target.checked)}
+	                  />
+	                  <span>Persist browser profiles in new team rooms</span>
+	                </label>
+	                <div className="browser-allowlist">
+	                  <label>
+	                    <span>New room allowed browser sites</span>
+	                    <textarea
+	                      value={teamDefaultBrowserAllowedOriginsDraft}
+	                      disabled={!selectedTeam}
+	                      onChange={(event) => setTeamDefaultBrowserAllowedOriginsDraft(event.target.value)}
+	                      placeholder="https://github.com"
+	                    />
+	                  </label>
+	                  <button className="ghost-wide" onClick={saveTeamDefaultBrowserPolicy} disabled={!selectedTeam}>
+	                    <Check size={15} />
+	                    Save browser defaults
+	                  </button>
+	                </div>
 	                <button className="ghost-wide" onClick={applyTeamHistoryDefaultsToRoom} disabled={!hasSelectedRoom}>
 	                  <Check size={15} />
 	                  Apply team default to room
@@ -5557,6 +5626,30 @@ export function App() {
 	              ))}
 	            </select>
 	          </label>
+	          <label className="checkbox-row">
+	            <input
+	              type="checkbox"
+	              checked={teamDefaultBrowserProfilePersistent}
+	              disabled={!selectedTeam}
+	              onChange={(event) => setTeamDefaultBrowserProfilePersistent(event.target.checked)}
+	            />
+	            <span>Persist browser profiles in new team rooms</span>
+	          </label>
+	          <div className="browser-allowlist">
+	            <label>
+	              <span>New room allowed browser sites</span>
+	              <textarea
+	                value={teamDefaultBrowserAllowedOriginsDraft}
+	                disabled={!selectedTeam}
+	                onChange={(event) => setTeamDefaultBrowserAllowedOriginsDraft(event.target.value)}
+	                placeholder="https://github.com"
+	              />
+	            </label>
+	            <button className="ghost-wide" onClick={saveTeamDefaultBrowserPolicy} disabled={!selectedTeam}>
+	              <Check size={15} />
+	              Save browser defaults
+	            </button>
+	          </div>
 	          {visibleHistoryMessage && <div className="workflow-message">{visibleHistoryMessage}</div>}
 	        </section>
 

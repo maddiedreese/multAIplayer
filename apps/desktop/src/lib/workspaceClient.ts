@@ -69,13 +69,17 @@ export async function createRoom(
   teamId: string,
   name: string,
   projectPath: string,
-  approvalPolicy?: ApprovalPolicy
+  settings: {
+    approvalPolicy?: ApprovalPolicy;
+    browserAllowedOrigins?: string[];
+    browserProfilePersistent?: boolean;
+  } = {}
 ): Promise<RoomRecord> {
   const response = await fetch(`${getRelayHttpUrl()}/rooms`, {
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ teamId, name, projectPath, approvalPolicy })
+    body: JSON.stringify({ teamId, name, projectPath, ...settings })
   });
   const body = await readJsonResponse<{ room: RoomRecord }>(response, "Failed to create room");
   return body.room as RoomRecord;

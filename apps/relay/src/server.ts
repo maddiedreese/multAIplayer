@@ -526,6 +526,8 @@ app.post("/rooms", (req, res) => {
   const name = normalizeMetadataText(req.body?.name, maxRoomNameChars);
   const projectPath = normalizeRoomProjectPath(req.body?.projectPath);
   const approvalPolicy = req.body?.approvalPolicy === undefined ? "ask_every_turn" : String(req.body.approvalPolicy);
+  const browserAllowedOrigins = req.body?.browserAllowedOrigins;
+  const browserProfilePersistent = req.body?.browserProfilePersistent;
   if (!teams.has(teamId)) {
     res.status(404).json({ error: "Team not found" });
     return;
@@ -546,6 +548,19 @@ app.post("/rooms", (req, res) => {
     res.status(400).json({ error: "approvalPolicy is invalid" });
     return;
   }
+  let normalizedBrowserAllowedOrigins = defaultBrowserAllowedOrigins;
+  if (browserAllowedOrigins !== undefined) {
+    const parsedBrowserAllowedOrigins = normalizeBrowserAllowedOrigins(browserAllowedOrigins);
+    if (parsedBrowserAllowedOrigins === null) {
+      res.status(400).json({ error: "browserAllowedOrigins must be up to 20 http(s) origins such as https://github.com" });
+      return;
+    }
+    normalizedBrowserAllowedOrigins = parsedBrowserAllowedOrigins;
+  }
+  if (browserProfilePersistent !== undefined && typeof browserProfilePersistent !== "boolean") {
+    res.status(400).json({ error: "browserProfilePersistent must be a boolean" });
+    return;
+  }
   const room: RoomRecord = {
     id: `room_${nanoid(10)}`,
     teamId,
@@ -556,8 +571,8 @@ app.post("/rooms", (req, res) => {
     approvalPolicy,
     mode: defaultRoomMode,
     codexModel: defaultCodexModel,
-    browserAllowedOrigins: defaultBrowserAllowedOrigins,
-    browserProfilePersistent: defaultBrowserProfilePersistent,
+    browserAllowedOrigins: normalizedBrowserAllowedOrigins,
+    browserProfilePersistent: browserProfilePersistent ?? defaultBrowserProfilePersistent,
     unread: 0
   };
   rooms.set(room.id, room);

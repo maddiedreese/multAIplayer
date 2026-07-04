@@ -130,13 +130,15 @@ test("relay broadcasts newly created rooms to team subscribers", async () => {
     assert.equal(updatedRoom.name, "New project room");
     assert.equal(updatedRoom.teamId, "team-core");
     assert.equal(updatedRoom.approvalPolicy, "ask_every_turn");
+    assert.deepEqual(updatedRoom.browserAllowedOrigins, ["https://github.com"]);
+    assert.equal(updatedRoom.browserProfilePersistent, true);
   } finally {
     socket.close();
     await relay.close();
   }
 });
 
-test("relay accepts approval policy when creating a room", async () => {
+test("relay accepts room defaults when creating a room", async () => {
   const relay = await startRelay();
   try {
     const response = await fetch(`${relay.baseUrl}/rooms`, {
@@ -146,12 +148,22 @@ test("relay accepts approval policy when creating a room", async () => {
         teamId: "team-core",
         name: "Autopilot room",
         projectPath: "/tmp/multaiplayer",
-        approvalPolicy: "auto_chat_only"
+        approvalPolicy: "auto_chat_only",
+        browserAllowedOrigins: ["https://github.com", "https://example.com"],
+        browserProfilePersistent: false
       })
     });
     assert.equal(response.status, 201);
-    const body = await response.json() as { room: { approvalPolicy: string } };
+    const body = await response.json() as {
+      room: {
+        approvalPolicy: string;
+        browserAllowedOrigins: string[];
+        browserProfilePersistent: boolean;
+      };
+    };
     assert.equal(body.room.approvalPolicy, "auto_chat_only");
+    assert.deepEqual(body.room.browserAllowedOrigins, ["https://github.com", "https://example.com"]);
+    assert.equal(body.room.browserProfilePersistent, false);
 
     assert.equal(
       await postJsonStatus(relay.baseUrl, "/rooms", {
@@ -159,6 +171,24 @@ test("relay accepts approval policy when creating a room", async () => {
         name: "Bad policy room",
         projectPath: "/tmp/multaiplayer",
         approvalPolicy: "surprise"
+      }),
+      400
+    );
+    assert.equal(
+      await postJsonStatus(relay.baseUrl, "/rooms", {
+        teamId: "team-core",
+        name: "Bad browser room",
+        projectPath: "/tmp/multaiplayer",
+        browserAllowedOrigins: ["ftp://example.com"]
+      }),
+      400
+    );
+    assert.equal(
+      await postJsonStatus(relay.baseUrl, "/rooms", {
+        teamId: "team-core",
+        name: "Bad browser persistence room",
+        projectPath: "/tmp/multaiplayer",
+        browserProfilePersistent: "sometimes"
       }),
       400
     );
@@ -1963,13 +1993,24 @@ function waitForRoomUpdated(socket: WebSocket): Promise<{
   teamId: string;
   name: string;
   codexModel: string;
+  approvalPolicy: string;
+  browserAllowedOrigins: string[];
+  browserProfilePersistent: boolean;
 }> {
   return new Promise((resolveUpdate, rejectUpdate) => {
     const timer = setTimeout(() => rejectUpdate(new Error("Timed out waiting for room.updated")), 5_000);
     socket.on("message", (raw) => {
       const message = JSON.parse(raw.toString()) as {
         type: string;
-        room?: { id: string; teamId: string; name: string; codexModel: string };
+        room?: {
+          id: string;
+          teamId: string;
+          name: string;
+          codexModel: string;
+          approvalPolicy: string;
+          browserAllowedOrigins: string[];
+          browserProfilePersistent: boolean;
+        };
       };
       if (message.type === "room.updated" && message.room) {
         clearTimeout(timer);
