@@ -30,7 +30,7 @@ import {
   UsersRound,
   X
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ChatPlaintextPayload,
   BrowserRequestPlaintextPayload,
@@ -1069,23 +1069,23 @@ export function App() {
       });
   }, [appConfig.relayHttpUrl]);
 
+  const refreshTeamMembers = useCallback(async (teamId: string, showErrors = true): Promise<void> => {
+    if (!teamId) return;
+    try {
+      const members = await loadTeamMembers(teamId);
+      setTeamMembersByTeam((current) => ({ ...current, [teamId]: members }));
+      setTeamMembersMessageByTeam((current) => ({ ...current, [teamId]: null }));
+    } catch (error) {
+      if (showErrors) {
+        setTeamMembersMessageByTeam((current) => ({ ...current, [teamId]: String(error) }));
+      }
+    }
+  }, [appConfig.relayHttpUrl]);
+
   useEffect(() => {
     if (!selectedTeam) return;
-    let cancelled = false;
-    loadTeamMembers(selectedTeam)
-      .then((members) => {
-        if (cancelled) return;
-        setTeamMembersByTeam((current) => ({ ...current, [selectedTeam]: members }));
-        setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: null }));
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: String(error) }));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [appConfig.relayHttpUrl, selectedTeam]);
+    void refreshTeamMembers(selectedTeam);
+  }, [refreshTeamMembers, selectedTeam]);
 
   useEffect(() => {
     const invitePayload = readInviteUrlPayload(window.location);
@@ -1250,6 +1250,7 @@ export function App() {
         }
         if (message.type === "team.updated") {
           upsertTeam(message.team);
+          void refreshTeamMembers(message.team.id, false);
           return;
         }
         if (message.type !== "envelope") {
@@ -1471,6 +1472,7 @@ export function App() {
     localUser.name,
     deviceIdentity?.publicKeyFingerprint,
     inviteAdmissionsByRoom,
+    refreshTeamMembers,
     selectedRoom.approvalPolicy,
     selectedRoom.browserAllowedOrigins,
     selectedRoom.id,

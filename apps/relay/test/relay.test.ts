@@ -1578,6 +1578,36 @@ test("relay lets authorized team roles manage non-owner members", async () => {
   }
 });
 
+test("relay preserves requester team role in workspace updates", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const ownerCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+  const socket = new WebSocket(relay.wsUrl, { headers: { cookie: ownerCookie } });
+  try {
+    await onceOpen(socket);
+    socket.send(JSON.stringify({
+      type: "subscribe.workspace",
+      userId: "github:maddiedreese",
+      deviceId: "device-owner-123"
+    }));
+    await waitForWorkspaceSubscribed(socket);
+
+    const updatePromise = waitForTeamUpdated(socket);
+    const response = await fetch(`${relay.baseUrl}/teams/team-core/members/github%3Adesign`, {
+      method: "DELETE",
+      headers: { cookie: ownerCookie }
+    });
+    assert.equal(response.status, 200);
+
+    const updatedTeam = await updatePromise;
+    assert.equal(updatedTeam.id, "team-core");
+    assert.equal(updatedTeam.members, 3);
+    assert.equal(updatedTeam.role, "owner");
+  } finally {
+    socket.close();
+    await relay.close();
+  }
+});
+
 test("relay creates invite metadata with expiry", async () => {
   const relay = await startRelay({ MULTAIPLAYER_RELAY_INVITE_TTL_DAYS: "3" });
   try {
@@ -2145,13 +2175,14 @@ function waitForTeamUpdated(socket: WebSocket): Promise<{
   id: string;
   name: string;
   members: number;
+  role?: string;
 }> {
   return new Promise((resolveUpdate, rejectUpdate) => {
     const timer = setTimeout(() => rejectUpdate(new Error("Timed out waiting for team.updated")), 5_000);
     socket.on("message", (raw) => {
       const message = JSON.parse(raw.toString()) as {
         type: string;
-        team?: { id: string; name: string; members: number };
+        team?: { id: string; name: string; members: number; role?: string };
       };
       if (message.type === "team.updated" && message.team) {
         clearTimeout(timer);
@@ -2159,6 +2190,20 @@ function waitForTeamUpdated(socket: WebSocket): Promise<{
       }
     });
     socket.once("error", rejectUpdate);
+  });
+}
+
+function waitForWorkspaceSubscribed(socket: WebSocket): Promise<void> {
+  return new Promise((resolveSubscribed, rejectSubscribed) => {
+    const timer = setTimeout(() => rejectSubscribed(new Error("Timed out waiting for workspace.subscribed")), 5_000);
+    socket.on("message", (raw) => {
+      const message = JSON.parse(raw.toString()) as { type: string };
+      if (message.type === "workspace.subscribed") {
+        clearTimeout(timer);
+        resolveSubscribed();
+      }
+    });
+    socket.once("error", rejectSubscribed);
   });
 }
 

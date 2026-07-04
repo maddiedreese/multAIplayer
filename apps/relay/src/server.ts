@@ -1309,7 +1309,10 @@ function broadcastRoomUpdated(room: RoomRecord) {
 }
 
 function broadcastWorkspaceUpdated(team: TeamRecord) {
-  for (const socket of workspaceSockets) send(socket, { type: "team.updated", team });
+  for (const socket of workspaceSockets) {
+    const session = sessions.get(socket);
+    send(socket, { type: "team.updated", team: teamRecordForUser(team, session?.authSession?.user.id ?? session?.userId) });
+  }
 }
 
 function send(socket: WebSocket, message: RelayServerMessage) {
