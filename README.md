@@ -9,6 +9,12 @@ Short version: group chat for coding with Codex. Private by default. Open source
 See [docs/product-architecture.md](docs/product-architecture.md) for the initial product and architecture spec.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidance and [SECURITY.md](SECURITY.md) for the alpha security policy.
 
+## Download
+
+The first public prerelease is [v0.1.0-alpha.0](https://github.com/maddiedreese/multAIplayer/releases/tag/v0.1.0-alpha.0).
+
+The macOS artifact is unsigned and not notarized yet. Gatekeeper may require manual approval to open it. Treat this as security-sensitive alpha software and prefer test/self-hosted rooms before using private projects.
+
 ## Run the Alpha
 
 ```sh
