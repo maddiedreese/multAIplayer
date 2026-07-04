@@ -510,7 +510,7 @@ export function App() {
     summary: CodexTurnSummary;
   }>>({});
   const [codexRunningByRoom, setCodexRunningByRoom] = useState<Record<string, boolean>>({});
-  const [secretWarningVisible, setSecretWarningVisible] = useState(true);
+  const [secretWarningsVisibleByRoom, setSecretWarningsVisibleByRoom] = useState<Record<string, boolean>>({});
   const [gitStatusByRoom, setGitStatusByRoom] = useState<Record<string, GitStatusSummary | null>>({});
   const [codexProbe, setCodexProbe] = useState<CodexProbe | null>(null);
   const [terminalLinesByRoom, setTerminalLinesByRoom] = useState<Record<string, string[]>>(initialTerminalLinesByRoom);
@@ -620,6 +620,10 @@ export function App() {
   const chatMessage = chatMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const settingsMessage = settingsMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const markdownCopyFallback = markdownCopyFallbacksByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const secretWarningVisible = hasSelectedRoom && (
+    secretWarningsVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ??
+    !hasAcknowledgedRoomVisibilityWarning(selectedRoom?.id ?? selectedRoomId)
+  );
   const actionsSummary = useMemo(() => summarizeActionRuns(actionRuns), [actionRuns]);
   const githubWorkflowReadiness = useMemo(() => checkGitHubWorkflowReadiness({
     pushEnabled: gitWorkflowDraft.pushEnabled,
@@ -723,6 +727,10 @@ export function App() {
 
   function setMarkdownCopyFallbackForRoom(roomId: string, fallback: MarkdownCopyFallback | null) {
     setMarkdownCopyFallbacksByRoom((current) => fallback ? { ...current, [roomId]: fallback } : omitRecordKey(current, roomId));
+  }
+
+  function setSecretWarningVisibleForRoom(roomId: string, visible: boolean) {
+    setSecretWarningsVisibleByRoom((current) => visible ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
   function setSettingsBusyForRoom(roomId: string, busy: boolean) {
@@ -1109,10 +1117,6 @@ export function App() {
       cancelled = true;
     };
   }, [forgottenRoomIds, hasSelectedRoom, selectedRoom.teamId, selectedRoomId]);
-
-  useEffect(() => {
-    setSecretWarningVisible(hasSelectedRoom && !hasAcknowledgedRoomVisibilityWarning(selectedRoomId));
-  }, [hasSelectedRoom, selectedRoomId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2479,6 +2483,7 @@ export function App() {
     setHostMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setChatMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setMarkdownCopyFallbacksByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setSecretWarningsVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2561,6 +2566,7 @@ export function App() {
     setHostMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setChatMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setMarkdownCopyFallbacksByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setSecretWarningsVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2594,7 +2600,7 @@ export function App() {
     setInviteMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHistorySettings(loadHistorySettings(selectedRoom.id));
-    setSecretWarningVisible(true);
+    setSecretWarningVisibleForRoom(selectedRoom.id, true);
     setHistoryMessage("Forgot this room on this device. Rejoin or paste a room invite key to unlock it again.");
   }
 
@@ -3609,11 +3615,10 @@ export function App() {
 
   function acknowledgeRoomVisibilityWarning() {
     if (!hasSelectedRoom) {
-      setSecretWarningVisible(false);
       return;
     }
     saveRoomVisibilityWarningAcknowledgement(selectedRoom.id);
-    setSecretWarningVisible(false);
+    setSecretWarningVisibleForRoom(selectedRoom.id, false);
   }
 
   function appendBrowserRequest(roomId: string, request: BrowserAccessRequest) {
