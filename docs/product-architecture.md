@@ -177,7 +177,7 @@ The macOS alpha bounds approved one-shot terminal commands, persistent terminal 
 
 Browser mode is room-scoped. Members request specific URLs with a short reason, and those requests are routed as encrypted room events. The host approves or denies each URL before it appears in the Codex turn context. Auto-approval for allowed browser sites is evaluated against the request's room, host, approval policy, and origin allowlist, never against whichever room happens to be selected in the app.
 
-The relay can see that a `browser.request` envelope exists, but not the requested URL or reason. Approved URLs can be opened in a room/project-scoped Tauri WebView window on the host machine. The alpha keeps this as an explicit host action; deeper browser automation can be added behind the same approval boundary.
+The relay can see that a `browser.request` envelope exists, but not the requested URL or reason. Approved URLs can be opened in a room/project-scoped Tauri WebView window on the host machine. Browser profile persistence is a host-controlled room setting: profiles persist by default, hosts can reset them manually, and refresh mode closes and clears the room/project browser profile before each approved open. The alpha keeps this as an explicit host action; deeper browser automation can be added behind the same approval boundary.
 
 Auto-approve browser on allowed sites is intentionally conservative. It only applies for the active host, only when the URL origin is on the room allowlist, and it refuses URLs that look like signed-in account, token, billing, security, or credential pages. Those pages fall back to manual host review and show inline warnings.
 
@@ -315,7 +315,7 @@ Security model:
 
 - separate browser profile per room and active project path;
 - room browser profile path and native guard status indicators are scoped to the selected room/project;
-- state persists by default, with optional refresh/reset;
+- state persists by default, with a room setting for refreshing the profile before each approved open and a host reset action;
 - no access to the user's normal Chrome profile, cookies, passwords, extensions, or tabs;
 - explicit host approval before Codex can use a site;
 - origin allowlist per room;
@@ -552,7 +552,7 @@ docs/
 - Per-room Chromium/WebView profile.
 - Site allowlist.
 - Browser approval flow.
-- Browser state persistence and refresh/reset.
+- Browser state persistence setting plus refresh/reset.
 
 ## 11. Open Questions
 

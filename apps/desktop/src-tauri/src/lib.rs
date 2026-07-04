@@ -239,6 +239,7 @@ struct BrowserOpenRequest {
     project_path: Option<String>,
     url: String,
     title: Option<String>,
+    persistent: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -597,9 +598,21 @@ fn open_browser_view(
     request: BrowserOpenRequest,
 ) -> Result<BrowserOpenResult, String> {
     let url = validate_browser_url(&request.url)?;
+    let persistent = request.persistent.unwrap_or(true);
 
     let label = browser_window_label(&request.room_id, request.project_path.as_deref())?;
     let profile_dir = browser_profile_dir(&app, &request.room_id, request.project_path.as_deref())?;
+    if !persistent {
+        if let Some(window) = app.get_webview_window(&label) {
+            window
+                .close()
+                .map_err(|error| format!("Failed to close room browser before refresh: {error}"))?;
+        }
+        if profile_dir.exists() {
+            fs::remove_dir_all(&profile_dir)
+                .map_err(|error| format!("Failed to refresh room browser profile: {error}"))?;
+        }
+    }
     fs::create_dir_all(&profile_dir)
         .map_err(|error| format!("Failed to create room browser profile: {error}"))?;
     let title = request
@@ -612,26 +625,28 @@ fn open_browser_view(
             )
         });
 
-    if let Some(window) = app.get_webview_window(&label) {
-        window
-            .navigate(url.clone())
-            .map_err(|error| format!("Failed to navigate browser view: {error}"))?;
-        window
-            .set_title(&title)
-            .map_err(|error| format!("Failed to retitle browser view: {error}"))?;
-        window
-            .set_focus()
-            .map_err(|error| format!("Failed to focus browser view: {error}"))?;
-        return Ok(BrowserOpenResult {
-            label,
-            url: url.to_string(),
-            reused: true,
-            profile_path: profile_dir.to_string_lossy().to_string(),
-            persistent: true,
-            downloads_blocked: true,
-            clipboard_blocked: true,
-            file_uploads_blocked: true,
-        });
+    if persistent {
+        if let Some(window) = app.get_webview_window(&label) {
+            window
+                .navigate(url.clone())
+                .map_err(|error| format!("Failed to navigate browser view: {error}"))?;
+            window
+                .set_title(&title)
+                .map_err(|error| format!("Failed to retitle browser view: {error}"))?;
+            window
+                .set_focus()
+                .map_err(|error| format!("Failed to focus browser view: {error}"))?;
+            return Ok(BrowserOpenResult {
+                label,
+                url: url.to_string(),
+                reused: true,
+                profile_path: profile_dir.to_string_lossy().to_string(),
+                persistent,
+                downloads_blocked: true,
+                clipboard_blocked: true,
+                file_uploads_blocked: true,
+            });
+        }
     }
 
     WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(url.clone()))
@@ -656,7 +671,7 @@ fn open_browser_view(
         url: url.to_string(),
         reused: false,
         profile_path: profile_dir.to_string_lossy().to_string(),
-        persistent: true,
+        persistent,
         downloads_blocked: true,
         clipboard_blocked: true,
         file_uploads_blocked: true,

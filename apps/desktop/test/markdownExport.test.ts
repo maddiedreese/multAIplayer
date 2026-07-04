@@ -24,6 +24,7 @@ const room: RoomRecord = {
   mode: { chat: true, code: true, workspace: true, browser: false },
   codexModel: "gpt-5.4",
   browserAllowedOrigins: ["https://github.com"],
+  browserProfilePersistent: true,
   unread: 0
 };
 

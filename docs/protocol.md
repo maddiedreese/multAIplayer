@@ -33,7 +33,7 @@ Git workflow progress and GitHub Actions refreshes are routed as encrypted `git.
 
 Clients can send `subscribe.workspace` over the room WebSocket to receive plaintext `team.updated` metadata events when teams are created. They can also send `subscribe.team` to receive plaintext `room.updated` metadata events for that team. This keeps sidebars current when teams or rooms are created and when room settings change. These updates contain metadata only; encrypted chat envelopes still require joining the specific room.
 
-Room metadata is bounded before storage and broadcast. Project paths are trimmed, must be non-empty, cannot contain control characters, and are capped at 2,048 characters. Codex model ids are trimmed, capped at 80 characters, and must either match the known model switcher ids or a compact model-id pattern.
+Room metadata is bounded before storage and broadcast. Project paths are trimmed, must be non-empty, cannot contain control characters, and are capped at 2,048 characters. Codex model ids are trimmed, capped at 80 characters, and must either match the known model switcher ids or a compact model-id pattern. Browser origin allowlists are normalized to http(s) origins, and browser profile persistence is stored as a boolean room setting.
 
 Encrypted room envelopes are idempotent by envelope id within a room. If the same joined device publishes the same envelope id again, the relay keeps the first copy and does not append or rebroadcast the duplicate.
 

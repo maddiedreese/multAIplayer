@@ -107,6 +107,7 @@ export async function updateRoomSettings(
     codexModel?: string;
     projectPath?: string;
     browserAllowedOrigins?: string[];
+    browserProfilePersistent?: boolean;
     requesterName?: string;
     requesterUserId?: string;
   }

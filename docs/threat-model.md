@@ -53,7 +53,7 @@ The packaged Tauri app sets a Content Security Policy for the main multAIplayer 
 
 ## Room Browser Capability Guards
 
-Approved room browser pages run in a room/project-scoped native WebView profile. Downloads are denied by the native download handler. A guard script is injected into every frame to reject page Clipboard API calls and block file inputs, file input changes, and file drag/drop. This keeps the alpha on the conservative side until a host-approved browser upload flow exists.
+Approved room browser pages run in a room/project-scoped native WebView profile. The profile persists by default so signed-in sites can work inside that isolated room/project context, but the host can reset it or switch the room to refresh mode, which closes the room browser and clears the profile before each approved open. Downloads are denied by the native download handler. A guard script is injected into every frame to reject page Clipboard API calls and block file inputs, file input changes, and file drag/drop. This keeps the alpha on the conservative side until a host-approved browser upload flow exists.
 
 ## Sensitive Attachment Review
 

@@ -321,10 +321,16 @@ export async function probeCodex(): Promise<CodexProbe> {
   };
 }
 
-export async function openBrowserView(roomId: string, projectPath: string, url: string, title?: string): Promise<BrowserOpenResult> {
+export async function openBrowserView(
+  roomId: string,
+  projectPath: string,
+  url: string,
+  title?: string,
+  persistent = true
+): Promise<BrowserOpenResult> {
   if (isTauriRuntime()) {
     return invoke<BrowserOpenResult>("open_browser_view", {
-      request: { roomId, projectPath, url, title }
+      request: { roomId, projectPath, url, title, persistent }
     });
   }
 
@@ -334,7 +340,7 @@ export async function openBrowserView(roomId: string, projectPath: string, url: 
     url,
     reused: false,
     profilePath: "Preview browser opens outside the native room profile.",
-    persistent: false,
+    persistent,
     downloadsBlocked: false,
     clipboardBlocked: false,
     fileUploadsBlocked: false

@@ -15,6 +15,7 @@ const activeRoom: RoomRecord = {
   mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.4",
   browserAllowedOrigins: ["https://docs.example.com"],
+  browserProfilePersistent: true,
   unread: 0
 };
 

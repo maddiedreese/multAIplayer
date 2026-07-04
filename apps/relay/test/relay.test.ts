@@ -86,7 +86,8 @@ test("relay broadcasts room.updated after room settings change", async () => {
       body: JSON.stringify({
         requesterName: "Maddie",
         requesterUserId: "github:maddiedreese",
-        codexModel: "gpt-5.4-thinking"
+        codexModel: "gpt-5.4-thinking",
+        browserProfilePersistent: false
       })
     });
     assert.equal(response.status, 200);
@@ -94,6 +95,7 @@ test("relay broadcasts room.updated after room settings change", async () => {
     const updatedRoom = await updatePromise;
     assert.equal(updatedRoom.id, "room-desktop");
     assert.equal(updatedRoom.codexModel, "gpt-5.4-thinking");
+    assert.equal(updatedRoom.browserProfilePersistent, false);
   } finally {
     socket.close();
     await relay.close();
@@ -177,6 +179,7 @@ test("relay updates team member count from room presence", async () => {
       mode: { chat: true, code: true, workspace: true, browser: false },
       codexModel: "gpt-5.4",
       browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: true,
       unread: 0
     }],
     invites: [],
@@ -692,6 +695,7 @@ test("relay enriches presence with registered device fingerprints", async () => 
       mode: { chat: true, code: true, workspace: true, browser: false },
       codexModel: "gpt-5.4-codex",
       browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: true,
       unread: 0
     }],
     invites: [],

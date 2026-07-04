@@ -267,6 +267,7 @@ export type ApprovalPolicy =
 
 export const defaultCodexModel = "gpt-5.4";
 export const defaultBrowserAllowedOrigins = ["https://github.com"];
+export const defaultBrowserProfilePersistent = true;
 
 export const codexModelOptions = [
   { id: "gpt-5.4", label: "GPT-5.4", description: "Default high-capability Codex host model" },
@@ -314,6 +315,7 @@ export const RoomRecord = z.object({
   mode: RoomModeSchema,
   codexModel: z.string().min(1),
   browserAllowedOrigins: z.array(z.string().min(1)).max(20),
+  browserProfilePersistent: z.boolean(),
   unread: z.number().int().nonnegative()
 });
 

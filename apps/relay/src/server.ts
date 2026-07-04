@@ -16,6 +16,7 @@ import {
   defaultRoomMode,
   defaultCodexModel,
   defaultBrowserAllowedOrigins,
+  defaultBrowserProfilePersistent,
   codexModelOptions,
   type InviteRecord,
   type AttachmentBlobRecord as AttachmentBlobRecordType,
@@ -551,6 +552,7 @@ app.post("/rooms", (req, res) => {
     mode: defaultRoomMode,
     codexModel: defaultCodexModel,
     browserAllowedOrigins: defaultBrowserAllowedOrigins,
+    browserProfilePersistent: defaultBrowserProfilePersistent,
     unread: 0
   };
   rooms.set(room.id, room);
@@ -625,6 +627,7 @@ app.patch("/rooms/:roomId/settings", (req, res) => {
   const codexModel = req.body?.codexModel === undefined ? undefined : normalizeCodexModel(req.body.codexModel);
   const projectPath = req.body?.projectPath === undefined ? undefined : normalizeRoomProjectPath(req.body.projectPath);
   const browserAllowedOrigins = req.body?.browserAllowedOrigins;
+  const browserProfilePersistent = req.body?.browserProfilePersistent;
   const requester = requesterFromRequest(req.body, req.cookies?.multaiplayer_session);
   const room = rooms.get(roomId);
   if (!room) {
@@ -662,6 +665,10 @@ app.patch("/rooms/:roomId/settings", (req, res) => {
     res.status(400).json({ error: "browserAllowedOrigins must be up to 20 http(s) origins such as https://github.com" });
     return;
   }
+  if (browserProfilePersistent !== undefined && typeof browserProfilePersistent !== "boolean") {
+    res.status(400).json({ error: "browserProfilePersistent must be a boolean" });
+    return;
+  }
 
   const updated: RoomRecord = {
     ...room,
@@ -669,7 +676,8 @@ app.patch("/rooms/:roomId/settings", (req, res) => {
     approvalPolicy: approvalPolicy ?? room.approvalPolicy,
     mode: mode ?? room.mode,
     codexModel: codexModel ?? room.codexModel,
-    browserAllowedOrigins: normalizedBrowserAllowedOrigins ?? room.browserAllowedOrigins
+    browserAllowedOrigins: normalizedBrowserAllowedOrigins ?? room.browserAllowedOrigins,
+    browserProfilePersistent: browserProfilePersistent ?? room.browserProfilePersistent
   };
   rooms.set(roomId, updated);
   scheduleStoreSave();
@@ -1848,6 +1856,7 @@ function seedWorkspace() {
       mode: { ...defaultRoomMode, browser: true },
       codexModel: defaultCodexModel,
       browserAllowedOrigins: defaultBrowserAllowedOrigins,
+      browserProfilePersistent: defaultBrowserProfilePersistent,
       unread: 0
     },
     {
@@ -1862,6 +1871,7 @@ function seedWorkspace() {
       mode: defaultRoomMode,
       codexModel: "gpt-5.4-mini",
       browserAllowedOrigins: defaultBrowserAllowedOrigins,
+      browserProfilePersistent: defaultBrowserProfilePersistent,
       unread: 2
     },
     {
@@ -1876,6 +1886,7 @@ function seedWorkspace() {
       mode: defaultRoomMode,
       codexModel: "gpt-5.4-thinking",
       browserAllowedOrigins: defaultBrowserAllowedOrigins,
+      browserProfilePersistent: defaultBrowserProfilePersistent,
       unread: 0
     }
   ];
@@ -1901,7 +1912,10 @@ function normalizeRoom(room: RoomRecord | (RoomRecord & { codexModel?: string })
     hostUserId,
     codexModel: normalizeCodexModel(room.codexModel) ?? defaultCodexModel,
     browserAllowedOrigins: normalizeBrowserAllowedOrigins((room as { browserAllowedOrigins?: unknown }).browserAllowedOrigins)
-      ?? defaultBrowserAllowedOrigins
+      ?? defaultBrowserAllowedOrigins,
+    browserProfilePersistent: typeof (room as { browserProfilePersistent?: unknown }).browserProfilePersistent === "boolean"
+      ? (room as { browserProfilePersistent: boolean }).browserProfilePersistent
+      : defaultBrowserProfilePersistent
   };
 }
 

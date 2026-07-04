@@ -55,6 +55,7 @@ import type {
 import {
   codexModelOptions,
   defaultBrowserAllowedOrigins,
+  defaultBrowserProfilePersistent,
   defaultCodexModel,
   defaultRoomMode,
   maxEmbeddedAttachmentBytes,
@@ -303,6 +304,7 @@ const seededRooms: RoomRecord[] = [
     mode: { ...defaultRoomMode, browser: true },
     codexModel: defaultCodexModel,
     browserAllowedOrigins: defaultBrowserAllowedOrigins,
+    browserProfilePersistent: defaultBrowserProfilePersistent,
     unread: 0
   },
   {
@@ -317,6 +319,7 @@ const seededRooms: RoomRecord[] = [
     mode: defaultRoomMode,
     codexModel: "gpt-5.4-mini",
     browserAllowedOrigins: defaultBrowserAllowedOrigins,
+    browserProfilePersistent: defaultBrowserProfilePersistent,
     unread: 2
   },
   {
@@ -331,6 +334,7 @@ const seededRooms: RoomRecord[] = [
     mode: defaultRoomMode,
     codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: defaultBrowserAllowedOrigins,
+    browserProfilePersistent: defaultBrowserProfilePersistent,
     unread: 0
   }
 ];
@@ -347,6 +351,7 @@ const emptyRoom: RoomRecord = {
   mode: defaultRoomMode,
   codexModel: defaultCodexModel,
   browserAllowedOrigins: defaultBrowserAllowedOrigins,
+  browserProfilePersistent: defaultBrowserProfilePersistent,
   unread: 0
 };
 
@@ -1978,6 +1983,39 @@ export function App() {
     }
   }
 
+  async function setBrowserProfilePersistence(browserProfilePersistent: boolean) {
+    if (!hasSelectedRoom) {
+      setBrowserMessage("Create or join a room before changing browser profile persistence.");
+      return;
+    }
+    if (!isActiveHost) {
+      setBrowserMessage(roomSettingsGateMessage);
+      return;
+    }
+    if (browserProfilePersistent === selectedRoom.browserProfilePersistent) return;
+    setSettingsBusy(true);
+    setBrowserMessage(null);
+    try {
+      const room = await updateRoomSettings(selectedRoom.id, {
+        ...roomSettingsActor(),
+        browserProfilePersistent
+      });
+      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      if (!browserProfilePersistent) {
+        setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
+      }
+      setBrowserMessage(
+        browserProfilePersistent
+          ? "Browser profile persistence enabled for this room."
+          : "Browser profile will refresh before each approved page opens."
+      );
+    } catch (error) {
+      setBrowserMessage(String(error));
+    } finally {
+      setSettingsBusy(false);
+    }
+  }
+
   async function updateProjectPath() {
     const nextProjectPath = normalizeProjectPath(projectPathDraft);
     if (!nextProjectPath) {
@@ -2335,6 +2373,7 @@ export function App() {
         mode: defaultRoomMode,
         codexModel: defaultCodexModel,
         browserAllowedOrigins: defaultBrowserAllowedOrigins,
+        browserProfilePersistent: defaultBrowserProfilePersistent,
         unread: 0
       }));
     }
@@ -2407,6 +2446,7 @@ export function App() {
         mode: defaultRoomMode,
         codexModel: defaultCodexModel,
         browserAllowedOrigins: defaultBrowserAllowedOrigins,
+        browserProfilePersistent: defaultBrowserProfilePersistent,
         unread: 0
       }));
     }
@@ -3083,7 +3123,8 @@ export function App() {
         selectedRoom.id,
         selectedRoom.projectPath,
         request.url,
-        `${selectedRoom.name} - ${formatBrowserAccessLabel(request.url)}`
+        `${selectedRoom.name} - ${formatBrowserAccessLabel(request.url)}`,
+        selectedRoom.browserProfilePersistent
       );
       setBrowserStatusByRoom((current) => ({
         ...current,
@@ -3097,7 +3138,9 @@ export function App() {
       setBrowserMessage(
         result.reused
           ? `Reused isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
-          : `Opened isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
+          : selectedRoom.browserProfilePersistent
+            ? `Opened isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
+            : `Opened fresh isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
       );
     } catch (error) {
       setBrowserMessage(String(error));
@@ -4418,13 +4461,26 @@ export function App() {
           <div className="browser-profile-state">
             <div>
               <strong>Room-isolated profile</strong>
-              <span>{browserStatus.profilePath ?? "Created when the host opens an approved page."}</span>
+              <span>
+                {browserStatus.profilePath ?? "Created when the host opens an approved page."}
+                {" · "}
+                {selectedRoom.browserProfilePersistent ? "persists between opens" : "refreshes before each open"}
+              </span>
             </div>
             <button onClick={resetRoomBrowserProfile} disabled={!hasSelectedRoom || !isActiveHost}>
               <RefreshCw size={13} />
               Reset
             </button>
           </div>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={selectedRoom.browserProfilePersistent}
+              disabled={!hasSelectedRoom || !isActiveHost || settingsBusy}
+              onChange={(event) => setBrowserProfilePersistence(event.target.checked)}
+            />
+            <span>Persist room browser profile</span>
+          </label>
           <div className="browser-policy-state">
             <StatusPill
               icon={<Lock size={13} />}
@@ -5340,7 +5396,10 @@ function ensureRoomDefaults(room: RoomRecord): RoomRecord {
   return {
     ...room,
     codexModel: room.codexModel || defaultCodexModel,
-    browserAllowedOrigins: normalizeBrowserAllowedOrigins(room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins) ?? defaultBrowserAllowedOrigins
+    browserAllowedOrigins: normalizeBrowserAllowedOrigins(room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins) ?? defaultBrowserAllowedOrigins,
+    browserProfilePersistent: typeof room.browserProfilePersistent === "boolean"
+      ? room.browserProfilePersistent
+      : defaultBrowserProfilePersistent
   };
 }
 
