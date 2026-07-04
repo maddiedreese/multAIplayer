@@ -459,6 +459,8 @@ const defaultBrowserStatus: BrowserStatus = {
   clipboardBlocked: false,
   fileUploadsBlocked: false
 };
+const defaultBrowserUrl = "https://github.com/maddiedreese/multAIplayer";
+const defaultBrowserReason = "Use this page as Codex browser context.";
 
 export function App() {
   const [teams, setTeams] = useState<TeamRecord[]>(seededTeams);
@@ -520,9 +522,9 @@ export function App() {
   const [terminalInputsByRoom, setTerminalInputsByRoom] = useState<Record<string, string>>({});
   const [terminalErrorsByRoom, setTerminalErrorsByRoom] = useState<Record<string, string | null>>({});
   const [browserRequestsByRoom, setBrowserRequestsByRoom] = useState<Record<string, BrowserAccessRequest[]>>({});
-  const [browserUrl, setBrowserUrl] = useState("https://github.com/maddiedreese/multAIplayer");
-  const [browserReason, setBrowserReason] = useState("Use this page as Codex browser context.");
-  const [browserMessage, setBrowserMessage] = useState<string | null>(null);
+  const [browserUrlsByRoom, setBrowserUrlsByRoom] = useState<Record<string, string>>({});
+  const [browserReasonsByRoom, setBrowserReasonsByRoom] = useState<Record<string, string>>({});
+  const [browserMessagesByRoom, setBrowserMessagesByRoom] = useState<Record<string, string | null>>({});
   const [browserStatusByRoom, setBrowserStatusByRoom] = useState<Record<string, BrowserStatus>>({});
   const [browserAllowedOriginsDraft, setBrowserAllowedOriginsDraft] = useState(defaultBrowserAllowedOrigins.join("\n"));
   const [relayStatus, setRelayStatus] = useState<RelayStatus>("closed");
@@ -583,6 +585,9 @@ export function App() {
   const pendingAttachments = pendingAttachmentsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const pendingAttachmentBytes = embeddedAttachmentBytes(pendingAttachments);
   const browserRequests = browserRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
+  const browserUrl = browserUrlsByRoom[selectedRoom?.id ?? selectedRoomId] ?? defaultBrowserUrl;
+  const browserReason = browserReasonsByRoom[selectedRoom?.id ?? selectedRoomId] ?? defaultBrowserReason;
+  const browserMessage = browserMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const browserStatus = browserStatusByRoom[selectedRoom?.id ?? selectedRoomId] ?? defaultBrowserStatus;
   const gitStatus = gitStatusByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const gitWorkflowDraft = resolveGitWorkflowDraft(gitWorkflowDraftsByRoom, selectedRoom?.id ?? selectedRoomId);
@@ -766,6 +771,22 @@ export function App() {
 
   function setSelectedTerminalError(error: string | null) {
     setTerminalErrorForRoom(selectedRoom.id, error);
+  }
+
+  function setBrowserUrlForRoom(roomId: string, url: string) {
+    setBrowserUrlsByRoom((current) => url === defaultBrowserUrl ? omitRecordKey(current, roomId) : { ...current, [roomId]: url });
+  }
+
+  function setBrowserReasonForRoom(roomId: string, reason: string) {
+    setBrowserReasonsByRoom((current) => reason === defaultBrowserReason ? omitRecordKey(current, roomId) : { ...current, [roomId]: reason });
+  }
+
+  function setBrowserMessageForRoom(roomId: string, message: string | null) {
+    setBrowserMessagesByRoom((current) => message ? { ...current, [roomId]: message } : omitRecordKey(current, roomId));
+  }
+
+  function setSelectedBrowserMessage(message: string | null) {
+    setBrowserMessageForRoom(selectedRoom.id, message);
   }
 
   function resetFileContextForRoom(roomId: string) {
@@ -1195,10 +1216,10 @@ export function App() {
             });
             if (status === "approved" && envelopeRoom) {
               publishRequestStatus("browser.event", plaintext.id, "approved", envelopeRoom).catch((error) => {
-                if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, envelopeRoom.id)) setBrowserMessage(String(error));
+                if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, envelopeRoom.id)) setBrowserMessageForRoom(envelopeRoom.id, String(error));
               });
               if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, envelopeRoom.id)) {
-                setBrowserMessage(`Auto-approved allowed browser site ${formatBrowserAccessLabel(plaintext.url)}.`);
+                setBrowserMessageForRoom(envelopeRoom.id, `Auto-approved allowed browser site ${formatBrowserAccessLabel(plaintext.url)}.`);
               }
             }
           }
@@ -2146,21 +2167,21 @@ export function App() {
 
   async function saveBrowserAllowedOrigins() {
     if (!hasSelectedRoom) {
-      setBrowserMessage("Create or join a room before changing browser site permissions.");
+      setSelectedBrowserMessage("Create or join a room before changing browser site permissions.");
       return;
     }
     if (!isActiveHost) {
-      setBrowserMessage(roomSettingsGateMessage);
+      setSelectedBrowserMessage(roomSettingsGateMessage);
       return;
     }
     const normalized = normalizeBrowserAllowedOrigins(browserAllowedOriginsDraft);
     if (!normalized) {
-      setBrowserMessage("Use one http(s) origin per line, such as https://github.com.");
+      setSelectedBrowserMessage("Use one http(s) origin per line, such as https://github.com.");
       return;
     }
     const roomId = selectedRoom.id;
     setSettingsBusyForRoom(roomId, true);
-    setBrowserMessage(null);
+    setBrowserMessageForRoom(roomId, null);
     try {
       const room = await updateRoomSettings(roomId, {
         ...roomSettingsActor(),
@@ -2169,14 +2190,15 @@ export function App() {
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setBrowserAllowedOriginsDraft(normalized.join("\n"));
-        setBrowserMessage(
+        setBrowserMessageForRoom(
+          roomId,
           normalized.length
             ? `Allowed browser sites saved: ${normalized.map(formatBrowserAccessLabel).join(", ")}.`
             : "Allowed browser site list is empty. Browser requests will require manual approval."
         );
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -2184,17 +2206,17 @@ export function App() {
 
   async function setBrowserProfilePersistence(browserProfilePersistent: boolean) {
     if (!hasSelectedRoom) {
-      setBrowserMessage("Create or join a room before changing browser profile persistence.");
+      setSelectedBrowserMessage("Create or join a room before changing browser profile persistence.");
       return;
     }
     if (!isActiveHost) {
-      setBrowserMessage(roomSettingsGateMessage);
+      setSelectedBrowserMessage(roomSettingsGateMessage);
       return;
     }
     if (browserProfilePersistent === selectedRoom.browserProfilePersistent) return;
     const roomId = selectedRoom.id;
     setSettingsBusyForRoom(roomId, true);
-    setBrowserMessage(null);
+    setBrowserMessageForRoom(roomId, null);
     try {
       const room = await updateRoomSettings(roomId, {
         ...roomSettingsActor(),
@@ -2205,14 +2227,15 @@ export function App() {
         setBrowserStatusByRoom((current) => omitRecordKey(current, roomId));
       }
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setBrowserMessage(
+        setBrowserMessageForRoom(
+          roomId,
           browserProfilePersistent
             ? "Browser profile persistence enabled for this room."
             : "Browser profile will refresh before each approved page opens."
         );
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -2393,6 +2416,9 @@ export function App() {
     setTerminalCommandsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setTerminalInputsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setTerminalErrorsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setBrowserReasonsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setBrowserMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHistoryMessage("Cleared encrypted local history for this room.");
   }
@@ -2462,6 +2488,9 @@ export function App() {
     setTerminalCommandsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setTerminalInputsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setTerminalErrorsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setBrowserReasonsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setBrowserMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHistorySettings(loadHistorySettings(selectedRoom.id));
     setSecretWarningVisible(true);
@@ -3284,24 +3313,24 @@ export function App() {
 
   async function requestBrowserAccess() {
     if (!hasSelectedRoom) {
-      setBrowserMessage("Create or join a room before requesting browser access.");
+      setSelectedBrowserMessage("Create or join a room before requesting browser access.");
       return;
     }
     const room = selectedRoom;
     const activeHost = isActiveHost;
     if (!room.mode.browser) {
-      setBrowserMessage("Browser mode is disabled for this room.");
+      setSelectedBrowserMessage("Browser mode is disabled for this room.");
       return;
     }
     const roomId = room.id;
     const rawUrl = browserUrl.trim();
     if (!rawUrl) return;
-    setBrowserMessage(null);
+    setBrowserMessageForRoom(roomId, null);
     let parsedUrl: URL;
     try {
       parsedUrl = new URL(rawUrl);
     } catch {
-      setBrowserMessage("Enter a valid browser URL.");
+      setBrowserMessageForRoom(roomId, "Enter a valid browser URL.");
       return;
     }
 
@@ -3320,7 +3349,8 @@ export function App() {
     if (!client || relayStatus === "closed" || relayStatus === "error") {
       appendBrowserRequest(room.id, request);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setBrowserMessage(
+        setBrowserMessageForRoom(
+          roomId,
           autoApproved
             ? `Auto-approved allowed browser site ${formatBrowserAccessLabel(request.url)} locally because the relay is not connected.`
             : "Saved browser request locally because the relay is not connected."
@@ -3356,61 +3386,64 @@ export function App() {
         await publishRequestStatus("browser.event", request.id, "approved", room);
       }
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setBrowserMessage(
+        setBrowserMessageForRoom(
+          roomId,
           autoApproved
             ? `Auto-approved allowed browser site ${formatBrowserAccessLabel(request.url)}.`
             : `Requested browser access to ${formatBrowserAccessLabel(request.url)}.`
         );
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessageForRoom(roomId, String(error));
     }
   }
 
   function approveBrowserRequest(request: BrowserAccessRequest) {
     if (!hasSelectedRoom) {
-      setBrowserMessage("Create or join a room before approving browser access.");
+      setSelectedBrowserMessage("Create or join a room before approving browser access.");
       return;
     }
     if (!isActiveHost) {
-      setBrowserMessage(hostGateMessage);
+      setSelectedBrowserMessage(hostGateMessage);
       return;
     }
-    updateBrowserRequestStatus(selectedRoom.id, request.id, "approved");
+    const roomId = selectedRoom.id;
+    updateBrowserRequestStatus(roomId, request.id, "approved");
     publishRequestStatus("browser.event", request.id, "approved").catch((error) => {
-      setBrowserMessage(String(error));
+      setBrowserMessageForRoom(roomId, String(error));
     });
-    setBrowserMessage(`Approved browser access to ${formatBrowserAccessLabel(request.url)}.`);
+    setBrowserMessageForRoom(roomId, `Approved browser access to ${formatBrowserAccessLabel(request.url)}.`);
   }
 
   function denyBrowserRequest(requestId: string) {
     if (!hasSelectedRoom) {
-      setBrowserMessage("Create or join a room before denying browser access.");
+      setSelectedBrowserMessage("Create or join a room before denying browser access.");
       return;
     }
     if (!isActiveHost) {
-      setBrowserMessage(hostGateMessage);
+      setSelectedBrowserMessage(hostGateMessage);
       return;
     }
-    updateBrowserRequestStatus(selectedRoom.id, requestId, "denied");
+    const roomId = selectedRoom.id;
+    updateBrowserRequestStatus(roomId, requestId, "denied");
     publishRequestStatus("browser.event", requestId, "denied").catch((error) => {
-      setBrowserMessage(String(error));
+      setBrowserMessageForRoom(roomId, String(error));
     });
-    setBrowserMessage("Denied browser access request.");
+    setBrowserMessageForRoom(roomId, "Denied browser access request.");
   }
 
   async function openApprovedBrowserRequest(request: BrowserAccessRequest) {
     if (request.status !== "approved") return;
     if (!hasSelectedRoom) {
-      setBrowserMessage("Create or join a room before opening the room browser.");
+      setSelectedBrowserMessage("Create or join a room before opening the room browser.");
       return;
     }
     if (!isActiveHost) {
-      setBrowserMessage(hostGateMessage);
+      setSelectedBrowserMessage(hostGateMessage);
       return;
     }
     const room = selectedRoom;
-    setBrowserMessage(null);
+    setBrowserMessageForRoom(room.id, null);
     try {
       const result = await openBrowserView(
         room.id,
@@ -3429,7 +3462,8 @@ export function App() {
         }
       }));
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
-        setBrowserMessage(
+        setBrowserMessageForRoom(
+          room.id,
           result.reused
             ? `Reused isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
             : room.browserProfilePersistent
@@ -3438,21 +3472,21 @@ export function App() {
         );
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setBrowserMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setBrowserMessageForRoom(room.id, String(error));
     }
   }
 
   async function resetRoomBrowserProfile() {
     if (!hasSelectedRoom) {
-      setBrowserMessage("Create or join a room before resetting browser state.");
+      setSelectedBrowserMessage("Create or join a room before resetting browser state.");
       return;
     }
     if (!isActiveHost) {
-      setBrowserMessage(hostGateMessage);
+      setSelectedBrowserMessage(hostGateMessage);
       return;
     }
     const room = selectedRoom;
-    setBrowserMessage(null);
+    setBrowserMessageForRoom(room.id, null);
     try {
       const result = await resetBrowserProfile(room.id, room.projectPath);
       setBrowserStatusByRoom((current) => ({
@@ -3463,10 +3497,10 @@ export function App() {
         }
       }));
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
-        setBrowserMessage("Reset isolated room browser state. The next approved page opens with a fresh profile.");
+        setBrowserMessageForRoom(room.id, "Reset isolated room browser state. The next approved page opens with a fresh profile.");
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setBrowserMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setBrowserMessageForRoom(room.id, String(error));
     }
   }
 
@@ -4884,7 +4918,7 @@ export function App() {
             <input
               value={browserUrl}
               disabled={!hasSelectedRoom || !selectedRoom.mode.browser}
-              onChange={(event) => setBrowserUrl(event.target.value)}
+              onChange={(event) => setBrowserUrlForRoom(selectedRoom.id, event.target.value)}
               placeholder="https://github.com/maddiedreese/multAIplayer"
             />
           </label>
@@ -4893,7 +4927,7 @@ export function App() {
             <textarea
               value={browserReason}
               disabled={!hasSelectedRoom || !selectedRoom.mode.browser}
-              onChange={(event) => setBrowserReason(event.target.value)}
+              onChange={(event) => setBrowserReasonForRoom(selectedRoom.id, event.target.value)}
               placeholder="Why should Codex use this page?"
             />
           </label>
