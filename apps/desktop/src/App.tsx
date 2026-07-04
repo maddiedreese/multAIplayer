@@ -1600,20 +1600,23 @@ export function App() {
       setHostMessage(hostGateMessage);
       return;
     }
+    const roomId = selectedRoom.id;
     setHostBusy(true);
     setHostMessage(null);
     try {
       const host = hostStatus === "active" ? localUser.name : hostStatus === "handoff" ? selectedRoom.host : "No host";
       const hostUserId = hostStatus === "active" ? localUser.id : selectedRoom.hostUserId ?? localUser.id;
-      const room = await updateRoomHost(selectedRoom.id, host, hostUserId, hostStatus);
+      const room = await updateRoomHost(roomId, host, hostUserId, hostStatus);
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
-      setHostMessage(
-        hostStatus === "active"
-          ? `You are hosting ${room.name}.`
-          : hostStatus === "handoff"
-            ? `${room.name} is ready for host handoff.`
-            : `${room.name} no longer has an active host.`
-      );
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setHostMessage(
+          hostStatus === "active"
+            ? `You are hosting ${room.name}.`
+            : hostStatus === "handoff"
+              ? `${room.name} is ready for host handoff.`
+              : `${room.name} no longer has an active host.`
+        );
+      }
       if (hostStatus === "handoff") {
         await publishHostHandoff(room);
       }
@@ -1621,7 +1624,7 @@ export function App() {
         markLatestHostHandoffAccepted(room.id);
       }
     } catch (error) {
-      setHostMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessage(String(error));
     } finally {
       setHostBusy(false);
     }
@@ -1636,25 +1639,28 @@ export function App() {
       setHostMessage("This host handoff has already been accepted.");
       return;
     }
+    const roomId = selectedRoom.id;
     setHostBusy(true);
     setHostMessage(null);
     try {
       const patch = createHandoffSettingsPatch(handoff);
-      const updatedSettings = await updateRoomSettings(selectedRoom.id, {
+      const updatedSettings = await updateRoomSettings(roomId, {
         ...roomSettingsActor(),
         ...patch
       });
       const claimed = await updateRoomHost(updatedSettings.id, localUser.name, localUser.id, "active");
       setRooms((current) => current.map((item) => (item.id === claimed.id ? ensureRoomDefaults(claimed) : item)));
-      markHostHandoffAccepted(selectedRoom.id, handoff.id);
-      setProjectPathDraft(patch.projectPath);
-      setCustomCodexModel(patch.codexModel);
-      setSettingsMessage(
-        `Accepted handoff from ${handoff.fromHost}; inherited ${formatCodexModel(patch.codexModel)} and ${patch.projectPath}.`
-      );
-      setHostMessage(`You are now hosting ${claimed.name} from ${handoff.fromHost}'s handoff.`);
+      markHostHandoffAccepted(roomId, handoff.id);
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setProjectPathDraft(patch.projectPath);
+        setCustomCodexModel(patch.codexModel);
+        setSettingsMessage(
+          `Accepted handoff from ${handoff.fromHost}; inherited ${formatCodexModel(patch.codexModel)} and ${patch.projectPath}.`
+        );
+        setHostMessage(`You are now hosting ${claimed.name} from ${handoff.fromHost}'s handoff.`);
+      }
     } catch (error) {
-      setHostMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessage(String(error));
     } finally {
       setHostBusy(false);
     }
@@ -1929,18 +1935,21 @@ export function App() {
       setSettingsMessage(roomSettingsGateMessage);
       return;
     }
+    const roomId = selectedRoom.id;
     setSettingsBusy(true);
     setSettingsMessage(null);
     try {
-      const room = await updateRoomSettings(selectedRoom.id, { ...roomSettingsActor(), approvalPolicy });
+      const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), approvalPolicy });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
-      setSettingsMessage(`Approval policy set to ${approvalPolicyLabels[approvalPolicy]}.`);
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setSettingsMessage(`Approval policy set to ${approvalPolicyLabels[approvalPolicy]}.`);
+      }
       if (approvalPolicy === "never_host") {
-        setPendingCodexApproval(null);
-        setApprovalVisible(false);
+        setPendingCodexApproval((current) => (current?.roomId === roomId ? null : current));
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setApprovalVisible(false);
       }
     } catch (error) {
-      setSettingsMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
     } finally {
       setSettingsBusy(false);
     }
@@ -1955,6 +1964,7 @@ export function App() {
       setSettingsMessage(roomSettingsGateMessage);
       return;
     }
+    const roomId = selectedRoom.id;
     setSettingsBusy(true);
     setSettingsMessage(null);
     try {
@@ -1962,11 +1972,13 @@ export function App() {
         ...selectedRoom.mode,
         [key]: !selectedRoom.mode[key]
       };
-      const room = await updateRoomSettings(selectedRoom.id, { ...roomSettingsActor(), mode: nextMode });
+      const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), mode: nextMode });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
-      setSettingsMessage(`${roomModeLabels[key]} mode ${nextMode[key] ? "enabled" : "disabled"}.`);
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setSettingsMessage(`${roomModeLabels[key]} mode ${nextMode[key] ? "enabled" : "disabled"}.`);
+      }
     } catch (error) {
-      setSettingsMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
     } finally {
       setSettingsBusy(false);
     }
@@ -2092,14 +2104,17 @@ export function App() {
       setSettingsMessage(roomSettingsGateMessage);
       return;
     }
+    const roomId = selectedRoom.id;
     setSettingsBusy(true);
     setSettingsMessage(null);
     try {
-      const room = await updateRoomSettings(selectedRoom.id, { ...roomSettingsActor(), projectPath: nextProjectPath });
+      const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), projectPath: nextProjectPath });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
-      setSettingsMessage(`Project folder set to ${nextProjectPath}.`);
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setSettingsMessage(`Project folder set to ${nextProjectPath}.`);
+      }
     } catch (error) {
-      setSettingsMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
     } finally {
       setSettingsBusy(false);
     }
@@ -2117,17 +2132,22 @@ export function App() {
       setSettingsMessage("Create or join a room before choosing a project folder.");
       return;
     }
+    const roomId = selectedRoom.id;
     setSettingsMessage(null);
     try {
       const selectedPath = await chooseProjectFolder(projectPathDraft || selectedRoom.projectPath);
       if (!selectedPath) {
-        setSettingsMessage("Native folder picker is available in the Tauri app. In web preview, paste a local folder path.");
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+          setSettingsMessage("Native folder picker is available in the Tauri app. In web preview, paste a local folder path.");
+        }
         return;
       }
-      setProjectPathDraft(selectedPath);
-      setSettingsMessage(`Selected project folder: ${selectedPath}`);
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setProjectPathDraft(selectedPath);
+        setSettingsMessage(`Selected project folder: ${selectedPath}`);
+      }
     } catch (error) {
-      setSettingsMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
     }
   }
 
