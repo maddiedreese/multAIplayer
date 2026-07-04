@@ -5,6 +5,14 @@ export interface TrustedDeviceKey {
   trustedAt: string;
 }
 
+export interface DeviceFingerprintMarkdownInput {
+  roomName: string;
+  displayName: string;
+  deviceId: string;
+  fingerprint: string;
+  trusted: boolean;
+}
+
 const trustedDeviceKeysStorageKey = "multaiplayer:trusted-device-keys:v1";
 const maxTrustedDeviceKeys = 500;
 
@@ -61,6 +69,22 @@ export function isDeviceKeyTrusted(
     item.deviceId === key.deviceId &&
     item.fingerprint === key.fingerprint
   );
+}
+
+export function buildDeviceFingerprintMarkdown(input: DeviceFingerprintMarkdownInput): string {
+  return [
+    `# Device fingerprint for ${input.displayName}`,
+    "",
+    `Room: ${input.roomName}`,
+    `Device: ${input.deviceId}`,
+    `Trust status: ${input.trusted ? "locally trusted" : "not locally trusted"}`,
+    "",
+    "```text",
+    input.fingerprint,
+    "```",
+    "",
+    "Verify this fingerprint out of band before trusting the device."
+  ].join("\n");
 }
 
 function persistTrustedDeviceKeys(keys: TrustedDeviceKey[]): TrustedDeviceKey[] {

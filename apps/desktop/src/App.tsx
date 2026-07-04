@@ -94,6 +94,7 @@ import {
 import { loadTeamRoomDefaults, saveTeamRoomDefaults, teamDefaultsRoomSettings } from "./lib/teamRoomDefaults";
 import { loadOrCreateDeviceIdentity, resetDeviceIdentity, type DeviceIdentity } from "./lib/deviceIdentity";
 import {
+  buildDeviceFingerprintMarkdown,
   isDeviceKeyTrusted,
   loadTrustedDeviceKeys,
   trustDeviceKey,
@@ -1757,6 +1758,27 @@ export function App() {
   function untrustRoomMemberDevice(member: RoomPresence) {
     setTrustedDeviceKeys((current) => untrustDeviceKey(current, selectedRoom.id, member.deviceId));
     setDeviceIdentityMessage(`Removed local trust for ${member.displayName}'s device key in ${selectedRoom.name}.`);
+  }
+
+  async function copyRoomMemberDeviceFingerprint(member: RoomPresence, trusted: boolean) {
+    const fingerprint = member.publicKeyFingerprint;
+    if (!fingerprint) {
+      setDeviceIdentityMessage(`${member.displayName} has no registered device key to copy.`);
+      return;
+    }
+    const markdown = buildDeviceFingerprintMarkdown({
+      roomName: selectedRoom.name,
+      displayName: member.displayName,
+      deviceId: member.deviceId,
+      fingerprint,
+      trusted
+    });
+    await copyMarkdownWithFallback(
+      `${member.displayName} device fingerprint`,
+      markdown,
+      setDeviceIdentityMessage,
+      selectedRoom.id
+    );
   }
 
   function saveRelayConfiguration() {
@@ -5385,11 +5407,16 @@ export function App() {
                       {member.publicKeyFingerprint ? trusted ? "trusted" : "keyed" : "unregistered"}
                     </b>
                     {member.publicKeyFingerprint && member.deviceId !== deviceId && (
-                      trusted ? (
-                        <button onClick={() => untrustRoomMemberDevice(member)}>Untrust</button>
-                      ) : (
-                        <button onClick={() => trustRoomMemberDevice(member)}>Trust</button>
-                      )
+                      <>
+                        <button onClick={() => copyRoomMemberDeviceFingerprint(member, trusted)} title="Copy full device fingerprint">
+                          <Copy size={12} />
+                        </button>
+                        {trusted ? (
+                          <button onClick={() => untrustRoomMemberDevice(member)}>Untrust</button>
+                        ) : (
+                          <button onClick={() => trustRoomMemberDevice(member)}>Trust</button>
+                        )}
+                      </>
                     )}
                   </div>
                   <i />
@@ -5397,6 +5424,7 @@ export function App() {
               );
             })}
           </div>
+          {deviceIdentityMessage && <div className="workflow-message">{deviceIdentityMessage}</div>}
         </section>
 
         <section className="panel handoff-panel">

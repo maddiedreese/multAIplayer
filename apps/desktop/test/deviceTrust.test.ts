@@ -36,6 +36,7 @@ Object.defineProperty(globalThis, "localStorage", {
 });
 
 const {
+  buildDeviceFingerprintMarkdown,
   isDeviceKeyTrusted,
   loadTrustedDeviceKeys,
   trustDeviceKey,
@@ -84,4 +85,21 @@ test("loadTrustedDeviceKeys drops corrupted trust storage", () => {
 
   assert.deepEqual(loadTrustedDeviceKeys(), []);
   assert.equal(localStorage.getItem(trustStorageKey), null);
+});
+
+test("buildDeviceFingerprintMarkdown produces verification text", () => {
+  const markdown = buildDeviceFingerprintMarkdown({
+    roomName: "Core Desktop",
+    displayName: "Maddie",
+    deviceId: "device-123",
+    fingerprint: "abcdef1234567890abcdef",
+    trusted: true
+  });
+
+  assert.match(markdown, /^# Device fingerprint for Maddie/);
+  assert.match(markdown, /Room: Core Desktop/);
+  assert.match(markdown, /Device: device-123/);
+  assert.match(markdown, /Trust status: locally trusted/);
+  assert.match(markdown, /```text\nabcdef1234567890abcdef\n```/);
+  assert.match(markdown, /Verify this fingerprint out of band/);
 });
