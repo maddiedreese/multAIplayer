@@ -3,7 +3,8 @@ import { test } from "node:test";
 import {
   InviteJoinRequestPlaintextPayload,
   InviteJoinStatusPlaintextPayload,
-  RelayEnvelope
+  RelayEnvelope,
+  RoomKeyRotationPlaintextPayload
 } from "../src/index";
 
 test("invite join request accepts optional requester device public key", () => {
@@ -91,4 +92,40 @@ test("relay envelope accepts device-sealed invite payloads", () => {
   });
 
   assert.equal(parsed.payload.algorithm, "ECDH-P256-HKDF-SHA256-AES-GCM-256");
+});
+
+test("room key rotation payload carries a new room secret", () => {
+  const parsed = RoomKeyRotationPlaintextPayload.parse({
+    eventType: "room.key.rotated",
+    id: "rotation-1",
+    rotatedBy: "Host",
+    rotatedByUserId: "github:host",
+    rotatedAt: "2026-07-04T12:03:00.000Z",
+    newSecret: {
+      algorithm: "AES-GCM-256",
+      rawKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    },
+    note: "Future messages use this key."
+  });
+
+  assert.equal(parsed.newSecret.algorithm, "AES-GCM-256");
+});
+
+test("relay envelope accepts encrypted room key rotation events", () => {
+  const parsed = RelayEnvelope.parse({
+    id: "envelope-rotation",
+    teamId: "team-1",
+    roomId: "room-1",
+    senderDeviceId: "device_12345678",
+    senderUserId: "github:maddie",
+    createdAt: "2026-07-04T12:04:00.000Z",
+    kind: "room.key",
+    payload: {
+      algorithm: "AES-GCM-256",
+      nonce: "nonce",
+      ciphertext: "ciphertext"
+    }
+  });
+
+  assert.equal(parsed.kind, "room.key");
 });

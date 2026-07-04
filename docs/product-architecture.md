@@ -94,6 +94,8 @@ Users chat normally in a room. Messages, reactions, attachments, and references 
 
 Invite approval requests are encrypted room events. A gated invite imports room metadata but not the room key, then sends a device-sealed join request encrypted to the active host device public key. If the host approves, the approval event is device-sealed to the requester and includes the room key wrapped to the requester device public key. The alpha treats this as an approval workflow and visibility boundary, not as full cryptographic member removal; production-grade gated membership still needs key rotation after removal.
 
+Active hosts can rotate a room key for future messages and invite links. The rotation is published as an encrypted room event using the current room key, then clients that can decrypt that event replace their local room key and clear stale encrypted local-history ciphertext before future saves use the new key. This is useful after accidental direct-invite sharing or routine hygiene, but it is not full member removal in the alpha: any device that still has the old room key and can receive the rotation event can learn the new key. Strong removal still requires relay membership enforcement, key rotation that excludes removed devices, and recovery semantics.
+
 The alpha embeds small text/code attachment previews directly in encrypted chat payloads: up to 5 files per message, 80 KB per file, and 200 KB total preview content per message. Larger previews are encrypted locally, uploaded to relay blob storage as ciphertext, referenced from the encrypted chat message by blob id, and decrypted locally into the file preview pane when a room member opens them. Serialized encrypted room envelopes are also bounded by the relay before WebSocket fanout and backlog storage, so large file previews must use encrypted blob storage rather than oversized room events.
 
 Codex approval distinguishes inline attachment content from encrypted blob references. Inline text previews are included in the Codex turn package after host approval. Encrypted blob attachments are listed by name and blob reference only in the alpha Codex turn package, so approving a turn does not silently decrypt and inject large files into Codex context.
@@ -263,6 +265,7 @@ Initial E2EE model:
 - messages and attachments are encrypted locally before upload;
 - the crypto package can seal invite workflow payloads and wrap a room key to a registered device public key without exposing the room key to the relay;
 - gated invite links carry room metadata plus a host device public key, while direct convenience invite links can carry room secrets in URL fragments so the relay never receives the secret;
+- active hosts can rotate room keys for future messages by publishing an encrypted `room.key` event under the current key;
 - room keys and the device ECDH identity are stored in macOS Keychain in the native app, with localStorage used only by the web preview fallback;
 - encrypted local history is stored on device;
 - losing a device/key may make old local history unrecoverable until recovery is designed.

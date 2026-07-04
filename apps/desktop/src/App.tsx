@@ -44,6 +44,7 @@ import type {
   InviteJoinStatusPlaintextPayload,
   RelayEnvelope,
   RequestStatusPlaintextPayload,
+  RoomKeyRotationPlaintextPayload,
   RoomRecord,
   RoomMode,
   TeamRecord,
@@ -58,9 +59,11 @@ import {
   defaultRoomMode,
   maxEmbeddedAttachmentBytes,
   maxEmbeddedAttachmentBytesPerMessage,
-  maxMessageAttachments
+  maxMessageAttachments,
+  RoomKeyRotationPlaintextPayload as RoomKeyRotationPlaintextPayloadSchema
 } from "@multaiplayer/protocol";
 import {
+  createRoomSecret,
   decodeRoomInviteSecret,
   decryptJson,
   encodeRoomInviteSecret,
@@ -83,6 +86,7 @@ import {
   clearEncryptedHistory,
   forgetRoomLocalData,
   loadRoomSecret,
+  replaceRoomSecret,
   type LocalHistorySettings,
   saveEncryptedHistory
 } from "./lib/localHistory";
@@ -539,6 +543,7 @@ export function App() {
   const [inviteSecretInput, setInviteSecretInput] = useState("");
   const [inviteApprovalGate, setInviteApprovalGate] = useState(false);
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
+  const [keyRotationBusy, setKeyRotationBusy] = useState(false);
   const [inviteAdmissionsByRoom, setInviteAdmissionsByRoom] = useState<Record<string, string>>({});
   const [codexThreadIdsByRoom, setCodexThreadIdsByRoom] = useState<Record<string, string>>({});
   const relayRef = useRef<RelayClient | null>(null);
@@ -1040,6 +1045,23 @@ export function App() {
                 [message.envelope.roomId]: [...roomHandoffs, { ...plaintext, status: "available" }]
               };
             });
+          }
+          if (message.envelope.kind === "room.key") {
+            const plaintext = await decryptJson<unknown>(roomPayload, secret);
+            if (isRoomKeyRotationPlaintextPayload(plaintext)) {
+              await replaceRoomSecret(message.envelope.roomId, plaintext.newSecret);
+              historyLoadedRoomIds.current.add(message.envelope.roomId);
+              setForgottenRoomIds((current) => withoutSetValue(current, message.envelope.roomId));
+              appendRoomMessage(message.envelope.roomId, {
+                id: plaintext.id,
+                author: "multAIplayer",
+                role: "system",
+                body: `${plaintext.rotatedBy} rotated the room key. Future messages and invites use the new key.`,
+                time: formatMessageTime(plaintext.rotatedAt),
+                createdAt: plaintext.rotatedAt
+              });
+              setInviteMessage(`${plaintext.rotatedBy} rotated the room key for future messages.`);
+            }
           }
         } catch (error) {
           console.warn("Failed to decrypt relay envelope", error);
@@ -2207,6 +2229,77 @@ export function App() {
       }
     } catch (error) {
       setInviteMessage(String(error));
+    }
+  }
+
+  async function rotateSelectedRoomKey() {
+    if (!hasSelectedRoom) {
+      setInviteMessage("Create or join a room before rotating a room key.");
+      return;
+    }
+    if (!isActiveHost) {
+      setInviteMessage(hostGateMessage);
+      return;
+    }
+    const confirmed = window.confirm(
+      `Rotate the room key for ${selectedRoom.name}?\n\nThis sends the new key to current room-key holders in an encrypted room event and clears stale encrypted local history on this device. It is not full member removal in the alpha.`
+    );
+    if (!confirmed) return;
+
+    const room = selectedRoom;
+    setKeyRotationBusy(true);
+    setInviteMessage(null);
+    try {
+      const oldSecret = await loadOrCreateRoomSecret(room.id);
+      const newSecret = await createRoomSecret();
+      const rotatedAt = new Date().toISOString();
+      const payload: RoomKeyRotationPlaintextPayload = {
+        eventType: "room.key.rotated",
+        id: crypto.randomUUID(),
+        rotatedBy: localUser.name,
+        rotatedByUserId: localUser.id,
+        rotatedAt,
+        newSecret,
+        note: "Future room messages and invites use this key."
+      };
+
+      const client = relayRef.current;
+      if (client && relayStatus !== "closed" && relayStatus !== "error") {
+        const envelope: RelayEnvelope = {
+          id: crypto.randomUUID(),
+          teamId: room.teamId,
+          roomId: room.id,
+          senderDeviceId: deviceId,
+          senderUserId: localUser.id,
+          createdAt: rotatedAt,
+          kind: "room.key",
+          payload: await encryptJson(payload, oldSecret)
+        };
+        seenEnvelopeIds.current.add(envelope.id);
+        client.publish({ type: "publish", envelope });
+      }
+
+      await replaceRoomSecret(room.id, newSecret);
+      historyLoadedRoomIds.current.add(room.id);
+      appendRoomMessage(room.id, {
+        id: payload.id,
+        author: "multAIplayer",
+        role: "system",
+        body: `${localUser.name} rotated the room key. Future messages and invites use the new key.`,
+        time: formatMessageTime(rotatedAt),
+        createdAt: rotatedAt
+      });
+      setForgottenRoomIds((current) => withoutSetValue(current, room.id));
+      setInviteLink("");
+      setInviteMessage(
+        client && relayStatus !== "closed" && relayStatus !== "error"
+          ? "Rotated the room key for future messages and invites. Current key holders can receive it through the encrypted room event."
+          : "Rotated the local room key, but the relay is offline. Other members will need a fresh invite key."
+      );
+    } catch (error) {
+      setInviteMessage(String(error));
+    } finally {
+      setKeyRotationBusy(false);
     }
   }
 
@@ -4599,6 +4692,13 @@ export function App() {
             <KeyRound size={15} />
             Import invite
           </button>
+          <button className="ghost-wide danger" onClick={rotateSelectedRoomKey} disabled={!hasSelectedRoom || !isActiveHost || keyRotationBusy}>
+            <RefreshCw size={15} />
+            {keyRotationBusy ? "Rotating room key" : "Rotate room key"}
+          </button>
+          <div className="empty-state compact">
+            Rotation updates future messages and invites for current key holders. It is not alpha member removal.
+          </div>
           <div className="terminal-requests">
             {inviteRequests.slice(-4).reverse().map((request) => (
               <div className={`terminal-request ${request.status}`} key={request.id}>
@@ -5591,6 +5691,10 @@ function isDeviceSealedPayload(value: unknown): value is {
     typeof value.nonce === "string" &&
     typeof value.ciphertext === "string"
   );
+}
+
+function isRoomKeyRotationPlaintextPayload(value: unknown): value is RoomKeyRotationPlaintextPayload {
+  return RoomKeyRotationPlaintextPayloadSchema.safeParse(value).success;
 }
 
 function isCodexEventPlaintextPayload(value: unknown): value is CodexEventPlaintextPayload {

@@ -45,7 +45,8 @@ export const RelayEnvelope = z.object({
     "git.event",
     "room.presence",
     "room.invite",
-    "room.host"
+    "room.host",
+    "room.key"
   ]),
   payload: EncryptedPayload
 });
@@ -136,6 +137,21 @@ export const InviteJoinStatusPlaintextPayload = z.object({
   recipientDeviceId: z.string().optional(),
   recipientPublicKeyFingerprint: z.string().optional(),
   wrappedRoomSecret: WrappedRoomSecretPayload.optional()
+});
+
+export const RoomSecretPayload = z.object({
+  algorithm: z.literal("AES-GCM-256"),
+  rawKey: z.string()
+});
+
+export const RoomKeyRotationPlaintextPayload = z.object({
+  eventType: z.literal("room.key.rotated"),
+  id: z.string(),
+  rotatedBy: z.string(),
+  rotatedByUserId: z.string(),
+  rotatedAt: z.string().datetime(),
+  newSecret: RoomSecretPayload,
+  note: z.string().optional()
 });
 
 export const CodexEventPlaintextPayload = z.object({
@@ -400,6 +416,7 @@ export type RequestStatusPlaintextPayload = z.infer<typeof RequestStatusPlaintex
 export type InviteJoinRequestPlaintextPayload = z.infer<typeof InviteJoinRequestPlaintextPayload>;
 export type InviteJoinStatusPlaintextPayload = z.infer<typeof InviteJoinStatusPlaintextPayload>;
 export type WrappedRoomSecretPayload = z.infer<typeof WrappedRoomSecretPayload>;
+export type RoomKeyRotationPlaintextPayload = z.infer<typeof RoomKeyRotationPlaintextPayload>;
 export type CodexEventPlaintextPayload = z.infer<typeof CodexEventPlaintextPayload>;
 export type TerminalResultPlaintextPayload = z.infer<typeof TerminalResultPlaintextPayload>;
 export type GitWorkflowEventPlaintextPayload = z.infer<typeof GitWorkflowEventPlaintextPayload>;

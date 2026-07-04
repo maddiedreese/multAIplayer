@@ -131,6 +131,11 @@ export async function importRoomSecret(roomId: string, secret: RoomSecret): Prom
   await writeNativeRoomSecret(roomId, secret);
 }
 
+export async function replaceRoomSecret(roomId: string, secret: RoomSecret): Promise<void> {
+  await writeNativeRoomSecret(roomId, secret);
+  localStorage.removeItem(historyKey(roomId));
+}
+
 function readStoredHistory(roomId: string): StoredHistory | null {
   const stored = localStorage.getItem(historyKey(roomId));
   if (!stored) return null;

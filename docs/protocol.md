@@ -47,6 +47,8 @@ Device keys are P-256 ECDH key-agreement keys. The crypto package can wrap an AE
 
 For gated invites, the desktop creates a no-secret `#multaiplayerJoin=...` fragment containing room metadata and the host device public key, but not the room key. The joiner sends a `room.invite` request as a device-sealed payload encrypted to the host public key. When the host approves, the approval status is device-sealed to the requester and includes a wrapped room secret for that requester device. Non-gated direct invites still use the older room-key fragment flow.
 
+Room key rotations use encrypted `room.key` envelopes. The payload is encrypted with the current room key and contains a new AES-GCM room key plus rotation metadata. Clients that can decrypt the event replace their local room key and use the new key for future room messages and invite links.
+
 The relay accepts device-sealed envelope payloads only for `room.invite`. All other room events must use normal room-key AES-GCM payloads, which keeps the envelope formats predictable and prevents device-sealed chat, terminal, Git, or Codex events from being routed as if peers could read them.
 
 Room presence updates also register the user id as a known member of that team for metadata counts. This updates the plaintext `members` count in `team.updated` events and relay storage, but it is not an authorization boundary in the alpha; room access still depends on possessing the room key.

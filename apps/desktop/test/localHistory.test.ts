@@ -55,6 +55,7 @@ const {
   loadEncryptedHistory,
   loadHistorySettings,
   loadRoomSecret,
+  replaceRoomSecret,
   roomVisibilityWarningKey,
   saveEncryptedHistory,
   saveHistorySettings
@@ -114,6 +115,23 @@ test("encrypted history keeps Codex thread continuity local and encrypted", asyn
   assert.ok(stored);
   assert.doesNotMatch(stored, /thr_room_123/);
   assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
+});
+
+test("replaceRoomSecret clears stale encrypted history", async () => {
+  const roomId = "room-rotate-key";
+  await saveEncryptedHistory(roomId, { messages: [{ body: "before rotation" }] });
+  assert.ok(localStorage.getItem(`multaiplayer:history:${roomId}`));
+
+  const oldSecret = await loadRoomSecret(roomId);
+  assert.ok(oldSecret);
+  await replaceRoomSecret(roomId, {
+    algorithm: "AES-GCM-256",
+    rawKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  });
+
+  const nextSecret = await loadRoomSecret(roomId);
+  assert.notEqual(nextSecret?.rawKey, oldSecret.rawKey);
+  assert.equal(localStorage.getItem(`multaiplayer:history:${roomId}`), null);
 });
 
 test("disabled history clears stored ciphertext and prevents new saves", async () => {
