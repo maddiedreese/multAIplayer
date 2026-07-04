@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { detectBrowserSecretRisks, detectSecretRisks } from "../src/lib/secretRisks";
+import { detectBrowserSecretRisks, detectSecretRisks, detectTerminalCommandRisks } from "../src/lib/secretRisks";
 
 test("detectSecretRisks flags sensitive filenames", () => {
   assert.deepEqual(detectSecretRisks("DATABASE_URL=postgres://example", "/repo/.env.local"), [
@@ -48,4 +48,18 @@ test("detectBrowserSecretRisks flags signed-in and account pages", () => {
     "Account or credential page"
   ]);
   assert.deepEqual(detectBrowserSecretRisks("not a url"), []);
+});
+
+test("detectTerminalCommandRisks flags environment dumps and sensitive file reads", () => {
+  assert.deepEqual(detectTerminalCommandRisks("printenv | sort"), ["Environment variables"]);
+  assert.deepEqual(detectTerminalCommandRisks("cat .env.local"), ["Sensitive file access"]);
+  assert.deepEqual(detectTerminalCommandRisks("rg token ~/.aws/credentials"), ["Sensitive file access"]);
+});
+
+test("detectTerminalCommandRisks flags credential-looking command text", () => {
+  assert.deepEqual(detectTerminalCommandRisks("curl -H 'Authorization: token=ghp_1234567890abcdefghijklmnop' https://api.github.com"), [
+    "Credential-looking command",
+    "Token or private key pattern"
+  ]);
+  assert.deepEqual(detectTerminalCommandRisks("npm test"), []);
 });

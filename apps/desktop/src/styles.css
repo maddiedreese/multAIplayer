@@ -1800,6 +1800,11 @@ button:disabled {
   color: #25312a;
 }
 
+.terminal-launcher .inline-secret-warning {
+  grid-column: 1 / -1;
+  margin-bottom: 0;
+}
+
 .terminal-requests {
   display: grid;
   gap: 6px;
@@ -1852,6 +1857,14 @@ button:disabled {
 .terminal-request > div:last-child {
   display: flex;
   gap: 5px;
+}
+
+.terminal-request-warning {
+  grid-column: 1 / -1;
+}
+
+.terminal-request-warning .inline-secret-warning {
+  margin-bottom: 0;
 }
 
 .terminal-request button {

@@ -168,7 +168,7 @@ import {
   planTeamCreation
 } from "./lib/workspaceCreation";
 import { createHandoffSettingsPatch } from "./lib/hostHandoff";
-import { detectBrowserSecretRisks, detectSecretRisks } from "./lib/secretRisks";
+import { detectBrowserSecretRisks, detectSecretRisks, detectTerminalCommandRisks } from "./lib/secretRisks";
 import { createGitWorkflowApprovalPlan, formatGitWorkflowApprovalPreview } from "@multaiplayer/git";
 import { normalizeGitHubBranchName } from "@multaiplayer/github";
 import { terminalRequestForApprovedRun } from "./lib/terminalApproval";
@@ -629,6 +629,7 @@ export function App() {
   const terminalRisks = selectedTerminal
     ? detectSecretRisks(selectedTerminal.lines.map((line) => line.text).join("\n"))
     : detectSecretRisks(terminalLines.join("\n"));
+  const terminalCommandRisks = detectTerminalCommandRisks(terminalCommand);
   const normalizedSidebarQuery = sidebarQuery.trim().toLowerCase();
   const searchActive = normalizedSidebarQuery.length > 0;
   const teamRooms = useMemo(
@@ -5035,6 +5036,13 @@ export function App() {
             <button onClick={requestTerminalCommand} disabled={!hasSelectedRoom || !terminalCommand.trim()}>
               <MessageSquare size={14} />
             </button>
+            {terminalCommandRisks.length > 0 && (
+              <InlineSecretWarning
+                risks={terminalCommandRisks}
+                detail="Review before requesting or running it on the host machine."
+                compact
+              />
+            )}
           </div>
           <div className="terminal-requests">
             {codexEvents.slice(-5).reverse().map((event) => (
@@ -5052,25 +5060,38 @@ export function App() {
             )}
           </div>
           <div className="terminal-requests">
-            {terminalRequests.map((request) => (
-              <div className={`terminal-request ${request.status}`} key={request.id}>
-                <div>
-                  <strong>{request.command}</strong>
-                  <span>{request.requester} · {request.cwd}</span>
-                </div>
-                <small>{request.status}</small>
-                {request.status === "pending" && (
+            {terminalRequests.map((request) => {
+              const requestRisks = detectTerminalCommandRisks(request.command);
+
+              return (
+                <div className={`terminal-request ${request.status}`} key={request.id}>
                   <div>
-                    <button onClick={() => approveTerminalRequest(request)} disabled={!hasSelectedRoom || terminalBusy || !isActiveHost}>
-                      <Check size={13} />
-                    </button>
-                    <button onClick={() => denyTerminalRequest(request.id)} disabled={!hasSelectedRoom || terminalBusy || !isActiveHost}>
-                      <X size={13} />
-                    </button>
+                    <strong>{request.command}</strong>
+                    <span>{request.requester} · {request.cwd}</span>
                   </div>
-                )}
-              </div>
-            ))}
+                  <small>{request.status}</small>
+                  {request.status === "pending" && (
+                    <div>
+                      <button onClick={() => approveTerminalRequest(request)} disabled={!hasSelectedRoom || terminalBusy || !isActiveHost}>
+                        <Check size={13} />
+                      </button>
+                      <button onClick={() => denyTerminalRequest(request.id)} disabled={!hasSelectedRoom || terminalBusy || !isActiveHost}>
+                        <X size={13} />
+                      </button>
+                    </div>
+                  )}
+                  {requestRisks.length > 0 && (
+                    <div className="terminal-request-warning">
+                      <InlineSecretWarning
+                        risks={requestRisks}
+                        detail="Review before approving this command on the host machine."
+                        compact
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             {terminalRequests.length === 0 && (
               <div className="empty-state compact">No command requests in this room.</div>
             )}
