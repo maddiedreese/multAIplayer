@@ -6,7 +6,8 @@ import type {
   InviteRecord,
   RoomRecord,
   TeamMemberRecord,
-  TeamRecord
+  TeamRecord,
+  TeamRole
 } from "@multaiplayer/protocol";
 import { getRelayHttpUrl } from "./appConfig";
 import { readJsonResponse } from "./httpResponse";
@@ -60,6 +61,30 @@ export async function loadTeamMembers(teamId: string): Promise<TeamMemberRecord[
     credentials: "include"
   });
   const body = await readJsonResponse<{ members: TeamMemberRecord[] }>(response, "Failed to load team members");
+  return body.members as TeamMemberRecord[];
+}
+
+export async function updateTeamMemberRole(
+  teamId: string,
+  userId: string,
+  role: Exclude<TeamRole, "owner">
+): Promise<TeamMemberRecord[]> {
+  const response = await fetch(`${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ role })
+  });
+  const body = await readJsonResponse<{ members: TeamMemberRecord[] }>(response, "Failed to update team member role");
+  return body.members as TeamMemberRecord[];
+}
+
+export async function removeTeamMember(teamId: string, userId: string): Promise<TeamMemberRecord[]> {
+  const response = await fetch(`${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    credentials: "include"
+  });
+  const body = await readJsonResponse<{ members: TeamMemberRecord[] }>(response, "Failed to remove team member");
   return body.members as TeamMemberRecord[];
 }
 

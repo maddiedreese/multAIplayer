@@ -152,6 +152,8 @@ import {
   loadWorkspace,
   lookupInvite,
   registerDevice,
+  removeTeamMember,
+  updateTeamMemberRole,
   updateRoomHost,
   updateRoomSettings
 } from "./lib/workspaceClient";
@@ -484,6 +486,7 @@ export function App() {
   const [rooms, setRooms] = useState<RoomRecord[]>(seededRooms);
   const [teamMembersByTeam, setTeamMembersByTeam] = useState<Record<string, TeamMemberRecord[]>>(seededTeamMembers);
   const [teamMembersMessageByTeam, setTeamMembersMessageByTeam] = useState<Record<string, string | null>>({});
+  const [teamMembersBusyByTeam, setTeamMembersBusyByTeam] = useState<Record<string, boolean>>({});
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>(null);
   const [appConfig, setAppConfig] = useState<AppConfig>(() => loadAppConfig());
@@ -607,9 +610,11 @@ export function App() {
 
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? emptyRoom;
-  const selectedTeamName = teams.find((team) => team.id === selectedTeam)?.name ?? (teams.length ? "No team selected" : "No teams yet");
+  const selectedTeamRecord = teams.find((team) => team.id === selectedTeam) ?? null;
+  const selectedTeamName = selectedTeamRecord?.name ?? (teams.length ? "No team selected" : "No teams yet");
   const selectedTeamMembers = teamMembersByTeam[selectedTeam] ?? [];
   const selectedTeamMembersMessage = teamMembersMessageByTeam[selectedTeam] ?? null;
+  const selectedTeamMembersBusy = teamMembersBusyByTeam[selectedTeam] ?? false;
   const selectedCodexModel = selectedRoom?.codexModel ?? defaultCodexModel;
   const selectedBrowserAllowedOrigins = selectedRoom.browserAllowedOrigins ?? defaultBrowserAllowedOrigins;
   const customCodexModel = customCodexModelsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedCodexModel;
@@ -1931,6 +1936,43 @@ export function App() {
 
   function upsertRoom(room: RoomRecord) {
     setRooms((current) => upsertRoomPreservingUnread(current, room));
+  }
+
+  async function changeTeamMemberRole(member: TeamMemberRecord, role: "admin" | "member") {
+    if (!selectedTeam || selectedTeamMembersBusy) return;
+    setTeamMembersBusyByTeam((current) => ({ ...current, [selectedTeam]: true }));
+    setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: null }));
+    try {
+      const members = await updateTeamMemberRole(selectedTeam, member.userId, role);
+      setTeamMembersByTeam((current) => ({ ...current, [selectedTeam]: members }));
+      setTeamMembersMessageByTeam((current) => ({
+        ...current,
+        [selectedTeam]: `${formatTeamMemberName(member.userId, currentUser)} is now ${formatTeamRole(role)}.`
+      }));
+    } catch (error) {
+      setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: String(error) }));
+    } finally {
+      setTeamMembersBusyByTeam((current) => ({ ...current, [selectedTeam]: false }));
+    }
+  }
+
+  async function removeMemberFromTeam(member: TeamMemberRecord) {
+    if (!selectedTeam || selectedTeamMembersBusy) return;
+    setTeamMembersBusyByTeam((current) => ({ ...current, [selectedTeam]: true }));
+    setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: null }));
+    try {
+      const members = await removeTeamMember(selectedTeam, member.userId);
+      setTeamMembersByTeam((current) => ({ ...current, [selectedTeam]: members }));
+      setTeams((current) => current.map((team) => team.id === selectedTeam ? { ...team, members: members.length } : team));
+      setTeamMembersMessageByTeam((current) => ({
+        ...current,
+        [selectedTeam]: `Removed ${formatTeamMemberName(member.userId, currentUser)} from ${selectedTeamName}.`
+      }));
+    } catch (error) {
+      setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: String(error) }));
+    } finally {
+      setTeamMembersBusyByTeam((current) => ({ ...current, [selectedTeam]: false }));
+    }
   }
 
   async function setRoomHost(hostStatus: RoomRecord["hostStatus"]) {
@@ -5459,6 +5501,15 @@ export function App() {
                   <b className={member.role === "owner" ? "trusted" : member.role === "admin" ? "verified" : ""}>
                     {formatTeamRole(member.role)}
                   </b>
+                  {canPromoteTeamMember(selectedTeamRecord, member) && (
+                    <button onClick={() => changeTeamMemberRole(member, "admin")} disabled={selectedTeamMembersBusy}>Promote</button>
+                  )}
+                  {canDemoteTeamMember(selectedTeamRecord, member) && (
+                    <button onClick={() => changeTeamMemberRole(member, "member")} disabled={selectedTeamMembersBusy}>Demote</button>
+                  )}
+                  {canRemoveTeamMember(selectedTeamRecord, member) && (
+                    <button onClick={() => removeMemberFromTeam(member)} disabled={selectedTeamMembersBusy}>Remove</button>
+                  )}
                 </div>
                 <small>{formatTeamMemberJoinedAt(member.joinedAt)}</small>
               </div>
@@ -6320,6 +6371,20 @@ function formatTeamMemberJoinedAt(joinedAt: string): string {
   const timestamp = Date.parse(joinedAt);
   if (Number.isNaN(timestamp)) return "joined";
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(timestamp));
+}
+
+function canPromoteTeamMember(team: TeamRecord | null, member: TeamMemberRecord): boolean {
+  return team?.role === "owner" && member.role === "member";
+}
+
+function canDemoteTeamMember(team: TeamRecord | null, member: TeamMemberRecord): boolean {
+  return team?.role === "owner" && member.role === "admin";
+}
+
+function canRemoveTeamMember(team: TeamRecord | null, member: TeamMemberRecord): boolean {
+  if (member.role === "owner") return false;
+  if (team?.role === "owner") return true;
+  return team?.role === "admin" && member.role === "member";
 }
 
 function formatCodexThreadId(threadId: string | null): string {

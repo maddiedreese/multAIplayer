@@ -1520,6 +1520,64 @@ test("relay assigns team creators owner role", async () => {
   }
 });
 
+test("relay lets authorized team roles manage non-owner members", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const ownerCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+  const adminCookie = await createDebugSession(relay.baseUrl, "github:alex", "alex");
+  const memberCookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
+  try {
+    const promoteResponse = await fetch(`${relay.baseUrl}/teams/team-core/members/github%3Atester`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      body: JSON.stringify({ role: "admin" })
+    });
+    assert.equal(promoteResponse.status, 200);
+    const promoted = await promoteResponse.json() as {
+      member: { userId: string; role: string };
+      members: Array<{ userId: string; role: string }>;
+    };
+    assert.equal(promoted.member.userId, "github:tester");
+    assert.equal(promoted.member.role, "admin");
+
+    const adminDemoteResponse = await fetch(`${relay.baseUrl}/teams/team-core/members/github%3Atester`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", cookie: adminCookie },
+      body: JSON.stringify({ role: "member" })
+    });
+    assert.equal(adminDemoteResponse.status, 403);
+
+    const ownerDemoteResponse = await fetch(`${relay.baseUrl}/teams/team-core/members/github%3Atester`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      body: JSON.stringify({ role: "member" })
+    });
+    assert.equal(ownerDemoteResponse.status, 200);
+
+    const memberPromoteResponse = await fetch(`${relay.baseUrl}/teams/team-core/members/github%3Adesign`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", cookie: memberCookie },
+      body: JSON.stringify({ role: "admin" })
+    });
+    assert.equal(memberPromoteResponse.status, 403);
+
+    const removeOwnerResponse = await fetch(`${relay.baseUrl}/teams/team-core/members/github%3Amaddiedreese`, {
+      method: "DELETE",
+      headers: { cookie: ownerCookie }
+    });
+    assert.equal(removeOwnerResponse.status, 403);
+
+    const removeMemberResponse = await fetch(`${relay.baseUrl}/teams/team-core/members/github%3Adesign`, {
+      method: "DELETE",
+      headers: { cookie: adminCookie }
+    });
+    assert.equal(removeMemberResponse.status, 200);
+    const removed = await removeMemberResponse.json() as { members: Array<{ userId: string }> };
+    assert.ok(!removed.members.some((member) => member.userId === "github:design"));
+  } finally {
+    await relay.close();
+  }
+});
+
 test("relay creates invite metadata with expiry", async () => {
   const relay = await startRelay({ MULTAIPLAYER_RELAY_INVITE_TTL_DAYS: "3" });
   try {

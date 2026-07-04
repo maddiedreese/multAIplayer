@@ -474,6 +474,72 @@ app.get("/teams/:teamId/members", (req, res) => {
   res.json({ members: listTeamMembers(teamId) });
 });
 
+app.patch("/teams/:teamId/members/:userId", (req, res) => {
+  const session = getAuthSession(req.cookies?.multaiplayer_session);
+  if (!allowMutation(session, res)) return;
+
+  const teamId = String(req.params.teamId ?? "");
+  const userId = String(req.params.userId ?? "");
+  const role = parseRequestedTeamRole(req.body?.role);
+  if (!teams.has(teamId)) {
+    res.status(404).json({ error: "Team not found" });
+    return;
+  }
+  if (!role || role === "owner") {
+    res.status(400).json({ error: "role must be admin or member" });
+    return;
+  }
+  const members = teamMembers.get(teamId);
+  const target = members?.get(userId);
+  if (!members || !target) {
+    res.status(404).json({ error: "Team member not found" });
+    return;
+  }
+  const requesterRole = session ? members.get(session.user.id)?.role : "owner";
+  if (!canSetTeamMemberRole(requesterRole, target.role, role)) {
+    res.status(403).json({ error: "Only team owners can change admin roles." });
+    return;
+  }
+
+  const updated: TeamMemberRecord = { ...target, role };
+  members.set(userId, updated);
+  scheduleStoreSave();
+  res.json({ member: updated, members: listTeamMembers(teamId) });
+});
+
+app.delete("/teams/:teamId/members/:userId", (req, res) => {
+  const session = getAuthSession(req.cookies?.multaiplayer_session);
+  if (!allowMutation(session, res)) return;
+
+  const teamId = String(req.params.teamId ?? "");
+  const userId = String(req.params.userId ?? "");
+  if (!teams.has(teamId)) {
+    res.status(404).json({ error: "Team not found" });
+    return;
+  }
+  const members = teamMembers.get(teamId);
+  const target = members?.get(userId);
+  if (!members || !target) {
+    res.status(404).json({ error: "Team member not found" });
+    return;
+  }
+  const requesterRole = session ? members.get(session.user.id)?.role : "owner";
+  if (!canRemoveTeamMember(requesterRole, target.role)) {
+    res.status(403).json({ error: "Only team owners can remove admins, and owners cannot be removed." });
+    return;
+  }
+
+  members.delete(userId);
+  const team = teams.get(teamId);
+  if (team) {
+    const updatedTeam = { ...team, members: members.size };
+    teams.set(teamId, updatedTeam);
+    broadcastWorkspaceUpdated(updatedTeam);
+  }
+  scheduleStoreSave();
+  res.json({ members: listTeamMembers(teamId) });
+});
+
 app.post("/devices", (req, res) => {
   const session = getAuthSession(req.cookies?.multaiplayer_session);
   if (!allowMutation(session, res)) return;
@@ -1379,6 +1445,23 @@ function teamRoleRank(role: TeamRole): number {
   return 2;
 }
 
+function canSetTeamMemberRole(
+  requesterRole: TeamRole | undefined,
+  targetRole: TeamRole,
+  nextRole: TeamRole
+): boolean {
+  if (targetRole === "owner" || nextRole === "owner") return false;
+  if (requesterRole === "owner") return true;
+  if (requesterRole !== "admin") return false;
+  return targetRole === "member" && nextRole === "member";
+}
+
+function canRemoveTeamMember(requesterRole: TeamRole | undefined, targetRole: TeamRole): boolean {
+  if (targetRole === "owner") return false;
+  if (requesterRole === "owner") return true;
+  return requesterRole === "admin" && targetRole === "member";
+}
+
 function canAccessRoom(teamId: string, roomId: string, userId: string): boolean {
   return rooms.get(roomId)?.teamId === teamId && isTeamMember(teamId, userId);
 }
@@ -1607,6 +1690,10 @@ function normalizeCodexModel(value: unknown): string | null {
 
 function normalizeTeamRole(value: unknown): TeamRole {
   return value === "owner" || value === "admin" || value === "member" ? value : "member";
+}
+
+function parseRequestedTeamRole(value: unknown): TeamRole | null {
+  return value === "owner" || value === "admin" || value === "member" ? value : null;
 }
 
 function normalizeBrowserAllowedOrigins(value: unknown): string[] | null {
