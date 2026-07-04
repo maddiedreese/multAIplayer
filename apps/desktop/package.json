@@ -1,0 +1,35 @@
+{
+  "name": "@multaiplayer/desktop",
+  "private": true,
+  "version": "0.1.0-alpha.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "check": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "preview": "vite preview",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "dependencies": {
+    "@multaiplayer/crypto": "0.1.0-alpha.0",
+    "@multaiplayer/git": "0.1.0-alpha.0",
+    "@multaiplayer/github": "0.1.0-alpha.0",
+    "@multaiplayer/protocol": "0.1.0-alpha.0",
+    "@tauri-apps/api": "^2.8.0",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.8.4",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.0"
+  }
+}

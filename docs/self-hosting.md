@@ -1,0 +1,183 @@
+# Self-Hosting
+
+The relay is intended to be self-hostable. In v1 it routes encrypted room events and manages presence; it does not call OpenAI or store plaintext chat transcripts.
+
+Planned self-hosting requirements:
+
+- Node.js runtime for the relay;
+- GitHub OAuth app configured by the self-hoster;
+- HTTPS and WebSocket support;
+- object storage for encrypted attachment blobs;
+- database for accounts, devices, teams, rooms, and encrypted metadata.
+
+## Relay Configuration
+
+The relay reads configuration from shell-exported environment variables first. For local and single-process deployments, it also loads `.env` files before reading relay settings:
+
+- an explicit `MULTAIPLAYER_RELAY_ENV_FILE=/absolute/path/to/.env`;
+- `apps/relay/.env` when present;
+- the repo root `.env` when present.
+
+Shell-exported values take precedence over `.env` file values. The parser supports simple `KEY=value` lines, quoted values, blank lines, and comments.
+
+## Relay Storage
+
+The alpha relay persists its state to a JSON file. Set:
+
+```bash
+MULTAIPLAYER_RELAY_DATA_PATH=/var/lib/multaiplayer/relay-store.json
+```
+
+If unset, local development uses `.multaiplayer/relay-store.json`.
+
+If the relay cannot parse the JSON store, or the store version is unsupported, it moves the file aside next to the original path with a `.corrupt-...` suffix and starts from a clean in-memory state. Keep regular backups of `MULTAIPLAYER_RELAY_DATA_PATH` for production/self-hosted deployments; the quarantine file is a recovery aid, not a replacement for backups.
+
+The alpha store contains:
+
+- teams and room records;
+- known team member ids used for metadata counts;
+- device ECDH public keys and fingerprints;
+- invite metadata;
+- encrypted WebSocket message envelopes and ciphertext payloads;
+- encrypted attachment blob ciphertext and metadata.
+- encrypted GitHub session access tokens, only when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured.
+
+It does not contain:
+
+- plaintext chat transcripts;
+- Codex credentials;
+- OpenAI credentials;
+- plaintext GitHub access tokens;
+- repo files;
+- terminal output in plaintext.
+
+GitHub sign-in sessions are memory-only unless the relay has a session secret. To keep users signed in across relay restarts, configure a high-entropy secret and keep it stable:
+
+```bash
+MULTAIPLAYER_RELAY_SESSION_SECRET=$(openssl rand -base64 32)
+```
+
+With this set, the relay encrypts GitHub session access tokens with AES-GCM before writing them to the JSON store and prunes expired sessions on load and save. The secret must be at least 32 characters; shorter values are ignored and durable sessions stay disabled. If the secret is missing, sessions are not persisted and restarting the relay signs users out. If the secret changes, previously stored sessions cannot be decrypted and users must sign in again. Plaintext access tokens in the relay store are ignored.
+
+The desktop Account drawer reads `/auth/config` and shows whether the connected relay is using encrypted-at-rest sessions or memory-only sessions.
+
+Local development seeds a small demo workspace by default. Production relays do not seed demo teams or rooms unless explicitly enabled:
+
+```bash
+MULTAIPLAYER_RELAY_SEED_DEMO=true
+```
+
+The encrypted reconnect backlog is pruned by both count and age:
+
+```bash
+MULTAIPLAYER_RELAY_BACKLOG_LIMIT=200
+MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS=30
+```
+
+These limits apply to ciphertext envelopes only. Plaintext live metadata such as presence and `room.updated` broadcasts is not stored in the encrypted backlog.
+
+Expired reconnect backlog entries are pruned on load, publish, debug inspection, and relay store save.
+
+Invite metadata expires by default:
+
+```bash
+MULTAIPLAYER_RELAY_INVITE_TTL_DAYS=7
+```
+
+The relay stores invite metadata only. Gated invite links do not contain the room key; the desktop sends a device-sealed join request to the host, and host approval returns the room key wrapped to the joiner's device. Direct invite links can still carry the room key in the URL fragment for convenience, which is not sent to the relay by normal HTTP requests.
+
+Encrypted attachment blobs are also bounded and pruned:
+
+```bash
+MULTAIPLAYER_ATTACHMENT_BLOB_TTL_DAYS=30
+MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES=5000000
+```
+
+The max-bytes setting limits both the declared plaintext attachment size and the ciphertext field size accepted by the relay. Blob payloads are still ciphertext; this limit is for relay storage and request-size control, not content inspection.
+
+Encrypted room events are also bounded before they enter WebSocket fanout or backlog:
+
+```bash
+MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES=1000000
+```
+
+This caps the serialized encrypted envelope, including ids, sender fields, nonce, ciphertext, and device-sealed invite key material. Larger file previews should use encrypted attachment blobs instead of oversized room events.
+
+Expired invites and encrypted attachment blobs are pruned when loaded from disk, when the relay store is saved, and when debug state is inspected. Direct reads of an expired invite or blob return an expired response and remove the record.
+
+The relay applies fixed-window in-memory rate limits by default:
+
+```bash
+MULTAIPLAYER_RELAY_RATE_LIMITS=true
+MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS=60000
+MULTAIPLAYER_RELAY_RATE_LIMIT_AUTH=30
+MULTAIPLAYER_RELAY_RATE_LIMIT_READ=300
+MULTAIPLAYER_RELAY_RATE_LIMIT_MUTATION=120
+MULTAIPLAYER_RELAY_RATE_LIMIT_ATTACHMENT=60
+MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET=600
+```
+
+These limits are keyed by signed-in session when available, otherwise by client IP. HTTP requests over the limit receive `429` with `Retry-After`; room WebSocket clients receive an encrypted-room-safe error message and remain connected. The alpha limiter is process-local, so multi-instance deployments should add an edge or shared-store limiter in front of the relay.
+
+Debug endpoints are available in non-production relay runs. In production (`NODE_ENV=production`), they are disabled unless explicitly enabled:
+
+```bash
+MULTAIPLAYER_RELAY_DEBUG=true
+```
+
+Workspace mutations can require GitHub sign-in:
+
+```bash
+MULTAIPLAYER_RELAY_REQUIRE_AUTH=true
+```
+
+When enabled, reading workspace metadata, creating teams, creating rooms, creating invites, registering devices, uploading encrypted attachment blobs, changing host state, and changing room settings return `401` unless the desktop has a valid GitHub session cookie with that relay. Authenticated device registration is bound to the signed-in GitHub user id.
+
+Authenticated workspace reads are membership-scoped. A signed-in user only receives teams and rooms where they are a known team member. Room-level mutations and attachment blob reads also require membership. Invite metadata remains readable by invite id so a joiner can verify that the relay metadata matches the invite fragment; the desktop then presents that invite id during WebSocket join to be admitted as a team member.
+
+Local development can leave auth off for seeded-room testing. Production relays default it on when `NODE_ENV=production`, even if GitHub OAuth has not been configured yet; self-hosters can still set the variable explicitly.
+
+Credentialed browser origins and WebSocket room upgrades can be restricted:
+
+```bash
+MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://multaiplayer.com,https://app.multaiplayer.com
+```
+
+If set, the relay only emits CORS credential headers and accepts browser-origin WebSocket upgrades for those exact origins. If unset, local development is permissive, while production denies browser origins by default. Requests without a browser `Origin` header are still allowed so native clients and server-side health checks continue to work.
+
+Origin entries are normalized to bare origins. `https://multaiplayer.com/` becomes `https://multaiplayer.com`, and app origins such as `tauri://localhost` are preserved. Entries with paths, queries, or fragments are ignored because CORS and WebSocket `Origin` checks cannot be path-scoped.
+
+## GitHub OAuth
+
+The alpha relay supports GitHub device-code OAuth. This works well for the desktop app because users can sign in through a browser without the desktop app needing to receive an OAuth redirect.
+
+Create a GitHub OAuth app, then start the relay with:
+
+```bash
+GITHUB_CLIENT_ID=your_client_id npm run dev:relay
+```
+
+By default the relay requests:
+
+```bash
+GITHUB_OAUTH_SCOPES="read:user public_repo"
+```
+
+That is enough for identity plus public open-source PR creation. For private repositories, set:
+
+```bash
+GITHUB_OAUTH_SCOPES="read:user repo"
+```
+
+The app shows the relay-advertised scopes in the Account drawer so users can see what the self-hosted relay is asking GitHub to authorize.
+
+For local development, the desktop app expects:
+
+```bash
+VITE_RELAY_HTTP_URL=http://127.0.0.1:4321
+VITE_RELAY_URL=ws://127.0.0.1:4321/rooms
+```
+
+These env vars define the packaged defaults. Desktop users can also open Settings and change the relay HTTP API URL and WebSocket rooms URL without rebuilding the app. The override is stored locally on that device.
+
+The current alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured. Production/self-hosted deployments should still prefer a real database-backed session store, token rotation, and regular key rotation once multi-instance hosting is needed.
