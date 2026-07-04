@@ -475,7 +475,7 @@ export function App() {
   const [hostMessagesByRoom, setHostMessagesByRoom] = useState<Record<string, string | null>>({});
   const [chatMessage, setChatMessage] = useState<string | null>(null);
   const [settingsBusyByRoom, setSettingsBusyByRoom] = useState<Record<string, boolean>>({});
-  const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
+  const [settingsMessagesByRoom, setSettingsMessagesByRoom] = useState<Record<string, string | null>>({});
   const [customCodexModelsByRoom, setCustomCodexModelsByRoom] = useState<Record<string, string>>({});
   const [projectPathDraftsByRoom, setProjectPathDraftsByRoom] = useState<Record<string, string>>({});
   const [browserAllowedOriginsDraftsByRoom, setBrowserAllowedOriginsDraftsByRoom] = useState<Record<string, string>>({});
@@ -617,6 +617,7 @@ export function App() {
   const inviteApprovalGate = inviteApprovalGatesByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const inviteMessage = inviteMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const hostMessage = hostMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const settingsMessage = settingsMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const actionsSummary = useMemo(() => summarizeActionRuns(actionRuns), [actionRuns]);
   const githubWorkflowReadiness = useMemo(() => checkGitHubWorkflowReadiness({
     pushEnabled: gitWorkflowDraft.pushEnabled,
@@ -712,6 +713,14 @@ export function App() {
 
   function setSettingsBusyForRoom(roomId: string, busy: boolean) {
     setSettingsBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function setSettingsMessageForRoom(roomId: string, message: string | null) {
+    setSettingsMessagesByRoom((current) => message ? { ...current, [roomId]: message } : omitRecordKey(current, roomId));
+  }
+
+  function setSelectedSettingsMessage(message: string | null) {
+    setSettingsMessageForRoom(selectedRoom.id, message);
   }
 
   function setKeyRotationBusyForRoom(roomId: string, busy: boolean) {
@@ -1853,7 +1862,8 @@ export function App() {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setProjectPathDraftForRoom(roomId, patch.projectPath);
         setCustomCodexModelForRoom(roomId, patch.codexModel);
-        setSettingsMessage(
+        setSettingsMessageForRoom(
+          roomId,
           `Accepted handoff from ${handoff.fromHost}; inherited ${formatCodexModel(patch.codexModel)} and ${patch.projectPath}.`
         );
         setHostMessageForRoom(roomId, `You are now hosting ${claimed.name} from ${handoff.fromHost}'s handoff.`);
@@ -2135,28 +2145,28 @@ export function App() {
 
   async function setApprovalPolicy(approvalPolicy: ApprovalPolicy) {
     if (!hasSelectedRoom) {
-      setSettingsMessage("Create or join a room before changing room settings.");
+      setSelectedSettingsMessage("Create or join a room before changing room settings.");
       return;
     }
     if (!isActiveHost) {
-      setSettingsMessage(roomSettingsGateMessage);
+      setSelectedSettingsMessage(roomSettingsGateMessage);
       return;
     }
     const roomId = selectedRoom.id;
     setSettingsBusyForRoom(roomId, true);
-    setSettingsMessage(null);
+    setSettingsMessageForRoom(roomId, null);
     try {
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), approvalPolicy });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setSettingsMessage(`Approval policy set to ${approvalPolicyLabels[approvalPolicy]}.`);
+        setSettingsMessageForRoom(roomId, `Approval policy set to ${approvalPolicyLabels[approvalPolicy]}.`);
       }
       if (approvalPolicy === "never_host") {
         setPendingCodexApprovalForRoom(roomId, null);
         setApprovalVisibleForRoom(roomId, false);
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -2164,16 +2174,16 @@ export function App() {
 
   async function toggleRoomMode(key: keyof RoomMode) {
     if (!hasSelectedRoom) {
-      setSettingsMessage("Create or join a room before changing room settings.");
+      setSelectedSettingsMessage("Create or join a room before changing room settings.");
       return;
     }
     if (!isActiveHost) {
-      setSettingsMessage(roomSettingsGateMessage);
+      setSelectedSettingsMessage(roomSettingsGateMessage);
       return;
     }
     const roomId = selectedRoom.id;
     setSettingsBusyForRoom(roomId, true);
-    setSettingsMessage(null);
+    setSettingsMessageForRoom(roomId, null);
     try {
       const nextMode: RoomMode = {
         ...selectedRoom.mode,
@@ -2182,10 +2192,10 @@ export function App() {
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), mode: nextMode });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setSettingsMessage(`${roomModeLabels[key]} mode ${nextMode[key] ? "enabled" : "disabled"}.`);
+        setSettingsMessageForRoom(roomId, `${roomModeLabels[key]} mode ${nextMode[key] ? "enabled" : "disabled"}.`);
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -2194,29 +2204,29 @@ export function App() {
   async function setCodexModel(codexModel: string) {
     const nextModel = normalizeCodexModel(codexModel);
     if (!nextModel) {
-      setSettingsMessage(`Use a known Codex model or a model-like id up to ${maxCodexModelChars} characters.`);
+      setSelectedSettingsMessage(`Use a known Codex model or a model-like id up to ${maxCodexModelChars} characters.`);
       return;
     }
     if (nextModel === selectedCodexModel) return;
     if (!hasSelectedRoom) {
-      setSettingsMessage("Create or join a room before changing the Codex model.");
+      setSelectedSettingsMessage("Create or join a room before changing the Codex model.");
       return;
     }
     if (!isActiveHost) {
-      setSettingsMessage(roomSettingsGateMessage);
+      setSelectedSettingsMessage(roomSettingsGateMessage);
       return;
     }
     const roomId = selectedRoom.id;
     setSettingsBusyForRoom(roomId, true);
-    setSettingsMessage(null);
+    setSettingsMessageForRoom(roomId, null);
     try {
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), codexModel: nextModel });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setSettingsMessage(`Codex model set to ${formatCodexModel(nextModel)}.`);
+        setSettingsMessageForRoom(roomId, `Codex model set to ${formatCodexModel(nextModel)}.`);
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -2301,30 +2311,30 @@ export function App() {
   async function updateProjectPath() {
     const nextProjectPath = normalizeProjectPath(projectPathDraft);
     if (!nextProjectPath) {
-      setSettingsMessage(`Enter a local project folder up to ${maxRoomProjectPathChars} characters without control characters.`);
+      setSelectedSettingsMessage(`Enter a local project folder up to ${maxRoomProjectPathChars} characters without control characters.`);
       return;
     }
     if (!hasSelectedRoom) {
-      setSettingsMessage("Create or join a room before attaching a project folder.");
+      setSelectedSettingsMessage("Create or join a room before attaching a project folder.");
       return;
     }
     if (nextProjectPath === selectedRoom.projectPath) return;
     if (!isActiveHost) {
-      setSettingsMessage(roomSettingsGateMessage);
+      setSelectedSettingsMessage(roomSettingsGateMessage);
       return;
     }
     const roomId = selectedRoom.id;
     setSettingsBusyForRoom(roomId, true);
-    setSettingsMessage(null);
+    setSettingsMessageForRoom(roomId, null);
     try {
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), projectPath: nextProjectPath });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
       resetFileContextForRoom(roomId);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setSettingsMessage(`Project folder set to ${nextProjectPath}.`);
+        setSettingsMessageForRoom(roomId, `Project folder set to ${nextProjectPath}.`);
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -2339,25 +2349,25 @@ export function App() {
 
   async function chooseProjectPath() {
     if (!hasSelectedRoom) {
-      setSettingsMessage("Create or join a room before choosing a project folder.");
+      setSelectedSettingsMessage("Create or join a room before choosing a project folder.");
       return;
     }
     const roomId = selectedRoom.id;
-    setSettingsMessage(null);
+    setSettingsMessageForRoom(roomId, null);
     try {
       const selectedPath = await chooseProjectFolder(projectPathDraft || selectedRoom.projectPath);
       if (!selectedPath) {
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setSettingsMessage("Native folder picker is available in the Tauri app. In web preview, paste a local folder path.");
+          setSettingsMessageForRoom(roomId, "Native folder picker is available in the Tauri app. In web preview, paste a local folder path.");
         }
         return;
       }
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setProjectPathDraftForRoom(roomId, selectedPath);
-        setSettingsMessage(`Selected project folder: ${selectedPath}`);
+        setSettingsMessageForRoom(roomId, `Selected project folder: ${selectedPath}`);
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
     }
   }
 
@@ -2454,6 +2464,7 @@ export function App() {
     setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHostMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setSettingsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setProjectPathDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserAllowedOriginsDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2533,6 +2544,7 @@ export function App() {
     setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHostMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setSettingsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setProjectPathDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserAllowedOriginsDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
