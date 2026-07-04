@@ -16,7 +16,7 @@ Production relays require auth by default. Self-hosters can explicitly set `MULT
 
 When relay auth is enabled, team and room metadata reads are scoped to signed-in GitHub users who are known team members. Room mutations, attachment blob reads, and WebSocket room joins require membership, except that a valid room invite id can be presented once to admit an authenticated joiner. The invite id is server-visible metadata. Gated invite links do not include the room secret; direct invite links can include it in the URL fragment, which is not sent to the relay by normal HTTP requests.
 
-This limits casual cross-team metadata exposure on hosted/self-hosted relays. It is not full cryptographic membership enforcement: anyone with a valid room key can decrypt content they already received, and production-grade removal still needs key rotation and mediated key exchange.
+Team member removal closes that user's live relay sockets for the team and invalidates outstanding team invite metadata, so stale invites cannot immediately re-admit the removed user. This limits casual cross-team metadata exposure on hosted/self-hosted relays. It is not full cryptographic membership enforcement: anyone with a valid room key can decrypt content they already received, and production-grade removal still needs key rotation and mediated key exchange.
 
 The relay also bounds stored and live routing metadata such as team names, room names, WebSocket user/device identities, live presence labels, avatar URLs, host labels, device identity fields, public key fingerprints, public key JWK blobs, project paths, and model ids. Oversized or control-character-bearing user-visible metadata is rejected at HTTP/WebSocket boundaries, and persisted records are normalized or discarded on startup.
 

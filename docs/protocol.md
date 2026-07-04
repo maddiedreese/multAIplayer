@@ -39,6 +39,8 @@ Encrypted room envelopes are idempotent by envelope id within a room. If the sam
 
 When relay auth is required, workspace metadata is scoped to the signed-in GitHub user's team memberships. Non-members cannot list a team's rooms, create rooms, create invites, upload or fetch attachment blobs, change room settings, or join the room WebSocket unless they present a valid invite id for that room. The invite id does not carry the room key; it only lets the relay add the authenticated user to the team membership list so encrypted room traffic can be routed.
 
+When a team member is removed, the relay closes that user's live room/team/workspace sockets for the team and deletes outstanding invite metadata for that team. Removed users must receive a fresh invite before the relay will admit them again. This does not erase room keys or ciphertext already present on their device.
+
 Desktop clients register a device public key with `POST /devices`. The relay stores the user id, device id, display name, public JWK, fingerprint, and timestamps. On authenticated relays, the device user id is bound to the signed-in GitHub session and a mismatched client-supplied user id is rejected. The private key stays on the device.
 
 Device fingerprint trust is local desktop state. The relay does not receive or store trusted/untrusted decisions. A trusted badge means this device has locally marked the exact room id, device id, and fingerprint as expected.

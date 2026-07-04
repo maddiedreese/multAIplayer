@@ -567,6 +567,8 @@ app.delete("/teams/:teamId/members/:userId", (req, res) => {
   if (team) {
     const updatedTeam = { ...team, members: members.size };
     teams.set(teamId, updatedTeam);
+    revokeTeamInvites(teamId);
+    revokeTeamMemberSessions(teamId, userId);
     broadcastWorkspaceUpdated(updatedTeam);
   }
   scheduleStoreSave();
@@ -1266,6 +1268,34 @@ function leaveWorkspace(session: ClientSession) {
   if (!session.workspaceSubscribed) return;
   workspaceSockets.delete(session.socket);
   session.workspaceSubscribed = false;
+}
+
+function revokeTeamMemberSessions(teamId: string, userId: string) {
+  for (const session of Array.from(sessions.values())) {
+    if (session.authSession?.user.id !== userId && session.userId !== userId) continue;
+
+    const joinedRemovedTeam = session.teamId === teamId;
+    const subscribedRemovedTeam = session.subscribedTeamIds.has(teamId);
+    const workspaceSubscribed = session.workspaceSubscribed;
+    if (!joinedRemovedTeam && !subscribedRemovedTeam && !workspaceSubscribed) continue;
+
+    send(session.socket, { type: "error", message: "Your team membership was removed. Rejoin with a fresh invite before continuing." });
+    leaveRoom(session);
+    leaveTeams(session);
+    leaveWorkspace(session);
+    session.socket.close(1008, "Team membership removed");
+  }
+}
+
+function revokeTeamInvites(teamId: string) {
+  let revoked = false;
+  for (const [inviteId, invite] of invites.entries()) {
+    if (invite.teamId === teamId) {
+      invites.delete(inviteId);
+      revoked = true;
+    }
+  }
+  if (revoked) scheduleStoreSave();
 }
 
 function publishEnvelope(envelope: RelayEnvelope) {

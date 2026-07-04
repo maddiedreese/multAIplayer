@@ -1487,6 +1487,68 @@ test("relay scopes authenticated workspace access to team members and admits inv
   }
 });
 
+test("relay revokes live room access and stale invites when a team member is removed", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const ownerCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+  const peerCookie = await createDebugSession(relay.baseUrl, "github:peer", "peer");
+  let peerSocket: WebSocket | null = null;
+  let staleInviteSocket: WebSocket | null = null;
+  try {
+    const inviteResponse = await fetch(`${relay.baseUrl}/invites`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
+    });
+    assert.equal(inviteResponse.status, 201);
+    const inviteBody = await inviteResponse.json() as { invite: { id: string } };
+
+    peerSocket = new WebSocket(relay.wsUrl, { headers: { cookie: peerCookie } });
+    await onceOpen(peerSocket);
+    peerSocket.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:peer",
+      deviceId: "device-peer-removed",
+      inviteId: inviteBody.invite.id
+    }));
+    await waitForJoined(peerSocket);
+
+    const removalError = waitForError(peerSocket);
+    const removalClose = waitForClose(peerSocket);
+    const removeResponse = await fetch(`${relay.baseUrl}/teams/team-core/members/github%3Apeer`, {
+      method: "DELETE",
+      headers: { cookie: ownerCookie }
+    });
+    assert.equal(removeResponse.status, 200);
+    assert.match(await removalError, /membership was removed/);
+    assert.equal((await removalClose).code, 1008);
+
+    const peerWorkspace = await fetch(`${relay.baseUrl}/teams`, {
+      headers: { cookie: peerCookie }
+    });
+    assert.equal(peerWorkspace.status, 200);
+    assert.deepEqual(await peerWorkspace.json(), { teams: [], rooms: [] });
+
+    staleInviteSocket = new WebSocket(relay.wsUrl, { headers: { cookie: peerCookie } });
+    await onceOpen(staleInviteSocket);
+    const staleInviteError = waitForError(staleInviteSocket);
+    staleInviteSocket.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:peer",
+      deviceId: "device-peer-stale-invite",
+      inviteId: inviteBody.invite.id
+    }));
+    assert.match(await staleInviteError, /valid invite/);
+  } finally {
+    peerSocket?.close();
+    staleInviteSocket?.close();
+    await relay.close();
+  }
+});
+
 test("relay assigns team creators owner role", async () => {
   const relay = await startRelay({
     MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
@@ -2160,6 +2222,17 @@ function waitForRejectedOpen(socket: WebSocket): Promise<string> {
       clearTimeout(timer);
       resolveReject(error.message);
     });
+  });
+}
+
+function waitForClose(socket: WebSocket): Promise<{ code: number; reason: string }> {
+  return new Promise((resolveClose, rejectClose) => {
+    const timer = setTimeout(() => rejectClose(new Error("Timed out waiting for WebSocket close")), 5_000);
+    socket.once("close", (code, reason) => {
+      clearTimeout(timer);
+      resolveClose({ code, reason: reason.toString() });
+    });
+    socket.once("error", rejectClose);
   });
 }
 
