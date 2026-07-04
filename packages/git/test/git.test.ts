@@ -4,6 +4,7 @@ import {
   assertSafeBranchName,
   createBranchApproval,
   createGitWorkflowApprovalPlan,
+  formatGitWorkflowApprovalPreview,
   maxCommitMessageChars,
   maxGitBranchNameChars,
   normalizeCommitMessage
@@ -44,6 +45,26 @@ test("createGitWorkflowApprovalPlan includes push and draft PR approval steps", 
     "git push -u origin 'codex/test-plan'",
     "gh pr create --draft --head 'codex/test-plan'"
   ]);
+});
+
+test("formatGitWorkflowApprovalPreview exposes pre-run host review steps", () => {
+  const plan = createGitWorkflowApprovalPlan("/repo", "codex/test-plan", "Commit changes", true);
+  const preview = formatGitWorkflowApprovalPreview(plan);
+
+  assert.deepEqual(preview.map((item) => item.title), [
+    "Create branch codex/test-plan",
+    "Commit staged room changes",
+    "Push branch codex/test-plan",
+    "Open draft pull request from codex/test-plan"
+  ]);
+  assert.deepEqual(preview.flatMap((item) => item.commands), [
+    "git switch -c 'codex/test-plan'",
+    "git add -A",
+    "git commit -m 'Commit changes'",
+    "git push -u origin 'codex/test-plan'",
+    "gh pr create --draft --head 'codex/test-plan'"
+  ]);
+  assert.match(preview.at(-1)?.detail ?? "", /signed-in GitHub session/);
 });
 
 test("approval command previews quote single quotes safely", () => {

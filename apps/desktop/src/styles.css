@@ -1952,6 +1952,56 @@ button:disabled {
   background: #fffdfa;
 }
 
+.git-approval-preview {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid #d8ded8;
+  border-radius: 8px;
+  background: #f8faf7;
+}
+
+.git-approval-preview > strong {
+  color: #25312a;
+  font-size: 13px;
+}
+
+.git-approval-preview > small {
+  color: #68756d;
+  font-size: 11px;
+}
+
+.git-approval-step {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid #e2e7e1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.git-approval-step span {
+  color: #25312a;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.git-approval-step small {
+  color: #68756d;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.git-approval-step code {
+  overflow-x: auto;
+  padding: 5px 6px;
+  border-radius: 6px;
+  background: #eef1ed;
+  color: #25312a;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .primary-wide {
   display: inline-flex;
   align-items: center;
@@ -2138,6 +2188,12 @@ button:disabled {
   color: #3c4840;
   font-size: 12px;
   line-height: 1.4;
+}
+
+.workflow-message.danger {
+  border-color: #f0c6bf;
+  background: #fff3f1;
+  color: #8c2d25;
 }
 
 .actions-list {

@@ -169,7 +169,7 @@ import {
 } from "./lib/workspaceCreation";
 import { createHandoffSettingsPatch } from "./lib/hostHandoff";
 import { detectBrowserSecretRisks, detectSecretRisks } from "./lib/secretRisks";
-import { createGitWorkflowApprovalPlan } from "@multaiplayer/git";
+import { createGitWorkflowApprovalPlan, formatGitWorkflowApprovalPreview } from "@multaiplayer/git";
 import { normalizeGitHubBranchName } from "@multaiplayer/github";
 import { terminalRequestForApprovedRun } from "./lib/terminalApproval";
 import { readInviteUrlPayload } from "./lib/inviteUrl";
@@ -572,6 +572,30 @@ export function App() {
   const actionsMessage = actionsMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const terminalLines = terminalLinesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const actionsSummary = useMemo(() => summarizeActionRuns(actionRuns), [actionRuns]);
+  const gitApprovalPreview = useMemo(() => {
+    try {
+      const plan = createGitWorkflowApprovalPlan(
+        selectedRoom.projectPath,
+        gitBranchName,
+        gitCommitMessage,
+        gitPushEnabled
+      );
+      const normalizedBase = gitPushEnabled ? normalizeGitHubBranchName(prBase.trim() || "main") : prBase.trim();
+      return {
+        plan,
+        normalizedBase,
+        steps: formatGitWorkflowApprovalPreview(plan),
+        error: null
+      };
+    } catch (error) {
+      return {
+        plan: null,
+        normalizedBase: prBase.trim(),
+        steps: [],
+        error: String(error)
+      };
+    }
+  }, [gitBranchName, gitCommitMessage, gitPushEnabled, prBase, selectedRoom.projectPath]);
   const codexTurnSummary = useMemo(
     () => buildCodexTurnSummary(messages, selectedRoom, terminals, browserRequests, gitStatus),
     [messages, selectedRoom, terminals, browserRequests, gitStatus]
@@ -3458,20 +3482,12 @@ export function App() {
     const room = selectedRoom;
     const roomId = room.id;
     const projectPath = room.projectPath;
-    let gitPlan: ReturnType<typeof createGitWorkflowApprovalPlan>;
-    let normalizedPrBase = prBase.trim();
-    try {
-      gitPlan = createGitWorkflowApprovalPlan(
-        projectPath,
-        gitBranchName,
-        gitCommitMessage,
-        gitPushEnabled
-      );
-      if (gitPlan.push) normalizedPrBase = normalizeGitHubBranchName(normalizedPrBase || "main");
-    } catch (error) {
-      setGitWorkflowMessage(String(error));
+    if (!gitApprovalPreview.plan) {
+      setGitWorkflowMessage(gitApprovalPreview.error ?? "Git workflow approval preview is invalid.");
       return;
     }
+    const gitPlan = gitApprovalPreview.plan;
+    const normalizedPrBase = gitApprovalPreview.normalizedBase;
     setGitWorkflowBusy(true);
     setGitWorkflowMessage(null);
     appendTerminalLinesForRoom(roomId, [
@@ -4918,11 +4934,30 @@ export function App() {
             />
             <span>Push branch and open draft PR</span>
           </label>
+          <div className="git-approval-preview">
+            <strong>Host will approve</strong>
+            {gitApprovalPreview.error ? (
+              <div className="workflow-message danger">{gitApprovalPreview.error}</div>
+            ) : (
+              gitApprovalPreview.steps.map((step) => (
+                <div className="git-approval-step" key={step.title}>
+                  <span>{step.title}</span>
+                  <small>{step.detail}</small>
+                  {step.commands.map((command) => (
+                    <code key={command}>{command}</code>
+                  ))}
+                </div>
+              ))
+            )}
+            {gitPushEnabled && !gitApprovalPreview.error && (
+              <small>Draft PR target: {prOwner}/{prRepo} to {gitApprovalPreview.normalizedBase || "main"}</small>
+            )}
+          </div>
           <button className="ghost-wide" onClick={copyPullRequestDraftMarkdown} disabled={!hasSelectedRoom}>
             <Copy size={15} />
             Copy PR draft
           </button>
-          <button className="primary-wide" onClick={approveGitWorkflow} disabled={!hasSelectedRoom || gitWorkflowBusy || !isActiveHost}>
+          <button className="primary-wide" onClick={approveGitWorkflow} disabled={!hasSelectedRoom || gitWorkflowBusy || !isActiveHost || Boolean(gitApprovalPreview.error)}>
             <Github size={15} />
             {gitWorkflowBusy ? "Running approved git workflow" : "Approve git workflow"}
           </button>

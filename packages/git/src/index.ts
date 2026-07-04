@@ -13,6 +13,12 @@ export interface GitWorkflowApprovalPlan {
   approvals: GitActionApproval[];
 }
 
+export interface GitWorkflowApprovalPreview {
+  title: string;
+  detail: string;
+  commands: string[];
+}
+
 export interface GitStatusFile {
   path: string;
   status: "added" | "modified" | "deleted" | "renamed" | "untracked";
@@ -89,6 +95,16 @@ export function createGitWorkflowApprovalPlan(
     push,
     approvals
   };
+}
+
+export function formatGitWorkflowApprovalPreview(plan: GitWorkflowApprovalPlan): GitWorkflowApprovalPreview[] {
+  return plan.approvals.map((approval) => ({
+    title: approval.summary,
+    detail: approval.action === "pull_request"
+      ? "Uses the signed-in GitHub session to open a draft pull request after push succeeds."
+      : `Runs in ${approval.cwd}`,
+    commands: [...approval.commands]
+  }));
 }
 
 export function assertSafeBranchName(branch: string): string {
