@@ -1,4 +1,5 @@
 import type {
+  ApprovalPolicy,
   AttachmentBlobRecord,
   CiphertextPayload,
   DeviceRecord,
@@ -67,13 +68,14 @@ export async function registerDevice(request: DeviceRegistrationRequest): Promis
 export async function createRoom(
   teamId: string,
   name: string,
-  projectPath: string
+  projectPath: string,
+  approvalPolicy?: ApprovalPolicy
 ): Promise<RoomRecord> {
   const response = await fetch(`${getRelayHttpUrl()}/rooms`, {
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ teamId, name, projectPath })
+    body: JSON.stringify({ teamId, name, projectPath, approvalPolicy })
   });
   const body = await readJsonResponse<{ room: RoomRecord }>(response, "Failed to create room");
   return body.room as RoomRecord;

@@ -525,6 +525,7 @@ app.post("/rooms", (req, res) => {
   const teamId = String(req.body?.teamId ?? "");
   const name = normalizeMetadataText(req.body?.name, maxRoomNameChars);
   const projectPath = normalizeRoomProjectPath(req.body?.projectPath);
+  const approvalPolicy = req.body?.approvalPolicy === undefined ? "ask_every_turn" : String(req.body.approvalPolicy);
   if (!teams.has(teamId)) {
     res.status(404).json({ error: "Team not found" });
     return;
@@ -541,6 +542,10 @@ app.post("/rooms", (req, res) => {
     res.status(400).json({ error: `projectPath must be a non-empty string up to ${maxRoomProjectPathChars} characters` });
     return;
   }
+  if (!isApprovalPolicy(approvalPolicy)) {
+    res.status(400).json({ error: "approvalPolicy is invalid" });
+    return;
+  }
   const room: RoomRecord = {
     id: `room_${nanoid(10)}`,
     teamId,
@@ -548,7 +553,7 @@ app.post("/rooms", (req, res) => {
     projectPath,
     host: "No host",
     hostStatus: "offline",
-    approvalPolicy: "ask_every_turn",
+    approvalPolicy,
     mode: defaultRoomMode,
     codexModel: defaultCodexModel,
     browserAllowedOrigins: defaultBrowserAllowedOrigins,

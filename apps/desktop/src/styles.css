@@ -2166,7 +2166,7 @@ button:disabled {
 
 .history-retention {
   display: grid;
-  grid-template-columns: 1fr 86px;
+  grid-template-columns: minmax(0, 1fr) minmax(86px, 180px);
   align-items: center;
   gap: 8px;
   color: #4b574f;
@@ -2174,7 +2174,8 @@ button:disabled {
   font-weight: 680;
 }
 
-.history-retention input {
+.history-retention input,
+.history-retention select {
   min-height: 34px;
   padding: 7px 8px;
   border: 1px solid #d8ded8;
@@ -2182,6 +2183,7 @@ button:disabled {
   outline: none;
   background: #fff;
   color: #17201b;
+  min-width: 0;
 }
 
 .history-defaults {

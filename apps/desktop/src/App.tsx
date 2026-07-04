@@ -91,6 +91,7 @@ import {
   type LocalHistorySettings,
   saveEncryptedHistory
 } from "./lib/localHistory";
+import { loadTeamRoomDefaults, saveTeamRoomDefaults } from "./lib/teamRoomDefaults";
 import { loadOrCreateDeviceIdentity, resetDeviceIdentity, type DeviceIdentity } from "./lib/deviceIdentity";
 import {
   isDeviceKeyTrusted,
@@ -487,6 +488,9 @@ export function App() {
     enabled: true,
     retentionDays: 30
   });
+  const [teamDefaultApprovalPolicy, setTeamDefaultApprovalPolicy] = useState<ApprovalPolicy>(() =>
+    loadTeamRoomDefaults(seededTeams[0].id).approvalPolicy
+  );
   const [historyMessagesByRoom, setHistoryMessagesByRoom] = useState<Record<string, string | null>>({});
   const [teamHistoryMessagesByTeam, setTeamHistoryMessagesByTeam] = useState<Record<string, string | null>>({});
   const [newTeamName, setNewTeamName] = useState("");
@@ -1074,6 +1078,7 @@ export function App() {
   useEffect(() => {
     if (!selectedTeam) return;
     setTeamHistorySettings(loadTeamHistorySettings(selectedTeam));
+    setTeamDefaultApprovalPolicy(loadTeamRoomDefaults(selectedTeam).approvalPolicy);
   }, [selectedTeam]);
 
   useEffect(() => {
@@ -1796,7 +1801,8 @@ export function App() {
       const room = await createRoom(
         plan.teamId,
         plan.name,
-        plan.projectPath
+        plan.projectPath,
+        loadTeamRoomDefaults(plan.teamId).approvalPolicy
 	      );
       upsertRoom(ensureRoomDefaults(room));
       setForgottenRoomIds((current) => withoutSetValue(current, room.id));
@@ -2456,6 +2462,19 @@ export function App() {
       saved.enabled
         ? `Team default local history retention set to ${saved.retentionDays} days for new rooms.`
         : "Team default local history is disabled for new rooms."
+    );
+  }
+
+  function updateTeamDefaultApprovalPolicy(approvalPolicy: ApprovalPolicy) {
+    if (!selectedTeam) {
+      setSelectedTeamHistoryMessage("Create or select a team before changing team defaults.");
+      return;
+    }
+    const saved = saveTeamRoomDefaults(selectedTeam, { approvalPolicy });
+    setTeamDefaultApprovalPolicy(saved.approvalPolicy);
+    setTeamHistoryMessageForTeam(
+      selectedTeam,
+      `New rooms in this team will default to ${approvalPolicyLabels[saved.approvalPolicy]}.`
     );
   }
 
@@ -4730,6 +4749,18 @@ export function App() {
 	                    }
 	                  />
 	                </label>
+	                <label className="history-retention">
+	                  <span>New room approval</span>
+	                  <select
+	                    value={teamDefaultApprovalPolicy}
+	                    disabled={!selectedTeam}
+	                    onChange={(event) => updateTeamDefaultApprovalPolicy(event.target.value as ApprovalPolicy)}
+	                  >
+	                    {(Object.keys(approvalPolicyLabels) as ApprovalPolicy[]).map((policy) => (
+	                      <option key={policy} value={policy}>{approvalPolicyLabels[policy]}</option>
+	                    ))}
+	                  </select>
+	                </label>
 	                <button className="ghost-wide" onClick={applyTeamHistoryDefaultsToRoom} disabled={!hasSelectedRoom}>
 	                  <Check size={15} />
 	                  Apply team default to room
@@ -5513,6 +5544,18 @@ export function App() {
 	                })
 	              }
 	            />
+	          </label>
+	          <label className="history-retention">
+	            <span>New room approval</span>
+	            <select
+	              value={teamDefaultApprovalPolicy}
+	              disabled={!selectedTeam}
+	              onChange={(event) => updateTeamDefaultApprovalPolicy(event.target.value as ApprovalPolicy)}
+	            >
+	              {(Object.keys(approvalPolicyLabels) as ApprovalPolicy[]).map((policy) => (
+	                <option key={policy} value={policy}>{approvalPolicyLabels[policy]}</option>
+	              ))}
+	            </select>
 	          </label>
 	          {visibleHistoryMessage && <div className="workflow-message">{visibleHistoryMessage}</div>}
 	        </section>

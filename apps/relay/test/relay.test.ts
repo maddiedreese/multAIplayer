@@ -129,8 +129,40 @@ test("relay broadcasts newly created rooms to team subscribers", async () => {
     const updatedRoom = await updatePromise;
     assert.equal(updatedRoom.name, "New project room");
     assert.equal(updatedRoom.teamId, "team-core");
+    assert.equal(updatedRoom.approvalPolicy, "ask_every_turn");
   } finally {
     socket.close();
+    await relay.close();
+  }
+});
+
+test("relay accepts approval policy when creating a room", async () => {
+  const relay = await startRelay();
+  try {
+    const response = await fetch(`${relay.baseUrl}/rooms`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        teamId: "team-core",
+        name: "Autopilot room",
+        projectPath: "/tmp/multaiplayer",
+        approvalPolicy: "auto_chat_only"
+      })
+    });
+    assert.equal(response.status, 201);
+    const body = await response.json() as { room: { approvalPolicy: string } };
+    assert.equal(body.room.approvalPolicy, "auto_chat_only");
+
+    assert.equal(
+      await postJsonStatus(relay.baseUrl, "/rooms", {
+        teamId: "team-core",
+        name: "Bad policy room",
+        projectPath: "/tmp/multaiplayer",
+        approvalPolicy: "surprise"
+      }),
+      400
+    );
+  } finally {
     await relay.close();
   }
 });

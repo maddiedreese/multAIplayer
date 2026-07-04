@@ -1,0 +1,70 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  loadTeamRoomDefaults,
+  saveTeamRoomDefaults,
+  sanitizeTeamRoomDefaults,
+  teamRoomDefaultsKey
+} from "../src/lib/teamRoomDefaults";
+
+class MemoryStorage {
+  private readonly values = new Map<string, string>();
+
+  get length(): number {
+    return this.values.size;
+  }
+
+  clear(): void {
+    this.values.clear();
+  }
+
+  getItem(key: string): string | null {
+    return this.values.get(key) ?? null;
+  }
+
+  key(index: number): string | null {
+    return Array.from(this.values.keys())[index] ?? null;
+  }
+
+  removeItem(key: string): void {
+    this.values.delete(key);
+  }
+
+  setItem(key: string, value: string): void {
+    this.values.set(key, value);
+  }
+}
+
+const localStorage = new MemoryStorage();
+Object.defineProperty(globalThis, "localStorage", {
+  configurable: true,
+  value: localStorage
+});
+
+test.beforeEach(() => {
+  localStorage.clear();
+});
+
+test("team room defaults persist approval policy per team", () => {
+  const saved = saveTeamRoomDefaults("team-core", { approvalPolicy: "auto_chat_only" });
+
+  assert.deepEqual(saved, { approvalPolicy: "auto_chat_only" });
+  assert.deepEqual(loadTeamRoomDefaults("team-core"), { approvalPolicy: "auto_chat_only" });
+  assert.deepEqual(loadTeamRoomDefaults("team-labs"), { approvalPolicy: "ask_every_turn" });
+});
+
+test("team room defaults sanitize unsupported approval policies", () => {
+  assert.deepEqual(sanitizeTeamRoomDefaults({ approvalPolicy: "surprise" as never }), {
+    approvalPolicy: "ask_every_turn"
+  });
+
+  localStorage.setItem(teamRoomDefaultsKey("team-core"), JSON.stringify({ approvalPolicy: "nope" }));
+  assert.deepEqual(loadTeamRoomDefaults("team-core"), { approvalPolicy: "ask_every_turn" });
+});
+
+test("team room defaults drop corrupted storage", () => {
+  localStorage.setItem(teamRoomDefaultsKey("team-core"), "{");
+
+  assert.deepEqual(loadTeamRoomDefaults("team-core"), { approvalPolicy: "ask_every_turn" });
+  assert.equal(localStorage.getItem(teamRoomDefaultsKey("team-core")), null);
+});
