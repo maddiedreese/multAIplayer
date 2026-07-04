@@ -47,6 +47,7 @@ import type {
   RoomKeyRotationPlaintextPayload,
   RoomRecord,
   RoomMode,
+  TeamMemberRecord,
   TeamRecord,
   TerminalResultPlaintextPayload,
   TerminalRequestPlaintextPayload,
@@ -147,6 +148,7 @@ import {
   createRoom,
   createTeam,
   loadAttachmentBlob,
+  loadTeamMembers,
   loadWorkspace,
   lookupInvite,
   registerDevice,
@@ -296,6 +298,19 @@ const seededTeams: TeamRecord[] = [
   { id: "team-core", name: "Core Team", members: 4, role: "owner" },
   { id: "team-labs", name: "Labs", members: 2 }
 ];
+
+const seededTeamMembers: Record<string, TeamMemberRecord[]> = {
+  "team-core": [
+    { teamId: "team-core", userId: "github:maddiedreese", role: "owner", joinedAt: "2026-07-04T00:00:00.000Z" },
+    { teamId: "team-core", userId: "github:alex", role: "admin", joinedAt: "2026-07-04T00:00:00.000Z" },
+    { teamId: "team-core", userId: "github:tester", role: "member", joinedAt: "2026-07-04T00:00:00.000Z" },
+    { teamId: "team-core", userId: "github:design", role: "member", joinedAt: "2026-07-04T00:00:00.000Z" }
+  ],
+  "team-labs": [
+    { teamId: "team-labs", userId: "github:labs", role: "owner", joinedAt: "2026-07-04T00:00:00.000Z" },
+    { teamId: "team-labs", userId: "github:research", role: "member", joinedAt: "2026-07-04T00:00:00.000Z" }
+  ]
+};
 
 const seededRooms: RoomRecord[] = [
   {
@@ -467,6 +482,8 @@ const defaultBrowserReason = "Use this page as Codex browser context.";
 export function App() {
   const [teams, setTeams] = useState<TeamRecord[]>(seededTeams);
   const [rooms, setRooms] = useState<RoomRecord[]>(seededRooms);
+  const [teamMembersByTeam, setTeamMembersByTeam] = useState<Record<string, TeamMemberRecord[]>>(seededTeamMembers);
+  const [teamMembersMessageByTeam, setTeamMembersMessageByTeam] = useState<Record<string, string | null>>({});
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>(null);
   const [appConfig, setAppConfig] = useState<AppConfig>(() => loadAppConfig());
@@ -591,6 +608,8 @@ export function App() {
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? emptyRoom;
   const selectedTeamName = teams.find((team) => team.id === selectedTeam)?.name ?? (teams.length ? "No team selected" : "No teams yet");
+  const selectedTeamMembers = teamMembersByTeam[selectedTeam] ?? [];
+  const selectedTeamMembersMessage = teamMembersMessageByTeam[selectedTeam] ?? null;
   const selectedCodexModel = selectedRoom?.codexModel ?? defaultCodexModel;
   const selectedBrowserAllowedOrigins = selectedRoom.browserAllowedOrigins ?? defaultBrowserAllowedOrigins;
   const customCodexModel = customCodexModelsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedCodexModel;
@@ -1044,6 +1063,24 @@ export function App() {
         setWorkspaceError(`Using local starter rooms: ${String(error)}`);
       });
   }, [appConfig.relayHttpUrl]);
+
+  useEffect(() => {
+    if (!selectedTeam) return;
+    let cancelled = false;
+    loadTeamMembers(selectedTeam)
+      .then((members) => {
+        if (cancelled) return;
+        setTeamMembersByTeam((current) => ({ ...current, [selectedTeam]: members }));
+        setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: null }));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: String(error) }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [appConfig.relayHttpUrl, selectedTeam]);
 
   useEffect(() => {
     const invitePayload = readInviteUrlPayload(window.location);
@@ -1876,6 +1913,20 @@ export function App() {
       }
       return [...current, team];
     });
+    if (team.role) {
+      setTeamMembersByTeam((current) => {
+        if (current[team.id]?.some((member) => member.userId === localUser.id)) return current;
+        return {
+          ...current,
+          [team.id]: [{
+            teamId: team.id,
+            userId: localUser.id,
+            role: team.role ?? "member",
+            joinedAt: new Date().toISOString()
+          }]
+        };
+      });
+    }
   }
 
   function upsertRoom(room: RoomRecord) {
@@ -5393,6 +5444,36 @@ export function App() {
 
         <section className="panel members-panel">
           <div className="panel-title">
+            <span>Team roster</span>
+            <StatusPill icon={<UsersRound size={13} />} label={`${selectedTeamMembers.length || 0}`} tone="dark" />
+          </div>
+          <div className="member-list">
+            {selectedTeamMembers.map((member) => (
+              <div className="member-row team-member-row" key={`${member.teamId}:${member.userId}`}>
+                <span>{formatTeamMemberInitial(member.userId)}</span>
+                <div>
+                  <strong>{formatTeamMemberName(member.userId, currentUser)}</strong>
+                  <small>{member.userId}</small>
+                </div>
+                <div className="member-badges">
+                  <b className={member.role === "owner" ? "trusted" : member.role === "admin" ? "verified" : ""}>
+                    {formatTeamRole(member.role)}
+                  </b>
+                </div>
+                <small>{formatTeamMemberJoinedAt(member.joinedAt)}</small>
+              </div>
+            ))}
+          </div>
+          {selectedTeamMembers.length === 0 && (
+            <div className="sidebar-empty">
+              {selectedTeam ? "No team roster loaded yet." : "Select a team to view its roster."}
+            </div>
+          )}
+          {selectedTeamMembersMessage && <div className="workflow-message">{selectedTeamMembersMessage}</div>}
+        </section>
+
+        <section className="panel members-panel">
+          <div className="panel-title">
             <span>Members</span>
             <StatusPill icon={<UsersRound size={13} />} label={`${roomMembers.length || 1} online`} tone="blue" />
           </div>
@@ -6224,6 +6305,21 @@ function formatTeamRole(role: NonNullable<TeamRecord["role"]>): string {
   if (role === "owner") return "Owner";
   if (role === "admin") return "Admin";
   return "Member";
+}
+
+function formatTeamMemberInitial(userId: string): string {
+  return userId.replace(/^github:/, "").slice(0, 1).toUpperCase() || "?";
+}
+
+function formatTeamMemberName(userId: string, currentUser: SignedInUser | null): string {
+  if (currentUser?.id === userId) return currentUser.name ?? currentUser.login;
+  return userId.replace(/^github:/, "");
+}
+
+function formatTeamMemberJoinedAt(joinedAt: string): string {
+  const timestamp = Date.parse(joinedAt);
+  if (Number.isNaN(timestamp)) return "joined";
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(timestamp));
 }
 
 function formatCodexThreadId(threadId: string | null): string {

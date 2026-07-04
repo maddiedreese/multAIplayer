@@ -5,6 +5,7 @@ import type {
   DeviceRecord,
   InviteRecord,
   RoomRecord,
+  TeamMemberRecord,
   TeamRecord
 } from "@multaiplayer/protocol";
 import { getRelayHttpUrl } from "./appConfig";
@@ -52,6 +53,14 @@ export async function createTeam(name: string): Promise<TeamRecord> {
   });
   const body = await readJsonResponse<{ team: TeamRecord }>(response, "Failed to create team");
   return body.team as TeamRecord;
+}
+
+export async function loadTeamMembers(teamId: string): Promise<TeamMemberRecord[]> {
+  const response = await fetch(`${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/members`, {
+    credentials: "include"
+  });
+  const body = await readJsonResponse<{ members: TeamMemberRecord[] }>(response, "Failed to load team members");
+  return body.members as TeamMemberRecord[];
 }
 
 export async function registerDevice(request: DeviceRegistrationRequest): Promise<DeviceRecord> {

@@ -1407,6 +1407,12 @@ button:disabled {
   font-weight: 700;
 }
 
+.team-member-row > small {
+  color: #68756d;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .member-row i {
   width: 8px;
   height: 8px;
