@@ -1838,13 +1838,15 @@ export function App() {
       await importRoomSecret(roomId, unwrappedSecret);
       setForgottenRoomIds((current) => withoutSetValue(current, roomId));
     }
-    setInviteMessage(
-      plaintext.status === "approved"
-        ? plaintext.wrappedRoomSecret
-          ? `${plaintext.decidedBy} approved your room join request and delivered a device-wrapped room key.`
-          : `${plaintext.decidedBy} approved your room join request.`
-        : `${plaintext.decidedBy} denied your room join request.`
-    );
+    if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+      setInviteMessage(
+        plaintext.status === "approved"
+          ? plaintext.wrappedRoomSecret
+            ? `${plaintext.decidedBy} approved your room join request and delivered a device-wrapped room key.`
+            : `${plaintext.decidedBy} approved your room join request.`
+          : `${plaintext.decidedBy} denied your room join request.`
+      );
+    }
   }
 
   async function decideInviteJoinRequest(request: InviteJoinRequest, status: InviteJoinRequest["status"]) {
@@ -1857,45 +1859,50 @@ export function App() {
       return;
     }
     if (status === "pending") return;
-    updateInviteRequestStatus(selectedRoom.id, request.id, status);
+    const room = selectedRoom;
+    updateInviteRequestStatus(room.id, request.id, status);
     setInviteMessage(`${status === "approved" ? "Approved" : "Denied"} ${request.requester}'s join request.`);
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
-    const secret = await loadOrCreateRoomSecret(selectedRoom.id);
-    const wrappedRoomSecret = status === "approved" && request.requesterPublicKeyJwk
-      ? await wrapRoomSecretForDevice(secret, request.requesterPublicKeyJwk)
-      : undefined;
-    const payload: InviteJoinStatusPlaintextPayload = {
-      eventType: "invite.status",
-      requestId: request.id,
-      status,
-      decidedBy: localUser.name,
-      decidedByUserId: localUser.id,
-      decidedAt: new Date().toISOString(),
-      recipientDeviceId: request.requesterDeviceId,
-      recipientPublicKeyFingerprint: request.requesterPublicKeyFingerprint,
-      wrappedRoomSecret: wrappedRoomSecret
-        ? {
-            ...wrappedRoomSecret,
-            ephemeralPublicKeyJwk: jsonWebKeyToRecord(wrappedRoomSecret.ephemeralPublicKeyJwk)
-        }
-        : undefined
-    };
-    const envelopePayload = request.requesterPublicKeyJwk
-      ? await sealJsonToDevice(payload, request.requesterPublicKeyJwk)
-      : await encryptJson(payload, secret);
-    const envelope: RelayEnvelope = {
-      id: crypto.randomUUID(),
-      teamId: selectedRoom.teamId,
-      roomId: selectedRoom.id,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
-      createdAt: payload.decidedAt,
-      kind: "room.invite",
-      payload: envelopePayload
-    };
-    seenEnvelopeIds.current.add(envelope.id);
-    client.publish({ type: "publish", envelope });
+    try {
+      const secret = await loadOrCreateRoomSecret(room.id);
+      const wrappedRoomSecret = status === "approved" && request.requesterPublicKeyJwk
+        ? await wrapRoomSecretForDevice(secret, request.requesterPublicKeyJwk)
+        : undefined;
+      const payload: InviteJoinStatusPlaintextPayload = {
+        eventType: "invite.status",
+        requestId: request.id,
+        status,
+        decidedBy: localUser.name,
+        decidedByUserId: localUser.id,
+        decidedAt: new Date().toISOString(),
+        recipientDeviceId: request.requesterDeviceId,
+        recipientPublicKeyFingerprint: request.requesterPublicKeyFingerprint,
+        wrappedRoomSecret: wrappedRoomSecret
+          ? {
+              ...wrappedRoomSecret,
+              ephemeralPublicKeyJwk: jsonWebKeyToRecord(wrappedRoomSecret.ephemeralPublicKeyJwk)
+          }
+          : undefined
+      };
+      const envelopePayload = request.requesterPublicKeyJwk
+        ? await sealJsonToDevice(payload, request.requesterPublicKeyJwk)
+        : await encryptJson(payload, secret);
+      const envelope: RelayEnvelope = {
+        id: crypto.randomUUID(),
+        teamId: room.teamId,
+        roomId: room.id,
+        senderDeviceId: deviceId,
+        senderUserId: localUser.id,
+        createdAt: payload.decidedAt,
+        kind: "room.invite",
+        payload: envelopePayload
+      };
+      seenEnvelopeIds.current.add(envelope.id);
+      client.publish({ type: "publish", envelope });
+    } catch (error) {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setInviteMessage(String(error));
+    }
   }
 
   function markLatestHostHandoffAccepted(roomId: string) {
@@ -2303,52 +2310,68 @@ export function App() {
       setInviteMessage("Create or join a room before copying an invite.");
       return;
     }
+    const room = selectedRoom;
+    const roomId = room.id;
     setInviteMessage(null);
     setInviteLink("");
     try {
-      const invite = await createInvite(selectedRoom.teamId, selectedRoom.id);
+      const invite = await createInvite(room.teamId, room.id);
       if (inviteApprovalGate) {
         if (!deviceIdentity) {
-          setInviteMessage("Device key is still being prepared. Try again in a moment.");
+          if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+            setInviteMessage("Device key is still being prepared. Try again in a moment.");
+          }
           return;
         }
         const joinFragment = encodeNoSecretRoomInvite({
           version: 1,
-          teamId: selectedRoom.teamId,
-          roomId: selectedRoom.id,
-          roomName: selectedRoom.name,
+          teamId: room.teamId,
+          roomId: room.id,
+          roomName: room.name,
           hostDeviceId: deviceId,
           hostPublicKeyJwk: jsonWebKeyToRecord(deviceIdentity.publicKeyJwk),
           hostPublicKeyFingerprint: deviceIdentity.publicKeyFingerprint
         });
         const link = `${window.location.origin}${window.location.pathname}?invite=${invite.id}#multaiplayerJoin=${joinFragment}&approval=request`;
-        setInviteLink(displayableInviteLink(link, false));
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+          setInviteLink(displayableInviteLink(link, false));
+        }
         try {
           await navigator.clipboard.writeText(link);
-          setInviteMessage("Copied gated invite link. The room key is not in the link; approval delivers it wrapped to the joiner's device key.");
+          if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+            setInviteMessage("Copied gated invite link. The room key is not in the link; approval delivers it wrapped to the joiner's device key.");
+          }
         } catch {
-          setInviteMessage("Gated invite generated. Copying was blocked because the app was not focused; the room key is not in the link.");
+          if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+            setInviteMessage("Gated invite generated. Copying was blocked because the app was not focused; the room key is not in the link.");
+          }
         }
         return;
       }
-      const secret = await exportRoomSecret(selectedRoom.id);
+      const secret = await exportRoomSecret(room.id);
       const secretFragment = encodeRoomInviteSecret({
         version: 1,
-        teamId: selectedRoom.teamId,
-        roomId: selectedRoom.id,
-        roomName: selectedRoom.name,
+        teamId: room.teamId,
+        roomId: room.id,
+        roomName: room.name,
         secret
       });
       const link = `${window.location.origin}${window.location.pathname}?invite=${invite.id}#multaiplayerInvite=${secretFragment}`;
-      setInviteLink(displayableInviteLink(link, true));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setInviteLink(displayableInviteLink(link, true));
+      }
       try {
         await navigator.clipboard.writeText(link);
-        setInviteMessage("Copied direct invite link. It contains the room key, so it is not displayed in the app after copying.");
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+          setInviteMessage("Copied direct invite link. It contains the room key, so it is not displayed in the app after copying.");
+        }
       } catch {
-        setInviteMessage("Direct invite generated, but copying was blocked. Because it contains the room key, it is not displayed; focus the app and try again or use the approval gate.");
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+          setInviteMessage("Direct invite generated, but copying was blocked. Because it contains the room key, it is not displayed; focus the app and try again or use the approval gate.");
+        }
       }
     } catch (error) {
-      setInviteMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setInviteMessage(String(error));
     }
   }
 
@@ -2410,14 +2433,16 @@ export function App() {
         createdAt: rotatedAt
       });
       setForgottenRoomIds((current) => withoutSetValue(current, room.id));
-      setInviteLink("");
-      setInviteMessage(
-        client && relayStatus !== "closed" && relayStatus !== "error"
-          ? "Rotated the room key for future messages and invites. Current key holders can receive it through the encrypted room event."
-          : "Rotated the local room key, but the relay is offline. Other members will need a fresh invite key."
-      );
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
+        setInviteLink("");
+        setInviteMessage(
+          client && relayStatus !== "closed" && relayStatus !== "error"
+            ? "Rotated the room key for future messages and invites. Current key holders can receive it through the encrypted room event."
+            : "Rotated the local room key, but the relay is offline. Other members will need a fresh invite key."
+        );
+      }
     } catch (error) {
-      setInviteMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setInviteMessage(String(error));
     } finally {
       setKeyRotationBusy(false);
     }
