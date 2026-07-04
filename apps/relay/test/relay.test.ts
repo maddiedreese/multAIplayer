@@ -1560,6 +1560,31 @@ test("relay lets authorized team roles manage non-owner members", async () => {
     });
     assert.equal(memberPromoteResponse.status, 403);
 
+    const adminTransferResponse = await fetch(`${relay.baseUrl}/teams/team-core/members/github%3Atester/transfer-owner`, {
+      method: "POST",
+      headers: { cookie: adminCookie }
+    });
+    assert.equal(adminTransferResponse.status, 403);
+
+    const transferResponse = await fetch(`${relay.baseUrl}/teams/team-core/members/github%3Aalex/transfer-owner`, {
+      method: "POST",
+      headers: { cookie: ownerCookie }
+    });
+    assert.equal(transferResponse.status, 200);
+    const transferred = await transferResponse.json() as {
+      member: { userId: string; role: string };
+      members: Array<{ userId: string; role: string }>;
+    };
+    assert.equal(transferred.member.userId, "github:alex");
+    assert.equal(transferred.member.role, "owner");
+    assert.deepEqual(
+      transferred.members
+        .filter((member) => member.role === "owner")
+        .map((member) => member.userId),
+      ["github:alex"]
+    );
+    assert.equal(transferred.members.find((member) => member.userId === "github:maddiedreese")?.role, "admin");
+
     const removeOwnerResponse = await fetch(`${relay.baseUrl}/teams/team-core/members/github%3Amaddiedreese`, {
       method: "DELETE",
       headers: { cookie: ownerCookie }

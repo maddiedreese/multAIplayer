@@ -153,6 +153,7 @@ import {
   lookupInvite,
   registerDevice,
   removeTeamMember,
+  transferTeamOwnership,
   updateTeamMemberRole,
   updateRoomHost,
   updateRoomSettings
@@ -1950,6 +1951,28 @@ export function App() {
       setTeamMembersMessageByTeam((current) => ({
         ...current,
         [selectedTeam]: `${formatTeamMemberName(member.userId, currentUser)} is now ${formatTeamRole(role)}.`
+      }));
+    } catch (error) {
+      setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: String(error) }));
+    } finally {
+      setTeamMembersBusyByTeam((current) => ({ ...current, [selectedTeam]: false }));
+    }
+  }
+
+  async function transferOwnershipToTeamMember(member: TeamMemberRecord) {
+    if (!selectedTeam || selectedTeamMembersBusy) return;
+    setTeamMembersBusyByTeam((current) => ({ ...current, [selectedTeam]: true }));
+    setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: null }));
+    try {
+      const members = await transferTeamOwnership(selectedTeam, member.userId);
+      setTeamMembersByTeam((current) => ({ ...current, [selectedTeam]: members }));
+      const localMember = members.find((item) => item.userId === localUser.id);
+      setTeams((current) => current.map((team) =>
+        team.id === selectedTeam ? { ...team, role: localMember?.role ?? team.role } : team
+      ));
+      setTeamMembersMessageByTeam((current) => ({
+        ...current,
+        [selectedTeam]: `${formatTeamMemberName(member.userId, currentUser)} is now the team owner.`
       }));
     } catch (error) {
       setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: String(error) }));
@@ -5509,6 +5532,9 @@ export function App() {
                   {canDemoteTeamMember(selectedTeamRecord, member) && (
                     <button onClick={() => changeTeamMemberRole(member, "member")} disabled={selectedTeamMembersBusy}>Demote</button>
                   )}
+                  {canTransferTeamOwnership(selectedTeamRecord, member, localUser.id) && (
+                    <button onClick={() => transferOwnershipToTeamMember(member)} disabled={selectedTeamMembersBusy}>Make owner</button>
+                  )}
                   {canRemoveTeamMember(selectedTeamRecord, member) && (
                     <button onClick={() => removeMemberFromTeam(member)} disabled={selectedTeamMembersBusy}>Remove</button>
                   )}
@@ -6387,6 +6413,14 @@ function canRemoveTeamMember(team: TeamRecord | null, member: TeamMemberRecord):
   if (member.role === "owner") return false;
   if (team?.role === "owner") return true;
   return team?.role === "admin" && member.role === "member";
+}
+
+function canTransferTeamOwnership(
+  team: TeamRecord | null,
+  member: TeamMemberRecord,
+  localUserId: string
+): boolean {
+  return team?.role === "owner" && member.role !== "owner" && member.userId !== localUserId;
 }
 
 function formatCodexThreadId(threadId: string | null): string {

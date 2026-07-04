@@ -507,6 +507,39 @@ app.patch("/teams/:teamId/members/:userId", (req, res) => {
   res.json({ member: updated, members: listTeamMembers(teamId) });
 });
 
+app.post("/teams/:teamId/members/:userId/transfer-owner", (req, res) => {
+  const session = getAuthSession(req.cookies?.multaiplayer_session);
+  if (!allowMutation(session, res)) return;
+
+  const teamId = String(req.params.teamId ?? "");
+  const userId = String(req.params.userId ?? "");
+  if (!teams.has(teamId)) {
+    res.status(404).json({ error: "Team not found" });
+    return;
+  }
+  const members = teamMembers.get(teamId);
+  const target = members?.get(userId);
+  if (!members || !target) {
+    res.status(404).json({ error: "Team member not found" });
+    return;
+  }
+  const requesterRole = session ? members.get(session.user.id)?.role : "owner";
+  if (requesterRole !== "owner") {
+    res.status(403).json({ error: "Only the current team owner can transfer ownership." });
+    return;
+  }
+  if (session?.user.id && session.user.id === userId) {
+    res.status(400).json({ error: "Choose a different team member before transferring ownership." });
+    return;
+  }
+
+  const updatedMembers = transferTeamOwnership(members, userId);
+  const team = teams.get(teamId);
+  if (team) broadcastWorkspaceUpdated(team);
+  scheduleStoreSave();
+  res.json({ member: updatedMembers.get(userId), members: listTeamMembers(teamId) });
+});
+
 app.delete("/teams/:teamId/members/:userId", (req, res) => {
   const session = getAuthSession(req.cookies?.multaiplayer_session);
   if (!allowMutation(session, res)) return;
@@ -1463,6 +1496,20 @@ function canRemoveTeamMember(requesterRole: TeamRole | undefined, targetRole: Te
   if (targetRole === "owner") return false;
   if (requesterRole === "owner") return true;
   return requesterRole === "admin" && targetRole === "member";
+}
+
+function transferTeamOwnership(
+  members: Map<string, TeamMemberRecord>,
+  nextOwnerUserId: string
+): Map<string, TeamMemberRecord> {
+  for (const [userId, member] of members.entries()) {
+    if (userId === nextOwnerUserId) {
+      members.set(userId, { ...member, role: "owner" });
+    } else if (member.role === "owner") {
+      members.set(userId, { ...member, role: "admin" });
+    }
+  }
+  return members;
 }
 
 function canAccessRoom(teamId: string, roomId: string, userId: string): boolean {

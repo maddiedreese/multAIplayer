@@ -39,6 +39,8 @@ A team/group is the top-level collaboration layer.
 
 Teams can contain many project rooms. Membership is invite-based, with an optional approval gate for team admins.
 
+Owners can promote members, demote admins, remove non-owner members, and transfer ownership to another team member. Ownership transfer is explicit and leaves a single owner; the previous owner becomes an admin.
+
 Team-level settings include:
 
 - members and roles;

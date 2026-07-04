@@ -79,6 +79,15 @@ export async function updateTeamMemberRole(
   return body.members as TeamMemberRecord[];
 }
 
+export async function transferTeamOwnership(teamId: string, userId: string): Promise<TeamMemberRecord[]> {
+  const response = await fetch(`${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}/transfer-owner`, {
+    method: "POST",
+    credentials: "include"
+  });
+  const body = await readJsonResponse<{ members: TeamMemberRecord[] }>(response, "Failed to transfer team ownership");
+  return body.members as TeamMemberRecord[];
+}
+
 export async function removeTeamMember(teamId: string, userId: string): Promise<TeamMemberRecord[]> {
   const response = await fetch(`${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`, {
     method: "DELETE",
