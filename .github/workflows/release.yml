@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release, such as v0.1.0-alpha.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  macos-prerelease:
+    name: macOS prerelease
+    runs-on: macos-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set release tag
+        id: release
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          if ! git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag does not exist: $tag" >&2
+            exit 1
+          fi
+          prerelease=false
+          case "$tag" in
+            *alpha*|*beta*|*rc*) prerelease=true ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Cache Cargo registry and build output
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/desktop/src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify
+        run: npm run verify
+
+      - name: Build unsigned Tauri app
+        run: npm run tauri:build -w @multaiplayer/desktop
+
+      - name: Package release assets
+        run: |
+          mkdir -p release-assets
+          dmg_path="$(find apps/desktop/src-tauri/target/release/bundle/dmg -maxdepth 1 -type f -name '*.dmg' | head -n 1)"
+          if [ -z "$dmg_path" ]; then
+            echo "No DMG found." >&2
+            exit 1
+          fi
+          cp "$dmg_path" "release-assets/$(basename "$dmg_path")"
+          ditto -c -k --sequesterRsrc --keepParent \
+            apps/desktop/src-tauri/target/release/bundle/macos/multAIplayer.app \
+            release-assets/multAIplayer-macos-app.zip
+          (cd release-assets && shasum -a 256 * > SHA256SUMS.txt)
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          args=()
+          if [ "${{ steps.release.outputs.prerelease }}" = "true" ]; then
+            args+=(--prerelease)
+          fi
+          gh release create "${{ steps.release.outputs.tag }}" release-assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "multAIplayer ${{ steps.release.outputs.tag }}" \
+            --notes "$(cat <<'EOF'
+          Automated macOS release build.
+
+          Important alpha notes:
+          - This app is unsigned and not notarized yet. macOS Gatekeeper may require manual approval to open it.
+          - Treat it as security-sensitive alpha software and prefer test/self-hosted rooms before using private projects.
+          - See `SHA256SUMS.txt` for release asset checksums.
+          EOF
+          )" \
+            "${args[@]}"
