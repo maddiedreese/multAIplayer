@@ -4966,11 +4966,28 @@ export function App() {
                 <X size={14} />
               </button>
             </div>
-            <StatusPill
-              icon={<Terminal size={14} />}
-              label={codexProbe?.available ? `${formatCodexModel(selectedCodexModel)}` : "Codex not connected"}
-              tone={codexProbe?.available ? "green" : "muted"}
-            />
+            <label className="header-model-switcher" title={isActiveHost ? "Switch Codex model for this room" : "Only the active host can switch models"}>
+              <Terminal size={14} />
+              <select
+                aria-label="Codex host model"
+                value={codexModelOptions.some((option) => option.id === selectedCodexModel) ? selectedCodexModel : "custom"}
+                disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}
+                onChange={(event) => {
+                  if (event.target.value !== "custom") {
+                    setCodexModel(event.target.value);
+                  }
+                }}
+              >
+                {codexModelOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+                {!codexModelOptions.some((option) => option.id === selectedCodexModel) && (
+                  <option value="custom">{formatCodexModel(selectedCodexModel)}</option>
+                )}
+              </select>
+            </label>
             <StatusPill icon={<Globe2 size={14} />} label={selectedRoom.mode.browser ? "Browser on" : "Browser off"} tone={selectedRoom.mode.browser ? "green" : "muted"} />
             <StatusPill icon={<FolderGit2 size={14} />} label={selectedRoom.projectPath.split("/").slice(-1)[0]} tone="dark" />
             <button className="header-copy" onClick={copyRoomMarkdown} disabled={!hasSelectedRoom}>

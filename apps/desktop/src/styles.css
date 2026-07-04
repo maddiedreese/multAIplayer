@@ -683,6 +683,36 @@ button:disabled {
   font-weight: 700;
 }
 
+.header-model-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  max-width: 178px;
+  padding: 3px 6px 3px 8px;
+  border-radius: 999px;
+  background: #e5f7e8;
+  color: #14542c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.header-model-switcher select {
+  min-width: 0;
+  max-width: 132px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-overflow: ellipsis;
+}
+
+.header-model-switcher:has(select:disabled) {
+  background: #eef1ed;
+  color: #68756d;
+}
+
 .host-message {
   margin: 12px 18px 0;
   padding: 9px 11px;
