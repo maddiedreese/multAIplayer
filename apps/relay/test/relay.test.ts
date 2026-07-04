@@ -1713,51 +1713,57 @@ async function startRelay(
   storedState?: StoredRelayStateFixture,
   existingDataPath?: string
 ): Promise<RelayHarness> {
-  const port = await getFreePort();
   const tempDir = existingDataPath ? resolve(existingDataPath, "..") : await mkdtemp(join(tmpdir(), "multaiplayer-relay-test-"));
   const dataPath = existingDataPath ?? join(tempDir, "relay-store.json");
   if (storedState) {
     await writeFile(dataPath, `${JSON.stringify(storedState, null, 2)}\n`, "utf8");
   }
   const bin = resolve("../../node_modules/.bin/tsx");
-  const child = spawn(bin, ["src/server.ts"], {
-    cwd: resolve("."),
-    env: {
-      ...process.env,
-      ...extraEnv,
-      PORT: String(port),
-      MULTAIPLAYER_RELAY_DATA_PATH: dataPath
-    },
-    stdio: ["ignore", "pipe", "pipe"]
-  });
+  let lastError: unknown = null;
 
-  let output = "";
-  child.stdout.on("data", (chunk) => {
-    output += chunk.toString();
-  });
-  child.stderr.on("data", (chunk) => {
-    output += chunk.toString();
-  });
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const port = await getFreePort();
+    const child = spawn(bin, ["src/server.ts"], {
+      cwd: resolve("."),
+      env: {
+        ...process.env,
+        ...extraEnv,
+        PORT: String(port),
+        MULTAIPLAYER_RELAY_DATA_PATH: dataPath
+      },
+      stdio: ["ignore", "pipe", "pipe"]
+    });
 
-  const baseUrl = `http://127.0.0.1:${port}`;
-  try {
-    await waitForReady(baseUrl, child, () => output);
-  } catch (error) {
-    child.kill("SIGTERM");
-    await rm(tempDir, { recursive: true, force: true });
-    throw error;
+    let output = "";
+    child.stdout.on("data", (chunk) => {
+      output += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      output += chunk.toString();
+    });
+
+    const baseUrl = `http://127.0.0.1:${port}`;
+    try {
+      await waitForReady(baseUrl, child, () => output);
+      return {
+        baseUrl,
+        wsUrl: `ws://127.0.0.1:${port}/rooms`,
+        dataPath,
+        tempDir,
+        async close(options = {}) {
+          await stopProcess(child);
+          if (!options.preserveData) await rm(tempDir, { recursive: true, force: true });
+        }
+      };
+    } catch (error) {
+      lastError = error;
+      await stopProcess(child);
+      if (!String(error).includes("EADDRINUSE")) break;
+    }
   }
 
-  return {
-    baseUrl,
-    wsUrl: `ws://127.0.0.1:${port}/rooms`,
-    dataPath,
-    tempDir,
-    async close(options = {}) {
-      await stopProcess(child);
-      if (!options.preserveData) await rm(tempDir, { recursive: true, force: true });
-    }
-  };
+  await rm(tempDir, { recursive: true, force: true });
+  throw lastError;
 }
 
 async function patchHostStatus(
@@ -2090,7 +2096,7 @@ async function getFreePort(): Promise<number> {
   return new Promise((resolvePort, rejectPort) => {
     const server = createServer();
     server.once("error", rejectPort);
-    server.listen(0, "127.0.0.1", () => {
+    server.listen(0, () => {
       const address = server.address();
       server.close(() => {
         if (typeof address === "object" && address) {
