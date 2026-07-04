@@ -2085,7 +2085,8 @@ export function App() {
         browserRequests,
         inviteRequests,
         codexEvents,
-        hostHandoffs
+        hostHandoffs,
+        ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
       }, saved.retentionDays);
       setMessagesByRoom((current) => ({ ...current, [selectedRoom.id]: payload.messages }));
       setTerminalRequestsByRoom((current) => ({ ...current, [selectedRoom.id]: payload.terminalRequests }));
@@ -5570,7 +5571,8 @@ function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentionDays: 
     browserRequests: payload.browserRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     inviteRequests: payload.inviteRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     codexEvents: payload.codexEvents.filter((event) => isWithinRetention(event.createdAt, cutoffMs)),
-    hostHandoffs: payload.hostHandoffs.filter((handoff) => isWithinRetention(handoff.createdAt, cutoffMs))
+    hostHandoffs: payload.hostHandoffs.filter((handoff) => isWithinRetention(handoff.createdAt, cutoffMs)),
+    ...(payload.codexThreadId ? { codexThreadId: payload.codexThreadId } : {})
   };
 }
 
