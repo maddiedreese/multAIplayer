@@ -49,23 +49,27 @@ test("team room defaults persist approval policy per team", () => {
   const saved = saveTeamRoomDefaults("team-core", {
     approvalPolicy: "auto_chat_only",
     browserAllowedOrigins: ["https://github.com", "https://example.com"],
-    browserProfilePersistent: false
+    browserProfilePersistent: false,
+    inviteApprovalGate: true
   });
 
   assert.deepEqual(saved, {
     approvalPolicy: "auto_chat_only",
     browserAllowedOrigins: ["https://github.com", "https://example.com"],
-    browserProfilePersistent: false
+    browserProfilePersistent: false,
+    inviteApprovalGate: true
   });
   assert.deepEqual(loadTeamRoomDefaults("team-core"), {
     approvalPolicy: "auto_chat_only",
     browserAllowedOrigins: ["https://github.com", "https://example.com"],
-    browserProfilePersistent: false
+    browserProfilePersistent: false,
+    inviteApprovalGate: true
   });
   assert.deepEqual(loadTeamRoomDefaults("team-labs"), {
     approvalPolicy: "ask_every_turn",
     browserAllowedOrigins: ["https://github.com"],
-    browserProfilePersistent: true
+    browserProfilePersistent: true,
+    inviteApprovalGate: false
   });
 });
 
@@ -73,14 +77,16 @@ test("team room defaults sanitize unsupported approval policies", () => {
   assert.deepEqual(sanitizeTeamRoomDefaults({ approvalPolicy: "surprise" as never }), {
     approvalPolicy: "ask_every_turn",
     browserAllowedOrigins: ["https://github.com"],
-    browserProfilePersistent: true
+    browserProfilePersistent: true,
+    inviteApprovalGate: false
   });
 
   localStorage.setItem(teamRoomDefaultsKey("team-core"), JSON.stringify({ approvalPolicy: "nope" }));
   assert.deepEqual(loadTeamRoomDefaults("team-core"), {
     approvalPolicy: "ask_every_turn",
     browserAllowedOrigins: ["https://github.com"],
-    browserProfilePersistent: true
+    browserProfilePersistent: true,
+    inviteApprovalGate: false
   });
 });
 
@@ -92,17 +98,34 @@ test("team room defaults sanitize browser policy", () => {
   }), {
     approvalPolicy: "auto_browser_allowed_sites",
     browserAllowedOrigins: ["https://github.com"],
-    browserProfilePersistent: true
+    browserProfilePersistent: true,
+    inviteApprovalGate: false
   });
 
   assert.deepEqual(sanitizeTeamRoomDefaults({
     approvalPolicy: "auto_browser_allowed_sites",
     browserAllowedOrigins: ["https://github.com", "https://github.com"],
-    browserProfilePersistent: false
+    browserProfilePersistent: false,
+    inviteApprovalGate: true
   }), {
     approvalPolicy: "auto_browser_allowed_sites",
     browserAllowedOrigins: ["https://github.com"],
-    browserProfilePersistent: false
+    browserProfilePersistent: false,
+    inviteApprovalGate: true
+  });
+});
+
+test("team room defaults sanitize invite policy", () => {
+  assert.deepEqual(sanitizeTeamRoomDefaults({
+    approvalPolicy: "ask_every_turn",
+    browserAllowedOrigins: ["https://github.com"],
+    browserProfilePersistent: true,
+    inviteApprovalGate: "yes" as never
+  }), {
+    approvalPolicy: "ask_every_turn",
+    browserAllowedOrigins: ["https://github.com"],
+    browserProfilePersistent: true,
+    inviteApprovalGate: false
   });
 });
 
@@ -112,7 +135,8 @@ test("team room defaults drop corrupted storage", () => {
   assert.deepEqual(loadTeamRoomDefaults("team-core"), {
     approvalPolicy: "ask_every_turn",
     browserAllowedOrigins: ["https://github.com"],
-    browserProfilePersistent: true
+    browserProfilePersistent: true,
+    inviteApprovalGate: false
   });
   assert.equal(localStorage.getItem(teamRoomDefaultsKey("team-core")), null);
 });

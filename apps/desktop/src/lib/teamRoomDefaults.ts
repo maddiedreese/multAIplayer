@@ -9,12 +9,14 @@ export interface TeamRoomDefaults {
   approvalPolicy: ApprovalPolicy;
   browserAllowedOrigins: string[];
   browserProfilePersistent: boolean;
+  inviteApprovalGate: boolean;
 }
 
 const defaultTeamRoomDefaults: TeamRoomDefaults = {
   approvalPolicy: "ask_every_turn",
   browserAllowedOrigins: [...defaultBrowserAllowedOrigins],
-  browserProfilePersistent: defaultBrowserProfilePersistent
+  browserProfilePersistent: defaultBrowserProfilePersistent,
+  inviteApprovalGate: false
 };
 
 const approvalPolicies: ApprovalPolicy[] = [
@@ -31,7 +33,7 @@ export function loadTeamRoomDefaults(teamId: string): TeamRoomDefaults {
     return sanitizeTeamRoomDefaults(JSON.parse(stored) as Partial<TeamRoomDefaults>);
   } catch {
     localStorage.removeItem(teamRoomDefaultsKey(teamId));
-    return defaultTeamRoomDefaults;
+    return copyTeamRoomDefaults(defaultTeamRoomDefaults);
   }
 }
 
@@ -52,7 +54,10 @@ export function sanitizeTeamRoomDefaults(defaults: Partial<TeamRoomDefaults>): T
     browserAllowedOrigins: [...(browserAllowedOrigins ?? defaultTeamRoomDefaults.browserAllowedOrigins)],
     browserProfilePersistent: typeof defaults.browserProfilePersistent === "boolean"
       ? defaults.browserProfilePersistent
-      : defaultTeamRoomDefaults.browserProfilePersistent
+      : defaultTeamRoomDefaults.browserProfilePersistent,
+    inviteApprovalGate: typeof defaults.inviteApprovalGate === "boolean"
+      ? defaults.inviteApprovalGate
+      : defaultTeamRoomDefaults.inviteApprovalGate
   };
 }
 

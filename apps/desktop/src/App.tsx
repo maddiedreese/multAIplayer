@@ -497,6 +497,9 @@ export function App() {
   const [teamDefaultBrowserProfilePersistent, setTeamDefaultBrowserProfilePersistent] = useState(() =>
     loadTeamRoomDefaults(seededTeams[0].id).browserProfilePersistent
   );
+  const [teamDefaultInviteApprovalGate, setTeamDefaultInviteApprovalGate] = useState(() =>
+    loadTeamRoomDefaults(seededTeams[0].id).inviteApprovalGate
+  );
   const [historyMessagesByRoom, setHistoryMessagesByRoom] = useState<Record<string, string | null>>({});
   const [teamHistoryMessagesByTeam, setTeamHistoryMessagesByTeam] = useState<Record<string, string | null>>({});
   const [newTeamName, setNewTeamName] = useState("");
@@ -1088,6 +1091,7 @@ export function App() {
     setTeamDefaultApprovalPolicy(teamRoomDefaults.approvalPolicy);
     setTeamDefaultBrowserAllowedOriginsDraft(teamRoomDefaults.browserAllowedOrigins.join("\n"));
     setTeamDefaultBrowserProfilePersistent(teamRoomDefaults.browserProfilePersistent);
+    setTeamDefaultInviteApprovalGate(teamRoomDefaults.inviteApprovalGate);
   }, [selectedTeam]);
 
   useEffect(() => {
@@ -1820,6 +1824,7 @@ export function App() {
       );
       upsertRoom(ensureRoomDefaults(room));
       setForgottenRoomIds((current) => withoutSetValue(current, room.id));
+      setInviteApprovalGateForRoom(room.id, teamDefaults.inviteApprovalGate);
       saveHistorySettings(room.id, loadTeamHistorySettings(plan.teamId));
       setMessagesByRoom((current) => ({ ...current, [room.id]: [] }));
       setSelectedRoomId(room.id);
@@ -2491,6 +2496,7 @@ export function App() {
     setTeamDefaultApprovalPolicy(saved.approvalPolicy);
     setTeamDefaultBrowserAllowedOriginsDraft(saved.browserAllowedOrigins.join("\n"));
     setTeamDefaultBrowserProfilePersistent(saved.browserProfilePersistent);
+    setTeamDefaultInviteApprovalGate(saved.inviteApprovalGate);
     setTeamHistoryMessageForTeam(
       selectedTeam,
       `New rooms in this team will default to ${approvalPolicyLabels[saved.approvalPolicy]}.`
@@ -2515,11 +2521,33 @@ export function App() {
     setTeamDefaultApprovalPolicy(saved.approvalPolicy);
     setTeamDefaultBrowserAllowedOriginsDraft(saved.browserAllowedOrigins.join("\n"));
     setTeamDefaultBrowserProfilePersistent(saved.browserProfilePersistent);
+    setTeamDefaultInviteApprovalGate(saved.inviteApprovalGate);
     setTeamHistoryMessageForTeam(
       selectedTeam,
       saved.browserAllowedOrigins.length
         ? `New rooms will allow ${saved.browserAllowedOrigins.map(formatBrowserAccessLabel).join(", ")} by default.`
         : "New rooms will start with an empty browser allowlist."
+    );
+  }
+
+  function updateTeamDefaultInviteApprovalGate(inviteApprovalGate: boolean) {
+    if (!selectedTeam) {
+      setSelectedTeamHistoryMessage("Create or select a team before changing team defaults.");
+      return;
+    }
+    const saved = saveTeamRoomDefaults(selectedTeam, {
+      ...loadTeamRoomDefaults(selectedTeam),
+      inviteApprovalGate
+    });
+    setTeamDefaultApprovalPolicy(saved.approvalPolicy);
+    setTeamDefaultBrowserAllowedOriginsDraft(saved.browserAllowedOrigins.join("\n"));
+    setTeamDefaultBrowserProfilePersistent(saved.browserProfilePersistent);
+    setTeamDefaultInviteApprovalGate(saved.inviteApprovalGate);
+    setTeamHistoryMessageForTeam(
+      selectedTeam,
+      saved.inviteApprovalGate
+        ? "New room invites in this team will require host approval by default."
+        : "New room invites in this team will include the room key by default."
     );
   }
 
@@ -4830,6 +4858,15 @@ export function App() {
 	                    Save browser defaults
 	                  </button>
 	                </div>
+	                <label className="checkbox-row">
+	                  <input
+	                    type="checkbox"
+	                    checked={teamDefaultInviteApprovalGate}
+	                    disabled={!selectedTeam}
+	                    onChange={(event) => updateTeamDefaultInviteApprovalGate(event.target.checked)}
+	                  />
+	                  <span>Require host approval for new room invites</span>
+	                </label>
 	                <button className="ghost-wide" onClick={applyTeamHistoryDefaultsToRoom} disabled={!hasSelectedRoom}>
 	                  <Check size={15} />
 	                  Apply team default to room
@@ -5650,6 +5687,15 @@ export function App() {
 	              Save browser defaults
 	            </button>
 	          </div>
+	          <label className="checkbox-row">
+	            <input
+	              type="checkbox"
+	              checked={teamDefaultInviteApprovalGate}
+	              disabled={!selectedTeam}
+	              onChange={(event) => updateTeamDefaultInviteApprovalGate(event.target.checked)}
+	            />
+	            <span>Require host approval for new room invites</span>
+	          </label>
 	          {visibleHistoryMessage && <div className="workflow-message">{visibleHistoryMessage}</div>}
 	        </section>
 
