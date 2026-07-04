@@ -1,0 +1,67 @@
+import { normalizeGitHubBranchName, normalizeGitHubRepoRef } from "@multaiplayer/github";
+import type { GitHubAuthConfig, SignedInUser } from "./authClient";
+
+export interface GitHubWorkflowReadinessInput {
+  pushEnabled: boolean;
+  authConfig: GitHubAuthConfig | null;
+  currentUser: SignedInUser | null;
+  owner: string;
+  repo: string;
+  head: string;
+  base: string;
+}
+
+export interface GitHubWorkflowReadiness {
+  ready: boolean;
+  messages: string[];
+  target: string | null;
+  normalizedBase: string;
+}
+
+export function checkGitHubWorkflowReadiness(input: GitHubWorkflowReadinessInput): GitHubWorkflowReadiness {
+  const messages: string[] = [];
+  let target: string | null = null;
+  let normalizedBase = input.base.trim() || "main";
+
+  if (!input.pushEnabled) {
+    return {
+      ready: true,
+      messages: ["Local branch and commit only. GitHub sign-in is not required until push/PR is enabled."],
+      target,
+      normalizedBase
+    };
+  }
+
+  if (input.authConfig?.configured === false) {
+    messages.push("GitHub OAuth is not configured on this relay.");
+  }
+  if (!input.currentUser) {
+    messages.push("Sign in with GitHub before approving a push and draft PR.");
+  }
+  if (input.authConfig?.scopes.length) {
+    const scopes = new Set(input.authConfig.scopes);
+    if (!scopes.has("public_repo") && !scopes.has("repo")) {
+      messages.push("GitHub OAuth scopes need public_repo for public repos or repo for private repos.");
+    }
+  }
+
+  try {
+    const repo = normalizeGitHubRepoRef(input.owner, input.repo);
+    const head = normalizeGitHubBranchName(input.head);
+    normalizedBase = normalizeGitHubBranchName(normalizedBase);
+    target = `${repo.owner}/${repo.repo}:${head} -> ${normalizedBase}`;
+  } catch (error) {
+    messages.push(String(error));
+  }
+
+  if (messages.length === 0 && target) {
+    messages.push(`Ready to push and open a draft PR: ${target}.`);
+  }
+
+  return {
+    ready: messages.length === 1 && messages[0].startsWith("Ready to push"),
+    messages,
+    target,
+    normalizedBase
+  };
+}

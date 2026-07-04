@@ -179,6 +179,7 @@ import { attachmentReviewMessage, decideAttachmentReview } from "./lib/attachmen
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { copyTextToClipboard } from "./lib/clipboard";
+import { checkGitHubWorkflowReadiness } from "./lib/githubWorkflowReadiness";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -572,6 +573,15 @@ export function App() {
   const actionsMessage = actionsMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const terminalLines = terminalLinesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const actionsSummary = useMemo(() => summarizeActionRuns(actionRuns), [actionRuns]);
+  const githubWorkflowReadiness = useMemo(() => checkGitHubWorkflowReadiness({
+    pushEnabled: gitPushEnabled,
+    authConfig,
+    currentUser,
+    owner: prOwner,
+    repo: prRepo,
+    head: gitBranchName,
+    base: prBase
+  }), [authConfig, currentUser, gitBranchName, gitPushEnabled, prBase, prOwner, prRepo]);
   const gitApprovalPreview = useMemo(() => {
     try {
       const plan = createGitWorkflowApprovalPlan(
@@ -3487,8 +3497,12 @@ export function App() {
       setGitWorkflowMessage(gitApprovalPreview.error ?? "Git workflow approval preview is invalid.");
       return;
     }
+    if (gitPushEnabled && !githubWorkflowReadiness.ready) {
+      setGitWorkflowMessage(githubWorkflowReadiness.messages.join(" "));
+      return;
+    }
     const gitPlan = gitApprovalPreview.plan;
-    const normalizedPrBase = gitApprovalPreview.normalizedBase;
+    const normalizedPrBase = gitPushEnabled ? githubWorkflowReadiness.normalizedBase : gitApprovalPreview.normalizedBase;
     setGitWorkflowBusy(true);
     setGitWorkflowMessage(null);
     appendTerminalLinesForRoom(roomId, [
@@ -4951,14 +4965,23 @@ export function App() {
               ))
             )}
             {gitPushEnabled && !gitApprovalPreview.error && (
-              <small>Draft PR target: {prOwner}/{prRepo} to {gitApprovalPreview.normalizedBase || "main"}</small>
+              <small>Draft PR target: {githubWorkflowReadiness.target ?? `${prOwner}/${prRepo} to ${githubWorkflowReadiness.normalizedBase || "main"}`}</small>
             )}
           </div>
+          {gitPushEnabled && (
+            <div className={`workflow-message ${githubWorkflowReadiness.ready ? "" : "danger"}`}>
+              {githubWorkflowReadiness.messages.join(" ")}
+            </div>
+          )}
           <button className="ghost-wide" onClick={copyPullRequestDraftMarkdown} disabled={!hasSelectedRoom}>
             <Copy size={15} />
             Copy PR draft
           </button>
-          <button className="primary-wide" onClick={approveGitWorkflow} disabled={!hasSelectedRoom || gitWorkflowBusy || !isActiveHost || Boolean(gitApprovalPreview.error)}>
+          <button
+            className="primary-wide"
+            onClick={approveGitWorkflow}
+            disabled={!hasSelectedRoom || gitWorkflowBusy || !isActiveHost || Boolean(gitApprovalPreview.error) || (gitPushEnabled && !githubWorkflowReadiness.ready)}
+          >
             <Github size={15} />
             {gitWorkflowBusy ? "Running approved git workflow" : "Approve git workflow"}
           </button>

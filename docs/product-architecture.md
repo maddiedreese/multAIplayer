@@ -197,6 +197,8 @@ Git operations in v1:
 
 GitHub Actions in v1 are a room-visible branch status surface. After GitHub sign-in, the host can refresh workflow runs for the selected owner, repo, and branch. The loaded runs, last-checked timestamp, and status message are scoped to the current room so switching projects does not show another room's CI state. The UI summarizes whether the loaded runs are passing, failing, running, or unknown, and links directly to each run on GitHub.
 
+Before a host can approve a workflow that pushes and opens a draft PR, the desktop performs a GitHub readiness check. Local-only branch and commit workflows do not require GitHub sign-in. Push/PR workflows require a signed-in GitHub session, a relay with GitHub OAuth configured, PR-capable OAuth scopes (`public_repo` for public repos or `repo` for private repos), and normalized owner/repo/base/head values. The app shows any blocker before approval so a host does not run local git steps and only then discover that the PR cannot be created.
+
 The open-source repo includes a GitHub Actions CI workflow. It checks, tests, and builds all TypeScript workspaces on Ubuntu; on macOS it runs the shared `npm run verify` gate, including Rust formatting and native Tauri/Rust tests, then builds the unsigned desktop app and uploads the `.app` and `.dmg` artifacts for inspection. The repo also provides `npm run doctor` as a read-only local setup check for Node/npm/Rust/Cargo and macOS packaging prerequisites.
 
 Example approval:
