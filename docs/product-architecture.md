@@ -309,7 +309,7 @@ The app must warn that secrets may be exposed. The first-time room warning cover
 
 ### Browser Use
 
-v1 includes an isolated Chromium/WebView browser that Codex can use.
+v1 includes an isolated native WebView browser surface that Codex can use after host approval. On macOS, this is Tauri's platform WebView rather than the user's normal Chrome profile or a bundled Chrome session.
 
 Security model:
 
@@ -317,6 +317,7 @@ Security model:
 - room browser profile path and native guard status indicators are scoped to the selected room/project;
 - state persists by default, with a room setting for refreshing the profile before each approved open and a host reset action;
 - no access to the user's normal Chrome profile, cookies, passwords, extensions, or tabs;
+- browser engine behavior follows the host platform WebView; the security boundary is room/project profile isolation plus host approvals and native guards, not a separate consumer-browser account container;
 - explicit host approval before Codex can use a site;
 - origin allowlist per room;
 - downloads are blocked by the native room browser download handler;
@@ -549,7 +550,7 @@ docs/
 
 ### Milestone 6: Isolated Browser
 
-- Per-room Chromium/WebView profile.
+- Per-room native WebView profile.
 - Site allowlist.
 - Browser approval flow.
 - Browser state persistence setting plus refresh/reset.
