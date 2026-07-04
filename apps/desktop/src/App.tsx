@@ -196,6 +196,7 @@ import { copyTextToClipboard } from "./lib/clipboard";
 import { checkGitHubWorkflowReadiness } from "./lib/githubWorkflowReadiness";
 import { resolveGitWorkflowDraft, updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "./lib/gitWorkflowDraft";
 import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
+import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -532,6 +533,8 @@ export function App() {
   const [sidebarQuery, setSidebarQuery] = useState("");
   const [messagesByRoom, setMessagesByRoom] = useState<Record<string, ChatMessage[]>>(initialMessagesByRoom);
   const [forgottenRoomIds, setForgottenRoomIds] = useState<Set<string>>(() => new Set());
+  const [revokedRoomIds, setRevokedRoomIds] = useState<Set<string>>(() => new Set());
+  const [revokedTeamIds, setRevokedTeamIds] = useState<Set<string>>(() => new Set());
   const [presenceByRoom, setPresenceByRoom] = useState<Record<string, Record<string, RoomPresence>>>({});
   const [hostHandoffsByRoom, setHostHandoffsByRoom] = useState<Record<string, HostHandoffRecord[]>>({});
   const [inviteRequestsByRoom, setInviteRequestsByRoom] = useState<Record<string, InviteJoinRequest[]>>({});
@@ -724,6 +727,8 @@ export function App() {
   const hostStatusLabel = formatHostStatus(selectedRoom);
   const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser);
   const isSelectedRoomForgotten = forgottenRoomIds.has(selectedRoom.id);
+  const isSelectedRoomRevoked = revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId);
+  const isSelectedRoomLocked = isSelectedRoomForgotten || isSelectedRoomRevoked;
   const hostGateMessage =
     selectedRoom.hostStatus === "active"
       ? `Only ${selectedRoom.host} can approve host-side actions in this room.`
@@ -1219,7 +1224,7 @@ export function App() {
           return;
         }
         if (message.type === "error") {
-          console.warn("Relay error", message.message);
+          handleRelayError(message.message);
           return;
         }
         if (message.type === "presence") {
@@ -1426,7 +1431,15 @@ export function App() {
           userId: localUser.id,
           deviceId
         });
-        if (!hasSelectedRoom) return;
+        if (selectedTeam && !revokedTeamIds.has(selectedTeam)) {
+          openClient.publish({
+            type: "subscribe.team",
+            teamId: selectedTeam,
+            userId: localUser.id,
+            deviceId
+          });
+        }
+        if (!hasSelectedRoom || revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId)) return;
         openClient.publish({
           type: "join",
           teamId: selectedRoom.teamId,
@@ -1435,14 +1448,6 @@ export function App() {
           deviceId,
           inviteId: inviteAdmissionsByRoom[selectedRoom.id]
         });
-        if (selectedTeam) {
-          openClient.publish({
-            type: "subscribe.team",
-            teamId: selectedTeam,
-            userId: localUser.id,
-            deviceId
-          });
-        }
         openClient.publish({
           type: "presence",
           teamId: selectedRoom.teamId,
@@ -1474,16 +1479,19 @@ export function App() {
     deviceIdentity?.publicKeyFingerprint,
     inviteAdmissionsByRoom,
     refreshTeamMembers,
+    revokedRoomIds,
+    revokedTeamIds,
     selectedRoom.approvalPolicy,
     selectedRoom.browserAllowedOrigins,
     selectedRoom.id,
+    selectedRoom.name,
     selectedRoom.teamId,
     selectedTeam
   ]);
 
   useEffect(() => {
     if (!hasSelectedRoom) return;
-    if (forgottenRoomIds.has(selectedRoomId)) return;
+    if (forgottenRoomIds.has(selectedRoomId) || revokedRoomIds.has(selectedRoomId) || revokedTeamIds.has(selectedRoom.teamId)) return;
     if (!historyLoadedRoomIds.current.has(selectedRoomId)) return;
     const payload = pruneLocalRoomHistory({
       version: 2,
@@ -1506,6 +1514,8 @@ export function App() {
     inviteRequests,
     codexEvents,
     forgottenRoomIds,
+    revokedRoomIds,
+    revokedTeamIds,
     messages,
     hasSelectedRoom,
     selectedCodexThreadId,
@@ -1677,8 +1687,8 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
-    if (isSelectedRoomForgotten) {
-      setChatMessageForRoom(roomId, "This room was forgotten on this device. Rejoin or paste a room invite key before sending.");
+    if (isSelectedRoomLocked) {
+      setChatMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;
     }
     const attachments = pendingAttachments;
@@ -1713,8 +1723,8 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
-    if (isSelectedRoomForgotten) {
-      setHostMessageForRoom(roomId, "This room was forgotten on this device. Rejoin or paste a room invite key before invoking Codex.");
+    if (isSelectedRoomLocked) {
+      setHostMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
@@ -1890,6 +1900,8 @@ export function App() {
         }
       );
       upsertRoom(ensureRoomDefaults(room));
+      setRevokedRoomIds((current) => withoutSetValue(current, room.id));
+      setRevokedTeamIds((current) => withoutSetValue(current, room.teamId));
       setForgottenRoomIds((current) => withoutSetValue(current, room.id));
       setInviteApprovalGateForRoom(room.id, teamDefaults.inviteApprovalGate);
       saveHistorySettings(room.id, loadTeamHistorySettings(plan.teamId));
@@ -1939,6 +1951,24 @@ export function App() {
 
   function upsertRoom(room: RoomRecord) {
     setRooms((current) => upsertRoomPreservingUnread(current, room));
+  }
+
+  function handleRelayError(message: string) {
+    console.warn("Relay error", message);
+    if (!isMembershipRemovedRelayError(message) || !hasSelectedRoom) return;
+
+    const room = selectedRoom;
+    const userMessage = membershipRemovedRoomMessage(room.name);
+    setRevokedRoomIds((current) => new Set(current).add(room.id));
+    setRevokedTeamIds((current) => new Set(current).add(room.teamId));
+    setForgottenRoomIds((current) => new Set(current).add(room.id));
+    setInviteAdmissionsByRoom((current) => omitRecordKey(current, room.id));
+    setPresenceByRoom((current) => omitRecordKey(current, room.id));
+    setInviteLinkForRoom(room.id, "");
+    setInviteMessageForRoom(room.id, userMessage);
+    setChatMessageForRoom(room.id, userMessage);
+    setHostMessageForRoom(room.id, userMessage);
+    setWorkspaceError(userMessage);
   }
 
   async function changeTeamMemberRole(member: TeamMemberRecord, role: "admin" | "member") {
@@ -3051,6 +3081,8 @@ export function App() {
       upsertTeam(metadata.team);
       upsertRoom(ensureRoomDefaults(metadata.room));
       acceptedRoomName = metadata.room.name;
+      setRevokedRoomIds((current) => withoutSetValue(current, inviteSecret.roomId));
+      setRevokedTeamIds((current) => withoutSetValue(current, inviteSecret.teamId));
       setInviteAdmissionsByRoom((current) => ({
         ...current,
         [inviteSecret.roomId]: inviteId
@@ -3128,6 +3160,8 @@ export function App() {
       upsertTeam(metadata.team);
       upsertRoom(ensureRoomDefaults(metadata.room));
       acceptedRoomName = metadata.room.name;
+      setRevokedRoomIds((current) => withoutSetValue(current, inviteSecret.roomId));
+      setRevokedTeamIds((current) => withoutSetValue(current, inviteSecret.teamId));
     } else {
       upsertTeam({
         id: inviteSecret.teamId,
@@ -3325,8 +3359,9 @@ export function App() {
   }
 
   async function publishChatMessage(message: ChatMessage, room: RoomRecord = selectedRoom) {
-    if (forgottenRoomIds.has(room.id)) {
-      setChatMessageForRoom(room.id, "This room was forgotten on this device. Rejoin or paste a room invite key before sending.");
+    const revoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
+    if (forgottenRoomIds.has(room.id) || revoked) {
+      setChatMessageForRoom(room.id, roomLockMessage(room, revoked));
       return;
     }
     const client = relayRef.current;
@@ -5139,10 +5174,10 @@ export function App() {
           </div>
         )}
 
-        {isSelectedRoomForgotten && (
+        {isSelectedRoomLocked && (
           <div className="warning-banner local-lock-banner">
             <Lock size={18} />
-            <span>This room was forgotten on this device. Paste a room invite key or get approved through a gated invite to unlock encrypted messages again.</span>
+            <span>{roomLockMessage(selectedRoom, isSelectedRoomRevoked)}</span>
           </div>
         )}
 
@@ -5264,7 +5299,7 @@ export function App() {
                 }}>
                   <X size={16} /> Deny
                 </button>
-                <button className="primary" onClick={() => approveCodexTurn()} disabled={!hasSelectedRoom || codexRunning || !isActiveHost || isSelectedRoomForgotten}>
+                <button className="primary" onClick={() => approveCodexTurn()} disabled={!hasSelectedRoom || codexRunning || !isActiveHost || isSelectedRoomLocked}>
                   <Check size={16} /> {codexRunning ? "Running" : "Approve"}
                 </button>
               </div>
@@ -5273,7 +5308,7 @@ export function App() {
         </div>
 
         <footer className="composer">
-	          <button title="Invoke Codex" onClick={() => handleCodexInvoke()} disabled={isSelectedRoomForgotten}>
+	          <button title="Invoke Codex" onClick={() => handleCodexInvoke()} disabled={isSelectedRoomLocked}>
             <Bot size={18} />
           </button>
           <div className="composer-body">
@@ -5295,14 +5330,14 @@ export function App() {
             )}
             <textarea
               placeholder={
-                isSelectedRoomForgotten
-                  ? "Room key forgotten on this device. Rejoin or paste an invite key to unlock."
+                isSelectedRoomLocked
+                  ? roomLockMessage(selectedRoom, isSelectedRoomRevoked)
                   : selectedRoom.mode.chat
                     ? "Message the room, or type @Codex to invoke the active host..."
                     : "Chat mode is disabled for this room"
               }
               value={draft}
-              disabled={!selectedRoom.mode.chat || isSelectedRoomForgotten}
+              disabled={!selectedRoom.mode.chat || isSelectedRoomLocked}
               onChange={(event) => setDraftForRoom(selectedRoom.id, event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
@@ -5312,7 +5347,7 @@ export function App() {
               }}
             />
           </div>
-          <button className="send" onClick={sendMessage} disabled={!selectedRoom.mode.chat || isSelectedRoomForgotten}>
+          <button className="send" onClick={sendMessage} disabled={!selectedRoom.mode.chat || isSelectedRoomLocked}>
             <Send size={18} />
           </button>
         </footer>
@@ -6421,6 +6456,11 @@ function canTransferTeamOwnership(
   localUserId: string
 ): boolean {
   return team?.role === "owner" && member.role !== "owner" && member.userId !== localUserId;
+}
+
+function roomLockMessage(room: RoomRecord, revoked: boolean): string {
+  if (revoked) return membershipRemovedRoomMessage(room.name);
+  return "This room was forgotten on this device. Paste a room invite key or get approved through a gated invite to unlock encrypted messages again.";
 }
 
 function formatCodexThreadId(threadId: string | null): string {
