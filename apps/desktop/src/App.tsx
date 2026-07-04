@@ -534,9 +534,9 @@ export function App() {
   const [trustedDeviceKeys, setTrustedDeviceKeys] = useState<TrustedDeviceKey[]>(() => loadTrustedDeviceKeys());
   const [authError, setAuthError] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
-  const [gitWorkflowBusy, setGitWorkflowBusy] = useState(false);
+  const [gitWorkflowBusyByRoom, setGitWorkflowBusyByRoom] = useState<Record<string, boolean>>({});
   const [gitWorkflowMessagesByRoom, setGitWorkflowMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [actionsBusy, setActionsBusy] = useState(false);
+  const [actionsBusyByRoom, setActionsBusyByRoom] = useState<Record<string, boolean>>({});
   const [actionsMessagesByRoom, setActionsMessagesByRoom] = useState<Record<string, string | null>>({});
   const [actionRunsByRoom, setActionRunsByRoom] = useState<Record<string, GitHubActionRun[]>>({});
   const [actionsLastCheckedByRoom, setActionsLastCheckedByRoom] = useState<Record<string, string | null>>({});
@@ -586,8 +586,10 @@ export function App() {
   const browserStatus = browserStatusByRoom[selectedRoom?.id ?? selectedRoomId] ?? defaultBrowserStatus;
   const gitStatus = gitStatusByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const gitWorkflowDraft = resolveGitWorkflowDraft(gitWorkflowDraftsByRoom, selectedRoom?.id ?? selectedRoomId);
+  const gitWorkflowBusy = gitWorkflowBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const gitWorkflowMessage = gitWorkflowMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const actionRuns = actionRunsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
+  const actionsBusy = actionsBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const actionsLastChecked = actionsLastCheckedByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const actionsMessage = actionsMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const terminalLines = terminalLinesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
@@ -658,6 +660,14 @@ export function App() {
       ...current,
       [roomId]: message
     }));
+  }
+
+  function setGitWorkflowBusyForRoom(roomId: string, busy: boolean) {
+    setGitWorkflowBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function setActionsBusyForRoom(roomId: string, busy: boolean) {
+    setActionsBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
   function setSelectedGitWorkflowMessage(message: string | null) {
@@ -1243,6 +1253,7 @@ export function App() {
     }));
     setActionsLastCheckedByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setActionsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setActionsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
   }, [gitWorkflowDraft.branchName, gitWorkflowDraft.prOwner, gitWorkflowDraft.prRepo, hasSelectedRoom, selectedRoom.id]);
 
   useEffect(() => {
@@ -2254,6 +2265,8 @@ export function App() {
     setActionRunsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setActionsLastCheckedByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setActionsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setActionsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setGitWorkflowBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setPendingAttachmentsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2304,6 +2317,8 @@ export function App() {
     setActionRunsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setActionsLastCheckedByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setActionsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setActionsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setGitWorkflowBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setPendingAttachmentsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -3827,7 +3842,7 @@ export function App() {
     }
     const gitPlan = gitApprovalPreview.plan;
     const normalizedPrBase = workflowDraft.pushEnabled ? githubWorkflowReadiness.normalizedBase : gitApprovalPreview.normalizedBase;
-    setGitWorkflowBusy(true);
+    setGitWorkflowBusyForRoom(roomId, true);
     setGitWorkflowMessageForRoom(roomId, null);
     appendTerminalLinesForRoom(roomId, [
       `Approve git workflow: branch=${gitPlan.branch}, push=${gitPlan.push}`,
@@ -3929,7 +3944,7 @@ export function App() {
         console.warn("Failed to publish git workflow error", publishError);
       });
     } finally {
-      setGitWorkflowBusy(false);
+      setGitWorkflowBusyForRoom(roomId, false);
     }
   }
 
@@ -3943,7 +3958,7 @@ export function App() {
       return;
     }
     const workflowDraft = resolveGitWorkflowDraft(gitWorkflowDraftsByRoom, roomId);
-    setActionsBusy(true);
+    setActionsBusyForRoom(roomId, true);
     setActionsMessagesByRoom((current) => omitRecordKey(current, roomId));
     try {
       const result = await listGitHubActionRuns(workflowDraft.prOwner, workflowDraft.prRepo, workflowDraft.branchName);
@@ -3981,7 +3996,7 @@ export function App() {
         [roomId]: String(error)
       }));
     } finally {
-      setActionsBusy(false);
+      setActionsBusyForRoom(roomId, false);
     }
   }
 
