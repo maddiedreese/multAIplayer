@@ -153,7 +153,7 @@ import {
 } from "./lib/workspaceClient";
 import { defaultRelayHttpUrl, defaultRelayWsUrl, loadAppConfig, resetAppConfig, saveAppConfig, type AppConfig } from "./lib/appConfig";
 import { shouldAutoApproveChatOnlyTurn } from "./lib/codexApproval";
-import { buildCodexTurnInput, buildCodexTurnSummary, messagesSinceLastCodex } from "./lib/codexTurn";
+import { buildCodexApprovalSnapshot, buildCodexTurnInput, buildCodexTurnSummary, messagesSinceLastCodex } from "./lib/codexTurn";
 import { normalizeCodexThreadId } from "./lib/codexThread";
 import {
   buildCodexOutputMarkdown,
@@ -495,7 +495,12 @@ export function App() {
   const [codexEventsByRoom, setCodexEventsByRoom] = useState<Record<string, CodexRoomEvent[]>>({});
   const [draftsByRoom, setDraftsByRoom] = useState<Record<string, string>>({});
   const [pendingAttachmentsByRoom, setPendingAttachmentsByRoom] = useState<Record<string, ChatAttachment[]>>({});
-  const [approvalVisible, setApprovalVisible] = useState(true);
+  const [approvalVisible, setApprovalVisible] = useState(false);
+  const [pendingCodexApproval, setPendingCodexApproval] = useState<{
+    roomId: string;
+    messages: ChatMessage[];
+    summary: CodexTurnSummary;
+  } | null>(null);
   const [codexRunning, setCodexRunning] = useState(false);
   const [secretWarningVisible, setSecretWarningVisible] = useState(true);
   const [gitStatusByRoom, setGitStatusByRoom] = useState<Record<string, GitStatusSummary | null>>({});
@@ -620,6 +625,8 @@ export function App() {
     () => buildCodexTurnSummary(messages, selectedRoom, terminals, browserRequests, gitStatus),
     [messages, selectedRoom, terminals, browserRequests, gitStatus]
   );
+  const activeCodexApproval = pendingCodexApproval?.roomId === selectedRoom.id ? pendingCodexApproval : null;
+  const visibleCodexTurnSummary = activeCodexApproval?.summary ?? codexTurnSummary;
   const roomMembers = Object.values(presenceByRoom[selectedRoom?.id ?? selectedRoomId] ?? {})
     .filter((member) => member.status === "online")
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
@@ -693,6 +700,11 @@ export function App() {
 
   useEffect(() => {
     selectedRoomIdRef.current = selectedRoomId;
+  }, [selectedRoomId]);
+
+  useEffect(() => {
+    setPendingCodexApproval(null);
+    setApprovalVisible(false);
   }, [selectedRoomId]);
 
   useEffect(() => {
@@ -1341,15 +1353,15 @@ export function App() {
       createdAt,
       attachments: attachments.length ? attachments : undefined
     };
-	    await publishChatMessage(message);
-	    if (body.includes("@Codex")) {
-	      handleCodexInvoke(message);
-	    }
-	    setDraftForRoom(roomId, "");
-	    setPendingAttachmentsForRoom(roomId, []);
-	  }
+    await publishChatMessage(message);
+    if (body.includes("@Codex")) {
+      handleCodexInvoke(message);
+    }
+    setDraftForRoom(roomId, "");
+    setPendingAttachmentsForRoom(roomId, []);
+  }
 
-	  function handleCodexInvoke(pendingMessage?: ChatMessage) {
+  function handleCodexInvoke(pendingMessage?: ChatMessage) {
     if (!hasSelectedRoom) {
       setHostMessage("Create or join a room before invoking Codex.");
       setApprovalVisible(false);
@@ -1367,28 +1379,31 @@ export function App() {
     }
     if (selectedRoom.approvalPolicy === "never_host") {
       setHostMessage("This room is set to never host Codex turns.");
-	      setApprovalVisible(false);
-	      return;
-	    }
-	    if (selectedRoom.approvalPolicy === "auto_chat_only") {
-	      const turnMessages = pendingMessage ? [...messages, pendingMessage] : messages;
-	      const turnSummary = buildCodexTurnSummary(turnMessages, selectedRoom, terminals, browserRequests, gitStatus);
-      if (shouldAutoApproveChatOnlyTurn(turnSummary, isActiveHost)) {
-	        setApprovalVisible(false);
-	        setHostMessage("Auto-approved chat-only Codex turn.");
-	        approveCodexTurn(turnMessages, turnSummary).catch((error) => setHostMessage(String(error)));
-	        return;
-	      }
-	      setApprovalVisible(true);
-	      setHostMessage(
-	        isActiveHost
-	          ? "This turn includes workspace, browser, terminal, or attachment context, so host approval is required."
-	          : hostGateMessage
-	      );
-	      return;
-	    }
-	    setApprovalVisible(true);
-	  }
+      setPendingCodexApproval(null);
+      setApprovalVisible(false);
+      return;
+    }
+    const approvalSnapshot = buildCodexApprovalSnapshot(selectedRoom, messages, pendingMessage, terminals, browserRequests, gitStatus);
+    if (selectedRoom.approvalPolicy === "auto_chat_only") {
+      if (shouldAutoApproveChatOnlyTurn(approvalSnapshot.summary, isActiveHost)) {
+        setPendingCodexApproval(null);
+        setApprovalVisible(false);
+        setHostMessage("Auto-approved chat-only Codex turn.");
+        approveCodexTurn(approvalSnapshot.messages, approvalSnapshot.summary).catch((error) => setHostMessage(String(error)));
+        return;
+      }
+      setPendingCodexApproval(approvalSnapshot);
+      setApprovalVisible(true);
+      setHostMessage(
+        isActiveHost
+          ? "This turn includes workspace, browser, terminal, or attachment context, so host approval is required."
+          : hostGateMessage
+      );
+      return;
+    }
+    setPendingCodexApproval(approvalSnapshot);
+    setApprovalVisible(true);
+  }
 
   async function beginGitHubSignIn() {
     setAuthBusy(true);
@@ -1885,6 +1900,7 @@ export function App() {
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
       setSettingsMessage(`Approval policy set to ${approvalPolicyLabels[approvalPolicy]}.`);
       if (approvalPolicy === "never_host") {
+        setPendingCodexApproval(null);
         setApprovalVisible(false);
       }
     } catch (error) {
@@ -2527,13 +2543,13 @@ export function App() {
     }
   }
 
-	  async function approveCodexTurn(
-	    turnMessages: ChatMessage[] = messages,
-	    turnSummary: CodexTurnSummary = codexTurnSummary
-	  ) {
-	    if (!hasSelectedRoom) {
-	      setHostMessage("Create or join a room before approving a Codex turn.");
-	      setApprovalVisible(false);
+  async function approveCodexTurn(
+    turnMessages: ChatMessage[] = activeCodexApproval?.messages ?? messages,
+    turnSummary: CodexTurnSummary = activeCodexApproval?.summary ?? codexTurnSummary
+  ) {
+    if (!hasSelectedRoom) {
+      setHostMessage("Create or join a room before approving a Codex turn.");
+      setApprovalVisible(false);
       return;
     }
     if (!isActiveHost) {
@@ -2544,6 +2560,7 @@ export function App() {
     const roomId = room.id;
     const model = selectedCodexModel;
     const projectPath = room.projectPath;
+    setPendingCodexApproval(null);
     setApprovalVisible(false);
     setCodexRunning(true);
     appendTerminalLinesForRoom(roomId, [
@@ -4376,21 +4393,24 @@ export function App() {
                 />
               </div>
               <div className="approval-grid">
-                <ApprovalItem label="Messages" value={`${codexTurnSummary.messagesSinceLastCodex} since last Codex response`} />
-                <ApprovalItem label="Attachments" value={formatCodexAttachmentSummary(codexTurnSummary.attachments)} />
-                <ApprovalItem label="Workspace" value={selectedRoom.mode.workspace ? codexTurnSummary.workspacePath ?? "None" : "Disabled"} />
-                <ApprovalItem label="Git" value={formatCodexGitSummary(codexTurnSummary.git)} />
-                <ApprovalItem label="Browser" value={selectedRoom.mode.browser ? codexTurnSummary.browserAccess.join(", ") || "No pages shared" : "Disabled"} />
-                <ApprovalItem label="Terminals" value={codexTurnSummary.terminals.join(", ") || "None"} />
+                <ApprovalItem label="Messages" value={`${visibleCodexTurnSummary.messagesSinceLastCodex} since last Codex response`} />
+                <ApprovalItem label="Attachments" value={formatCodexAttachmentSummary(visibleCodexTurnSummary.attachments)} />
+                <ApprovalItem label="Workspace" value={selectedRoom.mode.workspace ? visibleCodexTurnSummary.workspacePath ?? "None" : "Disabled"} />
+                <ApprovalItem label="Git" value={formatCodexGitSummary(visibleCodexTurnSummary.git)} />
+                <ApprovalItem label="Browser" value={selectedRoom.mode.browser ? visibleCodexTurnSummary.browserAccess.join(", ") || "No pages shared" : "Disabled"} />
+                <ApprovalItem label="Terminals" value={visibleCodexTurnSummary.terminals.join(", ") || "None"} />
                 <ApprovalItem label="Model" value={formatCodexModel(selectedCodexModel)} />
                 <ApprovalItem label="Thread" value={formatCodexThreadId(selectedCodexThreadId)} />
                 <ApprovalItem label="Policy" value={approvalPolicyLabels[selectedRoom.approvalPolicy]} />
               </div>
               <div className="approval-actions">
-                <button className="secondary" onClick={() => setApprovalVisible(false)}>
+                <button className="secondary" onClick={() => {
+                  setPendingCodexApproval(null);
+                  setApprovalVisible(false);
+                }}>
                   <X size={16} /> Deny
                 </button>
-	                <button className="primary" onClick={() => approveCodexTurn()} disabled={!hasSelectedRoom || codexRunning || !isActiveHost || isSelectedRoomForgotten}>
+                <button className="primary" onClick={() => approveCodexTurn()} disabled={!hasSelectedRoom || codexRunning || !isActiveHost || isSelectedRoomForgotten}>
                   <Check size={16} /> {codexRunning ? "Running" : "Approve"}
                 </button>
               </div>

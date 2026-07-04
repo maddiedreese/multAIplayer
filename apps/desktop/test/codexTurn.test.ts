@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import {
+  buildCodexApprovalSnapshot,
   codexTurnInputTruncationNotice,
   maxCodexTurnInputChars,
   buildCodexTurnInput,
@@ -47,6 +48,22 @@ test("messagesSinceLastCodex returns only new room context", () => {
     "please inspect the parser",
     "include this note"
   ]);
+});
+
+test("buildCodexApprovalSnapshot includes the just-sent invoke message", () => {
+  const pendingMessage: CodexChatMessage = {
+    author: "Maddie",
+    role: "system",
+    body: "@Codex please use the note I just sent",
+    time: "9:04 AM",
+    attachments: [{ id: "att-pending", name: "pending.md", type: "code", size: 12, content: "now" }]
+  };
+  const snapshot = buildCodexApprovalSnapshot(room, messages, pendingMessage, [], [], null);
+
+  assert.equal(snapshot.roomId, room.id);
+  assert.equal(snapshot.messages.at(-1), pendingMessage);
+  assert.equal(snapshot.summary.messagesSinceLastCodex, 3);
+  assert.deepEqual(snapshot.summary.attachments.map((attachment) => attachment.name), ["notes.md", "pending.md"]);
 });
 
 test("buildCodexTurnSummary respects room mode and approved browser context", () => {

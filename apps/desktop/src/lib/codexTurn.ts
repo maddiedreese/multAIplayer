@@ -33,10 +33,32 @@ export interface CodexGitStatusContext {
   files: Array<{ path: string; status: string; added: number; removed: number }>;
 }
 
+export interface CodexApprovalSnapshot<Message extends CodexChatMessage = CodexChatMessage> {
+  roomId: string;
+  messages: Message[];
+  summary: CodexTurnSummary;
+}
+
 export const maxCodexTurnInputChars = 220_000;
 export const maxCodexGitFiles = 12;
 export const codexTurnInputTruncationNotice =
   "[multAIplayer truncated older room context to fit the local Codex app-server input limit.]";
+
+export function buildCodexApprovalSnapshot<Message extends CodexChatMessage>(
+  room: RoomRecord,
+  messages: Message[],
+  pendingMessage: Message | undefined,
+  terminals: CodexTerminalContext[],
+  browserRequests: CodexBrowserRequestContext[],
+  gitStatus?: CodexGitStatusContext | null
+): CodexApprovalSnapshot<Message> {
+  const turnMessages = pendingMessage ? [...messages, pendingMessage] : messages;
+  return {
+    roomId: room.id,
+    messages: turnMessages,
+    summary: buildCodexTurnSummary(turnMessages, room, terminals, browserRequests, gitStatus)
+  };
+}
 
 export function buildCodexTurnSummary(
   messages: CodexChatMessage[],
