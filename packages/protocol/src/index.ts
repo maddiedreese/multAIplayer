@@ -275,10 +275,20 @@ export const codexModelOptions = [
   { id: "gpt-5.4-thinking", label: "GPT-5.4 thinking", description: "Deeper reasoning for larger coding turns" }
 ] as const;
 
+export const TeamRole = z.enum(["owner", "admin", "member"]);
+
 export const TeamRecord = z.object({
   id: TeamId,
   name: z.string().min(1),
-  members: z.number().int().nonnegative()
+  members: z.number().int().nonnegative(),
+  role: TeamRole.optional()
+});
+
+export const TeamMemberRecord = z.object({
+  teamId: TeamId,
+  userId: UserId,
+  role: TeamRole,
+  joinedAt: z.string().datetime()
 });
 
 export const DeviceRecord = z.object({
@@ -428,7 +438,9 @@ export type RelayClientMessage = z.infer<typeof RelayClientMessage>;
 export type RelayServerMessage = z.infer<typeof RelayServerMessage>;
 export type DeviceSealedPayload = z.infer<typeof DeviceSealedPayload>;
 export type EncryptedPayload = z.infer<typeof EncryptedPayload>;
+export type TeamRole = z.infer<typeof TeamRole>;
 export type TeamRecord = z.infer<typeof TeamRecord>;
+export type TeamMemberRecord = z.infer<typeof TeamMemberRecord>;
 export type DeviceRecord = z.infer<typeof DeviceRecord>;
 export type RoomRecord = z.infer<typeof RoomRecord>;
 export type InviteRecord = z.infer<typeof InviteRecord>;

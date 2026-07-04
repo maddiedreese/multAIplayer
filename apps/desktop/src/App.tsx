@@ -293,7 +293,7 @@ const fallbackUser = {
 };
 
 const seededTeams: TeamRecord[] = [
-  { id: "team-core", name: "Core Team", members: 4 },
+  { id: "team-core", name: "Core Team", members: 4, role: "owner" },
   { id: "team-labs", name: "Labs", members: 2 }
 ];
 
@@ -4550,7 +4550,7 @@ export function App() {
               >
                 <UsersRound size={16} />
                 <span>{team.name}</span>
-                <small>{team.members}</small>
+                <small>{formatTeamMeta(team)}</small>
               </button>
             ))}
             {visibleTeams.length === 0 && (
@@ -6213,6 +6213,17 @@ function ensureRoomDefaults(room: RoomRecord): RoomRecord {
 
 function formatCodexModel(model: string): string {
   return codexModelOptions.find((option) => option.id === model)?.label ?? model;
+}
+
+function formatTeamMeta(team: TeamRecord): string {
+  const members = `${team.members} ${team.members === 1 ? "member" : "members"}`;
+  return team.role ? `${formatTeamRole(team.role)} · ${members}` : members;
+}
+
+function formatTeamRole(role: NonNullable<TeamRecord["role"]>): string {
+  if (role === "owner") return "Owner";
+  if (role === "admin") return "Admin";
+  return "Member";
 }
 
 function formatCodexThreadId(threadId: string | null): string {

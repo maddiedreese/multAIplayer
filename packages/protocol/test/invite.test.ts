@@ -4,8 +4,32 @@ import {
   InviteJoinRequestPlaintextPayload,
   InviteJoinStatusPlaintextPayload,
   RelayEnvelope,
-  RoomKeyRotationPlaintextPayload
+  RoomKeyRotationPlaintextPayload,
+  TeamMemberRecord,
+  TeamRecord
 } from "../src/index";
+
+test("team records can carry the current user's role", () => {
+  const parsed = TeamRecord.parse({
+    id: "team-core",
+    name: "Core Team",
+    members: 4,
+    role: "owner"
+  });
+
+  assert.equal(parsed.role, "owner");
+});
+
+test("team member records carry role and join metadata", () => {
+  const parsed = TeamMemberRecord.parse({
+    teamId: "team-core",
+    userId: "github:maddiedreese",
+    role: "admin",
+    joinedAt: "2026-07-04T12:00:00.000Z"
+  });
+
+  assert.equal(parsed.role, "admin");
+});
 
 test("invite join request accepts optional requester device public key", () => {
   const parsed = InviteJoinRequestPlaintextPayload.parse({

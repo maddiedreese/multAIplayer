@@ -22,6 +22,11 @@ interface StoredRelayStateFixture {
   teams: unknown[];
   rooms: unknown[];
   invites: unknown[];
+  teamMembers?: Array<{
+    teamId: string;
+    members?: Array<{ userId: string; role?: string; joinedAt?: string }>;
+    userIds?: string[];
+  }>;
   devices?: unknown[];
   authSessions?: Array<{
     sessionId?: string;
@@ -1427,10 +1432,11 @@ test("relay scopes authenticated workspace access to team members and admits inv
     });
     assert.equal(memberWorkspace.status, 200);
     const memberBody = await memberWorkspace.json() as {
-      teams: Array<{ id: string }>;
+      teams: Array<{ id: string; role?: string }>;
       rooms: Array<{ id: string }>;
     };
     assert.deepEqual(memberBody.teams.map((team) => team.id), ["team-core"]);
+    assert.equal(memberBody.teams[0]?.role, "owner");
     assert.ok(memberBody.rooms.some((room) => room.id === "room-desktop"));
     assert.ok(!memberBody.rooms.some((room) => room.id === "room-github"));
 
@@ -1459,13 +1465,57 @@ test("relay scopes authenticated workspace access to team members and admits inv
     });
     assert.equal(admittedWorkspace.status, 200);
     const admittedBody = await admittedWorkspace.json() as {
-      teams: Array<{ id: string }>;
+      teams: Array<{ id: string; role?: string }>;
       rooms: Array<{ id: string }>;
     };
     assert.deepEqual(admittedBody.teams.map((team) => team.id), ["team-core"]);
+    assert.equal(admittedBody.teams[0]?.role, "member");
     assert.ok(admittedBody.rooms.some((room) => room.id === "room-desktop"));
+
+    const membersResponse = await fetch(`${relay.baseUrl}/teams/team-core/members`, {
+      headers: { cookie: peerCookie }
+    });
+    assert.equal(membersResponse.status, 200);
+    const membersBody = await membersResponse.json() as {
+      members: Array<{ userId: string; role: string; joinedAt: string }>;
+    };
+    assert.equal(membersBody.members.find((member) => member.userId === "github:maddiedreese")?.role, "owner");
+    assert.equal(membersBody.members.find((member) => member.userId === "github:peer")?.role, "member");
   } finally {
     peerSocket?.close();
+    await relay.close();
+  }
+});
+
+test("relay assigns team creators owner role", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_SEED_DEMO: "false"
+  });
+  const cookie = await createDebugSession(relay.baseUrl, "github:owner", "owner");
+  try {
+    const createResponse = await fetch(`${relay.baseUrl}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ name: "Owner Team" })
+    });
+    assert.equal(createResponse.status, 201);
+    const createBody = await createResponse.json() as { team: { id: string; members: number; role?: string } };
+    assert.equal(createBody.team.members, 1);
+    assert.equal(createBody.team.role, "owner");
+
+    const membersResponse = await fetch(`${relay.baseUrl}/teams/${createBody.team.id}/members`, {
+      headers: { cookie }
+    });
+    assert.equal(membersResponse.status, 200);
+    const membersBody = await membersResponse.json() as {
+      members: Array<{ userId: string; role: string }>;
+    };
+    assert.deepEqual(
+      membersBody.members.map((member) => ({ userId: member.userId, role: member.role })),
+      [{ userId: "github:owner", role: "owner" }]
+    );
+  } finally {
     await relay.close();
   }
 });
@@ -1645,14 +1695,18 @@ test("relay prunes expired in-memory invites and attachment blobs", async () => 
   }
 });
 
-test("relay restores persisted team member counts", async () => {
+test("relay restores persisted team member roles and legacy counts", async () => {
   const relay = await startRelay({}, {
     version: 1,
     savedAt: new Date().toISOString(),
     teams: [{ id: "team-core", name: "Core Team", members: 1 }],
     rooms: [],
     invites: [],
-    teamMembers: [{ teamId: "team-core", userIds: ["github:first", "github:second", "github:third"] }],
+    teamMembers: [{
+      teamId: "team-core",
+      members: [{ userId: "github:first", role: "owner", joinedAt: "2026-07-04T12:00:00.000Z" }],
+      userIds: ["github:first", "github:second", "github:third"]
+    }],
     encryptedBacklog: []
   });
   try {
@@ -1660,6 +1714,14 @@ test("relay restores persisted team member counts", async () => {
     assert.equal(response.status, 200);
     const body = await response.json() as { teams: Array<{ id: string; members: number }> };
     assert.equal(body.teams.find((team) => team.id === "team-core")?.members, 3);
+
+    const membersResponse = await fetch(`${relay.baseUrl}/teams/team-core/members`);
+    assert.equal(membersResponse.status, 200);
+    const membersBody = await membersResponse.json() as {
+      members: Array<{ userId: string; role: string }>;
+    };
+    assert.equal(membersBody.members.find((member) => member.userId === "github:first")?.role, "owner");
+    assert.equal(membersBody.members.find((member) => member.userId === "github:second")?.role, "member");
   } finally {
     await relay.close();
   }

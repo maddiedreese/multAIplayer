@@ -369,7 +369,18 @@ button:disabled {
 }
 
 .team-button small {
+  max-width: 96px;
+  overflow: hidden;
   color: #66736b;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .room-button {

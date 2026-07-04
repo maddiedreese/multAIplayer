@@ -22,7 +22,9 @@ import {
   type AttachmentBlobRecord as AttachmentBlobRecordType,
   type DeviceRecord,
   type RoomRecord,
+  type TeamMemberRecord,
   type TeamRecord,
+  type TeamRole,
   type RelayEnvelope,
   type RelayServerMessage
 } from "@multaiplayer/protocol";
@@ -129,7 +131,7 @@ const rooms = new Map<string, RoomRecord>();
 const invites = new Map<string, InviteRecord>();
 const devices = new Map<string, DeviceRecord>();
 const attachmentBlobs = new Map<string, AttachmentBlobRecordType>();
-const teamMembers = new Map<string, Set<string>>();
+const teamMembers = new Map<string, Map<string, TeamMemberRecord>>();
 const rateLimitStore = new Map<string, RateLimitRecord>();
 let saveTimer: NodeJS.Timeout | null = null;
 
@@ -183,7 +185,12 @@ interface StoredRelayState {
 	  devices?: DeviceRecord[];
 	  teamMembers?: Array<{
 	    teamId: string;
-	    userIds: string[];
+	    members?: Array<{
+	      userId: string;
+	      role?: string;
+	      joinedAt?: string;
+	    }>;
+	    userIds?: string[];
 	  }>;
 	  authSessions?: StoredAuthSession[];
 	  attachmentBlobs?: AttachmentBlobRecordType[];
@@ -444,9 +451,27 @@ app.get("/teams", (_req, res) => {
   if (!allowRead(session, res)) return;
   const visibleTeamIds = session ? teamIdsForUser(session.user.id) : new Set(teams.keys());
   res.json({
-    teams: Array.from(teams.values()).filter((team) => visibleTeamIds.has(team.id)),
+    teams: Array.from(teams.values())
+      .filter((team) => visibleTeamIds.has(team.id))
+      .map((team) => teamRecordForUser(team, session?.user.id)),
     rooms: Array.from(rooms.values()).filter((room) => visibleTeamIds.has(room.teamId))
   });
+});
+
+app.get("/teams/:teamId/members", (req, res) => {
+  const session = getAuthSession(req.cookies?.multaiplayer_session);
+  if (!allowRead(session, res)) return;
+
+  const teamId = String(req.params.teamId ?? "");
+  if (!teams.has(teamId)) {
+    res.status(404).json({ error: "Team not found" });
+    return;
+  }
+  if (session && !isTeamMember(teamId, session.user.id)) {
+    res.status(403).json({ error: "Join this team before reading its member list." });
+    return;
+  }
+  res.json({ members: listTeamMembers(teamId) });
 });
 
 app.post("/devices", (req, res) => {
@@ -511,11 +536,12 @@ app.post("/teams", (req, res) => {
   };
   teams.set(team.id, team);
   if (session?.user.id) {
-    teamMembers.set(team.id, new Set([session.user.id]));
+    addTeamMember(team.id, session.user.id, "owner");
+  } else {
+    scheduleStoreSave();
+    broadcastWorkspaceUpdated(team);
   }
-  scheduleStoreSave();
-  broadcastWorkspaceUpdated(team);
-  res.status(201).json({ team });
+  res.status(201).json({ team: teamRecordForUser(teams.get(team.id) ?? team, session?.user.id) });
 });
 
 app.post("/rooms", (req, res) => {
@@ -1169,21 +1195,36 @@ function publishPresence(session: ClientSession, teamId: string, roomId: string,
   broadcast(key, { type: "presence", ...verifiedPresence, status: "online" });
 }
 
-function addTeamMember(teamId: string, userId: string) {
+function addTeamMember(teamId: string, userId: string, role: TeamRole = "member") {
   if (!userId) return;
   const team = teams.get(teamId);
   if (!team) return;
-  const members = teamMembers.get(teamId) ?? new Set<string>();
+  const members = teamMembers.get(teamId) ?? new Map<string, TeamMemberRecord>();
   if (members.has(userId)) return;
-  members.add(userId);
+  members.set(userId, {
+    teamId,
+    userId,
+    role,
+    joinedAt: new Date().toISOString()
+  });
   teamMembers.set(teamId, members);
   const updated: TeamRecord = {
     ...team,
-    members: Math.max(team.members, members.size)
+    members: members.size
   };
   teams.set(teamId, updated);
   scheduleStoreSave();
   broadcastWorkspaceUpdated(updated);
+}
+
+function listTeamMembers(teamId: string): TeamMemberRecord[] {
+  return Array.from(teamMembers.get(teamId)?.values() ?? [])
+    .sort((a, b) => teamRoleRank(a.role) - teamRoleRank(b.role) || a.userId.localeCompare(b.userId));
+}
+
+function teamRecordForUser(team: TeamRecord, userId?: string): TeamRecord {
+  const role = userId ? teamMembers.get(team.id)?.get(userId)?.role : undefined;
+  return role ? { ...team, role } : team;
 }
 
 function broadcast(key: RoomKey, message: RelayServerMessage) {
@@ -1330,6 +1371,12 @@ function teamIdsForUser(userId: string): Set<string> {
 
 function isTeamMember(teamId: string, userId: string): boolean {
   return teamMembers.get(teamId)?.has(userId) ?? false;
+}
+
+function teamRoleRank(role: TeamRole): number {
+  if (role === "owner") return 0;
+  if (role === "admin") return 1;
+  return 2;
 }
 
 function canAccessRoom(teamId: string, roomId: string, userId: string): boolean {
@@ -1558,6 +1605,10 @@ function normalizeCodexModel(value: unknown): string | null {
   return model;
 }
 
+function normalizeTeamRole(value: unknown): TeamRole {
+  return value === "owner" || value === "admin" || value === "member" ? value : "member";
+}
+
 function normalizeBrowserAllowedOrigins(value: unknown): string[] | null {
   if (!Array.isArray(value) || value.length > 20) return null;
   const origins = new Set<string>();
@@ -1770,8 +1821,30 @@ async function loadRelayStore() {
 	      if (normalized) devices.set(deviceKey(normalized.userId, normalized.deviceId), normalized);
 	    }
 	    for (const item of stored.teamMembers ?? []) {
-	      if (!teams.has(item.teamId) || !Array.isArray(item.userIds)) continue;
-	      const members = new Set(item.userIds.filter((userId) => typeof userId === "string" && userId.length > 0));
+	      if (!teams.has(item.teamId)) continue;
+	      const members = new Map<string, TeamMemberRecord>();
+	      const storedMembers = Array.isArray(item.members) ? item.members : [];
+	      for (const member of storedMembers) {
+	        if (!member || typeof member.userId !== "string" || member.userId.length === 0) continue;
+	        members.set(member.userId, {
+	          teamId: item.teamId,
+	          userId: member.userId,
+	          role: normalizeTeamRole(member.role),
+	          joinedAt: typeof member.joinedAt === "string" && !Number.isNaN(Date.parse(member.joinedAt))
+	            ? member.joinedAt
+	            : new Date().toISOString()
+	        });
+	      }
+	      for (const userId of item.userIds ?? []) {
+	        if (typeof userId === "string" && userId.length > 0 && !members.has(userId)) {
+	          members.set(userId, {
+	            teamId: item.teamId,
+	            userId,
+	            role: "member",
+	            joinedAt: new Date().toISOString()
+	          });
+	        }
+	      }
 	      if (members.size === 0) continue;
 	      teamMembers.set(item.teamId, members);
 	      const team = teams.get(item.teamId);
@@ -1832,7 +1905,8 @@ async function saveRelayStore() {
 	    devices: Array.from(devices.values()),
 	    teamMembers: Array.from(teamMembers.entries()).map(([teamId, members]) => ({
 	      teamId,
-	      userIds: Array.from(members.values())
+	      members: Array.from(members.values()),
+	      userIds: Array.from(members.keys())
 	    })),
 	    authSessions: storedAuthSessions(),
 	    attachmentBlobs: Array.from(attachmentBlobs.values()).filter((blob) => !isExpiredAttachmentBlob(blob)),
@@ -1857,10 +1931,18 @@ function seedWorkspace() {
   if (!teams.has(core.id)) teams.set(core.id, core);
   if (!teams.has(labs.id)) teams.set(labs.id, labs);
   if (!teamMembers.has(core.id)) {
-    teamMembers.set(core.id, new Set(["github:maddiedreese", "github:alex"]));
+    teamMembers.set(core.id, new Map([
+      ["github:maddiedreese", seedTeamMember(core.id, "github:maddiedreese", "owner")],
+      ["github:alex", seedTeamMember(core.id, "github:alex", "admin")],
+      ["github:tester", seedTeamMember(core.id, "github:tester", "member")],
+      ["github:design", seedTeamMember(core.id, "github:design", "member")]
+    ]));
   }
   if (!teamMembers.has(labs.id)) {
-    teamMembers.set(labs.id, new Set(["github:labs"]));
+    teamMembers.set(labs.id, new Map([
+      ["github:labs", seedTeamMember(labs.id, "github:labs", "owner")],
+      ["github:research", seedTeamMember(labs.id, "github:research", "member")]
+    ]));
   }
 
   const seedRooms: RoomRecord[] = [
@@ -1914,6 +1996,15 @@ function seedWorkspace() {
     if (!rooms.has(room.id)) rooms.set(room.id, room);
   }
   scheduleStoreSave();
+}
+
+function seedTeamMember(teamId: string, userId: string, role: TeamRole): TeamMemberRecord {
+  return {
+    teamId,
+    userId,
+    role,
+    joinedAt: "2026-07-04T00:00:00.000Z"
+  };
 }
 
 function normalizeRoom(room: RoomRecord | (RoomRecord & { codexModel?: string })): RoomRecord {
