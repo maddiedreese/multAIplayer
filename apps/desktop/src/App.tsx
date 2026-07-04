@@ -476,8 +476,9 @@ export function App() {
   const [chatMessage, setChatMessage] = useState<string | null>(null);
   const [settingsBusyByRoom, setSettingsBusyByRoom] = useState<Record<string, boolean>>({});
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
-  const [customCodexModel, setCustomCodexModel] = useState(defaultCodexModel);
-  const [projectPathDraft, setProjectPathDraft] = useState(defaultProjectPath);
+  const [customCodexModelsByRoom, setCustomCodexModelsByRoom] = useState<Record<string, string>>({});
+  const [projectPathDraftsByRoom, setProjectPathDraftsByRoom] = useState<Record<string, string>>({});
+  const [browserAllowedOriginsDraftsByRoom, setBrowserAllowedOriginsDraftsByRoom] = useState<Record<string, string>>({});
   const [historySettings, setHistorySettings] = useState<LocalHistorySettings>({
     enabled: true,
     retentionDays: 30
@@ -526,7 +527,6 @@ export function App() {
   const [browserReasonsByRoom, setBrowserReasonsByRoom] = useState<Record<string, string>>({});
   const [browserMessagesByRoom, setBrowserMessagesByRoom] = useState<Record<string, string | null>>({});
   const [browserStatusByRoom, setBrowserStatusByRoom] = useState<Record<string, BrowserStatus>>({});
-  const [browserAllowedOriginsDraft, setBrowserAllowedOriginsDraft] = useState(defaultBrowserAllowedOrigins.join("\n"));
   const [relayStatus, setRelayStatus] = useState<RelayStatus>("closed");
   const [authConfig, setAuthConfig] = useState<GitHubAuthConfig | null>(null);
   const [currentUser, setCurrentUser] = useState<SignedInUser | null>(null);
@@ -578,6 +578,9 @@ export function App() {
   const selectedTeamName = teams.find((team) => team.id === selectedTeam)?.name ?? (teams.length ? "No team selected" : "No teams yet");
   const selectedCodexModel = selectedRoom?.codexModel ?? defaultCodexModel;
   const selectedBrowserAllowedOrigins = selectedRoom.browserAllowedOrigins ?? defaultBrowserAllowedOrigins;
+  const customCodexModel = customCodexModelsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedCodexModel;
+  const projectPathDraft = projectPathDraftsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedRoom.projectPath;
+  const browserAllowedOriginsDraft = browserAllowedOriginsDraftsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedBrowserAllowedOrigins.join("\n");
   const messages = messagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const draft = draftsByRoom[selectedRoom?.id ?? selectedRoomId] ?? "";
   const selectedMessageIds = selectedMessageIdsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
@@ -716,6 +719,25 @@ export function App() {
 
   function setCodexRunningForRoom(roomId: string, running: boolean) {
     setCodexRunningByRoom((current) => running ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function setCustomCodexModelForRoom(roomId: string, model: string) {
+    const room = roomsRef.current.find((item) => item.id === roomId);
+    const currentModel = room?.codexModel ?? defaultCodexModel;
+    setCustomCodexModelsByRoom((current) => model === currentModel ? omitRecordKey(current, roomId) : { ...current, [roomId]: model });
+  }
+
+  function setProjectPathDraftForRoom(roomId: string, projectPath: string) {
+    const room = roomsRef.current.find((item) => item.id === roomId);
+    const currentProjectPath = room?.projectPath ?? defaultProjectPath;
+    setProjectPathDraftsByRoom((current) => projectPath === currentProjectPath ? omitRecordKey(current, roomId) : { ...current, [roomId]: projectPath });
+  }
+
+  function setBrowserAllowedOriginsDraftForRoom(roomId: string, draftValue: string) {
+    const room = roomsRef.current.find((item) => item.id === roomId);
+    const currentOrigins = room?.browserAllowedOrigins ?? defaultBrowserAllowedOrigins;
+    const currentDraft = currentOrigins.join("\n");
+    setBrowserAllowedOriginsDraftsByRoom((current) => draftValue === currentDraft ? omitRecordKey(current, roomId) : { ...current, [roomId]: draftValue });
   }
 
   function setFileQueryForRoom(roomId: string, query: string) {
@@ -1456,16 +1478,20 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    setCustomCodexModel(selectedCodexModel);
-  }, [selectedCodexModel]);
+    if (!hasSelectedRoom) return;
+    setCustomCodexModelsByRoom((current) => current[selectedRoom.id] === selectedCodexModel ? omitRecordKey(current, selectedRoom.id) : current);
+  }, [hasSelectedRoom, selectedCodexModel, selectedRoom.id]);
 
   useEffect(() => {
-    setBrowserAllowedOriginsDraft(selectedBrowserAllowedOrigins.join("\n"));
-  }, [selectedRoom.id, selectedBrowserAllowedOrigins]);
+    if (!hasSelectedRoom) return;
+    const currentDraft = selectedBrowserAllowedOrigins.join("\n");
+    setBrowserAllowedOriginsDraftsByRoom((current) => current[selectedRoom.id] === currentDraft ? omitRecordKey(current, selectedRoom.id) : current);
+  }, [hasSelectedRoom, selectedBrowserAllowedOrigins, selectedRoom.id]);
 
   useEffect(() => {
-    setProjectPathDraft(selectedRoom.projectPath);
-  }, [selectedRoom.id, selectedRoom.projectPath]);
+    if (!hasSelectedRoom) return;
+    setProjectPathDraftsByRoom((current) => current[selectedRoom.id] === selectedRoom.projectPath ? omitRecordKey(current, selectedRoom.id) : current);
+  }, [hasSelectedRoom, selectedRoom.id, selectedRoom.projectPath]);
 
   function setPendingAttachmentsForRoom(
     roomId: string,
@@ -1795,8 +1821,8 @@ export function App() {
       markHostHandoffAccepted(roomId, handoff.id);
       resetFileContextForRoom(roomId);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setProjectPathDraft(patch.projectPath);
-        setCustomCodexModel(patch.codexModel);
+        setProjectPathDraftForRoom(roomId, patch.projectPath);
+        setCustomCodexModelForRoom(roomId, patch.codexModel);
         setSettingsMessage(
           `Accepted handoff from ${handoff.fromHost}; inherited ${formatCodexModel(patch.codexModel)} and ${patch.projectPath}.`
         );
@@ -2189,7 +2215,7 @@ export function App() {
       });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setBrowserAllowedOriginsDraft(normalized.join("\n"));
+        setBrowserAllowedOriginsDraftForRoom(roomId, normalized.join("\n"));
         setBrowserMessageForRoom(
           roomId,
           normalized.length
@@ -2296,7 +2322,7 @@ export function App() {
         return;
       }
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setProjectPathDraft(selectedPath);
+        setProjectPathDraftForRoom(roomId, selectedPath);
         setSettingsMessage(`Selected project folder: ${selectedPath}`);
       }
     } catch (error) {
@@ -2396,6 +2422,9 @@ export function App() {
     setGitWorkflowBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setProjectPathDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setBrowserAllowedOriginsDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setKeyRotationBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setApprovalVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setPendingCodexApprovalsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2468,6 +2497,9 @@ export function App() {
     setGitWorkflowBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setProjectPathDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setBrowserAllowedOriginsDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setKeyRotationBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setApprovalVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setPendingCodexApprovalsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -4900,7 +4932,7 @@ export function App() {
               <textarea
                 value={browserAllowedOriginsDraft}
                 disabled={!hasSelectedRoom || !isActiveHost || settingsBusy}
-                onChange={(event) => setBrowserAllowedOriginsDraft(event.target.value)}
+                onChange={(event) => setBrowserAllowedOriginsDraftForRoom(selectedRoom.id, event.target.value)}
                 placeholder="https://github.com"
               />
             </label>
@@ -4999,7 +5031,7 @@ export function App() {
               <input
                 value={projectPathDraft}
                 disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}
-                onChange={(event) => setProjectPathDraft(event.target.value)}
+                onChange={(event) => setProjectPathDraftForRoom(selectedRoom.id, event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -5013,7 +5045,7 @@ export function App() {
                 <FolderGit2 size={15} />
                 Choose folder
               </button>
-              <button className="ghost-wide" onClick={() => setProjectPathDraft(defaultProjectPath)} disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}>
+              <button className="ghost-wide" onClick={() => setProjectPathDraftForRoom(selectedRoom.id, defaultProjectPath)} disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}>
                 <FolderGit2 size={15} />
                 Current repo
               </button>
@@ -5248,7 +5280,7 @@ export function App() {
             <input
               value={customCodexModel}
               disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}
-              onChange={(event) => setCustomCodexModel(event.target.value)}
+              onChange={(event) => setCustomCodexModelForRoom(selectedRoom.id, event.target.value)}
               onBlur={() => setCodexModel(customCodexModel)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
