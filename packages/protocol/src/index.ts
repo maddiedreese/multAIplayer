@@ -417,7 +417,14 @@ export type AttachmentBlobRecord = z.infer<typeof AttachmentBlobRecord>;
 
 export interface CodexTurnSummary {
   messagesSinceLastCodex: number;
-  attachments: Array<{ id: string; name: string; type: string; size: number }>;
+  attachments: Array<{
+    id: string;
+    name: string;
+    type: string;
+    size: number;
+    storage: "inline" | "encrypted_blob";
+    contentIncluded: boolean;
+  }>;
   workspacePath: string | null;
   git: {
     branch: string;

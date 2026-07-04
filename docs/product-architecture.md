@@ -96,6 +96,8 @@ Invite approval requests are encrypted room events. A gated invite imports room 
 
 The alpha embeds small text/code attachment previews directly in encrypted chat payloads: up to 5 files per message, 80 KB per file, and 200 KB total preview content per message. Larger previews are encrypted locally, uploaded to relay blob storage as ciphertext, referenced from the encrypted chat message by blob id, and decrypted locally into the file preview pane when a room member opens them. Serialized encrypted room envelopes are also bounded by the relay before WebSocket fanout and backlog storage, so large file previews must use encrypted blob storage rather than oversized room events.
 
+Codex approval distinguishes inline attachment content from encrypted blob references. Inline text previews are included in the Codex turn package after host approval. Encrypted blob attachments are listed by name and blob reference only in the alpha Codex turn package, so approving a turn does not silently decrypt and inject large files into Codex context.
+
 Composer text and attachment drafts are scoped per room. If a user switches rooms, unfinished message text stays with its original room. If a large encrypted attachment blob finishes uploading after a switch, the finished attachment remains queued only for the room where the upload began.
 
 Project file previews and encrypted attachment blob opens are also tied to the originating room. If a room switch happens while a file read or blob decrypt is in flight, the completed read is ignored rather than rendered into the newly selected room's inspector.
@@ -127,6 +129,7 @@ Codex will receive:
 - 18 messages since the last Codex response
 - 2 images
 - 1 file: app.tsx
+- Large file: large.log as encrypted blob reference only
 - Workspace: /Users/maddie/dev/example
 - Model: GPT-5.4
 - Browser access: github.com only

@@ -17,6 +17,8 @@ The relay does not see plaintext message bodies, reactions, attachments, Codex t
 
 In the alpha desktop app, small text/code attachments can be embedded inside the encrypted chat payload. A message can include up to 5 embedded attachments, each with up to 80 KB of plaintext preview content and up to 200 KB of embedded preview content total. Larger previews are encrypted locally and uploaded to relay blob storage as ciphertext, then referenced from the encrypted chat payload by blob id. Desktop clients fetch ciphertext blobs with the blob id plus matching team and room ids, decrypt them with the room key, and preview them locally without exposing plaintext to the relay.
 
+Codex turn summaries mark each attachment as inline content, metadata-only, or encrypted-blob-reference-only. This keeps the host approval sheet aligned with the actual Codex turn input: inline content can be sent to the local Codex app-server after approval, while large encrypted blob attachments are referenced but not decrypted into Codex context by default.
+
 Message reactions are routed as encrypted `chat.reaction` envelopes. The relay sees that a reaction event happened in a room, but not the emoji, target message, action, or reactor identity.
 
 Host handoff packages are routed as encrypted `room.host` envelopes. The relay sees the envelope metadata but not the handoff summary contents.

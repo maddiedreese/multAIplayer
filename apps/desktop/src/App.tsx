@@ -4176,7 +4176,7 @@ export function App() {
               </div>
               <div className="approval-grid">
                 <ApprovalItem label="Messages" value={`${codexTurnSummary.messagesSinceLastCodex} since last Codex response`} />
-                <ApprovalItem label="Attachments" value={codexTurnSummary.attachments.map((item) => item.name).join(", ") || "None"} />
+                <ApprovalItem label="Attachments" value={formatCodexAttachmentSummary(codexTurnSummary.attachments)} />
                 <ApprovalItem label="Workspace" value={selectedRoom.mode.workspace ? codexTurnSummary.workspacePath ?? "None" : "Disabled"} />
                 <ApprovalItem label="Git" value={formatCodexGitSummary(codexTurnSummary.git)} />
                 <ApprovalItem label="Browser" value={selectedRoom.mode.browser ? codexTurnSummary.browserAccess.join(", ") || "No pages shared" : "Disabled"} />
@@ -5714,6 +5714,15 @@ function formatCodexGitSummary(git: CodexTurnSummary["git"]): string {
   if (git.totalFiles === 0) return `${git.branch}, clean`;
   const suffix = git.truncated ? `, showing ${git.files.length}` : "";
   return `${git.branch}, ${git.totalFiles} changed${suffix}`;
+}
+
+function formatCodexAttachmentSummary(attachments: CodexTurnSummary["attachments"]): string {
+  if (attachments.length === 0) return "None";
+  return attachments.map((attachment) => {
+    if (attachment.contentIncluded) return `${attachment.name} (inline)`;
+    if (attachment.storage === "encrypted_blob") return `${attachment.name} (encrypted blob reference only)`;
+    return `${attachment.name} (metadata only)`;
+  }).join(", ");
 }
 
 function formatMemberDeviceLabel(member: RoomPresence, localDeviceId: string): string {

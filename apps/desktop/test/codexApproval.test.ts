@@ -24,7 +24,14 @@ test("chat-only Codex turns are not auto-approved for non-host members", () => {
 test("attachments require host approval", () => {
   const summary = {
     ...baseSummary,
-    attachments: [{ id: "att-1", name: "notes.md", type: "code", size: 120 }]
+    attachments: [{
+      id: "att-1",
+      name: "notes.md",
+      type: "code",
+      size: 120,
+      storage: "inline" as const,
+      contentIncluded: true
+    }]
   };
 
   assert.equal(isChatOnlyCodexTurn(summary), false);
