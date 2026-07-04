@@ -185,6 +185,7 @@ import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { copyTextToClipboard } from "./lib/clipboard";
 import { checkGitHubWorkflowReadiness } from "./lib/githubWorkflowReadiness";
+import { resolveGitWorkflowDraft, updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "./lib/gitWorkflowDraft";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -530,17 +531,12 @@ export function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [gitWorkflowBusy, setGitWorkflowBusy] = useState(false);
-  const [gitWorkflowMessage, setGitWorkflowMessage] = useState<string | null>(null);
+  const [gitWorkflowMessagesByRoom, setGitWorkflowMessagesByRoom] = useState<Record<string, string | null>>({});
   const [actionsBusy, setActionsBusy] = useState(false);
   const [actionsMessagesByRoom, setActionsMessagesByRoom] = useState<Record<string, string | null>>({});
   const [actionRunsByRoom, setActionRunsByRoom] = useState<Record<string, GitHubActionRun[]>>({});
   const [actionsLastCheckedByRoom, setActionsLastCheckedByRoom] = useState<Record<string, string | null>>({});
-  const [gitBranchName, setGitBranchName] = useState("multaiplayer/alpha-codex-room");
-  const [gitCommitMessage, setGitCommitMessage] = useState("Build multAIplayer alpha room workflow");
-  const [gitPushEnabled, setGitPushEnabled] = useState(false);
-  const [prOwner, setPrOwner] = useState("maddiedreese");
-  const [prRepo, setPrRepo] = useState("multAIplayer");
-  const [prBase, setPrBase] = useState("main");
+  const [gitWorkflowDraftsByRoom, setGitWorkflowDraftsByRoom] = useState<Record<string, Partial<GitWorkflowDraft>>>({});
   const [fileQuery, setFileQuery] = useState("");
   const [projectFiles, setProjectFiles] = useState<ProjectFileEntry[]>([]);
   const [selectedFile, setSelectedFile] = useState<ProjectFileContent | null>(null);
@@ -583,29 +579,31 @@ export function App() {
   const browserRequests = browserRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const browserStatus = browserStatusByRoom[selectedRoom?.id ?? selectedRoomId] ?? defaultBrowserStatus;
   const gitStatus = gitStatusByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const gitWorkflowDraft = resolveGitWorkflowDraft(gitWorkflowDraftsByRoom, selectedRoom?.id ?? selectedRoomId);
+  const gitWorkflowMessage = gitWorkflowMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const actionRuns = actionRunsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const actionsLastChecked = actionsLastCheckedByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const actionsMessage = actionsMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const terminalLines = terminalLinesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const actionsSummary = useMemo(() => summarizeActionRuns(actionRuns), [actionRuns]);
   const githubWorkflowReadiness = useMemo(() => checkGitHubWorkflowReadiness({
-    pushEnabled: gitPushEnabled,
+    pushEnabled: gitWorkflowDraft.pushEnabled,
     authConfig,
     currentUser,
-    owner: prOwner,
-    repo: prRepo,
-    head: gitBranchName,
-    base: prBase
-  }), [authConfig, currentUser, gitBranchName, gitPushEnabled, prBase, prOwner, prRepo]);
+    owner: gitWorkflowDraft.prOwner,
+    repo: gitWorkflowDraft.prRepo,
+    head: gitWorkflowDraft.branchName,
+    base: gitWorkflowDraft.prBase
+  }), [authConfig, currentUser, gitWorkflowDraft.branchName, gitWorkflowDraft.prBase, gitWorkflowDraft.prOwner, gitWorkflowDraft.prRepo, gitWorkflowDraft.pushEnabled]);
   const gitApprovalPreview = useMemo(() => {
     try {
       const plan = createGitWorkflowApprovalPlan(
         selectedRoom.projectPath,
-        gitBranchName,
-        gitCommitMessage,
-        gitPushEnabled
+        gitWorkflowDraft.branchName,
+        gitWorkflowDraft.commitMessage,
+        gitWorkflowDraft.pushEnabled
       );
-      const normalizedBase = gitPushEnabled ? normalizeGitHubBranchName(prBase.trim() || "main") : prBase.trim();
+      const normalizedBase = gitWorkflowDraft.pushEnabled ? normalizeGitHubBranchName(gitWorkflowDraft.prBase.trim() || "main") : gitWorkflowDraft.prBase.trim();
       return {
         plan,
         normalizedBase,
@@ -615,12 +613,12 @@ export function App() {
     } catch (error) {
       return {
         plan: null,
-        normalizedBase: prBase.trim(),
+        normalizedBase: gitWorkflowDraft.prBase.trim(),
         steps: [],
         error: String(error)
       };
     }
-  }, [gitBranchName, gitCommitMessage, gitPushEnabled, prBase, selectedRoom.projectPath]);
+  }, [gitWorkflowDraft.branchName, gitWorkflowDraft.commitMessage, gitWorkflowDraft.prBase, gitWorkflowDraft.pushEnabled, selectedRoom.projectPath]);
   const codexTurnSummary = useMemo(
     () => buildCodexTurnSummary(messages, selectedRoom, terminals, browserRequests, gitStatus),
     [messages, selectedRoom, terminals, browserRequests, gitStatus]
@@ -647,6 +645,23 @@ export function App() {
     selectedRoom.hostStatus === "active"
       ? `Only ${selectedRoom.host} can change room host settings.`
       : "Claim host before changing room host settings.";
+
+  function setGitWorkflowMessageForRoom(roomId: string, message: string | null) {
+    setGitWorkflowMessagesByRoom((current) => ({
+      ...current,
+      [roomId]: message
+    }));
+  }
+
+  function setSelectedGitWorkflowMessage(message: string | null) {
+    setGitWorkflowMessageForRoom(selectedRoom.id, message);
+  }
+
+  function updateSelectedGitWorkflowDraft(patch: Partial<GitWorkflowDraft>) {
+    if (!hasSelectedRoom) return;
+    setGitWorkflowDraftsByRoom((current) => updateGitWorkflowDraftRecord(current, selectedRoom.id, patch));
+  }
+
   const selectedAttachmentReview = selectedFile
     ? decideAttachmentReview(
         selectedFile.content,
@@ -1001,7 +1016,7 @@ export function App() {
             const plaintext = await decryptJson<unknown>(roomPayload, secret);
             if (isGitWorkflowEventPlaintextPayload(plaintext)) {
               appendTerminalLinesForRoom(message.envelope.roomId, buildGitWorkflowEventLines(plaintext));
-              setGitWorkflowMessage(plaintext.message);
+              setGitWorkflowMessageForRoom(message.envelope.roomId, plaintext.message);
             }
             if (isGitHubActionsEventPlaintextPayload(plaintext)) {
               setActionRunsByRoom((current) => ({
@@ -1205,7 +1220,7 @@ export function App() {
     }));
     setActionsLastCheckedByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setActionsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-  }, [gitBranchName, hasSelectedRoom, prOwner, prRepo, selectedRoom.id]);
+  }, [gitWorkflowDraft.branchName, gitWorkflowDraft.prOwner, gitWorkflowDraft.prRepo, hasSelectedRoom, selectedRoom.id]);
 
   useEffect(() => {
     if (!hasSelectedRoom) {
@@ -3636,37 +3651,38 @@ export function App() {
 
   async function copyPullRequestDraftMarkdown() {
     if (!hasSelectedRoom) {
-      setGitWorkflowMessage("Create or join a room before copying a PR draft.");
+      setSelectedGitWorkflowMessage("Create or join a room before copying a PR draft.");
       return;
     }
     const markdown = buildPullRequestBody(messages, gitStatus?.files ?? []);
-    await copyMarkdownWithFallback("PR description draft", markdown, setGitWorkflowMessage);
+    await copyMarkdownWithFallback("PR description draft", markdown, setSelectedGitWorkflowMessage);
   }
 
   async function approveGitWorkflow() {
     if (!hasSelectedRoom) {
-      setGitWorkflowMessage("Create or join a room before approving a git workflow.");
+      setSelectedGitWorkflowMessage("Create or join a room before approving a git workflow.");
       return;
     }
     if (!isActiveHost) {
-      setGitWorkflowMessage(hostGateMessage);
+      setSelectedGitWorkflowMessage(hostGateMessage);
       return;
     }
     const room = selectedRoom;
     const roomId = room.id;
     const projectPath = room.projectPath;
+    const workflowDraft = gitWorkflowDraft;
     if (!gitApprovalPreview.plan) {
-      setGitWorkflowMessage(gitApprovalPreview.error ?? "Git workflow approval preview is invalid.");
+      setGitWorkflowMessageForRoom(roomId, gitApprovalPreview.error ?? "Git workflow approval preview is invalid.");
       return;
     }
-    if (gitPushEnabled && !githubWorkflowReadiness.ready) {
-      setGitWorkflowMessage(githubWorkflowReadiness.messages.join(" "));
+    if (workflowDraft.pushEnabled && !githubWorkflowReadiness.ready) {
+      setGitWorkflowMessageForRoom(roomId, githubWorkflowReadiness.messages.join(" "));
       return;
     }
     const gitPlan = gitApprovalPreview.plan;
-    const normalizedPrBase = gitPushEnabled ? githubWorkflowReadiness.normalizedBase : gitApprovalPreview.normalizedBase;
+    const normalizedPrBase = workflowDraft.pushEnabled ? githubWorkflowReadiness.normalizedBase : gitApprovalPreview.normalizedBase;
     setGitWorkflowBusy(true);
-    setGitWorkflowMessage(null);
+    setGitWorkflowMessageForRoom(roomId, null);
     appendTerminalLinesForRoom(roomId, [
       `Approve git workflow: branch=${gitPlan.branch}, push=${gitPlan.push}`,
       ...gitPlan.approvals.flatMap((approval) => approval.commands.map((command) => `$ ${command}`))
@@ -3699,7 +3715,7 @@ export function App() {
       const failed = results.find((result) => result.status !== 0);
       if (failed) {
         const message = `Stopped after failed command: ${failed.command}`;
-        setGitWorkflowMessage(message);
+        setGitWorkflowMessageForRoom(roomId, message);
         publishGitWorkflowEvent({
           status: "failed",
           branch: gitPlan.branch,
@@ -3714,8 +3730,8 @@ export function App() {
 
       if (gitPlan.push) {
         const pr = await createPullRequest({
-          owner: prOwner,
-          repo: prRepo,
+          owner: workflowDraft.prOwner,
+          repo: workflowDraft.prRepo,
           title: gitPlan.message,
           body: buildPullRequestBody(messages, gitStatus?.files ?? []),
           head: gitPlan.branch,
@@ -3723,7 +3739,7 @@ export function App() {
           draft: true
         });
         const message = `Opened draft PR #${pr.number}: ${pr.url}`;
-        setGitWorkflowMessage(message);
+        setGitWorkflowMessageForRoom(roomId, message);
         publishGitWorkflowEvent({
           status: "pr_opened",
           branch: gitPlan.branch,
@@ -3740,7 +3756,7 @@ export function App() {
         refreshGitHubActions(room);
       } else {
         const message = "Created local branch and commit. Enable push when you are ready to open a PR.";
-        setGitWorkflowMessage(message);
+        setGitWorkflowMessageForRoom(roomId, message);
         publishGitWorkflowEvent({
           status: "completed",
           branch: gitPlan.branch,
@@ -3756,12 +3772,12 @@ export function App() {
       setGitStatusForRoom(roomId, status);
     } catch (error) {
       const message = String(error);
-      setGitWorkflowMessage(message);
+      setGitWorkflowMessageForRoom(roomId, message);
       appendTerminalLinesForRoom(roomId, [`Git workflow error: ${message}`]);
       publishGitWorkflowEvent({
         status: "failed",
-        branch: gitPlan?.branch ?? gitBranchName,
-        push: gitPlan?.push ?? gitPushEnabled,
+        branch: gitPlan?.branch ?? workflowDraft.branchName,
+        push: gitPlan?.push ?? workflowDraft.pushEnabled,
         message
       }, room).catch((publishError) => {
         console.warn("Failed to publish git workflow error", publishError);
@@ -3772,18 +3788,19 @@ export function App() {
   }
 
   async function refreshGitHubActions(room: RoomRecord = selectedRoom) {
+    const roomId = room.id;
     if (!hasSelectedRoom) {
       setActionsMessagesByRoom((current) => ({
         ...current,
-        [room.id]: "Create or join a room before sharing GitHub Actions status."
+        [roomId]: "Create or join a room before sharing GitHub Actions status."
       }));
       return;
     }
-    const roomId = room.id;
+    const workflowDraft = resolveGitWorkflowDraft(gitWorkflowDraftsByRoom, roomId);
     setActionsBusy(true);
     setActionsMessagesByRoom((current) => omitRecordKey(current, roomId));
     try {
-      const result = await listGitHubActionRuns(prOwner, prRepo, gitBranchName);
+      const result = await listGitHubActionRuns(workflowDraft.prOwner, workflowDraft.prRepo, workflowDraft.branchName);
       const checkedAt = new Date().toISOString();
       setActionRunsByRoom((current) => ({
         ...current,
@@ -3795,16 +3812,16 @@ export function App() {
       }));
       const summary = summarizeActionRuns(result.runs);
       const message = result.runs.length
-        ? `Loaded ${result.runs.length} workflow runs for ${gitBranchName}.`
-        : `No workflow runs found for ${gitBranchName}. GitHub may still be scheduling the branch.`;
+        ? `Loaded ${result.runs.length} workflow runs for ${workflowDraft.branchName}.`
+        : `No workflow runs found for ${workflowDraft.branchName}. GitHub may still be scheduling the branch.`;
       setActionsMessagesByRoom((current) => ({
         ...current,
         [roomId]: `${summary.label}: ${message}`
       }));
       publishGitHubActionsEvent({
-        owner: prOwner,
-        repo: prRepo,
-        branch: gitBranchName,
+        owner: workflowDraft.prOwner,
+        repo: workflowDraft.prRepo,
+        branch: workflowDraft.branchName,
         summary,
         message,
         checkedAt,
@@ -5106,31 +5123,31 @@ export function App() {
           </div>
           <label>
             <span>Branch</span>
-            <input value={gitBranchName} onChange={(event) => setGitBranchName(event.target.value)} />
+            <input value={gitWorkflowDraft.branchName} onChange={(event) => updateSelectedGitWorkflowDraft({ branchName: event.target.value })} />
           </label>
           <label>
             <span>Commit message</span>
-            <input value={gitCommitMessage} onChange={(event) => setGitCommitMessage(event.target.value)} />
+            <input value={gitWorkflowDraft.commitMessage} onChange={(event) => updateSelectedGitWorkflowDraft({ commitMessage: event.target.value })} />
           </label>
           <div className="repo-grid">
             <label>
               <span>Owner</span>
-              <input value={prOwner} onChange={(event) => setPrOwner(event.target.value)} />
+              <input value={gitWorkflowDraft.prOwner} onChange={(event) => updateSelectedGitWorkflowDraft({ prOwner: event.target.value })} />
             </label>
             <label>
               <span>Repo</span>
-              <input value={prRepo} onChange={(event) => setPrRepo(event.target.value)} />
+              <input value={gitWorkflowDraft.prRepo} onChange={(event) => updateSelectedGitWorkflowDraft({ prRepo: event.target.value })} />
             </label>
             <label>
               <span>Base</span>
-              <input value={prBase} onChange={(event) => setPrBase(event.target.value)} />
+              <input value={gitWorkflowDraft.prBase} onChange={(event) => updateSelectedGitWorkflowDraft({ prBase: event.target.value })} />
             </label>
           </div>
           <label className="checkbox-row">
             <input
               type="checkbox"
-              checked={gitPushEnabled}
-              onChange={(event) => setGitPushEnabled(event.target.checked)}
+              checked={gitWorkflowDraft.pushEnabled}
+              onChange={(event) => updateSelectedGitWorkflowDraft({ pushEnabled: event.target.checked })}
             />
             <span>Push branch and open draft PR</span>
           </label>
@@ -5149,11 +5166,11 @@ export function App() {
                 </div>
               ))
             )}
-            {gitPushEnabled && !gitApprovalPreview.error && (
-              <small>Draft PR target: {githubWorkflowReadiness.target ?? `${prOwner}/${prRepo} to ${githubWorkflowReadiness.normalizedBase || "main"}`}</small>
+            {gitWorkflowDraft.pushEnabled && !gitApprovalPreview.error && (
+              <small>Draft PR target: {githubWorkflowReadiness.target ?? `${gitWorkflowDraft.prOwner}/${gitWorkflowDraft.prRepo} to ${githubWorkflowReadiness.normalizedBase || "main"}`}</small>
             )}
           </div>
-          {gitPushEnabled && (
+          {gitWorkflowDraft.pushEnabled && (
             <div className={`workflow-message ${githubWorkflowReadiness.ready ? "" : "danger"}`}>
               {githubWorkflowReadiness.messages.join(" ")}
             </div>
@@ -5165,7 +5182,7 @@ export function App() {
           <button
             className="primary-wide"
             onClick={approveGitWorkflow}
-            disabled={!hasSelectedRoom || gitWorkflowBusy || !isActiveHost || Boolean(gitApprovalPreview.error) || (gitPushEnabled && !githubWorkflowReadiness.ready)}
+            disabled={!hasSelectedRoom || gitWorkflowBusy || !isActiveHost || Boolean(gitApprovalPreview.error) || (gitWorkflowDraft.pushEnabled && !githubWorkflowReadiness.ready)}
           >
             <Github size={15} />
             {gitWorkflowBusy ? "Running approved git workflow" : "Approve git workflow"}
@@ -5187,7 +5204,7 @@ export function App() {
           <div className={`actions-summary ${actionsSummary.tone}`}>
             <strong>{actionsSummary.detail}</strong>
             <span>
-              {prOwner}/{prRepo} · {gitBranchName || "branch required"}
+              {gitWorkflowDraft.prOwner}/{gitWorkflowDraft.prRepo} · {gitWorkflowDraft.branchName || "branch required"}
               {actionsLastChecked ? ` · checked ${formatTimestamp(actionsLastChecked)}` : ""}
             </span>
           </div>
