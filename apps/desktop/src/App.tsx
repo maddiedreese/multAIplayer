@@ -178,6 +178,7 @@ import { normalizeBrowserAllowedOrigins, shouldAutoApproveBrowserRequest } from 
 import { attachmentReviewMessage, decideAttachmentReview } from "./lib/attachmentPolicy";
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
+import { copyTextToClipboard } from "./lib/clipboard";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -243,6 +244,11 @@ interface CodexRoomEvent extends CodexEventPlaintextPayload {}
 
 interface HostHandoffRecord extends HostHandoffPlaintextPayload {
   status: "available" | "accepted";
+}
+
+interface MarkdownCopyFallback {
+  title: string;
+  markdown: string;
 }
 
 interface NoSecretRoomInvite {
@@ -526,6 +532,7 @@ export function App() {
   const [selectedDiff, setSelectedDiff] = useState<GitDiffResult | null>(null);
   const [fileBusy, setFileBusy] = useState(false);
   const [fileMessage, setFileMessage] = useState<string | null>(null);
+  const [markdownCopyFallback, setMarkdownCopyFallback] = useState<MarkdownCopyFallback | null>(null);
   const [sensitiveAttachmentReviewPath, setSensitiveAttachmentReviewPath] = useState<string | null>(null);
   const [inviteLink, setInviteLink] = useState("");
   const [inviteSecretInput, setInviteSecretInput] = useState("");
@@ -3227,12 +3234,7 @@ export function App() {
           ? detectSecretRisks(selectedDiff.diff, selectedDiff.path)
           : []
     );
-    try {
-      await navigator.clipboard.writeText(markdown);
-      setFileMessage("Copied project context as Markdown.");
-    } catch {
-      setFileMessage("Markdown is ready, but copying was blocked because the app was not focused.");
-    }
+    await copyMarkdownWithFallback("project context", markdown, setFileMessage);
   }
 
   async function attachSelectedFileToMessage() {
@@ -3376,24 +3378,29 @@ export function App() {
     }
   }
 
+  async function copyMarkdownWithFallback(
+    title: string,
+    markdown: string,
+    onMessage: (message: string) => void
+  ) {
+    const result = await copyTextToClipboard(markdown);
+    if (result.status === "copied") {
+      setMarkdownCopyFallback(null);
+      onMessage(`Copied ${title} as Markdown.`);
+      return;
+    }
+    setMarkdownCopyFallback({ title, markdown });
+    onMessage(`${title} Markdown is ready below because copying was blocked.`);
+  }
+
   async function copyRoomMarkdown() {
     const markdown = buildRoomMarkdown(selectedRoom, teams.find((team) => team.id === selectedRoom.teamId)?.name ?? "Unknown team", messages);
-    try {
-      await navigator.clipboard.writeText(markdown);
-      setChatMessage("Copied room chat as Markdown.");
-    } catch {
-      setChatMessage("Room Markdown is ready, but copying was blocked because the app was not focused.");
-    }
+    await copyMarkdownWithFallback("room chat", markdown, setChatMessage);
   }
 
   async function copyMessageMarkdown(message: ChatMessage) {
     const markdown = buildMessageMarkdown(message);
-    try {
-      await navigator.clipboard.writeText(markdown);
-      setChatMessage("Copied message as Markdown.");
-    } catch {
-      setChatMessage("Message Markdown is ready, but copying was blocked because the app was not focused.");
-    }
+    await copyMarkdownWithFallback("message", markdown, setChatMessage);
   }
 
   async function copyCodexOutputMarkdown(message: ChatMessage) {
@@ -3402,12 +3409,7 @@ export function App() {
       return;
     }
     const markdown = buildCodexOutputMarkdown(selectedRoom, message, messages);
-    try {
-      await navigator.clipboard.writeText(markdown);
-      setChatMessage("Copied Codex turn output as Markdown.");
-    } catch {
-      setChatMessage("Codex output Markdown is ready, but copying was blocked because the app was not focused.");
-    }
+    await copyMarkdownWithFallback("Codex turn output", markdown, setChatMessage);
   }
 
   async function copyTerminalMarkdown() {
@@ -3417,12 +3419,7 @@ export function App() {
     }
     const lines = selectedTerminal?.lines ?? terminalLines.map((line) => ({ stream: "system", text: line }));
     const markdown = buildTerminalMarkdown(selectedRoom, selectedTerminal, lines, terminalRisks);
-    try {
-      await navigator.clipboard.writeText(markdown);
-      setTerminalError("Copied terminal output as Markdown.");
-    } catch {
-      setTerminalError("Terminal Markdown is ready, but copying was blocked because the app was not focused.");
-    }
+    await copyMarkdownWithFallback("terminal output", markdown, setTerminalError);
   }
 
   async function copyDiffSummaryMarkdown() {
@@ -3437,12 +3434,7 @@ export function App() {
       selectedDiff,
       selectedDiff ? detectSecretRisks(selectedDiff.diff, selectedDiff.path) : []
     );
-    try {
-      await navigator.clipboard.writeText(markdown);
-      setFileMessage("Copied diff summary as Markdown.");
-    } catch {
-      setFileMessage("Diff summary Markdown is ready, but copying was blocked because the app was not focused.");
-    }
+    await copyMarkdownWithFallback("diff summary", markdown, setFileMessage);
   }
 
   async function copyPullRequestDraftMarkdown() {
@@ -3451,12 +3443,7 @@ export function App() {
       return;
     }
     const markdown = buildPullRequestBody(messages, gitStatus?.files ?? []);
-    try {
-      await navigator.clipboard.writeText(markdown);
-      setGitWorkflowMessage("Copied PR description draft as Markdown.");
-    } catch {
-      setGitWorkflowMessage("PR draft Markdown is ready, but copying was blocked because the app was not focused.");
-    }
+    await copyMarkdownWithFallback("PR description draft", markdown, setGitWorkflowMessage);
   }
 
   async function approveGitWorkflow() {
@@ -4131,6 +4118,26 @@ export function App() {
             <Lock size={18} />
             <span>This room was forgotten on this device. Paste a room invite key or get approved through a gated invite to unlock encrypted messages again.</span>
           </div>
+        )}
+
+        {markdownCopyFallback && (
+          <section className="markdown-fallback">
+            <div>
+              <strong>{markdownCopyFallback.title} Markdown ready</strong>
+              <span>Copying was blocked, so the generated Markdown is available here.</span>
+            </div>
+            <textarea readOnly value={markdownCopyFallback.markdown} aria-label={`${markdownCopyFallback.title} Markdown fallback`} />
+            <div className="markdown-fallback-actions">
+              <button
+                onClick={() => copyMarkdownWithFallback(markdownCopyFallback.title, markdownCopyFallback.markdown, setChatMessage)}
+              >
+                <Copy size={14} /> Retry copy
+              </button>
+              <button onClick={() => setMarkdownCopyFallback(null)}>
+                <X size={14} /> Dismiss
+              </button>
+            </div>
+          </section>
         )}
 
         <div className="chat-scroll">
