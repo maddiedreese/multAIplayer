@@ -472,7 +472,7 @@ export function App() {
   const [relayWsDraft, setRelayWsDraft] = useState(() => loadAppConfig().relayWsUrl);
   const [appConfigMessage, setAppConfigMessage] = useState<string | null>(null);
   const [hostBusyByRoom, setHostBusyByRoom] = useState<Record<string, boolean>>({});
-  const [hostMessage, setHostMessage] = useState<string | null>(null);
+  const [hostMessagesByRoom, setHostMessagesByRoom] = useState<Record<string, string | null>>({});
   const [chatMessage, setChatMessage] = useState<string | null>(null);
   const [settingsBusyByRoom, setSettingsBusyByRoom] = useState<Record<string, boolean>>({});
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
@@ -616,6 +616,7 @@ export function App() {
   const inviteLink = inviteLinksByRoom[selectedRoom?.id ?? selectedRoomId] ?? "";
   const inviteApprovalGate = inviteApprovalGatesByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const inviteMessage = inviteMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const hostMessage = hostMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const actionsSummary = useMemo(() => summarizeActionRuns(actionRuns), [actionRuns]);
   const githubWorkflowReadiness = useMemo(() => checkGitHubWorkflowReadiness({
     pushEnabled: gitWorkflowDraft.pushEnabled,
@@ -699,6 +700,14 @@ export function App() {
 
   function setHostBusyForRoom(roomId: string, busy: boolean) {
     setHostBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function setHostMessageForRoom(roomId: string, message: string | null) {
+    setHostMessagesByRoom((current) => message ? { ...current, [roomId]: message } : omitRecordKey(current, roomId));
+  }
+
+  function setSelectedHostMessage(message: string | null) {
+    setHostMessageForRoom(selectedRoom.id, message);
   }
 
   function setSettingsBusyForRoom(roomId: string, busy: boolean) {
@@ -1589,22 +1598,22 @@ export function App() {
 
   function handleCodexInvoke(pendingMessage?: ChatMessage) {
     if (!hasSelectedRoom) {
-      setHostMessage("Create or join a room before invoking Codex.");
+      setSelectedHostMessage("Create or join a room before invoking Codex.");
       return;
     }
     const roomId = selectedRoom.id;
     if (isSelectedRoomForgotten) {
-      setHostMessage("This room was forgotten on this device. Rejoin or paste a room invite key before invoking Codex.");
+      setHostMessageForRoom(roomId, "This room was forgotten on this device. Rejoin or paste a room invite key before invoking Codex.");
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
     if (!selectedRoom.mode.code) {
-      setHostMessage("Code mode is disabled for this room.");
+      setHostMessageForRoom(roomId, "Code mode is disabled for this room.");
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
     if (selectedRoom.approvalPolicy === "never_host") {
-      setHostMessage("This room is set to never host Codex turns.");
+      setHostMessageForRoom(roomId, "This room is set to never host Codex turns.");
       setPendingCodexApprovalForRoom(roomId, null);
       setApprovalVisibleForRoom(roomId, false);
       return;
@@ -1614,15 +1623,16 @@ export function App() {
       if (shouldAutoApproveChatOnlyTurn(approvalSnapshot.summary, isActiveHost)) {
         setPendingCodexApprovalForRoom(roomId, null);
         setApprovalVisibleForRoom(roomId, false);
-        setHostMessage("Auto-approved chat-only Codex turn.");
+        setHostMessageForRoom(roomId, "Auto-approved chat-only Codex turn.");
         approveCodexTurn(approvalSnapshot.messages, approvalSnapshot.summary).catch((error) => {
-          if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessage(String(error));
+          if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessageForRoom(roomId, String(error));
         });
         return;
       }
       setPendingCodexApprovalForRoom(roomId, approvalSnapshot);
       setApprovalVisibleForRoom(roomId, true);
-      setHostMessage(
+      setHostMessageForRoom(
+        roomId,
         isActiveHost
           ? "This turn includes workspace, browser, terminal, or attachment context, so host approval is required."
           : hostGateMessage
@@ -1780,23 +1790,24 @@ export function App() {
 
   async function setRoomHost(hostStatus: RoomRecord["hostStatus"]) {
     if (!hasSelectedRoom) {
-      setHostMessage("Create or join a room before changing the host.");
+      setSelectedHostMessage("Create or join a room before changing the host.");
       return;
     }
     if (hostStatus !== "active" && !isActiveHost) {
-      setHostMessage(hostGateMessage);
+      setSelectedHostMessage(hostGateMessage);
       return;
     }
     const roomId = selectedRoom.id;
     setHostBusyForRoom(roomId, true);
-    setHostMessage(null);
+    setHostMessageForRoom(roomId, null);
     try {
       const host = hostStatus === "active" ? localUser.name : hostStatus === "handoff" ? selectedRoom.host : "No host";
       const hostUserId = hostStatus === "active" ? localUser.id : selectedRoom.hostUserId ?? localUser.id;
       const room = await updateRoomHost(roomId, host, hostUserId, hostStatus);
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setHostMessage(
+        setHostMessageForRoom(
+          roomId,
           hostStatus === "active"
             ? `You are hosting ${room.name}.`
             : hostStatus === "handoff"
@@ -1811,7 +1822,7 @@ export function App() {
         markLatestHostHandoffAccepted(room.id);
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessageForRoom(roomId, String(error));
     } finally {
       setHostBusyForRoom(roomId, false);
     }
@@ -1819,16 +1830,16 @@ export function App() {
 
   async function acceptHostHandoff(handoff: HostHandoffRecord) {
     if (!hasSelectedRoom) {
-      setHostMessage("Create or join a room before accepting a host handoff.");
+      setSelectedHostMessage("Create or join a room before accepting a host handoff.");
       return;
     }
     if (handoff.status !== "available") {
-      setHostMessage("This host handoff has already been accepted.");
+      setSelectedHostMessage("This host handoff has already been accepted.");
       return;
     }
     const roomId = selectedRoom.id;
     setHostBusyForRoom(roomId, true);
-    setHostMessage(null);
+    setHostMessageForRoom(roomId, null);
     try {
       const patch = createHandoffSettingsPatch(handoff);
       const updatedSettings = await updateRoomSettings(roomId, {
@@ -1845,10 +1856,10 @@ export function App() {
         setSettingsMessage(
           `Accepted handoff from ${handoff.fromHost}; inherited ${formatCodexModel(patch.codexModel)} and ${patch.projectPath}.`
         );
-        setHostMessage(`You are now hosting ${claimed.name} from ${handoff.fromHost}'s handoff.`);
+        setHostMessageForRoom(roomId, `You are now hosting ${claimed.name} from ${handoff.fromHost}'s handoff.`);
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessageForRoom(roomId, String(error));
     } finally {
       setHostBusyForRoom(roomId, false);
     }
@@ -1879,7 +1890,7 @@ export function App() {
 
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") {
-      setHostMessage("Host handoff package saved locally because the relay is not connected.");
+      setHostMessageForRoom(room.id, "Host handoff package saved locally because the relay is not connected.");
       return;
     }
 
@@ -2441,6 +2452,7 @@ export function App() {
     setActionsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setGitWorkflowBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setHostMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setProjectPathDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2519,6 +2531,7 @@ export function App() {
     setActionsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setGitWorkflowBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setHostMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setProjectPathDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2889,11 +2902,11 @@ export function App() {
     turnSummary: CodexTurnSummary = activeCodexApproval?.summary ?? codexTurnSummary
   ) {
     if (!hasSelectedRoom) {
-      setHostMessage("Create or join a room before approving a Codex turn.");
+      setSelectedHostMessage("Create or join a room before approving a Codex turn.");
       return;
     }
     if (!isActiveHost) {
-      setHostMessage(hostGateMessage);
+      setSelectedHostMessage(hostGateMessage);
       return;
     }
     const room = selectedRoom;
