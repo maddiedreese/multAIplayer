@@ -7,6 +7,7 @@ import type {
   TeamRecord
 } from "@multaiplayer/protocol";
 import { getRelayHttpUrl } from "./appConfig";
+import { readJsonResponse } from "./httpResponse";
 
 export interface WorkspaceSnapshot {
   teams: TeamRecord[];
@@ -38,8 +39,7 @@ export interface AttachmentBlobUploadRequest {
 
 export async function loadWorkspace(): Promise<WorkspaceSnapshot> {
   const response = await fetch(`${getRelayHttpUrl()}/teams`, { credentials: "include" });
-  if (!response.ok) throw new Error(`Failed to load teams: ${response.status}`);
-  return response.json() as Promise<WorkspaceSnapshot>;
+  return readJsonResponse<WorkspaceSnapshot>(response, "Failed to load workspace");
 }
 
 export async function createTeam(name: string): Promise<TeamRecord> {
@@ -49,8 +49,7 @@ export async function createTeam(name: string): Promise<TeamRecord> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ name })
   });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Failed to create team");
+  const body = await readJsonResponse<{ team: TeamRecord }>(response, "Failed to create team");
   return body.team as TeamRecord;
 }
 
@@ -61,8 +60,7 @@ export async function registerDevice(request: DeviceRegistrationRequest): Promis
     headers: { "content-type": "application/json" },
     body: JSON.stringify(request)
   });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Failed to register device");
+  const body = await readJsonResponse<{ device: DeviceRecord }>(response, "Failed to register device");
   return body.device as DeviceRecord;
 }
 
@@ -77,8 +75,7 @@ export async function createRoom(
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ teamId, name, projectPath })
   });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Failed to create room");
+  const body = await readJsonResponse<{ room: RoomRecord }>(response, "Failed to create room");
   return body.room as RoomRecord;
 }
 
@@ -94,8 +91,7 @@ export async function updateRoomHost(
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ host, hostUserId, hostStatus })
   });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Failed to update room host");
+  const body = await readJsonResponse<{ room: RoomRecord }>(response, "Failed to update room host");
   return body.room as RoomRecord;
 }
 
@@ -118,8 +114,7 @@ export async function updateRoomSettings(
     headers: { "content-type": "application/json" },
     body: JSON.stringify(settings)
   });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Failed to update room settings");
+  const body = await readJsonResponse<{ room: RoomRecord }>(response, "Failed to update room settings");
   return body.room as RoomRecord;
 }
 
@@ -130,8 +125,7 @@ export async function createInvite(teamId: string, roomId: string): Promise<Invi
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ teamId, roomId })
   });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Failed to create invite");
+  const body = await readJsonResponse<{ invite: InviteRecord }>(response, "Failed to create invite");
   return body.invite as InviteRecord;
 }
 
@@ -139,9 +133,7 @@ export async function lookupInvite(inviteId: string): Promise<InviteLookupResult
   const response = await fetch(`${getRelayHttpUrl()}/invites/${encodeURIComponent(inviteId)}`, {
     credentials: "include"
   });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Failed to load invite metadata");
-  return body as InviteLookupResult;
+  return readJsonResponse<InviteLookupResult>(response, "Failed to load invite metadata");
 }
 
 export async function createAttachmentBlob(request: AttachmentBlobUploadRequest): Promise<AttachmentBlobRecord> {
@@ -151,8 +143,7 @@ export async function createAttachmentBlob(request: AttachmentBlobUploadRequest)
     headers: { "content-type": "application/json" },
     body: JSON.stringify(request)
   });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Failed to upload encrypted attachment blob");
+  const body = await readJsonResponse<{ blob: AttachmentBlobRecord }>(response, "Failed to upload encrypted attachment blob");
   return body.blob as AttachmentBlobRecord;
 }
 
@@ -161,7 +152,6 @@ export async function loadAttachmentBlob(blobId: string, teamId: string, roomId:
   const response = await fetch(`${getRelayHttpUrl()}/attachment-blobs/${encodeURIComponent(blobId)}?${params}`, {
     credentials: "include"
   });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Failed to load encrypted attachment blob");
+  const body = await readJsonResponse<{ blob: AttachmentBlobRecord }>(response, "Failed to load encrypted attachment blob");
   return body.blob as AttachmentBlobRecord;
 }
