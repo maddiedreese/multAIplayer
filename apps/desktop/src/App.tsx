@@ -500,13 +500,13 @@ export function App() {
   const [draftsByRoom, setDraftsByRoom] = useState<Record<string, string>>({});
   const [selectedMessageIdsByRoom, setSelectedMessageIdsByRoom] = useState<Record<string, string[]>>({});
   const [pendingAttachmentsByRoom, setPendingAttachmentsByRoom] = useState<Record<string, ChatAttachment[]>>({});
-  const [approvalVisible, setApprovalVisible] = useState(false);
-  const [pendingCodexApproval, setPendingCodexApproval] = useState<{
+  const [approvalVisibleByRoom, setApprovalVisibleByRoom] = useState<Record<string, boolean>>({});
+  const [pendingCodexApprovalsByRoom, setPendingCodexApprovalsByRoom] = useState<Record<string, {
     roomId: string;
     messages: ChatMessage[];
     summary: CodexTurnSummary;
-  } | null>(null);
-  const [codexRunning, setCodexRunning] = useState(false);
+  }>>({});
+  const [codexRunningByRoom, setCodexRunningByRoom] = useState<Record<string, boolean>>({});
   const [secretWarningVisible, setSecretWarningVisible] = useState(true);
   const [gitStatusByRoom, setGitStatusByRoom] = useState<Record<string, GitStatusSummary | null>>({});
   const [codexProbe, setCodexProbe] = useState<CodexProbe | null>(null);
@@ -632,7 +632,8 @@ export function App() {
     () => buildCodexTurnSummary(messages, selectedRoom, terminals, browserRequests, gitStatus),
     [messages, selectedRoom, terminals, browserRequests, gitStatus]
   );
-  const activeCodexApproval = pendingCodexApproval?.roomId === selectedRoom.id ? pendingCodexApproval : null;
+  const activeCodexApproval = pendingCodexApprovalsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const approvalVisible = approvalVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const visibleCodexTurnSummary = activeCodexApproval?.summary ?? codexTurnSummary;
   const roomMembers = Object.values(presenceByRoom[selectedRoom?.id ?? selectedRoomId] ?? {})
     .filter((member) => member.status === "online")
@@ -643,6 +644,7 @@ export function App() {
   const inviteRequests = inviteRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const codexEvents = codexEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const selectedCodexThreadId = codexThreadIdsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const codexRunning = codexRunningByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const hostBusy = hostBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const settingsBusy = settingsBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const keyRotationBusy = keyRotationBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
@@ -683,6 +685,21 @@ export function App() {
 
   function setKeyRotationBusyForRoom(roomId: string, busy: boolean) {
     setKeyRotationBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function setApprovalVisibleForRoom(roomId: string, visible: boolean) {
+    setApprovalVisibleByRoom((current) => visible ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function setPendingCodexApprovalForRoom(
+    roomId: string,
+    approval: { roomId: string; messages: ChatMessage[]; summary: CodexTurnSummary } | null
+  ) {
+    setPendingCodexApprovalsByRoom((current) => approval ? { ...current, [roomId]: approval } : omitRecordKey(current, roomId));
+  }
+
+  function setCodexRunningForRoom(roomId: string, running: boolean) {
+    setCodexRunningByRoom((current) => running ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
   function setSelectedGitWorkflowMessage(message: string | null) {
@@ -756,11 +773,6 @@ export function App() {
   useEffect(() => {
     if (!selectedRoomId) return;
     setRooms((current) => markRoomRead(current, selectedRoomId));
-  }, [selectedRoomId]);
-
-  useEffect(() => {
-    setPendingCodexApproval(null);
-    setApprovalVisible(false);
   }, [selectedRoomId]);
 
   useEffect(() => {
@@ -1439,36 +1451,38 @@ export function App() {
   function handleCodexInvoke(pendingMessage?: ChatMessage) {
     if (!hasSelectedRoom) {
       setHostMessage("Create or join a room before invoking Codex.");
-      setApprovalVisible(false);
       return;
     }
+    const roomId = selectedRoom.id;
     if (isSelectedRoomForgotten) {
       setHostMessage("This room was forgotten on this device. Rejoin or paste a room invite key before invoking Codex.");
-      setApprovalVisible(false);
+      setApprovalVisibleForRoom(roomId, false);
       return;
     }
     if (!selectedRoom.mode.code) {
       setHostMessage("Code mode is disabled for this room.");
-      setApprovalVisible(false);
+      setApprovalVisibleForRoom(roomId, false);
       return;
     }
     if (selectedRoom.approvalPolicy === "never_host") {
       setHostMessage("This room is set to never host Codex turns.");
-      setPendingCodexApproval(null);
-      setApprovalVisible(false);
+      setPendingCodexApprovalForRoom(roomId, null);
+      setApprovalVisibleForRoom(roomId, false);
       return;
     }
     const approvalSnapshot = buildCodexApprovalSnapshot(selectedRoom, messages, pendingMessage, terminals, browserRequests, gitStatus);
     if (selectedRoom.approvalPolicy === "auto_chat_only") {
       if (shouldAutoApproveChatOnlyTurn(approvalSnapshot.summary, isActiveHost)) {
-        setPendingCodexApproval(null);
-        setApprovalVisible(false);
+        setPendingCodexApprovalForRoom(roomId, null);
+        setApprovalVisibleForRoom(roomId, false);
         setHostMessage("Auto-approved chat-only Codex turn.");
-        approveCodexTurn(approvalSnapshot.messages, approvalSnapshot.summary).catch((error) => setHostMessage(String(error)));
+        approveCodexTurn(approvalSnapshot.messages, approvalSnapshot.summary).catch((error) => {
+          if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessage(String(error));
+        });
         return;
       }
-      setPendingCodexApproval(approvalSnapshot);
-      setApprovalVisible(true);
+      setPendingCodexApprovalForRoom(roomId, approvalSnapshot);
+      setApprovalVisibleForRoom(roomId, true);
       setHostMessage(
         isActiveHost
           ? "This turn includes workspace, browser, terminal, or attachment context, so host approval is required."
@@ -1476,8 +1490,8 @@ export function App() {
       );
       return;
     }
-    setPendingCodexApproval(approvalSnapshot);
-    setApprovalVisible(true);
+    setPendingCodexApprovalForRoom(roomId, approvalSnapshot);
+    setApprovalVisibleForRoom(roomId, true);
   }
 
   async function beginGitHubSignIn() {
@@ -1986,8 +2000,8 @@ export function App() {
         setSettingsMessage(`Approval policy set to ${approvalPolicyLabels[approvalPolicy]}.`);
       }
       if (approvalPolicy === "never_host") {
-        setPendingCodexApproval((current) => (current?.roomId === roomId ? null : current));
-        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setApprovalVisible(false);
+        setPendingCodexApprovalForRoom(roomId, null);
+        setApprovalVisibleForRoom(roomId, false);
       }
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
@@ -2285,6 +2299,9 @@ export function App() {
     setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setKeyRotationBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setApprovalVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setPendingCodexApprovalsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setCodexRunningByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setPendingAttachmentsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2340,6 +2357,9 @@ export function App() {
     setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setKeyRotationBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setApprovalVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setPendingCodexApprovalsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setCodexRunningByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setPendingAttachmentsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2685,7 +2705,6 @@ export function App() {
   ) {
     if (!hasSelectedRoom) {
       setHostMessage("Create or join a room before approving a Codex turn.");
-      setApprovalVisible(false);
       return;
     }
     if (!isActiveHost) {
@@ -2696,9 +2715,9 @@ export function App() {
     const roomId = room.id;
     const model = selectedCodexModel;
     const projectPath = room.projectPath;
-    setPendingCodexApproval(null);
-    setApprovalVisible(false);
-    setCodexRunning(true);
+    setPendingCodexApprovalForRoom(roomId, null);
+    setApprovalVisibleForRoom(roomId, false);
+    setCodexRunningForRoom(roomId, true);
     appendTerminalLinesForRoom(roomId, [
       "$ codex app-server",
       `Starting approved Codex turn with ${formatCodexModel(model)} from encrypted room context...`
@@ -2775,7 +2794,7 @@ export function App() {
       }, room);
       appendTerminalLinesForRoom(roomId, [`Codex error: ${String(error)}`]);
     } finally {
-      setCodexRunning(false);
+      setCodexRunningForRoom(roomId, false);
     }
   }
 
@@ -4630,8 +4649,8 @@ export function App() {
               </div>
               <div className="approval-actions">
                 <button className="secondary" onClick={() => {
-                  setPendingCodexApproval(null);
-                  setApprovalVisible(false);
+                  setPendingCodexApprovalForRoom(selectedRoom.id, null);
+                  setApprovalVisibleForRoom(selectedRoom.id, false);
                 }}>
                   <X size={16} /> Deny
                 </button>
