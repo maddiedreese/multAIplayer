@@ -180,7 +180,7 @@ import { terminalRequestForApprovedRun } from "./lib/terminalApproval";
 import { readInviteUrlPayload } from "./lib/inviteUrl";
 import { displayableInviteLink } from "./lib/invitePrivacy";
 import { normalizeBrowserAllowedOrigins, shouldAutoApproveBrowserRequest } from "./lib/browserPolicy";
-import { attachmentReviewMessage, decideAttachmentReview } from "./lib/attachmentPolicy";
+import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { copyTextToClipboard } from "./lib/clipboard";
@@ -548,7 +548,7 @@ export function App() {
   const [fileBusy, setFileBusy] = useState(false);
   const [fileMessage, setFileMessage] = useState<string | null>(null);
   const [markdownCopyFallback, setMarkdownCopyFallback] = useState<MarkdownCopyFallback | null>(null);
-  const [sensitiveAttachmentReviewPath, setSensitiveAttachmentReviewPath] = useState<string | null>(null);
+  const [sensitiveAttachmentReviewKey, setSensitiveAttachmentReviewKey] = useState<string | null>(null);
   const [inviteLink, setInviteLink] = useState("");
   const [inviteSecretInput, setInviteSecretInput] = useState("");
   const [inviteApprovalGate, setInviteApprovalGate] = useState(false);
@@ -648,7 +648,11 @@ export function App() {
       ? `Only ${selectedRoom.host} can change room host settings.`
       : "Claim host before changing room host settings.";
   const selectedAttachmentReview = selectedFile
-    ? decideAttachmentReview(selectedFile.content, selectedFile.path, sensitiveAttachmentReviewPath)
+    ? decideAttachmentReview(
+        selectedFile.content,
+        selectedFile.path,
+        reviewedAttachmentPathForScope(sensitiveAttachmentReviewKey, selectedRoom.id, selectedRoom.projectPath, selectedFile.path)
+      )
     : null;
   const selectedFileRisks = selectedAttachmentReview?.risks ?? [];
   const selectedFileNeedsAttachmentReview = Boolean(selectedAttachmentReview?.requiresReview);
@@ -3398,7 +3402,7 @@ export function App() {
       if (selectedRoomIdRef.current !== room.id) return;
       setSelectedFile(file);
       setSelectedDiff(diff);
-      setSensitiveAttachmentReviewPath(null);
+      setSensitiveAttachmentReviewKey(null);
     } catch (error) {
       if (selectedRoomIdRef.current === room.id) setFileMessage(String(error));
     } finally {
@@ -3439,9 +3443,13 @@ export function App() {
     const teamId = selectedRoom.teamId;
     const fileToAttach = selectedFile;
     const roomPendingAttachments = pendingAttachmentsByRoom[roomId] ?? [];
-    const review = decideAttachmentReview(fileToAttach.content, fileToAttach.path, sensitiveAttachmentReviewPath);
+    const review = decideAttachmentReview(
+      fileToAttach.content,
+      fileToAttach.path,
+      reviewedAttachmentPathForScope(sensitiveAttachmentReviewKey, roomId, selectedRoom.projectPath, fileToAttach.path)
+    );
     if (!review.canAttach) {
-      setSensitiveAttachmentReviewPath(fileToAttach.path);
+      setSensitiveAttachmentReviewKey(attachmentReviewScopeKey(roomId, selectedRoom.projectPath, fileToAttach.path));
       setFileMessage(attachmentReviewMessage(fileToAttach.path, review.risks));
       return;
     }
@@ -3501,7 +3509,7 @@ export function App() {
         setFileMessage(validationError);
         return current;
       }
-      setSensitiveAttachmentReviewPath(null);
+      setSensitiveAttachmentReviewKey(null);
       setFileMessage(attachment.blobId
         ? `Attached ${fileToAttach.path} as an encrypted blob for the next room message.`
         : `Attached ${fileToAttach.path} to the next room message.`);

@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { attachmentReviewMessage, decideAttachmentReview } from "../src/lib/attachmentPolicy";
+import {
+  attachmentReviewMessage,
+  attachmentReviewScopeKey,
+  decideAttachmentReview,
+  reviewedAttachmentPathForScope
+} from "../src/lib/attachmentPolicy";
 
 test("ordinary files can be attached without extra review", () => {
   assert.deepEqual(decideAttachmentReview("const ok = true;\nconsole.log(ok);", "src/app.ts", null), {
@@ -35,4 +40,13 @@ test("credential-looking content requires review even in normal paths", () => {
   assert.deepEqual(decision.risks, ["Credential-looking output"]);
   assert.equal(decision.canAttach, false);
   assert.match(attachmentReviewMessage("notes.txt", decision.risks), /credential-looking output/);
+});
+
+test("attachment review acknowledgement is scoped to room, project, and path", () => {
+  const reviewKey = attachmentReviewScopeKey("room-a", "/project-a", ".env.local");
+
+  assert.equal(reviewedAttachmentPathForScope(reviewKey, "room-a", "/project-a", ".env.local"), ".env.local");
+  assert.equal(reviewedAttachmentPathForScope(reviewKey, "room-b", "/project-a", ".env.local"), null);
+  assert.equal(reviewedAttachmentPathForScope(reviewKey, "room-a", "/project-b", ".env.local"), null);
+  assert.equal(reviewedAttachmentPathForScope(reviewKey, "room-a", "/project-a", "nested/.env.local"), null);
 });

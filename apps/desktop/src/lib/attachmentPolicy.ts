@@ -34,3 +34,16 @@ export function decideAttachmentReview(
 export function attachmentReviewMessage(path: string, risks: string[]): string {
   return `Review warning before attaching ${path}. It may expose ${risks.join(", ").toLowerCase()} to everyone in this room and to Codex context.`;
 }
+
+export function attachmentReviewScopeKey(roomId: string, projectPath: string, path: string): string {
+  return JSON.stringify([roomId, projectPath, path]);
+}
+
+export function reviewedAttachmentPathForScope(
+  reviewKey: string | null,
+  roomId: string,
+  projectPath: string,
+  path: string
+): string | null {
+  return reviewKey === attachmentReviewScopeKey(roomId, projectPath, path) ? path : null;
+}
