@@ -469,10 +469,10 @@ export function App() {
   const [relayHttpDraft, setRelayHttpDraft] = useState(() => loadAppConfig().relayHttpUrl);
   const [relayWsDraft, setRelayWsDraft] = useState(() => loadAppConfig().relayWsUrl);
   const [appConfigMessage, setAppConfigMessage] = useState<string | null>(null);
-  const [hostBusy, setHostBusy] = useState(false);
+  const [hostBusyByRoom, setHostBusyByRoom] = useState<Record<string, boolean>>({});
   const [hostMessage, setHostMessage] = useState<string | null>(null);
   const [chatMessage, setChatMessage] = useState<string | null>(null);
-  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [settingsBusyByRoom, setSettingsBusyByRoom] = useState<Record<string, boolean>>({});
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
   const [customCodexModel, setCustomCodexModel] = useState(defaultCodexModel);
   const [projectPathDraft, setProjectPathDraft] = useState(defaultProjectPath);
@@ -553,7 +553,7 @@ export function App() {
   const [inviteSecretInput, setInviteSecretInput] = useState("");
   const [inviteApprovalGate, setInviteApprovalGate] = useState(false);
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
-  const [keyRotationBusy, setKeyRotationBusy] = useState(false);
+  const [keyRotationBusyByRoom, setKeyRotationBusyByRoom] = useState<Record<string, boolean>>({});
   const [inviteAdmissionsByRoom, setInviteAdmissionsByRoom] = useState<Record<string, string>>({});
   const [codexThreadIdsByRoom, setCodexThreadIdsByRoom] = useState<Record<string, string>>({});
   const relayRef = useRef<RelayClient | null>(null);
@@ -643,6 +643,9 @@ export function App() {
   const inviteRequests = inviteRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const codexEvents = codexEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const selectedCodexThreadId = codexThreadIdsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const hostBusy = hostBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
+  const settingsBusy = settingsBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
+  const keyRotationBusy = keyRotationBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const hostStatusLabel = formatHostStatus(selectedRoom);
   const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser);
   const isSelectedRoomForgotten = forgottenRoomIds.has(selectedRoom.id);
@@ -668,6 +671,18 @@ export function App() {
 
   function setActionsBusyForRoom(roomId: string, busy: boolean) {
     setActionsBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function setHostBusyForRoom(roomId: string, busy: boolean) {
+    setHostBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function setSettingsBusyForRoom(roomId: string, busy: boolean) {
+    setSettingsBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function setKeyRotationBusyForRoom(roomId: string, busy: boolean) {
+    setKeyRotationBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
   function setSelectedGitWorkflowMessage(message: string | null) {
@@ -1620,7 +1635,7 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
-    setHostBusy(true);
+    setHostBusyForRoom(roomId, true);
     setHostMessage(null);
     try {
       const host = hostStatus === "active" ? localUser.name : hostStatus === "handoff" ? selectedRoom.host : "No host";
@@ -1645,7 +1660,7 @@ export function App() {
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessage(String(error));
     } finally {
-      setHostBusy(false);
+      setHostBusyForRoom(roomId, false);
     }
   }
 
@@ -1659,7 +1674,7 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
-    setHostBusy(true);
+    setHostBusyForRoom(roomId, true);
     setHostMessage(null);
     try {
       const patch = createHandoffSettingsPatch(handoff);
@@ -1681,7 +1696,7 @@ export function App() {
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessage(String(error));
     } finally {
-      setHostBusy(false);
+      setHostBusyForRoom(roomId, false);
     }
   }
 
@@ -1962,7 +1977,7 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
-    setSettingsBusy(true);
+    setSettingsBusyForRoom(roomId, true);
     setSettingsMessage(null);
     try {
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), approvalPolicy });
@@ -1977,7 +1992,7 @@ export function App() {
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
     } finally {
-      setSettingsBusy(false);
+      setSettingsBusyForRoom(roomId, false);
     }
   }
 
@@ -1991,7 +2006,7 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
-    setSettingsBusy(true);
+    setSettingsBusyForRoom(roomId, true);
     setSettingsMessage(null);
     try {
       const nextMode: RoomMode = {
@@ -2006,7 +2021,7 @@ export function App() {
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
     } finally {
-      setSettingsBusy(false);
+      setSettingsBusyForRoom(roomId, false);
     }
   }
 
@@ -2026,7 +2041,7 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
-    setSettingsBusy(true);
+    setSettingsBusyForRoom(roomId, true);
     setSettingsMessage(null);
     try {
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), codexModel: nextModel });
@@ -2037,7 +2052,7 @@ export function App() {
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
     } finally {
-      setSettingsBusy(false);
+      setSettingsBusyForRoom(roomId, false);
     }
   }
 
@@ -2056,7 +2071,7 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
-    setSettingsBusy(true);
+    setSettingsBusyForRoom(roomId, true);
     setBrowserMessage(null);
     try {
       const room = await updateRoomSettings(roomId, {
@@ -2075,7 +2090,7 @@ export function App() {
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessage(String(error));
     } finally {
-      setSettingsBusy(false);
+      setSettingsBusyForRoom(roomId, false);
     }
   }
 
@@ -2090,7 +2105,7 @@ export function App() {
     }
     if (browserProfilePersistent === selectedRoom.browserProfilePersistent) return;
     const roomId = selectedRoom.id;
-    setSettingsBusy(true);
+    setSettingsBusyForRoom(roomId, true);
     setBrowserMessage(null);
     try {
       const room = await updateRoomSettings(roomId, {
@@ -2111,7 +2126,7 @@ export function App() {
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessage(String(error));
     } finally {
-      setSettingsBusy(false);
+      setSettingsBusyForRoom(roomId, false);
     }
   }
 
@@ -2131,7 +2146,7 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
-    setSettingsBusy(true);
+    setSettingsBusyForRoom(roomId, true);
     setSettingsMessage(null);
     try {
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), projectPath: nextProjectPath });
@@ -2142,7 +2157,7 @@ export function App() {
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessage(String(error));
     } finally {
-      setSettingsBusy(false);
+      setSettingsBusyForRoom(roomId, false);
     }
   }
 
@@ -2267,6 +2282,9 @@ export function App() {
     setActionsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setActionsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setGitWorkflowBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setKeyRotationBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setPendingAttachmentsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2319,6 +2337,9 @@ export function App() {
     setActionsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setActionsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setGitWorkflowBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setKeyRotationBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setPendingAttachmentsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2415,7 +2436,7 @@ export function App() {
     if (!confirmed) return;
 
     const room = selectedRoom;
-    setKeyRotationBusy(true);
+    setKeyRotationBusyForRoom(room.id, true);
     setInviteMessage(null);
     try {
       const oldSecret = await loadOrCreateRoomSecret(room.id);
@@ -2469,7 +2490,7 @@ export function App() {
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setInviteMessage(String(error));
     } finally {
-      setKeyRotationBusy(false);
+      setKeyRotationBusyForRoom(room.id, false);
     }
   }
 
