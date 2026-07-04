@@ -473,7 +473,7 @@ export function App() {
   const [appConfigMessage, setAppConfigMessage] = useState<string | null>(null);
   const [hostBusyByRoom, setHostBusyByRoom] = useState<Record<string, boolean>>({});
   const [hostMessagesByRoom, setHostMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [chatMessage, setChatMessage] = useState<string | null>(null);
+  const [chatMessagesByRoom, setChatMessagesByRoom] = useState<Record<string, string | null>>({});
   const [settingsBusyByRoom, setSettingsBusyByRoom] = useState<Record<string, boolean>>({});
   const [settingsMessagesByRoom, setSettingsMessagesByRoom] = useState<Record<string, string | null>>({});
   const [customCodexModelsByRoom, setCustomCodexModelsByRoom] = useState<Record<string, string>>({});
@@ -549,7 +549,7 @@ export function App() {
   const [selectedDiffsByRoom, setSelectedDiffsByRoom] = useState<Record<string, GitDiffResult | null>>({});
   const [fileBusyByRoom, setFileBusyByRoom] = useState<Record<string, boolean>>({});
   const [fileMessagesByRoom, setFileMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [markdownCopyFallback, setMarkdownCopyFallback] = useState<MarkdownCopyFallback | null>(null);
+  const [markdownCopyFallbacksByRoom, setMarkdownCopyFallbacksByRoom] = useState<Record<string, MarkdownCopyFallback | null>>({});
   const [sensitiveAttachmentReviewKey, setSensitiveAttachmentReviewKey] = useState<string | null>(null);
   const [inviteSecretInput, setInviteSecretInput] = useState("");
   const [inviteLinksByRoom, setInviteLinksByRoom] = useState<Record<string, string>>({});
@@ -617,7 +617,9 @@ export function App() {
   const inviteApprovalGate = inviteApprovalGatesByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const inviteMessage = inviteMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const hostMessage = hostMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const chatMessage = chatMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const settingsMessage = settingsMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const markdownCopyFallback = markdownCopyFallbacksByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const actionsSummary = useMemo(() => summarizeActionRuns(actionRuns), [actionRuns]);
   const githubWorkflowReadiness = useMemo(() => checkGitHubWorkflowReadiness({
     pushEnabled: gitWorkflowDraft.pushEnabled,
@@ -709,6 +711,18 @@ export function App() {
 
   function setSelectedHostMessage(message: string | null) {
     setHostMessageForRoom(selectedRoom.id, message);
+  }
+
+  function setChatMessageForRoom(roomId: string, message: string | null) {
+    setChatMessagesByRoom((current) => message ? { ...current, [roomId]: message } : omitRecordKey(current, roomId));
+  }
+
+  function setSelectedChatMessage(message: string | null) {
+    setChatMessageForRoom(selectedRoom.id, message);
+  }
+
+  function setMarkdownCopyFallbackForRoom(roomId: string, fallback: MarkdownCopyFallback | null) {
+    setMarkdownCopyFallbacksByRoom((current) => fallback ? { ...current, [roomId]: fallback } : omitRecordKey(current, roomId));
   }
 
   function setSettingsBusyForRoom(roomId: string, busy: boolean) {
@@ -1571,20 +1585,20 @@ export function App() {
 
   async function sendMessage() {
     if (!hasSelectedRoom) {
-      setChatMessage("Create or join a room before sending messages.");
-      return;
-    }
-    if (isSelectedRoomForgotten) {
-      setChatMessage("This room was forgotten on this device. Rejoin or paste a room invite key before sending.");
+      setSelectedChatMessage("Create or join a room before sending messages.");
       return;
     }
     const roomId = selectedRoom.id;
+    if (isSelectedRoomForgotten) {
+      setChatMessageForRoom(roomId, "This room was forgotten on this device. Rejoin or paste a room invite key before sending.");
+      return;
+    }
     const attachments = pendingAttachments;
     const body = draft.trim();
     if (!body && attachments.length === 0) return;
     const attachmentError = validatePendingAttachments(attachments);
     if (attachmentError) {
-      setChatMessage(attachmentError);
+      setChatMessageForRoom(roomId, attachmentError);
       return;
     }
     const createdAt = new Date().toISOString();
@@ -2463,6 +2477,8 @@ export function App() {
     setGitWorkflowBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHostMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setChatMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setMarkdownCopyFallbacksByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2543,6 +2559,8 @@ export function App() {
     setGitWorkflowBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHostMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setChatMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setMarkdownCopyFallbacksByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -3010,7 +3028,7 @@ export function App() {
 
   async function publishChatMessage(message: ChatMessage, room: RoomRecord = selectedRoom) {
     if (forgottenRoomIds.has(room.id)) {
-      setChatMessage("This room was forgotten on this device. Rejoin or paste a room invite key before sending.");
+      setChatMessageForRoom(room.id, "This room was forgotten on this device. Rejoin or paste a room invite key before sending.");
       return;
     }
     const client = relayRef.current;
@@ -3081,9 +3099,10 @@ export function App() {
 
   async function toggleMessageReaction(message: ChatMessage, emoji: string) {
     if (!hasSelectedRoom) {
-      setChatMessage("Create or join a room before reacting to messages.");
+      setSelectedChatMessage("Create or join a room before reacting to messages.");
       return;
     }
+    const roomId = selectedRoom.id;
     const hasReacted = message.reactions
       ?.find((reaction) => reaction.emoji === emoji)
       ?.reactors.some((reactor) => reactor.userId === localUser.id) ?? false;
@@ -3096,18 +3115,18 @@ export function App() {
       reactorUserId: localUser.id,
       createdAt: new Date().toISOString()
     };
-    applyMessageReaction(selectedRoom.id, payload);
+    applyMessageReaction(roomId, payload);
 
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") {
-      setChatMessage("Saved reaction locally because the relay is not connected.");
+      setChatMessageForRoom(roomId, "Saved reaction locally because the relay is not connected.");
       return;
     }
-    const secret = await loadOrCreateRoomSecret(selectedRoom.id);
+    const secret = await loadOrCreateRoomSecret(roomId);
     const envelope: RelayEnvelope = {
       id: crypto.randomUUID(),
       teamId: selectedRoom.teamId,
-      roomId: selectedRoom.id,
+      roomId,
       senderDeviceId: deviceId,
       senderUserId: localUser.id,
       createdAt: payload.createdAt,
@@ -3809,6 +3828,7 @@ export function App() {
       setSelectedFileMessage("Create or join a room before copying project context.");
       return;
     }
+    const roomId = selectedRoom.id;
     const markdown = buildProjectMarkdown(
       selectedRoom.name,
       selectedRoom.projectPath,
@@ -3821,7 +3841,7 @@ export function App() {
           ? detectSecretRisks(selectedDiff.diff, selectedDiff.path)
           : []
     );
-    await copyMarkdownWithFallback("project context", markdown, setSelectedFileMessage);
+    await copyMarkdownWithFallback("project context", markdown, (message) => setFileMessageForRoom(roomId, message), roomId);
   }
 
   async function attachSelectedFileToMessage() {
@@ -3977,21 +3997,27 @@ export function App() {
   async function copyMarkdownWithFallback(
     title: string,
     markdown: string,
-    onMessage: (message: string) => void
+    onMessage: (message: string) => void,
+    roomId = selectedRoom.id
   ) {
     const result = await copyTextToClipboard(markdown);
     if (result.status === "copied") {
-      setMarkdownCopyFallback(null);
+      setMarkdownCopyFallbackForRoom(roomId, null);
       onMessage(`Copied ${title} as Markdown.`);
       return;
     }
-    setMarkdownCopyFallback({ title, markdown });
+    setMarkdownCopyFallbackForRoom(roomId, { title, markdown });
     onMessage(`${title} Markdown is ready below because copying was blocked.`);
   }
 
   async function copyRoomMarkdown() {
+    if (!hasSelectedRoom) {
+      setSelectedChatMessage("Create or join a room before copying room chat.");
+      return;
+    }
+    const roomId = selectedRoom.id;
     const markdown = buildRoomMarkdown(selectedRoom, teams.find((team) => team.id === selectedRoom.teamId)?.name ?? "Unknown team", messages);
-    await copyMarkdownWithFallback("room chat", markdown, setChatMessage);
+    await copyMarkdownWithFallback("room chat", markdown, (message) => setChatMessageForRoom(roomId, message), roomId);
   }
 
   function toggleMessageSelection(messageId: string) {
@@ -4014,29 +4040,32 @@ export function App() {
 
   async function copySelectedMessagesMarkdown() {
     if (!hasSelectedRoom) {
-      setChatMessage("Create or join a room before copying selected messages.");
+      setSelectedChatMessage("Create or join a room before copying selected messages.");
       return;
     }
+    const roomId = selectedRoom.id;
     if (selectedMessages.length === 0) {
-      setChatMessage("Select one or more messages to copy.");
+      setChatMessageForRoom(roomId, "Select one or more messages to copy.");
       return;
     }
     const markdown = buildSelectedMessagesMarkdown(selectedRoom, selectedMessages);
-    await copyMarkdownWithFallback("selected messages", markdown, setChatMessage);
+    await copyMarkdownWithFallback("selected messages", markdown, (message) => setChatMessageForRoom(roomId, message), roomId);
   }
 
   async function copyMessageMarkdown(message: ChatMessage) {
+    const roomId = selectedRoom.id;
     const markdown = buildMessageMarkdown(message);
-    await copyMarkdownWithFallback("message", markdown, setChatMessage);
+    await copyMarkdownWithFallback("message", markdown, (copyMessage) => setChatMessageForRoom(roomId, copyMessage), roomId);
   }
 
   async function copyCodexOutputMarkdown(message: ChatMessage) {
     if (!hasSelectedRoom) {
-      setChatMessage("Create or join a room before copying Codex output.");
+      setSelectedChatMessage("Create or join a room before copying Codex output.");
       return;
     }
+    const roomId = selectedRoom.id;
     const markdown = buildCodexOutputMarkdown(selectedRoom, message, messages);
-    await copyMarkdownWithFallback("Codex turn output", markdown, setChatMessage);
+    await copyMarkdownWithFallback("Codex turn output", markdown, (copyMessage) => setChatMessageForRoom(roomId, copyMessage), roomId);
   }
 
   async function copyTerminalMarkdown() {
@@ -4044,9 +4073,10 @@ export function App() {
       setSelectedTerminalError("Create or join a room before copying terminal output.");
       return;
     }
+    const roomId = selectedRoom.id;
     const lines = selectedTerminal?.lines ?? terminalLines.map((line) => ({ stream: "system", text: line }));
     const markdown = buildTerminalMarkdown(selectedRoom, selectedTerminal, lines, terminalRisks);
-    await copyMarkdownWithFallback("terminal output", markdown, setSelectedTerminalError);
+    await copyMarkdownWithFallback("terminal output", markdown, (message) => setTerminalErrorForRoom(roomId, message), roomId);
   }
 
   async function copyDiffSummaryMarkdown() {
@@ -4054,6 +4084,7 @@ export function App() {
       setSelectedFileMessage("Create or join a room before copying a diff summary.");
       return;
     }
+    const roomId = selectedRoom.id;
     const markdown = buildDiffSummaryMarkdown(
       selectedRoom,
       gitStatus?.branch ?? "unknown",
@@ -4061,7 +4092,7 @@ export function App() {
       selectedDiff,
       selectedDiff ? detectSecretRisks(selectedDiff.diff, selectedDiff.path) : []
     );
-    await copyMarkdownWithFallback("diff summary", markdown, setSelectedFileMessage);
+    await copyMarkdownWithFallback("diff summary", markdown, (message) => setFileMessageForRoom(roomId, message), roomId);
   }
 
   async function copyPullRequestDraftMarkdown() {
@@ -4069,8 +4100,9 @@ export function App() {
       setSelectedGitWorkflowMessage("Create or join a room before copying a PR draft.");
       return;
     }
+    const roomId = selectedRoom.id;
     const markdown = buildPullRequestBody(messages, gitStatus?.files ?? []);
-    await copyMarkdownWithFallback("PR description draft", markdown, setSelectedGitWorkflowMessage);
+    await copyMarkdownWithFallback("PR description draft", markdown, (message) => setGitWorkflowMessageForRoom(roomId, message), roomId);
   }
 
   async function approveGitWorkflow() {
@@ -4764,11 +4796,16 @@ export function App() {
             <textarea readOnly value={markdownCopyFallback.markdown} aria-label={`${markdownCopyFallback.title} Markdown fallback`} />
             <div className="markdown-fallback-actions">
               <button
-                onClick={() => copyMarkdownWithFallback(markdownCopyFallback.title, markdownCopyFallback.markdown, setChatMessage)}
+                onClick={() => copyMarkdownWithFallback(
+                  markdownCopyFallback.title,
+                  markdownCopyFallback.markdown,
+                  (message) => setChatMessageForRoom(selectedRoom.id, message),
+                  selectedRoom.id
+                )}
               >
                 <Copy size={14} /> Retry copy
               </button>
-              <button onClick={() => setMarkdownCopyFallback(null)}>
+              <button onClick={() => setMarkdownCopyFallbackForRoom(selectedRoom.id, null)}>
                 <X size={14} /> Dismiss
               </button>
             </div>
