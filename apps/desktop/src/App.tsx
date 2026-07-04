@@ -551,10 +551,10 @@ export function App() {
   const [fileMessagesByRoom, setFileMessagesByRoom] = useState<Record<string, string | null>>({});
   const [markdownCopyFallback, setMarkdownCopyFallback] = useState<MarkdownCopyFallback | null>(null);
   const [sensitiveAttachmentReviewKey, setSensitiveAttachmentReviewKey] = useState<string | null>(null);
-  const [inviteLink, setInviteLink] = useState("");
   const [inviteSecretInput, setInviteSecretInput] = useState("");
-  const [inviteApprovalGate, setInviteApprovalGate] = useState(false);
-  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
+  const [inviteLinksByRoom, setInviteLinksByRoom] = useState<Record<string, string>>({});
+  const [inviteApprovalGatesByRoom, setInviteApprovalGatesByRoom] = useState<Record<string, boolean>>({});
+  const [inviteMessagesByRoom, setInviteMessagesByRoom] = useState<Record<string, string | null>>({});
   const [keyRotationBusyByRoom, setKeyRotationBusyByRoom] = useState<Record<string, boolean>>({});
   const [inviteAdmissionsByRoom, setInviteAdmissionsByRoom] = useState<Record<string, string>>({});
   const [codexThreadIdsByRoom, setCodexThreadIdsByRoom] = useState<Record<string, string>>({});
@@ -613,6 +613,9 @@ export function App() {
   const selectedDiff = selectedDiffsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const fileBusy = fileBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const fileMessage = fileMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const inviteLink = inviteLinksByRoom[selectedRoom?.id ?? selectedRoomId] ?? "";
+  const inviteApprovalGate = inviteApprovalGatesByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
+  const inviteMessage = inviteMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const actionsSummary = useMemo(() => summarizeActionRuns(actionRuns), [actionRuns]);
   const githubWorkflowReadiness = useMemo(() => checkGitHubWorkflowReadiness({
     pushEnabled: gitWorkflowDraft.pushEnabled,
@@ -811,6 +814,22 @@ export function App() {
     setBrowserMessageForRoom(selectedRoom.id, message);
   }
 
+  function setInviteLinkForRoom(roomId: string, link: string) {
+    setInviteLinksByRoom((current) => link ? { ...current, [roomId]: link } : omitRecordKey(current, roomId));
+  }
+
+  function setInviteApprovalGateForRoom(roomId: string, enabled: boolean) {
+    setInviteApprovalGatesByRoom((current) => enabled ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function setInviteMessageForRoom(roomId: string, message: string | null) {
+    setInviteMessagesByRoom((current) => message ? { ...current, [roomId]: message } : omitRecordKey(current, roomId));
+  }
+
+  function setSelectedInviteMessage(message: string | null) {
+    setInviteMessageForRoom(selectedRoom.id, message);
+  }
+
   function resetFileContextForRoom(roomId: string) {
     setSelectedFileForRoom(roomId, null);
     setSelectedDiffForRoom(roomId, null);
@@ -958,12 +977,12 @@ export function App() {
     window.history.replaceState(null, "", invitePayload.cleanupPath);
     if (invitePayload.kind === "join") {
       requestNoSecretInviteAccess(invitePayload.encoded, invitePayload.inviteId)
-        .catch((error) => setInviteMessage(`Invite could not be read: ${String(error)}`));
+        .catch((error) => setSelectedInviteMessage(`Invite could not be read: ${String(error)}`));
       return;
     }
 
     acceptInvite(invitePayload.encoded, invitePayload.inviteId, invitePayload.approvalRequested)
-      .catch((error) => setInviteMessage(`Invite could not be read: ${String(error)}`));
+      .catch((error) => setSelectedInviteMessage(`Invite could not be read: ${String(error)}`));
   }, []);
 
   useEffect(() => {
@@ -1274,7 +1293,7 @@ export function App() {
                 time: formatMessageTime(plaintext.rotatedAt),
                 createdAt: plaintext.rotatedAt
               });
-              setInviteMessage(`${plaintext.rotatedBy} rotated the room key for future messages.`);
+              setInviteMessageForRoom(message.envelope.roomId, `${plaintext.rotatedBy} rotated the room key for future messages.`);
             }
           }
         } catch (error) {
@@ -2008,7 +2027,8 @@ export function App() {
       setForgottenRoomIds((current) => withoutSetValue(current, roomId));
     }
     if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-      setInviteMessage(
+      setInviteMessageForRoom(
+        roomId,
         plaintext.status === "approved"
           ? plaintext.wrappedRoomSecret
             ? `${plaintext.decidedBy} approved your room join request and delivered a device-wrapped room key.`
@@ -2020,17 +2040,17 @@ export function App() {
 
   async function decideInviteJoinRequest(request: InviteJoinRequest, status: InviteJoinRequest["status"]) {
     if (!hasSelectedRoom) {
-      setInviteMessage("Create or join a room before deciding invite requests.");
+      setSelectedInviteMessage("Create or join a room before deciding invite requests.");
       return;
     }
     if (!isActiveHost) {
-      setInviteMessage(hostGateMessage);
+      setSelectedInviteMessage(hostGateMessage);
       return;
     }
     if (status === "pending") return;
     const room = selectedRoom;
     updateInviteRequestStatus(room.id, request.id, status);
-    setInviteMessage(`${status === "approved" ? "Approved" : "Denied"} ${request.requester}'s join request.`);
+    setInviteMessageForRoom(room.id, `${status === "approved" ? "Approved" : "Denied"} ${request.requester}'s join request.`);
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
     try {
@@ -2070,7 +2090,7 @@ export function App() {
       seenEnvelopeIds.current.add(envelope.id);
       client.publish({ type: "publish", envelope });
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setInviteMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setInviteMessageForRoom(room.id, String(error));
     }
   }
 
@@ -2448,6 +2468,9 @@ export function App() {
     setBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserReasonsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setInviteLinksByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setInviteApprovalGatesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setInviteMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHistoryMessage("Cleared encrypted local history for this room.");
   }
@@ -2523,6 +2546,9 @@ export function App() {
     setBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserReasonsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setInviteLinksByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setInviteApprovalGatesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setInviteMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHistorySettings(loadHistorySettings(selectedRoom.id));
     setSecretWarningVisible(true);
@@ -2531,19 +2557,19 @@ export function App() {
 
   async function copyInviteLink() {
     if (!hasSelectedRoom) {
-      setInviteMessage("Create or join a room before copying an invite.");
+      setSelectedInviteMessage("Create or join a room before copying an invite.");
       return;
     }
     const room = selectedRoom;
     const roomId = room.id;
-    setInviteMessage(null);
-    setInviteLink("");
+    setInviteMessageForRoom(roomId, null);
+    setInviteLinkForRoom(roomId, "");
     try {
       const invite = await createInvite(room.teamId, room.id);
       if (inviteApprovalGate) {
         if (!deviceIdentity) {
           if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-            setInviteMessage("Device key is still being prepared. Try again in a moment.");
+            setInviteMessageForRoom(roomId, "Device key is still being prepared. Try again in a moment.");
           }
           return;
         }
@@ -2558,16 +2584,16 @@ export function App() {
         });
         const link = `${window.location.origin}${window.location.pathname}?invite=${invite.id}#multaiplayerJoin=${joinFragment}&approval=request`;
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setInviteLink(displayableInviteLink(link, false));
+          setInviteLinkForRoom(roomId, displayableInviteLink(link, false));
         }
         try {
           await navigator.clipboard.writeText(link);
           if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-            setInviteMessage("Copied gated invite link. The room key is not in the link; approval delivers it wrapped to the joiner's device key.");
+            setInviteMessageForRoom(roomId, "Copied gated invite link. The room key is not in the link; approval delivers it wrapped to the joiner's device key.");
           }
         } catch {
           if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-            setInviteMessage("Gated invite generated. Copying was blocked because the app was not focused; the room key is not in the link.");
+            setInviteMessageForRoom(roomId, "Gated invite generated. Copying was blocked because the app was not focused; the room key is not in the link.");
           }
         }
         return;
@@ -2582,30 +2608,30 @@ export function App() {
       });
       const link = `${window.location.origin}${window.location.pathname}?invite=${invite.id}#multaiplayerInvite=${secretFragment}`;
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setInviteLink(displayableInviteLink(link, true));
+        setInviteLinkForRoom(roomId, displayableInviteLink(link, true));
       }
       try {
         await navigator.clipboard.writeText(link);
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setInviteMessage("Copied direct invite link. It contains the room key, so it is not displayed in the app after copying.");
+          setInviteMessageForRoom(roomId, "Copied direct invite link. It contains the room key, so it is not displayed in the app after copying.");
         }
       } catch {
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setInviteMessage("Direct invite generated, but copying was blocked. Because it contains the room key, it is not displayed; focus the app and try again or use the approval gate.");
+          setInviteMessageForRoom(roomId, "Direct invite generated, but copying was blocked. Because it contains the room key, it is not displayed; focus the app and try again or use the approval gate.");
         }
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setInviteMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setInviteMessageForRoom(roomId, String(error));
     }
   }
 
   async function rotateSelectedRoomKey() {
     if (!hasSelectedRoom) {
-      setInviteMessage("Create or join a room before rotating a room key.");
+      setSelectedInviteMessage("Create or join a room before rotating a room key.");
       return;
     }
     if (!isActiveHost) {
-      setInviteMessage(hostGateMessage);
+      setSelectedInviteMessage(hostGateMessage);
       return;
     }
     const confirmed = window.confirm(
@@ -2615,7 +2641,7 @@ export function App() {
 
     const room = selectedRoom;
     setKeyRotationBusyForRoom(room.id, true);
-    setInviteMessage(null);
+    setInviteMessageForRoom(room.id, null);
     try {
       const oldSecret = await loadOrCreateRoomSecret(room.id);
       const newSecret = await createRoomSecret();
@@ -2658,15 +2684,16 @@ export function App() {
       });
       setForgottenRoomIds((current) => withoutSetValue(current, room.id));
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
-        setInviteLink("");
-        setInviteMessage(
+        setInviteLinkForRoom(room.id, "");
+        setInviteMessageForRoom(
+          room.id,
           client && relayStatus !== "closed" && relayStatus !== "error"
             ? "Rotated the room key for future messages and invites. Current key holders can receive it through the encrypted room event."
             : "Rotated the local room key, but the relay is offline. Other members will need a fresh invite key."
         );
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setInviteMessage(String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setInviteMessageForRoom(room.id, String(error));
     } finally {
       setKeyRotationBusyForRoom(room.id, false);
     }
@@ -2743,7 +2770,7 @@ export function App() {
       requestedAt: request.requestedAt,
       note: request.note
     }, inviteSecret.hostPublicKeyJwk);
-    setInviteMessage(published
+    setInviteMessageForRoom(inviteSecret.roomId, published
       ? `Requested access to ${acceptedRoomName}. The room key is not on this device until the host approves.`
       : `Imported ${acceptedRoomName} metadata. Send again after the relay reconnects so the host can approve access.`);
   }
@@ -2825,18 +2852,18 @@ export function App() {
         requestedAt: request.requestedAt,
         note: request.note
       });
-      setInviteMessage(published
+      setInviteMessageForRoom(inviteSecret.roomId, published
         ? `Imported ${acceptedRoomName} and sent an encrypted join request to the active host.`
         : `Imported ${acceptedRoomName}. Send again after the relay reconnects so the host can approve access.`);
       return;
     }
-    setInviteMessage(`Joined ${acceptedRoomName}. The relay provided metadata only; the room key stayed in the URL fragment.`);
+    setInviteMessageForRoom(inviteSecret.roomId, `Joined ${acceptedRoomName}. The relay provided metadata only; the room key stayed in the URL fragment.`);
   }
 
   async function joinInviteSecret() {
     const raw = inviteSecretInput.trim();
     if (!raw) return;
-    setInviteMessage(null);
+    setSelectedInviteMessage(null);
     setInviteSecretInput("");
     try {
       const [beforeHash, afterHash] = raw.includes("#") ? raw.split("#") : ["", raw];
@@ -2853,7 +2880,7 @@ export function App() {
       const encoded = params.get("multaiplayerInvite") ?? raw;
       await acceptInvite(encoded, inviteId, params.get("approval") === "request");
     } catch (error) {
-      setInviteMessage(`Invite could not be imported: ${String(error)}`);
+      setSelectedInviteMessage(`Invite could not be imported: ${String(error)}`);
     }
   }
 
@@ -5159,7 +5186,7 @@ export function App() {
               type="checkbox"
               checked={inviteApprovalGate}
               disabled={!hasSelectedRoom}
-              onChange={(event) => setInviteApprovalGate(event.target.checked)}
+              onChange={(event) => setInviteApprovalGateForRoom(selectedRoom.id, event.target.checked)}
             />
             <span>Ask host to approve joiners</span>
           </label>
