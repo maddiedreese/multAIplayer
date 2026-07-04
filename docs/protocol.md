@@ -41,6 +41,8 @@ When relay auth is required, workspace metadata is scoped to the signed-in GitHu
 
 Desktop clients register a device public key with `POST /devices`. The relay stores the user id, device id, display name, public JWK, fingerprint, and timestamps. On authenticated relays, the device user id is bound to the signed-in GitHub session and a mismatched client-supplied user id is rejected. The private key stays on the device.
 
+Device fingerprint trust is local desktop state. The relay does not receive or store trusted/untrusted decisions. A trusted badge means this device has locally marked the exact room id, device id, and fingerprint as expected.
+
 Device keys are P-256 ECDH key-agreement keys. The crypto package can wrap an AES-GCM room secret to a registered device public key using an ephemeral ECDH sender key and AES-GCM wrapping payload, then unwrap it only with the recipient device private key. Gated join requests include the requester device public key when available, and host approval statuses can include a room secret wrapped specifically for that requester device.
 
 For gated invites, the desktop creates a no-secret `#multaiplayerJoin=...` fragment containing room metadata and the host device public key, but not the room key. The joiner sends a `room.invite` request as a device-sealed payload encrypted to the host public key. When the host approves, the approval status is device-sealed to the requester and includes a wrapped room secret for that requester device. Non-gated direct invites still use the older room-key fragment flow.

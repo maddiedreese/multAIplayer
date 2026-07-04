@@ -88,6 +88,13 @@ import {
 } from "./lib/localHistory";
 import { loadOrCreateDeviceIdentity, resetDeviceIdentity, type DeviceIdentity } from "./lib/deviceIdentity";
 import {
+  isDeviceKeyTrusted,
+  loadTrustedDeviceKeys,
+  trustDeviceKey,
+  untrustDeviceKey,
+  type TrustedDeviceKey
+} from "./lib/deviceTrust";
+import {
   chooseProjectFolder,
   defaultProjectPath,
   getGitDiff,
@@ -498,6 +505,7 @@ export function App() {
   const [deviceFlow, setDeviceFlow] = useState<GitHubDeviceStart | null>(null);
   const [deviceIdentity, setDeviceIdentity] = useState<DeviceIdentity | null>(null);
   const [deviceIdentityMessage, setDeviceIdentityMessage] = useState<string | null>(null);
+  const [trustedDeviceKeys, setTrustedDeviceKeys] = useState<TrustedDeviceKey[]>(() => loadTrustedDeviceKeys());
   const [authError, setAuthError] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [gitWorkflowBusy, setGitWorkflowBusy] = useState(false);
@@ -1340,10 +1348,28 @@ export function App() {
       await resetDeviceIdentity();
       const identity = await loadOrCreateDeviceIdentity();
       setDeviceIdentity(identity);
+      setTrustedDeviceKeys((current) => untrustDeviceKey(current, selectedRoom.id, deviceId));
       setDeviceIdentityMessage("Created new local device identity. Public key registration will refresh automatically.");
     } catch (error) {
       setDeviceIdentityMessage(`Device identity rotation failed: ${String(error)}`);
     }
+  }
+
+  function trustRoomMemberDevice(member: RoomPresence) {
+    const fingerprint = member.publicKeyFingerprint;
+    if (!fingerprint) {
+      setDeviceIdentityMessage(`${member.displayName} has no registered device key to trust.`);
+      return;
+    }
+    setTrustedDeviceKeys((current) =>
+      trustDeviceKey(current, selectedRoom.id, member.deviceId, fingerprint)
+    );
+    setDeviceIdentityMessage(`Trusted ${member.displayName}'s device key for ${selectedRoom.name}.`);
+  }
+
+  function untrustRoomMemberDevice(member: RoomPresence) {
+    setTrustedDeviceKeys((current) => untrustDeviceKey(current, selectedRoom.id, member.deviceId));
+    setDeviceIdentityMessage(`Removed local trust for ${member.displayName}'s device key in ${selectedRoom.name}.`);
   }
 
   function saveRelayConfiguration() {
@@ -4434,22 +4460,37 @@ export function App() {
               avatarUrl: localUser.avatarUrl,
               publicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
               status: "online" as const
-            }]).map((member) => (
-              <div className="member-row" key={member.deviceId}>
-                {member.avatarUrl ? <img src={member.avatarUrl} alt="" /> : <span>{member.displayName.slice(0, 1)}</span>}
-                <div>
-                  <strong>{member.displayName}</strong>
-                  <small>{formatMemberDeviceLabel(member, deviceId)}</small>
+            }]).map((member) => {
+              const trusted = isDeviceKeyTrusted(
+                trustedDeviceKeys,
+                selectedRoom.id,
+                member.deviceId,
+                member.publicKeyFingerprint
+              );
+              return (
+                <div className="member-row" key={member.deviceId}>
+                  {member.avatarUrl ? <img src={member.avatarUrl} alt="" /> : <span>{member.displayName.slice(0, 1)}</span>}
+                  <div>
+                    <strong>{member.displayName}</strong>
+                    <small>{formatMemberDeviceLabel(member, deviceId, trusted)}</small>
+                  </div>
+                  <div className="member-badges">
+                    {isRoomHostMember(member, selectedRoom) && <b>host</b>}
+                    <b className={member.publicKeyFingerprint ? trusted ? "trusted" : "verified" : "warning"}>
+                      {member.publicKeyFingerprint ? trusted ? "trusted" : "keyed" : "unregistered"}
+                    </b>
+                    {member.publicKeyFingerprint && member.deviceId !== deviceId && (
+                      trusted ? (
+                        <button onClick={() => untrustRoomMemberDevice(member)}>Untrust</button>
+                      ) : (
+                        <button onClick={() => trustRoomMemberDevice(member)}>Trust</button>
+                      )
+                    )}
+                  </div>
+                  <i />
                 </div>
-                <div className="member-badges">
-                  {isRoomHostMember(member, selectedRoom) && <b>host</b>}
-                  <b className={member.publicKeyFingerprint ? "verified" : "warning"}>
-                    {member.publicKeyFingerprint ? "keyed" : "unregistered"}
-                  </b>
-                </div>
-                <i />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
@@ -5725,10 +5766,10 @@ function formatCodexAttachmentSummary(attachments: CodexTurnSummary["attachments
   }).join(", ");
 }
 
-function formatMemberDeviceLabel(member: RoomPresence, localDeviceId: string): string {
+function formatMemberDeviceLabel(member: RoomPresence, localDeviceId: string, trusted = false): string {
   const localLabel = member.deviceId === localDeviceId ? "This device" : "Online";
   const fingerprint = member.publicKeyFingerprint ? shortFingerprint(member.publicKeyFingerprint) : "unregistered device key";
-  return `${localLabel} · ${fingerprint}`;
+  return `${localLabel} · ${fingerprint}${trusted ? " · locally trusted" : ""}`;
 }
 
 function shortFingerprint(fingerprint: string): string {

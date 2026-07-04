@@ -1262,10 +1262,27 @@ button:disabled {
   color: #1f6d38;
 }
 
+.member-badges b.trusted {
+  border-color: #9ecdb0;
+  background: #e5f6ea;
+  color: #14542c;
+}
+
 .member-badges b.warning {
   border-color: #efd79d;
   background: #fff8df;
   color: #80610d;
+}
+
+.member-badges button {
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid #d8ded8;
+  border-radius: 999px;
+  background: #fff;
+  color: #25312a;
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .member-row i {

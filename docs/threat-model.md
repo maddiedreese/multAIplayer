@@ -65,4 +65,6 @@ Desktop device identities use P-256 ECDH key-agreement keys. The relay receives 
 
 The crypto package includes tested device-sealed JSON and room-secret wrapping primitives: a sender can encrypt an invite request, approval status, or AES-GCM room secret to a recipient device public key using an ephemeral ECDH key and AES-GCM. Only the recipient private key can unwrap it.
 
+The desktop app lets a user locally trust a room member's device fingerprint. Trust is scoped to the room id, device id, and exact fingerprint. If the same device id later presents a different fingerprint, the UI falls back to an untrusted keyed state until the user reviews it again. This is a local verification aid only; it is not a relay-enforced role, member removal mechanism, or room-key rotation system.
+
 Gated invite links do not carry the room key. They carry room metadata and the host device public key in the URL fragment, then deliver the room key after host approval as a device-wrapped payload inside a device-sealed approval event. Non-gated direct invite links still carry the room key in the URL fragment for convenience.
