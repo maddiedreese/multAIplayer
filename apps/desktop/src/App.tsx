@@ -541,12 +541,12 @@ export function App() {
   const [actionRunsByRoom, setActionRunsByRoom] = useState<Record<string, GitHubActionRun[]>>({});
   const [actionsLastCheckedByRoom, setActionsLastCheckedByRoom] = useState<Record<string, string | null>>({});
   const [gitWorkflowDraftsByRoom, setGitWorkflowDraftsByRoom] = useState<Record<string, Partial<GitWorkflowDraft>>>({});
-  const [fileQuery, setFileQuery] = useState("");
-  const [projectFiles, setProjectFiles] = useState<ProjectFileEntry[]>([]);
-  const [selectedFile, setSelectedFile] = useState<ProjectFileContent | null>(null);
-  const [selectedDiff, setSelectedDiff] = useState<GitDiffResult | null>(null);
-  const [fileBusy, setFileBusy] = useState(false);
-  const [fileMessage, setFileMessage] = useState<string | null>(null);
+  const [fileQueriesByRoom, setFileQueriesByRoom] = useState<Record<string, string>>({});
+  const [projectFilesByRoom, setProjectFilesByRoom] = useState<Record<string, ProjectFileEntry[]>>({});
+  const [selectedFilesByRoom, setSelectedFilesByRoom] = useState<Record<string, ProjectFileContent | null>>({});
+  const [selectedDiffsByRoom, setSelectedDiffsByRoom] = useState<Record<string, GitDiffResult | null>>({});
+  const [fileBusyByRoom, setFileBusyByRoom] = useState<Record<string, boolean>>({});
+  const [fileMessagesByRoom, setFileMessagesByRoom] = useState<Record<string, string | null>>({});
   const [markdownCopyFallback, setMarkdownCopyFallback] = useState<MarkdownCopyFallback | null>(null);
   const [sensitiveAttachmentReviewKey, setSensitiveAttachmentReviewKey] = useState<string | null>(null);
   const [inviteLink, setInviteLink] = useState("");
@@ -594,6 +594,12 @@ export function App() {
   const actionsMessage = actionsMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const terminalLines = terminalLinesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const terminalBusy = terminalBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
+  const fileQuery = fileQueriesByRoom[selectedRoom?.id ?? selectedRoomId] ?? "";
+  const projectFiles = projectFilesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
+  const selectedFile = selectedFilesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const selectedDiff = selectedDiffsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const fileBusy = fileBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
+  const fileMessage = fileMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const actionsSummary = useMemo(() => summarizeActionRuns(actionRuns), [actionRuns]);
   const githubWorkflowReadiness = useMemo(() => checkGitHubWorkflowReadiness({
     pushEnabled: gitWorkflowDraft.pushEnabled,
@@ -700,6 +706,46 @@ export function App() {
 
   function setCodexRunningForRoom(roomId: string, running: boolean) {
     setCodexRunningByRoom((current) => running ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function setFileQueryForRoom(roomId: string, query: string) {
+    setFileQueriesByRoom((current) => query ? { ...current, [roomId]: query } : omitRecordKey(current, roomId));
+  }
+
+  function setProjectFilesForRoom(roomId: string, files: ProjectFileEntry[]) {
+    setProjectFilesByRoom((current) => ({
+      ...current,
+      [roomId]: files
+    }));
+  }
+
+  function setSelectedFileForRoom(roomId: string, file: ProjectFileContent | null) {
+    setSelectedFilesByRoom((current) => file ? { ...current, [roomId]: file } : omitRecordKey(current, roomId));
+  }
+
+  function setSelectedDiffForRoom(roomId: string, diff: GitDiffResult | null) {
+    setSelectedDiffsByRoom((current) => diff ? { ...current, [roomId]: diff } : omitRecordKey(current, roomId));
+  }
+
+  function setFileBusyForRoom(roomId: string, busy: boolean) {
+    setFileBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function setFileMessageForRoom(roomId: string, message: string | null) {
+    setFileMessagesByRoom((current) => message ? { ...current, [roomId]: message } : omitRecordKey(current, roomId));
+  }
+
+  function setSelectedFileMessage(message: string | null) {
+    setFileMessageForRoom(selectedRoom.id, message);
+  }
+
+  function resetFileContextForRoom(roomId: string) {
+    setSelectedFileForRoom(roomId, null);
+    setSelectedDiffForRoom(roomId, null);
+    setFileQueryForRoom(roomId, "");
+    setProjectFilesByRoom((current) => omitRecordKey(current, roomId));
+    setFileBusyByRoom((current) => omitRecordKey(current, roomId));
+    setFileMessagesByRoom((current) => omitRecordKey(current, roomId));
   }
 
   function setSelectedGitWorkflowMessage(message: string | null) {
@@ -1285,28 +1331,27 @@ export function App() {
 
   useEffect(() => {
     if (!hasSelectedRoom) {
-      setProjectFiles([]);
-      setFileBusy(false);
       return;
     }
+    const roomId = selectedRoom.id;
     let cancelled = false;
-    setFileBusy(true);
-    searchProjectFiles(selectedRoom.projectPath, fileQuery, 80)
+    setFileBusyForRoom(roomId, true);
+    searchProjectFiles(selectedRoom.projectPath, fileQueriesByRoom[roomId] ?? "", 80)
       .then((files) => {
         if (cancelled) return;
-        setProjectFiles(files);
-        setFileMessage(null);
+        setProjectFilesForRoom(roomId, files);
+        setFileMessageForRoom(roomId, null);
       })
       .catch((error) => {
-        if (!cancelled) setFileMessage(String(error));
+        if (!cancelled) setFileMessageForRoom(roomId, String(error));
       })
       .finally(() => {
-        if (!cancelled) setFileBusy(false);
+        if (!cancelled) setFileBusyForRoom(roomId, false);
       });
     return () => {
       cancelled = true;
     };
-  }, [fileQuery, hasSelectedRoom, selectedRoom.projectPath]);
+  }, [fileQueriesByRoom, hasSelectedRoom, selectedRoom.id, selectedRoom.projectPath]);
 
   useEffect(() => {
     if (!hasSelectedRoom) {
@@ -1368,9 +1413,6 @@ export function App() {
 
   useEffect(() => {
     setProjectPathDraft(selectedRoom.projectPath);
-    setSelectedFile(null);
-    setSelectedDiff(null);
-    setFileQuery("");
   }, [selectedRoom.id, selectedRoom.projectPath]);
 
   function setPendingAttachmentsForRoom(
@@ -1699,6 +1741,7 @@ export function App() {
       const claimed = await updateRoomHost(updatedSettings.id, localUser.name, localUser.id, "active");
       setRooms((current) => current.map((item) => (item.id === claimed.id ? ensureRoomDefaults(claimed) : item)));
       markHostHandoffAccepted(roomId, handoff.id);
+      resetFileContextForRoom(roomId);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setProjectPathDraft(patch.projectPath);
         setCustomCodexModel(patch.codexModel);
@@ -2165,6 +2208,7 @@ export function App() {
     try {
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), projectPath: nextProjectPath });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      resetFileContextForRoom(roomId);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setSettingsMessage(`Project folder set to ${nextProjectPath}.`);
       }
@@ -2304,6 +2348,12 @@ export function App() {
     setCodexRunningByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setFileQueriesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setProjectFilesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setSelectedFilesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setSelectedDiffsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setFileBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setFileMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setPendingAttachmentsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setTerminalLinesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setTerminalBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2362,6 +2412,12 @@ export function App() {
     setCodexRunningByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setFileQueriesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setProjectFilesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setSelectedFilesByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setSelectedDiffsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setFileBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setFileMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setPendingAttachmentsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setTerminalLinesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setTerminalBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -3567,31 +3623,31 @@ export function App() {
 
   async function openProjectFile(path: string) {
     if (!hasSelectedRoom) {
-      setFileMessage("Create or join a room before opening project files.");
+      setSelectedFileMessage("Create or join a room before opening project files.");
       return;
     }
     const room = selectedRoom;
-    setFileBusy(true);
-    setFileMessage(null);
+    setFileBusyForRoom(room.id, true);
+    setFileMessageForRoom(room.id, null);
     try {
       const [file, diff] = await Promise.all([
         readProjectFile(room.projectPath, path),
         getGitDiff(room.projectPath, path).catch(() => null)
       ]);
       if (selectedRoomIdRef.current !== room.id) return;
-      setSelectedFile(file);
-      setSelectedDiff(diff);
+      setSelectedFileForRoom(room.id, file);
+      setSelectedDiffForRoom(room.id, diff);
       setSensitiveAttachmentReviewKey(null);
     } catch (error) {
-      if (selectedRoomIdRef.current === room.id) setFileMessage(String(error));
+      if (selectedRoomIdRef.current === room.id) setFileMessageForRoom(room.id, String(error));
     } finally {
-      if (selectedRoomIdRef.current === room.id) setFileBusy(false);
+      setFileBusyForRoom(room.id, false);
     }
   }
 
   async function copyProjectMarkdown() {
     if (!hasSelectedRoom) {
-      setFileMessage("Create or join a room before copying project context.");
+      setSelectedFileMessage("Create or join a room before copying project context.");
       return;
     }
     const markdown = buildProjectMarkdown(
@@ -3606,16 +3662,16 @@ export function App() {
           ? detectSecretRisks(selectedDiff.diff, selectedDiff.path)
           : []
     );
-    await copyMarkdownWithFallback("project context", markdown, setFileMessage);
+    await copyMarkdownWithFallback("project context", markdown, setSelectedFileMessage);
   }
 
   async function attachSelectedFileToMessage() {
     if (!hasSelectedRoom) {
-      setFileMessage("Create or join a room before attaching project files.");
+      setSelectedFileMessage("Create or join a room before attaching project files.");
       return;
     }
     if (!selectedFile) {
-      setFileMessage("Select a project file before attaching it to the room.");
+      setSelectedFileMessage("Select a project file before attaching it to the room.");
       return;
     }
     const roomId = selectedRoom.id;
@@ -3629,7 +3685,7 @@ export function App() {
     );
     if (!review.canAttach) {
       setSensitiveAttachmentReviewKey(attachmentReviewScopeKey(roomId, selectedRoom.projectPath, fileToAttach.path));
-      setFileMessage(attachmentReviewMessage(fileToAttach.path, review.risks));
+      setFileMessageForRoom(roomId, attachmentReviewMessage(fileToAttach.path, review.risks));
       return;
     }
     const attachment: ChatAttachment = {
@@ -3641,7 +3697,7 @@ export function App() {
       truncated: fileToAttach.truncated
     };
     if (roomPendingAttachments.some((item) => item.name === attachment.name)) {
-      setFileMessage(`${attachment.name} is already attached to the next room message.`);
+      setFileMessageForRoom(roomId, `${attachment.name} is already attached to the next room message.`);
       return;
     }
     const selectedContentBytes = encodedBytes(attachment.content ?? "");
@@ -3649,7 +3705,7 @@ export function App() {
       embeddedAttachmentBytes(roomPendingAttachments) + selectedContentBytes > maxEmbeddedAttachmentBytesPerMessage;
     if (shouldUploadBlob) {
       try {
-        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setFileBusy(true);
+        setFileBusyForRoom(roomId, true);
         const secret = await loadOrCreateRoomSecret(roomId);
         const blob = await createAttachmentBlob({
           teamId,
@@ -3671,30 +3727,29 @@ export function App() {
         attachment.truncated = fileToAttach.truncated || selectedContentBytes > maxEmbeddedAttachmentBytes;
       } catch (error) {
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setFileMessage(`Could not upload encrypted attachment blob: ${String(error)}`);
-          setFileBusy(false);
+          setFileMessageForRoom(roomId, `Could not upload encrypted attachment blob: ${String(error)}`);
         }
         return;
       } finally {
-        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setFileBusy(false);
+        setFileBusyForRoom(roomId, false);
       }
     }
     setPendingAttachmentsForRoom(roomId, (current) => {
       if (current.some((item) => item.name === attachment.name)) {
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setFileMessage(`${attachment.name} is already attached to the next room message.`);
+          setFileMessageForRoom(roomId, `${attachment.name} is already attached to the next room message.`);
         }
         return current;
       }
       const next = [...current, attachment];
       const validationError = validatePendingAttachments(next);
       if (validationError) {
-        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setFileMessage(validationError);
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setFileMessageForRoom(roomId, validationError);
         return current;
       }
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setSensitiveAttachmentReviewKey(null);
-        setFileMessage(attachment.blobId
+        setFileMessageForRoom(roomId, attachment.blobId
           ? `Attached ${fileToAttach.path} as an encrypted blob for the next room message.`
           : `Attached ${fileToAttach.path} to the next room message.`);
       }
@@ -3710,26 +3765,26 @@ export function App() {
 
   async function openEncryptedAttachmentBlob(attachment: ChatAttachment) {
     if (!hasSelectedRoom) {
-      setFileMessage("Create or join a room before opening encrypted attachments.");
+      setSelectedFileMessage("Create or join a room before opening encrypted attachments.");
       return;
     }
     const room = selectedRoom;
     if (!attachment.blobId) {
       if (attachment.content) {
         if (selectedRoomIdRef.current !== room.id) return;
-        setSelectedDiff(null);
-        setSelectedFile({
+        setSelectedDiffForRoom(room.id, null);
+        setSelectedFileForRoom(room.id, {
           path: attachment.name,
           size: attachment.size,
           truncated: Boolean(attachment.truncated),
           content: attachment.content
         });
-        setFileMessage(`Opened inline attachment ${attachment.name}.`);
+        setFileMessageForRoom(room.id, `Opened inline attachment ${attachment.name}.`);
       }
       return;
     }
-    setFileBusy(true);
-    setFileMessage(null);
+    setFileBusyForRoom(room.id, true);
+    setFileMessageForRoom(room.id, null);
     try {
       const [blob, secret] = await Promise.all([
         loadAttachmentBlob(attachment.blobId, room.teamId, room.id),
@@ -3743,20 +3798,20 @@ export function App() {
         throw new Error("Attachment blob payload was not a supported file preview.");
       }
       if (selectedRoomIdRef.current !== room.id) return;
-      setSelectedDiff(null);
-      setSelectedFile({
+      setSelectedDiffForRoom(room.id, null);
+      setSelectedFileForRoom(room.id, {
         path: decrypted.name || attachment.name,
         size: decrypted.size ?? attachment.size,
         truncated: Boolean(decrypted.truncated),
         content: decrypted.content
       });
-      setFileMessage(`Opened encrypted attachment ${decrypted.name || attachment.name}.`);
+      setFileMessageForRoom(room.id, `Opened encrypted attachment ${decrypted.name || attachment.name}.`);
     } catch (error) {
       if (selectedRoomIdRef.current === room.id) {
-        setFileMessage(`Could not open encrypted attachment: ${String(error)}`);
+        setFileMessageForRoom(room.id, `Could not open encrypted attachment: ${String(error)}`);
       }
     } finally {
-      if (selectedRoomIdRef.current === room.id) setFileBusy(false);
+      setFileBusyForRoom(room.id, false);
     }
   }
 
@@ -3837,7 +3892,7 @@ export function App() {
 
   async function copyDiffSummaryMarkdown() {
     if (!hasSelectedRoom) {
-      setFileMessage("Create or join a room before copying a diff summary.");
+      setSelectedFileMessage("Create or join a room before copying a diff summary.");
       return;
     }
     const markdown = buildDiffSummaryMarkdown(
@@ -3847,7 +3902,7 @@ export function App() {
       selectedDiff,
       selectedDiff ? detectSecretRisks(selectedDiff.diff, selectedDiff.path) : []
     );
-    await copyMarkdownWithFallback("diff summary", markdown, setFileMessage);
+    await copyMarkdownWithFallback("diff summary", markdown, setSelectedFileMessage);
   }
 
   async function copyPullRequestDraftMarkdown() {
@@ -5242,7 +5297,7 @@ export function App() {
             <Search size={14} />
             <input
               value={fileQuery}
-              onChange={(event) => setFileQuery(event.target.value)}
+              onChange={(event) => setFileQueryForRoom(selectedRoom.id, event.target.value)}
               placeholder="Search project files"
             />
           </label>
