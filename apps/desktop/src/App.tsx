@@ -183,6 +183,7 @@ import { displayableInviteLink } from "./lib/invitePrivacy";
 import { normalizeBrowserAllowedOrigins, shouldAutoApproveBrowserRequest } from "./lib/browserPolicy";
 import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
+import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { copyTextToClipboard } from "./lib/clipboard";
 import { checkGitHubWorkflowReadiness } from "./lib/githubWorkflowReadiness";
@@ -3499,7 +3500,7 @@ export function App() {
       embeddedAttachmentBytes(roomPendingAttachments) + selectedContentBytes > maxEmbeddedAttachmentBytesPerMessage;
     if (shouldUploadBlob) {
       try {
-        setFileBusy(true);
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setFileBusy(true);
         const secret = await loadOrCreateRoomSecret(roomId);
         const blob = await createAttachmentBlob({
           teamId,
@@ -3520,28 +3521,34 @@ export function App() {
         attachment.blobBytes = selectedContentBytes;
         attachment.truncated = fileToAttach.truncated || selectedContentBytes > maxEmbeddedAttachmentBytes;
       } catch (error) {
-        setFileMessage(`Could not upload encrypted attachment blob: ${String(error)}`);
-        setFileBusy(false);
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+          setFileMessage(`Could not upload encrypted attachment blob: ${String(error)}`);
+          setFileBusy(false);
+        }
         return;
       } finally {
-        setFileBusy(false);
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setFileBusy(false);
       }
     }
     setPendingAttachmentsForRoom(roomId, (current) => {
       if (current.some((item) => item.name === attachment.name)) {
-        setFileMessage(`${attachment.name} is already attached to the next room message.`);
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+          setFileMessage(`${attachment.name} is already attached to the next room message.`);
+        }
         return current;
       }
       const next = [...current, attachment];
       const validationError = validatePendingAttachments(next);
       if (validationError) {
-        setFileMessage(validationError);
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setFileMessage(validationError);
         return current;
       }
-      setSensitiveAttachmentReviewKey(null);
-      setFileMessage(attachment.blobId
-        ? `Attached ${fileToAttach.path} as an encrypted blob for the next room message.`
-        : `Attached ${fileToAttach.path} to the next room message.`);
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setSensitiveAttachmentReviewKey(null);
+        setFileMessage(attachment.blobId
+          ? `Attached ${fileToAttach.path} as an encrypted blob for the next room message.`
+          : `Attached ${fileToAttach.path} to the next room message.`);
+      }
       return next;
     });
   }
