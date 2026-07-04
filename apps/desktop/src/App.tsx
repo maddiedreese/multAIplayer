@@ -487,7 +487,8 @@ export function App() {
     enabled: true,
     retentionDays: 30
   });
-  const [historyMessage, setHistoryMessage] = useState<string | null>(null);
+  const [historyMessagesByRoom, setHistoryMessagesByRoom] = useState<Record<string, string | null>>({});
+  const [teamHistoryMessagesByTeam, setTeamHistoryMessagesByTeam] = useState<Record<string, string | null>>({});
   const [newTeamName, setNewTeamName] = useState("");
   const [newRoomName, setNewRoomName] = useState("");
   const [newRoomProjectPath, setNewRoomProjectPath] = useState(defaultProjectPath);
@@ -619,6 +620,9 @@ export function App() {
   const hostMessage = hostMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const chatMessage = chatMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const settingsMessage = settingsMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const historyMessage = historyMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const teamHistoryMessage = teamHistoryMessagesByTeam[selectedTeam || "__no-team"] ?? null;
+  const visibleHistoryMessage = historyMessage ?? teamHistoryMessage;
   const markdownCopyFallback = markdownCopyFallbacksByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const secretWarningVisible = hasSelectedRoom && (
     secretWarningsVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ??
@@ -731,6 +735,22 @@ export function App() {
 
   function setSecretWarningVisibleForRoom(roomId: string, visible: boolean) {
     setSecretWarningsVisibleByRoom((current) => visible ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function setHistoryMessageForRoom(roomId: string, message: string | null) {
+    setHistoryMessagesByRoom((current) => message ? { ...current, [roomId]: message } : omitRecordKey(current, roomId));
+  }
+
+  function setSelectedHistoryMessage(message: string | null) {
+    setHistoryMessageForRoom(selectedRoom.id, message);
+  }
+
+  function setTeamHistoryMessageForTeam(teamId: string, message: string | null) {
+    setTeamHistoryMessagesByTeam((current) => message ? { ...current, [teamId || "__no-team"]: message } : omitRecordKey(current, teamId || "__no-team"));
+  }
+
+  function setSelectedTeamHistoryMessage(message: string | null) {
+    setTeamHistoryMessageForTeam(selectedTeam || "__no-team", message);
   }
 
   function setSettingsBusyForRoom(roomId: string, busy: boolean) {
@@ -2391,10 +2411,11 @@ export function App() {
 
   function updateLocalHistorySettings(next: LocalHistorySettings) {
     if (!hasSelectedRoom) {
-      setHistoryMessage("Create or join a room before changing encrypted history settings.");
+      setSelectedHistoryMessage("Create or join a room before changing encrypted history settings.");
       return;
     }
-    const saved = saveHistorySettings(selectedRoom.id, next);
+    const roomId = selectedRoom.id;
+    const saved = saveHistorySettings(roomId, next);
     setHistorySettings(saved);
     if (saved.enabled) {
       const payload = pruneLocalRoomHistory({
@@ -2407,28 +2428,31 @@ export function App() {
         hostHandoffs,
         ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
       }, saved.retentionDays);
-      setMessagesByRoom((current) => ({ ...current, [selectedRoom.id]: payload.messages }));
-      setTerminalRequestsByRoom((current) => ({ ...current, [selectedRoom.id]: payload.terminalRequests }));
-      setBrowserRequestsByRoom((current) => ({ ...current, [selectedRoom.id]: payload.browserRequests }));
-      setInviteRequestsByRoom((current) => ({ ...current, [selectedRoom.id]: payload.inviteRequests }));
-      setCodexEventsByRoom((current) => ({ ...current, [selectedRoom.id]: payload.codexEvents }));
-      setHostHandoffsByRoom((current) => ({ ...current, [selectedRoom.id]: payload.hostHandoffs }));
+      setMessagesByRoom((current) => ({ ...current, [roomId]: payload.messages }));
+      setTerminalRequestsByRoom((current) => ({ ...current, [roomId]: payload.terminalRequests }));
+      setBrowserRequestsByRoom((current) => ({ ...current, [roomId]: payload.browserRequests }));
+      setInviteRequestsByRoom((current) => ({ ...current, [roomId]: payload.inviteRequests }));
+      setCodexEventsByRoom((current) => ({ ...current, [roomId]: payload.codexEvents }));
+      setHostHandoffsByRoom((current) => ({ ...current, [roomId]: payload.hostHandoffs }));
     }
-    setHistoryMessage(
+    setHistoryMessageForRoom(
+      roomId,
       saved.enabled
         ? `Encrypted local history retention set to ${saved.retentionDays} days.`
         : "Encrypted local history is disabled for this room."
-	    );
+    );
 	  }
 
   function updateTeamHistoryDefaults(next: LocalHistorySettings) {
     if (!selectedTeam) {
-      setHistoryMessage("Create or select a team before changing team history defaults.");
+      setSelectedTeamHistoryMessage("Create or select a team before changing team history defaults.");
       return;
     }
+    const teamId = selectedTeam;
     const saved = saveTeamHistorySettings(selectedTeam, next);
     setTeamHistorySettings(saved);
-    setHistoryMessage(
+    setTeamHistoryMessageForTeam(
+      teamId,
       saved.enabled
         ? `Team default local history retention set to ${saved.retentionDays} days for new rooms.`
         : "Team default local history is disabled for new rooms."
@@ -2437,7 +2461,7 @@ export function App() {
 
   function applyTeamHistoryDefaultsToRoom() {
     if (!hasSelectedRoom) {
-      setHistoryMessage("Create or join a room before applying team history defaults.");
+      setSelectedHistoryMessage("Create or join a room before applying team history defaults.");
       return;
     }
     updateLocalHistorySettings(teamHistorySettings);
@@ -2445,9 +2469,10 @@ export function App() {
 
   async function clearRoomHistory() {
     if (!hasSelectedRoom) {
-      setHistoryMessage("Create or join a room before clearing local history.");
+      setSelectedHistoryMessage("Create or join a room before clearing local history.");
       return;
     }
+    const roomId = selectedRoom.id;
     await clearEncryptedHistory(selectedRoom.id);
     setMessagesByRoom((current) => ({
       ...current,
@@ -2484,6 +2509,7 @@ export function App() {
     setChatMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setMarkdownCopyFallbacksByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSecretWarningsVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setHistoryMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2516,14 +2542,15 @@ export function App() {
     setInviteApprovalGatesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setInviteMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setHistoryMessage("Cleared encrypted local history for this room.");
+    setHistoryMessageForRoom(roomId, "Cleared encrypted local history for this room.");
   }
 
   async function forgetSelectedRoomLocalData() {
     if (!hasSelectedRoom) {
-      setHistoryMessage("Create or join a room before forgetting local room data.");
+      setSelectedHistoryMessage("Create or join a room before forgetting local room data.");
       return;
     }
+    const roomId = selectedRoom.id;
     const confirmed = window.confirm(
       `Forget ${selectedRoom.name} on this device?\n\nThis deletes the encrypted local history, local history settings, and the local room key. You will need a fresh invite or room key to read or send encrypted room messages again.`
     );
@@ -2567,6 +2594,7 @@ export function App() {
     setChatMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setMarkdownCopyFallbacksByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSecretWarningsVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setHistoryMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setSettingsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -2601,7 +2629,7 @@ export function App() {
     setDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHistorySettings(loadHistorySettings(selectedRoom.id));
     setSecretWarningVisibleForRoom(selectedRoom.id, true);
-    setHistoryMessage("Forgot this room on this device. Rejoin or paste a room invite key to unlock it again.");
+    setHistoryMessageForRoom(roomId, "Forgot this room on this device. Rejoin or paste a room invite key to unlock it again.");
   }
 
   async function copyInviteLink() {
@@ -4708,8 +4736,8 @@ export function App() {
 	                </button>
 	              </section>
 
-              {(appConfigMessage || settingsMessage || historyMessage) && (
-                <div className="workflow-message">{appConfigMessage ?? settingsMessage ?? historyMessage}</div>
+              {(appConfigMessage || settingsMessage || visibleHistoryMessage) && (
+                <div className="workflow-message">{appConfigMessage ?? settingsMessage ?? visibleHistoryMessage}</div>
               )}
             </div>
           )}
@@ -5486,7 +5514,7 @@ export function App() {
 	              }
 	            />
 	          </label>
-	          {historyMessage && <div className="workflow-message">{historyMessage}</div>}
+	          {visibleHistoryMessage && <div className="workflow-message">{visibleHistoryMessage}</div>}
 	        </section>
 
         <section className="panel">
