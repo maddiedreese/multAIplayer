@@ -162,6 +162,7 @@ import {
   buildProjectMarkdown,
   buildPullRequestBody,
   buildRoomMarkdown,
+  buildSelectedMessagesMarkdown,
   buildTerminalMarkdown
 } from "./lib/markdownExport";
 import {
@@ -495,6 +496,7 @@ export function App() {
   const [inviteRequestsByRoom, setInviteRequestsByRoom] = useState<Record<string, InviteJoinRequest[]>>({});
   const [codexEventsByRoom, setCodexEventsByRoom] = useState<Record<string, CodexRoomEvent[]>>({});
   const [draftsByRoom, setDraftsByRoom] = useState<Record<string, string>>({});
+  const [selectedMessageIdsByRoom, setSelectedMessageIdsByRoom] = useState<Record<string, string[]>>({});
   const [pendingAttachmentsByRoom, setPendingAttachmentsByRoom] = useState<Record<string, ChatAttachment[]>>({});
   const [approvalVisible, setApprovalVisible] = useState(false);
   const [pendingCodexApproval, setPendingCodexApproval] = useState<{
@@ -574,6 +576,8 @@ export function App() {
   const selectedBrowserAllowedOrigins = selectedRoom.browserAllowedOrigins ?? defaultBrowserAllowedOrigins;
   const messages = messagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const draft = draftsByRoom[selectedRoom?.id ?? selectedRoomId] ?? "";
+  const selectedMessageIds = selectedMessageIdsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
+  const selectedMessages = messages.filter((message) => selectedMessageIds.includes(message.id));
   const pendingAttachments = pendingAttachmentsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const pendingAttachmentBytes = embeddedAttachmentBytes(pendingAttachments);
   const browserRequests = browserRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
@@ -3610,6 +3614,37 @@ export function App() {
     await copyMarkdownWithFallback("room chat", markdown, setChatMessage);
   }
 
+  function toggleMessageSelection(messageId: string) {
+    if (!hasSelectedRoom) return;
+    setSelectedMessageIdsByRoom((current) => {
+      const roomIds = current[selectedRoom.id] ?? [];
+      const nextIds = roomIds.includes(messageId)
+        ? roomIds.filter((id) => id !== messageId)
+        : [...roomIds, messageId];
+      return {
+        ...current,
+        [selectedRoom.id]: nextIds
+      };
+    });
+  }
+
+  function clearSelectedMessages() {
+    setSelectedMessageIdsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+  }
+
+  async function copySelectedMessagesMarkdown() {
+    if (!hasSelectedRoom) {
+      setChatMessage("Create or join a room before copying selected messages.");
+      return;
+    }
+    if (selectedMessages.length === 0) {
+      setChatMessage("Select one or more messages to copy.");
+      return;
+    }
+    const markdown = buildSelectedMessagesMarkdown(selectedRoom, selectedMessages);
+    await copyMarkdownWithFallback("selected messages", markdown, setChatMessage);
+  }
+
   async function copyMessageMarkdown(message: ChatMessage) {
     const markdown = buildMessageMarkdown(message);
     await copyMarkdownWithFallback("message", markdown, setChatMessage);
@@ -4306,6 +4341,16 @@ export function App() {
               <Copy size={14} />
               Markdown
             </button>
+            <button className="header-copy" onClick={copySelectedMessagesMarkdown} disabled={!hasSelectedRoom || selectedMessages.length === 0}>
+              <Copy size={14} />
+              {selectedMessages.length ? `${selectedMessages.length} selected` : "Selected"}
+            </button>
+            {selectedMessages.length > 0 && (
+              <button className="header-copy" onClick={clearSelectedMessages}>
+                <X size={14} />
+                Clear
+              </button>
+            )}
           </div>
         </header>
 
@@ -4352,10 +4397,18 @@ export function App() {
 
         <div className="chat-scroll">
           {messages.map((message) => (
-            <article className={`message ${message.role}`} key={message.id}>
+            <article className={`message ${message.role} ${selectedMessageIds.includes(message.id) ? "selected" : ""}`} key={message.id}>
               <div className="avatar">{message.role === "codex" ? <Bot size={17} /> : message.author.slice(0, 1)}</div>
               <div className="bubble">
                 <div className="message-meta">
+                  <label className="message-select" title="Select message for Markdown copy">
+                    <input
+                      type="checkbox"
+                      checked={selectedMessageIds.includes(message.id)}
+                      onChange={() => toggleMessageSelection(message.id)}
+                      aria-label={`Select message from ${message.author} at ${message.time}`}
+                    />
+                  </label>
                   <strong>{message.author}</strong>
                   <span>{message.time}</span>
                   <button onClick={() => copyMessageMarkdown(message)} title="Copy message as Markdown">

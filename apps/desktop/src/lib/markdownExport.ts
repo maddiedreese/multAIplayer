@@ -74,6 +74,18 @@ export function buildRoomMarkdown(room: RoomRecord, teamName: string, messages: 
   ]);
 }
 
+export function buildSelectedMessagesMarkdown(room: RoomRecord, messages: MarkdownChatMessage[]): string {
+  return compactMarkdown([
+    `# ${escapeMarkdown(room.name)} Selected Messages`,
+    "",
+    `Project: \`${escapeBackticks(room.projectPath)}\``,
+    `Model: ${escapeMarkdown(formatCodexModel(room.codexModel ?? defaultCodexModel))}`,
+    "",
+    "## Messages",
+    messages.map(buildMessageMarkdown).join("\n\n---\n\n") || "_No selected messages._"
+  ]);
+}
+
 export function buildMessageMarkdown(message: MarkdownChatMessage): string {
   const attachments = message.attachments?.length
     ? [

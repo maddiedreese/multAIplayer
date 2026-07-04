@@ -7,6 +7,7 @@ import {
   buildProjectMarkdown,
   buildPullRequestBody,
   buildRoomMarkdown,
+  buildSelectedMessagesMarkdown,
   buildTerminalMarkdown,
   fencedCode
 } from "../src/lib/markdownExport";
@@ -62,6 +63,20 @@ test("buildRoomMarkdown includes metadata and message separators", () => {
   assert.match(markdown, /Team: Core\\_Team/);
   assert.match(markdown, /Project: `\/Users\/maddie\/dev\/mult\\`AI\\`player`/);
   assert.match(markdown, /Hosted by Maddie/);
+  assert.match(markdown, /\n\n---\n\n/);
+});
+
+test("buildSelectedMessagesMarkdown includes only selected transcript messages", () => {
+  const markdown = buildSelectedMessagesMarkdown(room, [
+    { id: "b", author: "B", role: "human", body: "selected second", time: "10:01" },
+    { id: "c", author: "Codex", role: "codex", body: "selected output", time: "10:02" }
+  ]);
+
+  assert.match(markdown, /^# Docs & Diff Room Selected Messages/);
+  assert.match(markdown, /Project: `\/Users\/maddie\/dev\/mult\\`AI\\`player`/);
+  assert.match(markdown, /selected second/);
+  assert.match(markdown, /selected output/);
+  assert.doesNotMatch(markdown, /first unselected/);
   assert.match(markdown, /\n\n---\n\n/);
 });
 

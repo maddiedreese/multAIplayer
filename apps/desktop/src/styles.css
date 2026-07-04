@@ -880,11 +880,31 @@ button:disabled {
   background: #f3fbf5;
 }
 
+.message.selected .bubble {
+  border-color: #7aa7d9;
+  box-shadow: 0 0 0 2px rgba(122, 167, 217, 0.18);
+}
+
 .message-meta {
   display: flex;
   align-items: baseline;
   gap: 8px;
   margin-bottom: 5px;
+}
+
+.message-select {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.message-select input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #1d6aa8;
 }
 
 .message-meta button {
