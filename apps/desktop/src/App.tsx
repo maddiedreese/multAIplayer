@@ -187,6 +187,7 @@ import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { copyTextToClipboard } from "./lib/clipboard";
 import { checkGitHubWorkflowReadiness } from "./lib/githubWorkflowReadiness";
 import { resolveGitWorkflowDraft, updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "./lib/gitWorkflowDraft";
+import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -726,6 +727,11 @@ export function App() {
   }, [selectedRoomId]);
 
   useEffect(() => {
+    if (!selectedRoomId) return;
+    setRooms((current) => markRoomRead(current, selectedRoomId));
+  }, [selectedRoomId]);
+
+  useEffect(() => {
     setPendingCodexApproval(null);
     setApprovalVisible(false);
   }, [selectedRoomId]);
@@ -981,6 +987,15 @@ export function App() {
             const plaintext = await decryptJson<ChatPlaintextPayload>(roomPayload, secret);
             const chatMessage = normalizeChatMessage(plaintext) as ChatMessage | null;
             if (!chatMessage) return;
+            setRooms((current) =>
+              markRoomUnreadForIncomingChat(
+                current,
+                message.envelope.roomId,
+                selectedRoomIdRef.current,
+                message.envelope.senderDeviceId,
+                deviceId
+              )
+            );
             setMessagesByRoom((current) => {
               const roomMessages = current[message.envelope.roomId] ?? [];
               if (roomMessages.some((existing) => existing.id === chatMessage.id)) return current;
@@ -1570,12 +1585,7 @@ export function App() {
   }
 
   function upsertRoom(room: RoomRecord) {
-    setRooms((current) => {
-      if (current.some((item) => item.id === room.id)) {
-        return current.map((item) => (item.id === room.id ? room : item));
-      }
-      return [...current, room];
-    });
+    setRooms((current) => upsertRoomPreservingUnread(current, room));
   }
 
   async function setRoomHost(hostStatus: RoomRecord["hostStatus"]) {
