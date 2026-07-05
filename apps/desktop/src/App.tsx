@@ -7,11 +7,9 @@ import {
   FileCode2,
   FolderGit2,
   Github,
-  KeyRound,
   Lock,
   ExternalLink,
   Plus,
-  RefreshCw,
   Search,
   Send,
   Settings,
@@ -264,9 +262,8 @@ import {
   clearRoomVisibilityWarningAcknowledgement,
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
-import { InfoRow, InlineSecretWarning, StatusPill } from "./components/common";
+import { InlineSecretWarning, StatusPill } from "./components/common";
 import { InspectorTabs, type InspectorTab } from "./components/InspectorTabs";
-import { RoomSettingsOverview } from "./components/RoomSettingsOverview";
 import { RoomHeader } from "./components/RoomHeader";
 import { CodexApprovalCard } from "./components/CodexApprovalCard";
 import { ModelPanel } from "./components/ModelPanel";
@@ -284,6 +281,7 @@ import { RoomMembersPanel, TeamRosterPanel, type RoomMemberDisplay, type TeamMem
 import { TerminalPanel, type CodexEventDisplay, type TerminalCommandRequestDisplay, type TerminalOutputLineDisplay } from "./components/TerminalPanel";
 import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
 import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
+import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -5928,212 +5926,80 @@ export function App() {
               onSignOut={signOut}
             />
           ) : (
-            <div className="drawer-content">
-              <RoomSettingsOverview
-                relay={`${relayStatus} · ${appConfig.relayWsUrl}`}
-                relayApi={appConfig.relayHttpUrl}
-                codex={codexProbe?.available ? codexProbe.version ?? "Available" : codexProbe?.error ?? "Not connected"}
-                project={selectedRoom.projectPath}
-                model={formatCodexModel(selectedCodexModel)}
-                approval={approvalPolicyLabels[selectedRoom.approvalPolicy]}
-                roomKeys={roomSecretStorageLabel()}
-                posture={roomPosture}
-                chooseProjectDisabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-                onChooseProject={chooseProjectPath}
-              />
-
-              <section className="drawer-section relay-config-section">
-                <div className="drawer-section-title">Relay connection</div>
-                <label>
-                  <span>HTTP API URL</span>
-                  <input
-                    value={relayHttpDraft}
-                    onChange={(event) => setRelayHttpDraft(event.target.value)}
-                    placeholder={defaultRelayHttpUrl}
-                  />
-                </label>
-                <label>
-                  <span>WebSocket rooms URL</span>
-                  <input
-                    value={relayWsDraft}
-                    onChange={(event) => setRelayWsDraft(event.target.value)}
-                    placeholder={defaultRelayWsUrl}
-                  />
-                </label>
-                <div className="drawer-button-row">
-                  <button className="ghost-wide" onClick={resetRelayConfiguration}>
-                    <RefreshCw size={15} />
-                    Defaults
-                  </button>
-                  <button
-                    className="primary-wide"
-                    onClick={saveRelayConfiguration}
-                    disabled={!relayHttpDraft.trim() || !relayWsDraft.trim()}
-                  >
-                    <Check size={15} />
-                    Save relay
-                  </button>
-                </div>
-              </section>
-
-              <section className="drawer-section">
-                <div className="drawer-section-title">Room modes</div>
-                <div className="mode-options drawer-modes">
-                  {(Object.keys(roomModeLabels) as Array<keyof RoomMode>).map((key) => (
-                    <label key={key}>
-                      <input
-                        type="checkbox"
-                        checked={selectedRoom.mode[key]}
-                        disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-                        onChange={() => toggleRoomMode(key)}
-                      />
-                      <span>{roomModeLabels[key]}</span>
-                    </label>
-                  ))}
-                </div>
-                {!isActiveHost && hasSelectedRoom && (
-                  <div className="workflow-message">{roomSettingsGateMessage}</div>
-                )}
-              </section>
-
-              <section className="drawer-section">
-                <div className="drawer-section-title">Encrypted history</div>
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={historySettings.enabled}
-                    disabled={!hasSelectedRoom}
-                    onChange={(event) =>
-                      updateLocalHistorySettings({
-                        ...historySettings,
-                        enabled: event.target.checked
-                      })
-                    }
-                  />
-                  <span>Save local history</span>
-                </label>
-                <label className="history-retention">
-                  <span>Retention days</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={365}
-                    value={historySettings.retentionDays}
-                    disabled={!hasSelectedRoom || !historySettings.enabled}
-                    onChange={(event) =>
-                      updateLocalHistorySettings({
-                        ...historySettings,
-                        retentionDays: Number(event.target.value)
-                      })
-                    }
-                  />
-                </label>
-	                <button className="ghost-wide" onClick={clearRoomHistory} disabled={!hasSelectedRoom}>
-	                  <X size={15} />
-	                  Clear local history
-	                </button>
-	                <button className="ghost-wide danger" onClick={forgetSelectedRoomLocalData} disabled={!hasSelectedRoom}>
-	                  <KeyRound size={15} />
-	                  Forget room on this device
-	                </button>
-	                <div className="drawer-section-title">Team default</div>
-	                <label className="checkbox-row">
-	                  <input
-	                    type="checkbox"
-	                    checked={teamHistorySettings.enabled}
-	                    disabled={!selectedTeam}
-	                    onChange={(event) =>
-	                      updateTeamHistoryDefaults({
-	                        ...teamHistorySettings,
-	                        enabled: event.target.checked
-	                      })
-	                    }
-	                  />
-	                  <span>Save history in new team rooms</span>
-	                </label>
-	                <label className="history-retention">
-	                  <span>Team retention days</span>
-	                  <input
-	                    type="number"
-	                    min={1}
-	                    max={365}
-	                    value={teamHistorySettings.retentionDays}
-	                    disabled={!selectedTeam || !teamHistorySettings.enabled}
-	                    onChange={(event) =>
-	                      updateTeamHistoryDefaults({
-	                        ...teamHistorySettings,
-	                        retentionDays: Number(event.target.value)
-	                      })
-	                    }
-	                  />
-	                </label>
-	                <label className="history-retention">
-	                  <span>New room approval</span>
-	                  <select
-	                    value={teamDefaultApprovalPolicy}
-	                    disabled={!selectedTeam}
-	                    onChange={(event) => updateTeamDefaultApprovalPolicy(event.target.value as ApprovalPolicy)}
-	                  >
-	                    {(Object.keys(approvalPolicyLabels) as ApprovalPolicy[]).map((policy) => (
-	                      <option key={policy} value={policy}>{approvalPolicyLabels[policy]}</option>
-	                    ))}
-	                  </select>
-	                </label>
-	                <label className="history-retention">
-	                  <span>New room model</span>
-	                  <select
-	                    value={codexModelOptions.some((option) => option.id === teamDefaultCodexModel) ? teamDefaultCodexModel : defaultCodexModel}
-	                    disabled={!selectedTeam}
-	                    onChange={(event) => updateTeamDefaultCodexModel(event.target.value)}
-	                  >
-	                    {codexModelOptions.map((option) => (
-	                      <option key={option.id} value={option.id}>{option.label}</option>
-	                    ))}
-	                  </select>
-	                </label>
-	                <label className="checkbox-row">
-	                  <input
-	                    type="checkbox"
-	                    checked={teamDefaultBrowserProfilePersistent}
-	                    disabled={!selectedTeam}
-	                    onChange={(event) => setTeamDefaultBrowserProfilePersistent(event.target.checked)}
-	                  />
-	                  <span>Persist browser profiles in new team rooms</span>
-	                </label>
-	                <div className="browser-allowlist">
-	                  <label>
-	                    <span>New room allowed browser sites</span>
-	                    <textarea
-	                      value={teamDefaultBrowserAllowedOriginsDraft}
-	                      disabled={!selectedTeam}
-	                      onChange={(event) => setTeamDefaultBrowserAllowedOriginsDraft(event.target.value)}
-	                      placeholder="https://github.com"
-	                    />
-	                  </label>
-	                  <button className="ghost-wide" onClick={saveTeamDefaultBrowserPolicy} disabled={!selectedTeam}>
-	                    <Check size={15} />
-	                    Save browser defaults
-	                  </button>
-	                </div>
-	                <label className="checkbox-row">
-	                  <input
-	                    type="checkbox"
-	                    checked={teamDefaultInviteApprovalGate}
-	                    disabled={!selectedTeam}
-	                    onChange={(event) => updateTeamDefaultInviteApprovalGate(event.target.checked)}
-	                  />
-	                  <span>Require host approval for new room invites</span>
-	                </label>
-	                <button className="ghost-wide" onClick={applyTeamDefaultsToRoom} disabled={!hasSelectedRoom || settingsBusy}>
-	                  <Check size={15} />
-	                  Apply team default to room
-	                </button>
-	              </section>
-
-              {(appConfigMessage || settingsMessage || visibleHistoryMessage) && (
-                <div className="workflow-message">{appConfigMessage ?? settingsMessage ?? visibleHistoryMessage}</div>
-              )}
-            </div>
+            <RoomSettingsDrawerPanel
+              relaySummary={`${relayStatus} · ${appConfig.relayWsUrl}`}
+              relayApi={appConfig.relayHttpUrl}
+              codexSummary={codexProbe?.available ? codexProbe.version ?? "Available" : codexProbe?.error ?? "Not connected"}
+              projectPath={selectedRoom.projectPath}
+              modelLabel={formatCodexModel(selectedCodexModel)}
+              approvalLabel={approvalPolicyLabels[selectedRoom.approvalPolicy]}
+              roomKeysLabel={roomSecretStorageLabel()}
+              posture={roomPosture}
+              chooseProjectDisabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
+              relayHttpDraft={relayHttpDraft}
+              relayWsDraft={relayWsDraft}
+              defaultRelayHttpUrl={defaultRelayHttpUrl}
+              defaultRelayWsUrl={defaultRelayWsUrl}
+              saveRelayDisabled={!relayHttpDraft.trim() || !relayWsDraft.trim()}
+              roomMode={selectedRoom.mode}
+              roomModeLabels={roomModeLabels}
+              roomModesDisabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
+              showRoomSettingsGate={!isActiveHost && hasSelectedRoom}
+              roomSettingsGateMessage={roomSettingsGateMessage}
+              historySettings={historySettings}
+              teamHistorySettings={teamHistorySettings}
+              hasSelectedRoom={hasSelectedRoom}
+              selectedTeam={Boolean(selectedTeam)}
+              settingsBusy={settingsBusy}
+              teamDefaultApprovalPolicy={teamDefaultApprovalPolicy}
+              approvalPolicyLabels={approvalPolicyLabels}
+              teamDefaultCodexModel={teamDefaultCodexModel}
+              defaultCodexModel={defaultCodexModel}
+              codexModelOptions={codexModelOptions}
+              teamDefaultBrowserProfilePersistent={teamDefaultBrowserProfilePersistent}
+              teamDefaultBrowserAllowedOriginsDraft={teamDefaultBrowserAllowedOriginsDraft}
+              teamDefaultInviteApprovalGate={teamDefaultInviteApprovalGate}
+              message={appConfigMessage ?? settingsMessage ?? visibleHistoryMessage}
+              onChooseProject={chooseProjectPath}
+              onRelayHttpDraftChange={setRelayHttpDraft}
+              onRelayWsDraftChange={setRelayWsDraft}
+              onResetRelay={resetRelayConfiguration}
+              onSaveRelay={saveRelayConfiguration}
+              onToggleRoomMode={toggleRoomMode}
+              onHistoryEnabledChange={(enabled) =>
+                updateLocalHistorySettings({
+                  ...historySettings,
+                  enabled
+                })
+              }
+              onHistoryRetentionDaysChange={(retentionDays) =>
+                updateLocalHistorySettings({
+                  ...historySettings,
+                  retentionDays
+                })
+              }
+              onClearRoomHistory={clearRoomHistory}
+              onForgetRoomLocalData={forgetSelectedRoomLocalData}
+              onTeamHistoryEnabledChange={(enabled) =>
+                updateTeamHistoryDefaults({
+                  ...teamHistorySettings,
+                  enabled
+                })
+              }
+              onTeamHistoryRetentionDaysChange={(retentionDays) =>
+                updateTeamHistoryDefaults({
+                  ...teamHistorySettings,
+                  retentionDays
+                })
+              }
+              onTeamDefaultApprovalPolicyChange={updateTeamDefaultApprovalPolicy}
+              onTeamDefaultCodexModelChange={updateTeamDefaultCodexModel}
+              onTeamDefaultBrowserProfilePersistentChange={setTeamDefaultBrowserProfilePersistent}
+              onTeamDefaultBrowserAllowedOriginsDraftChange={setTeamDefaultBrowserAllowedOriginsDraft}
+              onSaveTeamDefaultBrowserPolicy={saveTeamDefaultBrowserPolicy}
+              onTeamDefaultInviteApprovalGateChange={updateTeamDefaultInviteApprovalGate}
+              onApplyTeamDefaultsToRoom={applyTeamDefaultsToRoom}
+            />
           )}
         </aside>
       )}
