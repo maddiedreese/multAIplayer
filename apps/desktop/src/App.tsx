@@ -236,6 +236,12 @@ interface ChatAttachment {
   truncated?: boolean;
 }
 
+interface PendingCodexApproval {
+  roomId: string;
+  messages: ChatMessage[];
+  summary: CodexTurnSummary;
+}
+
 interface RoomPresence {
   userId: string;
   deviceId: string;
@@ -557,11 +563,7 @@ export function App() {
   const [selectedMessageIdsByRoom, setSelectedMessageIdsByRoom] = useState<Record<string, string[]>>({});
   const [pendingAttachmentsByRoom, setPendingAttachmentsByRoom] = useState<Record<string, ChatAttachment[]>>({});
   const [approvalVisibleByRoom, setApprovalVisibleByRoom] = useState<Record<string, boolean>>({});
-  const [pendingCodexApprovalsByRoom, setPendingCodexApprovalsByRoom] = useState<Record<string, {
-    roomId: string;
-    messages: ChatMessage[];
-    summary: CodexTurnSummary;
-  }>>({});
+  const [pendingCodexApprovalsByRoom, setPendingCodexApprovalsByRoom] = useState<Record<string, PendingCodexApproval>>({});
   const [codexRunningByRoom, setCodexRunningByRoom] = useState<Record<string, boolean>>({});
   const [secretWarningsVisibleByRoom, setSecretWarningsVisibleByRoom] = useState<Record<string, boolean>>({});
   const [gitStatusByRoom, setGitStatusByRoom] = useState<Record<string, GitStatusSummary | null>>({});
@@ -751,11 +753,15 @@ export function App() {
       };
     }
   }, [gitWorkflowDraft.branchName, gitWorkflowDraft.commitMessage, gitWorkflowDraft.prBase, gitWorkflowDraft.pushEnabled, selectedRoom.projectPath]);
+  const roomTerminals = useMemo(
+    () => terminals.filter((terminal) => terminal.roomId === selectedRoom.id),
+    [terminals, selectedRoom.id]
+  );
   const codexTurnSummary = useMemo(
-    () => buildCodexTurnSummary(messages, selectedRoom, terminals, browserRequests, gitStatus, {
+    () => buildCodexTurnSummary(messages, selectedRoom, roomTerminals, browserRequests, gitStatus, {
       includeWorkspaceContext: canReadLocalWorkspace
     }),
-    [messages, selectedRoom, terminals, browserRequests, gitStatus, canReadLocalWorkspace]
+    [messages, selectedRoom, roomTerminals, browserRequests, gitStatus, canReadLocalWorkspace]
   );
   const activeCodexApproval = pendingCodexApprovalsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const approvalVisible = approvalVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
@@ -859,7 +865,7 @@ export function App() {
 
   function setPendingCodexApprovalForRoom(
     roomId: string,
-    approval: { roomId: string; messages: ChatMessage[]; summary: CodexTurnSummary } | null
+    approval: PendingCodexApproval | null
   ) {
     setPendingCodexApprovalsByRoom((current) => approval ? { ...current, [roomId]: approval } : omitRecordKey(current, roomId));
   }
@@ -1970,7 +1976,7 @@ export function App() {
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
-    const approvalSnapshot = buildCodexApprovalSnapshot(selectedRoom, messages, pendingMessage, terminals, browserRequests, gitStatus, {
+    const approvalSnapshot = buildCodexApprovalSnapshot(selectedRoom, messages, pendingMessage, roomTerminals, browserRequests, gitStatus, {
       includeWorkspaceContext: canReadLocalWorkspace
     });
     if (selectedRoom.approvalPolicy === "auto_chat_only") {
@@ -1978,7 +1984,7 @@ export function App() {
         setPendingCodexApprovalForRoom(roomId, null);
         setApprovalVisibleForRoom(roomId, false);
         setHostMessageForRoom(roomId, "Auto-approved chat-only Codex turn.");
-        approveCodexTurn(approvalSnapshot.messages, approvalSnapshot.summary).catch((error) => {
+        approveCodexTurn(approvalSnapshot).catch((error) => {
           if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessageForRoom(roomId, String(error));
         });
         return;
@@ -3685,26 +3691,29 @@ export function App() {
     }
   }
 
-  async function approveCodexTurn(
-    turnMessages: ChatMessage[] = activeCodexApproval?.messages ?? messages,
-    turnSummary: CodexTurnSummary = activeCodexApproval?.summary ?? codexTurnSummary
-  ) {
-    if (!hasSelectedRoom) {
-      setSelectedHostMessage("Create or join a room before approving a Codex turn.");
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedHostMessage(hostGateMessage);
-      return;
-    }
-    const room = selectedRoom;
-    const roomId = room.id;
-    if (isSelectedRoomLocked) {
-      setHostMessageForRoom(roomId, roomLockMessage(room, isSelectedRoomRevoked));
+  async function approveCodexTurn(approval: PendingCodexApproval | null = activeCodexApproval) {
+    const roomId = approval?.roomId ?? selectedRoom.id;
+    const room = roomsRef.current.find((item) => item.id === roomId);
+    if (!room) {
+      setHostMessageForRoom(roomId, "This Codex approval belongs to a room that is no longer available.");
       setPendingCodexApprovalForRoom(roomId, null);
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
+    const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
+    const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
+    const roomActiveHost = isLocalUserActiveHostForRoom(room, localUser);
+    const roomCanReadLocalWorkspace = canUseLocalWorkspace(room, localUser, roomLocked);
+    if (roomLocked) {
+      setHostMessageForRoom(roomId, roomLockMessage(room, roomRevoked));
+      setPendingCodexApprovalForRoom(roomId, null);
+      setApprovalVisibleForRoom(roomId, false);
+      return;
+    }
+    const roomHostGateMessage =
+      room.hostStatus === "active"
+        ? `Only ${room.host} can approve host-side actions in this room.`
+        : "Claim host before approving host-side actions in this room.";
     if (!room.mode.code) {
       setHostMessageForRoom(roomId, "Code mode is disabled for this room.");
       setPendingCodexApprovalForRoom(roomId, null);
@@ -3717,13 +3726,28 @@ export function App() {
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
-    if (!canReadLocalWorkspace) {
-      setHostMessageForRoom(roomId, localWorkspaceMessage);
+    if (!roomActiveHost) {
+      setHostMessageForRoom(roomId, roomHostGateMessage);
       setPendingCodexApprovalForRoom(roomId, null);
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
-    const model = selectedCodexModel;
+    if (!roomCanReadLocalWorkspace) {
+      setHostMessageForRoom(roomId, localWorkspaceGateMessage(room, roomLocked));
+      setPendingCodexApprovalForRoom(roomId, null);
+      setApprovalVisibleForRoom(roomId, false);
+      return;
+    }
+    const turnMessages = approval?.messages ?? messagesByRoom[roomId] ?? [];
+    const turnSummary = approval?.summary ?? buildCodexTurnSummary(
+      turnMessages,
+      room,
+      terminals.filter((terminal) => terminal.roomId === roomId),
+      browserRequestsByRoom[roomId] ?? [],
+      gitStatusByRoom[roomId] ?? null,
+      { includeWorkspaceContext: roomCanReadLocalWorkspace }
+    );
+    const model = room.codexModel ?? defaultCodexModel;
     const projectPath = room.projectPath;
     setPendingCodexApprovalForRoom(roomId, null);
     setApprovalVisibleForRoom(roomId, false);
