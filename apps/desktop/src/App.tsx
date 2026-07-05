@@ -281,6 +281,7 @@ import { RoomModePanel } from "./components/RoomModePanel";
 import { ApprovalPolicyPanel } from "./components/ApprovalPolicyPanel";
 import { HostHandoffPanel } from "./components/HostHandoffPanel";
 import { EncryptedInvitePanel } from "./components/EncryptedInvitePanel";
+import { LocalHistoryPanel } from "./components/LocalHistoryPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -6669,152 +6670,55 @@ export function App() {
           onApplyCustomModel={() => setCodexModel(customCodexModel)}
         />
 
-        <section className="panel history-panel">
-          <div className="panel-title">
-            <span>Local history</span>
-            <StatusPill
-              icon={<Lock size={13} />}
-              label={historySettings.enabled ? `${historySettings.retentionDays} days` : "off"}
-              tone={historySettings.enabled ? "green" : "muted"}
-            />
-          </div>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={historySettings.enabled}
-              disabled={!hasSelectedRoom}
-              onChange={(event) =>
-                updateLocalHistorySettings({
-                  ...historySettings,
-                  enabled: event.target.checked
-                })
-              }
-            />
-            <span>Save encrypted local room history</span>
-          </label>
-          <label className="history-retention">
-            <span>Retention days</span>
-            <input
-              type="number"
-              min={1}
-              max={365}
-              value={historySettings.retentionDays}
-              disabled={!hasSelectedRoom || !historySettings.enabled}
-              onChange={(event) =>
-                updateLocalHistorySettings({
-                  ...historySettings,
-                  retentionDays: Number(event.target.value)
-                })
-              }
-            />
-          </label>
-	          <button className="ghost-wide" onClick={clearRoomHistory} disabled={!hasSelectedRoom}>
-	            <X size={15} />
-	            Clear local history
-	          </button>
-	          <button className="ghost-wide danger" onClick={forgetSelectedRoomLocalData} disabled={!hasSelectedRoom}>
-	            <KeyRound size={15} />
-	            Forget room on this device
-	          </button>
-	          <div className="history-defaults">
-	            <div>
-	              <strong>Team default</strong>
-	              <span>{teamHistorySettings.enabled ? `${teamHistorySettings.retentionDays} days for new rooms` : "off for new rooms"}</span>
-	            </div>
-	            <button className="ghost-wide" onClick={applyTeamDefaultsToRoom} disabled={!hasSelectedRoom || settingsBusy}>
-	              <Check size={15} />
-	              Apply defaults to room
-	            </button>
-	          </div>
-	          <label className="checkbox-row">
-	            <input
-	              type="checkbox"
-	              checked={teamHistorySettings.enabled}
-	              disabled={!selectedTeam}
-	              onChange={(event) =>
-	                updateTeamHistoryDefaults({
-	                  ...teamHistorySettings,
-	                  enabled: event.target.checked
-	                })
-	              }
-	            />
-	            <span>Save encrypted history in new rooms for this team</span>
-	          </label>
-	          <label className="history-retention">
-	            <span>Team retention days</span>
-	            <input
-	              type="number"
-	              min={1}
-	              max={365}
-	              value={teamHistorySettings.retentionDays}
-	              disabled={!selectedTeam || !teamHistorySettings.enabled}
-	              onChange={(event) =>
-	                updateTeamHistoryDefaults({
-	                  ...teamHistorySettings,
-	                  retentionDays: Number(event.target.value)
-	                })
-	              }
-	            />
-	          </label>
-	          <label className="history-retention">
-	            <span>New room approval</span>
-	            <select
-	              value={teamDefaultApprovalPolicy}
-	              disabled={!selectedTeam}
-	              onChange={(event) => updateTeamDefaultApprovalPolicy(event.target.value as ApprovalPolicy)}
-	            >
-	              {(Object.keys(approvalPolicyLabels) as ApprovalPolicy[]).map((policy) => (
-	                <option key={policy} value={policy}>{approvalPolicyLabels[policy]}</option>
-	              ))}
-	            </select>
-	          </label>
-	          <label className="history-retention">
-	            <span>New room model</span>
-	            <select
-	              value={codexModelOptions.some((option) => option.id === teamDefaultCodexModel) ? teamDefaultCodexModel : defaultCodexModel}
-	              disabled={!selectedTeam}
-	              onChange={(event) => updateTeamDefaultCodexModel(event.target.value)}
-	            >
-	              {codexModelOptions.map((option) => (
-	                <option key={option.id} value={option.id}>{option.label}</option>
-	              ))}
-	            </select>
-	          </label>
-	          <label className="checkbox-row">
-	            <input
-	              type="checkbox"
-	              checked={teamDefaultBrowserProfilePersistent}
-	              disabled={!selectedTeam}
-	              onChange={(event) => setTeamDefaultBrowserProfilePersistent(event.target.checked)}
-	            />
-	            <span>Persist browser profiles in new team rooms</span>
-	          </label>
-	          <div className="browser-allowlist">
-	            <label>
-	              <span>New room allowed browser sites</span>
-	              <textarea
-	                value={teamDefaultBrowserAllowedOriginsDraft}
-	                disabled={!selectedTeam}
-	                onChange={(event) => setTeamDefaultBrowserAllowedOriginsDraft(event.target.value)}
-	                placeholder="https://github.com"
-	              />
-	            </label>
-	            <button className="ghost-wide" onClick={saveTeamDefaultBrowserPolicy} disabled={!selectedTeam}>
-	              <Check size={15} />
-	              Save browser defaults
-	            </button>
-	          </div>
-	          <label className="checkbox-row">
-	            <input
-	              type="checkbox"
-	              checked={teamDefaultInviteApprovalGate}
-	              disabled={!selectedTeam}
-	              onChange={(event) => updateTeamDefaultInviteApprovalGate(event.target.checked)}
-	            />
-	            <span>Require host approval for new room invites</span>
-	          </label>
-	          {visibleHistoryMessage && <div className="workflow-message">{visibleHistoryMessage}</div>}
-	        </section>
+        <LocalHistoryPanel
+          historySettings={historySettings}
+          teamHistorySettings={teamHistorySettings}
+          selectedTeam={Boolean(selectedTeam)}
+          hasSelectedRoom={hasSelectedRoom}
+          settingsBusy={settingsBusy}
+          teamDefaultApprovalPolicy={teamDefaultApprovalPolicy}
+          approvalPolicyLabels={approvalPolicyLabels}
+          teamDefaultCodexModel={teamDefaultCodexModel}
+          defaultCodexModel={defaultCodexModel}
+          codexModelOptions={codexModelOptions}
+          teamDefaultBrowserProfilePersistent={teamDefaultBrowserProfilePersistent}
+          teamDefaultBrowserAllowedOriginsDraft={teamDefaultBrowserAllowedOriginsDraft}
+          teamDefaultInviteApprovalGate={teamDefaultInviteApprovalGate}
+          message={visibleHistoryMessage}
+          onHistoryEnabledChange={(enabled) =>
+            updateLocalHistorySettings({
+              ...historySettings,
+              enabled
+            })
+          }
+          onHistoryRetentionDaysChange={(retentionDays) =>
+            updateLocalHistorySettings({
+              ...historySettings,
+              retentionDays
+            })
+          }
+          onClearRoomHistory={clearRoomHistory}
+          onForgetRoomLocalData={forgetSelectedRoomLocalData}
+          onApplyTeamDefaultsToRoom={applyTeamDefaultsToRoom}
+          onTeamHistoryEnabledChange={(enabled) =>
+            updateTeamHistoryDefaults({
+              ...teamHistorySettings,
+              enabled
+            })
+          }
+          onTeamHistoryRetentionDaysChange={(retentionDays) =>
+            updateTeamHistoryDefaults({
+              ...teamHistorySettings,
+              retentionDays
+            })
+          }
+          onTeamDefaultApprovalPolicyChange={updateTeamDefaultApprovalPolicy}
+          onTeamDefaultCodexModelChange={updateTeamDefaultCodexModel}
+          onTeamDefaultBrowserProfilePersistentChange={setTeamDefaultBrowserProfilePersistent}
+          onTeamDefaultBrowserAllowedOriginsDraftChange={setTeamDefaultBrowserAllowedOriginsDraft}
+          onSaveTeamDefaultBrowserPolicy={saveTeamDefaultBrowserPolicy}
+          onTeamDefaultInviteApprovalGateChange={updateTeamDefaultInviteApprovalGate}
+        />
 
         <section className="panel">
           <div className="panel-title">
