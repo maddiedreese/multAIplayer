@@ -9,16 +9,13 @@ import {
   Github,
   KeyRound,
   Lock,
-  MessageSquare,
   ExternalLink,
-  Play,
   Plus,
   RefreshCw,
   Search,
   Send,
   Settings,
   ShieldAlert,
-  Terminal,
   UserRoundCheck,
   UsersRound,
   X
@@ -284,6 +281,7 @@ import { GitHubActionsPanel } from "./components/GitHubActionsPanel";
 import { GitHandoffPanel } from "./components/GitHandoffPanel";
 import { ProjectPanel } from "./components/ProjectPanel";
 import { RoomMembersPanel, TeamRosterPanel, type RoomMemberDisplay, type TeamMemberDisplay } from "./components/RosterPanels";
+import { TerminalPanel, type CodexEventDisplay, type TerminalCommandRequestDisplay, type TerminalOutputLineDisplay } from "./components/TerminalPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -1236,6 +1234,27 @@ export function App() {
     ? detectSecretRisks(selectedTerminal.lines.map((line) => line.text).join("\n"))
     : detectSecretRisks(terminalLines.join("\n"));
   const terminalCommandRisks = detectTerminalCommandRisks(terminalCommand);
+  const selectedTerminalCanControl = canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked);
+  const terminalOutputLines: TerminalOutputLineDisplay[] = (selectedTerminal?.lines ?? terminalLines.map((line) => ({ stream: "system", text: line }))).map((line) => ({
+    ...line,
+    risks: detectSecretRisks(line.text)
+  }));
+  const terminalRequestRows: TerminalCommandRequestDisplay[] = terminalRequests.map((request) => ({
+    id: request.id,
+    command: request.command,
+    requester: request.requester,
+    cwd: request.cwd,
+    status: request.status,
+    risks: detectTerminalCommandRisks(request.command)
+  }));
+  const codexEventRows: CodexEventDisplay[] = codexEvents.slice(-5).reverse().map((event) => ({
+    key: `${event.turnId}-${event.createdAt}-${event.status}`,
+    status: event.status,
+    statusLabel: formatCodexEventStatus(event.status),
+    message: event.message,
+    detail: `${event.threadId ?? formatCodexModel(event.model)} · ${formatTimestamp(event.createdAt)}`,
+    host: event.host
+  }));
   const normalizedSidebarQuery = sidebarQuery.trim().toLowerCase();
   const searchActive = normalizedSidebarQuery.length > 0;
   const teamRooms = useMemo(
@@ -6589,156 +6608,43 @@ export function App() {
           onRefresh={() => refreshGitHubActions()}
         />
 
-        <section className="panel terminal-panel">
-          <div className="panel-title">
-            <span>Terminals</span>
-            <div className="panel-title-actions">
-              <button className="ghost" onClick={copyTerminalMarkdown} disabled={!canReadLocalWorkspace}>
-                <Copy size={14} /> Markdown
-              </button>
-              <button className="ghost" onClick={runApprovedTerminalCheck} disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost}>
-                <Play size={14} /> {terminalBusy ? "running" : "git status"}
-              </button>
-            </div>
-          </div>
-          <div className="terminal-launcher">
-            <input
-              value={terminalName}
-              onChange={(event) => setTerminalNameForRoom(selectedRoom.id, event.target.value)}
-              placeholder="name"
-            />
-            <input
-              value={terminalCommand}
-              onChange={(event) => setTerminalCommandForRoom(selectedRoom.id, event.target.value)}
-              placeholder="command"
-            />
-            <button onClick={startNamedTerminal} disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost || !terminalName.trim() || !terminalCommand.trim()}>
-              <Play size={14} />
-            </button>
-            <button onClick={requestTerminalCommand} disabled={!canRequestWorkspace || !terminalCommand.trim()}>
-              <MessageSquare size={14} />
-            </button>
-            {terminalCommandRisks.length > 0 && (
-              <InlineSecretWarning
-                risks={terminalCommandRisks}
-                detail="Review before requesting or running it on the host machine."
-                compact
-              />
-            )}
-          </div>
-          <div className="terminal-requests">
-            {codexEvents.slice(-5).reverse().map((event) => (
-              <div className={`terminal-request ${event.status === "failed" ? "denied" : event.status === "completed" ? "approved" : "pending"}`} key={`${event.turnId}-${event.createdAt}-${event.status}`}>
-                <div>
-                  <strong>{formatCodexEventStatus(event.status)}</strong>
-                  <span>{event.message}</span>
-                  <small>{event.threadId ?? formatCodexModel(event.model)} · {formatTimestamp(event.createdAt)}</small>
-                </div>
-                <small>{event.host}</small>
-              </div>
-            ))}
-            {codexEvents.length === 0 && (
-              <div className="empty-state compact">No Codex events in this room.</div>
-            )}
-          </div>
-          <div className="terminal-requests">
-            {terminalRequests.map((request) => {
-              const requestRisks = detectTerminalCommandRisks(request.command);
-
-              return (
-                <div className={`terminal-request ${request.status}`} key={request.id}>
-                  <div>
-                    <strong>{request.command}</strong>
-                    <span>{request.requester} · {request.cwd}</span>
-                  </div>
-                  <small>{request.status}</small>
-                  {request.status === "pending" && (
-                    <div>
-                      <button onClick={() => approveTerminalRequest(request)} disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost}>
-                        <Check size={13} />
-                      </button>
-                      <button onClick={() => denyTerminalRequest(request.id)} disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost}>
-                        <X size={13} />
-                      </button>
-                    </div>
-                  )}
-                  {requestRisks.length > 0 && (
-                    <div className="terminal-request-warning">
-                      <InlineSecretWarning
-                        risks={requestRisks}
-                        detail="Review before approving this command on the host machine."
-                        compact
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {terminalRequests.length === 0 && (
-              <div className="empty-state compact">No command requests in this room.</div>
-            )}
-          </div>
-          {roomTerminals.length > 0 && (
-            <div className="terminal-tabs">
-              {roomTerminals.map((terminal) => (
-                <button
-                  key={terminal.id}
-                  className={terminal.id === selectedTerminalId ? "active" : ""}
-                  onClick={() => setSelectedTerminalIdForRoom(selectedRoom.id, terminal.id)}
-                >
-                  <Terminal size={13} />
-                  {terminal.name}
-                  <span>{terminal.running ? "live" : terminal.exitStatus ?? "done"}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="terminal-output">
-            {terminalRisks.length > 0 && <InlineSecretWarning risks={terminalRisks} compact />}
-            {(selectedTerminal?.lines ?? terminalLines.map((line) => ({ stream: "system", text: line }))).map((line, index) => {
-              const lineRisks = detectSecretRisks(line.text);
-              return (
-                <div className={`terminal-line ${line.stream} ${lineRisks.length ? "sensitive" : ""}`} key={`${line.stream}-${index}-${line.text}`}>
-                  {line.stream !== "stdout" && <span>{line.stream}</span>}
-                  {line.text}
-                </div>
-              );
-            })}
-            {codexRunning && <div className="terminal-active">Codex is preparing a foreground terminal...</div>}
-          </div>
-          {selectedTerminal && (
-            <div className="terminal-input-row">
-              <input
-                value={terminalInput}
-                onChange={(event) => setTerminalInputForRoom(selectedRoom.id, event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    sendTerminalInput();
-                  }
-                }}
-                placeholder={`Send input to ${selectedTerminal.name}`}
-                disabled={!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked) || !selectedTerminal.running}
-              />
-              <button onClick={sendTerminalInput} disabled={!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked) || !selectedTerminal.running || !terminalInput.trim()}>
-                <Send size={14} />
-              </button>
-              {selectedTerminalCanRestart && (
-                <button
-                  onClick={restartSelectedTerminal}
-                  disabled={!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked) || terminalBusy}
-                  title={`Restart ${selectedTerminal.name}`}
-                >
-                  <Play size={14} />
-                </button>
-              )}
-              <button onClick={stopSelectedTerminal} disabled={!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked) || !selectedTerminal.running || terminalBusy}>
-                <X size={14} />
-              </button>
-            </div>
-          )}
-          {terminalError && <div className="workflow-message">{terminalError}</div>}
-        </section>
+        <TerminalPanel
+          terminalName={terminalName}
+          terminalCommand={terminalCommand}
+          terminalInput={terminalInput}
+          terminalBusy={terminalBusy}
+          terminalError={terminalError}
+          terminalCommandRisks={terminalCommandRisks}
+          terminalRisks={terminalRisks}
+          codexEvents={codexEventRows}
+          commandRequests={terminalRequestRows}
+          roomTerminals={roomTerminals}
+          selectedTerminal={selectedTerminal}
+          selectedTerminalId={selectedTerminalId}
+          selectedTerminalCanControl={selectedTerminalCanControl}
+          selectedTerminalCanRestart={selectedTerminalCanRestart}
+          terminalOutputLines={terminalOutputLines}
+          codexRunning={codexRunning}
+          canReadLocalWorkspace={canReadLocalWorkspace}
+          canRequestWorkspace={canRequestWorkspace}
+          canApproveTerminal={canReadLocalWorkspace && isActiveHost}
+          onCopyMarkdown={copyTerminalMarkdown}
+          onRunGitStatus={runApprovedTerminalCheck}
+          onTerminalNameChange={(name) => setTerminalNameForRoom(selectedRoom.id, name)}
+          onTerminalCommandChange={(command) => setTerminalCommandForRoom(selectedRoom.id, command)}
+          onStartTerminal={startNamedTerminal}
+          onRequestTerminalCommand={requestTerminalCommand}
+          onApproveTerminalRequest={(requestId) => {
+            const request = terminalRequests.find((item) => item.id === requestId);
+            if (request) approveTerminalRequest(request);
+          }}
+          onDenyTerminalRequest={denyTerminalRequest}
+          onSelectTerminal={(terminalId) => setSelectedTerminalIdForRoom(selectedRoom.id, terminalId)}
+          onTerminalInputChange={(input) => setTerminalInputForRoom(selectedRoom.id, input)}
+          onSendTerminalInput={sendTerminalInput}
+          onRestartTerminal={restartSelectedTerminal}
+          onStopTerminal={stopSelectedTerminal}
+        />
         </div>
       </aside>
     </div>
