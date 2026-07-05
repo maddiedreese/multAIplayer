@@ -274,6 +274,7 @@ import {
 } from "./lib/roomVisibilityWarning";
 import { ApprovalItem, InfoRow, InlineSecretWarning, StatusPill } from "./components/common";
 import { InspectorTabs, type InspectorTab } from "./components/InspectorTabs";
+import { FilePreviewTabs } from "./components/FilePreviewTabs";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -6828,18 +6829,26 @@ export function App() {
           </label>
           <label>
             <span>Custom model id</span>
-            <input
-              value={customCodexModel}
-              disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-              onChange={(event) => setCustomCodexModelForRoom(selectedRoom.id, event.target.value)}
-              onBlur={() => setCodexModel(customCodexModel)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  setCodexModel(customCodexModel);
-                }
-              }}
-            />
+            <div className="custom-model-row">
+              <input
+                value={customCodexModel}
+                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
+                onChange={(event) => setCustomCodexModelForRoom(selectedRoom.id, event.target.value)}
+                onBlur={() => setCodexModel(customCodexModel)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    setCodexModel(customCodexModel);
+                  }
+                }}
+              />
+              <button
+                onClick={() => setCodexModel(customCodexModel)}
+                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost || !customCodexModel.trim() || customCodexModel.trim() === selectedCodexModel}
+              >
+                <Check size={13} />
+              </button>
+            </div>
           </label>
           <div className="model-options">
             {codexModelOptions.map((option) => (
@@ -7090,25 +7099,11 @@ export function App() {
             />
           )}
           {selectedFile && (
-            <div className="file-preview-tabs">
-              <button
-                className={filePreviewTab === "file" ? "active" : ""}
-                onClick={() => setFilePreviewTabForRoom(selectedRoom.id, "file")}
-                aria-pressed={filePreviewTab === "file"}
-              >
-                <FileCode2 size={13} />
-                File
-              </button>
-              <button
-                className={filePreviewTab === "diff" ? "active" : ""}
-                onClick={() => setFilePreviewTabForRoom(selectedRoom.id, "diff")}
-                disabled={!selectedDiff?.diff.trim()}
-                aria-pressed={filePreviewTab === "diff"}
-              >
-                <Code2 size={13} />
-                Diff
-              </button>
-            </div>
+            <FilePreviewTabs
+              activeTab={filePreviewTab}
+              hasDiff={Boolean(selectedDiff?.diff.trim())}
+              onSelectTab={(tab) => setFilePreviewTabForRoom(selectedRoom.id, tab)}
+            />
           )}
           {filePreviewTab === "diff" && selectedDiff?.diff.trim() ? (
             <div className="diff-code" aria-label={`Diff for ${selectedDiff.path}`}>
