@@ -5226,30 +5226,42 @@ export function App() {
     }
   }
 
-  async function refreshGitHubActions(room: RoomRecord = selectedRoom) {
+  async function refreshGitHubActions(roomArg?: RoomRecord) {
+    const room = roomArg ?? (hasSelectedRoom ? selectedRoom : null);
+    if (!room) {
+      return;
+    }
     const roomId = room.id;
-    if (!hasSelectedRoom) {
+    if (!roomsRef.current.some((item) => item.id === roomId)) {
       setActionsMessagesByRoom((current) => ({
         ...current,
-        [roomId]: "Create or join a room before sharing GitHub Actions status."
+        [roomId]: "This room is no longer available for GitHub Actions refresh."
       }));
       return;
     }
-    if (!isActiveHost) {
+    const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
+    const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
+    const roomActiveHost = isLocalUserActiveHostForRoom(room, localUser);
+    const roomCanReadLocalWorkspace = canUseLocalWorkspace(room, localUser, roomLocked);
+    if (!roomActiveHost) {
+      const roomHostGateMessage =
+        room.hostStatus === "active"
+          ? `Only ${room.host} can refresh GitHub Actions in this room.`
+          : "Claim host before refreshing GitHub Actions in this room.";
       setActionsMessagesByRoom((current) => ({
         ...current,
-        [roomId]: hostGateMessage
+        [roomId]: roomHostGateMessage
       }));
       return;
     }
-    if (!canReadLocalWorkspace) {
+    if (!roomCanReadLocalWorkspace) {
       setActionsMessagesByRoom((current) => ({
         ...current,
-        [roomId]: localWorkspaceMessage
+        [roomId]: localWorkspaceGateMessage(room, roomLocked)
       }));
       return;
     }
-    const workflowDraft = resolveGitWorkflowDraft(gitWorkflowDraftsByRoom, roomId);
+    const workflowDraft = resolveGitWorkflowDraft(gitWorkflowDraftsRef.current, roomId);
     const readiness = checkGitHubActionsReadiness({
       authConfig,
       currentUser,
