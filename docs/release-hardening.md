@@ -43,6 +43,10 @@ Release workflows and logs must not expose:
 
 The current release workflow does not need OpenAI credentials because Codex runs through the user's local Codex app-server, not through the OpenAI API.
 
+## CI And Release Workflow Bounds
+
+CI and release jobs should keep least-privilege GitHub permissions and explicit timeouts. The alpha workflows use read-only repository permissions for CI, write access only for creating GitHub releases, and bounded job runtimes so a stuck build cannot run indefinitely.
+
 ## Before A Non-Alpha Release
 
 Before presenting multAIplayer as production-ready, the project should add:
