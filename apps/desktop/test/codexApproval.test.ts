@@ -38,8 +38,24 @@ test("attachments require host approval", () => {
   assert.equal(shouldAutoApproveChatOnlyTurn(summary, true), false);
 });
 
-test("workspace context requires host approval", () => {
+test("selected workspace path alone can still be chat-only", () => {
   const summary = { ...baseSummary, workspacePath: "/Users/maddie/project" };
+
+  assert.equal(isChatOnlyCodexTurn(summary), true);
+  assert.equal(shouldAutoApproveChatOnlyTurn(summary, true), true);
+});
+
+test("git context requires host approval", () => {
+  const summary = {
+    ...baseSummary,
+    workspacePath: "/Users/maddie/project",
+    git: {
+      branch: "main",
+      files: [],
+      totalFiles: 0,
+      truncated: false
+    }
+  };
 
   assert.equal(isChatOnlyCodexTurn(summary), false);
   assert.equal(shouldAutoApproveChatOnlyTurn(summary, true), false);

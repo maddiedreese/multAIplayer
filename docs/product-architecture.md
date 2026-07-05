@@ -164,7 +164,7 @@ Initial room approval presets:
 
 Approval policies are host-side. They do not grant other users access to the host's Codex credentials, project files, browser state, or shell.
 
-In the alpha, Auto-approve chat-only turns is intentionally narrow: it only runs automatically when the active host is invoking Codex and the turn package contains no attachments, no workspace path, no approved browser URLs, and no terminal context. Any host-side context falls back to the approval sheet.
+In the alpha, Auto-approve chat-only turns is intentionally narrow: it only runs automatically when the active host is invoking Codex and the turn package contains no attachments, no Git summary, no approved browser URLs, and no terminal context. The selected room project path can still be present because the local Codex app-server needs a working directory. Any richer host-side context falls back to the approval sheet.
 
 ### Terminal Requests
 
