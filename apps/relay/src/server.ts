@@ -128,6 +128,7 @@ const maxPublicKeyFingerprintChars = 128;
 const maxPublicKeyJwkChars = 4096;
 const maxAuthSessionIdChars = 160;
 const maxAccessTokenChars = 8192;
+const maxEncryptedAccessTokenChars = Math.ceil(maxAccessTokenChars * 4 / 3) + 1024;
 const maxEnvelopeIdChars = 160;
 const maxEnvelopeNonceChars = 512;
 const maxEnvelopeCiphertextChars = Math.ceil(encryptedEnvelopeMaxBytes * 4 / 3) + 1024;
@@ -1483,14 +1484,14 @@ function pruneRateLimitStore(now = Date.now()) {
 }
 
 function clientIdentityFromRequest(req: Request): string {
-  const sessionId = typeof req.cookies?.multaiplayer_session === "string" ? req.cookies.multaiplayer_session : "";
+  const sessionId = normalizeAuthSessionId(req.cookies?.multaiplayer_session);
   if (sessionId) return `session:${sessionId}`;
   return clientIdentityFromIncomingMessage(req);
 }
 
 function clientIdentityFromIncomingMessage(request: IncomingMessage): string {
   const cookies = parseCookieHeader(request.headers.cookie);
-  const sessionId = cookies.get("multaiplayer_session");
+  const sessionId = normalizeAuthSessionId(cookies.get("multaiplayer_session"));
   if (sessionId) return `session:${sessionId}`;
   const forwardedFor = request.headers["x-forwarded-for"];
   const forwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
@@ -1499,15 +1500,20 @@ function clientIdentityFromIncomingMessage(request: IncomingMessage): string {
 }
 
 function getAuthSession(sessionId: unknown): AuthSession | null {
-  if (typeof sessionId !== "string") return null;
-  const session = authSessions.get(sessionId);
+  const normalizedSessionId = normalizeAuthSessionId(sessionId);
+  if (!normalizedSessionId) return null;
+  const session = authSessions.get(normalizedSessionId);
   if (!session) return null;
   if (session.expiresAt <= Date.now()) {
-    authSessions.delete(sessionId);
+    authSessions.delete(normalizedSessionId);
     scheduleStoreSave();
     return null;
   }
   return session;
+}
+
+function normalizeAuthSessionId(value: unknown): string {
+  return normalizeRelayId(value, maxAuthSessionIdChars) ?? "";
 }
 
 function getAuthSessionFromRequest(request: IncomingMessage): AuthSession | undefined {
@@ -2056,7 +2062,10 @@ function decryptStoredAccessToken(stored: Record<string, unknown>): string | nul
     encrypted.algorithm !== "AES-GCM-256" ||
     typeof encrypted.nonce !== "string" ||
     typeof encrypted.ciphertext !== "string" ||
-    typeof encrypted.tag !== "string"
+    typeof encrypted.tag !== "string" ||
+    encrypted.nonce.length > maxEnvelopeNonceChars ||
+    encrypted.ciphertext.length > maxEncryptedAccessTokenChars ||
+    encrypted.tag.length > maxEnvelopeNonceChars
   ) {
     return null;
   }

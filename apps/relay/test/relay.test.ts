@@ -1279,10 +1279,21 @@ test("relay treats malformed session cookies as unauthenticated", async () => {
   const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
   let socket: WebSocket | null = null;
   try {
+    const validCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    const validMe = await fetch(`${relay.baseUrl}/auth/me`, {
+      headers: { cookie: validCookie }
+    });
+    assert.equal(validMe.status, 200);
+
     const me = await fetch(`${relay.baseUrl}/auth/me`, {
       headers: { cookie: "multaiplayer_session=%E0%A4%A" }
     });
     assert.equal(me.status, 401);
+
+    const oversized = await fetch(`${relay.baseUrl}/auth/me`, {
+      headers: { cookie: `multaiplayer_session=${"x".repeat(500)}` }
+    });
+    assert.equal(oversized.status, 401);
 
     const teams = await fetch(`${relay.baseUrl}/teams`, {
       headers: { cookie: "multaiplayer_session=%E0%A4%A" }
@@ -1302,6 +1313,21 @@ test("relay treats malformed session cookies as unauthenticated", async () => {
       deviceId: "device-bad-cookie"
     }));
     assert.match(await error, /Sign in and use a valid invite/);
+    socket.close();
+
+    socket = new WebSocket(relay.wsUrl, {
+      headers: { cookie: `multaiplayer_session=${"x".repeat(500)}` }
+    });
+    await onceOpen(socket);
+    const oversizedCookieError = waitForError(socket);
+    socket.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:maddiedreese",
+      deviceId: "device-oversized-cookie"
+    }));
+    assert.match(await oversizedCookieError, /Sign in and use a valid invite/);
   } finally {
     socket?.close();
     await relay.close();
@@ -1455,6 +1481,17 @@ test("relay drops malformed encrypted auth sessions loaded from disk", async () 
         user: { id: "github:far-future", login: "far-future" },
         encryptedAccessToken,
         expiresAt: Date.now() + 60 * 24 * 60 * 60 * 1000
+      },
+      {
+        sessionId: "huge-encrypted-token",
+        user: { id: "github:huge-token", login: "huge-token" },
+        encryptedAccessToken: {
+          algorithm: "AES-GCM-256",
+          nonce: "x".repeat(513),
+          ciphertext: "x".repeat(20_000),
+          tag: "x".repeat(513)
+        },
+        expiresAt: Date.now() + 60_000
       }
     ];
     await writeFile(relay.dataPath, `${JSON.stringify(stored, null, 2)}\n`, "utf8");
@@ -1469,7 +1506,7 @@ test("relay drops malformed encrypted auth sessions loaded from disk", async () 
     });
     assert.equal(valid.status, 200);
 
-    for (const sessionId of ["bad%3Asession", "bad-login", "bad-name", "far-future"]) {
+    for (const sessionId of ["bad%3Asession", "bad-login", "bad-name", "far-future", "huge-encrypted-token"]) {
       const response = await fetch(`${restarted.baseUrl}/auth/me`, {
         headers: { cookie: `multaiplayer_session=${sessionId}` }
       });
