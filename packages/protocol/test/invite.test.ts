@@ -71,6 +71,32 @@ test("room settings payloads can report model changes", () => {
   assert.equal(parsed.nextValue, "gpt-5.4-thinking");
 });
 
+test("room settings payloads cover host-controlled room settings", () => {
+  const settings = [
+    "approvalPolicy",
+    "roomMode",
+    "codexModel",
+    "projectPath",
+    "browserAllowedOrigins",
+    "browserProfilePersistent"
+  ];
+
+  for (const setting of settings) {
+    const parsed = RoomSettingsPlaintextPayload.parse({
+      eventType: "room.settings",
+      id: `settings-${setting}`,
+      setting,
+      previousValue: "before",
+      nextValue: "after",
+      changedBy: "Maddie",
+      changedByUserId: "github:maddie",
+      changedAt: "2026-07-04T12:00:00.000Z"
+    });
+
+    assert.equal(parsed.setting, setting);
+  }
+});
+
 test("invite join request accepts optional requester device public key", () => {
   const parsed = InviteJoinRequestPlaintextPayload.parse({
     eventType: "invite.request",

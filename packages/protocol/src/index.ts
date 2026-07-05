@@ -256,7 +256,14 @@ export const HostHandoffPlaintextPayload = z.object({
 export const RoomSettingsPlaintextPayload = z.object({
   eventType: z.literal("room.settings"),
   id: z.string(),
-  setting: z.literal("codexModel"),
+  setting: z.enum([
+    "approvalPolicy",
+    "roomMode",
+    "codexModel",
+    "projectPath",
+    "browserAllowedOrigins",
+    "browserProfilePersistent"
+  ]),
   previousValue: z.string(),
   nextValue: z.string(),
   changedBy: z.string(),

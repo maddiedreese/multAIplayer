@@ -2433,8 +2433,16 @@ export function App() {
     setSettingsBusyForRoom(roomId, true);
     setSettingsMessageForRoom(roomId, null);
     try {
+      const previousPolicy = selectedRoom.approvalPolicy;
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), approvalPolicy });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      await publishRoomSettingsEvent(room, {
+        id: crypto.randomUUID(),
+        setting: "approvalPolicy",
+        previousValue: previousPolicy,
+        nextValue: approvalPolicy,
+        changedAt: new Date().toISOString()
+      });
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setSettingsMessageForRoom(roomId, `Approval policy set to ${approvalPolicyLabels[approvalPolicy]}.`);
       }
@@ -2466,8 +2474,17 @@ export function App() {
         ...selectedRoom.mode,
         [key]: !selectedRoom.mode[key]
       };
+      const previousValue = `${key}:${selectedRoom.mode[key] ? "enabled" : "disabled"}`;
+      const nextValue = `${key}:${nextMode[key] ? "enabled" : "disabled"}`;
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), mode: nextMode });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      await publishRoomSettingsEvent(room, {
+        id: crypto.randomUUID(),
+        setting: "roomMode",
+        previousValue,
+        nextValue,
+        changedAt: new Date().toISOString()
+      });
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setSettingsMessageForRoom(roomId, `${roomModeLabels[key]} mode ${nextMode[key] ? "enabled" : "disabled"}.`);
       }
@@ -2535,11 +2552,19 @@ export function App() {
     setSettingsBusyForRoom(roomId, true);
     setBrowserMessageForRoom(roomId, null);
     try {
+      const previousOrigins = selectedRoom.browserAllowedOrigins ?? [];
       const room = await updateRoomSettings(roomId, {
         ...roomSettingsActor(),
         browserAllowedOrigins: normalized
       });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      await publishRoomSettingsEvent(room, {
+        id: crypto.randomUUID(),
+        setting: "browserAllowedOrigins",
+        previousValue: previousOrigins.join(","),
+        nextValue: normalized.join(","),
+        changedAt: new Date().toISOString()
+      });
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setBrowserAllowedOriginsDraftForRoom(roomId, normalized.join("\n"));
         setBrowserMessageForRoom(
@@ -2570,11 +2595,19 @@ export function App() {
     setSettingsBusyForRoom(roomId, true);
     setBrowserMessageForRoom(roomId, null);
     try {
+      const previousPersistence = selectedRoom.browserProfilePersistent;
       const room = await updateRoomSettings(roomId, {
         ...roomSettingsActor(),
         browserProfilePersistent
       });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      await publishRoomSettingsEvent(room, {
+        id: crypto.randomUUID(),
+        setting: "browserProfilePersistent",
+        previousValue: String(previousPersistence),
+        nextValue: String(browserProfilePersistent),
+        changedAt: new Date().toISOString()
+      });
       if (!browserProfilePersistent) {
         setBrowserStatusByRoom((current) => omitRecordKey(current, roomId));
       }
@@ -2612,8 +2645,16 @@ export function App() {
     setSettingsBusyForRoom(roomId, true);
     setSettingsMessageForRoom(roomId, null);
     try {
+      const previousProjectPath = selectedRoom.projectPath;
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), projectPath: nextProjectPath });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      await publishRoomSettingsEvent(room, {
+        id: crypto.randomUUID(),
+        setting: "projectPath",
+        previousValue: previousProjectPath,
+        nextValue: nextProjectPath,
+        changedAt: new Date().toISOString()
+      });
       resetFileContextForRoom(roomId);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setSettingsMessageForRoom(roomId, `Project folder set to ${nextProjectPath}.`);
@@ -6981,12 +7022,23 @@ function isRoomSettingsPlaintextPayload(value: unknown): value is RoomSettingsPl
   return (
     value.eventType === "room.settings" &&
     typeof value.id === "string" &&
-    value.setting === "codexModel" &&
+    isRoomSettingsName(value.setting) &&
     typeof value.previousValue === "string" &&
     typeof value.nextValue === "string" &&
     typeof value.changedBy === "string" &&
     typeof value.changedByUserId === "string" &&
     typeof value.changedAt === "string"
+  );
+}
+
+function isRoomSettingsName(value: unknown): value is RoomSettingsPlaintextPayload["setting"] {
+  return (
+    value === "approvalPolicy" ||
+    value === "roomMode" ||
+    value === "codexModel" ||
+    value === "projectPath" ||
+    value === "browserAllowedOrigins" ||
+    value === "browserProfilePersistent"
   );
 }
 
@@ -7063,10 +7115,47 @@ function buildRoomSettingsSystemMessage(event: RoomSettingsPlaintextPayload): Ch
     id: event.id,
     author: "multAIplayer",
     role: "system",
-    body: `${event.changedBy} changed the Codex model from ${formatCodexModel(event.previousValue)} to ${formatCodexModel(event.nextValue)}.`,
+    body: buildRoomSettingsMessageBody(event),
     time: formatMessageTime(event.changedAt),
     createdAt: event.changedAt
   };
+}
+
+function buildRoomSettingsMessageBody(event: RoomSettingsPlaintextPayload): string {
+  switch (event.setting) {
+    case "approvalPolicy":
+      return `${event.changedBy} changed the approval policy from ${formatApprovalPolicy(event.previousValue)} to ${formatApprovalPolicy(event.nextValue)}.`;
+    case "roomMode":
+      return `${event.changedBy} ${formatRoomModeChange(event.nextValue)}.`;
+    case "codexModel":
+      return `${event.changedBy} changed the Codex model from ${formatCodexModel(event.previousValue)} to ${formatCodexModel(event.nextValue)}.`;
+    case "projectPath":
+      return `${event.changedBy} changed the project folder from ${event.previousValue} to ${event.nextValue}.`;
+    case "browserAllowedOrigins":
+      return `${event.changedBy} changed allowed browser sites from ${formatOriginList(event.previousValue)} to ${formatOriginList(event.nextValue)}.`;
+    case "browserProfilePersistent":
+      return `${event.changedBy} changed browser profile mode from ${formatBrowserProfilePersistence(event.previousValue)} to ${formatBrowserProfilePersistence(event.nextValue)}.`;
+  }
+}
+
+function formatApprovalPolicy(value: string): string {
+  return approvalPolicyLabels[value as ApprovalPolicy] ?? value;
+}
+
+function formatRoomModeChange(value: string): string {
+  const [mode, state] = value.split(":");
+  const label = roomModeLabels[mode as keyof RoomMode] ?? mode;
+  return `${state === "enabled" ? "enabled" : "disabled"} ${label} mode`;
+}
+
+function formatOriginList(value: string): string {
+  const origins = value.split(",").map((origin) => origin.trim()).filter(Boolean);
+  if (!origins.length) return "no sites";
+  return origins.map(formatBrowserAccessLabel).join(", ");
+}
+
+function formatBrowserProfilePersistence(value: string): string {
+  return value === "true" ? "persistent profile" : "refresh before each approved open";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

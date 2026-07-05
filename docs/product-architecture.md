@@ -80,7 +80,7 @@ The relay bounds metadata before storage and broadcast: team names, room names, 
 
 The desktop client mirrors those bounds before creating teams/rooms, changing project paths or model ids, and accepting host handoff settings, so most invalid metadata is caught locally before it reaches the relay.
 
-When the active host changes the room's Codex model, the relay metadata updates for routing/sidebar freshness and the desktop also sends an encrypted `room.settings` activity event. Room members see a system transcript message after local decryption, while the relay cannot read the human-readable before/after activity text.
+When the active host changes approval policy, room mode, Codex model, project path, browser allowlist, or browser profile persistence, the relay metadata updates for routing/sidebar freshness and the desktop also sends an encrypted `room.settings` activity event. Room members see a system transcript message after local decryption, while the relay cannot read the human-readable before/after activity text.
 
 ### Active Codex Host
 
