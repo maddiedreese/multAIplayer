@@ -276,6 +276,7 @@ import { FilePreviewTabs } from "./components/FilePreviewTabs";
 import { RoomSettingsOverview } from "./components/RoomSettingsOverview";
 import { RoomHeader } from "./components/RoomHeader";
 import { CodexApprovalCard } from "./components/CodexApprovalCard";
+import { ModelPanel } from "./components/ModelPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -6752,67 +6753,17 @@ export function App() {
           </div>
         </section>
 
-        <section className="panel model-panel">
-          <div className="panel-title">
-            <span>Model</span>
-            <StatusPill icon={<Bot size={13} />} label={formatCodexModel(selectedCodexModel)} tone="blue" />
-          </div>
-          <label>
-            <span>Codex host model</span>
-            <select
-              value={codexModelOptions.some((option) => option.id === selectedCodexModel) ? selectedCodexModel : "custom"}
-              disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-              onChange={(event) => {
-                if (event.target.value !== "custom") {
-                  setCodexModel(event.target.value);
-                }
-              }}
-            >
-              {codexModelOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-              <option value="custom">Custom</option>
-            </select>
-          </label>
-          <label>
-            <span>Custom model id</span>
-            <div className="custom-model-row">
-              <input
-                value={customCodexModel}
-                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-                onChange={(event) => setCustomCodexModelForRoom(selectedRoom.id, event.target.value)}
-                onBlur={() => setCodexModel(customCodexModel)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    setCodexModel(customCodexModel);
-                  }
-                }}
-              />
-              <button
-                onClick={() => setCodexModel(customCodexModel)}
-                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost || !customCodexModel.trim() || customCodexModel.trim() === selectedCodexModel}
-              >
-                <Check size={13} />
-              </button>
-            </div>
-          </label>
-          <div className="model-options">
-            {codexModelOptions.map((option) => (
-              <button
-                key={option.id}
-                className={selectedCodexModel === option.id ? "active" : ""}
-                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-                onClick={() => setCodexModel(option.id)}
-              >
-                <strong>{option.label}</strong>
-                <span>{option.description}</span>
-              </button>
-            ))}
-          </div>
-        </section>
+        <ModelPanel
+          selectedModel={selectedCodexModel}
+          selectedModelLabel={formatCodexModel(selectedCodexModel)}
+          customModel={customCodexModel}
+          modelOptions={codexModelOptions}
+          disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
+          canApplyCustomModel={Boolean(customCodexModel.trim()) && customCodexModel.trim() !== selectedCodexModel}
+          onSelectModel={setCodexModel}
+          onCustomModelChange={(model) => setCustomCodexModelForRoom(selectedRoom.id, model)}
+          onApplyCustomModel={() => setCodexModel(customCodexModel)}
+        />
 
         <section className="panel history-panel">
           <div className="panel-title">
