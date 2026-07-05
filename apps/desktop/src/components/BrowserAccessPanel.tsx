@@ -1,5 +1,5 @@
-import { Check, ExternalLink, Globe2, Lock, RefreshCw, ShieldAlert, X } from "lucide-react";
-import { InlineSecretWarning, StatusPill } from "./common";
+import { Check, ExternalLink, Globe2, RefreshCw, X } from "lucide-react";
+import { InlineSecretWarning } from "./common";
 
 export interface BrowserStatusDisplay {
   profilePath: string | null;
@@ -73,11 +73,7 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
     <section className="panel browser-panel" hidden={hidden}>
       <div className="panel-title">
         <span>Browser access</span>
-        <StatusPill
-          icon={<Globe2 size={13} />}
-          label={browserEnabled ? "enabled" : "disabled"}
-          tone={browserEnabled ? "green" : "muted"}
-        />
+        <small className={browserEnabled ? "panel-state available" : "panel-state"}>{browserEnabled ? "Enabled" : "Disabled"}</small>
       </div>
       <div className="browser-profile-state">
         <div>
@@ -102,23 +98,11 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
         />
         <span>Persist room browser profile</span>
       </label>
-      <div className="browser-policy-state">
-        <StatusPill
-          icon={<Lock size={13} />}
-          label={browserStatus.downloadsBlocked ? "Downloads blocked" : "Downloads blocked in native browser"}
-          tone={browserStatus.downloadsBlocked ? "green" : "muted"}
-        />
-        <StatusPill
-          icon={<Lock size={13} />}
-          label={browserStatus.clipboardBlocked ? "Clipboard blocked" : "Clipboard blocked in native browser"}
-          tone={browserStatus.clipboardBlocked ? "green" : "muted"}
-        />
-        <StatusPill
-          icon={<Lock size={13} />}
-          label={browserStatus.fileUploadsBlocked ? "File uploads blocked" : "File uploads blocked in native browser"}
-          tone={browserStatus.fileUploadsBlocked ? "green" : "muted"}
-        />
-        <StatusPill icon={<ShieldAlert size={13} />} label="Signed-in pages are shared with room context" tone="yellow" />
+      <div className="browser-policy-state" aria-label="Browser safety policy">
+        <span>{browserStatus.downloadsBlocked ? "Downloads blocked" : "Downloads blocked in native browser"}</span>
+        <span>{browserStatus.clipboardBlocked ? "Clipboard blocked" : "Clipboard blocked in native browser"}</span>
+        <span>{browserStatus.fileUploadsBlocked ? "File uploads blocked" : "File uploads blocked in native browser"}</span>
+        <strong>Signed-in pages are shared with room context.</strong>
       </div>
       <div className="browser-allowlist">
         <label>

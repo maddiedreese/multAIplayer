@@ -1,8 +1,7 @@
-import { Copy, Github, ShieldAlert } from "lucide-react";
+import { Copy, Github } from "lucide-react";
 import type { GitWorkflowApprovalPreview } from "@multaiplayer/git";
 import type { GitHubWorkflowReadiness } from "../lib/githubWorkflowReadiness";
 import type { GitWorkflowDraft } from "../lib/gitWorkflowDraft";
-import { StatusPill } from "./common";
 
 export interface GitApprovalPreviewDisplay {
   error: string | null;
@@ -36,7 +35,7 @@ export function GitHandoffPanel({
     <section className="panel git-approval-panel">
       <div className="panel-title">
         <span>GitHub handoff</span>
-        <StatusPill icon={<ShieldAlert size={13} />} label="approval required" tone="yellow" />
+        <small className="panel-state attention">Approval required</small>
       </div>
       <label>
         <span>Branch</span>

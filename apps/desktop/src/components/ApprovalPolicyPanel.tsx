@@ -1,6 +1,4 @@
-import { KeyRound } from "lucide-react";
 import type { ApprovalPolicy } from "@multaiplayer/protocol";
-import { StatusPill } from "./common";
 
 export function ApprovalPolicyPanel({
   selectedPolicy,
@@ -19,7 +17,7 @@ export function ApprovalPolicyPanel({
     <section className="panel policy-panel">
       <div className="panel-title">
         <span>Approval policy</span>
-        <StatusPill icon={<KeyRound size={13} />} label="host-side" tone="yellow" />
+        <small className="panel-state attention">Host-side</small>
       </div>
       <div className="policy-options">
         {(Object.keys(labels) as ApprovalPolicy[]).map((policy) => (

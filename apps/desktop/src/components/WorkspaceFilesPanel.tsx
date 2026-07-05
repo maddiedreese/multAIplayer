@@ -1,4 +1,4 @@
-import { Code2, Copy, FileCode2, Plus, Search, ShieldAlert } from "lucide-react";
+import { Copy, FileCode2, Plus, Search, ShieldAlert } from "lucide-react";
 import type {
   GitDiffResult,
   GitStatusSummary,
@@ -7,7 +7,7 @@ import type {
 } from "../lib/localBackend";
 import type { FilePreviewTab } from "../lib/filePreview";
 import { FilePreviewTabs } from "./FilePreviewTabs";
-import { InlineSecretWarning, StatusPill } from "./common";
+import { InlineSecretWarning } from "./common";
 
 export function WorkspaceFilesPanel({
   fileQuery,
@@ -102,7 +102,7 @@ export function WorkspaceFilesPanel({
             <button className="ghost" onClick={onCopyDiffSummaryMarkdown} disabled={!canReadLocalWorkspace}>
               <Copy size={14} /> Summary
             </button>
-            <StatusPill icon={<Code2 size={13} />} label={`${gitStatus?.files.length ?? 0}`} tone="dark" />
+            <small className="panel-count">{gitStatus?.files.length ?? 0}</small>
           </div>
         </div>
         <div className="diff-list">
@@ -133,11 +133,9 @@ export function WorkspaceFilesPanel({
                 {selectedAttachmentActionLabel}
               </button>
             )}
-            <StatusPill
-              icon={<Code2 size={13} />}
-              label={selectedFile?.truncated ? "truncated" : selectedFile ? formatBytes(selectedFile.size) : "select file"}
-              tone={selectedFile?.truncated ? "yellow" : "green"}
-            />
+            <small className={selectedFile?.truncated ? "panel-state attention" : "panel-state"}>
+              {selectedFile?.truncated ? "Truncated" : selectedFile ? formatBytes(selectedFile.size) : "No file selected"}
+            </small>
           </div>
         </div>
         {selectedFileRisks.length > 0 && (
@@ -153,7 +151,9 @@ export function WorkspaceFilesPanel({
             onSelectTab={onFilePreviewTabChange}
           />
         )}
-        {filePreviewTab === "diff" && selectedDiff?.diff.trim() ? (
+        {!selectedFile ? (
+          <div className="empty-state preview-empty">Select a file or changed path to preview it here.</div>
+        ) : filePreviewTab === "diff" && selectedDiff?.diff.trim() ? (
           <div className="diff-code" aria-label={`Diff for ${selectedDiff.path}`}>
             {parseDiffLines(selectedDiff.diff).map((line, index) => (
               <div className={`diff-code-line ${line.kind}`} key={`${index}-${line.text}`}>
@@ -165,7 +165,7 @@ export function WorkspaceFilesPanel({
         ) : (
           <pre>
             <code>
-{selectedFile?.content ?? "Select a file or changed path to preview it here."}
+{selectedFile.content}
             </code>
           </pre>
         )}

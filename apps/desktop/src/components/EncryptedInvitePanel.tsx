@@ -1,5 +1,4 @@
-import { Check, Copy, KeyRound, Lock, RefreshCw, X } from "lucide-react";
-import { StatusPill } from "./common";
+import { Check, Copy, KeyRound, RefreshCw, X } from "lucide-react";
 
 export interface InviteRequestDisplay {
   id: string;
@@ -52,11 +51,9 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
     <section className="panel invite-panel">
       <div className="panel-title">
         <span>Encrypted invite</span>
-        <StatusPill
-          icon={<Lock size={13} />}
-          label={inviteApprovalGate ? "approval key delivery" : "fragment key"}
-          tone={inviteApprovalGate ? "blue" : "green"}
-        />
+        <small className="panel-state available">
+          {inviteApprovalGate ? "Host approval" : "Invite link"}
+        </small>
       </div>
       <button className="primary-wide" onClick={onCopyInvite} disabled={copyDisabled}>
         <Copy size={15} />

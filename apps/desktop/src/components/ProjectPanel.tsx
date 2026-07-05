@@ -1,5 +1,4 @@
-import { Check, FolderGit2, GitBranch } from "lucide-react";
-import { StatusPill } from "./common";
+import { Check, FolderGit2 } from "lucide-react";
 
 export function ProjectPanel({
   projectPath,
@@ -26,7 +25,7 @@ export function ProjectPanel({
     <section className="panel">
       <div className="panel-title">
         <span>Project</span>
-        <StatusPill icon={<GitBranch size={13} />} label={branchLabel} tone="dark" />
+        <small className="panel-state">{branchLabel}</small>
       </div>
       <div className="project-card">
         <FolderGit2 size={18} />

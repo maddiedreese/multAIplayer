@@ -5,14 +5,14 @@ import {
   Github,
   Plus,
   Search,
-  Settings,
-  UserRoundCheck,
   UsersRound,
   X
 } from "lucide-react";
+import brandIcon from "../assets/multaiplayer-icon.png";
 import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
 
 export type SidebarPanelName = "profile" | "settings" | null;
+export type ThemeMode = "light" | "dark";
 
 export interface SidebarTeamDisplay {
   id: string;
@@ -58,6 +58,7 @@ export function DesktopSidebar({
   messageHits,
   historySearchBusy,
   activeSidebarPanel,
+  themeMode,
   onSignIn,
   onSignOut,
   onSidebarQueryChange,
@@ -70,7 +71,8 @@ export function DesktopSidebar({
   onChooseNewRoomProjectPath,
   onCreateRoom,
   onSelectRoom,
-  onSelectSidebarPanel
+  onSelectSidebarPanel,
+  onToggleTheme
 }: {
   currentUser: SignedInUser | null;
   authBusy: boolean;
@@ -90,6 +92,7 @@ export function DesktopSidebar({
   messageHits: SidebarMessageHitDisplay[];
   historySearchBusy: boolean;
   activeSidebarPanel: SidebarPanelName;
+  themeMode: ThemeMode;
   onSignIn: () => void;
   onSignOut: () => void;
   onSidebarQueryChange: (query: string) => void;
@@ -103,14 +106,15 @@ export function DesktopSidebar({
   onCreateRoom: () => void;
   onSelectRoom: (roomId: string, teamId?: string) => void;
   onSelectSidebarPanel: (panel: SidebarPanelName) => void;
+  onToggleTheme: () => void;
 }) {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">AI</div>
+        <img className="brand-mark" src={brandIcon} alt="" />
         <div>
           <strong>multAIplayer</strong>
-          <span>honest alpha</span>
+          <span>group chat for Codex</span>
         </div>
       </div>
 
@@ -280,17 +284,20 @@ export function DesktopSidebar({
       )}
 
       <div className="sidebar-footer">
+        <button onClick={onToggleTheme}>
+          {themeMode === "dark" ? "Light" : "Dark"}
+        </button>
         <button
           className={activeSidebarPanel === "settings" ? "active" : ""}
           onClick={() => onSelectSidebarPanel(activeSidebarPanel === "settings" ? null : "settings")}
         >
-          <Settings size={16} /> Settings
+          Settings
         </button>
         <button
           className={activeSidebarPanel === "profile" ? "active" : ""}
           onClick={() => onSelectSidebarPanel(activeSidebarPanel === "profile" ? null : "profile")}
         >
-          <UserRoundCheck size={16} /> Profile
+          Profile
         </button>
       </div>
     </aside>

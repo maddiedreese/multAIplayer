@@ -1,6 +1,5 @@
-import { Check, KeyRound, Lock, X } from "lucide-react";
+import { Check, KeyRound, X } from "lucide-react";
 import type { ApprovalPolicy } from "@multaiplayer/protocol";
-import { StatusPill } from "./common";
 
 export interface HistorySettingsDisplay {
   enabled: boolean;
@@ -73,11 +72,9 @@ export function LocalHistoryPanel({
     <section className="panel history-panel">
       <div className="panel-title">
         <span>Local history</span>
-        <StatusPill
-          icon={<Lock size={13} />}
-          label={historySettings.enabled ? `${historySettings.retentionDays} days` : "off"}
-          tone={historySettings.enabled ? "green" : "muted"}
-        />
+        <small className={historySettings.enabled ? "panel-state available" : "panel-state"}>
+          {historySettings.enabled ? `${historySettings.retentionDays} days` : "Off"}
+        </small>
       </div>
       <label className="checkbox-row">
         <input

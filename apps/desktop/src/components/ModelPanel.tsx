@@ -1,5 +1,4 @@
-import { Bot, Check } from "lucide-react";
-import { StatusPill } from "./common";
+import { Check } from "lucide-react";
 
 export type ModelOptionDisplay = {
   id: string;
@@ -34,7 +33,7 @@ export function ModelPanel({
     <section className="panel model-panel">
       <div className="panel-title">
         <span>Model</span>
-        <StatusPill icon={<Bot size={13} />} label={selectedModelLabel} tone="blue" />
+        <small className="panel-state available">{selectedModelLabel}</small>
       </div>
       <label>
         <span>Codex host model</span>

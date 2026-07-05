@@ -1,5 +1,4 @@
-import { Check, UserRoundCheck } from "lucide-react";
-import { StatusPill } from "./common";
+import { Check } from "lucide-react";
 
 export interface HostHandoffDisplay {
   id: string;
@@ -29,11 +28,9 @@ export function HostHandoffPanel<T extends HostHandoffDisplay>({
     <section className="panel handoff-panel">
       <div className="panel-title">
         <span>Host handoff</span>
-        <StatusPill
-          icon={<UserRoundCheck size={13} />}
-          label={hasAvailableHandoff ? "available" : "none"}
-          tone={hasAvailableHandoff ? "yellow" : "muted"}
-        />
+        <small className={hasAvailableHandoff ? "panel-state attention" : "panel-state"}>
+          {hasAvailableHandoff ? "Available" : "None"}
+        </small>
       </div>
       <div className="handoff-list">
         {handoffs.slice(-3).reverse().map((handoff) => (

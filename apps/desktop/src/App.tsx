@@ -251,7 +251,7 @@ import {
   clearRoomVisibilityWarningAcknowledgement,
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
-import { InlineSecretWarning, StatusPill } from "./components/common";
+import { InlineSecretWarning } from "./components/common";
 import { RoomHeader } from "./components/RoomHeader";
 import { ModelPanel } from "./components/ModelPanel";
 import { RoomModePanel } from "./components/RoomModePanel";
@@ -269,7 +269,7 @@ import { TerminalPanel, type CodexEventDisplay, type TerminalCommandRequestDispl
 import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
 import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
-import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarPanelName, type SidebarRoomDisplay, type SidebarTeamDisplay } from "./components/DesktopSidebar";
+import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarPanelName, type SidebarRoomDisplay, type SidebarTeamDisplay, type ThemeMode } from "./components/DesktopSidebar";
 import { RoomChatPanel, type PendingAttachmentDisplay, type RoomChatMessageDisplay } from "./components/RoomChatPanel";
 import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
@@ -415,7 +415,7 @@ const seededRooms: RoomRecord[] = [
   {
     id: "room-relay",
     teamId: "team-core",
-    name: "Relay + E2EE",
+    name: "Relay ops",
     projectPath: defaultProjectPath,
     host: "Alex",
     hostUserId: "github:alex",
@@ -506,7 +506,7 @@ const initialMessagesByRoom: Record<string, ChatMessage[]> = {
       id: "relay-m1",
       author: "Alex",
       role: "human",
-      body: "The relay should only ever see encrypted envelopes and room metadata.",
+      body: "The relay should stay boring: route room events, keep metadata tight, and avoid touching project content.",
       time: "09:52"
     },
     {
@@ -564,6 +564,7 @@ const defaultBrowserUrl = "https://github.com/maddiedreese/multAIplayer";
 const defaultBrowserReason = "Use this page as Codex browser context.";
 
 export function App() {
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => loadThemeMode());
   const [teams, setTeams] = useState<TeamRecord[]>(seededTeams);
   const [rooms, setRooms] = useState<RoomRecord[]>(seededRooms);
   const [teamMembersByTeam, setTeamMembersByTeam] = useState<Record<string, TeamMemberRecord[]>>(seededTeamMembers);
@@ -705,6 +706,11 @@ export function App() {
     }),
     [currentUser]
   );
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = themeMode;
+    localStorage.setItem("multaiplayer:theme", themeMode);
+  }, [themeMode]);
 
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? emptyRoom;
@@ -5758,6 +5764,7 @@ export function App() {
         messageHits={sidebarMessageHitRows}
         historySearchBusy={historySearchBusy}
         activeSidebarPanel={activeSidebarPanel}
+        themeMode={themeMode}
         onSignIn={beginGitHubSignIn}
         onSignOut={signOut}
         onSidebarQueryChange={setSidebarQuery}
@@ -5777,6 +5784,7 @@ export function App() {
           setSelectedRoomId(roomId);
         }}
         onSelectSidebarPanel={setActiveSidebarPanel}
+        onToggleTheme={() => setThemeMode((current) => current === "dark" ? "light" : "dark")}
       />
 
       {activeSidebarPanel && (
@@ -6268,6 +6276,12 @@ function loadOrCreateDeviceId(): string {
   const created = `device_${crypto.randomUUID()}`;
   localStorage.setItem(key, created);
   return created;
+}
+
+function loadThemeMode(): ThemeMode {
+  const stored = localStorage.getItem("multaiplayer:theme");
+  if (stored === "light" || stored === "dark") return stored;
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 function ensureRoomDefaults(room: RoomRecord): RoomRecord {
