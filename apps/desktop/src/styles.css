@@ -33,6 +33,10 @@ button:disabled {
   opacity: 0.6;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 286px minmax(500px, 1fr) 420px;
@@ -410,6 +414,14 @@ button:disabled {
   font-size: 12px;
 }
 
+.room-indicators {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: 28px;
+}
+
 .room-button b {
   display: grid;
   place-items: center;
@@ -419,6 +431,10 @@ button:disabled {
   background: #1967d2;
   color: #fff;
   font-size: 11px;
+}
+
+.room-button b.attention {
+  background: #c73030;
 }
 
 .sidebar-footer {
@@ -1238,6 +1254,29 @@ button:disabled {
   color: #fff;
 }
 
+.tab-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #c73030;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.inspector-tabs button.active .tab-badge {
+  background: #ffd56a;
+  color: #111815;
+}
+
+.inspector-panel-group {
+  display: grid;
+  gap: 14px;
+}
+
 .panel {
   display: grid;
   gap: 10px;
@@ -1746,6 +1785,39 @@ button:disabled {
   font-style: normal;
 }
 
+.file-preview-tabs {
+  display: inline-flex;
+  gap: 5px;
+  padding: 3px;
+  border: 1px solid #d8ded8;
+  border-radius: 8px;
+  background: #eef1ed;
+}
+
+.file-preview-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #4b574f;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.file-preview-tabs button.active {
+  background: #fff;
+  color: #17201b;
+  box-shadow: 0 1px 2px rgba(23, 32, 27, 0.08);
+}
+
+.file-preview-tabs button:disabled {
+  color: #9ba59f;
+}
+
 .diff-preview pre {
   overflow: auto;
   margin: 0;
@@ -1990,6 +2062,7 @@ button:disabled {
 
 .git-approval-panel input[type="text"],
 .git-approval-panel input:not([type]),
+.custom-model-row input,
 .model-panel input,
 .model-panel select,
 .invite-panel textarea {
@@ -2004,9 +2077,26 @@ button:disabled {
 
 .git-approval-panel input[type="text"],
 .git-approval-panel input:not([type]),
+.custom-model-row input,
 .model-panel input,
 .model-panel select {
   min-height: 32px;
+}
+
+.custom-model-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 6px;
+}
+
+.custom-model-row button {
+  display: grid;
+  place-items: center;
+  min-height: 32px;
+  border: 1px solid #111815;
+  border-radius: 8px;
+  background: #111815;
+  color: #fff;
 }
 
 .invite-panel textarea {

@@ -1,33 +1,8 @@
 import {
   Bell,
-  Bot,
   Check,
-  ChevronDown,
-  Circle,
-  Code2,
-  Copy,
-  FileCode2,
-  FolderGit2,
-  GitBranch,
-  Github,
-  Globe2,
-  KeyRound,
   Lock,
-  MessageSquare,
-  ExternalLink,
-  PanelRight,
-  Play,
-  Plus,
-  RefreshCw,
-  Search,
-  Send,
-  Settings,
   ShieldAlert,
-  Wifi,
-  WifiOff,
-  Terminal,
-  UserRoundCheck,
-  UsersRound,
   X
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -246,6 +221,8 @@ import {
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
+import { messageInvokesCodex } from "./lib/codexInvoke";
+import { resolveFilePreviewTab, type FilePreviewTab } from "./lib/filePreview";
 import { copyTextToClipboard } from "./lib/clipboard";
 import {
   checkGitHubActionsReadiness,
@@ -266,6 +243,7 @@ import {
 import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
 import { isRoomKeyRotationInFlight, roomKeyRotationInFlightMessage } from "./lib/roomKeyRotation";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
+import { roomPostureSummary } from "./lib/roomPosture";
 import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "./lib/sidebarSearch";
 import { replaceRoomTerminalSnapshots } from "./lib/terminalState";
 import {
@@ -273,6 +251,28 @@ import {
   clearRoomVisibilityWarningAcknowledgement,
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
+import { InlineSecretWarning, StatusPill } from "./components/common";
+import { RoomHeader } from "./components/RoomHeader";
+import { ModelPanel } from "./components/ModelPanel";
+import { RoomModePanel } from "./components/RoomModePanel";
+import { ApprovalPolicyPanel } from "./components/ApprovalPolicyPanel";
+import { HostHandoffPanel } from "./components/HostHandoffPanel";
+import { EncryptedInvitePanel } from "./components/EncryptedInvitePanel";
+import { LocalHistoryPanel } from "./components/LocalHistoryPanel";
+import { BrowserAccessPanel } from "./components/BrowserAccessPanel";
+import { WorkspaceFilesPanel } from "./components/WorkspaceFilesPanel";
+import { GitHubActionsPanel } from "./components/GitHubActionsPanel";
+import { GitHandoffPanel } from "./components/GitHandoffPanel";
+import { ProjectPanel } from "./components/ProjectPanel";
+import { RoomMembersPanel, TeamRosterPanel, type RoomMemberDisplay, type TeamMemberDisplay } from "./components/RosterPanels";
+import { TerminalPanel, type CodexEventDisplay, type TerminalCommandRequestDisplay, type TerminalOutputLineDisplay } from "./components/TerminalPanel";
+import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
+import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
+import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
+import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarPanelName, type SidebarRoomDisplay, type SidebarTeamDisplay } from "./components/DesktopSidebar";
+import { RoomChatPanel, type PendingAttachmentDisplay, type RoomChatMessageDisplay } from "./components/RoomChatPanel";
+import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
+import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
   id: string;
@@ -371,7 +371,7 @@ interface LocalRoomHistoryPayload {
 }
 
 type RelayStatus = "connecting" | "open" | "closed" | "error";
-type SidebarPanel = "profile" | "settings" | null;
+type SidebarPanel = SidebarPanelName;
 
 const fallbackUser = {
   id: "github:maddiedreese",
@@ -613,6 +613,7 @@ export function App() {
   const [newRoomProjectPath, setNewRoomProjectPath] = useState(defaultProjectPath);
   const [selectedTeam, setSelectedTeam] = useState(seededTeams[0].id);
   const [selectedRoomId, setSelectedRoomId] = useState("room-desktop");
+  const [inspectorTabsByRoom, setInspectorTabsByRoom] = useState<Record<string, InspectorTab>>({});
   const [sidebarQuery, setSidebarQuery] = useState("");
   const [messagesByRoom, setMessagesByRoom] = useState<Record<string, ChatMessage[]>>(initialMessagesByRoom);
   const [forgottenRoomIds, setForgottenRoomIds] = useState<Set<string>>(() => new Set());
@@ -667,6 +668,7 @@ export function App() {
   const [projectFilesByRoom, setProjectFilesByRoom] = useState<Record<string, ProjectFileEntry[]>>({});
   const [selectedFilesByRoom, setSelectedFilesByRoom] = useState<Record<string, ProjectFileContent | null>>({});
   const [selectedDiffsByRoom, setSelectedDiffsByRoom] = useState<Record<string, GitDiffResult | null>>({});
+  const [filePreviewTabsByRoom, setFilePreviewTabsByRoom] = useState<Record<string, FilePreviewTab>>({});
   const [fileBusyByRoom, setFileBusyByRoom] = useState<Record<string, boolean>>({});
   const [fileMessagesByRoom, setFileMessagesByRoom] = useState<Record<string, string | null>>({});
   const [markdownCopyFallbacksByRoom, setMarkdownCopyFallbacksByRoom] = useState<Record<string, MarkdownCopyFallback | null>>({});
@@ -706,11 +708,23 @@ export function App() {
 
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? emptyRoom;
+  const inspectorTab = inspectorTabsByRoom[selectedRoom.id] ?? "work";
   const selectedTeamRecord = teams.find((team) => team.id === selectedTeam) ?? null;
   const selectedTeamName = selectedTeamRecord?.name ?? (teams.length ? "No team selected" : "No teams yet");
   const selectedTeamMembers = teamMembersByTeam[selectedTeam] ?? [];
   const selectedTeamMembersMessage = teamMembersMessageByTeam[selectedTeam] ?? null;
   const selectedTeamMembersBusy = teamMembersBusyByTeam[selectedTeam] ?? false;
+  const selectedTeamMemberRows: TeamMemberDisplay[] = selectedTeamMembers.map((member) => ({
+    member,
+    initial: formatTeamMemberInitial(member.userId),
+    name: formatTeamMemberName(member.userId, currentUser),
+    roleLabel: formatTeamRole(member.role),
+    joinedLabel: formatTeamMemberJoinedAt(member.joinedAt),
+    canPromote: canPromoteTeamMember(selectedTeamRecord, member),
+    canDemote: canDemoteTeamMember(selectedTeamRecord, member),
+    canTransferOwnership: canTransferTeamOwnership(selectedTeamRecord, member, localUser.id),
+    canRemove: canRemoveTeamMember(selectedTeamRecord, member)
+  }));
   const selectedCodexModel = selectedRoom?.codexModel ?? defaultCodexModel;
   const selectedBrowserAllowedOrigins = selectedRoom.browserAllowedOrigins ?? defaultBrowserAllowedOrigins;
   const customCodexModel = customCodexModelsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedCodexModel;
@@ -746,6 +760,10 @@ export function App() {
   const projectFiles = projectFilesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const selectedFile = selectedFilesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const selectedDiff = selectedDiffsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const filePreviewTab = resolveFilePreviewTab(
+    filePreviewTabsByRoom[selectedRoom?.id ?? selectedRoomId] ?? "file",
+    Boolean(selectedDiff?.diff.trim())
+  );
   const fileBusy = fileBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const fileMessage = fileMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const inviteLink = inviteLinksByRoom[selectedRoom?.id ?? selectedRoomId] ?? "";
@@ -772,6 +790,14 @@ export function App() {
   const canHostBrowser = hasSelectedRoom && canHostBrowserAction(selectedRoom, localUser, isSelectedRoomLocked);
   const canCopyRoomInvite = hasSelectedRoom && canCreateRoomInvite(selectedRoom, localUser, isSelectedRoomLocked, inviteApprovalGate);
   const localWorkspaceMessage = localWorkspaceGateMessage(selectedRoom, isSelectedRoomLocked);
+  const roomPosture = roomPostureSummary({
+    locked: isSelectedRoomLocked,
+    isActiveHost,
+    canReadLocalWorkspace,
+    historySettings,
+    browserProfilePersistent: selectedRoom.browserProfilePersistent,
+    mode: selectedRoom.mode
+  });
   const browserAccessMessage = browserAccessGateMessage(selectedRoom, isSelectedRoomLocked);
   const workspaceRequestMessage = isSelectedRoomLocked
     ? roomLockMessage(selectedRoom, isSelectedRoomRevoked)
@@ -841,16 +867,81 @@ export function App() {
   const roomMembers = Object.values(presenceByRoom[selectedRoom?.id ?? selectedRoomId] ?? {})
     .filter((member) => member.status === "online")
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  const visibleRoomMembers: RoomPresence[] = roomMembers.length ? roomMembers : [{
+    userId: localUser.id,
+    deviceId,
+    displayName: localUser.name,
+    avatarUrl: localUser.avatarUrl,
+    publicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
+    status: "online" as const
+  }];
+  const roomMemberRows: RoomMemberDisplay[] = visibleRoomMembers.map((member) => {
+    const trusted = isDeviceKeyTrusted(
+      trustedDeviceKeys,
+      selectedRoom.id,
+      member.deviceId,
+      member.publicKeyFingerprint
+    );
+    return {
+      ...member,
+      trusted,
+      isHost: isRoomHostMember(member, selectedRoom),
+      deviceLabel: formatMemberDeviceLabel(member, deviceId, trusted)
+    };
+  });
   const selectedTerminal = roomTerminals.find((terminal) => terminal.id === selectedTerminalId) ?? null;
   const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
   const hostHandoffs = hostHandoffsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const terminalRequests = terminalRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
+  const inspectorAttention = inspectorAttentionCounts({ approvalVisible, terminalRequests, browserRequests });
   const inviteRequests = inviteRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const codexEvents = codexEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const gitWorkflowEvents = gitWorkflowEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const githubActionsEvents = githubActionsEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const selectedCodexThreadId = codexThreadIdsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const codexRunning = codexRunningByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
+  const codexApprovalSummaryDisplay = {
+    messages: `${visibleCodexTurnSummary.messagesSinceLastCodex} since last Codex response`,
+    attachments: formatCodexAttachmentSummary(visibleCodexTurnSummary.attachments),
+    workspace: selectedRoom.mode.workspace ? visibleCodexTurnSummary.workspacePath ?? "None" : "Disabled",
+    git: formatCodexGitSummary(visibleCodexTurnSummary.git),
+    browser: selectedRoom.mode.browser ? visibleCodexTurnSummary.browserAccess.join(", ") || "No pages shared" : "Disabled",
+    terminals: visibleCodexTurnSummary.terminals.join(", ") || "None",
+    model: formatCodexModel(selectedCodexModel),
+    thread: formatCodexThreadId(selectedCodexThreadId),
+    policy: approvalPolicyLabels[selectedRoom.approvalPolicy]
+  };
+  const roomCanUseChat = canUseRoomChat(selectedRoom, isSelectedRoomLocked);
+  const chatMessageRows: RoomChatMessageDisplay[] = messages.map((message) => ({
+    id: message.id,
+    author: message.author,
+    role: message.role,
+    body: message.body,
+    time: message.time,
+    selected: selectedMessageIds.includes(message.id),
+    attachments: (message.attachments ?? []).map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      meta: formatAttachmentMeta(attachment),
+      encryptedBlob: Boolean(attachment.blobId),
+      canPreview: Boolean(attachment.blobId || attachment.content)
+    })),
+    reactions: ["👍", "✅", "👀"].map((emoji) => {
+      const reaction = message.reactions?.find((item) => item.emoji === emoji);
+      return {
+        emoji,
+        count: reaction?.reactors.length ?? 0,
+        active: reaction?.reactors.some((reactor) => reactor.userId === localUser.id) ?? false,
+        title: reaction?.reactors.map((reactor) => reactor.name).join(", ") || "React"
+      };
+    })
+  }));
+  const pendingAttachmentRows: PendingAttachmentDisplay[] = pendingAttachments.map((attachment) => ({
+    id: attachment.id,
+    name: attachment.name,
+    encryptedBlob: Boolean(attachment.blobId)
+  }));
+  const pendingAttachmentSummary = `${pendingAttachments.length}/${maxMessageAttachments} files · ${formatBytes(pendingAttachmentBytes)}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`;
   const hostBusy = hostBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const settingsBusy = settingsBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const keyRotationBusy = keyRotationBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
@@ -1025,6 +1116,10 @@ export function App() {
     setSelectedDiffsByRoom((current) => diff ? { ...current, [roomId]: diff } : omitRecordKey(current, roomId));
   }
 
+  function setFilePreviewTabForRoom(roomId: string, tab: FilePreviewTab) {
+    setFilePreviewTabsByRoom((current) => tab === "file" ? omitRecordKey(current, roomId) : { ...current, [roomId]: tab });
+  }
+
   function setFileBusyForRoom(roomId: string, busy: boolean) {
     fileBusyRef.current = busy
       ? { ...fileBusyRef.current, [roomId]: true }
@@ -1160,6 +1255,27 @@ export function App() {
     ? detectSecretRisks(selectedTerminal.lines.map((line) => line.text).join("\n"))
     : detectSecretRisks(terminalLines.join("\n"));
   const terminalCommandRisks = detectTerminalCommandRisks(terminalCommand);
+  const selectedTerminalCanControl = canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked);
+  const terminalOutputLines: TerminalOutputLineDisplay[] = (selectedTerminal?.lines ?? terminalLines.map((line) => ({ stream: "system", text: line }))).map((line) => ({
+    ...line,
+    risks: detectSecretRisks(line.text)
+  }));
+  const terminalRequestRows: TerminalCommandRequestDisplay[] = terminalRequests.map((request) => ({
+    id: request.id,
+    command: request.command,
+    requester: request.requester,
+    cwd: request.cwd,
+    status: request.status,
+    risks: detectTerminalCommandRisks(request.command)
+  }));
+  const codexEventRows: CodexEventDisplay[] = codexEvents.slice(-5).reverse().map((event) => ({
+    key: `${event.turnId}-${event.createdAt}-${event.status}`,
+    status: event.status,
+    statusLabel: formatCodexEventStatus(event.status),
+    message: event.message,
+    detail: `${event.threadId ?? formatCodexModel(event.model)} · ${formatTimestamp(event.createdAt)}`,
+    host: event.host
+  }));
   const normalizedSidebarQuery = sidebarQuery.trim().toLowerCase();
   const searchActive = normalizedSidebarQuery.length > 0;
   const teamRooms = useMemo(
@@ -1192,6 +1308,42 @@ export function App() {
   const visibleMessageHits = useMemo(() => {
     return searchActive ? findSidebarMessageHits(searchableMessagesByRoom, normalizedSidebarQuery) : [];
   }, [normalizedSidebarQuery, searchableMessagesByRoom, searchActive]);
+  const sidebarTeamRows: SidebarTeamDisplay[] = visibleTeams.map((team) => ({
+    id: team.id,
+    name: team.name,
+    meta: formatTeamMeta(team),
+    active: team.id === selectedTeam
+  }));
+  const sidebarRoomRows: SidebarRoomDisplay[] = visibleRooms.map((room) => {
+    const roomAttention = inspectorAttentionCounts({
+      approvalVisible: approvalVisibleByRoom[room.id] ?? false,
+      terminalRequests: terminalRequestsByRoom[room.id] ?? [],
+      browserRequests: browserRequestsByRoom[room.id] ?? []
+    });
+    const roomAttentionTotal = roomAttention.work + roomAttention.browser;
+    const team = teams.find((item) => item.id === room.teamId);
+
+    return {
+      id: room.id,
+      teamId: room.teamId,
+      name: room.name,
+      detail: searchActive ? team?.name ?? "Team" : room.projectPath.split("/").slice(-1)[0],
+      active: room.id === selectedRoomId,
+      attention: roomAttentionTotal,
+      unread: room.unread
+    };
+  });
+  const sidebarMessageHitRows: SidebarMessageHitDisplay[] = visibleMessageHits.map((hit) => {
+    const room = rooms.find((item) => item.id === hit.roomId);
+
+    return {
+      key: `${hit.roomId}-${hit.message.id}`,
+      roomId: hit.roomId,
+      teamId: room?.teamId,
+      author: hit.message.author,
+      preview: `${room?.name ?? "Room"} · ${hit.message.body}`
+    };
+  });
 
   useEffect(() => {
     roomsRef.current = rooms;
@@ -2099,18 +2251,19 @@ export function App() {
       setChatMessageForRoom(roomId, attachmentError);
       return;
     }
+    const invokesCodex = messageInvokesCodex(body);
     const createdAt = new Date().toISOString();
     const message: ChatMessage = {
       id: crypto.randomUUID(),
       author: localUser.name,
-      role: body.includes("@Codex") ? "system" : "human",
+      role: invokesCodex ? "system" : "human",
       body: body || "Attached files.",
       time: formatMessageTime(createdAt),
       createdAt,
       attachments: attachments.length ? attachments : undefined
     };
     await publishChatMessage(message);
-    if (body.includes("@Codex")) {
+    if (invokesCodex) {
       handleCodexInvoke(message);
     }
     setDraftForRoom(roomId, "");
@@ -4994,7 +5147,7 @@ export function App() {
     client.publish({ type: "publish", envelope });
   }
 
-  async function openProjectFile(path: string) {
+  async function openProjectFile(path: string, preferredPreview: FilePreviewTab = "file") {
     if (!hasSelectedRoom) {
       setSelectedFileMessage("Create or join a room before opening project files.");
       return;
@@ -5015,6 +5168,7 @@ export function App() {
       if (selectedRoomIdRef.current !== room.id) return;
       setSelectedFileForRoom(room.id, file);
       setSelectedDiffForRoom(room.id, diff);
+      setFilePreviewTabForRoom(room.id, resolveFilePreviewTab(preferredPreview, Boolean(diff?.diff.trim())));
       setSensitiveAttachmentReviewKey(null);
     } catch (error) {
       if (selectedRoomIdRef.current === room.id) setFileMessageForRoom(room.id, String(error));
@@ -5585,204 +5739,45 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">AI</div>
-          <div>
-            <strong>multAIplayer</strong>
-            <span>honest alpha</span>
-          </div>
-        </div>
-
-        {currentUser ? (
-          <div className="profile-card">
-            {currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" /> : <Github size={18} />}
-            <div>
-              <strong>{currentUser.name ?? currentUser.login}</strong>
-              <span>@{currentUser.login}</span>
-            </div>
-            <button onClick={signOut}>Sign out</button>
-          </div>
-        ) : (
-          <button className="github-button" onClick={beginGitHubSignIn} disabled={authBusy || authConfig?.configured === false}>
-            <Github size={16} />
-            {authConfig?.configured === false ? "GitHub OAuth not configured" : authBusy ? "Waiting for GitHub" : "Sign in with GitHub"}
-          </button>
-        )}
-
-        {deviceFlow && (
-          <div className="device-flow">
-            <span>Enter this code on GitHub</span>
-            <strong>{deviceFlow.user_code}</strong>
-            <a href={deviceFlow.verification_uri} target="_blank" rel="noreferrer">
-              Open GitHub <ExternalLink size={13} />
-            </a>
-          </div>
-        )}
-        {authError && <div className="auth-error">{authError}</div>}
-
-        <label className="search-box">
-          <Search size={16} />
-          <input
-            placeholder="Search rooms, projects, chats"
-            value={sidebarQuery}
-            onChange={(event) => setSidebarQuery(event.target.value)}
-          />
-          {sidebarQuery && (
-            <button onClick={() => setSidebarQuery("")} aria-label="Clear search">
-              <X size={14} />
-            </button>
-          )}
-        </label>
-        {workspaceError && <div className="workspace-error">{workspaceError}</div>}
-
-        <section className="sidebar-section">
-          <div className="section-title">
-            <span>{searchActive ? "Matching teams" : "Teams"}</span>
-            <button onClick={addTeam} aria-label="Create team" disabled={!newTeamName.trim()}><Plus size={15} /></button>
-          </div>
-          {!searchActive && (
-            <div className="sidebar-create-form">
-              <input
-                value={newTeamName}
-                onChange={(event) => setNewTeamName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && newTeamName.trim()) {
-                    event.preventDefault();
-                    addTeam();
-                  }
-                }}
-                placeholder="Team name"
-              />
-            </div>
-          )}
-          <div className="team-list">
-            {visibleTeams.map((team) => (
-              <button
-                className={`team-button ${team.id === selectedTeam ? "active" : ""}`}
-                key={team.id}
-                onClick={() => {
-                  setSelectedTeam(team.id);
-                  setSelectedRoomId(rooms.find((room) => room.teamId === team.id)?.id ?? rooms[0]?.id ?? "");
-                }}
-              >
-                <UsersRound size={16} />
-                <span>{team.name}</span>
-                <small>{formatTeamMeta(team)}</small>
-              </button>
-            ))}
-            {visibleTeams.length === 0 && (
-              <div className="sidebar-empty">
-                {searchActive ? "No teams found." : "No teams yet. Create one to start."}
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="sidebar-section rooms">
-          <div className="section-title">
-            <span>{searchActive ? "Matching rooms" : "Rooms"}</span>
-            <button onClick={addRoom} aria-label="Create room" disabled={!selectedTeam || !newRoomName.trim() || !newRoomProjectPath.trim()}><Plus size={15} /></button>
-          </div>
-          {!searchActive && (
-            <div className="sidebar-create-form room-create-form">
-              <input
-                value={newRoomName}
-                onChange={(event) => setNewRoomName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && newRoomName.trim() && newRoomProjectPath.trim()) {
-                    event.preventDefault();
-                    addRoom();
-                  }
-                }}
-                placeholder="Room name"
-                disabled={!selectedTeam}
-              />
-              <div className="path-create-row">
-                <input
-                  value={newRoomProjectPath}
-                  onChange={(event) => setNewRoomProjectPath(event.target.value)}
-                  placeholder={defaultProjectPath}
-                  disabled={!selectedTeam}
-                />
-                <button onClick={chooseNewRoomProjectPath} disabled={!selectedTeam} aria-label="Choose project folder">
-                  <FolderGit2 size={14} />
-                </button>
-              </div>
-            </div>
-          )}
-          {visibleRooms.map((room) => (
-            <button
-              key={room.id}
-              className={`room-button ${room.id === selectedRoomId ? "active" : ""}`}
-              onClick={() => {
-                setSelectedTeam(room.teamId);
-                setSelectedRoomId(room.id);
-              }}
-            >
-              <div>
-                <strong>{room.name}</strong>
-                <span>{searchActive ? teams.find((team) => team.id === room.teamId)?.name : room.projectPath.split("/").slice(-1)[0]}</span>
-              </div>
-              {room.unread > 0 ? <b>{room.unread}</b> : <Circle size={8} />}
-            </button>
-          ))}
-          {visibleRooms.length === 0 && (
-            <div className="sidebar-empty">
-              {searchActive
-                ? "No rooms or projects found."
-                : selectedTeam
-                  ? "No rooms yet. Create one for this team."
-                  : "Create a team before adding rooms."}
-            </div>
-          )}
-        </section>
-
-        {searchActive && (
-          <section className="sidebar-section">
-            <div className="section-title">
-              <span>Chat hits</span>
-            </div>
-            <div className="message-hit-list">
-              {visibleMessageHits.map((hit) => {
-                const room = rooms.find((item) => item.id === hit.roomId);
-                return (
-                <button
-                  key={`${hit.roomId}-${hit.message.id}`}
-                  onClick={() => {
-                    if (room) setSelectedTeam(room.teamId);
-                    setSelectedRoomId(hit.roomId);
-                  }}
-                >
-                  <strong>{hit.message.author}</strong>
-                  <span>{room?.name ?? "Room"} · {hit.message.body}</span>
-                </button>
-                );
-              })}
-              {visibleMessageHits.length === 0 && (
-                <div className="sidebar-empty">
-                  {historySearchBusy ? "Searching encrypted local history..." : "No chat or local history matches."}
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        <div className="sidebar-footer">
-          <button
-            className={activeSidebarPanel === "settings" ? "active" : ""}
-            onClick={() => setActiveSidebarPanel((current) => current === "settings" ? null : "settings")}
-          >
-            <Settings size={16} /> Settings
-          </button>
-          <button
-            className={activeSidebarPanel === "profile" ? "active" : ""}
-            onClick={() => setActiveSidebarPanel((current) => current === "profile" ? null : "profile")}
-          >
-            <UserRoundCheck size={16} /> Profile
-          </button>
-        </div>
-      </aside>
+      <DesktopSidebar
+        currentUser={currentUser}
+        authBusy={authBusy}
+        authConfig={authConfig}
+        authError={authError}
+        deviceFlow={deviceFlow}
+        sidebarQuery={sidebarQuery}
+        searchActive={searchActive}
+        workspaceError={workspaceError}
+        newTeamName={newTeamName}
+        newRoomName={newRoomName}
+        newRoomProjectPath={newRoomProjectPath}
+        defaultProjectPath={defaultProjectPath}
+        selectedTeam={Boolean(selectedTeam)}
+        teams={sidebarTeamRows}
+        rooms={sidebarRoomRows}
+        messageHits={sidebarMessageHitRows}
+        historySearchBusy={historySearchBusy}
+        activeSidebarPanel={activeSidebarPanel}
+        onSignIn={beginGitHubSignIn}
+        onSignOut={signOut}
+        onSidebarQueryChange={setSidebarQuery}
+        onClearSidebarQuery={() => setSidebarQuery("")}
+        onNewTeamNameChange={setNewTeamName}
+        onCreateTeam={addTeam}
+        onSelectTeam={(teamId) => {
+          setSelectedTeam(teamId);
+          setSelectedRoomId(rooms.find((room) => room.teamId === teamId)?.id ?? rooms[0]?.id ?? "");
+        }}
+        onNewRoomNameChange={setNewRoomName}
+        onNewRoomProjectPathChange={setNewRoomProjectPath}
+        onChooseNewRoomProjectPath={chooseNewRoomProjectPath}
+        onCreateRoom={addRoom}
+        onSelectRoom={(roomId, teamId) => {
+          if (teamId) setSelectedTeam(teamId);
+          setSelectedRoomId(roomId);
+        }}
+        onSelectSidebarPanel={setActiveSidebarPanel}
+      />
 
       {activeSidebarPanel && (
         <aside className="sidebar-drawer">
@@ -5797,350 +5792,124 @@ export function App() {
           </div>
 
           {activeSidebarPanel === "profile" ? (
-            <div className="drawer-content">
-              <section className="drawer-section account-section">
-                {currentUser?.avatarUrl ? (
-                  <img src={currentUser.avatarUrl} alt="" />
-                ) : (
-                  <div className="drawer-avatar">
-                    {currentUser ? currentUser.login.slice(0, 1).toUpperCase() : <Github size={24} />}
-                  </div>
-                )}
-                <div>
-                  <strong>{currentUser?.name ?? currentUser?.login ?? "Not signed in"}</strong>
-                  <span>{currentUser ? `@${currentUser.login}` : "GitHub required for PRs and Actions"}</span>
-                </div>
-              </section>
-
-              <section className="drawer-section">
-                <InfoRow label="GitHub OAuth" value={authConfig?.configured === false ? "Not configured" : "Configured"} />
-                <InfoRow label="OAuth scopes" value={authConfig?.scopes.join(", ") || "Unavailable"} />
-                <InfoRow label="Allowed origins" value={authConfig?.allowedOrigins.join(", ") || "Local/default"} />
-                <InfoRow label="Workspace edits" value={authConfig?.mutationsRequireAuth ? "Sign-in required" : "Local permissive"} />
-                <InfoRow label="Relay sessions" value={formatSessionPersistence(authConfig?.sessionPersistence)} />
-                <InfoRow label="Session" value={currentUser ? "Signed in" : "Signed out"} />
-                <InfoRow label="Device" value={deviceId} />
-                <InfoRow label="Device key" value={deviceIdentity?.publicKeyFingerprint ?? "Generating"} />
-                <InfoRow label="Key algorithm" value={deviceIdentity?.algorithm ?? "Unavailable"} />
-                {currentUser && <InfoRow label="User id" value={currentUser.id} />}
-              </section>
-
-              <button className="ghost-wide" onClick={rotateDeviceIdentity}>
-                <KeyRound size={15} />
-                Rotate device key
-              </button>
-              {deviceIdentityMessage && <div className="workflow-message">{deviceIdentityMessage}</div>}
-
-              {currentUser ? (
-                <button className="ghost-wide" onClick={signOut}>
-                  <X size={15} />
-                  Sign out
-                </button>
-              ) : (
-                <button
-                  className="primary-wide"
-                  onClick={beginGitHubSignIn}
-                  disabled={authBusy || authConfig?.configured === false}
-                >
-                  <Github size={15} />
-                  {authConfig?.configured === false ? "GitHub OAuth not configured" : authBusy ? "Waiting for GitHub" : "Sign in with GitHub"}
-                </button>
-              )}
-
-              {deviceFlow && (
-                <div className="device-flow drawer-flow">
-                  <span>GitHub code</span>
-                  <strong>{deviceFlow.user_code}</strong>
-                  <a href={deviceFlow.verification_uri} target="_blank" rel="noreferrer">
-                    Open GitHub <ExternalLink size={13} />
-                  </a>
-                </div>
-              )}
-              {authError && <div className="auth-error">{authError}</div>}
-            </div>
+            <ProfileDrawerPanel
+              currentUser={currentUser}
+              authConfig={authConfig}
+              authBusy={authBusy}
+              authError={authError}
+              deviceFlow={deviceFlow}
+              deviceId={deviceId}
+              deviceIdentity={deviceIdentity}
+              deviceIdentityMessage={deviceIdentityMessage}
+              relaySessionPersistence={formatSessionPersistence(authConfig?.sessionPersistence)}
+              onRotateDeviceIdentity={rotateDeviceIdentity}
+              onSignIn={beginGitHubSignIn}
+              onSignOut={signOut}
+            />
           ) : (
-            <div className="drawer-content">
-              <section className="drawer-section">
-                <InfoRow label="Relay" value={`${relayStatus} · ${appConfig.relayWsUrl}`} />
-                <InfoRow label="Relay API" value={appConfig.relayHttpUrl} />
-                <InfoRow label="Codex" value={codexProbe?.available ? codexProbe.version ?? "Available" : codexProbe?.error ?? "Not connected"} />
-                <InfoRow label="Project" value={selectedRoom.projectPath} />
-                <InfoRow label="Model" value={formatCodexModel(selectedCodexModel)} />
-                <InfoRow label="Approval" value={approvalPolicyLabels[selectedRoom.approvalPolicy]} />
-                <InfoRow label="Room keys" value={roomSecretStorageLabel()} />
-                <button className="ghost-wide" onClick={chooseProjectPath} disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}>
-                  <FolderGit2 size={15} />
-                  Choose project folder
-                </button>
-              </section>
-
-              <section className="drawer-section relay-config-section">
-                <div className="drawer-section-title">Relay connection</div>
-                <label>
-                  <span>HTTP API URL</span>
-                  <input
-                    value={relayHttpDraft}
-                    onChange={(event) => setRelayHttpDraft(event.target.value)}
-                    placeholder={defaultRelayHttpUrl}
-                  />
-                </label>
-                <label>
-                  <span>WebSocket rooms URL</span>
-                  <input
-                    value={relayWsDraft}
-                    onChange={(event) => setRelayWsDraft(event.target.value)}
-                    placeholder={defaultRelayWsUrl}
-                  />
-                </label>
-                <div className="drawer-button-row">
-                  <button className="ghost-wide" onClick={resetRelayConfiguration}>
-                    <RefreshCw size={15} />
-                    Defaults
-                  </button>
-                  <button
-                    className="primary-wide"
-                    onClick={saveRelayConfiguration}
-                    disabled={!relayHttpDraft.trim() || !relayWsDraft.trim()}
-                  >
-                    <Check size={15} />
-                    Save relay
-                  </button>
-                </div>
-              </section>
-
-              <section className="drawer-section">
-                <div className="drawer-section-title">Room modes</div>
-                <div className="mode-options drawer-modes">
-                  {(Object.keys(roomModeLabels) as Array<keyof RoomMode>).map((key) => (
-                    <label key={key}>
-                      <input
-                        type="checkbox"
-                        checked={selectedRoom.mode[key]}
-                        disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-                        onChange={() => toggleRoomMode(key)}
-                      />
-                      <span>{roomModeLabels[key]}</span>
-                    </label>
-                  ))}
-                </div>
-                {!isActiveHost && hasSelectedRoom && (
-                  <div className="workflow-message">{roomSettingsGateMessage}</div>
-                )}
-              </section>
-
-              <section className="drawer-section">
-                <div className="drawer-section-title">Encrypted history</div>
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={historySettings.enabled}
-                    disabled={!hasSelectedRoom}
-                    onChange={(event) =>
-                      updateLocalHistorySettings({
-                        ...historySettings,
-                        enabled: event.target.checked
-                      })
-                    }
-                  />
-                  <span>Save local history</span>
-                </label>
-                <label className="history-retention">
-                  <span>Retention days</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={365}
-                    value={historySettings.retentionDays}
-                    disabled={!hasSelectedRoom || !historySettings.enabled}
-                    onChange={(event) =>
-                      updateLocalHistorySettings({
-                        ...historySettings,
-                        retentionDays: Number(event.target.value)
-                      })
-                    }
-                  />
-                </label>
-	                <button className="ghost-wide" onClick={clearRoomHistory} disabled={!hasSelectedRoom}>
-	                  <X size={15} />
-	                  Clear local history
-	                </button>
-	                <button className="ghost-wide danger" onClick={forgetSelectedRoomLocalData} disabled={!hasSelectedRoom}>
-	                  <KeyRound size={15} />
-	                  Forget room on this device
-	                </button>
-	                <div className="drawer-section-title">Team default</div>
-	                <label className="checkbox-row">
-	                  <input
-	                    type="checkbox"
-	                    checked={teamHistorySettings.enabled}
-	                    disabled={!selectedTeam}
-	                    onChange={(event) =>
-	                      updateTeamHistoryDefaults({
-	                        ...teamHistorySettings,
-	                        enabled: event.target.checked
-	                      })
-	                    }
-	                  />
-	                  <span>Save history in new team rooms</span>
-	                </label>
-	                <label className="history-retention">
-	                  <span>Team retention days</span>
-	                  <input
-	                    type="number"
-	                    min={1}
-	                    max={365}
-	                    value={teamHistorySettings.retentionDays}
-	                    disabled={!selectedTeam || !teamHistorySettings.enabled}
-	                    onChange={(event) =>
-	                      updateTeamHistoryDefaults({
-	                        ...teamHistorySettings,
-	                        retentionDays: Number(event.target.value)
-	                      })
-	                    }
-	                  />
-	                </label>
-	                <label className="history-retention">
-	                  <span>New room approval</span>
-	                  <select
-	                    value={teamDefaultApprovalPolicy}
-	                    disabled={!selectedTeam}
-	                    onChange={(event) => updateTeamDefaultApprovalPolicy(event.target.value as ApprovalPolicy)}
-	                  >
-	                    {(Object.keys(approvalPolicyLabels) as ApprovalPolicy[]).map((policy) => (
-	                      <option key={policy} value={policy}>{approvalPolicyLabels[policy]}</option>
-	                    ))}
-	                  </select>
-	                </label>
-	                <label className="history-retention">
-	                  <span>New room model</span>
-	                  <select
-	                    value={codexModelOptions.some((option) => option.id === teamDefaultCodexModel) ? teamDefaultCodexModel : defaultCodexModel}
-	                    disabled={!selectedTeam}
-	                    onChange={(event) => updateTeamDefaultCodexModel(event.target.value)}
-	                  >
-	                    {codexModelOptions.map((option) => (
-	                      <option key={option.id} value={option.id}>{option.label}</option>
-	                    ))}
-	                  </select>
-	                </label>
-	                <label className="checkbox-row">
-	                  <input
-	                    type="checkbox"
-	                    checked={teamDefaultBrowserProfilePersistent}
-	                    disabled={!selectedTeam}
-	                    onChange={(event) => setTeamDefaultBrowserProfilePersistent(event.target.checked)}
-	                  />
-	                  <span>Persist browser profiles in new team rooms</span>
-	                </label>
-	                <div className="browser-allowlist">
-	                  <label>
-	                    <span>New room allowed browser sites</span>
-	                    <textarea
-	                      value={teamDefaultBrowserAllowedOriginsDraft}
-	                      disabled={!selectedTeam}
-	                      onChange={(event) => setTeamDefaultBrowserAllowedOriginsDraft(event.target.value)}
-	                      placeholder="https://github.com"
-	                    />
-	                  </label>
-	                  <button className="ghost-wide" onClick={saveTeamDefaultBrowserPolicy} disabled={!selectedTeam}>
-	                    <Check size={15} />
-	                    Save browser defaults
-	                  </button>
-	                </div>
-	                <label className="checkbox-row">
-	                  <input
-	                    type="checkbox"
-	                    checked={teamDefaultInviteApprovalGate}
-	                    disabled={!selectedTeam}
-	                    onChange={(event) => updateTeamDefaultInviteApprovalGate(event.target.checked)}
-	                  />
-	                  <span>Require host approval for new room invites</span>
-	                </label>
-	                <button className="ghost-wide" onClick={applyTeamDefaultsToRoom} disabled={!hasSelectedRoom || settingsBusy}>
-	                  <Check size={15} />
-	                  Apply team default to room
-	                </button>
-	              </section>
-
-              {(appConfigMessage || settingsMessage || visibleHistoryMessage) && (
-                <div className="workflow-message">{appConfigMessage ?? settingsMessage ?? visibleHistoryMessage}</div>
-              )}
-            </div>
+            <RoomSettingsDrawerPanel
+              relaySummary={`${relayStatus} · ${appConfig.relayWsUrl}`}
+              relayApi={appConfig.relayHttpUrl}
+              codexSummary={codexProbe?.available ? codexProbe.version ?? "Available" : codexProbe?.error ?? "Not connected"}
+              projectPath={selectedRoom.projectPath}
+              modelLabel={formatCodexModel(selectedCodexModel)}
+              approvalLabel={approvalPolicyLabels[selectedRoom.approvalPolicy]}
+              roomKeysLabel={roomSecretStorageLabel()}
+              posture={roomPosture}
+              chooseProjectDisabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
+              relayHttpDraft={relayHttpDraft}
+              relayWsDraft={relayWsDraft}
+              defaultRelayHttpUrl={defaultRelayHttpUrl}
+              defaultRelayWsUrl={defaultRelayWsUrl}
+              saveRelayDisabled={!relayHttpDraft.trim() || !relayWsDraft.trim()}
+              roomMode={selectedRoom.mode}
+              roomModeLabels={roomModeLabels}
+              roomModesDisabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
+              showRoomSettingsGate={!isActiveHost && hasSelectedRoom}
+              roomSettingsGateMessage={roomSettingsGateMessage}
+              historySettings={historySettings}
+              teamHistorySettings={teamHistorySettings}
+              hasSelectedRoom={hasSelectedRoom}
+              selectedTeam={Boolean(selectedTeam)}
+              settingsBusy={settingsBusy}
+              teamDefaultApprovalPolicy={teamDefaultApprovalPolicy}
+              approvalPolicyLabels={approvalPolicyLabels}
+              teamDefaultCodexModel={teamDefaultCodexModel}
+              defaultCodexModel={defaultCodexModel}
+              codexModelOptions={codexModelOptions}
+              teamDefaultBrowserProfilePersistent={teamDefaultBrowserProfilePersistent}
+              teamDefaultBrowserAllowedOriginsDraft={teamDefaultBrowserAllowedOriginsDraft}
+              teamDefaultInviteApprovalGate={teamDefaultInviteApprovalGate}
+              message={appConfigMessage ?? settingsMessage ?? visibleHistoryMessage}
+              onChooseProject={chooseProjectPath}
+              onRelayHttpDraftChange={setRelayHttpDraft}
+              onRelayWsDraftChange={setRelayWsDraft}
+              onResetRelay={resetRelayConfiguration}
+              onSaveRelay={saveRelayConfiguration}
+              onToggleRoomMode={toggleRoomMode}
+              onHistoryEnabledChange={(enabled) =>
+                updateLocalHistorySettings({
+                  ...historySettings,
+                  enabled
+                })
+              }
+              onHistoryRetentionDaysChange={(retentionDays) =>
+                updateLocalHistorySettings({
+                  ...historySettings,
+                  retentionDays
+                })
+              }
+              onClearRoomHistory={clearRoomHistory}
+              onForgetRoomLocalData={forgetSelectedRoomLocalData}
+              onTeamHistoryEnabledChange={(enabled) =>
+                updateTeamHistoryDefaults({
+                  ...teamHistorySettings,
+                  enabled
+                })
+              }
+              onTeamHistoryRetentionDaysChange={(retentionDays) =>
+                updateTeamHistoryDefaults({
+                  ...teamHistorySettings,
+                  retentionDays
+                })
+              }
+              onTeamDefaultApprovalPolicyChange={updateTeamDefaultApprovalPolicy}
+              onTeamDefaultCodexModelChange={updateTeamDefaultCodexModel}
+              onTeamDefaultBrowserProfilePersistentChange={setTeamDefaultBrowserProfilePersistent}
+              onTeamDefaultBrowserAllowedOriginsDraftChange={setTeamDefaultBrowserAllowedOriginsDraft}
+              onSaveTeamDefaultBrowserPolicy={saveTeamDefaultBrowserPolicy}
+              onTeamDefaultInviteApprovalGateChange={updateTeamDefaultInviteApprovalGate}
+              onApplyTeamDefaultsToRoom={applyTeamDefaultsToRoom}
+            />
           )}
         </aside>
       )}
 
       <main className="room">
-        <header className="room-header">
-          <div>
-            <div className="crumb">
-              <span>{selectedTeamName}</span>
-              <ChevronDown size={14} />
-            </div>
-            <h1>{selectedRoom.name}</h1>
-          </div>
-          <div className="header-actions">
-            <StatusPill icon={<Lock size={14} />} label="E2EE" tone="green" />
-            <StatusPill
-              icon={relayStatus === "open" ? <Wifi size={14} /> : <WifiOff size={14} />}
-              label={relayStatus === "open" ? "Relay live" : `Relay ${relayStatus}`}
-              tone={relayStatus === "open" ? "green" : "yellow"}
-            />
-            <StatusPill icon={<UsersRound size={14} />} label={`${roomMembers.length || 1} online`} tone="blue" />
-            <StatusPill icon={<Bot size={14} />} label={hostStatusLabel} tone={selectedRoom.hostStatus === "active" ? "blue" : selectedRoom.hostStatus === "handoff" ? "yellow" : "muted"} />
-            <div className="host-controls">
-              <button onClick={() => setRoomHost("active")} disabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy || selectedRoom.hostStatus === "active"}>
-                <UserRoundCheck size={14} />
-                Host
-              </button>
-              <button onClick={() => setRoomHost("handoff")} disabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy || !isActiveHost}>
-                <UsersRound size={14} />
-                Handoff
-              </button>
-              <button onClick={() => setRoomHost("offline")} disabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy || selectedRoom.hostStatus === "offline" || !isActiveHost}>
-                <X size={14} />
-              </button>
-            </div>
-            <label className="header-model-switcher" title={isActiveHost ? "Switch Codex model for this room" : "Only the active host can switch models"}>
-              <Terminal size={14} />
-              <select
-                aria-label="Codex host model"
-                value={codexModelOptions.some((option) => option.id === selectedCodexModel) ? selectedCodexModel : "custom"}
-                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-                onChange={(event) => {
-                  if (event.target.value !== "custom") {
-                    setCodexModel(event.target.value);
-                  }
-                }}
-              >
-                {codexModelOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-                {!codexModelOptions.some((option) => option.id === selectedCodexModel) && (
-                  <option value="custom">{formatCodexModel(selectedCodexModel)}</option>
-                )}
-              </select>
-            </label>
-            <StatusPill icon={<Globe2 size={14} />} label={selectedRoom.mode.browser ? "Browser on" : "Browser off"} tone={selectedRoom.mode.browser ? "green" : "muted"} />
-            <StatusPill icon={<FolderGit2 size={14} />} label={selectedRoom.projectPath.split("/").slice(-1)[0]} tone="dark" />
-            <button className="header-copy" onClick={copyRoomMarkdown} disabled={!hasSelectedRoom}>
-              <Copy size={14} />
-              Markdown
-            </button>
-            <button className="header-copy" onClick={copySelectedMessagesMarkdown} disabled={!hasSelectedRoom || selectedMessages.length === 0}>
-              <Copy size={14} />
-              {selectedMessages.length ? `${selectedMessages.length} selected` : "Selected"}
-            </button>
-            {selectedMessages.length > 0 && (
-              <button className="header-copy" onClick={clearSelectedMessages}>
-                <X size={14} />
-                Clear
-              </button>
-            )}
-          </div>
-        </header>
+        <RoomHeader
+          teamName={selectedTeamName}
+          roomName={selectedRoom.name}
+          relayStatus={relayStatus}
+          onlineCount={roomMembers.length || 1}
+          hostStatus={selectedRoom.hostStatus}
+          hostStatusLabel={hostStatusLabel}
+          hostBusy={hostBusy}
+          isActiveHost={isActiveHost}
+          roomLocked={isSelectedRoomLocked}
+          hasRoom={hasSelectedRoom}
+          selectedModel={selectedCodexModel}
+          modelLabel={formatCodexModel(selectedCodexModel)}
+          modelOptions={codexModelOptions}
+          settingsBusy={settingsBusy}
+          browserEnabled={selectedRoom.mode.browser}
+          projectLabel={selectedRoom.projectPath.split("/").slice(-1)[0]}
+          selectedCount={selectedMessages.length}
+          onSetHost={setRoomHost}
+          onSelectModel={setCodexModel}
+          onCopyRoomMarkdown={copyRoomMarkdown}
+          onCopySelectedMarkdown={copySelectedMessagesMarkdown}
+          onClearSelectedMessages={clearSelectedMessages}
+        />
 
         {hostMessage && <div className="host-message">{hostMessage}</div>}
         {chatMessage && <div className="host-message">{chatMessage}</div>}
@@ -6164,1235 +5933,331 @@ export function App() {
         )}
 
         {markdownCopyFallback && (
-          <section className="markdown-fallback">
-            <div>
-              <strong>{markdownCopyFallback.title} Markdown ready</strong>
-              <span>Copying was blocked, so the generated Markdown is available here.</span>
-            </div>
-            <textarea readOnly value={markdownCopyFallback.markdown} aria-label={`${markdownCopyFallback.title} Markdown fallback`} />
-            <div className="markdown-fallback-actions">
-              <button
-                onClick={() => copyMarkdownWithFallback(
-                  markdownCopyFallback.title,
-                  markdownCopyFallback.markdown,
-                  (message) => setChatMessageForRoom(selectedRoom.id, message),
-                  selectedRoom.id
-                )}
-              >
-                <Copy size={14} /> Retry copy
-              </button>
-              <button onClick={() => setMarkdownCopyFallbackForRoom(selectedRoom.id, null)}>
-                <X size={14} /> Dismiss
-              </button>
-            </div>
-          </section>
+          <MarkdownFallbackPanel
+            title={markdownCopyFallback.title}
+            markdown={markdownCopyFallback.markdown}
+            onRetryCopy={() => copyMarkdownWithFallback(
+              markdownCopyFallback.title,
+              markdownCopyFallback.markdown,
+              (message) => setChatMessageForRoom(selectedRoom.id, message),
+              selectedRoom.id
+            )}
+            onDismiss={() => setMarkdownCopyFallbackForRoom(selectedRoom.id, null)}
+          />
         )}
 
-        <div className="chat-scroll">
-          {messages.map((message) => (
-            <article className={`message ${message.role} ${selectedMessageIds.includes(message.id) ? "selected" : ""}`} key={message.id}>
-              <div className="avatar">{message.role === "codex" ? <Bot size={17} /> : message.author.slice(0, 1)}</div>
-              <div className="bubble">
-                <div className="message-meta">
-                  <label className="message-select" title="Select message for Markdown copy">
-                    <input
-                      type="checkbox"
-                      checked={selectedMessageIds.includes(message.id)}
-                      onChange={() => toggleMessageSelection(message.id)}
-                      aria-label={`Select message from ${message.author} at ${message.time}`}
-                    />
-                  </label>
-                  <strong>{message.author}</strong>
-                  <span>{message.time}</span>
-                  <button onClick={() => copyMessageMarkdown(message)} title="Copy message as Markdown">
-                    <Copy size={13} />
-                  </button>
-                  {message.role === "codex" && (
-                    <button onClick={() => copyCodexOutputMarkdown(message)} title="Copy Codex turn output as Markdown">
-                      <Bot size={13} />
-                    </button>
-                  )}
-                </div>
-                <p>{message.body}</p>
-		                {message.attachments?.map((attachment) => (
-		                  <div className="attachment" key={attachment.id}>
-		                    <FileCode2 size={15} />
-		                    <span>{attachment.name}</span>
-		                    <small>{formatAttachmentMeta(attachment)}</small>
-		                    {(attachment.blobId || attachment.content) && (
-		                      <button
-		                        onClick={() => openEncryptedAttachmentBlob(attachment)}
-		                        title={attachment.blobId ? "Decrypt and preview encrypted attachment" : "Preview inline attachment"}
-		                        disabled={isSelectedRoomLocked}
-		                      >
-		                        <ExternalLink size={12} />
-		                      </button>
-		                    )}
-		                  </div>
-		                ))}
-                <div className="reaction-row">
-                  {["👍", "✅", "👀"].map((emoji) => {
-                    const reaction = message.reactions?.find((item) => item.emoji === emoji);
-                    const reacted = reaction?.reactors.some((reactor) => reactor.userId === localUser.id) ?? false;
-                    return (
-                      <button
-                        className={reacted ? "active" : ""}
-                        key={emoji}
-                        onClick={() => toggleMessageReaction(message, emoji)}
-                        title={reaction?.reactors.map((reactor) => reactor.name).join(", ") || "React"}
-                        disabled={!canUseRoomChat(selectedRoom, isSelectedRoomLocked)}
-                      >
-                        <span>{emoji}</span>
-                        {reaction?.reactors.length ? <small>{reaction.reactors.length}</small> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </article>
-          ))}
-
-          {approvalVisible && (
-            <section className="approval-card">
-              <div className="approval-title">
-                <div>
-                  <Bot size={19} />
-                  <strong>Approve Codex turn</strong>
-                </div>
-                <StatusPill
-                  icon={<KeyRound size={14} />}
-                  label={isActiveHost ? "host-side approval" : "host locked"}
-                  tone={isActiveHost ? "yellow" : "muted"}
-                />
-              </div>
-              <div className="approval-grid">
-                <ApprovalItem label="Messages" value={`${visibleCodexTurnSummary.messagesSinceLastCodex} since last Codex response`} />
-                <ApprovalItem label="Attachments" value={formatCodexAttachmentSummary(visibleCodexTurnSummary.attachments)} />
-                <ApprovalItem label="Workspace" value={selectedRoom.mode.workspace ? visibleCodexTurnSummary.workspacePath ?? "None" : "Disabled"} />
-                <ApprovalItem label="Git" value={formatCodexGitSummary(visibleCodexTurnSummary.git)} />
-                <ApprovalItem label="Browser" value={selectedRoom.mode.browser ? visibleCodexTurnSummary.browserAccess.join(", ") || "No pages shared" : "Disabled"} />
-                <ApprovalItem label="Terminals" value={visibleCodexTurnSummary.terminals.join(", ") || "None"} />
-                <ApprovalItem label="Model" value={formatCodexModel(selectedCodexModel)} />
-                <ApprovalItem label="Thread" value={formatCodexThreadId(selectedCodexThreadId)} />
-                <ApprovalItem label="Policy" value={approvalPolicyLabels[selectedRoom.approvalPolicy]} />
-              </div>
-              <div className="approval-actions">
-                <button className="secondary" onClick={() => {
-                  setPendingCodexApprovalForRoom(selectedRoom.id, null);
-                  setApprovalVisibleForRoom(selectedRoom.id, false);
-                }}>
-                  <X size={16} /> Deny
-                </button>
-                <button className="primary" onClick={() => approveCodexTurn()} disabled={!hasSelectedRoom || codexRunning || !canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked)}>
-                  <Check size={16} /> {codexRunning ? "Running" : "Approve"}
-                </button>
-              </div>
-            </section>
-          )}
-        </div>
-
-        <footer className="composer">
-	          <button title="Invoke Codex" onClick={() => handleCodexInvoke()} disabled={!canUseRoomChat(selectedRoom, isSelectedRoomLocked)}>
-            <Bot size={18} />
-          </button>
-          <div className="composer-body">
-            {pendingAttachments.length > 0 && (
-              <div className="pending-attachments">
-	                {pendingAttachments.map((attachment) => (
-	                  <span key={attachment.id}>
-	                    <FileCode2 size={13} />
-	                    {attachment.name}{attachment.blobId ? " (encrypted blob)" : ""}
-	                    <button onClick={() => removePendingAttachment(attachment.id)} aria-label={`Remove ${attachment.name}`}>
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-                <small>
-                  {pendingAttachments.length}/{maxMessageAttachments} files · {formatBytes(pendingAttachmentBytes)}/{formatBytes(maxEmbeddedAttachmentBytesPerMessage)}
-                </small>
-              </div>
-            )}
-            <textarea
-              placeholder={
-                isSelectedRoomLocked
-                  ? roomLockMessage(selectedRoom, isSelectedRoomRevoked)
-                  : selectedRoom.mode.chat
-                    ? "Message the room, or type @Codex to invoke the active host..."
-                    : "Chat mode is disabled for this room"
-              }
-              value={draft}
-              disabled={!canUseRoomChat(selectedRoom, isSelectedRoomLocked)}
-              onChange={(event) => setDraftForRoom(selectedRoom.id, event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  sendMessage();
-                }
-              }}
-            />
-          </div>
-          <button className="send" onClick={sendMessage} disabled={!canUseRoomChat(selectedRoom, isSelectedRoomLocked)}>
-            <Send size={18} />
-          </button>
-        </footer>
+        <RoomChatPanel
+          messages={chatMessageRows}
+          approvalVisible={approvalVisible}
+          approvalSummary={codexApprovalSummaryDisplay}
+          isActiveHost={isActiveHost}
+          codexRunning={codexRunning}
+          canApproveCodex={hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked)}
+          canUseChat={roomCanUseChat}
+          roomLocked={isSelectedRoomLocked}
+          lockedPlaceholder={roomLockMessage(selectedRoom, isSelectedRoomRevoked)}
+          chatEnabled={selectedRoom.mode.chat}
+          draft={draft}
+          pendingAttachments={pendingAttachmentRows}
+          pendingAttachmentSummary={pendingAttachmentSummary}
+          onToggleMessageSelection={toggleMessageSelection}
+          onCopyMessageMarkdown={(messageId) => {
+            const message = messages.find((item) => item.id === messageId);
+            if (message) copyMessageMarkdown(message);
+          }}
+          onCopyCodexOutputMarkdown={(messageId) => {
+            const message = messages.find((item) => item.id === messageId);
+            if (message) copyCodexOutputMarkdown(message);
+          }}
+          onOpenAttachment={(messageId, attachmentId) => {
+            const message = messages.find((item) => item.id === messageId);
+            const attachment = message?.attachments?.find((item) => item.id === attachmentId);
+            if (attachment) openEncryptedAttachmentBlob(attachment);
+          }}
+          onToggleReaction={(messageId, emoji) => {
+            const message = messages.find((item) => item.id === messageId);
+            if (message) toggleMessageReaction(message, emoji);
+          }}
+          onDenyApproval={() => {
+            setPendingCodexApprovalForRoom(selectedRoom.id, null);
+            setApprovalVisibleForRoom(selectedRoom.id, false);
+          }}
+          onApproveApproval={() => approveCodexTurn()}
+          onInvokeCodex={() => handleCodexInvoke()}
+          onRemovePendingAttachment={removePendingAttachment}
+          onDraftChange={(nextDraft) => setDraftForRoom(selectedRoom.id, nextDraft)}
+          onSendMessage={sendMessage}
+        />
       </main>
 
-      <aside className="inspector">
-        <div className="inspector-tabs">
-          <button className="active"><PanelRight size={15} /> Work</button>
-          <button><Globe2 size={15} /> Browser</button>
-        </div>
+      <RoomInspectorPanel
+        activeTab={inspectorTab}
+        workAttentionCount={inspectorAttention.work}
+        browserAttentionCount={inspectorAttention.browser}
+        onSelectTab={(tab) => setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: tab }))}
+        browserPanel={(
+          <BrowserAccessPanel
+            hidden={false}
+            browserEnabled={selectedRoom.mode.browser}
+            browserStatus={browserStatus}
+            browserProfilePersistent={selectedRoom.browserProfilePersistent}
+            browserProfileDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
+            browserAllowedOriginsDraft={browserAllowedOriginsDraft}
+            browserAllowedOriginsDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
+            browserUrl={browserUrl}
+            browserReason={browserReason}
+            canRequestBrowser={canRequestBrowser}
+            canHostBrowser={canHostBrowser}
+            browserRequests={browserRequests}
+            browserMessage={browserMessage}
+            formatBrowserAccessLabel={formatBrowserAccessLabel}
+            detectBrowserSecretRisks={detectBrowserSecretRisks}
+            onResetBrowserProfile={resetRoomBrowserProfile}
+            onBrowserProfilePersistenceChange={setBrowserProfilePersistence}
+            onBrowserAllowedOriginsDraftChange={(draft) => setBrowserAllowedOriginsDraftForRoom(selectedRoom.id, draft)}
+            onSaveBrowserAllowedOrigins={saveBrowserAllowedOrigins}
+            onBrowserUrlChange={(url) => setBrowserUrlForRoom(selectedRoom.id, url)}
+            onBrowserReasonChange={(reason) => setBrowserReasonForRoom(selectedRoom.id, reason)}
+            onRequestBrowserAccess={requestBrowserAccess}
+            onApproveBrowserRequest={approveBrowserRequest}
+            onDenyBrowserRequest={denyBrowserRequest}
+            onOpenApprovedBrowserRequest={openApprovedBrowserRequest}
+          />
+        )}
+        workPanel={(
+          <>
+        <ProjectPanel
+          projectPath={selectedRoom.projectPath}
+          projectPathDraft={projectPathDraft}
+          branchLabel={gitStatus?.branch ?? "loading"}
+          disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
+          attachDisabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost || !projectPathDraft.trim() || projectPathDraft.trim() === selectedRoom.projectPath}
+          onProjectPathDraftChange={(path) => setProjectPathDraftForRoom(selectedRoom.id, path)}
+          onChooseProjectPath={chooseProjectPath}
+          onUseDefaultProjectPath={() => setProjectPathDraftForRoom(selectedRoom.id, defaultProjectPath)}
+          onUpdateProjectPath={updateProjectPath}
+        />
 
-        <section className="panel browser-panel">
-          <div className="panel-title">
-            <span>Browser access</span>
-            <StatusPill
-              icon={<Globe2 size={13} />}
-              label={selectedRoom.mode.browser ? "enabled" : "disabled"}
-              tone={selectedRoom.mode.browser ? "green" : "muted"}
-            />
-          </div>
-          <div className="browser-profile-state">
-            <div>
-              <strong>Room-isolated profile</strong>
-              <span>
-                {browserStatus.profilePath ?? "Created when the host opens an approved page."}
-                {" · "}
-                {selectedRoom.browserProfilePersistent ? "persists between opens" : "refreshes before each open"}
-              </span>
-            </div>
-            <button onClick={resetRoomBrowserProfile} disabled={!canHostBrowser}>
-              <RefreshCw size={13} />
-              Reset
-            </button>
-          </div>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={selectedRoom.browserProfilePersistent}
-              disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
-              onChange={(event) => setBrowserProfilePersistence(event.target.checked)}
-            />
-            <span>Persist room browser profile</span>
-          </label>
-          <div className="browser-policy-state">
-            <StatusPill
-              icon={<Lock size={13} />}
-              label={browserStatus.downloadsBlocked ? "Downloads blocked" : "Downloads blocked in native browser"}
-              tone={browserStatus.downloadsBlocked ? "green" : "muted"}
-            />
-            <StatusPill
-              icon={<Lock size={13} />}
-              label={browserStatus.clipboardBlocked ? "Clipboard blocked" : "Clipboard blocked in native browser"}
-              tone={browserStatus.clipboardBlocked ? "green" : "muted"}
-            />
-            <StatusPill
-              icon={<Lock size={13} />}
-              label={browserStatus.fileUploadsBlocked ? "File uploads blocked" : "File uploads blocked in native browser"}
-              tone={browserStatus.fileUploadsBlocked ? "green" : "muted"}
-            />
-            <StatusPill icon={<ShieldAlert size={13} />} label="Signed-in pages are shared with room context" tone="yellow" />
-          </div>
-          <div className="browser-allowlist">
-            <label>
-              <span>Allowed sites</span>
-              <textarea
-                value={browserAllowedOriginsDraft}
-                disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
-                onChange={(event) => setBrowserAllowedOriginsDraftForRoom(selectedRoom.id, event.target.value)}
-                placeholder="https://github.com"
-              />
-            </label>
-            <button
-              className="ghost-wide"
-              onClick={saveBrowserAllowedOrigins}
-              disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
-            >
-              <Check size={15} />
-              Save allowed sites
-            </button>
-          </div>
-          <label>
-            <span>URL</span>
-            <input
-              value={browserUrl}
-              disabled={!canRequestBrowser}
-              onChange={(event) => setBrowserUrlForRoom(selectedRoom.id, event.target.value)}
-              placeholder="https://github.com/maddiedreese/multAIplayer"
-            />
-          </label>
-          <label>
-            <span>Reason</span>
-            <textarea
-              value={browserReason}
-              disabled={!canRequestBrowser}
-              onChange={(event) => setBrowserReasonForRoom(selectedRoom.id, event.target.value)}
-              placeholder="Why should Codex use this page?"
-            />
-          </label>
-          <button
-            className="primary-wide"
-            onClick={requestBrowserAccess}
-            disabled={!canRequestBrowser || !browserUrl.trim()}
-          >
-            <Globe2 size={15} />
-            Request browser access
-          </button>
-          <div className="browser-requests">
-            {browserRequests.slice(-4).reverse().map((request) => (
-              <div className={`browser-request ${request.status}`} key={request.id}>
-                <div>
-                  <strong>{formatBrowserAccessLabel(request.url)}</strong>
-                  <span>{request.reason}</span>
-                  <small>{request.requester}</small>
-                </div>
-                <small>{request.status}</small>
-                {request.status === "pending" && (
-                  <div>
-                    <button onClick={() => approveBrowserRequest(request)} disabled={!canHostBrowser}>
-                      <Check size={13} />
-                    </button>
-                    <button onClick={() => denyBrowserRequest(request.id)} disabled={!canHostBrowser}>
-                      <X size={13} />
-                    </button>
-                  </div>
-                )}
-                {request.status === "approved" && (
-                  <div>
-                    <button onClick={() => openApprovedBrowserRequest(request)} title="Open approved room browser" disabled={!canHostBrowser}>
-                      <ExternalLink size={13} />
-                    </button>
-                  </div>
-                )}
-                {detectBrowserSecretRisks(request.url).length > 0 && (
-                  <InlineSecretWarning
-                    risks={detectBrowserSecretRisks(request.url)}
-                    compact
-                    detail="Opening this page can expose a signed-in browser session to room context and Codex actions."
-                  />
-                )}
-              </div>
-            ))}
-            {browserRequests.length === 0 && (
-              <div className="empty-state compact">No browser requests in this room.</div>
-            )}
-          </div>
-          {browserMessage && <div className="workflow-message">{browserMessage}</div>}
-        </section>
+        <TeamRosterPanel
+          members={selectedTeamMemberRows}
+          hasSelectedTeam={Boolean(selectedTeam)}
+          busy={selectedTeamMembersBusy}
+          message={selectedTeamMembersMessage}
+          onPromote={(member) => changeTeamMemberRole(member, "admin")}
+          onDemote={(member) => changeTeamMemberRole(member, "member")}
+          onTransferOwnership={transferOwnershipToTeamMember}
+          onRemove={removeMemberFromTeam}
+        />
 
-        <section className="panel">
-          <div className="panel-title">
-            <span>Project</span>
-            <StatusPill icon={<GitBranch size={13} />} label={gitStatus?.branch ?? "loading"} tone="dark" />
-          </div>
-          <div className="project-card">
-            <FolderGit2 size={18} />
-            <div>
-              <strong>multAIplayer</strong>
-              <span>{selectedRoom.projectPath}</span>
-            </div>
-          </div>
-          <div className="project-path-editor">
-            <label>
-              <span>Local folder</span>
-              <input
-                value={projectPathDraft}
-                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-                onChange={(event) => setProjectPathDraftForRoom(selectedRoom.id, event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    updateProjectPath();
-                  }
-                }}
-              />
-            </label>
-            <div>
-              <button className="ghost-wide" onClick={chooseProjectPath} disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}>
-                <FolderGit2 size={15} />
-                Choose folder
-              </button>
-              <button className="ghost-wide" onClick={() => setProjectPathDraftForRoom(selectedRoom.id, defaultProjectPath)} disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}>
-                <FolderGit2 size={15} />
-                Current repo
-              </button>
-              <button
-                className="primary-wide"
-                onClick={updateProjectPath}
-                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost || !projectPathDraft.trim() || projectPathDraft.trim() === selectedRoom.projectPath}
-              >
-                <Check size={15} />
-                Attach
-              </button>
-            </div>
-          </div>
-        </section>
+        <RoomMembersPanel
+          members={roomMemberRows}
+          localDeviceId={deviceId}
+          message={deviceIdentityMessage}
+          onCopyFingerprint={(member) => copyRoomMemberDeviceFingerprint(member, member.trusted)}
+          onTrust={trustRoomMemberDevice}
+          onUntrust={untrustRoomMemberDevice}
+        />
 
-        <section className="panel members-panel">
-          <div className="panel-title">
-            <span>Team roster</span>
-            <StatusPill icon={<UsersRound size={13} />} label={`${selectedTeamMembers.length || 0}`} tone="dark" />
-          </div>
-          <div className="member-list">
-            {selectedTeamMembers.map((member) => (
-              <div className="member-row team-member-row" key={`${member.teamId}:${member.userId}`}>
-                <span>{formatTeamMemberInitial(member.userId)}</span>
-                <div>
-                  <strong>{formatTeamMemberName(member.userId, currentUser)}</strong>
-                  <small>{member.userId}</small>
-                </div>
-                <div className="member-badges">
-                  <b className={member.role === "owner" ? "trusted" : member.role === "admin" ? "verified" : ""}>
-                    {formatTeamRole(member.role)}
-                  </b>
-                  {canPromoteTeamMember(selectedTeamRecord, member) && (
-                    <button onClick={() => changeTeamMemberRole(member, "admin")} disabled={selectedTeamMembersBusy}>Promote</button>
-                  )}
-                  {canDemoteTeamMember(selectedTeamRecord, member) && (
-                    <button onClick={() => changeTeamMemberRole(member, "member")} disabled={selectedTeamMembersBusy}>Demote</button>
-                  )}
-                  {canTransferTeamOwnership(selectedTeamRecord, member, localUser.id) && (
-                    <button onClick={() => transferOwnershipToTeamMember(member)} disabled={selectedTeamMembersBusy}>Make owner</button>
-                  )}
-                  {canRemoveTeamMember(selectedTeamRecord, member) && (
-                    <button onClick={() => removeMemberFromTeam(member)} disabled={selectedTeamMembersBusy}>Remove</button>
-                  )}
-                </div>
-                <small>{formatTeamMemberJoinedAt(member.joinedAt)}</small>
-              </div>
-            ))}
-          </div>
-          {selectedTeamMembers.length === 0 && (
-            <div className="sidebar-empty">
-              {selectedTeam ? "No team roster loaded yet." : "Select a team to view its roster."}
-            </div>
-          )}
-          {selectedTeamMembersMessage && <div className="workflow-message">{selectedTeamMembersMessage}</div>}
-        </section>
+        <HostHandoffPanel
+          handoffs={hostHandoffs}
+          acceptDisabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy}
+          onAcceptHandoff={acceptHostHandoff}
+          formatModel={formatCodexModel}
+        />
 
-        <section className="panel members-panel">
-          <div className="panel-title">
-            <span>Members</span>
-            <StatusPill icon={<UsersRound size={13} />} label={`${roomMembers.length || 1} online`} tone="blue" />
-          </div>
-          <div className="member-list">
-            {(roomMembers.length ? roomMembers : [{
-              userId: localUser.id,
-              deviceId,
-              displayName: localUser.name,
-              avatarUrl: localUser.avatarUrl,
-              publicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
-              status: "online" as const
-            }]).map((member) => {
-              const trusted = isDeviceKeyTrusted(
-                trustedDeviceKeys,
-                selectedRoom.id,
-                member.deviceId,
-                member.publicKeyFingerprint
-              );
-              return (
-                <div className="member-row" key={member.deviceId}>
-                  {member.avatarUrl ? <img src={member.avatarUrl} alt="" /> : <span>{member.displayName.slice(0, 1)}</span>}
-                  <div>
-                    <strong>{member.displayName}</strong>
-                    <small>{formatMemberDeviceLabel(member, deviceId, trusted)}</small>
-                  </div>
-                  <div className="member-badges">
-                    {isRoomHostMember(member, selectedRoom) && <b>host</b>}
-                    <b className={member.publicKeyFingerprint ? trusted ? "trusted" : "verified" : "warning"}>
-                      {member.publicKeyFingerprint ? trusted ? "trusted" : "keyed" : "unregistered"}
-                    </b>
-                    {member.publicKeyFingerprint && member.deviceId !== deviceId && (
-                      <>
-                        <button onClick={() => copyRoomMemberDeviceFingerprint(member, trusted)} title="Copy full device fingerprint">
-                          <Copy size={12} />
-                        </button>
-                        {trusted ? (
-                          <button onClick={() => untrustRoomMemberDevice(member)}>Untrust</button>
-                        ) : (
-                          <button onClick={() => trustRoomMemberDevice(member)}>Trust</button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                  <i />
-                </div>
-              );
-            })}
-          </div>
-          {deviceIdentityMessage && <div className="workflow-message">{deviceIdentityMessage}</div>}
-        </section>
+        <EncryptedInvitePanel
+          inviteApprovalGate={inviteApprovalGate}
+          copyDisabled={!canCopyRoomInvite}
+          inviteSecretInput={inviteSecretInput}
+          inviteRequests={inviteRequests}
+          localDeviceId={deviceId}
+          gateDisabled={!hasSelectedRoom || isSelectedRoomLocked}
+          importDisabled={!inviteSecretInput.trim()}
+          rotateDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || keyRotationBusy}
+          approvalDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost}
+          keyRotationBusy={keyRotationBusy}
+          inviteLink={inviteLink}
+          inviteMessage={inviteMessage}
+          onCopyInvite={copyInviteLink}
+          onInviteApprovalGateChange={(enabled) => setInviteApprovalGateForRoom(selectedRoom.id, enabled)}
+          onInviteSecretInputChange={setInviteSecretInput}
+          onImportInvite={joinInviteSecret}
+          onRotateRoomKey={rotateSelectedRoomKey}
+          onDecideInviteRequest={decideInviteJoinRequest}
+        />
 
-        <section className="panel handoff-panel">
-          <div className="panel-title">
-            <span>Host handoff</span>
-            <StatusPill
-              icon={<UserRoundCheck size={13} />}
-              label={hostHandoffs.some((handoff) => handoff.status === "available") ? "available" : "none"}
-              tone={hostHandoffs.some((handoff) => handoff.status === "available") ? "yellow" : "muted"}
-            />
-          </div>
-          <div className="handoff-list">
-            {hostHandoffs.slice(-3).reverse().map((handoff) => (
-              <div className={`handoff-row ${handoff.status}`} key={handoff.id}>
-                <div>
-                  <strong>{handoff.fromHost}</strong>
-                  <span>{handoff.messagesSinceLastCodex} messages · {handoff.attachmentNames.length} attachments · {handoff.terminals.length} terminals</span>
-                  <small>{handoff.projectPath} · {formatCodexModel(handoff.codexModel)}</small>
-                </div>
-                {handoff.status === "available" ? (
-                  <button onClick={() => acceptHostHandoff(handoff)} disabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy}>
-                    <Check size={13} />
-                    Accept
-                  </button>
-                ) : (
-                  <b>{handoff.status}</b>
-                )}
-              </div>
-            ))}
-            {hostHandoffs.length === 0 && (
-              <div className="empty-state compact">No host handoff package for this room.</div>
-            )}
-          </div>
-        </section>
+        <ApprovalPolicyPanel
+          selectedPolicy={selectedRoom.approvalPolicy}
+          labels={approvalPolicyLabels}
+          disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
+          message={settingsMessage}
+          onSelectPolicy={setApprovalPolicy}
+        />
 
-        <section className="panel invite-panel">
-          <div className="panel-title">
-            <span>Encrypted invite</span>
-            <StatusPill
-              icon={<Lock size={13} />}
-              label={inviteApprovalGate ? "approval key delivery" : "fragment key"}
-              tone={inviteApprovalGate ? "blue" : "green"}
-            />
-          </div>
-          <button className="primary-wide" onClick={copyInviteLink} disabled={!canCopyRoomInvite}>
-            <Copy size={15} />
-            Copy room invite
-          </button>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={inviteApprovalGate}
-              disabled={!hasSelectedRoom || isSelectedRoomLocked}
-              onChange={(event) => setInviteApprovalGateForRoom(selectedRoom.id, event.target.checked)}
-            />
-            <span>Ask host to approve joiners</span>
-          </label>
-          <label>
-            <span>Join from invite link or key</span>
-            <textarea
-              value={inviteSecretInput}
-              onChange={(event) => setInviteSecretInput(event.target.value)}
-              placeholder="Paste a multAIplayer invite..."
-            />
-          </label>
-          <button className="ghost-wide" onClick={joinInviteSecret} disabled={!inviteSecretInput.trim()}>
-            <KeyRound size={15} />
-            Import invite
-          </button>
-          <button className="ghost-wide danger" onClick={rotateSelectedRoomKey} disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || keyRotationBusy}>
-            <RefreshCw size={15} />
-            {keyRotationBusy ? "Rotating room key" : "Rotate room key"}
-          </button>
-          <div className="empty-state compact">
-            Rotation updates future messages and invites for current key holders. It is not alpha member removal.
-          </div>
-          <div className="terminal-requests">
-            {inviteRequests.slice(-4).reverse().map((request) => (
-              <div className={`terminal-request ${request.status}`} key={request.id}>
-                <div>
-                  <strong>{request.requester}</strong>
-                  <span>{request.note ?? "Requesting room access."}</span>
-                  <small>{request.requesterDeviceId === deviceId ? "This device" : request.requesterDeviceId}</small>
-                </div>
-                <small>{request.status}</small>
-                {request.status === "pending" && (
-                  <div>
-                    <button onClick={() => decideInviteJoinRequest(request, "approved")} disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost}>
-                      <Check size={13} />
-                    </button>
-                    <button onClick={() => decideInviteJoinRequest(request, "denied")} disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost}>
-                      <X size={13} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-            {inviteRequests.length === 0 && (
-              <div className="empty-state compact">No invite approval requests in this room.</div>
-            )}
-          </div>
-          {inviteLink && <div className="invite-link">{inviteLink}</div>}
-          {inviteMessage && <div className="workflow-message">{inviteMessage}</div>}
-        </section>
+        <RoomModePanel
+          mode={selectedRoom.mode}
+          labels={roomModeLabels}
+          disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
+          onToggleMode={toggleRoomMode}
+        />
 
-        <section className="panel policy-panel">
-          <div className="panel-title">
-            <span>Approval policy</span>
-            <StatusPill icon={<KeyRound size={13} />} label="host-side" tone="yellow" />
-          </div>
-          <div className="policy-options">
-            {(Object.keys(approvalPolicyLabels) as ApprovalPolicy[]).map((policy) => (
-              <button
-                key={policy}
-                className={selectedRoom.approvalPolicy === policy ? "active" : ""}
-                onClick={() => setApprovalPolicy(policy)}
-                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-              >
-                {approvalPolicyLabels[policy]}
-              </button>
-            ))}
-          </div>
-          {settingsMessage && <div className="workflow-message">{settingsMessage}</div>}
-        </section>
+        <ModelPanel
+          selectedModel={selectedCodexModel}
+          selectedModelLabel={formatCodexModel(selectedCodexModel)}
+          customModel={customCodexModel}
+          modelOptions={codexModelOptions}
+          disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
+          canApplyCustomModel={Boolean(customCodexModel.trim()) && customCodexModel.trim() !== selectedCodexModel}
+          onSelectModel={setCodexModel}
+          onCustomModelChange={(model) => setCustomCodexModelForRoom(selectedRoom.id, model)}
+          onApplyCustomModel={() => setCodexModel(customCodexModel)}
+        />
 
-        <section className="panel mode-panel">
-          <div className="panel-title">
-            <span>Room modes</span>
-            <StatusPill icon={<Settings size={13} />} label="per room" tone="dark" />
-          </div>
-          <div className="mode-options">
-            {(Object.keys(roomModeLabels) as Array<keyof RoomMode>).map((key) => (
-              <label key={key}>
-                <input
-                  type="checkbox"
-                  checked={selectedRoom.mode[key]}
-                  disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-                  onChange={() => toggleRoomMode(key)}
-                />
-                <span>{roomModeLabels[key]}</span>
-              </label>
-            ))}
-          </div>
-        </section>
+        <LocalHistoryPanel
+          historySettings={historySettings}
+          teamHistorySettings={teamHistorySettings}
+          selectedTeam={Boolean(selectedTeam)}
+          hasSelectedRoom={hasSelectedRoom}
+          settingsBusy={settingsBusy}
+          teamDefaultApprovalPolicy={teamDefaultApprovalPolicy}
+          approvalPolicyLabels={approvalPolicyLabels}
+          teamDefaultCodexModel={teamDefaultCodexModel}
+          defaultCodexModel={defaultCodexModel}
+          codexModelOptions={codexModelOptions}
+          teamDefaultBrowserProfilePersistent={teamDefaultBrowserProfilePersistent}
+          teamDefaultBrowserAllowedOriginsDraft={teamDefaultBrowserAllowedOriginsDraft}
+          teamDefaultInviteApprovalGate={teamDefaultInviteApprovalGate}
+          message={visibleHistoryMessage}
+          onHistoryEnabledChange={(enabled) =>
+            updateLocalHistorySettings({
+              ...historySettings,
+              enabled
+            })
+          }
+          onHistoryRetentionDaysChange={(retentionDays) =>
+            updateLocalHistorySettings({
+              ...historySettings,
+              retentionDays
+            })
+          }
+          onClearRoomHistory={clearRoomHistory}
+          onForgetRoomLocalData={forgetSelectedRoomLocalData}
+          onApplyTeamDefaultsToRoom={applyTeamDefaultsToRoom}
+          onTeamHistoryEnabledChange={(enabled) =>
+            updateTeamHistoryDefaults({
+              ...teamHistorySettings,
+              enabled
+            })
+          }
+          onTeamHistoryRetentionDaysChange={(retentionDays) =>
+            updateTeamHistoryDefaults({
+              ...teamHistorySettings,
+              retentionDays
+            })
+          }
+          onTeamDefaultApprovalPolicyChange={updateTeamDefaultApprovalPolicy}
+          onTeamDefaultCodexModelChange={updateTeamDefaultCodexModel}
+          onTeamDefaultBrowserProfilePersistentChange={setTeamDefaultBrowserProfilePersistent}
+          onTeamDefaultBrowserAllowedOriginsDraftChange={setTeamDefaultBrowserAllowedOriginsDraft}
+          onSaveTeamDefaultBrowserPolicy={saveTeamDefaultBrowserPolicy}
+          onTeamDefaultInviteApprovalGateChange={updateTeamDefaultInviteApprovalGate}
+        />
 
-        <section className="panel model-panel">
-          <div className="panel-title">
-            <span>Model</span>
-            <StatusPill icon={<Bot size={13} />} label={formatCodexModel(selectedCodexModel)} tone="blue" />
-          </div>
-          <label>
-            <span>Codex host model</span>
-            <select
-              value={codexModelOptions.some((option) => option.id === selectedCodexModel) ? selectedCodexModel : "custom"}
-              disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-              onChange={(event) => {
-                if (event.target.value !== "custom") {
-                  setCodexModel(event.target.value);
-                }
-              }}
-            >
-              {codexModelOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-              <option value="custom">Custom</option>
-            </select>
-          </label>
-          <label>
-            <span>Custom model id</span>
-            <input
-              value={customCodexModel}
-              disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-              onChange={(event) => setCustomCodexModelForRoom(selectedRoom.id, event.target.value)}
-              onBlur={() => setCodexModel(customCodexModel)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  setCodexModel(customCodexModel);
-                }
-              }}
-            />
-          </label>
-          <div className="model-options">
-            {codexModelOptions.map((option) => (
-              <button
-                key={option.id}
-                className={selectedCodexModel === option.id ? "active" : ""}
-                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-                onClick={() => setCodexModel(option.id)}
-              >
-                <strong>{option.label}</strong>
-                <span>{option.description}</span>
-              </button>
-            ))}
-          </div>
-        </section>
+        <WorkspaceFilesPanel
+          fileQuery={fileQuery}
+          projectFiles={projectFiles}
+          selectedFile={selectedFile}
+          gitStatus={gitStatus}
+          selectedDiff={selectedDiff}
+          fileBusy={fileBusy}
+          fileMessage={fileMessage}
+          canReadLocalWorkspace={canReadLocalWorkspace}
+          canAttachSelectedFile={canStageRoomChatAttachment(selectedRoom, isSelectedRoomLocked)}
+          selectedFileRisks={selectedFileRisks}
+          selectedFileNeedsAttachmentReview={selectedFileNeedsAttachmentReview}
+          selectedSensitiveFileReviewed={selectedSensitiveFileReviewed}
+          selectedAttachmentActionLabel={selectedAttachmentReview?.actionLabel ?? "Attach"}
+          selectedAttachmentWarningDetail={selectedAttachmentReview?.warningDetail ?? undefined}
+          filePreviewTab={filePreviewTab}
+          formatBytes={formatBytes}
+          onCopyProjectMarkdown={copyProjectMarkdown}
+          onFileQueryChange={(query) => setFileQueryForRoom(selectedRoom.id, query)}
+          onOpenProjectFile={openProjectFile}
+          onCopyDiffSummaryMarkdown={copyDiffSummaryMarkdown}
+          onAttachSelectedFileToMessage={attachSelectedFileToMessage}
+          onFilePreviewTabChange={(tab) => setFilePreviewTabForRoom(selectedRoom.id, tab)}
+        />
 
-        <section className="panel history-panel">
-          <div className="panel-title">
-            <span>Local history</span>
-            <StatusPill
-              icon={<Lock size={13} />}
-              label={historySettings.enabled ? `${historySettings.retentionDays} days` : "off"}
-              tone={historySettings.enabled ? "green" : "muted"}
-            />
-          </div>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={historySettings.enabled}
-              disabled={!hasSelectedRoom}
-              onChange={(event) =>
-                updateLocalHistorySettings({
-                  ...historySettings,
-                  enabled: event.target.checked
-                })
-              }
-            />
-            <span>Save encrypted local room history</span>
-          </label>
-          <label className="history-retention">
-            <span>Retention days</span>
-            <input
-              type="number"
-              min={1}
-              max={365}
-              value={historySettings.retentionDays}
-              disabled={!hasSelectedRoom || !historySettings.enabled}
-              onChange={(event) =>
-                updateLocalHistorySettings({
-                  ...historySettings,
-                  retentionDays: Number(event.target.value)
-                })
-              }
-            />
-          </label>
-	          <button className="ghost-wide" onClick={clearRoomHistory} disabled={!hasSelectedRoom}>
-	            <X size={15} />
-	            Clear local history
-	          </button>
-	          <button className="ghost-wide danger" onClick={forgetSelectedRoomLocalData} disabled={!hasSelectedRoom}>
-	            <KeyRound size={15} />
-	            Forget room on this device
-	          </button>
-	          <div className="history-defaults">
-	            <div>
-	              <strong>Team default</strong>
-	              <span>{teamHistorySettings.enabled ? `${teamHistorySettings.retentionDays} days for new rooms` : "off for new rooms"}</span>
-	            </div>
-	            <button className="ghost-wide" onClick={applyTeamDefaultsToRoom} disabled={!hasSelectedRoom || settingsBusy}>
-	              <Check size={15} />
-	              Apply defaults to room
-	            </button>
-	          </div>
-	          <label className="checkbox-row">
-	            <input
-	              type="checkbox"
-	              checked={teamHistorySettings.enabled}
-	              disabled={!selectedTeam}
-	              onChange={(event) =>
-	                updateTeamHistoryDefaults({
-	                  ...teamHistorySettings,
-	                  enabled: event.target.checked
-	                })
-	              }
-	            />
-	            <span>Save encrypted history in new rooms for this team</span>
-	          </label>
-	          <label className="history-retention">
-	            <span>Team retention days</span>
-	            <input
-	              type="number"
-	              min={1}
-	              max={365}
-	              value={teamHistorySettings.retentionDays}
-	              disabled={!selectedTeam || !teamHistorySettings.enabled}
-	              onChange={(event) =>
-	                updateTeamHistoryDefaults({
-	                  ...teamHistorySettings,
-	                  retentionDays: Number(event.target.value)
-	                })
-	              }
-	            />
-	          </label>
-	          <label className="history-retention">
-	            <span>New room approval</span>
-	            <select
-	              value={teamDefaultApprovalPolicy}
-	              disabled={!selectedTeam}
-	              onChange={(event) => updateTeamDefaultApprovalPolicy(event.target.value as ApprovalPolicy)}
-	            >
-	              {(Object.keys(approvalPolicyLabels) as ApprovalPolicy[]).map((policy) => (
-	                <option key={policy} value={policy}>{approvalPolicyLabels[policy]}</option>
-	              ))}
-	            </select>
-	          </label>
-	          <label className="history-retention">
-	            <span>New room model</span>
-	            <select
-	              value={codexModelOptions.some((option) => option.id === teamDefaultCodexModel) ? teamDefaultCodexModel : defaultCodexModel}
-	              disabled={!selectedTeam}
-	              onChange={(event) => updateTeamDefaultCodexModel(event.target.value)}
-	            >
-	              {codexModelOptions.map((option) => (
-	                <option key={option.id} value={option.id}>{option.label}</option>
-	              ))}
-	            </select>
-	          </label>
-	          <label className="checkbox-row">
-	            <input
-	              type="checkbox"
-	              checked={teamDefaultBrowserProfilePersistent}
-	              disabled={!selectedTeam}
-	              onChange={(event) => setTeamDefaultBrowserProfilePersistent(event.target.checked)}
-	            />
-	            <span>Persist browser profiles in new team rooms</span>
-	          </label>
-	          <div className="browser-allowlist">
-	            <label>
-	              <span>New room allowed browser sites</span>
-	              <textarea
-	                value={teamDefaultBrowserAllowedOriginsDraft}
-	                disabled={!selectedTeam}
-	                onChange={(event) => setTeamDefaultBrowserAllowedOriginsDraft(event.target.value)}
-	                placeholder="https://github.com"
-	              />
-	            </label>
-	            <button className="ghost-wide" onClick={saveTeamDefaultBrowserPolicy} disabled={!selectedTeam}>
-	              <Check size={15} />
-	              Save browser defaults
-	            </button>
-	          </div>
-	          <label className="checkbox-row">
-	            <input
-	              type="checkbox"
-	              checked={teamDefaultInviteApprovalGate}
-	              disabled={!selectedTeam}
-	              onChange={(event) => updateTeamDefaultInviteApprovalGate(event.target.checked)}
-	            />
-	            <span>Require host approval for new room invites</span>
-	          </label>
-	          {visibleHistoryMessage && <div className="workflow-message">{visibleHistoryMessage}</div>}
-	        </section>
+        <GitHandoffPanel
+          draft={gitWorkflowDraft}
+          preview={gitApprovalPreview}
+          readiness={githubWorkflowReadiness}
+          canReadLocalWorkspace={canReadLocalWorkspace}
+          gitWorkflowBusy={gitWorkflowBusy}
+          isActiveHost={isActiveHost}
+          message={gitWorkflowMessage}
+          onDraftChange={updateSelectedGitWorkflowDraft}
+          onCopyPullRequestDraftMarkdown={copyPullRequestDraftMarkdown}
+          onApproveGitWorkflow={approveGitWorkflow}
+        />
 
-        <section className="panel">
-          <div className="panel-title">
-            <span>Files</span>
-            <button className="ghost" onClick={copyProjectMarkdown} disabled={!canReadLocalWorkspace}><Copy size={14} /> Markdown</button>
-          </div>
-          <label className="file-search">
-            <Search size={14} />
-            <input
-              value={fileQuery}
-              onChange={(event) => setFileQueryForRoom(selectedRoom.id, event.target.value)}
-              placeholder="Search project files"
-              disabled={!canReadLocalWorkspace}
-            />
-          </label>
-          <div className="file-list">
-            {projectFiles.map((file) => (
-              <button
-                className={selectedFile?.path === file.path ? "file-row active" : "file-row"}
-                key={file.path}
-                onClick={() => openProjectFile(file.path)}
-                disabled={!canReadLocalWorkspace}
-              >
-                <FileCode2 size={15} />
-                <span>{file.path}</span>
-                <small>{formatBytes(file.size)}</small>
-              </button>
-            ))}
-            {!fileBusy && projectFiles.length === 0 && (
-              <div className="empty-state">No files match this search.</div>
-            )}
-          </div>
-          {fileBusy && <div className="empty-state">Loading project files...</div>}
-          {fileMessage && <div className="workflow-message">{fileMessage}</div>}
-        </section>
+        <GitHubActionsPanel
+          summary={actionsSummary}
+          readiness={githubActionsReadiness}
+          runs={actionRuns}
+          owner={gitWorkflowDraft.prOwner}
+          repo={gitWorkflowDraft.prRepo}
+          branch={gitWorkflowDraft.branchName}
+          lastChecked={actionsLastChecked}
+          busy={actionsBusy}
+          refreshDisabled={!canReadLocalWorkspace || actionsBusy || !isActiveHost || !githubActionsReadiness.ready}
+          currentUserSignedIn={Boolean(currentUser)}
+          message={actionsMessage}
+          formatTimestamp={formatTimestamp}
+          onRefresh={() => refreshGitHubActions()}
+        />
 
-        <section className="panel">
-          <div className="panel-title">
-            <span>Changed files</span>
-            <div className="panel-title-actions">
-              <button className="ghost" onClick={copyDiffSummaryMarkdown} disabled={!canReadLocalWorkspace}>
-                <Copy size={14} /> Summary
-              </button>
-              <StatusPill icon={<Code2 size={13} />} label={`${gitStatus?.files.length ?? 0}`} tone="dark" />
-            </div>
-          </div>
-          <div className="diff-list">
-            {(gitStatus?.files.length ? gitStatus.files : []).map((file) => (
-              <button className="diff-row" key={file.path} onClick={() => openProjectFile(file.path)} disabled={!canReadLocalWorkspace}>
-                <FileCode2 size={15} />
-                <span>{file.path}</span>
-                <small><b>+{file.added}</b> <i>-{file.removed}</i></small>
-              </button>
-            ))}
-            {gitStatus?.files.length === 0 && (
-              <div className="empty-state">No local file changes in this project.</div>
-            )}
-          </div>
-        </section>
-
-        <section className="panel diff-preview">
-          <div className="panel-title">
-            <span>{selectedFile ? selectedFile.path.split("/").at(-1) : "File preview"}</span>
-            <div className="panel-title-actions">
-              {selectedFile && (
-                <button
-                  className={selectedFileNeedsAttachmentReview && selectedSensitiveFileReviewed ? "ghost danger" : "ghost"}
-                  onClick={attachSelectedFileToMessage}
-                  disabled={!canReadLocalWorkspace || !canStageRoomChatAttachment(selectedRoom, isSelectedRoomLocked)}
-                >
-                  {selectedFileNeedsAttachmentReview && !selectedSensitiveFileReviewed ? <ShieldAlert size={14} /> : <Plus size={14} />}
-                  {selectedAttachmentReview?.actionLabel ?? "Attach"}
-                </button>
-              )}
-              <StatusPill
-                icon={<Code2 size={13} />}
-                label={selectedFile?.truncated ? "truncated" : selectedFile ? formatBytes(selectedFile.size) : "select file"}
-                tone={selectedFile?.truncated ? "yellow" : "green"}
-              />
-            </div>
-          </div>
-          {selectedFileRisks.length > 0 && (
-            <InlineSecretWarning
-              risks={selectedFileRisks}
-              detail={selectedAttachmentReview?.warningDetail ?? undefined}
-            />
-          )}
-          {selectedDiff?.diff.trim() ? (
-            <div className="diff-code" aria-label={`Diff for ${selectedDiff.path}`}>
-              {parseDiffLines(selectedDiff.diff).map((line, index) => (
-                <div className={`diff-code-line ${line.kind}`} key={`${index}-${line.text}`}>
-                  <span>{line.prefix || " "}</span>
-                  <code>{line.text}</code>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <pre>
-              <code>
-{selectedFile?.content ?? "Select a file or changed path to preview it here."}
-              </code>
-            </pre>
-          )}
-        </section>
-
-        <section className="panel git-approval-panel">
-          <div className="panel-title">
-            <span>GitHub handoff</span>
-            <StatusPill icon={<ShieldAlert size={13} />} label="approval required" tone="yellow" />
-          </div>
-          <label>
-            <span>Branch</span>
-            <input value={gitWorkflowDraft.branchName} onChange={(event) => updateSelectedGitWorkflowDraft({ branchName: event.target.value })} />
-          </label>
-          <label>
-            <span>Commit message</span>
-            <input value={gitWorkflowDraft.commitMessage} onChange={(event) => updateSelectedGitWorkflowDraft({ commitMessage: event.target.value })} />
-          </label>
-          <div className="repo-grid">
-            <label>
-              <span>Owner</span>
-              <input value={gitWorkflowDraft.prOwner} onChange={(event) => updateSelectedGitWorkflowDraft({ prOwner: event.target.value })} />
-            </label>
-            <label>
-              <span>Repo</span>
-              <input value={gitWorkflowDraft.prRepo} onChange={(event) => updateSelectedGitWorkflowDraft({ prRepo: event.target.value })} />
-            </label>
-            <label>
-              <span>Base</span>
-              <input value={gitWorkflowDraft.prBase} onChange={(event) => updateSelectedGitWorkflowDraft({ prBase: event.target.value })} />
-            </label>
-          </div>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={gitWorkflowDraft.pushEnabled}
-              onChange={(event) => updateSelectedGitWorkflowDraft({ pushEnabled: event.target.checked })}
-            />
-            <span>Push branch and open draft PR</span>
-          </label>
-          <div className="git-approval-preview">
-            <strong>Host will approve</strong>
-            {gitApprovalPreview.error ? (
-              <div className="workflow-message danger">{gitApprovalPreview.error}</div>
-            ) : (
-              gitApprovalPreview.steps.map((step) => (
-                <div className="git-approval-step" key={step.title}>
-                  <span>{step.title}</span>
-                  <small>{step.detail}</small>
-                  {step.commands.map((command) => (
-                    <code key={command}>{command}</code>
-                  ))}
-                </div>
-              ))
-            )}
-            {gitWorkflowDraft.pushEnabled && !gitApprovalPreview.error && (
-              <small>Draft PR target: {githubWorkflowReadiness.target ?? `${gitWorkflowDraft.prOwner}/${gitWorkflowDraft.prRepo} to ${githubWorkflowReadiness.normalizedBase || "main"}`}</small>
-            )}
-          </div>
-          {gitWorkflowDraft.pushEnabled && (
-            <div className={`workflow-message ${githubWorkflowReadiness.ready ? "" : "danger"}`}>
-              {githubWorkflowReadiness.messages.join(" ")}
-            </div>
-          )}
-          <button className="ghost-wide" onClick={copyPullRequestDraftMarkdown} disabled={!canReadLocalWorkspace}>
-            <Copy size={15} />
-            Copy PR draft
-          </button>
-          <button
-            className="primary-wide"
-            onClick={approveGitWorkflow}
-            disabled={!canReadLocalWorkspace || gitWorkflowBusy || !isActiveHost || Boolean(gitApprovalPreview.error) || (gitWorkflowDraft.pushEnabled && !githubWorkflowReadiness.ready)}
-          >
-            <Github size={15} />
-            {gitWorkflowBusy ? "Running approved git workflow" : "Approve git workflow"}
-          </button>
-          {gitWorkflowMessage && <div className="workflow-message">{gitWorkflowMessage}</div>}
-        </section>
-
-        <section className="panel actions-panel">
-          <div className="panel-title">
-            <span>GitHub Actions</span>
-            <div className="panel-title-actions">
-              <StatusPill icon={<Github size={13} />} label={actionsSummary.label} tone={actionsSummary.tone} />
-              <button
-                className="ghost"
-                onClick={() => refreshGitHubActions()}
-                disabled={!canReadLocalWorkspace || actionsBusy || !isActiveHost || !githubActionsReadiness.ready}
-              >
-                <RefreshCw size={14} />
-                {actionsBusy ? "Checking" : "Refresh"}
-              </button>
-            </div>
-          </div>
-          <div className={`actions-summary ${actionsSummary.tone}`}>
-            <strong>{actionsSummary.detail}</strong>
-            <span>
-              {gitWorkflowDraft.prOwner}/{gitWorkflowDraft.prRepo} · {gitWorkflowDraft.branchName || "branch required"}
-              {actionsLastChecked ? ` · checked ${formatTimestamp(actionsLastChecked)}` : ""}
-            </span>
-          </div>
-          <div className={`workflow-message ${githubActionsReadiness.ready ? "" : "danger"}`}>
-            {githubActionsReadiness.messages.join(" ")}
-          </div>
-          <div className="actions-list">
-            {actionRuns.map((run) => (
-              <a href={run.url} target="_blank" rel="noreferrer" className={`action-run ${run.conclusion ?? run.status}`} key={run.id}>
-                <span className={`run-dot ${run.conclusion ?? run.status}`} />
-                <div>
-                  <strong>{run.displayTitle ?? run.name}</strong>
-                  <small>
-                    {run.name}
-                    {run.runNumber ? ` #${run.runNumber}` : ""} · {run.status}
-                    {run.conclusion ? ` / ${run.conclusion}` : ""} · {run.event ?? "event unknown"} · {formatTimestamp(run.updatedAt)}
-                  </small>
-                </div>
-                <ExternalLink size={13} />
-              </a>
-            ))}
-            {!actionsBusy && actionRuns.length === 0 && (
-              <div className="empty-state">
-                {currentUser ? "No GitHub Actions runs loaded." : "Sign in with GitHub to check workflow runs."}
-              </div>
-            )}
-          </div>
-          {actionsMessage && <div className="workflow-message">{actionsMessage}</div>}
-        </section>
-
-        <section className="panel terminal-panel">
-          <div className="panel-title">
-            <span>Terminals</span>
-            <div className="panel-title-actions">
-              <button className="ghost" onClick={copyTerminalMarkdown} disabled={!canReadLocalWorkspace}>
-                <Copy size={14} /> Markdown
-              </button>
-              <button className="ghost" onClick={runApprovedTerminalCheck} disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost}>
-                <Play size={14} /> {terminalBusy ? "running" : "git status"}
-              </button>
-            </div>
-          </div>
-          <div className="terminal-launcher">
-            <input
-              value={terminalName}
-              onChange={(event) => setTerminalNameForRoom(selectedRoom.id, event.target.value)}
-              placeholder="name"
-            />
-            <input
-              value={terminalCommand}
-              onChange={(event) => setTerminalCommandForRoom(selectedRoom.id, event.target.value)}
-              placeholder="command"
-            />
-            <button onClick={startNamedTerminal} disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost || !terminalName.trim() || !terminalCommand.trim()}>
-              <Play size={14} />
-            </button>
-            <button onClick={requestTerminalCommand} disabled={!canRequestWorkspace || !terminalCommand.trim()}>
-              <MessageSquare size={14} />
-            </button>
-            {terminalCommandRisks.length > 0 && (
-              <InlineSecretWarning
-                risks={terminalCommandRisks}
-                detail="Review before requesting or running it on the host machine."
-                compact
-              />
-            )}
-          </div>
-          <div className="terminal-requests">
-            {codexEvents.slice(-5).reverse().map((event) => (
-              <div className={`terminal-request ${event.status === "failed" ? "denied" : event.status === "completed" ? "approved" : "pending"}`} key={`${event.turnId}-${event.createdAt}-${event.status}`}>
-                <div>
-                  <strong>{formatCodexEventStatus(event.status)}</strong>
-                  <span>{event.message}</span>
-                  <small>{event.threadId ?? formatCodexModel(event.model)} · {formatTimestamp(event.createdAt)}</small>
-                </div>
-                <small>{event.host}</small>
-              </div>
-            ))}
-            {codexEvents.length === 0 && (
-              <div className="empty-state compact">No Codex events in this room.</div>
-            )}
-          </div>
-          <div className="terminal-requests">
-            {terminalRequests.map((request) => {
-              const requestRisks = detectTerminalCommandRisks(request.command);
-
-              return (
-                <div className={`terminal-request ${request.status}`} key={request.id}>
-                  <div>
-                    <strong>{request.command}</strong>
-                    <span>{request.requester} · {request.cwd}</span>
-                  </div>
-                  <small>{request.status}</small>
-                  {request.status === "pending" && (
-                    <div>
-                      <button onClick={() => approveTerminalRequest(request)} disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost}>
-                        <Check size={13} />
-                      </button>
-                      <button onClick={() => denyTerminalRequest(request.id)} disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost}>
-                        <X size={13} />
-                      </button>
-                    </div>
-                  )}
-                  {requestRisks.length > 0 && (
-                    <div className="terminal-request-warning">
-                      <InlineSecretWarning
-                        risks={requestRisks}
-                        detail="Review before approving this command on the host machine."
-                        compact
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {terminalRequests.length === 0 && (
-              <div className="empty-state compact">No command requests in this room.</div>
-            )}
-          </div>
-          {roomTerminals.length > 0 && (
-            <div className="terminal-tabs">
-              {roomTerminals.map((terminal) => (
-                <button
-                  key={terminal.id}
-                  className={terminal.id === selectedTerminalId ? "active" : ""}
-                  onClick={() => setSelectedTerminalIdForRoom(selectedRoom.id, terminal.id)}
-                >
-                  <Terminal size={13} />
-                  {terminal.name}
-                  <span>{terminal.running ? "live" : terminal.exitStatus ?? "done"}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="terminal-output">
-            {terminalRisks.length > 0 && <InlineSecretWarning risks={terminalRisks} compact />}
-            {(selectedTerminal?.lines ?? terminalLines.map((line) => ({ stream: "system", text: line }))).map((line, index) => {
-              const lineRisks = detectSecretRisks(line.text);
-              return (
-                <div className={`terminal-line ${line.stream} ${lineRisks.length ? "sensitive" : ""}`} key={`${line.stream}-${index}-${line.text}`}>
-                  {line.stream !== "stdout" && <span>{line.stream}</span>}
-                  {line.text}
-                </div>
-              );
-            })}
-            {codexRunning && <div className="terminal-active">Codex is preparing a foreground terminal...</div>}
-          </div>
-          {selectedTerminal && (
-            <div className="terminal-input-row">
-              <input
-                value={terminalInput}
-                onChange={(event) => setTerminalInputForRoom(selectedRoom.id, event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    sendTerminalInput();
-                  }
-                }}
-                placeholder={`Send input to ${selectedTerminal.name}`}
-                disabled={!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked) || !selectedTerminal.running}
-              />
-              <button onClick={sendTerminalInput} disabled={!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked) || !selectedTerminal.running || !terminalInput.trim()}>
-                <Send size={14} />
-              </button>
-              {selectedTerminalCanRestart && (
-                <button
-                  onClick={restartSelectedTerminal}
-                  disabled={!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked) || terminalBusy}
-                  title={`Restart ${selectedTerminal.name}`}
-                >
-                  <Play size={14} />
-                </button>
-              )}
-              <button onClick={stopSelectedTerminal} disabled={!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked) || !selectedTerminal.running || terminalBusy}>
-                <X size={14} />
-              </button>
-            </div>
-          )}
-          {terminalError && <div className="workflow-message">{terminalError}</div>}
-        </section>
-      </aside>
+        <TerminalPanel
+          terminalName={terminalName}
+          terminalCommand={terminalCommand}
+          terminalInput={terminalInput}
+          terminalBusy={terminalBusy}
+          terminalError={terminalError}
+          terminalCommandRisks={terminalCommandRisks}
+          terminalRisks={terminalRisks}
+          codexEvents={codexEventRows}
+          commandRequests={terminalRequestRows}
+          roomTerminals={roomTerminals}
+          selectedTerminal={selectedTerminal}
+          selectedTerminalId={selectedTerminalId}
+          selectedTerminalCanControl={selectedTerminalCanControl}
+          selectedTerminalCanRestart={selectedTerminalCanRestart}
+          terminalOutputLines={terminalOutputLines}
+          codexRunning={codexRunning}
+          canReadLocalWorkspace={canReadLocalWorkspace}
+          canRequestWorkspace={canRequestWorkspace}
+          canApproveTerminal={canReadLocalWorkspace && isActiveHost}
+          onCopyMarkdown={copyTerminalMarkdown}
+          onRunGitStatus={runApprovedTerminalCheck}
+          onTerminalNameChange={(name) => setTerminalNameForRoom(selectedRoom.id, name)}
+          onTerminalCommandChange={(command) => setTerminalCommandForRoom(selectedRoom.id, command)}
+          onStartTerminal={startNamedTerminal}
+          onRequestTerminalCommand={requestTerminalCommand}
+          onApproveTerminalRequest={(requestId) => {
+            const request = terminalRequests.find((item) => item.id === requestId);
+            if (request) approveTerminalRequest(request);
+          }}
+          onDenyTerminalRequest={denyTerminalRequest}
+          onSelectTerminal={(terminalId) => setSelectedTerminalIdForRoom(selectedRoom.id, terminalId)}
+          onTerminalInputChange={(input) => setTerminalInputForRoom(selectedRoom.id, input)}
+          onSendTerminalInput={sendTerminalInput}
+          onRestartTerminal={restartSelectedTerminal}
+          onStopTerminal={stopSelectedTerminal}
+        />
+          </>
+        )}
+      />
     </div>
-  );
-}
-
-function ApprovalItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="approval-item">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="info-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function InlineSecretWarning({ risks, compact = false, detail }: { risks: string[]; compact?: boolean; detail?: string }) {
-  return (
-    <div className={`inline-secret-warning ${compact ? "compact" : ""}`}>
-      <ShieldAlert size={compact ? 14 : 16} />
-      <span>
-        {Array.from(new Set(risks)).join(", ")} may expose secrets to everyone in this room.
-        {detail ? ` ${detail}` : ""}
-      </span>
-    </div>
-  );
-}
-
-function StatusPill({
-  icon,
-  label,
-  tone
-}: {
-  icon: React.ReactNode;
-  label: string;
-  tone: "green" | "blue" | "yellow" | "red" | "dark" | "muted";
-}) {
-  return (
-    <span className={`status-pill ${tone}`}>
-      {icon}
-      {label}
-    </span>
   );
 }
 
@@ -8157,18 +7022,6 @@ function attachmentTypeFromName(name: string): string {
   if (["png", "jpg", "jpeg", "gif", "webp", "sketch"].includes(extension)) return "image";
   if (["ts", "tsx", "js", "jsx", "rs", "py", "go", "md", "json"].includes(extension)) return "code";
   return "file";
-}
-
-function parseDiffLines(diff: string): Array<{ kind: "added" | "removed" | "hunk" | "meta" | "context"; prefix: string; text: string }> {
-  return diff.split("\n").map((line) => {
-    if (line.startsWith("@@")) return { kind: "hunk", prefix: "", text: line };
-    if (line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff --git") || line.startsWith("index ")) {
-      return { kind: "meta", prefix: "", text: line };
-    }
-    if (line.startsWith("+")) return { kind: "added", prefix: "+", text: line.slice(1) };
-    if (line.startsWith("-")) return { kind: "removed", prefix: "-", text: line.slice(1) };
-    return { kind: "context", prefix: line.startsWith(" ") ? " " : "", text: line.startsWith(" ") ? line.slice(1) : line };
-  });
 }
 
 function formatHostStatus(room: RoomRecord): string {
