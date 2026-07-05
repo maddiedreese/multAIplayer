@@ -277,6 +277,7 @@ import { RoomSettingsOverview } from "./components/RoomSettingsOverview";
 import { RoomHeader } from "./components/RoomHeader";
 import { CodexApprovalCard } from "./components/CodexApprovalCard";
 import { ModelPanel } from "./components/ModelPanel";
+import { RoomModePanel } from "./components/RoomModePanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -6733,25 +6734,12 @@ export function App() {
           {settingsMessage && <div className="workflow-message">{settingsMessage}</div>}
         </section>
 
-        <section className="panel mode-panel">
-          <div className="panel-title">
-            <span>Room modes</span>
-            <StatusPill icon={<Settings size={13} />} label="per room" tone="dark" />
-          </div>
-          <div className="mode-options">
-            {(Object.keys(roomModeLabels) as Array<keyof RoomMode>).map((key) => (
-              <label key={key}>
-                <input
-                  type="checkbox"
-                  checked={selectedRoom.mode[key]}
-                  disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-                  onChange={() => toggleRoomMode(key)}
-                />
-                <span>{roomModeLabels[key]}</span>
-              </label>
-            ))}
-          </div>
-        </section>
+        <RoomModePanel
+          mode={selectedRoom.mode}
+          labels={roomModeLabels}
+          disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
+          onToggleMode={toggleRoomMode}
+        />
 
         <ModelPanel
           selectedModel={selectedCodexModel}
