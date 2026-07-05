@@ -252,6 +252,7 @@ import {
   type GitWorkflowDraft
 } from "./lib/gitWorkflowDraft";
 import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
+import { isRoomKeyRotationInFlight, roomKeyRotationInFlightMessage } from "./lib/roomKeyRotation";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "./lib/sidebarSearch";
 import { replaceRoomTerminalSnapshots } from "./lib/terminalState";
@@ -674,6 +675,7 @@ export function App() {
   const selectedRoomIdRef = useRef(selectedRoomId);
   const gitWorkflowDraftsRef = useRef(gitWorkflowDraftsByRoom);
   const settingsBusyRef = useRef(settingsBusyByRoom);
+  const keyRotationBusyRef = useRef(keyRotationBusyByRoom);
   const gitWorkflowBusyRef = useRef(gitWorkflowBusyByRoom);
   const actionsBusyRef = useRef(actionsBusyByRoom);
   const browserRequestsRef = useRef(browserRequestsByRoom);
@@ -929,7 +931,16 @@ export function App() {
   }
 
   function setKeyRotationBusyForRoom(roomId: string, busy: boolean) {
+    keyRotationBusyRef.current = busy
+      ? { ...keyRotationBusyRef.current, [roomId]: true }
+      : omitRecordKey(keyRotationBusyRef.current, roomId);
     setKeyRotationBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function reportRoomKeyRotationInFlight(roomId: string): boolean {
+    if (!isRoomKeyRotationInFlight(keyRotationBusyRef.current, roomId)) return false;
+    setInviteMessageForRoom(roomId, roomKeyRotationInFlightMessage());
+    return true;
   }
 
   function setApprovalVisibleForRoom(roomId: string, visible: boolean) {
@@ -1164,6 +1175,10 @@ export function App() {
   useEffect(() => {
     settingsBusyRef.current = settingsBusyByRoom;
   }, [settingsBusyByRoom]);
+
+  useEffect(() => {
+    keyRotationBusyRef.current = keyRotationBusyByRoom;
+  }, [keyRotationBusyByRoom]);
 
   useEffect(() => {
     gitWorkflowBusyRef.current = gitWorkflowBusyByRoom;
@@ -3564,6 +3579,7 @@ export function App() {
       setSelectedInviteMessage(hostGateMessage);
       return;
     }
+    if (reportRoomKeyRotationInFlight(selectedRoom.id)) return;
     const confirmed = window.confirm(
       `Rotate the room key for ${selectedRoom.name}?\n\nThis sends the new key to current room-key holders in an encrypted room event and clears stale encrypted local history on this device. It is not full member removal in the alpha.`
     );
