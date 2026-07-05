@@ -187,7 +187,12 @@ import {
   planRoomCreation,
   planTeamCreation
 } from "./lib/workspaceCreation";
-import { createHandoffSettingsPatch } from "./lib/hostHandoff";
+import {
+  canAcceptRoomHostHandoff,
+  createHandoffSettingsPatch,
+  findRoomHostHandoff,
+  roomHostHandoffMessage
+} from "./lib/hostHandoff";
 import { detectBrowserSecretRisks, detectSecretRisks, detectTerminalCommandRisks } from "./lib/secretRisks";
 import { createGitWorkflowApprovalPlan, formatGitWorkflowApprovalPreview } from "@multaiplayer/git";
 import { normalizeGitHubBranchName } from "@multaiplayer/github";
@@ -2375,18 +2380,23 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    const roomHandoff = findRoomHostHandoff(hostHandoffs, handoff.id);
+    if (!roomHandoff || !canAcceptRoomHostHandoff(hostHandoffs, handoff.id)) {
+      setHostMessageForRoom(roomId, roomHostHandoffMessage(hostHandoffs, handoff.id));
+      return;
+    }
     setHostBusyForRoom(roomId, true);
     setHostMessageForRoom(roomId, null);
     try {
-      const patch = createHandoffSettingsPatch(handoff);
+      const patch = createHandoffSettingsPatch(roomHandoff);
       const updatedSettings = await updateRoomSettings(roomId, {
         ...roomSettingsActor(),
         ...patch
       });
       const claimed = await updateRoomHost(updatedSettings.id, localUser.name, localUser.id, "active");
       setRooms((current) => current.map((item) => (item.id === claimed.id ? ensureRoomDefaults(claimed) : item)));
-      markHostHandoffAccepted(roomId, handoff.id);
-      await publishHostHandoffAccepted(selectedRoom, handoff);
+      markHostHandoffAccepted(roomId, roomHandoff.id);
+      await publishHostHandoffAccepted(selectedRoom, roomHandoff);
       resetFileContextForRoom(roomId);
       resetCodexApprovalForRoom(roomId);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
@@ -2394,9 +2404,9 @@ export function App() {
         setCustomCodexModelForRoom(roomId, patch.codexModel);
         setSettingsMessageForRoom(
           roomId,
-          `Accepted handoff from ${handoff.fromHost}; inherited ${formatCodexModel(patch.codexModel)} and ${patch.projectPath}.`
+          `Accepted handoff from ${roomHandoff.fromHost}; inherited ${formatCodexModel(patch.codexModel)} and ${patch.projectPath}.`
         );
-        setHostMessageForRoom(roomId, `You are now hosting ${claimed.name} from ${handoff.fromHost}'s handoff.`);
+        setHostMessageForRoom(roomId, `You are now hosting ${claimed.name} from ${roomHandoff.fromHost}'s handoff.`);
       }
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessageForRoom(roomId, String(error));

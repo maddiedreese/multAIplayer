@@ -7,6 +7,11 @@ export interface HandoffSettingsPatch {
   approvalPolicy: ApprovalPolicy;
 }
 
+export interface HostHandoffCandidate {
+  id: string;
+  status: "available" | "accepted";
+}
+
 const approvalPolicies: ApprovalPolicy[] = [
   "ask_every_turn",
   "auto_chat_only",
@@ -27,4 +32,31 @@ export function createHandoffSettingsPatch(handoff: HostHandoffPlaintextPayload)
     codexModel,
     approvalPolicy: handoff.approvalPolicy as ApprovalPolicy
   };
+}
+
+export function findRoomHostHandoff<T extends HostHandoffCandidate>(
+  handoffs: T[],
+  handoffId: string
+): T | null {
+  return handoffs.find((handoff) => handoff.id === handoffId) ?? null;
+}
+
+export function canAcceptRoomHostHandoff<T extends HostHandoffCandidate>(
+  handoffs: T[],
+  handoffId: string
+): boolean {
+  const handoff = findRoomHostHandoff(handoffs, handoffId);
+  return handoff?.status === "available";
+}
+
+export function roomHostHandoffMessage<T extends HostHandoffCandidate>(
+  handoffs: T[],
+  handoffId: string
+): string {
+  const handoff = findRoomHostHandoff(handoffs, handoffId);
+  if (!handoff) return "Host handoff is no longer available in this room.";
+  if (handoff.status !== "available") {
+    return `Host handoff is ${handoff.status}, not available.`;
+  }
+  return "Host handoff is available.";
 }

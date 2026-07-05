@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createHandoffSettingsPatch } from "../src/lib/hostHandoff";
+import {
+  canAcceptRoomHostHandoff,
+  createHandoffSettingsPatch,
+  findRoomHostHandoff,
+  roomHostHandoffMessage
+} from "../src/lib/hostHandoff";
 import type { HostHandoffPlaintextPayload } from "@multaiplayer/protocol";
 
 const baseHandoff: HostHandoffPlaintextPayload = {
@@ -36,4 +41,23 @@ test("createHandoffSettingsPatch rejects incomplete handoff packages", () => {
 test("createHandoffSettingsPatch rejects unsupported handoff room metadata", () => {
   assert.throws(() => createHandoffSettingsPatch({ ...baseHandoff, projectPath: "/tmp/project\u0000secret" }), /project path/);
   assert.throws(() => createHandoffSettingsPatch({ ...baseHandoff, codexModel: "bad model with spaces" }), /Codex model/);
+});
+
+test("host handoff acceptance requires an available handoff from the current room list", () => {
+  const available = { ...baseHandoff, status: "available" as const };
+  const accepted = { ...baseHandoff, id: "handoff-2", status: "accepted" as const };
+  const handoffs = [available, accepted];
+
+  assert.deepEqual(findRoomHostHandoff(handoffs, available.id), available);
+  assert.equal(canAcceptRoomHostHandoff(handoffs, available.id), true);
+  assert.equal(canAcceptRoomHostHandoff(handoffs, accepted.id), false);
+  assert.equal(canAcceptRoomHostHandoff(handoffs, "missing"), false);
+  assert.equal(
+    roomHostHandoffMessage(handoffs, accepted.id),
+    "Host handoff is accepted, not available."
+  );
+  assert.equal(
+    roomHostHandoffMessage(handoffs, "missing"),
+    "Host handoff is no longer available in this room."
+  );
 });
