@@ -1,12 +1,7 @@
 import {
   Bell,
-  Bot,
   Check,
-  Copy,
-  FileCode2,
   Lock,
-  ExternalLink,
-  Send,
   ShieldAlert,
   X
 } from "lucide-react";
@@ -257,7 +252,6 @@ import {
 import { InlineSecretWarning, StatusPill } from "./components/common";
 import { InspectorTabs, type InspectorTab } from "./components/InspectorTabs";
 import { RoomHeader } from "./components/RoomHeader";
-import { CodexApprovalCard } from "./components/CodexApprovalCard";
 import { ModelPanel } from "./components/ModelPanel";
 import { RoomModePanel } from "./components/RoomModePanel";
 import { ApprovalPolicyPanel } from "./components/ApprovalPolicyPanel";
@@ -275,6 +269,7 @@ import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
 import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
 import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarPanelName, type SidebarRoomDisplay, type SidebarTeamDisplay } from "./components/DesktopSidebar";
+import { RoomChatPanel, type PendingAttachmentDisplay, type RoomChatMessageDisplay } from "./components/RoomChatPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -914,6 +909,37 @@ export function App() {
     thread: formatCodexThreadId(selectedCodexThreadId),
     policy: approvalPolicyLabels[selectedRoom.approvalPolicy]
   };
+  const roomCanUseChat = canUseRoomChat(selectedRoom, isSelectedRoomLocked);
+  const chatMessageRows: RoomChatMessageDisplay[] = messages.map((message) => ({
+    id: message.id,
+    author: message.author,
+    role: message.role,
+    body: message.body,
+    time: message.time,
+    selected: selectedMessageIds.includes(message.id),
+    attachments: (message.attachments ?? []).map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      meta: formatAttachmentMeta(attachment),
+      encryptedBlob: Boolean(attachment.blobId),
+      canPreview: Boolean(attachment.blobId || attachment.content)
+    })),
+    reactions: ["👍", "✅", "👀"].map((emoji) => {
+      const reaction = message.reactions?.find((item) => item.emoji === emoji);
+      return {
+        emoji,
+        count: reaction?.reactors.length ?? 0,
+        active: reaction?.reactors.some((reactor) => reactor.userId === localUser.id) ?? false,
+        title: reaction?.reactors.map((reactor) => reactor.name).join(", ") || "React"
+      };
+    })
+  }));
+  const pendingAttachmentRows: PendingAttachmentDisplay[] = pendingAttachments.map((attachment) => ({
+    id: attachment.id,
+    name: attachment.name,
+    encryptedBlob: Boolean(attachment.blobId)
+  }));
+  const pendingAttachmentSummary = `${pendingAttachments.length}/${maxMessageAttachments} files · ${formatBytes(pendingAttachmentBytes)}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`;
   const hostBusy = hostBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const settingsBusy = settingsBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const keyRotationBusy = keyRotationBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
@@ -5923,129 +5949,48 @@ export function App() {
           />
         )}
 
-        <div className="chat-scroll">
-          {messages.map((message) => (
-            <article className={`message ${message.role} ${selectedMessageIds.includes(message.id) ? "selected" : ""}`} key={message.id}>
-              <div className="avatar">{message.role === "codex" ? <Bot size={17} /> : message.author.slice(0, 1)}</div>
-              <div className="bubble">
-                <div className="message-meta">
-                  <label className="message-select" title="Select message for Markdown copy">
-                    <input
-                      type="checkbox"
-                      checked={selectedMessageIds.includes(message.id)}
-                      onChange={() => toggleMessageSelection(message.id)}
-                      aria-label={`Select message from ${message.author} at ${message.time}`}
-                    />
-                  </label>
-                  <strong>{message.author}</strong>
-                  <span>{message.time}</span>
-                  <button onClick={() => copyMessageMarkdown(message)} title="Copy message as Markdown">
-                    <Copy size={13} />
-                  </button>
-                  {message.role === "codex" && (
-                    <button onClick={() => copyCodexOutputMarkdown(message)} title="Copy Codex turn output as Markdown">
-                      <Bot size={13} />
-                    </button>
-                  )}
-                </div>
-                <p>{message.body}</p>
-		                {message.attachments?.map((attachment) => (
-		                  <div className="attachment" key={attachment.id}>
-		                    <FileCode2 size={15} />
-		                    <span>{attachment.name}</span>
-		                    <small>{formatAttachmentMeta(attachment)}</small>
-		                    {(attachment.blobId || attachment.content) && (
-		                      <button
-		                        onClick={() => openEncryptedAttachmentBlob(attachment)}
-		                        title={attachment.blobId ? "Decrypt and preview encrypted attachment" : "Preview inline attachment"}
-		                        disabled={isSelectedRoomLocked}
-		                      >
-		                        <ExternalLink size={12} />
-		                      </button>
-		                    )}
-		                  </div>
-		                ))}
-                <div className="reaction-row">
-                  {["👍", "✅", "👀"].map((emoji) => {
-                    const reaction = message.reactions?.find((item) => item.emoji === emoji);
-                    const reacted = reaction?.reactors.some((reactor) => reactor.userId === localUser.id) ?? false;
-                    return (
-                      <button
-                        className={reacted ? "active" : ""}
-                        key={emoji}
-                        onClick={() => toggleMessageReaction(message, emoji)}
-                        title={reaction?.reactors.map((reactor) => reactor.name).join(", ") || "React"}
-                        disabled={!canUseRoomChat(selectedRoom, isSelectedRoomLocked)}
-                      >
-                        <span>{emoji}</span>
-                        {reaction?.reactors.length ? <small>{reaction.reactors.length}</small> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </article>
-          ))}
-
-          {approvalVisible && (
-            <CodexApprovalCard
-              summary={codexApprovalSummaryDisplay}
-              isActiveHost={isActiveHost}
-              codexRunning={codexRunning}
-              canApprove={hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked)}
-              onDeny={() => {
-                setPendingCodexApprovalForRoom(selectedRoom.id, null);
-                setApprovalVisibleForRoom(selectedRoom.id, false);
-              }}
-              onApprove={() => approveCodexTurn()}
-            />
-          )}
-        </div>
-
-        <footer className="composer">
-	          <button title="Invoke Codex" onClick={() => handleCodexInvoke()} disabled={!canUseRoomChat(selectedRoom, isSelectedRoomLocked)}>
-            <Bot size={18} />
-          </button>
-          <div className="composer-body">
-            {pendingAttachments.length > 0 && (
-              <div className="pending-attachments">
-	                {pendingAttachments.map((attachment) => (
-	                  <span key={attachment.id}>
-	                    <FileCode2 size={13} />
-	                    {attachment.name}{attachment.blobId ? " (encrypted blob)" : ""}
-	                    <button onClick={() => removePendingAttachment(attachment.id)} aria-label={`Remove ${attachment.name}`}>
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-                <small>
-                  {pendingAttachments.length}/{maxMessageAttachments} files · {formatBytes(pendingAttachmentBytes)}/{formatBytes(maxEmbeddedAttachmentBytesPerMessage)}
-                </small>
-              </div>
-            )}
-            <textarea
-              placeholder={
-                isSelectedRoomLocked
-                  ? roomLockMessage(selectedRoom, isSelectedRoomRevoked)
-                  : selectedRoom.mode.chat
-                    ? "Message the room, or type @Codex to invoke the active host..."
-                    : "Chat mode is disabled for this room"
-              }
-              value={draft}
-              disabled={!canUseRoomChat(selectedRoom, isSelectedRoomLocked)}
-              onChange={(event) => setDraftForRoom(selectedRoom.id, event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  sendMessage();
-                }
-              }}
-            />
-          </div>
-          <button className="send" onClick={sendMessage} disabled={!canUseRoomChat(selectedRoom, isSelectedRoomLocked)}>
-            <Send size={18} />
-          </button>
-        </footer>
+        <RoomChatPanel
+          messages={chatMessageRows}
+          approvalVisible={approvalVisible}
+          approvalSummary={codexApprovalSummaryDisplay}
+          isActiveHost={isActiveHost}
+          codexRunning={codexRunning}
+          canApproveCodex={hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked)}
+          canUseChat={roomCanUseChat}
+          roomLocked={isSelectedRoomLocked}
+          lockedPlaceholder={roomLockMessage(selectedRoom, isSelectedRoomRevoked)}
+          chatEnabled={selectedRoom.mode.chat}
+          draft={draft}
+          pendingAttachments={pendingAttachmentRows}
+          pendingAttachmentSummary={pendingAttachmentSummary}
+          onToggleMessageSelection={toggleMessageSelection}
+          onCopyMessageMarkdown={(messageId) => {
+            const message = messages.find((item) => item.id === messageId);
+            if (message) copyMessageMarkdown(message);
+          }}
+          onCopyCodexOutputMarkdown={(messageId) => {
+            const message = messages.find((item) => item.id === messageId);
+            if (message) copyCodexOutputMarkdown(message);
+          }}
+          onOpenAttachment={(messageId, attachmentId) => {
+            const message = messages.find((item) => item.id === messageId);
+            const attachment = message?.attachments?.find((item) => item.id === attachmentId);
+            if (attachment) openEncryptedAttachmentBlob(attachment);
+          }}
+          onToggleReaction={(messageId, emoji) => {
+            const message = messages.find((item) => item.id === messageId);
+            if (message) toggleMessageReaction(message, emoji);
+          }}
+          onDenyApproval={() => {
+            setPendingCodexApprovalForRoom(selectedRoom.id, null);
+            setApprovalVisibleForRoom(selectedRoom.id, false);
+          }}
+          onApproveApproval={() => approveCodexTurn()}
+          onInvokeCodex={() => handleCodexInvoke()}
+          onRemovePendingAttachment={removePendingAttachment}
+          onDraftChange={(nextDraft) => setDraftForRoom(selectedRoom.id, nextDraft)}
+          onSendMessage={sendMessage}
+        />
       </main>
 
       <aside className="inspector">
