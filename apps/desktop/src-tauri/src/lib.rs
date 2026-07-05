@@ -106,6 +106,12 @@ struct GitStatusSummary {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct GitRemoteInfo {
+    origin_url: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ProjectFileEntry {
     path: String,
     size: u64,
@@ -336,6 +342,29 @@ fn git_status(cwd: String) -> Result<GitStatusSummary, String> {
             branch
         },
         files,
+    })
+}
+
+#[tauri::command]
+fn git_remote_origin(cwd: String) -> Result<GitRemoteInfo, String> {
+    ensure_existing_dir(&cwd)?;
+
+    let output = Command::new("git")
+        .args(["-C", &cwd, "remote", "get-url", "origin"])
+        .output()
+        .map_err(|error| format!("Failed to run git remote: {error}"))?;
+
+    if !output.status.success() {
+        return Ok(GitRemoteInfo { origin_url: None });
+    }
+
+    let origin_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Ok(GitRemoteInfo {
+        origin_url: if origin_url.is_empty() {
+            None
+        } else {
+            Some(origin_url)
+        },
     })
 }
 
@@ -1644,6 +1673,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app_version,
             git_status,
+            git_remote_origin,
             git_diff_file,
             project_files,
             project_file_read,

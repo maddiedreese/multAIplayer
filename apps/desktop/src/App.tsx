@@ -107,6 +107,7 @@ import {
   chooseProjectFolder,
   defaultProjectPath,
   getGitDiff,
+  getGitRemoteOrigin,
   getGitStatus,
   listTerminals,
   openBrowserView,
@@ -195,7 +196,7 @@ import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { copyTextToClipboard } from "./lib/clipboard";
 import { checkGitHubWorkflowReadiness } from "./lib/githubWorkflowReadiness";
-import { resolveGitWorkflowDraft, updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "./lib/gitWorkflowDraft";
+import { defaultGitWorkflowDraft, parseGitHubRemoteUrl, resolveGitWorkflowDraft, updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "./lib/gitWorkflowDraft";
 import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import {
@@ -603,6 +604,7 @@ export function App() {
   const historyLoadedRoomIds = useRef(new Set<string>());
   const roomsRef = useRef<RoomRecord[]>(rooms);
   const selectedRoomIdRef = useRef(selectedRoomId);
+  const gitWorkflowDraftsRef = useRef(gitWorkflowDraftsByRoom);
   const deviceId = useMemo(() => loadOrCreateDeviceId(), []);
   const localUser = useMemo(
     () => ({
@@ -1011,6 +1013,10 @@ export function App() {
   useEffect(() => {
     selectedRoomIdRef.current = selectedRoomId;
   }, [selectedRoomId]);
+
+  useEffect(() => {
+    gitWorkflowDraftsRef.current = gitWorkflowDraftsByRoom;
+  }, [gitWorkflowDraftsByRoom]);
 
   useEffect(() => {
     if (!selectedRoomId) return;
@@ -1545,6 +1551,40 @@ export function App() {
           files: [{ path: String(error), status: "error", added: 0, removed: 0 }]
         });
       });
+  }, [hasSelectedRoom, selectedRoom.id, selectedRoom.projectPath]);
+
+  useEffect(() => {
+    if (!hasSelectedRoom) return;
+    const roomId = selectedRoom.id;
+    const projectPath = selectedRoom.projectPath;
+    let cancelled = false;
+    getGitRemoteOrigin(projectPath)
+      .then((remote) => {
+        if (cancelled || !remote.originUrl) return;
+        const repo = parseGitHubRemoteUrl(remote.originUrl);
+        if (!repo) return;
+        const currentDraft = resolveGitWorkflowDraft(gitWorkflowDraftsRef.current, roomId);
+        const isDefaultTarget =
+          currentDraft.prOwner === defaultGitWorkflowDraft.prOwner &&
+          currentDraft.prRepo === defaultGitWorkflowDraft.prRepo;
+        const alreadyMatches = currentDraft.prOwner === repo.owner && currentDraft.prRepo === repo.repo;
+        if (!isDefaultTarget || alreadyMatches) return;
+        setGitWorkflowDraftsByRoom((current) =>
+          updateGitWorkflowDraftRecord(current, roomId, {
+            prOwner: repo.owner,
+            prRepo: repo.repo
+          })
+        );
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+          setGitWorkflowMessageForRoom(roomId, `Detected GitHub remote ${repo.owner}/${repo.repo} for PRs and Actions.`);
+        }
+      })
+      .catch(() => {
+        // Remote inference is best-effort; manual owner/repo fields remain available.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [hasSelectedRoom, selectedRoom.id, selectedRoom.projectPath]);
 
   useEffect(() => {

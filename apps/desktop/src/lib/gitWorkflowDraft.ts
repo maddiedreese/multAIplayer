@@ -16,6 +16,11 @@ export const defaultGitWorkflowDraft: GitWorkflowDraft = {
   prBase: "main"
 };
 
+export interface GitRemoteRepoRef {
+  owner: string;
+  repo: string;
+}
+
 export function resolveGitWorkflowDraft(
   draftsByRoom: Record<string, Partial<GitWorkflowDraft>>,
   roomId: string
@@ -37,5 +42,34 @@ export function updateGitWorkflowDraftRecord(
       ...resolveGitWorkflowDraft(draftsByRoom, roomId),
       ...patch
     }
+  };
+}
+
+export function parseGitHubRemoteUrl(remoteUrl: string): GitRemoteRepoRef | null {
+  const trimmed = remoteUrl.trim();
+  if (!trimmed) return null;
+
+  const sshMatch = trimmed.match(/^git@github\.com:([^/\s]+)\/([^/\s]+?)(?:\.git)?$/i);
+  if (sshMatch) return normalizeRemoteRef(sshMatch[1], sshMatch[2]);
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.hostname.toLowerCase() !== "github.com") return null;
+    const [owner, repo, ...rest] = parsed.pathname.replace(/^\/+|\/+$/g, "").split("/");
+    if (rest.length > 0) return null;
+    return normalizeRemoteRef(owner, repo?.replace(/\.git$/i, ""));
+  } catch {
+    return null;
+  }
+}
+
+function normalizeRemoteRef(owner: string | undefined, repo: string | undefined): GitRemoteRepoRef | null {
+  const normalizedOwner = owner?.trim() ?? "";
+  const normalizedRepo = repo?.trim().replace(/\.git$/i, "") ?? "";
+  if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(normalizedOwner)) return null;
+  if (!/^[A-Za-z0-9._-]{1,100}$/.test(normalizedRepo) || normalizedRepo === "." || normalizedRepo === "..") return null;
+  return {
+    owner: normalizedOwner,
+    repo: normalizedRepo
   };
 }

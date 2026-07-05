@@ -14,6 +14,10 @@ export interface GitStatusSummary {
   files: GitStatusFile[];
 }
 
+export interface GitRemoteInfo {
+  originUrl: string | null;
+}
+
 export interface GitDiffResult {
   path: string;
   diff: string;
@@ -110,6 +114,16 @@ export async function getGitStatus(cwd: string): Promise<GitStatusSummary> {
       { path: "packages/protocol/src/index.ts", status: "modified", added: 32, removed: 0 },
       { path: "docs/threat-model.md", status: "modified", added: 21, removed: 2 }
     ]
+  };
+}
+
+export async function getGitRemoteOrigin(cwd: string): Promise<GitRemoteInfo> {
+  if (isTauriRuntime()) {
+    return invoke<GitRemoteInfo>("git_remote_origin", { cwd });
+  }
+
+  return {
+    originUrl: "git@github.com:maddiedreese/multAIplayer.git"
   };
 }
 

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   defaultGitWorkflowDraft,
+  parseGitHubRemoteUrl,
   resolveGitWorkflowDraft,
   updateGitWorkflowDraftRecord
 } from "../src/lib/gitWorkflowDraft";
@@ -40,4 +41,30 @@ test("updateGitWorkflowDraftRecord preserves existing room fields on partial upd
     commitMessage: "Ship room scoped workflow",
     pushEnabled: true
   });
+});
+
+test("parseGitHubRemoteUrl accepts GitHub ssh and https remotes", () => {
+  assert.deepEqual(parseGitHubRemoteUrl("git@github.com:maddiedreese/multAIplayer.git"), {
+    owner: "maddiedreese",
+    repo: "multAIplayer"
+  });
+  assert.deepEqual(parseGitHubRemoteUrl("https://github.com/openai/codex"), {
+    owner: "openai",
+    repo: "codex"
+  });
+  assert.deepEqual(parseGitHubRemoteUrl("ssh://git@github.com/maddiedreese/multAIplayer.git"), {
+    owner: "maddiedreese",
+    repo: "multAIplayer"
+  });
+  assert.deepEqual(parseGitHubRemoteUrl("https://github.com/maddiedreese/multAIplayer/"), {
+    owner: "maddiedreese",
+    repo: "multAIplayer"
+  });
+});
+
+test("parseGitHubRemoteUrl rejects non-GitHub and malformed remotes", () => {
+  assert.equal(parseGitHubRemoteUrl("git@example.com:maddiedreese/multAIplayer.git"), null);
+  assert.equal(parseGitHubRemoteUrl("https://github.com/maddiedreese/multAIplayer/issues"), null);
+  assert.equal(parseGitHubRemoteUrl("https://github.com/bad owner/repo"), null);
+  assert.equal(parseGitHubRemoteUrl(""), null);
 });
