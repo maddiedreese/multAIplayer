@@ -1242,6 +1242,24 @@ button:disabled {
   color: #fff;
 }
 
+.tab-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #c73030;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.inspector-tabs button.active .tab-badge {
+  background: #ffd56a;
+  color: #111815;
+}
+
 .inspector-panel-group {
   display: grid;
   gap: 14px;

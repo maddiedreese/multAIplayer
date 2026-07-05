@@ -847,6 +847,8 @@ export function App() {
   const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
   const hostHandoffs = hostHandoffsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const terminalRequests = terminalRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
+  const workAttentionCount = terminalRequests.filter((request) => request.status === "pending").length + (approvalVisible ? 1 : 0);
+  const browserAttentionCount = browserRequests.filter((request) => request.status === "pending").length;
   const inviteRequests = inviteRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const codexEvents = codexEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const gitWorkflowEvents = gitWorkflowEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
@@ -6352,6 +6354,7 @@ export function App() {
             aria-pressed={inspectorTab === "work"}
           >
             <PanelRight size={15} /> Work
+            {workAttentionCount > 0 && <span className="tab-badge">{workAttentionCount}</span>}
           </button>
           <button
             className={inspectorTab === "browser" ? "active" : ""}
@@ -6359,6 +6362,7 @@ export function App() {
             aria-pressed={inspectorTab === "browser"}
           >
             <Globe2 size={15} /> Browser
+            {browserAttentionCount > 0 && <span className="tab-badge">{browserAttentionCount}</span>}
           </button>
         </div>
 
