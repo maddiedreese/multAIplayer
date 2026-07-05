@@ -192,6 +192,11 @@ import { detectBrowserSecretRisks, detectSecretRisks, detectTerminalCommandRisks
 import { createGitWorkflowApprovalPlan, formatGitWorkflowApprovalPreview } from "@multaiplayer/git";
 import { normalizeGitHubBranchName } from "@multaiplayer/github";
 import {
+  canActOnRoomInviteRequest,
+  findRoomInviteRequest,
+  roomInviteRequestMessage
+} from "./lib/inviteApproval";
+import {
   canActOnRoomTerminalRequest,
   findRoomTerminalRequest,
   roomTerminalRequestMessage,
@@ -2634,24 +2639,29 @@ export function App() {
     }
     if (status === "pending") return;
     const room = selectedRoom;
-    updateInviteRequestStatus(room.id, request.id, status);
-    setInviteMessageForRoom(room.id, `${status === "approved" ? "Approved" : "Denied"} ${request.requester}'s join request.`);
+    const roomRequest = findRoomInviteRequest(inviteRequests, request.id);
+    if (!roomRequest || !canActOnRoomInviteRequest(inviteRequests, request.id)) {
+      setInviteMessageForRoom(room.id, roomInviteRequestMessage(inviteRequests, request.id));
+      return;
+    }
+    updateInviteRequestStatus(room.id, roomRequest.id, status);
+    setInviteMessageForRoom(room.id, `${status === "approved" ? "Approved" : "Denied"} ${roomRequest.requester}'s join request.`);
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
     try {
       const secret = await loadOrCreateRoomSecret(room.id);
-      const wrappedRoomSecret = status === "approved" && request.requesterPublicKeyJwk
-        ? await wrapRoomSecretForDevice(secret, request.requesterPublicKeyJwk)
+      const wrappedRoomSecret = status === "approved" && roomRequest.requesterPublicKeyJwk
+        ? await wrapRoomSecretForDevice(secret, roomRequest.requesterPublicKeyJwk)
         : undefined;
       const payload: InviteJoinStatusPlaintextPayload = {
         eventType: "invite.status",
-        requestId: request.id,
+        requestId: roomRequest.id,
         status,
         decidedBy: localUser.name,
         decidedByUserId: localUser.id,
         decidedAt: new Date().toISOString(),
-        recipientDeviceId: request.requesterDeviceId,
-        recipientPublicKeyFingerprint: request.requesterPublicKeyFingerprint,
+        recipientDeviceId: roomRequest.requesterDeviceId,
+        recipientPublicKeyFingerprint: roomRequest.requesterPublicKeyFingerprint,
         wrappedRoomSecret: wrappedRoomSecret
           ? {
               ...wrappedRoomSecret,
@@ -2659,8 +2669,8 @@ export function App() {
           }
           : undefined
       };
-      const envelopePayload = request.requesterPublicKeyJwk
-        ? await sealJsonToDevice(payload, request.requesterPublicKeyJwk)
+      const envelopePayload = roomRequest.requesterPublicKeyJwk
+        ? await sealJsonToDevice(payload, roomRequest.requesterPublicKeyJwk)
         : await encryptJson(payload, secret);
       const envelope: RelayEnvelope = {
         id: crypto.randomUUID(),
