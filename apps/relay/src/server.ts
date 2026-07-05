@@ -990,12 +990,17 @@ app.post("/attachment-blobs", (req, res) => {
     return;
   }
 
-  const name = String(req.body?.name ?? "").trim();
-  const type = String(req.body?.type ?? "file").trim() || "file";
+  const name = normalizeMetadataText(req.body?.name, maxAttachmentBlobNameChars);
+  const requestedType = String(req.body?.type ?? "file").trim() || "file";
+  const type = normalizeMetadataText(requestedType, maxAttachmentBlobTypeChars);
   const size = Number(req.body?.size);
   const payload = CiphertextPayload.safeParse(req.body?.payload);
-  if (!name || name.length > 512) {
+  if (!name) {
     res.status(400).json({ error: "name must be a non-empty string up to 512 characters" });
+    return;
+  }
+  if (!type) {
+    res.status(400).json({ error: "type must be a non-empty string up to 160 characters without control characters" });
     return;
   }
   if (!Number.isSafeInteger(size) || size < 0) {
@@ -1008,6 +1013,10 @@ app.post("/attachment-blobs", (req, res) => {
   }
   if (!payload.success) {
     res.status(400).json({ error: "payload must be a valid ciphertext payload" });
+    return;
+  }
+  if (payload.data.nonce.length > maxEnvelopeNonceChars) {
+    res.status(413).json({ error: `Attachment blob nonce exceeds ${maxEnvelopeNonceChars} characters` });
     return;
   }
   if (payload.data.ciphertext.length > maxCiphertextCharactersForBlob(attachmentBlobMaxBytes)) {
@@ -1907,6 +1916,7 @@ function normalizeAttachmentBlob(blob: unknown): AttachmentBlobRecordType | null
   if (!teams.has(parsed.data.teamId)) return null;
   if (!rooms.has(parsed.data.roomId) || rooms.get(parsed.data.roomId)?.teamId !== parsed.data.teamId) return null;
   if (parsed.data.size > attachmentBlobMaxBytes) return null;
+  if (parsed.data.payload.nonce.length > maxEnvelopeNonceChars) return null;
   if (parsed.data.payload.ciphertext.length > maxCiphertextCharactersForBlob(attachmentBlobMaxBytes)) return null;
   if (Number.isNaN(Date.parse(parsed.data.createdAt))) return null;
   if (parsed.data.expiresAt && Number.isNaN(Date.parse(parsed.data.expiresAt))) return null;

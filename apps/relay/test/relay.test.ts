@@ -1967,6 +1967,63 @@ test("relay stores encrypted attachment blobs as ciphertext", async () => {
 test("relay enforces encrypted attachment blob size limits", async () => {
   const relay = await startRelay({ MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "16" });
   try {
+    const controlName = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "bad\nname.txt",
+        type: "text/plain",
+        size: 4,
+        payload: {
+          algorithm: "AES-GCM-256",
+          nonce: "nonce-for-test",
+          ciphertext: "ciphertext"
+        }
+      })
+    });
+    assert.equal(controlName.status, 400);
+    assert.match(await controlName.text(), /name must be/);
+
+    const controlType = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "file.txt",
+        type: "text\nplain",
+        size: 4,
+        payload: {
+          algorithm: "AES-GCM-256",
+          nonce: "nonce-for-test",
+          ciphertext: "ciphertext"
+        }
+      })
+    });
+    assert.equal(controlType.status, 400);
+    assert.match(await controlType.text(), /type must be/);
+
+    const oversizedNonce = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "bad-nonce.txt",
+        type: "text/plain",
+        size: 4,
+        payload: {
+          algorithm: "AES-GCM-256",
+          nonce: "x".repeat(513),
+          ciphertext: "ciphertext"
+        }
+      })
+    });
+    assert.equal(oversizedNonce.status, 413);
+    assert.match(await oversizedNonce.text(), /nonce exceeds 512 characters/);
+
     const oversizedDeclared = await fetch(`${relay.baseUrl}/attachment-blobs`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -2089,6 +2146,21 @@ test("relay drops invalid persisted attachment blob metadata", async () => {
         },
         createdAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: "blob_bad_nonce",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "bad-nonce.txt",
+        type: "text/plain",
+        size: 4,
+        payload: {
+          algorithm: "AES-GCM-256",
+          nonce: "x".repeat(513),
+          ciphertext: "ciphertext"
+        },
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       }
     ],
     encryptedBacklog: []
@@ -2105,6 +2177,8 @@ test("relay drops invalid persisted attachment blob metadata", async () => {
     assert.equal(orphan.status, 404);
     const huge = await fetch(`${relay.baseUrl}/attachment-blobs/blob_huge?teamId=team-core&roomId=room-desktop`);
     assert.equal(huge.status, 404);
+    const badNonce = await fetch(`${relay.baseUrl}/attachment-blobs/blob_bad_nonce?teamId=team-core&roomId=room-desktop`);
+    assert.equal(badNonce.status, 404);
   } finally {
     await relay.close();
   }
