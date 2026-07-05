@@ -613,7 +613,7 @@ export function App() {
   const [newRoomProjectPath, setNewRoomProjectPath] = useState(defaultProjectPath);
   const [selectedTeam, setSelectedTeam] = useState(seededTeams[0].id);
   const [selectedRoomId, setSelectedRoomId] = useState("room-desktop");
-  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("work");
+  const [inspectorTabsByRoom, setInspectorTabsByRoom] = useState<Record<string, InspectorTab>>({});
   const [sidebarQuery, setSidebarQuery] = useState("");
   const [messagesByRoom, setMessagesByRoom] = useState<Record<string, ChatMessage[]>>(initialMessagesByRoom);
   const [forgottenRoomIds, setForgottenRoomIds] = useState<Set<string>>(() => new Set());
@@ -707,6 +707,7 @@ export function App() {
 
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? emptyRoom;
+  const inspectorTab = inspectorTabsByRoom[selectedRoom.id] ?? "work";
   const selectedTeamRecord = teams.find((team) => team.id === selectedTeam) ?? null;
   const selectedTeamName = selectedTeamRecord?.name ?? (teams.length ? "No team selected" : "No teams yet");
   const selectedTeamMembers = teamMembersByTeam[selectedTeam] ?? [];
@@ -6347,14 +6348,14 @@ export function App() {
         <div className="inspector-tabs">
           <button
             className={inspectorTab === "work" ? "active" : ""}
-            onClick={() => setInspectorTab("work")}
+            onClick={() => setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: "work" }))}
             aria-pressed={inspectorTab === "work"}
           >
             <PanelRight size={15} /> Work
           </button>
           <button
             className={inspectorTab === "browser" ? "active" : ""}
-            onClick={() => setInspectorTab("browser")}
+            onClick={() => setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: "browser" }))}
             aria-pressed={inspectorTab === "browser"}
           >
             <Globe2 size={15} /> Browser
