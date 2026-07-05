@@ -289,6 +289,8 @@ Initial E2EE model:
 - encrypted local history is stored on device;
 - losing a device/key may make old local history unrecoverable until recovery is designed.
 
+Stronger member removal should use room key epochs. When a member is removed, the relay should immediately revoke their live sockets, future room joins, encrypted backlog reads, and encrypted blob reads. A remaining owner or active host should then create a new room key epoch and wrap that key independently to each remaining trusted device public key. Removed devices would not receive the new epoch key, so they could not decrypt future room events through normal relay delivery. This still would not erase content they already received before removal.
+
 Hard parts to design carefully:
 
 - member removal;

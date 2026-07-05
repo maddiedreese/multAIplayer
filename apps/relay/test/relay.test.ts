@@ -455,6 +455,65 @@ test("relay prunes oversized encrypted backlog loaded from store", async () => {
   }
 });
 
+test("relay drops malformed and cross-room encrypted backlog loaded from store", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_SEED_DEMO: "false" }, {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+    rooms: [{
+      id: "room-desktop",
+      teamId: "team-core",
+      name: "Desktop client",
+      projectPath: "/tmp/multaiplayer",
+      host: "No host",
+      hostStatus: "offline",
+      approvalPolicy: "ask_every_turn",
+      mode: { chat: true, code: true, workspace: true, browser: false },
+      codexModel: "gpt-5.4",
+      browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: true,
+      unread: 0
+    }],
+    invites: [],
+    encryptedBacklog: [
+      {
+        key: "team-core:room-desktop",
+        envelopes: [
+          testEnvelope({ id: "envelope-kept" }),
+          testEnvelope({ id: "envelope-wrong-room", roomId: "room-other" }),
+          testEnvelope({
+            id: "envelope-device-sealed-wrong-kind",
+            kind: "browser.event",
+            payload: deviceSealedPayload()
+          }),
+          { id: "not-a-valid-envelope" }
+        ]
+      },
+      {
+        key: "team-core:room-missing",
+        envelopes: [testEnvelope({ id: "envelope-missing-room" })]
+      },
+      {
+        key: "team-core:room-desktop:extra",
+        envelopes: [testEnvelope({ id: "envelope-bad-key" })]
+      },
+      {
+        key: "team-core:room-desktop",
+        envelopes: "not an array"
+      }
+    ]
+  });
+  try {
+    const backlog = await debugBacklog(relay.baseUrl);
+    assert.equal(backlog.length, 1);
+    assert.equal(backlog[0]?.key, "team-core:room-desktop");
+    assert.equal(backlog[0]?.envelopes, 1);
+    assert.equal(backlog[0]?.sample?.id, "envelope-kept");
+  } finally {
+    await relay.close();
+  }
+});
+
 test("relay accepts and broadcasts encrypted browser status events", async () => {
   const relay = await startRelay();
   const receiver = new WebSocket(relay.wsUrl);
@@ -1216,6 +1275,39 @@ test("relay can require auth for workspace mutations", async () => {
   }
 });
 
+test("relay treats malformed session cookies as unauthenticated", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  let socket: WebSocket | null = null;
+  try {
+    const me = await fetch(`${relay.baseUrl}/auth/me`, {
+      headers: { cookie: "multaiplayer_session=%E0%A4%A" }
+    });
+    assert.equal(me.status, 401);
+
+    const teams = await fetch(`${relay.baseUrl}/teams`, {
+      headers: { cookie: "multaiplayer_session=%E0%A4%A" }
+    });
+    assert.equal(teams.status, 401);
+
+    socket = new WebSocket(relay.wsUrl, {
+      headers: { cookie: "multaiplayer_session=%E0%A4%A" }
+    });
+    await onceOpen(socket);
+    const error = waitForError(socket);
+    socket.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:maddiedreese",
+      deviceId: "device-bad-cookie"
+    }));
+    assert.match(await error, /Sign in and use a valid invite/);
+  } finally {
+    socket?.close();
+    await relay.close();
+  }
+});
+
 test("relay expires server-side auth sessions independently of cookies", async () => {
   const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
   try {
@@ -1875,6 +1967,63 @@ test("relay stores encrypted attachment blobs as ciphertext", async () => {
 test("relay enforces encrypted attachment blob size limits", async () => {
   const relay = await startRelay({ MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "16" });
   try {
+    const controlName = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "bad\nname.txt",
+        type: "text/plain",
+        size: 4,
+        payload: {
+          algorithm: "AES-GCM-256",
+          nonce: "nonce-for-test",
+          ciphertext: "ciphertext"
+        }
+      })
+    });
+    assert.equal(controlName.status, 400);
+    assert.match(await controlName.text(), /name must be/);
+
+    const controlType = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "file.txt",
+        type: "text\nplain",
+        size: 4,
+        payload: {
+          algorithm: "AES-GCM-256",
+          nonce: "nonce-for-test",
+          ciphertext: "ciphertext"
+        }
+      })
+    });
+    assert.equal(controlType.status, 400);
+    assert.match(await controlType.text(), /type must be/);
+
+    const oversizedNonce = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "bad-nonce.txt",
+        type: "text/plain",
+        size: 4,
+        payload: {
+          algorithm: "AES-GCM-256",
+          nonce: "x".repeat(513),
+          ciphertext: "ciphertext"
+        }
+      })
+    });
+    assert.equal(oversizedNonce.status, 413);
+    assert.match(await oversizedNonce.text(), /nonce exceeds 512 characters/);
+
     const oversizedDeclared = await fetch(`${relay.baseUrl}/attachment-blobs`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -1997,6 +2146,21 @@ test("relay drops invalid persisted attachment blob metadata", async () => {
         },
         createdAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: "blob_bad_nonce",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "bad-nonce.txt",
+        type: "text/plain",
+        size: 4,
+        payload: {
+          algorithm: "AES-GCM-256",
+          nonce: "x".repeat(513),
+          ciphertext: "ciphertext"
+        },
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       }
     ],
     encryptedBacklog: []
@@ -2013,6 +2177,8 @@ test("relay drops invalid persisted attachment blob metadata", async () => {
     assert.equal(orphan.status, 404);
     const huge = await fetch(`${relay.baseUrl}/attachment-blobs/blob_huge?teamId=team-core&roomId=room-desktop`);
     assert.equal(huge.status, 404);
+    const badNonce = await fetch(`${relay.baseUrl}/attachment-blobs/blob_bad_nonce?teamId=team-core&roomId=room-desktop`);
+    assert.equal(badNonce.status, 404);
   } finally {
     await relay.close();
   }
@@ -2201,6 +2367,60 @@ test("relay restores persisted team member roles and legacy counts", async () =>
     };
     assert.equal(membersBody.members.find((member) => member.userId === "github:first")?.role, "owner");
     assert.equal(membersBody.members.find((member) => member.userId === "github:second")?.role, "member");
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay drops unsafe persisted team member ids before granting access", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_SEED_DEMO: "false"
+  }, {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+    rooms: [],
+    invites: [],
+    teamMembers: [{
+      teamId: "team-core",
+      members: [
+        { userId: "github:valid", role: "owner", joinedAt: "2026-07-04T12:00:00.000Z" },
+        { userId: "github:bad\nmember", role: "admin", joinedAt: "2026-07-04T12:00:00.000Z" },
+        { userId: `github:${"x".repeat(200)}`, role: "member", joinedAt: "2026-07-04T12:00:00.000Z" }
+      ],
+      userIds: ["github:legacy", "github:legacy\nbad", `github:${"y".repeat(200)}`]
+    }],
+    encryptedBacklog: []
+  });
+  const validCookie = await createDebugSession(relay.baseUrl, "github:valid", "valid");
+  const legacyCookie = await createDebugSession(relay.baseUrl, "github:legacy", "legacy");
+  const outsiderCookie = await createDebugSession(relay.baseUrl, "github:outsider", "outsider");
+  try {
+    const membersResponse = await fetch(`${relay.baseUrl}/teams/team-core/members`, {
+      headers: { cookie: validCookie }
+    });
+    assert.equal(membersResponse.status, 200);
+    const membersBody = await membersResponse.json() as {
+      members: Array<{ userId: string; role: string }>;
+    };
+    assert.deepEqual(
+      membersBody.members.map((member) => member.userId).sort(),
+      ["github:legacy", "github:valid"]
+    );
+
+    const legacyWorkspace = await fetch(`${relay.baseUrl}/teams`, {
+      headers: { cookie: legacyCookie }
+    });
+    assert.equal(legacyWorkspace.status, 200);
+    const legacyBody = await legacyWorkspace.json() as { teams: Array<{ id: string }> };
+    assert.deepEqual(legacyBody.teams.map((team) => team.id), ["team-core"]);
+
+    const outsiderWorkspace = await fetch(`${relay.baseUrl}/teams`, {
+      headers: { cookie: outsiderCookie }
+    });
+    assert.equal(outsiderWorkspace.status, 200);
+    assert.deepEqual(await outsiderWorkspace.json(), { teams: [], rooms: [] });
   } finally {
     await relay.close();
   }
