@@ -845,12 +845,21 @@ test("relay enriches presence with registered device fingerprints", async () => 
       publicKeyFingerprint: "sha256:registered-device-key",
       registeredAt: new Date().toISOString(),
       lastSeenAt: new Date().toISOString()
+    }, {
+      userId: "github:tester",
+      deviceId: "device-private-key",
+      displayName: "Tester",
+      publicKeyJwk: { kty: "EC", crv: "P-256", x: "x", y: "y", d: "private-material" },
+      publicKeyFingerprint: "sha256:must-not-be-trusted",
+      registeredAt: new Date().toISOString(),
+      lastSeenAt: new Date().toISOString()
     }],
     encryptedBacklog: []
   });
   const socket = new WebSocket(relay.wsUrl);
+  const untrustedSocket = new WebSocket(relay.wsUrl);
   try {
-    await onceOpen(socket);
+    await Promise.all([onceOpen(socket), onceOpen(untrustedSocket)]);
     socket.send(JSON.stringify({
       type: "join",
       teamId: "team-core",
@@ -860,7 +869,7 @@ test("relay enriches presence with registered device fingerprints", async () => 
     }));
     await waitForJoined(socket);
 
-    const presencePromise = waitForPresence(socket);
+    const presencePromise = waitForPresence(socket, "device-test-123");
     socket.send(JSON.stringify({
       type: "presence",
       teamId: "team-core",
@@ -874,8 +883,32 @@ test("relay enriches presence with registered device fingerprints", async () => 
     const presence = await presencePromise;
     assert.equal(presence.publicKeyFingerprint, "sha256:registered-device-key");
     assert.equal(presence.status, "online");
+
+    untrustedSocket.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:tester",
+      deviceId: "device-private-key"
+    }));
+    await waitForJoined(untrustedSocket);
+
+    const untrustedPresencePromise = waitForPresence(untrustedSocket, "device-private-key");
+    untrustedSocket.send(JSON.stringify({
+      type: "presence",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:tester",
+      deviceId: "device-private-key",
+      displayName: "Tester",
+      publicKeyFingerprint: "sha256:client-presented-key"
+    }));
+
+    const untrustedPresence = await untrustedPresencePromise;
+    assert.equal(untrustedPresence.publicKeyFingerprint, "sha256:client-presented-key");
   } finally {
     socket.close();
+    untrustedSocket.close();
     await relay.close();
   }
 });
@@ -976,6 +1009,26 @@ test("relay bounds user-visible metadata strings", async () => {
         deviceId: "device-ok",
         displayName: "Maddie",
         publicKeyJwk: { kty: "EC", crv: "P-256", x: "x".repeat(5000), y: "y" },
+        publicKeyFingerprint: "fingerprint"
+      }),
+      400
+    );
+    assert.equal(
+      await postJsonStatus(relay.baseUrl, "/devices", {
+        userId: "github:maddiedreese",
+        deviceId: "device-private-key",
+        displayName: "Maddie",
+        publicKeyJwk: { kty: "EC", crv: "P-256", x: "x", y: "y", d: "private-material" },
+        publicKeyFingerprint: "fingerprint"
+      }),
+      400
+    );
+    assert.equal(
+      await postJsonStatus(relay.baseUrl, "/devices", {
+        userId: "github:maddiedreese",
+        deviceId: "device-rsa-key",
+        displayName: "Maddie",
+        publicKeyJwk: { kty: "RSA", n: "x", e: "AQAB" },
         publicKeyFingerprint: "fingerprint"
       }),
       400
@@ -2956,7 +3009,7 @@ function waitForJoined(socket: WebSocket): Promise<void> {
   });
 }
 
-function waitForPresence(socket: WebSocket): Promise<{
+function waitForPresence(socket: WebSocket, expectedDeviceId?: string): Promise<{
   userId: string;
   deviceId: string;
   publicKeyFingerprint?: string;
@@ -2972,7 +3025,13 @@ function waitForPresence(socket: WebSocket): Promise<{
         publicKeyFingerprint?: string;
         status?: string;
       };
-      if (message.type === "presence" && message.userId && message.deviceId && message.status) {
+      if (
+        message.type === "presence" &&
+        message.userId &&
+        message.deviceId &&
+        message.status &&
+        (!expectedDeviceId || message.deviceId === expectedDeviceId)
+      ) {
         clearTimeout(timer);
         resolvePresence({
           userId: message.userId,
