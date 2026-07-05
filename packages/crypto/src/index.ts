@@ -1,4 +1,4 @@
-import type { CiphertextPayload, DeviceSealedPayload } from "@multaiplayer/protocol";
+import type { CiphertextPayload, DevicePublicKeyJwk, DeviceSealedPayload } from "@multaiplayer/protocol";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -27,7 +27,7 @@ export interface DeviceKeyAgreementIdentity {
 export interface WrappedRoomSecret {
   version: 1;
   algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256";
-  ephemeralPublicKeyJwk: JsonWebKey;
+  ephemeralPublicKeyJwk: DevicePublicKeyJwk;
   nonce: string;
   ciphertext: string;
 }
@@ -138,7 +138,7 @@ export async function sealJsonToDevice(value: unknown, recipientPublicKeyJwk: Js
   );
   return {
     algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
-    ephemeralPublicKeyJwk: jsonWebKeyToRecord(await crypto.subtle.exportKey("jwk", ephemeralKeyPair.publicKey)),
+    ephemeralPublicKeyJwk: jsonWebKeyToPublicKeyJwk(await crypto.subtle.exportKey("jwk", ephemeralKeyPair.publicKey)),
     nonce: bytesToBase64(nonce),
     ciphertext: bytesToBase64(new Uint8Array(encrypted))
   };
@@ -188,7 +188,7 @@ export async function wrapRoomSecretForDevice(secret: RoomSecret, recipientPubli
   return {
     version: 1,
     algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
-    ephemeralPublicKeyJwk: await crypto.subtle.exportKey("jwk", ephemeralKeyPair.publicKey),
+    ephemeralPublicKeyJwk: jsonWebKeyToPublicKeyJwk(await crypto.subtle.exportKey("jwk", ephemeralKeyPair.publicKey)),
     nonce: bytesToBase64(nonce),
     ciphertext: bytesToBase64(new Uint8Array(encrypted))
   };
@@ -285,8 +285,17 @@ function deviceSealAdditionalData(): Uint8Array {
   return encoder.encode("multaiplayer:device-sealed-json:v1");
 }
 
-function jsonWebKeyToRecord(key: JsonWebKey): Record<string, unknown> {
-  return JSON.parse(JSON.stringify(key)) as Record<string, unknown>;
+function jsonWebKeyToPublicKeyJwk(key: JsonWebKey): DevicePublicKeyJwk {
+  if (
+    key.kty !== "EC" ||
+    key.crv !== "P-256" ||
+    typeof key.x !== "string" ||
+    typeof key.y !== "string" ||
+    typeof key.d === "string"
+  ) {
+    throw new Error("Expected a public P-256 ECDH JWK");
+  }
+  return JSON.parse(JSON.stringify(key)) as DevicePublicKeyJwk;
 }
 
 export async function fingerprintPublicKey(publicKeyJwk: JsonWebKey): Promise<string> {
