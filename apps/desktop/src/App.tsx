@@ -280,6 +280,7 @@ import { ModelPanel } from "./components/ModelPanel";
 import { RoomModePanel } from "./components/RoomModePanel";
 import { ApprovalPolicyPanel } from "./components/ApprovalPolicyPanel";
 import { HostHandoffPanel } from "./components/HostHandoffPanel";
+import { EncryptedInvitePanel } from "./components/EncryptedInvitePanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -6620,75 +6621,26 @@ export function App() {
           formatModel={formatCodexModel}
         />
 
-        <section className="panel invite-panel">
-          <div className="panel-title">
-            <span>Encrypted invite</span>
-            <StatusPill
-              icon={<Lock size={13} />}
-              label={inviteApprovalGate ? "approval key delivery" : "fragment key"}
-              tone={inviteApprovalGate ? "blue" : "green"}
-            />
-          </div>
-          <button className="primary-wide" onClick={copyInviteLink} disabled={!canCopyRoomInvite}>
-            <Copy size={15} />
-            Copy room invite
-          </button>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={inviteApprovalGate}
-              disabled={!hasSelectedRoom || isSelectedRoomLocked}
-              onChange={(event) => setInviteApprovalGateForRoom(selectedRoom.id, event.target.checked)}
-            />
-            <span>Ask host to approve joiners</span>
-          </label>
-          <label>
-            <span>Join from invite link or key</span>
-            <textarea
-              value={inviteSecretInput}
-              onChange={(event) => setInviteSecretInput(event.target.value)}
-              placeholder="Paste a multAIplayer invite..."
-            />
-          </label>
-          <button className="ghost-wide" onClick={joinInviteSecret} disabled={!inviteSecretInput.trim()}>
-            <KeyRound size={15} />
-            Import invite
-          </button>
-          <button className="ghost-wide danger" onClick={rotateSelectedRoomKey} disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || keyRotationBusy}>
-            <RefreshCw size={15} />
-            {keyRotationBusy ? "Rotating room key" : "Rotate room key"}
-          </button>
-          <div className="empty-state compact">
-            Rotation updates future messages and invites for current key holders. It is not alpha member removal.
-          </div>
-          <div className="terminal-requests">
-            {inviteRequests.slice(-4).reverse().map((request) => (
-              <div className={`terminal-request ${request.status}`} key={request.id}>
-                <div>
-                  <strong>{request.requester}</strong>
-                  <span>{request.note ?? "Requesting room access."}</span>
-                  <small>{request.requesterDeviceId === deviceId ? "This device" : request.requesterDeviceId}</small>
-                </div>
-                <small>{request.status}</small>
-                {request.status === "pending" && (
-                  <div>
-                    <button onClick={() => decideInviteJoinRequest(request, "approved")} disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost}>
-                      <Check size={13} />
-                    </button>
-                    <button onClick={() => decideInviteJoinRequest(request, "denied")} disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost}>
-                      <X size={13} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-            {inviteRequests.length === 0 && (
-              <div className="empty-state compact">No invite approval requests in this room.</div>
-            )}
-          </div>
-          {inviteLink && <div className="invite-link">{inviteLink}</div>}
-          {inviteMessage && <div className="workflow-message">{inviteMessage}</div>}
-        </section>
+        <EncryptedInvitePanel
+          inviteApprovalGate={inviteApprovalGate}
+          copyDisabled={!canCopyRoomInvite}
+          inviteSecretInput={inviteSecretInput}
+          inviteRequests={inviteRequests}
+          localDeviceId={deviceId}
+          gateDisabled={!hasSelectedRoom || isSelectedRoomLocked}
+          importDisabled={!inviteSecretInput.trim()}
+          rotateDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || keyRotationBusy}
+          approvalDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost}
+          keyRotationBusy={keyRotationBusy}
+          inviteLink={inviteLink}
+          inviteMessage={inviteMessage}
+          onCopyInvite={copyInviteLink}
+          onInviteApprovalGateChange={(enabled) => setInviteApprovalGateForRoom(selectedRoom.id, enabled)}
+          onInviteSecretInputChange={setInviteSecretInput}
+          onImportInvite={joinInviteSecret}
+          onRotateRoomKey={rotateSelectedRoomKey}
+          onDecideInviteRequest={decideInviteJoinRequest}
+        />
 
         <ApprovalPolicyPanel
           selectedPolicy={selectedRoom.approvalPolicy}
