@@ -250,7 +250,6 @@ import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
 import { InlineSecretWarning, StatusPill } from "./components/common";
-import { InspectorTabs, type InspectorTab } from "./components/InspectorTabs";
 import { RoomHeader } from "./components/RoomHeader";
 import { ModelPanel } from "./components/ModelPanel";
 import { RoomModePanel } from "./components/RoomModePanel";
@@ -270,6 +269,7 @@ import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
 import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarPanelName, type SidebarRoomDisplay, type SidebarTeamDisplay } from "./components/DesktopSidebar";
 import { RoomChatPanel, type PendingAttachmentDisplay, type RoomChatMessageDisplay } from "./components/RoomChatPanel";
+import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -5993,43 +5993,42 @@ export function App() {
         />
       </main>
 
-      <aside className="inspector">
-        <InspectorTabs
-          activeTab={inspectorTab}
-          workAttentionCount={inspectorAttention.work}
-          browserAttentionCount={inspectorAttention.browser}
-          onSelectTab={(tab) => setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: tab }))}
-        />
-
-        <BrowserAccessPanel
-          hidden={inspectorTab !== "browser"}
-          browserEnabled={selectedRoom.mode.browser}
-          browserStatus={browserStatus}
-          browserProfilePersistent={selectedRoom.browserProfilePersistent}
-          browserProfileDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
-          browserAllowedOriginsDraft={browserAllowedOriginsDraft}
-          browserAllowedOriginsDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
-          browserUrl={browserUrl}
-          browserReason={browserReason}
-          canRequestBrowser={canRequestBrowser}
-          canHostBrowser={canHostBrowser}
-          browserRequests={browserRequests}
-          browserMessage={browserMessage}
-          formatBrowserAccessLabel={formatBrowserAccessLabel}
-          detectBrowserSecretRisks={detectBrowserSecretRisks}
-          onResetBrowserProfile={resetRoomBrowserProfile}
-          onBrowserProfilePersistenceChange={setBrowserProfilePersistence}
-          onBrowserAllowedOriginsDraftChange={(draft) => setBrowserAllowedOriginsDraftForRoom(selectedRoom.id, draft)}
-          onSaveBrowserAllowedOrigins={saveBrowserAllowedOrigins}
-          onBrowserUrlChange={(url) => setBrowserUrlForRoom(selectedRoom.id, url)}
-          onBrowserReasonChange={(reason) => setBrowserReasonForRoom(selectedRoom.id, reason)}
-          onRequestBrowserAccess={requestBrowserAccess}
-          onApproveBrowserRequest={approveBrowserRequest}
-          onDenyBrowserRequest={denyBrowserRequest}
-          onOpenApprovedBrowserRequest={openApprovedBrowserRequest}
-        />
-
-        <div className="inspector-panel-group" hidden={inspectorTab !== "work"}>
+      <RoomInspectorPanel
+        activeTab={inspectorTab}
+        workAttentionCount={inspectorAttention.work}
+        browserAttentionCount={inspectorAttention.browser}
+        onSelectTab={(tab) => setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: tab }))}
+        browserPanel={(
+          <BrowserAccessPanel
+            hidden={false}
+            browserEnabled={selectedRoom.mode.browser}
+            browserStatus={browserStatus}
+            browserProfilePersistent={selectedRoom.browserProfilePersistent}
+            browserProfileDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
+            browserAllowedOriginsDraft={browserAllowedOriginsDraft}
+            browserAllowedOriginsDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
+            browserUrl={browserUrl}
+            browserReason={browserReason}
+            canRequestBrowser={canRequestBrowser}
+            canHostBrowser={canHostBrowser}
+            browserRequests={browserRequests}
+            browserMessage={browserMessage}
+            formatBrowserAccessLabel={formatBrowserAccessLabel}
+            detectBrowserSecretRisks={detectBrowserSecretRisks}
+            onResetBrowserProfile={resetRoomBrowserProfile}
+            onBrowserProfilePersistenceChange={setBrowserProfilePersistence}
+            onBrowserAllowedOriginsDraftChange={(draft) => setBrowserAllowedOriginsDraftForRoom(selectedRoom.id, draft)}
+            onSaveBrowserAllowedOrigins={saveBrowserAllowedOrigins}
+            onBrowserUrlChange={(url) => setBrowserUrlForRoom(selectedRoom.id, url)}
+            onBrowserReasonChange={(reason) => setBrowserReasonForRoom(selectedRoom.id, reason)}
+            onRequestBrowserAccess={requestBrowserAccess}
+            onApproveBrowserRequest={approveBrowserRequest}
+            onDenyBrowserRequest={denyBrowserRequest}
+            onOpenApprovedBrowserRequest={openApprovedBrowserRequest}
+          />
+        )}
+        workPanel={(
+          <>
         <ProjectPanel
           projectPath={selectedRoom.projectPath}
           projectPathDraft={projectPathDraft}
@@ -6258,8 +6257,9 @@ export function App() {
           onRestartTerminal={restartSelectedTerminal}
           onStopTerminal={stopSelectedTerminal}
         />
-        </div>
-      </aside>
+          </>
+        )}
+      />
     </div>
   );
 }
