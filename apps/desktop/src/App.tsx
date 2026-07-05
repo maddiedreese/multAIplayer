@@ -52,10 +52,12 @@ import type {
   TeamRecord,
   TerminalResultPlaintextPayload,
   TerminalRequestPlaintextPayload,
-  ApprovalPolicy
+  ApprovalPolicy,
+  DevicePublicKeyJwk as DevicePublicKeyJwkType
 } from "@multaiplayer/protocol";
 import {
   codexModelOptions,
+  DevicePublicKeyJwk,
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultCodexModel,
@@ -350,7 +352,7 @@ interface NoSecretRoomInvite {
   roomId: string;
   roomName: string;
   hostDeviceId: string;
-  hostPublicKeyJwk: Record<string, unknown>;
+  hostPublicKeyJwk: DevicePublicKeyJwkType;
   hostPublicKeyFingerprint: string;
 }
 
@@ -2794,12 +2796,7 @@ export function App() {
         decidedAt: new Date().toISOString(),
         recipientDeviceId: roomRequest.requesterDeviceId,
         recipientPublicKeyFingerprint: roomRequest.requesterPublicKeyFingerprint,
-        wrappedRoomSecret: wrappedRoomSecret
-          ? {
-              ...wrappedRoomSecret,
-              ephemeralPublicKeyJwk: jsonWebKeyToRecord(wrappedRoomSecret.ephemeralPublicKeyJwk)
-          }
-          : undefined
+        wrappedRoomSecret
       };
       const envelopePayload = roomRequest.requesterPublicKeyJwk
         ? await sealJsonToDevice(payload, roomRequest.requesterPublicKeyJwk)
@@ -3574,7 +3571,7 @@ export function App() {
           roomId: room.id,
           roomName: room.name,
           hostDeviceId: deviceId,
-          hostPublicKeyJwk: jsonWebKeyToRecord(deviceIdentity.publicKeyJwk),
+          hostPublicKeyJwk: jsonWebKeyToDevicePublicKeyJwk(deviceIdentity.publicKeyJwk),
           hostPublicKeyFingerprint: deviceIdentity.publicKeyFingerprint
         });
         const link = `${window.location.origin}${window.location.pathname}?invite=${invite.id}#multaiplayerJoin=${joinFragment}&approval=request`;
@@ -3753,7 +3750,7 @@ export function App() {
       requester: localUser.name,
       requesterUserId: localUser.id,
       requesterDeviceId: deviceId,
-      requesterPublicKeyJwk: deviceIdentity ? jsonWebKeyToRecord(deviceIdentity.publicKeyJwk) : undefined,
+      requesterPublicKeyJwk: deviceIdentity ? jsonWebKeyToDevicePublicKeyJwk(deviceIdentity.publicKeyJwk) : undefined,
       requesterPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
       requestedAt,
       note: `Requesting access to ${acceptedRoomName}.`,
@@ -3837,7 +3834,7 @@ export function App() {
         requester: localUser.name,
         requesterUserId: localUser.id,
         requesterDeviceId: deviceId,
-        requesterPublicKeyJwk: deviceIdentity ? jsonWebKeyToRecord(deviceIdentity.publicKeyJwk) : undefined,
+        requesterPublicKeyJwk: deviceIdentity ? jsonWebKeyToDevicePublicKeyJwk(deviceIdentity.publicKeyJwk) : undefined,
         requesterPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
         requestedAt,
         note: `Requesting access to ${acceptedRoomName}.`,
@@ -7811,7 +7808,7 @@ function isInviteJoinRequestPlaintextPayload(value: unknown): value is InviteJoi
     typeof value.requester === "string" &&
     typeof value.requesterUserId === "string" &&
     typeof value.requesterDeviceId === "string" &&
-    (value.requesterPublicKeyJwk === undefined || isRecord(value.requesterPublicKeyJwk)) &&
+    (value.requesterPublicKeyJwk === undefined || DevicePublicKeyJwk.safeParse(value.requesterPublicKeyJwk).success) &&
     (value.requesterPublicKeyFingerprint === undefined || typeof value.requesterPublicKeyFingerprint === "string") &&
     typeof value.requestedAt === "string" &&
     (value.note === undefined || typeof value.note === "string")
@@ -7838,7 +7835,7 @@ function isWrappedRoomSecretPayload(value: unknown): boolean {
   return (
     value.version === 1 &&
     value.algorithm === "ECDH-P256-HKDF-SHA256-AES-GCM-256" &&
-    isRecord(value.ephemeralPublicKeyJwk) &&
+    DevicePublicKeyJwk.safeParse(value.ephemeralPublicKeyJwk).success &&
     typeof value.nonce === "string" &&
     typeof value.ciphertext === "string"
   );
@@ -7846,14 +7843,14 @@ function isWrappedRoomSecretPayload(value: unknown): boolean {
 
 function isDeviceSealedPayload(value: unknown): value is {
   algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256";
-  ephemeralPublicKeyJwk: Record<string, unknown>;
+  ephemeralPublicKeyJwk: DevicePublicKeyJwkType;
   nonce: string;
   ciphertext: string;
 } {
   if (!isRecord(value)) return false;
   return (
     value.algorithm === "ECDH-P256-HKDF-SHA256-AES-GCM-256" &&
-    isRecord(value.ephemeralPublicKeyJwk) &&
+    DevicePublicKeyJwk.safeParse(value.ephemeralPublicKeyJwk).success &&
     typeof value.nonce === "string" &&
     typeof value.ciphertext === "string"
   );
@@ -8090,8 +8087,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function jsonWebKeyToRecord(key: JsonWebKey): Record<string, unknown> {
-  return JSON.parse(JSON.stringify(key)) as Record<string, unknown>;
+function jsonWebKeyToDevicePublicKeyJwk(key: JsonWebKey): DevicePublicKeyJwkType {
+  return DevicePublicKeyJwk.parse(JSON.parse(JSON.stringify(key)));
 }
 
 function encodeNoSecretRoomInvite(invite: NoSecretRoomInvite): string {
@@ -8106,18 +8103,19 @@ function decodeNoSecretRoomInvite(value: string): NoSecretRoomInvite {
     typeof decoded.roomId !== "string" ||
     typeof decoded.roomName !== "string" ||
     typeof decoded.hostDeviceId !== "string" ||
-    !isRecord(decoded.hostPublicKeyJwk) ||
+    !DevicePublicKeyJwk.safeParse(decoded.hostPublicKeyJwk).success ||
     typeof decoded.hostPublicKeyFingerprint !== "string"
   ) {
     throw new Error("No-secret invite is missing required metadata");
   }
+  const hostPublicKeyJwk = DevicePublicKeyJwk.parse(decoded.hostPublicKeyJwk);
   return {
     version: decoded.version,
     teamId: decoded.teamId,
     roomId: decoded.roomId,
     roomName: decoded.roomName,
     hostDeviceId: decoded.hostDeviceId,
-    hostPublicKeyJwk: decoded.hostPublicKeyJwk,
+    hostPublicKeyJwk,
     hostPublicKeyFingerprint: decoded.hostPublicKeyFingerprint
   };
 }
