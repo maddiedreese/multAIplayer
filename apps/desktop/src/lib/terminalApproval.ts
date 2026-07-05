@@ -26,3 +26,32 @@ export function terminalRequestForApprovedRun<T extends TerminalApprovalRequest>
     cwd: projectPath
   };
 }
+
+export function findRoomTerminalRequest<T extends TerminalApprovalRequest>(
+  requests: T[],
+  requestId: string
+): T | null {
+  return requests.find((request) => request.id === requestId) ?? null;
+}
+
+export function canActOnRoomTerminalRequest<T extends TerminalApprovalRequest>(
+  requests: T[],
+  requestId: string,
+  expectedStatus: TerminalApprovalRequest["status"] = "pending"
+): boolean {
+  const request = findRoomTerminalRequest(requests, requestId);
+  return request?.status === expectedStatus;
+}
+
+export function roomTerminalRequestMessage<T extends TerminalApprovalRequest>(
+  requests: T[],
+  requestId: string,
+  expectedStatus: TerminalApprovalRequest["status"] = "pending"
+): string {
+  const request = findRoomTerminalRequest(requests, requestId);
+  if (!request) return "Terminal request is no longer available in this room.";
+  if (request.status !== expectedStatus) {
+    return `Terminal request is ${request.status}, not ${expectedStatus}.`;
+  }
+  return "Terminal request is available.";
+}

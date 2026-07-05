@@ -191,7 +191,12 @@ import { createHandoffSettingsPatch } from "./lib/hostHandoff";
 import { detectBrowserSecretRisks, detectSecretRisks, detectTerminalCommandRisks } from "./lib/secretRisks";
 import { createGitWorkflowApprovalPlan, formatGitWorkflowApprovalPreview } from "@multaiplayer/git";
 import { normalizeGitHubBranchName } from "@multaiplayer/github";
-import { terminalRequestForApprovedRun } from "./lib/terminalApproval";
+import {
+  canActOnRoomTerminalRequest,
+  findRoomTerminalRequest,
+  roomTerminalRequestMessage,
+  terminalRequestForApprovedRun
+} from "./lib/terminalApproval";
 import { canControlRoomTerminal, roomTerminalControlMessage } from "./lib/terminalAccess";
 import { readInviteUrlPayload } from "./lib/inviteUrl";
 import { displayableInviteLink } from "./lib/invitePrivacy";
@@ -4243,11 +4248,16 @@ export function App() {
     }
     const room = selectedRoom;
     const roomId = room.id;
+    const roomRequest = findRoomTerminalRequest(terminalRequests, request.id);
+    if (!roomRequest || !canActOnRoomTerminalRequest(terminalRequests, request.id)) {
+      setTerminalErrorForRoom(roomId, roomTerminalRequestMessage(terminalRequests, request.id));
+      return;
+    }
     setTerminalBusyForRoom(roomId, true);
     setTerminalErrorForRoom(roomId, null);
     let approvedRequest: TerminalCommandRequest;
     try {
-      approvedRequest = terminalRequestForApprovedRun(request, room.projectPath);
+      approvedRequest = terminalRequestForApprovedRun(roomRequest, room.projectPath);
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalErrorForRoom(roomId, String(error));
       setTerminalBusyForRoom(roomId, false);
@@ -4261,7 +4271,7 @@ export function App() {
     appendTerminalLinesForRoom(roomId, [
       `${approvedRequest.requester} requested: ${approvedRequest.command}`,
       `$ ${approvedRequest.command}`,
-      ...(request.cwd !== approvedRequest.cwd ? [`Running in room project: ${approvedRequest.cwd}`] : [])
+      ...(roomRequest.cwd !== approvedRequest.cwd ? [`Running in room project: ${approvedRequest.cwd}`] : [])
     ]);
     const startedAt = new Date().toISOString();
     try {
@@ -4313,6 +4323,10 @@ export function App() {
       return;
     }
     const room = selectedRoom;
+    if (!canActOnRoomTerminalRequest(terminalRequests, requestId)) {
+      setTerminalErrorForRoom(room.id, roomTerminalRequestMessage(terminalRequests, requestId));
+      return;
+    }
     updateTerminalRequestStatus(room.id, requestId, "denied");
     publishRequestStatus("terminal.event", requestId, "denied", room).catch((error) => {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setTerminalErrorForRoom(room.id, String(error));
