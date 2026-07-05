@@ -161,7 +161,12 @@ import {
   updateRoomSettings
 } from "./lib/workspaceClient";
 import { defaultRelayHttpUrl, defaultRelayWsUrl, loadAppConfig, resetAppConfig, saveAppConfig, type AppConfig } from "./lib/appConfig";
-import { canApproveCodexTurn, shouldAutoApproveChatOnlyTurn, shouldResetCodexApprovalForRoomModeChange } from "./lib/codexApproval";
+import {
+  canApproveCodexTurn,
+  shouldAutoApproveChatOnlyTurn,
+  shouldResetCodexApprovalForRoomModeChange,
+  shouldResetCodexApprovalForRoomUpdate
+} from "./lib/codexApproval";
 import { buildCodexApprovalSnapshot, buildCodexTurnInput, buildCodexTurnSummary, messagesSinceLastCodex } from "./lib/codexTurn";
 import { normalizeCodexThreadId } from "./lib/codexThread";
 import {
@@ -869,6 +874,11 @@ export function App() {
     approval: PendingCodexApproval | null
   ) {
     setPendingCodexApprovalsByRoom((current) => approval ? { ...current, [roomId]: approval } : omitRecordKey(current, roomId));
+  }
+
+  function resetCodexApprovalForRoom(roomId: string) {
+    setPendingCodexApprovalForRoom(roomId, null);
+    setApprovalVisibleForRoom(roomId, false);
   }
 
   function setCodexRunningForRoom(roomId: string, running: boolean) {
@@ -2191,7 +2201,12 @@ export function App() {
   }
 
   function upsertRoom(room: RoomRecord) {
-    setRooms((current) => upsertRoomPreservingUnread(current, room));
+    const nextRoom = ensureRoomDefaults(room);
+    const previousRoom = roomsRef.current.find((existing) => existing.id === nextRoom.id);
+    if (previousRoom && shouldResetCodexApprovalForRoomUpdate(ensureRoomDefaults(previousRoom), nextRoom)) {
+      resetCodexApprovalForRoom(nextRoom.id);
+    }
+    setRooms((current) => upsertRoomPreservingUnread(current, nextRoom));
   }
 
   function handleRelayError(message: string) {
@@ -2308,6 +2323,7 @@ export function App() {
       if (hostStatus === "active") {
         markLatestHostHandoffAccepted(room.id);
       }
+      resetCodexApprovalForRoom(roomId);
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessageForRoom(roomId, String(error));
     } finally {
@@ -2342,6 +2358,7 @@ export function App() {
       markHostHandoffAccepted(roomId, handoff.id);
       await publishHostHandoffAccepted(selectedRoom, handoff);
       resetFileContextForRoom(roomId);
+      resetCodexApprovalForRoom(roomId);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setProjectPathDraftForRoom(roomId, patch.projectPath);
         setCustomCodexModelForRoom(roomId, patch.codexModel);
@@ -2695,10 +2712,7 @@ export function App() {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setSettingsMessageForRoom(roomId, `Approval policy set to ${approvalPolicyLabels[approvalPolicy]}.`);
       }
-      if (approvalPolicy === "never_host") {
-        setPendingCodexApprovalForRoom(roomId, null);
-        setApprovalVisibleForRoom(roomId, false);
-      }
+      resetCodexApprovalForRoom(roomId);
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
     } finally {
@@ -2742,8 +2756,7 @@ export function App() {
         setSettingsMessageForRoom(roomId, `${roomModeLabels[key]} mode ${nextMode[key] ? "enabled" : "disabled"}.`);
       }
       if (shouldResetCodexApprovalForRoomModeChange(key)) {
-        setPendingCodexApprovalForRoom(roomId, null);
-        setApprovalVisibleForRoom(roomId, false);
+        resetCodexApprovalForRoom(roomId);
       }
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
@@ -2788,6 +2801,7 @@ export function App() {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setSettingsMessageForRoom(roomId, `Codex model set to ${formatCodexModel(nextModel)}.`);
       }
+      resetCodexApprovalForRoom(roomId);
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
     } finally {
@@ -2839,6 +2853,7 @@ export function App() {
             : "Allowed browser site list is empty. Browser requests will require manual approval."
         );
       }
+      resetCodexApprovalForRoom(roomId);
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessageForRoom(roomId, String(error));
     } finally {
@@ -2880,6 +2895,7 @@ export function App() {
       if (!browserProfilePersistent) {
         setBrowserStatusByRoom((current) => omitRecordKey(current, roomId));
       }
+      resetCodexApprovalForRoom(roomId);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setBrowserMessageForRoom(
           roomId,
@@ -2929,6 +2945,7 @@ export function App() {
         changedAt: new Date().toISOString()
       });
       resetFileContextForRoom(roomId);
+      resetCodexApprovalForRoom(roomId);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setSettingsMessageForRoom(roomId, `Project folder set to ${nextProjectPath}.`);
       }

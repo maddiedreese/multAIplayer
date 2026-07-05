@@ -26,3 +26,23 @@ export function canApproveCodexTurn(room: RoomRecord, user: LocalHostUser, locke
 export function shouldResetCodexApprovalForRoomModeChange(mode: keyof RoomMode): boolean {
   return mode === "code" || mode === "workspace" || mode === "browser";
 }
+
+export function shouldResetCodexApprovalForRoomUpdate(previous: RoomRecord, next: RoomRecord): boolean {
+  return (
+    previous.projectPath !== next.projectPath ||
+    previous.codexModel !== next.codexModel ||
+    previous.approvalPolicy !== next.approvalPolicy ||
+    previous.hostStatus !== next.hostStatus ||
+    previous.hostUserId !== next.hostUserId ||
+    previous.mode.code !== next.mode.code ||
+    previous.mode.workspace !== next.mode.workspace ||
+    previous.mode.browser !== next.mode.browser ||
+    previous.browserProfilePersistent !== next.browserProfilePersistent ||
+    !sameStrings(previous.browserAllowedOrigins ?? [], next.browserAllowedOrigins ?? [])
+  );
+}
+
+function sameStrings(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}

@@ -5,7 +5,8 @@ import {
   canApproveCodexTurn,
   isChatOnlyCodexTurn,
   shouldAutoApproveChatOnlyTurn,
-  shouldResetCodexApprovalForRoomModeChange
+  shouldResetCodexApprovalForRoomModeChange,
+  shouldResetCodexApprovalForRoomUpdate
 } from "../src/lib/codexApproval";
 
 const baseSummary: CodexTurnSummary = {
@@ -110,4 +111,23 @@ test("Codex approvals reset when room modes change turn context", () => {
   assert.equal(shouldResetCodexApprovalForRoomModeChange("workspace"), true);
   assert.equal(shouldResetCodexApprovalForRoomModeChange("browser"), true);
   assert.equal(shouldResetCodexApprovalForRoomModeChange("chat"), false);
+});
+
+test("Codex approvals reset when room execution context changes", () => {
+  assert.equal(shouldResetCodexApprovalForRoomUpdate(room, { ...room, codexModel: "gpt-5.4-high" }), true);
+  assert.equal(shouldResetCodexApprovalForRoomUpdate(room, { ...room, projectPath: "/Users/maddie/other-project" }), true);
+  assert.equal(shouldResetCodexApprovalForRoomUpdate(room, { ...room, approvalPolicy: "auto_chat_only" }), true);
+  assert.equal(
+    shouldResetCodexApprovalForRoomUpdate(room, { ...room, mode: { ...room.mode, workspace: true } }),
+    true
+  );
+  assert.equal(
+    shouldResetCodexApprovalForRoomUpdate(room, { ...room, browserAllowedOrigins: ["https://github.com", "https://docs.github.com"] }),
+    true
+  );
+  assert.equal(
+    shouldResetCodexApprovalForRoomUpdate(room, { ...room, browserProfilePersistent: false }),
+    true
+  );
+  assert.equal(shouldResetCodexApprovalForRoomUpdate(room, { ...room, unread: 2 }), false);
 });
