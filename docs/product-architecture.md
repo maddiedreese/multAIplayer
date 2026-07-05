@@ -210,7 +210,7 @@ Git operations in v1:
 - every commit, push, and PR action requires explicit host approval;
 - Git workflow progress, results, and GitHub Actions refreshes are shared to the room as encrypted `git.event` envelopes, so peers can see branch, commit, push, PR, and CI outcomes without the relay seeing plaintext output.
 
-GitHub Actions in v1 are a room-visible branch status surface. After GitHub sign-in, the host can refresh workflow runs for the selected owner, repo, and branch. The loaded runs, last-checked timestamp, and status message are scoped to the current room so switching projects does not show another room's CI state. The UI summarizes whether the loaded runs are passing, failing, running, or unknown, and links directly to each run on GitHub.
+GitHub Actions in v1 are a room-visible branch status surface. After GitHub sign-in, the active host can refresh workflow runs for the selected owner, repo, and branch when workspace mode is enabled and the room is unlocked. The desktop validates the owner, repo, and branch target before calling the relay-side GitHub proxy or publishing a room-visible Actions event. The loaded runs, last-checked timestamp, and status message are scoped to the current room so switching projects does not show another room's CI state. The UI summarizes whether the loaded runs are passing, failing, running, or unknown, and links directly to each run on GitHub.
 
 When a room has an attached local project with a GitHub `origin` remote, the desktop infers the draft PR and Actions owner/repo target from that read-only git remote lookup. Manual owner/repo fields remain available and are not overwritten after the host edits them.
 

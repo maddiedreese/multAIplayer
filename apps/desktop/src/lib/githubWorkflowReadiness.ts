@@ -18,6 +18,20 @@ export interface GitHubWorkflowReadiness {
   normalizedBase: string;
 }
 
+export interface GitHubActionsReadinessInput {
+  authConfig: GitHubAuthConfig | null;
+  currentUser: SignedInUser | null;
+  owner: string;
+  repo: string;
+  branch: string;
+}
+
+export interface GitHubActionsReadiness {
+  ready: boolean;
+  messages: string[];
+  target: string | null;
+}
+
 export function checkGitHubWorkflowReadiness(input: GitHubWorkflowReadinessInput): GitHubWorkflowReadiness {
   const messages: string[] = [];
   let target: string | null = null;
@@ -63,5 +77,35 @@ export function checkGitHubWorkflowReadiness(input: GitHubWorkflowReadinessInput
     messages,
     target,
     normalizedBase
+  };
+}
+
+export function checkGitHubActionsReadiness(input: GitHubActionsReadinessInput): GitHubActionsReadiness {
+  const messages: string[] = [];
+  let target: string | null = null;
+
+  if (input.authConfig?.configured === false) {
+    messages.push("GitHub OAuth is not configured on this relay.");
+  }
+  if (!input.currentUser) {
+    messages.push("Sign in with GitHub before checking Actions.");
+  }
+
+  try {
+    const repo = normalizeGitHubRepoRef(input.owner, input.repo);
+    const branch = normalizeGitHubBranchName(input.branch);
+    target = `${repo.owner}/${repo.repo}@${branch}`;
+  } catch (error) {
+    messages.push(String(error));
+  }
+
+  if (messages.length === 0 && target) {
+    messages.push(`Ready to check GitHub Actions for ${target}.`);
+  }
+
+  return {
+    ready: messages.length === 1 && messages[0].startsWith("Ready to check GitHub Actions"),
+    messages,
+    target
   };
 }

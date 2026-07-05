@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GitHubAuthConfig, SignedInUser } from "../src/lib/authClient";
-import { checkGitHubWorkflowReadiness } from "../src/lib/githubWorkflowReadiness";
+import { checkGitHubActionsReadiness, checkGitHubWorkflowReadiness } from "../src/lib/githubWorkflowReadiness";
 
 const authConfig: GitHubAuthConfig = {
   provider: "github",
@@ -69,5 +69,55 @@ test("checkGitHubWorkflowReadiness returns normalized PR target when ready", () 
   assert.equal(readiness.normalizedBase, "main");
   assert.deepEqual(readiness.messages, [
     "Ready to push and open a draft PR: maddiedreese/multAIplayer:codex/ship -> main."
+  ]);
+});
+
+test("checkGitHubActionsReadiness requires sign-in and a valid repo target", () => {
+  const readiness = checkGitHubActionsReadiness({
+    authConfig: { ...authConfig, configured: false },
+    currentUser: null,
+    owner: "bad owner",
+    repo: "multAIplayer",
+    branch: "bad branch"
+  });
+
+  assert.equal(readiness.ready, false);
+  assert.equal(readiness.target, null);
+  assert.deepEqual(readiness.messages, [
+    "GitHub OAuth is not configured on this relay.",
+    "Sign in with GitHub before checking Actions.",
+    "Error: GitHub owner must be a valid user or organization name."
+  ]);
+});
+
+test("checkGitHubActionsReadiness rejects unsafe branch targets", () => {
+  const readiness = checkGitHubActionsReadiness({
+    authConfig,
+    currentUser: user,
+    owner: "maddiedreese",
+    repo: "multAIplayer",
+    branch: "bad branch"
+  });
+
+  assert.equal(readiness.ready, false);
+  assert.equal(readiness.target, null);
+  assert.deepEqual(readiness.messages, [
+    "Error: Unsafe GitHub branch name: bad branch"
+  ]);
+});
+
+test("checkGitHubActionsReadiness returns normalized Actions target when ready", () => {
+  const readiness = checkGitHubActionsReadiness({
+    authConfig,
+    currentUser: user,
+    owner: " maddiedreese ",
+    repo: " multAIplayer ",
+    branch: " codex/actions "
+  });
+
+  assert.equal(readiness.ready, true);
+  assert.equal(readiness.target, "maddiedreese/multAIplayer@codex/actions");
+  assert.deepEqual(readiness.messages, [
+    "Ready to check GitHub Actions for maddiedreese/multAIplayer@codex/actions."
   ]);
 });

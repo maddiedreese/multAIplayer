@@ -197,7 +197,7 @@ import { canRequestWorkspaceAction, canUseLocalWorkspace, localWorkspaceGateMess
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { copyTextToClipboard } from "./lib/clipboard";
-import { checkGitHubWorkflowReadiness } from "./lib/githubWorkflowReadiness";
+import { checkGitHubActionsReadiness, checkGitHubWorkflowReadiness } from "./lib/githubWorkflowReadiness";
 import { defaultGitWorkflowDraft, parseGitHubRemoteUrl, resolveGitWorkflowDraft, updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "./lib/gitWorkflowDraft";
 import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
@@ -712,6 +712,13 @@ export function App() {
     head: gitWorkflowDraft.branchName,
     base: gitWorkflowDraft.prBase
   }), [authConfig, currentUser, gitWorkflowDraft.branchName, gitWorkflowDraft.prBase, gitWorkflowDraft.prOwner, gitWorkflowDraft.prRepo, gitWorkflowDraft.pushEnabled]);
+  const githubActionsReadiness = useMemo(() => checkGitHubActionsReadiness({
+    authConfig,
+    currentUser,
+    owner: gitWorkflowDraft.prOwner,
+    repo: gitWorkflowDraft.prRepo,
+    branch: gitWorkflowDraft.branchName
+  }), [authConfig, currentUser, gitWorkflowDraft.branchName, gitWorkflowDraft.prOwner, gitWorkflowDraft.prRepo]);
   const gitApprovalPreview = useMemo(() => {
     try {
       const plan = createGitWorkflowApprovalPlan(
@@ -5062,7 +5069,35 @@ export function App() {
       }));
       return;
     }
+    if (!isActiveHost) {
+      setActionsMessagesByRoom((current) => ({
+        ...current,
+        [roomId]: hostGateMessage
+      }));
+      return;
+    }
+    if (!canReadLocalWorkspace) {
+      setActionsMessagesByRoom((current) => ({
+        ...current,
+        [roomId]: localWorkspaceMessage
+      }));
+      return;
+    }
     const workflowDraft = resolveGitWorkflowDraft(gitWorkflowDraftsByRoom, roomId);
+    const readiness = checkGitHubActionsReadiness({
+      authConfig,
+      currentUser,
+      owner: workflowDraft.prOwner,
+      repo: workflowDraft.prRepo,
+      branch: workflowDraft.branchName
+    });
+    if (!readiness.ready) {
+      setActionsMessagesByRoom((current) => ({
+        ...current,
+        [roomId]: readiness.messages.join(" ")
+      }));
+      return;
+    }
     setActionsBusyForRoom(roomId, true);
     setActionsMessagesByRoom((current) => omitRecordKey(current, roomId));
     try {
@@ -6668,7 +6703,11 @@ export function App() {
             <span>GitHub Actions</span>
             <div className="panel-title-actions">
               <StatusPill icon={<Github size={13} />} label={actionsSummary.label} tone={actionsSummary.tone} />
-              <button className="ghost" onClick={() => refreshGitHubActions()} disabled={!hasSelectedRoom || actionsBusy || !currentUser}>
+              <button
+                className="ghost"
+                onClick={() => refreshGitHubActions()}
+                disabled={!canReadLocalWorkspace || actionsBusy || !isActiveHost || !githubActionsReadiness.ready}
+              >
                 <RefreshCw size={14} />
                 {actionsBusy ? "Checking" : "Refresh"}
               </button>
@@ -6680,6 +6719,9 @@ export function App() {
               {gitWorkflowDraft.prOwner}/{gitWorkflowDraft.prRepo} · {gitWorkflowDraft.branchName || "branch required"}
               {actionsLastChecked ? ` · checked ${formatTimestamp(actionsLastChecked)}` : ""}
             </span>
+          </div>
+          <div className={`workflow-message ${githubActionsReadiness.ready ? "" : "danger"}`}>
+            {githubActionsReadiness.messages.join(" ")}
           </div>
           <div className="actions-list">
             {actionRuns.map((run) => (
