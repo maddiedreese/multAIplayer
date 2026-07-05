@@ -48,6 +48,7 @@ Team-level settings include:
 - members and roles;
 - default history retention;
 - default approval policy;
+- default Codex model;
 - default browser policy;
 - default invite policy;
 - official relay or self-hosted relay connection.
@@ -183,7 +184,7 @@ The macOS alpha bounds approved one-shot terminal commands, persistent terminal 
 
 Browser mode is room-scoped. Members request specific URLs with a short reason, and those requests are routed as encrypted room events. The host approves or denies each URL before it appears in the Codex turn context. Auto-approval for allowed browser sites is evaluated against the request's room, host, approval policy, and origin allowlist, never against whichever room happens to be selected in the app.
 
-The relay can see that a `browser.request` envelope exists, but not the requested URL or reason. Approved URLs can be opened in a room/project-scoped Tauri WebView window on the host machine. Browser profile persistence is a host-controlled room setting: profiles persist by default, hosts can reset them manually, and refresh mode closes and clears the room/project browser profile before each approved open. The alpha keeps this as an explicit host action; deeper browser automation can be added behind the same approval boundary.
+The relay can see that a `browser.request` or `browser.event` envelope exists, but not the requested URL, reason, or decision details. Browser approval and denial decisions render as local system transcript messages after decryption, so room members can see the host-side browser audit trail without exposing it to the relay. Approved URLs can be opened in a room/project-scoped Tauri WebView window on the host machine. Browser profile persistence is a host-controlled room setting: profiles persist by default, hosts can reset them manually, and refresh mode closes and clears the room/project browser profile before each approved open. The alpha keeps this as an explicit host action; deeper browser automation can be added behind the same approval boundary.
 
 Auto-approve browser on allowed sites is intentionally conservative. It only applies for the active host, only when the URL origin is on the room allowlist, and it refuses URLs that look like signed-in account, token, billing, security, or credential pages. Those pages fall back to manual host review and show inline warnings.
 

@@ -190,6 +190,7 @@ import { terminalRequestForApprovedRun } from "./lib/terminalApproval";
 import { readInviteUrlPayload } from "./lib/inviteUrl";
 import { displayableInviteLink } from "./lib/invitePrivacy";
 import { normalizeBrowserAllowedOrigins, shouldAutoApproveBrowserRequest } from "./lib/browserPolicy";
+import { browserDecisionMessageId, buildBrowserDecisionMessage } from "./lib/browserActivity";
 import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
@@ -613,6 +614,7 @@ export function App() {
   const roomsRef = useRef<RoomRecord[]>(rooms);
   const selectedRoomIdRef = useRef(selectedRoomId);
   const gitWorkflowDraftsRef = useRef(gitWorkflowDraftsByRoom);
+  const browserRequestsRef = useRef(browserRequestsByRoom);
   const deviceId = useMemo(() => loadOrCreateDeviceId(), []);
   const localUser = useMemo(
     () => ({
@@ -1056,6 +1058,10 @@ export function App() {
   }, [gitWorkflowDraftsByRoom]);
 
   useEffect(() => {
+    browserRequestsRef.current = browserRequestsByRoom;
+  }, [browserRequestsByRoom]);
+
+  useEffect(() => {
     if (!selectedRoomId) return;
     setRooms((current) => markRoomRead(current, selectedRoomId));
   }, [selectedRoomId]);
@@ -1466,6 +1472,11 @@ export function App() {
               };
             });
             if (status === "approved" && envelopeRoom) {
+              appendBrowserDecisionMessage(
+                envelopeRoom.id,
+                buildLocalRequestStatusPayload(plaintext.id, "approved"),
+                { url: plaintext.url, requester: plaintext.requester }
+              );
               publishRequestStatus("browser.event", plaintext.id, "approved", envelopeRoom).catch((error) => {
                 if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, envelopeRoom.id)) setBrowserMessageForRoom(envelopeRoom.id, String(error));
               });
@@ -1477,6 +1488,7 @@ export function App() {
           if (message.envelope.kind === "browser.event") {
             const plaintext = await decryptJson<RequestStatusPlaintextPayload>(roomPayload, secret);
             updateBrowserRequestStatus(message.envelope.roomId, plaintext.requestId, plaintext.status);
+            appendBrowserDecisionMessage(message.envelope.roomId, plaintext);
           }
           if (message.envelope.kind === "room.host") {
             const plaintext = await decryptJson<HostHandoffPlaintextPayload>(roomPayload, secret);
@@ -4088,6 +4100,13 @@ export function App() {
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") {
       appendBrowserRequest(room.id, request);
+      if (autoApproved) {
+        appendBrowserDecisionMessage(
+          room.id,
+          buildLocalRequestStatusPayload(request.id, "approved"),
+          request
+        );
+      }
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setBrowserMessageForRoom(
           roomId,
@@ -4123,6 +4142,11 @@ export function App() {
       client.publish({ type: "publish", envelope });
       appendBrowserRequest(room.id, request);
       if (autoApproved) {
+        appendBrowserDecisionMessage(
+          room.id,
+          buildLocalRequestStatusPayload(request.id, "approved"),
+          request
+        );
         await publishRequestStatus("browser.event", request.id, "approved", room);
       }
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
@@ -4148,7 +4172,9 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    const decision = buildLocalRequestStatusPayload(request.id, "approved");
     updateBrowserRequestStatus(roomId, request.id, "approved");
+    appendBrowserDecisionMessage(roomId, decision);
     publishRequestStatus("browser.event", request.id, "approved").catch((error) => {
       setBrowserMessageForRoom(roomId, String(error));
     });
@@ -4165,7 +4191,9 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    const decision = buildLocalRequestStatusPayload(requestId, "denied");
     updateBrowserRequestStatus(roomId, requestId, "denied");
+    appendBrowserDecisionMessage(roomId, decision);
     publishRequestStatus("browser.event", requestId, "denied").catch((error) => {
       setBrowserMessageForRoom(roomId, String(error));
     });
@@ -4276,6 +4304,35 @@ export function App() {
     }));
   }
 
+  function appendBrowserDecisionMessage(
+    roomId: string,
+    decision: RequestStatusPlaintextPayload,
+    requestOverride?: Pick<BrowserAccessRequest, "url" | "requester">
+  ) {
+    const request = requestOverride ?? (browserRequestsRef.current[roomId] ?? []).find((item) => item.id === decision.requestId);
+    appendRoomMessage(roomId, {
+      id: browserDecisionMessageId(decision),
+      author: "multAIplayer",
+      role: "system",
+      body: buildBrowserDecisionMessage(decision, request, formatBrowserAccessLabel),
+      time: formatMessageTime(decision.decidedAt),
+      createdAt: decision.decidedAt
+    });
+  }
+
+  function buildLocalRequestStatusPayload(
+    requestId: string,
+    status: RequestStatusPlaintextPayload["status"]
+  ): RequestStatusPlaintextPayload {
+    return {
+      requestId,
+      status,
+      decidedBy: localUser.name,
+      decidedByUserId: localUser.id,
+      decidedAt: new Date().toISOString()
+    };
+  }
+
   async function publishRequestStatus(
     kind: "terminal.event" | "browser.event",
     requestId: string,
@@ -4285,13 +4342,7 @@ export function App() {
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
     const secret = await loadOrCreateRoomSecret(room.id);
-    const payload: RequestStatusPlaintextPayload = {
-      requestId,
-      status,
-      decidedBy: localUser.name,
-      decidedByUserId: localUser.id,
-      decidedAt: new Date().toISOString()
-    };
+    const payload = buildLocalRequestStatusPayload(requestId, status);
     const envelope: RelayEnvelope = {
       id: crypto.randomUUID(),
       teamId: room.teamId,

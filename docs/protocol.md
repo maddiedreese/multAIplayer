@@ -25,7 +25,7 @@ Host handoff packages are routed as encrypted `room.host` envelopes. The relay s
 
 Room setting activity that should be visible in the transcript is routed as encrypted `room.settings` envelopes. The alpha uses this for host-controlled approval policy, room mode, Codex model, project path, browser allowlist, and browser profile persistence changes. The relay can store current room metadata, but it cannot read the human-readable before/after activity message.
 
-Browser access requests are routed as encrypted `browser.request` envelopes. The relay sees the envelope kind, room id, sender id, and timestamp, but not the URL, reason, requester display name, or host decision state.
+Browser access requests are routed as encrypted `browser.request` envelopes. Host decisions are routed as encrypted `browser.event` envelopes and can render as local room transcript activity after decryption. The relay sees the envelope kind, room id, sender id, and timestamp, but not the URL, reason, requester display name, decider, or host decision state.
 
 Gated invite requests are routed as encrypted `room.invite` envelopes. The relay sees that an invite workflow event happened in a room, but not the requester name, device id, note, host decision, requester device public key, or wrapped room-key payload.
 
