@@ -243,6 +243,7 @@ import {
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
+import { messageInvokesCodex } from "./lib/codexInvoke";
 import { copyTextToClipboard } from "./lib/clipboard";
 import {
   checkGitHubActionsReadiness,
@@ -2102,18 +2103,19 @@ export function App() {
       setChatMessageForRoom(roomId, attachmentError);
       return;
     }
+    const invokesCodex = messageInvokesCodex(body);
     const createdAt = new Date().toISOString();
     const message: ChatMessage = {
       id: crypto.randomUUID(),
       author: localUser.name,
-      role: body.includes("@Codex") ? "system" : "human",
+      role: invokesCodex ? "system" : "human",
       body: body || "Attached files.",
       time: formatMessageTime(createdAt),
       createdAt,
       attachments: attachments.length ? attachments : undefined
     };
     await publishChatMessage(message);
-    if (body.includes("@Codex")) {
+    if (invokesCodex) {
       handleCodexInvoke(message);
     }
     setDraftForRoom(roomId, "");
