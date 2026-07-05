@@ -282,6 +282,7 @@ import { GitHandoffPanel } from "./components/GitHandoffPanel";
 import { ProjectPanel } from "./components/ProjectPanel";
 import { RoomMembersPanel, TeamRosterPanel, type RoomMemberDisplay, type TeamMemberDisplay } from "./components/RosterPanels";
 import { TerminalPanel, type CodexEventDisplay, type TerminalCommandRequestDisplay, type TerminalOutputLineDisplay } from "./components/TerminalPanel";
+import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -6231,28 +6232,17 @@ export function App() {
         )}
 
         {markdownCopyFallback && (
-          <section className="markdown-fallback">
-            <div>
-              <strong>{markdownCopyFallback.title} Markdown ready</strong>
-              <span>Copying was blocked, so the generated Markdown is available here.</span>
-            </div>
-            <textarea readOnly value={markdownCopyFallback.markdown} aria-label={`${markdownCopyFallback.title} Markdown fallback`} />
-            <div className="markdown-fallback-actions">
-              <button
-                onClick={() => copyMarkdownWithFallback(
-                  markdownCopyFallback.title,
-                  markdownCopyFallback.markdown,
-                  (message) => setChatMessageForRoom(selectedRoom.id, message),
-                  selectedRoom.id
-                )}
-              >
-                <Copy size={14} /> Retry copy
-              </button>
-              <button onClick={() => setMarkdownCopyFallbackForRoom(selectedRoom.id, null)}>
-                <X size={14} /> Dismiss
-              </button>
-            </div>
-          </section>
+          <MarkdownFallbackPanel
+            title={markdownCopyFallback.title}
+            markdown={markdownCopyFallback.markdown}
+            onRetryCopy={() => copyMarkdownWithFallback(
+              markdownCopyFallback.title,
+              markdownCopyFallback.markdown,
+              (message) => setChatMessageForRoom(selectedRoom.id, message),
+              selectedRoom.id
+            )}
+            onDismiss={() => setMarkdownCopyFallbackForRoom(selectedRoom.id, null)}
+          />
         )}
 
         <div className="chat-scroll">
