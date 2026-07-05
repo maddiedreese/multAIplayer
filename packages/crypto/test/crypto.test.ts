@@ -9,6 +9,7 @@ import {
   openDeviceSealedJson,
   sealJsonToDevice,
   unwrapRoomSecretForDevice,
+  validateRoomSecret,
   wrapRoomSecretForDevice
 } from "../src/index";
 
@@ -69,4 +70,16 @@ test("device public key fingerprints are stable for canonical public fields", as
 
   assert.equal(fingerprint, identity.publicKeyFingerprint);
   assert.match(fingerprint, /^[a-f0-9]{4}(:[a-f0-9]{4}){7}$/);
+});
+
+test("room secret validation rejects malformed key material with stable errors", () => {
+  assert.throws(() => validateRoomSecret(null), /Room secret must be an object/);
+  assert.throws(
+    () => validateRoomSecret({ algorithm: "AES-GCM-128", rawKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" }),
+    /Unsupported room secret algorithm/
+  );
+  assert.throws(
+    () => validateRoomSecret({ algorithm: "AES-GCM-256", rawKey: "not-a-256-bit-key" }),
+    /Room key must be 256 bits/
+  );
 });

@@ -1,4 +1,5 @@
-import { createRoomSecret, decryptJson, encryptJson, type RoomSecret } from "@multaiplayer/crypto";
+import { createRoomSecret, decryptJson, encryptJson, validateRoomSecret, type RoomSecret } from "@multaiplayer/crypto";
+import { CiphertextPayload } from "@multaiplayer/protocol";
 import { invoke } from "@tauri-apps/api/core";
 
 const defaultRetentionDays = 30;
@@ -29,7 +30,12 @@ export async function loadEncryptedHistory<T>(roomId: string): Promise<T | null>
     return null;
   }
 
-  return decryptJson<T>(stored.ciphertext, secret);
+  try {
+    return await decryptJson<T>(stored.ciphertext, secret);
+  } catch {
+    localStorage.removeItem(historyKey(roomId));
+    return null;
+  }
 }
 
 export async function saveEncryptedHistory(roomId: string, value: unknown): Promise<void> {
@@ -114,10 +120,16 @@ export async function loadRoomSecret(roomId: string): Promise<RoomSecret | null>
 
   const stored = localStorage.getItem(secretKey(roomId));
   if (stored) {
-    const parsed = JSON.parse(stored) as RoomSecret;
-    await writeNativeRoomSecret(roomId, parsed);
-    if (isTauriRuntime()) localStorage.removeItem(secretKey(roomId));
-    return parsed;
+    try {
+      const parsed = JSON.parse(stored) as unknown;
+      validateRoomSecret(parsed);
+      await writeNativeRoomSecret(roomId, parsed);
+      if (isTauriRuntime()) localStorage.removeItem(secretKey(roomId));
+      return parsed;
+    } catch {
+      localStorage.removeItem(secretKey(roomId));
+      return null;
+    }
   }
 
   return null;
@@ -128,10 +140,12 @@ export async function exportRoomSecret(roomId: string): Promise<RoomSecret> {
 }
 
 export async function importRoomSecret(roomId: string, secret: RoomSecret): Promise<void> {
+  validateRoomSecret(secret);
   await writeNativeRoomSecret(roomId, secret);
 }
 
 export async function replaceRoomSecret(roomId: string, secret: RoomSecret): Promise<void> {
+  validateRoomSecret(secret);
   await writeNativeRoomSecret(roomId, secret);
   localStorage.removeItem(historyKey(roomId));
 }
@@ -140,7 +154,9 @@ function readStoredHistory(roomId: string): StoredHistory | null {
   const stored = localStorage.getItem(historyKey(roomId));
   if (!stored) return null;
   try {
-    return JSON.parse(stored) as StoredHistory;
+    const parsed = JSON.parse(stored) as unknown;
+    if (!isStoredHistory(parsed)) throw new Error("invalid stored encrypted history");
+    return parsed;
   } catch {
     localStorage.removeItem(historyKey(roomId));
     return null;
@@ -166,10 +182,19 @@ function secretKey(roomId: string): string {
 async function readNativeRoomSecret(roomId: string): Promise<RoomSecret | null> {
   if (!isTauriRuntime()) return null;
   const stored = await invoke<string | null>("room_secret_get", { roomId });
-  return stored ? JSON.parse(stored) as RoomSecret : null;
+  if (!stored) return null;
+  try {
+    const parsed = JSON.parse(stored) as unknown;
+    validateRoomSecret(parsed);
+    return parsed;
+  } catch {
+    await deleteNativeRoomSecret(roomId);
+    return null;
+  }
 }
 
 async function writeNativeRoomSecret(roomId: string, secret: RoomSecret): Promise<void> {
+  validateRoomSecret(secret);
   if (!isTauriRuntime()) {
     localStorage.setItem(secretKey(roomId), JSON.stringify(secret));
     return;
@@ -199,4 +224,11 @@ function sanitizeHistorySettings(settings: Partial<LocalHistorySettings>): Local
     enabled: settings.enabled !== false,
     retentionDays: Math.min(365, Math.max(1, retentionDays))
   };
+}
+
+function isStoredHistory(value: unknown): value is StoredHistory {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Partial<StoredHistory>;
+  if (typeof record.savedAt !== "string" || Number.isNaN(Date.parse(record.savedAt))) return false;
+  return CiphertextPayload.safeParse(record.ciphertext).success;
 }

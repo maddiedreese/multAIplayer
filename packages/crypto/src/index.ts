@@ -231,11 +231,23 @@ async function importRoomKey(secret: RoomSecret): Promise<CryptoKey> {
   );
 }
 
-function validateRoomSecret(secret: RoomSecret): void {
-  if (secret.algorithm !== "AES-GCM-256") {
-    throw new Error(`Unsupported room secret algorithm: ${secret.algorithm}`);
+export function validateRoomSecret(secret: unknown): asserts secret is RoomSecret {
+  if (!secret || typeof secret !== "object") {
+    throw new Error("Room secret must be an object");
   }
-  if (base64ToBytes(secret.rawKey).byteLength !== 32) {
+  const value = secret as Partial<RoomSecret>;
+  if (value.algorithm !== "AES-GCM-256") {
+    throw new Error(`Unsupported room secret algorithm: ${String(value.algorithm)}`);
+  }
+  let rawKeyBytes: Uint8Array | null = null;
+  if (typeof value.rawKey === "string") {
+    try {
+      rawKeyBytes = base64ToBytes(value.rawKey);
+    } catch {
+      rawKeyBytes = null;
+    }
+  }
+  if (rawKeyBytes?.byteLength !== 32) {
     throw new Error("Room key must be 256 bits");
   }
 }
