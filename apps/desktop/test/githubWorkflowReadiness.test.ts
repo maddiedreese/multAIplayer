@@ -51,9 +51,9 @@ test("checkGitHubWorkflowReadiness requires GitHub sign-in and valid repo target
 
   assert.equal(readiness.ready, false);
   assert.deepEqual(readiness.messages, [
-    "GitHub OAuth is not configured on this relay.",
+    "GitHub sign-in is not configured on this relay.",
     "Sign in with GitHub before approving a push and draft PR.",
-    "GitHub OAuth scopes need public_repo for public repos or repo for private repos.",
+    "GitHub permissions need public_repo for public repos or repo for private repos.",
     "Error: GitHub owner must be a valid user or organization name."
   ]);
 });
@@ -90,7 +90,7 @@ test("checkGitHubActionsReadiness requires sign-in and a valid repo target", () 
   assert.equal(readiness.target, null);
   assert.equal(readiness.normalizedTarget, null);
   assert.deepEqual(readiness.messages, [
-    "GitHub OAuth is not configured on this relay.",
+    "GitHub sign-in is not configured on this relay.",
     "Sign in with GitHub before checking Actions.",
     "Error: GitHub owner must be a valid user or organization name."
   ]);

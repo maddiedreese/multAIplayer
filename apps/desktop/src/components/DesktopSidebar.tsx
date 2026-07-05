@@ -137,7 +137,7 @@ export function DesktopSidebar({
       ) : (
         <button className="github-button" onClick={onSignIn} disabled={authBusy || authConfig?.configured === false}>
           <Github size={16} />
-          {authConfig?.configured === false ? "GitHub OAuth not configured" : authBusy ? "Waiting for GitHub" : "Sign in with GitHub"}
+          {authConfig?.configured === false ? "GitHub sign-in not configured" : authBusy ? "Waiting for GitHub" : "Sign in with GitHub"}
         </button>
       )}
 

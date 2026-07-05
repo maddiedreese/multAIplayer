@@ -1442,8 +1442,8 @@ export function App() {
       publicKeyJwk: deviceIdentity.publicKeyJwk,
       publicKeyFingerprint: deviceIdentity.publicKeyFingerprint
     })
-      .then(() => setDeviceIdentityMessage("Device public key registered with relay."))
-      .catch((error) => setDeviceIdentityMessage(`Device public key registration pending: ${String(error)}`));
+      .then(() => setDeviceIdentityMessage("Device identity registered with relay."))
+      .catch((error) => setDeviceIdentityMessage(`Device identity registration pending: ${String(error)}`));
   }, [appConfig.relayHttpUrl, deviceId, deviceIdentity, localUser.id, localUser.name]);
 
   useEffect(() => {
@@ -2358,7 +2358,7 @@ export function App() {
 
   async function rotateDeviceIdentity() {
     setDeviceIdentity(null);
-    setDeviceIdentityMessage("Rotating local device identity...");
+    setDeviceIdentityMessage("Resetting local device identity...");
     try {
       await resetDeviceIdentity();
       const identity = await loadOrCreateDeviceIdentity();
@@ -2373,24 +2373,24 @@ export function App() {
   function trustRoomMemberDevice(member: RoomPresence) {
     const fingerprint = member.publicKeyFingerprint;
     if (!fingerprint) {
-      setDeviceIdentityMessage(`${member.displayName} has no registered device key to trust.`);
+      setDeviceIdentityMessage(`${member.displayName} has no registered device identity to trust.`);
       return;
     }
     setTrustedDeviceKeys((current) =>
       trustDeviceKey(current, selectedRoom.id, member.deviceId, fingerprint)
     );
-    setDeviceIdentityMessage(`Trusted ${member.displayName}'s device key for ${selectedRoom.name}.`);
+    setDeviceIdentityMessage(`Trusted ${member.displayName}'s device identity for ${selectedRoom.name}.`);
   }
 
   function untrustRoomMemberDevice(member: RoomPresence) {
     setTrustedDeviceKeys((current) => untrustDeviceKey(current, selectedRoom.id, member.deviceId));
-    setDeviceIdentityMessage(`Removed local trust for ${member.displayName}'s device key in ${selectedRoom.name}.`);
+    setDeviceIdentityMessage(`Removed local trust for ${member.displayName}'s device identity in ${selectedRoom.name}.`);
   }
 
   async function copyRoomMemberDeviceFingerprint(member: RoomPresence, trusted: boolean) {
     const fingerprint = member.publicKeyFingerprint;
     if (!fingerprint) {
-      setDeviceIdentityMessage(`${member.displayName} has no registered device key to copy.`);
+      setDeviceIdentityMessage(`${member.displayName} has no registered device identity to copy.`);
       return;
     }
     const markdown = buildDeviceFingerprintMarkdown({
@@ -3726,7 +3726,7 @@ export function App() {
       if (inviteApprovalGate) {
         if (!deviceIdentity) {
           if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-            setInviteMessageForRoom(roomId, "Device key is still being prepared. Try again in a moment.");
+            setInviteMessageForRoom(roomId, "Device identity is still being prepared. Try again in a moment.");
           }
           return;
         }
@@ -6305,12 +6305,18 @@ function loadThemeMode(): ThemeMode {
 function ensureRoomDefaults(room: RoomRecord): RoomRecord {
   return {
     ...room,
+    name: normalizeRoomDisplayName(room.name),
     codexModel: room.codexModel || defaultCodexModel,
     browserAllowedOrigins: normalizeBrowserAllowedOrigins(room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins) ?? defaultBrowserAllowedOrigins,
     browserProfilePersistent: typeof room.browserProfilePersistent === "boolean"
       ? room.browserProfilePersistent
       : defaultBrowserProfilePersistent
   };
+}
+
+function normalizeRoomDisplayName(name: string): string {
+  if (name === "Relay + E2EE") return "Relay ops";
+  return name;
 }
 
 function formatCodexModel(model: string): string {
@@ -7080,7 +7086,7 @@ function formatCodexAttachmentSummary(attachments: CodexTurnSummary["attachments
 
 function formatMemberDeviceLabel(member: RoomPresence, localDeviceId: string, trusted = false): string {
   const localLabel = member.deviceId === localDeviceId ? "This device" : "Online";
-  const fingerprint = member.publicKeyFingerprint ? shortFingerprint(member.publicKeyFingerprint) : "unregistered device key";
+  const fingerprint = member.publicKeyFingerprint ? shortFingerprint(member.publicKeyFingerprint) : "identity pending";
   return `${localLabel} · ${fingerprint}${trusted ? " · locally trusted" : ""}`;
 }
 
