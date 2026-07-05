@@ -1,8 +1,15 @@
 import {
   ChevronDown,
   Copy,
+  FileText,
+  GitBranch,
+  Globe2,
+  Terminal,
+  UsersRound,
   X
 } from "lucide-react";
+import type { ReactNode } from "react";
+import type { InspectorTab } from "./InspectorTabs";
 
 type HostStatus = "active" | "handoff" | "offline";
 type RelayStatus = "open" | "connecting" | "closed" | "error";
@@ -30,8 +37,10 @@ export function RoomHeader({
   browserEnabled,
   projectLabel,
   selectedCount,
+  activeInspectorTab,
   onSetHost,
   onSelectModel,
+  onSelectInspectorTab,
   onCopyRoomMarkdown,
   onCopySelectedMarkdown,
   onClearSelectedMessages
@@ -53,14 +62,23 @@ export function RoomHeader({
   browserEnabled: boolean;
   projectLabel: string;
   selectedCount: number;
+  activeInspectorTab: InspectorTab;
   onSetHost: (status: HostStatus) => void;
   onSelectModel: (model: string) => void;
+  onSelectInspectorTab: (tab: InspectorTab) => void;
   onCopyRoomMarkdown: () => void;
   onCopySelectedMarkdown: () => void;
   onClearSelectedMessages: () => void;
 }) {
   const knownModel = modelOptions.some((option) => option.id === selectedModel);
   const relayLabel = relayStatus === "open" ? "live" : relayStatus;
+  const toolTabs: Array<{ id: InspectorTab; label: string; icon: ReactNode }> = [
+    { id: "files", label: "files", icon: <FileText size={16} /> },
+    { id: "diff", label: "diff", icon: <GitBranch size={16} /> },
+    { id: "terminal", label: "terminal", icon: <Terminal size={16} /> },
+    { id: "browser", label: "browser", icon: <Globe2 size={16} /> },
+    { id: "room", label: `${onlineCount || 1}`, icon: <UsersRound size={16} /> }
+  ];
 
   return (
     <header className="room-header">
@@ -78,6 +96,19 @@ export function RoomHeader({
           <span className={`relay-dot ${relayStatus}`}>{relayLabel}</span>
         </div>
       </div>
+      <nav className="room-tool-nav" aria-label="Room tools">
+        {toolTabs.map((tab) => (
+          <button
+            className={activeInspectorTab === tab.id ? "active" : ""}
+            key={tab.id}
+            onClick={() => onSelectInspectorTab(tab.id)}
+            aria-pressed={activeInspectorTab === tab.id}
+          >
+            {tab.icon}
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </nav>
       <div className="header-actions">
         <div className="host-controls">
           <button onClick={() => onSetHost("active")} disabled={!hasRoom || roomLocked || hostBusy || hostStatus === "active"}>

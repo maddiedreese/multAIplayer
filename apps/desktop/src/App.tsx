@@ -400,7 +400,7 @@ const seededRooms: RoomRecord[] = [
   {
     id: "room-desktop",
     teamId: "team-core",
-    name: "Desktop client",
+    name: "Desktop app",
     projectPath: defaultProjectPath,
     host: "Maddie",
     hostUserId: fallbackUser.id,
@@ -463,39 +463,53 @@ const emptyRoom: RoomRecord = {
 const initialMessages: ChatMessage[] = [
   {
     id: "m1",
-    author: "Maddie",
+    author: "Avery",
     role: "human",
-    body: "Let's make the first pass feel like a coding room, not a generic chat wrapper.",
-    time: "10:14"
+    body: "We need to capture onboarding progress and improve the stepper.",
+    time: "9:41"
   },
   {
     id: "m2",
-    author: "Sam",
+    author: "Jordan",
     role: "human",
-    body: "Agree. The right rail should show files and diffs while Codex is working.",
-    time: "10:15"
+    body: "Agree. Let's track drop-offs by step and add unit tests for the new hook.",
+    time: "9:42"
   },
   {
     id: "m3",
-    author: "Priya",
+    author: "Avery",
     role: "human",
-    body: "@Codex can you wire the approval sheet to show chat delta, attachments, browser access, terminals, and workspace?",
-    time: "10:17",
-    attachments: [{ id: "att-seed-approval", name: "approval-flow.sketch", type: "image", size: 2400000 }]
+    body: "@Codex draft the plan",
+    time: "9:43"
   },
   {
     id: "m4",
-    author: "Codex via Maddie",
+    author: "Codex",
     role: "codex",
-    body: "I can do that. I will use the current chat delta, selected project folder, and the dev-server terminal. I will not use browser access unless approved.",
-    time: "10:18"
+    body: "I'll draft a plan and list the changes.\n\nPLAN (Run #18)\n1. Read project context and existing onboarding flow\n2. Add analytics tracking to onboarding steps\n3. Implement useOnboardingAnalytics hook\n4. Update stepper to emit events\n5. Add unit tests for the hook\n6. Update docs\n\nFILES TO CHANGE (6)\n- src/hooks/useOnboardingAnalytics.ts\n- src/components/Stepper.tsx\n- src/components/OnboardingStep.tsx\n- src/services/analytics.ts\n- tests/hooks/useOnboardingAnalytics.test.ts\n- docs/analytics/onboarding.md",
+    time: "9:44"
   },
   {
     id: "m5",
-    author: "Maddie",
+    author: "Jordan",
     role: "human",
-    body: "Next turn should also include copy-as-markdown and the secret warning.",
-    time: "10:20"
+    body: "Looks good. Please also add tests for the analytics events.",
+    time: "9:45"
+  },
+  {
+    id: "m6",
+    author: "Codex",
+    role: "codex",
+    body: "Will do. I'll include tests and update the plan.",
+    time: "9:46"
+  },
+  {
+    id: "m7",
+    author: "Codex",
+    role: "codex",
+    body: "Plan updated. Ready for review.",
+    time: "9:48",
+    attachments: [{ id: "att-seed-plan", name: "docs/plan/run-18-plan.md", type: "code", size: 1800 }]
   }
 ];
 
@@ -714,7 +728,7 @@ export function App() {
 
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? emptyRoom;
-  const inspectorTab = inspectorTabsByRoom[selectedRoom.id] ?? "work";
+  const inspectorTab = inspectorTabsByRoom[selectedRoom.id] ?? "files";
   const selectedTeamRecord = teams.find((team) => team.id === selectedTeam) ?? null;
   const selectedTeamName = selectedTeamRecord?.name ?? (teams.length ? "No team selected" : "No teams yet");
   const selectedTeamMembers = teamMembersByTeam[selectedTeam] ?? [];
@@ -5919,8 +5933,10 @@ export function App() {
           browserEnabled={selectedRoom.mode.browser}
           projectLabel={selectedRoom.projectPath.split("/").slice(-1)[0]}
           selectedCount={selectedMessages.length}
+          activeInspectorTab={inspectorTab}
           onSetHost={setRoomHost}
           onSelectModel={setCodexModel}
+          onSelectInspectorTab={(tab) => setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: tab }))}
           onCopyRoomMarkdown={copyRoomMarkdown}
           onCopySelectedMarkdown={copySelectedMessagesMarkdown}
           onClearSelectedMessages={clearSelectedMessages}
@@ -6019,8 +6035,10 @@ export function App() {
 
       <RoomInspectorPanel
         activeTab={inspectorTab}
-        workAttentionCount={inspectorAttention.work}
+        diffAttentionCount={inspectorAttention.work}
+        terminalAttentionCount={terminalRequestRows.filter((request) => request.status === "pending").length}
         browserAttentionCount={inspectorAttention.browser}
+        roomAttentionCount={inviteRequests.filter((request) => request.status === "pending").length}
         onSelectTab={(tab) => setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: tab }))}
         browserPanel={(
           <BrowserAccessPanel
@@ -6317,6 +6335,7 @@ function ensureRoomDefaults(room: RoomRecord): RoomRecord {
 
 function normalizeRoomDisplayName(name: string): string {
   if (name === "Relay + E2EE") return "Relay ops";
+  if (name === "Desktop client") return "Desktop app";
   return name;
 }
 
@@ -6616,7 +6635,12 @@ function normalizeChatHistoryMessages(value: unknown[]): ChatMessage[] {
 function isLegacyDebugChatMessage(message: ChatMessage): boolean {
   const normalizedBody = message.body.trim().toLowerCase();
   return normalizedBody === "relay-backed encrypted hello from the room." ||
-    normalizedBody === "ciphertext-only debug check.";
+    normalizedBody === "ciphertext-only debug check." ||
+    normalizedBody === "let's make the first pass feel like a coding room, not a generic chat wrapper." ||
+    normalizedBody === "agree. the right rail should show files and diffs while codex is working." ||
+    normalizedBody === "@codex can you wire the approval sheet to show chat delta, attachments, browser access, terminals, and workspace?" ||
+    normalizedBody === "i can do that. i will use the current chat delta, selected project folder, and the dev-server terminal. i will not use browser access unless approved." ||
+    normalizedBody === "next turn should also include copy-as-markdown and the secret warning.";
 }
 
 function isChatMessage(value: unknown): value is ChatMessage {

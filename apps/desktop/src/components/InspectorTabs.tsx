@@ -1,36 +1,49 @@
-import { Globe2, PanelRight } from "lucide-react";
+import { FileText, GitBranch, Globe2, Terminal, UsersRound } from "lucide-react";
+import type { ReactNode } from "react";
 
-export type InspectorTab = "work" | "browser";
+export type InspectorTab = "files" | "diff" | "terminal" | "browser" | "room";
 
 export function InspectorTabs({
   activeTab,
-  workAttentionCount,
+  diffAttentionCount,
+  terminalAttentionCount,
   browserAttentionCount,
+  roomAttentionCount,
   onSelectTab
 }: {
   activeTab: InspectorTab;
-  workAttentionCount: number;
+  diffAttentionCount: number;
+  terminalAttentionCount: number;
   browserAttentionCount: number;
+  roomAttentionCount: number;
   onSelectTab: (tab: InspectorTab) => void;
 }) {
+  const tabs: Array<{
+    id: InspectorTab;
+    label: string;
+    icon: ReactNode;
+    count: number;
+  }> = [
+    { id: "files", label: "files", icon: <FileText size={15} />, count: 0 },
+    { id: "diff", label: "diff", icon: <GitBranch size={15} />, count: diffAttentionCount },
+    { id: "terminal", label: "terminal", icon: <Terminal size={15} />, count: terminalAttentionCount },
+    { id: "browser", label: "browser", icon: <Globe2 size={15} />, count: browserAttentionCount },
+    { id: "room", label: "room", icon: <UsersRound size={15} />, count: roomAttentionCount }
+  ];
+
   return (
     <div className="inspector-tabs">
-      <button
-        className={activeTab === "work" ? "active" : ""}
-        onClick={() => onSelectTab("work")}
-        aria-pressed={activeTab === "work"}
-      >
-        <PanelRight size={15} /> Work
-        {workAttentionCount > 0 && <span className="tab-badge">{workAttentionCount}</span>}
-      </button>
-      <button
-        className={activeTab === "browser" ? "active" : ""}
-        onClick={() => onSelectTab("browser")}
-        aria-pressed={activeTab === "browser"}
-      >
-        <Globe2 size={15} /> Browser
-        {browserAttentionCount > 0 && <span className="tab-badge">{browserAttentionCount}</span>}
-      </button>
+      {tabs.map((tab) => (
+        <button
+          className={activeTab === tab.id ? "active" : ""}
+          key={tab.id}
+          onClick={() => onSelectTab(tab.id)}
+          aria-pressed={activeTab === tab.id}
+        >
+          {tab.icon} {tab.label}
+          {tab.count > 0 && <span className="tab-badge">{tab.count}</span>}
+        </button>
+      ))}
     </div>
   );
 }
