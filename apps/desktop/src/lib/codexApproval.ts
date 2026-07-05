@@ -1,4 +1,4 @@
-import type { CodexTurnSummary, RoomRecord } from "@multaiplayer/protocol";
+import type { CodexTurnSummary, RoomMode, RoomRecord } from "@multaiplayer/protocol";
 import { isLocalUserActiveHostForRoom, type LocalHostUser } from "./roomHost";
 
 export function isChatOnlyCodexTurn(summary: CodexTurnSummary): boolean {
@@ -21,4 +21,8 @@ export function canApproveCodexTurn(room: RoomRecord, user: LocalHostUser, locke
     room.approvalPolicy !== "never_host" &&
     isLocalUserActiveHostForRoom(room, user)
   );
+}
+
+export function shouldResetCodexApprovalForRoomModeChange(mode: keyof RoomMode): boolean {
+  return mode === "code" || mode === "workspace" || mode === "browser";
 }

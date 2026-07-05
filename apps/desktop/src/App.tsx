@@ -161,7 +161,7 @@ import {
   updateRoomSettings
 } from "./lib/workspaceClient";
 import { defaultRelayHttpUrl, defaultRelayWsUrl, loadAppConfig, resetAppConfig, saveAppConfig, type AppConfig } from "./lib/appConfig";
-import { canApproveCodexTurn, shouldAutoApproveChatOnlyTurn } from "./lib/codexApproval";
+import { canApproveCodexTurn, shouldAutoApproveChatOnlyTurn, shouldResetCodexApprovalForRoomModeChange } from "./lib/codexApproval";
 import { buildCodexApprovalSnapshot, buildCodexTurnInput, buildCodexTurnSummary, messagesSinceLastCodex } from "./lib/codexTurn";
 import { normalizeCodexThreadId } from "./lib/codexThread";
 import {
@@ -2740,6 +2740,10 @@ export function App() {
       });
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setSettingsMessageForRoom(roomId, `${roomModeLabels[key]} mode ${nextMode[key] ? "enabled" : "disabled"}.`);
+      }
+      if (shouldResetCodexApprovalForRoomModeChange(key)) {
+        setPendingCodexApprovalForRoom(roomId, null);
+        setApprovalVisibleForRoom(roomId, false);
       }
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));

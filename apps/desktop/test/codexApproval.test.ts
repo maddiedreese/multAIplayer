@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { CodexTurnSummary, RoomRecord } from "@multaiplayer/protocol";
-import { canApproveCodexTurn, isChatOnlyCodexTurn, shouldAutoApproveChatOnlyTurn } from "../src/lib/codexApproval";
+import {
+  canApproveCodexTurn,
+  isChatOnlyCodexTurn,
+  shouldAutoApproveChatOnlyTurn,
+  shouldResetCodexApprovalForRoomModeChange
+} from "../src/lib/codexApproval";
 
 const baseSummary: CodexTurnSummary = {
   messagesSinceLastCodex: 2,
@@ -98,4 +103,11 @@ test("Codex approval requires an unlocked active host but not workspace mode", (
   assert.equal(canApproveCodexTurn(room, { id: "github:peer", name: "Peer" }), false);
   assert.equal(canApproveCodexTurn({ ...room, mode: { ...room.mode, code: false } }, host), false);
   assert.equal(canApproveCodexTurn({ ...room, approvalPolicy: "never_host" }, host), false);
+});
+
+test("Codex approvals reset when room modes change turn context", () => {
+  assert.equal(shouldResetCodexApprovalForRoomModeChange("code"), true);
+  assert.equal(shouldResetCodexApprovalForRoomModeChange("workspace"), true);
+  assert.equal(shouldResetCodexApprovalForRoomModeChange("browser"), true);
+  assert.equal(shouldResetCodexApprovalForRoomModeChange("chat"), false);
 });
