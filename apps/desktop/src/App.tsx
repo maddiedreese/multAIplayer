@@ -2,7 +2,6 @@ import {
   Bell,
   Bot,
   Check,
-  ChevronDown,
   Circle,
   Code2,
   Copy,
@@ -22,8 +21,6 @@ import {
   Send,
   Settings,
   ShieldAlert,
-  Wifi,
-  WifiOff,
   Terminal,
   UserRoundCheck,
   UsersRound,
@@ -277,6 +274,7 @@ import { ApprovalItem, InfoRow, InlineSecretWarning, StatusPill } from "./compon
 import { InspectorTabs, type InspectorTab } from "./components/InspectorTabs";
 import { FilePreviewTabs } from "./components/FilePreviewTabs";
 import { RoomSettingsOverview } from "./components/RoomSettingsOverview";
+import { RoomHeader } from "./components/RoomHeader";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -6114,76 +6112,30 @@ export function App() {
       )}
 
       <main className="room">
-        <header className="room-header">
-          <div>
-            <div className="crumb">
-              <span>{selectedTeamName}</span>
-              <ChevronDown size={14} />
-            </div>
-            <h1>{selectedRoom.name}</h1>
-          </div>
-          <div className="header-actions">
-            <StatusPill icon={<Lock size={14} />} label="E2EE" tone="green" />
-            <StatusPill
-              icon={relayStatus === "open" ? <Wifi size={14} /> : <WifiOff size={14} />}
-              label={relayStatus === "open" ? "Relay live" : `Relay ${relayStatus}`}
-              tone={relayStatus === "open" ? "green" : "yellow"}
-            />
-            <StatusPill icon={<UsersRound size={14} />} label={`${roomMembers.length || 1} online`} tone="blue" />
-            <StatusPill icon={<Bot size={14} />} label={hostStatusLabel} tone={selectedRoom.hostStatus === "active" ? "blue" : selectedRoom.hostStatus === "handoff" ? "yellow" : "muted"} />
-            <div className="host-controls">
-              <button onClick={() => setRoomHost("active")} disabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy || selectedRoom.hostStatus === "active"}>
-                <UserRoundCheck size={14} />
-                Host
-              </button>
-              <button onClick={() => setRoomHost("handoff")} disabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy || !isActiveHost}>
-                <UsersRound size={14} />
-                Handoff
-              </button>
-              <button onClick={() => setRoomHost("offline")} disabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy || selectedRoom.hostStatus === "offline" || !isActiveHost}>
-                <X size={14} />
-              </button>
-            </div>
-            <label className="header-model-switcher" title={isActiveHost ? "Switch Codex model for this room" : "Only the active host can switch models"}>
-              <Terminal size={14} />
-              <select
-                aria-label="Codex host model"
-                value={codexModelOptions.some((option) => option.id === selectedCodexModel) ? selectedCodexModel : "custom"}
-                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-                onChange={(event) => {
-                  if (event.target.value !== "custom") {
-                    setCodexModel(event.target.value);
-                  }
-                }}
-              >
-                {codexModelOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-                {!codexModelOptions.some((option) => option.id === selectedCodexModel) && (
-                  <option value="custom">{formatCodexModel(selectedCodexModel)}</option>
-                )}
-              </select>
-            </label>
-            <StatusPill icon={<Globe2 size={14} />} label={selectedRoom.mode.browser ? "Browser on" : "Browser off"} tone={selectedRoom.mode.browser ? "green" : "muted"} />
-            <StatusPill icon={<FolderGit2 size={14} />} label={selectedRoom.projectPath.split("/").slice(-1)[0]} tone="dark" />
-            <button className="header-copy" onClick={copyRoomMarkdown} disabled={!hasSelectedRoom}>
-              <Copy size={14} />
-              Markdown
-            </button>
-            <button className="header-copy" onClick={copySelectedMessagesMarkdown} disabled={!hasSelectedRoom || selectedMessages.length === 0}>
-              <Copy size={14} />
-              {selectedMessages.length ? `${selectedMessages.length} selected` : "Selected"}
-            </button>
-            {selectedMessages.length > 0 && (
-              <button className="header-copy" onClick={clearSelectedMessages}>
-                <X size={14} />
-                Clear
-              </button>
-            )}
-          </div>
-        </header>
+        <RoomHeader
+          teamName={selectedTeamName}
+          roomName={selectedRoom.name}
+          relayStatus={relayStatus}
+          onlineCount={roomMembers.length || 1}
+          hostStatus={selectedRoom.hostStatus}
+          hostStatusLabel={hostStatusLabel}
+          hostBusy={hostBusy}
+          isActiveHost={isActiveHost}
+          roomLocked={isSelectedRoomLocked}
+          hasRoom={hasSelectedRoom}
+          selectedModel={selectedCodexModel}
+          modelLabel={formatCodexModel(selectedCodexModel)}
+          modelOptions={codexModelOptions}
+          settingsBusy={settingsBusy}
+          browserEnabled={selectedRoom.mode.browser}
+          projectLabel={selectedRoom.projectPath.split("/").slice(-1)[0]}
+          selectedCount={selectedMessages.length}
+          onSetHost={setRoomHost}
+          onSelectModel={setCodexModel}
+          onCopyRoomMarkdown={copyRoomMarkdown}
+          onCopySelectedMarkdown={copySelectedMessagesMarkdown}
+          onClearSelectedMessages={clearSelectedMessages}
+        />
 
         {hostMessage && <div className="host-message">{hostMessage}</div>}
         {chatMessage && <div className="host-message">{chatMessage}</div>}
