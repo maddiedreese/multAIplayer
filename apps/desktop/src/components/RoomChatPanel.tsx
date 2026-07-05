@@ -89,73 +89,79 @@ export function RoomChatPanel({
   return (
     <>
       <div className="chat-scroll">
-        {messages.map((message) => (
-          <article className={`message ${message.role} ${message.selected ? "selected" : ""}`} key={message.id}>
-            <div className="avatar">{message.role === "codex" ? <Bot size={17} /> : message.author.slice(0, 1)}</div>
-            <div className="bubble">
-              <div className="message-meta">
-                <label className="message-select" title="Select message for Markdown copy">
-                  <input
-                    type="checkbox"
-                    checked={message.selected}
-                    onChange={() => onToggleMessageSelection(message.id)}
-                    aria-label={`Select message from ${message.author} at ${message.time}`}
-                  />
-                </label>
-                <strong>{message.author}</strong>
-                <span>{message.time}</span>
-                <button
-                  onClick={() => onCopyMessageMarkdown(message.id)}
-                  title="Copy message as Markdown"
-                  aria-label={`Copy message from ${message.author} as Markdown`}
-                >
-                  <Copy size={13} />
-                </button>
-                {message.role === "codex" && (
+        {messages.map((message) => {
+          const visibleReactions = message.reactions.filter((reaction) => reaction.count > 0 || reaction.active);
+
+          return (
+            <article className={`message ${message.role} ${message.selected ? "selected" : ""}`} key={message.id}>
+              <div className="avatar">{message.role === "codex" ? <Bot size={17} /> : message.author.slice(0, 1)}</div>
+              <div className="bubble">
+                <div className="message-meta">
+                  <label className="message-select" title="Select message for Markdown copy">
+                    <input
+                      type="checkbox"
+                      checked={message.selected}
+                      onChange={() => onToggleMessageSelection(message.id)}
+                      aria-label={`Select message from ${message.author} at ${message.time}`}
+                    />
+                  </label>
+                  <strong>{message.author}</strong>
+                  <span>{message.time}</span>
                   <button
-                    onClick={() => onCopyCodexOutputMarkdown(message.id)}
-                    title="Copy Codex turn output as Markdown"
-                    aria-label={`Copy Codex turn output from ${message.time} as Markdown`}
+                    onClick={() => onCopyMessageMarkdown(message.id)}
+                    title="Copy message as Markdown"
+                    aria-label={`Copy message from ${message.author} as Markdown`}
                   >
-                    <Bot size={13} />
+                    <Copy size={13} />
                   </button>
-                )}
-              </div>
-              <p>{message.body}</p>
-              {message.attachments.map((attachment) => (
-                <div className="attachment" key={attachment.id}>
-                  <FileCode2 size={15} />
-                  <span>{attachment.name}</span>
-                  <small>{attachment.meta}</small>
-                  {attachment.canPreview && (
+                  {message.role === "codex" && (
                     <button
-                      onClick={() => onOpenAttachment(message.id, attachment.id)}
-                      title={attachment.encryptedBlob ? "Decrypt and preview encrypted attachment" : "Preview inline attachment"}
-                      aria-label={`Preview ${attachment.name}`}
-                      disabled={roomLocked}
+                      onClick={() => onCopyCodexOutputMarkdown(message.id)}
+                      title="Copy Codex turn output as Markdown"
+                      aria-label={`Copy Codex turn output from ${message.time} as Markdown`}
                     >
-                      <ExternalLink size={12} />
+                      <Bot size={13} />
                     </button>
                   )}
                 </div>
-              ))}
-              <div className="reaction-row">
-                {message.reactions.map((reaction) => (
-                  <button
-                    className={reaction.active ? "active" : ""}
-                    key={reaction.emoji}
-                    onClick={() => onToggleReaction(message.id, reaction.emoji)}
-                    title={reaction.title}
-                    disabled={!canUseChat}
-                  >
-                    <span>{reaction.emoji}</span>
-                    {reaction.count ? <small>{reaction.count}</small> : null}
-                  </button>
+                <p>{message.body}</p>
+                {message.attachments.map((attachment) => (
+                  <div className="attachment" key={attachment.id}>
+                    <FileCode2 size={15} />
+                    <span>{attachment.name}</span>
+                    <small>{attachment.meta}</small>
+                    {attachment.canPreview && (
+                      <button
+                        onClick={() => onOpenAttachment(message.id, attachment.id)}
+                        title={attachment.encryptedBlob ? "Decrypt and preview encrypted attachment" : "Preview inline attachment"}
+                        aria-label={`Preview ${attachment.name}`}
+                        disabled={roomLocked}
+                      >
+                        <ExternalLink size={12} />
+                      </button>
+                    )}
+                  </div>
                 ))}
+                {visibleReactions.length > 0 && (
+                  <div className="reaction-row">
+                    {visibleReactions.map((reaction) => (
+                      <button
+                        className={reaction.active ? "active" : ""}
+                        key={reaction.emoji}
+                        onClick={() => onToggleReaction(message.id, reaction.emoji)}
+                        title={reaction.title}
+                        disabled={!canUseChat}
+                      >
+                        <span>{reaction.emoji}</span>
+                        {reaction.count ? <small>{reaction.count}</small> : null}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          </article>
-        ))}
+            </article>
+          );
+        })}
 
         {approvalVisible && (
           <CodexApprovalCard

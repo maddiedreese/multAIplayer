@@ -5,8 +5,10 @@ export type { InspectorTab };
 
 interface RoomInspectorPanelProps {
   activeTab: InspectorTab;
-  workAttentionCount: number;
+  diffAttentionCount: number;
+  terminalAttentionCount: number;
   browserAttentionCount: number;
+  roomAttentionCount: number;
   browserPanel: ReactNode;
   workPanel: ReactNode;
   onSelectTab: (tab: InspectorTab) => void;
@@ -14,8 +16,10 @@ interface RoomInspectorPanelProps {
 
 export function RoomInspectorPanel({
   activeTab,
-  workAttentionCount,
+  diffAttentionCount,
+  terminalAttentionCount,
   browserAttentionCount,
+  roomAttentionCount,
   browserPanel,
   workPanel,
   onSelectTab
@@ -24,14 +28,18 @@ export function RoomInspectorPanel({
     <aside className="inspector">
       <InspectorTabs
         activeTab={activeTab}
-        workAttentionCount={workAttentionCount}
+        diffAttentionCount={diffAttentionCount}
+        terminalAttentionCount={terminalAttentionCount}
         browserAttentionCount={browserAttentionCount}
+        roomAttentionCount={roomAttentionCount}
         onSelectTab={onSelectTab}
       />
 
-      <div hidden={activeTab !== "browser"}>{browserPanel}</div>
-
-      <div className="inspector-panel-group" hidden={activeTab !== "work"}>
+      <div className="inspector-panel-group" hidden={activeTab !== "browser"}>{browserPanel}</div>
+      <div
+        className={`inspector-panel-group inspector-panel-${activeTab}`}
+        hidden={activeTab === "browser"}
+      >
         {workPanel}
       </div>
     </aside>
