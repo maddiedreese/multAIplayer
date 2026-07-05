@@ -202,6 +202,7 @@ import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
 import { canRequestWorkspaceAction, canUseLocalWorkspace, localWorkspaceGateMessage } from "./lib/workspaceAccess";
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
+import { canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
 import { copyTextToClipboard } from "./lib/clipboard";
 import { checkGitHubActionsReadiness, checkGitHubWorkflowReadiness } from "./lib/githubWorkflowReadiness";
 import { defaultGitWorkflowDraft, parseGitHubRemoteUrl, resolveGitWorkflowDraft, updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "./lib/gitWorkflowDraft";
@@ -1939,6 +1940,10 @@ export function App() {
       setChatMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;
     }
+    if (!canUseRoomChat(selectedRoom)) {
+      setChatMessageForRoom(roomId, roomChatGateMessage(selectedRoom));
+      return;
+    }
     const attachments = pendingAttachments;
     const body = draft.trim();
     if (!body && attachments.length === 0) return;
@@ -1973,6 +1978,11 @@ export function App() {
     const roomId = selectedRoom.id;
     if (isSelectedRoomLocked) {
       setHostMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      setApprovalVisibleForRoom(roomId, false);
+      return;
+    }
+    if (!canUseRoomChat(selectedRoom)) {
+      setHostMessageForRoom(roomId, roomChatGateMessage(selectedRoom));
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
@@ -3927,6 +3937,10 @@ export function App() {
     const roomId = selectedRoom.id;
     if (isSelectedRoomLocked) {
       setChatMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
+    if (!canUseRoomChat(selectedRoom)) {
+      setChatMessageForRoom(roomId, roomChatGateMessage(selectedRoom));
       return;
     }
     const hasReacted = message.reactions
@@ -5989,7 +6003,7 @@ export function App() {
                         key={emoji}
                         onClick={() => toggleMessageReaction(message, emoji)}
                         title={reaction?.reactors.map((reactor) => reactor.name).join(", ") || "React"}
-                        disabled={isSelectedRoomLocked}
+                        disabled={!canUseRoomChat(selectedRoom, isSelectedRoomLocked)}
                       >
                         <span>{emoji}</span>
                         {reaction?.reactors.length ? <small>{reaction.reactors.length}</small> : null}
@@ -6041,7 +6055,7 @@ export function App() {
         </div>
 
         <footer className="composer">
-	          <button title="Invoke Codex" onClick={() => handleCodexInvoke()} disabled={isSelectedRoomLocked}>
+	          <button title="Invoke Codex" onClick={() => handleCodexInvoke()} disabled={!canUseRoomChat(selectedRoom, isSelectedRoomLocked)}>
             <Bot size={18} />
           </button>
           <div className="composer-body">
@@ -6070,7 +6084,7 @@ export function App() {
                     : "Chat mode is disabled for this room"
               }
               value={draft}
-              disabled={!selectedRoom.mode.chat || isSelectedRoomLocked}
+              disabled={!canUseRoomChat(selectedRoom, isSelectedRoomLocked)}
               onChange={(event) => setDraftForRoom(selectedRoom.id, event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
@@ -6080,7 +6094,7 @@ export function App() {
               }}
             />
           </div>
-          <button className="send" onClick={sendMessage} disabled={!selectedRoom.mode.chat || isSelectedRoomLocked}>
+          <button className="send" onClick={sendMessage} disabled={!canUseRoomChat(selectedRoom, isSelectedRoomLocked)}>
             <Send size={18} />
           </button>
         </footer>
