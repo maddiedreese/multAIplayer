@@ -11,6 +11,9 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   web-and-relay:
     name: Web, relay, and packages
@@ -76,6 +79,7 @@ jobs:
           name: multAIplayer-macos-app
           path: apps/desktop/src-tauri/target/release/bundle/macos/multAIplayer.app
           if-no-files-found: error
+          retention-days: 14
 
       - name: Upload macOS DMG
         uses: actions/upload-artifact@v6
@@ -83,3 +87,4 @@ jobs:
           name: multAIplayer-macos-dmg
           path: apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
           if-no-files-found: error
+          retention-days: 14

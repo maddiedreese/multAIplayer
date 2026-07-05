@@ -13,6 +13,7 @@ import {
   AttachmentBlobRecord,
   CiphertextPayload,
   InviteRecord,
+  RelayEnvelope,
   RelayClientMessage,
   defaultRoomMode,
   defaultCodexModel,
@@ -26,7 +27,6 @@ import {
   type TeamMemberRecord,
   type TeamRecord,
   type TeamRole,
-  type RelayEnvelope,
   type RelayServerMessage
 } from "@multaiplayer/protocol";
 
@@ -990,12 +990,17 @@ app.post("/attachment-blobs", (req, res) => {
     return;
   }
 
-  const name = String(req.body?.name ?? "").trim();
-  const type = String(req.body?.type ?? "file").trim() || "file";
+  const name = normalizeMetadataText(req.body?.name, maxAttachmentBlobNameChars);
+  const requestedType = String(req.body?.type ?? "file").trim() || "file";
+  const type = normalizeMetadataText(requestedType, maxAttachmentBlobTypeChars);
   const size = Number(req.body?.size);
   const payload = CiphertextPayload.safeParse(req.body?.payload);
-  if (!name || name.length > 512) {
+  if (!name) {
     res.status(400).json({ error: "name must be a non-empty string up to 512 characters" });
+    return;
+  }
+  if (!type) {
+    res.status(400).json({ error: "type must be a non-empty string up to 160 characters without control characters" });
     return;
   }
   if (!Number.isSafeInteger(size) || size < 0) {
@@ -1008,6 +1013,10 @@ app.post("/attachment-blobs", (req, res) => {
   }
   if (!payload.success) {
     res.status(400).json({ error: "payload must be a valid ciphertext payload" });
+    return;
+  }
+  if (payload.data.nonce.length > maxEnvelopeNonceChars) {
+    res.status(413).json({ error: `Attachment blob nonce exceeds ${maxEnvelopeNonceChars} characters` });
     return;
   }
   if (payload.data.ciphertext.length > maxCiphertextCharactersForBlob(attachmentBlobMaxBytes)) {
@@ -1512,9 +1521,18 @@ function parseCookieHeader(header: string | undefined): Map<string, string> {
     const [rawName, ...rawValue] = item.split("=");
     const name = rawName?.trim();
     if (!name) continue;
-    cookies.set(name, decodeURIComponent(rawValue.join("=").trim()));
+    const value = safeDecodeCookieValue(rawValue.join("=").trim());
+    if (value !== null) cookies.set(name, value);
   }
   return cookies;
+}
+
+function safeDecodeCookieValue(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
 }
 
 function allowRead(session: AuthSession | null, res: Response): boolean {
@@ -1898,6 +1916,7 @@ function normalizeAttachmentBlob(blob: unknown): AttachmentBlobRecordType | null
   if (!teams.has(parsed.data.teamId)) return null;
   if (!rooms.has(parsed.data.roomId) || rooms.get(parsed.data.roomId)?.teamId !== parsed.data.teamId) return null;
   if (parsed.data.size > attachmentBlobMaxBytes) return null;
+  if (parsed.data.payload.nonce.length > maxEnvelopeNonceChars) return null;
   if (parsed.data.payload.ciphertext.length > maxCiphertextCharactersForBlob(attachmentBlobMaxBytes)) return null;
   if (Number.isNaN(Date.parse(parsed.data.createdAt))) return null;
   if (parsed.data.expiresAt && Number.isNaN(Date.parse(parsed.data.expiresAt))) return null;
@@ -1920,6 +1939,24 @@ function pruneEncryptedBacklog(envelopes: RelayEnvelope[]): RelayEnvelope[] {
       return Number.isFinite(createdAtMs) && createdAtMs >= cutoffMs && isRelayEnvelopeWithinLimits(envelope);
     })
     .slice(-encryptedBacklogLimit);
+}
+
+function normalizeStoredBacklog(item: unknown): { key: RoomKey; envelopes: RelayEnvelope[] } | null {
+  if (!isRecord(item) || typeof item.key !== "string" || !Array.isArray(item.envelopes)) return null;
+  const [teamId, roomId, extra] = item.key.split(":");
+  if (extra !== undefined || !teamId || !roomId || !isKnownRoom(teamId, roomId)) return null;
+
+  const envelopes: RelayEnvelope[] = [];
+  for (const candidate of item.envelopes) {
+    const parsed = RelayEnvelope.safeParse(candidate);
+    if (!parsed.success) continue;
+    if (parsed.data.teamId !== teamId || parsed.data.roomId !== roomId) continue;
+    if (!isAllowedEnvelopePayload(parsed.data)) continue;
+    envelopes.push(parsed.data);
+  }
+
+  const pruned = pruneEncryptedBacklog(envelopes);
+  return pruned.length ? { key: roomKey(teamId, roomId), envelopes: pruned } : null;
 }
 
 function pruneExpiredRelayState() {
@@ -2080,10 +2117,11 @@ async function loadRelayStore() {
 	      const members = new Map<string, TeamMemberRecord>();
 	      const storedMembers = Array.isArray(item.members) ? item.members : [];
 	      for (const member of storedMembers) {
-	        if (!member || typeof member.userId !== "string" || member.userId.length === 0) continue;
-	        members.set(member.userId, {
+	        const userId = normalizeMetadataText(member?.userId, maxUserIdChars);
+	        if (!userId) continue;
+	        members.set(userId, {
 	          teamId,
-	          userId: member.userId,
+	          userId,
 	          role: normalizeTeamRole(member.role),
 	          joinedAt: typeof member.joinedAt === "string" && !Number.isNaN(Date.parse(member.joinedAt))
 	            ? member.joinedAt
@@ -2091,10 +2129,11 @@ async function loadRelayStore() {
 	        });
 	      }
 	      for (const userId of item.userIds ?? []) {
-	        if (typeof userId === "string" && userId.length > 0 && !members.has(userId)) {
-	          members.set(userId, {
+	        const normalizedUserId = normalizeMetadataText(userId, maxUserIdChars);
+	        if (normalizedUserId && !members.has(normalizedUserId)) {
+	          members.set(normalizedUserId, {
 	            teamId,
-	            userId,
+	            userId: normalizedUserId,
 	            role: "member",
 	            joinedAt: new Date().toISOString()
 	          });
@@ -2114,8 +2153,8 @@ async function loadRelayStore() {
 	      if (normalized) authSessions.set(normalized.sessionId, normalized.session);
 	    }
 	    for (const item of stored.encryptedBacklog ?? []) {
-      const pruned = pruneEncryptedBacklog(item.envelopes);
-      if (pruned.length) encryptedBacklog.set(item.key, pruned);
+      const normalized = normalizeStoredBacklog(item);
+      if (normalized) encryptedBacklog.set(normalized.key, normalized.envelopes);
     }
     console.log(`Loaded multAIplayer relay store from ${dataPath}`);
   } catch (error) {

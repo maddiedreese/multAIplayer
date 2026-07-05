@@ -72,3 +72,19 @@ The desktop app lets a user locally trust a room member's device fingerprint. Tr
 Gated invite links do not carry the room key. They carry room metadata and the host device public key in the URL fragment, then deliver the room key after host approval as a device-wrapped payload inside a device-sealed approval event. Non-gated direct invite links still carry the room key in the URL fragment for convenience.
 
 Room key rotation is available as an alpha hygiene control. The active host publishes a new room key inside an encrypted `room.key` event using the current room key, then clients that can decrypt that event replace their local room key for future messages and invites. Local encrypted history ciphertext is cleared when the key is replaced so stale ciphertext is not left behind under the old key. This does not provide cryptographic member removal by itself: any device that still has the old key and receives the rotation event can learn the new key.
+
+## Stronger Member Removal Design
+
+Production-grade member removal should use explicit room key epochs and per-device key delivery instead of broadcasting the next room key under the current room key.
+
+The intended stronger design is:
+
+- the relay keeps a membership-scoped device roster containing user ids, device ids, device public keys, and membership status;
+- every encrypted room envelope carries a key epoch id in authenticated metadata;
+- removing a member first closes their live relay sockets and blocks future room/backlog/blob reads at the relay boundary;
+- the active host or team owner creates a fresh room key epoch and wraps the new room key separately to each remaining trusted device public key;
+- removed devices do not receive a wrapped copy of the new key and cannot decrypt future epochs through the relay;
+- invite links created before removal are revoked, and new invites use the new epoch;
+- clients keep old epoch keys only as long as local retention requires reading already-received history.
+
+This design still cannot erase plaintext or ciphertext a removed member already received, screenshots they took, copied Markdown, terminal output they saw, browser pages they viewed, or local history retained on their own device. The realistic security goal is forward secrecy for future room events after removal, not retroactive erasure.

@@ -94,4 +94,6 @@ The current alpha invite payload is versioned and contains:
 
 This is intentionally simple for the alpha. A production-grade design still needs member removal, key rotation, identity verification, and multi-device recovery.
 
+For stronger member removal, future room events should move from a single room-key broadcast model to key epochs. A removal would create a new room key epoch, wrap that key independently to each remaining trusted device public key, and mark removed devices ineligible for future relay reads and key delivery. Old epochs may remain readable by devices that legitimately received them before removal, subject to local retention. That provides forward protection after removal without pretending previously delivered content can be erased.
+
 Shared TypeScript schemas live in `packages/protocol`.
