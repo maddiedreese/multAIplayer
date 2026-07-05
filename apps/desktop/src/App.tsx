@@ -189,6 +189,7 @@ import { normalizeGitHubBranchName } from "@multaiplayer/github";
 import { terminalRequestForApprovedRun } from "./lib/terminalApproval";
 import { readInviteUrlPayload } from "./lib/inviteUrl";
 import { displayableInviteLink } from "./lib/invitePrivacy";
+import { canCreateRoomInvite } from "./lib/invitePolicy";
 import { browserAccessGateMessage, canHostBrowserAction, canRequestBrowserAccess, normalizeBrowserAllowedOrigins, shouldAutoApproveBrowserRequest } from "./lib/browserPolicy";
 import { browserDecisionMessageId, buildBrowserDecisionMessage } from "./lib/browserActivity";
 import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
@@ -692,6 +693,7 @@ export function App() {
   const canRequestWorkspace = hasSelectedRoom && canRequestWorkspaceAction(selectedRoom, isSelectedRoomLocked);
   const canRequestBrowser = hasSelectedRoom && canRequestBrowserAccess(selectedRoom, isSelectedRoomLocked);
   const canHostBrowser = hasSelectedRoom && canHostBrowserAction(selectedRoom, localUser, isSelectedRoomLocked);
+  const canCopyRoomInvite = hasSelectedRoom && canCreateRoomInvite(selectedRoom, localUser, isSelectedRoomLocked, inviteApprovalGate);
   const localWorkspaceMessage = localWorkspaceGateMessage(selectedRoom, isSelectedRoomLocked);
   const browserAccessMessage = browserAccessGateMessage(selectedRoom, isSelectedRoomLocked);
   const workspaceRequestMessage = isSelectedRoomLocked
@@ -3309,6 +3311,10 @@ export function App() {
     }
     const room = selectedRoom;
     const roomId = room.id;
+    if (!canCreateRoomInvite(room, localUser, false, inviteApprovalGate)) {
+      setInviteMessageForRoom(roomId, "Only the active host can create approval-gated invite links.");
+      return;
+    }
     setInviteMessageForRoom(roomId, null);
     setInviteLinkForRoom(roomId, "");
     try {
@@ -6311,7 +6317,7 @@ export function App() {
               tone={inviteApprovalGate ? "blue" : "green"}
             />
           </div>
-          <button className="primary-wide" onClick={copyInviteLink} disabled={!hasSelectedRoom || isSelectedRoomLocked}>
+          <button className="primary-wide" onClick={copyInviteLink} disabled={!canCopyRoomInvite}>
             <Copy size={15} />
             Copy room invite
           </button>

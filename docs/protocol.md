@@ -53,7 +53,7 @@ Device fingerprint trust is local desktop state. The relay does not receive or s
 
 Device keys are P-256 ECDH key-agreement keys. The crypto package can wrap an AES-GCM room secret to a registered device public key using an ephemeral ECDH sender key and AES-GCM wrapping payload, then unwrap it only with the recipient device private key. Gated join requests include the requester device public key when available, and host approval statuses can include a room secret wrapped specifically for that requester device.
 
-For gated invites, the desktop creates a no-secret `#multaiplayerJoin=...` fragment containing room metadata and the host device public key, but not the room key. The joiner sends a `room.invite` request as a device-sealed payload encrypted to the host public key. When the host approves, the approval status is device-sealed to the requester and includes a wrapped room secret for that requester device. Non-gated direct invites still use the older room-key fragment flow.
+For gated invites, the desktop creates a no-secret `#multaiplayerJoin=...` fragment containing room metadata and the active host device public key, but not the room key. Because join requests are sealed to that host key, only the active host can generate approval-gated invite links. The joiner sends a `room.invite` request as a device-sealed payload encrypted to the host public key. When the host approves, the approval status is device-sealed to the requester and includes a wrapped room secret for that requester device. Non-gated direct invites still use the older room-key fragment flow.
 
 Room key rotations use encrypted `room.key` envelopes. The payload is encrypted with the current room key and contains a new AES-GCM room key plus rotation metadata. Clients that can decrypt the event replace their local room key and use the new key for future room messages and invite links.
 
@@ -77,7 +77,7 @@ The relay receives and stores only invite metadata:
 - creation time;
 - expiry time.
 
-The invite id is carried in the normal query string as `?invite=...`, which lets a joining desktop fetch room and team metadata from the relay. Non-gated direct invites encode the room key into the URL fragment as `#multaiplayerInvite=...`. Gated invites encode only request metadata and the host public key as `#multaiplayerJoin=...`; the room key is delivered later in the encrypted approval status. URL fragments are not sent to the relay by normal HTTP requests, so the official relay can route either invite type without receiving the room secret.
+The invite id is carried in the normal query string as `?invite=...`, which lets a joining desktop fetch room and team metadata from the relay. Non-gated direct invites encode the room key into the URL fragment as `#multaiplayerInvite=...`. Gated invites encode only request metadata and the active host public key as `#multaiplayerJoin=...`; the room key is delivered later in the encrypted approval status. URL fragments are not sent to the relay by normal HTTP requests, so the official relay can route either invite type without receiving the room secret.
 
 When the desktop detects an invite in the current URL, it immediately replaces the history entry with the same path and no query or fragment before lookup/import work continues. This removes direct room-key fragments from the address bar even if import later fails.
 
