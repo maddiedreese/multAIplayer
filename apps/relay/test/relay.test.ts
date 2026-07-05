@@ -1275,6 +1275,39 @@ test("relay can require auth for workspace mutations", async () => {
   }
 });
 
+test("relay treats malformed session cookies as unauthenticated", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  let socket: WebSocket | null = null;
+  try {
+    const me = await fetch(`${relay.baseUrl}/auth/me`, {
+      headers: { cookie: "multaiplayer_session=%E0%A4%A" }
+    });
+    assert.equal(me.status, 401);
+
+    const teams = await fetch(`${relay.baseUrl}/teams`, {
+      headers: { cookie: "multaiplayer_session=%E0%A4%A" }
+    });
+    assert.equal(teams.status, 401);
+
+    socket = new WebSocket(relay.wsUrl, {
+      headers: { cookie: "multaiplayer_session=%E0%A4%A" }
+    });
+    await onceOpen(socket);
+    const error = waitForError(socket);
+    socket.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:maddiedreese",
+      deviceId: "device-bad-cookie"
+    }));
+    assert.match(await error, /Sign in and use a valid invite/);
+  } finally {
+    socket?.close();
+    await relay.close();
+  }
+});
+
 test("relay expires server-side auth sessions independently of cookies", async () => {
   const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
   try {

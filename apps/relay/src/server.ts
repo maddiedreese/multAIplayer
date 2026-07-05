@@ -1512,9 +1512,18 @@ function parseCookieHeader(header: string | undefined): Map<string, string> {
     const [rawName, ...rawValue] = item.split("=");
     const name = rawName?.trim();
     if (!name) continue;
-    cookies.set(name, decodeURIComponent(rawValue.join("=").trim()));
+    const value = safeDecodeCookieValue(rawValue.join("=").trim());
+    if (value !== null) cookies.set(name, value);
   }
   return cookies;
+}
+
+function safeDecodeCookieValue(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
 }
 
 function allowRead(session: AuthSession | null, res: Response): boolean {
