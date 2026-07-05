@@ -1914,6 +1914,82 @@ test("relay restores persisted team member roles and legacy counts", async () =>
   }
 });
 
+test("relay drops invalid persisted team and room identifiers", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_SEED_DEMO: "false" }, {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    teams: [
+      { id: "team-core", name: "Core Team", members: 1 },
+      { id: "team:bad", name: "Bad Team", members: 1 },
+      { id: " team-padded", name: "Padded Team", members: 1 }
+    ],
+    rooms: [
+      {
+        id: "room-desktop",
+        teamId: "team-core",
+        name: "Desktop client",
+        projectPath: "/tmp/multaiplayer",
+        host: "Maddie",
+        hostUserId: "github:maddiedreese",
+        hostStatus: "active",
+        approvalPolicy: "ask_every_turn",
+        mode: { chat: true, code: true, workspace: true, browser: false },
+        codexModel: "gpt-5.4",
+        browserAllowedOrigins: ["https://github.com"],
+        browserProfilePersistent: true,
+        unread: 1
+      },
+      {
+        id: "room:bad",
+        teamId: "team-core",
+        name: "Bad room",
+        projectPath: "/tmp/multaiplayer",
+        host: "No host",
+        hostStatus: "offline",
+        approvalPolicy: "ask_every_turn",
+        mode: { chat: true, code: true, workspace: true, browser: false },
+        codexModel: "gpt-5.4",
+        browserAllowedOrigins: ["https://github.com"],
+        browserProfilePersistent: true,
+        unread: 0
+      },
+      {
+        id: "room-orphan",
+        teamId: "team-missing",
+        name: "Orphan room",
+        projectPath: "/tmp/multaiplayer",
+        host: "No host",
+        hostStatus: "offline",
+        approvalPolicy: "ask_every_turn",
+        mode: { chat: true, code: true, workspace: true, browser: false },
+        codexModel: "gpt-5.4",
+        browserAllowedOrigins: ["https://github.com"],
+        browserProfilePersistent: true,
+        unread: 0
+      }
+    ],
+    invites: [],
+    teamMembers: [
+      { teamId: "team-core", userIds: ["github:first"] },
+      { teamId: "team:bad", userIds: ["github:bad"] }
+    ],
+    encryptedBacklog: []
+  });
+  try {
+    const response = await fetch(`${relay.baseUrl}/teams`);
+    assert.equal(response.status, 200);
+    const body = await response.json() as {
+      teams: Array<{ id: string }>;
+      rooms: Array<{ id: string; teamId: string }>;
+    };
+    assert.deepEqual(body.teams.map((team) => team.id), ["team-core"]);
+    assert.deepEqual(body.rooms.map((room) => room.id), ["room-desktop"]);
+    assert.equal(body.rooms[0]?.teamId, "team-core");
+  } finally {
+    await relay.close();
+  }
+});
+
 test("relay quarantines unreadable persisted stores", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-corrupt-store-"));
   const dataPath = join(tempDir, "relay-store.json");

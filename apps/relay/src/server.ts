@@ -117,6 +117,8 @@ const maxRoomProjectPathChars = 2048;
 const maxCodexModelChars = 80;
 const maxTeamNameChars = 120;
 const maxRoomNameChars = 160;
+const maxTeamIdChars = 160;
+const maxRoomIdChars = 160;
 const maxDisplayNameChars = 120;
 const maxUserIdChars = 160;
 const maxDeviceIdChars = 160;
@@ -1744,6 +1746,12 @@ function normalizeMetadataText(value: unknown, maxChars: number): string | null 
   return text;
 }
 
+function normalizeRelayId(value: unknown, maxChars: number): string | null {
+  if (typeof value !== "string" || !value || value !== value.trim() || value.length > maxChars) return null;
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) return null;
+  return value;
+}
+
 function normalizeOptionalMetadataText(value: unknown, maxChars: number): string | null {
   const text = String(value ?? "").trim();
   if (!text) return "";
@@ -1809,13 +1817,14 @@ function deviceKey(userId: string, deviceId: string): string {
 }
 
 function normalizeTeam(team: unknown): TeamRecord | null {
-  if (!isRecord(team) || typeof team.id !== "string") return null;
+  if (!isRecord(team)) return null;
+  const id = normalizeRelayId(team.id, maxTeamIdChars);
   const name = normalizeMetadataText(team.name, maxTeamNameChars);
-  if (!name) return null;
+  if (!id || !name) return null;
   const members = typeof team.members === "number" && Number.isSafeInteger(team.members) && team.members >= 0
     ? team.members
     : 0;
-  return { id: team.id, name, members };
+  return { id, name, members };
 }
 
 function normalizeDevice(device: unknown): DeviceRecord | null {
@@ -1984,7 +1993,10 @@ async function loadRelayStore() {
       const normalized = normalizeTeam(team);
       if (normalized) teams.set(normalized.id, normalized);
     }
-    for (const room of stored.rooms ?? []) rooms.set(room.id, normalizeRoom(room));
+    for (const room of stored.rooms ?? []) {
+      const normalized = normalizeRoom(room);
+      if (normalized) rooms.set(normalized.id, normalized);
+    }
     for (const invite of stored.invites ?? []) {
       if (!isExpiredInvite(invite)) invites.set(invite.id, invite);
     }
@@ -1993,13 +2005,14 @@ async function loadRelayStore() {
 	      if (normalized) devices.set(deviceKey(normalized.userId, normalized.deviceId), normalized);
 	    }
 	    for (const item of stored.teamMembers ?? []) {
-	      if (!teams.has(item.teamId)) continue;
+	      const teamId = normalizeRelayId(item.teamId, maxTeamIdChars);
+	      if (!teamId || !teams.has(teamId)) continue;
 	      const members = new Map<string, TeamMemberRecord>();
 	      const storedMembers = Array.isArray(item.members) ? item.members : [];
 	      for (const member of storedMembers) {
 	        if (!member || typeof member.userId !== "string" || member.userId.length === 0) continue;
 	        members.set(member.userId, {
-	          teamId: item.teamId,
+	          teamId,
 	          userId: member.userId,
 	          role: normalizeTeamRole(member.role),
 	          joinedAt: typeof member.joinedAt === "string" && !Number.isNaN(Date.parse(member.joinedAt))
@@ -2010,7 +2023,7 @@ async function loadRelayStore() {
 	      for (const userId of item.userIds ?? []) {
 	        if (typeof userId === "string" && userId.length > 0 && !members.has(userId)) {
 	          members.set(userId, {
-	            teamId: item.teamId,
+	            teamId,
 	            userId,
 	            role: "member",
 	            joinedAt: new Date().toISOString()
@@ -2018,9 +2031,9 @@ async function loadRelayStore() {
 	        }
 	      }
 	      if (members.size === 0) continue;
-	      teamMembers.set(item.teamId, members);
-	      const team = teams.get(item.teamId);
-	      if (team && team.members < members.size) teams.set(item.teamId, { ...team, members: members.size });
+	      teamMembers.set(teamId, members);
+	      const team = teams.get(teamId);
+	      if (team && team.members < members.size) teams.set(teamId, { ...team, members: members.size });
 	    }
 	    for (const blob of stored.attachmentBlobs ?? []) {
 	      const parsed = AttachmentBlobRecord.safeParse(blob);
@@ -2179,26 +2192,45 @@ function seedTeamMember(teamId: string, userId: string, role: TeamRole): TeamMem
   };
 }
 
-function normalizeRoom(room: RoomRecord | (RoomRecord & { codexModel?: string })): RoomRecord {
+function normalizeRoom(room: unknown): RoomRecord | null {
+  if (!isRecord(room)) return null;
+  const id = normalizeRelayId(room.id, maxRoomIdChars);
+  const teamId = normalizeRelayId(room.teamId, maxTeamIdChars);
+  if (!id || !teamId || !teams.has(teamId)) return null;
+  const hostStatus = room.hostStatus === "active" || room.hostStatus === "handoff" || room.hostStatus === "offline"
+    ? room.hostStatus
+    : "offline";
   const name = normalizeMetadataText(room.name, maxRoomNameChars) ?? "Untitled room";
-  const host = room.hostStatus === "offline"
+  const host = hostStatus === "offline"
     ? "No host"
     : normalizeMetadataText(room.host, maxHostNameChars) ?? "No host";
-  const hostUserId = room.hostStatus === "offline"
+  const hostUserId = hostStatus === "offline"
     ? undefined
     : normalizeOptionalMetadataText(room.hostUserId, maxUserIdChars) || undefined;
+  const approvalPolicy = typeof room.approvalPolicy === "string" && isApprovalPolicy(room.approvalPolicy)
+    ? room.approvalPolicy
+    : "ask_every_turn";
+  const mode = isRoomMode(room.mode) ? room.mode : defaultRoomMode;
+  const unread = typeof room.unread === "number" && Number.isSafeInteger(room.unread) && room.unread >= 0
+    ? room.unread
+    : 0;
   return {
-    ...room,
+    id,
+    teamId,
     name,
     projectPath: normalizeRoomProjectPath(room.projectPath) ?? "/",
     host,
     hostUserId,
+    hostStatus,
+    approvalPolicy,
+    mode,
     codexModel: normalizeCodexModel(room.codexModel) ?? defaultCodexModel,
     browserAllowedOrigins: normalizeBrowserAllowedOrigins((room as { browserAllowedOrigins?: unknown }).browserAllowedOrigins)
       ?? defaultBrowserAllowedOrigins,
     browserProfilePersistent: typeof (room as { browserProfilePersistent?: unknown }).browserProfilePersistent === "boolean"
       ? (room as { browserProfilePersistent: boolean }).browserProfilePersistent
-      : defaultBrowserProfilePersistent
+      : defaultBrowserProfilePersistent,
+    unread
   };
 }
 
