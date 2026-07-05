@@ -193,6 +193,7 @@ import { normalizeBrowserAllowedOrigins, shouldAutoApproveBrowserRequest } from 
 import { browserDecisionMessageId, buildBrowserDecisionMessage } from "./lib/browserActivity";
 import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
+import { canUseLocalWorkspace, localWorkspaceGateMessage } from "./lib/workspaceAccess";
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { copyTextToClipboard } from "./lib/clipboard";
@@ -745,6 +746,8 @@ export function App() {
   const isSelectedRoomForgotten = forgottenRoomIds.has(selectedRoom.id);
   const isSelectedRoomRevoked = revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId);
   const isSelectedRoomLocked = isSelectedRoomForgotten || isSelectedRoomRevoked;
+  const canReadLocalWorkspace = hasSelectedRoom && canUseLocalWorkspace(selectedRoom, localUser, isSelectedRoomLocked);
+  const localWorkspaceMessage = localWorkspaceGateMessage(selectedRoom);
   const hostGateMessage =
     selectedRoom.hostStatus === "active"
       ? `Only ${selectedRoom.host} can approve host-side actions in this room.`
@@ -1639,6 +1642,10 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    if (!canReadLocalWorkspace) {
+      setGitStatusForRoom(roomId, null);
+      return;
+    }
     setGitStatusForRoom(roomId, null);
     getGitStatus(selectedRoom.projectPath)
       .then((status) => setGitStatusForRoom(roomId, status))
@@ -1648,10 +1655,11 @@ export function App() {
           files: [{ path: String(error), status: "error", added: 0, removed: 0 }]
         });
       });
-  }, [hasSelectedRoom, selectedRoom.id, selectedRoom.projectPath]);
+  }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoom.id, selectedRoom.projectPath]);
 
   useEffect(() => {
     if (!hasSelectedRoom) return;
+    if (!canReadLocalWorkspace) return;
     const roomId = selectedRoom.id;
     const projectPath = selectedRoom.projectPath;
     let cancelled = false;
@@ -1682,7 +1690,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [hasSelectedRoom, selectedRoom.id, selectedRoom.projectPath]);
+  }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoom.id, selectedRoom.projectPath]);
 
   useEffect(() => {
     if (!hasSelectedRoom) return;
@@ -1700,6 +1708,14 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    if (!canReadLocalWorkspace) {
+      setProjectFilesForRoom(roomId, []);
+      setSelectedFileForRoom(roomId, null);
+      setSelectedDiffForRoom(roomId, null);
+      setFileBusyForRoom(roomId, false);
+      setFileMessageForRoom(roomId, localWorkspaceMessage);
+      return;
+    }
     let cancelled = false;
     setFileBusyForRoom(roomId, true);
     searchProjectFiles(selectedRoom.projectPath, fileQueriesByRoom[roomId] ?? "", 80)
@@ -1717,7 +1733,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [fileQueriesByRoom, hasSelectedRoom, selectedRoom.id, selectedRoom.projectPath]);
+  }, [canReadLocalWorkspace, fileQueriesByRoom, hasSelectedRoom, localWorkspaceMessage, selectedRoom.id, selectedRoom.projectPath]);
 
   useEffect(() => {
     if (!hasSelectedRoom) {
@@ -4522,6 +4538,10 @@ export function App() {
       setSelectedFileMessage("Create or join a room before opening project files.");
       return;
     }
+    if (!canReadLocalWorkspace) {
+      setSelectedFileMessage(localWorkspaceMessage);
+      return;
+    }
     const room = selectedRoom;
     setFileBusyForRoom(room.id, true);
     setFileMessageForRoom(room.id, null);
@@ -4546,6 +4566,10 @@ export function App() {
       setSelectedFileMessage("Create or join a room before copying project context.");
       return;
     }
+    if (!canReadLocalWorkspace) {
+      setSelectedFileMessage(localWorkspaceMessage);
+      return;
+    }
     const roomId = selectedRoom.id;
     const markdown = buildProjectMarkdown(
       selectedRoom.name,
@@ -4565,6 +4589,10 @@ export function App() {
   async function attachSelectedFileToMessage() {
     if (!hasSelectedRoom) {
       setSelectedFileMessage("Create or join a room before attaching project files.");
+      return;
+    }
+    if (!canReadLocalWorkspace) {
+      setSelectedFileMessage(localWorkspaceMessage);
       return;
     }
     if (!selectedFile) {
@@ -4802,6 +4830,10 @@ export function App() {
       setSelectedFileMessage("Create or join a room before copying a diff summary.");
       return;
     }
+    if (!canReadLocalWorkspace) {
+      setSelectedFileMessage(localWorkspaceMessage);
+      return;
+    }
     const roomId = selectedRoom.id;
     const markdown = buildDiffSummaryMarkdown(
       selectedRoom,
@@ -4830,6 +4862,10 @@ export function App() {
     }
     if (!isActiveHost) {
       setSelectedGitWorkflowMessage(hostGateMessage);
+      return;
+    }
+    if (!canReadLocalWorkspace) {
+      setSelectedGitWorkflowMessage(localWorkspaceMessage);
       return;
     }
     const room = selectedRoom;
@@ -6387,7 +6423,7 @@ export function App() {
         <section className="panel">
           <div className="panel-title">
             <span>Files</span>
-            <button className="ghost" onClick={copyProjectMarkdown} disabled={!hasSelectedRoom}><Copy size={14} /> Markdown</button>
+            <button className="ghost" onClick={copyProjectMarkdown} disabled={!canReadLocalWorkspace}><Copy size={14} /> Markdown</button>
           </div>
           <label className="file-search">
             <Search size={14} />
@@ -6395,6 +6431,7 @@ export function App() {
               value={fileQuery}
               onChange={(event) => setFileQueryForRoom(selectedRoom.id, event.target.value)}
               placeholder="Search project files"
+              disabled={!canReadLocalWorkspace}
             />
           </label>
           <div className="file-list">
@@ -6403,6 +6440,7 @@ export function App() {
                 className={selectedFile?.path === file.path ? "file-row active" : "file-row"}
                 key={file.path}
                 onClick={() => openProjectFile(file.path)}
+                disabled={!canReadLocalWorkspace}
               >
                 <FileCode2 size={15} />
                 <span>{file.path}</span>
@@ -6421,7 +6459,7 @@ export function App() {
           <div className="panel-title">
             <span>Changed files</span>
             <div className="panel-title-actions">
-              <button className="ghost" onClick={copyDiffSummaryMarkdown} disabled={!hasSelectedRoom}>
+              <button className="ghost" onClick={copyDiffSummaryMarkdown} disabled={!canReadLocalWorkspace}>
                 <Copy size={14} /> Summary
               </button>
               <StatusPill icon={<Code2 size={13} />} label={`${gitStatus?.files.length ?? 0}`} tone="dark" />
@@ -6429,7 +6467,7 @@ export function App() {
           </div>
           <div className="diff-list">
             {(gitStatus?.files.length ? gitStatus.files : []).map((file) => (
-              <button className="diff-row" key={file.path} onClick={() => openProjectFile(file.path)}>
+              <button className="diff-row" key={file.path} onClick={() => openProjectFile(file.path)} disabled={!canReadLocalWorkspace}>
                 <FileCode2 size={15} />
                 <span>{file.path}</span>
                 <small><b>+{file.added}</b> <i>-{file.removed}</i></small>
@@ -6449,7 +6487,7 @@ export function App() {
                 <button
                   className={selectedFileNeedsAttachmentReview && selectedSensitiveFileReviewed ? "ghost danger" : "ghost"}
                   onClick={attachSelectedFileToMessage}
-                  disabled={!hasSelectedRoom}
+                  disabled={!canReadLocalWorkspace}
                 >
                   {selectedFileNeedsAttachmentReview && !selectedSensitiveFileReviewed ? <ShieldAlert size={14} /> : <Plus size={14} />}
                   {selectedAttachmentReview?.actionLabel ?? "Attach"}
@@ -6552,7 +6590,7 @@ export function App() {
           <button
             className="primary-wide"
             onClick={approveGitWorkflow}
-            disabled={!hasSelectedRoom || gitWorkflowBusy || !isActiveHost || Boolean(gitApprovalPreview.error) || (gitWorkflowDraft.pushEnabled && !githubWorkflowReadiness.ready)}
+            disabled={!canReadLocalWorkspace || gitWorkflowBusy || !isActiveHost || Boolean(gitApprovalPreview.error) || (gitWorkflowDraft.pushEnabled && !githubWorkflowReadiness.ready)}
           >
             <Github size={15} />
             {gitWorkflowBusy ? "Running approved git workflow" : "Approve git workflow"}

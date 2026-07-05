@@ -75,6 +75,8 @@ The active project folder is a host-local path. The macOS app can attach it with
 
 Native project file access is confined to the selected project root and rejects parent-directory or symlink escapes. File previews are read with a byte cap, and native diff output is bounded to 200,000 characters with an explicit truncation marker so generated files or large diffs do not overwhelm the desktop UI or copied context.
 
+Project file search, file preview, Git status, diff reads, Git remote inference, and approved Git workflows are local workspace actions. They are available only when workspace mode is enabled and the current device is the active host for the room. Other members can still see room-shared encrypted chat, attachments, browser decisions, Codex/Git events, and copied/shared outputs, but their clients do not independently read the host's local project path.
+
 Desktop git-status summaries are scoped per room/project. Switching rooms clears the visible status for the incoming room until its own local `git status` read completes, so changed-file counts, PR drafts, and diff summaries do not reuse another room's project state.
 
 The relay bounds metadata before storage and broadcast: team names, room names, WebSocket user/device identities, device ids, display names, live presence labels, host labels, avatar URLs, public key fingerprints, public key JWK blobs, project paths, and model ids all have explicit length limits and reject control characters where human-visible text is expected. Project paths are non-empty strings up to 2,048 characters, and model ids are known ids or model-like ids up to 80 characters.
