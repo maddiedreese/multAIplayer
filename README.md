@@ -46,6 +46,6 @@ npm run verify
 npm run tauri:build -w @multaiplayer/desktop
 ```
 
-`npm run verify` type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the relay/desktop web artifacts. The macOS job also builds an unsigned Tauri app and uploads both the `.app` bundle and `.dmg` as workflow artifacts.
+`npm run verify` type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the relay/desktop web artifacts. The macOS job runs on the pinned `macos-15` runner, then builds an unsigned Tauri app and uploads both the `.app` bundle and `.dmg` as workflow artifacts.
 
-Tagged versions matching `v*` run the release workflow. It verifies the repo, builds the unsigned macOS app, packages the `.app` bundle and `.dmg`, writes `SHA256SUMS.txt`, and creates a GitHub Release. Tags containing `alpha`, `beta`, or `rc` are published as prereleases.
+Tagged versions matching `v*` run the release workflow. It verifies the repo on the pinned `macos-15` runner, builds the unsigned macOS app, packages the `.app` bundle and `.dmg`, writes `SHA256SUMS.txt`, and creates a GitHub Release. Tags containing `alpha`, `beta`, or `rc` are published as prereleases.

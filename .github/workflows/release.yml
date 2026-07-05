@@ -21,7 +21,7 @@ concurrency:
 jobs:
   macos-prerelease:
     name: macOS prerelease
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - name: Check out repo
         uses: actions/checkout@v7

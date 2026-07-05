@@ -39,7 +39,7 @@ jobs:
 
   macos-desktop:
     name: macOS desktop package
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - name: Check out repo
         uses: actions/checkout@v7
