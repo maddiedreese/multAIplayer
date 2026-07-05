@@ -23,6 +23,7 @@ const MAX_GIT_DIFF_CHARS: usize = 200_000;
 const MAX_COMMAND_OUTPUT_CHARS: usize = 120_000;
 const MAX_GIT_BRANCH_CHARS: usize = 200;
 const MAX_COMMIT_MESSAGE_CHARS: usize = 500;
+const MAX_PROJECT_PATH_CHARS: usize = 2_048;
 const MIN_CODEX_TIMEOUT_SECONDS: u64 = 10;
 const MAX_CODEX_TIMEOUT_SECONDS: u64 = 900;
 const ROOM_BROWSER_GUARD_SCRIPT: &str = r#"
@@ -1110,6 +1111,7 @@ fn run_codex_turn(request: CodexTurnRequest) -> Result<CodexTurnResult, String> 
 }
 
 fn ensure_existing_dir(cwd: &str) -> Result<(), String> {
+    ensure_project_path(cwd)?;
     let path = Path::new(cwd);
     if path.is_dir() {
         Ok(())
@@ -1119,7 +1121,29 @@ fn ensure_existing_dir(cwd: &str) -> Result<(), String> {
 }
 
 fn canonical_project_root(cwd: &str) -> Result<PathBuf, String> {
+    ensure_project_path(cwd)?;
     fs::canonicalize(cwd).map_err(|error| format!("Failed to resolve project path: {error}"))
+}
+
+fn ensure_project_path(cwd: &str) -> Result<(), String> {
+    if cwd.trim().is_empty() {
+        return Err("Project path is required".to_string());
+    }
+    if cwd != cwd.trim() {
+        return Err("Project path cannot have leading or trailing whitespace".to_string());
+    }
+    if cwd.chars().count() > MAX_PROJECT_PATH_CHARS {
+        return Err(format!(
+            "Project path must be {MAX_PROJECT_PATH_CHARS} characters or fewer"
+        ));
+    }
+    if cwd.chars().any(char::is_control) {
+        return Err("Project path cannot contain control characters".to_string());
+    }
+    if !Path::new(cwd).is_absolute() {
+        return Err("Project path must be absolute".to_string());
+    }
+    Ok(())
 }
 
 fn safe_project_path(root: &Path, relative_path: &str) -> Result<PathBuf, String> {
@@ -1716,6 +1740,30 @@ mod tests {
             resolved,
             fs::canonicalize(root.join("README.md")).expect("canonical test file")
         );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn project_path_validation_rejects_unsafe_working_directories() {
+        let root = test_temp_dir("project-path-validation");
+        assert!(ensure_existing_dir(root.to_str().expect("utf8 temp path")).is_ok());
+
+        for path in [
+            "",
+            "relative/project",
+            " /tmp/project",
+            "/tmp/project ",
+            "/tmp/project\nsecret",
+        ] {
+            assert!(
+                ensure_existing_dir(path).is_err(),
+                "{path:?} should be rejected"
+            );
+        }
+        assert!(
+            ensure_existing_dir(&format!("/tmp/{}", "x".repeat(MAX_PROJECT_PATH_CHARS))).is_err()
+        );
+
         let _ = fs::remove_dir_all(root);
     }
 
