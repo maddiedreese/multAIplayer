@@ -1824,8 +1824,21 @@ test("relay rejects expired invite metadata loaded from store", async () => {
   const relay = await startRelay({}, {
     version: 1,
     savedAt: new Date().toISOString(),
-    teams: [],
-    rooms: [],
+    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+    rooms: [{
+      id: "room-desktop",
+      teamId: "team-core",
+      name: "Desktop client",
+      projectPath: "/tmp/multaiplayer",
+      host: "No host",
+      hostStatus: "offline",
+      approvalPolicy: "ask_every_turn",
+      mode: { chat: true, code: true, workspace: true, browser: false },
+      codexModel: "gpt-5.4",
+      browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: true,
+      unread: 0
+    }],
     invites: [{
       id: "invite_expired",
       teamId: "team-core",
@@ -1843,12 +1856,93 @@ test("relay rejects expired invite metadata loaded from store", async () => {
   }
 });
 
+test("relay drops invalid persisted invite metadata", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_SEED_DEMO: "false" }, {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+    rooms: [{
+      id: "room-desktop",
+      teamId: "team-core",
+      name: "Desktop client",
+      projectPath: "/tmp/multaiplayer",
+      host: "No host",
+      hostStatus: "offline",
+      approvalPolicy: "ask_every_turn",
+      mode: { chat: true, code: true, workspace: true, browser: false },
+      codexModel: "gpt-5.4",
+      browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: true,
+      unread: 0
+    }],
+    invites: [
+      {
+        id: "invite_live",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: "invite:bad",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: "invite_orphan",
+        teamId: "team-core",
+        roomId: "room-missing",
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: "invite_bad_time",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        createdAt: "not a date",
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      }
+    ],
+    encryptedBacklog: []
+  });
+  try {
+    const debug = await debugRelayState(relay.baseUrl);
+    assert.equal(debug.invites, 1);
+
+    const live = await fetch(`${relay.baseUrl}/invites/invite_live`);
+    assert.equal(live.status, 200);
+    const bad = await fetch(`${relay.baseUrl}/invites/invite%3Abad`);
+    assert.equal(bad.status, 404);
+    const orphan = await fetch(`${relay.baseUrl}/invites/invite_orphan`);
+    assert.equal(orphan.status, 404);
+    const badTime = await fetch(`${relay.baseUrl}/invites/invite_bad_time`);
+    assert.equal(badTime.status, 404);
+  } finally {
+    await relay.close();
+  }
+});
+
 test("relay prunes expired in-memory invites and attachment blobs", async () => {
   const relay = await startRelay({}, {
     version: 1,
     savedAt: new Date().toISOString(),
-    teams: [],
-    rooms: [],
+    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+    rooms: [{
+      id: "room-desktop",
+      teamId: "team-core",
+      name: "Desktop client",
+      projectPath: "/tmp/multaiplayer",
+      host: "No host",
+      hostStatus: "offline",
+      approvalPolicy: "ask_every_turn",
+      mode: { chat: true, code: true, workspace: true, browser: false },
+      codexModel: "gpt-5.4",
+      browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: true,
+      unread: 0
+    }],
     invites: [{
       id: "invite_live",
       teamId: "team-core",

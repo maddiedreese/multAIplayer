@@ -12,13 +12,14 @@ import { normalizeGitHubBranchName, normalizeGitHubRepoRef, normalizePullRequest
 import {
   AttachmentBlobRecord,
   CiphertextPayload,
+  InviteRecord,
   RelayClientMessage,
   defaultRoomMode,
   defaultCodexModel,
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   codexModelOptions,
-  type InviteRecord,
+  type InviteRecord as InviteRecordType,
   type AttachmentBlobRecord as AttachmentBlobRecordType,
   type DeviceRecord,
   type RoomRecord,
@@ -130,7 +131,7 @@ const maxEnvelopeNonceChars = 512;
 const maxEnvelopeCiphertextChars = Math.ceil(encryptedEnvelopeMaxBytes * 4 / 3) + 1024;
 const teams = new Map<string, TeamRecord>();
 const rooms = new Map<string, RoomRecord>();
-const invites = new Map<string, InviteRecord>();
+const invites = new Map<string, InviteRecordType>();
 const devices = new Map<string, DeviceRecord>();
 const attachmentBlobs = new Map<string, AttachmentBlobRecordType>();
 const teamMembers = new Map<string, Map<string, TeamMemberRecord>>();
@@ -183,7 +184,7 @@ interface StoredRelayState {
   savedAt: string;
 	  teams: TeamRecord[];
 	  rooms: RoomRecord[];
-	  invites: InviteRecord[];
+	  invites: InviteRecordType[];
 	  devices?: DeviceRecord[];
 	  teamMembers?: Array<{
 	    teamId: string;
@@ -907,7 +908,7 @@ app.post("/invites", (req, res) => {
     return;
   }
 
-  const invite: InviteRecord = {
+  const invite: InviteRecordType = {
     id: `invite_${nanoid(16)}`,
     teamId,
     roomId,
@@ -1847,7 +1848,19 @@ function normalizeDevice(device: unknown): DeviceRecord | null {
   };
 }
 
-function isExpiredInvite(invite: InviteRecord): boolean {
+function normalizeInvite(invite: unknown): InviteRecordType | null {
+  const parsed = InviteRecord.safeParse(invite);
+  if (!parsed.success) return null;
+  const id = normalizeRelayId(parsed.data.id, maxEnvelopeIdChars);
+  if (!id) return null;
+  if (!teams.has(parsed.data.teamId)) return null;
+  if (!rooms.has(parsed.data.roomId) || rooms.get(parsed.data.roomId)?.teamId !== parsed.data.teamId) return null;
+  if (Number.isNaN(Date.parse(parsed.data.createdAt))) return null;
+  if (parsed.data.expiresAt && Number.isNaN(Date.parse(parsed.data.expiresAt))) return null;
+  return { ...parsed.data, id };
+}
+
+function isExpiredInvite(invite: InviteRecordType): boolean {
   return Boolean(invite.expiresAt && Date.parse(invite.expiresAt) < Date.now());
 }
 
@@ -1998,7 +2011,8 @@ async function loadRelayStore() {
       if (normalized) rooms.set(normalized.id, normalized);
     }
     for (const invite of stored.invites ?? []) {
-      if (!isExpiredInvite(invite)) invites.set(invite.id, invite);
+      const normalized = normalizeInvite(invite);
+      if (normalized && !isExpiredInvite(normalized)) invites.set(normalized.id, normalized);
     }
 	    for (const device of stored.devices ?? []) {
 	      const normalized = normalizeDevice(device);
