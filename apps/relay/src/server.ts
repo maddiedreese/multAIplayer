@@ -21,6 +21,9 @@ import {
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   codexModelOptions,
+  maxMediumTextChars,
+  maxShortTextChars,
+  maxUrlChars,
   type DevicePublicKeyJwk as DevicePublicKeyJwkType,
   type InviteRecord as InviteRecordType,
   type AttachmentBlobRecord as AttachmentBlobRecordType,
@@ -414,15 +417,15 @@ app.post("/github/pulls", async (req, res) => {
   });
   const responseBody = await response.json();
   if (!response.ok) {
-    res.status(response.status).json(responseBody);
+    res.status(response.status).json(normalizeGitHubErrorResponse(responseBody));
     return;
   }
-  res.status(201).json({
-    id: responseBody.id,
-    number: responseBody.number,
-    url: responseBody.html_url,
-    title: responseBody.title
-  });
+  const pullRequest = normalizeGitHubPullResponse(responseBody);
+  if (!pullRequest) {
+    res.status(502).json({ error: "GitHub returned an invalid pull request response." });
+    return;
+  }
+  res.status(201).json(pullRequest);
 });
 
 app.get("/github/actions/runs", async (req, res) => {
@@ -455,28 +458,11 @@ app.get("/github/actions/runs", async (req, res) => {
   });
   const responseBody = await response.json();
   if (!response.ok) {
-    res.status(response.status).json(responseBody);
+    res.status(response.status).json(normalizeGitHubErrorResponse(responseBody));
     return;
   }
 
-  res.json({
-    totalCount: responseBody.total_count ?? 0,
-    runs: (responseBody.workflow_runs ?? []).slice(0, 6).map((run: Record<string, unknown>) => ({
-      id: run.id,
-      name: run.name,
-      displayTitle: run.display_title,
-      runNumber: run.run_number,
-      workflowId: run.workflow_id,
-      status: run.status,
-      conclusion: run.conclusion,
-      branch: run.head_branch,
-      headSha: run.head_sha,
-      event: run.event,
-      url: run.html_url,
-      createdAt: run.created_at,
-      updatedAt: run.updated_at
-    }))
-  });
+  res.json(normalizeGitHubActionsResponse(responseBody));
 });
 
 app.get("/teams", (_req, res) => {
@@ -1883,6 +1869,116 @@ function normalizeOptionalMetadataText(value: unknown, maxChars: number): string
   const text = String(value ?? "").trim();
   if (!text) return "";
   return normalizeMetadataText(text, maxChars);
+}
+
+function normalizeGitHubErrorResponse(value: unknown): { error: string; message?: string } {
+  const message = isRecord(value)
+    ? normalizeMetadataText(value.message, maxMediumTextChars)
+    : null;
+  return {
+    error: message ?? "GitHub request failed.",
+    ...(message ? { message } : {})
+  };
+}
+
+function normalizeGitHubPullResponse(value: unknown): {
+  id: number;
+  number: number;
+  url: string;
+  title: string;
+} | null {
+  if (!isRecord(value)) return null;
+  const id = normalizeSafeNonnegativeInteger(value.id);
+  const number = normalizeSafeNonnegativeInteger(value.number);
+  const url = normalizeMetadataText(value.html_url, maxUrlChars);
+  const title = normalizeMetadataText(value.title, maxShortTextChars);
+  if (id === null || number === null || !url || !title) return null;
+  return { id, number, url, title };
+}
+
+function normalizeGitHubActionsResponse(value: unknown): {
+  totalCount: number;
+  runs: Array<{
+    id: number;
+    name: string;
+    displayTitle?: string;
+    runNumber?: number;
+    workflowId?: number;
+    status: string;
+    conclusion: string | null;
+    branch?: string;
+    headSha?: string;
+    event?: string;
+    url: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+} {
+  if (!isRecord(value)) return { totalCount: 0, runs: [] };
+  return {
+    totalCount: normalizeSafeNonnegativeInteger(value.total_count) ?? 0,
+    runs: Array.isArray(value.workflow_runs)
+      ? value.workflow_runs.slice(0, 6).map(normalizeGitHubActionRun).filter((run) => run !== null)
+      : []
+  };
+}
+
+function normalizeGitHubActionRun(value: unknown): {
+  id: number;
+  name: string;
+  displayTitle?: string;
+  runNumber?: number;
+  workflowId?: number;
+  status: string;
+  conclusion: string | null;
+  branch?: string;
+  headSha?: string;
+  event?: string;
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+} | null {
+  if (!isRecord(value)) return null;
+  const id = normalizeSafeNonnegativeInteger(value.id);
+  const name = normalizeMetadataText(value.name, maxShortTextChars);
+  const status = normalizeMetadataText(value.status, maxShortTextChars);
+  const url = normalizeMetadataText(value.html_url, maxUrlChars);
+  const createdAt = normalizeMetadataText(value.created_at, maxShortTextChars);
+  const updatedAt = normalizeMetadataText(value.updated_at, maxShortTextChars);
+  if (id === null || !name || !status || !url || !createdAt || !updatedAt) return null;
+  const conclusion = value.conclusion === null
+    ? null
+    : normalizeMetadataText(value.conclusion, maxShortTextChars);
+  if (value.conclusion !== null && !conclusion) return null;
+  const displayTitle = normalizeOptionalMetadataText(value.display_title, maxShortTextChars);
+  const branch = normalizeOptionalMetadataText(value.head_branch, maxShortTextChars);
+  const headSha = normalizeOptionalMetadataText(value.head_sha, maxShortTextChars);
+  const event = normalizeOptionalMetadataText(value.event, maxShortTextChars);
+  const runNumber = normalizeOptionalSafeNonnegativeInteger(value.run_number);
+  const workflowId = normalizeOptionalSafeNonnegativeInteger(value.workflow_id);
+  return {
+    id,
+    name,
+    ...(displayTitle ? { displayTitle } : {}),
+    ...(runNumber !== undefined ? { runNumber } : {}),
+    ...(workflowId !== undefined ? { workflowId } : {}),
+    status,
+    conclusion,
+    ...(branch ? { branch } : {}),
+    ...(headSha ? { headSha } : {}),
+    ...(event ? { event } : {}),
+    url,
+    createdAt,
+    updatedAt
+  };
+}
+
+function normalizeSafeNonnegativeInteger(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+function normalizeOptionalSafeNonnegativeInteger(value: unknown): number | undefined {
+  return value === undefined || value === null ? undefined : normalizeSafeNonnegativeInteger(value) ?? undefined;
 }
 
 function isJsonStringifiableWithin(value: unknown, maxChars: number): boolean {
