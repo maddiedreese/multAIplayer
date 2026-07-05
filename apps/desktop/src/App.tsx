@@ -9,7 +9,6 @@ import {
   FolderGit2,
   GitBranch,
   Github,
-  Globe2,
   KeyRound,
   Lock,
   MessageSquare,
@@ -282,6 +281,7 @@ import { ApprovalPolicyPanel } from "./components/ApprovalPolicyPanel";
 import { HostHandoffPanel } from "./components/HostHandoffPanel";
 import { EncryptedInvitePanel } from "./components/EncryptedInvitePanel";
 import { LocalHistoryPanel } from "./components/LocalHistoryPanel";
+import { BrowserAccessPanel } from "./components/BrowserAccessPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -6334,142 +6334,33 @@ export function App() {
           onSelectTab={(tab) => setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: tab }))}
         />
 
-        <section className="panel browser-panel" hidden={inspectorTab !== "browser"}>
-          <div className="panel-title">
-            <span>Browser access</span>
-            <StatusPill
-              icon={<Globe2 size={13} />}
-              label={selectedRoom.mode.browser ? "enabled" : "disabled"}
-              tone={selectedRoom.mode.browser ? "green" : "muted"}
-            />
-          </div>
-          <div className="browser-profile-state">
-            <div>
-              <strong>Room-isolated profile</strong>
-              <span>
-                {browserStatus.profilePath ?? "Created when the host opens an approved page."}
-                {" · "}
-                {selectedRoom.browserProfilePersistent ? "persists between opens" : "refreshes before each open"}
-              </span>
-            </div>
-            <button onClick={resetRoomBrowserProfile} disabled={!canHostBrowser}>
-              <RefreshCw size={13} />
-              Reset
-            </button>
-          </div>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={selectedRoom.browserProfilePersistent}
-              disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
-              onChange={(event) => setBrowserProfilePersistence(event.target.checked)}
-            />
-            <span>Persist room browser profile</span>
-          </label>
-          <div className="browser-policy-state">
-            <StatusPill
-              icon={<Lock size={13} />}
-              label={browserStatus.downloadsBlocked ? "Downloads blocked" : "Downloads blocked in native browser"}
-              tone={browserStatus.downloadsBlocked ? "green" : "muted"}
-            />
-            <StatusPill
-              icon={<Lock size={13} />}
-              label={browserStatus.clipboardBlocked ? "Clipboard blocked" : "Clipboard blocked in native browser"}
-              tone={browserStatus.clipboardBlocked ? "green" : "muted"}
-            />
-            <StatusPill
-              icon={<Lock size={13} />}
-              label={browserStatus.fileUploadsBlocked ? "File uploads blocked" : "File uploads blocked in native browser"}
-              tone={browserStatus.fileUploadsBlocked ? "green" : "muted"}
-            />
-            <StatusPill icon={<ShieldAlert size={13} />} label="Signed-in pages are shared with room context" tone="yellow" />
-          </div>
-          <div className="browser-allowlist">
-            <label>
-              <span>Allowed sites</span>
-              <textarea
-                value={browserAllowedOriginsDraft}
-                disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
-                onChange={(event) => setBrowserAllowedOriginsDraftForRoom(selectedRoom.id, event.target.value)}
-                placeholder="https://github.com"
-              />
-            </label>
-            <button
-              className="ghost-wide"
-              onClick={saveBrowserAllowedOrigins}
-              disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
-            >
-              <Check size={15} />
-              Save allowed sites
-            </button>
-          </div>
-          <label>
-            <span>URL</span>
-            <input
-              value={browserUrl}
-              disabled={!canRequestBrowser}
-              onChange={(event) => setBrowserUrlForRoom(selectedRoom.id, event.target.value)}
-              placeholder="https://github.com/maddiedreese/multAIplayer"
-            />
-          </label>
-          <label>
-            <span>Reason</span>
-            <textarea
-              value={browserReason}
-              disabled={!canRequestBrowser}
-              onChange={(event) => setBrowserReasonForRoom(selectedRoom.id, event.target.value)}
-              placeholder="Why should Codex use this page?"
-            />
-          </label>
-          <button
-            className="primary-wide"
-            onClick={requestBrowserAccess}
-            disabled={!canRequestBrowser || !browserUrl.trim()}
-          >
-            <Globe2 size={15} />
-            Request browser access
-          </button>
-          <div className="browser-requests">
-            {browserRequests.slice(-4).reverse().map((request) => (
-              <div className={`browser-request ${request.status}`} key={request.id}>
-                <div>
-                  <strong>{formatBrowserAccessLabel(request.url)}</strong>
-                  <span>{request.reason}</span>
-                  <small>{request.requester}</small>
-                </div>
-                <small>{request.status}</small>
-                {request.status === "pending" && (
-                  <div>
-                    <button onClick={() => approveBrowserRequest(request)} disabled={!canHostBrowser}>
-                      <Check size={13} />
-                    </button>
-                    <button onClick={() => denyBrowserRequest(request.id)} disabled={!canHostBrowser}>
-                      <X size={13} />
-                    </button>
-                  </div>
-                )}
-                {request.status === "approved" && (
-                  <div>
-                    <button onClick={() => openApprovedBrowserRequest(request)} title="Open approved room browser" disabled={!canHostBrowser}>
-                      <ExternalLink size={13} />
-                    </button>
-                  </div>
-                )}
-                {detectBrowserSecretRisks(request.url).length > 0 && (
-                  <InlineSecretWarning
-                    risks={detectBrowserSecretRisks(request.url)}
-                    compact
-                    detail="Opening this page can expose a signed-in browser session to room context and Codex actions."
-                  />
-                )}
-              </div>
-            ))}
-            {browserRequests.length === 0 && (
-              <div className="empty-state compact">No browser requests in this room.</div>
-            )}
-          </div>
-          {browserMessage && <div className="workflow-message">{browserMessage}</div>}
-        </section>
+        <BrowserAccessPanel
+          hidden={inspectorTab !== "browser"}
+          browserEnabled={selectedRoom.mode.browser}
+          browserStatus={browserStatus}
+          browserProfilePersistent={selectedRoom.browserProfilePersistent}
+          browserProfileDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
+          browserAllowedOriginsDraft={browserAllowedOriginsDraft}
+          browserAllowedOriginsDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
+          browserUrl={browserUrl}
+          browserReason={browserReason}
+          canRequestBrowser={canRequestBrowser}
+          canHostBrowser={canHostBrowser}
+          browserRequests={browserRequests}
+          browserMessage={browserMessage}
+          formatBrowserAccessLabel={formatBrowserAccessLabel}
+          detectBrowserSecretRisks={detectBrowserSecretRisks}
+          onResetBrowserProfile={resetRoomBrowserProfile}
+          onBrowserProfilePersistenceChange={setBrowserProfilePersistence}
+          onBrowserAllowedOriginsDraftChange={(draft) => setBrowserAllowedOriginsDraftForRoom(selectedRoom.id, draft)}
+          onSaveBrowserAllowedOrigins={saveBrowserAllowedOrigins}
+          onBrowserUrlChange={(url) => setBrowserUrlForRoom(selectedRoom.id, url)}
+          onBrowserReasonChange={(reason) => setBrowserReasonForRoom(selectedRoom.id, reason)}
+          onRequestBrowserAccess={requestBrowserAccess}
+          onApproveBrowserRequest={approveBrowserRequest}
+          onDenyBrowserRequest={denyBrowserRequest}
+          onOpenApprovedBrowserRequest={openApprovedBrowserRequest}
+        />
 
         <div className="inspector-panel-group" hidden={inspectorTab !== "work"}>
         <section className="panel">
