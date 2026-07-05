@@ -4844,6 +4844,10 @@ export function App() {
       setSelectedFileMessage("Create or join a room before opening encrypted attachments.");
       return;
     }
+    if (isSelectedRoomLocked) {
+      setSelectedFileMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
     const room = selectedRoom;
     if (!attachment.blobId) {
       if (attachment.content) {
@@ -5861,6 +5865,7 @@ export function App() {
 		                      <button
 		                        onClick={() => openEncryptedAttachmentBlob(attachment)}
 		                        title={attachment.blobId ? "Decrypt and preview encrypted attachment" : "Preview inline attachment"}
+		                        disabled={isSelectedRoomLocked}
 		                      >
 		                        <ExternalLink size={12} />
 		                      </button>
