@@ -270,11 +270,12 @@ import {
   clearRoomVisibilityWarningAcknowledgement,
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
-import { ApprovalItem, InfoRow, InlineSecretWarning, StatusPill } from "./components/common";
+import { InfoRow, InlineSecretWarning, StatusPill } from "./components/common";
 import { InspectorTabs, type InspectorTab } from "./components/InspectorTabs";
 import { FilePreviewTabs } from "./components/FilePreviewTabs";
 import { RoomSettingsOverview } from "./components/RoomSettingsOverview";
 import { RoomHeader } from "./components/RoomHeader";
+import { CodexApprovalCard } from "./components/CodexApprovalCard";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -870,6 +871,17 @@ export function App() {
   const githubActionsEvents = githubActionsEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const selectedCodexThreadId = codexThreadIdsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const codexRunning = codexRunningByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
+  const codexApprovalSummaryDisplay = {
+    messages: `${visibleCodexTurnSummary.messagesSinceLastCodex} since last Codex response`,
+    attachments: formatCodexAttachmentSummary(visibleCodexTurnSummary.attachments),
+    workspace: selectedRoom.mode.workspace ? visibleCodexTurnSummary.workspacePath ?? "None" : "Disabled",
+    git: formatCodexGitSummary(visibleCodexTurnSummary.git),
+    browser: selectedRoom.mode.browser ? visibleCodexTurnSummary.browserAccess.join(", ") || "No pages shared" : "Disabled",
+    terminals: visibleCodexTurnSummary.terminals.join(", ") || "None",
+    model: formatCodexModel(selectedCodexModel),
+    thread: formatCodexThreadId(selectedCodexThreadId),
+    policy: approvalPolicyLabels[selectedRoom.approvalPolicy]
+  };
   const hostBusy = hostBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const settingsBusy = settingsBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const keyRotationBusy = keyRotationBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
@@ -6248,41 +6260,17 @@ export function App() {
           ))}
 
           {approvalVisible && (
-            <section className="approval-card">
-              <div className="approval-title">
-                <div>
-                  <Bot size={19} />
-                  <strong>Approve Codex turn</strong>
-                </div>
-                <StatusPill
-                  icon={<KeyRound size={14} />}
-                  label={isActiveHost ? "host-side approval" : "host locked"}
-                  tone={isActiveHost ? "yellow" : "muted"}
-                />
-              </div>
-              <div className="approval-grid">
-                <ApprovalItem label="Messages" value={`${visibleCodexTurnSummary.messagesSinceLastCodex} since last Codex response`} />
-                <ApprovalItem label="Attachments" value={formatCodexAttachmentSummary(visibleCodexTurnSummary.attachments)} />
-                <ApprovalItem label="Workspace" value={selectedRoom.mode.workspace ? visibleCodexTurnSummary.workspacePath ?? "None" : "Disabled"} />
-                <ApprovalItem label="Git" value={formatCodexGitSummary(visibleCodexTurnSummary.git)} />
-                <ApprovalItem label="Browser" value={selectedRoom.mode.browser ? visibleCodexTurnSummary.browserAccess.join(", ") || "No pages shared" : "Disabled"} />
-                <ApprovalItem label="Terminals" value={visibleCodexTurnSummary.terminals.join(", ") || "None"} />
-                <ApprovalItem label="Model" value={formatCodexModel(selectedCodexModel)} />
-                <ApprovalItem label="Thread" value={formatCodexThreadId(selectedCodexThreadId)} />
-                <ApprovalItem label="Policy" value={approvalPolicyLabels[selectedRoom.approvalPolicy]} />
-              </div>
-              <div className="approval-actions">
-                <button className="secondary" onClick={() => {
-                  setPendingCodexApprovalForRoom(selectedRoom.id, null);
-                  setApprovalVisibleForRoom(selectedRoom.id, false);
-                }}>
-                  <X size={16} /> Deny
-                </button>
-                <button className="primary" onClick={() => approveCodexTurn()} disabled={!hasSelectedRoom || codexRunning || !canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked)}>
-                  <Check size={16} /> {codexRunning ? "Running" : "Approve"}
-                </button>
-              </div>
-            </section>
+            <CodexApprovalCard
+              summary={codexApprovalSummaryDisplay}
+              isActiveHost={isActiveHost}
+              codexRunning={codexRunning}
+              canApprove={hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked)}
+              onDeny={() => {
+                setPendingCodexApprovalForRoom(selectedRoom.id, null);
+                setApprovalVisibleForRoom(selectedRoom.id, false);
+              }}
+              onApprove={() => approveCodexTurn()}
+            />
           )}
         </div>
 
