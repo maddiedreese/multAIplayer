@@ -282,12 +282,14 @@ interface NoSecretRoomInvite {
 }
 
 interface LocalRoomHistoryPayload {
-  version: 2;
+  version: 3;
   messages: ChatMessage[];
   terminalRequests: TerminalCommandRequest[];
   browserRequests: BrowserAccessRequest[];
   inviteRequests: InviteJoinRequest[];
   codexEvents: CodexRoomEvent[];
+  gitWorkflowEvents: GitWorkflowEventPlaintextPayload[];
+  githubActionsEvents: GitHubActionsEventPlaintextPayload[];
   hostHandoffs: HostHandoffRecord[];
   codexThreadId?: string;
 }
@@ -541,6 +543,8 @@ export function App() {
   const [hostHandoffsByRoom, setHostHandoffsByRoom] = useState<Record<string, HostHandoffRecord[]>>({});
   const [inviteRequestsByRoom, setInviteRequestsByRoom] = useState<Record<string, InviteJoinRequest[]>>({});
   const [codexEventsByRoom, setCodexEventsByRoom] = useState<Record<string, CodexRoomEvent[]>>({});
+  const [gitWorkflowEventsByRoom, setGitWorkflowEventsByRoom] = useState<Record<string, GitWorkflowEventPlaintextPayload[]>>({});
+  const [githubActionsEventsByRoom, setGitHubActionsEventsByRoom] = useState<Record<string, GitHubActionsEventPlaintextPayload[]>>({});
   const [draftsByRoom, setDraftsByRoom] = useState<Record<string, string>>({});
   const [selectedMessageIdsByRoom, setSelectedMessageIdsByRoom] = useState<Record<string, string[]>>({});
   const [pendingAttachmentsByRoom, setPendingAttachmentsByRoom] = useState<Record<string, ChatAttachment[]>>({});
@@ -722,6 +726,8 @@ export function App() {
   const terminalRequests = terminalRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const inviteRequests = inviteRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const codexEvents = codexEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
+  const gitWorkflowEvents = gitWorkflowEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
+  const githubActionsEvents = githubActionsEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const selectedCodexThreadId = codexThreadIdsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const codexRunning = codexRunningByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const hostBusy = hostBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
@@ -948,6 +954,32 @@ export function App() {
 
   function setSelectedGitWorkflowMessage(message: string | null) {
     setGitWorkflowMessageForRoom(selectedRoom.id, message);
+  }
+
+  function appendGitWorkflowEvent(roomId: string, event: GitWorkflowEventPlaintextPayload) {
+    setGitWorkflowEventsByRoom((current) => {
+      const roomEvents = current[roomId] ?? [];
+      if (roomEvents.some((existing) => existing.createdAt === event.createdAt && existing.status === event.status && existing.message === event.message)) {
+        return current;
+      }
+      return {
+        ...current,
+        [roomId]: [...roomEvents, event].slice(-100)
+      };
+    });
+  }
+
+  function appendGitHubActionsEvent(roomId: string, event: GitHubActionsEventPlaintextPayload) {
+    setGitHubActionsEventsByRoom((current) => {
+      const roomEvents = current[roomId] ?? [];
+      if (roomEvents.some((existing) => existing.checkedAt === event.checkedAt && existing.owner === event.owner && existing.repo === event.repo && existing.branch === event.branch)) {
+        return current;
+      }
+      return {
+        ...current,
+        [roomId]: [...roomEvents, event].slice(-50)
+      };
+    });
   }
 
   function updateSelectedGitWorkflowDraft(patch: Partial<GitWorkflowDraft>) {
@@ -1193,6 +1225,35 @@ export function App() {
           ? { ...current, [selectedRoomId]: payload.codexEvents }
           : current
       );
+      setGitWorkflowEventsByRoom((current) =>
+        payload.gitWorkflowEvents.length
+          ? { ...current, [selectedRoomId]: payload.gitWorkflowEvents }
+          : current
+      );
+      setGitHubActionsEventsByRoom((current) =>
+        payload.githubActionsEvents.length
+          ? { ...current, [selectedRoomId]: payload.githubActionsEvents }
+          : current
+      );
+      const latestGitWorkflowEvent = payload.gitWorkflowEvents.at(-1);
+      if (latestGitWorkflowEvent) {
+        setGitWorkflowMessageForRoom(selectedRoomId, latestGitWorkflowEvent.message);
+      }
+      const latestGitHubActionsEvent = payload.githubActionsEvents.at(-1);
+      if (latestGitHubActionsEvent) {
+        setActionRunsByRoom((current) => ({
+          ...current,
+          [selectedRoomId]: latestGitHubActionsEvent.runs
+        }));
+        setActionsLastCheckedByRoom((current) => ({
+          ...current,
+          [selectedRoomId]: latestGitHubActionsEvent.checkedAt
+        }));
+        setActionsMessagesByRoom((current) => ({
+          ...current,
+          [selectedRoomId]: `${latestGitHubActionsEvent.summary.label}: ${latestGitHubActionsEvent.message}`
+        }));
+      }
       setHostHandoffsByRoom((current) =>
         payload.hostHandoffs.length
           ? { ...current, [selectedRoomId]: payload.hostHandoffs }
@@ -1341,10 +1402,12 @@ export function App() {
           if (message.envelope.kind === "git.event") {
             const plaintext = await decryptJson<unknown>(roomPayload, secret);
             if (isGitWorkflowEventPlaintextPayload(plaintext)) {
+              appendGitWorkflowEvent(message.envelope.roomId, plaintext);
               appendTerminalLinesForRoom(message.envelope.roomId, buildGitWorkflowEventLines(plaintext));
               setGitWorkflowMessageForRoom(message.envelope.roomId, plaintext.message);
             }
             if (isGitHubActionsEventPlaintextPayload(plaintext)) {
+              appendGitHubActionsEvent(message.envelope.roomId, plaintext);
               setActionRunsByRoom((current) => ({
                 ...current,
                 [message.envelope.roomId]: plaintext.runs
@@ -1508,12 +1571,14 @@ export function App() {
     if (forgottenRoomIds.has(selectedRoomId) || revokedRoomIds.has(selectedRoomId) || revokedTeamIds.has(selectedRoom.teamId)) return;
     if (!historyLoadedRoomIds.current.has(selectedRoomId)) return;
     const payload = pruneLocalRoomHistory({
-      version: 2,
+      version: 3,
       messages,
       terminalRequests,
       browserRequests,
       inviteRequests,
       codexEvents,
+      gitWorkflowEvents,
+      githubActionsEvents,
       hostHandoffs,
       ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
     }, historySettings.retentionDays);
@@ -1527,6 +1592,8 @@ export function App() {
     hostHandoffs,
     inviteRequests,
     codexEvents,
+    gitWorkflowEvents,
+    githubActionsEvents,
     forgottenRoomIds,
     revokedRoomIds,
     revokedTeamIds,
@@ -2747,12 +2814,14 @@ export function App() {
     setHistorySettings(saved);
     if (saved.enabled) {
       const payload = pruneLocalRoomHistory({
-        version: 2,
+        version: 3,
         messages,
         terminalRequests,
         browserRequests,
         inviteRequests,
         codexEvents,
+        gitWorkflowEvents,
+        githubActionsEvents,
         hostHandoffs,
         ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
       }, saved.retentionDays);
@@ -2761,6 +2830,8 @@ export function App() {
       setBrowserRequestsByRoom((current) => ({ ...current, [roomId]: payload.browserRequests }));
       setInviteRequestsByRoom((current) => ({ ...current, [roomId]: payload.inviteRequests }));
       setCodexEventsByRoom((current) => ({ ...current, [roomId]: payload.codexEvents }));
+      setGitWorkflowEventsByRoom((current) => ({ ...current, [roomId]: payload.gitWorkflowEvents }));
+      setGitHubActionsEventsByRoom((current) => ({ ...current, [roomId]: payload.githubActionsEvents }));
       setHostHandoffsByRoom((current) => ({ ...current, [roomId]: payload.hostHandoffs }));
     }
     setHistoryMessageForRoom(
@@ -4182,9 +4253,6 @@ export function App() {
     event: Omit<GitWorkflowEventPlaintextPayload, "eventType" | "runner" | "runnerUserId" | "createdAt">,
     room: RoomRecord = selectedRoom
   ) {
-    const client = relayRef.current;
-    if (!client || relayStatus === "closed" || relayStatus === "error") return;
-    const secret = await loadOrCreateRoomSecret(room.id);
     const payload: GitWorkflowEventPlaintextPayload = {
       eventType: "git.workflow",
       runner: localUser.name,
@@ -4192,6 +4260,10 @@ export function App() {
       createdAt: new Date().toISOString(),
       ...event
     };
+    appendGitWorkflowEvent(room.id, payload);
+    const client = relayRef.current;
+    if (!client || relayStatus === "closed" || relayStatus === "error") return;
+    const secret = await loadOrCreateRoomSecret(room.id);
     const envelope: RelayEnvelope = {
       id: crypto.randomUUID(),
       teamId: room.teamId,
@@ -4270,15 +4342,16 @@ export function App() {
     event: Omit<GitHubActionsEventPlaintextPayload, "eventType" | "checkedBy" | "checkedByUserId">,
     room: RoomRecord = selectedRoom
   ) {
-    const client = relayRef.current;
-    if (!client || relayStatus === "closed" || relayStatus === "error") return;
-    const secret = await loadOrCreateRoomSecret(room.id);
     const payload: GitHubActionsEventPlaintextPayload = {
       eventType: "github.actions",
       checkedBy: localUser.name,
       checkedByUserId: localUser.id,
       ...event
     };
+    appendGitHubActionsEvent(room.id, payload);
+    const client = relayRef.current;
+    if (!client || relayStatus === "closed" || relayStatus === "error") return;
+    const secret = await loadOrCreateRoomSecret(room.id);
     const envelope: RelayEnvelope = {
       id: crypto.randomUUID(),
       teamId: room.teamId,
@@ -6782,12 +6855,14 @@ function roomSecretStorageLabel(): string {
 function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentionDays: number): LocalRoomHistoryPayload {
   const cutoffMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
   return {
-    version: 2,
+    version: 3,
     messages: payload.messages.filter((message) => isWithinRetention(message.createdAt ?? message.time, cutoffMs)),
     terminalRequests: payload.terminalRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     browserRequests: payload.browserRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     inviteRequests: payload.inviteRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     codexEvents: payload.codexEvents.filter((event) => isWithinRetention(event.createdAt, cutoffMs)),
+    gitWorkflowEvents: payload.gitWorkflowEvents.filter((event) => isWithinRetention(event.createdAt, cutoffMs)),
+    githubActionsEvents: payload.githubActionsEvents.filter((event) => isWithinRetention(event.checkedAt, cutoffMs)),
     hostHandoffs: payload.hostHandoffs.filter((handoff) => isWithinRetention(handoff.createdAt, cutoffMs)),
     ...(payload.codexThreadId ? { codexThreadId: payload.codexThreadId } : {})
   };
@@ -6803,19 +6878,21 @@ function isWithinRetention(value: string | undefined, cutoffMs: number): boolean
 function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistoryPayload): LocalRoomHistoryPayload {
   if (Array.isArray(value)) {
     return {
-      version: 2,
+      version: 3,
       messages: value.map((message) => normalizeChatMessage(message) as ChatMessage | null).filter((message): message is ChatMessage => message !== null),
       terminalRequests: [],
       browserRequests: [],
       inviteRequests: [],
       codexEvents: [],
+      gitWorkflowEvents: [],
+      githubActionsEvents: [],
       hostHandoffs: []
     };
   }
 
   const codexThreadId = normalizeCodexThreadId(value.codexThreadId);
   return {
-    version: 2,
+    version: 3,
     messages: Array.isArray(value.messages)
       ? value.messages.map((message) => normalizeChatMessage(message) as ChatMessage | null).filter((message): message is ChatMessage => message !== null)
       : [],
@@ -6830,6 +6907,12 @@ function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistoryPayloa
       : [],
     codexEvents: Array.isArray(value.codexEvents)
       ? value.codexEvents.filter(isCodexEventPlaintextPayload)
+      : [],
+    gitWorkflowEvents: Array.isArray(value.gitWorkflowEvents)
+      ? value.gitWorkflowEvents.filter(isGitWorkflowEventPlaintextPayload)
+      : [],
+    githubActionsEvents: Array.isArray(value.githubActionsEvents)
+      ? value.githubActionsEvents.filter(isGitHubActionsEventPlaintextPayload)
       : [],
     hostHandoffs: Array.isArray(value.hostHandoffs)
       ? value.hostHandoffs.filter(isHostHandoffRecord)

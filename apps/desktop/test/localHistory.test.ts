@@ -99,12 +99,14 @@ test("encrypted history stores no plaintext transcript while remaining recoverab
 test("encrypted history keeps Codex thread continuity local and encrypted", async () => {
   const roomId = "room-codex-thread-history";
   const payload = {
-    version: 2,
+    version: 3,
     messages: [],
     terminalRequests: [],
     browserRequests: [],
     inviteRequests: [],
     codexEvents: [],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
     hostHandoffs: [],
     codexThreadId: "thr_room_123"
   };
@@ -114,6 +116,79 @@ test("encrypted history keeps Codex thread continuity local and encrypted", asyn
   const stored = localStorage.getItem(`multaiplayer:history:${roomId}`);
   assert.ok(stored);
   assert.doesNotMatch(stored, /thr_room_123/);
+  assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
+});
+
+test("encrypted history keeps Git workflow and Actions events local and encrypted", async () => {
+  const roomId = "room-git-events-history";
+  const payload = {
+    version: 3,
+    messages: [],
+    terminalRequests: [],
+    browserRequests: [],
+    inviteRequests: [],
+    codexEvents: [],
+    gitWorkflowEvents: [{
+      eventType: "git.workflow",
+      status: "pr_opened",
+      branch: "codex/add-history",
+      push: true,
+      message: "Opened draft PR #42: https://github.com/maddiedreese/multAIplayer/pull/42",
+      runner: "Maddie",
+      runnerUserId: "github:maddie",
+      createdAt: "2026-07-05T00:00:00.000Z",
+      results: [{
+        command: "git push origin codex/add-history",
+        cwd: "/Users/maddie/dev/multAIplayer",
+        status: 0,
+        stdout: "pushed branch",
+        stderr: ""
+      }],
+      pullRequest: {
+        number: 42,
+        url: "https://github.com/maddiedreese/multAIplayer/pull/42"
+      }
+    }],
+    githubActionsEvents: [{
+      eventType: "github.actions",
+      owner: "maddiedreese",
+      repo: "multAIplayer",
+      branch: "codex/add-history",
+      summary: {
+        label: "passing",
+        detail: "All loaded workflow runs are passing.",
+        tone: "green"
+      },
+      message: "Loaded 1 workflow run for codex/add-history.",
+      checkedBy: "Maddie",
+      checkedByUserId: "github:maddie",
+      checkedAt: "2026-07-05T00:01:00.000Z",
+      runs: [{
+        id: 28724623234,
+        name: "CI",
+        displayTitle: "Add encrypted Git history",
+        runNumber: 42,
+        workflowId: 1,
+        status: "completed",
+        conclusion: "success",
+        branch: "codex/add-history",
+        headSha: "abc123",
+        event: "push",
+        url: "https://github.com/maddiedreese/multAIplayer/actions/runs/28724623234",
+        createdAt: "2026-07-05T00:00:30.000Z",
+        updatedAt: "2026-07-05T00:01:00.000Z"
+      }]
+    }],
+    hostHandoffs: []
+  };
+
+  await saveEncryptedHistory(roomId, payload);
+
+  const stored = localStorage.getItem(`multaiplayer:history:${roomId}`);
+  assert.ok(stored);
+  assert.doesNotMatch(stored, /codex\/add-history/);
+  assert.doesNotMatch(stored, /Opened draft PR/);
+  assert.doesNotMatch(stored, /28724623234/);
   assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
 });
 

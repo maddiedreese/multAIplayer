@@ -110,7 +110,7 @@ Composer text and attachment drafts are scoped per room. If a user switches room
 
 Project file previews and encrypted attachment blob opens are also tied to the originating room. If a room switch happens while a file read or blob decrypt is in flight, the completed read is ignored rather than rendered into the newly selected room's inspector.
 
-The app keeps encrypted local history with a default retention window of 30 days. Retention is configurable per room, and each team can define the default retention policy inherited by newly created rooms. The local encrypted room payload includes chat messages plus host-side workflow records such as terminal requests, browser approvals, and host handoff packages.
+The app keeps encrypted local history with a default retention window of 30 days. Retention is configurable per room, and each team can define the default retention policy inherited by newly created rooms. The local encrypted room payload includes chat messages plus host-side workflow records such as terminal requests, browser approvals, Codex events, Git workflow events, GitHub Actions refreshes, and host handoff packages.
 
 ### Invoke Codex
 
@@ -296,7 +296,7 @@ Defaults:
 - 30-day retention window;
 - configurable per room and team;
 - team defaults apply to newly created rooms and can be explicitly applied to the current room;
-- chat messages, terminal requests, browser approvals, and host handoff packages in one versioned encrypted room payload;
+- chat messages, terminal requests, browser approvals, Codex events, Git workflow events, GitHub Actions refreshes, host handoff packages, and saved Codex thread continuity in one versioned encrypted room payload;
 - attachment cache encrypted;
 - room keys in macOS Keychain in the native app;
 - user can clear local room history, including local room messages, workflow records, and the saved Codex thread id;
