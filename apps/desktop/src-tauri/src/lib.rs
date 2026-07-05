@@ -24,6 +24,7 @@ const MAX_COMMAND_OUTPUT_CHARS: usize = 120_000;
 const MAX_GIT_BRANCH_CHARS: usize = 200;
 const MAX_COMMIT_MESSAGE_CHARS: usize = 500;
 const MAX_PROJECT_PATH_CHARS: usize = 2_048;
+const MAX_ROOM_ID_CHARS: usize = 160;
 const MIN_CODEX_TIMEOUT_SECONDS: u64 = 10;
 const MAX_CODEX_TIMEOUT_SECONDS: u64 = 900;
 const ROOM_BROWSER_GUARD_SCRIPT: &str = r#"
@@ -481,6 +482,7 @@ fn terminal_start(
     state: State<'_, TerminalState>,
     request: TerminalStartRequest,
 ) -> Result<TerminalSnapshot, String> {
+    ensure_room_id(&request.room_id)?;
     ensure_existing_dir(&request.cwd)?;
     ensure_terminal_name(&request.name)?;
     ensure_terminal_command(&request.command)?;
@@ -548,6 +550,7 @@ fn terminal_list(
     state: State<'_, TerminalState>,
     room_id: String,
 ) -> Result<Vec<TerminalSnapshot>, String> {
+    ensure_room_id(&room_id)?;
     let mut sessions = state
         .sessions
         .lock()
@@ -564,6 +567,7 @@ fn terminal_list(
 
 #[tauri::command]
 fn terminal_read(state: State<'_, TerminalState>, id: String) -> Result<TerminalSnapshot, String> {
+    ensure_terminal_id(&id)?;
     let mut sessions = state
         .sessions
         .lock()
@@ -579,6 +583,8 @@ fn terminal_write(
     state: State<'_, TerminalState>,
     request: TerminalWriteRequest,
 ) -> Result<TerminalSnapshot, String> {
+    ensure_terminal_id(&request.id)?;
+    ensure_terminal_input(&request.input)?;
     let mut sessions = state
         .sessions
         .lock()
@@ -586,7 +592,6 @@ fn terminal_write(
     let session = sessions
         .get_mut(&request.id)
         .ok_or_else(|| format!("Terminal not found: {}", request.id))?;
-    ensure_terminal_input(&request.input)?;
     if !existing_is_running(session) {
         return Err(format!("Terminal {} is not running", session.name));
     }
@@ -611,6 +616,7 @@ fn terminal_write(
 
 #[tauri::command]
 fn terminal_stop(state: State<'_, TerminalState>, id: String) -> Result<TerminalSnapshot, String> {
+    ensure_terminal_id(&id)?;
     let mut sessions = state
         .sessions
         .lock()
@@ -1634,9 +1640,7 @@ fn browser_window_label(room_id: &str, project_path: Option<&str>) -> Result<Str
 }
 
 fn browser_profile_scope(room_id: &str, project_path: Option<&str>) -> Result<String, String> {
-    if room_id.trim().is_empty() || room_id.len() > 160 {
-        return Err("room id is invalid".to_string());
-    }
+    ensure_room_id(room_id)?;
     let normalized_project = project_path
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -1665,7 +1669,12 @@ fn validate_browser_url(value: &str) -> Result<tauri::Url, String> {
 }
 
 fn keychain_account(room_id: &str) -> Result<String, String> {
-    if room_id.is_empty() || room_id.len() > 160 {
+    ensure_room_id(room_id)?;
+    Ok(format!("room:{room_id}"))
+}
+
+fn ensure_room_id(room_id: &str) -> Result<(), String> {
+    if room_id.is_empty() || room_id.len() > MAX_ROOM_ID_CHARS {
         return Err("room id is invalid".to_string());
     }
     if !room_id
@@ -1674,7 +1683,18 @@ fn keychain_account(room_id: &str) -> Result<String, String> {
     {
         return Err("room id contains unsupported characters".to_string());
     }
-    Ok(format!("room:{room_id}"))
+    Ok(())
+}
+
+fn ensure_terminal_id(id: &str) -> Result<(), String> {
+    let Some((room_id, terminal_name)) = id.split_once(':') else {
+        return Err("terminal id is invalid".to_string());
+    };
+    if terminal_name.contains(':') {
+        return Err("terminal id is invalid".to_string());
+    }
+    ensure_room_id(room_id)?;
+    ensure_terminal_name(terminal_name)
 }
 
 fn ensure_device_identity_payload(identity: &str) -> Result<(), String> {
@@ -1925,9 +1945,13 @@ mod tests {
 
     #[test]
     fn keychain_account_rejects_room_ids_with_unsupported_characters() {
-        assert!(keychain_account("room_123").is_ok());
-        assert!(keychain_account("room:../../secret").is_err());
+        assert!(keychain_account("room-alpha_123").is_ok());
         assert!(keychain_account("").is_err());
+        assert!(keychain_account(" room-alpha").is_err());
+        assert!(keychain_account("room alpha").is_err());
+        assert!(keychain_account("room.alpha").is_err());
+        assert!(keychain_account("room:../../secret").is_err());
+        assert!(keychain_account(&"x".repeat(MAX_ROOM_ID_CHARS + 1)).is_err());
     }
 
     #[test]
@@ -1942,6 +1966,16 @@ mod tests {
 
     #[test]
     fn terminal_validation_rejects_bad_names_and_oversized_text() {
+        assert!(ensure_room_id("room-alpha_123").is_ok());
+        assert!(ensure_room_id("room.alpha").is_err());
+        assert!(ensure_room_id("room/alpha").is_err());
+        assert!(ensure_room_id(&"x".repeat(MAX_ROOM_ID_CHARS + 1)).is_err());
+
+        assert!(ensure_terminal_id("room-alpha_123:dev-server.1").is_ok());
+        assert!(ensure_terminal_id("room-alpha_123").is_err());
+        assert!(ensure_terminal_id("room-alpha_123:dev server").is_err());
+        assert!(ensure_terminal_id("room-alpha_123:dev:server").is_err());
+
         assert!(ensure_terminal_name("dev-server.1").is_ok());
         assert!(ensure_terminal_name("").is_err());
         assert!(ensure_terminal_name("bad name").is_err());
