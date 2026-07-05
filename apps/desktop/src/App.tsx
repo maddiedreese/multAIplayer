@@ -2621,6 +2621,10 @@ export function App() {
       setSelectedSettingsMessage("Create or join a room before changing room settings.");
       return;
     }
+    if (isSelectedRoomLocked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
     if (!isActiveHost) {
       setSelectedSettingsMessage(roomSettingsGateMessage);
       return;
@@ -2656,6 +2660,10 @@ export function App() {
   async function toggleRoomMode(key: keyof RoomMode) {
     if (!hasSelectedRoom) {
       setSelectedSettingsMessage("Create or join a room before changing room settings.");
+      return;
+    }
+    if (isSelectedRoomLocked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;
     }
     if (!isActiveHost) {
@@ -2739,6 +2747,10 @@ export function App() {
       setSelectedBrowserMessage("Create or join a room before changing browser site permissions.");
       return;
     }
+    if (isSelectedRoomLocked) {
+      setSelectedBrowserMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
     if (!isActiveHost) {
       setSelectedBrowserMessage(roomSettingsGateMessage);
       return;
@@ -2784,6 +2796,10 @@ export function App() {
   async function setBrowserProfilePersistence(browserProfilePersistent: boolean) {
     if (!hasSelectedRoom) {
       setSelectedBrowserMessage("Create or join a room before changing browser profile persistence.");
+      return;
+    }
+    if (isSelectedRoomLocked) {
+      setSelectedBrowserMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;
     }
     if (!isActiveHost) {
@@ -2837,6 +2853,10 @@ export function App() {
       return;
     }
     if (nextProjectPath === selectedRoom.projectPath) return;
+    if (isSelectedRoomLocked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
     if (!isActiveHost) {
       setSelectedSettingsMessage(roomSettingsGateMessage);
       return;
@@ -2876,6 +2896,14 @@ export function App() {
   async function chooseProjectPath() {
     if (!hasSelectedRoom) {
       setSelectedSettingsMessage("Create or join a room before choosing a project folder.");
+      return;
+    }
+    if (isSelectedRoomLocked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
+    if (!isActiveHost) {
+      setSelectedSettingsMessage(roomSettingsGateMessage);
       return;
     }
     const roomId = selectedRoom.id;
@@ -3054,6 +3082,10 @@ export function App() {
     const roomDefaults = loadTeamRoomDefaults(teamId);
     updateLocalHistorySettings(historyDefaults);
     setInviteApprovalGateForRoom(roomId, roomDefaults.inviteApprovalGate);
+    if (isSelectedRoomLocked) {
+      setHistoryMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
     if (!isActiveHost) {
       setHistoryMessageForRoom(
         roomId,
@@ -5474,7 +5506,7 @@ export function App() {
                 <InfoRow label="Model" value={formatCodexModel(selectedCodexModel)} />
                 <InfoRow label="Approval" value={approvalPolicyLabels[selectedRoom.approvalPolicy]} />
                 <InfoRow label="Room keys" value={roomSecretStorageLabel()} />
-                <button className="ghost-wide" onClick={chooseProjectPath} disabled={!hasSelectedRoom}>
+                <button className="ghost-wide" onClick={chooseProjectPath} disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}>
                   <FolderGit2 size={15} />
                   Choose project folder
                 </button>
@@ -5522,7 +5554,7 @@ export function App() {
                       <input
                         type="checkbox"
                         checked={selectedRoom.mode[key]}
-                        disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}
+                        disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
                         onChange={() => toggleRoomMode(key)}
                       />
                       <span>{roomModeLabels[key]}</span>
@@ -5974,7 +6006,7 @@ export function App() {
             <input
               type="checkbox"
               checked={selectedRoom.browserProfilePersistent}
-              disabled={!hasSelectedRoom || !isActiveHost || settingsBusy}
+              disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
               onChange={(event) => setBrowserProfilePersistence(event.target.checked)}
             />
             <span>Persist room browser profile</span>
@@ -6002,7 +6034,7 @@ export function App() {
               <span>Allowed sites</span>
               <textarea
                 value={browserAllowedOriginsDraft}
-                disabled={!hasSelectedRoom || !isActiveHost || settingsBusy}
+                disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
                 onChange={(event) => setBrowserAllowedOriginsDraftForRoom(selectedRoom.id, event.target.value)}
                 placeholder="https://github.com"
               />
@@ -6010,7 +6042,7 @@ export function App() {
             <button
               className="ghost-wide"
               onClick={saveBrowserAllowedOrigins}
-              disabled={!hasSelectedRoom || !isActiveHost || settingsBusy}
+              disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
             >
               <Check size={15} />
               Save allowed sites
@@ -6101,7 +6133,7 @@ export function App() {
               <span>Local folder</span>
               <input
                 value={projectPathDraft}
-                disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}
+                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
                 onChange={(event) => setProjectPathDraftForRoom(selectedRoom.id, event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
@@ -6112,18 +6144,18 @@ export function App() {
               />
             </label>
             <div>
-              <button className="ghost-wide" onClick={chooseProjectPath} disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}>
+              <button className="ghost-wide" onClick={chooseProjectPath} disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}>
                 <FolderGit2 size={15} />
                 Choose folder
               </button>
-              <button className="ghost-wide" onClick={() => setProjectPathDraftForRoom(selectedRoom.id, defaultProjectPath)} disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}>
+              <button className="ghost-wide" onClick={() => setProjectPathDraftForRoom(selectedRoom.id, defaultProjectPath)} disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}>
                 <FolderGit2 size={15} />
                 Current repo
               </button>
               <button
                 className="primary-wide"
                 onClick={updateProjectPath}
-                disabled={!hasSelectedRoom || settingsBusy || !isActiveHost || !projectPathDraft.trim() || projectPathDraft.trim() === selectedRoom.projectPath}
+                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost || !projectPathDraft.trim() || projectPathDraft.trim() === selectedRoom.projectPath}
               >
                 <Check size={15} />
                 Attach
@@ -6341,7 +6373,7 @@ export function App() {
                 key={policy}
                 className={selectedRoom.approvalPolicy === policy ? "active" : ""}
                 onClick={() => setApprovalPolicy(policy)}
-                disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}
+                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
               >
                 {approvalPolicyLabels[policy]}
               </button>
@@ -6361,7 +6393,7 @@ export function App() {
                 <input
                   type="checkbox"
                   checked={selectedRoom.mode[key]}
-                  disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}
+                  disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
                   onChange={() => toggleRoomMode(key)}
                 />
                 <span>{roomModeLabels[key]}</span>
