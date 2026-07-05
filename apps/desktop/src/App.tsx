@@ -684,6 +684,24 @@ export function App() {
     secretWarningsVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ??
     !hasAcknowledgedRoomVisibilityWarning(selectedRoom?.id ?? selectedRoomId)
   );
+  const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser);
+  const isSelectedRoomForgotten = forgottenRoomIds.has(selectedRoom.id);
+  const isSelectedRoomRevoked = revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId);
+  const isSelectedRoomLocked = isSelectedRoomForgotten || isSelectedRoomRevoked;
+  const canReadLocalWorkspace = hasSelectedRoom && canUseLocalWorkspace(selectedRoom, localUser, isSelectedRoomLocked);
+  const canRequestWorkspace = hasSelectedRoom && canRequestWorkspaceAction(selectedRoom, isSelectedRoomLocked);
+  const localWorkspaceMessage = localWorkspaceGateMessage(selectedRoom, isSelectedRoomLocked);
+  const workspaceRequestMessage = isSelectedRoomLocked
+    ? roomLockMessage(selectedRoom, isSelectedRoomRevoked)
+    : "Workspace mode is disabled for this room.";
+  const hostGateMessage =
+    selectedRoom.hostStatus === "active"
+      ? `Only ${selectedRoom.host} can approve host-side actions in this room.`
+      : "Claim host before approving host-side actions in this room.";
+  const roomSettingsGateMessage =
+    selectedRoom.hostStatus === "active"
+      ? `Only ${selectedRoom.host} can change room host settings.`
+      : "Claim host before changing room host settings.";
   const actionsSummary = useMemo(() => summarizeActionRuns(actionRuns), [actionRuns]);
   const githubWorkflowReadiness = useMemo(() => checkGitHubWorkflowReadiness({
     pushEnabled: gitWorkflowDraft.pushEnabled,
@@ -719,8 +737,10 @@ export function App() {
     }
   }, [gitWorkflowDraft.branchName, gitWorkflowDraft.commitMessage, gitWorkflowDraft.prBase, gitWorkflowDraft.pushEnabled, selectedRoom.projectPath]);
   const codexTurnSummary = useMemo(
-    () => buildCodexTurnSummary(messages, selectedRoom, terminals, browserRequests, gitStatus),
-    [messages, selectedRoom, terminals, browserRequests, gitStatus]
+    () => buildCodexTurnSummary(messages, selectedRoom, terminals, browserRequests, gitStatus, {
+      includeWorkspaceContext: canReadLocalWorkspace
+    }),
+    [messages, selectedRoom, terminals, browserRequests, gitStatus, canReadLocalWorkspace]
   );
   const activeCodexApproval = pendingCodexApprovalsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const approvalVisible = approvalVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
@@ -742,24 +762,6 @@ export function App() {
   const settingsBusy = settingsBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const keyRotationBusy = keyRotationBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const hostStatusLabel = formatHostStatus(selectedRoom);
-  const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser);
-  const isSelectedRoomForgotten = forgottenRoomIds.has(selectedRoom.id);
-  const isSelectedRoomRevoked = revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId);
-  const isSelectedRoomLocked = isSelectedRoomForgotten || isSelectedRoomRevoked;
-  const canReadLocalWorkspace = hasSelectedRoom && canUseLocalWorkspace(selectedRoom, localUser, isSelectedRoomLocked);
-  const canRequestWorkspace = hasSelectedRoom && canRequestWorkspaceAction(selectedRoom, isSelectedRoomLocked);
-  const localWorkspaceMessage = localWorkspaceGateMessage(selectedRoom, isSelectedRoomLocked);
-  const workspaceRequestMessage = isSelectedRoomLocked
-    ? roomLockMessage(selectedRoom, isSelectedRoomRevoked)
-    : "Workspace mode is disabled for this room.";
-  const hostGateMessage =
-    selectedRoom.hostStatus === "active"
-      ? `Only ${selectedRoom.host} can approve host-side actions in this room.`
-      : "Claim host before approving host-side actions in this room.";
-  const roomSettingsGateMessage =
-    selectedRoom.hostStatus === "active"
-      ? `Only ${selectedRoom.host} can change room host settings.`
-      : "Claim host before changing room host settings.";
 
   function setGitWorkflowMessageForRoom(roomId: string, message: string | null) {
     setGitWorkflowMessagesByRoom((current) => ({
@@ -1916,7 +1918,9 @@ export function App() {
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
-    const approvalSnapshot = buildCodexApprovalSnapshot(selectedRoom, messages, pendingMessage, terminals, browserRequests, gitStatus);
+    const approvalSnapshot = buildCodexApprovalSnapshot(selectedRoom, messages, pendingMessage, terminals, browserRequests, gitStatus, {
+      includeWorkspaceContext: canReadLocalWorkspace
+    });
     if (selectedRoom.approvalPolicy === "auto_chat_only") {
       if (shouldAutoApproveChatOnlyTurn(approvalSnapshot.summary, isActiveHost)) {
         setPendingCodexApprovalForRoom(roomId, null);
@@ -3583,6 +3587,30 @@ export function App() {
     }
     const room = selectedRoom;
     const roomId = room.id;
+    if (isSelectedRoomLocked) {
+      setHostMessageForRoom(roomId, roomLockMessage(room, isSelectedRoomRevoked));
+      setPendingCodexApprovalForRoom(roomId, null);
+      setApprovalVisibleForRoom(roomId, false);
+      return;
+    }
+    if (!room.mode.code) {
+      setHostMessageForRoom(roomId, "Code mode is disabled for this room.");
+      setPendingCodexApprovalForRoom(roomId, null);
+      setApprovalVisibleForRoom(roomId, false);
+      return;
+    }
+    if (room.approvalPolicy === "never_host") {
+      setHostMessageForRoom(roomId, "This room is set to never host Codex turns.");
+      setPendingCodexApprovalForRoom(roomId, null);
+      setApprovalVisibleForRoom(roomId, false);
+      return;
+    }
+    if (!canReadLocalWorkspace) {
+      setHostMessageForRoom(roomId, localWorkspaceMessage);
+      setPendingCodexApprovalForRoom(roomId, null);
+      setApprovalVisibleForRoom(roomId, false);
+      return;
+    }
     const model = selectedCodexModel;
     const projectPath = room.projectPath;
     setPendingCodexApprovalForRoom(roomId, null);
@@ -5773,7 +5801,7 @@ export function App() {
                 }}>
                   <X size={16} /> Deny
                 </button>
-                <button className="primary" onClick={() => approveCodexTurn()} disabled={!hasSelectedRoom || codexRunning || !isActiveHost || isSelectedRoomLocked}>
+                <button className="primary" onClick={() => approveCodexTurn()} disabled={!hasSelectedRoom || codexRunning || !isActiveHost || !canReadLocalWorkspace}>
                   <Check size={16} /> {codexRunning ? "Running" : "Approve"}
                 </button>
               </div>

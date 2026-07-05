@@ -39,6 +39,10 @@ export interface CodexApprovalSnapshot<Message extends CodexChatMessage = CodexC
   summary: CodexTurnSummary;
 }
 
+export interface CodexTurnContextOptions {
+  includeWorkspaceContext?: boolean;
+}
+
 export const maxCodexTurnInputChars = 220_000;
 export const maxCodexGitFiles = 12;
 export const codexTurnInputTruncationNotice =
@@ -50,13 +54,14 @@ export function buildCodexApprovalSnapshot<Message extends CodexChatMessage>(
   pendingMessage: Message | undefined,
   terminals: CodexTerminalContext[],
   browserRequests: CodexBrowserRequestContext[],
-  gitStatus?: CodexGitStatusContext | null
+  gitStatus?: CodexGitStatusContext | null,
+  options: CodexTurnContextOptions = {}
 ): CodexApprovalSnapshot<Message> {
   const turnMessages = pendingMessage ? [...messages, pendingMessage] : messages;
   return {
     roomId: room.id,
     messages: turnMessages,
-    summary: buildCodexTurnSummary(turnMessages, room, terminals, browserRequests, gitStatus)
+    summary: buildCodexTurnSummary(turnMessages, room, terminals, browserRequests, gitStatus, options)
   };
 }
 
@@ -65,10 +70,12 @@ export function buildCodexTurnSummary(
   room: RoomRecord,
   terminals: CodexTerminalContext[],
   browserRequests: CodexBrowserRequestContext[],
-  gitStatus?: CodexGitStatusContext | null
+  gitStatus?: CodexGitStatusContext | null,
+  options: CodexTurnContextOptions = {}
 ): CodexTurnSummary {
   const delta = messagesSinceLastCodex(messages);
   const attachments = delta.flatMap((message) => message.attachments ?? []);
+  const includeWorkspaceContext = options.includeWorkspaceContext ?? true;
   const approvedBrowserUrls = browserRequests
     .filter((request) => request.status === "approved")
     .map((request) => formatBrowserAccessLabel(request.url));
@@ -82,10 +89,10 @@ export function buildCodexTurnSummary(
       storage: attachment.blobId ? "encrypted_blob" : "inline",
       contentIncluded: Boolean(attachment.content)
     })),
-    workspacePath: room.mode.workspace ? room.projectPath : null,
-    git: room.mode.workspace && gitStatus ? summarizeGitStatus(gitStatus) : null,
+    workspacePath: room.mode.workspace && includeWorkspaceContext ? room.projectPath : null,
+    git: room.mode.workspace && includeWorkspaceContext && gitStatus ? summarizeGitStatus(gitStatus) : null,
     browserAccess: room.mode.browser ? approvedBrowserUrls : [],
-    terminals: terminals.map((terminal) => terminal.name)
+    terminals: room.mode.workspace && includeWorkspaceContext ? terminals.map((terminal) => terminal.name) : []
   };
 }
 

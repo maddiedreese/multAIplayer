@@ -109,6 +109,41 @@ test("buildCodexTurnSummary respects room mode and approved browser context", ()
   });
 });
 
+test("buildCodexTurnSummary omits host-local workspace context when not allowed", () => {
+  const summary = buildCodexTurnSummary(
+    messages,
+    room,
+    [{ name: "dev server" }, { name: "tests" }],
+    [{ url: "https://github.com/maddiedreese/multAIplayer/actions", status: "approved" }],
+    {
+      branch: "feature/private",
+      files: [{ path: ".env", status: "modified", added: 1, removed: 1 }]
+    },
+    { includeWorkspaceContext: false }
+  );
+
+  assert.equal(summary.workspacePath, null);
+  assert.equal(summary.git, null);
+  assert.deepEqual(summary.terminals, []);
+  assert.deepEqual(summary.browserAccess, ["https://github.com"]);
+});
+
+test("buildCodexApprovalSnapshot uses the workspace context permission option", () => {
+  const snapshot = buildCodexApprovalSnapshot(
+    room,
+    messages,
+    undefined,
+    [{ name: "private terminal" }],
+    [],
+    { branch: "main", files: [{ path: "secret.txt", status: "modified", added: 1, removed: 0 }] },
+    { includeWorkspaceContext: false }
+  );
+
+  assert.equal(snapshot.summary.workspacePath, null);
+  assert.equal(snapshot.summary.git, null);
+  assert.deepEqual(snapshot.summary.terminals, []);
+});
+
 test("buildCodexTurnSummary hides workspace and browser context when room modes are off", () => {
   const summary = buildCodexTurnSummary(
     messages,

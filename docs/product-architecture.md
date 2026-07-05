@@ -133,6 +133,8 @@ On invocation, multAIplayer builds a turn package containing:
 
 Attachments are included by default. Before the turn starts, the active host sees an approval sheet showing exactly what Codex will receive.
 
+Codex turn execution is an active-host local workspace action in the macOS alpha. The approval summary includes project path, Git status, and terminal names only when workspace mode is enabled, the room is unlocked, and the current device is the active host for that room. Stale approval sheets are rechecked at approval time before the app calls the local Codex app-server.
+
 Example approval summary:
 
 ```text
