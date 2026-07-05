@@ -283,6 +283,7 @@ import { WorkspaceFilesPanel } from "./components/WorkspaceFilesPanel";
 import { GitHubActionsPanel } from "./components/GitHubActionsPanel";
 import { GitHandoffPanel } from "./components/GitHandoffPanel";
 import { ProjectPanel } from "./components/ProjectPanel";
+import { RoomMembersPanel, TeamRosterPanel, type RoomMemberDisplay, type TeamMemberDisplay } from "./components/RosterPanels";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -725,6 +726,17 @@ export function App() {
   const selectedTeamMembers = teamMembersByTeam[selectedTeam] ?? [];
   const selectedTeamMembersMessage = teamMembersMessageByTeam[selectedTeam] ?? null;
   const selectedTeamMembersBusy = teamMembersBusyByTeam[selectedTeam] ?? false;
+  const selectedTeamMemberRows: TeamMemberDisplay[] = selectedTeamMembers.map((member) => ({
+    member,
+    initial: formatTeamMemberInitial(member.userId),
+    name: formatTeamMemberName(member.userId, currentUser),
+    roleLabel: formatTeamRole(member.role),
+    joinedLabel: formatTeamMemberJoinedAt(member.joinedAt),
+    canPromote: canPromoteTeamMember(selectedTeamRecord, member),
+    canDemote: canDemoteTeamMember(selectedTeamRecord, member),
+    canTransferOwnership: canTransferTeamOwnership(selectedTeamRecord, member, localUser.id),
+    canRemove: canRemoveTeamMember(selectedTeamRecord, member)
+  }));
   const selectedCodexModel = selectedRoom?.codexModel ?? defaultCodexModel;
   const selectedBrowserAllowedOrigins = selectedRoom.browserAllowedOrigins ?? defaultBrowserAllowedOrigins;
   const customCodexModel = customCodexModelsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedCodexModel;
@@ -867,6 +879,28 @@ export function App() {
   const roomMembers = Object.values(presenceByRoom[selectedRoom?.id ?? selectedRoomId] ?? {})
     .filter((member) => member.status === "online")
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  const visibleRoomMembers: RoomPresence[] = roomMembers.length ? roomMembers : [{
+    userId: localUser.id,
+    deviceId,
+    displayName: localUser.name,
+    avatarUrl: localUser.avatarUrl,
+    publicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
+    status: "online" as const
+  }];
+  const roomMemberRows: RoomMemberDisplay[] = visibleRoomMembers.map((member) => {
+    const trusted = isDeviceKeyTrusted(
+      trustedDeviceKeys,
+      selectedRoom.id,
+      member.deviceId,
+      member.publicKeyFingerprint
+    );
+    return {
+      ...member,
+      trusted,
+      isHost: isRoomHostMember(member, selectedRoom),
+      deviceLabel: formatMemberDeviceLabel(member, deviceId, trusted)
+    };
+  });
   const selectedTerminal = roomTerminals.find((terminal) => terminal.id === selectedTerminalId) ?? null;
   const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
   const hostHandoffs = hostHandoffsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
@@ -6376,100 +6410,25 @@ export function App() {
           onUpdateProjectPath={updateProjectPath}
         />
 
-        <section className="panel members-panel">
-          <div className="panel-title">
-            <span>Team roster</span>
-            <StatusPill icon={<UsersRound size={13} />} label={`${selectedTeamMembers.length || 0}`} tone="dark" />
-          </div>
-          <div className="member-list">
-            {selectedTeamMembers.map((member) => (
-              <div className="member-row team-member-row" key={`${member.teamId}:${member.userId}`}>
-                <span>{formatTeamMemberInitial(member.userId)}</span>
-                <div>
-                  <strong>{formatTeamMemberName(member.userId, currentUser)}</strong>
-                  <small>{member.userId}</small>
-                </div>
-                <div className="member-badges">
-                  <b className={member.role === "owner" ? "trusted" : member.role === "admin" ? "verified" : ""}>
-                    {formatTeamRole(member.role)}
-                  </b>
-                  {canPromoteTeamMember(selectedTeamRecord, member) && (
-                    <button onClick={() => changeTeamMemberRole(member, "admin")} disabled={selectedTeamMembersBusy}>Promote</button>
-                  )}
-                  {canDemoteTeamMember(selectedTeamRecord, member) && (
-                    <button onClick={() => changeTeamMemberRole(member, "member")} disabled={selectedTeamMembersBusy}>Demote</button>
-                  )}
-                  {canTransferTeamOwnership(selectedTeamRecord, member, localUser.id) && (
-                    <button onClick={() => transferOwnershipToTeamMember(member)} disabled={selectedTeamMembersBusy}>Make owner</button>
-                  )}
-                  {canRemoveTeamMember(selectedTeamRecord, member) && (
-                    <button onClick={() => removeMemberFromTeam(member)} disabled={selectedTeamMembersBusy}>Remove</button>
-                  )}
-                </div>
-                <small>{formatTeamMemberJoinedAt(member.joinedAt)}</small>
-              </div>
-            ))}
-          </div>
-          {selectedTeamMembers.length === 0 && (
-            <div className="sidebar-empty">
-              {selectedTeam ? "No team roster loaded yet." : "Select a team to view its roster."}
-            </div>
-          )}
-          {selectedTeamMembersMessage && <div className="workflow-message">{selectedTeamMembersMessage}</div>}
-        </section>
+        <TeamRosterPanel
+          members={selectedTeamMemberRows}
+          hasSelectedTeam={Boolean(selectedTeam)}
+          busy={selectedTeamMembersBusy}
+          message={selectedTeamMembersMessage}
+          onPromote={(member) => changeTeamMemberRole(member, "admin")}
+          onDemote={(member) => changeTeamMemberRole(member, "member")}
+          onTransferOwnership={transferOwnershipToTeamMember}
+          onRemove={removeMemberFromTeam}
+        />
 
-        <section className="panel members-panel">
-          <div className="panel-title">
-            <span>Members</span>
-            <StatusPill icon={<UsersRound size={13} />} label={`${roomMembers.length || 1} online`} tone="blue" />
-          </div>
-          <div className="member-list">
-            {(roomMembers.length ? roomMembers : [{
-              userId: localUser.id,
-              deviceId,
-              displayName: localUser.name,
-              avatarUrl: localUser.avatarUrl,
-              publicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
-              status: "online" as const
-            }]).map((member) => {
-              const trusted = isDeviceKeyTrusted(
-                trustedDeviceKeys,
-                selectedRoom.id,
-                member.deviceId,
-                member.publicKeyFingerprint
-              );
-              return (
-                <div className="member-row" key={member.deviceId}>
-                  {member.avatarUrl ? <img src={member.avatarUrl} alt="" /> : <span>{member.displayName.slice(0, 1)}</span>}
-                  <div>
-                    <strong>{member.displayName}</strong>
-                    <small>{formatMemberDeviceLabel(member, deviceId, trusted)}</small>
-                  </div>
-                  <div className="member-badges">
-                    {isRoomHostMember(member, selectedRoom) && <b>host</b>}
-                    <b className={member.publicKeyFingerprint ? trusted ? "trusted" : "verified" : "warning"}>
-                      {member.publicKeyFingerprint ? trusted ? "trusted" : "keyed" : "unregistered"}
-                    </b>
-                    {member.publicKeyFingerprint && member.deviceId !== deviceId && (
-                      <>
-                        <button onClick={() => copyRoomMemberDeviceFingerprint(member, trusted)} title="Copy full device fingerprint">
-                          <Copy size={12} />
-                        </button>
-                        {trusted ? (
-                          <button onClick={() => untrustRoomMemberDevice(member)}>Untrust</button>
-                        ) : (
-                          <button onClick={() => trustRoomMemberDevice(member)}>Trust</button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                  <i />
-                </div>
-              );
-            })}
-          </div>
-          {deviceIdentityMessage && <div className="workflow-message">{deviceIdentityMessage}</div>}
-        </section>
+        <RoomMembersPanel
+          members={roomMemberRows}
+          localDeviceId={deviceId}
+          message={deviceIdentityMessage}
+          onCopyFingerprint={(member) => copyRoomMemberDeviceFingerprint(member, member.trusted)}
+          onTrust={trustRoomMemberDevice}
+          onUntrust={untrustRoomMemberDevice}
+        />
 
         <HostHandoffPanel
           handoffs={hostHandoffs}
