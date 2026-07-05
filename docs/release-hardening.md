@@ -47,6 +47,8 @@ The current release workflow does not need OpenAI credentials because Codex runs
 
 CI and release jobs should keep least-privilege GitHub permissions and explicit timeouts. The alpha workflows use read-only repository permissions for CI, write access only for creating GitHub releases, and bounded job runtimes so a stuck build cannot run indefinitely.
 
+Manual release dispatches must point at an existing tag that starts with `v` and uses only letters, numbers, dots, underscores, or hyphens. The release workflow validates the tag before checking it out, builds from the detached tag ref, and passes the validated tag through environment variables instead of interpolating raw dispatch input into shell commands.
+
 ## Before A Non-Alpha Release
 
 Before presenting multAIplayer as production-ready, the project should add:

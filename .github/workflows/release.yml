@@ -27,20 +27,28 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
 
       - name: Set release tag
         id: release
+        shell: bash
+        env:
+          RELEASE_INPUT_TAG: ${{ inputs.tag }}
         run: |
-          if [ -n "${{ inputs.tag }}" ]; then
-            tag="${{ inputs.tag }}"
+          if [ -n "$RELEASE_INPUT_TAG" ]; then
+            tag="$RELEASE_INPUT_TAG"
           else
             tag="${GITHUB_REF_NAME}"
           fi
-          if ! git rev-parse "$tag" >/dev/null 2>&1; then
+          if [[ ! "$tag" =~ ^v[0-9][0-9A-Za-z._-]*$ ]]; then
+            echo "Release tag must start with v and contain only letters, numbers, dots, underscores, or hyphens: $tag" >&2
+            exit 1
+          fi
+          if ! git show-ref --verify --quiet "refs/tags/$tag"; then
             echo "Tag does not exist: $tag" >&2
             exit 1
           fi
+          git checkout --detach "refs/tags/$tag"
           prerelease=false
           case "$tag" in
             *alpha*|*beta*|*rc*) prerelease=true ;;
@@ -91,14 +99,16 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_PRERELEASE: ${{ steps.release.outputs.prerelease }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           args=()
-          if [ "${{ steps.release.outputs.prerelease }}" = "true" ]; then
+          if [ "$RELEASE_PRERELEASE" = "true" ]; then
             args+=(--prerelease)
           fi
-          gh release create "${{ steps.release.outputs.tag }}" release-assets/* \
+          gh release create "$RELEASE_TAG" release-assets/* \
             --repo "$GITHUB_REPOSITORY" \
-            --title "multAIplayer ${{ steps.release.outputs.tag }}" \
+            --title "multAIplayer $RELEASE_TAG" \
             --notes "$(cat <<'EOF'
           Automated macOS release build.
 
