@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  isRoomSettingsMutationInFlight,
   loadTeamRoomDefaults,
+  roomSettingsMutationInFlightMessage,
   saveTeamRoomDefaults,
   sanitizeTeamRoomDefaults,
   teamDefaultsRoomSettings,
@@ -184,6 +186,13 @@ test("team defaults room settings include only host-controlled room settings", (
   });
   settings.browserAllowedOrigins.push("https://mutated.example");
   assert.deepEqual(defaults.browserAllowedOrigins, ["https://github.com", "https://example.com"]);
+});
+
+test("room settings mutation in-flight guard is scoped to one room", () => {
+  assert.equal(isRoomSettingsMutationInFlight({ "room-a": true }, "room-a"), true);
+  assert.equal(isRoomSettingsMutationInFlight({ "room-a": true }, "room-b"), false);
+  assert.equal(isRoomSettingsMutationInFlight({ "room-a": false }, "room-a"), false);
+  assert.equal(roomSettingsMutationInFlightMessage(), "Room settings are already being updated.");
 });
 
 test("team room defaults drop corrupted storage", () => {

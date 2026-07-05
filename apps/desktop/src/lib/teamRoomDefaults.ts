@@ -15,6 +15,17 @@ export interface TeamRoomDefaults {
   inviteApprovalGate: boolean;
 }
 
+export function isRoomSettingsMutationInFlight(
+  busyByRoom: Record<string, boolean>,
+  roomId: string
+): boolean {
+  return busyByRoom[roomId] === true;
+}
+
+export function roomSettingsMutationInFlightMessage(): string {
+  return "Room settings are already being updated.";
+}
+
 const defaultTeamRoomDefaults: TeamRoomDefaults = {
   approvalPolicy: "ask_every_turn",
   codexModel: defaultCodexModel,

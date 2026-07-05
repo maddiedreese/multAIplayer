@@ -93,7 +93,13 @@ import {
   type LocalHistorySettings,
   saveEncryptedHistory
 } from "./lib/localHistory";
-import { loadTeamRoomDefaults, saveTeamRoomDefaults, teamDefaultsRoomSettings } from "./lib/teamRoomDefaults";
+import {
+  isRoomSettingsMutationInFlight,
+  loadTeamRoomDefaults,
+  roomSettingsMutationInFlightMessage,
+  saveTeamRoomDefaults,
+  teamDefaultsRoomSettings
+} from "./lib/teamRoomDefaults";
 import { loadOrCreateDeviceIdentity, resetDeviceIdentity, type DeviceIdentity } from "./lib/deviceIdentity";
 import {
   buildDeviceFingerprintMarkdown,
@@ -667,6 +673,7 @@ export function App() {
   const roomsRef = useRef<RoomRecord[]>(rooms);
   const selectedRoomIdRef = useRef(selectedRoomId);
   const gitWorkflowDraftsRef = useRef(gitWorkflowDraftsByRoom);
+  const settingsBusyRef = useRef(settingsBusyByRoom);
   const gitWorkflowBusyRef = useRef(gitWorkflowBusyByRoom);
   const actionsBusyRef = useRef(actionsBusyByRoom);
   const browserRequestsRef = useRef(browserRequestsByRoom);
@@ -898,6 +905,9 @@ export function App() {
   }
 
   function setSettingsBusyForRoom(roomId: string, busy: boolean) {
+    settingsBusyRef.current = busy
+      ? { ...settingsBusyRef.current, [roomId]: true }
+      : omitRecordKey(settingsBusyRef.current, roomId);
     setSettingsBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
@@ -907,6 +917,15 @@ export function App() {
 
   function setSelectedSettingsMessage(message: string | null) {
     setSettingsMessageForRoom(selectedRoom.id, message);
+  }
+
+  function reportRoomSettingsMutationInFlight(
+    roomId: string,
+    setMessage: (roomId: string, message: string | null) => void = setSettingsMessageForRoom
+  ): boolean {
+    if (!isRoomSettingsMutationInFlight(settingsBusyRef.current, roomId)) return false;
+    setMessage(roomId, roomSettingsMutationInFlightMessage());
+    return true;
   }
 
   function setKeyRotationBusyForRoom(roomId: string, busy: boolean) {
@@ -1141,6 +1160,10 @@ export function App() {
   useEffect(() => {
     gitWorkflowDraftsRef.current = gitWorkflowDraftsByRoom;
   }, [gitWorkflowDraftsByRoom]);
+
+  useEffect(() => {
+    settingsBusyRef.current = settingsBusyByRoom;
+  }, [settingsBusyByRoom]);
 
   useEffect(() => {
     gitWorkflowBusyRef.current = gitWorkflowBusyByRoom;
@@ -2771,6 +2794,7 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    if (reportRoomSettingsMutationInFlight(roomId)) return;
     setSettingsBusyForRoom(roomId, true);
     setSettingsMessageForRoom(roomId, null);
     try {
@@ -2809,6 +2833,7 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    if (reportRoomSettingsMutationInFlight(roomId)) return;
     setSettingsBusyForRoom(roomId, true);
     setSettingsMessageForRoom(roomId, null);
     try {
@@ -2860,6 +2885,7 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    if (reportRoomSettingsMutationInFlight(roomId)) return;
     setSettingsBusyForRoom(roomId, true);
     setSettingsMessageForRoom(roomId, null);
     try {
@@ -2903,6 +2929,7 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    if (reportRoomSettingsMutationInFlight(roomId, setBrowserMessageForRoom)) return;
     setSettingsBusyForRoom(roomId, true);
     setBrowserMessageForRoom(roomId, null);
     try {
@@ -2951,6 +2978,7 @@ export function App() {
     }
     if (browserProfilePersistent === selectedRoom.browserProfilePersistent) return;
     const roomId = selectedRoom.id;
+    if (reportRoomSettingsMutationInFlight(roomId, setBrowserMessageForRoom)) return;
     setSettingsBusyForRoom(roomId, true);
     setBrowserMessageForRoom(roomId, null);
     try {
@@ -3006,6 +3034,7 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    if (reportRoomSettingsMutationInFlight(roomId)) return;
     setSettingsBusyForRoom(roomId, true);
     setSettingsMessageForRoom(roomId, null);
     try {
@@ -3222,6 +3251,7 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    if (reportRoomSettingsMutationInFlight(roomId, setHistoryMessageForRoom)) return;
     const teamId = selectedRoom.teamId;
     const historyDefaults = loadTeamHistorySettings(teamId);
     const roomDefaults = loadTeamRoomDefaults(teamId);
