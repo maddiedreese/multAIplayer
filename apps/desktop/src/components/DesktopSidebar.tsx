@@ -1,0 +1,298 @@
+import {
+  Circle,
+  ExternalLink,
+  FolderGit2,
+  Github,
+  Plus,
+  Search,
+  Settings,
+  UserRoundCheck,
+  UsersRound,
+  X
+} from "lucide-react";
+import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
+
+export type SidebarPanelName = "profile" | "settings" | null;
+
+export interface SidebarTeamDisplay {
+  id: string;
+  name: string;
+  meta: string;
+  active: boolean;
+}
+
+export interface SidebarRoomDisplay {
+  id: string;
+  teamId: string;
+  name: string;
+  detail: string;
+  active: boolean;
+  attention: number;
+  unread: number;
+}
+
+export interface SidebarMessageHitDisplay {
+  key: string;
+  roomId: string;
+  teamId?: string;
+  author: string;
+  preview: string;
+}
+
+export function DesktopSidebar({
+  currentUser,
+  authBusy,
+  authConfig,
+  authError,
+  deviceFlow,
+  sidebarQuery,
+  searchActive,
+  workspaceError,
+  newTeamName,
+  newRoomName,
+  newRoomProjectPath,
+  defaultProjectPath,
+  selectedTeam,
+  teams,
+  rooms,
+  messageHits,
+  historySearchBusy,
+  activeSidebarPanel,
+  onSignIn,
+  onSignOut,
+  onSidebarQueryChange,
+  onClearSidebarQuery,
+  onNewTeamNameChange,
+  onCreateTeam,
+  onSelectTeam,
+  onNewRoomNameChange,
+  onNewRoomProjectPathChange,
+  onChooseNewRoomProjectPath,
+  onCreateRoom,
+  onSelectRoom,
+  onSelectSidebarPanel
+}: {
+  currentUser: SignedInUser | null;
+  authBusy: boolean;
+  authConfig: GitHubAuthConfig | null;
+  authError: string | null;
+  deviceFlow: GitHubDeviceStart | null;
+  sidebarQuery: string;
+  searchActive: boolean;
+  workspaceError: string | null;
+  newTeamName: string;
+  newRoomName: string;
+  newRoomProjectPath: string;
+  defaultProjectPath: string;
+  selectedTeam: boolean;
+  teams: SidebarTeamDisplay[];
+  rooms: SidebarRoomDisplay[];
+  messageHits: SidebarMessageHitDisplay[];
+  historySearchBusy: boolean;
+  activeSidebarPanel: SidebarPanelName;
+  onSignIn: () => void;
+  onSignOut: () => void;
+  onSidebarQueryChange: (query: string) => void;
+  onClearSidebarQuery: () => void;
+  onNewTeamNameChange: (name: string) => void;
+  onCreateTeam: () => void;
+  onSelectTeam: (teamId: string) => void;
+  onNewRoomNameChange: (name: string) => void;
+  onNewRoomProjectPathChange: (path: string) => void;
+  onChooseNewRoomProjectPath: () => void;
+  onCreateRoom: () => void;
+  onSelectRoom: (roomId: string, teamId?: string) => void;
+  onSelectSidebarPanel: (panel: SidebarPanelName) => void;
+}) {
+  return (
+    <aside className="sidebar">
+      <div className="brand">
+        <div className="brand-mark">AI</div>
+        <div>
+          <strong>multAIplayer</strong>
+          <span>honest alpha</span>
+        </div>
+      </div>
+
+      {currentUser ? (
+        <div className="profile-card">
+          {currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" /> : <Github size={18} />}
+          <div>
+            <strong>{currentUser.name ?? currentUser.login}</strong>
+            <span>@{currentUser.login}</span>
+          </div>
+          <button onClick={onSignOut}>Sign out</button>
+        </div>
+      ) : (
+        <button className="github-button" onClick={onSignIn} disabled={authBusy || authConfig?.configured === false}>
+          <Github size={16} />
+          {authConfig?.configured === false ? "GitHub OAuth not configured" : authBusy ? "Waiting for GitHub" : "Sign in with GitHub"}
+        </button>
+      )}
+
+      {deviceFlow && (
+        <div className="device-flow">
+          <span>Enter this code on GitHub</span>
+          <strong>{deviceFlow.user_code}</strong>
+          <a href={deviceFlow.verification_uri} target="_blank" rel="noreferrer">
+            Open GitHub <ExternalLink size={13} />
+          </a>
+        </div>
+      )}
+      {authError && <div className="auth-error">{authError}</div>}
+
+      <label className="search-box">
+        <Search size={16} />
+        <input
+          placeholder="Search rooms, projects, chats"
+          value={sidebarQuery}
+          onChange={(event) => onSidebarQueryChange(event.target.value)}
+        />
+        {sidebarQuery && (
+          <button onClick={onClearSidebarQuery} aria-label="Clear search">
+            <X size={14} />
+          </button>
+        )}
+      </label>
+      {workspaceError && <div className="workspace-error">{workspaceError}</div>}
+
+      <section className="sidebar-section">
+        <div className="section-title">
+          <span>{searchActive ? "Matching teams" : "Teams"}</span>
+          <button onClick={onCreateTeam} aria-label="Create team" disabled={!newTeamName.trim()}><Plus size={15} /></button>
+        </div>
+        {!searchActive && (
+          <div className="sidebar-create-form">
+            <input
+              value={newTeamName}
+              onChange={(event) => onNewTeamNameChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && newTeamName.trim()) {
+                  event.preventDefault();
+                  onCreateTeam();
+                }
+              }}
+              placeholder="Team name"
+            />
+          </div>
+        )}
+        <div className="team-list">
+          {teams.map((team) => (
+            <button
+              className={`team-button ${team.active ? "active" : ""}`}
+              key={team.id}
+              onClick={() => onSelectTeam(team.id)}
+            >
+              <UsersRound size={16} />
+              <span>{team.name}</span>
+              <small>{team.meta}</small>
+            </button>
+          ))}
+          {teams.length === 0 && (
+            <div className="sidebar-empty">
+              {searchActive ? "No teams found." : "No teams yet. Create one to start."}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="sidebar-section rooms">
+        <div className="section-title">
+          <span>{searchActive ? "Matching rooms" : "Rooms"}</span>
+          <button onClick={onCreateRoom} aria-label="Create room" disabled={!selectedTeam || !newRoomName.trim() || !newRoomProjectPath.trim()}><Plus size={15} /></button>
+        </div>
+        {!searchActive && (
+          <div className="sidebar-create-form room-create-form">
+            <input
+              value={newRoomName}
+              onChange={(event) => onNewRoomNameChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && newRoomName.trim() && newRoomProjectPath.trim()) {
+                  event.preventDefault();
+                  onCreateRoom();
+                }
+              }}
+              placeholder="Room name"
+              disabled={!selectedTeam}
+            />
+            <div className="path-create-row">
+              <input
+                value={newRoomProjectPath}
+                onChange={(event) => onNewRoomProjectPathChange(event.target.value)}
+                placeholder={defaultProjectPath}
+                disabled={!selectedTeam}
+              />
+              <button onClick={onChooseNewRoomProjectPath} disabled={!selectedTeam} aria-label="Choose project folder">
+                <FolderGit2 size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+        {rooms.map((room) => (
+          <button
+            key={room.id}
+            className={`room-button ${room.active ? "active" : ""}`}
+            onClick={() => onSelectRoom(room.id, room.teamId)}
+          >
+            <div>
+              <strong>{room.name}</strong>
+              <span>{room.detail}</span>
+            </div>
+            <div className="room-indicators">
+              {room.attention > 0 && <b className="attention">{room.attention}</b>}
+              {room.unread > 0 ? <b>{room.unread}</b> : room.attention === 0 ? <Circle size={8} /> : null}
+            </div>
+          </button>
+        ))}
+        {rooms.length === 0 && (
+          <div className="sidebar-empty">
+            {searchActive
+              ? "No rooms or projects found."
+              : selectedTeam
+                ? "No rooms yet. Create one for this team."
+                : "Create a team before adding rooms."}
+          </div>
+        )}
+      </section>
+
+      {searchActive && (
+        <section className="sidebar-section">
+          <div className="section-title">
+            <span>Chat hits</span>
+          </div>
+          <div className="message-hit-list">
+            {messageHits.map((hit) => (
+              <button
+                key={hit.key}
+                onClick={() => onSelectRoom(hit.roomId, hit.teamId)}
+              >
+                <strong>{hit.author}</strong>
+                <span>{hit.preview}</span>
+              </button>
+            ))}
+            {messageHits.length === 0 && (
+              <div className="sidebar-empty">
+                {historySearchBusy ? "Searching encrypted local history..." : "No chat or local history matches."}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      <div className="sidebar-footer">
+        <button
+          className={activeSidebarPanel === "settings" ? "active" : ""}
+          onClick={() => onSelectSidebarPanel(activeSidebarPanel === "settings" ? null : "settings")}
+        >
+          <Settings size={16} /> Settings
+        </button>
+        <button
+          className={activeSidebarPanel === "profile" ? "active" : ""}
+          onClick={() => onSelectSidebarPanel(activeSidebarPanel === "profile" ? null : "profile")}
+        >
+          <UserRoundCheck size={16} /> Profile
+        </button>
+      </div>
+    </aside>
+  );
+}
