@@ -15,7 +15,6 @@ import {
   Lock,
   MessageSquare,
   ExternalLink,
-  PanelRight,
   Play,
   Plus,
   RefreshCw,
@@ -272,6 +271,8 @@ import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
 import { ApprovalItem, InfoRow, InlineSecretWarning, StatusPill } from "./components/common";
+import { InspectorTabs, type InspectorTab } from "./components/InspectorTabs";
+import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
   id: string;
@@ -371,7 +372,6 @@ interface LocalRoomHistoryPayload {
 
 type RelayStatus = "connecting" | "open" | "closed" | "error";
 type SidebarPanel = "profile" | "settings" | null;
-type InspectorTab = "work" | "browser";
 
 const fallbackUser = {
   id: "github:maddiedreese",
@@ -847,8 +847,7 @@ export function App() {
   const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
   const hostHandoffs = hostHandoffsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const terminalRequests = terminalRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const workAttentionCount = terminalRequests.filter((request) => request.status === "pending").length + (approvalVisible ? 1 : 0);
-  const browserAttentionCount = browserRequests.filter((request) => request.status === "pending").length;
+  const inspectorAttention = inspectorAttentionCounts({ approvalVisible, terminalRequests, browserRequests });
   const inviteRequests = inviteRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const codexEvents = codexEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const gitWorkflowEvents = gitWorkflowEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
@@ -6347,24 +6346,12 @@ export function App() {
       </main>
 
       <aside className="inspector">
-        <div className="inspector-tabs">
-          <button
-            className={inspectorTab === "work" ? "active" : ""}
-            onClick={() => setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: "work" }))}
-            aria-pressed={inspectorTab === "work"}
-          >
-            <PanelRight size={15} /> Work
-            {workAttentionCount > 0 && <span className="tab-badge">{workAttentionCount}</span>}
-          </button>
-          <button
-            className={inspectorTab === "browser" ? "active" : ""}
-            onClick={() => setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: "browser" }))}
-            aria-pressed={inspectorTab === "browser"}
-          >
-            <Globe2 size={15} /> Browser
-            {browserAttentionCount > 0 && <span className="tab-badge">{browserAttentionCount}</span>}
-          </button>
-        </div>
+        <InspectorTabs
+          activeTab={inspectorTab}
+          workAttentionCount={inspectorAttention.work}
+          browserAttentionCount={inspectorAttention.browser}
+          onSelectTab={(tab) => setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: tab }))}
+        />
 
         <section className="panel browser-panel" hidden={inspectorTab !== "browser"}>
           <div className="panel-title">
