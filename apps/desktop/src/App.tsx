@@ -5719,22 +5719,34 @@ export function App() {
               </div>
             </div>
           )}
-          {visibleRooms.map((room) => (
-            <button
-              key={room.id}
-              className={`room-button ${room.id === selectedRoomId ? "active" : ""}`}
-              onClick={() => {
-                setSelectedTeam(room.teamId);
-                setSelectedRoomId(room.id);
-              }}
-            >
-              <div>
-                <strong>{room.name}</strong>
-                <span>{searchActive ? teams.find((team) => team.id === room.teamId)?.name : room.projectPath.split("/").slice(-1)[0]}</span>
-              </div>
-              {room.unread > 0 ? <b>{room.unread}</b> : <Circle size={8} />}
-            </button>
-          ))}
+          {visibleRooms.map((room) => {
+            const roomAttention = inspectorAttentionCounts({
+              approvalVisible: approvalVisibleByRoom[room.id] ?? false,
+              terminalRequests: terminalRequestsByRoom[room.id] ?? [],
+              browserRequests: browserRequestsByRoom[room.id] ?? []
+            });
+            const roomAttentionTotal = roomAttention.work + roomAttention.browser;
+
+            return (
+              <button
+                key={room.id}
+                className={`room-button ${room.id === selectedRoomId ? "active" : ""}`}
+                onClick={() => {
+                  setSelectedTeam(room.teamId);
+                  setSelectedRoomId(room.id);
+                }}
+              >
+                <div>
+                  <strong>{room.name}</strong>
+                  <span>{searchActive ? teams.find((team) => team.id === room.teamId)?.name : room.projectPath.split("/").slice(-1)[0]}</span>
+                </div>
+                <div className="room-indicators">
+                  {roomAttentionTotal > 0 && <b className="attention">{roomAttentionTotal}</b>}
+                  {room.unread > 0 ? <b>{room.unread}</b> : roomAttentionTotal === 0 ? <Circle size={8} /> : null}
+                </div>
+              </button>
+            );
+          })}
           {visibleRooms.length === 0 && (
             <div className="sidebar-empty">
               {searchActive

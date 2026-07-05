@@ -414,6 +414,14 @@ button:disabled {
   font-size: 12px;
 }
 
+.room-indicators {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: 28px;
+}
+
 .room-button b {
   display: grid;
   place-items: center;
@@ -423,6 +431,10 @@ button:disabled {
   background: #1967d2;
   color: #fff;
   font-size: 11px;
+}
+
+.room-button b.attention {
+  background: #c73030;
 }
 
 .sidebar-footer {
