@@ -1,8 +1,10 @@
 import { z } from "zod";
 
 export const DeviceId = z.string().min(8);
-export const TeamId = z.string().min(3);
-export const RoomId = z.string().min(3);
+export const maxRelayIdChars = 160;
+export const relayIdPattern = /^[A-Za-z0-9_-]+$/;
+export const TeamId = z.string().min(3).max(maxRelayIdChars).regex(relayIdPattern);
+export const RoomId = z.string().min(3).max(maxRelayIdChars).regex(relayIdPattern);
 export const UserId = z.string().min(1);
 
 export const CiphertextPayload = z.object({
@@ -59,17 +61,17 @@ export const ChatPlaintextPayload = z.object({
   body: z.string(),
   time: z.string(),
   createdAt: z.string().datetime().optional(),
-	  attachments: z.array(z.object({
-	    id: z.string(),
-	    name: z.string(),
-	    type: z.string(),
-	    size: z.number().int().nonnegative(),
-	    content: z.string().max(maxEmbeddedAttachmentBytes).optional(),
-	    blobId: z.string().optional(),
-	    blobBytes: z.number().int().nonnegative().optional(),
-	    truncated: z.boolean().optional()
-	  })).max(maxMessageAttachments).optional()
-	});
+  attachments: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    type: z.string(),
+    size: z.number().int().nonnegative(),
+    content: z.string().max(maxEmbeddedAttachmentBytes).optional(),
+    blobId: z.string().optional(),
+    blobBytes: z.number().int().nonnegative().optional(),
+    truncated: z.boolean().optional()
+  })).max(maxMessageAttachments).optional()
+});
 
 export const ChatReactionPlaintextPayload = z.object({
   id: z.string(),

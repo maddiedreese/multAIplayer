@@ -5,11 +5,27 @@ import {
   InviteJoinStatusPlaintextPayload,
   HostHandoffPlaintextPayload,
   RelayEnvelope,
+  RoomId,
   RoomSettingsPlaintextPayload,
   RoomKeyRotationPlaintextPayload,
+  TeamId,
   TeamMemberRecord,
   TeamRecord
 } from "../src/index";
+
+test("team and room ids use relay-safe bounded identifiers", () => {
+  assert.equal(TeamId.parse("team-core"), "team-core");
+  assert.equal(TeamId.parse("team_core"), "team_core");
+  assert.equal(RoomId.parse("room-desktop"), "room-desktop");
+  assert.equal(RoomId.parse("room_desktop"), "room_desktop");
+
+  for (const value of ["team:core", "team/core", " team-core", "team-core ", "te", "x".repeat(161)]) {
+    assert.equal(TeamId.safeParse(value).success, false, `${value} should not be a valid team id`);
+  }
+  for (const value of ["room:desktop", "room/desktop", " room-desktop", "room-desktop ", "ro", "x".repeat(161)]) {
+    assert.equal(RoomId.safeParse(value).success, false, `${value} should not be a valid room id`);
+  }
+});
 
 test("team records can carry the current user's role", () => {
   const parsed = TeamRecord.parse({
