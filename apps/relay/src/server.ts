@@ -129,6 +129,9 @@ const maxPublicKeyJwkChars = 4096;
 const maxEnvelopeIdChars = 160;
 const maxEnvelopeNonceChars = 512;
 const maxEnvelopeCiphertextChars = Math.ceil(encryptedEnvelopeMaxBytes * 4 / 3) + 1024;
+const maxAttachmentBlobIdChars = 160;
+const maxAttachmentBlobNameChars = 512;
+const maxAttachmentBlobTypeChars = 160;
 const teams = new Map<string, TeamRecord>();
 const rooms = new Map<string, RoomRecord>();
 const invites = new Map<string, InviteRecordType>();
@@ -1860,6 +1863,22 @@ function normalizeInvite(invite: unknown): InviteRecordType | null {
   return { ...parsed.data, id };
 }
 
+function normalizeAttachmentBlob(blob: unknown): AttachmentBlobRecordType | null {
+  const parsed = AttachmentBlobRecord.safeParse(blob);
+  if (!parsed.success) return null;
+  const id = normalizeRelayId(parsed.data.id, maxAttachmentBlobIdChars);
+  const name = normalizeMetadataText(parsed.data.name, maxAttachmentBlobNameChars);
+  const type = normalizeMetadataText(parsed.data.type, maxAttachmentBlobTypeChars);
+  if (!id || !name || !type) return null;
+  if (!teams.has(parsed.data.teamId)) return null;
+  if (!rooms.has(parsed.data.roomId) || rooms.get(parsed.data.roomId)?.teamId !== parsed.data.teamId) return null;
+  if (parsed.data.size > attachmentBlobMaxBytes) return null;
+  if (parsed.data.payload.ciphertext.length > maxCiphertextCharactersForBlob(attachmentBlobMaxBytes)) return null;
+  if (Number.isNaN(Date.parse(parsed.data.createdAt))) return null;
+  if (parsed.data.expiresAt && Number.isNaN(Date.parse(parsed.data.expiresAt))) return null;
+  return { ...parsed.data, id, name, type };
+}
+
 function isExpiredInvite(invite: InviteRecordType): boolean {
   return Boolean(invite.expiresAt && Date.parse(invite.expiresAt) < Date.now());
 }
@@ -2050,8 +2069,8 @@ async function loadRelayStore() {
 	      if (team && team.members < members.size) teams.set(teamId, { ...team, members: members.size });
 	    }
 	    for (const blob of stored.attachmentBlobs ?? []) {
-	      const parsed = AttachmentBlobRecord.safeParse(blob);
-	      if (parsed.success && !isExpiredAttachmentBlob(parsed.data)) attachmentBlobs.set(parsed.data.id, parsed.data);
+	      const normalized = normalizeAttachmentBlob(blob);
+	      if (normalized && !isExpiredAttachmentBlob(normalized)) attachmentBlobs.set(normalized.id, normalized);
 	    }
 	    for (const storedSession of stored.authSessions ?? []) {
 	      const normalized = normalizeStoredAuthSession(storedSession);

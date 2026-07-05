@@ -1820,6 +1820,107 @@ test("relay enforces encrypted attachment blob size limits", async () => {
   }
 });
 
+test("relay drops invalid persisted attachment blob metadata", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "16" }, {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+    rooms: [{
+      id: "room-desktop",
+      teamId: "team-core",
+      name: "Desktop client",
+      projectPath: "/tmp/multaiplayer",
+      host: "No host",
+      hostStatus: "offline",
+      approvalPolicy: "ask_every_turn",
+      mode: { chat: true, code: true, workspace: true, browser: false },
+      codexModel: "gpt-5.4",
+      browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: true,
+      unread: 0
+    }],
+    invites: [],
+    attachmentBlobs: [
+      {
+        id: "blob_live",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "live.txt",
+        type: "text/plain",
+        size: 4,
+        payload: {
+          algorithm: "AES-GCM-256",
+          nonce: "nonce-for-test",
+          ciphertext: "ciphertext"
+        },
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: "blob:bad",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "bad-id.txt",
+        type: "text/plain",
+        size: 4,
+        payload: {
+          algorithm: "AES-GCM-256",
+          nonce: "nonce-for-test",
+          ciphertext: "ciphertext"
+        },
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: "blob_orphan",
+        teamId: "team-core",
+        roomId: "room-missing",
+        name: "orphan.txt",
+        type: "text/plain",
+        size: 4,
+        payload: {
+          algorithm: "AES-GCM-256",
+          nonce: "nonce-for-test",
+          ciphertext: "ciphertext"
+        },
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: "blob_huge",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "huge.txt",
+        type: "text/plain",
+        size: 8,
+        payload: {
+          algorithm: "AES-GCM-256",
+          nonce: "nonce-for-test",
+          ciphertext: "x".repeat(1500)
+        },
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      }
+    ],
+    encryptedBacklog: []
+  });
+  try {
+    const debug = await debugRelayState(relay.baseUrl);
+    assert.equal(debug.attachmentBlobs, 1);
+
+    const live = await fetch(`${relay.baseUrl}/attachment-blobs/blob_live?teamId=team-core&roomId=room-desktop`);
+    assert.equal(live.status, 200);
+    const bad = await fetch(`${relay.baseUrl}/attachment-blobs/blob%3Abad?teamId=team-core&roomId=room-desktop`);
+    assert.equal(bad.status, 404);
+    const orphan = await fetch(`${relay.baseUrl}/attachment-blobs/blob_orphan?teamId=team-core&roomId=room-missing`);
+    assert.equal(orphan.status, 404);
+    const huge = await fetch(`${relay.baseUrl}/attachment-blobs/blob_huge?teamId=team-core&roomId=room-desktop`);
+    assert.equal(huge.status, 404);
+  } finally {
+    await relay.close();
+  }
+});
+
 test("relay rejects expired invite metadata loaded from store", async () => {
   const relay = await startRelay({}, {
     version: 1,
