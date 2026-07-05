@@ -192,6 +192,7 @@ import { detectBrowserSecretRisks, detectSecretRisks, detectTerminalCommandRisks
 import { createGitWorkflowApprovalPlan, formatGitWorkflowApprovalPreview } from "@multaiplayer/git";
 import { normalizeGitHubBranchName } from "@multaiplayer/github";
 import { terminalRequestForApprovedRun } from "./lib/terminalApproval";
+import { canControlRoomTerminal, roomTerminalControlMessage } from "./lib/terminalAccess";
 import { readInviteUrlPayload } from "./lib/inviteUrl";
 import { displayableInviteLink } from "./lib/invitePrivacy";
 import { canCreateRoomInvite } from "./lib/invitePolicy";
@@ -4049,7 +4050,6 @@ export function App() {
   }
 
   async function restartSelectedTerminal() {
-    if (!selectedTerminal) return;
     if (!hasSelectedRoom) {
       setSelectedTerminalError("Create or join a room before restarting terminals.");
       return;
@@ -4062,15 +4062,21 @@ export function App() {
       setSelectedTerminalError(localWorkspaceMessage);
       return;
     }
+    if (!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked)) {
+      setSelectedTerminalError(roomTerminalControlMessage(selectedRoom, selectedTerminal, isSelectedRoomLocked));
+      return;
+    }
+    const terminal = selectedTerminal;
+    if (!terminal) return;
     const roomId = selectedRoom.id;
     setTerminalBusyForRoom(roomId, true);
     setTerminalErrorForRoom(roomId, null);
     try {
       const snapshot = await startTerminal(
         roomId,
-        selectedTerminal.name,
-        selectedTerminal.cwd || selectedRoom.projectPath,
-        selectedTerminal.command
+        terminal.name,
+        terminal.cwd || selectedRoom.projectPath,
+        terminal.command
       );
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setTerminals((current) => upsertTerminal(current, snapshot));
@@ -4084,7 +4090,6 @@ export function App() {
   }
 
   async function stopSelectedTerminal() {
-    if (!selectedTerminalId) return;
     if (!hasSelectedRoom) {
       setSelectedTerminalError("Create or join a room before stopping terminals.");
       return;
@@ -4097,8 +4102,14 @@ export function App() {
       setSelectedTerminalError(localWorkspaceMessage);
       return;
     }
+    if (!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked)) {
+      setSelectedTerminalError(roomTerminalControlMessage(selectedRoom, selectedTerminal, isSelectedRoomLocked));
+      return;
+    }
+    const terminal = selectedTerminal;
+    if (!terminal) return;
     const roomId = selectedRoom.id;
-    const terminalId = selectedTerminalId;
+    const terminalId = terminal.id;
     setTerminalBusyForRoom(roomId, true);
     setTerminalErrorForRoom(roomId, null);
     try {
@@ -4115,7 +4126,7 @@ export function App() {
 
   async function sendTerminalInput() {
     const input = terminalInput.trim();
-    if (!selectedTerminalId || !input) return;
+    if (!input) return;
     if (!hasSelectedRoom) {
       setSelectedTerminalError("Create or join a room before sending terminal input.");
       return;
@@ -4128,8 +4139,14 @@ export function App() {
       setSelectedTerminalError(localWorkspaceMessage);
       return;
     }
+    if (!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked)) {
+      setSelectedTerminalError(roomTerminalControlMessage(selectedRoom, selectedTerminal, isSelectedRoomLocked));
+      return;
+    }
+    const terminal = selectedTerminal;
+    if (!terminal) return;
     const roomId = selectedRoom.id;
-    const terminalId = selectedTerminalId;
+    const terminalId = terminal.id;
     setTerminalErrorForRoom(roomId, null);
     try {
       const snapshot = await writeTerminal(terminalId, input);
@@ -7090,21 +7107,21 @@ export function App() {
                   }
                 }}
                 placeholder={`Send input to ${selectedTerminal.name}`}
-                disabled={!canReadLocalWorkspace || !selectedTerminal.running || !isActiveHost}
+                disabled={!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked) || !selectedTerminal.running}
               />
-              <button onClick={sendTerminalInput} disabled={!canReadLocalWorkspace || !selectedTerminal.running || !isActiveHost || !terminalInput.trim()}>
+              <button onClick={sendTerminalInput} disabled={!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked) || !selectedTerminal.running || !terminalInput.trim()}>
                 <Send size={14} />
               </button>
               {selectedTerminalCanRestart && (
                 <button
                   onClick={restartSelectedTerminal}
-                  disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost}
+                  disabled={!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked) || terminalBusy}
                   title={`Restart ${selectedTerminal.name}`}
                 >
                   <Play size={14} />
                 </button>
               )}
-              <button onClick={stopSelectedTerminal} disabled={!canReadLocalWorkspace || !selectedTerminal.running || terminalBusy || !isActiveHost}>
+              <button onClick={stopSelectedTerminal} disabled={!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked) || !selectedTerminal.running || terminalBusy}>
                 <X size={14} />
               </button>
             </div>
