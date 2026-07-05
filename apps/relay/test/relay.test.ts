@@ -1295,6 +1295,76 @@ test("relay persists auth sessions encrypted when a session secret is configured
   }
 });
 
+test("relay drops malformed encrypted auth sessions loaded from disk", async () => {
+  const strongSecret = "test-session-secret-with-at-least-32-characters";
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_SESSION_SECRET: strongSecret
+  });
+  let restarted: RelayHarness | null = null;
+  let relayClosed = false;
+  try {
+    const validCookie = await createDebugSession(relay.baseUrl, "github:valid-session", "valid-session");
+    const stored = await waitForStoredState(relay.dataPath, (state) => Array.isArray(state.authSessions) && state.authSessions.length === 1);
+    const encryptedAccessToken = stored.authSessions?.[0]?.encryptedAccessToken;
+    assert.ok(encryptedAccessToken);
+
+    await relay.close({ preserveData: true });
+    relayClosed = true;
+    stored.authSessions = [
+      stored.authSessions![0],
+      {
+        sessionId: "bad:session",
+        user: { id: "github:bad-session", login: "bad-session" },
+        encryptedAccessToken,
+        expiresAt: Date.now() + 60_000
+      },
+      {
+        sessionId: "bad-login",
+        user: { id: "github:bad-login", login: "x".repeat(121) },
+        encryptedAccessToken,
+        expiresAt: Date.now() + 60_000
+      },
+      {
+        sessionId: "bad-name",
+        user: { id: "github:bad-name", login: "bad-name", name: "bad\nname" },
+        encryptedAccessToken,
+        expiresAt: Date.now() + 60_000
+      },
+      {
+        sessionId: "far-future",
+        user: { id: "github:far-future", login: "far-future" },
+        encryptedAccessToken,
+        expiresAt: Date.now() + 60 * 24 * 60 * 60 * 1000
+      }
+    ];
+    await writeFile(relay.dataPath, `${JSON.stringify(stored, null, 2)}\n`, "utf8");
+
+    restarted = await startRelay({
+      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+      MULTAIPLAYER_RELAY_SESSION_SECRET: strongSecret
+    }, undefined, relay.dataPath);
+
+    const valid = await fetch(`${restarted.baseUrl}/auth/me`, {
+      headers: { cookie: validCookie }
+    });
+    assert.equal(valid.status, 200);
+
+    for (const sessionId of ["bad%3Asession", "bad-login", "bad-name", "far-future"]) {
+      const response = await fetch(`${restarted.baseUrl}/auth/me`, {
+        headers: { cookie: `multaiplayer_session=${sessionId}` }
+      });
+      assert.equal(response.status, 401);
+    }
+  } finally {
+    if (restarted) {
+      await restarted.close();
+    } else if (!relayClosed) {
+      await relay.close();
+    }
+  }
+});
+
 test("relay ignores weak auth session persistence secrets", async () => {
   const relay = await startRelay({
     MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",

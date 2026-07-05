@@ -126,6 +126,8 @@ const maxDeviceIdChars = 160;
 const maxHostNameChars = 120;
 const maxPublicKeyFingerprintChars = 128;
 const maxPublicKeyJwkChars = 4096;
+const maxAuthSessionIdChars = 160;
+const maxAccessTokenChars = 8192;
 const maxEnvelopeIdChars = 160;
 const maxEnvelopeNonceChars = 512;
 const maxEnvelopeCiphertextChars = Math.ceil(encryptedEnvelopeMaxBytes * 4 / 3) + 1024;
@@ -204,6 +206,11 @@ interface StoredRelayState {
 	    key: RoomKey;
 	    envelopes: RelayEnvelope[];
   }>;
+}
+
+interface NormalizedStoredAuthSession {
+  sessionId: string;
+  session: AuthSession;
 }
 
 interface PresenceRecord {
@@ -1934,30 +1941,42 @@ function storedAuthSessions(): StoredAuthSession[] {
   return sessions;
 }
 
-function normalizeStoredAuthSession(stored: unknown): AuthSession | null {
+function normalizeStoredAuthSession(stored: unknown): NormalizedStoredAuthSession | null {
   if (!isRecord(stored)) return null;
+  const sessionId = normalizeRelayId(stored.sessionId, maxAuthSessionIdChars);
+  const user = isRecord(stored.user) ? stored.user : null;
+  const userId = normalizeMetadataText(user?.id, maxUserIdChars);
+  const login = normalizeMetadataText(user?.login, maxDisplayNameChars);
+  const name = user?.name === undefined ? undefined : normalizeMetadataText(user.name, maxDisplayNameChars);
+  const avatarUrl = user?.avatarUrl === undefined ? undefined : normalizeMetadataText(user.avatarUrl, maxRoomProjectPathChars);
   if (
-    typeof stored.sessionId !== "string" ||
+    !sessionId ||
     typeof stored.expiresAt !== "number" ||
+    !Number.isSafeInteger(stored.expiresAt) ||
     stored.expiresAt <= Date.now() ||
-    !isRecord(stored.user) ||
-    typeof stored.user.id !== "string" ||
-    typeof stored.user.login !== "string"
+    stored.expiresAt > Date.now() + authSessionMaxAgeMs ||
+    !userId ||
+    !login ||
+    (user?.name !== undefined && !name) ||
+    (user?.avatarUrl !== undefined && !avatarUrl)
   ) {
     return null;
   }
 
   const accessToken = decryptStoredAccessToken(stored);
-  if (!accessToken) return null;
+  if (!accessToken || accessToken.length > maxAccessTokenChars) return null;
   return {
-    accessToken,
-    user: {
-      id: stored.user.id,
-      login: stored.user.login,
-      name: typeof stored.user.name === "string" ? stored.user.name : undefined,
-      avatarUrl: typeof stored.user.avatarUrl === "string" ? stored.user.avatarUrl : undefined
-    },
-    expiresAt: stored.expiresAt
+    sessionId,
+    session: {
+      accessToken,
+      user: {
+        id: userId,
+        login,
+        name: name ?? undefined,
+        avatarUrl: avatarUrl ?? undefined
+      },
+      expiresAt: stored.expiresAt
+    }
   };
 }
 
@@ -2074,7 +2093,7 @@ async function loadRelayStore() {
 	    }
 	    for (const storedSession of stored.authSessions ?? []) {
 	      const normalized = normalizeStoredAuthSession(storedSession);
-	      if (normalized) authSessions.set(storedSession.sessionId, normalized);
+	      if (normalized) authSessions.set(normalized.sessionId, normalized.session);
 	    }
 	    for (const item of stored.encryptedBacklog ?? []) {
       const pruned = pruneEncryptedBacklog(item.envelopes);
