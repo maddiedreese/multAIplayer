@@ -278,6 +278,7 @@ import { RoomHeader } from "./components/RoomHeader";
 import { CodexApprovalCard } from "./components/CodexApprovalCard";
 import { ModelPanel } from "./components/ModelPanel";
 import { RoomModePanel } from "./components/RoomModePanel";
+import { ApprovalPolicyPanel } from "./components/ApprovalPolicyPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -6714,25 +6715,13 @@ export function App() {
           {inviteMessage && <div className="workflow-message">{inviteMessage}</div>}
         </section>
 
-        <section className="panel policy-panel">
-          <div className="panel-title">
-            <span>Approval policy</span>
-            <StatusPill icon={<KeyRound size={13} />} label="host-side" tone="yellow" />
-          </div>
-          <div className="policy-options">
-            {(Object.keys(approvalPolicyLabels) as ApprovalPolicy[]).map((policy) => (
-              <button
-                key={policy}
-                className={selectedRoom.approvalPolicy === policy ? "active" : ""}
-                onClick={() => setApprovalPolicy(policy)}
-                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-              >
-                {approvalPolicyLabels[policy]}
-              </button>
-            ))}
-          </div>
-          {settingsMessage && <div className="workflow-message">{settingsMessage}</div>}
-        </section>
+        <ApprovalPolicyPanel
+          selectedPolicy={selectedRoom.approvalPolicy}
+          labels={approvalPolicyLabels}
+          disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
+          message={settingsMessage}
+          onSelectPolicy={setApprovalPolicy}
+        />
 
         <RoomModePanel
           mode={selectedRoom.mode}
