@@ -769,7 +769,7 @@ export function App() {
   const roomMembers = Object.values(presenceByRoom[selectedRoom?.id ?? selectedRoomId] ?? {})
     .filter((member) => member.status === "online")
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
-  const selectedTerminal = terminals.find((terminal) => terminal.id === selectedTerminalId) ?? null;
+  const selectedTerminal = roomTerminals.find((terminal) => terminal.id === selectedTerminalId) ?? null;
   const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
   const hostHandoffs = hostHandoffsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const terminalRequests = terminalRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
@@ -7005,9 +7005,9 @@ export function App() {
               <div className="empty-state compact">No command requests in this room.</div>
             )}
           </div>
-          {terminals.length > 0 && (
+          {roomTerminals.length > 0 && (
             <div className="terminal-tabs">
-              {terminals.map((terminal) => (
+              {roomTerminals.map((terminal) => (
                 <button
                   key={terminal.id}
                   className={terminal.id === selectedTerminalId ? "active" : ""}
