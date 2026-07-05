@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   canActOnRoomTerminalRequest,
   findRoomTerminalRequest,
+  isRoomTerminalActionInFlight,
+  roomTerminalActionInFlightMessage,
   roomTerminalRequestMessage,
   terminalRequestForApprovedRun
 } from "../src/lib/terminalApproval";
@@ -52,4 +54,11 @@ test("terminal request actions require a pending request from the current room l
     roomTerminalRequestMessage(requests, "missing"),
     "Terminal request is no longer available in this room."
   );
+});
+
+test("terminal action in-flight guard is scoped to one room", () => {
+  assert.equal(isRoomTerminalActionInFlight({ "room-a": true }, "room-a"), true);
+  assert.equal(isRoomTerminalActionInFlight({ "room-a": true }, "room-b"), false);
+  assert.equal(isRoomTerminalActionInFlight({ "room-a": false }, "room-a"), false);
+  assert.equal(roomTerminalActionInFlightMessage(), "A terminal action is already running in this room.");
 });

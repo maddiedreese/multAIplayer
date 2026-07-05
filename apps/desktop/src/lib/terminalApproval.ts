@@ -8,6 +8,17 @@ export interface TerminalApprovalRequest {
   status: "pending" | "approved" | "denied";
 }
 
+export function isRoomTerminalActionInFlight(
+  busyByRoom: Record<string, boolean>,
+  roomId: string
+): boolean {
+  return busyByRoom[roomId] === true;
+}
+
+export function roomTerminalActionInFlightMessage(): string {
+  return "A terminal action is already running in this room.";
+}
+
 export function terminalRequestForApprovedRun<T extends TerminalApprovalRequest>(
   request: T,
   roomProjectPath: string

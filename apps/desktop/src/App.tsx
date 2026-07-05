@@ -212,6 +212,8 @@ import {
 import {
   canActOnRoomTerminalRequest,
   findRoomTerminalRequest,
+  isRoomTerminalActionInFlight,
+  roomTerminalActionInFlightMessage,
   roomTerminalRequestMessage,
   terminalRequestForApprovedRun
 } from "./lib/terminalApproval";
@@ -681,6 +683,7 @@ export function App() {
   const keyRotationBusyRef = useRef(keyRotationBusyByRoom);
   const gitWorkflowBusyRef = useRef(gitWorkflowBusyByRoom);
   const actionsBusyRef = useRef(actionsBusyByRoom);
+  const terminalBusyRef = useRef(terminalBusyByRoom);
   const browserRequestsRef = useRef(browserRequestsByRoom);
   const deviceId = useMemo(() => loadOrCreateDeviceId(), []);
   const localUser = useMemo(
@@ -1203,6 +1206,10 @@ export function App() {
   useEffect(() => {
     actionsBusyRef.current = actionsBusyByRoom;
   }, [actionsBusyByRoom]);
+
+  useEffect(() => {
+    terminalBusyRef.current = terminalBusyByRoom;
+  }, [terminalBusyByRoom]);
 
   useEffect(() => {
     browserRequestsRef.current = browserRequestsByRoom;
@@ -2033,10 +2040,19 @@ export function App() {
   }
 
   function setTerminalBusyForRoom(roomId: string, busy: boolean) {
+    terminalBusyRef.current = busy
+      ? { ...terminalBusyRef.current, [roomId]: true }
+      : omitRecordKey(terminalBusyRef.current, roomId);
     setTerminalBusyByRoom((current) => {
       if (busy) return { ...current, [roomId]: true };
       return omitRecordKey(current, roomId);
     });
+  }
+
+  function reportRoomTerminalActionInFlight(roomId: string): boolean {
+    if (!isRoomTerminalActionInFlight(terminalBusyRef.current, roomId)) return false;
+    setTerminalErrorForRoom(roomId, roomTerminalActionInFlightMessage());
+    return true;
   }
 
   async function sendMessage() {
@@ -4122,6 +4138,7 @@ export function App() {
     const room = selectedRoom;
     const roomId = room.id;
     const projectPath = room.projectPath;
+    if (reportRoomTerminalActionInFlight(roomId)) return;
     setTerminalBusyForRoom(roomId, true);
     const command = "git status --short";
     appendTerminalLinesForRoom(roomId, [`$ ${command}`]);
@@ -4157,6 +4174,7 @@ export function App() {
     const roomId = room.id;
     const name = terminalName.trim();
     const command = terminalCommand.trim();
+    if (reportRoomTerminalActionInFlight(roomId)) return;
     setTerminalBusyForRoom(roomId, true);
     setTerminalErrorForRoom(roomId, null);
     try {
@@ -4197,6 +4215,7 @@ export function App() {
     const terminal = selectedTerminal;
     if (!terminal) return;
     const roomId = selectedRoom.id;
+    if (reportRoomTerminalActionInFlight(roomId)) return;
     setTerminalBusyForRoom(roomId, true);
     setTerminalErrorForRoom(roomId, null);
     try {
@@ -4238,6 +4257,7 @@ export function App() {
     if (!terminal) return;
     const roomId = selectedRoom.id;
     const terminalId = terminal.id;
+    if (reportRoomTerminalActionInFlight(roomId)) return;
     setTerminalBusyForRoom(roomId, true);
     setTerminalErrorForRoom(roomId, null);
     try {
@@ -4275,6 +4295,7 @@ export function App() {
     if (!terminal) return;
     const roomId = selectedRoom.id;
     const terminalId = terminal.id;
+    if (reportRoomTerminalActionInFlight(roomId)) return;
     setTerminalErrorForRoom(roomId, null);
     try {
       const snapshot = await writeTerminal(terminalId, input);
@@ -4362,6 +4383,7 @@ export function App() {
     }
     const room = selectedRoom;
     const roomId = room.id;
+    if (reportRoomTerminalActionInFlight(roomId)) return;
     const roomRequest = findRoomTerminalRequest(terminalRequests, request.id);
     if (!roomRequest || !canActOnRoomTerminalRequest(terminalRequests, request.id)) {
       setTerminalErrorForRoom(roomId, roomTerminalRequestMessage(terminalRequests, request.id));
