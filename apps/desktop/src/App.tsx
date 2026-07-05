@@ -203,6 +203,7 @@ import { defaultGitWorkflowDraft, parseGitHubRemoteUrl, resolveGitWorkflowDraft,
 import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "./lib/sidebarSearch";
+import { replaceRoomTerminalSnapshots } from "./lib/terminalState";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -1293,7 +1294,7 @@ export function App() {
         }));
       }
       if (payload.terminalSnapshots.length) {
-        setTerminals(payload.terminalSnapshots);
+        setTerminals((current) => replaceRoomTerminalSnapshots(current, selectedRoomId, payload.terminalSnapshots));
         setSelectedTerminalIdsByRoom((current) => {
           const currentTerminalId = current[selectedRoomId] ?? null;
           const nextTerminalId = currentTerminalId && payload.terminalSnapshots.some((terminal) => terminal.id === currentTerminalId)
@@ -1806,7 +1807,7 @@ export function App() {
     }
     const roomId = selectedRoom.id;
     if (!canReadLocalWorkspace) {
-      setTerminals([]);
+      setTerminals((current) => replaceRoomTerminalSnapshots(current, roomId, []));
       setSelectedTerminalIdForRoom(roomId, null);
       return;
     }
@@ -1820,7 +1821,7 @@ export function App() {
             current.filter((terminal) => terminal.roomId === roomId),
             snapshots
           );
-          return mergedSnapshots;
+          return replaceRoomTerminalSnapshots(current, roomId, mergedSnapshots);
         });
         setSelectedTerminalIdsByRoom((current) => {
           const currentTerminalId = current[roomId] ?? null;
@@ -3002,7 +3003,7 @@ export function App() {
       setCodexEventsByRoom((current) => ({ ...current, [roomId]: payload.codexEvents }));
       setGitWorkflowEventsByRoom((current) => ({ ...current, [roomId]: payload.gitWorkflowEvents }));
       setGitHubActionsEventsByRoom((current) => ({ ...current, [roomId]: payload.githubActionsEvents }));
-      setTerminals(payload.terminalSnapshots);
+      setTerminals((current) => replaceRoomTerminalSnapshots(current, roomId, payload.terminalSnapshots));
       setHostHandoffsByRoom((current) => ({ ...current, [roomId]: payload.hostHandoffs }));
     }
     setHistoryMessageForRoom(
