@@ -282,6 +282,7 @@ import { LocalHistoryPanel } from "./components/LocalHistoryPanel";
 import { BrowserAccessPanel } from "./components/BrowserAccessPanel";
 import { WorkspaceFilesPanel } from "./components/WorkspaceFilesPanel";
 import { GitHubActionsPanel } from "./components/GitHubActionsPanel";
+import { GitHandoffPanel } from "./components/GitHandoffPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -6636,79 +6637,18 @@ export function App() {
           onFilePreviewTabChange={(tab) => setFilePreviewTabForRoom(selectedRoom.id, tab)}
         />
 
-        <section className="panel git-approval-panel">
-          <div className="panel-title">
-            <span>GitHub handoff</span>
-            <StatusPill icon={<ShieldAlert size={13} />} label="approval required" tone="yellow" />
-          </div>
-          <label>
-            <span>Branch</span>
-            <input value={gitWorkflowDraft.branchName} onChange={(event) => updateSelectedGitWorkflowDraft({ branchName: event.target.value })} />
-          </label>
-          <label>
-            <span>Commit message</span>
-            <input value={gitWorkflowDraft.commitMessage} onChange={(event) => updateSelectedGitWorkflowDraft({ commitMessage: event.target.value })} />
-          </label>
-          <div className="repo-grid">
-            <label>
-              <span>Owner</span>
-              <input value={gitWorkflowDraft.prOwner} onChange={(event) => updateSelectedGitWorkflowDraft({ prOwner: event.target.value })} />
-            </label>
-            <label>
-              <span>Repo</span>
-              <input value={gitWorkflowDraft.prRepo} onChange={(event) => updateSelectedGitWorkflowDraft({ prRepo: event.target.value })} />
-            </label>
-            <label>
-              <span>Base</span>
-              <input value={gitWorkflowDraft.prBase} onChange={(event) => updateSelectedGitWorkflowDraft({ prBase: event.target.value })} />
-            </label>
-          </div>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={gitWorkflowDraft.pushEnabled}
-              onChange={(event) => updateSelectedGitWorkflowDraft({ pushEnabled: event.target.checked })}
-            />
-            <span>Push branch and open draft PR</span>
-          </label>
-          <div className="git-approval-preview">
-            <strong>Host will approve</strong>
-            {gitApprovalPreview.error ? (
-              <div className="workflow-message danger">{gitApprovalPreview.error}</div>
-            ) : (
-              gitApprovalPreview.steps.map((step) => (
-                <div className="git-approval-step" key={step.title}>
-                  <span>{step.title}</span>
-                  <small>{step.detail}</small>
-                  {step.commands.map((command) => (
-                    <code key={command}>{command}</code>
-                  ))}
-                </div>
-              ))
-            )}
-            {gitWorkflowDraft.pushEnabled && !gitApprovalPreview.error && (
-              <small>Draft PR target: {githubWorkflowReadiness.target ?? `${gitWorkflowDraft.prOwner}/${gitWorkflowDraft.prRepo} to ${githubWorkflowReadiness.normalizedBase || "main"}`}</small>
-            )}
-          </div>
-          {gitWorkflowDraft.pushEnabled && (
-            <div className={`workflow-message ${githubWorkflowReadiness.ready ? "" : "danger"}`}>
-              {githubWorkflowReadiness.messages.join(" ")}
-            </div>
-          )}
-          <button className="ghost-wide" onClick={copyPullRequestDraftMarkdown} disabled={!canReadLocalWorkspace}>
-            <Copy size={15} />
-            Copy PR draft
-          </button>
-          <button
-            className="primary-wide"
-            onClick={approveGitWorkflow}
-            disabled={!canReadLocalWorkspace || gitWorkflowBusy || !isActiveHost || Boolean(gitApprovalPreview.error) || (gitWorkflowDraft.pushEnabled && !githubWorkflowReadiness.ready)}
-          >
-            <Github size={15} />
-            {gitWorkflowBusy ? "Running approved git workflow" : "Approve git workflow"}
-          </button>
-          {gitWorkflowMessage && <div className="workflow-message">{gitWorkflowMessage}</div>}
-        </section>
+        <GitHandoffPanel
+          draft={gitWorkflowDraft}
+          preview={gitApprovalPreview}
+          readiness={githubWorkflowReadiness}
+          canReadLocalWorkspace={canReadLocalWorkspace}
+          gitWorkflowBusy={gitWorkflowBusy}
+          isActiveHost={isActiveHost}
+          message={gitWorkflowMessage}
+          onDraftChange={updateSelectedGitWorkflowDraft}
+          onCopyPullRequestDraftMarkdown={copyPullRequestDraftMarkdown}
+          onApproveGitWorkflow={approveGitWorkflow}
+        />
 
         <GitHubActionsPanel
           summary={actionsSummary}
