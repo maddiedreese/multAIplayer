@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { canUseRoomChat, roomChatGateMessage } from "../src/lib/chatPolicy";
+import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "../src/lib/chatPolicy";
 
 const room: RoomRecord = {
   id: "room-chat",
@@ -23,6 +23,12 @@ test("room chat requires chat mode and an unlocked room", () => {
   assert.equal(canUseRoomChat(room), true);
   assert.equal(canUseRoomChat({ ...room, mode: { ...room.mode, chat: false } }), false);
   assert.equal(canUseRoomChat(room, true), false);
+});
+
+test("room chat attachments require chat mode and an unlocked room", () => {
+  assert.equal(canStageRoomChatAttachment(room), true);
+  assert.equal(canStageRoomChatAttachment({ ...room, mode: { ...room.mode, chat: false } }), false);
+  assert.equal(canStageRoomChatAttachment(room, true), false);
 });
 
 test("room chat gate messages explain why chat is unavailable", () => {

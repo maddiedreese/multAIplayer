@@ -202,7 +202,7 @@ import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
 import { canRequestWorkspaceAction, canUseLocalWorkspace, localWorkspaceGateMessage } from "./lib/workspaceAccess";
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
-import { canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
+import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
 import { copyTextToClipboard } from "./lib/clipboard";
 import { checkGitHubActionsReadiness, checkGitHubWorkflowReadiness } from "./lib/githubWorkflowReadiness";
 import { defaultGitWorkflowDraft, parseGitHubRemoteUrl, resolveGitWorkflowDraft, updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "./lib/gitWorkflowDraft";
@@ -4849,6 +4849,10 @@ export function App() {
       setSelectedFileMessage(localWorkspaceMessage);
       return;
     }
+    if (!canStageRoomChatAttachment(selectedRoom, isSelectedRoomLocked)) {
+      setSelectedFileMessage(roomChatGateMessage(selectedRoom, isSelectedRoomLocked));
+      return;
+    }
     if (!selectedFile) {
       setSelectedFileMessage("Select a project file before attaching it to the room.");
       return;
@@ -6797,7 +6801,7 @@ export function App() {
                 <button
                   className={selectedFileNeedsAttachmentReview && selectedSensitiveFileReviewed ? "ghost danger" : "ghost"}
                   onClick={attachSelectedFileToMessage}
-                  disabled={!canReadLocalWorkspace}
+                  disabled={!canReadLocalWorkspace || !canStageRoomChatAttachment(selectedRoom, isSelectedRoomLocked)}
                 >
                   {selectedFileNeedsAttachmentReview && !selectedSensitiveFileReviewed ? <ShieldAlert size={14} /> : <Plus size={14} />}
                   {selectedAttachmentReview?.actionLabel ?? "Attach"}
