@@ -23,6 +23,8 @@ Message reactions are routed as encrypted `chat.reaction` envelopes. The relay s
 
 Host handoff packages are routed as encrypted `room.host` envelopes. The relay sees the envelope metadata but not the handoff summary contents.
 
+Room setting activity that should be visible in the transcript is routed as encrypted `room.settings` envelopes. The alpha uses this for Codex model changes, so the relay can store the selected model as room metadata but cannot read the human-readable before/after activity message.
+
 Browser access requests are routed as encrypted `browser.request` envelopes. The relay sees the envelope kind, room id, sender id, and timestamp, but not the URL, reason, requester display name, or host decision state.
 
 Gated invite requests are routed as encrypted `room.invite` envelopes. The relay sees that an invite workflow event happened in a room, but not the requester name, device id, note, host decision, requester device public key, or wrapped room-key payload.
@@ -52,6 +54,8 @@ For gated invites, the desktop creates a no-secret `#multaiplayerJoin=...` fragm
 Room key rotations use encrypted `room.key` envelopes. The payload is encrypted with the current room key and contains a new AES-GCM room key plus rotation metadata. Clients that can decrypt the event replace their local room key and use the new key for future room messages and invite links.
 
 Host handoff packages are encrypted `room.host` envelopes. An available handoff summarizes the outgoing host's project path, selected model, approval policy, recent-message count, attachment names, and terminal names. When another member accepts the handoff and claims host, the desktop sends a second encrypted `room.host` envelope with `status: "accepted"` so peers stop showing the stale handoff as available.
+
+Codex model changes are encrypted `room.settings` envelopes with `eventType: "room.settings"` and `setting: "codexModel"`. Clients render them as system transcript messages after decrypting locally, which gives the room an audit trail without exposing the before/after transcript text to the relay.
 
 The relay accepts device-sealed envelope payloads only for `room.invite`. All other room events must use normal room-key AES-GCM payloads, which keeps the envelope formats predictable and prevents device-sealed chat, terminal, Git, or Codex events from being routed as if peers could read them.
 

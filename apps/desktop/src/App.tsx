@@ -44,6 +44,7 @@ import type {
   InviteJoinStatusPlaintextPayload,
   RelayEnvelope,
   RequestStatusPlaintextPayload,
+  RoomSettingsPlaintextPayload,
   RoomKeyRotationPlaintextPayload,
   RoomRecord,
   RoomMode,
@@ -1404,6 +1405,12 @@ export function App() {
               appendHostHandoff(message.envelope.roomId, { ...plaintext, status: "available" });
             }
           }
+          if (message.envelope.kind === "room.settings") {
+            const plaintext = await decryptJson<unknown>(roomPayload, secret);
+            if (isRoomSettingsPlaintextPayload(plaintext)) {
+              appendRoomMessage(message.envelope.roomId, buildRoomSettingsSystemMessage(plaintext));
+            }
+          }
           if (message.envelope.kind === "room.key") {
             const plaintext = await decryptJson<unknown>(roomPayload, secret);
             if (isRoomKeyRotationPlaintextPayload(plaintext)) {
@@ -2490,8 +2497,16 @@ export function App() {
     setSettingsBusyForRoom(roomId, true);
     setSettingsMessageForRoom(roomId, null);
     try {
+      const previousModel = selectedCodexModel;
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), codexModel: nextModel });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      await publishRoomSettingsEvent(room, {
+        id: crypto.randomUUID(),
+        setting: "codexModel",
+        previousValue: previousModel,
+        nextValue: nextModel,
+        changedAt: new Date().toISOString()
+      });
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setSettingsMessageForRoom(roomId, `Codex model set to ${formatCodexModel(nextModel)}.`);
       }
@@ -4135,6 +4150,35 @@ export function App() {
       senderUserId: localUser.id,
       createdAt: payload.createdAt,
       kind: "codex.event",
+      payload: await encryptJson(payload, secret)
+    };
+    seenEnvelopeIds.current.add(envelope.id);
+    client.publish({ type: "publish", envelope });
+  }
+
+  async function publishRoomSettingsEvent(
+    room: RoomRecord,
+    event: Omit<RoomSettingsPlaintextPayload, "eventType" | "changedBy" | "changedByUserId">
+  ) {
+    const payload: RoomSettingsPlaintextPayload = {
+      eventType: "room.settings",
+      changedBy: localUser.name,
+      changedByUserId: localUser.id,
+      ...event
+    };
+    appendRoomMessage(room.id, buildRoomSettingsSystemMessage(payload));
+
+    const client = relayRef.current;
+    if (!client || relayStatus === "closed" || relayStatus === "error") return;
+    const secret = await loadOrCreateRoomSecret(room.id);
+    const envelope: RelayEnvelope = {
+      id: crypto.randomUUID(),
+      teamId: room.teamId,
+      roomId: room.id,
+      senderDeviceId: deviceId,
+      senderUserId: localUser.id,
+      createdAt: payload.changedAt,
+      kind: "room.settings",
       payload: await encryptJson(payload, secret)
     };
     seenEnvelopeIds.current.add(envelope.id);
@@ -6932,6 +6976,20 @@ function isGitHubActionsEventPlaintextPayload(value: unknown): value is GitHubAc
   );
 }
 
+function isRoomSettingsPlaintextPayload(value: unknown): value is RoomSettingsPlaintextPayload {
+  if (!isRecord(value)) return false;
+  return (
+    value.eventType === "room.settings" &&
+    typeof value.id === "string" &&
+    value.setting === "codexModel" &&
+    typeof value.previousValue === "string" &&
+    typeof value.nextValue === "string" &&
+    typeof value.changedBy === "string" &&
+    typeof value.changedByUserId === "string" &&
+    typeof value.changedAt === "string"
+  );
+}
+
 function isGitWorkflowResult(value: unknown): value is GitWorkflowResult {
   if (!isRecord(value)) return false;
   return (
@@ -6998,6 +7056,17 @@ function isHostHandoffRecord(value: unknown): value is HostHandoffRecord {
 
 function isWorkflowStatus(value: unknown): value is "pending" | "approved" | "denied" {
   return value === "pending" || value === "approved" || value === "denied";
+}
+
+function buildRoomSettingsSystemMessage(event: RoomSettingsPlaintextPayload): ChatMessage {
+  return {
+    id: event.id,
+    author: "multAIplayer",
+    role: "system",
+    body: `${event.changedBy} changed the Codex model from ${formatCodexModel(event.previousValue)} to ${formatCodexModel(event.nextValue)}.`,
+    time: formatMessageTime(event.changedAt),
+    createdAt: event.changedAt
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

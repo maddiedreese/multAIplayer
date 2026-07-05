@@ -46,6 +46,7 @@ export const RelayEnvelope = z.object({
     "room.presence",
     "room.invite",
     "room.host",
+    "room.settings",
     "room.key"
   ]),
   payload: EncryptedPayload
@@ -252,6 +253,17 @@ export const HostHandoffPlaintextPayload = z.object({
   acceptedAt: z.string().optional()
 });
 
+export const RoomSettingsPlaintextPayload = z.object({
+  eventType: z.literal("room.settings"),
+  id: z.string(),
+  setting: z.literal("codexModel"),
+  previousValue: z.string(),
+  nextValue: z.string(),
+  changedBy: z.string(),
+  changedByUserId: z.string(),
+  changedAt: z.string().datetime()
+});
+
 export const PresenceMessage = z.object({
   type: z.literal("presence"),
   teamId: TeamId,
@@ -438,6 +450,7 @@ export type TerminalResultPlaintextPayload = z.infer<typeof TerminalResultPlaint
 export type GitWorkflowEventPlaintextPayload = z.infer<typeof GitWorkflowEventPlaintextPayload>;
 export type GitHubActionsEventPlaintextPayload = z.infer<typeof GitHubActionsEventPlaintextPayload>;
 export type HostHandoffPlaintextPayload = z.infer<typeof HostHandoffPlaintextPayload>;
+export type RoomSettingsPlaintextPayload = z.infer<typeof RoomSettingsPlaintextPayload>;
 export type RelayClientMessage = z.infer<typeof RelayClientMessage>;
 export type RelayServerMessage = z.infer<typeof RelayServerMessage>;
 export type DeviceSealedPayload = z.infer<typeof DeviceSealedPayload>;

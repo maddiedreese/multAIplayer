@@ -5,6 +5,7 @@ import {
   InviteJoinStatusPlaintextPayload,
   HostHandoffPlaintextPayload,
   RelayEnvelope,
+  RoomSettingsPlaintextPayload,
   RoomKeyRotationPlaintextPayload,
   TeamMemberRecord,
   TeamRecord
@@ -52,6 +53,22 @@ test("host handoff payloads can report room-visible acceptance", () => {
 
   assert.equal(parsed.status, "accepted");
   assert.equal(parsed.acceptedBy, "Alex");
+});
+
+test("room settings payloads can report model changes", () => {
+  const parsed = RoomSettingsPlaintextPayload.parse({
+    eventType: "room.settings",
+    id: "settings-1",
+    setting: "codexModel",
+    previousValue: "gpt-5.4",
+    nextValue: "gpt-5.4-thinking",
+    changedBy: "Maddie",
+    changedByUserId: "github:maddie",
+    changedAt: "2026-07-04T12:00:00.000Z"
+  });
+
+  assert.equal(parsed.setting, "codexModel");
+  assert.equal(parsed.nextValue, "gpt-5.4-thinking");
 });
 
 test("invite join request accepts optional requester device public key", () => {
