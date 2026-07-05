@@ -7,7 +7,7 @@ People chat normally, like iMessage or Slack. When the group needs help, someone
 Short version: group chat for coding with Codex. Private by default. Open source.
 
 See [docs/product-architecture.md](docs/product-architecture.md) for the initial product and architecture spec.
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidance and [SECURITY.md](SECURITY.md) for the alpha security policy.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidance, [SECURITY.md](SECURITY.md) for the alpha security policy, and [docs/release-hardening.md](docs/release-hardening.md) for release checks.
 
 ## Download
 
