@@ -40,7 +40,7 @@ export function RoomSettingsOverview({
       <InfoRow label="Project" value={project} />
       <InfoRow label="Model" value={model} />
       <InfoRow label="Approval" value={approval} />
-      <InfoRow label="Room keys" value={roomKeys} />
+      <InfoRow label="Room access" value={roomKeys} />
       <InfoRow label="Host access" value={posture.hostAccess} />
       <InfoRow label="Workspace" value={posture.workspaceAccess} />
       <InfoRow label="History" value={posture.history} />

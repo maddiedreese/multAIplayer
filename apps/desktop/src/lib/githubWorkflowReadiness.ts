@@ -65,7 +65,7 @@ export function checkGitHubWorkflowReadiness(input: GitHubWorkflowReadinessInput
   }
 
   if (input.authConfig?.configured === false) {
-    messages.push("GitHub OAuth is not configured on this relay.");
+    messages.push("GitHub sign-in is not configured on this relay.");
   }
   if (!input.currentUser) {
     messages.push("Sign in with GitHub before approving a push and draft PR.");
@@ -73,7 +73,7 @@ export function checkGitHubWorkflowReadiness(input: GitHubWorkflowReadinessInput
   if (input.authConfig?.scopes.length) {
     const scopes = new Set(input.authConfig.scopes);
     if (!scopes.has("public_repo") && !scopes.has("repo")) {
-      messages.push("GitHub OAuth scopes need public_repo for public repos or repo for private repos.");
+      messages.push("GitHub permissions need public_repo for public repos or repo for private repos.");
     }
   }
 
@@ -104,7 +104,7 @@ export function checkGitHubActionsReadiness(input: GitHubActionsReadinessInput):
   let normalizedTarget: GitHubActionsTarget | null = null;
 
   if (input.authConfig?.configured === false) {
-    messages.push("GitHub OAuth is not configured on this relay.");
+    messages.push("GitHub sign-in is not configured on this relay.");
   }
   if (!input.currentUser) {
     messages.push("Sign in with GitHub before checking Actions.");

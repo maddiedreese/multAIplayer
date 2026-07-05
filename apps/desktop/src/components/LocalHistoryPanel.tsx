@@ -1,6 +1,5 @@
-import { Check, KeyRound, Lock, X } from "lucide-react";
+import { Check, KeyRound, X } from "lucide-react";
 import type { ApprovalPolicy } from "@multaiplayer/protocol";
-import { StatusPill } from "./common";
 
 export interface HistorySettingsDisplay {
   enabled: boolean;
@@ -73,11 +72,9 @@ export function LocalHistoryPanel({
     <section className="panel history-panel">
       <div className="panel-title">
         <span>Local history</span>
-        <StatusPill
-          icon={<Lock size={13} />}
-          label={historySettings.enabled ? `${historySettings.retentionDays} days` : "off"}
-          tone={historySettings.enabled ? "green" : "muted"}
-        />
+        <small className={historySettings.enabled ? "panel-state available" : "panel-state"}>
+          {historySettings.enabled ? `${historySettings.retentionDays} days` : "Off"}
+        </small>
       </div>
       <label className="checkbox-row">
         <input
@@ -86,7 +83,7 @@ export function LocalHistoryPanel({
           disabled={!hasSelectedRoom}
           onChange={(event) => onHistoryEnabledChange(event.target.checked)}
         />
-        <span>Save encrypted local room history</span>
+        <span>Save local room history</span>
       </label>
       <label className="history-retention">
         <span>Retention days</span>
@@ -124,7 +121,7 @@ export function LocalHistoryPanel({
           disabled={!selectedTeam}
           onChange={(event) => onTeamHistoryEnabledChange(event.target.checked)}
         />
-        <span>Save encrypted history in new rooms for this team</span>
+        <span>Save history in new rooms for this team</span>
       </label>
       <label className="history-retention">
         <span>Team retention days</span>

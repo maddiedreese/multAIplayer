@@ -116,10 +116,20 @@ export function TerminalPanel({
           onChange={(event) => onTerminalCommandChange(event.target.value)}
           placeholder="command"
         />
-        <button onClick={onStartTerminal} disabled={!canReadLocalWorkspace || terminalBusy || !canApproveTerminal || !terminalName.trim() || !terminalCommand.trim()}>
+        <button
+          onClick={onStartTerminal}
+          disabled={!canReadLocalWorkspace || terminalBusy || !canApproveTerminal || !terminalName.trim() || !terminalCommand.trim()}
+          title="Start terminal"
+          aria-label="Start terminal"
+        >
           <Play size={14} />
         </button>
-        <button onClick={onRequestTerminalCommand} disabled={!canRequestWorkspace || !terminalCommand.trim()}>
+        <button
+          onClick={onRequestTerminalCommand}
+          disabled={!canRequestWorkspace || !terminalCommand.trim()}
+          title="Request terminal command"
+          aria-label="Request terminal command"
+        >
           <MessageSquare size={14} />
         </button>
         {terminalCommandRisks.length > 0 && (
@@ -157,10 +167,20 @@ export function TerminalPanel({
             <small>{request.status}</small>
             {request.status === "pending" && (
               <div>
-                <button onClick={() => onApproveTerminalRequest(request.id)} disabled={!canApproveTerminal || terminalBusy}>
+                <button
+                  onClick={() => onApproveTerminalRequest(request.id)}
+                  disabled={!canApproveTerminal || terminalBusy}
+                  title={`Approve ${request.command}`}
+                  aria-label={`Approve ${request.command}`}
+                >
                   <Check size={13} />
                 </button>
-                <button onClick={() => onDenyTerminalRequest(request.id)} disabled={!canApproveTerminal || terminalBusy}>
+                <button
+                  onClick={() => onDenyTerminalRequest(request.id)}
+                  disabled={!canApproveTerminal || terminalBusy}
+                  title={`Deny ${request.command}`}
+                  aria-label={`Deny ${request.command}`}
+                >
                   <X size={13} />
                 </button>
               </div>
@@ -222,7 +242,12 @@ export function TerminalPanel({
             placeholder={`Send input to ${selectedTerminal.name}`}
             disabled={!selectedTerminalCanControl || !selectedTerminal.running}
           />
-          <button onClick={onSendTerminalInput} disabled={!selectedTerminalCanControl || !selectedTerminal.running || !terminalInput.trim()}>
+          <button
+            onClick={onSendTerminalInput}
+            disabled={!selectedTerminalCanControl || !selectedTerminal.running || !terminalInput.trim()}
+            title={`Send input to ${selectedTerminal.name}`}
+            aria-label={`Send input to ${selectedTerminal.name}`}
+          >
             <Send size={14} />
           </button>
           {selectedTerminalCanRestart && (
@@ -234,7 +259,12 @@ export function TerminalPanel({
               <Play size={14} />
             </button>
           )}
-          <button onClick={onStopTerminal} disabled={!selectedTerminalCanControl || !selectedTerminal.running || terminalBusy}>
+          <button
+            onClick={onStopTerminal}
+            disabled={!selectedTerminalCanControl || !selectedTerminal.running || terminalBusy}
+            title={`Stop ${selectedTerminal.name}`}
+            aria-label={`Stop ${selectedTerminal.name}`}
+          >
             <X size={14} />
           </button>
         </div>

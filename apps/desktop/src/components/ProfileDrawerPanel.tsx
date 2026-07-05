@@ -1,4 +1,4 @@
-import { ExternalLink, Github, KeyRound, X } from "lucide-react";
+import { ExternalLink, Github, X } from "lucide-react";
 import type { DeviceIdentity } from "../lib/deviceIdentity";
 import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
 import { InfoRow } from "./common";
@@ -47,21 +47,19 @@ export function ProfileDrawerPanel({
       </section>
 
       <section className="drawer-section">
-        <InfoRow label="GitHub OAuth" value={authConfig?.configured === false ? "Not configured" : "Configured"} />
-        <InfoRow label="OAuth scopes" value={authConfig?.scopes.join(", ") || "Unavailable"} />
-        <InfoRow label="Allowed origins" value={authConfig?.allowedOrigins.join(", ") || "Local/default"} />
-        <InfoRow label="Workspace edits" value={authConfig?.mutationsRequireAuth ? "Sign-in required" : "Local permissive"} />
+        <InfoRow label="GitHub sign-in" value={authConfig?.configured === false ? "Not configured" : "Ready"} />
+        <InfoRow label="GitHub access" value={authConfig?.scopes.join(", ") || "Unavailable"} />
+        <InfoRow label="App origins" value={authConfig?.allowedOrigins.join(", ") || "Local/default"} />
+        <InfoRow label="Workspace edits" value={authConfig?.mutationsRequireAuth ? "Requires sign-in" : "Local only"} />
         <InfoRow label="Relay sessions" value={relaySessionPersistence} />
         <InfoRow label="Session" value={currentUser ? "Signed in" : "Signed out"} />
         <InfoRow label="Device" value={deviceId} />
-        <InfoRow label="Device key" value={deviceIdentity?.publicKeyFingerprint ?? "Generating"} />
-        <InfoRow label="Key algorithm" value={deviceIdentity?.algorithm ?? "Unavailable"} />
+        <InfoRow label="Device identity" value={deviceIdentity?.publicKeyFingerprint ?? "Preparing"} />
         {currentUser && <InfoRow label="User id" value={currentUser.id} />}
       </section>
 
       <button className="ghost-wide" onClick={onRotateDeviceIdentity}>
-        <KeyRound size={15} />
-        Rotate device key
+        Reset device identity
       </button>
       {deviceIdentityMessage && <div className="workflow-message">{deviceIdentityMessage}</div>}
 
@@ -77,7 +75,7 @@ export function ProfileDrawerPanel({
           disabled={authBusy || authConfig?.configured === false}
         >
           <Github size={15} />
-          {authConfig?.configured === false ? "GitHub OAuth not configured" : authBusy ? "Waiting for GitHub" : "Sign in with GitHub"}
+          {authConfig?.configured === false ? "GitHub sign-in not configured" : authBusy ? "Waiting for GitHub" : "Sign in with GitHub"}
         </button>
       )}
 

@@ -1,6 +1,5 @@
-import { Copy, UsersRound } from "lucide-react";
+import { Copy } from "lucide-react";
 import type { TeamMemberRecord } from "@multaiplayer/protocol";
-import { StatusPill } from "./common";
 
 export interface TeamMemberDisplay {
   member: TeamMemberRecord;
@@ -49,7 +48,7 @@ export function TeamRosterPanel({
     <section className="panel members-panel">
       <div className="panel-title">
         <span>Team roster</span>
-        <StatusPill icon={<UsersRound size={13} />} label={`${members.length || 0}`} tone="dark" />
+        <small className="panel-count">{members.length || 0}</small>
       </div>
       <div className="member-list">
         {members.map(({ member, initial, name, roleLabel, joinedLabel, canPromote, canDemote, canTransferOwnership, canRemove }) => (
@@ -109,7 +108,7 @@ export function RoomMembersPanel({
     <section className="panel members-panel">
       <div className="panel-title">
         <span>Members</span>
-        <StatusPill icon={<UsersRound size={13} />} label={`${members.length || 1} online`} tone="blue" />
+        <small className="panel-state available">{members.length || 1} online</small>
       </div>
       <div className="member-list">
         {members.map((member) => (
@@ -122,7 +121,7 @@ export function RoomMembersPanel({
             <div className="member-badges">
               {member.isHost && <b>host</b>}
               <b className={member.publicKeyFingerprint ? member.trusted ? "trusted" : "verified" : "warning"}>
-                {member.publicKeyFingerprint ? member.trusted ? "trusted" : "keyed" : "unregistered"}
+                {member.publicKeyFingerprint ? member.trusted ? "trusted" : "verified" : "pending"}
               </b>
               {member.publicKeyFingerprint && member.deviceId !== localDeviceId && (
                 <>

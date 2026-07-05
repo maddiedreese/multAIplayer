@@ -251,7 +251,7 @@ import {
   clearRoomVisibilityWarningAcknowledgement,
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
-import { InlineSecretWarning, StatusPill } from "./components/common";
+import { InlineSecretWarning } from "./components/common";
 import { RoomHeader } from "./components/RoomHeader";
 import { ModelPanel } from "./components/ModelPanel";
 import { RoomModePanel } from "./components/RoomModePanel";
@@ -269,7 +269,7 @@ import { TerminalPanel, type CodexEventDisplay, type TerminalCommandRequestDispl
 import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
 import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
-import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarPanelName, type SidebarRoomDisplay, type SidebarTeamDisplay } from "./components/DesktopSidebar";
+import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarPanelName, type SidebarRoomDisplay, type SidebarTeamDisplay, type ThemeMode } from "./components/DesktopSidebar";
 import { RoomChatPanel, type PendingAttachmentDisplay, type RoomChatMessageDisplay } from "./components/RoomChatPanel";
 import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
@@ -415,7 +415,7 @@ const seededRooms: RoomRecord[] = [
   {
     id: "room-relay",
     teamId: "team-core",
-    name: "Relay + E2EE",
+    name: "Relay ops",
     projectPath: defaultProjectPath,
     host: "Alex",
     hostUserId: "github:alex",
@@ -506,14 +506,14 @@ const initialMessagesByRoom: Record<string, ChatMessage[]> = {
       id: "relay-m1",
       author: "Alex",
       role: "human",
-      body: "The relay should only ever see encrypted envelopes and room metadata.",
+      body: "The relay should stay boring: route room events, keep metadata tight, and avoid touching project content.",
       time: "09:52"
     },
     {
       id: "relay-m2",
       author: "Maddie",
       role: "human",
-      body: "Yes. Gated invites should only carry metadata and the host device key; approval can deliver the room key wrapped to the joiner's device.",
+      body: "Yes. Gated invites should carry only room metadata; the host can approve access when someone joins.",
       time: "09:55"
     }
   ],
@@ -564,6 +564,7 @@ const defaultBrowserUrl = "https://github.com/maddiedreese/multAIplayer";
 const defaultBrowserReason = "Use this page as Codex browser context.";
 
 export function App() {
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => loadThemeMode());
   const [teams, setTeams] = useState<TeamRecord[]>(seededTeams);
   const [rooms, setRooms] = useState<RoomRecord[]>(seededRooms);
   const [teamMembersByTeam, setTeamMembersByTeam] = useState<Record<string, TeamMemberRecord[]>>(seededTeamMembers);
@@ -706,6 +707,11 @@ export function App() {
     [currentUser]
   );
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = themeMode;
+    localStorage.setItem("multaiplayer:theme", themeMode);
+  }, [themeMode]);
+
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? emptyRoom;
   const inspectorTab = inspectorTabsByRoom[selectedRoom.id] ?? "work";
@@ -771,6 +777,12 @@ export function App() {
   const inviteMessage = inviteMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const hostMessage = hostMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const chatMessage = chatMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const roomNotices = [
+    hostMessage ? { key: "host", label: "Codex", message: hostMessage, onDismiss: () => setHostMessageForRoom(selectedRoom.id, null) } : null,
+    chatMessage && chatMessage !== hostMessage
+      ? { key: "chat", label: "Chat", message: chatMessage, onDismiss: () => setChatMessageForRoom(selectedRoom.id, null) }
+      : null
+  ].filter((notice): notice is { key: string; label: string; message: string; onDismiss: () => void } => Boolean(notice));
   const settingsMessage = settingsMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const historyMessage = historyMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const teamHistoryMessage = teamHistoryMessagesByTeam[selectedTeam || "__no-team"] ?? null;
@@ -1430,8 +1442,8 @@ export function App() {
       publicKeyJwk: deviceIdentity.publicKeyJwk,
       publicKeyFingerprint: deviceIdentity.publicKeyFingerprint
     })
-      .then(() => setDeviceIdentityMessage("Device public key registered with relay."))
-      .catch((error) => setDeviceIdentityMessage(`Device public key registration pending: ${String(error)}`));
+      .then(() => setDeviceIdentityMessage("Device identity registered with relay."))
+      .catch((error) => setDeviceIdentityMessage(`Device identity registration pending: ${String(error)}`));
   }, [appConfig.relayHttpUrl, deviceId, deviceIdentity, localUser.id, localUser.name]);
 
   useEffect(() => {
@@ -1746,6 +1758,7 @@ export function App() {
             const plaintext = await decryptJson<ChatPlaintextPayload>(roomPayload, secret);
             const chatMessage = normalizeChatMessage(plaintext) as ChatMessage | null;
             if (!chatMessage) return;
+            if (isLegacyDebugChatMessage(chatMessage)) return;
             setRooms((current) =>
               markRoomUnreadForIncomingChat(
                 current,
@@ -1887,11 +1900,11 @@ export function App() {
                 id: plaintext.id,
                 author: "multAIplayer",
                 role: "system",
-                body: `${plaintext.rotatedBy} rotated the room key. Future messages and invites use the new key.`,
+                body: `${plaintext.rotatedBy} refreshed room access. Future messages and invites use the updated access state.`,
                 time: formatMessageTime(plaintext.rotatedAt),
                 createdAt: plaintext.rotatedAt
               });
-              setInviteMessageForRoom(message.envelope.roomId, `${plaintext.rotatedBy} rotated the room key for future messages.`);
+              setInviteMessageForRoom(message.envelope.roomId, `${plaintext.rotatedBy} refreshed room access for future messages.`);
             }
           }
         } catch (error) {
@@ -2346,7 +2359,7 @@ export function App() {
 
   async function rotateDeviceIdentity() {
     setDeviceIdentity(null);
-    setDeviceIdentityMessage("Rotating local device identity...");
+    setDeviceIdentityMessage("Resetting local device identity...");
     try {
       await resetDeviceIdentity();
       const identity = await loadOrCreateDeviceIdentity();
@@ -2361,24 +2374,24 @@ export function App() {
   function trustRoomMemberDevice(member: RoomPresence) {
     const fingerprint = member.publicKeyFingerprint;
     if (!fingerprint) {
-      setDeviceIdentityMessage(`${member.displayName} has no registered device key to trust.`);
+      setDeviceIdentityMessage(`${member.displayName} has no registered device identity to trust.`);
       return;
     }
     setTrustedDeviceKeys((current) =>
       trustDeviceKey(current, selectedRoom.id, member.deviceId, fingerprint)
     );
-    setDeviceIdentityMessage(`Trusted ${member.displayName}'s device key for ${selectedRoom.name}.`);
+    setDeviceIdentityMessage(`Trusted ${member.displayName}'s device identity for ${selectedRoom.name}.`);
   }
 
   function untrustRoomMemberDevice(member: RoomPresence) {
     setTrustedDeviceKeys((current) => untrustDeviceKey(current, selectedRoom.id, member.deviceId));
-    setDeviceIdentityMessage(`Removed local trust for ${member.displayName}'s device key in ${selectedRoom.name}.`);
+    setDeviceIdentityMessage(`Removed local trust for ${member.displayName}'s device identity in ${selectedRoom.name}.`);
   }
 
   async function copyRoomMemberDeviceFingerprint(member: RoomPresence, trusted: boolean) {
     const fingerprint = member.publicKeyFingerprint;
     if (!fingerprint) {
-      setDeviceIdentityMessage(`${member.displayName} has no registered device key to copy.`);
+      setDeviceIdentityMessage(`${member.displayName} has no registered device identity to copy.`);
       return;
     }
     const markdown = buildDeviceFingerprintMarkdown({
@@ -2904,7 +2917,7 @@ export function App() {
         roomId,
         plaintext.status === "approved"
           ? plaintext.wrappedRoomSecret
-            ? `${plaintext.decidedBy} approved your room join request and delivered a device-wrapped room key.`
+            ? `${plaintext.decidedBy} approved your room join request. This room is unlocked on this device.`
             : `${plaintext.decidedBy} approved your room join request.`
           : `${plaintext.decidedBy} denied your room join request.`
       );
@@ -3603,7 +3616,7 @@ export function App() {
     }
     const roomId = selectedRoom.id;
     const confirmed = window.confirm(
-      `Forget ${selectedRoom.name} on this device?\n\nThis deletes the encrypted local history, local history settings, and the local room key. You will need a fresh invite or room key to read or send encrypted room messages again.`
+      `Forget ${selectedRoom.name} on this device?\n\nThis deletes local history, room settings, and this device's room access. You will need a fresh invite or host approval to read or send room messages again.`
     );
     if (!confirmed) return;
     await forgetRoomLocalData(selectedRoom.id);
@@ -3689,7 +3702,7 @@ export function App() {
     setDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHistorySettings(loadHistorySettings(selectedRoom.id));
     setSecretWarningVisibleForRoom(selectedRoom.id, true);
-    setHistoryMessageForRoom(roomId, "Forgot this room on this device. Rejoin or paste a room invite key to unlock it again.");
+    setHistoryMessageForRoom(roomId, "Forgot this room on this device. Rejoin from an invite to unlock it again.");
   }
 
   async function copyInviteLink() {
@@ -3714,7 +3727,7 @@ export function App() {
       if (inviteApprovalGate) {
         if (!deviceIdentity) {
           if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-            setInviteMessageForRoom(roomId, "Device key is still being prepared. Try again in a moment.");
+            setInviteMessageForRoom(roomId, "Device identity is still being prepared. Try again in a moment.");
           }
           return;
         }
@@ -3734,11 +3747,11 @@ export function App() {
         try {
           await navigator.clipboard.writeText(link);
           if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-            setInviteMessageForRoom(roomId, "Copied gated invite link. The room key is not in the link; approval delivers it wrapped to the joiner's device key.");
+            setInviteMessageForRoom(roomId, "Copied approval invite link. The host will approve access when someone joins.");
           }
         } catch {
           if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-            setInviteMessageForRoom(roomId, "Gated invite generated. Copying was blocked because the app was not focused; the room key is not in the link.");
+            setInviteMessageForRoom(roomId, "Approval invite generated. Copying was blocked because the app was not focused.");
           }
         }
         return;
@@ -3758,11 +3771,11 @@ export function App() {
       try {
         await navigator.clipboard.writeText(link);
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setInviteMessageForRoom(roomId, "Copied direct invite link. It contains the room key, so it is not displayed in the app after copying.");
+          setInviteMessageForRoom(roomId, "Copied direct invite link. It grants room access, so it is not displayed after copying.");
         }
       } catch {
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setInviteMessageForRoom(roomId, "Direct invite generated, but copying was blocked. Because it contains the room key, it is not displayed; focus the app and try again or use the approval gate.");
+          setInviteMessageForRoom(roomId, "Direct invite generated, but copying was blocked. Focus the app and try again, or use host approval.");
         }
       }
     } catch (error) {
@@ -3772,7 +3785,7 @@ export function App() {
 
   async function rotateSelectedRoomKey() {
     if (!hasSelectedRoom) {
-      setSelectedInviteMessage("Create or join a room before rotating a room key.");
+      setSelectedInviteMessage("Create or join a room before refreshing room access.");
       return;
     }
     if (isSelectedRoomLocked) {
@@ -3785,7 +3798,7 @@ export function App() {
     }
     if (reportRoomKeyRotationInFlight(selectedRoom.id)) return;
     const confirmed = window.confirm(
-      `Rotate the room key for ${selectedRoom.name}?\n\nThis sends the new key to current room-key holders in an encrypted room event and clears stale encrypted local history on this device. It is not full member removal in the alpha.`
+      `Refresh room access for ${selectedRoom.name}?\n\nThis updates future messages and invites for current members. It is not full member removal in the alpha.`
     );
     if (!confirmed) return;
 
@@ -3828,7 +3841,7 @@ export function App() {
         id: payload.id,
         author: "multAIplayer",
         role: "system",
-        body: `${localUser.name} rotated the room key. Future messages and invites use the new key.`,
+        body: `${localUser.name} refreshed room access. Future messages and invites use the updated access state.`,
         time: formatMessageTime(rotatedAt),
         createdAt: rotatedAt
       });
@@ -3838,8 +3851,8 @@ export function App() {
         setInviteMessageForRoom(
           room.id,
           client && relayStatus !== "closed" && relayStatus !== "error"
-            ? "Rotated the room key for future messages and invites. Current key holders can receive it through the encrypted room event."
-            : "Rotated the local room key, but the relay is offline. Other members will need a fresh invite key."
+            ? "Refreshed room access for future messages and invites."
+            : "Refreshed access locally, but the relay is offline. Other members will need a fresh invite."
         );
       }
     } catch (error) {
@@ -3923,7 +3936,7 @@ export function App() {
       note: request.note
     }, inviteSecret.hostPublicKeyJwk);
     setInviteMessageForRoom(inviteSecret.roomId, published
-      ? `Requested access to ${acceptedRoomName}. The room key is not on this device until the host approves.`
+      ? `Requested access to ${acceptedRoomName}. The host needs to approve this device before the room unlocks.`
       : `Imported ${acceptedRoomName} metadata. Send again after the relay reconnects so the host can approve access.`);
   }
 
@@ -3934,7 +3947,7 @@ export function App() {
     if (inviteId) {
       const metadata = await lookupInvite(inviteId);
       if (metadata.invite.teamId !== inviteSecret.teamId || metadata.invite.roomId !== inviteSecret.roomId) {
-        throw new Error("Invite metadata does not match the encrypted room key fragment.");
+        throw new Error("Invite metadata does not match this invite.");
       }
       upsertTeam(metadata.team);
       upsertRoom(ensureRoomDefaults(metadata.room));
@@ -4007,11 +4020,11 @@ export function App() {
         note: request.note
       });
       setInviteMessageForRoom(inviteSecret.roomId, published
-        ? `Imported ${acceptedRoomName} and sent an encrypted join request to the active host.`
+        ? `Imported ${acceptedRoomName} and sent a join request to the active host.`
         : `Imported ${acceptedRoomName}. Send again after the relay reconnects so the host can approve access.`);
       return;
     }
-    setInviteMessageForRoom(inviteSecret.roomId, `Joined ${acceptedRoomName}. The relay provided metadata only; the room key stayed in the URL fragment.`);
+    setInviteMessageForRoom(inviteSecret.roomId, `Joined ${acceptedRoomName}.`);
   }
 
   async function joinInviteSecret() {
@@ -5758,6 +5771,7 @@ export function App() {
         messageHits={sidebarMessageHitRows}
         historySearchBusy={historySearchBusy}
         activeSidebarPanel={activeSidebarPanel}
+        themeMode={themeMode}
         onSignIn={beginGitHubSignIn}
         onSignOut={signOut}
         onSidebarQueryChange={setSidebarQuery}
@@ -5777,6 +5791,7 @@ export function App() {
           setSelectedRoomId(roomId);
         }}
         onSelectSidebarPanel={setActiveSidebarPanel}
+        onToggleTheme={() => setThemeMode((current) => current === "dark" ? "light" : "dark")}
       />
 
       {activeSidebarPanel && (
@@ -5911,8 +5926,19 @@ export function App() {
           onClearSelectedMessages={clearSelectedMessages}
         />
 
-        {hostMessage && <div className="host-message">{hostMessage}</div>}
-        {chatMessage && <div className="host-message">{chatMessage}</div>}
+        {roomNotices.length > 0 && (
+          <div className="room-notice-stack">
+            {roomNotices.map((notice) => (
+              <div className="room-notice" key={notice.key}>
+                <strong>{notice.label}</strong>
+                <span>{notice.message}</span>
+                <button onClick={notice.onDismiss} aria-label={`Dismiss ${notice.label} notice`}>
+                  <X size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {secretWarningVisible && (
           <div className="warning-banner">
@@ -5954,6 +5980,7 @@ export function App() {
           codexRunning={codexRunning}
           canApproveCodex={hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked)}
           canUseChat={roomCanUseChat}
+          canSendMessage={roomCanUseChat && (Boolean(draft.trim()) || pendingAttachments.length > 0)}
           roomLocked={isSelectedRoomLocked}
           lockedPlaceholder={roomLockMessage(selectedRoom, isSelectedRoomRevoked)}
           chatEnabled={selectedRoom.mode.chat}
@@ -6270,15 +6297,27 @@ function loadOrCreateDeviceId(): string {
   return created;
 }
 
+function loadThemeMode(): ThemeMode {
+  const stored = localStorage.getItem("multaiplayer:theme");
+  if (stored === "light" || stored === "dark") return stored;
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 function ensureRoomDefaults(room: RoomRecord): RoomRecord {
   return {
     ...room,
+    name: normalizeRoomDisplayName(room.name),
     codexModel: room.codexModel || defaultCodexModel,
     browserAllowedOrigins: normalizeBrowserAllowedOrigins(room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins) ?? defaultBrowserAllowedOrigins,
     browserProfilePersistent: typeof room.browserProfilePersistent === "boolean"
       ? room.browserProfilePersistent
       : defaultBrowserProfilePersistent
   };
+}
+
+function normalizeRoomDisplayName(name: string): string {
+  if (name === "Relay + E2EE") return "Relay ops";
+  return name;
 }
 
 function formatCodexModel(model: string): string {
@@ -6335,7 +6374,7 @@ function canTransferTeamOwnership(
 
 function roomLockMessage(room: RoomRecord, revoked: boolean): string {
   if (revoked) return membershipRemovedRoomMessage(room.name);
-  return "This room was forgotten on this device. Paste a room invite key or get approved through a gated invite to unlock encrypted messages again.";
+  return "This room was forgotten on this device. Rejoin from an invite or get host approval to unlock messages again.";
 }
 
 function formatCodexThreadId(threadId: string | null): string {
@@ -6522,7 +6561,7 @@ function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistoryPayloa
   if (Array.isArray(value)) {
     return {
       version: 3,
-      messages: value.map((message) => normalizeChatMessage(message) as ChatMessage | null).filter((message): message is ChatMessage => message !== null),
+      messages: normalizeChatHistoryMessages(value),
       terminalRequests: [],
       browserRequests: [],
       inviteRequests: [],
@@ -6538,7 +6577,7 @@ function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistoryPayloa
   return {
     version: 3,
     messages: Array.isArray(value.messages)
-      ? value.messages.map((message) => normalizeChatMessage(message) as ChatMessage | null).filter((message): message is ChatMessage => message !== null)
+      ? normalizeChatHistoryMessages(value.messages)
       : [],
     terminalRequests: Array.isArray(value.terminalRequests)
       ? value.terminalRequests.filter(isTerminalCommandRequest)
@@ -6566,6 +6605,18 @@ function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistoryPayloa
       : [],
     ...(codexThreadId ? { codexThreadId } : {})
   };
+}
+
+function normalizeChatHistoryMessages(value: unknown[]): ChatMessage[] {
+  return value
+    .map((message) => normalizeChatMessage(message) as ChatMessage | null)
+    .filter((message): message is ChatMessage => Boolean(message && !isLegacyDebugChatMessage(message)));
+}
+
+function isLegacyDebugChatMessage(message: ChatMessage): boolean {
+  const normalizedBody = message.body.trim().toLowerCase();
+  return normalizedBody === "relay-backed encrypted hello from the room." ||
+    normalizedBody === "ciphertext-only debug check.";
 }
 
 function isChatMessage(value: unknown): value is ChatMessage {
@@ -7048,7 +7099,7 @@ function formatCodexAttachmentSummary(attachments: CodexTurnSummary["attachments
 
 function formatMemberDeviceLabel(member: RoomPresence, localDeviceId: string, trusted = false): string {
   const localLabel = member.deviceId === localDeviceId ? "This device" : "Online";
-  const fingerprint = member.publicKeyFingerprint ? shortFingerprint(member.publicKeyFingerprint) : "unregistered device key";
+  const fingerprint = member.publicKeyFingerprint ? shortFingerprint(member.publicKeyFingerprint) : "identity pending";
   return `${localLabel} · ${fingerprint}${trusted ? " · locally trusted" : ""}`;
 }
 

@@ -1,7 +1,6 @@
-import { ExternalLink, Github, RefreshCw } from "lucide-react";
+import { ExternalLink, RefreshCw } from "lucide-react";
 import type { GitHubActionRun } from "../lib/authClient";
 import type { GitHubActionsReadiness } from "../lib/githubWorkflowReadiness";
-import { StatusPill } from "./common";
 
 export interface ActionsSummaryDisplay {
   label: string;
@@ -43,7 +42,9 @@ export function GitHubActionsPanel({
       <div className="panel-title">
         <span>GitHub Actions</span>
         <div className="panel-title-actions">
-          <StatusPill icon={<Github size={13} />} label={summary.label} tone={summary.tone} />
+          <small className={`panel-state ${summary.tone === "green" ? "available" : summary.tone === "yellow" ? "attention" : ""}`}>
+            {summary.label}
+          </small>
           <button
             className="ghost"
             onClick={onRefresh}
