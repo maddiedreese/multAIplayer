@@ -132,6 +132,7 @@ const maxPublicKeyJwkChars = 4096;
 const maxAuthSessionIdChars = 160;
 const maxAccessTokenChars = 8192;
 const maxEncryptedAccessTokenChars = Math.ceil(maxAccessTokenChars * 4 / 3) + 1024;
+const maxGitHubDeviceCodeChars = 256;
 const maxEnvelopeIdChars = 160;
 const maxEnvelopeNonceChars = 512;
 const maxEnvelopeCiphertextChars = Math.ceil(encryptedEnvelopeMaxBytes * 4 / 3) + 1024;
@@ -280,9 +281,9 @@ app.post("/auth/github/device/poll", async (req, res) => {
     return;
   }
 
-  const deviceCode = String(req.body?.device_code ?? "");
+  const deviceCode = normalizeMetadataText(req.body?.device_code, maxGitHubDeviceCodeChars);
   if (!deviceCode) {
-    res.status(400).json({ error: "device_code is required" });
+    res.status(400).json({ error: "device_code must be a bounded non-empty string" });
     return;
   }
 

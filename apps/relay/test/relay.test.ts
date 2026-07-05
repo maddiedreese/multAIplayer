@@ -1061,6 +1061,34 @@ test("relay reports configured GitHub OAuth scopes", async () => {
   }
 });
 
+test("relay bounds GitHub device-code polling input", async () => {
+  const relay = await startRelay({ GITHUB_CLIENT_ID: "test-client-id" });
+  try {
+    const missing = await fetch(`${relay.baseUrl}/auth/github/device/poll`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({})
+    });
+    assert.equal(missing.status, 400);
+
+    const oversized = await fetch(`${relay.baseUrl}/auth/github/device/poll`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ device_code: "x".repeat(257) })
+    });
+    assert.equal(oversized.status, 400);
+
+    const controlCharacter = await fetch(`${relay.baseUrl}/auth/github/device/poll`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ device_code: "device\ncode" })
+    });
+    assert.equal(controlCharacter.status, 400);
+  } finally {
+    await relay.close();
+  }
+});
+
 test("relay loads configuration from env files without overriding process env", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-env-test-"));
   const envPath = join(tempDir, ".env");
