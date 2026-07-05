@@ -281,6 +281,7 @@ import { EncryptedInvitePanel } from "./components/EncryptedInvitePanel";
 import { LocalHistoryPanel } from "./components/LocalHistoryPanel";
 import { BrowserAccessPanel } from "./components/BrowserAccessPanel";
 import { WorkspaceFilesPanel } from "./components/WorkspaceFilesPanel";
+import { GitHubActionsPanel } from "./components/GitHubActionsPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -6709,54 +6710,21 @@ export function App() {
           {gitWorkflowMessage && <div className="workflow-message">{gitWorkflowMessage}</div>}
         </section>
 
-        <section className="panel actions-panel">
-          <div className="panel-title">
-            <span>GitHub Actions</span>
-            <div className="panel-title-actions">
-              <StatusPill icon={<Github size={13} />} label={actionsSummary.label} tone={actionsSummary.tone} />
-              <button
-                className="ghost"
-                onClick={() => refreshGitHubActions()}
-                disabled={!canReadLocalWorkspace || actionsBusy || !isActiveHost || !githubActionsReadiness.ready}
-              >
-                <RefreshCw size={14} />
-                {actionsBusy ? "Checking" : "Refresh"}
-              </button>
-            </div>
-          </div>
-          <div className={`actions-summary ${actionsSummary.tone}`}>
-            <strong>{actionsSummary.detail}</strong>
-            <span>
-              {gitWorkflowDraft.prOwner}/{gitWorkflowDraft.prRepo} · {gitWorkflowDraft.branchName || "branch required"}
-              {actionsLastChecked ? ` · checked ${formatTimestamp(actionsLastChecked)}` : ""}
-            </span>
-          </div>
-          <div className={`workflow-message ${githubActionsReadiness.ready ? "" : "danger"}`}>
-            {githubActionsReadiness.messages.join(" ")}
-          </div>
-          <div className="actions-list">
-            {actionRuns.map((run) => (
-              <a href={run.url} target="_blank" rel="noreferrer" className={`action-run ${run.conclusion ?? run.status}`} key={run.id}>
-                <span className={`run-dot ${run.conclusion ?? run.status}`} />
-                <div>
-                  <strong>{run.displayTitle ?? run.name}</strong>
-                  <small>
-                    {run.name}
-                    {run.runNumber ? ` #${run.runNumber}` : ""} · {run.status}
-                    {run.conclusion ? ` / ${run.conclusion}` : ""} · {run.event ?? "event unknown"} · {formatTimestamp(run.updatedAt)}
-                  </small>
-                </div>
-                <ExternalLink size={13} />
-              </a>
-            ))}
-            {!actionsBusy && actionRuns.length === 0 && (
-              <div className="empty-state">
-                {currentUser ? "No GitHub Actions runs loaded." : "Sign in with GitHub to check workflow runs."}
-              </div>
-            )}
-          </div>
-          {actionsMessage && <div className="workflow-message">{actionsMessage}</div>}
-        </section>
+        <GitHubActionsPanel
+          summary={actionsSummary}
+          readiness={githubActionsReadiness}
+          runs={actionRuns}
+          owner={gitWorkflowDraft.prOwner}
+          repo={gitWorkflowDraft.prRepo}
+          branch={gitWorkflowDraft.branchName}
+          lastChecked={actionsLastChecked}
+          busy={actionsBusy}
+          refreshDisabled={!canReadLocalWorkspace || actionsBusy || !isActiveHost || !githubActionsReadiness.ready}
+          currentUserSignedIn={Boolean(currentUser)}
+          message={actionsMessage}
+          formatTimestamp={formatTimestamp}
+          onRefresh={() => refreshGitHubActions()}
+        />
 
         <section className="panel terminal-panel">
           <div className="panel-title">
