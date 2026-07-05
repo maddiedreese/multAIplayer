@@ -2227,6 +2227,10 @@ export function App() {
       setSelectedHostMessage("Create or join a room before changing the host.");
       return;
     }
+    if (isSelectedRoomLocked) {
+      setSelectedHostMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
     if (hostStatus !== "active" && !isActiveHost) {
       setSelectedHostMessage(hostGateMessage);
       return;
@@ -2265,6 +2269,10 @@ export function App() {
   async function acceptHostHandoff(handoff: HostHandoffRecord) {
     if (!hasSelectedRoom) {
       setSelectedHostMessage("Create or join a room before accepting a host handoff.");
+      return;
+    }
+    if (isSelectedRoomLocked) {
+      setSelectedHostMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;
     }
     if (handoff.status !== "available") {
@@ -2525,6 +2533,10 @@ export function App() {
       setSelectedInviteMessage("Create or join a room before deciding invite requests.");
       return;
     }
+    if (isSelectedRoomLocked) {
+      setSelectedInviteMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
     if (!isActiveHost) {
       setSelectedInviteMessage(hostGateMessage);
       return;
@@ -2688,6 +2700,10 @@ export function App() {
     if (nextModel === selectedCodexModel) return;
     if (!hasSelectedRoom) {
       setSelectedSettingsMessage("Create or join a room before changing the Codex model.");
+      return;
+    }
+    if (isSelectedRoomLocked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;
     }
     if (!isActiveHost) {
@@ -3255,6 +3271,10 @@ export function App() {
       setSelectedInviteMessage("Create or join a room before copying an invite.");
       return;
     }
+    if (isSelectedRoomLocked) {
+      setSelectedInviteMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
     const room = selectedRoom;
     const roomId = room.id;
     setInviteMessageForRoom(roomId, null);
@@ -3323,6 +3343,10 @@ export function App() {
   async function rotateSelectedRoomKey() {
     if (!hasSelectedRoom) {
       setSelectedInviteMessage("Create or join a room before rotating a room key.");
+      return;
+    }
+    if (isSelectedRoomLocked) {
+      setSelectedInviteMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;
     }
     if (!isActiveHost) {
@@ -5667,15 +5691,15 @@ export function App() {
             <StatusPill icon={<UsersRound size={14} />} label={`${roomMembers.length || 1} online`} tone="blue" />
             <StatusPill icon={<Bot size={14} />} label={hostStatusLabel} tone={selectedRoom.hostStatus === "active" ? "blue" : selectedRoom.hostStatus === "handoff" ? "yellow" : "muted"} />
             <div className="host-controls">
-              <button onClick={() => setRoomHost("active")} disabled={!hasSelectedRoom || hostBusy || selectedRoom.hostStatus === "active"}>
+              <button onClick={() => setRoomHost("active")} disabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy || selectedRoom.hostStatus === "active"}>
                 <UserRoundCheck size={14} />
                 Host
               </button>
-              <button onClick={() => setRoomHost("handoff")} disabled={!hasSelectedRoom || hostBusy || !isActiveHost}>
+              <button onClick={() => setRoomHost("handoff")} disabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy || !isActiveHost}>
                 <UsersRound size={14} />
                 Handoff
               </button>
-              <button onClick={() => setRoomHost("offline")} disabled={!hasSelectedRoom || hostBusy || selectedRoom.hostStatus === "offline" || !isActiveHost}>
+              <button onClick={() => setRoomHost("offline")} disabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy || selectedRoom.hostStatus === "offline" || !isActiveHost}>
                 <X size={14} />
               </button>
             </div>
@@ -5684,7 +5708,7 @@ export function App() {
               <select
                 aria-label="Codex host model"
                 value={codexModelOptions.some((option) => option.id === selectedCodexModel) ? selectedCodexModel : "custom"}
-                disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}
+                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
                 onChange={(event) => {
                   if (event.target.value !== "custom") {
                     setCodexModel(event.target.value);
@@ -6217,7 +6241,7 @@ export function App() {
                   <small>{handoff.projectPath} · {formatCodexModel(handoff.codexModel)}</small>
                 </div>
                 {handoff.status === "available" ? (
-                  <button onClick={() => acceptHostHandoff(handoff)} disabled={!hasSelectedRoom || hostBusy}>
+                  <button onClick={() => acceptHostHandoff(handoff)} disabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy}>
                     <Check size={13} />
                     Accept
                   </button>
@@ -6241,7 +6265,7 @@ export function App() {
               tone={inviteApprovalGate ? "blue" : "green"}
             />
           </div>
-          <button className="primary-wide" onClick={copyInviteLink} disabled={!hasSelectedRoom}>
+          <button className="primary-wide" onClick={copyInviteLink} disabled={!hasSelectedRoom || isSelectedRoomLocked}>
             <Copy size={15} />
             Copy room invite
           </button>
@@ -6249,7 +6273,7 @@ export function App() {
             <input
               type="checkbox"
               checked={inviteApprovalGate}
-              disabled={!hasSelectedRoom}
+              disabled={!hasSelectedRoom || isSelectedRoomLocked}
               onChange={(event) => setInviteApprovalGateForRoom(selectedRoom.id, event.target.checked)}
             />
             <span>Ask host to approve joiners</span>
@@ -6266,7 +6290,7 @@ export function App() {
             <KeyRound size={15} />
             Import invite
           </button>
-          <button className="ghost-wide danger" onClick={rotateSelectedRoomKey} disabled={!hasSelectedRoom || !isActiveHost || keyRotationBusy}>
+          <button className="ghost-wide danger" onClick={rotateSelectedRoomKey} disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || keyRotationBusy}>
             <RefreshCw size={15} />
             {keyRotationBusy ? "Rotating room key" : "Rotate room key"}
           </button>
@@ -6284,10 +6308,10 @@ export function App() {
                 <small>{request.status}</small>
                 {request.status === "pending" && (
                   <div>
-                    <button onClick={() => decideInviteJoinRequest(request, "approved")} disabled={!hasSelectedRoom || !isActiveHost}>
+                    <button onClick={() => decideInviteJoinRequest(request, "approved")} disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost}>
                       <Check size={13} />
                     </button>
-                    <button onClick={() => decideInviteJoinRequest(request, "denied")} disabled={!hasSelectedRoom || !isActiveHost}>
+                    <button onClick={() => decideInviteJoinRequest(request, "denied")} disabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost}>
                       <X size={13} />
                     </button>
                   </div>
@@ -6351,7 +6375,7 @@ export function App() {
             <span>Codex host model</span>
             <select
               value={codexModelOptions.some((option) => option.id === selectedCodexModel) ? selectedCodexModel : "custom"}
-              disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}
+              disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
               onChange={(event) => {
                 if (event.target.value !== "custom") {
                   setCodexModel(event.target.value);
@@ -6370,7 +6394,7 @@ export function App() {
             <span>Custom model id</span>
             <input
               value={customCodexModel}
-              disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}
+              disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
               onChange={(event) => setCustomCodexModelForRoom(selectedRoom.id, event.target.value)}
               onBlur={() => setCodexModel(customCodexModel)}
               onKeyDown={(event) => {
@@ -6386,7 +6410,7 @@ export function App() {
               <button
                 key={option.id}
                 className={selectedCodexModel === option.id ? "active" : ""}
-                disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}
+                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
                 onClick={() => setCodexModel(option.id)}
               >
                 <strong>{option.label}</strong>
