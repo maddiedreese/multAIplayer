@@ -4984,6 +4984,10 @@ export function App() {
       setSelectedTerminalError("Create or join a room before copying terminal output.");
       return;
     }
+    if (!canReadLocalWorkspace) {
+      setSelectedTerminalError(localWorkspaceMessage);
+      return;
+    }
     const roomId = selectedRoom.id;
     const lines = selectedTerminal?.lines ?? terminalLines.map((line) => ({ stream: "system", text: line }));
     const markdown = buildTerminalMarkdown(selectedRoom, selectedTerminal, lines, terminalRisks);
@@ -6850,7 +6854,7 @@ export function App() {
           <div className="panel-title">
             <span>Terminals</span>
             <div className="panel-title-actions">
-              <button className="ghost" onClick={copyTerminalMarkdown} disabled={!hasSelectedRoom}>
+              <button className="ghost" onClick={copyTerminalMarkdown} disabled={!canReadLocalWorkspace}>
                 <Copy size={14} /> Markdown
               </button>
               <button className="ghost" onClick={runApprovedTerminalCheck} disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost}>
