@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   defaultGitWorkflowDraft,
+  gitWorkflowInFlightMessage,
+  isGitWorkflowInFlight,
   parseGitHubRemoteUrl,
   resolveGitWorkflowDraft,
   updateGitWorkflowDraftRecord
@@ -41,6 +43,13 @@ test("updateGitWorkflowDraftRecord preserves existing room fields on partial upd
     commitMessage: "Ship room scoped workflow",
     pushEnabled: true
   });
+});
+
+test("git workflow in-flight guard is scoped to one room", () => {
+  assert.equal(isGitWorkflowInFlight({ "room-a": true }, "room-a"), true);
+  assert.equal(isGitWorkflowInFlight({ "room-a": true }, "room-b"), false);
+  assert.equal(isGitWorkflowInFlight({ "room-a": false }, "room-a"), false);
+  assert.equal(gitWorkflowInFlightMessage(), "A git workflow is already running in this room.");
 });
 
 test("parseGitHubRemoteUrl accepts GitHub ssh and https remotes", () => {

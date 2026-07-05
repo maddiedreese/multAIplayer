@@ -234,7 +234,15 @@ import {
   checkGitHubWorkflowReadiness,
   type GitHubActionsTarget
 } from "./lib/githubWorkflowReadiness";
-import { defaultGitWorkflowDraft, parseGitHubRemoteUrl, resolveGitWorkflowDraft, updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "./lib/gitWorkflowDraft";
+import {
+  defaultGitWorkflowDraft,
+  gitWorkflowInFlightMessage,
+  isGitWorkflowInFlight,
+  parseGitHubRemoteUrl,
+  resolveGitWorkflowDraft,
+  updateGitWorkflowDraftRecord,
+  type GitWorkflowDraft
+} from "./lib/gitWorkflowDraft";
 import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "./lib/sidebarSearch";
@@ -657,6 +665,7 @@ export function App() {
   const roomsRef = useRef<RoomRecord[]>(rooms);
   const selectedRoomIdRef = useRef(selectedRoomId);
   const gitWorkflowDraftsRef = useRef(gitWorkflowDraftsByRoom);
+  const gitWorkflowBusyRef = useRef(gitWorkflowBusyByRoom);
   const browserRequestsRef = useRef(browserRequestsByRoom);
   const deviceId = useMemo(() => loadOrCreateDeviceId(), []);
   const localUser = useMemo(
@@ -828,6 +837,9 @@ export function App() {
   }
 
   function setGitWorkflowBusyForRoom(roomId: string, busy: boolean) {
+    gitWorkflowBusyRef.current = busy
+      ? { ...gitWorkflowBusyRef.current, [roomId]: true }
+      : omitRecordKey(gitWorkflowBusyRef.current, roomId);
     setGitWorkflowBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
@@ -1123,6 +1135,10 @@ export function App() {
   useEffect(() => {
     gitWorkflowDraftsRef.current = gitWorkflowDraftsByRoom;
   }, [gitWorkflowDraftsByRoom]);
+
+  useEffect(() => {
+    gitWorkflowBusyRef.current = gitWorkflowBusyByRoom;
+  }, [gitWorkflowBusyByRoom]);
 
   useEffect(() => {
     browserRequestsRef.current = browserRequestsByRoom;
@@ -5218,6 +5234,10 @@ export function App() {
     }
     const room = selectedRoom;
     const roomId = room.id;
+    if (isGitWorkflowInFlight(gitWorkflowBusyRef.current, roomId)) {
+      setGitWorkflowMessageForRoom(roomId, gitWorkflowInFlightMessage());
+      return;
+    }
     const projectPath = room.projectPath;
     const workflowDraft = gitWorkflowDraft;
     if (!gitApprovalPreview.plan) {

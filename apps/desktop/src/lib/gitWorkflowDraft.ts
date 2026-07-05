@@ -21,6 +21,17 @@ export interface GitRemoteRepoRef {
   repo: string;
 }
 
+export function isGitWorkflowInFlight(
+  busyByRoom: Record<string, boolean>,
+  roomId: string
+): boolean {
+  return busyByRoom[roomId] === true;
+}
+
+export function gitWorkflowInFlightMessage(): string {
+  return "A git workflow is already running in this room.";
+}
+
 export function resolveGitWorkflowDraft(
   draftsByRoom: Record<string, Partial<GitWorkflowDraft>>,
   roomId: string
