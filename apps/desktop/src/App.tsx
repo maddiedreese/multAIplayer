@@ -189,7 +189,7 @@ import { normalizeGitHubBranchName } from "@multaiplayer/github";
 import { terminalRequestForApprovedRun } from "./lib/terminalApproval";
 import { readInviteUrlPayload } from "./lib/inviteUrl";
 import { displayableInviteLink } from "./lib/invitePrivacy";
-import { normalizeBrowserAllowedOrigins, shouldAutoApproveBrowserRequest } from "./lib/browserPolicy";
+import { browserAccessGateMessage, canHostBrowserAction, canRequestBrowserAccess, normalizeBrowserAllowedOrigins, shouldAutoApproveBrowserRequest } from "./lib/browserPolicy";
 import { browserDecisionMessageId, buildBrowserDecisionMessage } from "./lib/browserActivity";
 import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
@@ -690,7 +690,10 @@ export function App() {
   const isSelectedRoomLocked = isSelectedRoomForgotten || isSelectedRoomRevoked;
   const canReadLocalWorkspace = hasSelectedRoom && canUseLocalWorkspace(selectedRoom, localUser, isSelectedRoomLocked);
   const canRequestWorkspace = hasSelectedRoom && canRequestWorkspaceAction(selectedRoom, isSelectedRoomLocked);
+  const canRequestBrowser = hasSelectedRoom && canRequestBrowserAccess(selectedRoom, isSelectedRoomLocked);
+  const canHostBrowser = hasSelectedRoom && canHostBrowserAction(selectedRoom, localUser, isSelectedRoomLocked);
   const localWorkspaceMessage = localWorkspaceGateMessage(selectedRoom, isSelectedRoomLocked);
+  const browserAccessMessage = browserAccessGateMessage(selectedRoom, isSelectedRoomLocked);
   const workspaceRequestMessage = isSelectedRoomLocked
     ? roomLockMessage(selectedRoom, isSelectedRoomRevoked)
     : "Workspace mode is disabled for this room.";
@@ -4158,8 +4161,8 @@ export function App() {
     }
     const room = selectedRoom;
     const activeHost = isActiveHost;
-    if (!room.mode.browser) {
-      setSelectedBrowserMessage("Browser mode is disabled for this room.");
+    if (!canRequestBrowser) {
+      setSelectedBrowserMessage(browserAccessMessage);
       return;
     }
     const roomId = room.id;
@@ -4259,6 +4262,10 @@ export function App() {
       setSelectedBrowserMessage(hostGateMessage);
       return;
     }
+    if (!canHostBrowser) {
+      setSelectedBrowserMessage(browserAccessMessage);
+      return;
+    }
     const roomId = selectedRoom.id;
     const decision = buildLocalRequestStatusPayload(request.id, "approved");
     updateBrowserRequestStatus(roomId, request.id, "approved");
@@ -4276,6 +4283,10 @@ export function App() {
     }
     if (!isActiveHost) {
       setSelectedBrowserMessage(hostGateMessage);
+      return;
+    }
+    if (!canHostBrowser) {
+      setSelectedBrowserMessage(browserAccessMessage);
       return;
     }
     const roomId = selectedRoom.id;
@@ -4296,6 +4307,10 @@ export function App() {
     }
     if (!isActiveHost) {
       setSelectedBrowserMessage(hostGateMessage);
+      return;
+    }
+    if (!canHostBrowser) {
+      setSelectedBrowserMessage(browserAccessMessage);
       return;
     }
     const room = selectedRoom;
@@ -4339,6 +4354,10 @@ export function App() {
     }
     if (!isActiveHost) {
       setSelectedBrowserMessage(hostGateMessage);
+      return;
+    }
+    if (!canHostBrowser) {
+      setSelectedBrowserMessage(browserAccessMessage);
       return;
     }
     const room = selectedRoom;
@@ -5918,7 +5937,7 @@ export function App() {
                 {selectedRoom.browserProfilePersistent ? "persists between opens" : "refreshes before each open"}
               </span>
             </div>
-            <button onClick={resetRoomBrowserProfile} disabled={!hasSelectedRoom || !isActiveHost}>
+            <button onClick={resetRoomBrowserProfile} disabled={!canHostBrowser}>
               <RefreshCw size={13} />
               Reset
             </button>
@@ -5973,7 +5992,7 @@ export function App() {
             <span>URL</span>
             <input
               value={browserUrl}
-              disabled={!hasSelectedRoom || !selectedRoom.mode.browser}
+              disabled={!canRequestBrowser}
               onChange={(event) => setBrowserUrlForRoom(selectedRoom.id, event.target.value)}
               placeholder="https://github.com/maddiedreese/multAIplayer"
             />
@@ -5982,7 +6001,7 @@ export function App() {
             <span>Reason</span>
             <textarea
               value={browserReason}
-              disabled={!hasSelectedRoom || !selectedRoom.mode.browser}
+              disabled={!canRequestBrowser}
               onChange={(event) => setBrowserReasonForRoom(selectedRoom.id, event.target.value)}
               placeholder="Why should Codex use this page?"
             />
@@ -5990,7 +6009,7 @@ export function App() {
           <button
             className="primary-wide"
             onClick={requestBrowserAccess}
-            disabled={!hasSelectedRoom || !selectedRoom.mode.browser || !browserUrl.trim()}
+            disabled={!canRequestBrowser || !browserUrl.trim()}
           >
             <Globe2 size={15} />
             Request browser access
@@ -6006,17 +6025,17 @@ export function App() {
                 <small>{request.status}</small>
                 {request.status === "pending" && (
                   <div>
-                    <button onClick={() => approveBrowserRequest(request)} disabled={!hasSelectedRoom || !isActiveHost}>
+                    <button onClick={() => approveBrowserRequest(request)} disabled={!canHostBrowser}>
                       <Check size={13} />
                     </button>
-                    <button onClick={() => denyBrowserRequest(request.id)} disabled={!hasSelectedRoom || !isActiveHost}>
+                    <button onClick={() => denyBrowserRequest(request.id)} disabled={!canHostBrowser}>
                       <X size={13} />
                     </button>
                   </div>
                 )}
                 {request.status === "approved" && (
                   <div>
-                    <button onClick={() => openApprovedBrowserRequest(request)} title="Open approved room browser" disabled={!hasSelectedRoom || !isActiveHost}>
+                    <button onClick={() => openApprovedBrowserRequest(request)} title="Open approved room browser" disabled={!canHostBrowser}>
                       <ExternalLink size={13} />
                     </button>
                   </div>

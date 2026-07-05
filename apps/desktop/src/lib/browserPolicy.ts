@@ -1,4 +1,5 @@
 import { defaultBrowserAllowedOrigins, type RoomRecord } from "@multaiplayer/protocol";
+import { isLocalUserActiveHostForRoom, type LocalHostUser } from "./roomHost";
 import { detectBrowserSecretRisks } from "./secretRisks";
 
 export function normalizeBrowserAllowedOrigins(value: string[] | string): string[] | null {
@@ -36,4 +37,18 @@ export function shouldAutoApproveBrowserRequest(url: string, room: RoomRecord, a
   if (!activeHost || room.approvalPolicy !== "auto_browser_allowed_sites") return false;
   if (detectBrowserSecretRisks(url).length > 0) return false;
   return isBrowserUrlAllowed(url, room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins);
+}
+
+export function canRequestBrowserAccess(room: RoomRecord, locked = false): boolean {
+  return !locked && room.mode.browser;
+}
+
+export function canHostBrowserAction(room: RoomRecord, user: LocalHostUser, locked = false): boolean {
+  return canRequestBrowserAccess(room, locked) && isLocalUserActiveHostForRoom(room, user);
+}
+
+export function browserAccessGateMessage(room: RoomRecord, locked = false): string {
+  if (locked) return "Unlock this room before using browser access.";
+  if (!room.mode.browser) return "Browser mode is disabled for this room.";
+  return "Browser access is available for this room.";
 }

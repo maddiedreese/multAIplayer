@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import {
+  browserAccessGateMessage,
+  canHostBrowserAction,
+  canRequestBrowserAccess,
   isBrowserUrlAllowed,
   normalizeBrowserAllowedOrigins,
   shouldAutoApproveBrowserRequest
@@ -47,4 +50,25 @@ test("shouldAutoApproveBrowserRequest refuses signed-in and credential-risk page
   assert.equal(shouldAutoApproveBrowserRequest("https://docs.example.com/account/security", room, true), false);
   assert.equal(shouldAutoApproveBrowserRequest("https://docs.example.com/guide", { ...room, approvalPolicy: "ask_every_turn" }, true), false);
   assert.equal(shouldAutoApproveBrowserRequest("https://docs.example.com/guide", room, false), false);
+});
+
+test("browser access requests require browser mode and an unlocked room", () => {
+  assert.equal(canRequestBrowserAccess(room), true);
+  assert.equal(canRequestBrowserAccess({ ...room, mode: { ...room.mode, browser: false } }), false);
+  assert.equal(canRequestBrowserAccess(room, true), false);
+});
+
+test("browser host actions require active host access", () => {
+  assert.equal(canHostBrowserAction(room, { id: "github:maddiedreese", name: "Maddie" }), true);
+  assert.equal(canHostBrowserAction(room, { id: "github:peer", name: "Peer" }), false);
+  assert.equal(canHostBrowserAction({ ...room, hostStatus: "offline" }, { id: "github:maddiedreese", name: "Maddie" }), false);
+  assert.equal(canHostBrowserAction(room, { id: "github:maddiedreese", name: "Maddie" }, true), false);
+});
+
+test("browser access gate messages explain missing browser access", () => {
+  assert.equal(browserAccessGateMessage(room, true), "Unlock this room before using browser access.");
+  assert.equal(
+    browserAccessGateMessage({ ...room, mode: { ...room.mode, browser: false } }),
+    "Browser mode is disabled for this room."
+  );
 });
