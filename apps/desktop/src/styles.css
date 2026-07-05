@@ -316,6 +316,21 @@ button:disabled {
   color: #7b867f;
 }
 
+.sidebar-create-form > button {
+  min-height: 32px;
+  border: 1px solid #cfd7cf;
+  border-radius: 7px;
+  background: #17201b;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.sidebar-create-form > button:disabled {
+  background: #eef1ed;
+  color: #8a958e;
+}
+
 .path-create-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 32px;
@@ -2702,6 +2717,7 @@ button:not(:disabled):active {
 .header-copy,
 .host-controls button,
 .section-title button,
+.sidebar-create-form > button,
 .path-create-row button,
 .message-meta button,
 .attachment button,
@@ -2782,11 +2798,36 @@ button:not(:disabled):active {
   letter-spacing: 0.08em;
 }
 
+.section-title button[aria-expanded="true"] {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
 .sidebar-create-form {
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.sidebar-create-form > button {
+  border-color: #11110f;
+  background: #11110f;
+  color: #fff8ea;
+}
+
+:root[data-theme="dark"] .sidebar-create-form > button {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #17120a;
+}
+
+.sidebar-create-form > button:disabled,
+:root[data-theme="dark"] .sidebar-create-form > button:disabled {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--text-muted);
 }
 
 .team-button,

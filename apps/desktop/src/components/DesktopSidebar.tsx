@@ -8,6 +8,7 @@ import {
   UsersRound,
   X
 } from "lucide-react";
+import { useState } from "react";
 import brandIcon from "../assets/multaiplayer-icon.png";
 import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
 
@@ -108,6 +109,12 @@ export function DesktopSidebar({
   onSelectSidebarPanel: (panel: SidebarPanelName) => void;
   onToggleTheme: () => void;
 }) {
+  const [teamCreateOpen, setTeamCreateOpen] = useState(false);
+  const [roomCreateOpen, setRoomCreateOpen] = useState(false);
+
+  const teamFormVisible = !searchActive && teamCreateOpen;
+  const roomFormVisible = !searchActive && roomCreateOpen;
+
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -163,9 +170,17 @@ export function DesktopSidebar({
       <section className="sidebar-section">
         <div className="section-title">
           <span>{searchActive ? "Matching teams" : "Teams"}</span>
-          <button onClick={onCreateTeam} aria-label="Create team" disabled={!newTeamName.trim()}><Plus size={15} /></button>
+          {!searchActive && (
+            <button
+              onClick={() => setTeamCreateOpen((open) => !open)}
+              aria-label={teamCreateOpen ? "Hide team form" : "New team"}
+              aria-expanded={teamCreateOpen}
+            >
+              {teamCreateOpen ? <X size={14} /> : <Plus size={15} />}
+            </button>
+          )}
         </div>
-        {!searchActive && (
+        {teamFormVisible && (
           <div className="sidebar-create-form">
             <input
               value={newTeamName}
@@ -178,6 +193,9 @@ export function DesktopSidebar({
               }}
               placeholder="Team name"
             />
+            <button onClick={onCreateTeam} disabled={!newTeamName.trim()}>
+              Create team
+            </button>
           </div>
         )}
         <div className="team-list">
@@ -203,9 +221,18 @@ export function DesktopSidebar({
       <section className="sidebar-section rooms">
         <div className="section-title">
           <span>{searchActive ? "Matching rooms" : "Rooms"}</span>
-          <button onClick={onCreateRoom} aria-label="Create room" disabled={!selectedTeam || !newRoomName.trim() || !newRoomProjectPath.trim()}><Plus size={15} /></button>
+          {!searchActive && (
+            <button
+              onClick={() => setRoomCreateOpen((open) => !open)}
+              aria-label={roomCreateOpen ? "Hide room form" : "New room"}
+              aria-expanded={roomCreateOpen}
+              disabled={!selectedTeam}
+            >
+              {roomCreateOpen ? <X size={14} /> : <Plus size={15} />}
+            </button>
+          )}
         </div>
-        {!searchActive && (
+        {roomFormVisible && (
           <div className="sidebar-create-form room-create-form">
             <input
               value={newRoomName}
@@ -230,6 +257,9 @@ export function DesktopSidebar({
                 <FolderGit2 size={14} />
               </button>
             </div>
+            <button onClick={onCreateRoom} disabled={!selectedTeam || !newRoomName.trim() || !newRoomProjectPath.trim()}>
+              Create room
+            </button>
           </div>
         )}
         {rooms.map((room) => (
