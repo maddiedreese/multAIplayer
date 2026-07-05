@@ -180,6 +180,8 @@ Human command requests are encrypted room events. The relay can route the reques
 
 Codex can spin up background or foreground terminals. A background terminal can be brought to the foreground by request or by host action.
 
+Live terminal listing, terminal start/restart/stop, terminal input, ad hoc host checks, and approved command execution are active-host local workspace actions. Non-host members can request terminal commands when the room is unlocked and workspace mode is enabled, but their clients do not list or control the active host's local terminal processes.
+
 The macOS alpha bounds approved one-shot terminal commands, persistent terminal launch commands, and interactive terminal input to 4,000 characters each, caps one-shot command output at 120,000 characters with an explicit truncation marker, and keeps the latest 1,000 output lines per terminal session in memory. Terminal snapshots are saved in encrypted local room history as stopped/restartable sessions, so a room can remember its named terminal roster and recent output after reload without claiming the underlying OS process survived. The desktop room activity feed for terminal, Codex, Git, and Actions events is also scoped per room and capped to the latest 1,000 lines per room.
 
 ### Browser Requests

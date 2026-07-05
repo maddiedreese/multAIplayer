@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { canUseLocalWorkspace, localWorkspaceGateMessage } from "../src/lib/workspaceAccess";
+import { canRequestWorkspaceAction, canUseLocalWorkspace, localWorkspaceGateMessage } from "../src/lib/workspaceAccess";
 
 const room: RoomRecord = {
   id: "room-workspace",
@@ -26,7 +26,14 @@ test("local workspace access requires active host, workspace mode, and unlocked 
   assert.equal(canUseLocalWorkspace(room, { id: "github:maddie", name: "Maddie" }, true), false);
 });
 
+test("workspace action requests require workspace mode and an unlocked room", () => {
+  assert.equal(canRequestWorkspaceAction(room), true);
+  assert.equal(canRequestWorkspaceAction({ ...room, mode: { ...room.mode, workspace: false } }), false);
+  assert.equal(canRequestWorkspaceAction(room, true), false);
+});
+
 test("local workspace gate messages explain the missing permission", () => {
+  assert.equal(localWorkspaceGateMessage(room, true), "Unlock this room before reading local project files.");
   assert.equal(
     localWorkspaceGateMessage({ ...room, mode: { ...room.mode, workspace: false } }),
     "Workspace mode is disabled for this room."

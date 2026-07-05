@@ -193,7 +193,7 @@ import { normalizeBrowserAllowedOrigins, shouldAutoApproveBrowserRequest } from 
 import { browserDecisionMessageId, buildBrowserDecisionMessage } from "./lib/browserActivity";
 import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
-import { canUseLocalWorkspace, localWorkspaceGateMessage } from "./lib/workspaceAccess";
+import { canRequestWorkspaceAction, canUseLocalWorkspace, localWorkspaceGateMessage } from "./lib/workspaceAccess";
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { copyTextToClipboard } from "./lib/clipboard";
@@ -747,7 +747,11 @@ export function App() {
   const isSelectedRoomRevoked = revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId);
   const isSelectedRoomLocked = isSelectedRoomForgotten || isSelectedRoomRevoked;
   const canReadLocalWorkspace = hasSelectedRoom && canUseLocalWorkspace(selectedRoom, localUser, isSelectedRoomLocked);
-  const localWorkspaceMessage = localWorkspaceGateMessage(selectedRoom);
+  const canRequestWorkspace = hasSelectedRoom && canRequestWorkspaceAction(selectedRoom, isSelectedRoomLocked);
+  const localWorkspaceMessage = localWorkspaceGateMessage(selectedRoom, isSelectedRoomLocked);
+  const workspaceRequestMessage = isSelectedRoomLocked
+    ? roomLockMessage(selectedRoom, isSelectedRoomRevoked)
+    : "Workspace mode is disabled for this room.";
   const hostGateMessage =
     selectedRoom.hostStatus === "active"
       ? `Only ${selectedRoom.host} can approve host-side actions in this room.`
@@ -1741,6 +1745,11 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    if (!canReadLocalWorkspace) {
+      setTerminals([]);
+      setSelectedTerminalIdForRoom(roomId, null);
+      return;
+    }
     let cancelled = false;
     listTerminals(roomId)
       .then((snapshots) => {
@@ -1767,10 +1776,10 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [hasSelectedRoom, selectedRoom.id]);
+  }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoom.id]);
 
   useEffect(() => {
-    if (!selectedTerminalId || !selectedTerminal?.running) return;
+    if (!canReadLocalWorkspace || !selectedTerminalId || !selectedTerminal?.running) return;
     let cancelled = false;
     const timer = window.setInterval(() => {
       readTerminal(selectedTerminalId)
@@ -3780,6 +3789,10 @@ export function App() {
       setSelectedTerminalError(hostGateMessage);
       return;
     }
+    if (!canReadLocalWorkspace) {
+      setSelectedTerminalError(localWorkspaceMessage);
+      return;
+    }
     const room = selectedRoom;
     const roomId = room.id;
     const projectPath = room.projectPath;
@@ -3808,6 +3821,10 @@ export function App() {
     }
     if (!isActiveHost) {
       setSelectedTerminalError(hostGateMessage);
+      return;
+    }
+    if (!canReadLocalWorkspace) {
+      setSelectedTerminalError(localWorkspaceMessage);
       return;
     }
     const room = selectedRoom;
@@ -3844,6 +3861,10 @@ export function App() {
       setSelectedTerminalError(hostGateMessage);
       return;
     }
+    if (!canReadLocalWorkspace) {
+      setSelectedTerminalError(localWorkspaceMessage);
+      return;
+    }
     const roomId = selectedRoom.id;
     setTerminalBusyForRoom(roomId, true);
     setTerminalErrorForRoom(roomId, null);
@@ -3875,6 +3896,10 @@ export function App() {
       setSelectedTerminalError(hostGateMessage);
       return;
     }
+    if (!canReadLocalWorkspace) {
+      setSelectedTerminalError(localWorkspaceMessage);
+      return;
+    }
     const roomId = selectedRoom.id;
     const terminalId = selectedTerminalId;
     setTerminalBusyForRoom(roomId, true);
@@ -3902,6 +3927,10 @@ export function App() {
       setSelectedTerminalError(hostGateMessage);
       return;
     }
+    if (!canReadLocalWorkspace) {
+      setSelectedTerminalError(localWorkspaceMessage);
+      return;
+    }
     const roomId = selectedRoom.id;
     const terminalId = selectedTerminalId;
     setTerminalErrorForRoom(roomId, null);
@@ -3921,6 +3950,10 @@ export function App() {
     if (!command) return;
     if (!hasSelectedRoom) {
       setSelectedTerminalError("Create or join a room before requesting terminal commands.");
+      return;
+    }
+    if (!canRequestWorkspace) {
+      setSelectedTerminalError(workspaceRequestMessage);
       return;
     }
     const room = selectedRoom;
@@ -3979,6 +4012,10 @@ export function App() {
     }
     if (!isActiveHost) {
       setSelectedTerminalError(hostGateMessage);
+      return;
+    }
+    if (!canReadLocalWorkspace) {
+      setSelectedTerminalError(localWorkspaceMessage);
       return;
     }
     const room = selectedRoom;
@@ -6647,7 +6684,7 @@ export function App() {
               <button className="ghost" onClick={copyTerminalMarkdown} disabled={!hasSelectedRoom}>
                 <Copy size={14} /> Markdown
               </button>
-              <button className="ghost" onClick={runApprovedTerminalCheck} disabled={!hasSelectedRoom || terminalBusy || !isActiveHost}>
+              <button className="ghost" onClick={runApprovedTerminalCheck} disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost}>
                 <Play size={14} /> {terminalBusy ? "running" : "git status"}
               </button>
             </div>
@@ -6663,10 +6700,10 @@ export function App() {
               onChange={(event) => setTerminalCommandForRoom(selectedRoom.id, event.target.value)}
               placeholder="command"
             />
-            <button onClick={startNamedTerminal} disabled={!hasSelectedRoom || terminalBusy || !isActiveHost || !terminalName.trim() || !terminalCommand.trim()}>
+            <button onClick={startNamedTerminal} disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost || !terminalName.trim() || !terminalCommand.trim()}>
               <Play size={14} />
             </button>
-            <button onClick={requestTerminalCommand} disabled={!hasSelectedRoom || !terminalCommand.trim()}>
+            <button onClick={requestTerminalCommand} disabled={!canRequestWorkspace || !terminalCommand.trim()}>
               <MessageSquare size={14} />
             </button>
             {terminalCommandRisks.length > 0 && (
@@ -6705,7 +6742,7 @@ export function App() {
                   <small>{request.status}</small>
                   {request.status === "pending" && (
                     <div>
-                      <button onClick={() => approveTerminalRequest(request)} disabled={!hasSelectedRoom || terminalBusy || !isActiveHost}>
+                      <button onClick={() => approveTerminalRequest(request)} disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost}>
                         <Check size={13} />
                       </button>
                       <button onClick={() => denyTerminalRequest(request.id)} disabled={!hasSelectedRoom || terminalBusy || !isActiveHost}>
@@ -6769,21 +6806,21 @@ export function App() {
                   }
                 }}
                 placeholder={`Send input to ${selectedTerminal.name}`}
-                disabled={!hasSelectedRoom || !selectedTerminal.running || !isActiveHost}
+                disabled={!canReadLocalWorkspace || !selectedTerminal.running || !isActiveHost}
               />
-              <button onClick={sendTerminalInput} disabled={!hasSelectedRoom || !selectedTerminal.running || !isActiveHost || !terminalInput.trim()}>
+              <button onClick={sendTerminalInput} disabled={!canReadLocalWorkspace || !selectedTerminal.running || !isActiveHost || !terminalInput.trim()}>
                 <Send size={14} />
               </button>
               {selectedTerminalCanRestart && (
                 <button
                   onClick={restartSelectedTerminal}
-                  disabled={!hasSelectedRoom || terminalBusy || !isActiveHost}
+                  disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost}
                   title={`Restart ${selectedTerminal.name}`}
                 >
                   <Play size={14} />
                 </button>
               )}
-              <button onClick={stopSelectedTerminal} disabled={!hasSelectedRoom || !selectedTerminal.running || terminalBusy || !isActiveHost}>
+              <button onClick={stopSelectedTerminal} disabled={!canReadLocalWorkspace || !selectedTerminal.running || terminalBusy || !isActiveHost}>
                 <X size={14} />
               </button>
             </div>
