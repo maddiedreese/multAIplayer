@@ -83,7 +83,7 @@ export function LocalHistoryPanel({
           disabled={!hasSelectedRoom}
           onChange={(event) => onHistoryEnabledChange(event.target.checked)}
         />
-        <span>Save encrypted local room history</span>
+        <span>Save local room history</span>
       </label>
       <label className="history-retention">
         <span>Retention days</span>
@@ -121,7 +121,7 @@ export function LocalHistoryPanel({
           disabled={!selectedTeam}
           onChange={(event) => onTeamHistoryEnabledChange(event.target.checked)}
         />
-        <span>Save encrypted history in new rooms for this team</span>
+        <span>Save history in new rooms for this team</span>
       </label>
       <label className="history-retention">
         <span>Team retention days</span>

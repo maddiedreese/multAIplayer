@@ -189,7 +189,7 @@ export function RoomSettingsDrawerPanel({
       </section>
 
       <section className="drawer-section">
-        <div className="drawer-section-title">Encrypted history</div>
+        <div className="drawer-section-title">Local history</div>
         <label className="checkbox-row">
           <input
             type="checkbox"

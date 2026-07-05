@@ -1,4 +1,4 @@
-import { Check, Copy, KeyRound, RefreshCw, X } from "lucide-react";
+import { Check, Copy, RefreshCw, X } from "lucide-react";
 
 export interface InviteRequestDisplay {
   id: string;
@@ -50,7 +50,7 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
   return (
     <section className="panel invite-panel">
       <div className="panel-title">
-        <span>Encrypted invite</span>
+        <span>Invites</span>
         <small className="panel-state available">
           {inviteApprovalGate ? "Host approval" : "Invite link"}
         </small>
@@ -69,7 +69,7 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
         <span>Ask host to approve joiners</span>
       </label>
       <label>
-        <span>Join from invite link or key</span>
+        <span>Join from invite</span>
         <textarea
           value={inviteSecretInput}
           onChange={(event) => onInviteSecretInputChange(event.target.value)}
@@ -77,15 +77,14 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
         />
       </label>
       <button className="ghost-wide" onClick={onImportInvite} disabled={importDisabled}>
-        <KeyRound size={15} />
         Import invite
       </button>
       <button className="ghost-wide danger" onClick={onRotateRoomKey} disabled={rotateDisabled}>
         <RefreshCw size={15} />
-        {keyRotationBusy ? "Rotating room key" : "Rotate room key"}
+        {keyRotationBusy ? "Refreshing room access" : "Refresh room access"}
       </button>
       <div className="empty-state compact">
-        Rotation updates future messages and invites for current key holders. It is not alpha member removal.
+        Refreshing access updates future messages and invites for current members. It is not member removal in this alpha.
       </div>
       <div className="terminal-requests">
         {inviteRequests.slice(-4).reverse().map((request) => (

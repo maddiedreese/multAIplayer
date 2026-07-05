@@ -513,7 +513,7 @@ const initialMessagesByRoom: Record<string, ChatMessage[]> = {
       id: "relay-m2",
       author: "Maddie",
       role: "human",
-      body: "Yes. Gated invites should only carry metadata and the host device key; approval can deliver the room key wrapped to the joiner's device.",
+      body: "Yes. Gated invites should carry only room metadata; the host can approve access when someone joins.",
       time: "09:55"
     }
   ],
@@ -1899,11 +1899,11 @@ export function App() {
                 id: plaintext.id,
                 author: "multAIplayer",
                 role: "system",
-                body: `${plaintext.rotatedBy} rotated the room key. Future messages and invites use the new key.`,
+                body: `${plaintext.rotatedBy} refreshed room access. Future messages and invites use the updated access state.`,
                 time: formatMessageTime(plaintext.rotatedAt),
                 createdAt: plaintext.rotatedAt
               });
-              setInviteMessageForRoom(message.envelope.roomId, `${plaintext.rotatedBy} rotated the room key for future messages.`);
+              setInviteMessageForRoom(message.envelope.roomId, `${plaintext.rotatedBy} refreshed room access for future messages.`);
             }
           }
         } catch (error) {
@@ -2916,7 +2916,7 @@ export function App() {
         roomId,
         plaintext.status === "approved"
           ? plaintext.wrappedRoomSecret
-            ? `${plaintext.decidedBy} approved your room join request and delivered a device-wrapped room key.`
+            ? `${plaintext.decidedBy} approved your room join request. This room is unlocked on this device.`
             : `${plaintext.decidedBy} approved your room join request.`
           : `${plaintext.decidedBy} denied your room join request.`
       );
@@ -3615,7 +3615,7 @@ export function App() {
     }
     const roomId = selectedRoom.id;
     const confirmed = window.confirm(
-      `Forget ${selectedRoom.name} on this device?\n\nThis deletes the encrypted local history, local history settings, and the local room key. You will need a fresh invite or room key to read or send encrypted room messages again.`
+      `Forget ${selectedRoom.name} on this device?\n\nThis deletes local history, room settings, and this device's room access. You will need a fresh invite or host approval to read or send room messages again.`
     );
     if (!confirmed) return;
     await forgetRoomLocalData(selectedRoom.id);
@@ -3701,7 +3701,7 @@ export function App() {
     setDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setHistorySettings(loadHistorySettings(selectedRoom.id));
     setSecretWarningVisibleForRoom(selectedRoom.id, true);
-    setHistoryMessageForRoom(roomId, "Forgot this room on this device. Rejoin or paste a room invite key to unlock it again.");
+    setHistoryMessageForRoom(roomId, "Forgot this room on this device. Rejoin from an invite to unlock it again.");
   }
 
   async function copyInviteLink() {
@@ -3746,11 +3746,11 @@ export function App() {
         try {
           await navigator.clipboard.writeText(link);
           if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-            setInviteMessageForRoom(roomId, "Copied gated invite link. The room key is not in the link; approval delivers it wrapped to the joiner's device key.");
+            setInviteMessageForRoom(roomId, "Copied approval invite link. The host will approve access when someone joins.");
           }
         } catch {
           if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-            setInviteMessageForRoom(roomId, "Gated invite generated. Copying was blocked because the app was not focused; the room key is not in the link.");
+            setInviteMessageForRoom(roomId, "Approval invite generated. Copying was blocked because the app was not focused.");
           }
         }
         return;
@@ -3770,11 +3770,11 @@ export function App() {
       try {
         await navigator.clipboard.writeText(link);
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setInviteMessageForRoom(roomId, "Copied direct invite link. It contains the room key, so it is not displayed in the app after copying.");
+          setInviteMessageForRoom(roomId, "Copied direct invite link. It grants room access, so it is not displayed after copying.");
         }
       } catch {
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setInviteMessageForRoom(roomId, "Direct invite generated, but copying was blocked. Because it contains the room key, it is not displayed; focus the app and try again or use the approval gate.");
+          setInviteMessageForRoom(roomId, "Direct invite generated, but copying was blocked. Focus the app and try again, or use host approval.");
         }
       }
     } catch (error) {
@@ -3784,7 +3784,7 @@ export function App() {
 
   async function rotateSelectedRoomKey() {
     if (!hasSelectedRoom) {
-      setSelectedInviteMessage("Create or join a room before rotating a room key.");
+      setSelectedInviteMessage("Create or join a room before refreshing room access.");
       return;
     }
     if (isSelectedRoomLocked) {
@@ -3797,7 +3797,7 @@ export function App() {
     }
     if (reportRoomKeyRotationInFlight(selectedRoom.id)) return;
     const confirmed = window.confirm(
-      `Rotate the room key for ${selectedRoom.name}?\n\nThis sends the new key to current room-key holders in an encrypted room event and clears stale encrypted local history on this device. It is not full member removal in the alpha.`
+      `Refresh room access for ${selectedRoom.name}?\n\nThis updates future messages and invites for current members. It is not full member removal in the alpha.`
     );
     if (!confirmed) return;
 
@@ -3840,7 +3840,7 @@ export function App() {
         id: payload.id,
         author: "multAIplayer",
         role: "system",
-        body: `${localUser.name} rotated the room key. Future messages and invites use the new key.`,
+        body: `${localUser.name} refreshed room access. Future messages and invites use the updated access state.`,
         time: formatMessageTime(rotatedAt),
         createdAt: rotatedAt
       });
@@ -3850,8 +3850,8 @@ export function App() {
         setInviteMessageForRoom(
           room.id,
           client && relayStatus !== "closed" && relayStatus !== "error"
-            ? "Rotated the room key for future messages and invites. Current key holders can receive it through the encrypted room event."
-            : "Rotated the local room key, but the relay is offline. Other members will need a fresh invite key."
+            ? "Refreshed room access for future messages and invites."
+            : "Refreshed access locally, but the relay is offline. Other members will need a fresh invite."
         );
       }
     } catch (error) {
@@ -3935,7 +3935,7 @@ export function App() {
       note: request.note
     }, inviteSecret.hostPublicKeyJwk);
     setInviteMessageForRoom(inviteSecret.roomId, published
-      ? `Requested access to ${acceptedRoomName}. The room key is not on this device until the host approves.`
+      ? `Requested access to ${acceptedRoomName}. The host needs to approve this device before the room unlocks.`
       : `Imported ${acceptedRoomName} metadata. Send again after the relay reconnects so the host can approve access.`);
   }
 
@@ -3946,7 +3946,7 @@ export function App() {
     if (inviteId) {
       const metadata = await lookupInvite(inviteId);
       if (metadata.invite.teamId !== inviteSecret.teamId || metadata.invite.roomId !== inviteSecret.roomId) {
-        throw new Error("Invite metadata does not match the encrypted room key fragment.");
+        throw new Error("Invite metadata does not match this invite.");
       }
       upsertTeam(metadata.team);
       upsertRoom(ensureRoomDefaults(metadata.room));
@@ -4019,11 +4019,11 @@ export function App() {
         note: request.note
       });
       setInviteMessageForRoom(inviteSecret.roomId, published
-        ? `Imported ${acceptedRoomName} and sent an encrypted join request to the active host.`
+        ? `Imported ${acceptedRoomName} and sent a join request to the active host.`
         : `Imported ${acceptedRoomName}. Send again after the relay reconnects so the host can approve access.`);
       return;
     }
-    setInviteMessageForRoom(inviteSecret.roomId, `Joined ${acceptedRoomName}. The relay provided metadata only; the room key stayed in the URL fragment.`);
+    setInviteMessageForRoom(inviteSecret.roomId, `Joined ${acceptedRoomName}.`);
   }
 
   async function joinInviteSecret() {
@@ -6367,7 +6367,7 @@ function canTransferTeamOwnership(
 
 function roomLockMessage(room: RoomRecord, revoked: boolean): string {
   if (revoked) return membershipRemovedRoomMessage(room.name);
-  return "This room was forgotten on this device. Paste a room invite key or get approved through a gated invite to unlock encrypted messages again.";
+  return "This room was forgotten on this device. Rejoin from an invite or get host approval to unlock messages again.";
 }
 
 function formatCodexThreadId(threadId: string | null): string {
