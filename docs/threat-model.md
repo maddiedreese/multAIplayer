@@ -43,7 +43,7 @@ The native desktop app stores room secrets and the device ECDH identity in the O
 
 The browser/web preview cannot access native keychain APIs, so it keeps using localStorage as a development fallback for room secrets and the device identity. Production security claims should be evaluated against the native app, not the web preview shell.
 
-Local room history is encrypted with the room secret before it is written to localStorage. The same encrypted payload includes room chat history, room workflow events, and the active host's last Codex thread id, so app restarts can resume the local Codex conversation without storing that thread id in plaintext app preferences or sending it to the relay as metadata.
+Local room history is encrypted with the room secret before it is written to localStorage. The same encrypted payload includes room chat history, room workflow events, stopped terminal snapshots, and the active host's last Codex thread id, so app restarts can resume the local Codex conversation and restore restartable terminal context without storing those values in plaintext app preferences or sending them to the relay as metadata.
 
 Draft message text and attachments are kept in memory per room. Large encrypted blob uploads append back to the originating room draft, so a delayed upload cannot attach project content to a different room after navigation.
 

@@ -110,7 +110,7 @@ Composer text and attachment drafts are scoped per room. If a user switches room
 
 Project file previews and encrypted attachment blob opens are also tied to the originating room. If a room switch happens while a file read or blob decrypt is in flight, the completed read is ignored rather than rendered into the newly selected room's inspector.
 
-The app keeps encrypted local history with a default retention window of 30 days. Retention is configurable per room, and each team can define the default retention policy inherited by newly created rooms. The local encrypted room payload includes chat messages plus host-side workflow records such as terminal requests, browser approvals, Codex events, Git workflow events, GitHub Actions refreshes, and host handoff packages.
+The app keeps encrypted local history with a default retention window of 30 days. Retention is configurable per room, and each team can define the default retention policy inherited by newly created rooms. The local encrypted room payload includes chat messages plus host-side workflow records such as terminal requests, terminal snapshots, browser approvals, Codex events, Git workflow events, GitHub Actions refreshes, and host handoff packages.
 
 ### Invoke Codex
 
@@ -177,7 +177,7 @@ Human command requests are encrypted room events. The relay can route the reques
 
 Codex can spin up background or foreground terminals. A background terminal can be brought to the foreground by request or by host action.
 
-The macOS alpha bounds approved one-shot terminal commands, persistent terminal launch commands, and interactive terminal input to 4,000 characters each, caps one-shot command output at 120,000 characters with an explicit truncation marker, and keeps the latest 1,000 output lines per terminal session in memory. The desktop room activity feed for terminal, Codex, Git, and Actions events is also scoped per room and capped to the latest 1,000 lines per room.
+The macOS alpha bounds approved one-shot terminal commands, persistent terminal launch commands, and interactive terminal input to 4,000 characters each, caps one-shot command output at 120,000 characters with an explicit truncation marker, and keeps the latest 1,000 output lines per terminal session in memory. Terminal snapshots are saved in encrypted local room history as stopped/restartable sessions, so a room can remember its named terminal roster and recent output after reload without claiming the underlying OS process survived. The desktop room activity feed for terminal, Codex, Git, and Actions events is also scoped per room and capped to the latest 1,000 lines per room.
 
 ### Browser Requests
 
@@ -296,7 +296,7 @@ Defaults:
 - 30-day retention window;
 - configurable per room and team;
 - team defaults apply to newly created rooms and can be explicitly applied to the current room;
-- chat messages, terminal requests, browser approvals, Codex events, Git workflow events, GitHub Actions refreshes, host handoff packages, and saved Codex thread continuity in one versioned encrypted room payload;
+- chat messages, terminal requests, terminal snapshots, browser approvals, Codex events, Git workflow events, GitHub Actions refreshes, host handoff packages, and saved Codex thread continuity in one versioned encrypted room payload;
 - attachment cache encrypted;
 - room keys in macOS Keychain in the native app;
 - user can clear local room history, including local room messages, workflow records, and the saved Codex thread id;

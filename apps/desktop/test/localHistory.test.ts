@@ -107,6 +107,7 @@ test("encrypted history keeps Codex thread continuity local and encrypted", asyn
     codexEvents: [],
     gitWorkflowEvents: [],
     githubActionsEvents: [],
+    terminalSnapshots: [],
     hostHandoffs: [],
     codexThreadId: "thr_room_123"
   };
@@ -179,6 +180,7 @@ test("encrypted history keeps Git workflow and Actions events local and encrypte
         updatedAt: "2026-07-05T00:01:00.000Z"
       }]
     }],
+    terminalSnapshots: [],
     hostHandoffs: []
   };
 
@@ -189,6 +191,43 @@ test("encrypted history keeps Git workflow and Actions events local and encrypte
   assert.doesNotMatch(stored, /codex\/add-history/);
   assert.doesNotMatch(stored, /Opened draft PR/);
   assert.doesNotMatch(stored, /28724623234/);
+  assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
+});
+
+test("encrypted history keeps terminal snapshots local and encrypted", async () => {
+  const roomId = "room-terminal-history";
+  const payload = {
+    version: 3,
+    messages: [],
+    terminalRequests: [],
+    browserRequests: [],
+    inviteRequests: [],
+    codexEvents: [],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
+    terminalSnapshots: [{
+      id: "room-terminal-history:dev-server",
+      roomId,
+      name: "dev-server",
+      cwd: "/Users/maddie/dev/multAIplayer",
+      command: "npm run dev:desktop",
+      running: false,
+      exitStatus: null,
+      startedAt: "2026-07-05T00:02:00.000Z",
+      lines: [
+        { stream: "system", text: "$ npm run dev:desktop" },
+        { stream: "stdout", text: "Local relay ready on http://127.0.0.1:4321" }
+      ]
+    }],
+    hostHandoffs: []
+  };
+
+  await saveEncryptedHistory(roomId, payload);
+
+  const stored = localStorage.getItem(`multaiplayer:history:${roomId}`);
+  assert.ok(stored);
+  assert.doesNotMatch(stored, /npm run dev:desktop/);
+  assert.doesNotMatch(stored, /Local relay ready/);
   assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
 });
 

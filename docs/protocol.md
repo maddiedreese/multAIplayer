@@ -35,6 +35,8 @@ Git workflow progress and GitHub Actions refreshes are routed as encrypted `git.
 
 Desktop clients also keep Git workflow events and GitHub Actions refreshes in the versioned encrypted local room-history payload. This lets a restarted client restore the latest workflow status and Actions panel from local ciphertext without storing plaintext branch names, PR URLs, command output, or run URLs on the relay.
 
+Persistent terminal snapshots are local-only and stored in that same encrypted room-history payload. Restored terminal snapshots are marked stopped/restartable; live terminal processes are not represented as durable relay state.
+
 Clients can send `subscribe.workspace` over the room WebSocket to receive plaintext `team.updated` metadata events when teams are created. They can also send `subscribe.team` to receive plaintext `room.updated` metadata events for that team. This keeps sidebars current when teams or rooms are created and when room settings change. These updates contain metadata only; encrypted chat envelopes still require joining the specific room.
 
 Room metadata is bounded before storage and broadcast. Project paths are trimmed, must be non-empty, cannot contain control characters, and are capped at 2,048 characters. Codex model ids are trimmed, capped at 80 characters, and must either match the known model switcher ids or a compact model-id pattern. Browser origin allowlists are normalized to http(s) origins, and browser profile persistence is stored as a boolean room setting.

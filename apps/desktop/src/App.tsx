@@ -290,6 +290,7 @@ interface LocalRoomHistoryPayload {
   codexEvents: CodexRoomEvent[];
   gitWorkflowEvents: GitWorkflowEventPlaintextPayload[];
   githubActionsEvents: GitHubActionsEventPlaintextPayload[];
+  terminalSnapshots: TerminalSnapshot[];
   hostHandoffs: HostHandoffRecord[];
   codexThreadId?: string;
 }
@@ -722,6 +723,7 @@ export function App() {
     .filter((member) => member.status === "online")
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
   const selectedTerminal = terminals.find((terminal) => terminal.id === selectedTerminalId) ?? null;
+  const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
   const hostHandoffs = hostHandoffsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const terminalRequests = terminalRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const inviteRequests = inviteRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
@@ -1254,6 +1256,16 @@ export function App() {
           [selectedRoomId]: `${latestGitHubActionsEvent.summary.label}: ${latestGitHubActionsEvent.message}`
         }));
       }
+      if (payload.terminalSnapshots.length) {
+        setTerminals(payload.terminalSnapshots);
+        setSelectedTerminalIdsByRoom((current) => {
+          const currentTerminalId = current[selectedRoomId] ?? null;
+          const nextTerminalId = currentTerminalId && payload.terminalSnapshots.some((terminal) => terminal.id === currentTerminalId)
+            ? currentTerminalId
+            : payload.terminalSnapshots[0]?.id ?? null;
+          return nextTerminalId ? { ...current, [selectedRoomId]: nextTerminalId } : current;
+        });
+      }
       setHostHandoffsByRoom((current) =>
         payload.hostHandoffs.length
           ? { ...current, [selectedRoomId]: payload.hostHandoffs }
@@ -1579,6 +1591,7 @@ export function App() {
       codexEvents,
       gitWorkflowEvents,
       githubActionsEvents,
+      terminalSnapshots: terminalsForLocalHistory(terminals.filter((terminal) => terminal.roomId === selectedRoomId)),
       hostHandoffs,
       ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
     }, historySettings.retentionDays);
@@ -1597,6 +1610,7 @@ export function App() {
     forgottenRoomIds,
     revokedRoomIds,
     revokedTeamIds,
+    terminals,
     messages,
     hasSelectedRoom,
     selectedCodexThreadId,
@@ -1699,12 +1713,19 @@ export function App() {
     listTerminals(roomId)
       .then((snapshots) => {
         if (cancelled) return;
-        setTerminals(snapshots);
+        let mergedSnapshots: TerminalSnapshot[] = [];
+        setTerminals((current) => {
+          mergedSnapshots = mergeTerminalSnapshots(
+            current.filter((terminal) => terminal.roomId === roomId),
+            snapshots
+          );
+          return mergedSnapshots;
+        });
         setSelectedTerminalIdsByRoom((current) => {
           const currentTerminalId = current[roomId] ?? null;
-          const nextTerminalId = currentTerminalId && snapshots.some((terminal) => terminal.id === currentTerminalId)
+          const nextTerminalId = currentTerminalId && mergedSnapshots.some((terminal) => terminal.id === currentTerminalId)
             ? currentTerminalId
-            : snapshots[0]?.id ?? null;
+            : mergedSnapshots[0]?.id ?? null;
           return nextTerminalId ? { ...current, [roomId]: nextTerminalId } : omitRecordKey(current, roomId);
         });
       })
@@ -1717,7 +1738,7 @@ export function App() {
   }, [hasSelectedRoom, selectedRoom.id]);
 
   useEffect(() => {
-    if (!selectedTerminalId) return;
+    if (!selectedTerminalId || !selectedTerminal?.running) return;
     let cancelled = false;
     const timer = window.setInterval(() => {
       readTerminal(selectedTerminalId)
@@ -1733,7 +1754,7 @@ export function App() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [hasSelectedRoom, selectedRoom.id, selectedTerminalId]);
+  }, [hasSelectedRoom, selectedRoom.id, selectedTerminal?.running, selectedTerminalId]);
 
   useEffect(() => {
     probeCodex().then(setCodexProbe).catch((error) => {
@@ -2822,6 +2843,7 @@ export function App() {
         codexEvents,
         gitWorkflowEvents,
         githubActionsEvents,
+        terminalSnapshots: terminalsForLocalHistory(terminals.filter((terminal) => terminal.roomId === roomId)),
         hostHandoffs,
         ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
       }, saved.retentionDays);
@@ -2832,6 +2854,7 @@ export function App() {
       setCodexEventsByRoom((current) => ({ ...current, [roomId]: payload.codexEvents }));
       setGitWorkflowEventsByRoom((current) => ({ ...current, [roomId]: payload.gitWorkflowEvents }));
       setGitHubActionsEventsByRoom((current) => ({ ...current, [roomId]: payload.githubActionsEvents }));
+      setTerminals(payload.terminalSnapshots);
       setHostHandoffsByRoom((current) => ({ ...current, [roomId]: payload.hostHandoffs }));
     }
     setHistoryMessageForRoom(
@@ -2992,6 +3015,14 @@ export function App() {
       ...current,
       [selectedRoom.id]: []
     }));
+    setGitWorkflowEventsByRoom((current) => ({
+      ...current,
+      [selectedRoom.id]: []
+    }));
+    setGitHubActionsEventsByRoom((current) => ({
+      ...current,
+      [selectedRoom.id]: []
+    }));
     setHostHandoffsByRoom((current) => ({
       ...current,
       [selectedRoom.id]: []
@@ -3033,6 +3064,7 @@ export function App() {
     setTerminalCommandsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setTerminalInputsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setTerminalErrorsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setTerminals((current) => current.filter((terminal) => terminal.roomId !== selectedRoom.id));
     setBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserReasonsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -3077,6 +3109,14 @@ export function App() {
       ...current,
       [selectedRoom.id]: []
     }));
+    setGitWorkflowEventsByRoom((current) => ({
+      ...current,
+      [selectedRoom.id]: []
+    }));
+    setGitHubActionsEventsByRoom((current) => ({
+      ...current,
+      [selectedRoom.id]: []
+    }));
     setHostHandoffsByRoom((current) => ({
       ...current,
       [selectedRoom.id]: []
@@ -3118,6 +3158,7 @@ export function App() {
     setTerminalCommandsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setTerminalInputsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setTerminalErrorsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setTerminals((current) => current.filter((terminal) => terminal.roomId !== selectedRoom.id));
     setBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserReasonsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -3725,6 +3766,37 @@ export function App() {
         name,
         room.projectPath,
         command
+      );
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setTerminals((current) => upsertTerminal(current, snapshot));
+        setSelectedTerminalIdForRoom(roomId, snapshot.id);
+      }
+    } catch (error) {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalErrorForRoom(roomId, String(error));
+    } finally {
+      setTerminalBusyForRoom(roomId, false);
+    }
+  }
+
+  async function restartSelectedTerminal() {
+    if (!selectedTerminal) return;
+    if (!hasSelectedRoom) {
+      setSelectedTerminalError("Create or join a room before restarting terminals.");
+      return;
+    }
+    if (!isActiveHost) {
+      setSelectedTerminalError(hostGateMessage);
+      return;
+    }
+    const roomId = selectedRoom.id;
+    setTerminalBusyForRoom(roomId, true);
+    setTerminalErrorForRoom(roomId, null);
+    try {
+      const snapshot = await startTerminal(
+        roomId,
+        selectedTerminal.name,
+        selectedTerminal.cwd || selectedRoom.projectPath,
+        selectedTerminal.command
       );
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setTerminals((current) => upsertTerminal(current, snapshot));
@@ -6558,6 +6630,15 @@ export function App() {
               <button onClick={sendTerminalInput} disabled={!hasSelectedRoom || !selectedTerminal.running || !isActiveHost || !terminalInput.trim()}>
                 <Send size={14} />
               </button>
+              {selectedTerminalCanRestart && (
+                <button
+                  onClick={restartSelectedTerminal}
+                  disabled={!hasSelectedRoom || terminalBusy || !isActiveHost}
+                  title={`Restart ${selectedTerminal.name}`}
+                >
+                  <Play size={14} />
+                </button>
+              )}
               <button onClick={stopSelectedTerminal} disabled={!hasSelectedRoom || !selectedTerminal.running || terminalBusy || !isActiveHost}>
                 <X size={14} />
               </button>
@@ -6863,6 +6944,9 @@ function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentionDays: 
     codexEvents: payload.codexEvents.filter((event) => isWithinRetention(event.createdAt, cutoffMs)),
     gitWorkflowEvents: payload.gitWorkflowEvents.filter((event) => isWithinRetention(event.createdAt, cutoffMs)),
     githubActionsEvents: payload.githubActionsEvents.filter((event) => isWithinRetention(event.checkedAt, cutoffMs)),
+    terminalSnapshots: terminalsForLocalHistory(
+      payload.terminalSnapshots.filter((terminal) => isWithinRetention(terminal.startedAt, cutoffMs))
+    ),
     hostHandoffs: payload.hostHandoffs.filter((handoff) => isWithinRetention(handoff.createdAt, cutoffMs)),
     ...(payload.codexThreadId ? { codexThreadId: payload.codexThreadId } : {})
   };
@@ -6886,6 +6970,7 @@ function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistoryPayloa
       codexEvents: [],
       gitWorkflowEvents: [],
       githubActionsEvents: [],
+      terminalSnapshots: [],
       hostHandoffs: []
     };
   }
@@ -6913,6 +6998,9 @@ function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistoryPayloa
       : [],
     githubActionsEvents: Array.isArray(value.githubActionsEvents)
       ? value.githubActionsEvents.filter(isGitHubActionsEventPlaintextPayload)
+      : [],
+    terminalSnapshots: Array.isArray(value.terminalSnapshots)
+      ? terminalsForLocalHistory(value.terminalSnapshots.filter(isTerminalSnapshot))
       : [],
     hostHandoffs: Array.isArray(value.hostHandoffs)
       ? value.hostHandoffs.filter(isHostHandoffRecord)
@@ -6984,6 +7072,26 @@ function isTerminalCommandRequest(value: unknown): value is TerminalCommandReque
     typeof value.requestedAt === "string" &&
     isWorkflowStatus(value.status)
   );
+}
+
+function isTerminalSnapshot(value: unknown): value is TerminalSnapshot {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.roomId === "string" &&
+    typeof value.name === "string" &&
+    typeof value.cwd === "string" &&
+    typeof value.command === "string" &&
+    typeof value.running === "boolean" &&
+    (typeof value.exitStatus === "number" || value.exitStatus === null) &&
+    typeof value.startedAt === "string" &&
+    Array.isArray(value.lines) &&
+    value.lines.every(isTerminalLine)
+  );
+}
+
+function isTerminalLine(value: unknown): value is { stream: string; text: string } {
+  return isRecord(value) && typeof value.stream === "string" && typeof value.text === "string";
 }
 
 function isRequestStatusPlaintextPayload(value: unknown): value is RequestStatusPlaintextPayload {
@@ -7412,6 +7520,30 @@ function upsertTerminal(current: TerminalSnapshot[], snapshot: TerminalSnapshot)
     ? current.map((terminal) => (terminal.id === snapshot.id ? snapshot : terminal))
     : [...current, snapshot];
   return next.sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function mergeTerminalSnapshots(remembered: TerminalSnapshot[], live: TerminalSnapshot[]): TerminalSnapshot[] {
+  const liveIds = new Set(live.map((terminal) => terminal.id));
+  return [
+    ...remembered
+      .filter((terminal) => !liveIds.has(terminal.id))
+      .map(terminalForLocalHistory),
+    ...live
+  ].sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function terminalsForLocalHistory(terminals: TerminalSnapshot[]): TerminalSnapshot[] {
+  return terminals
+    .map(terminalForLocalHistory)
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function terminalForLocalHistory(terminal: TerminalSnapshot): TerminalSnapshot {
+  return {
+    ...terminal,
+    running: false,
+    lines: terminal.lines.slice(-1000)
+  };
 }
 
 function withoutSetValue<T>(current: Set<T>, value: T): Set<T> {
