@@ -86,7 +86,7 @@ The active host is the user whose local desktop app talks to Codex app-server fo
 
 Only one Codex host is active per room. Hosting can be handed off. When hosting is handed off, the new host receives the room context needed to continue: encrypted local chat history, attachments, room metadata, and project association. After decrypting locally, the new host can approve Codex turns against the full available room context.
 
-The alpha sends host handoff packages as encrypted `room.host` events. They summarize the project path, selected model, approval policy, recent-message count, attachment names, and terminal names so a new host can understand what they are inheriting before claiming the room.
+The alpha sends host handoff packages as encrypted `room.host` events. They summarize the project path, selected model, approval policy, recent-message count, attachment names, and terminal names so a new host can understand what they are inheriting before claiming the room. Accepting a handoff sends a second encrypted `room.host` acceptance event so the room roster stops presenting that handoff as available.
 
 If the active host disconnects, the room remains available for human chat but becomes Codex-inactive until another member hosts.
 

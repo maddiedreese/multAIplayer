@@ -1394,14 +1394,15 @@ export function App() {
           }
           if (message.envelope.kind === "room.host") {
             const plaintext = await decryptJson<HostHandoffPlaintextPayload>(roomPayload, secret);
-            setHostHandoffsByRoom((current) => {
-              const roomHandoffs = current[message.envelope.roomId] ?? [];
-              if (roomHandoffs.some((existing) => existing.id === plaintext.id)) return current;
-              return {
-                ...current,
-                [message.envelope.roomId]: [...roomHandoffs, { ...plaintext, status: "available" }]
-              };
-            });
+            if (plaintext.status === "accepted") {
+              markHostHandoffAccepted(message.envelope.roomId, plaintext.id);
+              setHostMessageForRoom(
+                message.envelope.roomId,
+                `${plaintext.acceptedBy ?? "A room member"} accepted host handoff from ${plaintext.fromHost}.`
+              );
+            } else {
+              appendHostHandoff(message.envelope.roomId, { ...plaintext, status: "available" });
+            }
           }
           if (message.envelope.kind === "room.key") {
             const plaintext = await decryptJson<unknown>(roomPayload, secret);
@@ -2091,6 +2092,7 @@ export function App() {
       const claimed = await updateRoomHost(updatedSettings.id, localUser.name, localUser.id, "active");
       setRooms((current) => current.map((item) => (item.id === claimed.id ? ensureRoomDefaults(claimed) : item)));
       markHostHandoffAccepted(roomId, handoff.id);
+      await publishHostHandoffAccepted(selectedRoom, handoff);
       resetFileContextForRoom(roomId);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setProjectPathDraftForRoom(roomId, patch.projectPath);
@@ -2157,6 +2159,41 @@ export function App() {
       senderDeviceId: deviceId,
       senderUserId: localUser.id,
       createdAt: new Date().toISOString(),
+      kind: "room.host",
+      payload: await encryptJson(payload, secret)
+    };
+    seenEnvelopeIds.current.add(envelope.id);
+    client.publish({ type: "publish", envelope });
+  }
+
+  async function publishHostHandoffAccepted(room: RoomRecord, handoff: HostHandoffRecord) {
+    const client = relayRef.current;
+    if (!client || relayStatus === "closed" || relayStatus === "error") return;
+    const acceptedAt = new Date().toISOString();
+    const payload: HostHandoffPlaintextPayload = {
+      id: handoff.id,
+      fromHost: handoff.fromHost,
+      fromUserId: handoff.fromUserId,
+      projectPath: handoff.projectPath,
+      codexModel: handoff.codexModel,
+      approvalPolicy: handoff.approvalPolicy,
+      messagesSinceLastCodex: handoff.messagesSinceLastCodex,
+      attachmentNames: handoff.attachmentNames,
+      terminals: handoff.terminals,
+      createdAt: handoff.createdAt,
+      status: "accepted",
+      acceptedBy: localUser.name,
+      acceptedByUserId: localUser.id,
+      acceptedAt
+    };
+    const secret = await loadOrCreateRoomSecret(room.id);
+    const envelope: RelayEnvelope = {
+      id: crypto.randomUUID(),
+      teamId: room.teamId,
+      roomId: room.id,
+      senderDeviceId: deviceId,
+      senderUserId: localUser.id,
+      createdAt: acceptedAt,
       kind: "room.host",
       payload: await encryptJson(payload, secret)
     };

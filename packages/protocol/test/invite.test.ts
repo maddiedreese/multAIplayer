@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   InviteJoinRequestPlaintextPayload,
   InviteJoinStatusPlaintextPayload,
+  HostHandoffPlaintextPayload,
   RelayEnvelope,
   RoomKeyRotationPlaintextPayload,
   TeamMemberRecord,
@@ -29,6 +30,28 @@ test("team member records carry role and join metadata", () => {
   });
 
   assert.equal(parsed.role, "admin");
+});
+
+test("host handoff payloads can report room-visible acceptance", () => {
+  const parsed = HostHandoffPlaintextPayload.parse({
+    id: "handoff-1",
+    fromHost: "Maddie",
+    fromUserId: "github:maddie",
+    projectPath: "/tmp/multaiplayer",
+    codexModel: "gpt-5.4",
+    approvalPolicy: "ask_every_turn",
+    messagesSinceLastCodex: 2,
+    attachmentNames: [],
+    terminals: ["tests"],
+    createdAt: "2026-07-04T12:00:00.000Z",
+    status: "accepted",
+    acceptedBy: "Alex",
+    acceptedByUserId: "github:alex",
+    acceptedAt: "2026-07-04T12:05:00.000Z"
+  });
+
+  assert.equal(parsed.status, "accepted");
+  assert.equal(parsed.acceptedBy, "Alex");
 });
 
 test("invite join request accepts optional requester device public key", () => {

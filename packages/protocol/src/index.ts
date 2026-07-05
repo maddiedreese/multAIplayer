@@ -245,7 +245,11 @@ export const HostHandoffPlaintextPayload = z.object({
   messagesSinceLastCodex: z.number().int().nonnegative(),
   attachmentNames: z.array(z.string()),
   terminals: z.array(z.string()),
-  createdAt: z.string()
+  createdAt: z.string(),
+  status: z.enum(["available", "accepted"]).optional(),
+  acceptedBy: z.string().optional(),
+  acceptedByUserId: z.string().optional(),
+  acceptedAt: z.string().optional()
 });
 
 export const PresenceMessage = z.object({
