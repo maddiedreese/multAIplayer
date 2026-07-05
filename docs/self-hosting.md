@@ -20,6 +20,14 @@ The relay reads configuration from shell-exported environment variables first. F
 
 Shell-exported values take precedence over `.env` file values. The parser supports simple `KEY=value` lines, quoted values, blank lines, and comments.
 
+For a hosted or internet-facing relay, run the production relay doctor against the same shell environment used to start the relay:
+
+```bash
+npm run doctor:production-relay
+```
+
+This check fails if GitHub OAuth is missing, durable session encryption is weak or missing, credentialed browser origins are unset, auth is explicitly disabled, debug endpoints are enabled, or demo workspace seeding is enabled. It is a deployment sanity check, not a substitute for TLS, backups, log review, process supervision, or an external rate limiter in multi-instance deployments.
+
 ## Relay Storage
 
 The alpha relay persists its state to a JSON file. Set:
@@ -115,9 +123,10 @@ MULTAIPLAYER_RELAY_RATE_LIMIT_READ=300
 MULTAIPLAYER_RELAY_RATE_LIMIT_MUTATION=120
 MULTAIPLAYER_RELAY_RATE_LIMIT_ATTACHMENT=60
 MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET=600
+MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
 ```
 
-These limits are keyed by signed-in session when available, otherwise by client IP. HTTP requests over the limit receive `429` with `Retry-After`; room WebSocket clients receive an encrypted-room-safe error message and remain connected. The alpha limiter is process-local, so multi-instance deployments should add an edge or shared-store limiter in front of the relay.
+These limits are keyed by signed-in session when available, otherwise by client IP. By default, the relay uses the direct socket address and ignores `X-Forwarded-For`, because direct internet clients can spoof that header. Set `MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=true` only when the relay sits behind a trusted reverse proxy that removes client-supplied forwarding headers and writes its own. HTTP requests over the limit receive `429` with `Retry-After`; room WebSocket clients receive an encrypted-room-safe error message and remain connected. The alpha limiter is process-local, so multi-instance deployments should add an edge or shared-store limiter in front of the relay.
 
 Debug endpoints are available in non-production relay runs. In production (`NODE_ENV=production`), they are disabled unless explicitly enabled:
 
@@ -170,6 +179,8 @@ GITHUB_OAUTH_SCOPES="read:user repo"
 ```
 
 The app shows the relay-advertised scopes in the Account drawer so users can see what the self-hosted relay is asking GitHub to authorize.
+
+GitHub access tokens stay on the relay and are used only for identity, draft pull request creation, and Actions run reads. The relay does not return tokens to desktop clients, does not persist plaintext tokens, and normalizes successful/error responses from GitHub before returning them so arbitrary upstream fields are not relayed into the app.
 
 For local development, the desktop app expects:
 

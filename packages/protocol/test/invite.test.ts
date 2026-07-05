@@ -1,16 +1,25 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  DevicePublicKeyJwk,
+  GitHubActionsEventPlaintextPayload,
+  GitWorkflowEventPlaintextPayload,
   InviteJoinRequestPlaintextPayload,
   InviteJoinStatusPlaintextPayload,
+  DeviceRecord,
   HostHandoffPlaintextPayload,
   RelayEnvelope,
   RoomId,
   RoomSettingsPlaintextPayload,
   RoomKeyRotationPlaintextPayload,
+  TerminalResultPlaintextPayload,
   TeamId,
   TeamMemberRecord,
-  TeamRecord
+  TeamRecord,
+  maxGitHubActionRuns,
+  maxGitWorkflowResults,
+  maxLongTextChars,
+  maxWrappedCiphertextChars
 } from "../src/index";
 
 test("team and room ids use relay-safe bounded identifiers", () => {
@@ -49,6 +58,63 @@ test("team member records carry role and join metadata", () => {
   assert.equal(parsed.role, "admin");
 });
 
+test("device public key JWKs require bounded public P-256 material", () => {
+  const parsed = DevicePublicKeyJwk.parse({
+    kty: "EC",
+    crv: "P-256",
+    x: "x-coordinate",
+    y: "y-coordinate",
+    ext: true,
+    key_ops: []
+  });
+  assert.equal(parsed.kty, "EC");
+  assert.equal(parsed.crv, "P-256");
+
+  assert.equal(DevicePublicKeyJwk.safeParse({
+    kty: "EC",
+    crv: "P-256",
+    x: "x-coordinate",
+    y: "y-coordinate",
+    d: "private-material"
+  }).success, false);
+  assert.equal(DevicePublicKeyJwk.safeParse({
+    kty: "EC",
+    crv: "P-384",
+    x: "x-coordinate",
+    y: "y-coordinate"
+  }).success, false);
+  assert.equal(DevicePublicKeyJwk.safeParse({
+    kty: "RSA",
+    n: "modulus",
+    e: "AQAB"
+  }).success, false);
+  assert.equal(DevicePublicKeyJwk.safeParse({
+    kty: "EC",
+    crv: "P-256",
+    x: "x".repeat(129),
+    y: "y-coordinate"
+  }).success, false);
+});
+
+test("device records carry bounded public key JWKs", () => {
+  const parsed = DeviceRecord.parse({
+    userId: "github:maddiedreese",
+    deviceId: "device_12345678",
+    displayName: "Maddie",
+    publicKeyJwk: {
+      kty: "EC",
+      crv: "P-256",
+      x: "x-coordinate",
+      y: "y-coordinate",
+      ext: true
+    },
+    publicKeyFingerprint: "1111:2222:3333:4444",
+    registeredAt: "2026-07-04T12:00:00.000Z",
+    lastSeenAt: "2026-07-04T12:01:00.000Z"
+  });
+
+  assert.equal(parsed.publicKeyJwk.crv, "P-256");
+});
 test("host handoff payloads can report room-visible acceptance", () => {
   const parsed = HostHandoffPlaintextPayload.parse({
     id: "handoff-1",
@@ -200,6 +266,53 @@ test("relay envelope accepts device-sealed invite payloads", () => {
   assert.equal(parsed.payload.algorithm, "ECDH-P256-HKDF-SHA256-AES-GCM-256");
 });
 
+test("device-sealed and wrapped room secret payloads reject private keys and oversized ciphertext", () => {
+  assert.equal(RelayEnvelope.safeParse({
+    id: "envelope-oversized-sealed",
+    teamId: "team-1",
+    roomId: "room-1",
+    senderDeviceId: "device_12345678",
+    senderUserId: "github:maddie",
+    createdAt: "2026-07-04T12:02:00.000Z",
+    kind: "room.invite",
+    payload: {
+      algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
+      ephemeralPublicKeyJwk: {
+        kty: "EC",
+        crv: "P-256",
+        x: "ephemeral-x",
+        y: "ephemeral-y",
+        d: "private-material"
+      },
+      nonce: "nonce",
+      ciphertext: "ciphertext"
+    }
+  }).success, false);
+
+  assert.equal(InviteJoinStatusPlaintextPayload.safeParse({
+    eventType: "invite.status",
+    requestId: "device_12345678:request",
+    status: "approved",
+    decidedBy: "Host",
+    decidedByUserId: "github:host",
+    decidedAt: "2026-07-04T12:01:00.000Z",
+    recipientDeviceId: "device_12345678",
+    recipientPublicKeyFingerprint: "1111:2222:3333:4444:5555:6666:7777:8888",
+    wrappedRoomSecret: {
+      version: 1,
+      algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
+      ephemeralPublicKeyJwk: {
+        kty: "EC",
+        crv: "P-256",
+        x: "ephemeral-x",
+        y: "ephemeral-y"
+      },
+      nonce: "nonce",
+      ciphertext: "x".repeat(maxWrappedCiphertextChars + 1)
+    }
+  }).success, false);
+});
+
 test("room key rotation payload carries a new room secret", () => {
   const parsed = RoomKeyRotationPlaintextPayload.parse({
     eventType: "room.key.rotated",
@@ -234,4 +347,59 @@ test("relay envelope accepts encrypted room key rotation events", () => {
   });
 
   assert.equal(parsed.kind, "room.key");
+});
+
+test("decrypted workflow payloads reject unbounded local persistence fields", () => {
+  assert.equal(TerminalResultPlaintextPayload.safeParse({
+    eventType: "terminal.result",
+    requestId: "request-1",
+    command: "npm test",
+    cwd: "/tmp/project",
+    exitStatus: 0,
+    stdout: "x".repeat(maxLongTextChars + 1),
+    stderr: "",
+    ranBy: "Host",
+    ranByUserId: "github:host",
+    startedAt: "2026-07-04T12:00:00.000Z",
+    finishedAt: "2026-07-04T12:01:00.000Z"
+  }).success, false);
+
+  assert.equal(GitWorkflowEventPlaintextPayload.safeParse({
+    eventType: "git.workflow",
+    status: "completed",
+    branch: "codex/security",
+    push: true,
+    message: "Done",
+    runner: "Host",
+    runnerUserId: "github:host",
+    createdAt: "2026-07-04T12:00:00.000Z",
+    results: Array.from({ length: maxGitWorkflowResults + 1 }, (_, index) => ({
+      command: `echo ${index}`,
+      cwd: "/tmp/project",
+      status: 0,
+      stdout: "",
+      stderr: ""
+    }))
+  }).success, false);
+
+  assert.equal(GitHubActionsEventPlaintextPayload.safeParse({
+    eventType: "github.actions",
+    owner: "maddiedreese",
+    repo: "multAIplayer",
+    branch: "main",
+    summary: { label: "CI", detail: "Too many runs", tone: "yellow" },
+    message: "Checked Actions",
+    checkedBy: "Host",
+    checkedByUserId: "github:host",
+    checkedAt: "2026-07-04T12:00:00.000Z",
+    runs: Array.from({ length: maxGitHubActionRuns + 1 }, (_, index) => ({
+      id: index + 1,
+      name: "CI",
+      status: "completed",
+      conclusion: "success",
+      url: "https://github.com/maddiedreese/multAIplayer/actions",
+      createdAt: "2026-07-04T12:00:00.000Z",
+      updatedAt: "2026-07-04T12:01:00.000Z"
+    }))
+  }).success, false);
 });

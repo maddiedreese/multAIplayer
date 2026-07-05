@@ -282,6 +282,46 @@ test("expired encrypted history is removed on load", async () => {
   assert.equal(localStorage.getItem(key), null);
 });
 
+test("malformed encrypted history records are removed on load", async () => {
+  const roomId = "room-malformed-history";
+  const key = `multaiplayer:history:${roomId}`;
+  localStorage.setItem(key, JSON.stringify({
+    savedAt: "not-a-date",
+    ciphertext: {
+      algorithm: "AES-GCM-256",
+      nonce: "AAAAAAAAAAAAAAAA",
+      ciphertext: "AAAAAAAAAAAAAAAAAAAAAA=="
+    }
+  }));
+
+  assert.equal(await loadEncryptedHistory(roomId), null);
+  assert.equal(localStorage.getItem(key), null);
+});
+
+test("tampered encrypted history is removed without exposing plaintext", async () => {
+  const roomId = "room-tampered-history";
+  const key = `multaiplayer:history:${roomId}`;
+  await saveEncryptedHistory(roomId, { messages: [{ body: "still private" }] });
+  const stored = JSON.parse(localStorage.getItem(key) ?? "{}") as {
+    savedAt: string;
+    ciphertext: { algorithm: string; nonce: string; ciphertext: string };
+  };
+  localStorage.setItem(
+    key,
+    JSON.stringify({
+      ...stored,
+      ciphertext: {
+        ...stored.ciphertext,
+        ciphertext: "AAAAAAAAAAAAAAAAAAAAAA=="
+      }
+    })
+  );
+
+  assert.equal(await loadEncryptedHistory(roomId), null);
+  assert.equal(localStorage.getItem(key), null);
+  assert.doesNotMatch(localStorage.dump(), /still private/);
+});
+
 test("history retention settings are sanitized to the supported range", () => {
   assert.deepEqual(saveHistorySettings("room-low", { enabled: true, retentionDays: -10 }), {
     enabled: true,
@@ -311,6 +351,29 @@ test("clearEncryptedHistory removes only the selected room payload", async () =>
 test("loadEncryptedHistory does not create a room secret when no history exists", async () => {
   assert.equal(await loadEncryptedHistory("room-no-history"), null);
   assert.equal(localStorage.getItem("multaiplayer:room-secret:room-no-history"), null);
+});
+
+test("invalid fallback room secrets are removed instead of migrated", async () => {
+  const roomId = "room-invalid-fallback-secret";
+  const key = `multaiplayer:room-secret:${roomId}`;
+  localStorage.setItem(key, JSON.stringify({
+    algorithm: "AES-GCM-256",
+    rawKey: "not-a-256-bit-key"
+  }));
+
+  assert.equal(await loadRoomSecret(roomId), null);
+  assert.equal(localStorage.getItem(key), null);
+});
+
+test("room secret imports reject invalid key material", async () => {
+  await assert.rejects(
+    () => importRoomSecret("room-invalid-import", {
+      algorithm: "AES-GCM-256",
+      rawKey: "not-a-256-bit-key"
+    }),
+    /Room key must be 256 bits/
+  );
+  assert.equal(localStorage.getItem("multaiplayer:room-secret:room-invalid-import"), null);
 });
 
 test("forgetRoomLocalData removes history, settings, and the local fallback room secret", async () => {

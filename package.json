@@ -19,6 +19,7 @@
     "test:native": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml",
     "verify": "npm run check && npm test && npm run fmt:rust:check && npm run test:native && npm run build",
     "doctor": "node scripts/doctor.mjs",
+    "doctor:production-relay": "node scripts/doctor.mjs --production-relay",
     "dev": "concurrently -k --names relay,desktop --prefix-colors cyan,green \"npm:dev:relay\" \"npm:dev:desktop\"",
     "dev:desktop": "npm run dev -w @multaiplayer/desktop",
     "dev:relay": "npm run dev -w @multaiplayer/relay",

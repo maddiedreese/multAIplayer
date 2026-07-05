@@ -17,6 +17,8 @@ The intended security properties are:
 
 Known alpha limitations are documented in [docs/threat-model.md](docs/threat-model.md), especially member removal, key rotation, identity verification, and multi-device recovery.
 
+Release-specific checks and unsigned macOS artifact notes are tracked in [docs/release-hardening.md](docs/release-hardening.md).
+
 ## Reporting
 
 Until a private security contact is published, please open a GitHub issue with a minimal description and mark it clearly as security-sensitive. Do not include live secrets, access tokens, private repo contents, real chat transcripts, or exploit payloads that would expose another user's data.

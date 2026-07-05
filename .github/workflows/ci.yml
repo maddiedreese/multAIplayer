@@ -18,6 +18,7 @@ jobs:
   web-and-relay:
     name: Web, relay, and packages
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out repo
         uses: actions/checkout@v7
@@ -43,6 +44,7 @@ jobs:
   macos-desktop:
     name: macOS desktop package
     runs-on: macos-15
+    timeout-minutes: 45
     steps:
       - name: Check out repo
         uses: actions/checkout@v7

@@ -12,6 +12,7 @@ import { normalizeGitHubBranchName, normalizeGitHubRepoRef, normalizePullRequest
 import {
   AttachmentBlobRecord,
   CiphertextPayload,
+  DevicePublicKeyJwk,
   InviteRecord,
   RelayEnvelope,
   RelayClientMessage,
@@ -20,6 +21,10 @@ import {
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   codexModelOptions,
+  maxMediumTextChars,
+  maxShortTextChars,
+  maxUrlChars,
+  type DevicePublicKeyJwk as DevicePublicKeyJwkType,
   type InviteRecord as InviteRecordType,
   type AttachmentBlobRecord as AttachmentBlobRecordType,
   type DeviceRecord,
@@ -52,6 +57,7 @@ const mutationsRequireAuth = parseBooleanEnv(
   process.env.NODE_ENV === "production"
 );
 const rateLimitsEnabled = parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMITS, true);
+const trustProxyHeaders = parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS, false);
 const rateLimitWindowMs = parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS, 60_000, 1_000, 3_600_000);
 const rateLimitCaps = {
   auth: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_AUTH, 30, 1, 10_000),
@@ -128,6 +134,8 @@ const maxPublicKeyFingerprintChars = 128;
 const maxPublicKeyJwkChars = 4096;
 const maxAuthSessionIdChars = 160;
 const maxAccessTokenChars = 8192;
+const maxEncryptedAccessTokenChars = Math.ceil(maxAccessTokenChars * 4 / 3) + 1024;
+const maxGitHubDeviceCodeChars = 256;
 const maxEnvelopeIdChars = 160;
 const maxEnvelopeNonceChars = 512;
 const maxEnvelopeCiphertextChars = Math.ceil(encryptedEnvelopeMaxBytes * 4 / 3) + 1024;
@@ -276,9 +284,9 @@ app.post("/auth/github/device/poll", async (req, res) => {
     return;
   }
 
-  const deviceCode = String(req.body?.device_code ?? "");
+  const deviceCode = normalizeMetadataText(req.body?.device_code, maxGitHubDeviceCodeChars);
   if (!deviceCode) {
-    res.status(400).json({ error: "device_code is required" });
+    res.status(400).json({ error: "device_code must be a bounded non-empty string" });
     return;
   }
 
@@ -409,15 +417,15 @@ app.post("/github/pulls", async (req, res) => {
   });
   const responseBody = await response.json();
   if (!response.ok) {
-    res.status(response.status).json(responseBody);
+    res.status(response.status).json(normalizeGitHubErrorResponse(responseBody));
     return;
   }
-  res.status(201).json({
-    id: responseBody.id,
-    number: responseBody.number,
-    url: responseBody.html_url,
-    title: responseBody.title
-  });
+  const pullRequest = normalizeGitHubPullResponse(responseBody);
+  if (!pullRequest) {
+    res.status(502).json({ error: "GitHub returned an invalid pull request response." });
+    return;
+  }
+  res.status(201).json(pullRequest);
 });
 
 app.get("/github/actions/runs", async (req, res) => {
@@ -450,28 +458,11 @@ app.get("/github/actions/runs", async (req, res) => {
   });
   const responseBody = await response.json();
   if (!response.ok) {
-    res.status(response.status).json(responseBody);
+    res.status(response.status).json(normalizeGitHubErrorResponse(responseBody));
     return;
   }
 
-  res.json({
-    totalCount: responseBody.total_count ?? 0,
-    runs: (responseBody.workflow_runs ?? []).slice(0, 6).map((run: Record<string, unknown>) => ({
-      id: run.id,
-      name: run.name,
-      displayTitle: run.display_title,
-      runNumber: run.run_number,
-      workflowId: run.workflow_id,
-      status: run.status,
-      conclusion: run.conclusion,
-      branch: run.head_branch,
-      headSha: run.head_sha,
-      event: run.event,
-      url: run.html_url,
-      createdAt: run.created_at,
-      updatedAt: run.updated_at
-    }))
-  });
+  res.json(normalizeGitHubActionsResponse(responseBody));
 });
 
 app.get("/teams", (_req, res) => {
@@ -621,13 +612,13 @@ app.post("/devices", (req, res) => {
   const displayName = session
     ? normalizeMetadataText(displayNameForUser(session.user), maxDisplayNameChars)
     : normalizeMetadataText(req.body?.displayName, maxDisplayNameChars);
-  const publicKeyJwk = req.body?.publicKeyJwk;
+  const publicKeyJwk = normalizeDevicePublicKeyJwk(req.body?.publicKeyJwk);
   const publicKeyFingerprint = normalizeMetadataText(req.body?.publicKeyFingerprint, maxPublicKeyFingerprintChars);
   if (!userId || !deviceId || !displayName) {
     res.status(400).json({ error: "userId, deviceId, and displayName are required" });
     return;
   }
-  if (!isRecord(publicKeyJwk) || !publicKeyFingerprint || !isJsonStringifiableWithin(publicKeyJwk, maxPublicKeyJwkChars)) {
+  if (!publicKeyJwk || !publicKeyFingerprint) {
     res.status(400).json({ error: "A public key JWK and fingerprint are required" });
     return;
   }
@@ -1087,7 +1078,13 @@ wss.on("connection", (socket, request) => {
         send(socket, { type: "error", message: "Rate limit exceeded. Slow down before sending more room events." });
         return;
       }
-      const parsed = RelayClientMessage.parse(JSON.parse(raw.toString()));
+      const rawMessage = JSON.parse(raw.toString());
+      const preflightError = relayClientMessagePreflightError(rawMessage);
+      if (preflightError) {
+        send(socket, { type: "error", message: preflightError });
+        return;
+      }
+      const parsed = RelayClientMessage.parse(rawMessage);
       if (parsed.type === "join") {
         if (!isBoundedSocketIdentity(parsed.userId, parsed.deviceId)) {
           send(socket, { type: "error", message: "WebSocket user and device ids must be bounded strings without control characters." });
@@ -1250,6 +1247,65 @@ function isRelayEnvelopeWithinLimits(envelope: RelayEnvelope): boolean {
     if (!isJsonStringifiableWithin(envelope.payload.ephemeralPublicKeyJwk, maxPublicKeyJwkChars)) return false;
   }
   return Buffer.byteLength(JSON.stringify(envelope), "utf8") <= encryptedEnvelopeMaxBytes;
+}
+
+function relayClientMessagePreflightError(message: unknown): string | null {
+  if (!isRecord(message) || typeof message.type !== "string") return null;
+  if (message.type === "join" || message.type === "subscribe.team" || message.type === "subscribe.workspace") {
+    if (
+      typeof message.userId === "string" &&
+      typeof message.deviceId === "string" &&
+      !isBoundedSocketIdentity(message.userId, message.deviceId)
+    ) {
+      return "WebSocket user and device ids must be bounded strings without control characters.";
+    }
+    return null;
+  }
+  if (message.type === "publish" && isRecord(message.envelope)) {
+    const envelope = message.envelope;
+    if (
+      typeof envelope.id === "string" &&
+      typeof envelope.senderUserId === "string" &&
+      typeof envelope.senderDeviceId === "string" &&
+      isRecord(envelope.payload) &&
+      typeof envelope.payload.nonce === "string" &&
+      typeof envelope.payload.ciphertext === "string" &&
+      (
+        !normalizeMetadataText(envelope.id, maxEnvelopeIdChars) ||
+        !normalizeMetadataText(envelope.senderUserId, maxUserIdChars) ||
+        !normalizeMetadataText(envelope.senderDeviceId, maxDeviceIdChars) ||
+        !normalizeMetadataText(envelope.payload.nonce, maxEnvelopeNonceChars) ||
+        !envelope.payload.ciphertext ||
+        envelope.payload.ciphertext.length > maxEnvelopeCiphertextChars ||
+        Buffer.byteLength(JSON.stringify(envelope), "utf8") > encryptedEnvelopeMaxBytes
+      )
+    ) {
+      return `Encrypted room envelope exceeds relay limits (${encryptedEnvelopeMaxBytes} bytes max).`;
+    }
+  }
+  if (message.type === "presence") {
+    if (
+      typeof message.displayName === "string" &&
+      !normalizeMetadataText(message.displayName, maxDisplayNameChars)
+    ) {
+      return "Presence display name, avatar URL, and fingerprint must be bounded strings without control characters.";
+    }
+    if (
+      message.avatarUrl !== undefined &&
+      typeof message.avatarUrl === "string" &&
+      !normalizeMetadataText(message.avatarUrl, maxRoomProjectPathChars)
+    ) {
+      return "Presence display name, avatar URL, and fingerprint must be bounded strings without control characters.";
+    }
+    if (
+      message.publicKeyFingerprint !== undefined &&
+      typeof message.publicKeyFingerprint === "string" &&
+      !normalizeMetadataText(message.publicKeyFingerprint, maxPublicKeyFingerprintChars)
+    ) {
+      return "Presence display name, avatar URL, and fingerprint must be bounded strings without control characters.";
+    }
+  }
+  return null;
 }
 
 function isBoundedSocketIdentity(userId: string, deviceId: string): boolean {
@@ -1483,31 +1539,41 @@ function pruneRateLimitStore(now = Date.now()) {
 }
 
 function clientIdentityFromRequest(req: Request): string {
-  const sessionId = typeof req.cookies?.multaiplayer_session === "string" ? req.cookies.multaiplayer_session : "";
+  const sessionId = normalizeAuthSessionId(req.cookies?.multaiplayer_session);
   if (sessionId) return `session:${sessionId}`;
   return clientIdentityFromIncomingMessage(req);
 }
 
 function clientIdentityFromIncomingMessage(request: IncomingMessage): string {
   const cookies = parseCookieHeader(request.headers.cookie);
-  const sessionId = cookies.get("multaiplayer_session");
+  const sessionId = normalizeAuthSessionId(cookies.get("multaiplayer_session"));
   if (sessionId) return `session:${sessionId}`;
-  const forwardedFor = request.headers["x-forwarded-for"];
-  const forwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-  const ip = forwardedIp?.split(",")[0]?.trim() || request.socket.remoteAddress || "unknown";
+  const forwardedIp = trustProxyHeaders ? firstForwardedForIp(request.headers["x-forwarded-for"]) : null;
+  const ip = forwardedIp || request.socket.remoteAddress || "unknown";
   return `ip:${ip}`;
 }
 
+function firstForwardedForIp(header: string | string[] | undefined): string | null {
+  const value = Array.isArray(header) ? header[0] : header;
+  const ip = value?.split(",")[0]?.trim();
+  return ip || null;
+}
+
 function getAuthSession(sessionId: unknown): AuthSession | null {
-  if (typeof sessionId !== "string") return null;
-  const session = authSessions.get(sessionId);
+  const normalizedSessionId = normalizeAuthSessionId(sessionId);
+  if (!normalizedSessionId) return null;
+  const session = authSessions.get(normalizedSessionId);
   if (!session) return null;
   if (session.expiresAt <= Date.now()) {
-    authSessions.delete(sessionId);
+    authSessions.delete(normalizedSessionId);
     scheduleStoreSave();
     return null;
   }
   return session;
+}
+
+function normalizeAuthSessionId(value: unknown): string {
+  return normalizeRelayId(value, maxAuthSessionIdChars) ?? "";
 }
 
 function getAuthSessionFromRequest(request: IncomingMessage): AuthSession | undefined {
@@ -1805,12 +1871,128 @@ function normalizeOptionalMetadataText(value: unknown, maxChars: number): string
   return normalizeMetadataText(text, maxChars);
 }
 
+function normalizeGitHubErrorResponse(value: unknown): { error: string; message?: string } {
+  const message = isRecord(value)
+    ? normalizeMetadataText(value.message, maxMediumTextChars)
+    : null;
+  return {
+    error: message ?? "GitHub request failed.",
+    ...(message ? { message } : {})
+  };
+}
+
+function normalizeGitHubPullResponse(value: unknown): {
+  id: number;
+  number: number;
+  url: string;
+  title: string;
+} | null {
+  if (!isRecord(value)) return null;
+  const id = normalizeSafeNonnegativeInteger(value.id);
+  const number = normalizeSafeNonnegativeInteger(value.number);
+  const url = normalizeMetadataText(value.html_url, maxUrlChars);
+  const title = normalizeMetadataText(value.title, maxShortTextChars);
+  if (id === null || number === null || !url || !title) return null;
+  return { id, number, url, title };
+}
+
+function normalizeGitHubActionsResponse(value: unknown): {
+  totalCount: number;
+  runs: Array<{
+    id: number;
+    name: string;
+    displayTitle?: string;
+    runNumber?: number;
+    workflowId?: number;
+    status: string;
+    conclusion: string | null;
+    branch?: string;
+    headSha?: string;
+    event?: string;
+    url: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+} {
+  if (!isRecord(value)) return { totalCount: 0, runs: [] };
+  return {
+    totalCount: normalizeSafeNonnegativeInteger(value.total_count) ?? 0,
+    runs: Array.isArray(value.workflow_runs)
+      ? value.workflow_runs.slice(0, 6).map(normalizeGitHubActionRun).filter((run) => run !== null)
+      : []
+  };
+}
+
+function normalizeGitHubActionRun(value: unknown): {
+  id: number;
+  name: string;
+  displayTitle?: string;
+  runNumber?: number;
+  workflowId?: number;
+  status: string;
+  conclusion: string | null;
+  branch?: string;
+  headSha?: string;
+  event?: string;
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+} | null {
+  if (!isRecord(value)) return null;
+  const id = normalizeSafeNonnegativeInteger(value.id);
+  const name = normalizeMetadataText(value.name, maxShortTextChars);
+  const status = normalizeMetadataText(value.status, maxShortTextChars);
+  const url = normalizeMetadataText(value.html_url, maxUrlChars);
+  const createdAt = normalizeMetadataText(value.created_at, maxShortTextChars);
+  const updatedAt = normalizeMetadataText(value.updated_at, maxShortTextChars);
+  if (id === null || !name || !status || !url || !createdAt || !updatedAt) return null;
+  const conclusion = value.conclusion === null
+    ? null
+    : normalizeMetadataText(value.conclusion, maxShortTextChars);
+  if (value.conclusion !== null && !conclusion) return null;
+  const displayTitle = normalizeOptionalMetadataText(value.display_title, maxShortTextChars);
+  const branch = normalizeOptionalMetadataText(value.head_branch, maxShortTextChars);
+  const headSha = normalizeOptionalMetadataText(value.head_sha, maxShortTextChars);
+  const event = normalizeOptionalMetadataText(value.event, maxShortTextChars);
+  const runNumber = normalizeOptionalSafeNonnegativeInteger(value.run_number);
+  const workflowId = normalizeOptionalSafeNonnegativeInteger(value.workflow_id);
+  return {
+    id,
+    name,
+    ...(displayTitle ? { displayTitle } : {}),
+    ...(runNumber !== undefined ? { runNumber } : {}),
+    ...(workflowId !== undefined ? { workflowId } : {}),
+    status,
+    conclusion,
+    ...(branch ? { branch } : {}),
+    ...(headSha ? { headSha } : {}),
+    ...(event ? { event } : {}),
+    url,
+    createdAt,
+    updatedAt
+  };
+}
+
+function normalizeSafeNonnegativeInteger(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+function normalizeOptionalSafeNonnegativeInteger(value: unknown): number | undefined {
+  return value === undefined || value === null ? undefined : normalizeSafeNonnegativeInteger(value) ?? undefined;
+}
+
 function isJsonStringifiableWithin(value: unknown, maxChars: number): boolean {
   try {
     return JSON.stringify(value).length <= maxChars;
   } catch {
     return false;
   }
+}
+
+function normalizeDevicePublicKeyJwk(value: unknown): DevicePublicKeyJwkType | null {
+  if (!isJsonStringifiableWithin(value, maxPublicKeyJwkChars)) return null;
+  const parsed = DevicePublicKeyJwk.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 function normalizeRoomProjectPath(value: unknown): string | null {
@@ -1875,19 +2057,19 @@ function normalizeTeam(team: unknown): TeamRecord | null {
 }
 
 function normalizeDevice(device: unknown): DeviceRecord | null {
-  if (!isRecord(device) || !isRecord(device.publicKeyJwk)) return null;
+  if (!isRecord(device)) return null;
+  const publicKeyJwk = normalizeDevicePublicKeyJwk(device.publicKeyJwk);
   const userId = normalizeMetadataText(device.userId, maxUserIdChars);
   const deviceId = normalizeMetadataText(device.deviceId, maxDeviceIdChars);
   const displayName = normalizeMetadataText(device.displayName, maxDisplayNameChars);
   const publicKeyFingerprint = normalizeMetadataText(device.publicKeyFingerprint, maxPublicKeyFingerprintChars);
-  if (!userId || !deviceId || !displayName || !publicKeyFingerprint) return null;
-  if (!isJsonStringifiableWithin(device.publicKeyJwk, maxPublicKeyJwkChars)) return null;
+  if (!userId || !deviceId || !displayName || !publicKeyFingerprint || !publicKeyJwk) return null;
   if (typeof device.registeredAt !== "string" || typeof device.lastSeenAt !== "string") return null;
   return {
     userId,
     deviceId,
     displayName,
-    publicKeyJwk: device.publicKeyJwk,
+    publicKeyJwk,
     publicKeyFingerprint,
     registeredAt: device.registeredAt,
     lastSeenAt: device.lastSeenAt
@@ -2056,7 +2238,10 @@ function decryptStoredAccessToken(stored: Record<string, unknown>): string | nul
     encrypted.algorithm !== "AES-GCM-256" ||
     typeof encrypted.nonce !== "string" ||
     typeof encrypted.ciphertext !== "string" ||
-    typeof encrypted.tag !== "string"
+    typeof encrypted.tag !== "string" ||
+    encrypted.nonce.length > maxEnvelopeNonceChars ||
+    encrypted.ciphertext.length > maxEncryptedAccessTokenChars ||
+    encrypted.tag.length > maxEnvelopeNonceChars
   ) {
     return null;
   }
@@ -2089,70 +2274,71 @@ function normalizeSessionPersistenceSecret(value: string | undefined): string | 
 async function loadRelayStore() {
   try {
     const raw = await readFile(dataPath, "utf8");
-    const stored = JSON.parse(raw) as StoredRelayState;
-    if (stored.version !== 1) {
+    const stored = JSON.parse(raw) as unknown;
+    if (!isRecord(stored) || stored.version !== 1) {
       console.warn(`Ignoring unsupported relay store version at ${dataPath}`);
       await quarantineRelayStore("unsupported-version");
       return;
     }
-    for (const team of stored.teams ?? []) {
+    for (const team of storedArray(stored.teams)) {
       const normalized = normalizeTeam(team);
       if (normalized) teams.set(normalized.id, normalized);
     }
-    for (const room of stored.rooms ?? []) {
+    for (const room of storedArray(stored.rooms)) {
       const normalized = normalizeRoom(room);
       if (normalized) rooms.set(normalized.id, normalized);
     }
-    for (const invite of stored.invites ?? []) {
+    for (const invite of storedArray(stored.invites)) {
       const normalized = normalizeInvite(invite);
       if (normalized && !isExpiredInvite(normalized)) invites.set(normalized.id, normalized);
     }
-	    for (const device of stored.devices ?? []) {
-	      const normalized = normalizeDevice(device);
-	      if (normalized) devices.set(deviceKey(normalized.userId, normalized.deviceId), normalized);
-	    }
-	    for (const item of stored.teamMembers ?? []) {
-	      const teamId = normalizeRelayId(item.teamId, maxTeamIdChars);
-	      if (!teamId || !teams.has(teamId)) continue;
-	      const members = new Map<string, TeamMemberRecord>();
-	      const storedMembers = Array.isArray(item.members) ? item.members : [];
-	      for (const member of storedMembers) {
-	        const userId = normalizeMetadataText(member?.userId, maxUserIdChars);
-	        if (!userId) continue;
-	        members.set(userId, {
-	          teamId,
-	          userId,
-	          role: normalizeTeamRole(member.role),
-	          joinedAt: typeof member.joinedAt === "string" && !Number.isNaN(Date.parse(member.joinedAt))
-	            ? member.joinedAt
-	            : new Date().toISOString()
-	        });
-	      }
-	      for (const userId of item.userIds ?? []) {
-	        const normalizedUserId = normalizeMetadataText(userId, maxUserIdChars);
-	        if (normalizedUserId && !members.has(normalizedUserId)) {
-	          members.set(normalizedUserId, {
-	            teamId,
-	            userId: normalizedUserId,
-	            role: "member",
-	            joinedAt: new Date().toISOString()
-	          });
-	        }
-	      }
-	      if (members.size === 0) continue;
-	      teamMembers.set(teamId, members);
-	      const team = teams.get(teamId);
-	      if (team && team.members < members.size) teams.set(teamId, { ...team, members: members.size });
-	    }
-	    for (const blob of stored.attachmentBlobs ?? []) {
-	      const normalized = normalizeAttachmentBlob(blob);
-	      if (normalized && !isExpiredAttachmentBlob(normalized)) attachmentBlobs.set(normalized.id, normalized);
-	    }
-	    for (const storedSession of stored.authSessions ?? []) {
-	      const normalized = normalizeStoredAuthSession(storedSession);
-	      if (normalized) authSessions.set(normalized.sessionId, normalized.session);
-	    }
-	    for (const item of stored.encryptedBacklog ?? []) {
+    for (const device of storedArray(stored.devices)) {
+      const normalized = normalizeDevice(device);
+      if (normalized) devices.set(deviceKey(normalized.userId, normalized.deviceId), normalized);
+    }
+    for (const item of storedArray(stored.teamMembers)) {
+      if (!isRecord(item)) continue;
+      const teamId = normalizeRelayId(item.teamId, maxTeamIdChars);
+      if (!teamId || !teams.has(teamId)) continue;
+      const members = new Map<string, TeamMemberRecord>();
+      for (const member of storedArray(item.members)) {
+        if (!isRecord(member)) continue;
+        const userId = normalizeMetadataText(member.userId, maxUserIdChars);
+        if (!userId) continue;
+        members.set(userId, {
+          teamId,
+          userId,
+          role: normalizeTeamRole(member.role),
+          joinedAt: typeof member.joinedAt === "string" && !Number.isNaN(Date.parse(member.joinedAt))
+            ? member.joinedAt
+            : new Date().toISOString()
+        });
+      }
+      for (const userId of storedArray(item.userIds)) {
+        const normalizedUserId = normalizeMetadataText(userId, maxUserIdChars);
+        if (normalizedUserId && !members.has(normalizedUserId)) {
+          members.set(normalizedUserId, {
+            teamId,
+            userId: normalizedUserId,
+            role: "member",
+            joinedAt: new Date().toISOString()
+          });
+        }
+      }
+      if (members.size === 0) continue;
+      teamMembers.set(teamId, members);
+      const team = teams.get(teamId);
+      if (team && team.members < members.size) teams.set(teamId, { ...team, members: members.size });
+    }
+    for (const blob of storedArray(stored.attachmentBlobs)) {
+      const normalized = normalizeAttachmentBlob(blob);
+      if (normalized && !isExpiredAttachmentBlob(normalized)) attachmentBlobs.set(normalized.id, normalized);
+    }
+    for (const storedSession of storedArray(stored.authSessions)) {
+      const normalized = normalizeStoredAuthSession(storedSession);
+      if (normalized) authSessions.set(normalized.sessionId, normalized.session);
+    }
+    for (const item of storedArray(stored.encryptedBacklog)) {
       const normalized = normalizeStoredBacklog(item);
       if (normalized) encryptedBacklog.set(normalized.key, normalized.envelopes);
     }
@@ -2163,6 +2349,10 @@ async function loadRelayStore() {
       await quarantineRelayStore("unreadable");
     }
   }
+}
+
+function storedArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 async function quarantineRelayStore(reason: string) {
