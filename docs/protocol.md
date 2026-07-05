@@ -19,7 +19,7 @@ In the alpha desktop app, small text/code attachments can be embedded inside the
 
 Codex turn summaries mark each attachment as inline content, metadata-only, or encrypted-blob-reference-only. This keeps the host approval sheet aligned with the actual Codex turn input: inline content can be sent to the local Codex app-server after approval, while large encrypted blob attachments are referenced but not decrypted into Codex context by default.
 
-Message reactions are routed as encrypted `chat.reaction` envelopes. The relay sees that a reaction event happened in a room, but not the emoji, target message, action, or reactor identity.
+Message reactions are routed as encrypted `chat.reaction` envelopes. The relay sees that a reaction event happened in a room, but not the emoji, target message, action, or reactor identity. A locally locked room cannot add or remove reactions until it is unlocked.
 
 Host handoff packages are routed as encrypted `room.host` envelopes. The relay sees the envelope metadata but not the handoff summary contents.
 

@@ -3840,6 +3840,10 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    if (isSelectedRoomLocked) {
+      setChatMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
     const hasReacted = message.reactions
       ?.find((reaction) => reaction.emoji === emoji)
       ?.reactors.some((reactor) => reactor.userId === localUser.id) ?? false;
@@ -5882,6 +5886,7 @@ export function App() {
                         key={emoji}
                         onClick={() => toggleMessageReaction(message, emoji)}
                         title={reaction?.reactors.map((reactor) => reactor.name).join(", ") || "React"}
+                        disabled={isSelectedRoomLocked}
                       >
                         <span>{emoji}</span>
                         {reaction?.reactors.length ? <small>{reaction.reactors.length}</small> : null}
