@@ -276,6 +276,7 @@ import {
 import { ApprovalItem, InfoRow, InlineSecretWarning, StatusPill } from "./components/common";
 import { InspectorTabs, type InspectorTab } from "./components/InspectorTabs";
 import { FilePreviewTabs } from "./components/FilePreviewTabs";
+import { RoomSettingsOverview } from "./components/RoomSettingsOverview";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -5903,24 +5904,18 @@ export function App() {
             </div>
           ) : (
             <div className="drawer-content">
-              <section className="drawer-section">
-                <InfoRow label="Relay" value={`${relayStatus} · ${appConfig.relayWsUrl}`} />
-                <InfoRow label="Relay API" value={appConfig.relayHttpUrl} />
-                <InfoRow label="Codex" value={codexProbe?.available ? codexProbe.version ?? "Available" : codexProbe?.error ?? "Not connected"} />
-                <InfoRow label="Project" value={selectedRoom.projectPath} />
-                <InfoRow label="Model" value={formatCodexModel(selectedCodexModel)} />
-                <InfoRow label="Approval" value={approvalPolicyLabels[selectedRoom.approvalPolicy]} />
-                <InfoRow label="Room keys" value={roomSecretStorageLabel()} />
-                <InfoRow label="Host access" value={roomPosture.hostAccess} />
-                <InfoRow label="Workspace" value={roomPosture.workspaceAccess} />
-                <InfoRow label="History" value={roomPosture.history} />
-                <InfoRow label="Browser" value={roomPosture.browserProfile} />
-                <InfoRow label="Modes" value={roomPosture.modes} />
-                <button className="ghost-wide" onClick={chooseProjectPath} disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}>
-                  <FolderGit2 size={15} />
-                  Choose project folder
-                </button>
-              </section>
+              <RoomSettingsOverview
+                relay={`${relayStatus} · ${appConfig.relayWsUrl}`}
+                relayApi={appConfig.relayHttpUrl}
+                codex={codexProbe?.available ? codexProbe.version ?? "Available" : codexProbe?.error ?? "Not connected"}
+                project={selectedRoom.projectPath}
+                model={formatCodexModel(selectedCodexModel)}
+                approval={approvalPolicyLabels[selectedRoom.approvalPolicy]}
+                roomKeys={roomSecretStorageLabel()}
+                posture={roomPosture}
+                chooseProjectDisabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
+                onChooseProject={chooseProjectPath}
+              />
 
               <section className="drawer-section relay-config-section">
                 <div className="drawer-section-title">Relay connection</div>
