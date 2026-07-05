@@ -2,20 +2,12 @@ import {
   Bell,
   Bot,
   Check,
-  Circle,
   Copy,
   FileCode2,
-  FolderGit2,
-  Github,
   Lock,
   ExternalLink,
-  Plus,
-  Search,
   Send,
-  Settings,
   ShieldAlert,
-  UserRoundCheck,
-  UsersRound,
   X
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -282,6 +274,7 @@ import { TerminalPanel, type CodexEventDisplay, type TerminalCommandRequestDispl
 import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
 import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
+import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarPanelName, type SidebarRoomDisplay, type SidebarTeamDisplay } from "./components/DesktopSidebar";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -381,7 +374,7 @@ interface LocalRoomHistoryPayload {
 }
 
 type RelayStatus = "connecting" | "open" | "closed" | "error";
-type SidebarPanel = "profile" | "settings" | null;
+type SidebarPanel = SidebarPanelName;
 
 const fallbackUser = {
   id: "github:maddiedreese",
@@ -1287,6 +1280,42 @@ export function App() {
   const visibleMessageHits = useMemo(() => {
     return searchActive ? findSidebarMessageHits(searchableMessagesByRoom, normalizedSidebarQuery) : [];
   }, [normalizedSidebarQuery, searchableMessagesByRoom, searchActive]);
+  const sidebarTeamRows: SidebarTeamDisplay[] = visibleTeams.map((team) => ({
+    id: team.id,
+    name: team.name,
+    meta: formatTeamMeta(team),
+    active: team.id === selectedTeam
+  }));
+  const sidebarRoomRows: SidebarRoomDisplay[] = visibleRooms.map((room) => {
+    const roomAttention = inspectorAttentionCounts({
+      approvalVisible: approvalVisibleByRoom[room.id] ?? false,
+      terminalRequests: terminalRequestsByRoom[room.id] ?? [],
+      browserRequests: browserRequestsByRoom[room.id] ?? []
+    });
+    const roomAttentionTotal = roomAttention.work + roomAttention.browser;
+    const team = teams.find((item) => item.id === room.teamId);
+
+    return {
+      id: room.id,
+      teamId: room.teamId,
+      name: room.name,
+      detail: searchActive ? team?.name ?? "Team" : room.projectPath.split("/").slice(-1)[0],
+      active: room.id === selectedRoomId,
+      attention: roomAttentionTotal,
+      unread: room.unread
+    };
+  });
+  const sidebarMessageHitRows: SidebarMessageHitDisplay[] = visibleMessageHits.map((hit) => {
+    const room = rooms.find((item) => item.id === hit.roomId);
+
+    return {
+      key: `${hit.roomId}-${hit.message.id}`,
+      roomId: hit.roomId,
+      teamId: room?.teamId,
+      author: hit.message.author,
+      preview: `${room?.name ?? "Room"} · ${hit.message.body}`
+    };
+  });
 
   useEffect(() => {
     roomsRef.current = rooms;
@@ -5687,216 +5716,45 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">AI</div>
-          <div>
-            <strong>multAIplayer</strong>
-            <span>honest alpha</span>
-          </div>
-        </div>
-
-        {currentUser ? (
-          <div className="profile-card">
-            {currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" /> : <Github size={18} />}
-            <div>
-              <strong>{currentUser.name ?? currentUser.login}</strong>
-              <span>@{currentUser.login}</span>
-            </div>
-            <button onClick={signOut}>Sign out</button>
-          </div>
-        ) : (
-          <button className="github-button" onClick={beginGitHubSignIn} disabled={authBusy || authConfig?.configured === false}>
-            <Github size={16} />
-            {authConfig?.configured === false ? "GitHub OAuth not configured" : authBusy ? "Waiting for GitHub" : "Sign in with GitHub"}
-          </button>
-        )}
-
-        {deviceFlow && (
-          <div className="device-flow">
-            <span>Enter this code on GitHub</span>
-            <strong>{deviceFlow.user_code}</strong>
-            <a href={deviceFlow.verification_uri} target="_blank" rel="noreferrer">
-              Open GitHub <ExternalLink size={13} />
-            </a>
-          </div>
-        )}
-        {authError && <div className="auth-error">{authError}</div>}
-
-        <label className="search-box">
-          <Search size={16} />
-          <input
-            placeholder="Search rooms, projects, chats"
-            value={sidebarQuery}
-            onChange={(event) => setSidebarQuery(event.target.value)}
-          />
-          {sidebarQuery && (
-            <button onClick={() => setSidebarQuery("")} aria-label="Clear search">
-              <X size={14} />
-            </button>
-          )}
-        </label>
-        {workspaceError && <div className="workspace-error">{workspaceError}</div>}
-
-        <section className="sidebar-section">
-          <div className="section-title">
-            <span>{searchActive ? "Matching teams" : "Teams"}</span>
-            <button onClick={addTeam} aria-label="Create team" disabled={!newTeamName.trim()}><Plus size={15} /></button>
-          </div>
-          {!searchActive && (
-            <div className="sidebar-create-form">
-              <input
-                value={newTeamName}
-                onChange={(event) => setNewTeamName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && newTeamName.trim()) {
-                    event.preventDefault();
-                    addTeam();
-                  }
-                }}
-                placeholder="Team name"
-              />
-            </div>
-          )}
-          <div className="team-list">
-            {visibleTeams.map((team) => (
-              <button
-                className={`team-button ${team.id === selectedTeam ? "active" : ""}`}
-                key={team.id}
-                onClick={() => {
-                  setSelectedTeam(team.id);
-                  setSelectedRoomId(rooms.find((room) => room.teamId === team.id)?.id ?? rooms[0]?.id ?? "");
-                }}
-              >
-                <UsersRound size={16} />
-                <span>{team.name}</span>
-                <small>{formatTeamMeta(team)}</small>
-              </button>
-            ))}
-            {visibleTeams.length === 0 && (
-              <div className="sidebar-empty">
-                {searchActive ? "No teams found." : "No teams yet. Create one to start."}
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="sidebar-section rooms">
-          <div className="section-title">
-            <span>{searchActive ? "Matching rooms" : "Rooms"}</span>
-            <button onClick={addRoom} aria-label="Create room" disabled={!selectedTeam || !newRoomName.trim() || !newRoomProjectPath.trim()}><Plus size={15} /></button>
-          </div>
-          {!searchActive && (
-            <div className="sidebar-create-form room-create-form">
-              <input
-                value={newRoomName}
-                onChange={(event) => setNewRoomName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && newRoomName.trim() && newRoomProjectPath.trim()) {
-                    event.preventDefault();
-                    addRoom();
-                  }
-                }}
-                placeholder="Room name"
-                disabled={!selectedTeam}
-              />
-              <div className="path-create-row">
-                <input
-                  value={newRoomProjectPath}
-                  onChange={(event) => setNewRoomProjectPath(event.target.value)}
-                  placeholder={defaultProjectPath}
-                  disabled={!selectedTeam}
-                />
-                <button onClick={chooseNewRoomProjectPath} disabled={!selectedTeam} aria-label="Choose project folder">
-                  <FolderGit2 size={14} />
-                </button>
-              </div>
-            </div>
-          )}
-          {visibleRooms.map((room) => {
-            const roomAttention = inspectorAttentionCounts({
-              approvalVisible: approvalVisibleByRoom[room.id] ?? false,
-              terminalRequests: terminalRequestsByRoom[room.id] ?? [],
-              browserRequests: browserRequestsByRoom[room.id] ?? []
-            });
-            const roomAttentionTotal = roomAttention.work + roomAttention.browser;
-
-            return (
-              <button
-                key={room.id}
-                className={`room-button ${room.id === selectedRoomId ? "active" : ""}`}
-                onClick={() => {
-                  setSelectedTeam(room.teamId);
-                  setSelectedRoomId(room.id);
-                }}
-              >
-                <div>
-                  <strong>{room.name}</strong>
-                  <span>{searchActive ? teams.find((team) => team.id === room.teamId)?.name : room.projectPath.split("/").slice(-1)[0]}</span>
-                </div>
-                <div className="room-indicators">
-                  {roomAttentionTotal > 0 && <b className="attention">{roomAttentionTotal}</b>}
-                  {room.unread > 0 ? <b>{room.unread}</b> : roomAttentionTotal === 0 ? <Circle size={8} /> : null}
-                </div>
-              </button>
-            );
-          })}
-          {visibleRooms.length === 0 && (
-            <div className="sidebar-empty">
-              {searchActive
-                ? "No rooms or projects found."
-                : selectedTeam
-                  ? "No rooms yet. Create one for this team."
-                  : "Create a team before adding rooms."}
-            </div>
-          )}
-        </section>
-
-        {searchActive && (
-          <section className="sidebar-section">
-            <div className="section-title">
-              <span>Chat hits</span>
-            </div>
-            <div className="message-hit-list">
-              {visibleMessageHits.map((hit) => {
-                const room = rooms.find((item) => item.id === hit.roomId);
-                return (
-                <button
-                  key={`${hit.roomId}-${hit.message.id}`}
-                  onClick={() => {
-                    if (room) setSelectedTeam(room.teamId);
-                    setSelectedRoomId(hit.roomId);
-                  }}
-                >
-                  <strong>{hit.message.author}</strong>
-                  <span>{room?.name ?? "Room"} · {hit.message.body}</span>
-                </button>
-                );
-              })}
-              {visibleMessageHits.length === 0 && (
-                <div className="sidebar-empty">
-                  {historySearchBusy ? "Searching encrypted local history..." : "No chat or local history matches."}
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        <div className="sidebar-footer">
-          <button
-            className={activeSidebarPanel === "settings" ? "active" : ""}
-            onClick={() => setActiveSidebarPanel((current) => current === "settings" ? null : "settings")}
-          >
-            <Settings size={16} /> Settings
-          </button>
-          <button
-            className={activeSidebarPanel === "profile" ? "active" : ""}
-            onClick={() => setActiveSidebarPanel((current) => current === "profile" ? null : "profile")}
-          >
-            <UserRoundCheck size={16} /> Profile
-          </button>
-        </div>
-      </aside>
+      <DesktopSidebar
+        currentUser={currentUser}
+        authBusy={authBusy}
+        authConfig={authConfig}
+        authError={authError}
+        deviceFlow={deviceFlow}
+        sidebarQuery={sidebarQuery}
+        searchActive={searchActive}
+        workspaceError={workspaceError}
+        newTeamName={newTeamName}
+        newRoomName={newRoomName}
+        newRoomProjectPath={newRoomProjectPath}
+        defaultProjectPath={defaultProjectPath}
+        selectedTeam={Boolean(selectedTeam)}
+        teams={sidebarTeamRows}
+        rooms={sidebarRoomRows}
+        messageHits={sidebarMessageHitRows}
+        historySearchBusy={historySearchBusy}
+        activeSidebarPanel={activeSidebarPanel}
+        onSignIn={beginGitHubSignIn}
+        onSignOut={signOut}
+        onSidebarQueryChange={setSidebarQuery}
+        onClearSidebarQuery={() => setSidebarQuery("")}
+        onNewTeamNameChange={setNewTeamName}
+        onCreateTeam={addTeam}
+        onSelectTeam={(teamId) => {
+          setSelectedTeam(teamId);
+          setSelectedRoomId(rooms.find((room) => room.teamId === teamId)?.id ?? rooms[0]?.id ?? "");
+        }}
+        onNewRoomNameChange={setNewRoomName}
+        onNewRoomProjectPathChange={setNewRoomProjectPath}
+        onChooseNewRoomProjectPath={chooseNewRoomProjectPath}
+        onCreateRoom={addRoom}
+        onSelectRoom={(roomId, teamId) => {
+          if (teamId) setSelectedTeam(teamId);
+          setSelectedRoomId(roomId);
+        }}
+        onSelectSidebarPanel={setActiveSidebarPanel}
+      />
 
       {activeSidebarPanel && (
         <aside className="sidebar-drawer">
