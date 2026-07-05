@@ -4,7 +4,9 @@ import {
   canAcceptRoomHostHandoff,
   createHandoffSettingsPatch,
   findRoomHostHandoff,
-  roomHostHandoffMessage
+  isRoomHostMutationInFlight,
+  roomHostHandoffMessage,
+  roomHostMutationInFlightMessage
 } from "../src/lib/hostHandoff";
 import type { HostHandoffPlaintextPayload } from "@multaiplayer/protocol";
 
@@ -60,4 +62,11 @@ test("host handoff acceptance requires an available handoff from the current roo
     roomHostHandoffMessage(handoffs, "missing"),
     "Host handoff is no longer available in this room."
   );
+});
+
+test("host mutation in-flight guard is scoped to one room", () => {
+  assert.equal(isRoomHostMutationInFlight({ "room-a": true }, "room-a"), true);
+  assert.equal(isRoomHostMutationInFlight({ "room-a": true }, "room-b"), false);
+  assert.equal(isRoomHostMutationInFlight({ "room-a": false }, "room-a"), false);
+  assert.equal(roomHostMutationInFlightMessage(), "Host change is already in progress for this room.");
 });

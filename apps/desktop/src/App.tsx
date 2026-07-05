@@ -197,7 +197,9 @@ import {
   canAcceptRoomHostHandoff,
   createHandoffSettingsPatch,
   findRoomHostHandoff,
-  roomHostHandoffMessage
+  isRoomHostMutationInFlight,
+  roomHostHandoffMessage,
+  roomHostMutationInFlightMessage
 } from "./lib/hostHandoff";
 import { detectBrowserSecretRisks, detectSecretRisks, detectTerminalCommandRisks } from "./lib/secretRisks";
 import { createGitWorkflowApprovalPlan, formatGitWorkflowApprovalPreview } from "@multaiplayer/git";
@@ -674,6 +676,7 @@ export function App() {
   const roomsRef = useRef<RoomRecord[]>(rooms);
   const selectedRoomIdRef = useRef(selectedRoomId);
   const gitWorkflowDraftsRef = useRef(gitWorkflowDraftsByRoom);
+  const hostBusyRef = useRef(hostBusyByRoom);
   const settingsBusyRef = useRef(settingsBusyByRoom);
   const keyRotationBusyRef = useRef(keyRotationBusyByRoom);
   const gitWorkflowBusyRef = useRef(gitWorkflowBusyByRoom);
@@ -863,6 +866,9 @@ export function App() {
   }
 
   function setHostBusyForRoom(roomId: string, busy: boolean) {
+    hostBusyRef.current = busy
+      ? { ...hostBusyRef.current, [roomId]: true }
+      : omitRecordKey(hostBusyRef.current, roomId);
     setHostBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
@@ -872,6 +878,12 @@ export function App() {
 
   function setSelectedHostMessage(message: string | null) {
     setHostMessageForRoom(selectedRoom.id, message);
+  }
+
+  function reportRoomHostMutationInFlight(roomId: string): boolean {
+    if (!isRoomHostMutationInFlight(hostBusyRef.current, roomId)) return false;
+    setHostMessageForRoom(roomId, roomHostMutationInFlightMessage());
+    return true;
   }
 
   function setChatMessageForRoom(roomId: string, message: string | null) {
@@ -1171,6 +1183,10 @@ export function App() {
   useEffect(() => {
     gitWorkflowDraftsRef.current = gitWorkflowDraftsByRoom;
   }, [gitWorkflowDraftsByRoom]);
+
+  useEffect(() => {
+    hostBusyRef.current = hostBusyByRoom;
+  }, [hostBusyByRoom]);
 
   useEffect(() => {
     settingsBusyRef.current = settingsBusyByRoom;
@@ -2403,6 +2419,7 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    if (reportRoomHostMutationInFlight(roomId)) return;
     setHostBusyForRoom(roomId, true);
     setHostMessageForRoom(roomId, null);
     try {
@@ -2443,11 +2460,12 @@ export function App() {
       setSelectedHostMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;
     }
+    const roomId = selectedRoom.id;
+    if (reportRoomHostMutationInFlight(roomId)) return;
     if (handoff.status !== "available") {
       setSelectedHostMessage("This host handoff has already been accepted.");
       return;
     }
-    const roomId = selectedRoom.id;
     const roomHandoff = findRoomHostHandoff(hostHandoffs, handoff.id);
     if (!roomHandoff || !canAcceptRoomHostHandoff(hostHandoffs, handoff.id)) {
       setHostMessageForRoom(roomId, roomHostHandoffMessage(hostHandoffs, handoff.id));

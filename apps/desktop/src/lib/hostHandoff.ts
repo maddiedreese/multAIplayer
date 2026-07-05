@@ -12,6 +12,17 @@ export interface HostHandoffCandidate {
   status: "available" | "accepted";
 }
 
+export function isRoomHostMutationInFlight(
+  busyByRoom: Record<string, boolean>,
+  roomId: string
+): boolean {
+  return busyByRoom[roomId] === true;
+}
+
+export function roomHostMutationInFlightMessage(): string {
+  return "Host change is already in progress for this room.";
+}
+
 const approvalPolicies: ApprovalPolicy[] = [
   "ask_every_turn",
   "auto_chat_only",
