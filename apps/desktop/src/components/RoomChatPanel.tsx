@@ -41,6 +41,7 @@ export function RoomChatPanel({
   codexRunning,
   canApproveCodex,
   canUseChat,
+  canSendMessage,
   roomLocked,
   lockedPlaceholder,
   chatEnabled,
@@ -66,6 +67,7 @@ export function RoomChatPanel({
   codexRunning: boolean;
   canApproveCodex: boolean;
   canUseChat: boolean;
+  canSendMessage: boolean;
   roomLocked: boolean;
   lockedPlaceholder: string;
   chatEnabled: boolean;
@@ -191,12 +193,12 @@ export function RoomChatPanel({
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
-                onSendMessage();
+                if (canSendMessage) onSendMessage();
               }
             }}
           />
         </div>
-        <button className="send" onClick={onSendMessage} disabled={!canUseChat}>
+        <button className="send" onClick={onSendMessage} disabled={!canSendMessage}>
           <Send size={18} />
         </button>
       </footer>

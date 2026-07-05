@@ -3019,12 +3019,66 @@ button:not(:disabled):active {
   font-size: 12px;
 }
 
+.room-notice-stack {
+  display: grid;
+  gap: 6px;
+  padding: 10px clamp(24px, 4vw, 58px) 0;
+  background: var(--surface);
+}
+
+.room-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  max-width: 780px;
+  min-height: 32px;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-muted) 72%, transparent);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.room-notice strong {
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.room-notice span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-notice button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.room-notice button:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
 .host-message,
 .workflow-message {
-  margin: 10px 24px 0;
   border-color: var(--border);
-  background: var(--surface-muted);
+  background: color-mix(in srgb, var(--surface-muted) 62%, transparent);
   color: var(--text-muted);
+}
+
+.workflow-message {
+  margin: 0;
 }
 
 .warning-banner,

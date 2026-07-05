@@ -777,6 +777,12 @@ export function App() {
   const inviteMessage = inviteMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const hostMessage = hostMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const chatMessage = chatMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const roomNotices = [
+    hostMessage ? { key: "host", label: "Codex", message: hostMessage, onDismiss: () => setHostMessageForRoom(selectedRoom.id, null) } : null,
+    chatMessage && chatMessage !== hostMessage
+      ? { key: "chat", label: "Chat", message: chatMessage, onDismiss: () => setChatMessageForRoom(selectedRoom.id, null) }
+      : null
+  ].filter((notice): notice is { key: string; label: string; message: string; onDismiss: () => void } => Boolean(notice));
   const settingsMessage = settingsMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const historyMessage = historyMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const teamHistoryMessage = teamHistoryMessagesByTeam[selectedTeam || "__no-team"] ?? null;
@@ -5919,8 +5925,19 @@ export function App() {
           onClearSelectedMessages={clearSelectedMessages}
         />
 
-        {hostMessage && <div className="host-message">{hostMessage}</div>}
-        {chatMessage && <div className="host-message">{chatMessage}</div>}
+        {roomNotices.length > 0 && (
+          <div className="room-notice-stack">
+            {roomNotices.map((notice) => (
+              <div className="room-notice" key={notice.key}>
+                <strong>{notice.label}</strong>
+                <span>{notice.message}</span>
+                <button onClick={notice.onDismiss} aria-label={`Dismiss ${notice.label} notice`}>
+                  <X size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {secretWarningVisible && (
           <div className="warning-banner">
@@ -5962,6 +5979,7 @@ export function App() {
           codexRunning={codexRunning}
           canApproveCodex={hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked)}
           canUseChat={roomCanUseChat}
+          canSendMessage={roomCanUseChat && (Boolean(draft.trim()) || pendingAttachments.length > 0)}
           roomLocked={isSelectedRoomLocked}
           lockedPlaceholder={roomLockMessage(selectedRoom, isSelectedRoomRevoked)}
           chatEnabled={selectedRoom.mode.chat}
