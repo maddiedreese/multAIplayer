@@ -12,6 +12,7 @@ import { normalizeGitHubBranchName, normalizeGitHubRepoRef, normalizePullRequest
 import {
   AttachmentBlobRecord,
   CiphertextPayload,
+  DevicePublicKeyJwk,
   InviteRecord,
   RelayEnvelope,
   RelayClientMessage,
@@ -20,6 +21,7 @@ import {
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   codexModelOptions,
+  type DevicePublicKeyJwk as DevicePublicKeyJwkType,
   type InviteRecord as InviteRecordType,
   type AttachmentBlobRecord as AttachmentBlobRecordType,
   type DeviceRecord,
@@ -1819,17 +1821,8 @@ function isJsonStringifiableWithin(value: unknown, maxChars: number): boolean {
   }
 }
 
-function isDevicePublicKeyJwk(value: unknown): value is Record<string, unknown> {
-  if (!isRecord(value)) return false;
-  if (value.kty !== "EC" || value.crv !== "P-256") return false;
-  if (typeof value.x !== "string" || typeof value.y !== "string") return false;
-  if (!isBoundedBase64UrlField(value.x, 128) || !isBoundedBase64UrlField(value.y, 128)) return false;
-  if ("d" in value || "key_ops" in value || "ext" in value) return false;
-  return true;
-}
-
-function isBoundedBase64UrlField(value: string, maxChars: number): boolean {
-  return Boolean(value && value.length <= maxChars && /^[A-Za-z0-9_-]+$/.test(value));
+function isDevicePublicKeyJwk(value: unknown): value is DevicePublicKeyJwkType {
+  return DevicePublicKeyJwk.safeParse(value).success;
 }
 
 function normalizeRoomProjectPath(value: unknown): string | null {

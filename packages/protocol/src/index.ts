@@ -6,6 +6,16 @@ export const relayIdPattern = /^[A-Za-z0-9_-]+$/;
 export const TeamId = z.string().min(3).max(maxRelayIdChars).regex(relayIdPattern);
 export const RoomId = z.string().min(3).max(maxRelayIdChars).regex(relayIdPattern);
 export const UserId = z.string().min(1);
+export const publicKeyCoordinatePattern = /^[A-Za-z0-9_-]+$/;
+
+export const DevicePublicKeyJwk = z.object({
+  kty: z.literal("EC"),
+  crv: z.literal("P-256"),
+  x: z.string().min(1).max(128).regex(publicKeyCoordinatePattern),
+  y: z.string().min(1).max(128).regex(publicKeyCoordinatePattern)
+}).passthrough().refine((jwk) => !("d" in jwk), {
+  message: "Device public key JWK must not include private key material"
+});
 
 export const CiphertextPayload = z.object({
   algorithm: z.literal("AES-GCM-256"),
@@ -15,7 +25,7 @@ export const CiphertextPayload = z.object({
 
 export const DeviceSealedPayload = z.object({
   algorithm: z.literal("ECDH-P256-HKDF-SHA256-AES-GCM-256"),
-  ephemeralPublicKeyJwk: z.record(z.string(), z.unknown()),
+  ephemeralPublicKeyJwk: DevicePublicKeyJwk,
   nonce: z.string(),
   ciphertext: z.string()
 });
@@ -116,7 +126,7 @@ export const InviteJoinRequestPlaintextPayload = z.object({
   requester: z.string(),
   requesterUserId: z.string(),
   requesterDeviceId: z.string(),
-  requesterPublicKeyJwk: z.record(z.string(), z.unknown()).optional(),
+  requesterPublicKeyJwk: DevicePublicKeyJwk.optional(),
   requesterPublicKeyFingerprint: z.string().optional(),
   requestedAt: z.string().datetime(),
   note: z.string().optional()
@@ -125,7 +135,7 @@ export const InviteJoinRequestPlaintextPayload = z.object({
 export const WrappedRoomSecretPayload = z.object({
   version: z.literal(1),
   algorithm: z.literal("ECDH-P256-HKDF-SHA256-AES-GCM-256"),
-  ephemeralPublicKeyJwk: z.record(z.string(), z.unknown()),
+  ephemeralPublicKeyJwk: DevicePublicKeyJwk,
   nonce: z.string(),
   ciphertext: z.string()
 });
@@ -320,7 +330,7 @@ export const DeviceRecord = z.object({
   userId: UserId,
   deviceId: DeviceId,
   displayName: z.string().min(1),
-  publicKeyJwk: z.record(z.string(), z.unknown()),
+  publicKeyJwk: DevicePublicKeyJwk,
   publicKeyFingerprint: z.string().min(16),
   registeredAt: z.string().datetime(),
   lastSeenAt: z.string().datetime()
@@ -464,6 +474,7 @@ export type RelayClientMessage = z.infer<typeof RelayClientMessage>;
 export type RelayServerMessage = z.infer<typeof RelayServerMessage>;
 export type DeviceSealedPayload = z.infer<typeof DeviceSealedPayload>;
 export type EncryptedPayload = z.infer<typeof EncryptedPayload>;
+export type DevicePublicKeyJwk = z.infer<typeof DevicePublicKeyJwk>;
 export type TeamRole = z.infer<typeof TeamRole>;
 export type TeamRecord = z.infer<typeof TeamRecord>;
 export type TeamMemberRecord = z.infer<typeof TeamMemberRecord>;

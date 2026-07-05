@@ -3,6 +3,8 @@ import { test } from "node:test";
 import {
   InviteJoinRequestPlaintextPayload,
   InviteJoinStatusPlaintextPayload,
+  DevicePublicKeyJwk,
+  DeviceRecord,
   HostHandoffPlaintextPayload,
   RelayEnvelope,
   RoomId,
@@ -47,6 +49,57 @@ test("team member records carry role and join metadata", () => {
   });
 
   assert.equal(parsed.role, "admin");
+});
+
+test("device public key JWKs require P-256 public key material", () => {
+  const parsed = DevicePublicKeyJwk.parse({
+    kty: "EC",
+    crv: "P-256",
+    x: "x-coordinate",
+    y: "y-coordinate",
+    ext: true,
+    key_ops: []
+  });
+  assert.equal(parsed.kty, "EC");
+
+  assert.equal(DevicePublicKeyJwk.safeParse({
+    kty: "EC",
+    crv: "P-256",
+    x: "x-coordinate",
+    y: "y-coordinate",
+    d: "private-material"
+  }).success, false);
+  assert.equal(DevicePublicKeyJwk.safeParse({
+    kty: "EC",
+    crv: "P-384",
+    x: "x-coordinate",
+    y: "y-coordinate"
+  }).success, false);
+  assert.equal(DevicePublicKeyJwk.safeParse({
+    kty: "RSA",
+    n: "modulus",
+    e: "AQAB"
+  }).success, false);
+});
+
+test("device records carry bounded public key JWKs", () => {
+  const parsed = DeviceRecord.parse({
+    userId: "github:maddiedreese",
+    deviceId: "device_12345678",
+    displayName: "Maddie",
+    publicKeyJwk: {
+      kty: "EC",
+      crv: "P-256",
+      x: "x-coordinate",
+      y: "y-coordinate",
+      ext: true
+    },
+    publicKeyFingerprint: "1111:2222:3333:4444",
+    registeredAt: "2026-07-04T12:00:00.000Z",
+    lastSeenAt: "2026-07-04T12:01:00.000Z"
+  });
+
+  assert.equal(parsed.publicKeyJwk.crv, "P-256");
 });
 
 test("host handoff payloads can report room-visible acceptance", () => {
