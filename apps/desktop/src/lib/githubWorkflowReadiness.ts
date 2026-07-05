@@ -26,10 +26,17 @@ export interface GitHubActionsReadinessInput {
   branch: string;
 }
 
+export interface GitHubActionsTarget {
+  owner: string;
+  repo: string;
+  branch: string;
+}
+
 export interface GitHubActionsReadiness {
   ready: boolean;
   messages: string[];
   target: string | null;
+  normalizedTarget: GitHubActionsTarget | null;
 }
 
 export function checkGitHubWorkflowReadiness(input: GitHubWorkflowReadinessInput): GitHubWorkflowReadiness {
@@ -83,6 +90,7 @@ export function checkGitHubWorkflowReadiness(input: GitHubWorkflowReadinessInput
 export function checkGitHubActionsReadiness(input: GitHubActionsReadinessInput): GitHubActionsReadiness {
   const messages: string[] = [];
   let target: string | null = null;
+  let normalizedTarget: GitHubActionsTarget | null = null;
 
   if (input.authConfig?.configured === false) {
     messages.push("GitHub OAuth is not configured on this relay.");
@@ -94,6 +102,11 @@ export function checkGitHubActionsReadiness(input: GitHubActionsReadinessInput):
   try {
     const repo = normalizeGitHubRepoRef(input.owner, input.repo);
     const branch = normalizeGitHubBranchName(input.branch);
+    normalizedTarget = {
+      owner: repo.owner,
+      repo: repo.repo,
+      branch
+    };
     target = `${repo.owner}/${repo.repo}@${branch}`;
   } catch (error) {
     messages.push(String(error));
@@ -106,6 +119,7 @@ export function checkGitHubActionsReadiness(input: GitHubActionsReadinessInput):
   return {
     ready: messages.length === 1 && messages[0].startsWith("Ready to check GitHub Actions"),
     messages,
-    target
+    target,
+    normalizedTarget
   };
 }

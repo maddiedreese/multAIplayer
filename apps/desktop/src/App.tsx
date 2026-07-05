@@ -229,7 +229,11 @@ import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
 import { copyTextToClipboard } from "./lib/clipboard";
-import { checkGitHubActionsReadiness, checkGitHubWorkflowReadiness } from "./lib/githubWorkflowReadiness";
+import {
+  checkGitHubActionsReadiness,
+  checkGitHubWorkflowReadiness,
+  type GitHubActionsTarget
+} from "./lib/githubWorkflowReadiness";
 import { defaultGitWorkflowDraft, parseGitHubRemoteUrl, resolveGitWorkflowDraft, updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "./lib/gitWorkflowDraft";
 import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
@@ -5298,7 +5302,11 @@ export function App() {
         }, room).catch((error) => {
           console.warn("Failed to publish git workflow PR event", error);
         });
-        refreshGitHubActions(room);
+        refreshGitHubActions(room, {
+          owner: workflowDraft.prOwner,
+          repo: workflowDraft.prRepo,
+          branch: gitPlan.branch
+        });
       } else {
         const message = "Created local branch and commit. Enable push when you are ready to open a PR.";
         setGitWorkflowMessageForRoom(roomId, message);
@@ -5332,7 +5340,7 @@ export function App() {
     }
   }
 
-  async function refreshGitHubActions(roomArg?: RoomRecord) {
+  async function refreshGitHubActions(roomArg?: RoomRecord, targetArg?: GitHubActionsTarget) {
     const room = roomArg ?? (hasSelectedRoom ? selectedRoom : null);
     if (!room) {
       return;
@@ -5371,9 +5379,9 @@ export function App() {
     const readiness = checkGitHubActionsReadiness({
       authConfig,
       currentUser,
-      owner: workflowDraft.prOwner,
-      repo: workflowDraft.prRepo,
-      branch: workflowDraft.branchName
+      owner: targetArg?.owner ?? workflowDraft.prOwner,
+      repo: targetArg?.repo ?? workflowDraft.prRepo,
+      branch: targetArg?.branch ?? workflowDraft.branchName
     });
     if (!readiness.ready) {
       setActionsMessagesByRoom((current) => ({
@@ -5382,10 +5390,18 @@ export function App() {
       }));
       return;
     }
+    const actionsTarget = readiness.normalizedTarget;
+    if (!actionsTarget) {
+      setActionsMessagesByRoom((current) => ({
+        ...current,
+        [roomId]: "GitHub Actions target could not be normalized."
+      }));
+      return;
+    }
     setActionsBusyForRoom(roomId, true);
     setActionsMessagesByRoom((current) => omitRecordKey(current, roomId));
     try {
-      const result = await listGitHubActionRuns(workflowDraft.prOwner, workflowDraft.prRepo, workflowDraft.branchName);
+      const result = await listGitHubActionRuns(actionsTarget.owner, actionsTarget.repo, actionsTarget.branch);
       const checkedAt = new Date().toISOString();
       setActionRunsByRoom((current) => ({
         ...current,
@@ -5397,16 +5413,16 @@ export function App() {
       }));
       const summary = summarizeActionRuns(result.runs);
       const message = result.runs.length
-        ? `Loaded ${result.runs.length} workflow runs for ${workflowDraft.branchName}.`
-        : `No workflow runs found for ${workflowDraft.branchName}. GitHub may still be scheduling the branch.`;
+        ? `Loaded ${result.runs.length} workflow runs for ${actionsTarget.branch}.`
+        : `No workflow runs found for ${actionsTarget.branch}. GitHub may still be scheduling the branch.`;
       setActionsMessagesByRoom((current) => ({
         ...current,
         [roomId]: `${summary.label}: ${message}`
       }));
       publishGitHubActionsEvent({
-        owner: workflowDraft.prOwner,
-        repo: workflowDraft.prRepo,
-        branch: workflowDraft.branchName,
+        owner: actionsTarget.owner,
+        repo: actionsTarget.repo,
+        branch: actionsTarget.branch,
         summary,
         message,
         checkedAt,

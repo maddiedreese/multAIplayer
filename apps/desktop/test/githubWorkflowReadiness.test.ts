@@ -83,6 +83,7 @@ test("checkGitHubActionsReadiness requires sign-in and a valid repo target", () 
 
   assert.equal(readiness.ready, false);
   assert.equal(readiness.target, null);
+  assert.equal(readiness.normalizedTarget, null);
   assert.deepEqual(readiness.messages, [
     "GitHub OAuth is not configured on this relay.",
     "Sign in with GitHub before checking Actions.",
@@ -101,6 +102,7 @@ test("checkGitHubActionsReadiness rejects unsafe branch targets", () => {
 
   assert.equal(readiness.ready, false);
   assert.equal(readiness.target, null);
+  assert.equal(readiness.normalizedTarget, null);
   assert.deepEqual(readiness.messages, [
     "Error: Unsafe GitHub branch name: bad branch"
   ]);
@@ -117,6 +119,11 @@ test("checkGitHubActionsReadiness returns normalized Actions target when ready",
 
   assert.equal(readiness.ready, true);
   assert.equal(readiness.target, "maddiedreese/multAIplayer@codex/actions");
+  assert.deepEqual(readiness.normalizedTarget, {
+    owner: "maddiedreese",
+    repo: "multAIplayer",
+    branch: "codex/actions"
+  });
   assert.deepEqual(readiness.messages, [
     "Ready to check GitHub Actions for maddiedreese/multAIplayer@codex/actions."
   ]);
