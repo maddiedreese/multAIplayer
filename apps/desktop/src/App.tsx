@@ -265,6 +265,7 @@ import {
 import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
 import { isRoomKeyRotationInFlight, roomKeyRotationInFlightMessage } from "./lib/roomKeyRotation";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
+import { roomPostureSummary } from "./lib/roomPosture";
 import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "./lib/sidebarSearch";
 import { replaceRoomTerminalSnapshots } from "./lib/terminalState";
 import {
@@ -782,6 +783,14 @@ export function App() {
   const canHostBrowser = hasSelectedRoom && canHostBrowserAction(selectedRoom, localUser, isSelectedRoomLocked);
   const canCopyRoomInvite = hasSelectedRoom && canCreateRoomInvite(selectedRoom, localUser, isSelectedRoomLocked, inviteApprovalGate);
   const localWorkspaceMessage = localWorkspaceGateMessage(selectedRoom, isSelectedRoomLocked);
+  const roomPosture = roomPostureSummary({
+    locked: isSelectedRoomLocked,
+    isActiveHost,
+    canReadLocalWorkspace,
+    historySettings,
+    browserProfilePersistent: selectedRoom.browserProfilePersistent,
+    mode: selectedRoom.mode
+  });
   const browserAccessMessage = browserAccessGateMessage(selectedRoom, isSelectedRoomLocked);
   const workspaceRequestMessage = isSelectedRoomLocked
     ? roomLockMessage(selectedRoom, isSelectedRoomRevoked)
@@ -5902,6 +5911,11 @@ export function App() {
                 <InfoRow label="Model" value={formatCodexModel(selectedCodexModel)} />
                 <InfoRow label="Approval" value={approvalPolicyLabels[selectedRoom.approvalPolicy]} />
                 <InfoRow label="Room keys" value={roomSecretStorageLabel()} />
+                <InfoRow label="Host access" value={roomPosture.hostAccess} />
+                <InfoRow label="Workspace" value={roomPosture.workspaceAccess} />
+                <InfoRow label="History" value={roomPosture.history} />
+                <InfoRow label="Browser" value={roomPosture.browserProfile} />
+                <InfoRow label="Modes" value={roomPosture.modes} />
                 <button className="ghost-wide" onClick={chooseProjectPath} disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}>
                   <FolderGit2 size={15} />
                   Choose project folder
