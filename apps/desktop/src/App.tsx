@@ -371,6 +371,7 @@ interface LocalRoomHistoryPayload {
 
 type RelayStatus = "connecting" | "open" | "closed" | "error";
 type SidebarPanel = "profile" | "settings" | null;
+type InspectorTab = "work" | "browser";
 
 const fallbackUser = {
   id: "github:maddiedreese",
@@ -612,6 +613,7 @@ export function App() {
   const [newRoomProjectPath, setNewRoomProjectPath] = useState(defaultProjectPath);
   const [selectedTeam, setSelectedTeam] = useState(seededTeams[0].id);
   const [selectedRoomId, setSelectedRoomId] = useState("room-desktop");
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("work");
   const [sidebarQuery, setSidebarQuery] = useState("");
   const [messagesByRoom, setMessagesByRoom] = useState<Record<string, ChatMessage[]>>(initialMessagesByRoom);
   const [forgottenRoomIds, setForgottenRoomIds] = useState<Set<string>>(() => new Set());
@@ -6343,11 +6345,23 @@ export function App() {
 
       <aside className="inspector">
         <div className="inspector-tabs">
-          <button className="active"><PanelRight size={15} /> Work</button>
-          <button><Globe2 size={15} /> Browser</button>
+          <button
+            className={inspectorTab === "work" ? "active" : ""}
+            onClick={() => setInspectorTab("work")}
+            aria-pressed={inspectorTab === "work"}
+          >
+            <PanelRight size={15} /> Work
+          </button>
+          <button
+            className={inspectorTab === "browser" ? "active" : ""}
+            onClick={() => setInspectorTab("browser")}
+            aria-pressed={inspectorTab === "browser"}
+          >
+            <Globe2 size={15} /> Browser
+          </button>
         </div>
 
-        <section className="panel browser-panel">
+        <section className="panel browser-panel" hidden={inspectorTab !== "browser"}>
           <div className="panel-title">
             <span>Browser access</span>
             <StatusPill
@@ -6484,6 +6498,7 @@ export function App() {
           {browserMessage && <div className="workflow-message">{browserMessage}</div>}
         </section>
 
+        <div className="inspector-panel-group" hidden={inspectorTab !== "work"}>
         <section className="panel">
           <div className="panel-title">
             <span>Project</span>
@@ -7348,6 +7363,7 @@ export function App() {
           )}
           {terminalError && <div className="workflow-message">{terminalError}</div>}
         </section>
+        </div>
       </aside>
     </div>
   );

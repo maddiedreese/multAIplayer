@@ -33,6 +33,10 @@ button:disabled {
   opacity: 0.6;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 286px minmax(500px, 1fr) 420px;
@@ -1236,6 +1240,11 @@ button:disabled {
   border-color: #111815;
   background: #111815;
   color: #fff;
+}
+
+.inspector-panel-group {
+  display: grid;
+  gap: 14px;
 }
 
 .panel {
