@@ -322,15 +322,30 @@ app.post("/auth/github/device/poll", async (req, res) => {
     name?: string | null;
     avatar_url?: string;
   };
+  const userId = Number.isSafeInteger(githubUser.id) ? `github:${githubUser.id}` : null;
+  const normalizedUserId = normalizeMetadataText(userId, maxUserIdChars);
+  const login = normalizeMetadataText(githubUser.login, maxDisplayNameChars);
+  const name = githubUser.name ? normalizeMetadataText(githubUser.name, maxDisplayNameChars) : null;
+  const avatarUrl = githubUser.avatar_url
+    ? normalizeMetadataText(githubUser.avatar_url, maxRoomProjectPathChars)
+    : null;
+  if (!normalizedUserId || !login || (githubUser.name && !name) || (githubUser.avatar_url && !avatarUrl)) {
+    res.status(502).json({ error: "GitHub returned unsupported user metadata" });
+    return;
+  }
+  if (tokenBody.access_token.length > maxAccessTokenChars) {
+    res.status(502).json({ error: "GitHub returned an oversized access token" });
+    return;
+  }
 
   const sessionId = nanoid(32);
   const session: AuthSession = {
     accessToken: tokenBody.access_token,
     user: {
-      id: `github:${githubUser.id}`,
-      login: githubUser.login,
-      name: githubUser.name ?? undefined,
-      avatarUrl: githubUser.avatar_url
+      id: normalizedUserId,
+      login,
+      name: name ?? undefined,
+      avatarUrl: avatarUrl ?? undefined
     },
     expiresAt: Date.now() + authSessionMaxAgeMs
   };
@@ -883,14 +898,17 @@ app.post("/debug/auth-session", (req, res) => {
   const login = String(req.body?.login ?? id.replace(/^github:/, "")).trim();
   const name = String(req.body?.name ?? login).trim();
   const ttlMs = parseIntegerValue(req.body?.ttlMs, 1000 * 60 * 60, -1000 * 60 * 60, authSessionMaxAgeMs);
-  if (!id || !login) {
-    res.status(400).json({ error: "id and login are required" });
+  const userId = normalizeMetadataText(id, maxUserIdChars);
+  const normalizedLogin = normalizeMetadataText(login, maxDisplayNameChars);
+  const normalizedName = normalizeMetadataText(name, maxDisplayNameChars);
+  if (!userId || !normalizedLogin || !normalizedName) {
+    res.status(400).json({ error: "id, login, and name must be bounded strings without control characters" });
     return;
   }
   const sessionId = nanoid(32);
   const session: AuthSession = {
     accessToken: "debug-token",
-    user: { id, login, name },
+    user: { id: userId, login: normalizedLogin, name: normalizedName },
     expiresAt: Date.now() + ttlMs
   };
   authSessions.set(sessionId, session);

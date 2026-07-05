@@ -1235,6 +1235,33 @@ test("relay expires server-side auth sessions independently of cookies", async (
   }
 });
 
+test("relay bounds debug auth session metadata before storing", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  try {
+    const oversizedLogin = await fetch(`${relay.baseUrl}/debug/auth-session`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "github:debug", login: "x".repeat(121) })
+    });
+    assert.equal(oversizedLogin.status, 400);
+
+    const controlName = await fetch(`${relay.baseUrl}/debug/auth-session`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "github:debug", login: "debug", name: "bad\nname" })
+    });
+    assert.equal(controlName.status, 400);
+
+    const validCookie = await createDebugSession(relay.baseUrl, "github:debug", "debug");
+    const me = await fetch(`${relay.baseUrl}/auth/me`, {
+      headers: { cookie: validCookie }
+    });
+    assert.equal(me.status, 200);
+  } finally {
+    await relay.close();
+  }
+});
+
 test("relay logout clears the session cookie with matching attributes", async () => {
   const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
   try {
