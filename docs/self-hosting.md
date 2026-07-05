@@ -180,6 +180,8 @@ GITHUB_OAUTH_SCOPES="read:user repo"
 
 The app shows the relay-advertised scopes in the Account drawer so users can see what the self-hosted relay is asking GitHub to authorize.
 
+GitHub access tokens stay on the relay and are used only for identity, draft pull request creation, and Actions run reads. The relay does not return tokens to desktop clients, does not persist plaintext tokens, and normalizes successful/error responses from GitHub before returning them so arbitrary upstream fields are not relayed into the app.
+
 For local development, the desktop app expects:
 
 ```bash
