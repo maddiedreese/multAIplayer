@@ -4923,6 +4923,10 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    if (!canReadLocalWorkspace) {
+      setGitWorkflowMessageForRoom(roomId, localWorkspaceMessage);
+      return;
+    }
     const markdown = buildPullRequestBody(messages, gitStatus?.files ?? []);
     await copyMarkdownWithFallback("PR description draft", markdown, (message) => setGitWorkflowMessageForRoom(roomId, message), roomId);
   }
@@ -6683,7 +6687,7 @@ export function App() {
               {githubWorkflowReadiness.messages.join(" ")}
             </div>
           )}
-          <button className="ghost-wide" onClick={copyPullRequestDraftMarkdown} disabled={!hasSelectedRoom}>
+          <button className="ghost-wide" onClick={copyPullRequestDraftMarkdown} disabled={!canReadLocalWorkspace}>
             <Copy size={15} />
             Copy PR draft
           </button>

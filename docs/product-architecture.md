@@ -464,6 +464,8 @@ The app should support copying:
 
 Markdown export should make it easy to paste into GitHub, issues, PRs, docs, or another chat app.
 
+Project, diff, terminal, and PR draft exports are local workspace actions when they include local project metadata. They are available only to the active host while the room is unlocked and workspace mode is enabled.
+
 When the app detects sensitive material in project previews, diffs, or terminal output, the copied Markdown includes an explicit warning block. The alpha does not redact copied content automatically; it preserves the warning context so users can review before sharing outside the room.
 
 ## 8. Relay Architecture
