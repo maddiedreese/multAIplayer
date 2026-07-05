@@ -4147,6 +4147,10 @@ export function App() {
       setSelectedTerminalError(hostGateMessage);
       return;
     }
+    if (!canReadLocalWorkspace) {
+      setSelectedTerminalError(localWorkspaceMessage);
+      return;
+    }
     const room = selectedRoom;
     updateTerminalRequestStatus(room.id, requestId, "denied");
     publishRequestStatus("terminal.event", requestId, "denied", room).catch((error) => {
@@ -6862,7 +6866,7 @@ export function App() {
                       <button onClick={() => approveTerminalRequest(request)} disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost}>
                         <Check size={13} />
                       </button>
-                      <button onClick={() => denyTerminalRequest(request.id)} disabled={!hasSelectedRoom || terminalBusy || !isActiveHost}>
+                      <button onClick={() => denyTerminalRequest(request.id)} disabled={!canReadLocalWorkspace || terminalBusy || !isActiveHost}>
                         <X size={13} />
                       </button>
                     </div>
