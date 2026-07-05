@@ -1,12 +1,30 @@
 import { z } from "zod";
 
-export const DeviceId = z.string().min(8);
 export const maxRelayIdChars = 160;
 export const relayIdPattern = /^[A-Za-z0-9_-]+$/;
 export const TeamId = z.string().min(3).max(maxRelayIdChars).regex(relayIdPattern);
 export const RoomId = z.string().min(3).max(maxRelayIdChars).regex(relayIdPattern);
-export const UserId = z.string().min(1);
+export const maxEnvelopeIdChars = 160;
+export const maxDeviceIdChars = 160;
+export const maxUserIdChars = 160;
+export const maxDisplayNameChars = 120;
+export const maxShortTextChars = 512;
+export const maxMediumTextChars = 4_096;
+export const maxLongTextChars = 120_000;
+export const maxCiphertextNonceChars = 4_096;
+export const maxCiphertextPayloadChars = 70_000_000;
+export const maxProjectPathChars = 2_048;
+export const maxUrlChars = 2_048;
+export const maxCodexModelChars = 80;
+export const maxCodexThreadIdChars = 512;
+export const maxTerminalSnapshots = 20;
+export const maxGitWorkflowResults = 20;
+export const maxGitHubActionRuns = 20;
+export const maxWrappedCiphertextChars = 4_096;
+export const maxRoomSecretRawKeyChars = 128;
 export const publicKeyCoordinatePattern = /^[A-Za-z0-9_-]+$/;
+export const DeviceId = z.string().min(8).max(maxDeviceIdChars);
+export const UserId = z.string().min(1).max(maxUserIdChars);
 
 export const DevicePublicKeyJwk = z.object({
   kty: z.literal("EC"),
@@ -19,15 +37,15 @@ export const DevicePublicKeyJwk = z.object({
 
 export const CiphertextPayload = z.object({
   algorithm: z.literal("AES-GCM-256"),
-  nonce: z.string(),
-  ciphertext: z.string()
+  nonce: z.string().min(1).max(maxCiphertextNonceChars),
+  ciphertext: z.string().min(1).max(maxCiphertextPayloadChars)
 });
 
 export const DeviceSealedPayload = z.object({
   algorithm: z.literal("ECDH-P256-HKDF-SHA256-AES-GCM-256"),
   ephemeralPublicKeyJwk: DevicePublicKeyJwk,
-  nonce: z.string(),
-  ciphertext: z.string()
+  nonce: z.string().min(1).max(maxCiphertextNonceChars),
+  ciphertext: z.string().min(1).max(maxWrappedCiphertextChars)
 });
 
 export const EncryptedPayload = z.union([CiphertextPayload, DeviceSealedPayload]);
@@ -37,7 +55,7 @@ export const maxEmbeddedAttachmentBytes = 80_000;
 export const maxEmbeddedAttachmentBytesPerMessage = 200_000;
 
 export const RelayEnvelope = z.object({
-  id: z.string(),
+  id: z.string().min(1).max(maxEnvelopeIdChars),
   teamId: TeamId,
   roomId: RoomId,
   senderDeviceId: DeviceId,
@@ -65,132 +83,132 @@ export const RelayEnvelope = z.object({
 });
 
 export const ChatPlaintextPayload = z.object({
-  id: z.string(),
-  author: z.string(),
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  author: z.string().min(1).max(maxDisplayNameChars),
   role: z.enum(["human", "codex", "system"]),
-  body: z.string(),
-  time: z.string(),
+  body: z.string().max(maxLongTextChars),
+  time: z.string().min(1).max(maxShortTextChars),
   createdAt: z.string().datetime().optional(),
   attachments: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    type: z.string(),
+    id: z.string().min(1).max(maxEnvelopeIdChars),
+    name: z.string().min(1).max(maxShortTextChars),
+    type: z.string().min(1).max(maxShortTextChars),
     size: z.number().int().nonnegative(),
     content: z.string().max(maxEmbeddedAttachmentBytes).optional(),
-    blobId: z.string().optional(),
+    blobId: z.string().min(1).max(maxEnvelopeIdChars).optional(),
     blobBytes: z.number().int().nonnegative().optional(),
     truncated: z.boolean().optional()
   })).max(maxMessageAttachments).optional()
 });
 
 export const ChatReactionPlaintextPayload = z.object({
-  id: z.string(),
-  messageId: z.string(),
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  messageId: z.string().min(1).max(maxEnvelopeIdChars),
   emoji: z.string().min(1).max(16),
   action: z.enum(["add", "remove"]),
-  reactor: z.string(),
-  reactorUserId: z.string(),
+  reactor: z.string().min(1).max(maxDisplayNameChars),
+  reactorUserId: z.string().min(1).max(maxUserIdChars),
   createdAt: z.string().datetime()
 });
 
 export const TerminalRequestPlaintextPayload = z.object({
-  id: z.string(),
-  requester: z.string(),
-  requesterUserId: z.string(),
-  command: z.string(),
-  cwd: z.string(),
-  requestedAt: z.string()
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  requester: z.string().min(1).max(maxDisplayNameChars),
+  requesterUserId: z.string().min(1).max(maxUserIdChars),
+  command: z.string().min(1).max(maxMediumTextChars),
+  cwd: z.string().min(1).max(maxProjectPathChars),
+  requestedAt: z.string().datetime()
 });
 
 export const BrowserRequestPlaintextPayload = z.object({
-  id: z.string(),
-  requester: z.string(),
-  requesterUserId: z.string(),
-  url: z.string(),
-  reason: z.string(),
-  requestedAt: z.string()
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  requester: z.string().min(1).max(maxDisplayNameChars),
+  requesterUserId: z.string().min(1).max(maxUserIdChars),
+  url: z.string().min(1).max(maxUrlChars),
+  reason: z.string().max(maxMediumTextChars),
+  requestedAt: z.string().datetime()
 });
 
 export const RequestStatusPlaintextPayload = z.object({
-  requestId: z.string(),
+  requestId: z.string().min(1).max(maxEnvelopeIdChars),
   status: z.enum(["approved", "denied"]),
-  decidedBy: z.string(),
-  decidedByUserId: z.string(),
+  decidedBy: z.string().min(1).max(maxDisplayNameChars),
+  decidedByUserId: z.string().min(1).max(maxUserIdChars),
   decidedAt: z.string().datetime()
 });
 
 export const InviteJoinRequestPlaintextPayload = z.object({
   eventType: z.literal("invite.request"),
-  id: z.string(),
-  inviteId: z.string().optional(),
-  requester: z.string(),
-  requesterUserId: z.string(),
-  requesterDeviceId: z.string(),
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  inviteId: z.string().min(1).max(maxEnvelopeIdChars).optional(),
+  requester: z.string().min(1).max(maxDisplayNameChars),
+  requesterUserId: z.string().min(1).max(maxUserIdChars),
+  requesterDeviceId: DeviceId,
   requesterPublicKeyJwk: DevicePublicKeyJwk.optional(),
-  requesterPublicKeyFingerprint: z.string().optional(),
+  requesterPublicKeyFingerprint: z.string().min(16).max(maxShortTextChars).optional(),
   requestedAt: z.string().datetime(),
-  note: z.string().optional()
+  note: z.string().max(maxMediumTextChars).optional()
 });
 
 export const WrappedRoomSecretPayload = z.object({
   version: z.literal(1),
   algorithm: z.literal("ECDH-P256-HKDF-SHA256-AES-GCM-256"),
   ephemeralPublicKeyJwk: DevicePublicKeyJwk,
-  nonce: z.string(),
-  ciphertext: z.string()
+  nonce: z.string().min(1).max(maxCiphertextNonceChars),
+  ciphertext: z.string().min(1).max(maxWrappedCiphertextChars)
 });
 
 export const InviteJoinStatusPlaintextPayload = z.object({
   eventType: z.literal("invite.status"),
-  requestId: z.string(),
+  requestId: z.string().min(1).max(maxEnvelopeIdChars),
   status: z.enum(["approved", "denied"]),
-  decidedBy: z.string(),
-  decidedByUserId: z.string(),
+  decidedBy: z.string().min(1).max(maxDisplayNameChars),
+  decidedByUserId: z.string().min(1).max(maxUserIdChars),
   decidedAt: z.string().datetime(),
-  recipientDeviceId: z.string().optional(),
-  recipientPublicKeyFingerprint: z.string().optional(),
+  recipientDeviceId: DeviceId.optional(),
+  recipientPublicKeyFingerprint: z.string().min(16).max(maxShortTextChars).optional(),
   wrappedRoomSecret: WrappedRoomSecretPayload.optional()
 });
 
 export const RoomSecretPayload = z.object({
   algorithm: z.literal("AES-GCM-256"),
-  rawKey: z.string()
+  rawKey: z.string().min(1).max(maxRoomSecretRawKeyChars)
 });
 
 export const RoomKeyRotationPlaintextPayload = z.object({
   eventType: z.literal("room.key.rotated"),
-  id: z.string(),
-  rotatedBy: z.string(),
-  rotatedByUserId: z.string(),
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  rotatedBy: z.string().min(1).max(maxDisplayNameChars),
+  rotatedByUserId: z.string().min(1).max(maxUserIdChars),
   rotatedAt: z.string().datetime(),
   newSecret: RoomSecretPayload,
-  note: z.string().optional()
+  note: z.string().max(maxMediumTextChars).optional()
 });
 
 export const CodexEventPlaintextPayload = z.object({
   eventType: z.literal("codex.turn"),
-  turnId: z.string(),
+  turnId: z.string().min(1).max(maxEnvelopeIdChars),
   status: z.enum(["started", "event", "completed", "failed"]),
-  message: z.string(),
-  model: z.string(),
-  threadId: z.string().optional(),
-  eventName: z.string().optional(),
-  host: z.string(),
-  hostUserId: z.string(),
+  message: z.string().max(maxLongTextChars),
+  model: z.string().min(1).max(maxCodexModelChars),
+  threadId: z.string().min(1).max(maxCodexThreadIdChars).optional(),
+  eventName: z.string().min(1).max(maxShortTextChars).optional(),
+  host: z.string().min(1).max(maxDisplayNameChars),
+  hostUserId: z.string().min(1).max(maxUserIdChars),
   createdAt: z.string().datetime()
 });
 
 export const TerminalResultPlaintextPayload = z.object({
   eventType: z.literal("terminal.result"),
-  requestId: z.string(),
-  command: z.string(),
-  cwd: z.string(),
+  requestId: z.string().min(1).max(maxEnvelopeIdChars),
+  command: z.string().min(1).max(maxMediumTextChars),
+  cwd: z.string().min(1).max(maxProjectPathChars),
   exitStatus: z.number().int().nullable(),
-  stdout: z.string(),
-  stderr: z.string(),
-  error: z.string().optional(),
-  ranBy: z.string(),
-  ranByUserId: z.string(),
+  stdout: z.string().max(maxLongTextChars),
+  stderr: z.string().max(maxLongTextChars),
+  error: z.string().max(maxMediumTextChars).optional(),
+  ranBy: z.string().min(1).max(maxDisplayNameChars),
+  ranByUserId: z.string().min(1).max(maxUserIdChars),
   startedAt: z.string().datetime(),
   finishedAt: z.string().datetime()
 });
@@ -198,76 +216,76 @@ export const TerminalResultPlaintextPayload = z.object({
 export const GitWorkflowEventPlaintextPayload = z.object({
   eventType: z.literal("git.workflow"),
   status: z.enum(["started", "completed", "failed", "pr_opened"]),
-  branch: z.string(),
+  branch: z.string().min(1).max(maxShortTextChars),
   push: z.boolean(),
-  message: z.string(),
-  runner: z.string(),
-  runnerUserId: z.string(),
+  message: z.string().max(maxMediumTextChars),
+  runner: z.string().min(1).max(maxDisplayNameChars),
+  runnerUserId: z.string().min(1).max(maxUserIdChars),
   createdAt: z.string().datetime(),
   results: z.array(z.object({
-    command: z.string(),
-    cwd: z.string(),
+    command: z.string().min(1).max(maxMediumTextChars),
+    cwd: z.string().min(1).max(maxProjectPathChars),
     status: z.number().int().nullable(),
-    stdout: z.string(),
-    stderr: z.string()
-  })).optional(),
+    stdout: z.string().max(maxLongTextChars),
+    stderr: z.string().max(maxLongTextChars)
+  })).max(maxGitWorkflowResults).optional(),
   pullRequest: z.object({
     number: z.number().int(),
-    url: z.string()
+    url: z.string().min(1).max(maxUrlChars)
   }).optional()
 });
 
 export const GitHubActionsEventPlaintextPayload = z.object({
   eventType: z.literal("github.actions"),
-  owner: z.string(),
-  repo: z.string(),
-  branch: z.string(),
+  owner: z.string().min(1).max(maxShortTextChars),
+  repo: z.string().min(1).max(maxShortTextChars),
+  branch: z.string().min(1).max(maxShortTextChars),
   summary: z.object({
-    label: z.string(),
-    detail: z.string(),
+    label: z.string().max(maxShortTextChars),
+    detail: z.string().max(maxMediumTextChars),
     tone: z.enum(["green", "yellow", "red", "dark", "muted"])
   }),
-  message: z.string(),
-  checkedBy: z.string(),
-  checkedByUserId: z.string(),
+  message: z.string().max(maxMediumTextChars),
+  checkedBy: z.string().min(1).max(maxDisplayNameChars),
+  checkedByUserId: z.string().min(1).max(maxUserIdChars),
   checkedAt: z.string().datetime(),
   runs: z.array(z.object({
     id: z.number().int(),
-    name: z.string(),
-    displayTitle: z.string().optional(),
+    name: z.string().max(maxShortTextChars),
+    displayTitle: z.string().max(maxShortTextChars).optional(),
     runNumber: z.number().int().optional(),
     workflowId: z.number().int().optional(),
-    status: z.string(),
-    conclusion: z.string().nullable(),
-    branch: z.string().optional(),
-    headSha: z.string().optional(),
-    event: z.string().optional(),
-    url: z.string(),
-    createdAt: z.string(),
-    updatedAt: z.string()
-  }))
+    status: z.string().max(maxShortTextChars),
+    conclusion: z.string().max(maxShortTextChars).nullable(),
+    branch: z.string().max(maxShortTextChars).optional(),
+    headSha: z.string().max(maxShortTextChars).optional(),
+    event: z.string().max(maxShortTextChars).optional(),
+    url: z.string().min(1).max(maxUrlChars),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime()
+  })).max(maxGitHubActionRuns)
 });
 
 export const HostHandoffPlaintextPayload = z.object({
-  id: z.string(),
-  fromHost: z.string(),
-  fromUserId: z.string(),
-  projectPath: z.string(),
-  codexModel: z.string(),
-  approvalPolicy: z.string(),
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  fromHost: z.string().min(1).max(maxDisplayNameChars),
+  fromUserId: z.string().min(1).max(maxUserIdChars),
+  projectPath: z.string().min(1).max(maxProjectPathChars),
+  codexModel: z.string().min(1).max(maxCodexModelChars),
+  approvalPolicy: z.string().min(1).max(maxShortTextChars),
   messagesSinceLastCodex: z.number().int().nonnegative(),
-  attachmentNames: z.array(z.string()),
-  terminals: z.array(z.string()),
-  createdAt: z.string(),
+  attachmentNames: z.array(z.string().min(1).max(maxShortTextChars)).max(maxMessageAttachments),
+  terminals: z.array(z.string().min(1).max(maxShortTextChars)).max(maxTerminalSnapshots),
+  createdAt: z.string().datetime(),
   status: z.enum(["available", "accepted"]).optional(),
-  acceptedBy: z.string().optional(),
-  acceptedByUserId: z.string().optional(),
-  acceptedAt: z.string().optional()
+  acceptedBy: z.string().min(1).max(maxDisplayNameChars).optional(),
+  acceptedByUserId: z.string().min(1).max(maxUserIdChars).optional(),
+  acceptedAt: z.string().datetime().optional()
 });
 
 export const RoomSettingsPlaintextPayload = z.object({
   eventType: z.literal("room.settings"),
-  id: z.string(),
+  id: z.string().min(1).max(maxEnvelopeIdChars),
   setting: z.enum([
     "approvalPolicy",
     "roomMode",
@@ -276,10 +294,10 @@ export const RoomSettingsPlaintextPayload = z.object({
     "browserAllowedOrigins",
     "browserProfilePersistent"
   ]),
-  previousValue: z.string(),
-  nextValue: z.string(),
-  changedBy: z.string(),
-  changedByUserId: z.string(),
+  previousValue: z.string().max(maxMediumTextChars),
+  nextValue: z.string().max(maxMediumTextChars),
+  changedBy: z.string().min(1).max(maxDisplayNameChars),
+  changedByUserId: z.string().min(1).max(maxUserIdChars),
   changedAt: z.string().datetime()
 });
 
@@ -289,9 +307,9 @@ export const PresenceMessage = z.object({
   roomId: RoomId,
   userId: UserId,
   deviceId: DeviceId,
-  displayName: z.string(),
-  avatarUrl: z.string().optional(),
-  publicKeyFingerprint: z.string().optional()
+  displayName: z.string().min(1).max(maxDisplayNameChars),
+  avatarUrl: z.string().max(maxUrlChars).optional(),
+  publicKeyFingerprint: z.string().max(maxShortTextChars).optional()
 });
 
 export type ApprovalPolicy =
@@ -314,7 +332,7 @@ export const TeamRole = z.enum(["owner", "admin", "member"]);
 
 export const TeamRecord = z.object({
   id: TeamId,
-  name: z.string().min(1),
+  name: z.string().min(1).max(maxDisplayNameChars),
   members: z.number().int().nonnegative(),
   role: TeamRole.optional()
 });
@@ -329,9 +347,9 @@ export const TeamMemberRecord = z.object({
 export const DeviceRecord = z.object({
   userId: UserId,
   deviceId: DeviceId,
-  displayName: z.string().min(1),
+  displayName: z.string().min(1).max(maxDisplayNameChars),
   publicKeyJwk: DevicePublicKeyJwk,
-  publicKeyFingerprint: z.string().min(16),
+  publicKeyFingerprint: z.string().min(16).max(maxShortTextChars),
   registeredAt: z.string().datetime(),
   lastSeenAt: z.string().datetime()
 });
@@ -346,10 +364,10 @@ export const RoomModeSchema = z.object({
 export const RoomRecord = z.object({
   id: RoomId,
   teamId: TeamId,
-  name: z.string().min(1),
-  projectPath: z.string(),
-  host: z.string(),
-  hostUserId: z.string().optional(),
+  name: z.string().min(1).max(maxDisplayNameChars),
+  projectPath: z.string().min(1).max(maxProjectPathChars),
+  host: z.string().min(1).max(maxDisplayNameChars),
+  hostUserId: UserId.optional(),
   hostStatus: z.enum(["active", "offline", "handoff"]),
   approvalPolicy: z.enum([
     "ask_every_turn",
@@ -358,14 +376,14 @@ export const RoomRecord = z.object({
     "never_host"
   ]),
   mode: RoomModeSchema,
-  codexModel: z.string().min(1),
-  browserAllowedOrigins: z.array(z.string().min(1)).max(20),
+  codexModel: z.string().min(1).max(maxCodexModelChars),
+  browserAllowedOrigins: z.array(z.string().min(1).max(maxUrlChars)).max(20),
   browserProfilePersistent: z.boolean(),
   unread: z.number().int().nonnegative()
 });
 
 export const InviteRecord = z.object({
-  id: z.string(),
+  id: z.string().min(1).max(maxEnvelopeIdChars),
   teamId: TeamId,
   roomId: RoomId,
   createdAt: z.string().datetime(),
@@ -373,11 +391,11 @@ export const InviteRecord = z.object({
 });
 
 export const AttachmentBlobRecord = z.object({
-  id: z.string(),
+  id: z.string().min(1).max(maxEnvelopeIdChars),
   teamId: TeamId,
   roomId: RoomId,
-  name: z.string(),
-  type: z.string(),
+  name: z.string().min(1).max(maxShortTextChars),
+  type: z.string().min(1).max(maxShortTextChars),
   size: z.number().int().nonnegative(),
   payload: CiphertextPayload,
   createdAt: z.string().datetime(),
@@ -391,7 +409,7 @@ export const RelayClientMessage = z.discriminatedUnion("type", [
     roomId: RoomId,
     userId: UserId,
     deviceId: DeviceId,
-    inviteId: z.string().optional()
+    inviteId: z.string().min(1).max(maxEnvelopeIdChars).optional()
   }),
   z.object({
     type: z.literal("subscribe.team"),
@@ -434,9 +452,9 @@ export const RelayServerMessage = z.discriminatedUnion("type", [
     roomId: RoomId,
     userId: UserId,
     deviceId: DeviceId,
-    displayName: z.string(),
-    avatarUrl: z.string().optional(),
-    publicKeyFingerprint: z.string().optional(),
+    displayName: z.string().min(1).max(maxDisplayNameChars),
+    avatarUrl: z.string().max(maxUrlChars).optional(),
+    publicKeyFingerprint: z.string().max(maxShortTextChars).optional(),
     status: z.enum(["online", "offline"])
   }),
   z.object({
@@ -449,7 +467,7 @@ export const RelayServerMessage = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("error"),
-    message: z.string()
+    message: z.string().max(maxMediumTextChars)
   })
 ]);
 

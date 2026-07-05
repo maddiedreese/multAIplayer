@@ -626,13 +626,13 @@ app.post("/devices", (req, res) => {
   const displayName = session
     ? normalizeMetadataText(displayNameForUser(session.user), maxDisplayNameChars)
     : normalizeMetadataText(req.body?.displayName, maxDisplayNameChars);
-  const publicKeyJwk = req.body?.publicKeyJwk;
+  const publicKeyJwk = normalizeDevicePublicKeyJwk(req.body?.publicKeyJwk);
   const publicKeyFingerprint = normalizeMetadataText(req.body?.publicKeyFingerprint, maxPublicKeyFingerprintChars);
   if (!userId || !deviceId || !displayName) {
     res.status(400).json({ error: "userId, deviceId, and displayName are required" });
     return;
   }
-  if (!isDevicePublicKeyJwk(publicKeyJwk) || !publicKeyFingerprint || !isJsonStringifiableWithin(publicKeyJwk, maxPublicKeyJwkChars)) {
+  if (!publicKeyJwk || !publicKeyFingerprint) {
     res.status(400).json({ error: "A public key JWK and fingerprint are required" });
     return;
   }
@@ -1092,7 +1092,13 @@ wss.on("connection", (socket, request) => {
         send(socket, { type: "error", message: "Rate limit exceeded. Slow down before sending more room events." });
         return;
       }
-      const parsed = RelayClientMessage.parse(JSON.parse(raw.toString()));
+      const rawMessage = JSON.parse(raw.toString());
+      const preflightError = relayClientMessagePreflightError(rawMessage);
+      if (preflightError) {
+        send(socket, { type: "error", message: preflightError });
+        return;
+      }
+      const parsed = RelayClientMessage.parse(rawMessage);
       if (parsed.type === "join") {
         if (!isBoundedSocketIdentity(parsed.userId, parsed.deviceId)) {
           send(socket, { type: "error", message: "WebSocket user and device ids must be bounded strings without control characters." });
@@ -1255,6 +1261,65 @@ function isRelayEnvelopeWithinLimits(envelope: RelayEnvelope): boolean {
     if (!isJsonStringifiableWithin(envelope.payload.ephemeralPublicKeyJwk, maxPublicKeyJwkChars)) return false;
   }
   return Buffer.byteLength(JSON.stringify(envelope), "utf8") <= encryptedEnvelopeMaxBytes;
+}
+
+function relayClientMessagePreflightError(message: unknown): string | null {
+  if (!isRecord(message) || typeof message.type !== "string") return null;
+  if (message.type === "join" || message.type === "subscribe.team" || message.type === "subscribe.workspace") {
+    if (
+      typeof message.userId === "string" &&
+      typeof message.deviceId === "string" &&
+      !isBoundedSocketIdentity(message.userId, message.deviceId)
+    ) {
+      return "WebSocket user and device ids must be bounded strings without control characters.";
+    }
+    return null;
+  }
+  if (message.type === "publish" && isRecord(message.envelope)) {
+    const envelope = message.envelope;
+    if (
+      typeof envelope.id === "string" &&
+      typeof envelope.senderUserId === "string" &&
+      typeof envelope.senderDeviceId === "string" &&
+      isRecord(envelope.payload) &&
+      typeof envelope.payload.nonce === "string" &&
+      typeof envelope.payload.ciphertext === "string" &&
+      (
+        !normalizeMetadataText(envelope.id, maxEnvelopeIdChars) ||
+        !normalizeMetadataText(envelope.senderUserId, maxUserIdChars) ||
+        !normalizeMetadataText(envelope.senderDeviceId, maxDeviceIdChars) ||
+        !normalizeMetadataText(envelope.payload.nonce, maxEnvelopeNonceChars) ||
+        !envelope.payload.ciphertext ||
+        envelope.payload.ciphertext.length > maxEnvelopeCiphertextChars ||
+        Buffer.byteLength(JSON.stringify(envelope), "utf8") > encryptedEnvelopeMaxBytes
+      )
+    ) {
+      return `Encrypted room envelope exceeds relay limits (${encryptedEnvelopeMaxBytes} bytes max).`;
+    }
+  }
+  if (message.type === "presence") {
+    if (
+      typeof message.displayName === "string" &&
+      !normalizeMetadataText(message.displayName, maxDisplayNameChars)
+    ) {
+      return "Presence display name, avatar URL, and fingerprint must be bounded strings without control characters.";
+    }
+    if (
+      message.avatarUrl !== undefined &&
+      typeof message.avatarUrl === "string" &&
+      !normalizeMetadataText(message.avatarUrl, maxRoomProjectPathChars)
+    ) {
+      return "Presence display name, avatar URL, and fingerprint must be bounded strings without control characters.";
+    }
+    if (
+      message.publicKeyFingerprint !== undefined &&
+      typeof message.publicKeyFingerprint === "string" &&
+      !normalizeMetadataText(message.publicKeyFingerprint, maxPublicKeyFingerprintChars)
+    ) {
+      return "Presence display name, avatar URL, and fingerprint must be bounded strings without control characters.";
+    }
+  }
+  return null;
 }
 
 function isBoundedSocketIdentity(userId: string, deviceId: string): boolean {
@@ -1828,8 +1893,10 @@ function isJsonStringifiableWithin(value: unknown, maxChars: number): boolean {
   }
 }
 
-function isDevicePublicKeyJwk(value: unknown): value is DevicePublicKeyJwkType {
-  return DevicePublicKeyJwk.safeParse(value).success;
+function normalizeDevicePublicKeyJwk(value: unknown): DevicePublicKeyJwkType | null {
+  if (!isJsonStringifiableWithin(value, maxPublicKeyJwkChars)) return null;
+  const parsed = DevicePublicKeyJwk.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 function normalizeRoomProjectPath(value: unknown): string | null {
@@ -1894,19 +1961,19 @@ function normalizeTeam(team: unknown): TeamRecord | null {
 }
 
 function normalizeDevice(device: unknown): DeviceRecord | null {
-  if (!isRecord(device) || !isDevicePublicKeyJwk(device.publicKeyJwk)) return null;
+  if (!isRecord(device)) return null;
+  const publicKeyJwk = normalizeDevicePublicKeyJwk(device.publicKeyJwk);
   const userId = normalizeMetadataText(device.userId, maxUserIdChars);
   const deviceId = normalizeMetadataText(device.deviceId, maxDeviceIdChars);
   const displayName = normalizeMetadataText(device.displayName, maxDisplayNameChars);
   const publicKeyFingerprint = normalizeMetadataText(device.publicKeyFingerprint, maxPublicKeyFingerprintChars);
-  if (!userId || !deviceId || !displayName || !publicKeyFingerprint) return null;
-  if (!isJsonStringifiableWithin(device.publicKeyJwk, maxPublicKeyJwkChars)) return null;
+  if (!userId || !deviceId || !displayName || !publicKeyFingerprint || !publicKeyJwk) return null;
   if (typeof device.registeredAt !== "string" || typeof device.lastSeenAt !== "string") return null;
   return {
     userId,
     deviceId,
     displayName,
-    publicKeyJwk: device.publicKeyJwk,
+    publicKeyJwk,
     publicKeyFingerprint,
     registeredAt: device.registeredAt,
     lastSeenAt: device.lastSeenAt

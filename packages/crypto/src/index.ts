@@ -1,4 +1,9 @@
-import type { CiphertextPayload, DevicePublicKeyJwk, DeviceSealedPayload } from "@multaiplayer/protocol";
+import {
+  DevicePublicKeyJwk,
+  type CiphertextPayload,
+  type DevicePublicKeyJwk as DevicePublicKeyJwkType,
+  type DeviceSealedPayload
+} from "@multaiplayer/protocol";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -18,7 +23,7 @@ export interface RoomInviteSecret {
 
 export interface DeviceKeyAgreementIdentity {
   algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256";
-  publicKeyJwk: JsonWebKey;
+  publicKeyJwk: DevicePublicKeyJwkType;
   privateKeyJwk: JsonWebKey;
   publicKeyFingerprint: string;
   createdAt: string;
@@ -27,7 +32,7 @@ export interface DeviceKeyAgreementIdentity {
 export interface WrappedRoomSecret {
   version: 1;
   algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256";
-  ephemeralPublicKeyJwk: DevicePublicKeyJwk;
+  ephemeralPublicKeyJwk: DevicePublicKeyJwkType;
   nonce: string;
   ciphertext: string;
 }
@@ -54,7 +59,7 @@ export async function createDeviceKeyAgreementIdentity(): Promise<DeviceKeyAgree
     true,
     ["deriveKey"]
   );
-  const publicKeyJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+  const publicKeyJwk = jsonWebKeyToDevicePublicKeyJwk(await crypto.subtle.exportKey("jwk", keyPair.publicKey));
   const privateKeyJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
   return {
     algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
@@ -138,7 +143,7 @@ export async function sealJsonToDevice(value: unknown, recipientPublicKeyJwk: Js
   );
   return {
     algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
-    ephemeralPublicKeyJwk: jsonWebKeyToPublicKeyJwk(await crypto.subtle.exportKey("jwk", ephemeralKeyPair.publicKey)),
+    ephemeralPublicKeyJwk: jsonWebKeyToDevicePublicKeyJwk(await crypto.subtle.exportKey("jwk", ephemeralKeyPair.publicKey)),
     nonce: bytesToBase64(nonce),
     ciphertext: bytesToBase64(new Uint8Array(encrypted))
   };
@@ -188,7 +193,7 @@ export async function wrapRoomSecretForDevice(secret: RoomSecret, recipientPubli
   return {
     version: 1,
     algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
-    ephemeralPublicKeyJwk: jsonWebKeyToPublicKeyJwk(await crypto.subtle.exportKey("jwk", ephemeralKeyPair.publicKey)),
+    ephemeralPublicKeyJwk: jsonWebKeyToDevicePublicKeyJwk(await crypto.subtle.exportKey("jwk", ephemeralKeyPair.publicKey)),
     nonce: bytesToBase64(nonce),
     ciphertext: bytesToBase64(new Uint8Array(encrypted))
   };
@@ -285,17 +290,12 @@ function deviceSealAdditionalData(): Uint8Array {
   return encoder.encode("multaiplayer:device-sealed-json:v1");
 }
 
-function jsonWebKeyToPublicKeyJwk(key: JsonWebKey): DevicePublicKeyJwk {
-  if (
-    key.kty !== "EC" ||
-    key.crv !== "P-256" ||
-    typeof key.x !== "string" ||
-    typeof key.y !== "string" ||
-    typeof key.d === "string"
-  ) {
-    throw new Error("Expected a public P-256 ECDH JWK");
+function jsonWebKeyToDevicePublicKeyJwk(key: JsonWebKey): DevicePublicKeyJwkType {
+  const parsed = DevicePublicKeyJwk.safeParse(JSON.parse(JSON.stringify(key)));
+  if (!parsed.success) {
+    throw new Error("Expected exported ECDH public key material");
   }
-  return JSON.parse(JSON.stringify(key)) as DevicePublicKeyJwk;
+  return parsed.data;
 }
 
 export async function fingerprintPublicKey(publicKeyJwk: JsonWebKey): Promise<string> {
