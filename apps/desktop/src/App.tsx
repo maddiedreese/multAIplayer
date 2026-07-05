@@ -6,7 +6,6 @@ import {
   Copy,
   FileCode2,
   FolderGit2,
-  GitBranch,
   Github,
   KeyRound,
   Lock,
@@ -283,6 +282,7 @@ import { BrowserAccessPanel } from "./components/BrowserAccessPanel";
 import { WorkspaceFilesPanel } from "./components/WorkspaceFilesPanel";
 import { GitHubActionsPanel } from "./components/GitHubActionsPanel";
 import { GitHandoffPanel } from "./components/GitHandoffPanel";
+import { ProjectPanel } from "./components/ProjectPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -6364,53 +6364,17 @@ export function App() {
         />
 
         <div className="inspector-panel-group" hidden={inspectorTab !== "work"}>
-        <section className="panel">
-          <div className="panel-title">
-            <span>Project</span>
-            <StatusPill icon={<GitBranch size={13} />} label={gitStatus?.branch ?? "loading"} tone="dark" />
-          </div>
-          <div className="project-card">
-            <FolderGit2 size={18} />
-            <div>
-              <strong>multAIplayer</strong>
-              <span>{selectedRoom.projectPath}</span>
-            </div>
-          </div>
-          <div className="project-path-editor">
-            <label>
-              <span>Local folder</span>
-              <input
-                value={projectPathDraft}
-                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-                onChange={(event) => setProjectPathDraftForRoom(selectedRoom.id, event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    updateProjectPath();
-                  }
-                }}
-              />
-            </label>
-            <div>
-              <button className="ghost-wide" onClick={chooseProjectPath} disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}>
-                <FolderGit2 size={15} />
-                Choose folder
-              </button>
-              <button className="ghost-wide" onClick={() => setProjectPathDraftForRoom(selectedRoom.id, defaultProjectPath)} disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}>
-                <FolderGit2 size={15} />
-                Current repo
-              </button>
-              <button
-                className="primary-wide"
-                onClick={updateProjectPath}
-                disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost || !projectPathDraft.trim() || projectPathDraft.trim() === selectedRoom.projectPath}
-              >
-                <Check size={15} />
-                Attach
-              </button>
-            </div>
-          </div>
-        </section>
+        <ProjectPanel
+          projectPath={selectedRoom.projectPath}
+          projectPathDraft={projectPathDraft}
+          branchLabel={gitStatus?.branch ?? "loading"}
+          disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
+          attachDisabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost || !projectPathDraft.trim() || projectPathDraft.trim() === selectedRoom.projectPath}
+          onProjectPathDraftChange={(path) => setProjectPathDraftForRoom(selectedRoom.id, path)}
+          onChooseProjectPath={chooseProjectPath}
+          onUseDefaultProjectPath={() => setProjectPathDraftForRoom(selectedRoom.id, defaultProjectPath)}
+          onUpdateProjectPath={updateProjectPath}
+        />
 
         <section className="panel members-panel">
           <div className="panel-title">
