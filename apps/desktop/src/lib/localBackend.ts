@@ -142,8 +142,8 @@ export async function getGitDiff(cwd: string, path: string): Promise<GitDiffResu
       `+++ b/${path}`,
       "@@ -1,4 +1,5 @@",
       " export const multAIplayer = 'private group chat for coding with Codex';",
-      "-export const diffView = 'placeholder';",
-      "+export const diffView = 'red green real diff preview';",
+      "-export const diffView = 'basic file changes';",
+      "+export const diffView = 'reviewable red and green file changes';",
       "+export const hostApproval = true;"
     ].join("\n")
   };
