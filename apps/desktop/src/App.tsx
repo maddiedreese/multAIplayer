@@ -5256,13 +5256,16 @@ export function App() {
                       <input
                         type="checkbox"
                         checked={selectedRoom.mode[key]}
-                        disabled={!hasSelectedRoom || settingsBusy}
+                        disabled={!hasSelectedRoom || settingsBusy || !isActiveHost}
                         onChange={() => toggleRoomMode(key)}
                       />
                       <span>{roomModeLabels[key]}</span>
                     </label>
                   ))}
                 </div>
+                {!isActiveHost && hasSelectedRoom && (
+                  <div className="workflow-message">{roomSettingsGateMessage}</div>
+                )}
               </section>
 
               <section className="drawer-section">
