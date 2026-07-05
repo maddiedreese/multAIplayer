@@ -161,7 +161,7 @@ import {
   updateRoomSettings
 } from "./lib/workspaceClient";
 import { defaultRelayHttpUrl, defaultRelayWsUrl, loadAppConfig, resetAppConfig, saveAppConfig, type AppConfig } from "./lib/appConfig";
-import { shouldAutoApproveChatOnlyTurn } from "./lib/codexApproval";
+import { canApproveCodexTurn, shouldAutoApproveChatOnlyTurn } from "./lib/codexApproval";
 import { buildCodexApprovalSnapshot, buildCodexTurnInput, buildCodexTurnSummary, messagesSinceLastCodex } from "./lib/codexTurn";
 import { normalizeCodexThreadId } from "./lib/codexThread";
 import {
@@ -3703,7 +3703,6 @@ export function App() {
     }
     const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
     const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
-    const roomActiveHost = isLocalUserActiveHostForRoom(room, localUser);
     const roomCanReadLocalWorkspace = canUseLocalWorkspace(room, localUser, roomLocked);
     if (roomLocked) {
       setHostMessageForRoom(roomId, roomLockMessage(room, roomRevoked));
@@ -3727,20 +3726,14 @@ export function App() {
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
-    if (!roomActiveHost) {
+    if (!canApproveCodexTurn(room, localUser, roomLocked)) {
       setHostMessageForRoom(roomId, roomHostGateMessage);
       setPendingCodexApprovalForRoom(roomId, null);
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
-    if (!roomCanReadLocalWorkspace) {
-      setHostMessageForRoom(roomId, localWorkspaceGateMessage(room, roomLocked));
-      setPendingCodexApprovalForRoom(roomId, null);
-      setApprovalVisibleForRoom(roomId, false);
-      return;
-    }
     const turnMessages = approval?.messages ?? messagesByRoom[roomId] ?? [];
-    const turnSummary = approval?.summary ?? buildCodexTurnSummary(
+    const turnSummary = buildCodexTurnSummary(
       turnMessages,
       room,
       terminals.filter((terminal) => terminal.roomId === roomId),
@@ -6018,7 +6011,7 @@ export function App() {
                 }}>
                   <X size={16} /> Deny
                 </button>
-                <button className="primary" onClick={() => approveCodexTurn()} disabled={!hasSelectedRoom || codexRunning || !isActiveHost || !canReadLocalWorkspace}>
+                <button className="primary" onClick={() => approveCodexTurn()} disabled={!hasSelectedRoom || codexRunning || !canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked)}>
                   <Check size={16} /> {codexRunning ? "Running" : "Approve"}
                 </button>
               </div>

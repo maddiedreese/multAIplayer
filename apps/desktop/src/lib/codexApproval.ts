@@ -1,4 +1,5 @@
-import type { CodexTurnSummary } from "@multaiplayer/protocol";
+import type { CodexTurnSummary, RoomRecord } from "@multaiplayer/protocol";
+import { isLocalUserActiveHostForRoom, type LocalHostUser } from "./roomHost";
 
 export function isChatOnlyCodexTurn(summary: CodexTurnSummary): boolean {
   return (
@@ -11,4 +12,13 @@ export function isChatOnlyCodexTurn(summary: CodexTurnSummary): boolean {
 
 export function shouldAutoApproveChatOnlyTurn(summary: CodexTurnSummary, activeHost: boolean): boolean {
   return activeHost && isChatOnlyCodexTurn(summary);
+}
+
+export function canApproveCodexTurn(room: RoomRecord, user: LocalHostUser, locked = false): boolean {
+  return (
+    !locked &&
+    room.mode.code &&
+    room.approvalPolicy !== "never_host" &&
+    isLocalUserActiveHostForRoom(room, user)
+  );
 }

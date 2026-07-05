@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { CodexTurnSummary } from "@multaiplayer/protocol";
-import { isChatOnlyCodexTurn, shouldAutoApproveChatOnlyTurn } from "../src/lib/codexApproval";
+import type { CodexTurnSummary, RoomRecord } from "@multaiplayer/protocol";
+import { canApproveCodexTurn, isChatOnlyCodexTurn, shouldAutoApproveChatOnlyTurn } from "../src/lib/codexApproval";
 
 const baseSummary: CodexTurnSummary = {
   messagesSinceLastCodex: 2,
@@ -10,6 +10,22 @@ const baseSummary: CodexTurnSummary = {
   git: null,
   browserAccess: [],
   terminals: []
+};
+
+const room: RoomRecord = {
+  id: "room-codex",
+  teamId: "team-core",
+  name: "Codex",
+  projectPath: "/Users/maddie/project",
+  host: "Maddie",
+  hostUserId: "github:maddie",
+  hostStatus: "active",
+  approvalPolicy: "ask_every_turn",
+  mode: { chat: true, code: true, workspace: false, browser: false },
+  codexModel: "gpt-5.4",
+  browserAllowedOrigins: ["https://github.com"],
+  browserProfilePersistent: true,
+  unread: 0
 };
 
 test("chat-only Codex turns are auto-approved for the active host", () => {
@@ -73,4 +89,13 @@ test("terminal context requires host approval", () => {
 
   assert.equal(isChatOnlyCodexTurn(summary), false);
   assert.equal(shouldAutoApproveChatOnlyTurn(summary, true), false);
+});
+
+test("Codex approval requires an unlocked active host but not workspace mode", () => {
+  const host = { id: "github:maddie", name: "Maddie" };
+  assert.equal(canApproveCodexTurn(room, host), true);
+  assert.equal(canApproveCodexTurn(room, host, true), false);
+  assert.equal(canApproveCodexTurn(room, { id: "github:peer", name: "Peer" }), false);
+  assert.equal(canApproveCodexTurn({ ...room, mode: { ...room.mode, code: false } }, host), false);
+  assert.equal(canApproveCodexTurn({ ...room, approvalPolicy: "never_host" }, host), false);
 });
