@@ -1,12 +1,15 @@
 import {
+  defaultCodexModel,
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   type ApprovalPolicy
 } from "@multaiplayer/protocol";
 import { normalizeBrowserAllowedOrigins } from "./browserPolicy";
+import { normalizeCodexModel } from "./workspaceCreation";
 
 export interface TeamRoomDefaults {
   approvalPolicy: ApprovalPolicy;
+  codexModel: string;
   browserAllowedOrigins: string[];
   browserProfilePersistent: boolean;
   inviteApprovalGate: boolean;
@@ -14,6 +17,7 @@ export interface TeamRoomDefaults {
 
 const defaultTeamRoomDefaults: TeamRoomDefaults = {
   approvalPolicy: "ask_every_turn",
+  codexModel: defaultCodexModel,
   browserAllowedOrigins: [...defaultBrowserAllowedOrigins],
   browserProfilePersistent: defaultBrowserProfilePersistent,
   inviteApprovalGate: false
@@ -51,6 +55,7 @@ export function sanitizeTeamRoomDefaults(defaults: Partial<TeamRoomDefaults>): T
     approvalPolicy: isApprovalPolicy(defaults.approvalPolicy)
       ? defaults.approvalPolicy
       : defaultTeamRoomDefaults.approvalPolicy,
+    codexModel: normalizeCodexModel(defaults.codexModel ?? "") ?? defaultTeamRoomDefaults.codexModel,
     browserAllowedOrigins: [...(browserAllowedOrigins ?? defaultTeamRoomDefaults.browserAllowedOrigins)],
     browserProfilePersistent: typeof defaults.browserProfilePersistent === "boolean"
       ? defaults.browserProfilePersistent
@@ -63,11 +68,12 @@ export function sanitizeTeamRoomDefaults(defaults: Partial<TeamRoomDefaults>): T
 
 export function teamDefaultsRoomSettings(defaults: TeamRoomDefaults): Pick<
   TeamRoomDefaults,
-  "approvalPolicy" | "browserAllowedOrigins" | "browserProfilePersistent"
+  "approvalPolicy" | "codexModel" | "browserAllowedOrigins" | "browserProfilePersistent"
 > {
   const sanitized = sanitizeTeamRoomDefaults(defaults);
   return {
     approvalPolicy: sanitized.approvalPolicy,
+    codexModel: sanitized.codexModel,
     browserAllowedOrigins: [...sanitized.browserAllowedOrigins],
     browserProfilePersistent: sanitized.browserProfilePersistent
   };

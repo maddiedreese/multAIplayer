@@ -519,6 +519,9 @@ export function App() {
   const [teamDefaultApprovalPolicy, setTeamDefaultApprovalPolicy] = useState<ApprovalPolicy>(() =>
     loadTeamRoomDefaults(seededTeams[0].id).approvalPolicy
   );
+  const [teamDefaultCodexModel, setTeamDefaultCodexModel] = useState(() =>
+    loadTeamRoomDefaults(seededTeams[0].id).codexModel
+  );
   const [teamDefaultBrowserAllowedOriginsDraft, setTeamDefaultBrowserAllowedOriginsDraft] = useState(() =>
     loadTeamRoomDefaults(seededTeams[0].id).browserAllowedOrigins.join("\n")
   );
@@ -1179,6 +1182,7 @@ export function App() {
     const teamRoomDefaults = loadTeamRoomDefaults(selectedTeam);
     setTeamHistorySettings(loadTeamHistorySettings(selectedTeam));
     setTeamDefaultApprovalPolicy(teamRoomDefaults.approvalPolicy);
+    setTeamDefaultCodexModel(teamRoomDefaults.codexModel);
     setTeamDefaultBrowserAllowedOriginsDraft(teamRoomDefaults.browserAllowedOrigins.join("\n"));
     setTeamDefaultBrowserProfilePersistent(teamRoomDefaults.browserProfilePersistent);
     setTeamDefaultInviteApprovalGate(teamRoomDefaults.inviteApprovalGate);
@@ -2031,6 +2035,7 @@ export function App() {
         plan.projectPath,
         {
           approvalPolicy: teamDefaults.approvalPolicy,
+          codexModel: teamDefaults.codexModel,
           browserAllowedOrigins: teamDefaults.browserAllowedOrigins,
           browserProfilePersistent: teamDefaults.browserProfilePersistent
         }
@@ -2891,12 +2896,33 @@ export function App() {
       approvalPolicy
     });
     setTeamDefaultApprovalPolicy(saved.approvalPolicy);
+    setTeamDefaultCodexModel(saved.codexModel);
     setTeamDefaultBrowserAllowedOriginsDraft(saved.browserAllowedOrigins.join("\n"));
     setTeamDefaultBrowserProfilePersistent(saved.browserProfilePersistent);
     setTeamDefaultInviteApprovalGate(saved.inviteApprovalGate);
     setTeamHistoryMessageForTeam(
       selectedTeam,
       `New rooms in this team will default to ${approvalPolicyLabels[saved.approvalPolicy]}.`
+    );
+  }
+
+  function updateTeamDefaultCodexModel(codexModel: string) {
+    if (!selectedTeam) {
+      setSelectedTeamHistoryMessage("Create or select a team before changing team defaults.");
+      return;
+    }
+    const saved = saveTeamRoomDefaults(selectedTeam, {
+      ...loadTeamRoomDefaults(selectedTeam),
+      codexModel
+    });
+    setTeamDefaultApprovalPolicy(saved.approvalPolicy);
+    setTeamDefaultCodexModel(saved.codexModel);
+    setTeamDefaultBrowserAllowedOriginsDraft(saved.browserAllowedOrigins.join("\n"));
+    setTeamDefaultBrowserProfilePersistent(saved.browserProfilePersistent);
+    setTeamDefaultInviteApprovalGate(saved.inviteApprovalGate);
+    setTeamHistoryMessageForTeam(
+      selectedTeam,
+      `New rooms in this team will default to ${formatCodexModel(saved.codexModel)}.`
     );
   }
 
@@ -2916,6 +2942,7 @@ export function App() {
       browserProfilePersistent: teamDefaultBrowserProfilePersistent
     });
     setTeamDefaultApprovalPolicy(saved.approvalPolicy);
+    setTeamDefaultCodexModel(saved.codexModel);
     setTeamDefaultBrowserAllowedOriginsDraft(saved.browserAllowedOrigins.join("\n"));
     setTeamDefaultBrowserProfilePersistent(saved.browserProfilePersistent);
     setTeamDefaultInviteApprovalGate(saved.inviteApprovalGate);
@@ -2937,6 +2964,7 @@ export function App() {
       inviteApprovalGate
     });
     setTeamDefaultApprovalPolicy(saved.approvalPolicy);
+    setTeamDefaultCodexModel(saved.codexModel);
     setTeamDefaultBrowserAllowedOriginsDraft(saved.browserAllowedOrigins.join("\n"));
     setTeamDefaultBrowserProfilePersistent(saved.browserProfilePersistent);
     setTeamDefaultInviteApprovalGate(saved.inviteApprovalGate);
@@ -5351,6 +5379,18 @@ export function App() {
 	                    ))}
 	                  </select>
 	                </label>
+	                <label className="history-retention">
+	                  <span>New room model</span>
+	                  <select
+	                    value={codexModelOptions.some((option) => option.id === teamDefaultCodexModel) ? teamDefaultCodexModel : defaultCodexModel}
+	                    disabled={!selectedTeam}
+	                    onChange={(event) => updateTeamDefaultCodexModel(event.target.value)}
+	                  >
+	                    {codexModelOptions.map((option) => (
+	                      <option key={option.id} value={option.id}>{option.label}</option>
+	                    ))}
+	                  </select>
+	                </label>
 	                <label className="checkbox-row">
 	                  <input
 	                    type="checkbox"
@@ -6242,6 +6282,18 @@ export function App() {
 	            >
 	              {(Object.keys(approvalPolicyLabels) as ApprovalPolicy[]).map((policy) => (
 	                <option key={policy} value={policy}>{approvalPolicyLabels[policy]}</option>
+	              ))}
+	            </select>
+	          </label>
+	          <label className="history-retention">
+	            <span>New room model</span>
+	            <select
+	              value={codexModelOptions.some((option) => option.id === teamDefaultCodexModel) ? teamDefaultCodexModel : defaultCodexModel}
+	              disabled={!selectedTeam}
+	              onChange={(event) => updateTeamDefaultCodexModel(event.target.value)}
+	            >
+	              {codexModelOptions.map((option) => (
+	                <option key={option.id} value={option.id}>{option.label}</option>
 	              ))}
 	            </select>
 	          </label>

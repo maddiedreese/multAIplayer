@@ -114,6 +114,7 @@ export async function createRoom(
   projectPath: string,
   settings: {
     approvalPolicy?: ApprovalPolicy;
+    codexModel?: string;
     browserAllowedOrigins?: string[];
     browserProfilePersistent?: boolean;
   } = {}

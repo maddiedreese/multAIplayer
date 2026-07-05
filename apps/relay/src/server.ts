@@ -653,6 +653,7 @@ app.post("/rooms", (req, res) => {
   const name = normalizeMetadataText(req.body?.name, maxRoomNameChars);
   const projectPath = normalizeRoomProjectPath(req.body?.projectPath);
   const approvalPolicy = req.body?.approvalPolicy === undefined ? "ask_every_turn" : String(req.body.approvalPolicy);
+  const codexModel = req.body?.codexModel === undefined ? defaultCodexModel : normalizeCodexModel(req.body.codexModel);
   const browserAllowedOrigins = req.body?.browserAllowedOrigins;
   const browserProfilePersistent = req.body?.browserProfilePersistent;
   if (!teams.has(teamId)) {
@@ -673,6 +674,10 @@ app.post("/rooms", (req, res) => {
   }
   if (!isApprovalPolicy(approvalPolicy)) {
     res.status(400).json({ error: "approvalPolicy is invalid" });
+    return;
+  }
+  if (!codexModel) {
+    res.status(400).json({ error: `codexModel must be a known model id or a model-like id up to ${maxCodexModelChars} characters` });
     return;
   }
   let normalizedBrowserAllowedOrigins = defaultBrowserAllowedOrigins;
@@ -697,7 +702,7 @@ app.post("/rooms", (req, res) => {
     hostStatus: "offline",
     approvalPolicy,
     mode: defaultRoomMode,
-    codexModel: defaultCodexModel,
+    codexModel,
     browserAllowedOrigins: normalizedBrowserAllowedOrigins,
     browserProfilePersistent: browserProfilePersistent ?? defaultBrowserProfilePersistent,
     unread: 0

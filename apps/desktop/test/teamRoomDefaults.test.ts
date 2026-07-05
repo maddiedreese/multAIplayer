@@ -49,6 +49,7 @@ test.beforeEach(() => {
 test("team room defaults persist approval policy per team", () => {
   const saved = saveTeamRoomDefaults("team-core", {
     approvalPolicy: "auto_chat_only",
+    codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: ["https://github.com", "https://example.com"],
     browserProfilePersistent: false,
     inviteApprovalGate: true
@@ -56,18 +57,21 @@ test("team room defaults persist approval policy per team", () => {
 
   assert.deepEqual(saved, {
     approvalPolicy: "auto_chat_only",
+    codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: ["https://github.com", "https://example.com"],
     browserProfilePersistent: false,
     inviteApprovalGate: true
   });
   assert.deepEqual(loadTeamRoomDefaults("team-core"), {
     approvalPolicy: "auto_chat_only",
+    codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: ["https://github.com", "https://example.com"],
     browserProfilePersistent: false,
     inviteApprovalGate: true
   });
   assert.deepEqual(loadTeamRoomDefaults("team-labs"), {
     approvalPolicy: "ask_every_turn",
+    codexModel: "gpt-5.4",
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
     inviteApprovalGate: false
@@ -77,6 +81,7 @@ test("team room defaults persist approval policy per team", () => {
 test("team room defaults sanitize unsupported approval policies", () => {
   assert.deepEqual(sanitizeTeamRoomDefaults({ approvalPolicy: "surprise" as never }), {
     approvalPolicy: "ask_every_turn",
+    codexModel: "gpt-5.4",
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
     inviteApprovalGate: false
@@ -85,6 +90,31 @@ test("team room defaults sanitize unsupported approval policies", () => {
   localStorage.setItem(teamRoomDefaultsKey("team-core"), JSON.stringify({ approvalPolicy: "nope" }));
   assert.deepEqual(loadTeamRoomDefaults("team-core"), {
     approvalPolicy: "ask_every_turn",
+    codexModel: "gpt-5.4",
+    browserAllowedOrigins: ["https://github.com"],
+    browserProfilePersistent: true,
+    inviteApprovalGate: false
+  });
+});
+
+test("team room defaults sanitize Codex model", () => {
+  assert.deepEqual(sanitizeTeamRoomDefaults({
+    approvalPolicy: "ask_every_turn",
+    codexModel: "gpt-5.4-mini",
+    browserAllowedOrigins: ["https://github.com"],
+    browserProfilePersistent: true,
+    inviteApprovalGate: false
+  }), {
+    approvalPolicy: "ask_every_turn",
+    codexModel: "gpt-5.4-mini",
+    browserAllowedOrigins: ["https://github.com"],
+    browserProfilePersistent: true,
+    inviteApprovalGate: false
+  });
+
+  assert.deepEqual(sanitizeTeamRoomDefaults({ codexModel: "not a model id" }), {
+    approvalPolicy: "ask_every_turn",
+    codexModel: "gpt-5.4",
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
     inviteApprovalGate: false
@@ -94,10 +124,12 @@ test("team room defaults sanitize unsupported approval policies", () => {
 test("team room defaults sanitize browser policy", () => {
   assert.deepEqual(sanitizeTeamRoomDefaults({
     approvalPolicy: "auto_browser_allowed_sites",
+    codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: ["https://github.com/path"],
     browserProfilePersistent: "yes" as never
   }), {
     approvalPolicy: "auto_browser_allowed_sites",
+    codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
     inviteApprovalGate: false
@@ -105,11 +137,13 @@ test("team room defaults sanitize browser policy", () => {
 
   assert.deepEqual(sanitizeTeamRoomDefaults({
     approvalPolicy: "auto_browser_allowed_sites",
+    codexModel: "gpt-5.4-mini",
     browserAllowedOrigins: ["https://github.com", "https://github.com"],
     browserProfilePersistent: false,
     inviteApprovalGate: true
   }), {
     approvalPolicy: "auto_browser_allowed_sites",
+    codexModel: "gpt-5.4-mini",
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: false,
     inviteApprovalGate: true
@@ -119,11 +153,13 @@ test("team room defaults sanitize browser policy", () => {
 test("team room defaults sanitize invite policy", () => {
   assert.deepEqual(sanitizeTeamRoomDefaults({
     approvalPolicy: "ask_every_turn",
+    codexModel: "gpt-5.4",
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
     inviteApprovalGate: "yes" as never
   }), {
     approvalPolicy: "ask_every_turn",
+    codexModel: "gpt-5.4",
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
     inviteApprovalGate: false
@@ -133,6 +169,7 @@ test("team room defaults sanitize invite policy", () => {
 test("team defaults room settings include only host-controlled room settings", () => {
   const defaults = {
     approvalPolicy: "auto_browser_allowed_sites" as const,
+    codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: ["https://github.com", "https://example.com"],
     browserProfilePersistent: false,
     inviteApprovalGate: true
@@ -141,6 +178,7 @@ test("team defaults room settings include only host-controlled room settings", (
 
   assert.deepEqual(settings, {
     approvalPolicy: "auto_browser_allowed_sites",
+    codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: ["https://github.com", "https://example.com"],
     browserProfilePersistent: false
   });
@@ -153,6 +191,7 @@ test("team room defaults drop corrupted storage", () => {
 
   assert.deepEqual(loadTeamRoomDefaults("team-core"), {
     approvalPolicy: "ask_every_turn",
+    codexModel: "gpt-5.4",
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
     inviteApprovalGate: false

@@ -154,6 +154,7 @@ test("relay accepts room defaults when creating a room", async () => {
         name: "Autopilot room",
         projectPath: "/tmp/multaiplayer",
         approvalPolicy: "auto_chat_only",
+        codexModel: "gpt-5.4-thinking",
         browserAllowedOrigins: ["https://github.com", "https://example.com"],
         browserProfilePersistent: false
       })
@@ -162,11 +163,13 @@ test("relay accepts room defaults when creating a room", async () => {
     const body = await response.json() as {
       room: {
         approvalPolicy: string;
+        codexModel: string;
         browserAllowedOrigins: string[];
         browserProfilePersistent: boolean;
       };
     };
     assert.equal(body.room.approvalPolicy, "auto_chat_only");
+    assert.equal(body.room.codexModel, "gpt-5.4-thinking");
     assert.deepEqual(body.room.browserAllowedOrigins, ["https://github.com", "https://example.com"]);
     assert.equal(body.room.browserProfilePersistent, false);
 
@@ -194,6 +197,15 @@ test("relay accepts room defaults when creating a room", async () => {
         name: "Bad browser persistence room",
         projectPath: "/tmp/multaiplayer",
         browserProfilePersistent: "sometimes"
+      }),
+      400
+    );
+    assert.equal(
+      await postJsonStatus(relay.baseUrl, "/rooms", {
+        teamId: "team-core",
+        name: "Bad model room",
+        projectPath: "/tmp/multaiplayer",
+        codexModel: "not a model id"
       }),
       400
     );
