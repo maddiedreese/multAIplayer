@@ -69,7 +69,12 @@ export function ModelPanel({
               }
             }}
           />
-          <button onClick={onApplyCustomModel} disabled={disabled || !canApplyCustomModel}>
+          <button
+            onClick={onApplyCustomModel}
+            disabled={disabled || !canApplyCustomModel}
+            title="Apply custom model"
+            aria-label="Apply custom model"
+          >
             <Check size={13} />
           </button>
         </div>

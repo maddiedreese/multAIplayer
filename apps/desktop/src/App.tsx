@@ -1758,6 +1758,7 @@ export function App() {
             const plaintext = await decryptJson<ChatPlaintextPayload>(roomPayload, secret);
             const chatMessage = normalizeChatMessage(plaintext) as ChatMessage | null;
             if (!chatMessage) return;
+            if (isLegacyDebugChatMessage(chatMessage)) return;
             setRooms((current) =>
               markRoomUnreadForIncomingChat(
                 current,
@@ -6560,7 +6561,7 @@ function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistoryPayloa
   if (Array.isArray(value)) {
     return {
       version: 3,
-      messages: value.map((message) => normalizeChatMessage(message) as ChatMessage | null).filter((message): message is ChatMessage => message !== null),
+      messages: normalizeChatHistoryMessages(value),
       terminalRequests: [],
       browserRequests: [],
       inviteRequests: [],
@@ -6576,7 +6577,7 @@ function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistoryPayloa
   return {
     version: 3,
     messages: Array.isArray(value.messages)
-      ? value.messages.map((message) => normalizeChatMessage(message) as ChatMessage | null).filter((message): message is ChatMessage => message !== null)
+      ? normalizeChatHistoryMessages(value.messages)
       : [],
     terminalRequests: Array.isArray(value.terminalRequests)
       ? value.terminalRequests.filter(isTerminalCommandRequest)
@@ -6604,6 +6605,18 @@ function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistoryPayloa
       : [],
     ...(codexThreadId ? { codexThreadId } : {})
   };
+}
+
+function normalizeChatHistoryMessages(value: unknown[]): ChatMessage[] {
+  return value
+    .map((message) => normalizeChatMessage(message) as ChatMessage | null)
+    .filter((message): message is ChatMessage => Boolean(message && !isLegacyDebugChatMessage(message)));
+}
+
+function isLegacyDebugChatMessage(message: ChatMessage): boolean {
+  const normalizedBody = message.body.trim().toLowerCase();
+  return normalizedBody === "relay-backed encrypted hello from the room." ||
+    normalizedBody === "ciphertext-only debug check.";
 }
 
 function isChatMessage(value: unknown): value is ChatMessage {

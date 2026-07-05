@@ -104,11 +104,19 @@ export function RoomChatPanel({
                 </label>
                 <strong>{message.author}</strong>
                 <span>{message.time}</span>
-                <button onClick={() => onCopyMessageMarkdown(message.id)} title="Copy message as Markdown">
+                <button
+                  onClick={() => onCopyMessageMarkdown(message.id)}
+                  title="Copy message as Markdown"
+                  aria-label={`Copy message from ${message.author} as Markdown`}
+                >
                   <Copy size={13} />
                 </button>
                 {message.role === "codex" && (
-                  <button onClick={() => onCopyCodexOutputMarkdown(message.id)} title="Copy Codex turn output as Markdown">
+                  <button
+                    onClick={() => onCopyCodexOutputMarkdown(message.id)}
+                    title="Copy Codex turn output as Markdown"
+                    aria-label={`Copy Codex turn output from ${message.time} as Markdown`}
+                  >
                     <Bot size={13} />
                   </button>
                 )}
@@ -123,6 +131,7 @@ export function RoomChatPanel({
                     <button
                       onClick={() => onOpenAttachment(message.id, attachment.id)}
                       title={attachment.encryptedBlob ? "Decrypt and preview encrypted attachment" : "Preview inline attachment"}
+                      aria-label={`Preview ${attachment.name}`}
                       disabled={roomLocked}
                     >
                       <ExternalLink size={12} />
@@ -161,7 +170,7 @@ export function RoomChatPanel({
       </div>
 
       <footer className="composer">
-        <button title="Invoke Codex" onClick={onInvokeCodex} disabled={!canUseChat}>
+        <button title="Invoke Codex" aria-label="Invoke Codex" onClick={onInvokeCodex} disabled={!canUseChat}>
           <Bot size={18} />
         </button>
         <div className="composer-body">
@@ -198,7 +207,7 @@ export function RoomChatPanel({
             }}
           />
         </div>
-        <button className="send" onClick={onSendMessage} disabled={!canSendMessage}>
+        <button className="send" onClick={onSendMessage} disabled={!canSendMessage} aria-label="Send message">
           <Send size={18} />
         </button>
       </footer>
