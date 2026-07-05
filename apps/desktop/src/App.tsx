@@ -279,6 +279,7 @@ import { CodexApprovalCard } from "./components/CodexApprovalCard";
 import { ModelPanel } from "./components/ModelPanel";
 import { RoomModePanel } from "./components/RoomModePanel";
 import { ApprovalPolicyPanel } from "./components/ApprovalPolicyPanel";
+import { HostHandoffPanel } from "./components/HostHandoffPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
 interface ChatMessage {
@@ -6612,38 +6613,12 @@ export function App() {
           {deviceIdentityMessage && <div className="workflow-message">{deviceIdentityMessage}</div>}
         </section>
 
-        <section className="panel handoff-panel">
-          <div className="panel-title">
-            <span>Host handoff</span>
-            <StatusPill
-              icon={<UserRoundCheck size={13} />}
-              label={hostHandoffs.some((handoff) => handoff.status === "available") ? "available" : "none"}
-              tone={hostHandoffs.some((handoff) => handoff.status === "available") ? "yellow" : "muted"}
-            />
-          </div>
-          <div className="handoff-list">
-            {hostHandoffs.slice(-3).reverse().map((handoff) => (
-              <div className={`handoff-row ${handoff.status}`} key={handoff.id}>
-                <div>
-                  <strong>{handoff.fromHost}</strong>
-                  <span>{handoff.messagesSinceLastCodex} messages · {handoff.attachmentNames.length} attachments · {handoff.terminals.length} terminals</span>
-                  <small>{handoff.projectPath} · {formatCodexModel(handoff.codexModel)}</small>
-                </div>
-                {handoff.status === "available" ? (
-                  <button onClick={() => acceptHostHandoff(handoff)} disabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy}>
-                    <Check size={13} />
-                    Accept
-                  </button>
-                ) : (
-                  <b>{handoff.status}</b>
-                )}
-              </div>
-            ))}
-            {hostHandoffs.length === 0 && (
-              <div className="empty-state compact">No host handoff package for this room.</div>
-            )}
-          </div>
-        </section>
+        <HostHandoffPanel
+          handoffs={hostHandoffs}
+          acceptDisabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy}
+          onAcceptHandoff={acceptHostHandoff}
+          formatModel={formatCodexModel}
+        />
 
         <section className="panel invite-panel">
           <div className="panel-title">
