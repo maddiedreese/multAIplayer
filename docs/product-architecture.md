@@ -296,7 +296,7 @@ Hard parts to design carefully:
 - multi-device support;
 - identity verification;
 - history recovery;
-- encrypted search.
+- server-side encrypted search.
 
 ### Encrypted Local History
 
@@ -308,6 +308,7 @@ Defaults:
 - configurable per room and team;
 - team defaults apply to newly created rooms and can be explicitly applied to the current room;
 - chat messages, terminal requests, terminal snapshots, browser approvals, Codex events, Git workflow events, GitHub Actions refreshes, host handoff packages, and saved Codex thread continuity in one versioned encrypted room payload;
+- sidebar chat search includes decrypted-on-device local history for rooms whose keys are still available, without creating a relay-readable search index;
 - attachment cache encrypted;
 - room keys in macOS Keychain in the native app;
 - user can clear local room history, including local room messages, workflow records, and the saved Codex thread id;

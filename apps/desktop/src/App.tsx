@@ -202,6 +202,7 @@ import { checkGitHubActionsReadiness, checkGitHubWorkflowReadiness } from "./lib
 import { defaultGitWorkflowDraft, parseGitHubRemoteUrl, resolveGitWorkflowDraft, updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "./lib/gitWorkflowDraft";
 import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
+import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "./lib/sidebarSearch";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -602,6 +603,8 @@ export function App() {
   const [fileBusyByRoom, setFileBusyByRoom] = useState<Record<string, boolean>>({});
   const [fileMessagesByRoom, setFileMessagesByRoom] = useState<Record<string, string | null>>({});
   const [markdownCopyFallbacksByRoom, setMarkdownCopyFallbacksByRoom] = useState<Record<string, MarkdownCopyFallback | null>>({});
+  const [historySearchMessagesByRoom, setHistorySearchMessagesByRoom] = useState<Record<string, ChatMessage[]>>({});
+  const [historySearchBusy, setHistorySearchBusy] = useState(false);
   const [sensitiveAttachmentReviewKey, setSensitiveAttachmentReviewKey] = useState<string | null>(null);
   const [inviteSecretInput, setInviteSecretInput] = useState("");
   const [inviteLinksByRoom, setInviteLinksByRoom] = useState<Record<string, string>>({});
@@ -1055,16 +1058,12 @@ export function App() {
         : teamRooms,
     [normalizedSidebarQuery, rooms, searchActive, teamRooms, teams]
   );
+  const searchableMessagesByRoom = useMemo(() => {
+    return mergeSearchableMessages(messagesByRoom, historySearchMessagesByRoom);
+  }, [historySearchMessagesByRoom, messagesByRoom]);
   const visibleMessageHits = useMemo(() => {
-    if (!searchActive) return [];
-    return Object.entries(messagesByRoom)
-      .flatMap(([roomId, roomMessages]) =>
-        roomMessages
-          .filter((message) => searchMatches([message.author, message.body, message.attachments?.map((attachment) => attachment.name).join(" ") ?? ""], normalizedSidebarQuery))
-          .map((message) => ({ roomId, message }))
-      )
-      .slice(-8);
-  }, [messagesByRoom, normalizedSidebarQuery, searchActive]);
+    return searchActive ? findSidebarMessageHits(searchableMessagesByRoom, normalizedSidebarQuery) : [];
+  }, [normalizedSidebarQuery, searchableMessagesByRoom, searchActive]);
 
   useEffect(() => {
     roomsRef.current = rooms;
@@ -1315,6 +1314,47 @@ export function App() {
       cancelled = true;
     };
   }, [forgottenRoomIds, hasSelectedRoom, selectedRoom.teamId, selectedRoomId]);
+
+  useEffect(() => {
+    if (!searchActive) {
+      setHistorySearchMessagesByRoom({});
+      setHistorySearchBusy(false);
+      return;
+    }
+
+    let cancelled = false;
+    const searchableRooms = rooms.filter((room) =>
+      !forgottenRoomIds.has(room.id) &&
+      !revokedRoomIds.has(room.id) &&
+      !revokedTeamIds.has(room.teamId)
+    );
+    setHistorySearchBusy(searchableRooms.length > 0);
+    Promise.all(
+      searchableRooms.map(async (room) => {
+        const storedHistory = await loadEncryptedHistory<ChatMessage[] | LocalRoomHistoryPayload>(room.id);
+        if (!storedHistory) return [room.id, []] as const;
+        const settings = loadHistorySettings(room.id);
+        const payload = pruneLocalRoomHistory(normalizeLocalRoomHistory(storedHistory), settings.retentionDays);
+        return [room.id, payload.messages] as const;
+      })
+    )
+      .then((entries) => {
+        if (cancelled) return;
+        setHistorySearchMessagesByRoom(
+          Object.fromEntries(entries.filter(([, roomMessages]) => roomMessages.length > 0))
+        );
+      })
+      .catch((error) => {
+        if (!cancelled) console.warn("Failed to search encrypted local history", error);
+      })
+      .finally(() => {
+        if (!cancelled) setHistorySearchBusy(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [forgottenRoomIds, revokedRoomIds, revokedTeamIds, rooms, searchActive]);
 
   useEffect(() => {
     let cancelled = false;
@@ -5418,7 +5458,9 @@ export function App() {
                 );
               })}
               {visibleMessageHits.length === 0 && (
-                <div className="sidebar-empty">No loaded chat matches.</div>
+                <div className="sidebar-empty">
+                  {historySearchBusy ? "Searching encrypted local history..." : "No chat or local history matches."}
+                </div>
               )}
             </div>
           </section>
@@ -7050,10 +7092,6 @@ function StatusPill({
       {label}
     </span>
   );
-}
-
-function searchMatches(values: string[], query: string): boolean {
-  return values.some((value) => value.toLowerCase().includes(query));
 }
 
 function loadOrCreateDeviceId(): string {
