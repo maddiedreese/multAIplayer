@@ -19,24 +19,14 @@ interface RelayHarness {
 interface StoredRelayStateFixture {
   version: 1;
   savedAt: string;
-  teams: unknown[];
-  rooms: unknown[];
-  invites: unknown[];
-  teamMembers?: Array<{
-    teamId: string;
-    members?: Array<{ userId: string; role?: string; joinedAt?: string }>;
-    userIds?: string[];
-  }>;
+  teams: unknown;
+  rooms: unknown;
+  invites: unknown;
+  teamMembers?: unknown[];
   devices?: unknown[];
-  authSessions?: Array<{
-    sessionId?: string;
-    encryptedAccessToken?: { algorithm?: string };
-    accessToken?: string;
-    user?: unknown;
-    expiresAt?: number;
-  }>;
+  authSessions?: unknown[];
   attachmentBlobs?: unknown[];
-  encryptedBacklog: unknown[];
+  encryptedBacklog: unknown;
 }
 
 test("relay rejects non-host takeover and allows explicit handoff", async () => {
@@ -2618,6 +2608,55 @@ test("relay drops invalid persisted team and room identifiers", async () => {
     assert.deepEqual(body.teams.map((team) => team.id), ["team-core"]);
     assert.deepEqual(body.rooms.map((room) => room.id), ["room-desktop"]);
     assert.equal(body.rooms[0]?.teamId, "team-core");
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay salvages valid persisted records from malformed collection fields", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_SEED_DEMO: "false"
+  }, {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    teams: [{ id: "team-core", name: "Core Team", members: 0 }],
+    rooms: "not-an-array",
+    invites: null,
+    devices: { malformed: true },
+    teamMembers: [
+      null,
+      "not-a-member-record",
+      {
+        teamId: "team-core",
+        members: [
+          null,
+          { userId: "github:owner", role: "owner", joinedAt: "2026-07-04T12:00:00.000Z" },
+          { userId: "github:bad\nmember", role: "admin", joinedAt: "2026-07-04T12:00:00.000Z" }
+        ],
+        userIds: "github:not-an-array"
+      }
+    ],
+    authSessions: "not-an-array",
+    attachmentBlobs: false,
+    encryptedBacklog: { malformed: true }
+  });
+  const ownerCookie = await createDebugSession(relay.baseUrl, "github:owner", "owner");
+  const outsiderCookie = await createDebugSession(relay.baseUrl, "github:outsider", "outsider");
+  try {
+    const ownerWorkspace = await fetch(`${relay.baseUrl}/teams`, {
+      headers: { cookie: ownerCookie }
+    });
+    assert.equal(ownerWorkspace.status, 200);
+    const ownerBody = await ownerWorkspace.json() as { teams: Array<{ id: string; members: number; role: string }>; rooms: unknown[] };
+    assert.deepEqual(ownerBody.teams, [{ id: "team-core", name: "Core Team", members: 1, role: "owner" }]);
+    assert.deepEqual(ownerBody.rooms, []);
+
+    const outsiderWorkspace = await fetch(`${relay.baseUrl}/teams`, {
+      headers: { cookie: outsiderCookie }
+    });
+    assert.equal(outsiderWorkspace.status, 200);
+    assert.deepEqual(await outsiderWorkspace.json(), { teams: [], rooms: [] });
   } finally {
     await relay.close();
   }

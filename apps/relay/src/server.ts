@@ -2110,70 +2110,71 @@ function normalizeSessionPersistenceSecret(value: string | undefined): string | 
 async function loadRelayStore() {
   try {
     const raw = await readFile(dataPath, "utf8");
-    const stored = JSON.parse(raw) as StoredRelayState;
-    if (stored.version !== 1) {
+    const stored = JSON.parse(raw) as unknown;
+    if (!isRecord(stored) || stored.version !== 1) {
       console.warn(`Ignoring unsupported relay store version at ${dataPath}`);
       await quarantineRelayStore("unsupported-version");
       return;
     }
-    for (const team of stored.teams ?? []) {
+    for (const team of storedArray(stored.teams)) {
       const normalized = normalizeTeam(team);
       if (normalized) teams.set(normalized.id, normalized);
     }
-    for (const room of stored.rooms ?? []) {
+    for (const room of storedArray(stored.rooms)) {
       const normalized = normalizeRoom(room);
       if (normalized) rooms.set(normalized.id, normalized);
     }
-    for (const invite of stored.invites ?? []) {
+    for (const invite of storedArray(stored.invites)) {
       const normalized = normalizeInvite(invite);
       if (normalized && !isExpiredInvite(normalized)) invites.set(normalized.id, normalized);
     }
-	    for (const device of stored.devices ?? []) {
-	      const normalized = normalizeDevice(device);
-	      if (normalized) devices.set(deviceKey(normalized.userId, normalized.deviceId), normalized);
-	    }
-	    for (const item of stored.teamMembers ?? []) {
-	      const teamId = normalizeRelayId(item.teamId, maxTeamIdChars);
-	      if (!teamId || !teams.has(teamId)) continue;
-	      const members = new Map<string, TeamMemberRecord>();
-	      const storedMembers = Array.isArray(item.members) ? item.members : [];
-	      for (const member of storedMembers) {
-	        const userId = normalizeMetadataText(member?.userId, maxUserIdChars);
-	        if (!userId) continue;
-	        members.set(userId, {
-	          teamId,
-	          userId,
-	          role: normalizeTeamRole(member.role),
-	          joinedAt: typeof member.joinedAt === "string" && !Number.isNaN(Date.parse(member.joinedAt))
-	            ? member.joinedAt
-	            : new Date().toISOString()
-	        });
-	      }
-	      for (const userId of item.userIds ?? []) {
-	        const normalizedUserId = normalizeMetadataText(userId, maxUserIdChars);
-	        if (normalizedUserId && !members.has(normalizedUserId)) {
-	          members.set(normalizedUserId, {
-	            teamId,
-	            userId: normalizedUserId,
-	            role: "member",
-	            joinedAt: new Date().toISOString()
-	          });
-	        }
-	      }
-	      if (members.size === 0) continue;
-	      teamMembers.set(teamId, members);
-	      const team = teams.get(teamId);
-	      if (team && team.members < members.size) teams.set(teamId, { ...team, members: members.size });
-	    }
-	    for (const blob of stored.attachmentBlobs ?? []) {
-	      const normalized = normalizeAttachmentBlob(blob);
-	      if (normalized && !isExpiredAttachmentBlob(normalized)) attachmentBlobs.set(normalized.id, normalized);
-	    }
-	    for (const storedSession of stored.authSessions ?? []) {
-	      const normalized = normalizeStoredAuthSession(storedSession);
-	      if (normalized) authSessions.set(normalized.sessionId, normalized.session);
-	    }
-	    for (const item of stored.encryptedBacklog ?? []) {
+    for (const device of storedArray(stored.devices)) {
+      const normalized = normalizeDevice(device);
+      if (normalized) devices.set(deviceKey(normalized.userId, normalized.deviceId), normalized);
+    }
+    for (const item of storedArray(stored.teamMembers)) {
+      if (!isRecord(item)) continue;
+      const teamId = normalizeRelayId(item.teamId, maxTeamIdChars);
+      if (!teamId || !teams.has(teamId)) continue;
+      const members = new Map<string, TeamMemberRecord>();
+      for (const member of storedArray(item.members)) {
+        if (!isRecord(member)) continue;
+        const userId = normalizeMetadataText(member.userId, maxUserIdChars);
+        if (!userId) continue;
+        members.set(userId, {
+          teamId,
+          userId,
+          role: normalizeTeamRole(member.role),
+          joinedAt: typeof member.joinedAt === "string" && !Number.isNaN(Date.parse(member.joinedAt))
+            ? member.joinedAt
+            : new Date().toISOString()
+        });
+      }
+      for (const userId of storedArray(item.userIds)) {
+        const normalizedUserId = normalizeMetadataText(userId, maxUserIdChars);
+        if (normalizedUserId && !members.has(normalizedUserId)) {
+          members.set(normalizedUserId, {
+            teamId,
+            userId: normalizedUserId,
+            role: "member",
+            joinedAt: new Date().toISOString()
+          });
+        }
+      }
+      if (members.size === 0) continue;
+      teamMembers.set(teamId, members);
+      const team = teams.get(teamId);
+      if (team && team.members < members.size) teams.set(teamId, { ...team, members: members.size });
+    }
+    for (const blob of storedArray(stored.attachmentBlobs)) {
+      const normalized = normalizeAttachmentBlob(blob);
+      if (normalized && !isExpiredAttachmentBlob(normalized)) attachmentBlobs.set(normalized.id, normalized);
+    }
+    for (const storedSession of storedArray(stored.authSessions)) {
+      const normalized = normalizeStoredAuthSession(storedSession);
+      if (normalized) authSessions.set(normalized.sessionId, normalized.session);
+    }
+    for (const item of storedArray(stored.encryptedBacklog)) {
       const normalized = normalizeStoredBacklog(item);
       if (normalized) encryptedBacklog.set(normalized.key, normalized.envelopes);
     }
@@ -2184,6 +2185,10 @@ async function loadRelayStore() {
       await quarantineRelayStore("unreadable");
     }
   }
+}
+
+function storedArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 async function quarantineRelayStore(reason: string) {
