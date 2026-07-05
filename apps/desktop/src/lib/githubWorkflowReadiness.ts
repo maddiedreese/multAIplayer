@@ -39,6 +39,17 @@ export interface GitHubActionsReadiness {
   normalizedTarget: GitHubActionsTarget | null;
 }
 
+export function isGitHubActionsRefreshInFlight(
+  busyByRoom: Record<string, boolean>,
+  roomId: string
+): boolean {
+  return busyByRoom[roomId] === true;
+}
+
+export function gitHubActionsRefreshInFlightMessage(): string {
+  return "GitHub Actions refresh is already running in this room.";
+}
+
 export function checkGitHubWorkflowReadiness(input: GitHubWorkflowReadinessInput): GitHubWorkflowReadiness {
   const messages: string[] = [];
   let target: string | null = null;

@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GitHubAuthConfig, SignedInUser } from "../src/lib/authClient";
-import { checkGitHubActionsReadiness, checkGitHubWorkflowReadiness } from "../src/lib/githubWorkflowReadiness";
+import {
+  checkGitHubActionsReadiness,
+  checkGitHubWorkflowReadiness,
+  gitHubActionsRefreshInFlightMessage,
+  isGitHubActionsRefreshInFlight
+} from "../src/lib/githubWorkflowReadiness";
 
 const authConfig: GitHubAuthConfig = {
   provider: "github",
@@ -89,6 +94,13 @@ test("checkGitHubActionsReadiness requires sign-in and a valid repo target", () 
     "Sign in with GitHub before checking Actions.",
     "Error: GitHub owner must be a valid user or organization name."
   ]);
+});
+
+test("GitHub Actions refresh in-flight guard is scoped to one room", () => {
+  assert.equal(isGitHubActionsRefreshInFlight({ "room-a": true }, "room-a"), true);
+  assert.equal(isGitHubActionsRefreshInFlight({ "room-a": true }, "room-b"), false);
+  assert.equal(isGitHubActionsRefreshInFlight({ "room-a": false }, "room-a"), false);
+  assert.equal(gitHubActionsRefreshInFlightMessage(), "GitHub Actions refresh is already running in this room.");
 });
 
 test("checkGitHubActionsReadiness rejects unsafe branch targets", () => {

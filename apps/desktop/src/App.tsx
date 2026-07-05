@@ -232,6 +232,8 @@ import { copyTextToClipboard } from "./lib/clipboard";
 import {
   checkGitHubActionsReadiness,
   checkGitHubWorkflowReadiness,
+  gitHubActionsRefreshInFlightMessage,
+  isGitHubActionsRefreshInFlight,
   type GitHubActionsTarget
 } from "./lib/githubWorkflowReadiness";
 import {
@@ -666,6 +668,7 @@ export function App() {
   const selectedRoomIdRef = useRef(selectedRoomId);
   const gitWorkflowDraftsRef = useRef(gitWorkflowDraftsByRoom);
   const gitWorkflowBusyRef = useRef(gitWorkflowBusyByRoom);
+  const actionsBusyRef = useRef(actionsBusyByRoom);
   const browserRequestsRef = useRef(browserRequestsByRoom);
   const deviceId = useMemo(() => loadOrCreateDeviceId(), []);
   const localUser = useMemo(
@@ -844,6 +847,9 @@ export function App() {
   }
 
   function setActionsBusyForRoom(roomId: string, busy: boolean) {
+    actionsBusyRef.current = busy
+      ? { ...actionsBusyRef.current, [roomId]: true }
+      : omitRecordKey(actionsBusyRef.current, roomId);
     setActionsBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
@@ -1139,6 +1145,10 @@ export function App() {
   useEffect(() => {
     gitWorkflowBusyRef.current = gitWorkflowBusyByRoom;
   }, [gitWorkflowBusyByRoom]);
+
+  useEffect(() => {
+    actionsBusyRef.current = actionsBusyByRoom;
+  }, [actionsBusyByRoom]);
 
   useEffect(() => {
     browserRequestsRef.current = browserRequestsByRoom;
@@ -5366,6 +5376,13 @@ export function App() {
       return;
     }
     const roomId = room.id;
+    if (isGitHubActionsRefreshInFlight(actionsBusyRef.current, roomId)) {
+      setActionsMessagesByRoom((current) => ({
+        ...current,
+        [roomId]: gitHubActionsRefreshInFlightMessage()
+      }));
+      return;
+    }
     if (!roomsRef.current.some((item) => item.id === roomId)) {
       setActionsMessagesByRoom((current) => ({
         ...current,
