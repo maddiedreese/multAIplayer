@@ -244,6 +244,7 @@ import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
 import { messageInvokesCodex } from "./lib/codexInvoke";
+import { resolveFilePreviewTab, type FilePreviewTab } from "./lib/filePreview";
 import { copyTextToClipboard } from "./lib/clipboard";
 import {
   checkGitHubActionsReadiness,
@@ -669,6 +670,7 @@ export function App() {
   const [projectFilesByRoom, setProjectFilesByRoom] = useState<Record<string, ProjectFileEntry[]>>({});
   const [selectedFilesByRoom, setSelectedFilesByRoom] = useState<Record<string, ProjectFileContent | null>>({});
   const [selectedDiffsByRoom, setSelectedDiffsByRoom] = useState<Record<string, GitDiffResult | null>>({});
+  const [filePreviewTabsByRoom, setFilePreviewTabsByRoom] = useState<Record<string, FilePreviewTab>>({});
   const [fileBusyByRoom, setFileBusyByRoom] = useState<Record<string, boolean>>({});
   const [fileMessagesByRoom, setFileMessagesByRoom] = useState<Record<string, string | null>>({});
   const [markdownCopyFallbacksByRoom, setMarkdownCopyFallbacksByRoom] = useState<Record<string, MarkdownCopyFallback | null>>({});
@@ -749,6 +751,10 @@ export function App() {
   const projectFiles = projectFilesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const selectedFile = selectedFilesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const selectedDiff = selectedDiffsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const filePreviewTab = resolveFilePreviewTab(
+    filePreviewTabsByRoom[selectedRoom?.id ?? selectedRoomId] ?? "file",
+    Boolean(selectedDiff?.diff.trim())
+  );
   const fileBusy = fileBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const fileMessage = fileMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const inviteLink = inviteLinksByRoom[selectedRoom?.id ?? selectedRoomId] ?? "";
@@ -1027,6 +1033,10 @@ export function App() {
 
   function setSelectedDiffForRoom(roomId: string, diff: GitDiffResult | null) {
     setSelectedDiffsByRoom((current) => diff ? { ...current, [roomId]: diff } : omitRecordKey(current, roomId));
+  }
+
+  function setFilePreviewTabForRoom(roomId: string, tab: FilePreviewTab) {
+    setFilePreviewTabsByRoom((current) => tab === "file" ? omitRecordKey(current, roomId) : { ...current, [roomId]: tab });
   }
 
   function setFileBusyForRoom(roomId: string, busy: boolean) {
@@ -5004,7 +5014,7 @@ export function App() {
     client.publish({ type: "publish", envelope });
   }
 
-  async function openProjectFile(path: string) {
+  async function openProjectFile(path: string, preferredPreview: FilePreviewTab = "file") {
     if (!hasSelectedRoom) {
       setSelectedFileMessage("Create or join a room before opening project files.");
       return;
@@ -5025,6 +5035,7 @@ export function App() {
       if (selectedRoomIdRef.current !== room.id) return;
       setSelectedFileForRoom(room.id, file);
       setSelectedDiffForRoom(room.id, diff);
+      setFilePreviewTabForRoom(room.id, resolveFilePreviewTab(preferredPreview, Boolean(diff?.diff.trim())));
       setSensitiveAttachmentReviewKey(null);
     } catch (error) {
       if (selectedRoomIdRef.current === room.id) setFileMessageForRoom(room.id, String(error));
@@ -7011,7 +7022,7 @@ export function App() {
               <button
                 className={selectedFile?.path === file.path ? "file-row active" : "file-row"}
                 key={file.path}
-                onClick={() => openProjectFile(file.path)}
+                onClick={() => openProjectFile(file.path, "file")}
                 disabled={!canReadLocalWorkspace}
               >
                 <FileCode2 size={15} />
@@ -7039,7 +7050,7 @@ export function App() {
           </div>
           <div className="diff-list">
             {(gitStatus?.files.length ? gitStatus.files : []).map((file) => (
-              <button className="diff-row" key={file.path} onClick={() => openProjectFile(file.path)} disabled={!canReadLocalWorkspace}>
+              <button className="diff-row" key={file.path} onClick={() => openProjectFile(file.path, "diff")} disabled={!canReadLocalWorkspace}>
                 <FileCode2 size={15} />
                 <span>{file.path}</span>
                 <small><b>+{file.added}</b> <i>-{file.removed}</i></small>
@@ -7078,7 +7089,28 @@ export function App() {
               detail={selectedAttachmentReview?.warningDetail ?? undefined}
             />
           )}
-          {selectedDiff?.diff.trim() ? (
+          {selectedFile && (
+            <div className="file-preview-tabs">
+              <button
+                className={filePreviewTab === "file" ? "active" : ""}
+                onClick={() => setFilePreviewTabForRoom(selectedRoom.id, "file")}
+                aria-pressed={filePreviewTab === "file"}
+              >
+                <FileCode2 size={13} />
+                File
+              </button>
+              <button
+                className={filePreviewTab === "diff" ? "active" : ""}
+                onClick={() => setFilePreviewTabForRoom(selectedRoom.id, "diff")}
+                disabled={!selectedDiff?.diff.trim()}
+                aria-pressed={filePreviewTab === "diff"}
+              >
+                <Code2 size={13} />
+                Diff
+              </button>
+            </div>
+          )}
+          {filePreviewTab === "diff" && selectedDiff?.diff.trim() ? (
             <div className="diff-code" aria-label={`Diff for ${selectedDiff.path}`}>
               {parseDiffLines(selectedDiff.diff).map((line, index) => (
                 <div className={`diff-code-line ${line.kind}`} key={`${index}-${line.text}`}>
