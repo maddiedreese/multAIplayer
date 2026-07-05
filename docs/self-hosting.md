@@ -20,6 +20,14 @@ The relay reads configuration from shell-exported environment variables first. F
 
 Shell-exported values take precedence over `.env` file values. The parser supports simple `KEY=value` lines, quoted values, blank lines, and comments.
 
+For a hosted or internet-facing relay, run the production relay doctor against the same shell environment used to start the relay:
+
+```bash
+npm run doctor:production-relay
+```
+
+This check fails if GitHub OAuth is missing, durable session encryption is weak or missing, credentialed browser origins are unset, auth is explicitly disabled, debug endpoints are enabled, or demo workspace seeding is enabled. It is a deployment sanity check, not a substitute for TLS, backups, log review, process supervision, or an external rate limiter in multi-instance deployments.
+
 ## Relay Storage
 
 The alpha relay persists its state to a JSON file. Set:
