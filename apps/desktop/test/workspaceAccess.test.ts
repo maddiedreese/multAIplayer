@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { canRequestWorkspaceAction, canUseLocalWorkspace, localWorkspaceGateMessage } from "../src/lib/workspaceAccess";
+import {
+  canRequestWorkspaceAction,
+  canUseLocalWorkspace,
+  isRoomFileActionInFlight,
+  localWorkspaceGateMessage,
+  roomFileActionInFlightMessage
+} from "../src/lib/workspaceAccess";
 
 const room: RoomRecord = {
   id: "room-workspace",
@@ -43,4 +49,11 @@ test("local workspace gate messages explain the missing permission", () => {
     localWorkspaceGateMessage({ ...room, host: "No host", hostUserId: undefined, hostStatus: "offline" }),
     "Claim host before reading local project files."
   );
+});
+
+test("file action in-flight guard is scoped to one room", () => {
+  assert.equal(isRoomFileActionInFlight({ "room-a": true }, "room-a"), true);
+  assert.equal(isRoomFileActionInFlight({ "room-a": true }, "room-b"), false);
+  assert.equal(isRoomFileActionInFlight({ "room-a": false }, "room-a"), false);
+  assert.equal(roomFileActionInFlightMessage(), "A file action is already running in this room.");
 });

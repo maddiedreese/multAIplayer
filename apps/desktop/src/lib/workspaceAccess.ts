@@ -9,6 +9,17 @@ export function canRequestWorkspaceAction(room: RoomRecord, locked = false): boo
   return !locked && room.mode.workspace;
 }
 
+export function isRoomFileActionInFlight(
+  busyByRoom: Record<string, boolean>,
+  roomId: string
+): boolean {
+  return busyByRoom[roomId] === true;
+}
+
+export function roomFileActionInFlightMessage(): string {
+  return "A file action is already running in this room.";
+}
+
 export function localWorkspaceGateMessage(room: RoomRecord, locked = false): string {
   if (locked) return "Unlock this room before reading local project files.";
   if (!room.mode.workspace) return "Workspace mode is disabled for this room.";

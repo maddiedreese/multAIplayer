@@ -234,7 +234,13 @@ import {
 import { browserDecisionMessageId, buildBrowserDecisionMessage } from "./lib/browserActivity";
 import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
-import { canRequestWorkspaceAction, canUseLocalWorkspace, localWorkspaceGateMessage } from "./lib/workspaceAccess";
+import {
+  canRequestWorkspaceAction,
+  canUseLocalWorkspace,
+  isRoomFileActionInFlight,
+  localWorkspaceGateMessage,
+  roomFileActionInFlightMessage
+} from "./lib/workspaceAccess";
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
@@ -684,6 +690,7 @@ export function App() {
   const gitWorkflowBusyRef = useRef(gitWorkflowBusyByRoom);
   const actionsBusyRef = useRef(actionsBusyByRoom);
   const terminalBusyRef = useRef(terminalBusyByRoom);
+  const fileBusyRef = useRef(fileBusyByRoom);
   const browserRequestsRef = useRef(browserRequestsByRoom);
   const deviceId = useMemo(() => loadOrCreateDeviceId(), []);
   const localUser = useMemo(
@@ -1017,6 +1024,9 @@ export function App() {
   }
 
   function setFileBusyForRoom(roomId: string, busy: boolean) {
+    fileBusyRef.current = busy
+      ? { ...fileBusyRef.current, [roomId]: true }
+      : omitRecordKey(fileBusyRef.current, roomId);
     setFileBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
@@ -1026,6 +1036,12 @@ export function App() {
 
   function setSelectedFileMessage(message: string | null) {
     setFileMessageForRoom(selectedRoom.id, message);
+  }
+
+  function reportRoomFileActionInFlight(roomId: string): boolean {
+    if (!isRoomFileActionInFlight(fileBusyRef.current, roomId)) return false;
+    setFileMessageForRoom(roomId, roomFileActionInFlightMessage());
+    return true;
   }
 
   function setSelectedTerminalIdForRoom(roomId: string, terminalId: string | null) {
@@ -1210,6 +1226,10 @@ export function App() {
   useEffect(() => {
     terminalBusyRef.current = terminalBusyByRoom;
   }, [terminalBusyByRoom]);
+
+  useEffect(() => {
+    fileBusyRef.current = fileBusyByRoom;
+  }, [fileBusyByRoom]);
 
   useEffect(() => {
     browserRequestsRef.current = browserRequestsByRoom;
@@ -4987,6 +5007,7 @@ export function App() {
       return;
     }
     const room = selectedRoom;
+    if (reportRoomFileActionInFlight(room.id)) return;
     setFileBusyForRoom(room.id, true);
     setFileMessageForRoom(room.id, null);
     try {
@@ -5077,6 +5098,7 @@ export function App() {
     const shouldUploadBlob = selectedContentBytes > maxEmbeddedAttachmentBytes ||
       embeddedAttachmentBytes(roomPendingAttachments) + selectedContentBytes > maxEmbeddedAttachmentBytesPerMessage;
     if (shouldUploadBlob) {
+      if (reportRoomFileActionInFlight(roomId)) return;
       try {
         setFileBusyForRoom(roomId, true);
         const secret = await loadOrCreateRoomSecret(roomId);
@@ -5160,6 +5182,7 @@ export function App() {
       }
       return;
     }
+    if (reportRoomFileActionInFlight(room.id)) return;
     setFileBusyForRoom(room.id, true);
     setFileMessageForRoom(room.id, null);
     try {
