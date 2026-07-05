@@ -3,10 +3,13 @@ import test from "node:test";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import {
   browserAccessGateMessage,
+  canActOnRoomBrowserRequest,
   canHostBrowserAction,
   canRequestBrowserAccess,
+  findRoomBrowserRequest,
   isBrowserUrlAllowed,
   normalizeBrowserAllowedOrigins,
+  roomBrowserRequestMessage,
   shouldAutoApproveBrowserRequest
 } from "../src/lib/browserPolicy";
 
@@ -70,5 +73,25 @@ test("browser access gate messages explain missing browser access", () => {
   assert.equal(
     browserAccessGateMessage({ ...room, mode: { ...room.mode, browser: false } }),
     "Browser mode is disabled for this room."
+  );
+});
+
+test("browser request actions require a request from the current room list", () => {
+  const requests = [
+    { id: "request-1", status: "pending" as const },
+    { id: "request-2", status: "approved" as const }
+  ];
+
+  assert.deepEqual(findRoomBrowserRequest(requests, "request-1"), requests[0]);
+  assert.equal(canActOnRoomBrowserRequest(requests, "request-1", "pending"), true);
+  assert.equal(canActOnRoomBrowserRequest(requests, "request-1", "approved"), false);
+  assert.equal(canActOnRoomBrowserRequest(requests, "missing", "pending"), false);
+  assert.equal(
+    roomBrowserRequestMessage(requests, "request-1", "approved"),
+    "Browser request is pending, not approved."
+  );
+  assert.equal(
+    roomBrowserRequestMessage(requests, "missing"),
+    "Browser request is no longer available in this room."
   );
 });

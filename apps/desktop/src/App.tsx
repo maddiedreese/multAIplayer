@@ -196,7 +196,16 @@ import { canControlRoomTerminal, roomTerminalControlMessage } from "./lib/termin
 import { readInviteUrlPayload } from "./lib/inviteUrl";
 import { displayableInviteLink } from "./lib/invitePrivacy";
 import { canCreateRoomInvite } from "./lib/invitePolicy";
-import { browserAccessGateMessage, canHostBrowserAction, canRequestBrowserAccess, normalizeBrowserAllowedOrigins, shouldAutoApproveBrowserRequest } from "./lib/browserPolicy";
+import {
+  browserAccessGateMessage,
+  canActOnRoomBrowserRequest,
+  canHostBrowserAction,
+  canRequestBrowserAccess,
+  findRoomBrowserRequest,
+  normalizeBrowserAllowedOrigins,
+  roomBrowserRequestMessage,
+  shouldAutoApproveBrowserRequest
+} from "./lib/browserPolicy";
 import { browserDecisionMessageId, buildBrowserDecisionMessage } from "./lib/browserActivity";
 import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
@@ -4447,13 +4456,18 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
-    const decision = buildLocalRequestStatusPayload(request.id, "approved");
-    updateBrowserRequestStatus(roomId, request.id, "approved");
+    const roomRequest = findRoomBrowserRequest(browserRequests, request.id);
+    if (!roomRequest || !canActOnRoomBrowserRequest(browserRequests, request.id, "pending")) {
+      setBrowserMessageForRoom(roomId, roomBrowserRequestMessage(browserRequests, request.id, "pending"));
+      return;
+    }
+    const decision = buildLocalRequestStatusPayload(roomRequest.id, "approved");
+    updateBrowserRequestStatus(roomId, roomRequest.id, "approved");
     appendBrowserDecisionMessage(roomId, decision);
-    publishRequestStatus("browser.event", request.id, "approved").catch((error) => {
+    publishRequestStatus("browser.event", roomRequest.id, "approved").catch((error) => {
       setBrowserMessageForRoom(roomId, String(error));
     });
-    setBrowserMessageForRoom(roomId, `Approved browser access to ${formatBrowserAccessLabel(request.url)}.`);
+    setBrowserMessageForRoom(roomId, `Approved browser access to ${formatBrowserAccessLabel(roomRequest.url)}.`);
   }
 
   function denyBrowserRequest(requestId: string) {
@@ -4470,6 +4484,10 @@ export function App() {
       return;
     }
     const roomId = selectedRoom.id;
+    if (!canActOnRoomBrowserRequest(browserRequests, requestId, "pending")) {
+      setBrowserMessageForRoom(roomId, roomBrowserRequestMessage(browserRequests, requestId, "pending"));
+      return;
+    }
     const decision = buildLocalRequestStatusPayload(requestId, "denied");
     updateBrowserRequestStatus(roomId, requestId, "denied");
     appendBrowserDecisionMessage(roomId, decision);
@@ -4494,13 +4512,18 @@ export function App() {
       return;
     }
     const room = selectedRoom;
+    const roomRequest = findRoomBrowserRequest(browserRequests, request.id);
+    if (!roomRequest || !canActOnRoomBrowserRequest(browserRequests, request.id, "approved")) {
+      setBrowserMessageForRoom(room.id, roomBrowserRequestMessage(browserRequests, request.id, "approved"));
+      return;
+    }
     setBrowserMessageForRoom(room.id, null);
     try {
       const result = await openBrowserView(
         room.id,
         room.projectPath,
-        request.url,
-        `${room.name} - ${formatBrowserAccessLabel(request.url)}`,
+        roomRequest.url,
+        `${room.name} - ${formatBrowserAccessLabel(roomRequest.url)}`,
         room.browserProfilePersistent
       );
       setBrowserStatusByRoom((current) => ({
