@@ -54,6 +54,7 @@ const mutationsRequireAuth = parseBooleanEnv(
   process.env.NODE_ENV === "production"
 );
 const rateLimitsEnabled = parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMITS, true);
+const trustProxyHeaders = parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS, false);
 const rateLimitWindowMs = parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS, 60_000, 1_000, 3_600_000);
 const rateLimitCaps = {
   auth: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_AUTH, 30, 1, 10_000),
@@ -1495,10 +1496,15 @@ function clientIdentityFromIncomingMessage(request: IncomingMessage): string {
   const cookies = parseCookieHeader(request.headers.cookie);
   const sessionId = normalizeAuthSessionId(cookies.get("multaiplayer_session"));
   if (sessionId) return `session:${sessionId}`;
-  const forwardedFor = request.headers["x-forwarded-for"];
-  const forwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-  const ip = forwardedIp?.split(",")[0]?.trim() || request.socket.remoteAddress || "unknown";
+  const forwardedIp = trustProxyHeaders ? firstForwardedForIp(request.headers["x-forwarded-for"]) : null;
+  const ip = forwardedIp || request.socket.remoteAddress || "unknown";
   return `ip:${ip}`;
+}
+
+function firstForwardedForIp(header: string | string[] | undefined): string | null {
+  const value = Array.isArray(header) ? header[0] : header;
+  const ip = value?.split(",")[0]?.trim();
+  return ip || null;
 }
 
 function getAuthSession(sessionId: unknown): AuthSession | null {

@@ -1171,6 +1171,37 @@ test("relay rate limits repeated HTTP reads and mutations", async () => {
   }
 });
 
+test("relay ignores forwarded IP headers for rate limits unless explicitly trusted", async () => {
+  const directRelay = await startRelay({
+    MULTAIPLAYER_RELAY_RATE_LIMIT_READ: "1",
+    MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS: "60000"
+  });
+  try {
+    const first = await fetch(`${directRelay.baseUrl}/teams`, { headers: { "x-forwarded-for": "203.0.113.20" } });
+    assert.equal(first.status, 200);
+    const spoofedSecond = await fetch(`${directRelay.baseUrl}/teams`, { headers: { "x-forwarded-for": "203.0.113.21" } });
+    assert.equal(spoofedSecond.status, 429);
+  } finally {
+    await directRelay.close();
+  }
+
+  const trustedProxyRelay = await startRelay({
+    MULTAIPLAYER_RELAY_RATE_LIMIT_READ: "1",
+    MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS: "60000",
+    MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS: "true"
+  });
+  try {
+    const first = await fetch(`${trustedProxyRelay.baseUrl}/teams`, { headers: { "x-forwarded-for": "203.0.113.30" } });
+    assert.equal(first.status, 200);
+    const secondIp = await fetch(`${trustedProxyRelay.baseUrl}/teams`, { headers: { "x-forwarded-for": "203.0.113.31" } });
+    assert.equal(secondIp.status, 200);
+    const repeatedSecondIp = await fetch(`${trustedProxyRelay.baseUrl}/teams`, { headers: { "x-forwarded-for": "203.0.113.31" } });
+    assert.equal(repeatedSecondIp.status, 429);
+  } finally {
+    await trustedProxyRelay.close();
+  }
+});
+
 test("relay rate limits room WebSocket events per client", async () => {
   const relay = await startRelay({
     MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET: "1",
