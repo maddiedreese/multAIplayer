@@ -261,7 +261,6 @@ import { formatApprovalAttachments, formatApprovalMessages } from "./lib/codexAp
 import { buildRoomSettingsSystemMessage } from "./lib/roomSettingsMessages";
 import {
   isAttachmentBlobContent,
-  isBrowserDecisionSystemMessage,
   isChatReactionPlaintextPayload,
   isCodexEventPlaintextPayload,
   isDeviceSealedPayload,
@@ -295,13 +294,11 @@ import {
 } from "./lib/teamMemberPermissions";
 import { nextShellTerminalName, terminalInputForShellSubmit } from "./lib/terminalUi";
 import {
-  canOpenChatAttachment,
   canOpenProjectAttachment,
   clamp,
   embeddedAttachmentBytes,
   encodedBytes,
   attachmentTypeFromName,
-  formatAttachmentMeta,
   formatBytes,
   formatCodexModel,
   formatHostStatus,
@@ -319,12 +316,12 @@ import {
 } from "./lib/appFormatters";
 import {
   localPreviewLabel,
-  localPreviewStatusLabel,
   normalizeLocalPreviewUrl,
   quickTunnelDisclaimer,
   quickTunnelSafetyText,
   type LocalPreviewCandidate
 } from "./lib/localPreview";
+import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessageRows } from "./lib/chatDisplayRows";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -350,7 +347,7 @@ import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
 import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
 import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarRoomDisplay, type SidebarTeamDisplay, type ThemeMode } from "./components/DesktopSidebar";
-import { RoomChatPanel, type LocalPreviewCardDisplay, type PendingAttachmentDisplay, type RoomChatMessageDisplay } from "./components/RoomChatPanel";
+import { RoomChatPanel } from "./components/RoomChatPanel";
 import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
 import { LocalPreviewDialog } from "./components/LocalPreviewDialog";
 import { RoomStatusBanners } from "./components/RoomStatusBanners";
@@ -763,45 +760,14 @@ export function App() {
     attachments: formatApprovalAttachments(approvalTranscriptMessages)
   };
   const roomCanUseChat = canUseRoomChat(selectedRoom, isSelectedRoomLocked);
-  const chatMessageRows: RoomChatMessageDisplay[] = messages.filter((message) => !isBrowserDecisionSystemMessage(message)).map((message) => ({
-    id: message.id,
-    author: message.author,
-    role: message.role,
-    body: message.body,
-    time: message.time,
-    selected: markdownSelectionMode && selectedMessageIds.includes(message.id),
-    attachments: (message.attachments ?? []).map((attachment) => ({
-      id: attachment.id,
-      name: attachment.name,
-      meta: formatAttachmentMeta(attachment),
-      encryptedBlob: Boolean(attachment.blobId),
-      canPreview: canOpenChatAttachment(attachment)
-    })),
-    reactions: ["👍", "✅", "👀"].map((emoji) => {
-      const reaction = message.reactions?.find((item) => item.emoji === emoji);
-      return {
-        emoji,
-        count: reaction?.reactors.length ?? 0,
-        active: reaction?.reactors.some((reactor) => reactor.userId === localUser.id) ?? false,
-        title: reaction?.reactors.map((reactor) => reactor.name).join(", ") || "React"
-      };
-    })
-  }));
-  const pendingAttachmentRows: PendingAttachmentDisplay[] = pendingAttachments.map((attachment) => ({
-    id: attachment.id,
-    name: attachment.name,
-    encryptedBlob: Boolean(attachment.blobId)
-  }));
-  const localPreviewCards: LocalPreviewCardDisplay[] = localPreviews.slice(-6).map((preview) => ({
-    id: preview.id,
-    sharedBy: preview.sharedBy,
-    sourceUrl: preview.sourceUrl,
-    publicUrl: preview.publicUrl,
-    status: preview.status,
-    statusLabel: localPreviewStatusLabel(preview.status),
-    message: preview.message,
-    canStop: preview.sharedByUserId === localUser.id && (preview.status === "live" || preview.status === "starting")
-  }));
+  const chatMessageRows = buildRoomChatMessageRows({
+    messages,
+    markdownSelectionMode,
+    selectedMessageIds,
+    localUserId: localUser.id
+  });
+  const pendingAttachmentRows = buildPendingAttachmentRows(pendingAttachments);
+  const localPreviewCards = buildLocalPreviewCards(localPreviews, localUser.id);
   const pendingAttachmentSummary = `${pendingAttachments.length}/${maxMessageAttachments} files · ${formatBytes(pendingAttachmentBytes)}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`;
   const hostBusy = hostBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const settingsBusy = settingsBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
