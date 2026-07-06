@@ -50,12 +50,8 @@ import { useRelaySyncContext } from "./hooks/useRelaySyncContext";
 import { useRoomRuntimeContext } from "./hooks/useRoomRuntimeContext";
 import { useRoomPanelActions } from "./hooks/useRoomPanelActions";
 import { InlineSecretWarning } from "./components/common";
-import { AppWorkspaceShell } from "./components/AppWorkspaceShell";
-import { AppSidebarDrawer } from "./components/AppSidebarDrawer";
-import { DesktopSidebar } from "./components/DesktopSidebar";
-import { RoomMainColumn } from "./components/RoomMainColumn";
-import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
-import { LocalPreviewDialog } from "./components/LocalPreviewDialog";
+import { AppShellView } from "./components/AppShellView";
+import type { InspectorTab } from "./components/RoomInspectorPanel";
 import type {
   BrowserAccessRequest,
   ChatAttachment,
@@ -2061,7 +2057,7 @@ export function App() {
   });
 
   return (
-    <AppWorkspaceShell
+    <AppShellView
       sidebarCollapsed={sidebarCollapsed}
       inspectorCollapsed={inspectorCollapsed}
       shellStyle={shellStyle}
@@ -2069,15 +2065,12 @@ export function App() {
       onBeginInspectorResize={(event) => beginShellResize("inspector", event)}
       onToggleSidebarCollapsed={toggleSidebarCollapsed}
       onToggleInspectorCollapsed={toggleInspectorCollapsed}
-      sidebar={<DesktopSidebar {...sidebarProps} />}
-      drawer={<AppSidebarDrawer {...drawerProps} />}
-      main={(
-        <RoomMainColumn {...roomMainColumnProps} />
-      )}
-      inspector={(
-        <RoomInspectorPanel {...roomInspectorPanelProps} />
-      )}
-      dialog={localPreviewDialogOpen ? <LocalPreviewDialog {...localPreviewDialogProps} /> : null}
+      sidebarProps={sidebarProps}
+      drawerProps={drawerProps}
+      roomMainColumnProps={roomMainColumnProps}
+      roomInspectorPanelProps={roomInspectorPanelProps}
+      localPreviewDialogOpen={localPreviewDialogOpen}
+      localPreviewDialogProps={localPreviewDialogProps}
     />
   );
 }
