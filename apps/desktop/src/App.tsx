@@ -44,10 +44,9 @@ import {
   type LocalHistorySettings
 } from "./lib/localHistory";
 import { loadTeamRoomDefaults } from "./lib/teamRoomDefaults";
-import { loadOrCreateDeviceIdentity, resetDeviceIdentity, type DeviceIdentity } from "./lib/deviceIdentity";
+import type { DeviceIdentity } from "./lib/deviceIdentity";
 import {
   loadTrustedDeviceKeys,
-  untrustDeviceKey,
   type TrustedDeviceKey
 } from "./lib/deviceTrust";
 import {
@@ -210,6 +209,7 @@ import { useRoomSettingsActions } from "./hooks/useRoomSettingsActions";
 import { useTeamDefaultActions } from "./hooks/useTeamDefaultActions";
 import { useLocalHistoryActions } from "./hooks/useLocalHistoryActions";
 import { useWorkspaceRecordActions } from "./hooks/useWorkspaceRecordActions";
+import { useAccountActions } from "./hooks/useAccountActions";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   hasAcknowledgedRoomVisibilityWarning
@@ -1409,6 +1409,15 @@ export function App() {
     setChatMessageForRoom,
     publishLocalPreviewEvent
   });
+  const { signOut, rotateDeviceIdentity } = useAccountActions({
+    selectedRoomId: selectedRoom.id,
+    deviceId,
+    stopOwnedLocalPreviews,
+    signOutGitHub,
+    setDeviceIdentity,
+    setDeviceIdentityMessage,
+    setTrustedDeviceKeys
+  });
   const { refreshGitHubActions } = useGitHubActionsRefresh({
     hasSelectedRoom,
     selectedRoom,
@@ -1680,25 +1689,6 @@ export function App() {
     }
     openRoomBrowserForUrl(room, url, `Opened by ${message.author} through Codex.`);
     return true;
-  }
-
-  async function signOut() {
-    await stopOwnedLocalPreviews("Stopped because the sharing user signed out.");
-    await signOutGitHub();
-  }
-
-  async function rotateDeviceIdentity() {
-    setDeviceIdentity(null);
-    setDeviceIdentityMessage("Resetting local device identity...");
-    try {
-      await resetDeviceIdentity();
-      const identity = await loadOrCreateDeviceIdentity();
-      setDeviceIdentity(identity);
-      setTrustedDeviceKeys((current) => untrustDeviceKey(current, selectedRoom.id, deviceId));
-      setDeviceIdentityMessage("Created new local device identity. Public key registration will refresh automatically.");
-    } catch (error) {
-      setDeviceIdentityMessage(`Device identity rotation failed: ${String(error)}`);
-    }
   }
 
   async function setRoomHost(hostStatus: RoomRecord["hostStatus"]) {
