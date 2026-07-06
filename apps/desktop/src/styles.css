@@ -6053,3 +6053,181 @@ select {
   color: var(--text);
   border-color: var(--border-strong);
 }
+
+/* Local preview sharing. */
+.local-preview-card {
+  display: grid;
+  gap: 12px;
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+
+.local-preview-card dl,
+.local-preview-summary {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.local-preview-card dl div,
+.local-preview-summary div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+}
+
+.local-preview-card dt,
+.local-preview-summary dt {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.local-preview-card dd,
+.local-preview-summary dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 650;
+}
+
+.local-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.local-preview-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.local-preview-actions button:last-child {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.local-preview-actions button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.modal {
+  width: min(560px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.modal-header span,
+.field-stack span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.modal-header strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 22px;
+}
+
+.modal-header button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.modal-copy,
+.confirmation-copy p {
+  margin: 0 0 12px;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.field-stack {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0;
+}
+
+.field-stack input,
+.field-stack select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.install-snippet {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--code-bg);
+  overflow-x: auto;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.modal-actions button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.modal-actions button.primary {
+  background: var(--text);
+  color: var(--bg);
+}

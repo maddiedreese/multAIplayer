@@ -3,6 +3,7 @@ import {
   Copy,
   FileText,
   Globe2,
+  MonitorUp,
   Terminal,
   UsersRound,
   X
@@ -41,7 +42,8 @@ export function RoomHeader({
   onCopyRoomMarkdown,
   onCopySelectedMarkdown,
   onToggleMarkdownSelection,
-  onClearSelectedMessages
+  onClearSelectedMessages,
+  onShareLocalPreview
 }: {
   teams: Array<{ id: string; name: string }>;
   selectedTeamId: string;
@@ -67,6 +69,7 @@ export function RoomHeader({
   onCopySelectedMarkdown: () => void;
   onToggleMarkdownSelection: () => void;
   onClearSelectedMessages: () => void;
+  onShareLocalPreview: () => void;
 }) {
   const knownModel = modelOptions.some((option) => option.id === selectedModel);
   const [roomNameDraft, setRoomNameDraft] = useState(roomName);
@@ -173,6 +176,10 @@ export function RoomHeader({
         <button className="header-copy" onClick={onCopyRoomMarkdown} disabled={!hasRoom}>
           <Copy size={14} />
           Markdown
+        </button>
+        <button className="header-copy" onClick={onShareLocalPreview} disabled={!hasRoom || roomLocked}>
+          <MonitorUp size={14} />
+          Share Local Preview
         </button>
         <button
           className={markdownSelectionMode ? "header-copy active" : "header-copy"}

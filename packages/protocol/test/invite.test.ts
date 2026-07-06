@@ -8,6 +8,7 @@ import {
   InviteJoinStatusPlaintextPayload,
   DeviceRecord,
   HostHandoffPlaintextPayload,
+  LocalPreviewPlaintextPayload,
   RelayEnvelope,
   RoomId,
   RoomSettingsPlaintextPayload,
@@ -19,6 +20,7 @@ import {
   maxGitHubActionRuns,
   maxGitWorkflowResults,
   maxLongTextChars,
+  maxUrlChars,
   maxWrappedCiphertextChars
 } from "../src/index";
 
@@ -357,6 +359,44 @@ test("relay envelope accepts encrypted room key rotation events", () => {
   });
 
   assert.equal(parsed.kind, "room.key");
+});
+
+test("local preview payloads and encrypted preview events are bounded", () => {
+  const parsed = LocalPreviewPlaintextPayload.parse({
+    eventType: "local.preview",
+    id: "preview-1",
+    sharedBy: "Maddie",
+    sharedByUserId: "github:maddie",
+    sourceUrl: "http://localhost:5173/",
+    publicUrl: "https://demo.trycloudflare.com",
+    status: "live",
+    message: "Cloudflare is a third-party service.",
+    createdAt: "2026-07-06T12:00:00.000Z",
+    updatedAt: "2026-07-06T12:01:00.000Z"
+  });
+
+  assert.equal(parsed.status, "live");
+  assert.equal(LocalPreviewPlaintextPayload.safeParse({
+    ...parsed,
+    sourceUrl: "x".repeat(maxUrlChars + 1)
+  }).success, false);
+
+  const envelope = RelayEnvelope.parse({
+    id: "envelope-preview",
+    teamId: "team-1",
+    roomId: "room-1",
+    senderDeviceId: "device_12345678",
+    senderUserId: "github:maddie",
+    createdAt: "2026-07-06T12:01:00.000Z",
+    kind: "preview.event",
+    payload: {
+      algorithm: "AES-GCM-256",
+      nonce: "nonce",
+      ciphertext: "ciphertext"
+    }
+  });
+
+  assert.equal(envelope.kind, "preview.event");
 });
 
 test("decrypted workflow payloads reject unbounded local persistence fields", () => {

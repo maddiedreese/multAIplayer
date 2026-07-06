@@ -1,4 +1,4 @@
-import { Bot, Copy, FileCode2, Send, X } from "lucide-react";
+import { Bot, Copy, ExternalLink, FileCode2, Send, Square, X } from "lucide-react";
 import { CodexApprovalCard, type CodexApprovalSummaryDisplay } from "./CodexApprovalCard";
 
 export interface RoomChatAttachmentDisplay {
@@ -27,6 +27,17 @@ export interface RoomChatMessageDisplay {
   reactions: RoomChatReactionDisplay[];
 }
 
+export interface LocalPreviewCardDisplay {
+  id: string;
+  sharedBy: string;
+  sourceUrl: string;
+  publicUrl?: string;
+  status: "starting" | "live" | "stopped" | "error";
+  statusLabel: string;
+  message?: string;
+  canStop: boolean;
+}
+
 export interface PendingAttachmentDisplay {
   id: string;
   name: string;
@@ -47,6 +58,7 @@ export function RoomChatPanel({
   chatEnabled,
   draft,
   pendingAttachments,
+  localPreviewCards = [],
   pendingAttachmentSummary,
   markdownSelectionMode,
   onToggleMessageSelection,
@@ -58,6 +70,9 @@ export function RoomChatPanel({
   onApproveApproval,
   onInvokeCodex,
   onRemovePendingAttachment,
+  onOpenLocalPreview,
+  onCopyLocalPreviewLink,
+  onStopLocalPreview,
   onDraftChange,
   onSendMessage
 }: {
@@ -74,6 +89,7 @@ export function RoomChatPanel({
   chatEnabled: boolean;
   draft: string;
   pendingAttachments: PendingAttachmentDisplay[];
+  localPreviewCards: LocalPreviewCardDisplay[];
   pendingAttachmentSummary: string;
   markdownSelectionMode: boolean;
   onToggleMessageSelection: (messageId: string) => void;
@@ -85,6 +101,9 @@ export function RoomChatPanel({
   onApproveApproval: () => void;
   onInvokeCodex: () => void;
   onRemovePendingAttachment: (attachmentId: string) => void;
+  onOpenLocalPreview: (previewId: string) => void;
+  onCopyLocalPreviewLink: (previewId: string) => void;
+  onStopLocalPreview: (previewId: string) => void;
   onDraftChange: (draft: string) => void;
   onSendMessage: () => void;
 }) {
@@ -164,6 +183,56 @@ export function RoomChatPanel({
             </article>
           );
         })}
+
+        {localPreviewCards.map((preview) => (
+          <article className="message system local-preview-message" key={preview.id}>
+            <div className="avatar">P</div>
+            <div className="bubble local-preview-card">
+              <div className="message-meta">
+                <strong>Live Local Preview</strong>
+                <span>{preview.statusLabel}</span>
+              </div>
+              <dl>
+                <div>
+                  <dt>Shared by</dt>
+                  <dd>{preview.sharedBy}</dd>
+                </div>
+                <div>
+                  <dt>Source</dt>
+                  <dd>{preview.sourceUrl}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>{preview.statusLabel}</dd>
+                </div>
+                {preview.publicUrl && preview.status === "live" && (
+                  <div>
+                    <dt>URL</dt>
+                    <dd>{preview.publicUrl}</dd>
+                  </div>
+                )}
+              </dl>
+              {preview.status === "stopped" && <p>This preview is no longer available.</p>}
+              {preview.message && preview.status !== "stopped" && <p>{preview.message}</p>}
+              <div className="local-preview-actions">
+                <button onClick={() => onOpenLocalPreview(preview.id)} disabled={!preview.publicUrl || preview.status !== "live"}>
+                  <ExternalLink size={14} />
+                  Open Preview
+                </button>
+                <button onClick={() => onCopyLocalPreviewLink(preview.id)} disabled={!preview.publicUrl}>
+                  <Copy size={14} />
+                  Copy Link
+                </button>
+                {preview.canStop && (
+                  <button onClick={() => onStopLocalPreview(preview.id)} disabled={preview.status !== "live" && preview.status !== "starting"}>
+                    <Square size={13} />
+                    Stop Sharing
+                  </button>
+                )}
+              </div>
+            </div>
+          </article>
+        ))}
 
         {approvalVisible && (
           <CodexApprovalCard
