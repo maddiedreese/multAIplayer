@@ -275,7 +275,7 @@ import {
   normalizeLocalRoomHistory,
   pruneLocalRoomHistory
 } from "./lib/localRoomHistoryPayload";
-import { loadOrCreateDeviceId, roomLockMessage, roomSecretStorageLabel } from "./lib/appRuntime";
+import { roomLockMessage, roomSecretStorageLabel } from "./lib/appRuntime";
 import { decodeNoSecretRoomInvite, encodeNoSecretRoomInvite, jsonWebKeyToDevicePublicKeyJwk } from "./lib/noSecretRoomInvite";
 import {
   buildCodexEventLine,
@@ -311,6 +311,7 @@ import { buildRoomMemberRows, buildTeamMemberRows } from "./lib/rosterDisplayRow
 import { buildSidebarMessageHitRows, buildSidebarRoomRows, buildSidebarTeamRows } from "./lib/sidebarDisplayRows";
 import { buildCodexEventRows, buildTerminalOutputLines, buildTerminalRequestRows } from "./lib/terminalDisplayRows";
 import { useAppConfigState } from "./hooks/useAppConfigState";
+import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useShellLayout } from "./hooks/useShellLayout";
 import { useThemeMode } from "./hooks/useThemeMode";
@@ -370,7 +371,6 @@ import {
   defaultBrowserStatus,
   defaultBrowserUrl,
   emptyRoom,
-  fallbackUser,
   initialMessagesByRoom,
   initialTerminalLinesByRoom,
   maxTerminalActivityLines,
@@ -539,15 +539,7 @@ export function App() {
   const localPreviewBusyRef = useRef(localPreviewBusyByRoom);
   const fileBusyRef = useRef(fileBusyByRoom);
   const browserRequestsRef = useRef(browserRequestsByRoom);
-  const deviceId = useMemo(() => loadOrCreateDeviceId(), []);
-  const localUser = useMemo(
-    () => ({
-      id: currentUser?.id ?? fallbackUser.id,
-      name: currentUser?.name ?? currentUser?.login ?? fallbackUser.name,
-      avatarUrl: currentUser?.avatarUrl
-    }),
-    [currentUser]
-  );
+  const { deviceId, localUser } = useLocalIdentity(currentUser);
 
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? emptyRoom;
