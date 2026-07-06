@@ -22,6 +22,8 @@ test("production relay doctor accepts a hardened representative environment", ()
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: configured with exact http\(s\) origins/);
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_RATE_LIMITS: rate limits enabled/);
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_DATA_PATH: configured/);
+  assert.doesNotMatch(result.stdout, /\bcargo:/);
+  assert.doesNotMatch(result.stdout, /\brustc:/);
 });
 
 test("production relay doctor rejects wildcard and pathful origins", () => {

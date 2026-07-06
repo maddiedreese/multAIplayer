@@ -1,7 +1,7 @@
 import cors, { type CorsOptions } from "cors";
 import cookieParser from "cookie-parser";
 import express, { type CookieOptions, type NextFunction, type Request, type Response } from "express";
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage } from "node:http";
 import { dirname, resolve } from "node:path";
@@ -2126,7 +2126,13 @@ function decryptStoredAccessToken(stored: Record<string, unknown>): string | nul
 }
 
 function sessionPersistenceKey(): Buffer {
-  return createHash("sha256").update(sessionPersistenceSecret ?? "").digest();
+  return Buffer.from(hkdfSync(
+    "sha256",
+    Buffer.from(sessionPersistenceSecret ?? "", "utf8"),
+    "multaiplayer-relay-session-v1",
+    "github-session-access-token",
+    32
+  ));
 }
 
 async function loadRelayStore() {
