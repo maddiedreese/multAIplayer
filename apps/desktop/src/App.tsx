@@ -24,12 +24,10 @@ import type {
   TeamRecord,
   TerminalResultPlaintextPayload,
   TerminalRequestPlaintextPayload,
-  ApprovalPolicy,
-  DevicePublicKeyJwk as DevicePublicKeyJwkType
+  ApprovalPolicy
 } from "@multaiplayer/protocol";
 import {
   codexModelOptions,
-  DevicePublicKeyJwk,
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultCodexModel,
@@ -252,7 +250,7 @@ import { isRoomKeyRotationInFlight, roomKeyRotationInFlightMessage } from "./lib
 import { ensureRoomDefaults } from "./lib/roomDefaults";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import { roomPostureSummary } from "./lib/roomPosture";
-import { withoutSetValue } from "./lib/setUtils";
+import { omitRecordKey, withoutSetValue } from "./lib/setUtils";
 import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "./lib/sidebarSearch";
 import {
   mergeTerminalSnapshots,
@@ -283,6 +281,8 @@ import {
   normalizeLocalRoomHistory,
   pruneLocalRoomHistory
 } from "./lib/localRoomHistoryPayload";
+import { loadOrCreateDeviceId, loadThemeMode, roomLockMessage, roomSecretStorageLabel } from "./lib/appRuntime";
+import { decodeNoSecretRoomInvite, encodeNoSecretRoomInvite, jsonWebKeyToDevicePublicKeyJwk } from "./lib/noSecretRoomInvite";
 import {
   buildCodexEventLine,
   buildGitHubActionsEventLines,
@@ -6635,85 +6635,4 @@ export function App() {
       )}
     </div>
   );
-}
-
-function loadOrCreateDeviceId(): string {
-  const key = "multaiplayer:device-id";
-  const existing = localStorage.getItem(key);
-  if (existing) return existing;
-  const created = `device_${crypto.randomUUID()}`;
-  localStorage.setItem(key, created);
-  return created;
-}
-
-function loadThemeMode(): ThemeMode {
-  const stored = localStorage.getItem("multaiplayer:theme");
-  if (stored === "light" || stored === "dark") return stored;
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
-
-function roomLockMessage(room: RoomRecord, revoked: boolean): string {
-  if (revoked) return membershipRemovedRoomMessage(room.name);
-  return "This room was forgotten on this device. Rejoin from an invite or get host approval to unlock messages again.";
-}
-
-function omitRecordKey<T>(record: Record<string, T>, key: string): Record<string, T> {
-  if (!(key in record)) return record;
-  const rest = { ...record };
-  delete rest[key];
-  return rest;
-}
-
-function roomSecretStorageLabel(): string {
-  return "__TAURI_INTERNALS__" in window ? "macOS Keychain" : "web preview localStorage";
-}
-
-function jsonWebKeyToDevicePublicKeyJwk(key: JsonWebKey): DevicePublicKeyJwkType {
-  return DevicePublicKeyJwk.parse(JSON.parse(JSON.stringify(key)));
-}
-
-function encodeNoSecretRoomInvite(invite: NoSecretRoomInvite): string {
-  return bytesToBase64Url(new TextEncoder().encode(JSON.stringify(invite)));
-}
-
-function decodeNoSecretRoomInvite(value: string): NoSecretRoomInvite {
-  const decoded = JSON.parse(new TextDecoder().decode(base64UrlToBytes(value))) as Partial<NoSecretRoomInvite>;
-  if (
-    decoded.version !== 1 ||
-    typeof decoded.teamId !== "string" ||
-    typeof decoded.roomId !== "string" ||
-    typeof decoded.roomName !== "string" ||
-    typeof decoded.hostDeviceId !== "string" ||
-    !DevicePublicKeyJwk.safeParse(decoded.hostPublicKeyJwk).success ||
-    typeof decoded.hostPublicKeyFingerprint !== "string"
-  ) {
-    throw new Error("No-secret invite is missing required metadata");
-  }
-  const hostPublicKeyJwk = DevicePublicKeyJwk.parse(decoded.hostPublicKeyJwk);
-  return {
-    version: decoded.version,
-    teamId: decoded.teamId,
-    roomId: decoded.roomId,
-    roomName: decoded.roomName,
-    hostDeviceId: decoded.hostDeviceId,
-    hostPublicKeyJwk,
-    hostPublicKeyFingerprint: decoded.hostPublicKeyFingerprint
-  };
-}
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function base64UrlToBytes(value: string): Uint8Array {
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
 }
