@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   ChatPlaintextPayload,
   BrowserRequestPlaintextPayload,
@@ -129,7 +129,6 @@ import {
   createRoom,
   createTeam,
   loadAttachmentBlob,
-  loadTeamMembers,
   loadWorkspace,
   lookupInvite,
   registerDevice,
@@ -315,6 +314,7 @@ import { useSelectedRoomValues } from "./hooks/useSelectedRoomValues";
 import { useSelectedRoomRuntime } from "./hooks/useSelectedRoomRuntime";
 import { useSidebarNavigation } from "./hooks/useSidebarNavigation";
 import { useRoomTerminalSetters } from "./hooks/useRoomTerminalSetters";
+import { useTeamMembersRefresh } from "./hooks/useTeamMembersRefresh";
 import { useThemeMode } from "./hooks/useThemeMode";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
@@ -1021,6 +1021,12 @@ export function App() {
     browserRequestsByRoom,
     approvalPolicyLabels
   });
+  const { refreshTeamMembers } = useTeamMembersRefresh({
+    selectedTeam,
+    relayHttpUrl: appConfig.relayHttpUrl,
+    setTeamMembersByTeam,
+    setTeamMembersMessageByTeam
+  });
 
   useEffect(() => {
     if (!selectedRoomId) return;
@@ -1085,24 +1091,6 @@ export function App() {
         setWorkspaceError(`Using local starter rooms: ${String(error)}`);
       });
   }, [appConfig.relayHttpUrl]);
-
-  const refreshTeamMembers = useCallback(async (teamId: string, showErrors = true): Promise<void> => {
-    if (!teamId) return;
-    try {
-      const members = await loadTeamMembers(teamId);
-      setTeamMembersByTeam((current) => ({ ...current, [teamId]: members }));
-      setTeamMembersMessageByTeam((current) => ({ ...current, [teamId]: null }));
-    } catch (error) {
-      if (showErrors) {
-        setTeamMembersMessageByTeam((current) => ({ ...current, [teamId]: String(error) }));
-      }
-    }
-  }, [appConfig.relayHttpUrl]);
-
-  useEffect(() => {
-    if (!selectedTeam) return;
-    void refreshTeamMembers(selectedTeam);
-  }, [refreshTeamMembers, selectedTeam]);
 
   useEffect(() => {
     const invitePayload = readInviteUrlPayload(window.location);
