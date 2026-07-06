@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type {
   ChatPlaintextPayload,
   BrowserRequestPlaintextPayload,
@@ -106,7 +106,7 @@ import {
   listGitHubActionRuns,
   type GitHubActionRun,
 } from "./lib/authClient";
-import { connectRelay, type RelayClient } from "./lib/relayClient";
+import type { RelayClient } from "./lib/relayClient";
 import {
   createAttachmentBlob,
   createInvite,
@@ -198,7 +198,6 @@ import {
   localWorkspaceGateMessage
 } from "./lib/workspaceAccess";
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
-import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
 import { extractCodexBrowserOpenUrl, messageInvokesCodex } from "./lib/codexInvoke";
 import { classifyCodexFailure, codexUsageLimitMessage } from "./lib/codexFailure";
@@ -217,7 +216,7 @@ import {
   resolveGitWorkflowDraft,
   type GitWorkflowDraft
 } from "./lib/gitWorkflowDraft";
-import { markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
+import { upsertRoomPreservingUnread } from "./lib/roomUnread";
 import { ensureRoomDefaults } from "./lib/roomDefaults";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import { omitRecordKey, withoutSetValue } from "./lib/setUtils";
@@ -231,29 +230,14 @@ import { formatBrowserAccessLabel, normalizeBrowserLocationInput } from "./lib/b
 import { buildRoomSettingsSystemMessage } from "./lib/roomSettingsMessages";
 import {
   isAttachmentBlobContent,
-  isChatReactionPlaintextPayload,
-  isCodexEventPlaintextPayload,
   isDeviceSealedPayload,
-  isGitHubActionsEventPlaintextPayload,
-  isGitWorkflowEventPlaintextPayload,
   isInviteJoinRequestPlaintextPayload,
   isInviteJoinStatusPlaintextPayload,
-  isLegacyDebugChatMessage,
-  isLocalPreviewPlaintextPayload,
-  isRequestStatusPlaintextPayload,
-  isRoomKeyRotationPlaintextPayload,
-  isRoomSettingsPlaintextPayload,
-  isTerminalResultPlaintextPayload,
   pruneLocalRoomHistory
 } from "./lib/localRoomHistoryPayload";
 import { roomLockMessage, roomSecretStorageLabel } from "./lib/appRuntime";
 import { decodeNoSecretRoomInvite, encodeNoSecretRoomInvite, jsonWebKeyToDevicePublicKeyJwk } from "./lib/noSecretRoomInvite";
-import {
-  buildCodexEventLine,
-  buildGitHubActionsEventLines,
-  buildGitWorkflowEventLines,
-  buildTerminalResultLines
-} from "./lib/activityLines";
+import { buildCodexEventLine } from "./lib/activityLines";
 import { nextShellTerminalName, terminalInputForShellSubmit } from "./lib/terminalUi";
 import {
   canOpenProjectAttachment,
@@ -311,6 +295,7 @@ import { useThemeMode } from "./hooks/useThemeMode";
 import { useWorkspaceBootstrap } from "./hooks/useWorkspaceBootstrap";
 import { useLocalPreviewPolling } from "./hooks/useLocalPreviewPolling";
 import { useInviteUrlBootstrap } from "./hooks/useInviteUrlBootstrap";
+import { useRelaySubscription } from "./hooks/useRelaySubscription";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -1097,303 +1082,58 @@ export function App() {
     setHistorySearchBusy
   });
 
-  useEffect(() => {
-    let cancelled = false;
-    setPresenceByRoom({});
-    const client = connectRelay(
-      appConfig.relayWsUrl,
-      async (message) => {
-        if (cancelled) return;
-        if (message.type === "joined") {
-          setRelayStatus("open");
-          return;
-        }
-        if (message.type === "team.subscribed") {
-          return;
-        }
-        if (message.type === "workspace.subscribed") {
-          setRelayStatus("open");
-          return;
-        }
-        if (message.type === "error") {
-          handleRelayError(message.message);
-          return;
-        }
-        if (message.type === "presence") {
-          setPresenceByRoom((current) => {
-            const roomPresence = current[message.roomId] ?? {};
-            const nextRoomPresence = { ...roomPresence };
-            if (message.status === "offline") {
-              delete nextRoomPresence[message.deviceId];
-            } else {
-              nextRoomPresence[message.deviceId] = {
-                userId: message.userId,
-                deviceId: message.deviceId,
-                displayName: message.displayName,
-                avatarUrl: message.avatarUrl,
-                publicKeyFingerprint: message.publicKeyFingerprint,
-                status: message.status
-              };
-            }
-            return {
-              ...current,
-              [message.roomId]: nextRoomPresence
-            };
-          });
-          return;
-        }
-        if (message.type === "room.updated") {
-          upsertRoom(ensureRoomDefaults(message.room));
-          return;
-        }
-        if (message.type === "team.updated") {
-          upsertTeam(message.team);
-          void refreshTeamMembers(message.team.id, false);
-          return;
-        }
-        if (message.type !== "envelope") {
-          return;
-        }
-        if (seenEnvelopeIds.current.has(message.envelope.id)) {
-          return;
-        }
-        seenEnvelopeIds.current.add(message.envelope.id);
-        try {
-          if (message.envelope.kind === "room.invite") {
-            const plaintext = await decryptInviteEnvelope(message.envelope);
-            if (plaintext) {
-              await handleInviteEnvelopePlaintext(message.envelope.roomId, plaintext);
-            }
-            return;
-          }
-          if (message.envelope.payload.algorithm !== "AES-GCM-256") {
-            return;
-          }
-          const roomPayload = message.envelope.payload;
-          const secret = await loadRoomSecret(message.envelope.roomId);
-          if (!secret) {
-            setForgottenRoomIds((current) => new Set(current).add(message.envelope.roomId));
-            return;
-          }
-          if (message.envelope.kind === "chat.message") {
-            const plaintext = await decryptJson<ChatPlaintextPayload>(roomPayload, secret);
-            const chatMessage = normalizeChatMessage(plaintext) as ChatMessage | null;
-            if (!chatMessage) return;
-            if (isLegacyDebugChatMessage(chatMessage)) return;
-            setRooms((current) =>
-              markRoomUnreadForIncomingChat(
-                current,
-                message.envelope.roomId,
-                selectedRoomIdRef.current,
-                message.envelope.senderDeviceId,
-                deviceId
-              )
-            );
-            setMessagesByRoom((current) => {
-              const roomMessages = current[message.envelope.roomId] ?? [];
-              if (roomMessages.some((existing) => existing.id === chatMessage.id)) return current;
-              return {
-                ...current,
-                [message.envelope.roomId]: [...roomMessages, chatMessage]
-              };
-            });
-            const envelopeRoom = roomsRef.current.find((room) => room.id === message.envelope.roomId);
-            if (envelopeRoom) handleCodexBrowserOpenCommand(chatMessage, envelopeRoom);
-          }
-          if (message.envelope.kind === "chat.reaction") {
-            const plaintext = await decryptJson<unknown>(roomPayload, secret);
-            if (isChatReactionPlaintextPayload(plaintext)) {
-              applyMessageReaction(message.envelope.roomId, plaintext);
-            }
-          }
-          if (message.envelope.kind === "terminal.request") {
-            const plaintext = await decryptJson<TerminalRequestPlaintextPayload>(roomPayload, secret);
-            setTerminalRequestsByRoom((current) => {
-              const roomRequests = current[message.envelope.roomId] ?? [];
-              if (roomRequests.some((existing) => existing.id === plaintext.id)) return current;
-              return {
-                ...current,
-                [message.envelope.roomId]: [...roomRequests, { ...plaintext, status: "pending" }]
-              };
-            });
-          }
-          if (message.envelope.kind === "terminal.event") {
-            const plaintext = await decryptJson<unknown>(roomPayload, secret);
-            if (isRequestStatusPlaintextPayload(plaintext)) {
-              updateTerminalRequestStatus(message.envelope.roomId, plaintext.requestId, plaintext.status);
-            }
-            if (isTerminalResultPlaintextPayload(plaintext)) {
-              appendTerminalLinesForRoom(message.envelope.roomId, buildTerminalResultLines(plaintext));
-            }
-          }
-          if (message.envelope.kind === "git.event") {
-            const plaintext = await decryptJson<unknown>(roomPayload, secret);
-            if (isGitWorkflowEventPlaintextPayload(plaintext)) {
-              appendGitWorkflowEvent(message.envelope.roomId, plaintext);
-              appendTerminalLinesForRoom(message.envelope.roomId, buildGitWorkflowEventLines(plaintext));
-              setGitWorkflowMessageForRoom(message.envelope.roomId, plaintext.message);
-            }
-            if (isGitHubActionsEventPlaintextPayload(plaintext)) {
-              appendGitHubActionsEvent(message.envelope.roomId, plaintext);
-              setActionRunsByRoom((current) => ({
-                ...current,
-                [message.envelope.roomId]: plaintext.runs
-              }));
-              setActionsLastCheckedByRoom((current) => ({
-                ...current,
-                [message.envelope.roomId]: plaintext.checkedAt
-              }));
-              setActionsMessagesByRoom((current) => ({
-                ...current,
-                [message.envelope.roomId]: `${plaintext.summary.label}: ${plaintext.message}`
-              }));
-              appendTerminalLinesForRoom(message.envelope.roomId, buildGitHubActionsEventLines(plaintext));
-            }
-          }
-          if (message.envelope.kind === "codex.event") {
-            const plaintext = await decryptJson<unknown>(roomPayload, secret);
-            if (isCodexEventPlaintextPayload(plaintext)) {
-              appendCodexEvent(message.envelope.roomId, plaintext);
-              appendTerminalLinesForRoom(message.envelope.roomId, [buildCodexEventLine(plaintext)]);
-            }
-          }
-          if (message.envelope.kind === "browser.request") {
-            const plaintext = await decryptJson<BrowserRequestPlaintextPayload>(roomPayload, secret);
-            const envelopeRoom = roomsRef.current.find((room) => room.id === message.envelope.roomId);
-            const status = "pending";
-            setBrowserRequestsByRoom((current) => {
-              const roomRequests = current[message.envelope.roomId] ?? [];
-              if (roomRequests.some((existing) => existing.id === plaintext.id)) return current;
-              return {
-                ...current,
-                [message.envelope.roomId]: [...roomRequests, { ...plaintext, status }]
-              };
-            });
-          }
-          if (message.envelope.kind === "browser.event") {
-            const plaintext = await decryptJson<RequestStatusPlaintextPayload>(roomPayload, secret);
-            updateBrowserRequestStatus(message.envelope.roomId, plaintext.requestId, plaintext.status);
-          }
-          if (message.envelope.kind === "preview.event") {
-            const plaintext = await decryptJson<unknown>(roomPayload, secret);
-            if (isLocalPreviewPlaintextPayload(plaintext)) {
-              appendLocalPreviewEvent(message.envelope.roomId, plaintext);
-              setChatMessageForRoom(
-                message.envelope.roomId,
-                plaintext.status === "live"
-                  ? `${plaintext.sharedBy} shared a local preview.`
-                  : plaintext.status === "stopped"
-                    ? `${plaintext.sharedBy} stopped sharing a local preview.`
-                    : plaintext.message ?? "Local preview status changed."
-              );
-            }
-          }
-          if (message.envelope.kind === "room.host") {
-            const plaintext = await decryptJson<HostHandoffPlaintextPayload>(roomPayload, secret);
-            if (plaintext.status === "accepted") {
-              markHostHandoffAccepted(message.envelope.roomId, plaintext.id);
-              setHostMessageForRoom(
-                message.envelope.roomId,
-                `${plaintext.acceptedBy ?? "A room member"} accepted host handoff from ${plaintext.fromHost}.`
-              );
-            } else {
-              appendHostHandoff(message.envelope.roomId, { ...plaintext, status: "available" });
-            }
-          }
-          if (message.envelope.kind === "room.settings") {
-            const plaintext = await decryptJson<unknown>(roomPayload, secret);
-            if (isRoomSettingsPlaintextPayload(plaintext)) {
-              appendRoomMessage(
-                message.envelope.roomId,
-                buildRoomSettingsSystemMessage(plaintext, { approvalPolicyLabels, roomModeLabels })
-              );
-            }
-          }
-          if (message.envelope.kind === "room.key") {
-            const plaintext = await decryptJson<unknown>(roomPayload, secret);
-            if (isRoomKeyRotationPlaintextPayload(plaintext)) {
-              await replaceRoomSecret(message.envelope.roomId, plaintext.newSecret);
-              historyLoadedRoomIds.current.add(message.envelope.roomId);
-              setForgottenRoomIds((current) => withoutSetValue(current, message.envelope.roomId));
-              appendRoomMessage(message.envelope.roomId, {
-                id: plaintext.id,
-                author: "multAIplayer",
-                role: "system",
-                body: `${plaintext.rotatedBy} refreshed room access. Future messages and invites use the updated access state.`,
-                time: formatMessageTime(plaintext.rotatedAt),
-                createdAt: plaintext.rotatedAt
-              });
-              setInviteMessageForRoom(message.envelope.roomId, `${plaintext.rotatedBy} refreshed room access for future messages.`);
-            }
-          }
-        } catch (error) {
-          console.warn("Failed to decrypt relay envelope", error);
-        }
-      },
-      setRelayStatus,
-      (openClient) => {
-        openClient.publish({
-          type: "subscribe.workspace",
-          userId: localUser.id,
-          deviceId
-        });
-        if (selectedTeam && !revokedTeamIds.has(selectedTeam)) {
-          openClient.publish({
-            type: "subscribe.team",
-            teamId: selectedTeam,
-            userId: localUser.id,
-            deviceId
-          });
-        }
-        if (!hasSelectedRoom || revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId)) return;
-        openClient.publish({
-          type: "join",
-          teamId: selectedRoom.teamId,
-          roomId: selectedRoom.id,
-          userId: localUser.id,
-          deviceId,
-          inviteId: inviteAdmissionsByRoom[selectedRoom.id]
-        });
-        openClient.publish({
-          type: "presence",
-          teamId: selectedRoom.teamId,
-          roomId: selectedRoom.id,
-          userId: localUser.id,
-          deviceId,
-          displayName: localUser.name,
-          avatarUrl: localUser.avatarUrl,
-          publicKeyFingerprint: deviceIdentity?.publicKeyFingerprint
-        });
-      }
-    );
-
-    relayRef.current = client;
-
-    return () => {
-      cancelled = true;
-      relayRef.current = null;
-      client.close();
-    };
-  }, [
-    appConfig.relayWsUrl,
+  useRelaySubscription({
+    relayWsUrl: appConfig.relayWsUrl,
     deviceId,
+    localUser,
+    devicePublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
+    selectedTeam,
+    selectedRoom,
     hasSelectedRoom,
     isActiveHost,
-    localUser.avatarUrl,
-    localUser.id,
-    localUser.name,
-    deviceIdentity?.publicKeyFingerprint,
     inviteAdmissionsByRoom,
-    refreshTeamMembers,
     revokedRoomIds,
     revokedTeamIds,
-    selectedRoom.approvalPolicy,
-    selectedRoom.browserAllowedOrigins,
-    selectedRoom.id,
-    selectedRoom.name,
-    selectedRoom.teamId,
-    selectedTeam
-  ]);
+    approvalPolicyLabels,
+    roomModeLabels,
+    relayRef,
+    seenEnvelopeIds,
+    roomsRef,
+    selectedRoomIdRef,
+    historyLoadedRoomIds,
+    setRelayStatus,
+    setPresenceByRoom,
+    setRooms,
+    setMessagesByRoom,
+    setTerminalRequestsByRoom,
+    setBrowserRequestsByRoom,
+    setActionRunsByRoom,
+    setActionsLastCheckedByRoom,
+    setActionsMessagesByRoom,
+    setForgottenRoomIds,
+    handleRelayError,
+    upsertRoom,
+    upsertTeam,
+    refreshTeamMembers,
+    decryptInviteEnvelope,
+    handleInviteEnvelopePlaintext,
+    handleCodexBrowserOpenCommand,
+    applyMessageReaction,
+    updateTerminalRequestStatus,
+    appendTerminalLinesForRoom,
+    appendGitWorkflowEvent,
+    setGitWorkflowMessageForRoom,
+    appendGitHubActionsEvent,
+    appendCodexEvent,
+    updateBrowserRequestStatus,
+    appendLocalPreviewEvent,
+    setChatMessageForRoom,
+    markHostHandoffAccepted,
+    setHostMessageForRoom,
+    appendHostHandoff,
+    appendRoomMessage,
+    setInviteMessageForRoom
+  });
 
   useLocalHistoryPersistence({
     hasSelectedRoom,
