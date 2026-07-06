@@ -38,19 +38,12 @@ import {
   exportRoomSecret,
   importRoomSecret,
   loadHistorySettings,
-  loadTeamHistorySettings,
   loadOrCreateRoomSecret,
-  saveHistorySettings,
-  clearEncryptedHistory,
-  forgetRoomLocalData,
   loadRoomSecret,
   replaceRoomSecret,
   type LocalHistorySettings
 } from "./lib/localHistory";
-import {
-  loadTeamRoomDefaults,
-  teamDefaultsRoomSettings
-} from "./lib/teamRoomDefaults";
+import { loadTeamRoomDefaults } from "./lib/teamRoomDefaults";
 import { loadOrCreateDeviceIdentity, resetDeviceIdentity, type DeviceIdentity } from "./lib/deviceIdentity";
 import {
   loadTrustedDeviceKeys,
@@ -150,14 +143,9 @@ import { ensureRoomDefaults } from "./lib/roomDefaults";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import { omitRecordKey, withoutSetValue } from "./lib/setUtils";
 import {
-  replaceRoomTerminalSnapshots,
-  terminalsForLocalHistory
-} from "./lib/terminalState";
-import {
   isDeviceSealedPayload,
   isInviteJoinRequestPlaintextPayload,
-  isInviteJoinStatusPlaintextPayload,
-  pruneLocalRoomHistory
+  isInviteJoinStatusPlaintextPayload
 } from "./lib/localRoomHistoryPayload";
 import { roomLockMessage, roomSecretStorageLabel } from "./lib/appRuntime";
 import { decodeNoSecretRoomInvite, encodeNoSecretRoomInvite, jsonWebKeyToDevicePublicKeyJwk } from "./lib/noSecretRoomInvite";
@@ -223,9 +211,9 @@ import { useMemberActions } from "./hooks/useMemberActions";
 import { useWorkspaceCreationActions } from "./hooks/useWorkspaceCreationActions";
 import { useRoomSettingsActions } from "./hooks/useRoomSettingsActions";
 import { useTeamDefaultActions } from "./hooks/useTeamDefaultActions";
+import { useLocalHistoryActions } from "./hooks/useLocalHistoryActions";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
-  clearRoomVisibilityWarningAcknowledgement,
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
 import { InlineSecretWarning } from "./components/common";
@@ -1068,6 +1056,95 @@ export function App() {
     setTeamDefaultCodexModel,
     setTeamDefaultBrowserProfilePersistent,
     setTeamDefaultInviteApprovalGate
+  });
+  const {
+    updateLocalHistorySettings,
+    applyTeamDefaultsToRoom,
+    clearRoomHistory,
+    forgetSelectedRoomLocalData
+  } = useLocalHistoryActions({
+    hasSelectedRoom,
+    selectedRoom,
+    selectedRoomIdRef,
+    isSelectedRoomLocked,
+    isSelectedRoomRevoked,
+    isActiveHost,
+    messages,
+    terminalRequests,
+    browserRequests,
+    inviteRequests,
+    codexEvents,
+    gitWorkflowEvents,
+    githubActionsEvents,
+    localPreviews,
+    terminals,
+    hostHandoffs,
+    selectedCodexThreadId,
+    reportRoomSettingsMutationInFlight,
+    roomSettingsActor,
+    setSelectedHistoryMessage,
+    setHistoryMessageForRoom,
+    setInviteApprovalGateForRoom,
+    setSettingsBusyForRoom,
+    setSecretWarningVisibleForRoom,
+    setHistorySettings,
+    setMessagesByRoom,
+    setTerminalRequestsByRoom,
+    setBrowserRequestsByRoom,
+    setInviteRequestsByRoom,
+    setCodexEventsByRoom,
+    setGitWorkflowEventsByRoom,
+    setGitHubActionsEventsByRoom,
+    setLocalPreviewsByRoom,
+    setTerminals,
+    setHostHandoffsByRoom,
+    setRooms,
+    setBrowserStatusByRoom,
+    setActiveBrowserUrlsByRoom,
+    setCodexThreadIdsByRoom,
+    setActionRunsByRoom,
+    setActionsLastCheckedByRoom,
+    setActionsMessagesByRoom,
+    setActionsBusyByRoom,
+    setGitWorkflowBusyByRoom,
+    setHostBusyByRoom,
+    setHostMessagesByRoom,
+    setChatMessagesByRoom,
+    setMarkdownCopyFallbacksByRoom,
+    setSecretWarningsVisibleByRoom,
+    setHistoryMessagesByRoom,
+    setSettingsBusyByRoom,
+    setSettingsMessagesByRoom,
+    setCustomCodexModelsByRoom,
+    setProjectPathDraftsByRoom,
+    setKeyRotationBusyByRoom,
+    setApprovalVisibleByRoom,
+    setPendingCodexApprovalsByRoom,
+    setCodexRunningByRoom,
+    setGitStatusByRoom,
+    setFileQueriesByRoom,
+    setProjectFilesByRoom,
+    setSelectedFilesByRoom,
+    setSelectedDiffsByRoom,
+    setFileBusyByRoom,
+    setFileMessagesByRoom,
+    setPendingAttachmentsByRoom,
+    setTerminalLinesByRoom,
+    setTerminalBusyByRoom,
+    setSelectedTerminalIdsByRoom,
+    setTerminalNamesByRoom,
+    setTerminalCommandsByRoom,
+    setTerminalInputsByRoom,
+    setTerminalErrorsByRoom,
+    setBrowserUrlsByRoom,
+    setBrowserReasonsByRoom,
+    setBrowserMessagesByRoom,
+    setInviteLinksByRoom,
+    setInviteApprovalGatesByRoom,
+    setInviteMessagesByRoom,
+    setDraftsByRoom,
+    setForgottenRoomIds,
+    historyLoadedRoomIds
   });
   const {
     openProjectFile,
@@ -2119,276 +2196,6 @@ export function App() {
       requesterName: localUser.name,
       requesterUserId: localUser.id
     };
-  }
-
-  function updateLocalHistorySettings(next: LocalHistorySettings) {
-    if (!hasSelectedRoom) {
-      setSelectedHistoryMessage("Create or join a room before changing encrypted history settings.");
-      return;
-    }
-    const roomId = selectedRoom.id;
-    const saved = saveHistorySettings(roomId, next);
-    setHistorySettings(saved);
-    if (saved.enabled) {
-      const payload = pruneLocalRoomHistory({
-        version: 3,
-        messages,
-        terminalRequests,
-        browserRequests,
-        inviteRequests,
-        codexEvents,
-        gitWorkflowEvents,
-        githubActionsEvents,
-        localPreviews,
-        terminalSnapshots: terminalsForLocalHistory(terminals.filter((terminal) => terminal.roomId === roomId)),
-        hostHandoffs,
-        ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
-      }, saved.retentionDays);
-      setMessagesByRoom((current) => ({ ...current, [roomId]: payload.messages }));
-      setTerminalRequestsByRoom((current) => ({ ...current, [roomId]: payload.terminalRequests }));
-      setBrowserRequestsByRoom((current) => ({ ...current, [roomId]: payload.browserRequests }));
-      setInviteRequestsByRoom((current) => ({ ...current, [roomId]: payload.inviteRequests }));
-      setCodexEventsByRoom((current) => ({ ...current, [roomId]: payload.codexEvents }));
-      setGitWorkflowEventsByRoom((current) => ({ ...current, [roomId]: payload.gitWorkflowEvents }));
-      setGitHubActionsEventsByRoom((current) => ({ ...current, [roomId]: payload.githubActionsEvents }));
-      setLocalPreviewsByRoom((current) => ({ ...current, [roomId]: payload.localPreviews }));
-      setTerminals((current) => replaceRoomTerminalSnapshots(current, roomId, payload.terminalSnapshots));
-      setHostHandoffsByRoom((current) => ({ ...current, [roomId]: payload.hostHandoffs }));
-    }
-    setHistoryMessageForRoom(
-      roomId,
-      saved.enabled
-        ? `Encrypted local history retention set to ${saved.retentionDays} days.`
-        : "Encrypted local history is disabled for this room."
-    );
-	  }
-
-  async function applyTeamDefaultsToRoom() {
-    if (!hasSelectedRoom) {
-      setSelectedHistoryMessage("Create or join a room before applying team defaults.");
-      return;
-    }
-    const roomId = selectedRoom.id;
-    if (reportRoomSettingsMutationInFlight(roomId, setHistoryMessageForRoom)) return;
-    const teamId = selectedRoom.teamId;
-    const historyDefaults = loadTeamHistorySettings(teamId);
-    const roomDefaults = loadTeamRoomDefaults(teamId);
-    updateLocalHistorySettings(historyDefaults);
-    setInviteApprovalGateForRoom(roomId, roomDefaults.inviteApprovalGate);
-    if (isSelectedRoomLocked) {
-      setHistoryMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
-      return;
-    }
-    if (!isActiveHost) {
-      setHistoryMessageForRoom(
-        roomId,
-        "Applied local history and invite defaults. Claim host to apply approval and browser defaults to this room."
-      );
-      return;
-    }
-    setSettingsBusyForRoom(roomId, true);
-    try {
-      const roomSettings = teamDefaultsRoomSettings(roomDefaults);
-      const room = await updateRoomSettings(roomId, {
-        ...roomSettingsActor(),
-        ...roomSettings
-      });
-      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
-      if (!roomSettings.browserProfilePersistent) {
-        setBrowserStatusByRoom((current) => omitRecordKey(current, roomId));
-        setActiveBrowserUrlsByRoom((current) => omitRecordKey(current, roomId));
-      }
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setHistoryMessageForRoom(roomId, "Applied team defaults to this room.");
-      }
-    } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHistoryMessageForRoom(roomId, String(error));
-    } finally {
-      setSettingsBusyForRoom(roomId, false);
-    }
-  }
-
-  async function clearRoomHistory() {
-    if (!hasSelectedRoom) {
-      setSelectedHistoryMessage("Create or join a room before clearing local history.");
-      return;
-    }
-    const roomId = selectedRoom.id;
-    await clearEncryptedHistory(selectedRoom.id);
-    setMessagesByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setTerminalRequestsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setBrowserRequestsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setInviteRequestsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setCodexEventsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setGitWorkflowEventsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setGitHubActionsEventsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setHostHandoffsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setCodexThreadIdsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActionRunsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActionsLastCheckedByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActionsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActionsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setGitWorkflowBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setHostMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setChatMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setMarkdownCopyFallbacksByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSecretWarningsVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setHistoryMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSettingsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setProjectPathDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setKeyRotationBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setApprovalVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setPendingCodexApprovalsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setCodexRunningByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActiveBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setFileQueriesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setProjectFilesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSelectedFilesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSelectedDiffsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setFileBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setFileMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setPendingAttachmentsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalLinesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSelectedTerminalIdsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalNamesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalCommandsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalInputsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalErrorsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminals((current) => current.filter((terminal) => terminal.roomId !== selectedRoom.id));
-    setBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setBrowserReasonsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setBrowserMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setInviteLinksByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setInviteApprovalGatesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setInviteMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setHistoryMessageForRoom(roomId, "Cleared encrypted local history for this room.");
-  }
-
-  async function forgetSelectedRoomLocalData() {
-    if (!hasSelectedRoom) {
-      setSelectedHistoryMessage("Create or join a room before forgetting local room data.");
-      return;
-    }
-    const roomId = selectedRoom.id;
-    const confirmed = window.confirm(
-      `Forget ${selectedRoom.name} on this device?\n\nThis deletes local history, room settings, and this device's room access. You will need a fresh invite or host approval to read or send room messages again.`
-    );
-    if (!confirmed) return;
-    await forgetRoomLocalData(selectedRoom.id);
-    clearRoomVisibilityWarningAcknowledgement(selectedRoom.id);
-    historyLoadedRoomIds.current.delete(selectedRoom.id);
-    setForgottenRoomIds((current) => new Set(current).add(selectedRoom.id));
-    setMessagesByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setTerminalRequestsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setBrowserRequestsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setInviteRequestsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setCodexEventsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setGitWorkflowEventsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setGitHubActionsEventsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setHostHandoffsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setCodexThreadIdsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActionRunsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActionsLastCheckedByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActionsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActionsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setGitWorkflowBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setHostMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setChatMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setMarkdownCopyFallbacksByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSecretWarningsVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setHistoryMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSettingsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setProjectPathDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setKeyRotationBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setApprovalVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setPendingCodexApprovalsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setCodexRunningByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActiveBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setFileQueriesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setProjectFilesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSelectedFilesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSelectedDiffsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setFileBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setFileMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setPendingAttachmentsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalLinesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSelectedTerminalIdsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalNamesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalCommandsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalInputsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalErrorsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminals((current) => current.filter((terminal) => terminal.roomId !== selectedRoom.id));
-    setBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setBrowserReasonsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setBrowserMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setInviteLinksByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setInviteApprovalGatesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setInviteMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setHistorySettings(loadHistorySettings(selectedRoom.id));
-    setSecretWarningVisibleForRoom(selectedRoom.id, true);
-    setHistoryMessageForRoom(roomId, "Forgot this room on this device. Rejoin from an invite to unlock it again.");
   }
 
   async function copyInviteLink() {
