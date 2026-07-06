@@ -37,7 +37,6 @@ const defaultTeamRoomDefaults: TeamRoomDefaults = {
 const approvalPolicies: ApprovalPolicy[] = [
   "ask_every_turn",
   "auto_chat_only",
-  "auto_browser_allowed_sites",
   "never_host"
 ];
 

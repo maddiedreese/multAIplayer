@@ -23,7 +23,7 @@ Message reactions are routed as encrypted `chat.reaction` envelopes. The relay s
 
 Host handoff packages are routed as encrypted `room.host` envelopes. The relay sees the envelope metadata but not the handoff summary contents.
 
-Room setting activity that should be visible in the transcript is routed as encrypted `room.settings` envelopes. The alpha uses this for host-controlled approval policy, room mode, Codex model, project path, browser allowlist, and browser profile persistence changes. The relay can store current room metadata, but it cannot read the human-readable before/after activity message.
+Room setting activity that should be visible in the transcript is routed as encrypted `room.settings` envelopes. The alpha uses this for host-controlled approval policy, room mode, Codex model, project path, and browser profile persistence changes. The relay can store current room metadata, but it cannot read the human-readable before/after activity message.
 
 Browser access requests are routed as encrypted `browser.request` envelopes. Host decisions are routed as encrypted `browser.event` envelopes and can render as local room transcript activity after decryption. The relay sees the envelope kind, room id, sender id, and timestamp, but not the URL, reason, requester display name, decider, or host decision state.
 
@@ -39,7 +39,7 @@ Persistent terminal snapshots are local-only and stored in that same encrypted r
 
 Clients can send `subscribe.workspace` over the room WebSocket to receive plaintext `team.updated` metadata events when teams are created. They can also send `subscribe.team` to receive plaintext `room.updated` metadata events for that team. This keeps sidebars current when teams or rooms are created and when room settings change. These updates contain metadata only; encrypted chat envelopes still require joining the specific room.
 
-Room metadata is bounded before storage and broadcast. Project paths are trimmed, must be non-empty, cannot contain control characters, and are capped at 2,048 characters. Codex model ids are trimmed, capped at 80 characters, and must either match the known model switcher ids or a compact model-id pattern. Browser origin allowlists are normalized to http(s) origins, and browser profile persistence is stored as a boolean room setting.
+Room metadata is bounded before storage and broadcast. Project paths are trimmed, must be non-empty, cannot contain control characters, and are capped at 2,048 characters. Codex model ids are trimmed, capped at 80 characters, and must either match the known model switcher ids or a compact model-id pattern. Legacy browser origin metadata is normalized to http(s) origins when present, and browser profile persistence is stored as a boolean room setting.
 
 Encrypted room envelopes are idempotent by envelope id within a room. If the same joined device publishes the same envelope id again, the relay keeps the first copy and does not append or rebroadcast the duplicate.
 

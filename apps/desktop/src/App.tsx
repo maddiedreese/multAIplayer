@@ -213,8 +213,7 @@ import {
   canRequestBrowserAccess,
   findRoomBrowserRequest,
   normalizeBrowserAllowedOrigins,
-  roomBrowserRequestMessage,
-  shouldAutoApproveBrowserRequest
+  roomBrowserRequestMessage
 } from "./lib/browserPolicy";
 import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
@@ -254,6 +253,7 @@ import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./l
 import { roomPostureSummary } from "./lib/roomPosture";
 import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "./lib/sidebarSearch";
 import { replaceRoomTerminalSnapshots } from "./lib/terminalState";
+import { nextShellTerminalName, terminalInputForShellSubmit } from "./lib/terminalUi";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -553,7 +553,7 @@ const initialMessagesByRoom: Record<string, ChatMessage[]> = {
 const approvalPolicyLabels: Record<ApprovalPolicy, string> = {
   ask_every_turn: "Ask every Codex turn",
   auto_chat_only: "Auto-approve chat-only turns",
-  auto_browser_allowed_sites: "Auto-approve allowed browser sites",
+  auto_browser_allowed_sites: "Legacy browser auto-approval",
   never_host: "Never host this room"
 };
 
@@ -664,6 +664,7 @@ export function App() {
   const [terminalCommandsByRoom, setTerminalCommandsByRoom] = useState<Record<string, string>>({});
   const [terminalInputsByRoom, setTerminalInputsByRoom] = useState<Record<string, string>>({});
   const [terminalErrorsByRoom, setTerminalErrorsByRoom] = useState<Record<string, string | null>>({});
+  const terminalAutoOpenedRoomsRef = useRef<Set<string>>(new Set());
   const [browserRequestsByRoom, setBrowserRequestsByRoom] = useState<Record<string, BrowserAccessRequest[]>>({});
   const [browserUrlsByRoom, setBrowserUrlsByRoom] = useState<Record<string, string>>({});
   const [browserReasonsByRoom, setBrowserReasonsByRoom] = useState<Record<string, string>>({});
@@ -1849,14 +1850,7 @@ export function App() {
           if (message.envelope.kind === "browser.request") {
             const plaintext = await decryptJson<BrowserRequestPlaintextPayload>(roomPayload, secret);
             const envelopeRoom = roomsRef.current.find((room) => room.id === message.envelope.roomId);
-            const status =
-              envelopeRoom && shouldAutoApproveBrowserRequest(
-                plaintext.url,
-                envelopeRoom,
-                isLocalUserActiveHostForRoom(envelopeRoom, localUser)
-              )
-                ? "approved"
-                : "pending";
+            const status = "pending";
             setBrowserRequestsByRoom((current) => {
               const roomRequests = current[message.envelope.roomId] ?? [];
               if (roomRequests.some((existing) => existing.id === plaintext.id)) return current;
@@ -1865,14 +1859,6 @@ export function App() {
                 [message.envelope.roomId]: [...roomRequests, { ...plaintext, status }]
               };
             });
-            if (status === "approved" && envelopeRoom) {
-              publishRequestStatus("browser.event", plaintext.id, "approved", envelopeRoom).catch((error) => {
-                if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, envelopeRoom.id)) setBrowserMessageForRoom(envelopeRoom.id, String(error));
-              });
-              if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, envelopeRoom.id)) {
-                setBrowserMessageForRoom(envelopeRoom.id, `Auto-approved allowed browser site ${formatBrowserAccessLabel(plaintext.url)}.`);
-              }
-            }
           }
           if (message.envelope.kind === "browser.event") {
             const plaintext = await decryptJson<RequestStatusPlaintextPayload>(roomPayload, secret);
@@ -2177,6 +2163,33 @@ export function App() {
       window.clearInterval(timer);
     };
   }, [hasSelectedRoom, selectedRoom.id, selectedTerminal?.running, selectedTerminalId]);
+
+  useEffect(() => {
+    if (
+      inspectorTab !== "terminal" ||
+      !hasSelectedRoom ||
+      !isActiveHost ||
+      !canReadLocalWorkspace ||
+      isSelectedRoomLocked ||
+      terminalBusy ||
+      roomTerminals.length > 0 ||
+      terminalAutoOpenedRoomsRef.current.has(selectedRoom.id)
+    ) {
+      return;
+    }
+
+    terminalAutoOpenedRoomsRef.current.add(selectedRoom.id);
+    void openInteractiveTerminal({ reuseExisting: true, quiet: true });
+  }, [
+    canReadLocalWorkspace,
+    hasSelectedRoom,
+    inspectorTab,
+    isActiveHost,
+    isSelectedRoomLocked,
+    roomTerminals.length,
+    selectedRoom.id,
+    terminalBusy
+  ]);
 
   useEffect(() => {
     probeCodex().then(setCodexProbe).catch((error) => {
@@ -4513,7 +4526,7 @@ export function App() {
     }
   }
 
-  async function openInteractiveTerminal() {
+  async function openInteractiveTerminal(options: { reuseExisting?: boolean; quiet?: boolean } = {}) {
     if (!hasSelectedRoom) {
       setSelectedTerminalError("Create or join a room before opening a terminal.");
       return;
@@ -4528,28 +4541,29 @@ export function App() {
     }
     const room = selectedRoom;
     const roomId = room.id;
-    const existingShell = roomTerminals.find((terminal) => terminal.name === "shell" && terminal.running);
-    if (existingShell) {
+    const existingShell = roomTerminals.find((terminal) => terminal.running);
+    if (options.reuseExisting !== false && existingShell) {
       setSelectedTerminalIdForRoom(roomId, existingShell.id);
-      setTerminalErrorForRoom(roomId, "Opened existing interactive shell.");
+      if (!options.quiet) setTerminalErrorForRoom(roomId, null);
       return;
     }
+    const name = nextShellTerminalName(roomTerminals);
     if (reportRoomTerminalActionInFlight(roomId)) return;
     setTerminalBusyForRoom(roomId, true);
     setTerminalErrorForRoom(roomId, null);
     try {
       const snapshot = await startTerminal(
         roomId,
-        "shell",
+        name,
         room.projectPath,
         "zsh -l"
       );
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setTerminals((current) => upsertTerminal(current, snapshot));
         setSelectedTerminalIdForRoom(roomId, snapshot.id);
-        setTerminalNameForRoom(roomId, "shell");
+        setTerminalNameForRoom(roomId, name);
         setTerminalCommandForRoom(roomId, "zsh -l");
-        setTerminalErrorForRoom(roomId, "Opened interactive shell in the room project.");
+        if (!options.quiet) setTerminalErrorForRoom(roomId, null);
       }
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalErrorForRoom(roomId, String(error));
@@ -4636,7 +4650,7 @@ export function App() {
   }
 
   async function sendTerminalInput() {
-    const input = terminalInput.trim();
+    const input = terminalInputForShellSubmit(terminalInput);
     if (!input) return;
     if (!hasSelectedRoom) {
       setSelectedTerminalError("Create or join a room before sending terminal input.");
@@ -4879,7 +4893,6 @@ export function App() {
       return;
     }
 
-    const autoApproved = shouldAutoApproveBrowserRequest(parsedUrl.toString(), room, activeHost);
     const request: BrowserAccessRequest = {
       id: crypto.randomUUID(),
       requester: localUser.name,
@@ -4887,7 +4900,7 @@ export function App() {
       url: parsedUrl.toString(),
       reason: browserReason.trim() || "No reason provided.",
       requestedAt: new Date().toISOString(),
-      status: autoApproved ? "approved" : "pending"
+      status: "pending"
     };
 
     const client = relayRef.current;
@@ -4896,9 +4909,7 @@ export function App() {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setBrowserMessageForRoom(
           roomId,
-          autoApproved
-            ? `Auto-approved allowed browser site ${formatBrowserAccessLabel(request.url)} locally because the relay is not connected.`
-            : "Saved browser request locally because the relay is not connected."
+          "Saved browser request locally because the relay is not connected."
         );
       }
       return;
@@ -4927,15 +4938,10 @@ export function App() {
       seenEnvelopeIds.current.add(envelope.id);
       client.publish({ type: "publish", envelope });
       appendBrowserRequest(room.id, request);
-      if (autoApproved) {
-        await publishRequestStatus("browser.event", request.id, "approved", room);
-      }
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setBrowserMessageForRoom(
           roomId,
-          autoApproved
-            ? `Auto-approved allowed browser site ${formatBrowserAccessLabel(request.url)}.`
-            : `Requested browser access to ${formatBrowserAccessLabel(request.url)}.`
+          `Requested browser access to ${formatBrowserAccessLabel(request.url)}.`
         );
       }
     } catch (error) {
@@ -6522,7 +6528,7 @@ export function App() {
           canApproveTerminal={canReadLocalWorkspace && isActiveHost}
           onCopyMarkdown={copyTerminalMarkdown}
           onRunGitStatus={runApprovedTerminalCheck}
-          onOpenInteractiveTerminal={openInteractiveTerminal}
+          onOpenInteractiveTerminal={() => openInteractiveTerminal({ reuseExisting: false })}
           onTerminalNameChange={(name) => setTerminalNameForRoom(selectedRoom.id, name)}
           onTerminalCommandChange={(command) => setTerminalCommandForRoom(selectedRoom.id, command)}
           onStartTerminal={startNamedTerminal}
@@ -7242,7 +7248,7 @@ function buildRoomSettingsMessageBody(event: RoomSettingsPlaintextPayload): stri
     case "projectPath":
       return `${event.changedBy} changed the project folder from ${event.previousValue} to ${event.nextValue}.`;
     case "browserAllowedOrigins":
-      return `${event.changedBy} changed allowed browser sites from ${formatOriginList(event.previousValue)} to ${formatOriginList(event.nextValue)}.`;
+      return `${event.changedBy} changed legacy browser origin metadata from ${formatOriginList(event.previousValue)} to ${formatOriginList(event.nextValue)}.`;
     case "browserProfilePersistent":
       return `${event.changedBy} changed browser profile mode from ${formatBrowserProfilePersistence(event.previousValue)} to ${formatBrowserProfilePersistence(event.nextValue)}.`;
   }

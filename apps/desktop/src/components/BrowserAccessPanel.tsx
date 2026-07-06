@@ -42,7 +42,7 @@ export function BrowserAccessPanel({
       const rect = slot.getBoundingClientRect();
       const toolbar = slot.parentElement?.querySelector<HTMLElement>(".browser-toolbar");
       const toolbarRect = toolbar?.getBoundingClientRect();
-      const top = toolbarRect ? Math.max(rect.top, toolbarRect.bottom + 8) : rect.top;
+      const top = toolbarRect ? Math.max(rect.top, toolbarRect.bottom + 18) : rect.top;
       const width = Math.max(1, Math.round(rect.width));
       const height = Math.max(1, Math.round(rect.bottom - top));
       await webview.setPosition(new LogicalPosition(Math.round(rect.left), Math.round(top)));
@@ -60,7 +60,7 @@ export function BrowserAccessPanel({
       const rect = browserViewportRef.current.getBoundingClientRect();
       const toolbar = browserViewportRef.current.parentElement?.querySelector<HTMLElement>(".browser-toolbar");
       const toolbarRect = toolbar?.getBoundingClientRect();
-      const top = toolbarRect ? Math.max(rect.top, toolbarRect.bottom + 8) : rect.top;
+      const top = toolbarRect ? Math.max(rect.top, toolbarRect.bottom + 18) : rect.top;
       const webview = new Webview(getCurrentWindow(), "room_browser", {
         url: activeBrowserUrl,
         x: Math.round(rect.left),

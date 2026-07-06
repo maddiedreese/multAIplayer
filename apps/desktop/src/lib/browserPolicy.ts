@@ -34,6 +34,13 @@ export function isBrowserUrlAllowed(url: string, allowedOrigins: string[]): bool
 }
 
 export function shouldAutoApproveBrowserRequest(url: string, room: RoomRecord, activeHost: boolean): boolean {
+  void url;
+  void room;
+  void activeHost;
+  return false;
+}
+
+export function shouldAutoApproveBrowserRequestLegacy(url: string, room: RoomRecord, activeHost: boolean): boolean {
   if (!activeHost || room.approvalPolicy !== "auto_browser_allowed_sites") return false;
   if (detectBrowserSecretRisks(url).length > 0) return false;
   return isBrowserUrlAllowed(url, room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins);

@@ -1,5 +1,11 @@
 import type { ApprovalPolicy } from "@multaiplayer/protocol";
 
+const selectableApprovalPolicies: ApprovalPolicy[] = [
+  "ask_every_turn",
+  "auto_chat_only",
+  "never_host"
+];
+
 export function ApprovalPolicyPanel({
   selectedPolicy,
   labels,
@@ -20,7 +26,7 @@ export function ApprovalPolicyPanel({
         <small className="panel-state attention">Host-side</small>
       </div>
       <div className="policy-options">
-        {(Object.keys(labels) as ApprovalPolicy[]).map((policy) => (
+        {selectableApprovalPolicies.map((policy) => (
           <button
             key={policy}
             className={selectedPolicy === policy ? "active" : ""}
