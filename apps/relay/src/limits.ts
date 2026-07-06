@@ -1,10 +1,27 @@
 import {
   DevicePublicKeyJwk,
+  type RelayEnvelope,
   codexModelOptions,
   type DevicePublicKeyJwk as DevicePublicKeyJwkType,
   type RoomRecord,
   type TeamRole
 } from "@multaiplayer/protocol";
+
+export interface RelayEnvelopeLimitOptions {
+  encryptedEnvelopeMaxBytes: number;
+  maxEnvelopeCiphertextChars: number;
+  maxEnvelopeIdChars: number;
+  maxEnvelopeNonceChars: number;
+  maxDeviceIdChars: number;
+  maxPublicKeyJwkChars: number;
+  maxUserIdChars: number;
+}
+
+export interface EncryptedBacklogLimitOptions extends RelayEnvelopeLimitOptions {
+  encryptedBacklogLimit: number;
+  encryptedBacklogRetentionDays: number;
+  now?: () => number;
+}
 
 export function normalizeMetadataText(value: unknown, maxChars: number): string | null {
   const text = String(value ?? "").trim();
@@ -104,4 +121,32 @@ export function normalizeBrowserAllowedOrigins(value: unknown): string[] | null 
     }
   }
   return Array.from(origins);
+}
+
+export function isAllowedEnvelopePayload(envelope: RelayEnvelope): boolean {
+  if (envelope.payload.algorithm === "AES-GCM-256") return true;
+  return envelope.kind === "room.invite";
+}
+
+export function isRelayEnvelopeWithinLimits(envelope: RelayEnvelope, options: RelayEnvelopeLimitOptions): boolean {
+  if (!normalizeMetadataText(envelope.id, options.maxEnvelopeIdChars)) return false;
+  if (!normalizeMetadataText(envelope.senderUserId, options.maxUserIdChars)) return false;
+  if (!normalizeMetadataText(envelope.senderDeviceId, options.maxDeviceIdChars)) return false;
+  if (!normalizeMetadataText(envelope.payload.nonce, options.maxEnvelopeNonceChars)) return false;
+  if (!envelope.payload.ciphertext || envelope.payload.ciphertext.length > options.maxEnvelopeCiphertextChars) return false;
+  if (envelope.payload.algorithm === "ECDH-P256-HKDF-SHA256-AES-GCM-256") {
+    if (!isJsonStringifiableWithin(envelope.payload.ephemeralPublicKeyJwk, options.maxPublicKeyJwkChars)) return false;
+  }
+  return Buffer.byteLength(JSON.stringify(envelope), "utf8") <= options.encryptedEnvelopeMaxBytes;
+}
+
+export function pruneEncryptedBacklog(envelopes: RelayEnvelope[], options: EncryptedBacklogLimitOptions): RelayEnvelope[] {
+  const now = options.now ?? Date.now;
+  const cutoffMs = now() - options.encryptedBacklogRetentionDays * 24 * 60 * 60 * 1000;
+  return envelopes
+    .filter((envelope) => {
+      const createdAtMs = Date.parse(envelope.createdAt);
+      return Number.isFinite(createdAtMs) && createdAtMs >= cutoffMs && isRelayEnvelopeWithinLimits(envelope, options);
+    })
+    .slice(-options.encryptedBacklogLimit);
 }
