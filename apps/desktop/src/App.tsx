@@ -132,6 +132,7 @@ import { useDeviceIdentityLifecycle } from "./hooks/useDeviceIdentityLifecycle";
 import { useSelectedTeamDefaults } from "./hooks/useSelectedTeamDefaults";
 import { useCodexProbe } from "./hooks/useCodexProbe";
 import { useRoomDraftCleanup } from "./hooks/useRoomDraftCleanup";
+import { useHistorySearch } from "./hooks/useHistorySearch";
 import {
   canApproveCodexTurn,
   shouldAutoApproveChatOnlyTurn,
@@ -1178,46 +1179,15 @@ export function App() {
     };
   }, [forgottenRoomIds, hasSelectedRoom, selectedRoom.teamId, selectedRoomId]);
 
-  useEffect(() => {
-    if (!searchActive) {
-      setHistorySearchMessagesByRoom({});
-      setHistorySearchBusy(false);
-      return;
-    }
-
-    let cancelled = false;
-    const searchableRooms = rooms.filter((room) =>
-      !forgottenRoomIds.has(room.id) &&
-      !revokedRoomIds.has(room.id) &&
-      !revokedTeamIds.has(room.teamId)
-    );
-    setHistorySearchBusy(searchableRooms.length > 0);
-    Promise.all(
-      searchableRooms.map(async (room) => {
-        const storedHistory = await loadEncryptedHistory<ChatMessage[] | LocalRoomHistoryPayload>(room.id);
-        if (!storedHistory) return [room.id, []] as const;
-        const settings = loadHistorySettings(room.id);
-        const payload = pruneLocalRoomHistory(normalizeLocalRoomHistory(storedHistory), settings.retentionDays);
-        return [room.id, payload.messages] as const;
-      })
-    )
-      .then((entries) => {
-        if (cancelled) return;
-        setHistorySearchMessagesByRoom(
-          Object.fromEntries(entries.filter(([, roomMessages]) => roomMessages.length > 0))
-        );
-      })
-      .catch((error) => {
-        if (!cancelled) console.warn("Failed to search encrypted local history", error);
-      })
-      .finally(() => {
-        if (!cancelled) setHistorySearchBusy(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [forgottenRoomIds, revokedRoomIds, revokedTeamIds, rooms, searchActive]);
+  useHistorySearch({
+    searchActive,
+    rooms,
+    forgottenRoomIds,
+    revokedRoomIds,
+    revokedTeamIds,
+    setHistorySearchMessagesByRoom,
+    setHistorySearchBusy
+  });
 
   useEffect(() => {
     let cancelled = false;
