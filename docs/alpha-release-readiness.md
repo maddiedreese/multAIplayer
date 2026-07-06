@@ -24,7 +24,8 @@ Expected automated coverage:
 - Rust formatting.
 - Production web build.
 - Local setup checks for Node, npm, Rust, Cargo, lockfiles, env templates, and macOS packaging tools.
-- Hosted relay sanity checks for GitHub OAuth, session secret strength, allowed origins, auth-required mode, disabled debug endpoints, and disabled demo seeding.
+- Hosted relay sanity checks for GitHub OAuth, session secret strength, exact HTTP(S) allowed origins, auth-required mode, disabled debug endpoints, disabled demo seeding, enabled rate limits, persistent data path, and conservative proxy-header handling.
+- An alpha smoke test that covers room creation, encrypted local history, chat attachments, Codex approval context, file/diff preview selection, terminal approval, GitHub PR/Actions readiness, browser gating, usage-limit host handoff context, and locked-room blocking.
 
 ## Manual Maintainer Work
 
@@ -53,6 +54,7 @@ Before a wider alpha, manually run these in the native macOS app:
 - Trigger or simulate Codex usage exhaustion and accept host handoff on another device.
 - Forget a room locally and confirm locked-room controls stay blocked.
 - Remove a team member and confirm relay access is revoked for future room traffic.
+- Review [alpha-limitations.md](alpha-limitations.md) and repeat private-repo/browser/terminal limitations in release notes.
 
 ## Alpha-Only Limitations To Keep Visible
 

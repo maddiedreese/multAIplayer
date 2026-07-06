@@ -26,7 +26,33 @@ For a hosted or internet-facing relay, run the production relay doctor against t
 npm run doctor:production-relay
 ```
 
-This check fails if GitHub OAuth is missing, durable session encryption is weak or missing, credentialed browser origins are unset, auth is explicitly disabled, debug endpoints are enabled, or demo workspace seeding is enabled. It is a deployment sanity check, not a substitute for TLS, backups, log review, process supervision, or an external rate limiter in multi-instance deployments.
+This check fails if GitHub OAuth is missing, durable session encryption is weak or missing, credentialed browser origins are unset or not exact HTTP(S) origins, auth is explicitly disabled, debug endpoints are enabled, demo workspace seeding is enabled, in-process rate limits are disabled, relay storage points at `/tmp`, or untrusted proxy headers are accepted. It is a deployment sanity check, not a substitute for TLS, backups, log review, process supervision, or an external rate limiter in multi-instance deployments.
+
+## Docker Relay
+
+The relay includes a production Dockerfile at `apps/relay/Dockerfile`.
+
+Build it from the repository root:
+
+```bash
+docker build -f apps/relay/Dockerfile -t multaiplayer-relay:alpha .
+```
+
+Run it with a persistent `/data` mount and the same environment that passes `npm run doctor:production-relay`:
+
+```bash
+docker run --rm -p 4321:4321 \
+  -v multaiplayer-relay-data:/data \
+  -e GITHUB_CLIENT_ID=your_client_id \
+  -e MULTAIPLAYER_RELAY_SESSION_SECRET=replace_with_at_least_32_chars \
+  -e MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://multaiplayer.com \
+  -e MULTAIPLAYER_RELAY_REQUIRE_AUTH=true \
+  -e MULTAIPLAYER_RELAY_DEBUG=false \
+  -e MULTAIPLAYER_RELAY_SEED_DEMO=false \
+  multaiplayer-relay:alpha
+```
+
+The image sets `NODE_ENV=production`, `PORT=4321`, and `MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.json` by default. The container healthcheck reads `/healthz`; keep `/readyz` available for platform-level readiness checks, but do not treat either endpoint as a security audit.
 
 ## Relay Storage
 
@@ -154,7 +180,7 @@ MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://multaiplayer.com,https://app.multaipl
 
 If set, the relay only emits CORS credential headers and accepts browser-origin WebSocket upgrades for those exact origins. If unset, local development is permissive, while production denies browser origins by default. Requests without a browser `Origin` header are still allowed so native clients and server-side health checks continue to work.
 
-Origin entries are normalized to bare origins. `https://multaiplayer.com/` becomes `https://multaiplayer.com`, and app origins such as `tauri://localhost` are preserved. Entries with paths, queries, or fragments are ignored because CORS and WebSocket `Origin` checks cannot be path-scoped.
+Origin entries are normalized to bare origins by the relay. `https://multaiplayer.com/` becomes `https://multaiplayer.com`. Entries with paths, queries, fragments, credentials, wildcards, or non-HTTP(S) schemes are invalid for production doctor because CORS and WebSocket `Origin` checks cannot be path-scoped. Native desktop requests without an `Origin` header are still allowed.
 
 ## GitHub OAuth
 

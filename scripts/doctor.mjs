@@ -101,6 +101,10 @@ function checkProductionRelayEnv() {
   const requireAuth = envBoolean("MULTAIPLAYER_RELAY_REQUIRE_AUTH", true);
   const debug = envBoolean("MULTAIPLAYER_RELAY_DEBUG", false);
   const seedDemo = envBoolean("MULTAIPLAYER_RELAY_SEED_DEMO", false);
+  const rateLimits = envBoolean("MULTAIPLAYER_RELAY_RATE_LIMITS", true);
+  const trustProxyHeaders = envBoolean("MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS", false);
+  const dataPath = envValue("MULTAIPLAYER_RELAY_DATA_PATH");
+  const allowedOriginErrors = validateAllowedOrigins(allowedOrigins);
 
   checks.push({
     ok: Boolean(githubClientId),
@@ -115,11 +119,13 @@ function checkProductionRelayEnv() {
       : "required: use a stable high-entropy value of at least 32 characters"
   });
   checks.push({
-    ok: Boolean(allowedOrigins),
+    ok: Boolean(allowedOrigins) && allowedOriginErrors.length === 0,
     label: "production MULTAIPLAYER_RELAY_ALLOWED_ORIGINS",
-    detail: allowedOrigins
-      ? "configured"
-      : "required: set exact app origins for credentialed CORS and browser WebSocket upgrades"
+    detail: !allowedOrigins
+      ? "required: set exact app origins for credentialed CORS and browser WebSocket upgrades"
+      : allowedOriginErrors.length === 0
+        ? "configured with exact http(s) origins"
+        : `invalid: ${allowedOriginErrors.join("; ")}`
   });
   checks.push({
     ok: requireAuth,
@@ -136,6 +142,27 @@ function checkProductionRelayEnv() {
     label: "production MULTAIPLAYER_RELAY_SEED_DEMO",
     detail: seedDemo ? "must not be true for a hosted production relay" : "demo workspace seeding disabled"
   });
+  checks.push({
+    ok: rateLimits,
+    label: "production MULTAIPLAYER_RELAY_RATE_LIMITS",
+    detail: rateLimits ? "rate limits enabled" : "must not be false for a hosted production relay"
+  });
+  checks.push({
+    ok: Boolean(dataPath) && !dataPath.startsWith("/tmp/"),
+    label: "production MULTAIPLAYER_RELAY_DATA_PATH",
+    detail: dataPath
+      ? dataPath.startsWith("/tmp/")
+        ? "must not point at /tmp for a hosted production relay"
+        : "configured"
+      : "required: set a persistent relay store path or mounted volume"
+  });
+  checks.push({
+    ok: !trustProxyHeaders,
+    label: "production MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS",
+    detail: trustProxyHeaders
+      ? "only enable after configuring a trusted reverse proxy; leave false by default"
+      : "proxy headers not trusted by default"
+  });
 }
 
 function envValue(name) {
@@ -148,4 +175,32 @@ function envBoolean(name, fallback) {
   if (["1", "true", "yes", "on"].includes(value)) return true;
   if (["0", "false", "no", "off"].includes(value)) return false;
   return fallback;
+}
+
+function validateAllowedOrigins(value) {
+  if (!value) return [];
+  const errors = [];
+  const origins = value.split(",").map((origin) => origin.trim()).filter(Boolean);
+  if (origins.length === 0) return ["no origins were provided"];
+  for (const origin of origins) {
+    if (origin === "*") {
+      errors.push("* is not allowed with credentialed CORS");
+      continue;
+    }
+    try {
+      const parsed = new URL(origin);
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        errors.push(`${origin} must use http or https`);
+      }
+      if (parsed.pathname !== "/" || parsed.search || parsed.hash) {
+        errors.push(`${origin} must be a bare origin without path, query, or hash`);
+      }
+      if (parsed.username || parsed.password) {
+        errors.push(`${origin} must not include credentials`);
+      }
+    } catch {
+      errors.push(`${origin} is not a valid URL origin`);
+    }
+  }
+  return errors;
 }

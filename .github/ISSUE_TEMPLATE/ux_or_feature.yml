@@ -1,0 +1,39 @@
+name: UX Or Feature Request
+description: Suggest a product improvement, interaction polish, or new alpha feature.
+title: "[UX]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What feels confusing or missing?
+      description: Describe the workflow and who is affected.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What should happen instead?
+      description: Include screenshots or sketches if helpful, but avoid private room content.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Product area
+      options:
+        - Group chat
+        - Codex approvals
+        - Host handoff
+        - Terminal
+        - Browser
+        - Files / diffs
+        - GitHub / Actions
+        - Relay / self-hosting
+        - Settings / profile
+        - Documentation
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints or risks
+      description: Note any privacy, security, or open-source expectations this should preserve.

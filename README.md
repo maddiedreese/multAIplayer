@@ -7,7 +7,7 @@ People chat normally, like iMessage or Slack. When the group needs help, someone
 Short version: group chat for coding with Codex. Private by default. Open source.
 
 See [docs/product-architecture.md](docs/product-architecture.md) for the initial product and architecture spec.
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidance, [SECURITY.md](SECURITY.md) for the alpha security policy, [docs/release-hardening.md](docs/release-hardening.md) for release checks, and [docs/alpha-release-readiness.md](docs/alpha-release-readiness.md) for the release-readiness checklist.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidance, [SECURITY.md](SECURITY.md) for the alpha security policy, [docs/threat-model.md](docs/threat-model.md) for privacy boundaries, [docs/codex-hosting.md](docs/codex-hosting.md) for how host-side Codex works, [docs/self-hosting.md](docs/self-hosting.md) for relay deployment, [docs/release-hardening.md](docs/release-hardening.md) for release checks, and [docs/alpha-limitations.md](docs/alpha-limitations.md) for current alpha limits.
 
 ## Download
 
@@ -36,6 +36,14 @@ Copy `.env.example` to `.env` and set `GITHUB_CLIENT_ID` to enable GitHub sign-i
 For `NODE_ENV=production`, the relay requires auth by default even if GitHub OAuth is not configured, and demo rooms are not seeded. Self-hosters who intentionally want an unauthenticated private LAN relay must set `MULTAIPLAYER_RELAY_REQUIRE_AUTH=false` explicitly.
 
 Self-hosted relays can be selected from the in-app Settings drawer by changing the relay HTTP API URL and WebSocket rooms URL.
+
+For an internet-facing relay, configure exact allowed origins, durable encrypted session storage, auth-required mode, persistent relay storage, and rate limits, then run:
+
+```sh
+npm run doctor:production-relay
+```
+
+The relay also ships with a Dockerfile at `apps/relay/Dockerfile`; see [docs/self-hosting.md](docs/self-hosting.md) for the build/run command and production env checklist.
 
 ## CI
 
