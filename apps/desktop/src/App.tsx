@@ -35,7 +35,7 @@ import { useAppRoomScopedSetters } from "./hooks/useAppRoomScopedSetters";
 import { useAppSelectedRoomRuntime } from "./hooks/useAppSelectedRoomRuntime";
 import { useAppRoomDisplayContext } from "./hooks/useAppRoomDisplayContext";
 import { useThemeMode } from "./hooks/useThemeMode";
-import { useWorkspaceRecordActions } from "./hooks/useWorkspaceRecordActions";
+import { useAppWorkspaceRecords } from "./hooks/useAppWorkspaceRecords";
 import { useHostHandoffActions } from "./hooks/useHostHandoffActions";
 import { useInviteActions } from "./hooks/useInviteActions";
 import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
@@ -270,25 +270,12 @@ export function App() {
   const roomChatMutations = useRoomChatMutations({
     setMessagesByRoom: workspaceState.setMessagesByRoom
   });
-  const workspaceRecords = useWorkspaceRecordActions({
-    hasSelectedRoom,
-    selectedRoom,
-    localUser: localIdentity.localUser,
-    roomsRef: appRefs.roomsRef,
-    setTeams: workspaceState.setTeams,
-    setTeamMembersByTeam: workspaceState.setTeamMembersByTeam,
-    setRooms: workspaceState.setRooms,
-    resetCodexApprovalForRoom,
-    setRevokedRoomIds: roomRuntimeState.setRevokedRoomIds,
-    setRevokedTeamIds: roomRuntimeState.setRevokedTeamIds,
-    setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
-    setInviteAdmissionsByRoom: invitePanelState.setInviteAdmissionsByRoom,
-    setPresenceByRoom: roomRuntimeState.setPresenceByRoom,
-    setInviteLinkForRoom,
-    setInviteMessageForRoom,
-    setChatMessageForRoom,
-    setHostMessageForRoom,
-    setWorkspaceError: workspaceState.setWorkspaceError
+  const workspaceRecords = useAppWorkspaceRecords({
+    appState,
+    appRefs,
+    localIdentity,
+    selected: selectedContext,
+    roomSetters
   });
   const roomInteraction = useAppRoomInteractionContext({
     appState,
