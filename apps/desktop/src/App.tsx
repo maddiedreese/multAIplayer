@@ -30,8 +30,7 @@ import {
   defaultCodexModel,
   defaultRoomMode,
   maxEmbeddedAttachmentBytes,
-  maxEmbeddedAttachmentBytesPerMessage,
-  maxMessageAttachments
+  maxEmbeddedAttachmentBytesPerMessage
 } from "@multaiplayer/protocol";
 import {
   createRoomSecret,
@@ -149,7 +148,7 @@ import {
   shouldResetCodexApprovalForRoomModeChange,
   shouldResetCodexApprovalForRoomUpdate
 } from "./lib/codexApproval";
-import { buildCodexApprovalSnapshot, buildCodexTurnInput, buildCodexTurnSummary, messagesSinceLastCodex } from "./lib/codexTurn";
+import { buildCodexApprovalSnapshot, buildCodexTurnInput, buildCodexTurnSummary } from "./lib/codexTurn";
 import { normalizeCodexThreadId } from "./lib/codexThread";
 import {
   buildCodexOutputMarkdown,
@@ -248,7 +247,6 @@ import {
 } from "./lib/terminalState";
 import { summarizeActionRuns } from "./lib/githubActionsSummary";
 import { formatBrowserAccessLabel, normalizeBrowserLocationInput } from "./lib/browserUi";
-import { formatApprovalAttachments, formatApprovalMessages } from "./lib/codexApprovalSummary";
 import { buildRoomSettingsSystemMessage } from "./lib/roomSettingsMessages";
 import {
   isAttachmentBlobContent,
@@ -284,7 +282,6 @@ import {
   attachmentTypeFromName,
   formatBytes,
   formatCodexModel,
-  formatHostStatus,
   formatMessageTime,
   formatSessionPersistence,
   formatTeamMemberName,
@@ -299,7 +296,6 @@ import {
   quickTunnelSafetyText,
   type LocalPreviewCandidate
 } from "./lib/localPreview";
-import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessageRows } from "./lib/chatDisplayRows";
 import { useAppConfigState } from "./hooks/useAppConfigState";
 import { useFileTerminalDisplay } from "./hooks/useFileTerminalDisplay";
 import { useLatestRef } from "./hooks/useLatestRef";
@@ -312,6 +308,7 @@ import { useRoomNotices } from "./hooks/useRoomNotices";
 import { useShellLayout } from "./hooks/useShellLayout";
 import { useSelectedTeamData } from "./hooks/useSelectedTeamData";
 import { useSelectedRoomValues } from "./hooks/useSelectedRoomValues";
+import { useSelectedRoomRuntime } from "./hooks/useSelectedRoomRuntime";
 import { useSidebarNavigation } from "./hooks/useSidebarNavigation";
 import { useThemeMode } from "./hooks/useThemeMode";
 import {
@@ -343,7 +340,6 @@ import { RoomChatPanel } from "./components/RoomChatPanel";
 import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
 import { LocalPreviewDialog } from "./components/LocalPreviewDialog";
 import { RoomStatusBanners } from "./components/RoomStatusBanners";
-import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 import type {
   BrowserAccessRequest,
   BrowserStatus,
@@ -717,8 +713,6 @@ export function App() {
     () => terminals.filter((terminal) => terminal.roomId === selectedRoom.id),
     [terminals, selectedRoom.id]
   );
-  const activeCodexApproval = pendingCodexApprovalsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const approvalVisible = approvalVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const roomMemberRows = useRoomMemberRows({
     presenceByRoom,
     selectedRoom,
@@ -728,38 +722,61 @@ export function App() {
     localPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
     trustedDeviceKeys
   });
-  const selectedTerminal = roomTerminals.find((terminal) => terminal.id === selectedTerminalId) ?? null;
-  const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
-  const hostHandoffs = hostHandoffsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const terminalRequests = terminalRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const localPreviews = localPreviewsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const localPreviewBusy = localPreviewBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
-  const inspectorAttention = inspectorAttentionCounts({ approvalVisible, terminalRequests, browserRequests });
-  const inviteRequests = inviteRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const codexEvents = codexEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const gitWorkflowEvents = gitWorkflowEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const githubActionsEvents = githubActionsEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const selectedCodexThreadId = codexThreadIdsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const codexRunning = codexRunningByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
-  const approvalTranscriptMessages = messagesSinceLastCodex(activeCodexApproval?.messages ?? messages) as ChatMessage[];
-  const codexApprovalSummaryDisplay = {
-    messages: formatApprovalMessages(approvalTranscriptMessages),
-    attachments: formatApprovalAttachments(approvalTranscriptMessages)
-  };
-  const roomCanUseChat = canUseRoomChat(selectedRoom, isSelectedRoomLocked);
-  const chatMessageRows = buildRoomChatMessageRows({
-    messages,
+  const {
+    activeCodexApproval,
+    approvalVisible,
+    selectedTerminal,
+    selectedTerminalCanRestart,
+    hostHandoffs,
+    terminalRequests,
+    localPreviews,
+    localPreviewBusy,
+    inspectorAttention,
+    inviteRequests,
+    codexEvents,
+    gitWorkflowEvents,
+    githubActionsEvents,
+    selectedCodexThreadId,
+    codexRunning,
+    approvalTranscriptMessages,
+    codexApprovalSummaryDisplay,
+    chatMessageRows,
+    pendingAttachmentRows,
+    localPreviewCards,
+    pendingAttachmentSummary,
+    hostBusy,
+    settingsBusy,
+    keyRotationBusy,
+    hostStatusLabel
+  } = useSelectedRoomRuntime({
+    selectedRoom,
+    selectedRoomId,
     markdownSelectionMode,
     selectedMessageIds,
-    localUserId: localUser.id
+    localUserId: localUser.id,
+    messages,
+    pendingAttachments,
+    pendingAttachmentBytes,
+    browserRequests,
+    roomTerminals,
+    selectedTerminalId,
+    pendingCodexApprovalsByRoom,
+    approvalVisibleByRoom,
+    hostHandoffsByRoom,
+    terminalRequestsByRoom,
+    localPreviewsByRoom,
+    localPreviewBusyByRoom,
+    inviteRequestsByRoom,
+    codexEventsByRoom,
+    gitWorkflowEventsByRoom,
+    githubActionsEventsByRoom,
+    codexThreadIdsByRoom,
+    codexRunningByRoom,
+    hostBusyByRoom,
+    settingsBusyByRoom,
+    keyRotationBusyByRoom
   });
-  const pendingAttachmentRows = buildPendingAttachmentRows(pendingAttachments);
-  const localPreviewCards = buildLocalPreviewCards(localPreviews, localUser.id);
-  const pendingAttachmentSummary = `${pendingAttachments.length}/${maxMessageAttachments} files · ${formatBytes(pendingAttachmentBytes)}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`;
-  const hostBusy = hostBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
-  const settingsBusy = settingsBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
-  const keyRotationBusy = keyRotationBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
-  const hostStatusLabel = formatHostStatus(selectedRoom);
+  const roomCanUseChat = canUseRoomChat(selectedRoom, isSelectedRoomLocked);
 
   function setGitWorkflowMessageForRoom(roomId: string, message: string | null) {
     setGitWorkflowMessagesByRoom((current) => ({
