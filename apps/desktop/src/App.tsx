@@ -27,7 +27,7 @@ import {
   attachmentTypeFromName,
   formatTimestamp
 } from "./lib/appFormatters";
-import { useAppConfigState } from "./hooks/useAppConfigState";
+import { useAppStateSlices } from "./hooks/useAppStateSlices";
 import { useFileTerminalDisplay } from "./hooks/useFileTerminalDisplay";
 import { useGitHubWorkflowState } from "./hooks/useGitHubWorkflowState";
 import { useGitHubAuth } from "./hooks/useGitHubAuth";
@@ -39,7 +39,6 @@ import { useRoomInFlightReporters } from "./hooks/useRoomInFlightReporters";
 import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
 import { useRoomNotices } from "./hooks/useRoomNotices";
 import { useRoomScopedSetters } from "./hooks/useRoomScopedSetters";
-import { useShellLayout } from "./hooks/useShellLayout";
 import { useSelectedTeamData } from "./hooks/useSelectedTeamData";
 import { useSelectedRoomValues } from "./hooks/useSelectedRoomValues";
 import { useSelectedRoomRuntime } from "./hooks/useSelectedRoomRuntime";
@@ -52,19 +51,6 @@ import { useHostHandoffActions } from "./hooks/useHostHandoffActions";
 import { useInviteActions } from "./hooks/useInviteActions";
 import { useChatActions } from "./hooks/useChatActions";
 import { useRoomVisibilityWarningActions } from "./hooks/useRoomVisibilityWarningActions";
-import { useWorkspaceUiState } from "./hooks/useWorkspaceUiState";
-import { useHistoryDefaultsState } from "./hooks/useHistoryDefaultsState";
-import { useBrowserPanelState } from "./hooks/useBrowserPanelState";
-import { useTerminalPanelState } from "./hooks/useTerminalPanelState";
-import { useFilePanelState } from "./hooks/useFilePanelState";
-import { useGitHubWorkflowPanelState } from "./hooks/useGitHubWorkflowPanelState";
-import { useLocalPreviewState } from "./hooks/useLocalPreviewState";
-import { useInvitePanelState } from "./hooks/useInvitePanelState";
-import { useRoomSettingsState } from "./hooks/useRoomSettingsState";
-import { useRoomChatState } from "./hooks/useRoomChatState";
-import { useCodexRoomState } from "./hooks/useCodexRoomState";
-import { useRoomRuntimeState } from "./hooks/useRoomRuntimeState";
-import { useAppRuntimeState } from "./hooks/useAppRuntimeState";
 import { useCodexBrowserOpenCommand } from "./hooks/useCodexBrowserOpenCommand";
 import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
 import { useAppRefs } from "./hooks/useAppRefs";
@@ -141,16 +127,7 @@ export function App() {
     sidebarQuery,
     setSidebarQuery,
     messagesByRoom,
-    setMessagesByRoom
-  } = useWorkspaceUiState({
-    initialTeams: seededTeams,
-    initialRooms: seededRooms,
-    initialTeamMembersByTeam: seededTeamMembers,
-    initialProjectPath: defaultProjectPath,
-    initialRoomId: "room-desktop",
-    initialMessagesByRoom
-  });
-  const {
+    setMessagesByRoom,
     appConfig,
     relayHttpDraft,
     relayWsDraft,
@@ -158,9 +135,7 @@ export function App() {
     setRelayHttpDraft,
     setRelayWsDraft,
     saveRelayConfiguration,
-    resetRelayConfiguration
-  } = useAppConfigState();
-  const {
+    resetRelayConfiguration,
     chatMessagesByRoom,
     setChatMessagesByRoom,
     draftsByRoom,
@@ -168,9 +143,7 @@ export function App() {
     pendingAttachmentsByRoom,
     setPendingAttachmentsByRoom,
     sensitiveAttachmentReviewKey,
-    setSensitiveAttachmentReviewKey
-  } = useRoomChatState();
-  const {
+    setSensitiveAttachmentReviewKey,
     hostBusyByRoom,
     setHostBusyByRoom,
     hostMessagesByRoom,
@@ -182,9 +155,7 @@ export function App() {
     customCodexModelsByRoom,
     setCustomCodexModelsByRoom,
     projectPathDraftsByRoom,
-    setProjectPathDraftsByRoom
-  } = useRoomSettingsState();
-  const {
+    setProjectPathDraftsByRoom,
     historySettings,
     setHistorySettings,
     teamHistorySettings,
@@ -200,9 +171,7 @@ export function App() {
     historyMessagesByRoom,
     setHistoryMessagesByRoom,
     teamHistoryMessagesByTeam,
-    setTeamHistoryMessagesByTeam
-  } = useHistoryDefaultsState({ initialTeamId: seededTeams[0].id });
-  const {
+    setTeamHistoryMessagesByTeam,
     inspectorTabsByRoom,
     setInspectorTabsByRoom,
     forgottenRoomIds,
@@ -220,9 +189,7 @@ export function App() {
     gitWorkflowEventsByRoom,
     setGitWorkflowEventsByRoom,
     githubActionsEventsByRoom,
-    setGitHubActionsEventsByRoom
-  } = useRoomRuntimeState();
-  const {
+    setGitHubActionsEventsByRoom,
     codexEventsByRoom,
     setCodexEventsByRoom,
     approvalVisibleByRoom,
@@ -234,17 +201,13 @@ export function App() {
     secretWarningsVisibleByRoom,
     setSecretWarningsVisibleByRoom,
     codexThreadIdsByRoom,
-    setCodexThreadIdsByRoom
-  } = useCodexRoomState();
-  const {
+    setCodexThreadIdsByRoom,
     localPreviewsByRoom,
     setLocalPreviewsByRoom,
     localPreviewDialog,
     setLocalPreviewDialog,
     localPreviewBusyByRoom,
-    setLocalPreviewBusyByRoom
-  } = useLocalPreviewState();
-  const {
+    setLocalPreviewBusyByRoom,
     codexProbe,
     setCodexProbe,
     relayStatus,
@@ -258,9 +221,7 @@ export function App() {
     historySearchMessagesByRoom,
     setHistorySearchMessagesByRoom,
     historySearchBusy,
-    setHistorySearchBusy
-  } = useAppRuntimeState();
-  const {
+    setHistorySearchBusy,
     terminalLinesByRoom,
     setTerminalLinesByRoom,
     terminalBusyByRoom,
@@ -279,9 +240,7 @@ export function App() {
     setTerminalInputsByRoom,
     terminalErrorsByRoom,
     setTerminalErrorsByRoom,
-    terminalAutoOpenedRoomsRef
-  } = useTerminalPanelState({ initialTerminalLinesByRoom });
-  const {
+    terminalAutoOpenedRoomsRef,
     browserRequestsByRoom,
     setBrowserRequestsByRoom,
     browserUrlsByRoom,
@@ -293,9 +252,7 @@ export function App() {
     browserStatusByRoom,
     setBrowserStatusByRoom,
     activeBrowserUrlsByRoom,
-    setActiveBrowserUrlsByRoom
-  } = useBrowserPanelState();
-  const {
+    setActiveBrowserUrlsByRoom,
     gitStatusByRoom,
     setGitStatusByRoom,
     gitWorkflowBusyByRoom,
@@ -311,9 +268,7 @@ export function App() {
     actionsLastCheckedByRoom,
     setActionsLastCheckedByRoom,
     gitWorkflowDraftsByRoom,
-    setGitWorkflowDraftsByRoom
-  } = useGitHubWorkflowPanelState();
-  const {
+    setGitWorkflowDraftsByRoom,
     fileQueriesByRoom,
     setFileQueriesByRoom,
     projectFilesByRoom,
@@ -329,9 +284,7 @@ export function App() {
     fileMessagesByRoom,
     setFileMessagesByRoom,
     markdownCopyFallbacksByRoom,
-    setMarkdownCopyFallbacksByRoom
-  } = useFilePanelState();
-  const {
+    setMarkdownCopyFallbacksByRoom,
     inviteRequestsByRoom,
     setInviteRequestsByRoom,
     inviteSecretInput,
@@ -345,16 +298,25 @@ export function App() {
     keyRotationBusyByRoom,
     setKeyRotationBusyByRoom,
     inviteAdmissionsByRoom,
-    setInviteAdmissionsByRoom
-  } = useInvitePanelState();
-  const {
+    setInviteAdmissionsByRoom,
     sidebarCollapsed,
     inspectorCollapsed,
     shellStyle,
     beginShellResize,
     toggleSidebarCollapsed,
     toggleInspectorCollapsed
-  } = useShellLayout();
+  } = useAppStateSlices({
+    workspace: {
+      initialTeams: seededTeams,
+      initialRooms: seededRooms,
+      initialTeamMembersByTeam: seededTeamMembers,
+      initialProjectPath: defaultProjectPath,
+      initialRoomId: "room-desktop",
+      initialMessagesByRoom
+    },
+    historyDefaults: { initialTeamId: seededTeams[0].id },
+    terminals: { initialTerminalLinesByRoom }
+  });
   const {
     relayRef,
     seenEnvelopeIds,
