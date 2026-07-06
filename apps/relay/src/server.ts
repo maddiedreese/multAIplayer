@@ -43,6 +43,7 @@ import { registerTeamRoutes, teamRecordForUser } from "./http/teams.js";
 import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
 import { createRelayPersistence } from "./persistence.js";
 import { createRelayStore, type AuthSession, type ClientSession, type PresenceRecord, type RoomKey } from "./state.js";
+import { createRelayFanout } from "./ws/fanout.js";
 
 const relayConfig = loadRelayConfig();
 const {
@@ -218,6 +219,20 @@ const { rateLimitMiddleware, clientIdentityFromIncomingMessage, consumeRateLimit
   trustProxyHeaders,
   metrics: relayMetrics,
   normalizeSessionId: normalizeAuthSessionId
+});
+const {
+  send,
+  broadcast,
+  broadcastRoomUpdated,
+  broadcastWorkspaceUpdated
+} = createRelayFanout({
+  roomSockets,
+  teamSockets,
+  workspaceSockets,
+  sessions,
+  teamMembers,
+  roomKey,
+  teamRecordForUser
 });
 
 app.use(rateLimitMiddleware);
@@ -746,34 +761,6 @@ function addTeamMember(teamId: string, userId: string, role: TeamRole = "member"
   teams.set(teamId, updated);
   scheduleStoreSave();
   broadcastWorkspaceUpdated(updated);
-}
-
-function broadcast(key: RoomKey, message: RelayServerMessage) {
-  const sockets = roomSockets.get(key);
-  if (!sockets) return;
-  for (const socket of sockets) {
-    send(socket, message);
-  }
-}
-
-function broadcastRoomUpdated(room: RoomRecord) {
-  const sockets = new Set<WebSocket>();
-  for (const socket of roomSockets.get(roomKey(room.teamId, room.id)) ?? []) sockets.add(socket);
-  for (const socket of teamSockets.get(room.teamId) ?? []) sockets.add(socket);
-  for (const socket of sockets) send(socket, { type: "room.updated", room });
-}
-
-function broadcastWorkspaceUpdated(team: TeamRecord) {
-  for (const socket of workspaceSockets) {
-    const session = sessions.get(socket);
-    send(socket, { type: "team.updated", team: teamRecordForUser(team, teamMembers, session?.authSession?.user.id ?? session?.userId) });
-  }
-}
-
-function send(socket: WebSocket, message: RelayServerMessage) {
-  if (socket.readyState === socket.OPEN) {
-    socket.send(JSON.stringify(message));
-  }
 }
 
 function roomKey(teamId: string, roomId: string): RoomKey {
