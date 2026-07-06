@@ -35,6 +35,7 @@ import { loadRelayConfig } from "./config.js";
 import { registerAttachmentRoutes } from "./http/attachments.js";
 import { registerDebugRoutes } from "./http/debug.js";
 import { registerGitHubRoutes } from "./http/github.js";
+import { registerInviteRoutes } from "./http/invites.js";
 import { createRelayRequestGuards } from "./http/middleware.js";
 import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
 import { createRelayPersistence } from "./persistence.js";
@@ -273,6 +274,17 @@ registerAttachmentRoutes({
   normalizeMetadataText,
   maxCiphertextCharactersForBlob,
   isExpiredAttachmentBlob
+});
+registerInviteRoutes({
+  app,
+  teams,
+  rooms,
+  invites,
+  inviteTtlDays,
+  getAuthSession,
+  allowMutation,
+  canAccessRoom,
+  scheduleStoreSave
 });
 
 await loadRelayStore();
@@ -685,60 +697,6 @@ app.patch("/rooms/:roomId/settings", (req, res) => {
   scheduleStoreSave();
   broadcastRoomUpdated(updated);
   res.json({ room: updated });
-});
-
-app.post("/invites", (req, res) => {
-  const session = getAuthSession(req.cookies?.multaiplayer_session);
-  if (!allowMutation(session, res)) return;
-
-  const teamId = String(req.body?.teamId ?? "");
-  const roomId = String(req.body?.roomId ?? "");
-  if (!teams.has(teamId)) {
-    res.status(404).json({ error: "Team not found" });
-    return;
-  }
-  if (!rooms.has(roomId) || rooms.get(roomId)?.teamId !== teamId) {
-    res.status(404).json({ error: "Room not found" });
-    return;
-  }
-  if (session && !canAccessRoom(teamId, roomId, session.user.id)) {
-    res.status(403).json({ error: "Join this room before creating invites." });
-    return;
-  }
-
-  const invite: InviteRecordType = {
-    id: `invite_${nanoid(16)}`,
-    teamId,
-    roomId,
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + inviteTtlDays * 24 * 60 * 60 * 1000).toISOString()
-  };
-  invites.set(invite.id, invite);
-  scheduleStoreSave();
-  res.status(201).json({ invite });
-});
-
-app.get("/invites/:inviteId", (req, res) => {
-  const invite = invites.get(req.params.inviteId);
-  if (!invite) {
-    res.status(404).json({ error: "Invite not found" });
-    return;
-  }
-  if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
-    invites.delete(invite.id);
-    scheduleStoreSave();
-    res.status(410).json({ error: "Invite expired" });
-    return;
-  }
-
-  const team = teams.get(invite.teamId);
-  const room = rooms.get(invite.roomId);
-  if (!team || !room) {
-    res.status(404).json({ error: "Invite target no longer exists" });
-    return;
-  }
-
-  res.json({ invite, team, room });
 });
 
 wss.on("connection", (socket, request) => {
