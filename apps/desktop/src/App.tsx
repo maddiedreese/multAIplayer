@@ -314,6 +314,7 @@ import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useShellLayout } from "./hooks/useShellLayout";
 import { useSelectedTeamData } from "./hooks/useSelectedTeamData";
+import { useSelectedRoomValues } from "./hooks/useSelectedRoomValues";
 import { useSidebarNavigation } from "./hooks/useSidebarNavigation";
 import { useThemeMode } from "./hooks/useThemeMode";
 import {
@@ -574,61 +575,104 @@ export function App() {
     currentUser,
     localUserId: localUser.id
   });
-  const selectedCodexModel = selectedRoom?.codexModel ?? defaultCodexModel;
-  const customCodexModel = customCodexModelsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedCodexModel;
-  const projectPathDraft = projectPathDraftsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedRoom.projectPath;
-  const messages = messagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const draft = draftsByRoom[selectedRoom?.id ?? selectedRoomId] ?? "";
-  const selectedMessages = markdownSelectionMode
-    ? messages.filter((message) => selectedMessageIds.includes(message.id))
-    : [];
-  const pendingAttachments = pendingAttachmentsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const pendingAttachmentBytes = embeddedAttachmentBytes(pendingAttachments);
-  const browserRequests = browserRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const browserUrl = browserUrlsByRoom[selectedRoom?.id ?? selectedRoomId] ?? defaultBrowserUrl;
-  const browserReason = browserReasonsByRoom[selectedRoom?.id ?? selectedRoomId] ?? defaultBrowserReason;
-  const activeBrowserUrl = activeBrowserUrlsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const gitStatus = gitStatusByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const gitWorkflowDraft = resolveGitWorkflowDraft(gitWorkflowDraftsByRoom, selectedRoom?.id ?? selectedRoomId);
-  const gitWorkflowBusy = gitWorkflowBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
-  const gitWorkflowMessage = gitWorkflowMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const actionRuns = actionRunsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const actionsBusy = actionsBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
-  const actionsLastChecked = actionsLastCheckedByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const actionsMessage = actionsMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const terminalLines = terminalLinesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const terminalBusy = terminalBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
-  const selectedTerminalId = selectedTerminalIdsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const terminalName = terminalNamesByRoom[selectedRoom?.id ?? selectedRoomId] ?? "dev-server";
-  const terminalCommand = terminalCommandsByRoom[selectedRoom?.id ?? selectedRoomId] ?? "npm run dev:desktop";
-  const terminalInput = terminalInputsByRoom[selectedRoom?.id ?? selectedRoomId] ?? "";
-  const terminalError = terminalErrorsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const fileQuery = fileQueriesByRoom[selectedRoom?.id ?? selectedRoomId] ?? "";
-  const projectFiles = projectFilesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const selectedFile = selectedFilesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const selectedDiff = selectedDiffsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const filePreviewTab = resolveFilePreviewTab(
-    filePreviewTabsByRoom[selectedRoom?.id ?? selectedRoomId] ?? "file",
-    Boolean(selectedDiff?.diff.trim())
-  );
-  const fileBusy = fileBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
-  const fileMessage = fileMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const inviteLink = inviteLinksByRoom[selectedRoom?.id ?? selectedRoomId] ?? "";
-  const inviteApprovalGate = inviteApprovalGatesByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
-  const inviteMessage = inviteMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const hostMessage = hostMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const chatMessage = chatMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
+  const {
+    selectedCodexModel,
+    customCodexModel,
+    projectPathDraft,
+    messages,
+    draft,
+    selectedMessages,
+    pendingAttachments,
+    pendingAttachmentBytes,
+    browserRequests,
+    browserUrl,
+    browserReason,
+    activeBrowserUrl,
+    gitStatus,
+    gitWorkflowDraft,
+    gitWorkflowBusy,
+    gitWorkflowMessage,
+    actionRuns,
+    actionsBusy,
+    actionsLastChecked,
+    actionsMessage,
+    terminalLines,
+    terminalBusy,
+    selectedTerminalId,
+    terminalName,
+    terminalCommand,
+    terminalInput,
+    terminalError,
+    fileQuery,
+    projectFiles,
+    selectedFile,
+    selectedDiff,
+    filePreviewTab,
+    fileBusy,
+    fileMessage,
+    inviteLink,
+    inviteApprovalGate,
+    inviteMessage,
+    hostMessage,
+    chatMessage,
+    settingsMessage,
+    visibleHistoryMessage,
+    markdownCopyFallback
+  } = useSelectedRoomValues({
+    selectedRoom,
+    selectedRoomId,
+    selectedTeam,
+    selectedMessageIds,
+    markdownSelectionMode,
+    customCodexModelsByRoom,
+    projectPathDraftsByRoom,
+    messagesByRoom,
+    draftsByRoom,
+    pendingAttachmentsByRoom,
+    browserRequestsByRoom,
+    browserUrlsByRoom,
+    browserReasonsByRoom,
+    activeBrowserUrlsByRoom,
+    gitStatusByRoom,
+    gitWorkflowDraftsByRoom,
+    gitWorkflowBusyByRoom,
+    gitWorkflowMessagesByRoom,
+    actionRunsByRoom,
+    actionsBusyByRoom,
+    actionsLastCheckedByRoom,
+    actionsMessagesByRoom,
+    terminalLinesByRoom,
+    terminalBusyByRoom,
+    selectedTerminalIdsByRoom,
+    terminalNamesByRoom,
+    terminalCommandsByRoom,
+    terminalInputsByRoom,
+    terminalErrorsByRoom,
+    fileQueriesByRoom,
+    projectFilesByRoom,
+    selectedFilesByRoom,
+    selectedDiffsByRoom,
+    filePreviewTabsByRoom,
+    fileBusyByRoom,
+    fileMessagesByRoom,
+    inviteLinksByRoom,
+    inviteApprovalGatesByRoom,
+    inviteMessagesByRoom,
+    hostMessagesByRoom,
+    chatMessagesByRoom,
+    settingsMessagesByRoom,
+    historyMessagesByRoom,
+    teamHistoryMessagesByTeam,
+    markdownCopyFallbacksByRoom,
+    defaultBrowserUrl,
+    defaultBrowserReason
+  });
   const roomNotices = [
     hostMessage ? { key: "host", label: "Codex", message: hostMessage, onDismiss: () => setHostMessageForRoom(selectedRoom.id, null) } : null,
     chatMessage && chatMessage !== hostMessage
       ? { key: "chat", label: "Chat", message: chatMessage, onDismiss: () => setChatMessageForRoom(selectedRoom.id, null) }
       : null
   ].filter((notice): notice is { key: string; label: string; message: string; onDismiss: () => void } => Boolean(notice));
-  const settingsMessage = settingsMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const historyMessage = historyMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const teamHistoryMessage = teamHistoryMessagesByTeam[selectedTeam || "__no-team"] ?? null;
-  const visibleHistoryMessage = historyMessage ?? teamHistoryMessage;
-  const markdownCopyFallback = markdownCopyFallbacksByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const secretWarningVisible = hasSelectedRoom && (
     secretWarningsVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ??
     !hasAcknowledgedRoomVisibilityWarning(selectedRoom?.id ?? selectedRoomId)
