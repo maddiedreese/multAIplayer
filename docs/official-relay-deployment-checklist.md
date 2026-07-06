@@ -21,7 +21,8 @@ PORT=4321
 GITHUB_CLIENT_ID=...
 GITHUB_OAUTH_SCOPES="read:user public_repo"
 MULTAIPLAYER_RELAY_SESSION_SECRET=...
-MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.json
+MULTAIPLAYER_RELAY_STORAGE=sqlite
+MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
 MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://multaiplayer.com
 MULTAIPLAYER_RELAY_REQUIRE_AUTH=true
 MULTAIPLAYER_RELAY_DEBUG=false
@@ -55,8 +56,9 @@ The check must pass. It verifies GitHub OAuth presence, strong durable session e
 
 - Mount persistent storage outside the container filesystem.
 - Do not use `/tmp` for `MULTAIPLAYER_RELAY_DATA_PATH`.
-- Back up the relay JSON store before deploys and before any migration.
-- Treat the JSON store as alpha infrastructure. Plan a database-backed store before production claims or multi-instance hosting.
+- Use `MULTAIPLAYER_RELAY_STORAGE=sqlite` for the official hosted alpha relay.
+- Back up the relay SQLite store before deploys and before any migration.
+- Treat the SQLite snapshot store as alpha infrastructure. Plan route-level tables, backup/restore drills, and shared/external rate limiting before production claims or multi-instance hosting.
 
 ## Network And Proxy
 

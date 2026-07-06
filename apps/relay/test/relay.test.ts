@@ -2882,6 +2882,57 @@ test("relay quarantines unsupported persisted store versions", async () => {
   }
 });
 
+test("relay persists workspace state through SQLite storage", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-sqlite-store-"));
+  const dataPath = join(tempDir, "relay-store.sqlite");
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+    MULTAIPLAYER_RELAY_SEED_DEMO: "false"
+  }, undefined, dataPath);
+  let restarted: RelayHarness | null = null;
+  try {
+    const createTeam = await fetch(`${relay.baseUrl}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "SQLite Team", requesterUserId: "github:owner" })
+    });
+    assert.equal(createTeam.status, 201);
+    const team = await createTeam.json() as { team: { id: string } };
+
+    const createRoom = await fetch(`${relay.baseUrl}/rooms`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        teamId: team.team.id,
+        name: "SQLite Room",
+        projectPath: "/tmp/multaiplayer",
+        requesterUserId: "github:owner"
+      })
+    });
+    assert.equal(createRoom.status, 201);
+
+    await delay(250);
+    await relay.close({ preserveData: true });
+
+    restarted = await startRelay({
+      MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+      MULTAIPLAYER_RELAY_SEED_DEMO: "false"
+    }, undefined, dataPath);
+    const response = await fetch(`${restarted.baseUrl}/teams`);
+    assert.equal(response.status, 200);
+    const body = await response.json() as {
+      teams: Array<{ name: string }>;
+      rooms: Array<{ name: string }>;
+    };
+    assert.ok(body.teams.some((item) => item.name === "SQLite Team"));
+    assert.ok(body.rooms.some((item) => item.name === "SQLite Room"));
+  } finally {
+    if (restarted) await restarted.close();
+    else await relay.close();
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("relay disables debug endpoints in production unless explicitly enabled", async () => {
   const productionRelay = await startRelay({ NODE_ENV: "production" });
   try {

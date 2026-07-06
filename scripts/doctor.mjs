@@ -106,6 +106,7 @@ function checkProductionRelayEnv() {
   const seedDemo = envBoolean("MULTAIPLAYER_RELAY_SEED_DEMO", false);
   const rateLimits = envBoolean("MULTAIPLAYER_RELAY_RATE_LIMITS", true);
   const trustProxyHeaders = envBoolean("MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS", false);
+  const storage = envValue("MULTAIPLAYER_RELAY_STORAGE") || "json";
   const dataPath = envValue("MULTAIPLAYER_RELAY_DATA_PATH");
   const allowedOriginErrors = validateAllowedOrigins(allowedOrigins);
 
@@ -149,6 +150,15 @@ function checkProductionRelayEnv() {
     ok: rateLimits,
     label: "production MULTAIPLAYER_RELAY_RATE_LIMITS",
     detail: rateLimits ? "rate limits enabled" : "must not be false for a hosted production relay"
+  });
+  checks.push({
+    ok: ["json", "sqlite"].includes(storage),
+    label: "production MULTAIPLAYER_RELAY_STORAGE",
+    detail: storage === "sqlite"
+      ? "sqlite storage configured"
+      : storage === "json"
+        ? "json storage configured; sqlite is recommended for the official hosted alpha relay"
+        : "must be json or sqlite"
   });
   checks.push({
     ok: Boolean(dataPath) && !dataPath.startsWith("/tmp/"),
