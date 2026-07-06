@@ -5884,7 +5884,7 @@ select {
 
 /* Overnight hardening: final UI guardrails for cramped alpha surfaces. */
 .app-shell {
-  grid-template-columns: minmax(240px, var(--sidebar-width)) minmax(620px, 1fr) minmax(340px, var(--rail-width));
+  grid-template-columns: var(--sidebar-width) 8px minmax(620px, 1fr) 8px var(--rail-width);
 }
 
 .sidebar {
