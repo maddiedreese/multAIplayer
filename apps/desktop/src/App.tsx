@@ -32,15 +32,12 @@ import { useFileTerminalDisplay } from "./hooks/useFileTerminalDisplay";
 import { useGitHubWorkflowState } from "./hooks/useGitHubWorkflowState";
 import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
-import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useRoomAccess } from "./hooks/useRoomAccess";
 import { useRoomChatMutations } from "./hooks/useRoomChatMutations";
 import { useRoomInFlightReporters } from "./hooks/useRoomInFlightReporters";
 import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
 import { useRoomNotices } from "./hooks/useRoomNotices";
 import { useRoomScopedSetters } from "./hooks/useRoomScopedSetters";
-import { useSelectedTeamData } from "./hooks/useSelectedTeamData";
-import { useSelectedRoomValues } from "./hooks/useSelectedRoomValues";
 import { useSelectedRoomRuntime } from "./hooks/useSelectedRoomRuntime";
 import { useSidebarNavigation } from "./hooks/useSidebarNavigation";
 import { useTeamMembersRefresh } from "./hooks/useTeamMembersRefresh";
@@ -54,9 +51,9 @@ import { useRoomVisibilityWarningActions } from "./hooks/useRoomVisibilityWarnin
 import { useCodexBrowserOpenCommand } from "./hooks/useCodexBrowserOpenCommand";
 import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
 import { useAppRefs } from "./hooks/useAppRefs";
+import { useAppSelectedContext } from "./hooks/useAppSelectedContext";
 import { useRoomMainColumnProps } from "./hooks/useRoomMainColumnProps";
 import { useRoomInspectorPanelProps } from "./hooks/useRoomInspectorPanelProps";
-import { useSelectedRoomContext } from "./hooks/useSelectedRoomContext";
 import { useAppSidebarProps } from "./hooks/useAppSidebarProps";
 import { useLocalPreviewDialogProps } from "./hooks/useLocalPreviewDialogProps";
 import { useAppBootstrapEffects } from "./hooks/useAppBootstrapEffects";
@@ -360,48 +357,21 @@ export function App() {
   const roomSettingsActor = useRoomSettingsActor(localUser);
 
   const {
+    selectedCodexModel,
     hasSelectedRoom,
     selectedRoom,
     inspectorTab,
     secretWarningVisible,
-    roomTerminals
-  } = useSelectedRoomContext({
-    rooms,
-    selectedRoomId,
-    fallbackRoom: emptyRoom,
-    inspectorTabsByRoom,
-    secretWarningsVisibleByRoom,
-    terminals
-  });
-  const {
+    roomTerminals,
     markdownSelectionMode,
     selectedMessageIds,
     clearSelectedMessages,
     toggleMarkdownSelectionMode,
-    toggleMessageSelection
-  } = useMarkdownSelection({
-    activeRoomId: selectedRoom.id,
-    enabled: hasSelectedRoom,
-    resetKey: selectedRoomId
-  });
-  const {
-    selectedTeamRecord,
+    toggleMessageSelection,
     selectedTeamName,
-    selectedTeamMembers,
     selectedTeamMembersMessage,
     selectedTeamMembersBusy,
-    selectedTeamMemberRows
-  } = useSelectedTeamData({
-    teams,
-    selectedTeam,
-    teamMembersByTeam,
-    teamMembersMessageByTeam,
-    teamMembersBusyByTeam,
-    currentUser,
-    localUserId: localUser.id
-  });
-  const {
-    selectedCodexModel,
+    selectedTeamMemberRows,
     customCodexModel,
     projectPathDraft,
     messages,
@@ -443,54 +413,73 @@ export function App() {
     settingsMessage,
     visibleHistoryMessage,
     markdownCopyFallback
-  } = useSelectedRoomValues({
-    selectedRoom,
-    selectedRoomId,
-    selectedTeam,
-    selectedMessageIds,
-    markdownSelectionMode,
-    customCodexModelsByRoom,
-    projectPathDraftsByRoom,
-    messagesByRoom,
-    draftsByRoom,
-    pendingAttachmentsByRoom,
-    browserRequestsByRoom,
-    browserUrlsByRoom,
-    browserReasonsByRoom,
-    activeBrowserUrlsByRoom,
-    gitStatusByRoom,
-    gitWorkflowDraftsByRoom,
-    gitWorkflowBusyByRoom,
-    gitWorkflowMessagesByRoom,
-    actionRunsByRoom,
-    actionsBusyByRoom,
-    actionsLastCheckedByRoom,
-    actionsMessagesByRoom,
-    terminalLinesByRoom,
-    terminalBusyByRoom,
-    selectedTerminalIdsByRoom,
-    terminalNamesByRoom,
-    terminalCommandsByRoom,
-    terminalInputsByRoom,
-    terminalErrorsByRoom,
-    fileQueriesByRoom,
-    projectFilesByRoom,
-    selectedFilesByRoom,
-    selectedDiffsByRoom,
-    filePreviewTabsByRoom,
-    fileBusyByRoom,
-    fileMessagesByRoom,
-    inviteLinksByRoom,
-    inviteApprovalGatesByRoom,
-    inviteMessagesByRoom,
-    hostMessagesByRoom,
-    chatMessagesByRoom,
-    settingsMessagesByRoom,
-    historyMessagesByRoom,
-    teamHistoryMessagesByTeam,
-    markdownCopyFallbacksByRoom,
-    defaultBrowserUrl,
-    defaultBrowserReason
+  } = useAppSelectedContext({
+    roomContext: {
+      rooms,
+      selectedRoomId,
+      fallbackRoom: emptyRoom,
+      inspectorTabsByRoom,
+      secretWarningsVisibleByRoom,
+      terminals
+    },
+    markdownSelection: {
+      resetKey: selectedRoomId
+    },
+    teamData: {
+      teams,
+      selectedTeam,
+      teamMembersByTeam,
+      teamMembersMessageByTeam,
+      teamMembersBusyByTeam,
+      currentUser,
+      localUserId: localUser.id
+    },
+    roomValues: {
+      selectedRoomId,
+      selectedTeam,
+      customCodexModelsByRoom,
+      projectPathDraftsByRoom,
+      messagesByRoom,
+      draftsByRoom,
+      pendingAttachmentsByRoom,
+      browserRequestsByRoom,
+      browserUrlsByRoom,
+      browserReasonsByRoom,
+      activeBrowserUrlsByRoom,
+      gitStatusByRoom,
+      gitWorkflowDraftsByRoom,
+      gitWorkflowBusyByRoom,
+      gitWorkflowMessagesByRoom,
+      actionRunsByRoom,
+      actionsBusyByRoom,
+      actionsLastCheckedByRoom,
+      actionsMessagesByRoom,
+      terminalLinesByRoom,
+      terminalBusyByRoom,
+      selectedTerminalIdsByRoom,
+      terminalNamesByRoom,
+      terminalCommandsByRoom,
+      terminalInputsByRoom,
+      terminalErrorsByRoom,
+      fileQueriesByRoom,
+      projectFilesByRoom,
+      selectedFilesByRoom,
+      selectedDiffsByRoom,
+      filePreviewTabsByRoom,
+      fileBusyByRoom,
+      fileMessagesByRoom,
+      inviteLinksByRoom,
+      inviteApprovalGatesByRoom,
+      inviteMessagesByRoom,
+      hostMessagesByRoom,
+      chatMessagesByRoom,
+      settingsMessagesByRoom,
+      historyMessagesByRoom,
+      teamHistoryMessagesByTeam,
+      markdownCopyFallbacksByRoom,
+      defaultBrowserUrl,
+      defaultBrowserReason
+    }
   });
   const {
     setHostMessageForRoom,
