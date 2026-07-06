@@ -37,6 +37,7 @@ import { registerDebugRoutes } from "./http/debug.js";
 import { registerGitHubRoutes } from "./http/github.js";
 import { registerInviteRoutes } from "./http/invites.js";
 import { createRelayRequestGuards } from "./http/middleware.js";
+import { registerTeamRoutes, teamRecordForUser } from "./http/teams.js";
 import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
 import { createRelayPersistence } from "./persistence.js";
 import { createRelayStore, type AuthSession, type ClientSession, type PresenceRecord, type RoomKey } from "./state.js";
@@ -286,6 +287,28 @@ registerInviteRoutes({
   canAccessRoom,
   scheduleStoreSave
 });
+registerTeamRoutes({
+  app,
+  teams,
+  rooms,
+  teamMembers,
+  getAuthSession,
+  allowRead,
+  allowMutation,
+  teamIdsForUser,
+  isTeamMember,
+  teamRoleRank,
+  canSetTeamMemberRole,
+  canRemoveTeamMember,
+  transferTeamOwnership,
+  addTeamMember,
+  revokeTeamInvites,
+  revokeTeamMemberSessions,
+  broadcastWorkspaceUpdated,
+  scheduleStoreSave,
+  normalizeMetadataText,
+  maxTeamNameChars
+});
 
 await loadRelayStore();
 seedWorkspace();
@@ -300,135 +323,6 @@ app.get("/readyz", (_req, res) => {
 
 app.get("/metrics", (_req, res) => {
   res.json(relayMetrics.snapshot(sessions.size));
-});
-
-app.get("/teams", (_req, res) => {
-  const session = getAuthSession(_req.cookies?.multaiplayer_session);
-  if (!allowRead(session, res)) return;
-  const visibleTeamIds = session ? teamIdsForUser(session.user.id) : new Set(teams.keys());
-  res.json({
-    teams: Array.from(teams.values())
-      .filter((team) => visibleTeamIds.has(team.id))
-      .map((team) => teamRecordForUser(team, session?.user.id)),
-    rooms: Array.from(rooms.values()).filter((room) => visibleTeamIds.has(room.teamId))
-  });
-});
-
-app.get("/teams/:teamId/members", (req, res) => {
-  const session = getAuthSession(req.cookies?.multaiplayer_session);
-  if (!allowRead(session, res)) return;
-
-  const teamId = String(req.params.teamId ?? "");
-  if (!teams.has(teamId)) {
-    res.status(404).json({ error: "Team not found" });
-    return;
-  }
-  if (session && !isTeamMember(teamId, session.user.id)) {
-    res.status(403).json({ error: "Join this team before reading its member list." });
-    return;
-  }
-  res.json({ members: listTeamMembers(teamId) });
-});
-
-app.patch("/teams/:teamId/members/:userId", (req, res) => {
-  const session = getAuthSession(req.cookies?.multaiplayer_session);
-  if (!allowMutation(session, res)) return;
-
-  const teamId = String(req.params.teamId ?? "");
-  const userId = String(req.params.userId ?? "");
-  const role = parseRequestedTeamRole(req.body?.role);
-  if (!teams.has(teamId)) {
-    res.status(404).json({ error: "Team not found" });
-    return;
-  }
-  if (!role || role === "owner") {
-    res.status(400).json({ error: "role must be admin or member" });
-    return;
-  }
-  const members = teamMembers.get(teamId);
-  const target = members?.get(userId);
-  if (!members || !target) {
-    res.status(404).json({ error: "Team member not found" });
-    return;
-  }
-  const requesterRole = session ? members.get(session.user.id)?.role : "owner";
-  if (!canSetTeamMemberRole(requesterRole, target.role, role)) {
-    res.status(403).json({ error: "Only team owners can change admin roles." });
-    return;
-  }
-
-  const updated: TeamMemberRecord = { ...target, role };
-  members.set(userId, updated);
-  scheduleStoreSave();
-  res.json({ member: updated, members: listTeamMembers(teamId) });
-});
-
-app.post("/teams/:teamId/members/:userId/transfer-owner", (req, res) => {
-  const session = getAuthSession(req.cookies?.multaiplayer_session);
-  if (!allowMutation(session, res)) return;
-
-  const teamId = String(req.params.teamId ?? "");
-  const userId = String(req.params.userId ?? "");
-  if (!teams.has(teamId)) {
-    res.status(404).json({ error: "Team not found" });
-    return;
-  }
-  const members = teamMembers.get(teamId);
-  const target = members?.get(userId);
-  if (!members || !target) {
-    res.status(404).json({ error: "Team member not found" });
-    return;
-  }
-  const requesterRole = session ? members.get(session.user.id)?.role : "owner";
-  if (requesterRole !== "owner") {
-    res.status(403).json({ error: "Only the current team owner can transfer ownership." });
-    return;
-  }
-  if (session?.user.id && session.user.id === userId) {
-    res.status(400).json({ error: "Choose a different team member before transferring ownership." });
-    return;
-  }
-
-  const updatedMembers = transferTeamOwnership(members, userId);
-  const team = teams.get(teamId);
-  if (team) broadcastWorkspaceUpdated(team);
-  scheduleStoreSave();
-  res.json({ member: updatedMembers.get(userId), members: listTeamMembers(teamId) });
-});
-
-app.delete("/teams/:teamId/members/:userId", (req, res) => {
-  const session = getAuthSession(req.cookies?.multaiplayer_session);
-  if (!allowMutation(session, res)) return;
-
-  const teamId = String(req.params.teamId ?? "");
-  const userId = String(req.params.userId ?? "");
-  if (!teams.has(teamId)) {
-    res.status(404).json({ error: "Team not found" });
-    return;
-  }
-  const members = teamMembers.get(teamId);
-  const target = members?.get(userId);
-  if (!members || !target) {
-    res.status(404).json({ error: "Team member not found" });
-    return;
-  }
-  const requesterRole = session ? members.get(session.user.id)?.role : "owner";
-  if (!canRemoveTeamMember(requesterRole, target.role)) {
-    res.status(403).json({ error: "Only team owners can remove admins, and owners cannot be removed." });
-    return;
-  }
-
-  members.delete(userId);
-  const team = teams.get(teamId);
-  if (team) {
-    const updatedTeam = { ...team, members: members.size };
-    teams.set(teamId, updatedTeam);
-    revokeTeamInvites(teamId);
-    revokeTeamMemberSessions(teamId, userId);
-    broadcastWorkspaceUpdated(updatedTeam);
-  }
-  scheduleStoreSave();
-  res.json({ members: listTeamMembers(teamId) });
 });
 
 app.post("/devices", (req, res) => {
@@ -475,30 +369,6 @@ app.post("/devices", (req, res) => {
   devices.set(key, device);
   scheduleStoreSave();
   res.status(existing ? 200 : 201).json({ device });
-});
-
-app.post("/teams", (req, res) => {
-  const session = getAuthSession(req.cookies?.multaiplayer_session);
-  if (!allowMutation(session, res)) return;
-
-  const name = normalizeMetadataText(req.body?.name, maxTeamNameChars);
-  if (!name) {
-    res.status(400).json({ error: `Team name is required and must be up to ${maxTeamNameChars} characters` });
-    return;
-  }
-  const team: TeamRecord = {
-    id: `team_${nanoid(10)}`,
-    name,
-    members: 1
-  };
-  teams.set(team.id, team);
-  if (session?.user.id) {
-    addTeamMember(team.id, session.user.id, "owner");
-  } else {
-    scheduleStoreSave();
-    broadcastWorkspaceUpdated(team);
-  }
-  res.status(201).json({ team: teamRecordForUser(teams.get(team.id) ?? team, session?.user.id) });
 });
 
 app.post("/rooms", (req, res) => {
@@ -1085,16 +955,6 @@ function addTeamMember(teamId: string, userId: string, role: TeamRole = "member"
   broadcastWorkspaceUpdated(updated);
 }
 
-function listTeamMembers(teamId: string): TeamMemberRecord[] {
-  return Array.from(teamMembers.get(teamId)?.values() ?? [])
-    .sort((a, b) => teamRoleRank(a.role) - teamRoleRank(b.role) || a.userId.localeCompare(b.userId));
-}
-
-function teamRecordForUser(team: TeamRecord, userId?: string): TeamRecord {
-  const role = userId ? teamMembers.get(team.id)?.get(userId)?.role : undefined;
-  return role ? { ...team, role } : team;
-}
-
 function broadcast(key: RoomKey, message: RelayServerMessage) {
   const sockets = roomSockets.get(key);
   if (!sockets) return;
@@ -1113,7 +973,7 @@ function broadcastRoomUpdated(room: RoomRecord) {
 function broadcastWorkspaceUpdated(team: TeamRecord) {
   for (const socket of workspaceSockets) {
     const session = sessions.get(socket);
-    send(socket, { type: "team.updated", team: teamRecordForUser(team, session?.authSession?.user.id ?? session?.userId) });
+    send(socket, { type: "team.updated", team: teamRecordForUser(team, teamMembers, session?.authSession?.user.id ?? session?.userId) });
   }
 }
 
@@ -1274,10 +1134,6 @@ function normalizeCodexModel(value: unknown): string | null {
 
 function normalizeTeamRole(value: unknown): TeamRole {
   return value === "owner" || value === "admin" || value === "member" ? value : "member";
-}
-
-function parseRequestedTeamRole(value: unknown): TeamRole | null {
-  return value === "owner" || value === "admin" || value === "member" ? value : null;
 }
 
 function normalizeBrowserAllowedOrigins(value: unknown): string[] | null {
