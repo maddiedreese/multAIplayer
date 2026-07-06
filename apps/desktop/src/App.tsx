@@ -135,6 +135,7 @@ import { useRoomDraftCleanup } from "./hooks/useRoomDraftCleanup";
 import { useHistorySearch } from "./hooks/useHistorySearch";
 import { useRoomGitStatusRefresh } from "./hooks/useRoomGitStatusRefresh";
 import { useGitHubRemoteInference } from "./hooks/useGitHubRemoteInference";
+import { useGitHubActionsDraftReset } from "./hooks/useGitHubActionsDraftReset";
 import {
   canApproveCodexTurn,
   shouldAutoApproveChatOnlyTurn,
@@ -1581,16 +1582,15 @@ export function App() {
     setGitWorkflowMessageForRoom
   });
 
-  useEffect(() => {
-    if (!hasSelectedRoom) return;
-    setActionRunsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setActionsLastCheckedByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActionsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActionsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-  }, [gitWorkflowDraft.branchName, gitWorkflowDraft.prOwner, gitWorkflowDraft.prRepo, hasSelectedRoom, selectedRoom.id]);
+  useGitHubActionsDraftReset({
+    hasSelectedRoom,
+    selectedRoomId: selectedRoom.id,
+    gitWorkflowDraft,
+    setActionRunsByRoom,
+    setActionsLastCheckedByRoom,
+    setActionsMessagesByRoom,
+    setActionsBusyByRoom
+  });
 
   useEffect(() => {
     if (!hasSelectedRoom) {
