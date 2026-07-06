@@ -306,13 +306,14 @@ import {
   type LocalPreviewCandidate
 } from "./lib/localPreview";
 import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessageRows } from "./lib/chatDisplayRows";
-import { buildRoomMemberRows, buildTeamMemberRows } from "./lib/rosterDisplayRows";
+import { buildRoomMemberRows } from "./lib/rosterDisplayRows";
 import { buildCodexEventRows, buildTerminalOutputLines, buildTerminalRequestRows } from "./lib/terminalDisplayRows";
 import { useAppConfigState } from "./hooks/useAppConfigState";
 import { useLatestRef } from "./hooks/useLatestRef";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useShellLayout } from "./hooks/useShellLayout";
+import { useSelectedTeamData } from "./hooks/useSelectedTeamData";
 import { useSidebarNavigation } from "./hooks/useSidebarNavigation";
 import { useThemeMode } from "./hooks/useThemeMode";
 import {
@@ -557,14 +558,19 @@ export function App() {
   const inspectorTab = inspectorTabsByRoom[selectedRoom.id] === "diff"
     ? "files"
     : inspectorTabsByRoom[selectedRoom.id] ?? "files";
-  const selectedTeamRecord = teams.find((team) => team.id === selectedTeam) ?? null;
-  const selectedTeamName = selectedTeamRecord?.name ?? (teams.length ? "No team selected" : "No teams yet");
-  const selectedTeamMembers = teamMembersByTeam[selectedTeam] ?? [];
-  const selectedTeamMembersMessage = teamMembersMessageByTeam[selectedTeam] ?? null;
-  const selectedTeamMembersBusy = teamMembersBusyByTeam[selectedTeam] ?? false;
-  const selectedTeamMemberRows = buildTeamMemberRows({
-    members: selectedTeamMembers,
-    team: selectedTeamRecord,
+  const {
+    selectedTeamRecord,
+    selectedTeamName,
+    selectedTeamMembers,
+    selectedTeamMembersMessage,
+    selectedTeamMembersBusy,
+    selectedTeamMemberRows
+  } = useSelectedTeamData({
+    teams,
+    selectedTeam,
+    teamMembersByTeam,
+    teamMembersMessageByTeam,
+    teamMembersBusyByTeam,
     currentUser,
     localUserId: localUser.id
   });
