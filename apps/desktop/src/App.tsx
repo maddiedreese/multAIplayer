@@ -41,10 +41,7 @@ import { useInviteActions } from "./hooks/useInviteActions";
 import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
 import { useAppRefs } from "./hooks/useAppRefs";
 import { useAppSelectedContext } from "./hooks/useAppSelectedContext";
-import { useRoomMainColumnProps } from "./hooks/useRoomMainColumnProps";
-import { useRoomInspectorPanelProps } from "./hooks/useRoomInspectorPanelProps";
-import { useAppSidebarProps } from "./hooks/useAppSidebarProps";
-import { useLocalPreviewDialogProps } from "./hooks/useLocalPreviewDialogProps";
+import { useAppViewProps } from "./hooks/useAppViewProps";
 import { useWorkspaceFlowContext } from "./hooks/useWorkspaceFlowContext";
 import { useRelaySyncContext } from "./hooks/useRelaySyncContext";
 import { useRoomRuntimeContext } from "./hooks/useRoomRuntimeContext";
@@ -1736,7 +1733,15 @@ export function App() {
       setSensitiveAttachmentReviewKey
     }
   });
-  const roomMainColumnProps = useRoomMainColumnProps({
+  const {
+    roomMainColumnProps,
+    roomInspectorPanelProps,
+    sidebarProps,
+    drawerProps,
+    localPreviewDialogOpen,
+    localPreviewDialogProps
+  } = useAppViewProps({
+    roomMainColumn: {
     teams: teams.map((team) => ({ id: team.id, name: team.name })),
     selectedTeam,
     selectedRoom,
@@ -1786,8 +1791,8 @@ export function App() {
     onRemovePendingAttachment: removePendingAttachment,
     onSendMessage: sendMessage,
     roomChatPanelActions
-  });
-  const roomInspectorPanelProps = useRoomInspectorPanelProps({
+    },
+    roomInspectorPanel: {
     activeTab: inspectorTab,
     activeBrowserUrl,
     browserUrl,
@@ -1969,8 +1974,8 @@ export function App() {
       canRequestWorkspace,
       ...terminalPanelActions
     }
-  });
-  const { sidebarProps, drawerProps } = useAppSidebarProps({
+    },
+    appSidebar: {
     currentUser,
     authBusy,
     authConfig,
@@ -2047,13 +2052,14 @@ export function App() {
     onTeamDefaultInviteApprovalGateChange: updateTeamDefaultInviteApprovalGate,
     onApplyTeamDefaultsToRoom: applyTeamDefaultsToRoom,
     roomSources: rooms
-  });
-  const { localPreviewDialogOpen, localPreviewDialogProps } = useLocalPreviewDialogProps({
+    },
+    localPreviewDialog: {
     localPreviewDialog,
     setLocalPreviewDialog,
     localPreviewBusy,
     prepareLocalPreviewConfirmation,
     confirmLocalPreviewShare
+    }
   });
 
   return (
