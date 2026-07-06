@@ -21,7 +21,18 @@ The production relay doctor must pass before using an official hosted relay. It 
 
 ## Release Artifacts
 
-The current GitHub release workflow builds unsigned macOS artifacts and writes `SHA256SUMS.txt`. Until signing and notarization are configured, every release note must clearly state:
+The GitHub release workflow builds macOS artifacts and writes `SHA256SUMS.txt`. When Apple signing secrets are configured, it passes Developer ID signing and notarization environment variables to Tauri, then verifies the resulting app with `codesign` and `spctl` before packaging.
+
+Required GitHub secrets for signed/notarized releases:
+
+- `APPLE_CERTIFICATE`: base64 encoded Developer ID Application `.p12`;
+- `APPLE_CERTIFICATE_PASSWORD`: password for the exported `.p12`;
+- `APPLE_SIGNING_IDENTITY`: Developer ID Application signing identity;
+- `APPLE_ID`: Apple ID email used for notarization;
+- `APPLE_PASSWORD`: app-specific password for that Apple ID;
+- `APPLE_TEAM_ID`: Apple Developer team id.
+
+If any required Apple signing secret is missing, the workflow falls back to unsigned macOS artifacts. In that case, every release note must clearly state:
 
 - the app is unsigned and not notarized;
 - macOS Gatekeeper may require manual approval;

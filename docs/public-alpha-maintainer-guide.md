@@ -74,15 +74,28 @@ Do not store OpenAI or Codex credentials in the relay. multAIplayer uses each ho
 
 ## Signing And Notarization
 
-Recommendation for the first public alpha: unsigned is acceptable only if every download surface clearly says so and the release is framed as a security-sensitive alpha for testers.
+Recommendation for the first public alpha: use Apple Developer ID signing and notarization because the release workflow supports it when secrets are configured.
 
-Move to Apple Developer ID signing and notarization before trying to reach non-technical users. Once signing is enabled, update:
+Create or export a Developer ID Application certificate, then add these GitHub Actions secrets:
 
-- README download copy;
-- release notes;
-- `docs/alpha-release-readiness.md`;
-- GitHub release workflow/secrets;
-- checksum/signature instructions.
+```text
+APPLE_CERTIFICATE
+APPLE_CERTIFICATE_PASSWORD
+APPLE_SIGNING_IDENTITY
+APPLE_ID
+APPLE_PASSWORD
+APPLE_TEAM_ID
+```
+
+`APPLE_CERTIFICATE` should be the base64 encoded `.p12` export:
+
+```bash
+openssl base64 -A -in /path/to/developer-id-application.p12 -out certificate-base64.txt
+```
+
+Use an app-specific password for `APPLE_PASSWORD`. The release workflow falls back to unsigned artifacts if any signing/notarization secret is missing; do a dry-run tag before the announcement tag.
+
+After the first signed release succeeds, update README download copy and release notes so they no longer say the current artifact is unsigned.
 
 ## Two-Person Dogfood
 
@@ -122,4 +135,3 @@ Recommendation:
 - GitHub Issues for bugs, UX, dogfood reports, and relay deployment help;
 - GitHub Security Advisories or the `SECURITY.md` contact path for vulnerabilities and private-data exposure;
 - a short support expectation in the README saying alpha support is best-effort.
-
