@@ -308,8 +308,8 @@ export function App() {
     browserRequestsByRoom
   });
   const githubAuth = useGitHubAuth(appConfig.relayHttpUrl);
-  const { deviceId, localUser } = useLocalIdentity(githubAuth.currentUser);
-  const roomSettingsActor = useRoomSettingsActor(localUser);
+  const localIdentity = useLocalIdentity(githubAuth.currentUser);
+  const roomSettingsActor = useRoomSettingsActor(localIdentity.localUser);
 
   const {
     selectedCodexModel,
@@ -387,7 +387,7 @@ export function App() {
       teamMembersMessageByTeam,
       teamMembersBusyByTeam,
       currentUser: githubAuth.currentUser,
-      localUserId: localUser.id
+      localUserId: localIdentity.localUser.id
     },
     roomValues: {
       selectedRoomId,
@@ -610,7 +610,7 @@ export function App() {
   const workspaceRecords = useWorkspaceRecordActions({
     hasSelectedRoom,
     selectedRoom,
-    localUser,
+    localUser: localIdentity.localUser,
     roomsRef: appRefs.roomsRef,
     setTeams,
     setTeamMembersByTeam,
@@ -655,7 +655,7 @@ export function App() {
     access: {
       hasSelectedRoom,
       selectedRoom,
-      localUser,
+      localUser: localIdentity.localUser,
       forgottenRoomIds,
       revokedRoomIds,
       revokedTeamIds,
@@ -668,8 +668,8 @@ export function App() {
       forgottenRoomIds,
       revokedRoomIds,
       revokedTeamIds,
-      localUser,
-      deviceId,
+      localUser: localIdentity.localUser,
+      deviceId: localIdentity.deviceId,
       relayStatus,
       relayRef: appRefs.relayRef,
       seenEnvelopeIds: appRefs.seenEnvelopeIds,
@@ -689,8 +689,8 @@ export function App() {
       presenceByRoom,
       selectedRoom,
       selectedRoomId,
-      localUser,
-      localDeviceId: deviceId,
+      localUser: localIdentity.localUser,
+      localDeviceId: localIdentity.deviceId,
       localPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
       trustedDeviceKeys
     }
@@ -700,7 +700,7 @@ export function App() {
     selectedRoomId,
     markdownSelectionMode,
     selectedMessageIds,
-    localUser,
+    localUser: localIdentity.localUser,
     isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
     messages,
     pendingAttachments,
@@ -733,8 +733,8 @@ export function App() {
     isActiveHost: roomInteraction.isActiveHost,
     hostGateMessage: roomInteraction.hostGateMessage,
     hostHandoffs: selectedRuntime.hostHandoffs,
-    localUser,
-    deviceId,
+    localUser: localIdentity.localUser,
+    deviceId: localIdentity.deviceId,
     relayStatus,
     relayRef: appRefs.relayRef,
     seenEnvelopeIds: appRefs.seenEnvelopeIds,
@@ -769,8 +769,8 @@ export function App() {
     inviteApprovalGate,
     inviteRequests: selectedRuntime.inviteRequests,
     inviteSecretInput,
-    localUser,
-    deviceId,
+    localUser: localIdentity.localUser,
+    deviceId: localIdentity.deviceId,
     deviceIdentity,
     relayStatus,
     relayRef: appRefs.relayRef,
@@ -844,9 +844,9 @@ export function App() {
       },
       deviceIdentity: {
         relayHttpUrl: appConfig.relayHttpUrl,
-        deviceId,
-        userId: localUser.id,
-        displayName: localUser.name,
+        deviceId: localIdentity.deviceId,
+        userId: localIdentity.localUser.id,
+        displayName: localIdentity.localUser.name,
         deviceIdentity,
         setDeviceIdentity,
         setDeviceIdentityMessage
@@ -896,7 +896,7 @@ export function App() {
         selectedTeamName,
         selectedTeamMembersBusy,
         selectedRoom,
-        localUser,
+        localUser: localIdentity.localUser,
         currentUser: githubAuth.currentUser,
         setDeviceIdentityMessage,
         setTrustedDeviceKeys,
@@ -1081,7 +1081,7 @@ export function App() {
 
   const relaySync = useRelaySyncContext({
     browserOpenCommand: {
-      localUser,
+      localUser: localIdentity.localUser,
       selectedRoomIdRef: appRefs.selectedRoomIdRef,
       forgottenRoomIds,
       revokedRoomIds,
@@ -1096,8 +1096,8 @@ export function App() {
     relayRoomSync: {
       subscription: {
         relayWsUrl: appConfig.relayWsUrl,
-        deviceId,
-        localUser,
+        deviceId: localIdentity.deviceId,
+        localUser: localIdentity.localUser,
         devicePublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
         selectedTeam,
         selectedRoom,
@@ -1150,8 +1150,8 @@ export function App() {
         seenEnvelopeIds: appRefs.seenEnvelopeIds,
         relayStatus,
         selectedRoom,
-        deviceId,
-        localUser,
+        deviceId: localIdentity.deviceId,
+        localUser: localIdentity.localUser,
         approvalPolicyLabels,
         roomModeLabels,
         appendLocalPreviewEvent,
@@ -1173,7 +1173,7 @@ export function App() {
       forgottenRoomIds,
       revokedRoomIds,
       revokedTeamIds,
-      localUser,
+      localUser: localIdentity.localUser,
       messagesByRoom,
       terminals,
       browserRequestsByRoom,
@@ -1201,7 +1201,7 @@ export function App() {
       isActiveHost: roomInteraction.isActiveHost,
       canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
       hostGateMessage: roomInteraction.hostGateMessage,
-      localUser,
+      localUser: localIdentity.localUser,
       draft,
       pendingAttachments,
       messages,
@@ -1258,8 +1258,8 @@ export function App() {
       selectedRoom,
       selectedRoomIdRef: appRefs.selectedRoomIdRef,
       isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
-      localUser,
-      deviceId,
+      localUser: localIdentity.localUser,
+      deviceId: localIdentity.deviceId,
       relayStatus,
       relayRef: appRefs.relayRef,
       seenEnvelopeIds: appRefs.seenEnvelopeIds,
@@ -1291,7 +1291,7 @@ export function App() {
       isSelectedRoomRevoked: roomInteraction.isSelectedRoomRevoked,
       selectedRoom,
       rooms,
-      localUser,
+      localUser: localIdentity.localUser,
       localPreviewDialog,
       localPreviewsByRoom,
       setLocalPreviewDialog,
@@ -1302,7 +1302,7 @@ export function App() {
     },
     account: {
       selectedRoomId: selectedRoom.id,
-      deviceId,
+      deviceId: localIdentity.deviceId,
       signOutGitHub: githubAuth.signOutGitHub,
       setDeviceIdentity,
       setDeviceIdentityMessage,
@@ -1317,7 +1317,7 @@ export function App() {
       forgottenRoomIds,
       revokedRoomIds,
       revokedTeamIds,
-      localUser,
+      localUser: localIdentity.localUser,
       authConfig: githubAuth.authConfig,
       currentUser: githubAuth.currentUser,
       setActionsBusyForRoom,
@@ -1358,8 +1358,8 @@ export function App() {
       browserUrl,
       browserReason,
       browserRequests,
-      localUser,
-      deviceId,
+      localUser: localIdentity.localUser,
+      deviceId: localIdentity.deviceId,
       relayStatus,
       relayRef: appRefs.relayRef,
       seenEnvelopeIds: appRefs.seenEnvelopeIds,
@@ -1399,7 +1399,7 @@ export function App() {
     },
     localPreviewPolling: {
       localPreviewsByRoom,
-      localUserId: localUser.id,
+      localUserId: localIdentity.localUser.id,
       roomsRef: appRefs.roomsRef,
       publishLocalPreviewEvent: relaySync.publishLocalPreviewEvent
     },
@@ -1549,7 +1549,7 @@ export function App() {
     teamRecords: teams,
     selectedTeam,
     selectedRoom,
-    localUser,
+    localUser: localIdentity.localUser,
     hostBusy: selectedRuntime.hostBusy,
     isActiveHost: roomInteraction.isActiveHost,
     isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
@@ -1622,7 +1622,7 @@ export function App() {
     },
     roomMembers: {
       members: roomInteraction.roomMemberRows,
-      localDeviceId: deviceId,
+      localDeviceId: localIdentity.deviceId,
       message: deviceIdentityMessage,
       onCopyFingerprint: (member) => workspaceFlow.copyRoomMemberDeviceFingerprint(member, member.trusted),
       onTrust: workspaceFlow.trustRoomMemberDevice,
@@ -1636,7 +1636,7 @@ export function App() {
       copyDisabled: !roomInteraction.canCopyRoomInvite,
       inviteSecretInput,
       inviteRequests: selectedRuntime.inviteRequests,
-      localDeviceId: deviceId,
+      localDeviceId: localIdentity.deviceId,
       gateDisabled: !hasSelectedRoom || roomInteraction.isSelectedRoomLocked,
       importDisabled: !inviteSecretInput.trim(),
       rotateDisabled:
@@ -1803,9 +1803,9 @@ export function App() {
     historySearchBusy,
     activeSidebarPanel,
     themeMode: theme.themeMode,
-    localUserName: localUser.name,
+    localUserName: localIdentity.localUser.name,
     selectedRoomName: selectedRoom.name,
-    deviceId,
+    deviceId: localIdentity.deviceId,
     deviceIdentity,
     deviceIdentityMessage,
     relayStatus,
