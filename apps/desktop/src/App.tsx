@@ -61,9 +61,7 @@ import {
   saveEncryptedHistory
 } from "./lib/localHistory";
 import {
-  isRoomSettingsMutationInFlight,
   loadTeamRoomDefaults,
-  roomSettingsMutationInFlightMessage,
   saveTeamRoomDefaults,
   teamDefaultsRoomSettings
 } from "./lib/teamRoomDefaults";
@@ -175,9 +173,7 @@ import {
   findRoomHostHandoff,
   handoffRepoIdentity,
   hostHandoffDetail,
-  isRoomHostMutationInFlight,
   roomHostHandoffMessage,
-  roomHostMutationInFlightMessage,
   sameHandoffRepo
 } from "./lib/hostHandoff";
 import { detectBrowserSecretRisks, detectSecretRisks } from "./lib/secretRisks";
@@ -189,8 +185,6 @@ import {
 import {
   canActOnRoomTerminalRequest,
   findRoomTerminalRequest,
-  isRoomTerminalActionInFlight,
-  roomTerminalActionInFlightMessage,
   roomTerminalRequestMessage,
   terminalRequestForApprovedRun
 } from "./lib/terminalApproval";
@@ -208,9 +202,7 @@ import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentRevi
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
 import {
   canUseLocalWorkspace,
-  isRoomFileActionInFlight,
-  localWorkspaceGateMessage,
-  roomFileActionInFlightMessage
+  localWorkspaceGateMessage
 } from "./lib/workspaceAccess";
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
@@ -235,7 +227,6 @@ import {
   type GitWorkflowDraft
 } from "./lib/gitWorkflowDraft";
 import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
-import { isRoomKeyRotationInFlight, roomKeyRotationInFlightMessage } from "./lib/roomKeyRotation";
 import { ensureRoomDefaults } from "./lib/roomDefaults";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import { omitRecordKey, withoutSetValue } from "./lib/setUtils";
@@ -312,6 +303,7 @@ import { useRoomEventAppenders } from "./hooks/useRoomEventAppenders";
 import { useRoomFileSetters } from "./hooks/useRoomFileSetters";
 import { useRoomGitSetters } from "./hooks/useRoomGitSetters";
 import { useRoomInviteSetters } from "./hooks/useRoomInviteSetters";
+import { useRoomInFlightReporters } from "./hooks/useRoomInFlightReporters";
 import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
 import { useRoomMessageSetters } from "./hooks/useRoomMessageSetters";
 import { useRoomNotices } from "./hooks/useRoomNotices";
@@ -850,6 +842,24 @@ export function App() {
   } = useRoomChatMutations({
     setMessagesByRoom
   });
+  const {
+    reportRoomHostMutationInFlight,
+    reportRoomSettingsMutationInFlight,
+    reportRoomKeyRotationInFlight,
+    reportRoomFileActionInFlight,
+    reportRoomTerminalActionInFlight
+  } = useRoomInFlightReporters({
+    hostBusyRef,
+    settingsBusyRef,
+    keyRotationBusyRef,
+    fileBusyRef,
+    terminalBusyRef,
+    setHostMessageForRoom,
+    setSettingsMessageForRoom,
+    setInviteMessageForRoom,
+    setFileMessageForRoom,
+    setTerminalErrorForRoom
+  });
   const roomNotices = useRoomNotices({
     roomId: selectedRoom.id,
     hostMessage,
@@ -967,33 +977,6 @@ export function App() {
     keyRotationBusyByRoom
   });
   const roomCanUseChat = canUseRoomChat(selectedRoom, isSelectedRoomLocked);
-
-  function reportRoomHostMutationInFlight(roomId: string): boolean {
-    if (!isRoomHostMutationInFlight(hostBusyRef.current, roomId)) return false;
-    setHostMessageForRoom(roomId, roomHostMutationInFlightMessage());
-    return true;
-  }
-
-  function reportRoomSettingsMutationInFlight(
-    roomId: string,
-    setMessage: (roomId: string, message: string | null) => void = setSettingsMessageForRoom
-  ): boolean {
-    if (!isRoomSettingsMutationInFlight(settingsBusyRef.current, roomId)) return false;
-    setMessage(roomId, roomSettingsMutationInFlightMessage());
-    return true;
-  }
-
-  function reportRoomKeyRotationInFlight(roomId: string): boolean {
-    if (!isRoomKeyRotationInFlight(keyRotationBusyRef.current, roomId)) return false;
-    setInviteMessageForRoom(roomId, roomKeyRotationInFlightMessage());
-    return true;
-  }
-
-  function reportRoomFileActionInFlight(roomId: string): boolean {
-    if (!isRoomFileActionInFlight(fileBusyRef.current, roomId)) return false;
-    setFileMessageForRoom(roomId, roomFileActionInFlightMessage());
-    return true;
-  }
 
   function updateSelectedGitWorkflowDraft(patch: Partial<GitWorkflowDraft>) {
     if (!hasSelectedRoom) return;
@@ -1891,12 +1874,6 @@ export function App() {
     if (!hasSelectedRoom) return;
     setProjectPathDraftsByRoom((current) => current[selectedRoom.id] === selectedRoom.projectPath ? omitRecordKey(current, selectedRoom.id) : current);
   }, [hasSelectedRoom, selectedRoom.id, selectedRoom.projectPath]);
-
-  function reportRoomTerminalActionInFlight(roomId: string): boolean {
-    if (!isRoomTerminalActionInFlight(terminalBusyRef.current, roomId)) return false;
-    setTerminalErrorForRoom(roomId, roomTerminalActionInFlightMessage());
-    return true;
-  }
 
   async function sendMessage() {
     if (!hasSelectedRoom) {
