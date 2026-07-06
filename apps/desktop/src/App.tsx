@@ -308,6 +308,7 @@ import { useGitHubWorkflowState } from "./hooks/useGitHubWorkflowState";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useRoomAccess } from "./hooks/useRoomAccess";
+import { useRoomNotices } from "./hooks/useRoomNotices";
 import { useShellLayout } from "./hooks/useShellLayout";
 import { useSelectedTeamData } from "./hooks/useSelectedTeamData";
 import { useSelectedRoomValues } from "./hooks/useSelectedRoomValues";
@@ -663,12 +664,13 @@ export function App() {
     defaultBrowserUrl,
     defaultBrowserReason
   });
-  const roomNotices = [
-    hostMessage ? { key: "host", label: "Codex", message: hostMessage, onDismiss: () => setHostMessageForRoom(selectedRoom.id, null) } : null,
-    chatMessage && chatMessage !== hostMessage
-      ? { key: "chat", label: "Chat", message: chatMessage, onDismiss: () => setChatMessageForRoom(selectedRoom.id, null) }
-      : null
-  ].filter((notice): notice is { key: string; label: string; message: string; onDismiss: () => void } => Boolean(notice));
+  const roomNotices = useRoomNotices({
+    roomId: selectedRoom.id,
+    hostMessage,
+    chatMessage,
+    setHostMessageForRoom,
+    setChatMessageForRoom
+  });
   const secretWarningVisible = hasSelectedRoom && (
     secretWarningsVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ??
     !hasAcknowledgedRoomVisibilityWarning(selectedRoom?.id ?? selectedRoomId)
