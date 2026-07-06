@@ -1,7 +1,5 @@
 import { useMemo, useRef, useState } from "react";
 import type {
-  GitHubActionsEventPlaintextPayload,
-  GitWorkflowEventPlaintextPayload,
   LocalPreviewPlaintextPayload,
   RoomRecord
 } from "@multaiplayer/protocol";
@@ -136,6 +134,7 @@ import { useInvitePanelState } from "./hooks/useInvitePanelState";
 import { useRoomSettingsState } from "./hooks/useRoomSettingsState";
 import { useRoomChatState } from "./hooks/useRoomChatState";
 import { useCodexRoomState } from "./hooks/useCodexRoomState";
+import { useRoomRuntimeState } from "./hooks/useRoomRuntimeState";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -153,11 +152,9 @@ import type {
   ChatAttachment,
   ChatMessage,
   ChatReaction,
-  HostHandoffRecord,
   LocalPreviewRecord,
   NoSecretRoomInvite,
   RelayStatus,
-  RoomPresence,
   SidebarPanel,
   TerminalCommandRequest
 } from "./types";
@@ -267,13 +264,26 @@ export function App() {
     teamHistoryMessagesByTeam,
     setTeamHistoryMessagesByTeam
   } = useHistoryDefaultsState({ initialTeamId: seededTeams[0].id });
-  const [inspectorTabsByRoom, setInspectorTabsByRoom] = useState<Record<string, InspectorTab>>({});
-  const [forgottenRoomIds, setForgottenRoomIds] = useState<Set<string>>(() => new Set());
-  const [revokedRoomIds, setRevokedRoomIds] = useState<Set<string>>(() => new Set());
-  const [revokedTeamIds, setRevokedTeamIds] = useState<Set<string>>(() => new Set());
-  const [presenceByRoom, setPresenceByRoom] = useState<Record<string, Record<string, RoomPresence>>>({});
-  const [hostHandoffsByRoom, setHostHandoffsByRoom] = useState<Record<string, HostHandoffRecord[]>>({});
-  const [codexContinuationByRoom, setCodexContinuationByRoom] = useState<Record<string, HostHandoffRecord>>({});
+  const {
+    inspectorTabsByRoom,
+    setInspectorTabsByRoom,
+    forgottenRoomIds,
+    setForgottenRoomIds,
+    revokedRoomIds,
+    setRevokedRoomIds,
+    revokedTeamIds,
+    setRevokedTeamIds,
+    presenceByRoom,
+    setPresenceByRoom,
+    hostHandoffsByRoom,
+    setHostHandoffsByRoom,
+    codexContinuationByRoom,
+    setCodexContinuationByRoom,
+    gitWorkflowEventsByRoom,
+    setGitWorkflowEventsByRoom,
+    githubActionsEventsByRoom,
+    setGitHubActionsEventsByRoom
+  } = useRoomRuntimeState();
   const {
     codexEventsByRoom,
     setCodexEventsByRoom,
@@ -288,8 +298,6 @@ export function App() {
     codexThreadIdsByRoom,
     setCodexThreadIdsByRoom
   } = useCodexRoomState();
-  const [gitWorkflowEventsByRoom, setGitWorkflowEventsByRoom] = useState<Record<string, GitWorkflowEventPlaintextPayload[]>>({});
-  const [githubActionsEventsByRoom, setGitHubActionsEventsByRoom] = useState<Record<string, GitHubActionsEventPlaintextPayload[]>>({});
   const {
     localPreviewsByRoom,
     setLocalPreviewsByRoom,
