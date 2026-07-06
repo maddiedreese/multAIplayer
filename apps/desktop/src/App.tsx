@@ -1,7 +1,6 @@
 import { useMemo, useRef } from "react";
 import type {
-  LocalPreviewPlaintextPayload,
-  RoomRecord
+  LocalPreviewPlaintextPayload
 } from "@multaiplayer/protocol";
 import {
   codexModelOptions,
@@ -34,11 +33,8 @@ import { canApproveCodexTurn } from "./lib/codexApproval";
 import {
   normalizeRoomName
 } from "./lib/workspaceCreation";
-import { canHostBrowserAction } from "./lib/browserPolicy";
 import { attachmentReviewScopeKey } from "./lib/attachmentPolicy";
-import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { canStageRoomChatAttachment, roomChatGateMessage } from "./lib/chatPolicy";
-import { extractCodexBrowserOpenUrl } from "./lib/codexInvoke";
 import type { GitHubActionsTarget } from "./lib/githubWorkflowReadiness";
 import type { GitWorkflowDraft } from "./lib/gitWorkflowDraft";
 import { roomLockMessage, roomSecretStorageLabel } from "./lib/appRuntime";
@@ -129,6 +125,7 @@ import { useRoomChatState } from "./hooks/useRoomChatState";
 import { useCodexRoomState } from "./hooks/useCodexRoomState";
 import { useRoomRuntimeState } from "./hooks/useRoomRuntimeState";
 import { useAppRuntimeState } from "./hooks/useAppRuntimeState";
+import { useCodexBrowserOpenCommand } from "./hooks/useCodexBrowserOpenCommand";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -144,7 +141,6 @@ import { LocalPreviewDialog } from "./components/LocalPreviewDialog";
 import type {
   BrowserAccessRequest,
   ChatAttachment,
-  ChatMessage,
   ChatReaction,
   LocalPreviewRecord,
   NoSecretRoomInvite,
@@ -1344,6 +1340,20 @@ export function App() {
     setHistorySearchBusy
   });
 
+  const { handleCodexBrowserOpenCommand } = useCodexBrowserOpenCommand({
+    localUser,
+    selectedRoomIdRef,
+    forgottenRoomIds,
+    revokedRoomIds,
+    revokedTeamIds,
+    appendBrowserRequest,
+    setBrowserMessageForRoom,
+    setBrowserUrlForRoom,
+    setActiveBrowserUrlsByRoom,
+    setBrowserStatusByRoom,
+    setInspectorTabsByRoom
+  });
+
   useRelaySubscription({
     relayWsUrl: appConfig.relayWsUrl,
     deviceId,
@@ -1635,7 +1645,6 @@ export function App() {
     denyBrowserRequest,
     openApprovedBrowserRequest,
     openRoomBrowserNow,
-    openRoomBrowserForUrl,
     resetRoomBrowserProfile
   } = useBrowserActions({
     hasSelectedRoom,
@@ -1831,21 +1840,6 @@ export function App() {
     setSelectedDiffForRoom,
     setSensitiveAttachmentReviewKey
   });
-
-  function handleCodexBrowserOpenCommand(message: ChatMessage, room: RoomRecord): boolean {
-    const url = extractCodexBrowserOpenUrl(message.body);
-    if (!url) return false;
-    const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
-    const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
-    if (!canHostBrowserAction(room, localUser, roomLocked)) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
-        setBrowserMessageForRoom(room.id, "Only the active host can open the in-room browser.");
-      }
-      return true;
-    }
-    openRoomBrowserForUrl(room, url, `Opened by ${message.author} through Codex.`);
-    return true;
-  }
 
   function roomSettingsActor() {
     return {
