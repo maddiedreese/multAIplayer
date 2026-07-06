@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import type {
   LocalPreviewPlaintextPayload,
   RoomRecord
@@ -10,14 +10,8 @@ import {
 } from "@multaiplayer/protocol";
 import { decryptJson } from "@multaiplayer/crypto";
 import { loadHistorySettings } from "./lib/localHistory";
-import type { DeviceIdentity } from "./lib/deviceIdentity";
-import {
-  loadTrustedDeviceKeys,
-  type TrustedDeviceKey
-} from "./lib/deviceTrust";
 import {
   defaultProjectPath,
-  type CodexProbe,
   type GitWorkflowResult,
 } from "./lib/localBackend";
 import type { GitHubActionRun } from "./lib/authClient";
@@ -135,6 +129,7 @@ import { useRoomSettingsState } from "./hooks/useRoomSettingsState";
 import { useRoomChatState } from "./hooks/useRoomChatState";
 import { useCodexRoomState } from "./hooks/useCodexRoomState";
 import { useRoomRuntimeState } from "./hooks/useRoomRuntimeState";
+import { useAppRuntimeState } from "./hooks/useAppRuntimeState";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -154,7 +149,6 @@ import type {
   ChatReaction,
   LocalPreviewRecord,
   NoSecretRoomInvite,
-  RelayStatus,
   SidebarPanel,
   TerminalCommandRequest
 } from "./types";
@@ -306,7 +300,22 @@ export function App() {
     localPreviewBusyByRoom,
     setLocalPreviewBusyByRoom
   } = useLocalPreviewState();
-  const [codexProbe, setCodexProbe] = useState<CodexProbe | null>(null);
+  const {
+    codexProbe,
+    setCodexProbe,
+    relayStatus,
+    setRelayStatus,
+    deviceIdentity,
+    setDeviceIdentity,
+    deviceIdentityMessage,
+    setDeviceIdentityMessage,
+    trustedDeviceKeys,
+    setTrustedDeviceKeys,
+    historySearchMessagesByRoom,
+    setHistorySearchMessagesByRoom,
+    historySearchBusy,
+    setHistorySearchBusy
+  } = useAppRuntimeState();
   const {
     terminalLinesByRoom,
     setTerminalLinesByRoom,
@@ -342,10 +351,6 @@ export function App() {
     activeBrowserUrlsByRoom,
     setActiveBrowserUrlsByRoom
   } = useBrowserPanelState();
-  const [relayStatus, setRelayStatus] = useState<RelayStatus>("closed");
-  const [deviceIdentity, setDeviceIdentity] = useState<DeviceIdentity | null>(null);
-  const [deviceIdentityMessage, setDeviceIdentityMessage] = useState<string | null>(null);
-  const [trustedDeviceKeys, setTrustedDeviceKeys] = useState<TrustedDeviceKey[]>(() => loadTrustedDeviceKeys());
   const {
     gitStatusByRoom,
     setGitStatusByRoom,
@@ -382,8 +387,6 @@ export function App() {
     markdownCopyFallbacksByRoom,
     setMarkdownCopyFallbacksByRoom
   } = useFilePanelState();
-  const [historySearchMessagesByRoom, setHistorySearchMessagesByRoom] = useState<Record<string, ChatMessage[]>>({});
-  const [historySearchBusy, setHistorySearchBusy] = useState(false);
   const {
     inviteRequestsByRoom,
     setInviteRequestsByRoom,
