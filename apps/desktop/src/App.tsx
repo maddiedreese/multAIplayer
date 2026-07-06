@@ -24,8 +24,7 @@ import {
   type GitWorkflowResult,
   type GitStatusSummary,
   type ProjectFileContent,
-  type ProjectFileEntry,
-  type TerminalSnapshot
+  type ProjectFileEntry
 } from "./lib/localBackend";
 import {
   type GitHubActionRun,
@@ -138,6 +137,7 @@ import { useWorkspaceFilesPanelActions } from "./hooks/useWorkspaceFilesPanelAct
 import { useWorkspaceUiState } from "./hooks/useWorkspaceUiState";
 import { useHistoryDefaultsState } from "./hooks/useHistoryDefaultsState";
 import { useBrowserPanelState } from "./hooks/useBrowserPanelState";
+import { useTerminalPanelState } from "./hooks/useTerminalPanelState";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -288,16 +288,27 @@ export function App() {
   const [secretWarningsVisibleByRoom, setSecretWarningsVisibleByRoom] = useState<Record<string, boolean>>({});
   const [gitStatusByRoom, setGitStatusByRoom] = useState<Record<string, GitStatusSummary | null>>({});
   const [codexProbe, setCodexProbe] = useState<CodexProbe | null>(null);
-  const [terminalLinesByRoom, setTerminalLinesByRoom] = useState<Record<string, string[]>>(initialTerminalLinesByRoom);
-  const [terminalBusyByRoom, setTerminalBusyByRoom] = useState<Record<string, boolean>>({});
-  const [terminals, setTerminals] = useState<TerminalSnapshot[]>([]);
-  const [terminalRequestsByRoom, setTerminalRequestsByRoom] = useState<Record<string, TerminalCommandRequest[]>>({});
-  const [selectedTerminalIdsByRoom, setSelectedTerminalIdsByRoom] = useState<Record<string, string | null>>({});
-  const [terminalNamesByRoom, setTerminalNamesByRoom] = useState<Record<string, string>>({});
-  const [terminalCommandsByRoom, setTerminalCommandsByRoom] = useState<Record<string, string>>({});
-  const [terminalInputsByRoom, setTerminalInputsByRoom] = useState<Record<string, string>>({});
-  const [terminalErrorsByRoom, setTerminalErrorsByRoom] = useState<Record<string, string | null>>({});
-  const terminalAutoOpenedRoomsRef = useRef<Set<string>>(new Set());
+  const {
+    terminalLinesByRoom,
+    setTerminalLinesByRoom,
+    terminalBusyByRoom,
+    setTerminalBusyByRoom,
+    terminals,
+    setTerminals,
+    terminalRequestsByRoom,
+    setTerminalRequestsByRoom,
+    selectedTerminalIdsByRoom,
+    setSelectedTerminalIdsByRoom,
+    terminalNamesByRoom,
+    setTerminalNamesByRoom,
+    terminalCommandsByRoom,
+    setTerminalCommandsByRoom,
+    terminalInputsByRoom,
+    setTerminalInputsByRoom,
+    terminalErrorsByRoom,
+    setTerminalErrorsByRoom,
+    terminalAutoOpenedRoomsRef
+  } = useTerminalPanelState({ initialTerminalLinesByRoom });
   const {
     browserRequestsByRoom,
     setBrowserRequestsByRoom,
