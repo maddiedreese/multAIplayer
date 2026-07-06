@@ -13,8 +13,7 @@ import {
   type GitWorkflowResult,
 } from "./lib/localBackend";
 import type { GitHubActionRun } from "./lib/authClient";
-import { useHistorySearch } from "./hooks/useHistorySearch";
-import { useLocalHistoryHydration } from "./hooks/useLocalHistoryHydration";
+import { useWorkspaceHistoryEffects } from "./hooks/useWorkspaceHistoryEffects";
 import {
   normalizeRoomName
 } from "./lib/workspaceCreation";
@@ -1261,39 +1260,40 @@ export function App() {
       setInspectorTabsByRoom
     }
   });
-  useLocalHistoryHydration({
-    hasSelectedRoom,
-    selectedRoomId,
-    selectedRoomTeamId: selectedRoom.teamId,
-    forgottenRoomIds,
-    historyLoadedRoomIds,
-    setHistorySettings,
-    setMessagesByRoom,
-    setTerminalRequestsByRoom,
-    setBrowserRequestsByRoom,
-    setInviteRequestsByRoom,
-    setCodexEventsByRoom,
-    setGitWorkflowEventsByRoom,
-    setGitHubActionsEventsByRoom,
-    setLocalPreviewsByRoom,
-    setGitWorkflowMessageForRoom,
-    setActionRunsByRoom,
-    setActionsLastCheckedByRoom,
-    setActionsMessagesByRoom,
-    setTerminals,
-    setSelectedTerminalIdsByRoom,
-    setHostHandoffsByRoom,
-    setCodexThreadIdsByRoom
-  });
-
-  useHistorySearch({
-    searchActive,
-    rooms,
-    forgottenRoomIds,
-    revokedRoomIds,
-    revokedTeamIds,
-    setHistorySearchMessagesByRoom,
-    setHistorySearchBusy
+  useWorkspaceHistoryEffects({
+    hydration: {
+      hasSelectedRoom,
+      selectedRoomId,
+      selectedRoomTeamId: selectedRoom.teamId,
+      forgottenRoomIds,
+      historyLoadedRoomIds,
+      setHistorySettings,
+      setMessagesByRoom,
+      setTerminalRequestsByRoom,
+      setBrowserRequestsByRoom,
+      setInviteRequestsByRoom,
+      setCodexEventsByRoom,
+      setGitWorkflowEventsByRoom,
+      setGitHubActionsEventsByRoom,
+      setLocalPreviewsByRoom,
+      setGitWorkflowMessageForRoom,
+      setActionRunsByRoom,
+      setActionsLastCheckedByRoom,
+      setActionsMessagesByRoom,
+      setTerminals,
+      setSelectedTerminalIdsByRoom,
+      setHostHandoffsByRoom,
+      setCodexThreadIdsByRoom
+    },
+    search: {
+      searchActive,
+      rooms,
+      forgottenRoomIds,
+      revokedRoomIds,
+      revokedTeamIds,
+      setHistorySearchMessagesByRoom,
+      setHistorySearchBusy
+    }
   });
 
   const { handleCodexBrowserOpenCommand } = useCodexBrowserOpenCommand({
