@@ -25,6 +25,7 @@ MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.json
 MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://multaiplayer.com
 MULTAIPLAYER_RELAY_REQUIRE_AUTH=true
 MULTAIPLAYER_RELAY_DEBUG=false
+MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
 MULTAIPLAYER_RELAY_SEED_DEMO=false
 MULTAIPLAYER_RELAY_RATE_LIMITS=true
 MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
@@ -70,7 +71,8 @@ The check must pass. It verifies GitHub OAuth presence, strong durable session e
 
 - Use `/healthz` for container health.
 - Use `/readyz` for platform readiness.
-- Do not treat either endpoint as a privacy or security audit.
+- Use `/metrics` for content-free relay counters such as active sockets, published envelopes, rate-limit rejections, start time, and uptime.
+- Do not treat these endpoints as a privacy or security audit.
 
 ## Launch Smoke Test
 
@@ -93,4 +95,3 @@ Before announcing the relay:
 - Keep the previous relay JSON store backup available.
 - If auth, storage, or WebSocket routing breaks, disable the official relay link in public copy and direct users to self-hosting until fixed.
 - If plaintext leakage is suspected, stop the relay, preserve logs/store for private investigation, and use the security disclosure path instead of a public issue.
-
