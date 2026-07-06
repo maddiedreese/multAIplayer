@@ -225,14 +225,24 @@ const {
   send,
   broadcast,
   broadcastRoomUpdated,
-  broadcastWorkspaceUpdated
+  broadcastWorkspaceUpdated,
+  publishEnvelope,
+  publishPresence
 } = createRelayFanout({
   roomSockets,
   teamSockets,
   workspaceSockets,
   sessions,
+  encryptedBacklog,
+  roomPresence,
+  devices,
   teamMembers,
+  metrics: relayMetrics,
   roomKey,
+  deviceKey,
+  pruneEncryptedBacklog,
+  addTeamMember,
+  scheduleStoreSave,
   teamRecordForUser
 });
 const {
@@ -666,33 +676,6 @@ function revokeTeamInvites(teamId: string) {
     }
   }
   if (revoked) scheduleStoreSave();
-}
-
-function publishEnvelope(envelope: RelayEnvelope) {
-  const key = roomKey(envelope.teamId, envelope.roomId);
-  const backlog = encryptedBacklog.get(key) ?? [];
-  if (backlog.some((existing) => existing.id === envelope.id)) return;
-  backlog.push(envelope);
-  encryptedBacklog.set(key, pruneEncryptedBacklog(backlog));
-  relayMetrics.recordEnvelopePublished();
-  scheduleStoreSave();
-  broadcast(key, { type: "envelope", envelope });
-}
-
-function publishPresence(session: ClientSession, teamId: string, roomId: string, presence: PresenceRecord) {
-  session.displayName = presence.displayName;
-  session.avatarUrl = presence.avatarUrl;
-  addTeamMember(teamId, presence.userId);
-  const registeredDevice = devices.get(deviceKey(presence.userId, presence.deviceId));
-  const verifiedPresence: PresenceRecord = {
-    ...presence,
-    publicKeyFingerprint: registeredDevice?.publicKeyFingerprint ?? presence.publicKeyFingerprint
-  };
-  const key = roomKey(teamId, roomId);
-  const roster = roomPresence.get(key) ?? new Map<string, PresenceRecord>();
-  roster.set(verifiedPresence.deviceId, verifiedPresence);
-  roomPresence.set(key, roster);
-  broadcast(key, { type: "presence", ...verifiedPresence, status: "online" });
 }
 
 function addTeamMember(teamId: string, userId: string, role: TeamRole = "member") {
