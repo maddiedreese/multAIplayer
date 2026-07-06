@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import type { RelayStorageBackend } from "./persistence.js";
 
 export interface RelayConfig {
   nodeEnv: string;
@@ -7,6 +8,7 @@ export interface RelayConfig {
   githubClientId: string | undefined;
   githubOAuthScopes: string[];
   dataPath: string;
+  storageBackend: RelayStorageBackend;
   encryptedBacklogLimit: number;
   encryptedBacklogRetentionDays: number;
   inviteTtlDays: number;
@@ -50,6 +52,7 @@ export function loadRelayConfig(): RelayConfig {
     githubClientId: process.env.GITHUB_CLIENT_ID,
     githubOAuthScopes: parseGitHubScopes(process.env.GITHUB_OAUTH_SCOPES),
     dataPath: resolve(process.env.MULTAIPLAYER_RELAY_DATA_PATH ?? ".multaiplayer/relay-store.json"),
+    storageBackend: parseStorageBackend(process.env.MULTAIPLAYER_RELAY_STORAGE),
     encryptedBacklogLimit: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_LIMIT, 200, 1, 1000),
     encryptedBacklogRetentionDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS, 30, 1, 365),
     inviteTtlDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_INVITE_TTL_DAYS, 7, 1, 365),
@@ -86,6 +89,14 @@ export function loadRelayConfig(): RelayConfig {
 
 function parseGitHubScopes(value: string | undefined): string[] {
   return parseListEnv(value ?? "read:user public_repo");
+}
+
+function parseStorageBackend(value: string | undefined): RelayStorageBackend {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized || normalized === "json") return "json";
+  if (normalized === "sqlite") return "sqlite";
+  console.warn(`Ignoring invalid MULTAIPLAYER_RELAY_STORAGE value: ${value}`);
+  return "json";
 }
 
 function loadRelayEnvFiles() {

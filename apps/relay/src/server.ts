@@ -2,9 +2,7 @@ import cors, { type CorsOptions } from "cors";
 import cookieParser from "cookie-parser";
 import express, { type CookieOptions, type NextFunction, type Request, type Response } from "express";
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage } from "node:http";
-import { dirname, resolve } from "node:path";
 import { nanoid } from "nanoid";
 import { WebSocketServer, type WebSocket } from "ws";
 import { normalizeGitHubBranchName, normalizeGitHubRepoRef, normalizePullRequestDraft } from "@multaiplayer/github";
@@ -36,6 +34,7 @@ import {
 import { createRelayAuthz } from "./authz.js";
 import { loadRelayConfig } from "./config.js";
 import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
+import { createRelayPersistence } from "./persistence.js";
 import { createRelayStore, type AuthSession, type ClientSession, type PresenceRecord, type RoomKey } from "./state.js";
 
 const relayConfig = loadRelayConfig();
@@ -45,6 +44,7 @@ const {
   githubClientId,
   githubOAuthScopes,
   dataPath,
+  storageBackend,
   encryptedBacklogLimit,
   encryptedBacklogRetentionDays,
   inviteTtlDays,
@@ -64,6 +64,7 @@ const {
   rateLimitCaps
 } = relayConfig;
 const relayMetrics = createRelayMetrics();
+const relayPersistence = createRelayPersistence({ backend: storageBackend, dataPath });
 const corsOptions: CorsOptions = {
   credentials: true,
   origin(origin, callback) {
@@ -2105,11 +2106,11 @@ function sessionPersistenceKey(): Buffer {
 
 async function loadRelayStore() {
   try {
-    const raw = await readFile(dataPath, "utf8");
-    const stored = JSON.parse(raw) as unknown;
+    const stored = await relayPersistence.load();
+    if (stored === null) return;
     if (!isRecord(stored) || stored.version !== 1) {
       console.warn(`Ignoring unsupported relay store version at ${dataPath}`);
-      await quarantineRelayStore("unsupported-version");
+      await relayPersistence.quarantine("unsupported-version");
       return;
     }
     for (const team of storedArray(stored.teams)) {
@@ -2176,28 +2177,13 @@ async function loadRelayStore() {
     }
     console.log(`Loaded multAIplayer relay store from ${dataPath}`);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      console.warn(`Could not load relay store at ${dataPath}:`, error);
-      await quarantineRelayStore("unreadable");
-    }
+    console.warn(`Could not load relay store at ${dataPath}:`, error);
+    await relayPersistence.quarantine("unreadable");
   }
 }
 
 function storedArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
-}
-
-async function quarantineRelayStore(reason: string) {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const backupPath = `${dataPath}.corrupt-${reason}-${timestamp}`;
-  try {
-    await rename(dataPath, backupPath);
-    console.warn(`Moved unreadable relay store to ${backupPath}`);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      console.warn(`Failed to move unreadable relay store at ${dataPath}:`, error);
-    }
-  }
 }
 
 function scheduleStoreSave() {
@@ -2233,10 +2219,7 @@ async function saveRelayStore() {
       }))
       .filter((item) => item.envelopes.length > 0)
   };
-  await mkdir(dirname(dataPath), { recursive: true });
-  const tempPath = `${dataPath}.${process.pid}.${nanoid(8)}.tmp`;
-  await writeFile(tempPath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
-  await rename(tempPath, dataPath);
+  await relayPersistence.save(state);
 }
 
 function seedWorkspace() {

@@ -59,12 +59,22 @@ The image sets `NODE_ENV=production`, `PORT=4321`, and `MULTAIPLAYER_RELAY_DATA_
 The alpha relay persists its state to a JSON file. Set:
 
 ```bash
+MULTAIPLAYER_RELAY_STORAGE=json
 MULTAIPLAYER_RELAY_DATA_PATH=/var/lib/multaiplayer/relay-store.json
 ```
 
 If unset, local development uses `.multaiplayer/relay-store.json`.
 
-If the relay cannot parse the JSON store, or the store version is unsupported, it moves the file aside next to the original path with a `.corrupt-...` suffix and starts from a clean in-memory state. Keep regular backups of `MULTAIPLAYER_RELAY_DATA_PATH` for production/self-hosted deployments; the quarantine file is a recovery aid, not a replacement for backups.
+Hosted relays can use SQLite instead:
+
+```bash
+MULTAIPLAYER_RELAY_STORAGE=sqlite
+MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
+```
+
+SQLite uses WAL mode and transactional snapshot writes. It is the recommended alpha storage backend for the official hosted relay because it is more crash-safe than replacing one JSON file. The current SQLite adapter still stores the normalized encrypted relay snapshot as JSON inside SQLite; route-level per-mutation tables are a later migration step now that the persistence backend is isolated.
+
+If the relay cannot parse the configured store, or the store version is unsupported, it moves the store aside next to the original path with a `.corrupt-...` suffix and starts from a clean in-memory state. Keep regular backups of `MULTAIPLAYER_RELAY_DATA_PATH` for production/self-hosted deployments; the quarantine file is a recovery aid, not a replacement for backups.
 
 The alpha store contains:
 

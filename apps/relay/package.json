@@ -13,6 +13,7 @@
   "dependencies": {
     "@multaiplayer/github": "0.1.0-alpha.0",
     "@multaiplayer/protocol": "0.1.0-alpha.0",
+    "better-sqlite3": "^12.11.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "express": "^4.21.2",
@@ -21,6 +22,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
