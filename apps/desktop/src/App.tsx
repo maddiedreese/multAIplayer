@@ -182,8 +182,6 @@ import {
   sameHandoffRepo
 } from "./lib/hostHandoff";
 import { detectBrowserSecretRisks, detectSecretRisks, detectTerminalCommandRisks } from "./lib/secretRisks";
-import { createGitWorkflowApprovalPlan, formatGitWorkflowApprovalPreview } from "@multaiplayer/git";
-import { normalizeGitHubBranchName } from "@multaiplayer/github";
 import {
   canActOnRoomInviteRequest,
   findRoomInviteRequest,
@@ -234,6 +232,7 @@ import {
 } from "./lib/githubWorkflowReadiness";
 import {
   defaultGitWorkflowDraft,
+  buildGitWorkflowApprovalPreview,
   gitWorkflowInFlightMessage,
   isGitWorkflowInFlight,
   parseGitHubRemoteUrl,
@@ -671,30 +670,10 @@ export function App() {
     repo: gitWorkflowDraft.prRepo,
     branch: gitWorkflowDraft.branchName
   }), [authConfig, currentUser, gitWorkflowDraft.branchName, gitWorkflowDraft.prOwner, gitWorkflowDraft.prRepo]);
-  const gitApprovalPreview = useMemo(() => {
-    try {
-      const plan = createGitWorkflowApprovalPlan(
-        selectedRoom.projectPath,
-        gitWorkflowDraft.branchName,
-        gitWorkflowDraft.commitMessage,
-        gitWorkflowDraft.pushEnabled
-      );
-      const normalizedBase = gitWorkflowDraft.pushEnabled ? normalizeGitHubBranchName(gitWorkflowDraft.prBase.trim() || "main") : gitWorkflowDraft.prBase.trim();
-      return {
-        plan,
-        normalizedBase,
-        steps: formatGitWorkflowApprovalPreview(plan),
-        error: null
-      };
-    } catch (error) {
-      return {
-        plan: null,
-        normalizedBase: gitWorkflowDraft.prBase.trim(),
-        steps: [],
-        error: String(error)
-      };
-    }
-  }, [gitWorkflowDraft.branchName, gitWorkflowDraft.commitMessage, gitWorkflowDraft.prBase, gitWorkflowDraft.pushEnabled, selectedRoom.projectPath]);
+  const gitApprovalPreview = useMemo(
+    () => buildGitWorkflowApprovalPreview(selectedRoom.projectPath, gitWorkflowDraft),
+    [gitWorkflowDraft, selectedRoom.projectPath]
+  );
   const roomTerminals = useMemo(
     () => terminals.filter((terminal) => terminal.roomId === selectedRoom.id),
     [terminals, selectedRoom.id]
