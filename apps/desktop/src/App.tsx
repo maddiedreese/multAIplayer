@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type {
   ChatPlaintextPayload,
-  BrowserRequestPlaintextPayload,
   ChatReactionPlaintextPayload,
   CodexTurnSummary,
   GitHubActionsEventPlaintextPayload,
@@ -81,7 +80,6 @@ import {
   runShellCommand,
   startTerminal,
   stopTerminal,
-  resetBrowserProfile,
   writeTerminal,
   type CodexProbe,
   type GitApplyPatchResult,
@@ -166,12 +164,7 @@ import {
 import { canControlRoomTerminal, roomTerminalControlMessage } from "./lib/terminalAccess";
 import { displayableInviteLink } from "./lib/invitePrivacy";
 import { canCreateRoomInvite } from "./lib/invitePolicy";
-import {
-  canActOnRoomBrowserRequest,
-  canHostBrowserAction,
-  findRoomBrowserRequest,
-  roomBrowserRequestMessage
-} from "./lib/browserPolicy";
+import { canHostBrowserAction } from "./lib/browserPolicy";
 import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
 import { canUseLocalWorkspace } from "./lib/workspaceAccess";
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
@@ -195,7 +188,6 @@ import {
   terminalsForLocalHistory,
   upsertTerminal
 } from "./lib/terminalState";
-import { formatBrowserAccessLabel, normalizeBrowserLocationInput } from "./lib/browserUi";
 import {
   isAttachmentBlobContent,
   isDeviceSealedPayload,
@@ -264,6 +256,7 @@ import { useRelayPublishers } from "./hooks/useRelayPublishers";
 import { useLocalPreviewActions } from "./hooks/useLocalPreviewActions";
 import { useMarkdownCopyActions } from "./hooks/useMarkdownCopyActions";
 import { useGitHubActionsRefresh } from "./hooks/useGitHubActionsRefresh";
+import { useBrowserActions } from "./hooks/useBrowserActions";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -1199,6 +1192,42 @@ export function App() {
     setActionRunsByRoom,
     setActionsLastCheckedByRoom,
     publishGitHubActionsEvent
+  });
+  const {
+    requestBrowserAccess,
+    approveBrowserRequest,
+    denyBrowserRequest,
+    openApprovedBrowserRequest,
+    openRoomBrowserNow,
+    openRoomBrowserForUrl,
+    resetRoomBrowserProfile
+  } = useBrowserActions({
+    hasSelectedRoom,
+    isActiveHost,
+    canRequestBrowser,
+    canHostBrowser,
+    browserAccessMessage,
+    hostGateMessage,
+    selectedRoom,
+    selectedRoomIdRef,
+    browserUrl,
+    browserReason,
+    browserRequests,
+    localUser,
+    deviceId,
+    relayStatus,
+    relayRef,
+    seenEnvelopeIds,
+    defaultBrowserStatus,
+    setSelectedBrowserMessage,
+    setBrowserMessageForRoom,
+    setBrowserUrlForRoom,
+    appendBrowserRequest,
+    updateBrowserRequestStatus,
+    publishRequestStatus,
+    setActiveBrowserUrlsByRoom,
+    setBrowserStatusByRoom,
+    setInspectorTabsByRoom
   });
 
   useLocalHistoryPersistence({
@@ -3764,253 +3793,6 @@ export function App() {
     publishRequestStatus("terminal.event", requestId, "denied", room).catch((error) => {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setTerminalErrorForRoom(room.id, String(error));
     });
-  }
-
-  async function requestBrowserAccess() {
-    if (!hasSelectedRoom) {
-      setSelectedBrowserMessage("Create or join a room before requesting browser access.");
-      return;
-    }
-    const room = selectedRoom;
-    const activeHost = isActiveHost;
-    if (!canRequestBrowser) {
-      setSelectedBrowserMessage(browserAccessMessage);
-      return;
-    }
-    const roomId = room.id;
-    const rawUrl = browserUrl.trim();
-    if (!rawUrl) return;
-    setBrowserMessageForRoom(roomId, null);
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(rawUrl);
-    } catch {
-      setBrowserMessageForRoom(roomId, "Enter a valid browser URL.");
-      return;
-    }
-
-    const request: BrowserAccessRequest = {
-      id: crypto.randomUUID(),
-      requester: localUser.name,
-      requesterUserId: localUser.id,
-      url: parsedUrl.toString(),
-      reason: browserReason.trim() || "No reason provided.",
-      requestedAt: new Date().toISOString(),
-      status: "pending"
-    };
-
-    const client = relayRef.current;
-    if (!client || relayStatus === "closed" || relayStatus === "error") {
-      appendBrowserRequest(room.id, request);
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setBrowserMessageForRoom(
-          roomId,
-          "Saved browser request locally because the relay is not connected."
-        );
-      }
-      return;
-    }
-
-    try {
-      const payload: BrowserRequestPlaintextPayload = {
-        id: request.id,
-        requester: request.requester,
-        requesterUserId: request.requesterUserId,
-        url: request.url,
-        reason: request.reason,
-        requestedAt: request.requestedAt
-      };
-      const secret = await loadOrCreateRoomSecret(room.id);
-      const envelope: RelayEnvelope = {
-        id: crypto.randomUUID(),
-        teamId: room.teamId,
-        roomId: room.id,
-        senderDeviceId: deviceId,
-        senderUserId: localUser.id,
-        createdAt: new Date().toISOString(),
-        kind: "browser.request",
-        payload: await encryptJson(payload, secret)
-      };
-      seenEnvelopeIds.current.add(envelope.id);
-      client.publish({ type: "publish", envelope });
-      appendBrowserRequest(room.id, request);
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setBrowserMessageForRoom(
-          roomId,
-          `Requested browser access to ${formatBrowserAccessLabel(request.url)}.`
-        );
-      }
-    } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessageForRoom(roomId, String(error));
-    }
-  }
-
-  function approveBrowserRequest(request: BrowserAccessRequest) {
-    if (!hasSelectedRoom) {
-      setSelectedBrowserMessage("Create or join a room before approving browser access.");
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedBrowserMessage(hostGateMessage);
-      return;
-    }
-    if (!canHostBrowser) {
-      setSelectedBrowserMessage(browserAccessMessage);
-      return;
-    }
-    const roomId = selectedRoom.id;
-    const roomRequest = findRoomBrowserRequest(browserRequests, request.id);
-    if (!roomRequest || !canActOnRoomBrowserRequest(browserRequests, request.id, "pending")) {
-      setBrowserMessageForRoom(roomId, roomBrowserRequestMessage(browserRequests, request.id, "pending"));
-      return;
-    }
-    updateBrowserRequestStatus(roomId, roomRequest.id, "approved");
-    publishRequestStatus("browser.event", roomRequest.id, "approved").catch((error) => {
-      setBrowserMessageForRoom(roomId, String(error));
-    });
-    setBrowserMessageForRoom(roomId, `Approved browser access to ${formatBrowserAccessLabel(roomRequest.url)}.`);
-  }
-
-  function denyBrowserRequest(requestId: string) {
-    if (!hasSelectedRoom) {
-      setSelectedBrowserMessage("Create or join a room before denying browser access.");
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedBrowserMessage(hostGateMessage);
-      return;
-    }
-    if (!canHostBrowser) {
-      setSelectedBrowserMessage(browserAccessMessage);
-      return;
-    }
-    const roomId = selectedRoom.id;
-    if (!canActOnRoomBrowserRequest(browserRequests, requestId, "pending")) {
-      setBrowserMessageForRoom(roomId, roomBrowserRequestMessage(browserRequests, requestId, "pending"));
-      return;
-    }
-    updateBrowserRequestStatus(roomId, requestId, "denied");
-    publishRequestStatus("browser.event", requestId, "denied").catch((error) => {
-      setBrowserMessageForRoom(roomId, String(error));
-    });
-    setBrowserMessageForRoom(roomId, "Denied browser access request.");
-  }
-
-  async function openApprovedBrowserRequest(request: BrowserAccessRequest) {
-    if (request.status !== "approved") return;
-    if (!hasSelectedRoom) {
-      setSelectedBrowserMessage("Create or join a room before opening the room browser.");
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedBrowserMessage(hostGateMessage);
-      return;
-    }
-    if (!canHostBrowser) {
-      setSelectedBrowserMessage(browserAccessMessage);
-      return;
-    }
-    const room = selectedRoom;
-    const roomRequest = findRoomBrowserRequest(browserRequests, request.id);
-    if (!roomRequest || !canActOnRoomBrowserRequest(browserRequests, request.id, "approved")) {
-      setBrowserMessageForRoom(room.id, roomBrowserRequestMessage(browserRequests, request.id, "approved"));
-      return;
-    }
-    setBrowserMessageForRoom(room.id, null);
-    openEmbeddedRoomBrowser(room, roomRequest.url);
-  }
-
-  async function openRoomBrowserNow() {
-    if (!hasSelectedRoom) {
-      setSelectedBrowserMessage("Create or join a room before opening the room browser.");
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedBrowserMessage(hostGateMessage);
-      return;
-    }
-    if (!canHostBrowser) {
-      setSelectedBrowserMessage(browserAccessMessage);
-      return;
-    }
-    const room = selectedRoom;
-    const rawUrl = browserUrl.trim();
-    if (!rawUrl) {
-      setBrowserMessageForRoom(room.id, "Enter a URL to open in the room browser.");
-      return;
-    }
-    const nextUrl = normalizeBrowserLocationInput(rawUrl);
-    if (!nextUrl) {
-      setBrowserMessageForRoom(room.id, "Enter a valid URL or search.");
-      return;
-    }
-    openRoomBrowserForUrl(room, nextUrl, "Opened by the active host.");
-  }
-
-  function openRoomBrowserForUrl(room: RoomRecord, url: string, reason: string) {
-    const request: BrowserAccessRequest = {
-      id: crypto.randomUUID(),
-      requester: localUser.name,
-      requesterUserId: localUser.id,
-      url,
-      reason,
-      requestedAt: new Date().toISOString(),
-      status: "approved"
-    };
-    appendBrowserRequest(room.id, request);
-    setBrowserMessageForRoom(room.id, null);
-    setBrowserUrlForRoom(room.id, request.url);
-    openEmbeddedRoomBrowser(room, request.url);
-  }
-
-  function openEmbeddedRoomBrowser(room: RoomRecord, url: string) {
-    setActiveBrowserUrlsByRoom((current) => ({ ...current, [room.id]: url }));
-    setBrowserStatusByRoom((current) => ({
-      ...current,
-      [room.id]: {
-        profilePath: "Embedded in this room",
-        downloadsBlocked: false,
-        clipboardBlocked: false,
-        fileUploadsBlocked: false
-      }
-    }));
-    if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
-      setBrowserMessageForRoom(room.id, `Opened in-room browser for ${formatBrowserAccessLabel(url)}.`);
-      setInspectorTabsByRoom((current) => ({ ...current, [room.id]: "browser" }));
-    }
-  }
-
-  async function resetRoomBrowserProfile() {
-    if (!hasSelectedRoom) {
-      setSelectedBrowserMessage("Create or join a room before resetting browser state.");
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedBrowserMessage(hostGateMessage);
-      return;
-    }
-    if (!canHostBrowser) {
-      setSelectedBrowserMessage(browserAccessMessage);
-      return;
-    }
-    const room = selectedRoom;
-    setBrowserMessageForRoom(room.id, null);
-    try {
-      const result = await resetBrowserProfile(room.id, room.projectPath);
-      setBrowserStatusByRoom((current) => ({
-        ...current,
-        [room.id]: {
-          ...defaultBrowserStatus,
-          profilePath: result.profilePath
-        }
-      }));
-      setActiveBrowserUrlsByRoom((current) => omitRecordKey(current, room.id));
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
-        setBrowserMessageForRoom(room.id, "Reset isolated room browser state. The next approved page opens with a fresh profile.");
-      }
-    } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setBrowserMessageForRoom(room.id, String(error));
-    }
   }
 
   function acknowledgeRoomVisibilityWarning() {
