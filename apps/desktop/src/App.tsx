@@ -140,6 +140,7 @@ import { useCodexTurnActions } from "./hooks/useCodexTurnActions";
 import { useRoomVisibilityWarningActions } from "./hooks/useRoomVisibilityWarningActions";
 import { useRoomChatPanelActions } from "./hooks/useRoomChatPanelActions";
 import { useRoomHeaderActions } from "./hooks/useRoomHeaderActions";
+import { useTerminalPanelActions } from "./hooks/useTerminalPanelActions";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -1715,6 +1716,24 @@ export function App() {
     setInspectorTabsByRoom,
     openRoomBrowserNow
   });
+  const terminalPanelActions = useTerminalPanelActions({
+    selectedRoomId: selectedRoom.id,
+    terminalRequests,
+    copyTerminalMarkdown,
+    runApprovedTerminalCheck,
+    openInteractiveTerminal,
+    setTerminalNameForRoom,
+    setTerminalCommandForRoom,
+    startNamedTerminal,
+    requestTerminalCommand,
+    approveTerminalRequest,
+    denyTerminalRequest,
+    setSelectedTerminalIdForRoom,
+    setTerminalInputForRoom,
+    sendTerminalInput,
+    restartSelectedTerminal,
+    stopSelectedTerminal
+  });
 
   function handleCodexBrowserOpenCommand(message: ChatMessage, room: RoomRecord): boolean {
     const url = extractCodexBrowserOpenUrl(message.body);
@@ -2169,23 +2188,7 @@ export function App() {
               canReadLocalWorkspace,
               canRequestWorkspace,
               canApproveTerminal: canReadLocalWorkspace && isActiveHost,
-              onCopyMarkdown: copyTerminalMarkdown,
-              onRunGitStatus: runApprovedTerminalCheck,
-              onOpenInteractiveTerminal: () => openInteractiveTerminal({ reuseExisting: false }),
-              onTerminalNameChange: (name) => setTerminalNameForRoom(selectedRoom.id, name),
-              onTerminalCommandChange: (command) => setTerminalCommandForRoom(selectedRoom.id, command),
-              onStartTerminal: startNamedTerminal,
-              onRequestTerminalCommand: requestTerminalCommand,
-              onApproveTerminalRequest: (requestId) => {
-                const request = terminalRequests.find((item) => item.id === requestId);
-                if (request) approveTerminalRequest(request);
-              },
-              onDenyTerminalRequest: denyTerminalRequest,
-              onSelectTerminal: (terminalId) => setSelectedTerminalIdForRoom(selectedRoom.id, terminalId),
-              onTerminalInputChange: (input) => setTerminalInputForRoom(selectedRoom.id, input),
-              onSendTerminalInput: sendTerminalInput,
-              onRestartTerminal: restartSelectedTerminal,
-              onStopTerminal: stopSelectedTerminal
+              ...terminalPanelActions
             }}
           />
         )}
