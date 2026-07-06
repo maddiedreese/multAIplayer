@@ -56,9 +56,7 @@ import {
 } from "./lib/teamRoomDefaults";
 import { loadOrCreateDeviceIdentity, resetDeviceIdentity, type DeviceIdentity } from "./lib/deviceIdentity";
 import {
-  buildDeviceFingerprintMarkdown,
   loadTrustedDeviceKeys,
-  trustDeviceKey,
   untrustDeviceKey,
   type TrustedDeviceKey
 } from "./lib/deviceTrust";
@@ -92,9 +90,6 @@ import {
   createRoom,
   createTeam,
   lookupInvite,
-  removeTeamMember,
-  transferTeamOwnership,
-  updateTeamMemberRole,
   updateRoomHost,
   updateRoomSettings
 } from "./lib/workspaceClient";
@@ -186,8 +181,6 @@ import {
   formatCodexModel,
   formatMessageTime,
   formatSessionPersistence,
-  formatTeamMemberName,
-  formatTeamRole,
   formatTimestamp,
   validatePendingAttachments
 } from "./lib/appFormatters";
@@ -238,6 +231,7 @@ import { useGitHubActionsRefresh } from "./hooks/useGitHubActionsRefresh";
 import { useBrowserActions } from "./hooks/useBrowserActions";
 import { useFileActions } from "./hooks/useFileActions";
 import { useTerminalActions } from "./hooks/useTerminalActions";
+import { useMemberActions } from "./hooks/useMemberActions";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -1024,6 +1018,28 @@ export function App() {
     setGitWorkflowMessageForRoom
   });
   const {
+    trustRoomMemberDevice,
+    untrustRoomMemberDevice,
+    copyRoomMemberDeviceFingerprint,
+    changeTeamMemberRole,
+    transferOwnershipToTeamMember,
+    removeMemberFromTeam
+  } = useMemberActions({
+    selectedTeam,
+    selectedTeamName,
+    selectedTeamMembersBusy,
+    selectedRoom,
+    localUser,
+    currentUser,
+    setDeviceIdentityMessage,
+    setTrustedDeviceKeys,
+    setTeamMembersBusyByTeam,
+    setTeamMembersMessageByTeam,
+    setTeamMembersByTeam,
+    setTeams,
+    copyMarkdownWithFallback
+  });
+  const {
     openProjectFile,
     attachSelectedFileToMessage,
     removePendingAttachment,
@@ -1522,44 +1538,6 @@ export function App() {
     }
   }
 
-  function trustRoomMemberDevice(member: RoomPresence) {
-    const fingerprint = member.publicKeyFingerprint;
-    if (!fingerprint) {
-      setDeviceIdentityMessage(`${member.displayName} has no registered device identity to trust.`);
-      return;
-    }
-    setTrustedDeviceKeys((current) =>
-      trustDeviceKey(current, selectedRoom.id, member.deviceId, fingerprint)
-    );
-    setDeviceIdentityMessage(`Trusted ${member.displayName}'s device identity for ${selectedRoom.name}.`);
-  }
-
-  function untrustRoomMemberDevice(member: RoomPresence) {
-    setTrustedDeviceKeys((current) => untrustDeviceKey(current, selectedRoom.id, member.deviceId));
-    setDeviceIdentityMessage(`Removed local trust for ${member.displayName}'s device identity in ${selectedRoom.name}.`);
-  }
-
-  async function copyRoomMemberDeviceFingerprint(member: RoomPresence, trusted: boolean) {
-    const fingerprint = member.publicKeyFingerprint;
-    if (!fingerprint) {
-      setDeviceIdentityMessage(`${member.displayName} has no registered device identity to copy.`);
-      return;
-    }
-    const markdown = buildDeviceFingerprintMarkdown({
-      roomName: selectedRoom.name,
-      displayName: member.displayName,
-      deviceId: member.deviceId,
-      fingerprint,
-      trusted
-    });
-    await copyMarkdownWithFallback(
-      `${member.displayName} device fingerprint`,
-      markdown,
-      setDeviceIdentityMessage,
-      selectedRoom.id
-    );
-  }
-
   async function addTeam() {
     let plan: ReturnType<typeof planTeamCreation>;
     try {
@@ -1675,65 +1653,6 @@ export function App() {
     setChatMessageForRoom(room.id, userMessage);
     setHostMessageForRoom(room.id, userMessage);
     setWorkspaceError(userMessage);
-  }
-
-  async function changeTeamMemberRole(member: TeamMemberRecord, role: "admin" | "member") {
-    if (!selectedTeam || selectedTeamMembersBusy) return;
-    setTeamMembersBusyByTeam((current) => ({ ...current, [selectedTeam]: true }));
-    setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: null }));
-    try {
-      const members = await updateTeamMemberRole(selectedTeam, member.userId, role);
-      setTeamMembersByTeam((current) => ({ ...current, [selectedTeam]: members }));
-      setTeamMembersMessageByTeam((current) => ({
-        ...current,
-        [selectedTeam]: `${formatTeamMemberName(member.userId, currentUser)} is now ${formatTeamRole(role)}.`
-      }));
-    } catch (error) {
-      setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: String(error) }));
-    } finally {
-      setTeamMembersBusyByTeam((current) => ({ ...current, [selectedTeam]: false }));
-    }
-  }
-
-  async function transferOwnershipToTeamMember(member: TeamMemberRecord) {
-    if (!selectedTeam || selectedTeamMembersBusy) return;
-    setTeamMembersBusyByTeam((current) => ({ ...current, [selectedTeam]: true }));
-    setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: null }));
-    try {
-      const members = await transferTeamOwnership(selectedTeam, member.userId);
-      setTeamMembersByTeam((current) => ({ ...current, [selectedTeam]: members }));
-      const localMember = members.find((item) => item.userId === localUser.id);
-      setTeams((current) => current.map((team) =>
-        team.id === selectedTeam ? { ...team, role: localMember?.role ?? team.role } : team
-      ));
-      setTeamMembersMessageByTeam((current) => ({
-        ...current,
-        [selectedTeam]: `${formatTeamMemberName(member.userId, currentUser)} is now the team owner.`
-      }));
-    } catch (error) {
-      setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: String(error) }));
-    } finally {
-      setTeamMembersBusyByTeam((current) => ({ ...current, [selectedTeam]: false }));
-    }
-  }
-
-  async function removeMemberFromTeam(member: TeamMemberRecord) {
-    if (!selectedTeam || selectedTeamMembersBusy) return;
-    setTeamMembersBusyByTeam((current) => ({ ...current, [selectedTeam]: true }));
-    setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: null }));
-    try {
-      const members = await removeTeamMember(selectedTeam, member.userId);
-      setTeamMembersByTeam((current) => ({ ...current, [selectedTeam]: members }));
-      setTeams((current) => current.map((team) => team.id === selectedTeam ? { ...team, members: members.length } : team));
-      setTeamMembersMessageByTeam((current) => ({
-        ...current,
-        [selectedTeam]: `Removed ${formatTeamMemberName(member.userId, currentUser)} from ${selectedTeamName}.`
-      }));
-    } catch (error) {
-      setTeamMembersMessageByTeam((current) => ({ ...current, [selectedTeam]: String(error) }));
-    } finally {
-      setTeamMembersBusyByTeam((current) => ({ ...current, [selectedTeam]: false }));
-    }
   }
 
   async function setRoomHost(hostStatus: RoomRecord["hostStatus"]) {
