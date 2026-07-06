@@ -36,7 +36,7 @@ import { useAppSelectedRoomRuntime } from "./hooks/useAppSelectedRoomRuntime";
 import { useAppRoomDisplayContext } from "./hooks/useAppRoomDisplayContext";
 import { useThemeMode } from "./hooks/useThemeMode";
 import { useAppWorkspaceRecords } from "./hooks/useAppWorkspaceRecords";
-import { useHostHandoffActions } from "./hooks/useHostHandoffActions";
+import { useAppHostHandoffActions } from "./hooks/useAppHostHandoffActions";
 import { useInviteActions } from "./hooks/useInviteActions";
 import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
 import { useAppRefs } from "./hooks/useAppRefs";
@@ -292,39 +292,15 @@ export function App() {
     selected: selectedContext,
     roomInteraction
   });
-  const hostHandoffActions = useHostHandoffActions({
-    hasSelectedRoom,
-    selectedRoom,
-    selectedRoomIdRef: appRefs.selectedRoomIdRef,
-    isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
-    isSelectedRoomRevoked: roomInteraction.isSelectedRoomRevoked,
-    isActiveHost: roomInteraction.isActiveHost,
-    hostGateMessage: roomInteraction.hostGateMessage,
-    hostHandoffs: selectedRuntime.hostHandoffs,
-    localUser: localIdentity.localUser,
-    deviceId: localIdentity.deviceId,
-    relayStatus: appRuntimeState.relayStatus,
-    relayRef: appRefs.relayRef,
-    seenEnvelopeIds: appRefs.seenEnvelopeIds,
-    messages,
-    terminals: terminalPanelState.terminals,
-    browserRequestsByRoom: browserPanelState.browserRequestsByRoom,
-    gitStatus,
-    gitStatusByRoom: githubWorkflowPanelState.gitStatusByRoom,
-    reportRoomHostMutationInFlight: roomInteraction.reportRoomHostMutationInFlight,
-    roomSettingsActor,
-    setRooms: workspaceState.setRooms,
-    setCodexContinuationByRoom: roomRuntimeState.setCodexContinuationByRoom,
-    setHostHandoffsByRoom: roomRuntimeState.setHostHandoffsByRoom,
-    setHostBusyForRoom,
-    setHostMessageForRoom,
-    setSelectedHostMessage,
-    setSettingsMessageForRoom,
-    setProjectPathDraftForRoom,
-    setCustomCodexModelForRoom,
-    resetFileContextForRoom,
-    resetCodexApprovalForRoom,
-    appendHostHandoff
+  const hostHandoffActions = useAppHostHandoffActions({
+    appState,
+    appRefs,
+    localIdentity,
+    selected: selectedContext,
+    selectedRuntime,
+    roomInteraction,
+    roomSetters,
+    roomSettingsActor
   });
   const inviteActions = useInviteActions({
     hasSelectedRoom,
