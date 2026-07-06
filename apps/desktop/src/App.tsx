@@ -255,7 +255,12 @@ import { isRoomKeyRotationInFlight, roomKeyRotationInFlightMessage } from "./lib
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import { roomPostureSummary } from "./lib/roomPosture";
 import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "./lib/sidebarSearch";
-import { replaceRoomTerminalSnapshots } from "./lib/terminalState";
+import {
+  mergeTerminalSnapshots,
+  replaceRoomTerminalSnapshots,
+  terminalsForLocalHistory,
+  upsertTerminal
+} from "./lib/terminalState";
 import { summarizeActionRuns } from "./lib/githubActionsSummary";
 import {
   buildCodexEventLine,
@@ -7268,37 +7273,6 @@ function isRoomHostMember(member: RoomPresence, room: RoomRecord): boolean {
   if (room.hostStatus !== "active") return false;
   if (room.hostUserId) return member.userId === room.hostUserId;
   return member.displayName === room.host;
-}
-
-function upsertTerminal(current: TerminalSnapshot[], snapshot: TerminalSnapshot): TerminalSnapshot[] {
-  const next = current.some((terminal) => terminal.id === snapshot.id)
-    ? current.map((terminal) => (terminal.id === snapshot.id ? snapshot : terminal))
-    : [...current, snapshot];
-  return next.sort((left, right) => left.name.localeCompare(right.name));
-}
-
-function mergeTerminalSnapshots(remembered: TerminalSnapshot[], live: TerminalSnapshot[]): TerminalSnapshot[] {
-  const liveIds = new Set(live.map((terminal) => terminal.id));
-  return [
-    ...remembered
-      .filter((terminal) => !liveIds.has(terminal.id))
-      .map(terminalForLocalHistory),
-    ...live
-  ].sort((left, right) => left.name.localeCompare(right.name));
-}
-
-function terminalsForLocalHistory(terminals: TerminalSnapshot[]): TerminalSnapshot[] {
-  return terminals
-    .map(terminalForLocalHistory)
-    .sort((left, right) => left.name.localeCompare(right.name));
-}
-
-function terminalForLocalHistory(terminal: TerminalSnapshot): TerminalSnapshot {
-  return {
-    ...terminal,
-    running: false,
-    lines: terminal.lines.slice(-1000)
-  };
 }
 
 function withoutSetValue<T>(current: Set<T>, value: T): Set<T> {
