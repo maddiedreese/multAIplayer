@@ -785,16 +785,7 @@ export function App() {
     resetCodexApprovalForRoom,
     appendHostHandoff
   });
-  const {
-    acceptInvite,
-    copyInviteLink,
-    decryptInviteEnvelope,
-    decideInviteJoinRequest,
-    handleInviteEnvelopePlaintext,
-    joinInviteSecret,
-    requestNoSecretInviteAccess,
-    rotateSelectedRoomKey
-  } = useInviteActions({
+  const inviteActions = useInviteActions({
     hasSelectedRoom,
     selectedRoom,
     selectedRoomIdRef,
@@ -896,8 +887,8 @@ export function App() {
         setTeamDefaultInviteApprovalGate
       },
       inviteUrl: {
-        requestNoSecretInviteAccess,
-        acceptInvite,
+        requestNoSecretInviteAccess: inviteActions.requestNoSecretInviteAccess,
+        acceptInvite: inviteActions.acceptInvite,
         setSelectedInviteMessage
       }
     },
@@ -1172,8 +1163,8 @@ export function App() {
         upsertRoom: workspaceRecords.upsertRoom,
         upsertTeam: workspaceRecords.upsertTeam,
         refreshTeamMembers: roomDisplay.refreshTeamMembers,
-        decryptInviteEnvelope,
-        handleInviteEnvelopePlaintext,
+        decryptInviteEnvelope: inviteActions.decryptInviteEnvelope,
+        handleInviteEnvelopePlaintext: inviteActions.handleInviteEnvelopePlaintext,
         applyMessageReaction,
         updateTerminalRequestStatus,
         appendTerminalLinesForRoom,
@@ -1694,12 +1685,12 @@ export function App() {
       keyRotationBusy: selectedRuntime.keyRotationBusy,
       inviteLink,
       inviteMessage,
-      onCopyInvite: copyInviteLink,
+      onCopyInvite: inviteActions.copyInviteLink,
       onInviteApprovalGateChange: (enabled) => setInviteApprovalGateForRoom(selectedRoom.id, enabled),
       onInviteSecretInputChange: setInviteSecretInput,
-      onImportInvite: joinInviteSecret,
-      onRotateRoomKey: rotateSelectedRoomKey,
-      onDecideInviteRequest: decideInviteJoinRequest
+      onImportInvite: inviteActions.joinInviteSecret,
+      onRotateRoomKey: inviteActions.rotateSelectedRoomKey,
+      onDecideInviteRequest: inviteActions.decideInviteJoinRequest
     },
     approvalPolicy: {
       labels: approvalPolicyLabels,
