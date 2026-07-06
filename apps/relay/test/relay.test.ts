@@ -3021,7 +3021,7 @@ async function startRelay(
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const port = await getFreePort();
-    const child = spawn(bin, ["src/server.ts"], {
+    const child = spawn(bin, ["src/index.ts"], {
       cwd: resolve("."),
       env: {
         ...process.env,

@@ -632,18 +632,29 @@ async function saveRelayStore() {
   await relayPersistence.save(toStoredRelayState());
 }
 
-server.listen(port, () => {
-  console.log(`multAIplayer relay listening on http://127.0.0.1:${port}`);
-});
+export function listenRelayServer() {
+  server.listen(port, () => {
+    console.log(`multAIplayer relay listening on http://127.0.0.1:${port}`);
+  });
+  return server;
+}
 
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, () => {
-    if (saveTimer) {
-      clearTimeout(saveTimer);
-      saveTimer = null;
-    }
-    saveRelayStore()
-      .catch((error) => console.error("Failed to save relay store before shutdown:", error))
-      .finally(() => process.exit(0));
+export async function flushRelayStore() {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  await saveRelayStore();
+}
+
+export function closeRelayServer() {
+  return new Promise<void>((resolve, reject) => {
+    server.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
   });
 }
