@@ -90,7 +90,6 @@ import {
   runCodexTurn,
   runGitWorkflow,
   runShellCommand,
-  searchProjectFiles,
   startTerminal,
   detectLocalPreviewServers,
   startLocalPreviewTunnel,
@@ -136,6 +135,7 @@ import { useHistorySearch } from "./hooks/useHistorySearch";
 import { useRoomGitStatusRefresh } from "./hooks/useRoomGitStatusRefresh";
 import { useGitHubRemoteInference } from "./hooks/useGitHubRemoteInference";
 import { useGitHubActionsDraftReset } from "./hooks/useGitHubActionsDraftReset";
+import { useProjectFilesSearch } from "./hooks/useProjectFilesSearch";
 import {
   canApproveCodexTurn,
   shouldAutoApproveChatOnlyTurn,
@@ -1592,37 +1592,19 @@ export function App() {
     setActionsBusyByRoom
   });
 
-  useEffect(() => {
-    if (!hasSelectedRoom) {
-      return;
-    }
-    const roomId = selectedRoom.id;
-    if (!canReadLocalWorkspace) {
-      setProjectFilesForRoom(roomId, []);
-      setSelectedFileForRoom(roomId, null);
-      setSelectedDiffForRoom(roomId, null);
-      setFileBusyForRoom(roomId, false);
-      setFileMessageForRoom(roomId, localWorkspaceMessage);
-      return;
-    }
-    let cancelled = false;
-    setFileBusyForRoom(roomId, true);
-    searchProjectFiles(selectedRoom.projectPath, fileQueriesByRoom[roomId] ?? "", 80)
-      .then((files) => {
-        if (cancelled) return;
-        setProjectFilesForRoom(roomId, files);
-        setFileMessageForRoom(roomId, null);
-      })
-      .catch((error) => {
-        if (!cancelled) setFileMessageForRoom(roomId, String(error));
-      })
-      .finally(() => {
-        if (!cancelled) setFileBusyForRoom(roomId, false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [canReadLocalWorkspace, fileQueriesByRoom, hasSelectedRoom, localWorkspaceMessage, selectedRoom.id, selectedRoom.projectPath]);
+  useProjectFilesSearch({
+    hasSelectedRoom,
+    canReadLocalWorkspace,
+    selectedRoomId: selectedRoom.id,
+    selectedRoomProjectPath: selectedRoom.projectPath,
+    fileQueriesByRoom,
+    localWorkspaceMessage,
+    setProjectFilesForRoom,
+    setSelectedFileForRoom,
+    setSelectedDiffForRoom,
+    setFileBusyForRoom,
+    setFileMessageForRoom
+  });
 
   useEffect(() => {
     if (!hasSelectedRoom) {
