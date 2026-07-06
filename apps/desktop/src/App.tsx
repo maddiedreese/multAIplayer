@@ -117,20 +117,7 @@ export function App() {
     browserPanelState,
     githubWorkflowPanelState,
     filePanelState,
-    inviteRequestsByRoom,
-    setInviteRequestsByRoom,
-    inviteSecretInput,
-    setInviteSecretInput,
-    inviteLinksByRoom,
-    setInviteLinksByRoom,
-    inviteApprovalGatesByRoom,
-    setInviteApprovalGatesByRoom,
-    inviteMessagesByRoom,
-    setInviteMessagesByRoom,
-    keyRotationBusyByRoom,
-    setKeyRotationBusyByRoom,
-    inviteAdmissionsByRoom,
-    setInviteAdmissionsByRoom,
+    invitePanelState,
     shellLayout
   } = useAppStateSlices({
     workspace: {
@@ -150,7 +137,7 @@ export function App() {
     gitWorkflowDraftsByRoom: githubWorkflowPanelState.gitWorkflowDraftsByRoom,
     hostBusyByRoom: roomSettingsState.hostBusyByRoom,
     settingsBusyByRoom: roomSettingsState.settingsBusyByRoom,
-    keyRotationBusyByRoom,
+    keyRotationBusyByRoom: invitePanelState.keyRotationBusyByRoom,
     gitWorkflowBusyByRoom: githubWorkflowPanelState.gitWorkflowBusyByRoom,
     actionsBusyByRoom: githubWorkflowPanelState.actionsBusyByRoom,
     localPreviewBusyByRoom: localPreviewState.localPreviewBusyByRoom,
@@ -274,9 +261,9 @@ export function App() {
       filePreviewTabsByRoom: filePanelState.filePreviewTabsByRoom,
       fileBusyByRoom: filePanelState.fileBusyByRoom,
       fileMessagesByRoom: filePanelState.fileMessagesByRoom,
-      inviteLinksByRoom,
-      inviteApprovalGatesByRoom,
-      inviteMessagesByRoom,
+      inviteLinksByRoom: invitePanelState.inviteLinksByRoom,
+      inviteApprovalGatesByRoom: invitePanelState.inviteApprovalGatesByRoom,
+      inviteMessagesByRoom: invitePanelState.inviteMessagesByRoom,
       hostMessagesByRoom: roomSettingsState.hostMessagesByRoom,
       chatMessagesByRoom: roomChatState.chatMessagesByRoom,
       settingsMessagesByRoom: roomSettingsState.settingsMessagesByRoom,
@@ -380,7 +367,7 @@ export function App() {
       setLocalPreviewBusyByRoom: localPreviewState.setLocalPreviewBusyByRoom,
       setHostBusyByRoom: roomSettingsState.setHostBusyByRoom,
       setSettingsBusyByRoom: roomSettingsState.setSettingsBusyByRoom,
-      setKeyRotationBusyByRoom,
+      setKeyRotationBusyByRoom: invitePanelState.setKeyRotationBusyByRoom,
       setFileBusyByRoom: filePanelState.setFileBusyByRoom,
       setTerminalBusyByRoom: terminalPanelState.setTerminalBusyByRoom
     },
@@ -419,9 +406,9 @@ export function App() {
     },
     invites: {
       selectedRoomId: selectedRoom.id,
-      setInviteLinksByRoom,
-      setInviteApprovalGatesByRoom,
-      setInviteMessagesByRoom
+      setInviteLinksByRoom: invitePanelState.setInviteLinksByRoom,
+      setInviteApprovalGatesByRoom: invitePanelState.setInviteApprovalGatesByRoom,
+      setInviteMessagesByRoom: invitePanelState.setInviteMessagesByRoom
     },
     drafts: {
       setPendingAttachmentsByRoom: roomChatState.setPendingAttachmentsByRoom,
@@ -446,11 +433,11 @@ export function App() {
       setGitHubActionsEventsByRoom,
       setLocalPreviewsByRoom: localPreviewState.setLocalPreviewsByRoom,
       setHostHandoffsByRoom,
-      setInviteRequestsByRoom,
+      setInviteRequestsByRoom: invitePanelState.setInviteRequestsByRoom,
       setCodexEventsByRoom
     },
     requests: {
-      setInviteRequestsByRoom,
+      setInviteRequestsByRoom: invitePanelState.setInviteRequestsByRoom,
       setTerminalRequestsByRoom: terminalPanelState.setTerminalRequestsByRoom,
       setBrowserRequestsByRoom: browserPanelState.setBrowserRequestsByRoom
     }
@@ -470,7 +457,7 @@ export function App() {
     setRevokedRoomIds,
     setRevokedTeamIds,
     setForgottenRoomIds,
-    setInviteAdmissionsByRoom,
+    setInviteAdmissionsByRoom: invitePanelState.setInviteAdmissionsByRoom,
     setPresenceByRoom,
     setInviteLinkForRoom,
     setInviteMessageForRoom,
@@ -565,7 +552,7 @@ export function App() {
     terminalRequestsByRoom: terminalPanelState.terminalRequestsByRoom,
     localPreviewsByRoom: localPreviewState.localPreviewsByRoom,
     localPreviewBusyByRoom: localPreviewState.localPreviewBusyByRoom,
-    inviteRequestsByRoom,
+    inviteRequestsByRoom: invitePanelState.inviteRequestsByRoom,
     codexEventsByRoom,
     gitWorkflowEventsByRoom,
     githubActionsEventsByRoom,
@@ -573,7 +560,7 @@ export function App() {
     codexRunningByRoom,
     hostBusyByRoom: roomSettingsState.hostBusyByRoom,
     settingsBusyByRoom: roomSettingsState.settingsBusyByRoom,
-    keyRotationBusyByRoom
+    keyRotationBusyByRoom: invitePanelState.keyRotationBusyByRoom
   });
   const hostHandoffActions = useHostHandoffActions({
     hasSelectedRoom,
@@ -619,7 +606,7 @@ export function App() {
     hostGateMessage: roomInteraction.hostGateMessage,
     inviteApprovalGate,
     inviteRequests: selectedRuntime.inviteRequests,
-    inviteSecretInput,
+    inviteSecretInput: invitePanelState.inviteSecretInput,
     localUser: localIdentity.localUser,
     deviceId: localIdentity.deviceId,
     deviceIdentity: appRuntimeState.deviceIdentity,
@@ -636,13 +623,13 @@ export function App() {
     setSelectedInviteMessage,
     setInviteMessageForRoom,
     setInviteLinkForRoom,
-    setInviteSecretInput,
+    setInviteSecretInput: invitePanelState.setInviteSecretInput,
     setSelectedTeam: workspaceState.setSelectedTeam,
     setSelectedRoomId: workspaceState.setSelectedRoomId,
     setForgottenRoomIds,
     setRevokedRoomIds,
     setRevokedTeamIds,
-    setInviteAdmissionsByRoom,
+    setInviteAdmissionsByRoom: invitePanelState.setInviteAdmissionsByRoom,
     setMessagesByRoom: workspaceState.setMessagesByRoom,
     setKeyRotationBusyForRoom
   });
@@ -815,7 +802,7 @@ export function App() {
         setMessagesByRoom: workspaceState.setMessagesByRoom,
         setTerminalRequestsByRoom: terminalPanelState.setTerminalRequestsByRoom,
         setBrowserRequestsByRoom: browserPanelState.setBrowserRequestsByRoom,
-        setInviteRequestsByRoom,
+        setInviteRequestsByRoom: invitePanelState.setInviteRequestsByRoom,
         setCodexEventsByRoom,
         setGitWorkflowEventsByRoom,
         setGitHubActionsEventsByRoom,
@@ -841,7 +828,7 @@ export function App() {
         setSettingsMessagesByRoom: roomSettingsState.setSettingsMessagesByRoom,
         setCustomCodexModelsByRoom: roomSettingsState.setCustomCodexModelsByRoom,
         setProjectPathDraftsByRoom: roomSettingsState.setProjectPathDraftsByRoom,
-        setKeyRotationBusyByRoom,
+        setKeyRotationBusyByRoom: invitePanelState.setKeyRotationBusyByRoom,
         setApprovalVisibleByRoom,
         setPendingCodexApprovalsByRoom,
         setCodexRunningByRoom,
@@ -863,9 +850,9 @@ export function App() {
         setBrowserUrlsByRoom: browserPanelState.setBrowserUrlsByRoom,
         setBrowserReasonsByRoom: browserPanelState.setBrowserReasonsByRoom,
         setBrowserMessagesByRoom: browserPanelState.setBrowserMessagesByRoom,
-        setInviteLinksByRoom,
-        setInviteApprovalGatesByRoom,
-        setInviteMessagesByRoom,
+        setInviteLinksByRoom: invitePanelState.setInviteLinksByRoom,
+        setInviteApprovalGatesByRoom: invitePanelState.setInviteApprovalGatesByRoom,
+        setInviteMessagesByRoom: invitePanelState.setInviteMessagesByRoom,
         setDraftsByRoom: roomChatState.setDraftsByRoom,
         setForgottenRoomIds,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds
@@ -904,7 +891,7 @@ export function App() {
       setMessagesByRoom: workspaceState.setMessagesByRoom,
       setTerminalRequestsByRoom: terminalPanelState.setTerminalRequestsByRoom,
       setBrowserRequestsByRoom: browserPanelState.setBrowserRequestsByRoom,
-      setInviteRequestsByRoom,
+      setInviteRequestsByRoom: invitePanelState.setInviteRequestsByRoom,
       setCodexEventsByRoom,
       setGitWorkflowEventsByRoom,
       setGitHubActionsEventsByRoom,
@@ -954,7 +941,7 @@ export function App() {
         selectedRoom,
         hasSelectedRoom,
         isActiveHost: roomInteraction.isActiveHost,
-        inviteAdmissionsByRoom,
+        inviteAdmissionsByRoom: invitePanelState.inviteAdmissionsByRoom,
         revokedRoomIds,
         revokedTeamIds,
         approvalPolicyLabels,
@@ -1485,11 +1472,11 @@ export function App() {
     encryptedInvite: {
       inviteApprovalGate,
       copyDisabled: !roomInteraction.canCopyRoomInvite,
-      inviteSecretInput,
+      inviteSecretInput: invitePanelState.inviteSecretInput,
       inviteRequests: selectedRuntime.inviteRequests,
       localDeviceId: localIdentity.deviceId,
       gateDisabled: !hasSelectedRoom || roomInteraction.isSelectedRoomLocked,
-      importDisabled: !inviteSecretInput.trim(),
+      importDisabled: !invitePanelState.inviteSecretInput.trim(),
       rotateDisabled:
         !hasSelectedRoom ||
         roomInteraction.isSelectedRoomLocked ||
@@ -1502,7 +1489,7 @@ export function App() {
       inviteMessage,
       onCopyInvite: inviteActions.copyInviteLink,
       onInviteApprovalGateChange: (enabled) => setInviteApprovalGateForRoom(selectedRoom.id, enabled),
-      onInviteSecretInputChange: setInviteSecretInput,
+      onInviteSecretInputChange: invitePanelState.setInviteSecretInput,
       onImportInvite: inviteActions.joinInviteSecret,
       onRotateRoomKey: inviteActions.rotateSelectedRoomKey,
       onDecideInviteRequest: inviteActions.decideInviteJoinRequest
