@@ -33,7 +33,7 @@ import { useRoomChatMutations } from "./hooks/useRoomChatMutations";
 import { useAppRoomInteractionContext } from "./hooks/useAppRoomInteractionContext";
 import { useAppRoomScopedSetters } from "./hooks/useAppRoomScopedSetters";
 import { useAppSelectedRoomRuntime } from "./hooks/useAppSelectedRoomRuntime";
-import { useRoomDisplayContext } from "./hooks/useRoomDisplayContext";
+import { useAppRoomDisplayContext } from "./hooks/useAppRoomDisplayContext";
 import { useThemeMode } from "./hooks/useThemeMode";
 import { useWorkspaceRecordActions } from "./hooks/useWorkspaceRecordActions";
 import { useHostHandoffActions } from "./hooks/useHostHandoffActions";
@@ -377,37 +377,11 @@ export function App() {
     setKeyRotationBusyForRoom
   });
 
-  const roomDisplay = useRoomDisplayContext({
-    fileTerminal: {
-      selectedFile,
-      selectedRoomId: selectedRoom.id,
-      selectedRoomProjectPath: selectedRoom.projectPath,
-      sensitiveAttachmentReviewKey: roomChatState.sensitiveAttachmentReviewKey,
-      selectedTerminal: selectedRuntime.selectedTerminal,
-      terminalLines,
-      terminalCommand,
-      terminalRequests: selectedRuntime.terminalRequests,
-      codexEvents: selectedRuntime.codexEvents
-    },
-    sidebar: {
-      sidebarQuery: workspaceState.sidebarQuery,
-      rooms: workspaceState.rooms,
-      teams: workspaceState.teams,
-      selectedTeam: workspaceState.selectedTeam,
-      selectedRoomId: workspaceState.selectedRoomId,
-      messagesByRoom: workspaceState.messagesByRoom,
-      historySearchMessagesByRoom: appRuntimeState.historySearchMessagesByRoom,
-      approvalVisibleByRoom: codexRoomState.approvalVisibleByRoom,
-      terminalRequestsByRoom: terminalPanelState.terminalRequestsByRoom,
-      browserRequestsByRoom: browserPanelState.browserRequestsByRoom,
-      approvalPolicyLabels
-    },
-    teamMembers: {
-      selectedTeam: workspaceState.selectedTeam,
-      relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
-      setTeamMembersByTeam: workspaceState.setTeamMembersByTeam,
-      setTeamMembersMessageByTeam: workspaceState.setTeamMembersMessageByTeam
-    }
+  const roomDisplay = useAppRoomDisplayContext({
+    appState,
+    selected: selectedContext,
+    selectedRuntime,
+    approvalPolicyLabels
   });
   const workspaceFlow = useWorkspaceFlowContext({
     bootstrap: {
