@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from "react";
 import type {
-  CodexTurnSummary,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
   LocalPreviewPlaintextPayload,
@@ -57,11 +56,8 @@ import { useTerminalLifecycle } from "./hooks/useTerminalLifecycle";
 import { useLocalHistoryPersistence } from "./hooks/useLocalHistoryPersistence";
 import { useTerminalAutoOpen } from "./hooks/useTerminalAutoOpen";
 import { useLocalHistoryHydration } from "./hooks/useLocalHistoryHydration";
-import {
-  canApproveCodexTurn,
-  shouldAutoApproveChatOnlyTurn
-} from "./lib/codexApproval";
-import { buildCodexApprovalSnapshot, buildCodexTurnInput, buildCodexTurnSummary } from "./lib/codexTurn";
+import { canApproveCodexTurn } from "./lib/codexApproval";
+import { buildCodexTurnInput, buildCodexTurnSummary } from "./lib/codexTurn";
 import { normalizeCodexThreadId } from "./lib/codexThread";
 import {
   normalizeRoomName
@@ -72,7 +68,7 @@ import { attachmentReviewScopeKey } from "./lib/attachmentPolicy";
 import { canUseLocalWorkspace } from "./lib/workspaceAccess";
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
-import { extractCodexBrowserOpenUrl, messageInvokesCodex } from "./lib/codexInvoke";
+import { extractCodexBrowserOpenUrl } from "./lib/codexInvoke";
 import { classifyCodexFailure, codexUsageLimitMessage } from "./lib/codexFailure";
 import type { FilePreviewTab } from "./lib/filePreview";
 import type { GitHubActionsTarget } from "./lib/githubWorkflowReadiness";
@@ -90,8 +86,7 @@ import {
   formatCodexModel,
   formatMessageTime,
   formatSessionPersistence,
-  formatTimestamp,
-  validatePendingAttachments
+  formatTimestamp
 } from "./lib/appFormatters";
 import {
   quickTunnelDisclaimer,
@@ -151,6 +146,7 @@ import { useHostHandoffActions } from "./hooks/useHostHandoffActions";
 import { useInviteActions } from "./hooks/useInviteActions";
 import { useGitWorkflowActions } from "./hooks/useGitWorkflowActions";
 import { useChatActions } from "./hooks/useChatActions";
+import { useCodexInvokeActions } from "./hooks/useCodexInvokeActions";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   hasAcknowledgedRoomVisibilityWarning
@@ -862,6 +858,37 @@ export function App() {
     keyRotationBusyByRoom
   });
   const roomCanUseChat = canUseRoomChat(selectedRoom, isSelectedRoomLocked);
+  const {
+    handleCodexInvoke,
+    sendMessage
+  } = useCodexInvokeActions({
+    hasSelectedRoom,
+    selectedRoom,
+    selectedRoomIdRef,
+    isSelectedRoomLocked,
+    isSelectedRoomRevoked,
+    isActiveHost,
+    canReadLocalWorkspace,
+    hostGateMessage,
+    localUser,
+    draft,
+    pendingAttachments,
+    messages,
+    roomTerminals,
+    browserRequests,
+    gitStatus,
+    publishChatMessage,
+    handleCodexBrowserOpenCommand,
+    approveCodexTurn,
+    setSelectedChatMessage,
+    setChatMessageForRoom,
+    setSelectedHostMessage,
+    setHostMessageForRoom,
+    setPendingCodexApprovalForRoom,
+    setApprovalVisibleForRoom,
+    setDraftForRoom,
+    setPendingAttachmentsForRoom
+  });
   const {
     setRoomHost,
     acceptHostHandoff,
@@ -1648,101 +1675,6 @@ export function App() {
     setCustomCodexModelsByRoom,
     setProjectPathDraftsByRoom
   });
-
-  async function sendMessage() {
-    if (!hasSelectedRoom) {
-      setSelectedChatMessage("Create or join a room before sending messages.");
-      return;
-    }
-    const roomId = selectedRoom.id;
-    if (isSelectedRoomLocked) {
-      setChatMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
-      return;
-    }
-    if (!canUseRoomChat(selectedRoom)) {
-      setChatMessageForRoom(roomId, roomChatGateMessage(selectedRoom));
-      return;
-    }
-    const attachments = pendingAttachments;
-    const body = draft.trim();
-    if (!body && attachments.length === 0) return;
-    const attachmentError = validatePendingAttachments(attachments);
-    if (attachmentError) {
-      setChatMessageForRoom(roomId, attachmentError);
-      return;
-    }
-    const invokesCodex = messageInvokesCodex(body);
-    const createdAt = new Date().toISOString();
-    const message: ChatMessage = {
-      id: crypto.randomUUID(),
-      author: localUser.name,
-      role: invokesCodex ? "system" : "human",
-      body: body || "Attached files.",
-      time: formatMessageTime(createdAt),
-      createdAt,
-      attachments: attachments.length ? attachments : undefined
-    };
-    await publishChatMessage(message);
-    if (invokesCodex) {
-      if (!handleCodexBrowserOpenCommand(message, selectedRoom)) handleCodexInvoke(message);
-    }
-    setDraftForRoom(roomId, "");
-    setPendingAttachmentsForRoom(roomId, []);
-  }
-
-  function handleCodexInvoke(pendingMessage?: ChatMessage) {
-    if (!hasSelectedRoom) {
-      setSelectedHostMessage("Create or join a room before invoking Codex.");
-      return;
-    }
-    const roomId = selectedRoom.id;
-    if (isSelectedRoomLocked) {
-      setHostMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
-      setApprovalVisibleForRoom(roomId, false);
-      return;
-    }
-    if (!canUseRoomChat(selectedRoom)) {
-      setHostMessageForRoom(roomId, roomChatGateMessage(selectedRoom));
-      setApprovalVisibleForRoom(roomId, false);
-      return;
-    }
-    if (!selectedRoom.mode.code) {
-      setHostMessageForRoom(roomId, "Code mode is disabled for this room.");
-      setApprovalVisibleForRoom(roomId, false);
-      return;
-    }
-    if (selectedRoom.approvalPolicy === "never_host") {
-      setHostMessageForRoom(roomId, "This room is set to never host Codex turns.");
-      setPendingCodexApprovalForRoom(roomId, null);
-      setApprovalVisibleForRoom(roomId, false);
-      return;
-    }
-    const approvalSnapshot = buildCodexApprovalSnapshot(selectedRoom, messages, pendingMessage, roomTerminals, browserRequests, gitStatus, {
-      includeWorkspaceContext: canReadLocalWorkspace
-    });
-    if (selectedRoom.approvalPolicy === "auto_chat_only") {
-      if (shouldAutoApproveChatOnlyTurn(approvalSnapshot.summary, isActiveHost)) {
-        setPendingCodexApprovalForRoom(roomId, null);
-        setApprovalVisibleForRoom(roomId, false);
-        setHostMessageForRoom(roomId, "Auto-approved chat-only Codex turn.");
-        approveCodexTurn(approvalSnapshot).catch((error) => {
-          if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessageForRoom(roomId, String(error));
-        });
-        return;
-      }
-      setPendingCodexApprovalForRoom(roomId, approvalSnapshot);
-      setApprovalVisibleForRoom(roomId, true);
-      setHostMessageForRoom(
-        roomId,
-        isActiveHost
-          ? "This turn includes workspace, browser, terminal, or attachment context, so host approval is required."
-          : hostGateMessage
-      );
-      return;
-    }
-    setPendingCodexApprovalForRoom(roomId, approvalSnapshot);
-    setApprovalVisibleForRoom(roomId, true);
-  }
 
   function handleCodexBrowserOpenCommand(message: ChatMessage, room: RoomRecord): boolean {
     const url = extractCodexBrowserOpenUrl(message.body);
