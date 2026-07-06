@@ -21,6 +21,7 @@ const MAX_CODEX_INPUT_CHARS: usize = 240_000;
 const MAX_CODEX_THREAD_ID_CHARS: usize = 200;
 const MAX_DEVICE_IDENTITY_CHARS: usize = 16_384;
 const MAX_GIT_DIFF_CHARS: usize = 200_000;
+const MAX_GIT_PATCH_CHARS: usize = 120_000;
 const MAX_COMMAND_OUTPUT_CHARS: usize = 120_000;
 const MAX_GIT_BRANCH_CHARS: usize = 200;
 const MAX_COMMIT_MESSAGE_CHARS: usize = 500;
@@ -116,6 +117,34 @@ struct GitRemoteInfo {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct GitPatchResult {
+    patch: String,
+    truncated: bool,
+    dirty_files: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GitCloneResult {
+    path: String,
+    command: String,
+    status: Option<i32>,
+    stdout: String,
+    stderr: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GitApplyPatchResult {
+    command: String,
+    cwd: String,
+    status: Option<i32>,
+    stdout: String,
+    stderr: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ProjectFileEntry {
     path: String,
     size: u64,
@@ -151,6 +180,21 @@ struct ProjectFileReadRequest {
 struct GitDiffRequest {
     cwd: String,
     path: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GitCloneRequest {
+    remote_url: String,
+    parent_dir: String,
+    branch: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GitApplyPatchRequest {
+    cwd: String,
+    patch: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -369,6 +413,131 @@ fn git_remote_origin(cwd: String) -> Result<GitRemoteInfo, String> {
         } else {
             Some(origin_url)
         },
+    })
+}
+
+#[tauri::command]
+fn git_create_patch(cwd: String) -> Result<GitPatchResult, String> {
+    ensure_existing_dir(&cwd)?;
+    let status = git_status(cwd.clone())?;
+    if status.files.is_empty() {
+        return Ok(GitPatchResult {
+            patch: String::new(),
+            truncated: false,
+            dirty_files: Vec::new(),
+        });
+    }
+
+    let output = Command::new("git")
+        .args(["-C", &cwd, "diff", "--binary", "HEAD"])
+        .output()
+        .map_err(|error| format!("Failed to create git patch: {error}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+
+    let mut patch = String::from_utf8_lossy(&output.stdout).to_string();
+    for file in status
+        .files
+        .iter()
+        .filter(|file| file.status == "untracked")
+    {
+        let root = canonical_project_root(&cwd)?;
+        let requested = safe_project_path(&root, &file.path)?;
+        let output = Command::new("git")
+            .args([
+                "-C",
+                &cwd,
+                "diff",
+                "--binary",
+                "--no-index",
+                "--",
+                "/dev/null",
+            ])
+            .arg(&requested)
+            .output()
+            .map_err(|error| format!("Failed to create untracked file patch: {error}"))?;
+        if !output.stdout.is_empty() {
+            if !patch.is_empty() && !patch.ends_with('\n') {
+                patch.push('\n');
+            }
+            patch.push_str(&normalize_no_index_patch(
+                &String::from_utf8_lossy(&output.stdout),
+                &file.path,
+            ));
+        }
+    }
+
+    let truncated = patch.chars().count() > MAX_GIT_PATCH_CHARS;
+    Ok(GitPatchResult {
+        patch: bound_text_chars(
+            &patch,
+            MAX_GIT_PATCH_CHARS,
+            "\n\n[multAIplayer truncated this handoff patch. Ask the previous host to push or share a patch if needed.]\n",
+        ),
+        truncated,
+        dirty_files: status.files.into_iter().map(|file| file.path).collect(),
+    })
+}
+
+#[tauri::command]
+fn git_clone_repository(request: GitCloneRequest) -> Result<GitCloneResult, String> {
+    ensure_git_remote_url(&request.remote_url)?;
+    ensure_existing_dir(&request.parent_dir)?;
+    if let Some(branch) = request.branch.as_deref() {
+        if branch != "detached" {
+            ensure_safe_branch_name(branch)?;
+        }
+    }
+
+    let repo_name = repo_name_from_remote_url(&request.remote_url)?;
+    let target = next_available_clone_path(Path::new(&request.parent_dir), &repo_name)?;
+    let target_arg = target.to_string_lossy().to_string();
+    let mut command = Command::new("git");
+    command.arg("clone");
+    if let Some(branch) = request.branch.as_deref() {
+        if branch != "detached" {
+            command.args(["--branch", branch]);
+        }
+    }
+    command.args([&request.remote_url, &target_arg]);
+    let output = command
+        .output()
+        .map_err(|error| format!("Failed to run git clone: {error}"))?;
+    Ok(GitCloneResult {
+        path: target_arg,
+        command: format!("git clone {} {}", request.remote_url, target.display()),
+        status: output.status.code(),
+        stdout: bound_command_output(&output.stdout),
+        stderr: bound_command_output(&output.stderr),
+    })
+}
+
+#[tauri::command]
+fn git_apply_patch(request: GitApplyPatchRequest) -> Result<GitApplyPatchResult, String> {
+    ensure_existing_dir(&request.cwd)?;
+    ensure_git_patch(&request.patch)?;
+    let mut child = Command::new("git")
+        .args(["-C", &request.cwd, "apply", "--whitespace=nowarn", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("Failed to run git apply: {error}"))?;
+    if let Some(stdin) = child.stdin.as_mut() {
+        stdin
+            .write_all(request.patch.as_bytes())
+            .map_err(|error| format!("Failed to write handoff patch to git apply: {error}"))?;
+    }
+    let output = child
+        .wait_with_output()
+        .map_err(|error| format!("Failed to read git apply output: {error}"))?;
+    Ok(GitApplyPatchResult {
+        command: "git apply --whitespace=nowarn -".to_string(),
+        cwd: request.cwd,
+        status: output.status.code(),
+        stdout: bound_command_output(&output.stdout),
+        stderr: bound_command_output(&output.stderr),
     })
 }
 
@@ -1158,6 +1327,79 @@ fn ensure_project_path(cwd: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn ensure_git_remote_url(remote_url: &str) -> Result<(), String> {
+    let trimmed = remote_url.trim();
+    if trimmed.is_empty()
+        || trimmed != remote_url
+        || trimmed.chars().count() > MAX_PROJECT_PATH_CHARS
+    {
+        return Err("Git remote URL is invalid".to_string());
+    }
+    if trimmed.chars().any(char::is_control) {
+        return Err("Git remote URL cannot contain control characters".to_string());
+    }
+    if trimmed.starts_with("https://github.com/")
+        || trimmed.starts_with("git@github.com:")
+        || trimmed.starts_with("ssh://git@github.com/")
+    {
+        Ok(())
+    } else {
+        Err("Only GitHub remotes can be cloned from a host handoff.".to_string())
+    }
+}
+
+fn ensure_git_patch(patch: &str) -> Result<(), String> {
+    if patch.trim().is_empty() {
+        return Err("Handoff patch is empty".to_string());
+    }
+    if patch.chars().count() > MAX_GIT_PATCH_CHARS {
+        return Err(format!(
+            "Handoff patch must be {MAX_GIT_PATCH_CHARS} characters or fewer"
+        ));
+    }
+    if patch.chars().any(|character| character == '\0') {
+        return Err("Handoff patch cannot contain null bytes".to_string());
+    }
+    Ok(())
+}
+
+fn repo_name_from_remote_url(remote_url: &str) -> Result<String, String> {
+    ensure_git_remote_url(remote_url)?;
+    let trimmed = remote_url.trim_end_matches('/');
+    let name = trimmed
+        .rsplit(['/', ':'])
+        .next()
+        .unwrap_or("")
+        .trim_end_matches(".git");
+    if name.is_empty()
+        || name.starts_with('.')
+        || name.chars().count() > 100
+        || !name.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.')
+        })
+    {
+        return Err("Git remote repository name is invalid".to_string());
+    }
+    Ok(name.to_string())
+}
+
+fn next_available_clone_path(parent_dir: &Path, repo_name: &str) -> Result<PathBuf, String> {
+    let parent = fs::canonicalize(parent_dir)
+        .map_err(|error| format!("Failed to resolve clone parent folder: {error}"))?;
+    for index in 0..100 {
+        let suffix = if index == 0 {
+            String::new()
+        } else {
+            format!("-{index}")
+        };
+        let candidate = parent.join(format!("{repo_name}{suffix}"));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+    Err("Could not find an available clone folder name.".to_string())
+}
+
 fn safe_project_path(root: &Path, relative_path: &str) -> Result<PathBuf, String> {
     let relative = Path::new(relative_path);
     if relative.is_absolute()
@@ -1198,6 +1440,23 @@ fn untracked_file_diff(path: &Path, display_path: &str) -> Result<String, String
         .collect::<Vec<_>>()
         .join("\n");
     Ok(bound_git_diff(&diff))
+}
+
+fn normalize_no_index_patch(diff: &str, display_path: &str) -> String {
+    diff.lines()
+        .map(|line| {
+            if line.starts_with("diff --git ") {
+                format!("diff --git a/{display_path} b/{display_path}")
+            } else if line.starts_with("+++ ") {
+                format!("+++ b/{display_path}")
+            } else if line.starts_with("--- ") {
+                "--- /dev/null".to_string()
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn bound_git_diff(diff: &str) -> String {
@@ -1737,6 +1996,9 @@ pub fn run() {
             app_version,
             git_status,
             git_remote_origin,
+            git_create_patch,
+            git_clone_repository,
+            git_apply_patch,
             git_diff_file,
             project_files,
             project_file_read,
@@ -1864,6 +2126,100 @@ mod tests {
         assert!(bounded.contains("multAIplayer truncated this diff"));
         assert!(bounded.starts_with("start"));
         assert!(bounded.ends_with("end"));
+    }
+
+    #[test]
+    fn host_handoff_git_remote_validation_allows_github_only() {
+        assert!(ensure_git_remote_url("https://github.com/maddiedreese/multAIplayer.git").is_ok());
+        assert!(ensure_git_remote_url("git@github.com:maddiedreese/multAIplayer.git").is_ok());
+        assert!(
+            ensure_git_remote_url("ssh://git@github.com/maddiedreese/multAIplayer.git").is_ok()
+        );
+        assert!(
+            ensure_git_remote_url("https://example.com/maddiedreese/multAIplayer.git").is_err()
+        );
+        assert!(
+            ensure_git_remote_url(" https://github.com/maddiedreese/multAIplayer.git").is_err()
+        );
+    }
+
+    #[test]
+    fn host_handoff_repo_name_is_derived_from_remote() {
+        assert_eq!(
+            repo_name_from_remote_url("https://github.com/maddiedreese/multAIplayer.git")
+                .expect("repo name"),
+            "multAIplayer"
+        );
+        assert_eq!(
+            repo_name_from_remote_url("git@github.com:maddiedreese/multAIplayer.git")
+                .expect("repo name"),
+            "multAIplayer"
+        );
+    }
+
+    #[test]
+    fn host_handoff_patch_validation_bounds_payload() {
+        assert!(ensure_git_patch("diff --git a/README.md b/README.md\n").is_ok());
+        assert!(ensure_git_patch("").is_err());
+        assert!(ensure_git_patch(&"x".repeat(MAX_GIT_PATCH_CHARS + 1)).is_err());
+        assert!(ensure_git_patch("diff\0bad").is_err());
+    }
+
+    #[test]
+    fn host_handoff_patch_round_trips_tracked_changes() {
+        let source =
+            std::env::temp_dir().join(format!("multaiplayer-patch-source-{}", std::process::id()));
+        let target =
+            std::env::temp_dir().join(format!("multaiplayer-patch-target-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&source);
+        let _ = fs::remove_dir_all(&target);
+        fs::create_dir_all(&source).expect("create source repo");
+        fs::create_dir_all(&target).expect("create target repo");
+
+        for repo in [&source, &target] {
+            Command::new("git")
+                .args(["init"])
+                .current_dir(repo)
+                .output()
+                .expect("git init");
+            fs::write(repo.join("README.md"), "before\n").expect("seed file");
+            Command::new("git")
+                .args(["add", "README.md"])
+                .current_dir(repo)
+                .output()
+                .expect("git add");
+            Command::new("git")
+                .args([
+                    "-c",
+                    "user.name=multAIplayer",
+                    "-c",
+                    "user.email=test@example.com",
+                    "commit",
+                    "-m",
+                    "seed",
+                ])
+                .current_dir(repo)
+                .output()
+                .expect("git commit");
+        }
+
+        fs::write(source.join("README.md"), "after\n").expect("modify source file");
+        let patch = git_create_patch(source.to_string_lossy().to_string()).expect("create patch");
+        assert!(!patch.patch.is_empty());
+        assert!(!patch.truncated);
+        let applied = git_apply_patch(GitApplyPatchRequest {
+            cwd: target.to_string_lossy().to_string(),
+            patch: patch.patch,
+        })
+        .expect("apply patch");
+        assert_eq!(applied.status, Some(0), "{applied:?}");
+        assert_eq!(
+            fs::read_to_string(target.join("README.md")).expect("read target file"),
+            "after\n"
+        );
+
+        let _ = fs::remove_dir_all(source);
+        let _ = fs::remove_dir_all(target);
     }
 
     #[test]

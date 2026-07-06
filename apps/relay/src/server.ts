@@ -793,6 +793,7 @@ app.patch("/rooms/:roomId/settings", (req, res) => {
   if (!allowMutation(session, res)) return;
 
   const roomId = String(req.params.roomId ?? "");
+  const name = req.body?.name === undefined ? undefined : normalizeMetadataText(req.body.name, maxRoomNameChars);
   const approvalPolicy = req.body?.approvalPolicy === undefined ? undefined : String(req.body.approvalPolicy);
   const mode = req.body?.mode;
   const codexModel = req.body?.codexModel === undefined ? undefined : normalizeCodexModel(req.body.codexModel);
@@ -811,6 +812,10 @@ app.patch("/rooms/:roomId/settings", (req, res) => {
   }
   if (room.hostStatus === "active" && !isRoomHost(room, requester)) {
     res.status(403).json({ error: "Only the active host can change room settings." });
+    return;
+  }
+  if (req.body?.name !== undefined && !name) {
+    res.status(400).json({ error: `Room name is required and must be up to ${maxRoomNameChars} characters` });
     return;
   }
   if (approvalPolicy !== undefined && !isApprovalPolicy(approvalPolicy)) {
@@ -843,6 +848,7 @@ app.patch("/rooms/:roomId/settings", (req, res) => {
 
   const updated: RoomRecord = {
     ...room,
+    name: name ?? room.name,
     projectPath: projectPath ?? room.projectPath,
     approvalPolicy: approvalPolicy ?? room.approvalPolicy,
     mode: mode ?? room.mode,

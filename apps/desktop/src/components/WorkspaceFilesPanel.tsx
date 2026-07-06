@@ -1,4 +1,4 @@
-import { Copy, FileCode2, Plus, Search, ShieldAlert } from "lucide-react";
+import { Copy, FileCode2, Plus, Search, ShieldAlert, X } from "lucide-react";
 import type {
   GitDiffResult,
   GitStatusSummary,
@@ -31,7 +31,8 @@ export function WorkspaceFilesPanel({
   onOpenProjectFile,
   onCopyDiffSummaryMarkdown,
   onAttachSelectedFileToMessage,
-  onFilePreviewTabChange
+  onFilePreviewTabChange,
+  onCloseFileViewer
 }: {
   fileQuery: string;
   projectFiles: ProjectFileEntry[];
@@ -55,7 +56,125 @@ export function WorkspaceFilesPanel({
   onCopyDiffSummaryMarkdown: () => void;
   onAttachSelectedFileToMessage: () => void;
   onFilePreviewTabChange: (tab: FilePreviewTab) => void;
+  onCloseFileViewer: () => void;
 }) {
+  const viewerPath = selectedFile?.path ?? selectedDiff?.path ?? null;
+  if (viewerPath) {
+    const selectedFileName = viewerPath.split("/").at(-1) ?? viewerPath;
+    return (
+      <section className="panel file-viewer-open">
+        <div className="file-viewer-toolbar">
+          <button className="ghost icon-only" onClick={onCloseFileViewer} aria-label="Close file viewer">
+            <X size={15} />
+          </button>
+          <div>
+            <strong>{selectedFileName}</strong>
+            <span>{viewerPath}</span>
+          </div>
+          <button
+            className={selectedFileNeedsAttachmentReview && selectedSensitiveFileReviewed ? "ghost danger" : "ghost"}
+            onClick={onAttachSelectedFileToMessage}
+            disabled={!selectedFile || !canReadLocalWorkspace || !canAttachSelectedFile}
+          >
+            {selectedFileNeedsAttachmentReview && !selectedSensitiveFileReviewed ? <ShieldAlert size={14} /> : <Plus size={14} />}
+            {selectedAttachmentActionLabel}
+          </button>
+        </div>
+
+        <label className="file-search viewer-search">
+          <Search size={14} />
+          <input
+            value={fileQuery}
+            onChange={(event) => onFileQueryChange(event.target.value)}
+            placeholder="Search files in this project"
+            disabled={!canReadLocalWorkspace}
+          />
+        </label>
+
+        <div className="file-viewer-switcher">
+          <label>
+            <span>File</span>
+            <select
+              value={projectFiles.some((file) => file.path === viewerPath) ? viewerPath : ""}
+              onChange={(event) => {
+                if (event.target.value) onOpenProjectFile(event.target.value, "file");
+              }}
+              disabled={!canReadLocalWorkspace || projectFiles.length === 0}
+            >
+              <option value="">Choose file</option>
+              {projectFiles.map((file) => (
+                <option key={file.path} value={file.path}>
+                  {file.path} · {formatBytes(file.size)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Diff</span>
+            <select
+              value={gitStatus?.files.some((file) => file.path === viewerPath) && filePreviewTab === "diff" ? viewerPath : ""}
+              onChange={(event) => {
+                if (event.target.value) onOpenProjectFile(event.target.value, "diff");
+              }}
+              disabled={!canReadLocalWorkspace || !gitStatus?.files.length}
+            >
+              <option value="">Choose diff</option>
+              {(gitStatus?.files ?? []).map((file) => (
+                <option key={file.path} value={file.path}>
+                  {file.path} · +{file.added} -{file.removed}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {selectedFileRisks.length > 0 && (
+          <InlineSecretWarning
+            risks={selectedFileRisks}
+            detail={selectedAttachmentWarningDetail}
+          />
+        )}
+        <div className="file-viewer-meta">
+          <FilePreviewTabs
+            activeTab={filePreviewTab}
+            hasDiff={Boolean(selectedDiff?.diff.trim())}
+            onSelectTab={onFilePreviewTabChange}
+          />
+          <small className={selectedFile?.truncated ? "panel-state attention" : "panel-state"}>
+            {selectedFile
+              ? selectedFile.truncated
+                ? "Truncated"
+                : formatBytes(selectedFile.size)
+              : "Diff only"}
+          </small>
+        </div>
+        <div className="file-viewer-body">
+          {filePreviewTab === "diff" && selectedDiff?.diff.trim() ? (
+            <div className="diff-code" aria-label={`Diff for ${selectedDiff.path}`}>
+              {parseDiffLines(selectedDiff.diff).map((line, index) => (
+                <div className={`diff-code-line ${line.kind}`} key={`${index}-${line.text}`}>
+                  <span>{line.prefix || " "}</span>
+                  <code>{line.text}</code>
+                </div>
+              ))}
+            </div>
+          ) : (
+            selectedFile ? (
+              <pre>
+                <code>
+{selectedFile.content}
+                </code>
+              </pre>
+            ) : (
+              <div className="empty-state compact">No current file content is available for this diff.</div>
+            )
+          )}
+        </div>
+        {fileMessage && <div className="workflow-message">{fileMessage}</div>}
+      </section>
+    );
+  }
+
   return (
     <>
       <section className="panel">
@@ -77,7 +196,7 @@ export function WorkspaceFilesPanel({
         <div className="file-list">
           {projectFiles.map((file) => (
             <button
-              className={selectedFile?.path === file.path ? "file-row active" : "file-row"}
+              className="file-row"
               key={file.path}
               onClick={() => onOpenProjectFile(file.path, "file")}
               disabled={!canReadLocalWorkspace}
@@ -117,58 +236,6 @@ export function WorkspaceFilesPanel({
             <div className="empty-state">No local file changes in this project.</div>
           )}
         </div>
-      </section>
-
-      <section className="panel diff-preview">
-        <div className="panel-title">
-          <span>{selectedFile ? selectedFile.path.split("/").at(-1) : "File preview"}</span>
-          <div className="panel-title-actions">
-            {selectedFile && (
-              <button
-                className={selectedFileNeedsAttachmentReview && selectedSensitiveFileReviewed ? "ghost danger" : "ghost"}
-                onClick={onAttachSelectedFileToMessage}
-                disabled={!canReadLocalWorkspace || !canAttachSelectedFile}
-              >
-                {selectedFileNeedsAttachmentReview && !selectedSensitiveFileReviewed ? <ShieldAlert size={14} /> : <Plus size={14} />}
-                {selectedAttachmentActionLabel}
-              </button>
-            )}
-            <small className={selectedFile?.truncated ? "panel-state attention" : "panel-state"}>
-              {selectedFile?.truncated ? "Truncated" : selectedFile ? formatBytes(selectedFile.size) : "No file selected"}
-            </small>
-          </div>
-        </div>
-        {selectedFileRisks.length > 0 && (
-          <InlineSecretWarning
-            risks={selectedFileRisks}
-            detail={selectedAttachmentWarningDetail}
-          />
-        )}
-        {selectedFile && (
-          <FilePreviewTabs
-            activeTab={filePreviewTab}
-            hasDiff={Boolean(selectedDiff?.diff.trim())}
-            onSelectTab={onFilePreviewTabChange}
-          />
-        )}
-        {!selectedFile ? (
-          <div className="empty-state preview-empty">Select a file or changed path to preview it here.</div>
-        ) : filePreviewTab === "diff" && selectedDiff?.diff.trim() ? (
-          <div className="diff-code" aria-label={`Diff for ${selectedDiff.path}`}>
-            {parseDiffLines(selectedDiff.diff).map((line, index) => (
-              <div className={`diff-code-line ${line.kind}`} key={`${index}-${line.text}`}>
-                <span>{line.prefix || " "}</span>
-                <code>{line.text}</code>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <pre>
-            <code>
-{selectedFile.content}
-            </code>
-          </pre>
-        )}
       </section>
     </>
   );

@@ -192,6 +192,24 @@ test("buildCodexTurnInput includes model, summary, and only the recent transcrip
   assert.doesNotMatch(input, /old answer/);
 });
 
+test("buildCodexTurnInput can include full room context for host continuation", () => {
+  const messages = [
+    { author: "Avery", role: "human" as const, body: "Initial task", time: "9:00 AM" },
+    { author: "Codex", role: "codex" as const, body: "Earlier answer", time: "9:01 AM" },
+    { author: "Jordan", role: "human" as const, body: "Continue this", time: "9:02 AM" }
+  ];
+  const summary = buildCodexTurnSummary(messages, room, [], [], null);
+  const input = buildCodexTurnInput(messages, room.projectPath, "gpt-5.4-mini", summary, {
+    fullRoomContext: true
+  });
+
+  assert.match(input, /host-continuation handoff/);
+  assert.match(input, /Full available room chat/);
+  assert.match(input, /Avery \(human, 9:00 AM\): Initial task/);
+  assert.match(input, /Codex \(codex, 9:01 AM\): Earlier answer/);
+  assert.match(input, /Jordan \(human, 9:02 AM\): Continue this/);
+});
+
 test("buildCodexTurnInput bounds oversized context before invoking native Codex", () => {
   const hugeMessages: CodexChatMessage[] = [
     { author: "Codex", role: "codex", body: "previous turn", time: "9:01 AM" },

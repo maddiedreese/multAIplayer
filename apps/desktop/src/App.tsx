@@ -87,7 +87,10 @@ import {
   type TrustedDeviceKey
 } from "./lib/deviceTrust";
 import {
+  applyGitPatch,
   chooseProjectFolder,
+  cloneGitRepository,
+  createGitPatch,
   defaultProjectPath,
   getGitDiff,
   getGitRemoteOrigin,
@@ -105,6 +108,8 @@ import {
   resetBrowserProfile,
   writeTerminal,
   type CodexProbe,
+  type GitApplyPatchResult,
+  type GitCloneResult,
   type GitDiffResult,
   type GitWorkflowResult,
   type GitStatusSummary,
@@ -166,6 +171,7 @@ import {
   maxRoomProjectPathChars,
   normalizeCodexModel,
   normalizeProjectPath,
+  normalizeRoomName,
   planRoomCreation,
   planTeamCreation
 } from "./lib/workspaceCreation";
@@ -173,9 +179,12 @@ import {
   canAcceptRoomHostHandoff,
   createHandoffSettingsPatch,
   findRoomHostHandoff,
+  handoffRepoIdentity,
+  hostHandoffDetail,
   isRoomHostMutationInFlight,
   roomHostHandoffMessage,
-  roomHostMutationInFlightMessage
+  roomHostMutationInFlightMessage,
+  sameHandoffRepo
 } from "./lib/hostHandoff";
 import { detectBrowserSecretRisks, detectSecretRisks, detectTerminalCommandRisks } from "./lib/secretRisks";
 import { createGitWorkflowApprovalPlan, formatGitWorkflowApprovalPreview } from "@multaiplayer/git";
@@ -207,7 +216,6 @@ import {
   roomBrowserRequestMessage,
   shouldAutoApproveBrowserRequest
 } from "./lib/browserPolicy";
-import { browserDecisionMessageId, buildBrowserDecisionMessage } from "./lib/browserActivity";
 import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
 import {
@@ -220,7 +228,8 @@ import {
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
-import { messageInvokesCodex } from "./lib/codexInvoke";
+import { extractCodexBrowserOpenUrl, messageInvokesCodex, normalizeBrowserCommandUrl } from "./lib/codexInvoke";
+import { classifyCodexFailure, codexUsageLimitMessage } from "./lib/codexFailure";
 import { resolveFilePreviewTab, type FilePreviewTab } from "./lib/filePreview";
 import { copyTextToClipboard } from "./lib/clipboard";
 import {
@@ -631,6 +640,7 @@ export function App() {
   const [revokedTeamIds, setRevokedTeamIds] = useState<Set<string>>(() => new Set());
   const [presenceByRoom, setPresenceByRoom] = useState<Record<string, Record<string, RoomPresence>>>({});
   const [hostHandoffsByRoom, setHostHandoffsByRoom] = useState<Record<string, HostHandoffRecord[]>>({});
+  const [codexContinuationByRoom, setCodexContinuationByRoom] = useState<Record<string, HostHandoffRecord>>({});
   const [inviteRequestsByRoom, setInviteRequestsByRoom] = useState<Record<string, InviteJoinRequest[]>>({});
   const [codexEventsByRoom, setCodexEventsByRoom] = useState<Record<string, CodexRoomEvent[]>>({});
   const [gitWorkflowEventsByRoom, setGitWorkflowEventsByRoom] = useState<Record<string, GitWorkflowEventPlaintextPayload[]>>({});
@@ -733,7 +743,9 @@ export function App() {
 
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? emptyRoom;
-  const inspectorTab = inspectorTabsByRoom[selectedRoom.id] ?? "files";
+  const inspectorTab = inspectorTabsByRoom[selectedRoom.id] === "diff"
+    ? "files"
+    : inspectorTabsByRoom[selectedRoom.id] ?? "files";
   const selectedTeamRecord = teams.find((team) => team.id === selectedTeam) ?? null;
   const selectedTeamName = selectedTeamRecord?.name ?? (teams.length ? "No team selected" : "No teams yet");
   const selectedTeamMembers = teamMembersByTeam[selectedTeam] ?? [];
@@ -764,8 +776,6 @@ export function App() {
   const browserRequests = browserRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const browserUrl = browserUrlsByRoom[selectedRoom?.id ?? selectedRoomId] ?? defaultBrowserUrl;
   const browserReason = browserReasonsByRoom[selectedRoom?.id ?? selectedRoomId] ?? defaultBrowserReason;
-  const browserMessage = browserMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
-  const browserStatus = browserStatusByRoom[selectedRoom?.id ?? selectedRoomId] ?? defaultBrowserStatus;
   const activeBrowserUrl = activeBrowserUrlsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const gitStatus = gitStatusByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const gitWorkflowDraft = resolveGitWorkflowDraft(gitWorkflowDraftsByRoom, selectedRoom?.id ?? selectedRoomId);
@@ -887,15 +897,8 @@ export function App() {
     () => terminals.filter((terminal) => terminal.roomId === selectedRoom.id),
     [terminals, selectedRoom.id]
   );
-  const codexTurnSummary = useMemo(
-    () => buildCodexTurnSummary(messages, selectedRoom, roomTerminals, browserRequests, gitStatus, {
-      includeWorkspaceContext: canReadLocalWorkspace
-    }),
-    [messages, selectedRoom, roomTerminals, browserRequests, gitStatus, canReadLocalWorkspace]
-  );
   const activeCodexApproval = pendingCodexApprovalsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const approvalVisible = approvalVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
-  const visibleCodexTurnSummary = activeCodexApproval?.summary ?? codexTurnSummary;
   const roomMembers = Object.values(presenceByRoom[selectedRoom?.id ?? selectedRoomId] ?? {})
     .filter((member) => member.status === "online")
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
@@ -932,19 +935,13 @@ export function App() {
   const githubActionsEvents = githubActionsEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const selectedCodexThreadId = codexThreadIdsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const codexRunning = codexRunningByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
+  const approvalTranscriptMessages = messagesSinceLastCodex(activeCodexApproval?.messages ?? messages) as ChatMessage[];
   const codexApprovalSummaryDisplay = {
-    messages: `${visibleCodexTurnSummary.messagesSinceLastCodex} since last Codex response`,
-    attachments: formatCodexAttachmentSummary(visibleCodexTurnSummary.attachments),
-    workspace: selectedRoom.mode.workspace ? visibleCodexTurnSummary.workspacePath ?? "None" : "Disabled",
-    git: formatCodexGitSummary(visibleCodexTurnSummary.git),
-    browser: selectedRoom.mode.browser ? visibleCodexTurnSummary.browserAccess.join(", ") || "No pages shared" : "Disabled",
-    terminals: visibleCodexTurnSummary.terminals.join(", ") || "None",
-    model: formatCodexModel(selectedCodexModel),
-    thread: formatCodexThreadId(selectedCodexThreadId),
-    policy: approvalPolicyLabels[selectedRoom.approvalPolicy]
+    messages: formatApprovalMessages(approvalTranscriptMessages),
+    attachments: formatApprovalAttachments(approvalTranscriptMessages)
   };
   const roomCanUseChat = canUseRoomChat(selectedRoom, isSelectedRoomLocked);
-  const chatMessageRows: RoomChatMessageDisplay[] = messages.map((message) => ({
+  const chatMessageRows: RoomChatMessageDisplay[] = messages.filter((message) => !isBrowserDecisionSystemMessage(message)).map((message) => ({
     id: message.id,
     author: message.author,
     role: message.role,
@@ -956,7 +953,7 @@ export function App() {
       name: attachment.name,
       meta: formatAttachmentMeta(attachment),
       encryptedBlob: Boolean(attachment.blobId),
-      canPreview: Boolean(attachment.blobId || attachment.content)
+      canPreview: canOpenChatAttachment(attachment)
     })),
     reactions: ["👍", "✅", "👀"].map((emoji) => {
       const reaction = message.reactions?.find((item) => item.emoji === emoji);
@@ -1307,13 +1304,6 @@ export function App() {
     () => rooms.filter((room) => room.teamId === selectedTeam),
     [rooms, selectedTeam]
   );
-  const visibleTeams = useMemo(
-    () =>
-      searchActive
-        ? teams.filter((team) => searchMatches([team.name], normalizedSidebarQuery))
-        : teams,
-    [normalizedSidebarQuery, searchActive, teams]
-  );
   const visibleRooms = useMemo(
     () =>
       searchActive
@@ -1326,6 +1316,14 @@ export function App() {
           })
         : teamRooms,
     [normalizedSidebarQuery, rooms, searchActive, teamRooms, teams]
+  );
+  const visibleTeams = useMemo(
+    () => {
+      if (!searchActive) return teams;
+      const visibleRoomTeamIds = new Set(visibleRooms.map((room) => room.teamId));
+      return teams.filter((team) => visibleRoomTeamIds.has(team.id) || searchMatches([team.name], normalizedSidebarQuery));
+    },
+    [normalizedSidebarQuery, searchActive, teams, visibleRooms]
   );
   const searchableMessagesByRoom = useMemo(() => {
     return mergeSearchableMessages(messagesByRoom, historySearchMessagesByRoom);
@@ -1788,6 +1786,8 @@ export function App() {
                 [message.envelope.roomId]: [...roomMessages, chatMessage]
               };
             });
+            const envelopeRoom = roomsRef.current.find((room) => room.id === message.envelope.roomId);
+            if (envelopeRoom) handleCodexBrowserOpenCommand(chatMessage, envelopeRoom);
           }
           if (message.envelope.kind === "chat.reaction") {
             const plaintext = await decryptJson<unknown>(roomPayload, secret);
@@ -1866,11 +1866,6 @@ export function App() {
               };
             });
             if (status === "approved" && envelopeRoom) {
-              appendBrowserDecisionMessage(
-                envelopeRoom.id,
-                buildLocalRequestStatusPayload(plaintext.id, "approved"),
-                { url: plaintext.url, requester: plaintext.requester }
-              );
               publishRequestStatus("browser.event", plaintext.id, "approved", envelopeRoom).catch((error) => {
                 if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, envelopeRoom.id)) setBrowserMessageForRoom(envelopeRoom.id, String(error));
               });
@@ -1882,7 +1877,6 @@ export function App() {
           if (message.envelope.kind === "browser.event") {
             const plaintext = await decryptJson<RequestStatusPlaintextPayload>(roomPayload, secret);
             updateBrowserRequestStatus(message.envelope.roomId, plaintext.requestId, plaintext.status);
-            appendBrowserDecisionMessage(message.envelope.roomId, plaintext);
           }
           if (message.envelope.kind === "room.host") {
             const plaintext = await decryptJson<HostHandoffPlaintextPayload>(roomPayload, secret);
@@ -2283,7 +2277,7 @@ export function App() {
     };
     await publishChatMessage(message);
     if (invokesCodex) {
-      handleCodexInvoke(message);
+      if (!handleCodexBrowserOpenCommand(message, selectedRoom)) handleCodexInvoke(message);
     }
     setDraftForRoom(roomId, "");
     setPendingAttachmentsForRoom(roomId, []);
@@ -2341,6 +2335,21 @@ export function App() {
     }
     setPendingCodexApprovalForRoom(roomId, approvalSnapshot);
     setApprovalVisibleForRoom(roomId, true);
+  }
+
+  function handleCodexBrowserOpenCommand(message: ChatMessage, room: RoomRecord): boolean {
+    const url = extractCodexBrowserOpenUrl(message.body);
+    if (!url) return false;
+    const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
+    const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
+    if (!canHostBrowserAction(room, localUser, roomLocked)) {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
+        setBrowserMessageForRoom(room.id, "Only the active host can open the in-room browser.");
+      }
+      return true;
+    }
+    openRoomBrowserForUrl(room, url, `Opened by ${message.author} through Codex.`);
+    return true;
   }
 
   async function beginGitHubSignIn() {
@@ -2652,6 +2661,7 @@ export function App() {
       }
       if (hostStatus === "active") {
         markLatestHostHandoffAccepted(room.id);
+        setCodexContinuationByRoom((current) => omitRecordKey(current, room.id));
       }
       resetCodexApprovalForRoom(roomId);
     } catch (error) {
@@ -2685,24 +2695,41 @@ export function App() {
     setHostMessageForRoom(roomId, null);
     try {
       const patch = createHandoffSettingsPatch(roomHandoff);
+      const handoffProject = await resolveHandoffProject(roomHandoff, patch.projectPath);
+      if (roomHandoff.gitPatch && !roomHandoff.gitPatchTruncated) {
+        const patchResult = await applyGitPatch(handoffProject.path, roomHandoff.gitPatch);
+        if (patchResult.status !== 0) {
+          throw new Error(`Cloned or selected the repository, but could not apply ${roomHandoff.fromHost}'s local patch: ${patchResult.stderr || patchResult.stdout || "git apply failed"}`);
+        }
+      }
+      const handoffProjectPath = handoffProject.path;
       const updatedSettings = await updateRoomSettings(roomId, {
         ...roomSettingsActor(),
-        ...patch
+        ...patch,
+        projectPath: handoffProjectPath
       });
       const claimed = await updateRoomHost(updatedSettings.id, localUser.name, localUser.id, "active");
       setRooms((current) => current.map((item) => (item.id === claimed.id ? ensureRoomDefaults(claimed) : item)));
       markHostHandoffAccepted(roomId, roomHandoff.id);
       await publishHostHandoffAccepted(selectedRoom, roomHandoff);
+      setCodexContinuationByRoom((current) =>
+        roomHandoff.reason === "usage_limit" ? { ...current, [roomId]: roomHandoff } : omitRecordKey(current, roomId)
+      );
       resetFileContextForRoom(roomId);
       resetCodexApprovalForRoom(roomId);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setProjectPathDraftForRoom(roomId, patch.projectPath);
+        setProjectPathDraftForRoom(roomId, handoffProjectPath);
         setCustomCodexModelForRoom(roomId, patch.codexModel);
         setSettingsMessageForRoom(
           roomId,
-          `Accepted handoff from ${roomHandoff.fromHost}; inherited ${formatCodexModel(patch.codexModel)} and ${patch.projectPath}.`
+          buildAcceptedHandoffMessage(roomHandoff, handoffProject, patch.codexModel)
         );
-        setHostMessageForRoom(roomId, `You are now hosting ${claimed.name} from ${roomHandoff.fromHost}'s handoff.`);
+        setHostMessageForRoom(
+          roomId,
+          roomHandoff.reason === "usage_limit"
+            ? `You are now hosting ${claimed.name}. Codex will continue with the full room context on the next approved turn.`
+            : `You are now hosting ${claimed.name} from ${roomHandoff.fromHost}'s handoff.`
+        );
       }
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessageForRoom(roomId, String(error));
@@ -2711,24 +2738,100 @@ export function App() {
     }
   }
 
-  async function publishHostHandoff(room: RoomRecord) {
+  async function resolveHandoffProject(
+    handoff: HostHandoffRecord,
+    fallbackPath: string
+  ): Promise<{ path: string; source: "existing" | "cloned" | "selected"; cloneResult?: GitCloneResult; patchResult?: GitApplyPatchResult }> {
+    const expectedRepo = handoffRepoIdentity(handoff);
+
+    async function pathMatches(path: string): Promise<boolean> {
+      if (!expectedRepo) return true;
+      const remote = await getGitRemoteOrigin(path).catch(() => ({ originUrl: null }));
+      const actualRepo = remote.originUrl ? parseGitHubRemoteUrl(remote.originUrl) : null;
+      return sameHandoffRepo(expectedRepo, actualRepo);
+    }
+
+    if (await pathMatches(fallbackPath)) return { path: fallbackPath, source: "existing" };
+
+    if (handoff.gitRemoteUrl && expectedRepo) {
+      const parentDir = defaultProjectPath.slice(0, defaultProjectPath.lastIndexOf("/")) || defaultProjectPath;
+      const cloneResult = await cloneGitRepository(handoff.gitRemoteUrl, parentDir, handoff.gitBranch);
+      if (cloneResult.status === 0 && await pathMatches(cloneResult.path)) {
+        return { path: cloneResult.path, source: "cloned", cloneResult };
+      }
+      throw new Error(`Could not clone ${expectedRepo.owner}/${expectedRepo.repo}: ${cloneResult.stderr || cloneResult.stdout || "git clone failed"}`);
+    }
+
+    const selected = await chooseProjectFolder(defaultProjectPath);
+    if (!selected) {
+      throw new Error(`${hostHandoffDetail(handoff)} No local project folder was selected.`);
+    }
+    if (!(await pathMatches(selected))) {
+      const repoLabel = expectedRepo ? `${expectedRepo.owner}/${expectedRepo.repo}` : "the handoff repository";
+      throw new Error(`Selected folder is not a clone of ${repoLabel}. Choose a local clone or continue from GitHub.`);
+    }
+    return { path: selected, source: "selected" };
+  }
+
+  function buildAcceptedHandoffMessage(
+    handoff: HostHandoffRecord,
+    project: { path: string; source: "existing" | "cloned" | "selected" },
+    codexModel: string
+  ): string {
+    const source =
+      project.source === "cloned"
+        ? "cloned from GitHub"
+        : project.source === "selected"
+          ? "selected locally"
+          : "matched locally";
+    const patchMessage = handoff.gitPatch && !handoff.gitPatchTruncated
+      ? " Applied the previous host's local patch."
+      : handoff.gitPatchTruncated
+        ? " The previous host's patch was too large to apply automatically; ask them to push or share it."
+        : handoff.gitDirtyFiles?.length
+          ? " The previous host had local changes but no transferable patch was available."
+          : "";
+    return `Accepted handoff from ${handoff.fromHost}; ${source}, using ${formatCodexModel(codexModel)} at ${project.path}.${patchMessage}`;
+  }
+
+  async function publishHostHandoff(
+    room: RoomRecord,
+    reason: HostHandoffRecord["reason"] = "manual",
+    contextMessages: ChatMessage[] = messages
+  ) {
+    const remoteInfo = await getGitRemoteOrigin(room.projectPath).catch(() => ({ originUrl: null }));
+    const repoRef = remoteInfo.originUrl ? parseGitHubRemoteUrl(remoteInfo.originUrl) : null;
+    const roomGitStatus = room.id === selectedRoom.id ? gitStatus : gitStatusByRoom[room.id] ?? null;
+    const patchResult = roomGitStatus?.files.length
+      ? await createGitPatch(room.projectPath).catch(() => null)
+      : null;
     const summary = buildCodexTurnSummary(
-      messages,
+      contextMessages,
       room,
       terminals,
       browserRequestsByRoom[room.id] ?? [],
-      room.id === selectedRoom.id ? gitStatus : null
+      roomGitStatus
     );
     const handoff: HostHandoffRecord = {
       id: crypto.randomUUID(),
       fromHost: localUser.name,
       fromUserId: localUser.id,
+      reason,
       projectPath: room.projectPath,
+      ...(remoteInfo.originUrl ? { gitRemoteUrl: remoteInfo.originUrl } : {}),
+      ...(repoRef ? { gitRepoOwner: repoRef.owner, gitRepoName: repoRef.repo } : {}),
+      ...(roomGitStatus?.branch ? { gitBranch: roomGitStatus.branch } : {}),
+      ...(roomGitStatus?.files.length ? { gitDirtyFiles: roomGitStatus.files.slice(0, 50).map((file) => file.path) } : {}),
+      ...(patchResult?.patch && !patchResult.truncated ? { gitPatch: patchResult.patch } : {}),
+      ...(patchResult?.truncated ? { gitPatchTruncated: true } : {}),
       codexModel: room.codexModel,
       approvalPolicy: room.approvalPolicy,
       messagesSinceLastCodex: summary.messagesSinceLastCodex,
       attachmentNames: summary.attachments.map((attachment) => attachment.name),
       terminals: summary.terminals,
+      continuationSummary: reason === "usage_limit"
+        ? codexUsageLimitMessage(localUser.name)
+        : undefined,
       createdAt: new Date().toISOString(),
       status: "available"
     };
@@ -2744,12 +2847,21 @@ export function App() {
       id: handoff.id,
       fromHost: handoff.fromHost,
       fromUserId: handoff.fromUserId,
+      reason: handoff.reason,
       projectPath: handoff.projectPath,
+      gitRemoteUrl: handoff.gitRemoteUrl,
+      gitRepoOwner: handoff.gitRepoOwner,
+      gitRepoName: handoff.gitRepoName,
+      gitBranch: handoff.gitBranch,
+      gitDirtyFiles: handoff.gitDirtyFiles,
+      gitPatch: handoff.gitPatch,
+      gitPatchTruncated: handoff.gitPatchTruncated,
       codexModel: handoff.codexModel,
       approvalPolicy: handoff.approvalPolicy,
       messagesSinceLastCodex: handoff.messagesSinceLastCodex,
       attachmentNames: handoff.attachmentNames,
       terminals: handoff.terminals,
+      continuationSummary: handoff.continuationSummary,
       createdAt: handoff.createdAt
     };
     const secret = await loadOrCreateRoomSecret(room.id);
@@ -2775,12 +2887,21 @@ export function App() {
       id: handoff.id,
       fromHost: handoff.fromHost,
       fromUserId: handoff.fromUserId,
+      reason: handoff.reason,
       projectPath: handoff.projectPath,
+      gitRemoteUrl: handoff.gitRemoteUrl,
+      gitRepoOwner: handoff.gitRepoOwner,
+      gitRepoName: handoff.gitRepoName,
+      gitBranch: handoff.gitBranch,
+      gitDirtyFiles: handoff.gitDirtyFiles,
+      gitPatch: handoff.gitPatch,
+      gitPatchTruncated: handoff.gitPatchTruncated,
       codexModel: handoff.codexModel,
       approvalPolicy: handoff.approvalPolicy,
       messagesSinceLastCodex: handoff.messagesSinceLastCodex,
       attachmentNames: handoff.attachmentNames,
       terminals: handoff.terminals,
+      continuationSummary: handoff.continuationSummary,
       createdAt: handoff.createdAt,
       status: "accepted",
       acceptedBy: localUser.name,
@@ -3141,6 +3262,42 @@ export function App() {
         setSettingsMessageForRoom(roomId, `Codex model set to ${formatCodexModel(nextModel)}.`);
       }
       resetCodexApprovalForRoom(roomId);
+    } catch (error) {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
+    } finally {
+      setSettingsBusyForRoom(roomId, false);
+    }
+  }
+
+  async function renameRoom(name: string) {
+    const nextName = normalizeRoomName(name);
+    if (!nextName) {
+      setSelectedSettingsMessage("Use a room title up to 160 characters without control characters.");
+      return;
+    }
+    if (!hasSelectedRoom || nextName === selectedRoom.name) return;
+    if (isSelectedRoomLocked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
+    const roomId = selectedRoom.id;
+    if (reportRoomSettingsMutationInFlight(roomId)) return;
+    setSettingsBusyForRoom(roomId, true);
+    setSettingsMessageForRoom(roomId, null);
+    try {
+      const previousName = selectedRoom.name;
+      const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), name: nextName });
+      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      await publishRoomSettingsEvent(room, {
+        id: crypto.randomUUID(),
+        setting: "roomName",
+        previousValue: previousName,
+        nextValue: nextName,
+        changedAt: new Date().toISOString()
+      });
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setSettingsMessageForRoom(roomId, `Room title changed to ${nextName}.`);
+      }
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
     } finally {
@@ -4033,7 +4190,10 @@ export function App() {
     ]);
 
 	    const turnId = crypto.randomUUID();
-	    const input = buildCodexTurnInput(turnMessages, projectPath, model, turnSummary);
+    const continuationHandoff = codexContinuationByRoom[roomId] ?? null;
+	    const input = buildCodexTurnInput(turnMessages, projectPath, model, turnSummary, {
+      fullRoomContext: Boolean(continuationHandoff)
+    });
     const previousThreadId = codexThreadIdsByRoom[roomId] ?? null;
     try {
       await publishCodexEvent({
@@ -4045,6 +4205,10 @@ export function App() {
         model
       }, room);
       const result = await runCodexTurn(projectPath, input, model, previousThreadId);
+      if (classifyCodexFailure([result.status, result.stderr, result.transcript, ...result.events]) === "usage_limit") {
+        await handleCodexUsageLimit(room, turnId, model, turnMessages, result.events, result.stderr);
+        return;
+      }
       const threadId = normalizeCodexThreadId(result.threadId);
       if (threadId) {
         setCodexThreadIdsByRoom((current) => ({
@@ -4087,6 +4251,10 @@ export function App() {
         ...(result.stderr ? [`stderr: ${result.stderr}`] : [])
       ]);
     } catch (error) {
+      if (classifyCodexFailure([String(error)]) === "usage_limit") {
+        await handleCodexUsageLimit(room, turnId, model, turnMessages, [String(error)], String(error));
+        return;
+      }
       await publishCodexEvent({
         turnId,
         status: "failed",
@@ -4103,7 +4271,52 @@ export function App() {
       }, room);
       appendTerminalLinesForRoom(roomId, [`Codex error: ${String(error)}`]);
     } finally {
+      if (continuationHandoff) {
+        setCodexContinuationByRoom((current) => omitRecordKey(current, roomId));
+      }
       setCodexRunningForRoom(roomId, false);
+    }
+  }
+
+  async function handleCodexUsageLimit(
+    room: RoomRecord,
+    turnId: string,
+    model: string,
+    turnMessages: ChatMessage[],
+    events: string[],
+    stderr: string
+  ) {
+    const roomId = room.id;
+    await publishCodexEvent({
+      turnId,
+      status: "failed",
+      message: codexUsageLimitMessage(room.host),
+      model
+    }, room);
+    appendTerminalLinesForRoom(roomId, [
+      codexUsageLimitMessage(room.host),
+      ...events.slice(-4).map((event) => `event: ${event}`),
+      ...(stderr ? [`stderr: ${stderr}`] : [])
+    ]);
+    await publishChatMessage({
+      id: crypto.randomUUID(),
+      author: "multAIplayer",
+      role: "system",
+      body: `${codexUsageLimitMessage(room.host)} Click Continue with another host in the room panel to keep going from this room context.`,
+      time: formatMessageTime(),
+      createdAt: new Date().toISOString()
+    }, room);
+    try {
+      const handedOff = await updateRoomHost(roomId, room.host, room.hostUserId ?? localUser.id, "handoff");
+      setRooms((current) => current.map((item) => (item.id === handedOff.id ? ensureRoomDefaults(handedOff) : item)));
+    } catch (error) {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setHostMessageForRoom(roomId, `Codex usage is unavailable, but host handoff could not update room host status: ${String(error)}`);
+      }
+    }
+    await publishHostHandoff(room, "usage_limit", turnMessages);
+    if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+      setHostMessageForRoom(roomId, codexUsageLimitMessage(room.host));
     }
   }
 
@@ -4680,13 +4893,6 @@ export function App() {
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") {
       appendBrowserRequest(room.id, request);
-      if (autoApproved) {
-        appendBrowserDecisionMessage(
-          room.id,
-          buildLocalRequestStatusPayload(request.id, "approved"),
-          request
-        );
-      }
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setBrowserMessageForRoom(
           roomId,
@@ -4722,11 +4928,6 @@ export function App() {
       client.publish({ type: "publish", envelope });
       appendBrowserRequest(room.id, request);
       if (autoApproved) {
-        appendBrowserDecisionMessage(
-          room.id,
-          buildLocalRequestStatusPayload(request.id, "approved"),
-          request
-        );
         await publishRequestStatus("browser.event", request.id, "approved", room);
       }
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
@@ -4761,9 +4962,7 @@ export function App() {
       setBrowserMessageForRoom(roomId, roomBrowserRequestMessage(browserRequests, request.id, "pending"));
       return;
     }
-    const decision = buildLocalRequestStatusPayload(roomRequest.id, "approved");
     updateBrowserRequestStatus(roomId, roomRequest.id, "approved");
-    appendBrowserDecisionMessage(roomId, decision);
     publishRequestStatus("browser.event", roomRequest.id, "approved").catch((error) => {
       setBrowserMessageForRoom(roomId, String(error));
     });
@@ -4788,9 +4987,7 @@ export function App() {
       setBrowserMessageForRoom(roomId, roomBrowserRequestMessage(browserRequests, requestId, "pending"));
       return;
     }
-    const decision = buildLocalRequestStatusPayload(requestId, "denied");
     updateBrowserRequestStatus(roomId, requestId, "denied");
-    appendBrowserDecisionMessage(roomId, decision);
     publishRequestStatus("browser.event", requestId, "denied").catch((error) => {
       setBrowserMessageForRoom(roomId, String(error));
     });
@@ -4840,29 +5037,27 @@ export function App() {
       setBrowserMessageForRoom(room.id, "Enter a URL to open in the room browser.");
       return;
     }
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(rawUrl);
-    } catch {
-      setBrowserMessageForRoom(room.id, "Enter a valid browser URL.");
+    const nextUrl = normalizeBrowserLocationInput(rawUrl);
+    if (!nextUrl) {
+      setBrowserMessageForRoom(room.id, "Enter a valid URL or search.");
       return;
     }
+    openRoomBrowserForUrl(room, nextUrl, "Opened by the active host.");
+  }
+
+  function openRoomBrowserForUrl(room: RoomRecord, url: string, reason: string) {
     const request: BrowserAccessRequest = {
       id: crypto.randomUUID(),
       requester: localUser.name,
       requesterUserId: localUser.id,
-      url: parsedUrl.toString(),
-      reason: browserReason.trim() || "Opened by the active host.",
+      url,
+      reason,
       requestedAt: new Date().toISOString(),
       status: "approved"
     };
     appendBrowserRequest(room.id, request);
-    appendBrowserDecisionMessage(
-      room.id,
-      buildLocalRequestStatusPayload(request.id, "approved"),
-      request
-    );
     setBrowserMessageForRoom(room.id, null);
+    setBrowserUrlForRoom(room.id, request.url);
     openEmbeddedRoomBrowser(room, request.url);
   }
 
@@ -4946,22 +5141,6 @@ export function App() {
         request.id === requestId ? { ...request, status } : request
       )
     }));
-  }
-
-  function appendBrowserDecisionMessage(
-    roomId: string,
-    decision: RequestStatusPlaintextPayload,
-    requestOverride?: Pick<BrowserAccessRequest, "url" | "requester">
-  ) {
-    const request = requestOverride ?? (browserRequestsRef.current[roomId] ?? []).find((item) => item.id === decision.requestId);
-    appendRoomMessage(roomId, {
-      id: browserDecisionMessageId(decision),
-      author: "multAIplayer",
-      role: "system",
-      body: buildBrowserDecisionMessage(decision, request, formatBrowserAccessLabel),
-      time: formatMessageTime(decision.decidedAt),
-      createdAt: decision.decidedAt
-    });
   }
 
   function buildLocalRequestStatusPayload(
@@ -5175,12 +5354,15 @@ export function App() {
     setFileBusyForRoom(room.id, true);
     setFileMessageForRoom(room.id, null);
     try {
-      const [file, diff] = await Promise.all([
-        readProjectFile(room.projectPath, path),
+      const [fileResult, diff] = await Promise.all([
+        readProjectFile(room.projectPath, path).then((file) => ({ file, error: null })).catch((error) => ({ file: null, error })),
         getGitDiff(room.projectPath, path).catch(() => null)
       ]);
       if (selectedRoomIdRef.current !== room.id) return;
-      setSelectedFileForRoom(room.id, file);
+      if (!fileResult.file && !(preferredPreview === "diff" && diff?.diff.trim())) {
+        throw fileResult.error;
+      }
+      setSelectedFileForRoom(room.id, fileResult.file);
       setSelectedDiffForRoom(room.id, diff);
       setFilePreviewTabForRoom(room.id, resolveFilePreviewTab(preferredPreview, Boolean(diff?.diff.trim())));
       setSensitiveAttachmentReviewKey(null);
@@ -5343,7 +5525,10 @@ export function App() {
           truncated: Boolean(attachment.truncated),
           content: attachment.content
         });
+        setInspectorTabsByRoom((current) => ({ ...current, [room.id]: "files" }));
         setFileMessageForRoom(room.id, `Opened inline attachment ${attachment.name}.`);
+      } else if (canOpenProjectAttachment(attachment)) {
+        await openProjectFile(attachment.name, "file");
       }
       return;
     }
@@ -5370,6 +5555,7 @@ export function App() {
         truncated: Boolean(decrypted.truncated),
         content: decrypted.content
       });
+      setInspectorTabsByRoom((current) => ({ ...current, [room.id]: "files" }));
       setFileMessageForRoom(room.id, `Opened encrypted attachment ${decrypted.name || attachment.name}.`);
     } catch (error) {
       if (selectedRoomIdRef.current === room.id) {
@@ -5957,12 +6143,10 @@ export function App() {
 
       <main className="room">
         <RoomHeader
-          teamName={selectedTeamName}
+          teams={teams.map((team) => ({ id: team.id, name: team.name }))}
+          selectedTeamId={selectedTeam}
           roomName={selectedRoom.name}
-          relayStatus={relayStatus}
-          onlineCount={roomMembers.length || 1}
           hostStatus={selectedRoom.hostStatus}
-          hostStatusLabel={hostStatusLabel}
           hostBusy={hostBusy}
           isActiveHost={isActiveHost}
           roomLocked={isSelectedRoomLocked}
@@ -5971,14 +6155,20 @@ export function App() {
           modelLabel={formatCodexModel(selectedCodexModel)}
           modelOptions={codexModelOptions}
           settingsBusy={settingsBusy}
-          browserEnabled={selectedRoom.mode.browser}
-          projectLabel={selectedRoom.projectPath.split("/").slice(-1)[0]}
           selectedCount={selectedMessages.length}
           markdownSelectionMode={markdownSelectionMode}
           activeInspectorTab={inspectorTab}
           onSetHost={setRoomHost}
+          onSelectTeam={(teamId) => {
+            setSelectedTeam(teamId);
+            setSelectedRoomId(rooms.find((room) => room.teamId === teamId)?.id ?? selectedRoomId);
+          }}
+          onRenameRoom={renameRoom}
           onSelectModel={setCodexModel}
-          onSelectInspectorTab={(tab) => setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: tab }))}
+          onSelectInspectorTab={(tab) => {
+            setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: tab }));
+            if (tab === "browser" && !activeBrowserUrl) openRoomBrowserNow();
+          }}
           onCopyRoomMarkdown={copyRoomMarkdown}
           onCopySelectedMarkdown={copySelectedMessagesMarkdown}
           onToggleMarkdownSelection={toggleMarkdownSelectionMode}
@@ -6003,7 +6193,15 @@ export function App() {
           <div className="warning-banner">
             <ShieldAlert size={18} />
             <span>Everyone in this room can see Codex events, terminal output, diffs, and tool logs. Secrets may be exposed.</span>
-            <button onClick={acknowledgeRoomVisibilityWarning} aria-label="Acknowledge room visibility warning">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                acknowledgeRoomVisibilityWarning();
+              }}
+              aria-label="Acknowledge room visibility warning"
+            >
               <Check size={16} />
               <span>I understand</span>
             </button>
@@ -6100,28 +6298,11 @@ export function App() {
         browserPanel={(
           <BrowserAccessPanel
             hidden={inspectorTab !== "browser"}
-            browserEnabled={selectedRoom.mode.browser}
-            browserStatus={browserStatus}
-            browserProfilePersistent={selectedRoom.browserProfilePersistent}
-            browserProfileDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
             activeBrowserUrl={activeBrowserUrl}
             browserUrl={browserUrl}
-            browserReason={browserReason}
-            canRequestBrowser={canRequestBrowser}
             canHostBrowser={canHostBrowser}
-            browserRequests={browserRequests}
-            browserMessage={browserMessage}
-            formatBrowserAccessLabel={formatBrowserAccessLabel}
-            detectBrowserSecretRisks={detectBrowserSecretRisks}
-            onResetBrowserProfile={resetRoomBrowserProfile}
-            onBrowserProfilePersistenceChange={setBrowserProfilePersistence}
             onBrowserUrlChange={(url) => setBrowserUrlForRoom(selectedRoom.id, url)}
-            onBrowserReasonChange={(reason) => setBrowserReasonForRoom(selectedRoom.id, reason)}
             onOpenBrowserNow={openRoomBrowserNow}
-            onRequestBrowserAccess={requestBrowserAccess}
-            onApproveBrowserRequest={approveBrowserRequest}
-            onDenyBrowserRequest={denyBrowserRequest}
-            onOpenApprovedBrowserRequest={openApprovedBrowserRequest}
           />
         )}
         workPanel={(
@@ -6283,6 +6464,11 @@ export function App() {
           onCopyDiffSummaryMarkdown={copyDiffSummaryMarkdown}
           onAttachSelectedFileToMessage={attachSelectedFileToMessage}
           onFilePreviewTabChange={(tab) => setFilePreviewTabForRoom(selectedRoom.id, tab)}
+          onCloseFileViewer={() => {
+            setSelectedFileForRoom(selectedRoom.id, null);
+            setSelectedDiffForRoom(selectedRoom.id, null);
+            setSensitiveAttachmentReviewKey(null);
+          }}
         />
 
         <GitHandoffPanel
@@ -6451,12 +6637,6 @@ function canTransferTeamOwnership(
 function roomLockMessage(room: RoomRecord, revoked: boolean): string {
   if (revoked) return membershipRemovedRoomMessage(room.name);
   return "This room was forgotten on this device. Rejoin from an invite or get host approval to unlock messages again.";
-}
-
-function formatCodexThreadId(threadId: string | null): string {
-  if (!threadId) return "New room thread";
-  if (threadId.length <= 28) return threadId;
-  return `${threadId.slice(0, 12)}...${threadId.slice(-8)}`;
 }
 
 function omitRecordKey<T>(record: Record<string, T>, key: string): Record<string, T> {
@@ -6752,6 +6932,11 @@ function isAttachmentBlobContent(value: unknown): value is {
   );
 }
 
+function isBrowserDecisionSystemMessage(message: ChatMessage): boolean {
+  if (message.role !== "system" || message.author !== "multAIplayer") return false;
+  return /^[^\n]+ (approved|denied) (https?:\/\/|a browser access request)/i.test(message.body.trim());
+}
+
 function isTerminalCommandRequest(value: unknown): value is TerminalCommandRequest {
   if (!isRecord(value)) return false;
   return (
@@ -6956,6 +7141,7 @@ function isRoomSettingsPlaintextPayload(value: unknown): value is RoomSettingsPl
 function isRoomSettingsName(value: unknown): value is RoomSettingsPlaintextPayload["setting"] {
   return (
     value === "approvalPolicy" ||
+    value === "roomName" ||
     value === "roomMode" ||
     value === "codexModel" ||
     value === "projectPath" ||
@@ -7045,6 +7231,8 @@ function buildRoomSettingsSystemMessage(event: RoomSettingsPlaintextPayload): Ch
 
 function buildRoomSettingsMessageBody(event: RoomSettingsPlaintextPayload): string {
   switch (event.setting) {
+    case "roomName":
+      return `${event.changedBy} changed the room title from ${event.previousValue} to ${event.nextValue}.`;
     case "approvalPolicy":
       return `${event.changedBy} changed the approval policy from ${formatApprovalPolicy(event.previousValue)} to ${formatApprovalPolicy(event.nextValue)}.`;
     case "roomMode":
@@ -7142,6 +7330,35 @@ function formatBrowserAccessLabel(url: string): string {
   }
 }
 
+function formatApprovalMessages(messages: ChatMessage[]): string {
+  if (messages.length === 0) return "No new messages.";
+  const visible = messages.slice(-6).map((message) => {
+    const body = message.body.replace(/\s+/g, " ").trim();
+    return `${message.author}: ${body.length > 140 ? `${body.slice(0, 137)}...` : body}`;
+  });
+  const hidden = messages.length - visible.length;
+  return hidden > 0 ? [`${hidden} earlier message${hidden === 1 ? "" : "s"}`, ...visible].join("\n") : visible.join("\n");
+}
+
+function formatApprovalAttachments(messages: ChatMessage[]): string {
+  const attachments = messages.flatMap((message) =>
+    (message.attachments ?? []).map((attachment) => `${attachment.name} (${formatBytes(attachment.size)})`)
+  );
+  if (attachments.length === 0) return "None";
+  const visible = attachments.slice(-8);
+  const hidden = attachments.length - visible.length;
+  return hidden > 0 ? [`${hidden} earlier attachment${hidden === 1 ? "" : "s"}`, ...visible].join("\n") : visible.join("\n");
+}
+
+function normalizeBrowserLocationInput(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/\s/.test(trimmed)) {
+    return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
+  }
+  return normalizeBrowserCommandUrl(trimmed);
+}
+
 function formatSessionPersistence(value: GitHubAuthConfig["sessionPersistence"] | undefined): string {
   if (value === "encrypted") return "Encrypted at rest";
   if (value === "memory_only") return "Memory-only";
@@ -7160,22 +7377,6 @@ function formatHostStatus(room: RoomRecord): string {
   if (room.hostStatus === "active") return `Hosted by ${room.host}`;
   if (room.hostStatus === "handoff") return `Handoff from ${room.host}`;
   return "No active host";
-}
-
-function formatCodexGitSummary(git: CodexTurnSummary["git"]): string {
-  if (!git) return "Disabled or unavailable";
-  if (git.totalFiles === 0) return `${git.branch}, clean`;
-  const suffix = git.truncated ? `, showing ${git.files.length}` : "";
-  return `${git.branch}, ${git.totalFiles} changed${suffix}`;
-}
-
-function formatCodexAttachmentSummary(attachments: CodexTurnSummary["attachments"]): string {
-  if (attachments.length === 0) return "None";
-  return attachments.map((attachment) => {
-    if (attachment.contentIncluded) return `${attachment.name} (inline)`;
-    if (attachment.storage === "encrypted_blob") return `${attachment.name} (encrypted blob reference only)`;
-    return `${attachment.name} (metadata only)`;
-  }).join(", ");
 }
 
 function formatMemberDeviceLabel(member: RoomPresence, localDeviceId: string, trusted = false): string {
@@ -7260,6 +7461,16 @@ function encodedBytes(value: string): number {
 function formatAttachmentMeta(attachment: ChatAttachment): string {
   const blobNote = attachment.blobId ? `, encrypted blob${attachment.blobBytes ? ` preview ${formatBytes(attachment.blobBytes)}` : ""}` : "";
   return `${attachment.type}, ${formatBytes(attachment.size)}${blobNote}`;
+}
+
+function canOpenChatAttachment(attachment: ChatAttachment): boolean {
+  return Boolean(attachment.blobId || attachment.content || canOpenProjectAttachment(attachment));
+}
+
+function canOpenProjectAttachment(attachment: ChatAttachment): boolean {
+  const name = attachment.name.trim();
+  if (!name || name.startsWith("/") || name.includes("..") || name.includes("\0")) return false;
+  return attachment.type === "code" || name.includes("/") || /\.[a-z0-9]{1,12}$/i.test(name);
 }
 
 function formatBytes(bytes: number): string {

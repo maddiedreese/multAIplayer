@@ -12,6 +12,11 @@ export interface HostHandoffCandidate {
   status: "available" | "accepted";
 }
 
+export interface HandoffRepoIdentity {
+  owner: string;
+  repo: string;
+}
+
 export function isRoomHostMutationInFlight(
   busyByRoom: Record<string, boolean>,
   roomId: string
@@ -70,4 +75,35 @@ export function roomHostHandoffMessage<T extends HostHandoffCandidate>(
     return `Host handoff is ${handoff.status}, not available.`;
   }
   return "Host handoff is available.";
+}
+
+export function handoffRepoIdentity(handoff: Pick<HostHandoffPlaintextPayload, "gitRepoOwner" | "gitRepoName">): HandoffRepoIdentity | null {
+  const owner = handoff.gitRepoOwner?.trim();
+  const repo = handoff.gitRepoName?.trim();
+  if (!owner || !repo) return null;
+  return { owner, repo };
+}
+
+export function sameHandoffRepo(
+  expected: HandoffRepoIdentity | null,
+  actual: HandoffRepoIdentity | null
+): boolean {
+  if (!expected || !actual) return false;
+  return expected.owner.toLowerCase() === actual.owner.toLowerCase() &&
+    expected.repo.toLowerCase() === actual.repo.toLowerCase();
+}
+
+export function hostHandoffTitle(handoff: Pick<HostHandoffPlaintextPayload, "reason" | "fromHost">): string {
+  return handoff.reason === "usage_limit"
+    ? `Continue with another host`
+    : `Host handoff from ${handoff.fromHost}`;
+}
+
+export function hostHandoffDetail(handoff: Pick<HostHandoffPlaintextPayload, "reason" | "fromHost" | "gitRepoOwner" | "gitRepoName" | "gitBranch">): string {
+  const repo = handoff.gitRepoOwner && handoff.gitRepoName
+    ? `${handoff.gitRepoOwner}/${handoff.gitRepoName}${handoff.gitBranch ? `@${handoff.gitBranch}` : ""}`
+    : "an equivalent local project folder";
+  return handoff.reason === "usage_limit"
+    ? `${handoff.fromHost} is out of Codex usage. Attach ${repo} to continue from the room context.`
+    : `Attach ${repo} to continue from ${handoff.fromHost}'s handoff.`;
 }
