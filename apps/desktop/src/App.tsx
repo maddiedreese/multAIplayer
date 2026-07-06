@@ -141,6 +141,7 @@ import { useRoomVisibilityWarningActions } from "./hooks/useRoomVisibilityWarnin
 import { useRoomChatPanelActions } from "./hooks/useRoomChatPanelActions";
 import { useRoomHeaderActions } from "./hooks/useRoomHeaderActions";
 import { useTerminalPanelActions } from "./hooks/useTerminalPanelActions";
+import { useWorkspaceFilesPanelActions } from "./hooks/useWorkspaceFilesPanelActions";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -1734,6 +1735,18 @@ export function App() {
     restartSelectedTerminal,
     stopSelectedTerminal
   });
+  const workspaceFilesPanelActions = useWorkspaceFilesPanelActions({
+    selectedRoomId: selectedRoom.id,
+    copyProjectMarkdown,
+    setFileQueryForRoom,
+    openProjectFile,
+    copyDiffSummaryMarkdown,
+    attachSelectedFileToMessage,
+    setFilePreviewTabForRoom,
+    setSelectedFileForRoom,
+    setSelectedDiffForRoom,
+    setSensitiveAttachmentReviewKey
+  });
 
   function handleCodexBrowserOpenCommand(message: ChatMessage, room: RoomRecord): boolean {
     const url = extractCodexBrowserOpenUrl(message.body);
@@ -2129,17 +2142,7 @@ export function App() {
               selectedAttachmentWarningDetail: selectedAttachmentReview?.warningDetail ?? undefined,
               filePreviewTab,
               formatBytes,
-              onCopyProjectMarkdown: copyProjectMarkdown,
-              onFileQueryChange: (query) => setFileQueryForRoom(selectedRoom.id, query),
-              onOpenProjectFile: openProjectFile,
-              onCopyDiffSummaryMarkdown: copyDiffSummaryMarkdown,
-              onAttachSelectedFileToMessage: attachSelectedFileToMessage,
-              onFilePreviewTabChange: (tab) => setFilePreviewTabForRoom(selectedRoom.id, tab),
-              onCloseFileViewer: () => {
-                setSelectedFileForRoom(selectedRoom.id, null);
-                setSelectedDiffForRoom(selectedRoom.id, null);
-                setSensitiveAttachmentReviewKey(null);
-              }
+              ...workspaceFilesPanelActions
             }}
             gitHandoff={{
               draft: gitWorkflowDraft,
