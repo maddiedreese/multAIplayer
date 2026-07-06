@@ -256,6 +256,12 @@ import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./l
 import { roomPostureSummary } from "./lib/roomPosture";
 import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "./lib/sidebarSearch";
 import { replaceRoomTerminalSnapshots } from "./lib/terminalState";
+import {
+  canDemoteTeamMember,
+  canPromoteTeamMember,
+  canRemoveTeamMember,
+  canTransferTeamOwnership
+} from "./lib/teamMemberPermissions";
 import { nextShellTerminalName, terminalInputForShellSubmit } from "./lib/terminalUi";
 import {
   canOpenChatAttachment,
@@ -6620,28 +6626,6 @@ function normalizeRoomDisplayName(name: string): string {
   if (name === "Relay + E2EE") return "Relay ops";
   if (name === "Desktop client") return "Desktop app";
   return name;
-}
-
-function canPromoteTeamMember(team: TeamRecord | null, member: TeamMemberRecord): boolean {
-  return team?.role === "owner" && member.role === "member";
-}
-
-function canDemoteTeamMember(team: TeamRecord | null, member: TeamMemberRecord): boolean {
-  return team?.role === "owner" && member.role === "admin";
-}
-
-function canRemoveTeamMember(team: TeamRecord | null, member: TeamMemberRecord): boolean {
-  if (member.role === "owner") return false;
-  if (team?.role === "owner") return true;
-  return team?.role === "admin" && member.role === "member";
-}
-
-function canTransferTeamOwnership(
-  team: TeamRecord | null,
-  member: TeamMemberRecord,
-  localUserId: string
-): boolean {
-  return team?.role === "owner" && member.role !== "owner" && member.userId !== localUserId;
 }
 
 function roomLockMessage(room: RoomRecord, revoked: boolean): string {
