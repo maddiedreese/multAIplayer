@@ -78,14 +78,7 @@ export function App() {
   const {
     workspaceState,
     appConfigState,
-    chatMessagesByRoom,
-    setChatMessagesByRoom,
-    draftsByRoom,
-    setDraftsByRoom,
-    pendingAttachmentsByRoom,
-    setPendingAttachmentsByRoom,
-    sensitiveAttachmentReviewKey,
-    setSensitiveAttachmentReviewKey,
+    roomChatState,
     hostBusyByRoom,
     setHostBusyByRoom,
     hostMessagesByRoom,
@@ -356,8 +349,8 @@ export function App() {
       customCodexModelsByRoom,
       projectPathDraftsByRoom,
       messagesByRoom: workspaceState.messagesByRoom,
-      draftsByRoom,
-      pendingAttachmentsByRoom,
+      draftsByRoom: roomChatState.draftsByRoom,
+      pendingAttachmentsByRoom: roomChatState.pendingAttachmentsByRoom,
       browserRequestsByRoom,
       browserUrlsByRoom,
       browserReasonsByRoom,
@@ -388,7 +381,7 @@ export function App() {
       inviteApprovalGatesByRoom,
       inviteMessagesByRoom,
       hostMessagesByRoom,
-      chatMessagesByRoom,
+      chatMessagesByRoom: roomChatState.chatMessagesByRoom,
       settingsMessagesByRoom,
       historyMessagesByRoom,
       teamHistoryMessagesByTeam,
@@ -469,7 +462,7 @@ export function App() {
       selectedRoomId: selectedRoom.id,
       selectedTeamId: workspaceState.selectedTeam,
       setHostMessagesByRoom,
-      setChatMessagesByRoom,
+      setChatMessagesByRoom: roomChatState.setChatMessagesByRoom,
       setMarkdownCopyFallbacksByRoom,
       setSecretWarningsVisibleByRoom,
       setHistoryMessagesByRoom,
@@ -534,8 +527,8 @@ export function App() {
       setInviteMessagesByRoom
     },
     drafts: {
-      setPendingAttachmentsByRoom,
-      setDraftsByRoom
+      setPendingAttachmentsByRoom: roomChatState.setPendingAttachmentsByRoom,
+      setDraftsByRoom: roomChatState.setDraftsByRoom
     },
     project: {
       roomsRef: appRefs.roomsRef,
@@ -762,7 +755,7 @@ export function App() {
       selectedFile,
       selectedRoomId: selectedRoom.id,
       selectedRoomProjectPath: selectedRoom.projectPath,
-      sensitiveAttachmentReviewKey,
+      sensitiveAttachmentReviewKey: roomChatState.sensitiveAttachmentReviewKey,
       selectedTerminal: selectedRuntime.selectedTerminal,
       terminalLines,
       terminalCommand,
@@ -943,7 +936,7 @@ export function App() {
         setGitWorkflowBusyByRoom,
         setHostBusyByRoom,
         setHostMessagesByRoom,
-        setChatMessagesByRoom,
+        setChatMessagesByRoom: roomChatState.setChatMessagesByRoom,
         setMarkdownCopyFallbacksByRoom,
         setSecretWarningsVisibleByRoom,
         setHistoryMessagesByRoom,
@@ -962,7 +955,7 @@ export function App() {
         setSelectedDiffsByRoom,
         setFileBusyByRoom,
         setFileMessagesByRoom,
-        setPendingAttachmentsByRoom,
+        setPendingAttachmentsByRoom: roomChatState.setPendingAttachmentsByRoom,
         setTerminalLinesByRoom,
         setTerminalBusyByRoom,
         setSelectedTerminalIdsByRoom,
@@ -976,7 +969,7 @@ export function App() {
         setInviteLinksByRoom,
         setInviteApprovalGatesByRoom,
         setInviteMessagesByRoom,
-        setDraftsByRoom,
+        setDraftsByRoom: roomChatState.setDraftsByRoom,
         setForgottenRoomIds,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds
       },
@@ -989,9 +982,9 @@ export function App() {
         isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
         isSelectedRoomRevoked: roomInteraction.isSelectedRoomRevoked,
         selectedFile,
-        pendingAttachmentsByRoom,
-        sensitiveAttachmentReviewKey,
-        setSensitiveAttachmentReviewKey,
+        pendingAttachmentsByRoom: roomChatState.pendingAttachmentsByRoom,
+        sensitiveAttachmentReviewKey: roomChatState.sensitiveAttachmentReviewKey,
+        setSensitiveAttachmentReviewKey: roomChatState.setSensitiveAttachmentReviewKey,
         reportRoomFileActionInFlight: roomInteraction.reportRoomFileActionInFlight,
         setFileBusyForRoom,
         setSelectedFileForRoom,
@@ -1493,7 +1486,7 @@ export function App() {
       setFilePreviewTabForRoom,
       setSelectedFileForRoom,
       setSelectedDiffForRoom,
-      setSensitiveAttachmentReviewKey
+      setSensitiveAttachmentReviewKey: roomChatState.setSensitiveAttachmentReviewKey
     }
   });
   const appView = useAppViewProps({
