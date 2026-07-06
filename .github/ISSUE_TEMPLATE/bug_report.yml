@@ -42,6 +42,9 @@ body:
         - Terminal
         - Browser
         - Files / diffs
+        - Local preview
+        - Invite / room join
+        - Release / install
         - Docs
   - type: textarea
     id: logs

@@ -1,0 +1,51 @@
+name: Relay Deployment Help
+description: Get help with official or self-hosted relay deployment.
+title: "[Relay]: "
+labels: ["relay", "deployment", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste production secrets, GitHub OAuth secrets, access tokens, private room data, relay store contents, or unredacted logs.
+  - type: dropdown
+    id: deployment_type
+    attributes:
+      label: Deployment type
+      options:
+        - Official relay
+        - Self-hosted Docker
+        - Self-hosted Node
+        - Local development
+        - Other / unsure
+    validations:
+      required: true
+  - type: textarea
+    id: symptom
+    attributes:
+      label: What is failing?
+      description: Describe the visible behavior, response code, or app state.
+    validations:
+      required: true
+  - type: textarea
+    id: production_doctor
+    attributes:
+      label: Production doctor result
+      description: Paste the redacted output of `NODE_ENV=production npm run doctor:production-relay` if relevant.
+      render: shell
+  - type: textarea
+    id: config
+    attributes:
+      label: Redacted relay configuration
+      description: Include hostnames and boolean settings only. Redact secrets.
+      placeholder: |
+        MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://example.com
+        MULTAIPLAYER_RELAY_REQUIRE_AUTH=true
+        MULTAIPLAYER_RELAY_DEBUG=false
+        MULTAIPLAYER_RELAY_SEED_DEMO=false
+        MULTAIPLAYER_RELAY_RATE_LIMITS=true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted logs or screenshots
+      description: Remove tokens, cookies, private room ids, invite fragments, repo data, and user content.
+

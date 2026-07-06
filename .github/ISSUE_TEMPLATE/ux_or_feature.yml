@@ -29,6 +29,8 @@ body:
         - Browser
         - Files / diffs
         - GitHub / Actions
+        - Local preview
+        - Invite / room join
         - Relay / self-hosting
         - Settings / profile
         - Documentation
