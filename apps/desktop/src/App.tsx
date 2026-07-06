@@ -82,11 +82,9 @@ import {
   getGitDiff,
   getGitRemoteOrigin,
   getGitStatus,
-  listTerminals,
   probeCloudflared,
   readLocalPreviewTunnelStatus,
   readProjectFile,
-  readTerminal,
   runCodexTurn,
   runGitWorkflow,
   runShellCommand,
@@ -136,6 +134,7 @@ import { useRoomGitStatusRefresh } from "./hooks/useRoomGitStatusRefresh";
 import { useGitHubRemoteInference } from "./hooks/useGitHubRemoteInference";
 import { useGitHubActionsDraftReset } from "./hooks/useGitHubActionsDraftReset";
 import { useProjectFilesSearch } from "./hooks/useProjectFilesSearch";
+import { useTerminalLifecycle } from "./hooks/useTerminalLifecycle";
 import {
   canApproveCodexTurn,
   shouldAutoApproveChatOnlyTurn,
@@ -225,7 +224,6 @@ import { ensureRoomDefaults } from "./lib/roomDefaults";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import { omitRecordKey, withoutSetValue } from "./lib/setUtils";
 import {
-  mergeTerminalSnapshots,
   replaceRoomTerminalSnapshots,
   terminalsForLocalHistory,
   upsertTerminal
@@ -1606,63 +1604,17 @@ export function App() {
     setFileMessageForRoom
   });
 
-  useEffect(() => {
-    if (!hasSelectedRoom) {
-      setTerminals([]);
-      return;
-    }
-    const roomId = selectedRoom.id;
-    if (!canReadLocalWorkspace) {
-      setTerminals((current) => replaceRoomTerminalSnapshots(current, roomId, []));
-      setSelectedTerminalIdForRoom(roomId, null);
-      return;
-    }
-    let cancelled = false;
-    listTerminals(roomId)
-      .then((snapshots) => {
-        if (cancelled) return;
-        let mergedSnapshots: TerminalSnapshot[] = [];
-        setTerminals((current) => {
-          mergedSnapshots = mergeTerminalSnapshots(
-            current.filter((terminal) => terminal.roomId === roomId),
-            snapshots
-          );
-          return replaceRoomTerminalSnapshots(current, roomId, mergedSnapshots);
-        });
-        setSelectedTerminalIdsByRoom((current) => {
-          const currentTerminalId = current[roomId] ?? null;
-          const nextTerminalId = currentTerminalId && mergedSnapshots.some((terminal) => terminal.id === currentTerminalId)
-            ? currentTerminalId
-            : mergedSnapshots[0]?.id ?? null;
-          return nextTerminalId ? { ...current, [roomId]: nextTerminalId } : omitRecordKey(current, roomId);
-        });
-      })
-      .catch((error) => {
-        if (!cancelled) setTerminalErrorForRoom(roomId, String(error));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoom.id]);
-
-  useEffect(() => {
-    if (!canReadLocalWorkspace || !selectedTerminalId || !selectedTerminal?.running) return;
-    let cancelled = false;
-    const timer = window.setInterval(() => {
-      readTerminal(selectedTerminalId)
-        .then((snapshot) => {
-          if (cancelled) return;
-          setTerminals((current) => upsertTerminal(current, snapshot));
-        })
-        .catch((error) => {
-          if (!cancelled && hasSelectedRoom) setTerminalErrorForRoom(selectedRoom.id, String(error));
-        });
-    }, 1500);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [hasSelectedRoom, selectedRoom.id, selectedTerminal?.running, selectedTerminalId]);
+  useTerminalLifecycle({
+    hasSelectedRoom,
+    canReadLocalWorkspace,
+    selectedRoomId: selectedRoom.id,
+    selectedTerminalId,
+    selectedTerminalRunning: selectedTerminal?.running,
+    setTerminals,
+    setSelectedTerminalIdsByRoom,
+    setSelectedTerminalIdForRoom,
+    setTerminalErrorForRoom
+  });
 
   useEffect(() => {
     if (
