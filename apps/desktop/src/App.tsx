@@ -628,10 +628,7 @@ export function App() {
       setBrowserRequestsByRoom
     }
   });
-  const {
-    appendRoomMessage,
-    applyMessageReaction
-  } = useRoomChatMutations({
+  const roomChatMutations = useRoomChatMutations({
     setMessagesByRoom
   });
   const workspaceRecords = useWorkspaceRecordActions({
@@ -700,8 +697,8 @@ export function App() {
       relayStatus,
       relayRef,
       seenEnvelopeIds,
-      appendRoomMessage,
-      applyMessageReaction,
+      appendRoomMessage: roomChatMutations.appendRoomMessage,
+      applyMessageReaction: roomChatMutations.applyMessageReaction,
       setChatMessageForRoom,
       setSelectedChatMessage
     },
@@ -808,7 +805,7 @@ export function App() {
     upsertRoom: workspaceRecords.upsertRoom,
     appendInviteRequest,
     updateInviteRequestStatus,
-    appendRoomMessage,
+    appendRoomMessage: roomChatMutations.appendRoomMessage,
     setSelectedInviteMessage,
     setInviteMessageForRoom,
     setInviteLinkForRoom,
@@ -1156,7 +1153,7 @@ export function App() {
         refreshTeamMembers: roomDisplay.refreshTeamMembers,
         decryptInviteEnvelope: inviteActions.decryptInviteEnvelope,
         handleInviteEnvelopePlaintext: inviteActions.handleInviteEnvelopePlaintext,
-        applyMessageReaction,
+        applyMessageReaction: roomChatMutations.applyMessageReaction,
         updateTerminalRequestStatus,
         appendTerminalLinesForRoom,
         appendGitWorkflowEvent,
@@ -1169,7 +1166,7 @@ export function App() {
         markHostHandoffAccepted: hostHandoffActions.markHostHandoffAccepted,
         setHostMessageForRoom,
         appendHostHandoff,
-        appendRoomMessage,
+        appendRoomMessage: roomChatMutations.appendRoomMessage,
         setInviteMessageForRoom
       },
       publishers: {
@@ -1185,7 +1182,7 @@ export function App() {
         appendGitWorkflowEvent,
         appendCodexEvent,
         appendTerminalLinesForRoom,
-        appendRoomMessage,
+        appendRoomMessage: roomChatMutations.appendRoomMessage,
         appendGitHubActionsEvent
       }
     }
