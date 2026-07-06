@@ -318,7 +318,6 @@ import {
 } from "./lib/roomVisibilityWarning";
 import { InlineSecretWarning } from "./components/common";
 import { ShellResizer, SidebarDrawer } from "./components/AppShellLayout";
-import { RoomHeader } from "./components/RoomHeader";
 import { ModelPanel } from "./components/ModelPanel";
 import { RoomModePanel } from "./components/RoomModePanel";
 import { ApprovalPolicyPanel } from "./components/ApprovalPolicyPanel";
@@ -332,14 +331,12 @@ import { GitHandoffPanel } from "./components/GitHandoffPanel";
 import { ProjectPanel } from "./components/ProjectPanel";
 import { RoomMembersPanel, TeamRosterPanel } from "./components/RosterPanels";
 import { TerminalPanel } from "./components/TerminalPanel";
-import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
 import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
 import { DesktopSidebar } from "./components/DesktopSidebar";
-import { RoomChatPanel } from "./components/RoomChatPanel";
+import { RoomMainColumn } from "./components/RoomMainColumn";
 import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
 import { LocalPreviewDialog } from "./components/LocalPreviewDialog";
-import { RoomStatusBanners } from "./components/RoomStatusBanners";
 import type {
   BrowserAccessRequest,
   BrowserStatus,
@@ -6006,119 +6003,114 @@ export function App() {
         </SidebarDrawer>
       )}
 
-      <main className="room">
-        <RoomHeader
-          teams={teams.map((team) => ({ id: team.id, name: team.name }))}
-          selectedTeamId={selectedTeam}
-          roomName={selectedRoom.name}
-          hostStatus={selectedRoom.hostStatus}
-          hostBusy={hostBusy}
-          isActiveHost={isActiveHost}
-          roomLocked={isSelectedRoomLocked}
-          hasRoom={hasSelectedRoom}
-          selectedModel={selectedCodexModel}
-          modelLabel={formatCodexModel(selectedCodexModel)}
-          modelOptions={codexModelOptions}
-          settingsBusy={settingsBusy}
-          selectedCount={selectedMessages.length}
-          markdownSelectionMode={markdownSelectionMode}
-          activeInspectorTab={inspectorTab}
-          onSetHost={setRoomHost}
-          onSelectTeam={(teamId) => {
+      <RoomMainColumn
+        headerProps={{
+          teams: teams.map((team) => ({ id: team.id, name: team.name })),
+          selectedTeamId: selectedTeam,
+          roomName: selectedRoom.name,
+          hostStatus: selectedRoom.hostStatus,
+          hostBusy,
+          isActiveHost,
+          roomLocked: isSelectedRoomLocked,
+          hasRoom: hasSelectedRoom,
+          selectedModel: selectedCodexModel,
+          modelLabel: formatCodexModel(selectedCodexModel),
+          modelOptions: codexModelOptions,
+          settingsBusy,
+          selectedCount: selectedMessages.length,
+          markdownSelectionMode,
+          activeInspectorTab: inspectorTab,
+          onSetHost: setRoomHost,
+          onSelectTeam: (teamId) => {
             setSelectedTeam(teamId);
             setSelectedRoomId(rooms.find((room) => room.teamId === teamId)?.id ?? selectedRoomId);
-          }}
-          onRenameRoom={renameRoom}
-          onSelectModel={setCodexModel}
-          onSelectInspectorTab={(tab) => {
+          },
+          onRenameRoom: renameRoom,
+          onSelectModel: setCodexModel,
+          onSelectInspectorTab: (tab) => {
             setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: tab }));
             if (tab === "browser" && !activeBrowserUrl) openRoomBrowserNow();
-          }}
-          onCopyRoomMarkdown={copyRoomMarkdown}
-          onCopySelectedMarkdown={copySelectedMessagesMarkdown}
-          onToggleMarkdownSelection={toggleMarkdownSelectionMode}
-          onClearSelectedMessages={clearSelectedMessages}
-          onShareLocalPreview={openLocalPreviewDialog}
-        />
-
-        <RoomStatusBanners
-          notices={roomNotices}
-          secretWarningVisible={secretWarningVisible}
-          lockedMessage={isSelectedRoomLocked ? roomLockMessage(selectedRoom, isSelectedRoomRevoked) : null}
-          onAcknowledgeSecretWarning={acknowledgeRoomVisibilityWarning}
-        />
-
-        {markdownCopyFallback && (
-          <MarkdownFallbackPanel
-            title={markdownCopyFallback.title}
-            markdown={markdownCopyFallback.markdown}
-            onRetryCopy={() => copyMarkdownWithFallback(
-              markdownCopyFallback.title,
-              markdownCopyFallback.markdown,
-              (message) => setChatMessageForRoom(selectedRoom.id, message),
-              selectedRoom.id
-            )}
-            onDismiss={() => setMarkdownCopyFallbackForRoom(selectedRoom.id, null)}
-          />
-        )}
-
-        <RoomChatPanel
-          messages={chatMessageRows}
-          approvalVisible={approvalVisible}
-          approvalSummary={codexApprovalSummaryDisplay}
-          isActiveHost={isActiveHost}
-          codexRunning={codexRunning}
-          canApproveCodex={hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked)}
-          canUseChat={roomCanUseChat}
-          canSendMessage={roomCanUseChat && (Boolean(draft.trim()) || pendingAttachments.length > 0)}
-          roomLocked={isSelectedRoomLocked}
-          lockedPlaceholder={roomLockMessage(selectedRoom, isSelectedRoomRevoked)}
-          chatEnabled={selectedRoom.mode.chat}
-          draft={draft}
-          pendingAttachments={pendingAttachmentRows}
-          localPreviewCards={localPreviewCards}
-          pendingAttachmentSummary={pendingAttachmentSummary}
-          markdownSelectionMode={markdownSelectionMode}
-          onToggleMessageSelection={toggleMessageSelection}
-          onCopyMessageMarkdown={(messageId) => {
+          },
+          onCopyRoomMarkdown: copyRoomMarkdown,
+          onCopySelectedMarkdown: copySelectedMessagesMarkdown,
+          onToggleMarkdownSelection: toggleMarkdownSelectionMode,
+          onClearSelectedMessages: clearSelectedMessages,
+          onShareLocalPreview: openLocalPreviewDialog
+        }}
+        statusProps={{
+          notices: roomNotices,
+          secretWarningVisible,
+          lockedMessage: isSelectedRoomLocked ? roomLockMessage(selectedRoom, isSelectedRoomRevoked) : null,
+          onAcknowledgeSecretWarning: acknowledgeRoomVisibilityWarning
+        }}
+        markdownFallbackProps={markdownCopyFallback ? {
+          title: markdownCopyFallback.title,
+          markdown: markdownCopyFallback.markdown,
+          onRetryCopy: () => copyMarkdownWithFallback(
+            markdownCopyFallback.title,
+            markdownCopyFallback.markdown,
+            (message) => setChatMessageForRoom(selectedRoom.id, message),
+            selectedRoom.id
+          ),
+          onDismiss: () => setMarkdownCopyFallbackForRoom(selectedRoom.id, null)
+        } : null}
+        chatProps={{
+          messages: chatMessageRows,
+          approvalVisible,
+          approvalSummary: codexApprovalSummaryDisplay,
+          isActiveHost,
+          codexRunning,
+          canApproveCodex: hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked),
+          canUseChat: roomCanUseChat,
+          canSendMessage: roomCanUseChat && (Boolean(draft.trim()) || pendingAttachments.length > 0),
+          roomLocked: isSelectedRoomLocked,
+          lockedPlaceholder: roomLockMessage(selectedRoom, isSelectedRoomRevoked),
+          chatEnabled: selectedRoom.mode.chat,
+          draft,
+          pendingAttachments: pendingAttachmentRows,
+          localPreviewCards,
+          pendingAttachmentSummary,
+          markdownSelectionMode,
+          onToggleMessageSelection: toggleMessageSelection,
+          onCopyMessageMarkdown: (messageId) => {
             const message = messages.find((item) => item.id === messageId);
             if (message) copyMessageMarkdown(message);
-          }}
-          onCopyCodexOutputMarkdown={(messageId) => {
+          },
+          onCopyCodexOutputMarkdown: (messageId) => {
             const message = messages.find((item) => item.id === messageId);
             if (message) copyCodexOutputMarkdown(message);
-          }}
-          onOpenAttachment={(messageId, attachmentId) => {
+          },
+          onOpenAttachment: (messageId, attachmentId) => {
             const message = messages.find((item) => item.id === messageId);
             const attachment = message?.attachments?.find((item) => item.id === attachmentId);
             if (attachment) openEncryptedAttachmentBlob(attachment);
-          }}
-          onToggleReaction={(messageId, emoji) => {
+          },
+          onToggleReaction: (messageId, emoji) => {
             const message = messages.find((item) => item.id === messageId);
             if (message) toggleMessageReaction(message, emoji);
-          }}
-          onDenyApproval={() => {
+          },
+          onDenyApproval: () => {
             setPendingCodexApprovalForRoom(selectedRoom.id, null);
             setApprovalVisibleForRoom(selectedRoom.id, false);
-          }}
-          onApproveApproval={() => approveCodexTurn()}
-          onInvokeCodex={() => handleCodexInvoke()}
-          onRemovePendingAttachment={removePendingAttachment}
-          onOpenLocalPreview={(previewId) => {
+          },
+          onApproveApproval: () => approveCodexTurn(),
+          onInvokeCodex: () => handleCodexInvoke(),
+          onRemovePendingAttachment: removePendingAttachment,
+          onOpenLocalPreview: (previewId) => {
             const preview = localPreviews.find((item) => item.id === previewId);
             if (preview?.publicUrl) window.open(preview.publicUrl, "_blank", "noopener,noreferrer");
-          }}
-          onCopyLocalPreviewLink={(previewId) => {
+          },
+          onCopyLocalPreviewLink: (previewId) => {
             const preview = localPreviews.find((item) => item.id === previewId);
             if (preview?.publicUrl) {
               void copyMarkdownWithFallback("local preview link", preview.publicUrl, (message) => setChatMessageForRoom(selectedRoom.id, message), selectedRoom.id);
             }
-          }}
-          onStopLocalPreview={(previewId) => void stopLocalPreview(previewId)}
-          onDraftChange={(nextDraft) => setDraftForRoom(selectedRoom.id, nextDraft)}
-          onSendMessage={sendMessage}
-        />
-      </main>
+          },
+          onStopLocalPreview: (previewId) => void stopLocalPreview(previewId),
+          onDraftChange: (nextDraft) => setDraftForRoom(selectedRoom.id, nextDraft),
+          onSendMessage: sendMessage
+        }}
+      />
 
       <ShellResizer
         side="right"
