@@ -304,6 +304,7 @@ import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useRoomAccess } from "./hooks/useRoomAccess";
 import { useRoomBusySetters } from "./hooks/useRoomBusySetters";
+import { useRoomCodexApprovalSetters } from "./hooks/useRoomCodexApprovalSetters";
 import { useRoomFileSetters } from "./hooks/useRoomFileSetters";
 import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
 import { useRoomMessageSetters } from "./hooks/useRoomMessageSetters";
@@ -749,6 +750,16 @@ export function App() {
     setTerminalErrorsByRoom,
     setTerminalLinesByRoom
   });
+  const {
+    setApprovalVisibleForRoom,
+    setPendingCodexApprovalForRoom,
+    resetCodexApprovalForRoom,
+    setCodexRunningForRoom
+  } = useRoomCodexApprovalSetters({
+    setApprovalVisibleByRoom,
+    setPendingCodexApprovalsByRoom,
+    setCodexRunningByRoom
+  });
   const roomNotices = useRoomNotices({
     roomId: selectedRoom.id,
     hostMessage,
@@ -893,26 +904,6 @@ export function App() {
     if (!isRoomKeyRotationInFlight(keyRotationBusyRef.current, roomId)) return false;
     setInviteMessageForRoom(roomId, roomKeyRotationInFlightMessage());
     return true;
-  }
-
-  function setApprovalVisibleForRoom(roomId: string, visible: boolean) {
-    setApprovalVisibleByRoom((current) => visible ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
-  }
-
-  function setPendingCodexApprovalForRoom(
-    roomId: string,
-    approval: PendingCodexApproval | null
-  ) {
-    setPendingCodexApprovalsByRoom((current) => approval ? { ...current, [roomId]: approval } : omitRecordKey(current, roomId));
-  }
-
-  function resetCodexApprovalForRoom(roomId: string) {
-    setPendingCodexApprovalForRoom(roomId, null);
-    setApprovalVisibleForRoom(roomId, false);
-  }
-
-  function setCodexRunningForRoom(roomId: string, running: boolean) {
-    setCodexRunningByRoom((current) => running ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
   function setCustomCodexModelForRoom(roomId: string, model: string) {
