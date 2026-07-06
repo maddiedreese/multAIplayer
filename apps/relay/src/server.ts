@@ -34,6 +34,7 @@ import {
   type RelayServerMessage
 } from "@multaiplayer/protocol";
 import { loadRelayConfig } from "./config.js";
+import { createRelayStore, type AuthSession, type ClientSession, type PresenceRecord, type RoomKey } from "./state.js";
 
 const relayConfig = loadRelayConfig();
 const {
@@ -89,29 +90,23 @@ const wss = new WebSocketServer({
   }
 });
 
-type RoomKey = `${string}:${string}`;
-
-interface ClientSession {
-  socket: WebSocket;
-  authSession?: AuthSession;
-  rateClientId: string;
-  teamId?: string;
-  roomId?: string;
-  userId?: string;
-  deviceId?: string;
-  subscribedTeamIds: Set<string>;
-  workspaceSubscribed: boolean;
-  displayName?: string;
-  avatarUrl?: string;
-}
-
-const sessions = new Map<WebSocket, ClientSession>();
-const roomSockets = new Map<RoomKey, Set<WebSocket>>();
-const teamSockets = new Map<string, Set<WebSocket>>();
-const workspaceSockets = new Set<WebSocket>();
-const roomPresence = new Map<RoomKey, Map<string, PresenceRecord>>();
-const encryptedBacklog = new Map<RoomKey, RelayEnvelope[]>();
-const authSessions = new Map<string, AuthSession>();
+const relayStore = createRelayStore();
+const {
+  sessions,
+  roomSockets,
+  teamSockets,
+  workspaceSockets,
+  roomPresence,
+  encryptedBacklog,
+  authSessions,
+  teams,
+  rooms,
+  invites,
+  devices,
+  attachmentBlobs,
+  teamMembers,
+  rateLimitStore
+} = relayStore;
 const authSessionMaxAgeMs = 1000 * 60 * 60 * 24 * 30;
 const maxRoomProjectPathChars = 2048;
 const maxCodexModelChars = 80;
@@ -135,13 +130,6 @@ const maxEnvelopeCiphertextChars = Math.ceil(encryptedEnvelopeMaxBytes * 4 / 3) 
 const maxAttachmentBlobIdChars = 160;
 const maxAttachmentBlobNameChars = 512;
 const maxAttachmentBlobTypeChars = 160;
-const teams = new Map<string, TeamRecord>();
-const rooms = new Map<string, RoomRecord>();
-const invites = new Map<string, InviteRecordType>();
-const devices = new Map<string, DeviceRecord>();
-const attachmentBlobs = new Map<string, AttachmentBlobRecordType>();
-const teamMembers = new Map<string, Map<string, TeamMemberRecord>>();
-const rateLimitStore = new Map<string, RateLimitRecord>();
 let saveTimer: NodeJS.Timeout | null = null;
 
 type RateLimitBucket = keyof typeof rateLimitCaps;
@@ -154,22 +142,6 @@ function authCookieOptions(maxAge?: number): CookieOptions {
     path: "/",
     ...(maxAge === undefined ? {} : { maxAge })
   };
-}
-
-interface RateLimitRecord {
-  count: number;
-  resetAt: number;
-}
-
-interface AuthSession {
-  accessToken: string;
-  user: {
-    id: string;
-    login: string;
-    name?: string;
-    avatarUrl?: string;
-  };
-  expiresAt: number;
 }
 
 interface StoredAuthSession {
@@ -212,16 +184,6 @@ interface StoredRelayState {
 interface NormalizedStoredAuthSession {
   sessionId: string;
   session: AuthSession;
-}
-
-interface PresenceRecord {
-  teamId: string;
-  roomId: string;
-  userId: string;
-  deviceId: string;
-  displayName: string;
-  avatarUrl?: string;
-  publicKeyFingerprint?: string;
 }
 
 await loadRelayStore();
