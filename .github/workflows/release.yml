@@ -76,11 +76,56 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Detect Apple signing configuration
+        id: signing
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          can_sign=false
+          can_notarize=false
+          if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_CERTIFICATE_PASSWORD" ] && [ -n "$APPLE_SIGNING_IDENTITY" ]; then
+            can_sign=true
+          fi
+          if [ "$can_sign" = "true" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            can_notarize=true
+          fi
+          echo "can_sign=$can_sign" >> "$GITHUB_OUTPUT"
+          echo "can_notarize=$can_notarize" >> "$GITHUB_OUTPUT"
+          if [ "$can_notarize" = "true" ]; then
+            echo "Release build will use Developer ID signing and notarization."
+          else
+            echo "Release build will remain unsigned/not notarized because Apple signing secrets are incomplete."
+          fi
+
       - name: Verify
         run: npm run verify
 
-      - name: Build unsigned Tauri app
+      - name: Build signed and notarized Tauri app
+        if: steps.signing.outputs.can_notarize == 'true'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run tauri:build -w @multaiplayer/desktop
+
+      - name: Build unsigned Tauri app
+        if: steps.signing.outputs.can_notarize != 'true'
+        run: npm run tauri:build -w @multaiplayer/desktop
+
+      - name: Verify signed and notarized app
+        if: steps.signing.outputs.can_notarize == 'true'
+        run: |
+          app_path="apps/desktop/src-tauri/target/release/bundle/macos/multAIplayer.app"
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          spctl -a -vvv -t install "$app_path"
 
       - name: Package release assets
         run: |
@@ -101,21 +146,33 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_PRERELEASE: ${{ steps.release.outputs.prerelease }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_CAN_NOTARIZE: ${{ steps.signing.outputs.can_notarize }}
         run: |
           args=()
           if [ "$RELEASE_PRERELEASE" = "true" ]; then
             args+=(--prerelease)
           fi
-          gh release create "$RELEASE_TAG" release-assets/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "multAIplayer $RELEASE_TAG" \
-            --notes "$(cat <<'EOF'
-          Automated macOS release build.
-
+          if [ "$RELEASE_CAN_NOTARIZE" = "true" ]; then
+            signing_notes="$(cat <<'EOF'
+          Important alpha notes:
+          - This macOS app is Developer ID signed and notarized.
+          - Treat it as security-sensitive alpha software and prefer test/self-hosted rooms before using private projects.
+          - See `SHA256SUMS.txt` for release asset checksums.
+          EOF
+          )"
+          else
+            signing_notes="$(cat <<'EOF'
           Important alpha notes:
           - This app is unsigned and not notarized yet. macOS Gatekeeper may require manual approval to open it.
           - Treat it as security-sensitive alpha software and prefer test/self-hosted rooms before using private projects.
           - See `SHA256SUMS.txt` for release asset checksums.
           EOF
-          )" \
+          )"
+          fi
+          gh release create "$RELEASE_TAG" release-assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "multAIplayer $RELEASE_TAG" \
+            --notes "Automated macOS release build.
+
+          $signing_notes" \
             "${args[@]}"
