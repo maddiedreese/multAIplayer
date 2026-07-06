@@ -305,6 +305,7 @@ import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useRoomAccess } from "./hooks/useRoomAccess";
 import { useRoomBrowserSetters } from "./hooks/useRoomBrowserSetters";
 import { useRoomBusySetters } from "./hooks/useRoomBusySetters";
+import { useRoomChatMutations } from "./hooks/useRoomChatMutations";
 import { useRoomCodexApprovalSetters } from "./hooks/useRoomCodexApprovalSetters";
 import { useRoomDraftSetters } from "./hooks/useRoomDraftSetters";
 import { useRoomEventAppenders } from "./hooks/useRoomEventAppenders";
@@ -842,6 +843,12 @@ export function App() {
     setInviteRequestsByRoom,
     setTerminalRequestsByRoom,
     setBrowserRequestsByRoom
+  });
+  const {
+    appendRoomMessage,
+    applyMessageReaction
+  } = useRoomChatMutations({
+    setMessagesByRoom
   });
   const roomNotices = useRoomNotices({
     roomId: selectedRoom.id,
@@ -3921,43 +3928,6 @@ export function App() {
     seenEnvelopeIds.current.add(envelope.id);
     client.publish({ type: "publish", envelope });
     appendRoomMessage(room.id, message);
-  }
-
-  function appendRoomMessage(roomId: string, message: ChatMessage) {
-    setMessagesByRoom((current) => {
-      const roomMessages = current[roomId] ?? [];
-      if (roomMessages.some((existing) => existing.id === message.id)) return current;
-      return {
-        ...current,
-        [roomId]: [...roomMessages, message]
-      };
-    });
-  }
-
-  function applyMessageReaction(roomId: string, reaction: ChatReactionPlaintextPayload) {
-    setMessagesByRoom((current) => {
-      const roomMessages = current[roomId] ?? [];
-      return {
-        ...current,
-        [roomId]: roomMessages.map((message) => {
-          if (message.id !== reaction.messageId) return message;
-          const reactions = message.reactions ?? [];
-          const existing = reactions.find((item) => item.emoji === reaction.emoji);
-          const reactors = existing?.reactors.filter((reactor) => reactor.userId !== reaction.reactorUserId) ?? [];
-          const nextReactors = reaction.action === "add"
-            ? [...reactors, { userId: reaction.reactorUserId, name: reaction.reactor }]
-            : reactors;
-          const nextReactions = [
-            ...reactions.filter((item) => item.emoji !== reaction.emoji),
-            ...(nextReactors.length ? [{ emoji: reaction.emoji, reactors: nextReactors }] : [])
-          ];
-          return {
-            ...message,
-            reactions: nextReactions
-          };
-        })
-      };
-    });
   }
 
   async function toggleMessageReaction(message: ChatMessage, emoji: string) {
