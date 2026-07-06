@@ -37,12 +37,14 @@ export function RoomHeader({
   browserEnabled,
   projectLabel,
   selectedCount,
+  markdownSelectionMode,
   activeInspectorTab,
   onSetHost,
   onSelectModel,
   onSelectInspectorTab,
   onCopyRoomMarkdown,
   onCopySelectedMarkdown,
+  onToggleMarkdownSelection,
   onClearSelectedMessages
 }: {
   teamName: string;
@@ -62,12 +64,14 @@ export function RoomHeader({
   browserEnabled: boolean;
   projectLabel: string;
   selectedCount: number;
+  markdownSelectionMode: boolean;
   activeInspectorTab: InspectorTab;
   onSetHost: (status: HostStatus) => void;
   onSelectModel: (model: string) => void;
   onSelectInspectorTab: (tab: InspectorTab) => void;
   onCopyRoomMarkdown: () => void;
   onCopySelectedMarkdown: () => void;
+  onToggleMarkdownSelection: () => void;
   onClearSelectedMessages: () => void;
 }) {
   const knownModel = modelOptions.some((option) => option.id === selectedModel);
@@ -149,14 +153,28 @@ export function RoomHeader({
           <Copy size={14} />
           Markdown
         </button>
-        <button className="header-copy" onClick={onCopySelectedMarkdown} disabled={!hasRoom || selectedCount === 0}>
+        <button
+          className={markdownSelectionMode ? "header-copy active" : "header-copy"}
+          onClick={() => {
+            if (markdownSelectionMode && selectedCount > 0) {
+              onCopySelectedMarkdown();
+            } else {
+              onToggleMarkdownSelection();
+            }
+          }}
+          disabled={!hasRoom}
+        >
           <Copy size={14} />
-          {selectedCount ? `${selectedCount} selected` : "Selected"}
+          {markdownSelectionMode
+            ? selectedCount
+              ? `Copy ${selectedCount}`
+              : "Select messages"
+            : "Selected"}
         </button>
-        {selectedCount > 0 && (
-          <button className="header-copy" onClick={onClearSelectedMessages}>
+        {markdownSelectionMode && (
+          <button className="header-copy" onClick={selectedCount > 0 ? onClearSelectedMessages : onToggleMarkdownSelection}>
             <X size={14} />
-            Clear
+            {selectedCount > 0 ? "Clear" : "Done"}
           </button>
         )}
       </div>

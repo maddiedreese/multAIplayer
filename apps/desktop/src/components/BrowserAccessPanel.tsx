@@ -38,6 +38,7 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
   onSaveBrowserAllowedOrigins,
   onBrowserUrlChange,
   onBrowserReasonChange,
+  onOpenBrowserNow,
   onRequestBrowserAccess,
   onApproveBrowserRequest,
   onDenyBrowserRequest,
@@ -64,6 +65,7 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
   onSaveBrowserAllowedOrigins: () => void;
   onBrowserUrlChange: (url: string) => void;
   onBrowserReasonChange: (reason: string) => void;
+  onOpenBrowserNow: () => void;
   onRequestBrowserAccess: () => void;
   onApproveBrowserRequest: (request: T) => void;
   onDenyBrowserRequest: (requestId: string) => void;
@@ -143,6 +145,14 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
       </label>
       <button
         className="primary-wide"
+        onClick={onOpenBrowserNow}
+        disabled={!canHostBrowser || !browserUrl.trim()}
+      >
+        <ExternalLink size={15} />
+        Open browser
+      </button>
+      <button
+        className="ghost-wide"
         onClick={onRequestBrowserAccess}
         disabled={!canRequestBrowser || !browserUrl.trim()}
       >
