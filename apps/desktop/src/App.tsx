@@ -39,7 +39,6 @@ import { useThemeMode } from "./hooks/useThemeMode";
 import { useWorkspaceRecordActions } from "./hooks/useWorkspaceRecordActions";
 import { useHostHandoffActions } from "./hooks/useHostHandoffActions";
 import { useInviteActions } from "./hooks/useInviteActions";
-import { useCodexBrowserOpenCommand } from "./hooks/useCodexBrowserOpenCommand";
 import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
 import { useAppRefs } from "./hooks/useAppRefs";
 import { useAppSelectedContext } from "./hooks/useAppSelectedContext";
@@ -50,7 +49,7 @@ import { useLocalPreviewDialogProps } from "./hooks/useLocalPreviewDialogProps";
 import { useWorkspaceFlowContext } from "./hooks/useWorkspaceFlowContext";
 import { useRoomBackgroundEffects } from "./hooks/useRoomBackgroundEffects";
 import { useRoomPanelActions } from "./hooks/useRoomPanelActions";
-import { useRelayRoomSync } from "./hooks/useRelayRoomSync";
+import { useRelaySyncContext } from "./hooks/useRelaySyncContext";
 import { useCodexRoomActions } from "./hooks/useCodexRoomActions";
 import { useRoomToolActions } from "./hooks/useRoomToolActions";
 import { InlineSecretWarning } from "./components/common";
@@ -1239,21 +1238,8 @@ export function App() {
     }
   });
 
-  const { handleCodexBrowserOpenCommand } = useCodexBrowserOpenCommand({
-    localUser,
-    selectedRoomIdRef,
-    forgottenRoomIds,
-    revokedRoomIds,
-    revokedTeamIds,
-    appendBrowserRequest,
-    setBrowserMessageForRoom,
-    setBrowserUrlForRoom,
-    setActiveBrowserUrlsByRoom,
-    setBrowserStatusByRoom,
-    setInspectorTabsByRoom
-  });
-
   const {
+    handleCodexBrowserOpenCommand,
     publishRequestStatus,
     publishLocalPreviewEvent,
     publishTerminalResult,
@@ -1261,74 +1247,88 @@ export function App() {
     publishCodexEvent,
     publishRoomSettingsEvent,
     publishGitHubActionsEvent
-  } = useRelayRoomSync({
-    subscription: {
-      relayWsUrl: appConfig.relayWsUrl,
-      deviceId,
+  } = useRelaySyncContext({
+    browserOpenCommand: {
       localUser,
-      devicePublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
-      selectedTeam,
-      selectedRoom,
-      hasSelectedRoom,
-      isActiveHost,
-      inviteAdmissionsByRoom,
+      selectedRoomIdRef,
+      forgottenRoomIds,
       revokedRoomIds,
       revokedTeamIds,
-      approvalPolicyLabels,
-      roomModeLabels,
-      relayRef,
-      seenEnvelopeIds,
-      roomsRef,
-      selectedRoomIdRef,
-      historyLoadedRoomIds,
-      setRelayStatus,
-      setPresenceByRoom,
-      setRooms,
-      setMessagesByRoom,
-      setTerminalRequestsByRoom,
-      setBrowserRequestsByRoom,
-      setActionRunsByRoom,
-      setActionsLastCheckedByRoom,
-      setActionsMessagesByRoom,
-      setForgottenRoomIds,
-      handleRelayError,
-      upsertRoom,
-      upsertTeam,
-      refreshTeamMembers,
-      decryptInviteEnvelope,
-      handleInviteEnvelopePlaintext,
-      handleCodexBrowserOpenCommand,
-      applyMessageReaction,
-      updateTerminalRequestStatus,
-      appendTerminalLinesForRoom,
-      appendGitWorkflowEvent,
-      setGitWorkflowMessageForRoom,
-      appendGitHubActionsEvent,
-      appendCodexEvent,
-      updateBrowserRequestStatus,
-      appendLocalPreviewEvent,
-      setChatMessageForRoom,
-      markHostHandoffAccepted,
-      setHostMessageForRoom,
-      appendHostHandoff,
-      appendRoomMessage,
-      setInviteMessageForRoom
+      appendBrowserRequest,
+      setBrowserMessageForRoom,
+      setBrowserUrlForRoom,
+      setActiveBrowserUrlsByRoom,
+      setBrowserStatusByRoom,
+      setInspectorTabsByRoom
     },
-    publishers: {
-      relayRef,
-      seenEnvelopeIds,
-      relayStatus,
-      selectedRoom,
-      deviceId,
-      localUser,
-      approvalPolicyLabels,
-      roomModeLabels,
-      appendLocalPreviewEvent,
-      appendGitWorkflowEvent,
-      appendCodexEvent,
-      appendTerminalLinesForRoom,
-      appendRoomMessage,
-      appendGitHubActionsEvent
+    relayRoomSync: {
+      subscription: {
+        relayWsUrl: appConfig.relayWsUrl,
+        deviceId,
+        localUser,
+        devicePublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
+        selectedTeam,
+        selectedRoom,
+        hasSelectedRoom,
+        isActiveHost,
+        inviteAdmissionsByRoom,
+        revokedRoomIds,
+        revokedTeamIds,
+        approvalPolicyLabels,
+        roomModeLabels,
+        relayRef,
+        seenEnvelopeIds,
+        roomsRef,
+        selectedRoomIdRef,
+        historyLoadedRoomIds,
+        setRelayStatus,
+        setPresenceByRoom,
+        setRooms,
+        setMessagesByRoom,
+        setTerminalRequestsByRoom,
+        setBrowserRequestsByRoom,
+        setActionRunsByRoom,
+        setActionsLastCheckedByRoom,
+        setActionsMessagesByRoom,
+        setForgottenRoomIds,
+        handleRelayError,
+        upsertRoom,
+        upsertTeam,
+        refreshTeamMembers,
+        decryptInviteEnvelope,
+        handleInviteEnvelopePlaintext,
+        applyMessageReaction,
+        updateTerminalRequestStatus,
+        appendTerminalLinesForRoom,
+        appendGitWorkflowEvent,
+        setGitWorkflowMessageForRoom,
+        appendGitHubActionsEvent,
+        appendCodexEvent,
+        updateBrowserRequestStatus,
+        appendLocalPreviewEvent,
+        setChatMessageForRoom,
+        markHostHandoffAccepted,
+        setHostMessageForRoom,
+        appendHostHandoff,
+        appendRoomMessage,
+        setInviteMessageForRoom
+      },
+      publishers: {
+        relayRef,
+        seenEnvelopeIds,
+        relayStatus,
+        selectedRoom,
+        deviceId,
+        localUser,
+        approvalPolicyLabels,
+        roomModeLabels,
+        appendLocalPreviewEvent,
+        appendGitWorkflowEvent,
+        appendCodexEvent,
+        appendTerminalLinesForRoom,
+        appendRoomMessage,
+        appendGitHubActionsEvent
+      }
     }
   });
   const {
