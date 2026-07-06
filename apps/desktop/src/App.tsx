@@ -307,16 +307,8 @@ export function App() {
     terminalBusyByRoom,
     browserRequestsByRoom
   });
-  const {
-    authConfig,
-    currentUser,
-    deviceFlow,
-    authError,
-    authBusy,
-    beginGitHubSignIn,
-    signOutGitHub
-  } = useGitHubAuth(appConfig.relayHttpUrl);
-  const { deviceId, localUser } = useLocalIdentity(currentUser);
+  const githubAuth = useGitHubAuth(appConfig.relayHttpUrl);
+  const { deviceId, localUser } = useLocalIdentity(githubAuth.currentUser);
   const roomSettingsActor = useRoomSettingsActor(localUser);
 
   const {
@@ -394,7 +386,7 @@ export function App() {
       teamMembersByTeam,
       teamMembersMessageByTeam,
       teamMembersBusyByTeam,
-      currentUser,
+      currentUser: githubAuth.currentUser,
       localUserId: localUser.id
     },
     roomValues: {
@@ -688,8 +680,8 @@ export function App() {
     },
     githubWorkflow: {
       actionRuns,
-      authConfig,
-      currentUser,
+      authConfig: githubAuth.authConfig,
+      currentUser: githubAuth.currentUser,
       gitWorkflowDraft,
       projectPath: selectedRoom.projectPath
     },
@@ -905,7 +897,7 @@ export function App() {
         selectedTeamMembersBusy,
         selectedRoom,
         localUser,
-        currentUser,
+        currentUser: githubAuth.currentUser,
         setDeviceIdentityMessage,
         setTrustedDeviceKeys,
         setTeamMembersBusyByTeam,
@@ -1311,7 +1303,7 @@ export function App() {
     account: {
       selectedRoomId: selectedRoom.id,
       deviceId,
-      signOutGitHub,
+      signOutGitHub: githubAuth.signOutGitHub,
       setDeviceIdentity,
       setDeviceIdentityMessage,
       setTrustedDeviceKeys
@@ -1326,8 +1318,8 @@ export function App() {
       revokedRoomIds,
       revokedTeamIds,
       localUser,
-      authConfig,
-      currentUser,
+      authConfig: githubAuth.authConfig,
+      currentUser: githubAuth.currentUser,
       setActionsBusyForRoom,
       setActionsMessagesByRoom,
       setActionRunsByRoom,
@@ -1766,7 +1758,7 @@ export function App() {
         actionsBusy ||
         !roomInteraction.isActiveHost ||
         !roomInteraction.githubActionsReadiness.ready,
-      currentUserSignedIn: Boolean(currentUser),
+      currentUserSignedIn: Boolean(githubAuth.currentUser),
       message: actionsMessage,
       onRefresh: () => roomRuntime.refreshGitHubActions()
     },
@@ -1793,11 +1785,11 @@ export function App() {
     }
     },
     appSidebar: {
-    currentUser,
-    authBusy,
-    authConfig,
-    authError,
-    deviceFlow,
+    currentUser: githubAuth.currentUser,
+    authBusy: githubAuth.authBusy,
+    authConfig: githubAuth.authConfig,
+    authError: githubAuth.authError,
+    deviceFlow: githubAuth.deviceFlow,
     sidebarQuery,
     searchActive: roomDisplay.searchActive,
     workspaceError,
@@ -1841,7 +1833,7 @@ export function App() {
     appConfigMessage,
     roomSettingsMessage: settingsMessage,
     historyMessage: visibleHistoryMessage,
-    onSignIn: beginGitHubSignIn,
+    onSignIn: githubAuth.beginGitHubSignIn,
     onSignOut: roomRuntime.signOut,
     onSidebarQueryChange: setSidebarQuery,
     onNewTeamNameChange: setNewTeamName,
