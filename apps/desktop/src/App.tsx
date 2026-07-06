@@ -133,6 +133,7 @@ import { useSelectedTeamDefaults } from "./hooks/useSelectedTeamDefaults";
 import { useCodexProbe } from "./hooks/useCodexProbe";
 import { useRoomDraftCleanup } from "./hooks/useRoomDraftCleanup";
 import { useHistorySearch } from "./hooks/useHistorySearch";
+import { useRoomGitStatusRefresh } from "./hooks/useRoomGitStatusRefresh";
 import {
   canApproveCodexTurn,
   shouldAutoApproveChatOnlyTurn,
@@ -1562,25 +1563,13 @@ export function App() {
     return () => window.clearInterval(interval);
   }, [localPreviewsByRoom, localUser.id]);
 
-  useEffect(() => {
-    if (!hasSelectedRoom) {
-      return;
-    }
-    const roomId = selectedRoom.id;
-    if (!canReadLocalWorkspace) {
-      setGitStatusForRoom(roomId, null);
-      return;
-    }
-    setGitStatusForRoom(roomId, null);
-    getGitStatus(selectedRoom.projectPath)
-      .then((status) => setGitStatusForRoom(roomId, status))
-      .catch((error) => {
-        setGitStatusForRoom(roomId, {
-          branch: "unknown",
-          files: [{ path: String(error), status: "error", added: 0, removed: 0 }]
-        });
-      });
-  }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoom.id, selectedRoom.projectPath]);
+  useRoomGitStatusRefresh({
+    hasSelectedRoom,
+    canReadLocalWorkspace,
+    selectedRoomId: selectedRoom.id,
+    selectedRoomProjectPath: selectedRoom.projectPath,
+    setGitStatusForRoom
+  });
 
   useEffect(() => {
     if (!hasSelectedRoom) return;
