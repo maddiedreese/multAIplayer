@@ -29,14 +29,10 @@ import {
 } from "./lib/appFormatters";
 import { useAppStateSlices } from "./hooks/useAppStateSlices";
 import { useFileTerminalDisplay } from "./hooks/useFileTerminalDisplay";
-import { useGitHubWorkflowState } from "./hooks/useGitHubWorkflowState";
 import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
-import { useRoomAccess } from "./hooks/useRoomAccess";
 import { useRoomChatMutations } from "./hooks/useRoomChatMutations";
-import { useRoomInFlightReporters } from "./hooks/useRoomInFlightReporters";
-import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
-import { useRoomNotices } from "./hooks/useRoomNotices";
+import { useRoomInteractionContext } from "./hooks/useRoomInteractionContext";
 import { useRoomScopedSetters } from "./hooks/useRoomScopedSetters";
 import { useSelectedRoomRuntime } from "./hooks/useSelectedRoomRuntime";
 import { useSidebarNavigation } from "./hooks/useSidebarNavigation";
@@ -46,8 +42,6 @@ import { useMarkdownCopyActions } from "./hooks/useMarkdownCopyActions";
 import { useWorkspaceRecordActions } from "./hooks/useWorkspaceRecordActions";
 import { useHostHandoffActions } from "./hooks/useHostHandoffActions";
 import { useInviteActions } from "./hooks/useInviteActions";
-import { useChatActions } from "./hooks/useChatActions";
-import { useRoomVisibilityWarningActions } from "./hooks/useRoomVisibilityWarningActions";
 import { useCodexBrowserOpenCommand } from "./hooks/useCodexBrowserOpenCommand";
 import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
 import { useAppRefs } from "./hooks/useAppRefs";
@@ -684,32 +678,9 @@ export function App() {
     reportRoomSettingsMutationInFlight,
     reportRoomKeyRotationInFlight,
     reportRoomFileActionInFlight,
-    reportRoomTerminalActionInFlight
-  } = useRoomInFlightReporters({
-    hostBusyRef,
-    settingsBusyRef,
-    keyRotationBusyRef,
-    fileBusyRef,
-    terminalBusyRef,
-    setHostMessageForRoom,
-    setSettingsMessageForRoom,
-    setInviteMessageForRoom,
-    setFileMessageForRoom,
-    setTerminalErrorForRoom
-  });
-  const roomNotices = useRoomNotices({
-    roomId: selectedRoom.id,
-    hostMessage,
-    chatMessage,
-    setHostMessageForRoom,
-    setChatMessageForRoom
-  });
-  const { acknowledgeRoomVisibilityWarning } = useRoomVisibilityWarningActions({
-    hasSelectedRoom,
-    selectedRoomId: selectedRoom.id,
-    setSecretWarningVisibleForRoom
-  });
-  const {
+    reportRoomTerminalActionInFlight,
+    roomNotices,
+    acknowledgeRoomVisibilityWarning,
     isActiveHost,
     isSelectedRoomForgotten,
     isSelectedRoomRevoked,
@@ -724,58 +695,81 @@ export function App() {
     browserAccessMessage,
     workspaceRequestMessage,
     hostGateMessage,
-    roomSettingsGateMessage
-  } = useRoomAccess({
-    hasSelectedRoom,
-    selectedRoom,
-    localUser,
-    forgottenRoomIds,
-    revokedRoomIds,
-    revokedTeamIds,
-    historySettings,
-    inviteApprovalGate
-  });
-  const {
+    roomSettingsGateMessage,
     publishChatMessage,
-    toggleMessageReaction
-  } = useChatActions({
-    hasSelectedRoom,
-    selectedRoom,
-    isSelectedRoomLocked,
-    isSelectedRoomRevoked,
-    forgottenRoomIds,
-    revokedRoomIds,
-    revokedTeamIds,
-    localUser,
-    deviceId,
-    relayStatus,
-    relayRef,
-    seenEnvelopeIds,
-    appendRoomMessage,
-    applyMessageReaction,
-    setChatMessageForRoom,
-    setSelectedChatMessage
-  });
-  const {
+    toggleMessageReaction,
     actionsSummary,
     githubWorkflowReadiness,
     githubActionsReadiness,
-    gitApprovalPreview
-  } = useGitHubWorkflowState({
-    actionRuns,
-    authConfig,
-    currentUser,
-    gitWorkflowDraft,
-    projectPath: selectedRoom.projectPath
-  });
-  const roomMemberRows = useRoomMemberRows({
-    presenceByRoom,
-    selectedRoom,
-    selectedRoomId,
-    localUser,
-    localDeviceId: deviceId,
-    localPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
-    trustedDeviceKeys
+    gitApprovalPreview,
+    roomMemberRows
+  } = useRoomInteractionContext({
+    inFlightReporters: {
+      hostBusyRef,
+      settingsBusyRef,
+      keyRotationBusyRef,
+      fileBusyRef,
+      terminalBusyRef,
+      setHostMessageForRoom,
+      setSettingsMessageForRoom,
+      setInviteMessageForRoom,
+      setFileMessageForRoom,
+      setTerminalErrorForRoom
+    },
+    notices: {
+      roomId: selectedRoom.id,
+      hostMessage,
+      chatMessage,
+      setHostMessageForRoom,
+      setChatMessageForRoom
+    },
+    visibilityWarning: {
+      hasSelectedRoom,
+      selectedRoomId: selectedRoom.id,
+      setSecretWarningVisibleForRoom
+    },
+    access: {
+      hasSelectedRoom,
+      selectedRoom,
+      localUser,
+      forgottenRoomIds,
+      revokedRoomIds,
+      revokedTeamIds,
+      historySettings,
+      inviteApprovalGate
+    },
+    chat: {
+      hasSelectedRoom,
+      selectedRoom,
+      forgottenRoomIds,
+      revokedRoomIds,
+      revokedTeamIds,
+      localUser,
+      deviceId,
+      relayStatus,
+      relayRef,
+      seenEnvelopeIds,
+      appendRoomMessage,
+      applyMessageReaction,
+      setChatMessageForRoom,
+      setSelectedChatMessage
+    },
+    githubWorkflow: {
+      actionRuns,
+      authConfig,
+      currentUser,
+      gitWorkflowDraft,
+      projectPath: selectedRoom.projectPath
+    },
+    memberRows: {
+      presenceByRoom,
+      selectedRoom,
+      selectedRoomId,
+      localUser,
+      localDeviceId: deviceId,
+      localPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
+      trustedDeviceKeys
+    }
   });
   const {
     activeCodexApproval,
