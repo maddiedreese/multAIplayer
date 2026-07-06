@@ -33,6 +33,7 @@ import {
   type TeamRole,
   type RelayServerMessage
 } from "@multaiplayer/protocol";
+import { createRelayAuthz } from "./authz.js";
 import { loadRelayConfig } from "./config.js";
 import { createRelayStore, type AuthSession, type ClientSession, type PresenceRecord, type RoomKey } from "./state.js";
 
@@ -107,6 +108,16 @@ const {
   teamMembers,
   rateLimitStore
 } = relayStore;
+const relayAuthz = createRelayAuthz(relayStore);
+const {
+  teamIdsForUser,
+  isTeamMember,
+  teamRoleRank,
+  canSetTeamMemberRole,
+  canRemoveTeamMember,
+  transferTeamOwnership,
+  canAccessRoom
+} = relayAuthz;
 const authSessionMaxAgeMs = 1000 * 60 * 60 * 24 * 30;
 const maxRoomProjectPathChars = 2048;
 const maxCodexModelChars = 80;
@@ -1572,59 +1583,6 @@ function allowMutation(session: AuthSession | null, res: Response): boolean {
   if (!mutationsRequireAuth || session) return true;
   res.status(401).json({ error: "Sign in with GitHub before changing workspace state." });
   return false;
-}
-
-function teamIdsForUser(userId: string): Set<string> {
-  const visible = new Set<string>();
-  for (const [teamId, members] of teamMembers.entries()) {
-    if (members.has(userId)) visible.add(teamId);
-  }
-  return visible;
-}
-
-function isTeamMember(teamId: string, userId: string): boolean {
-  return teamMembers.get(teamId)?.has(userId) ?? false;
-}
-
-function teamRoleRank(role: TeamRole): number {
-  if (role === "owner") return 0;
-  if (role === "admin") return 1;
-  return 2;
-}
-
-function canSetTeamMemberRole(
-  requesterRole: TeamRole | undefined,
-  targetRole: TeamRole,
-  nextRole: TeamRole
-): boolean {
-  if (targetRole === "owner" || nextRole === "owner") return false;
-  if (requesterRole === "owner") return true;
-  if (requesterRole !== "admin") return false;
-  return targetRole === "member" && nextRole === "member";
-}
-
-function canRemoveTeamMember(requesterRole: TeamRole | undefined, targetRole: TeamRole): boolean {
-  if (targetRole === "owner") return false;
-  if (requesterRole === "owner") return true;
-  return requesterRole === "admin" && targetRole === "member";
-}
-
-function transferTeamOwnership(
-  members: Map<string, TeamMemberRecord>,
-  nextOwnerUserId: string
-): Map<string, TeamMemberRecord> {
-  for (const [userId, member] of members.entries()) {
-    if (userId === nextOwnerUserId) {
-      members.set(userId, { ...member, role: "owner" });
-    } else if (member.role === "owner") {
-      members.set(userId, { ...member, role: "admin" });
-    }
-  }
-  return members;
-}
-
-function canAccessRoom(teamId: string, roomId: string, userId: string): boolean {
-  return rooms.get(roomId)?.teamId === teamId && isTeamMember(teamId, userId);
 }
 
 function canJoinRoom(
