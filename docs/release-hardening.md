@@ -17,7 +17,7 @@ For an internet-facing relay, run the production relay doctor in the same enviro
 npm run doctor:production-relay
 ```
 
-The production relay doctor must pass before using an official hosted relay. It checks for GitHub OAuth, a strong durable session secret, explicit allowed origins, auth-required mode, disabled debug endpoints, and disabled demo seeding.
+The production relay doctor must pass before using an official hosted relay. It checks for GitHub OAuth, a strong durable session secret, explicit exact HTTP(S) allowed origins, auth-required mode, disabled debug endpoints, disabled demo seeding, enabled rate limits, persistent relay storage, and conservative proxy-header handling.
 
 ## Release Artifacts
 
@@ -29,6 +29,16 @@ The current GitHub release workflow builds unsigned macOS artifacts and writes `
 - checksums are provided for integrity checking, not as a substitute for signing.
 
 Do not attach ad hoc local builds to public releases. Release artifacts should come from GitHub Actions so the source commit, workflow logs, and checksums are visible.
+
+## Relay Deployment
+
+Before advertising an official relay, verify the exact environment that will run the relay:
+
+```bash
+NODE_ENV=production npm run doctor:production-relay
+```
+
+For Docker deployments, build from the repository root with `apps/relay/Dockerfile`, mount persistent storage at `/data`, and set `MULTAIPLAYER_RELAY_ALLOWED_ORIGINS` to bare origins only, such as `https://multaiplayer.com`. Do not use `*`, path-scoped origins, `/tmp` storage, or disabled rate limits for public relays.
 
 ## Secrets
 

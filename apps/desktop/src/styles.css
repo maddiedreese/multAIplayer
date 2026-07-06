@@ -2675,9 +2675,7 @@ button:not(:disabled):active {
   min-height: 0;
   padding: 18px 16px;
   border-right: 1px solid var(--border);
-  background:
-    radial-gradient(circle at 0 0, rgba(241, 184, 61, 0.14), transparent 26%),
-    var(--sidebar);
+  background: var(--sidebar);
 }
 
 .brand {
@@ -2691,7 +2689,7 @@ button:not(:disabled):active {
   border-radius: 8px;
   object-fit: cover;
   background: transparent;
-  box-shadow: 0 8px 18px rgba(35, 31, 24, 0.12);
+  box-shadow: none;
 }
 
 .brand strong {
@@ -2765,7 +2763,7 @@ button:not(:disabled):active {
   height: 42px;
   padding: 0 12px;
   color: var(--text-muted);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38);
+  box-shadow: none;
 }
 
 .search-box input,
@@ -2811,7 +2809,7 @@ button:not(:disabled):active {
 .sidebar-create-form > button {
   border-color: #11110f;
   background: #11110f;
-  color: #fff8ea;
+  color: #ffffff;
 }
 
 :root[data-theme="dark"] .sidebar-create-form > button {
@@ -3035,12 +3033,12 @@ button:not(:disabled):active {
 .host-controls button:first-child:not(:disabled) {
   background: var(--surface-strong);
   color: var(--text);
-  box-shadow: 0 1px 4px rgba(38, 32, 22, 0.08);
+  box-shadow: none;
 }
 
 .header-model-switcher {
   min-height: 36px;
-  max-width: 170px;
+  max-width: 220px;
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -3054,7 +3052,7 @@ button:not(:disabled):active {
 }
 
 .header-model-switcher select {
-  max-width: 148px;
+  max-width: 184px;
 }
 
 .header-copy {
@@ -3292,7 +3290,7 @@ button:not(:disabled):active {
 .custom-model-row button {
   border-color: #11110f;
   background: #11110f;
-  color: #fff8ea;
+  color: #ffffff;
 }
 
 :root[data-theme="dark"] .approval-actions .primary,
@@ -5882,4 +5880,176 @@ select {
 
 .sidebar .nested-team-list .team-select small {
   justify-self: start;
+}
+
+/* Overnight hardening: final UI guardrails for cramped alpha surfaces. */
+.app-shell {
+  grid-template-columns: var(--sidebar-width) 8px minmax(620px, 1fr) 8px var(--rail-width);
+}
+
+.sidebar {
+  background: var(--sidebar);
+}
+
+.sidebar .nested-team-list .team-select {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  padding: 9px 10px;
+}
+
+.sidebar .nested-team-list .team-select svg {
+  display: none;
+}
+
+.sidebar .nested-team-list .team-select span,
+.sidebar .nested-team-list .team-select small {
+  display: block;
+  justify-self: stretch;
+  width: 100%;
+  min-width: 0;
+}
+
+.sidebar .nested-team-list .team-select span {
+  color: var(--text);
+  font-weight: 620;
+}
+
+.sidebar .nested-team-list .team-select small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.team-disclosure {
+  color: var(--text-muted);
+}
+
+.room-button.nested {
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-right: 2px;
+}
+
+.room-button.nested strong,
+.room-button.nested span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-pill,
+.panel-state,
+.panel-count,
+.member-badges b,
+.member-badges button,
+.browser-policy-state span,
+.terminal-tabs span,
+.relay-dot,
+.header-copy,
+.host-controls button,
+.primary-tool,
+.file-preview-tabs button {
+  min-width: fit-content;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.member-row {
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+}
+
+.member-badges {
+  grid-column: 2;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.team-member-row > small,
+.member-row i {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.header-model-switcher {
+  min-width: 176px;
+  max-width: 240px;
+}
+
+.header-model-switcher select,
+.model-panel select,
+.history-retention select,
+.file-viewer-switcher select {
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: none;
+}
+
+.header-model-switcher select {
+  width: 100%;
+  max-width: none;
+  padding-right: 20px;
+}
+
+.warning-banner {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.warning-banner span {
+  white-space: normal;
+}
+
+.approval-card {
+  box-shadow: none;
+}
+
+.approval-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.browser-toolbar {
+  min-height: 62px;
+  padding: 12px 12px 14px;
+}
+
+.browser-open .browser-viewport {
+  margin-top: 0;
+}
+
+.terminal-output {
+  min-height: 420px;
+}
+
+.terminal-command-line {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  padding-top: 10px;
+  background: linear-gradient(180deg, transparent, var(--code-bg) 28%);
+}
+
+.file-viewer-switcher {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.file-preview-tabs {
+  background: var(--surface);
+}
+
+.file-preview-tabs button.active {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.workspace-error,
+.device-flow,
+.auth-error,
+.warning-banner,
+.inline-secret-warning,
+.workflow-message {
+  background: var(--surface-muted);
+  color: var(--text);
+  border-color: var(--border-strong);
 }

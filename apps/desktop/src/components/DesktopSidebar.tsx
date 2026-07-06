@@ -219,6 +219,7 @@ export function DesktopSidebar({
                 <button
                   type="button"
                   className="team-select"
+                  title={`${team.name} · ${team.meta}`}
                   onClick={() => {
                     onSelectTeam(team.id);
                     setCollapsedTeams((current) => ({ ...current, [team.id]: false }));
@@ -236,6 +237,7 @@ export function DesktopSidebar({
                       key={room.id}
                       className={`room-button nested ${room.active ? "active" : ""}`}
                       onClick={() => onSelectRoom(room.id, room.teamId)}
+                      title={`${room.name} · ${room.detail}`}
                     >
                       <div>
                         <strong>{room.name}</strong>
