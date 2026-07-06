@@ -21,11 +21,8 @@ import {
   defaultProjectPath,
   type CodexProbe,
   type GitWorkflowResult,
-  type GitStatusSummary,
 } from "./lib/localBackend";
-import {
-  type GitHubActionRun,
-} from "./lib/authClient";
+import type { GitHubActionRun } from "./lib/authClient";
 import type { RelayClient } from "./lib/relayClient";
 import { defaultRelayHttpUrl, defaultRelayWsUrl } from "./lib/appConfig";
 import { useDeviceIdentityLifecycle } from "./hooks/useDeviceIdentityLifecycle";
@@ -52,9 +49,7 @@ import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
 import { extractCodexBrowserOpenUrl } from "./lib/codexInvoke";
 import type { GitHubActionsTarget } from "./lib/githubWorkflowReadiness";
-import {
-  type GitWorkflowDraft
-} from "./lib/gitWorkflowDraft";
+import type { GitWorkflowDraft } from "./lib/gitWorkflowDraft";
 import { roomLockMessage, roomSecretStorageLabel } from "./lib/appRuntime";
 import {
   embeddedAttachmentBytes,
@@ -135,6 +130,7 @@ import { useHistoryDefaultsState } from "./hooks/useHistoryDefaultsState";
 import { useBrowserPanelState } from "./hooks/useBrowserPanelState";
 import { useTerminalPanelState } from "./hooks/useTerminalPanelState";
 import { useFilePanelState } from "./hooks/useFilePanelState";
+import { useGitHubWorkflowPanelState } from "./hooks/useGitHubWorkflowPanelState";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -282,7 +278,6 @@ export function App() {
   const [pendingCodexApprovalsByRoom, setPendingCodexApprovalsByRoom] = useState<Record<string, PendingCodexApproval>>({});
   const [codexRunningByRoom, setCodexRunningByRoom] = useState<Record<string, boolean>>({});
   const [secretWarningsVisibleByRoom, setSecretWarningsVisibleByRoom] = useState<Record<string, boolean>>({});
-  const [gitStatusByRoom, setGitStatusByRoom] = useState<Record<string, GitStatusSummary | null>>({});
   const [codexProbe, setCodexProbe] = useState<CodexProbe | null>(null);
   const {
     terminalLinesByRoom,
@@ -323,13 +318,24 @@ export function App() {
   const [deviceIdentity, setDeviceIdentity] = useState<DeviceIdentity | null>(null);
   const [deviceIdentityMessage, setDeviceIdentityMessage] = useState<string | null>(null);
   const [trustedDeviceKeys, setTrustedDeviceKeys] = useState<TrustedDeviceKey[]>(() => loadTrustedDeviceKeys());
-  const [gitWorkflowBusyByRoom, setGitWorkflowBusyByRoom] = useState<Record<string, boolean>>({});
-  const [gitWorkflowMessagesByRoom, setGitWorkflowMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [actionsBusyByRoom, setActionsBusyByRoom] = useState<Record<string, boolean>>({});
-  const [actionsMessagesByRoom, setActionsMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [actionRunsByRoom, setActionRunsByRoom] = useState<Record<string, GitHubActionRun[]>>({});
-  const [actionsLastCheckedByRoom, setActionsLastCheckedByRoom] = useState<Record<string, string | null>>({});
-  const [gitWorkflowDraftsByRoom, setGitWorkflowDraftsByRoom] = useState<Record<string, Partial<GitWorkflowDraft>>>({});
+  const {
+    gitStatusByRoom,
+    setGitStatusByRoom,
+    gitWorkflowBusyByRoom,
+    setGitWorkflowBusyByRoom,
+    gitWorkflowMessagesByRoom,
+    setGitWorkflowMessagesByRoom,
+    actionsBusyByRoom,
+    setActionsBusyByRoom,
+    actionsMessagesByRoom,
+    setActionsMessagesByRoom,
+    actionRunsByRoom,
+    setActionRunsByRoom,
+    actionsLastCheckedByRoom,
+    setActionsLastCheckedByRoom,
+    gitWorkflowDraftsByRoom,
+    setGitWorkflowDraftsByRoom
+  } = useGitHubWorkflowPanelState();
   const {
     fileQueriesByRoom,
     setFileQueriesByRoom,
