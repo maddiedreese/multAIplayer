@@ -40,6 +40,15 @@ import { createRelayRequestGuards } from "./http/middleware.js";
 import { registerOpsRoutes } from "./http/ops.js";
 import { registerRoomRoutes } from "./http/rooms.js";
 import { registerTeamRoutes, teamRecordForUser } from "./http/teams.js";
+import {
+  isJsonStringifiableWithin,
+  isRecord,
+  maxCiphertextCharactersForBlob,
+  normalizeMetadataText,
+  normalizeOptionalMetadataText,
+  normalizeRelayId,
+  parseIntegerValue
+} from "./limits.js";
 import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
 import { createRelayPersistence } from "./persistence.js";
 import { createRelayStore, type AuthSession, type ClientSession, type PresenceRecord, type RoomKey } from "./state.js";
@@ -546,16 +555,6 @@ function isAllowedCorsOrigin(origin: string | undefined): boolean {
   return nodeEnv !== "production";
 }
 
-function parseIntegerValue(value: unknown, fallback: number, min: number, max: number): number {
-  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(parsed)));
-}
-
-function maxCiphertextCharactersForBlob(maxBytes: number): number {
-  return Math.ceil((maxBytes + 1024) * 4 / 3) + 64;
-}
-
 function displayNameForUser(user: AuthSession["user"]): string {
   return user.name?.trim() || user.login;
 }
@@ -580,33 +579,6 @@ function isRoomMode(value: unknown): value is RoomRecord["mode"] {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
   return ["chat", "code", "workspace", "browser"].every((key) => typeof candidate[key] === "boolean");
-}
-
-function normalizeMetadataText(value: unknown, maxChars: number): string | null {
-  const text = String(value ?? "").trim();
-  if (!text || text.length > maxChars) return null;
-  if (/[\u0000-\u001f\u007f]/.test(text)) return null;
-  return text;
-}
-
-function normalizeRelayId(value: unknown, maxChars: number): string | null {
-  if (typeof value !== "string" || !value || value !== value.trim() || value.length > maxChars) return null;
-  if (!/^[A-Za-z0-9_-]+$/.test(value)) return null;
-  return value;
-}
-
-function normalizeOptionalMetadataText(value: unknown, maxChars: number): string | null {
-  const text = String(value ?? "").trim();
-  if (!text) return "";
-  return normalizeMetadataText(text, maxChars);
-}
-
-function isJsonStringifiableWithin(value: unknown, maxChars: number): boolean {
-  try {
-    return JSON.stringify(value).length <= maxChars;
-  } catch {
-    return false;
-  }
 }
 
 function normalizeDevicePublicKeyJwk(value: unknown): DevicePublicKeyJwkType | null {
@@ -651,10 +623,6 @@ function normalizeBrowserAllowedOrigins(value: unknown): string[] | null {
     }
   }
   return Array.from(origins);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 function deviceKey(userId: string, deviceId: string): string {
