@@ -160,6 +160,16 @@ Debug endpoints are available in non-production relay runs. In production (`NODE
 MULTAIPLAYER_RELAY_DEBUG=true
 ```
 
+Production relays emit structured JSON request logs by default. Local development can opt in:
+
+```bash
+MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
+```
+
+Each response includes an `x-request-id` header. The relay accepts a bounded incoming `x-request-id` or generates one. Logs include request method, path, status code, duration, and request id; they do not include room plaintext, encrypted payload bodies, attachment contents, GitHub tokens, Codex credentials, terminal output, browser pages, or repo files.
+
+The relay also exposes content-free operational counters at `/metrics`, including active sockets, published envelope count, rate-limit rejection count, start time, and uptime.
+
 Workspace mutations can require GitHub sign-in:
 
 ```bash

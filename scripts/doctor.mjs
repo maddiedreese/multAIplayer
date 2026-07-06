@@ -8,22 +8,25 @@ const productionRelay = process.argv.includes("--production-relay");
 
 checkNode();
 checkCommand("npm", ["--version"], "npm is required to install and run workspace scripts.");
-checkCommand("cargo", ["--version"], "Cargo is required for the Tauri desktop shell.");
-checkCommand("rustc", ["--version"], "rustc is required for native Tauri tests and builds.");
 checkLocalFile("package-lock.json", "package-lock.json is present for npm ci.");
-checkLocalFile(join("apps", "desktop", "src-tauri", "Cargo.lock"), "Cargo.lock is present for reproducible native builds.");
 checkLocalFile(".env.example", ".env.example is present for relay/self-host configuration.");
 checkOptionalFile(".env", "optional: copy .env.example to .env for local relay/GitHub configuration.");
 checkOptionalFile(join("apps", "relay", ".env"), "optional: relay-local env file for package-specific runs.");
 
-if (platform() === "darwin") {
-  checkCommand("xcodebuild", ["-version"], "Xcode command line tools are required for macOS Tauri bundling.");
-} else {
-  checks.push({
-    ok: true,
-    label: "macOS packaging",
-    detail: "Skipped: Tauri app/dmg packaging is macOS-only in this alpha."
-  });
+if (!productionRelay) {
+  checkCommand("cargo", ["--version"], "Cargo is required for the Tauri desktop shell.");
+  checkCommand("rustc", ["--version"], "rustc is required for native Tauri tests and builds.");
+  checkLocalFile(join("apps", "desktop", "src-tauri", "Cargo.lock"), "Cargo.lock is present for reproducible native builds.");
+
+  if (platform() === "darwin") {
+    checkCommand("xcodebuild", ["-version"], "Xcode command line tools are required for macOS Tauri bundling.");
+  } else {
+    checks.push({
+      ok: true,
+      label: "macOS packaging",
+      detail: "Skipped: Tauri app/dmg packaging is macOS-only in this alpha."
+    });
+  }
 }
 
 checkOptionalEnv("GITHUB_CLIENT_ID", "GitHub sign-in and PR/Actions flows need a relay GitHub OAuth app.");

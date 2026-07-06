@@ -1,8 +1,7 @@
 import cors, { type CorsOptions } from "cors";
 import cookieParser from "cookie-parser";
 import express, { type CookieOptions, type NextFunction, type Request, type Response } from "express";
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage } from "node:http";
 import { dirname, resolve } from "node:path";
@@ -34,38 +33,37 @@ import {
   type TeamRole,
   type RelayServerMessage
 } from "@multaiplayer/protocol";
+import { createRelayAuthz } from "./authz.js";
+import { loadRelayConfig } from "./config.js";
+import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
+import { createRelayStore, type AuthSession, type ClientSession, type PresenceRecord, type RoomKey } from "./state.js";
 
-loadRelayEnvFiles();
-
-const port = Number(process.env.PORT ?? 4321);
-const githubClientId = process.env.GITHUB_CLIENT_ID;
-const githubOAuthScopes = parseGitHubScopes(process.env.GITHUB_OAUTH_SCOPES);
-const dataPath = resolve(process.env.MULTAIPLAYER_RELAY_DATA_PATH ?? ".multaiplayer/relay-store.json");
-const encryptedBacklogLimit = parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_LIMIT, 200, 1, 1000);
-const encryptedBacklogRetentionDays = parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS, 30, 1, 365);
-const inviteTtlDays = parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_INVITE_TTL_DAYS, 7, 1, 365);
-const attachmentBlobTtlDays = parseIntegerEnv(process.env.MULTAIPLAYER_ATTACHMENT_BLOB_TTL_DAYS, 30, 1, 365);
-const attachmentBlobMaxBytes = parseIntegerEnv(process.env.MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES, 5_000_000, 1, 50_000_000);
-const jsonBodyLimitBytes = Math.ceil(Math.max(1_000_000, attachmentBlobMaxBytes * 1.5 + 100_000));
-const encryptedEnvelopeMaxBytes = parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES, 1_000_000, 4096, 5_000_000);
-const sessionPersistenceSecret = normalizeSessionPersistenceSecret(process.env.MULTAIPLAYER_RELAY_SESSION_SECRET);
-const debugEndpointsEnabled = process.env.NODE_ENV !== "production" || process.env.MULTAIPLAYER_RELAY_DEBUG === "true";
-const allowedCorsOrigins = parseAllowedOriginEnv(process.env.MULTAIPLAYER_RELAY_ALLOWED_ORIGINS);
-const seedDemoWorkspace = parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_SEED_DEMO, process.env.NODE_ENV !== "production");
-const mutationsRequireAuth = parseBooleanEnv(
-  process.env.MULTAIPLAYER_RELAY_REQUIRE_AUTH,
-  process.env.NODE_ENV === "production"
-);
-const rateLimitsEnabled = parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMITS, true);
-const trustProxyHeaders = parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS, false);
-const rateLimitWindowMs = parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS, 60_000, 1_000, 3_600_000);
-const rateLimitCaps = {
-  auth: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_AUTH, 30, 1, 10_000),
-  read: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_READ, 300, 1, 100_000),
-  mutation: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_MUTATION, 120, 1, 100_000),
-  attachment: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_ATTACHMENT, 60, 1, 10_000),
-  websocket: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET, 600, 1, 100_000)
-} as const;
+const relayConfig = loadRelayConfig();
+const {
+  nodeEnv,
+  port,
+  githubClientId,
+  githubOAuthScopes,
+  dataPath,
+  encryptedBacklogLimit,
+  encryptedBacklogRetentionDays,
+  inviteTtlDays,
+  attachmentBlobTtlDays,
+  attachmentBlobMaxBytes,
+  jsonBodyLimitBytes,
+  encryptedEnvelopeMaxBytes,
+  sessionPersistenceSecret,
+  debugEndpointsEnabled,
+  allowedCorsOrigins,
+  seedDemoWorkspace,
+  mutationsRequireAuth,
+  rateLimitsEnabled,
+  trustProxyHeaders,
+  structuredLogsEnabled,
+  rateLimitWindowMs,
+  rateLimitCaps
+} = relayConfig;
+const relayMetrics = createRelayMetrics();
 const corsOptions: CorsOptions = {
   credentials: true,
   origin(origin, callback) {
@@ -79,6 +77,7 @@ const corsOptions: CorsOptions = {
 const app = express();
 app.use(cors(corsOptions));
 app.use(cookieParser());
+app.use(requestLoggingMiddleware(structuredLogsEnabled));
 app.use(express.json({ limit: `${jsonBodyLimitBytes}b` }));
 app.use(rateLimitMiddleware);
 
@@ -96,29 +95,33 @@ const wss = new WebSocketServer({
   }
 });
 
-type RoomKey = `${string}:${string}`;
-
-interface ClientSession {
-  socket: WebSocket;
-  authSession?: AuthSession;
-  rateClientId: string;
-  teamId?: string;
-  roomId?: string;
-  userId?: string;
-  deviceId?: string;
-  subscribedTeamIds: Set<string>;
-  workspaceSubscribed: boolean;
-  displayName?: string;
-  avatarUrl?: string;
-}
-
-const sessions = new Map<WebSocket, ClientSession>();
-const roomSockets = new Map<RoomKey, Set<WebSocket>>();
-const teamSockets = new Map<string, Set<WebSocket>>();
-const workspaceSockets = new Set<WebSocket>();
-const roomPresence = new Map<RoomKey, Map<string, PresenceRecord>>();
-const encryptedBacklog = new Map<RoomKey, RelayEnvelope[]>();
-const authSessions = new Map<string, AuthSession>();
+const relayStore = createRelayStore();
+const {
+  sessions,
+  roomSockets,
+  teamSockets,
+  workspaceSockets,
+  roomPresence,
+  encryptedBacklog,
+  authSessions,
+  teams,
+  rooms,
+  invites,
+  devices,
+  attachmentBlobs,
+  teamMembers,
+  rateLimitStore
+} = relayStore;
+const relayAuthz = createRelayAuthz(relayStore);
+const {
+  teamIdsForUser,
+  isTeamMember,
+  teamRoleRank,
+  canSetTeamMemberRole,
+  canRemoveTeamMember,
+  transferTeamOwnership,
+  canAccessRoom
+} = relayAuthz;
 const authSessionMaxAgeMs = 1000 * 60 * 60 * 24 * 30;
 const maxRoomProjectPathChars = 2048;
 const maxCodexModelChars = 80;
@@ -142,13 +145,6 @@ const maxEnvelopeCiphertextChars = Math.ceil(encryptedEnvelopeMaxBytes * 4 / 3) 
 const maxAttachmentBlobIdChars = 160;
 const maxAttachmentBlobNameChars = 512;
 const maxAttachmentBlobTypeChars = 160;
-const teams = new Map<string, TeamRecord>();
-const rooms = new Map<string, RoomRecord>();
-const invites = new Map<string, InviteRecordType>();
-const devices = new Map<string, DeviceRecord>();
-const attachmentBlobs = new Map<string, AttachmentBlobRecordType>();
-const teamMembers = new Map<string, Map<string, TeamMemberRecord>>();
-const rateLimitStore = new Map<string, RateLimitRecord>();
 let saveTimer: NodeJS.Timeout | null = null;
 
 type RateLimitBucket = keyof typeof rateLimitCaps;
@@ -157,26 +153,10 @@ function authCookieOptions(maxAge?: number): CookieOptions {
   return {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: nodeEnv === "production",
     path: "/",
     ...(maxAge === undefined ? {} : { maxAge })
   };
-}
-
-interface RateLimitRecord {
-  count: number;
-  resetAt: number;
-}
-
-interface AuthSession {
-  accessToken: string;
-  user: {
-    id: string;
-    login: string;
-    name?: string;
-    avatarUrl?: string;
-  };
-  expiresAt: number;
 }
 
 interface StoredAuthSession {
@@ -221,16 +201,6 @@ interface NormalizedStoredAuthSession {
   session: AuthSession;
 }
 
-interface PresenceRecord {
-  teamId: string;
-  roomId: string;
-  userId: string;
-  deviceId: string;
-  displayName: string;
-  avatarUrl?: string;
-  publicKeyFingerprint?: string;
-}
-
 await loadRelayStore();
 seedWorkspace();
 
@@ -240,6 +210,10 @@ app.get("/healthz", (_req, res) => {
 
 app.get("/readyz", (_req, res) => {
   res.json({ ok: true, dataPath });
+});
+
+app.get("/metrics", (_req, res) => {
+  res.json(relayMetrics.snapshot(sessions.size));
 });
 
 app.get("/auth/config", (_req, res) => {
@@ -1411,6 +1385,7 @@ function publishEnvelope(envelope: RelayEnvelope) {
   if (backlog.some((existing) => existing.id === envelope.id)) return;
   backlog.push(envelope);
   encryptedBacklog.set(key, pruneEncryptedBacklog(backlog));
+  relayMetrics.recordEnvelopePublished();
   scheduleStoreSave();
   broadcast(key, { type: "envelope", envelope });
 }
@@ -1506,6 +1481,7 @@ function rateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
     next();
     return;
   }
+  relayMetrics.recordRateLimitRejection();
   res.setHeader("Retry-After", String(Math.ceil(Math.max(0, result.resetAt - Date.now()) / 1000)));
   res.status(429).json({
     error: "Rate limit exceeded. Slow down before retrying.",
@@ -1515,7 +1491,7 @@ function rateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
 }
 
 function rateLimitBucketForRequest(req: Request): RateLimitBucket | null {
-  if (req.path === "/healthz" || req.path === "/readyz" || req.path === "/auth/config") return null;
+  if (req.path === "/healthz" || req.path === "/readyz" || req.path === "/metrics" || req.path === "/auth/config") return null;
   if (req.path.startsWith("/auth/")) return "auth";
   if (req.path.startsWith("/attachment-blobs")) return "attachment";
   if (req.method === "GET") return "read";
@@ -1619,59 +1595,6 @@ function allowMutation(session: AuthSession | null, res: Response): boolean {
   return false;
 }
 
-function teamIdsForUser(userId: string): Set<string> {
-  const visible = new Set<string>();
-  for (const [teamId, members] of teamMembers.entries()) {
-    if (members.has(userId)) visible.add(teamId);
-  }
-  return visible;
-}
-
-function isTeamMember(teamId: string, userId: string): boolean {
-  return teamMembers.get(teamId)?.has(userId) ?? false;
-}
-
-function teamRoleRank(role: TeamRole): number {
-  if (role === "owner") return 0;
-  if (role === "admin") return 1;
-  return 2;
-}
-
-function canSetTeamMemberRole(
-  requesterRole: TeamRole | undefined,
-  targetRole: TeamRole,
-  nextRole: TeamRole
-): boolean {
-  if (targetRole === "owner" || nextRole === "owner") return false;
-  if (requesterRole === "owner") return true;
-  if (requesterRole !== "admin") return false;
-  return targetRole === "member" && nextRole === "member";
-}
-
-function canRemoveTeamMember(requesterRole: TeamRole | undefined, targetRole: TeamRole): boolean {
-  if (targetRole === "owner") return false;
-  if (requesterRole === "owner") return true;
-  return requesterRole === "admin" && targetRole === "member";
-}
-
-function transferTeamOwnership(
-  members: Map<string, TeamMemberRecord>,
-  nextOwnerUserId: string
-): Map<string, TeamMemberRecord> {
-  for (const [userId, member] of members.entries()) {
-    if (userId === nextOwnerUserId) {
-      members.set(userId, { ...member, role: "owner" });
-    } else if (member.role === "owner") {
-      members.set(userId, { ...member, role: "admin" });
-    }
-  }
-  return members;
-}
-
-function canAccessRoom(teamId: string, roomId: string, userId: string): boolean {
-  return rooms.get(roomId)?.teamId === teamId && isTeamMember(teamId, userId);
-}
-
 function canJoinRoom(
   session: ClientSession,
   teamId: string,
@@ -1726,92 +1649,7 @@ function requesterFromRequest(body: unknown, sessionId: unknown): { id: string; 
 function isAllowedCorsOrigin(origin: string | undefined): boolean {
   if (!origin) return true;
   if (allowedCorsOrigins.length > 0) return allowedCorsOrigins.includes(origin);
-  return process.env.NODE_ENV !== "production";
-}
-
-function parseGitHubScopes(value: string | undefined): string[] {
-  return parseListEnv(value ?? "read:user public_repo");
-}
-
-function loadRelayEnvFiles() {
-  for (const path of relayEnvFileCandidates()) {
-    if (!existsSync(path)) continue;
-    const parsed = parseEnvFile(readFileSync(path, "utf8"));
-    for (const [key, value] of Object.entries(parsed)) {
-      process.env[key] ??= value;
-    }
-  }
-}
-
-function relayEnvFileCandidates(): string[] {
-  return Array.from(new Set([
-    process.env.MULTAIPLAYER_RELAY_ENV_FILE ? resolve(process.env.MULTAIPLAYER_RELAY_ENV_FILE) : "",
-    resolve(process.cwd(), "apps/relay/.env"),
-    resolve(process.cwd(), ".env"),
-    resolve(process.cwd(), "../..", ".env")
-  ].filter(Boolean)));
-}
-
-function parseEnvFile(contents: string): Record<string, string> {
-  const parsed: Record<string, string> = {};
-  for (const line of contents.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const match = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(trimmed);
-    if (!match) continue;
-    const [, key, rawValue] = match;
-    parsed[key] = normalizeEnvFileValue(rawValue);
-  }
-  return parsed;
-}
-
-function normalizeEnvFileValue(value: string): string {
-  const trimmed = value.trim();
-  if (
-    (trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
-  ) {
-    return trimmed.slice(1, -1);
-  }
-  return trimmed.replace(/\s+#.*$/, "");
-}
-
-function parseAllowedOriginEnv(value: string | undefined): string[] {
-  const origins = new Set<string>();
-  for (const item of parseListEnv(value)) {
-    const normalized = normalizeConfiguredOrigin(item);
-    if (normalized) {
-      origins.add(normalized);
-    } else {
-      console.warn(`Ignoring invalid MULTAIPLAYER_RELAY_ALLOWED_ORIGINS entry: ${item}`);
-    }
-  }
-  return Array.from(origins);
-}
-
-function normalizeConfiguredOrigin(value: string): string | null {
-  try {
-    const parsed = new URL(value);
-    if (!["", "/"].includes(parsed.pathname) || parsed.search || parsed.hash) return null;
-    if (["http:", "https:"].includes(parsed.protocol)) return parsed.origin;
-    if (!/^[a-z][a-z0-9+.-]*:$/i.test(parsed.protocol) || !parsed.hostname) return null;
-    return `${parsed.protocol}//${parsed.host}`;
-  } catch {
-    return null;
-  }
-}
-
-function parseListEnv(value: string | undefined): string[] {
-  return (value ?? "")
-    .split(/[\s,]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function parseIntegerEnv(value: string | undefined, fallback: number, min: number, max: number): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(parsed)));
+  return nodeEnv !== "production";
 }
 
 function parseIntegerValue(value: unknown, fallback: number, min: number, max: number): number {
@@ -1822,14 +1660,6 @@ function parseIntegerValue(value: unknown, fallback: number, min: number, max: n
 
 function maxCiphertextCharactersForBlob(maxBytes: number): number {
   return Math.ceil((maxBytes + 1024) * 4 / 3) + 64;
-}
-
-function parseBooleanEnv(value: string | undefined, fallback: boolean): boolean {
-  if (value === undefined) return fallback;
-  const normalized = value.trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized)) return true;
-  if (["0", "false", "no", "off"].includes(normalized)) return false;
-  return fallback;
 }
 
 function displayNameForUser(user: AuthSession["user"]): string {
@@ -2264,17 +2094,13 @@ function decryptStoredAccessToken(stored: Record<string, unknown>): string | nul
 }
 
 function sessionPersistenceKey(): Buffer {
-  return createHash("sha256").update(sessionPersistenceSecret ?? "").digest();
-}
-
-function normalizeSessionPersistenceSecret(value: string | undefined): string | null {
-  const secret = value?.trim();
-  if (!secret) return null;
-  if (secret.length < 32) {
-    console.warn("MULTAIPLAYER_RELAY_SESSION_SECRET must be at least 32 characters; durable auth sessions are disabled.");
-    return null;
-  }
-  return secret;
+  return Buffer.from(hkdfSync(
+    "sha256",
+    Buffer.from(sessionPersistenceSecret ?? "", "utf8"),
+    "multaiplayer-relay-session-v1",
+    "github-session-access-token",
+    32
+  ));
 }
 
 async function loadRelayStore() {
