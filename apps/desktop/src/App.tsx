@@ -6035,11 +6035,6 @@ export function App() {
 
       <RoomInspectorPanel
         activeTab={inspectorTab}
-        diffAttentionCount={inspectorAttention.work}
-        terminalAttentionCount={terminalRequestRows.filter((request) => request.status === "pending").length}
-        browserAttentionCount={inspectorAttention.browser}
-        roomAttentionCount={inviteRequests.filter((request) => request.status === "pending").length}
-        onSelectTab={(tab) => setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: tab }))}
         browserPanel={(
           <BrowserAccessPanel
             hidden={false}
