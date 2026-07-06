@@ -133,6 +133,7 @@ import { useFilePanelState } from "./hooks/useFilePanelState";
 import { useGitHubWorkflowPanelState } from "./hooks/useGitHubWorkflowPanelState";
 import { useLocalPreviewState } from "./hooks/useLocalPreviewState";
 import { useInvitePanelState } from "./hooks/useInvitePanelState";
+import { useRoomSettingsState } from "./hooks/useRoomSettingsState";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -224,13 +225,21 @@ export function App() {
     saveRelayConfiguration,
     resetRelayConfiguration
   } = useAppConfigState();
-  const [hostBusyByRoom, setHostBusyByRoom] = useState<Record<string, boolean>>({});
-  const [hostMessagesByRoom, setHostMessagesByRoom] = useState<Record<string, string | null>>({});
   const [chatMessagesByRoom, setChatMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [settingsBusyByRoom, setSettingsBusyByRoom] = useState<Record<string, boolean>>({});
-  const [settingsMessagesByRoom, setSettingsMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [customCodexModelsByRoom, setCustomCodexModelsByRoom] = useState<Record<string, string>>({});
-  const [projectPathDraftsByRoom, setProjectPathDraftsByRoom] = useState<Record<string, string>>({});
+  const {
+    hostBusyByRoom,
+    setHostBusyByRoom,
+    hostMessagesByRoom,
+    setHostMessagesByRoom,
+    settingsBusyByRoom,
+    setSettingsBusyByRoom,
+    settingsMessagesByRoom,
+    setSettingsMessagesByRoom,
+    customCodexModelsByRoom,
+    setCustomCodexModelsByRoom,
+    projectPathDraftsByRoom,
+    setProjectPathDraftsByRoom
+  } = useRoomSettingsState();
   const {
     historySettings,
     setHistorySettings,
