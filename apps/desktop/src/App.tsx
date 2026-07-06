@@ -40,7 +40,7 @@ import { useHostHandoffActions } from "./hooks/useHostHandoffActions";
 import { useInviteActions } from "./hooks/useInviteActions";
 import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
 import { useAppRefs } from "./hooks/useAppRefs";
-import { useAppSelectedContext } from "./hooks/useAppSelectedContext";
+import { useAppSelectedRoomContext } from "./hooks/useAppSelectedRoomContext";
 import { useAppViewProps } from "./hooks/useAppViewProps";
 import { useWorkspaceFlowContext } from "./hooks/useWorkspaceFlowContext";
 import { useRelaySyncContext } from "./hooks/useRelaySyncContext";
@@ -179,73 +179,13 @@ export function App() {
     settingsMessage,
     visibleHistoryMessage,
     markdownCopyFallback
-  } = useAppSelectedContext({
-    roomContext: {
-      rooms: workspaceState.rooms,
-      selectedRoomId: workspaceState.selectedRoomId,
-      fallbackRoom: emptyRoom,
-      inspectorTabsByRoom: roomRuntimeState.inspectorTabsByRoom,
-      secretWarningsVisibleByRoom: codexRoomState.secretWarningsVisibleByRoom,
-      terminals: terminalPanelState.terminals
-    },
-    markdownSelection: {
-      resetKey: workspaceState.selectedRoomId
-    },
-    teamData: {
-      teams: workspaceState.teams,
-      selectedTeam: workspaceState.selectedTeam,
-      teamMembersByTeam: workspaceState.teamMembersByTeam,
-      teamMembersMessageByTeam: workspaceState.teamMembersMessageByTeam,
-      teamMembersBusyByTeam: workspaceState.teamMembersBusyByTeam,
-      currentUser: githubAuth.currentUser,
-      localUserId: localIdentity.localUser.id
-    },
-    roomValues: {
-      selectedRoomId: workspaceState.selectedRoomId,
-      selectedTeam: workspaceState.selectedTeam,
-      customCodexModelsByRoom: roomSettingsState.customCodexModelsByRoom,
-      projectPathDraftsByRoom: roomSettingsState.projectPathDraftsByRoom,
-      messagesByRoom: workspaceState.messagesByRoom,
-      draftsByRoom: roomChatState.draftsByRoom,
-      pendingAttachmentsByRoom: roomChatState.pendingAttachmentsByRoom,
-      browserRequestsByRoom: browserPanelState.browserRequestsByRoom,
-      browserUrlsByRoom: browserPanelState.browserUrlsByRoom,
-      browserReasonsByRoom: browserPanelState.browserReasonsByRoom,
-      activeBrowserUrlsByRoom: browserPanelState.activeBrowserUrlsByRoom,
-      gitStatusByRoom: githubWorkflowPanelState.gitStatusByRoom,
-      gitWorkflowDraftsByRoom: githubWorkflowPanelState.gitWorkflowDraftsByRoom,
-      gitWorkflowBusyByRoom: githubWorkflowPanelState.gitWorkflowBusyByRoom,
-      gitWorkflowMessagesByRoom: githubWorkflowPanelState.gitWorkflowMessagesByRoom,
-      actionRunsByRoom: githubWorkflowPanelState.actionRunsByRoom,
-      actionsBusyByRoom: githubWorkflowPanelState.actionsBusyByRoom,
-      actionsLastCheckedByRoom: githubWorkflowPanelState.actionsLastCheckedByRoom,
-      actionsMessagesByRoom: githubWorkflowPanelState.actionsMessagesByRoom,
-      terminalLinesByRoom: terminalPanelState.terminalLinesByRoom,
-      terminalBusyByRoom: terminalPanelState.terminalBusyByRoom,
-      selectedTerminalIdsByRoom: terminalPanelState.selectedTerminalIdsByRoom,
-      terminalNamesByRoom: terminalPanelState.terminalNamesByRoom,
-      terminalCommandsByRoom: terminalPanelState.terminalCommandsByRoom,
-      terminalInputsByRoom: terminalPanelState.terminalInputsByRoom,
-      terminalErrorsByRoom: terminalPanelState.terminalErrorsByRoom,
-      fileQueriesByRoom: filePanelState.fileQueriesByRoom,
-      projectFilesByRoom: filePanelState.projectFilesByRoom,
-      selectedFilesByRoom: filePanelState.selectedFilesByRoom,
-      selectedDiffsByRoom: filePanelState.selectedDiffsByRoom,
-      filePreviewTabsByRoom: filePanelState.filePreviewTabsByRoom,
-      fileBusyByRoom: filePanelState.fileBusyByRoom,
-      fileMessagesByRoom: filePanelState.fileMessagesByRoom,
-      inviteLinksByRoom: invitePanelState.inviteLinksByRoom,
-      inviteApprovalGatesByRoom: invitePanelState.inviteApprovalGatesByRoom,
-      inviteMessagesByRoom: invitePanelState.inviteMessagesByRoom,
-      hostMessagesByRoom: roomSettingsState.hostMessagesByRoom,
-      chatMessagesByRoom: roomChatState.chatMessagesByRoom,
-      settingsMessagesByRoom: roomSettingsState.settingsMessagesByRoom,
-      historyMessagesByRoom: historyDefaultsState.historyMessagesByRoom,
-      teamHistoryMessagesByTeam: historyDefaultsState.teamHistoryMessagesByTeam,
-      markdownCopyFallbacksByRoom: filePanelState.markdownCopyFallbacksByRoom,
-      defaultBrowserUrl,
-      defaultBrowserReason
-    }
+  } = useAppSelectedRoomContext({
+    appState,
+    githubAuth,
+    localIdentity,
+    fallbackRoom: emptyRoom,
+    defaultBrowserUrl,
+    defaultBrowserReason
   });
   const {
     setHostMessageForRoom,
