@@ -134,7 +134,7 @@ import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
 import { InlineSecretWarning } from "./components/common";
-import { ShellResizer } from "./components/AppShellLayout";
+import { AppWorkspaceShell } from "./components/AppWorkspaceShell";
 import { BrowserAccessPanel } from "./components/BrowserAccessPanel";
 import { AppSidebarDrawer } from "./components/AppSidebarDrawer";
 import { DesktopSidebar } from "./components/DesktopSidebar";
@@ -1854,11 +1854,16 @@ export function App() {
     };
   }
   return (
-    <div
-      className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${inspectorCollapsed ? "inspector-collapsed" : ""}`}
-      style={shellStyle}
-    >
-      <DesktopSidebar
+    <AppWorkspaceShell
+      sidebarCollapsed={sidebarCollapsed}
+      inspectorCollapsed={inspectorCollapsed}
+      shellStyle={shellStyle}
+      onBeginSidebarResize={(event) => beginShellResize("sidebar", event)}
+      onBeginInspectorResize={(event) => beginShellResize("inspector", event)}
+      onToggleSidebarCollapsed={toggleSidebarCollapsed}
+      onToggleInspectorCollapsed={toggleInspectorCollapsed}
+      sidebar={(
+        <DesktopSidebar
         currentUser={currentUser}
         authBusy={authBusy}
         authConfig={authConfig}
@@ -1899,17 +1904,9 @@ export function App() {
         onSelectSidebarPanel={setActiveSidebarPanel}
         onToggleTheme={toggleThemeMode}
       />
-
-      <ShellResizer
-        side="left"
-        collapsed={sidebarCollapsed}
-        expandLabel="Expand sidebar"
-        collapseLabel="Collapse sidebar"
-        onBeginResize={(event) => beginShellResize("sidebar", event)}
-        onToggleCollapsed={toggleSidebarCollapsed}
-      />
-
-      <AppSidebarDrawer
+      )}
+      drawer={(
+        <AppSidebarDrawer
         activePanel={activeSidebarPanel}
         profileTitle={localUser.name}
         settingsTitle={selectedRoom.name}
@@ -1996,8 +1993,9 @@ export function App() {
         }}
         onClose={() => setActiveSidebarPanel(null)}
       />
-
-      <RoomMainColumn
+      )}
+      main={(
+        <RoomMainColumn
         headerProps={{
           teams: teams.map((team) => ({ id: team.id, name: team.name })),
           selectedTeamId: selectedTeam,
@@ -2064,17 +2062,9 @@ export function App() {
           ...roomChatPanelActions
         }}
       />
-
-      <ShellResizer
-        side="right"
-        collapsed={inspectorCollapsed}
-        expandLabel="Expand context column"
-        collapseLabel="Collapse context column"
-        onBeginResize={(event) => beginShellResize("inspector", event)}
-        onToggleCollapsed={toggleInspectorCollapsed}
-      />
-
-      <RoomInspectorPanel
+      )}
+      inspector={(
+        <RoomInspectorPanel
         activeTab={inspectorTab}
         browserPanel={(
           <BrowserAccessPanel
@@ -2280,7 +2270,8 @@ export function App() {
           />
         )}
       />
-      {localPreviewDialog.open && (
+      )}
+      dialog={localPreviewDialog.open ? (
         <LocalPreviewDialog
           dialog={localPreviewDialog}
           busy={localPreviewBusy}
@@ -2293,7 +2284,7 @@ export function App() {
           onContinue={() => void prepareLocalPreviewConfirmation()}
           onStartSharing={() => void confirmLocalPreviewShare()}
         />
-      )}
-    </div>
+      ) : null}
+    />
   );
 }
