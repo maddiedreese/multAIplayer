@@ -216,7 +216,7 @@ import {
   updateGitWorkflowDraftRecord,
   type GitWorkflowDraft
 } from "./lib/gitWorkflowDraft";
-import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
+import { markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
 import { ensureRoomDefaults } from "./lib/roomDefaults";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import { omitRecordKey, withoutSetValue } from "./lib/setUtils";
@@ -304,6 +304,7 @@ import { useShellLayout } from "./hooks/useShellLayout";
 import { useSelectedTeamData } from "./hooks/useSelectedTeamData";
 import { useSelectedRoomValues } from "./hooks/useSelectedRoomValues";
 import { useSelectedRoomRuntime } from "./hooks/useSelectedRoomRuntime";
+import { useSelectedRoomReadReceipt } from "./hooks/useSelectedRoomReadReceipt";
 import { useSidebarNavigation } from "./hooks/useSidebarNavigation";
 import { useRoomTerminalSetters } from "./hooks/useRoomTerminalSetters";
 import { useTeamMembersRefresh } from "./hooks/useTeamMembersRefresh";
@@ -1032,11 +1033,10 @@ export function App() {
     setSelectedRoomId,
     setWorkspaceError
   });
-
-  useEffect(() => {
-    if (!selectedRoomId) return;
-    setRooms((current) => markRoomRead(current, selectedRoomId));
-  }, [selectedRoomId]);
+  useSelectedRoomReadReceipt({
+    selectedRoomId,
+    setRooms
+  });
 
   useEffect(() => {
     loadOrCreateDeviceIdentity()
