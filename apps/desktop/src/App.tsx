@@ -34,9 +34,7 @@ import {
 } from "./lib/deviceTrust";
 import {
   defaultProjectPath,
-  getGitStatus,
   runCodexTurn,
-  runGitWorkflow,
   type CodexProbe,
   type GitDiffResult,
   type GitWorkflowResult,
@@ -46,7 +44,6 @@ import {
   type TerminalSnapshot
 } from "./lib/localBackend";
 import {
-  createPullRequest,
   type GitHubActionRun,
 } from "./lib/authClient";
 import type { RelayClient } from "./lib/relayClient";
@@ -73,7 +70,6 @@ import {
 } from "./lib/codexApproval";
 import { buildCodexApprovalSnapshot, buildCodexTurnInput, buildCodexTurnSummary } from "./lib/codexTurn";
 import { normalizeCodexThreadId } from "./lib/codexThread";
-import { buildPullRequestBody } from "./lib/markdownExport";
 import {
   normalizeRoomName
 } from "./lib/workspaceCreation";
@@ -88,8 +84,6 @@ import { classifyCodexFailure, codexUsageLimitMessage } from "./lib/codexFailure
 import type { FilePreviewTab } from "./lib/filePreview";
 import type { GitHubActionsTarget } from "./lib/githubWorkflowReadiness";
 import {
-  gitWorkflowInFlightMessage,
-  isGitWorkflowInFlight,
   type GitWorkflowDraft
 } from "./lib/gitWorkflowDraft";
 import { ensureRoomDefaults } from "./lib/roomDefaults";
@@ -162,6 +156,7 @@ import { useWorkspaceRecordActions } from "./hooks/useWorkspaceRecordActions";
 import { useAccountActions } from "./hooks/useAccountActions";
 import { useHostHandoffActions } from "./hooks/useHostHandoffActions";
 import { useInviteActions } from "./hooks/useInviteActions";
+import { useGitWorkflowActions } from "./hooks/useGitWorkflowActions";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   hasAcknowledgedRoomVisibilityWarning
@@ -1473,6 +1468,27 @@ export function App() {
     setActionsLastCheckedByRoom,
     publishGitHubActionsEvent
   });
+  const { approveGitWorkflow } = useGitWorkflowActions({
+    hasSelectedRoom,
+    isActiveHost,
+    canReadLocalWorkspace,
+    hostGateMessage,
+    localWorkspaceMessage,
+    selectedRoom,
+    gitWorkflowBusyRef,
+    gitWorkflowDraft,
+    gitApprovalPreview,
+    githubWorkflowReadiness,
+    messages,
+    gitStatus,
+    setSelectedGitWorkflowMessage,
+    setGitWorkflowMessageForRoom,
+    setGitWorkflowBusyForRoom,
+    appendTerminalLinesForRoom,
+    setGitStatusForRoom,
+    publishGitWorkflowEvent,
+    refreshGitHubActions
+  });
   const {
     requestBrowserAccess,
     approveBrowserRequest,
@@ -2006,147 +2022,6 @@ export function App() {
     }
     saveRoomVisibilityWarningAcknowledgement(selectedRoom.id);
     setSecretWarningVisibleForRoom(selectedRoom.id, false);
-  }
-
-  async function approveGitWorkflow() {
-    if (!hasSelectedRoom) {
-      setSelectedGitWorkflowMessage("Create or join a room before approving a git workflow.");
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedGitWorkflowMessage(hostGateMessage);
-      return;
-    }
-    if (!canReadLocalWorkspace) {
-      setSelectedGitWorkflowMessage(localWorkspaceMessage);
-      return;
-    }
-    const room = selectedRoom;
-    const roomId = room.id;
-    if (isGitWorkflowInFlight(gitWorkflowBusyRef.current, roomId)) {
-      setGitWorkflowMessageForRoom(roomId, gitWorkflowInFlightMessage());
-      return;
-    }
-    const projectPath = room.projectPath;
-    const workflowDraft = gitWorkflowDraft;
-    if (!gitApprovalPreview.plan) {
-      setGitWorkflowMessageForRoom(roomId, gitApprovalPreview.error ?? "Git workflow approval preview is invalid.");
-      return;
-    }
-    if (workflowDraft.pushEnabled && !githubWorkflowReadiness.ready) {
-      setGitWorkflowMessageForRoom(roomId, githubWorkflowReadiness.messages.join(" "));
-      return;
-    }
-    const gitPlan = gitApprovalPreview.plan;
-    const normalizedPrBase = workflowDraft.pushEnabled ? githubWorkflowReadiness.normalizedBase : gitApprovalPreview.normalizedBase;
-    setGitWorkflowBusyForRoom(roomId, true);
-    setGitWorkflowMessageForRoom(roomId, null);
-    appendTerminalLinesForRoom(roomId, [
-      `Approve git workflow: branch=${gitPlan.branch}, push=${gitPlan.push}`,
-      ...gitPlan.approvals.flatMap((approval) => approval.commands.map((command) => `$ ${command}`))
-    ]);
-    publishGitWorkflowEvent({
-      status: "started",
-      branch: gitPlan.branch,
-      push: gitPlan.push,
-      message: `Started Git workflow on ${gitPlan.branch}.`
-    }, room).catch((error) => {
-      console.warn("Failed to publish git workflow start", error);
-    });
-    try {
-      const results = await runGitWorkflow(
-        gitPlan.cwd,
-        gitPlan.branch,
-        gitPlan.message,
-        gitPlan.push
-      );
-      appendTerminalLinesForRoom(roomId, [
-        ...results
-          .flatMap((result) => [
-            `$ ${result.command}`,
-            result.stdout.trim(),
-            result.stderr.trim()
-          ])
-          .filter(Boolean)
-      ]);
-
-      const failed = results.find((result) => result.status !== 0);
-      if (failed) {
-        const message = `Stopped after failed command: ${failed.command}`;
-        setGitWorkflowMessageForRoom(roomId, message);
-        publishGitWorkflowEvent({
-          status: "failed",
-          branch: gitPlan.branch,
-          push: gitPlan.push,
-          message,
-          results
-        }, room).catch((error) => {
-          console.warn("Failed to publish git workflow failure", error);
-        });
-        return;
-      }
-
-      if (gitPlan.push) {
-        const pr = await createPullRequest({
-          owner: workflowDraft.prOwner,
-          repo: workflowDraft.prRepo,
-          title: gitPlan.message,
-          body: buildPullRequestBody(messages, gitStatus?.files ?? []),
-          head: gitPlan.branch,
-          base: normalizedPrBase,
-          draft: true
-        });
-        const message = `Opened draft PR #${pr.number}: ${pr.url}`;
-        setGitWorkflowMessageForRoom(roomId, message);
-        publishGitWorkflowEvent({
-          status: "pr_opened",
-          branch: gitPlan.branch,
-          push: gitPlan.push,
-          message,
-          results,
-          pullRequest: {
-            number: pr.number,
-            url: pr.url
-          }
-        }, room).catch((error) => {
-          console.warn("Failed to publish git workflow PR event", error);
-        });
-        refreshGitHubActions(room, {
-          owner: workflowDraft.prOwner,
-          repo: workflowDraft.prRepo,
-          branch: gitPlan.branch
-        });
-      } else {
-        const message = "Created local branch and commit. Enable push when you are ready to open a PR.";
-        setGitWorkflowMessageForRoom(roomId, message);
-        publishGitWorkflowEvent({
-          status: "completed",
-          branch: gitPlan.branch,
-          push: gitPlan.push,
-          message,
-          results
-        }, room).catch((error) => {
-          console.warn("Failed to publish git workflow completion", error);
-        });
-      }
-
-      const status = await getGitStatus(projectPath);
-      setGitStatusForRoom(roomId, status);
-    } catch (error) {
-      const message = String(error);
-      setGitWorkflowMessageForRoom(roomId, message);
-      appendTerminalLinesForRoom(roomId, [`Git workflow error: ${message}`]);
-      publishGitWorkflowEvent({
-        status: "failed",
-        branch: gitPlan?.branch ?? workflowDraft.branchName,
-        push: gitPlan?.push ?? workflowDraft.pushEnabled,
-        message
-      }, room).catch((publishError) => {
-        console.warn("Failed to publish git workflow error", publishError);
-      });
-    } finally {
-      setGitWorkflowBusyForRoom(roomId, false);
-    }
   }
 
   return (
