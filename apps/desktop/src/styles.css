@@ -5375,7 +5375,10 @@ select {
 .browser-panel.browser-open {
   position: relative;
   display: flex;
+  flex-direction: column;
   flex: 1;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
   padding: 0;
@@ -5436,6 +5439,8 @@ select {
 
 .browser-open .browser-viewport {
   flex: 1;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   height: auto;
   border: 0;
