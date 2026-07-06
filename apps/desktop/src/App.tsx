@@ -30,7 +30,7 @@ import { useAppStateSlices } from "./hooks/useAppStateSlices";
 import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useRoomChatMutations } from "./hooks/useRoomChatMutations";
-import { useRoomInteractionContext } from "./hooks/useRoomInteractionContext";
+import { useAppRoomInteractionContext } from "./hooks/useAppRoomInteractionContext";
 import { useAppRoomScopedSetters } from "./hooks/useAppRoomScopedSetters";
 import { useSelectedRoomRuntime } from "./hooks/useSelectedRoomRuntime";
 import { useRoomDisplayContext } from "./hooks/useRoomDisplayContext";
@@ -122,6 +122,14 @@ export function App() {
   const localIdentity = useLocalIdentity(githubAuth.currentUser);
   const roomSettingsActor = useRoomSettingsActor(localIdentity.localUser);
 
+  const selectedContext = useAppSelectedRoomContext({
+    appState,
+    githubAuth,
+    localIdentity,
+    fallbackRoom: emptyRoom,
+    defaultBrowserUrl,
+    defaultBrowserReason
+  });
   const {
     selectedCodexModel,
     hasSelectedRoom,
@@ -179,13 +187,17 @@ export function App() {
     settingsMessage,
     visibleHistoryMessage,
     markdownCopyFallback
-  } = useAppSelectedRoomContext({
+  } = selectedContext;
+  const roomSetters = useAppRoomScopedSetters({
     appState,
-    githubAuth,
-    localIdentity,
-    fallbackRoom: emptyRoom,
+    appRefs,
+    selectedRoom,
+    hasSelectedRoom,
+    maxTerminalActivityLines,
     defaultBrowserUrl,
-    defaultBrowserReason
+    defaultBrowserReason,
+    defaultCodexModel,
+    defaultProjectPath
   });
   const {
     setHostMessageForRoom,
@@ -254,17 +266,7 @@ export function App() {
     updateTerminalRequestStatus,
     appendBrowserRequest,
     updateBrowserRequestStatus
-  } = useAppRoomScopedSetters({
-    appState,
-    appRefs,
-    selectedRoom,
-    hasSelectedRoom,
-    maxTerminalActivityLines,
-    defaultBrowserUrl,
-    defaultBrowserReason,
-    defaultCodexModel,
-    defaultProjectPath
-  });
+  } = roomSetters;
   const roomChatMutations = useRoomChatMutations({
     setMessagesByRoom: workspaceState.setMessagesByRoom
   });
@@ -288,73 +290,14 @@ export function App() {
     setHostMessageForRoom,
     setWorkspaceError: workspaceState.setWorkspaceError
   });
-  const roomInteraction = useRoomInteractionContext({
-    inFlightReporters: {
-      hostBusyRef: appRefs.hostBusyRef,
-      settingsBusyRef: appRefs.settingsBusyRef,
-      keyRotationBusyRef: appRefs.keyRotationBusyRef,
-      fileBusyRef: appRefs.fileBusyRef,
-      terminalBusyRef: appRefs.terminalBusyRef,
-      setHostMessageForRoom,
-      setSettingsMessageForRoom,
-      setInviteMessageForRoom,
-      setFileMessageForRoom,
-      setTerminalErrorForRoom
-    },
-    notices: {
-      roomId: selectedRoom.id,
-      hostMessage,
-      chatMessage,
-      setHostMessageForRoom,
-      setChatMessageForRoom
-    },
-    visibilityWarning: {
-      hasSelectedRoom,
-      selectedRoomId: selectedRoom.id,
-      setSecretWarningVisibleForRoom
-    },
-    access: {
-      hasSelectedRoom,
-      selectedRoom,
-      localUser: localIdentity.localUser,
-      forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
-      revokedRoomIds: roomRuntimeState.revokedRoomIds,
-      revokedTeamIds: roomRuntimeState.revokedTeamIds,
-      historySettings: historyDefaultsState.historySettings,
-      inviteApprovalGate
-    },
-    chat: {
-      hasSelectedRoom,
-      selectedRoom,
-      forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
-      revokedRoomIds: roomRuntimeState.revokedRoomIds,
-      revokedTeamIds: roomRuntimeState.revokedTeamIds,
-      localUser: localIdentity.localUser,
-      deviceId: localIdentity.deviceId,
-      relayStatus: appRuntimeState.relayStatus,
-      relayRef: appRefs.relayRef,
-      seenEnvelopeIds: appRefs.seenEnvelopeIds,
-      appendRoomMessage: roomChatMutations.appendRoomMessage,
-      applyMessageReaction: roomChatMutations.applyMessageReaction,
-      setChatMessageForRoom,
-      setSelectedChatMessage
-    },
-    githubWorkflow: {
-      actionRuns,
-      authConfig: githubAuth.authConfig,
-      currentUser: githubAuth.currentUser,
-      gitWorkflowDraft,
-      projectPath: selectedRoom.projectPath
-    },
-    memberRows: {
-      presenceByRoom: roomRuntimeState.presenceByRoom,
-      selectedRoom,
-      selectedRoomId: workspaceState.selectedRoomId,
-      localUser: localIdentity.localUser,
-      localDeviceId: localIdentity.deviceId,
-      localPublicKeyFingerprint: appRuntimeState.deviceIdentity?.publicKeyFingerprint,
-      trustedDeviceKeys: appRuntimeState.trustedDeviceKeys
-    }
+  const roomInteraction = useAppRoomInteractionContext({
+    appState,
+    appRefs,
+    githubAuth,
+    localIdentity,
+    selected: selectedContext,
+    roomChatMutations,
+    roomSetters
   });
   const selectedRuntime = useSelectedRoomRuntime({
     selectedRoom,
