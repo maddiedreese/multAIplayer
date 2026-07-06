@@ -15,7 +15,8 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 keyring = "4.1.3"
-tauri = { version = "2", features = [] }
+portable-pty = "0.9.0"
+tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }

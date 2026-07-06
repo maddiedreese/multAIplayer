@@ -1,3 +1,4 @@
+use portable_pty::{native_pty_system, Child as PtyChild, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{hash_map::DefaultHasher, HashMap};
@@ -79,8 +80,9 @@ struct TerminalSession {
     name: String,
     cwd: String,
     command: String,
-    child: Child,
-    stdin: Option<ChildStdin>,
+    child: Box<dyn PtyChild + Send + Sync>,
+    writer: Box<dyn Write + Send>,
+    _master: Box<dyn MasterPty + Send>,
     output: Arc<Mutex<Vec<TerminalLine>>>,
     started_at: String,
 }
@@ -497,36 +499,42 @@ fn terminal_start(
         if existing_is_running(existing) {
             return Err(format!("Terminal {} is already running", request.name));
         }
-        terminate_child(&mut existing.child);
+        terminate_terminal_child(existing.child.as_mut());
         sessions.remove(&id);
     }
 
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
-    let mut child = Command::new(shell)
-        .current_dir(&request.cwd)
-        .args(["-lc", &request.command])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+    let pty_system = native_pty_system();
+    let pair = pty_system
+        .openpty(PtySize {
+            rows: 30,
+            cols: 120,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|error| format!("Failed to open terminal pty: {error}"))?;
+    let mut command = CommandBuilder::new(shell);
+    command.cwd(&request.cwd);
+    command.arg("-lc");
+    command.arg(&request.command);
+    let child = pair
+        .slave
+        .spawn_command(command)
         .map_err(|error| format!("Failed to start terminal: {error}"))?;
-
-    let stdin = child.stdin.take();
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| "Could not open terminal stdout".to_string())?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| "Could not open terminal stderr".to_string())?;
+    let reader = pair
+        .master
+        .try_clone_reader()
+        .map_err(|error| format!("Failed to read terminal pty: {error}"))?;
+    let writer = pair
+        .master
+        .take_writer()
+        .map_err(|error| format!("Failed to write terminal pty: {error}"))?;
     let output = Arc::new(Mutex::new(vec![TerminalLine {
         stream: "system".to_string(),
         text: format!("$ {}", request.command),
     }]));
 
-    capture_terminal_stream(stdout, "stdout", Arc::clone(&output));
-    capture_terminal_stream(stderr, "stderr", Arc::clone(&output));
+    capture_terminal_stream(reader, "stdout", Arc::clone(&output));
 
     let session = TerminalSession {
         room_id: request.room_id,
@@ -534,7 +542,8 @@ fn terminal_start(
         cwd: request.cwd,
         command: request.command,
         child,
-        stdin,
+        writer,
+        _master: pair.master,
         output,
         started_at: unix_timestamp_millis().to_string(),
     };
@@ -595,13 +604,10 @@ fn terminal_write(
     if !existing_is_running(session) {
         return Err(format!("Terminal {} is not running", session.name));
     }
-    let stdin = session
-        .stdin
-        .as_mut()
-        .ok_or_else(|| "Terminal stdin is closed".to_string())?;
-    writeln!(stdin, "{}", request.input)
+    writeln!(session.writer, "{}", request.input)
         .map_err(|error| format!("Failed to write terminal input: {error}"))?;
-    stdin
+    session
+        .writer
         .flush()
         .map_err(|error| format!("Failed to flush terminal input: {error}"))?;
     push_terminal_line(
@@ -624,7 +630,7 @@ fn terminal_stop(state: State<'_, TerminalState>, id: String) -> Result<Terminal
     let session = sessions
         .get_mut(&id)
         .ok_or_else(|| format!("Terminal not found: {id}"))?;
-    terminate_child(&mut session.child);
+    terminate_terminal_child(session.child.as_mut());
     snapshot_terminal(&id, session)
 }
 
@@ -1463,7 +1469,7 @@ fn existing_is_running(session: &mut TerminalSession) -> bool {
 
 fn snapshot_terminal(id: &str, session: &mut TerminalSession) -> Result<TerminalSnapshot, String> {
     let exit_status = match session.child.try_wait() {
-        Ok(Some(status)) => status.code(),
+        Ok(Some(status)) => Some(status.exit_code() as i32),
         Ok(None) => None,
         Err(error) => return Err(format!("Failed to read terminal status: {error}")),
     };
@@ -1485,18 +1491,31 @@ fn snapshot_terminal(id: &str, session: &mut TerminalSession) -> Result<Terminal
     })
 }
 
+fn terminate_terminal_child(child: &mut dyn PtyChild) {
+    let _ = child.kill();
+}
+
 fn capture_terminal_stream<T>(stream: T, name: &'static str, output: Arc<Mutex<Vec<TerminalLine>>>)
 where
     T: std::io::Read + Send + 'static,
 {
     thread::spawn(move || {
-        let reader = BufReader::new(stream);
-        for line in reader.lines().map_while(Result::ok) {
+        let mut reader = BufReader::new(stream);
+        let mut buffer = [0_u8; 4096];
+        loop {
+            let byte_count = match reader.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(byte_count) => byte_count,
+                Err(_) => break,
+            };
+            let text = String::from_utf8_lossy(&buffer[..byte_count])
+                .replace("\r\n", "\n")
+                .replace('\r', "\n");
             push_terminal_line(
                 &output,
                 TerminalLine {
                     stream: name.to_string(),
-                    text: line,
+                    text,
                 },
             );
         }

@@ -5371,6 +5371,36 @@ select {
   cursor: text;
 }
 
+.terminal-panel .panel-title {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.terminal-panel .panel-title > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-panel .panel-title-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  gap: 8px;
+}
+
+.terminal-panel .panel-title-actions button {
+  min-width: 0;
+  width: 100%;
+}
+
+.terminal-panel .panel-title-actions .primary-tool {
+  grid-column: 1 / -1;
+}
+
 .terminal-command-line {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr);
