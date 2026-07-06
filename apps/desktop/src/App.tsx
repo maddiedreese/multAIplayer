@@ -304,6 +304,7 @@ import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useRoomAccess } from "./hooks/useRoomAccess";
 import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
+import { useRoomMessageSetters } from "./hooks/useRoomMessageSetters";
 import { useRoomNotices } from "./hooks/useRoomNotices";
 import { useShellLayout } from "./hooks/useShellLayout";
 import { useSelectedTeamData } from "./hooks/useSelectedTeamData";
@@ -657,6 +658,30 @@ export function App() {
     defaultBrowserUrl,
     defaultBrowserReason
   });
+  const {
+    setHostMessageForRoom,
+    setSelectedHostMessage,
+    setChatMessageForRoom,
+    setSelectedChatMessage,
+    setMarkdownCopyFallbackForRoom,
+    setSecretWarningVisibleForRoom,
+    setHistoryMessageForRoom,
+    setSelectedHistoryMessage,
+    setTeamHistoryMessageForTeam,
+    setSelectedTeamHistoryMessage,
+    setSettingsMessageForRoom,
+    setSelectedSettingsMessage
+  } = useRoomMessageSetters({
+    selectedRoomId: selectedRoom.id,
+    selectedTeamId: selectedTeam,
+    setHostMessagesByRoom,
+    setChatMessagesByRoom,
+    setMarkdownCopyFallbacksByRoom,
+    setSecretWarningsVisibleByRoom,
+    setHistoryMessagesByRoom,
+    setTeamHistoryMessagesByTeam,
+    setSettingsMessagesByRoom
+  });
   const roomNotices = useRoomNotices({
     roomId: selectedRoom.id,
     hostMessage,
@@ -810,50 +835,10 @@ export function App() {
     setHostBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
-  function setHostMessageForRoom(roomId: string, message: string | null) {
-    setHostMessagesByRoom((current) => message ? { ...current, [roomId]: message } : omitRecordKey(current, roomId));
-  }
-
-  function setSelectedHostMessage(message: string | null) {
-    setHostMessageForRoom(selectedRoom.id, message);
-  }
-
   function reportRoomHostMutationInFlight(roomId: string): boolean {
     if (!isRoomHostMutationInFlight(hostBusyRef.current, roomId)) return false;
     setHostMessageForRoom(roomId, roomHostMutationInFlightMessage());
     return true;
-  }
-
-  function setChatMessageForRoom(roomId: string, message: string | null) {
-    setChatMessagesByRoom((current) => message ? { ...current, [roomId]: message } : omitRecordKey(current, roomId));
-  }
-
-  function setSelectedChatMessage(message: string | null) {
-    setChatMessageForRoom(selectedRoom.id, message);
-  }
-
-  function setMarkdownCopyFallbackForRoom(roomId: string, fallback: MarkdownCopyFallback | null) {
-    setMarkdownCopyFallbacksByRoom((current) => fallback ? { ...current, [roomId]: fallback } : omitRecordKey(current, roomId));
-  }
-
-  function setSecretWarningVisibleForRoom(roomId: string, visible: boolean) {
-    setSecretWarningsVisibleByRoom((current) => visible ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
-  }
-
-  function setHistoryMessageForRoom(roomId: string, message: string | null) {
-    setHistoryMessagesByRoom((current) => message ? { ...current, [roomId]: message } : omitRecordKey(current, roomId));
-  }
-
-  function setSelectedHistoryMessage(message: string | null) {
-    setHistoryMessageForRoom(selectedRoom.id, message);
-  }
-
-  function setTeamHistoryMessageForTeam(teamId: string, message: string | null) {
-    setTeamHistoryMessagesByTeam((current) => message ? { ...current, [teamId || "__no-team"]: message } : omitRecordKey(current, teamId || "__no-team"));
-  }
-
-  function setSelectedTeamHistoryMessage(message: string | null) {
-    setTeamHistoryMessageForTeam(selectedTeam || "__no-team", message);
   }
 
   function setSettingsBusyForRoom(roomId: string, busy: boolean) {
@@ -861,14 +846,6 @@ export function App() {
       ? { ...settingsBusyRef.current, [roomId]: true }
       : omitRecordKey(settingsBusyRef.current, roomId);
     setSettingsBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
-  }
-
-  function setSettingsMessageForRoom(roomId: string, message: string | null) {
-    setSettingsMessagesByRoom((current) => message ? { ...current, [roomId]: message } : omitRecordKey(current, roomId));
-  }
-
-  function setSelectedSettingsMessage(message: string | null) {
-    setSettingsMessageForRoom(selectedRoom.id, message);
   }
 
   function reportRoomSettingsMutationInFlight(
