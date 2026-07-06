@@ -46,11 +46,9 @@ import { useRoomInspectorPanelProps } from "./hooks/useRoomInspectorPanelProps";
 import { useAppSidebarProps } from "./hooks/useAppSidebarProps";
 import { useLocalPreviewDialogProps } from "./hooks/useLocalPreviewDialogProps";
 import { useWorkspaceFlowContext } from "./hooks/useWorkspaceFlowContext";
-import { useRoomBackgroundEffects } from "./hooks/useRoomBackgroundEffects";
-import { useRoomPanelActions } from "./hooks/useRoomPanelActions";
 import { useRelaySyncContext } from "./hooks/useRelaySyncContext";
-import { useCodexRoomActions } from "./hooks/useCodexRoomActions";
-import { useRoomToolActions } from "./hooks/useRoomToolActions";
+import { useRoomRuntimeContext } from "./hooks/useRoomRuntimeContext";
+import { useRoomPanelActions } from "./hooks/useRoomPanelActions";
 import { InlineSecretWarning } from "./components/common";
 import { AppWorkspaceShell } from "./components/AppWorkspaceShell";
 import { AppSidebarDrawer } from "./components/AppSidebarDrawer";
@@ -1333,64 +1331,7 @@ export function App() {
   const {
     approveCodexTurn,
     handleCodexInvoke,
-    sendMessage
-  } = useCodexRoomActions({
-    turn: {
-      selectedRoom,
-      activeCodexApproval,
-      roomsRef,
-      selectedRoomIdRef,
-      forgottenRoomIds,
-      revokedRoomIds,
-      revokedTeamIds,
-      localUser,
-      messagesByRoom,
-      terminals,
-      browserRequestsByRoom,
-      gitStatusByRoom,
-      codexContinuationByRoom,
-      codexThreadIdsByRoom,
-      setHostMessageForRoom,
-      setPendingCodexApprovalForRoom,
-      setApprovalVisibleForRoom,
-      setCodexRunningForRoom,
-      appendTerminalLinesForRoom,
-      setCodexThreadIdsByRoom,
-      setCodexContinuationByRoom,
-      setRooms,
-      publishCodexEvent,
-      publishChatMessage,
-      publishHostHandoff
-    },
-    invoke: {
-      hasSelectedRoom,
-      selectedRoom,
-      selectedRoomIdRef,
-      isSelectedRoomLocked,
-      isSelectedRoomRevoked,
-      isActiveHost,
-      canReadLocalWorkspace,
-      hostGateMessage,
-      localUser,
-      draft,
-      pendingAttachments,
-      messages,
-      roomTerminals,
-      browserRequests,
-      gitStatus,
-      publishChatMessage,
-      handleCodexBrowserOpenCommand,
-      setSelectedChatMessage,
-      setChatMessageForRoom,
-      setSelectedHostMessage,
-      setHostMessageForRoom,
-      setPendingCodexApprovalForRoom,
-      setApprovalVisibleForRoom,
-      setDraftForRoom,
-      setPendingAttachmentsForRoom
-    }
-  });
-  const {
+    sendMessage,
     setApprovalPolicy,
     toggleRoomMode,
     setCodexModel,
@@ -1422,8 +1363,65 @@ export function App() {
     openApprovedBrowserRequest,
     openRoomBrowserNow,
     resetRoomBrowserProfile
-  } = useRoomToolActions({
-    settings: {
+  } = useRoomRuntimeContext({
+    codexActions: {
+      turn: {
+      selectedRoom,
+      activeCodexApproval,
+      roomsRef,
+      selectedRoomIdRef,
+      forgottenRoomIds,
+      revokedRoomIds,
+      revokedTeamIds,
+      localUser,
+      messagesByRoom,
+      terminals,
+      browserRequestsByRoom,
+      gitStatusByRoom,
+      codexContinuationByRoom,
+      codexThreadIdsByRoom,
+      setHostMessageForRoom,
+      setPendingCodexApprovalForRoom,
+      setApprovalVisibleForRoom,
+      setCodexRunningForRoom,
+      appendTerminalLinesForRoom,
+      setCodexThreadIdsByRoom,
+      setCodexContinuationByRoom,
+      setRooms,
+      publishCodexEvent,
+      publishChatMessage,
+      publishHostHandoff
+    },
+      invoke: {
+      hasSelectedRoom,
+      selectedRoom,
+      selectedRoomIdRef,
+      isSelectedRoomLocked,
+      isSelectedRoomRevoked,
+      isActiveHost,
+      canReadLocalWorkspace,
+      hostGateMessage,
+      localUser,
+      draft,
+      pendingAttachments,
+      messages,
+      roomTerminals,
+      browserRequests,
+      gitStatus,
+      publishChatMessage,
+      handleCodexBrowserOpenCommand,
+      setSelectedChatMessage,
+      setChatMessageForRoom,
+      setSelectedHostMessage,
+      setHostMessageForRoom,
+      setPendingCodexApprovalForRoom,
+      setApprovalVisibleForRoom,
+      setDraftForRoom,
+      setPendingAttachmentsForRoom
+      }
+    },
+    toolActions: {
+      settings: {
       hasSelectedRoom,
       isSelectedRoomLocked,
       isSelectedRoomRevoked,
@@ -1575,11 +1573,10 @@ export function App() {
       setActiveBrowserUrlsByRoom,
       setBrowserStatusByRoom,
       setInspectorTabsByRoom
-    }
-  });
-
-  useRoomBackgroundEffects({
-    localHistoryPersistence: {
+      }
+    },
+    backgroundEffects: {
+      localHistoryPersistence: {
       hasSelectedRoom,
       selectedRoomId,
       selectedRoomTeamId: selectedRoom.teamId,
@@ -1665,8 +1662,7 @@ export function App() {
       terminalBusy,
       roomTerminalCount: roomTerminals.length,
       selectedRoomId: selectedRoom.id,
-      terminalAutoOpenedRoomsRef,
-      openInteractiveTerminal
+      terminalAutoOpenedRoomsRef
     },
     codexProbe: { setCodexProbe },
     roomDraftCleanup: {
@@ -1676,6 +1672,7 @@ export function App() {
       selectedCodexModel,
       setCustomCodexModelsByRoom,
       setProjectPathDraftsByRoom
+      }
     }
   });
 
