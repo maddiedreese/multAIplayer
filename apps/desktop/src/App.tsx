@@ -229,7 +229,7 @@ import {
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { normalizeChatMessage } from "./lib/chatSanitizer";
 import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
-import { extractCodexBrowserOpenUrl, messageInvokesCodex, normalizeBrowserCommandUrl } from "./lib/codexInvoke";
+import { extractCodexBrowserOpenUrl, messageInvokesCodex } from "./lib/codexInvoke";
 import { classifyCodexFailure, codexUsageLimitMessage } from "./lib/codexFailure";
 import { resolveFilePreviewTab, type FilePreviewTab } from "./lib/filePreview";
 import { copyTextToClipboard } from "./lib/clipboard";
@@ -263,6 +263,8 @@ import {
   upsertTerminal
 } from "./lib/terminalState";
 import { summarizeActionRuns } from "./lib/githubActionsSummary";
+import { formatBrowserAccessLabel, normalizeBrowserLocationInput } from "./lib/browserUi";
+import { formatApprovalAttachments, formatApprovalMessages } from "./lib/codexApprovalSummary";
 import {
   buildCodexEventLine,
   buildGitHubActionsEventLines,
@@ -7187,41 +7189,4 @@ function base64UrlToBytes(value: string): Uint8Array {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
-}
-
-function formatBrowserAccessLabel(url: string): string {
-  try {
-    return new URL(url).origin;
-  } catch {
-    return url;
-  }
-}
-
-function formatApprovalMessages(messages: ChatMessage[]): string {
-  if (messages.length === 0) return "No new messages.";
-  const visible = messages.slice(-6).map((message) => {
-    const body = message.body.replace(/\s+/g, " ").trim();
-    return `${message.author}: ${body.length > 140 ? `${body.slice(0, 137)}...` : body}`;
-  });
-  const hidden = messages.length - visible.length;
-  return hidden > 0 ? [`${hidden} earlier message${hidden === 1 ? "" : "s"}`, ...visible].join("\n") : visible.join("\n");
-}
-
-function formatApprovalAttachments(messages: ChatMessage[]): string {
-  const attachments = messages.flatMap((message) =>
-    (message.attachments ?? []).map((attachment) => `${attachment.name} (${formatBytes(attachment.size)})`)
-  );
-  if (attachments.length === 0) return "None";
-  const visible = attachments.slice(-8);
-  const hidden = attachments.length - visible.length;
-  return hidden > 0 ? [`${hidden} earlier attachment${hidden === 1 ? "" : "s"}`, ...visible].join("\n") : visible.join("\n");
-}
-
-function normalizeBrowserLocationInput(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (/\s/.test(trimmed)) {
-    return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
-  }
-  return normalizeBrowserCommandUrl(trimmed);
 }
