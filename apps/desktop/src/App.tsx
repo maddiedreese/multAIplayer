@@ -80,10 +80,6 @@ import { useChatActions } from "./hooks/useChatActions";
 import { useCodexInvokeActions } from "./hooks/useCodexInvokeActions";
 import { useCodexTurnActions } from "./hooks/useCodexTurnActions";
 import { useRoomVisibilityWarningActions } from "./hooks/useRoomVisibilityWarningActions";
-import { useRoomChatPanelActions } from "./hooks/useRoomChatPanelActions";
-import { useRoomHeaderActions } from "./hooks/useRoomHeaderActions";
-import { useTerminalPanelActions } from "./hooks/useTerminalPanelActions";
-import { useWorkspaceFilesPanelActions } from "./hooks/useWorkspaceFilesPanelActions";
 import { useWorkspaceUiState } from "./hooks/useWorkspaceUiState";
 import { useHistoryDefaultsState } from "./hooks/useHistoryDefaultsState";
 import { useBrowserPanelState } from "./hooks/useBrowserPanelState";
@@ -107,6 +103,7 @@ import { useAppSidebarProps } from "./hooks/useAppSidebarProps";
 import { useLocalPreviewDialogProps } from "./hooks/useLocalPreviewDialogProps";
 import { useAppBootstrapEffects } from "./hooks/useAppBootstrapEffects";
 import { useRoomBackgroundEffects } from "./hooks/useRoomBackgroundEffects";
+import { useRoomPanelActions } from "./hooks/useRoomPanelActions";
 import { InlineSecretWarning } from "./components/common";
 import { AppWorkspaceShell } from "./components/AppWorkspaceShell";
 import { AppSidebarDrawer } from "./components/AppSidebarDrawer";
@@ -1769,62 +1766,69 @@ export function App() {
     }
   });
 
-  const roomChatPanelActions = useRoomChatPanelActions({
-    selectedRoomId: selectedRoom.id,
-    messages,
-    localPreviews,
-    copyMessageMarkdown,
-    copyCodexOutputMarkdown,
-    openEncryptedAttachmentBlob,
-    toggleMessageReaction,
-    setPendingCodexApprovalForRoom,
-    setApprovalVisibleForRoom,
-    approveCodexTurn,
-    handleCodexInvoke,
-    copyMarkdownWithFallback,
-    setChatMessageForRoom,
-    stopLocalPreview,
-    setDraftForRoom
-  });
-  const roomHeaderActions = useRoomHeaderActions({
-    rooms,
-    selectedRoomId,
-    selectedRoomIdForTabs: selectedRoom.id,
-    activeBrowserUrl,
-    setSelectedTeam,
-    setSelectedRoomId,
-    setInspectorTabsByRoom,
-    openRoomBrowserNow
-  });
-  const terminalPanelActions = useTerminalPanelActions({
-    selectedRoomId: selectedRoom.id,
-    terminalRequests,
-    copyTerminalMarkdown,
-    runApprovedTerminalCheck,
-    openInteractiveTerminal,
-    setTerminalNameForRoom,
-    setTerminalCommandForRoom,
-    startNamedTerminal,
-    requestTerminalCommand,
-    approveTerminalRequest,
-    denyTerminalRequest,
-    setSelectedTerminalIdForRoom,
-    setTerminalInputForRoom,
-    sendTerminalInput,
-    restartSelectedTerminal,
-    stopSelectedTerminal
-  });
-  const workspaceFilesPanelActions = useWorkspaceFilesPanelActions({
-    selectedRoomId: selectedRoom.id,
-    copyProjectMarkdown,
-    setFileQueryForRoom,
-    openProjectFile,
-    copyDiffSummaryMarkdown,
-    attachSelectedFileToMessage,
-    setFilePreviewTabForRoom,
-    setSelectedFileForRoom,
-    setSelectedDiffForRoom,
-    setSensitiveAttachmentReviewKey
+  const {
+    roomChatPanelActions,
+    roomHeaderActions,
+    terminalPanelActions,
+    workspaceFilesPanelActions
+  } = useRoomPanelActions({
+    chat: {
+      selectedRoomId: selectedRoom.id,
+      messages,
+      localPreviews,
+      copyMessageMarkdown,
+      copyCodexOutputMarkdown,
+      openEncryptedAttachmentBlob,
+      toggleMessageReaction,
+      setPendingCodexApprovalForRoom,
+      setApprovalVisibleForRoom,
+      approveCodexTurn,
+      handleCodexInvoke,
+      copyMarkdownWithFallback,
+      setChatMessageForRoom,
+      stopLocalPreview,
+      setDraftForRoom
+    },
+    header: {
+      rooms,
+      selectedRoomId,
+      selectedRoomIdForTabs: selectedRoom.id,
+      activeBrowserUrl,
+      setSelectedTeam,
+      setSelectedRoomId,
+      setInspectorTabsByRoom,
+      openRoomBrowserNow
+    },
+    terminal: {
+      selectedRoomId: selectedRoom.id,
+      terminalRequests,
+      copyTerminalMarkdown,
+      runApprovedTerminalCheck,
+      openInteractiveTerminal,
+      setTerminalNameForRoom,
+      setTerminalCommandForRoom,
+      startNamedTerminal,
+      requestTerminalCommand,
+      approveTerminalRequest,
+      denyTerminalRequest,
+      setSelectedTerminalIdForRoom,
+      setTerminalInputForRoom,
+      sendTerminalInput,
+      restartSelectedTerminal,
+      stopSelectedTerminal
+    },
+    workspaceFiles: {
+      selectedRoomId: selectedRoom.id,
+      copyProjectMarkdown,
+      setFileQueryForRoom,
+      openProjectFile,
+      copyDiffSummaryMarkdown,
+      attachSelectedFileToMessage,
+      setFilePreviewTabForRoom,
+      setSelectedFileForRoom,
+      setSelectedDiffForRoom,
+      setSensitiveAttachmentReviewKey
+    }
   });
   const roomMainColumnProps = useRoomMainColumnProps({
     teams: teams.map((team) => ({ id: team.id, name: team.name })),
