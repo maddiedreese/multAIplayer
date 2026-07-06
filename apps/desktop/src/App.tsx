@@ -275,7 +275,7 @@ import {
   normalizeLocalRoomHistory,
   pruneLocalRoomHistory
 } from "./lib/localRoomHistoryPayload";
-import { loadOrCreateDeviceId, loadThemeMode, roomLockMessage, roomSecretStorageLabel } from "./lib/appRuntime";
+import { loadOrCreateDeviceId, roomLockMessage, roomSecretStorageLabel } from "./lib/appRuntime";
 import { decodeNoSecretRoomInvite, encodeNoSecretRoomInvite, jsonWebKeyToDevicePublicKeyJwk } from "./lib/noSecretRoomInvite";
 import {
   buildCodexEventLine,
@@ -311,6 +311,7 @@ import { buildRoomMemberRows, buildTeamMemberRows } from "./lib/rosterDisplayRow
 import { buildSidebarMessageHitRows, buildSidebarRoomRows, buildSidebarTeamRows } from "./lib/sidebarDisplayRows";
 import { buildCodexEventRows, buildTerminalOutputLines, buildTerminalRequestRows } from "./lib/terminalDisplayRows";
 import { useShellLayout } from "./hooks/useShellLayout";
+import { useThemeMode } from "./hooks/useThemeMode";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -335,7 +336,7 @@ import { TerminalPanel } from "./components/TerminalPanel";
 import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
 import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
-import { DesktopSidebar, type ThemeMode } from "./components/DesktopSidebar";
+import { DesktopSidebar } from "./components/DesktopSidebar";
 import { RoomChatPanel } from "./components/RoomChatPanel";
 import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
 import { LocalPreviewDialog } from "./components/LocalPreviewDialog";
@@ -378,7 +379,7 @@ import {
 } from "./seedData";
 
 export function App() {
-  const [themeMode, setThemeMode] = useState<ThemeMode>(() => loadThemeMode());
+  const { themeMode, toggleThemeMode } = useThemeMode();
   const [teams, setTeams] = useState<TeamRecord[]>(seededTeams);
   const [rooms, setRooms] = useState<RoomRecord[]>(seededRooms);
   const [teamMembersByTeam, setTeamMembersByTeam] = useState<Record<string, TeamMemberRecord[]>>(seededTeamMembers);
@@ -541,11 +542,6 @@ export function App() {
     }),
     [currentUser]
   );
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = themeMode;
-    localStorage.setItem("multaiplayer:theme", themeMode);
-  }, [themeMode]);
 
   useEffect(() => {
     setMarkdownSelectionMode(false);
@@ -5960,7 +5956,7 @@ export function App() {
           setSelectedRoomId(roomId);
         }}
         onSelectSidebarPanel={setActiveSidebarPanel}
-        onToggleTheme={() => setThemeMode((current) => current === "dark" ? "light" : "dark")}
+        onToggleTheme={toggleThemeMode}
       />
 
       <ShellResizer
