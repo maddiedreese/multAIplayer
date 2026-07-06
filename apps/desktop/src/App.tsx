@@ -867,22 +867,7 @@ export function App() {
     setKeyRotationBusyForRoom
   });
 
-  const {
-    selectedAttachmentReview,
-    selectedFileRisks,
-    selectedFileNeedsAttachmentReview,
-    selectedSensitiveFileReviewed,
-    terminalRisks,
-    terminalCommandRisks,
-    terminalOutputLines,
-    terminalRequestRows,
-    codexEventRows,
-    searchActive,
-    sidebarTeamRows,
-    sidebarRoomRows,
-    sidebarMessageHitRows,
-    refreshTeamMembers
-  } = useRoomDisplayContext({
+  const roomDisplay = useRoomDisplayContext({
     fileTerminal: {
       selectedFile,
       selectedRoomId: selectedRoom.id,
@@ -962,10 +947,10 @@ export function App() {
       gitStatus,
       selectedFile,
       selectedDiff,
-      selectedFileRisks,
+      selectedFileRisks: roomDisplay.selectedFileRisks,
       selectedTerminal: selectedRuntime.selectedTerminal,
       terminalLines,
-      terminalRisks,
+      terminalRisks: roomDisplay.terminalRisks,
       setMarkdownCopyFallbackForRoom,
       setSelectedChatMessage,
       setChatMessageForRoom,
@@ -1154,7 +1139,7 @@ export function App() {
       setCodexThreadIdsByRoom
     },
     search: {
-      searchActive,
+      searchActive: roomDisplay.searchActive,
       rooms,
       forgottenRoomIds,
       revokedRoomIds,
@@ -1221,7 +1206,7 @@ export function App() {
         handleRelayError: workspaceRecords.handleRelayError,
         upsertRoom: workspaceRecords.upsertRoom,
         upsertTeam: workspaceRecords.upsertTeam,
-        refreshTeamMembers,
+        refreshTeamMembers: roomDisplay.refreshTeamMembers,
         decryptInviteEnvelope,
         handleInviteEnvelopePlaintext,
         applyMessageReaction,
@@ -1571,12 +1556,7 @@ export function App() {
     }
   });
 
-  const {
-    roomChatPanelActions,
-    roomHeaderActions,
-    terminalPanelActions,
-    workspaceFilesPanelActions
-  } = useRoomPanelActions({
+  const roomPanels = useRoomPanelActions({
     chat: {
       selectedRoomId: selectedRoom.id,
       messages,
@@ -1661,7 +1641,7 @@ export function App() {
     selectedMessages,
     markdownSelectionMode,
     inspectorTab,
-    roomHeaderActions,
+    roomHeaderActions: roomPanels.roomHeaderActions,
     onSetHost: setRoomHost,
     onRenameRoom: roomRuntime.renameRoom,
     onSelectModel: roomRuntime.setCodexModel,
@@ -1690,7 +1670,7 @@ export function App() {
     onToggleMessageSelection: toggleMessageSelection,
     onRemovePendingAttachment: workspaceFlow.removePendingAttachment,
     onSendMessage: roomRuntime.sendMessage,
-    roomChatPanelActions
+    roomChatPanelActions: roomPanels.roomChatPanelActions
     },
     roomInspectorPanel: {
     activeTab: inspectorTab,
@@ -1819,13 +1799,13 @@ export function App() {
       fileBusy,
       fileMessage,
       canReadLocalWorkspace,
-      selectedFileRisks,
-      selectedFileNeedsAttachmentReview,
-      selectedSensitiveFileReviewed,
-      selectedAttachmentActionLabel: selectedAttachmentReview?.actionLabel ?? "Attach",
-      selectedAttachmentWarningDetail: selectedAttachmentReview?.warningDetail ?? undefined,
+      selectedFileRisks: roomDisplay.selectedFileRisks,
+      selectedFileNeedsAttachmentReview: roomDisplay.selectedFileNeedsAttachmentReview,
+      selectedSensitiveFileReviewed: roomDisplay.selectedSensitiveFileReviewed,
+      selectedAttachmentActionLabel: roomDisplay.selectedAttachmentReview?.actionLabel ?? "Attach",
+      selectedAttachmentWarningDetail: roomDisplay.selectedAttachmentReview?.warningDetail ?? undefined,
       filePreviewTab,
-      ...workspaceFilesPanelActions
+      ...roomPanels.workspaceFilesPanelActions
     },
     gitHandoff: {
       draft: gitWorkflowDraft,
@@ -1859,20 +1839,20 @@ export function App() {
       terminalInput,
       terminalBusy,
       terminalError,
-      terminalCommandRisks,
-      terminalRisks,
-      codexEvents: codexEventRows,
-      commandRequests: terminalRequestRows,
+      terminalCommandRisks: roomDisplay.terminalCommandRisks,
+      terminalRisks: roomDisplay.terminalRisks,
+      codexEvents: roomDisplay.codexEventRows,
+      commandRequests: roomDisplay.terminalRequestRows,
       roomTerminals,
       selectedTerminal: selectedRuntime.selectedTerminal,
       selectedTerminalId,
       selectedTerminalCanControl: selectedRuntime.selectedTerminalCanControl,
       selectedTerminalCanRestart: selectedRuntime.selectedTerminalCanRestart,
-      terminalOutputLines,
+      terminalOutputLines: roomDisplay.terminalOutputLines,
       codexRunning: selectedRuntime.codexRunning,
       canReadLocalWorkspace,
       canRequestWorkspace,
-      ...terminalPanelActions
+      ...roomPanels.terminalPanelActions
     }
     },
     appSidebar: {
@@ -1882,15 +1862,15 @@ export function App() {
     authError,
     deviceFlow,
     sidebarQuery,
-    searchActive,
+    searchActive: roomDisplay.searchActive,
     workspaceError,
     newTeamName,
     newRoomName,
     newRoomProjectPath,
     selectedTeamId: selectedTeam,
-    teams: sidebarTeamRows,
-    rooms: sidebarRoomRows,
-    messageHits: sidebarMessageHitRows,
+    teams: roomDisplay.sidebarTeamRows,
+    rooms: roomDisplay.sidebarRoomRows,
+    messageHits: roomDisplay.sidebarMessageHitRows,
     historySearchBusy,
     activeSidebarPanel,
     themeMode,
