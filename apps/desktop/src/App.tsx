@@ -304,6 +304,7 @@ import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useRoomAccess } from "./hooks/useRoomAccess";
 import { useRoomBusySetters } from "./hooks/useRoomBusySetters";
+import { useRoomFileSetters } from "./hooks/useRoomFileSetters";
 import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
 import { useRoomMessageSetters } from "./hooks/useRoomMessageSetters";
 import { useRoomNotices } from "./hooks/useRoomNotices";
@@ -710,6 +711,25 @@ export function App() {
     setFileBusyByRoom,
     setTerminalBusyByRoom
   });
+  const {
+    setFileQueryForRoom,
+    setProjectFilesForRoom,
+    setSelectedFileForRoom,
+    setSelectedDiffForRoom,
+    setFilePreviewTabForRoom,
+    setFileMessageForRoom,
+    setSelectedFileMessage,
+    resetFileContextForRoom
+  } = useRoomFileSetters({
+    selectedRoomId: selectedRoom.id,
+    setFileQueriesByRoom,
+    setProjectFilesByRoom,
+    setSelectedFilesByRoom,
+    setSelectedDiffsByRoom,
+    setFilePreviewTabsByRoom,
+    setFileBusyByRoom,
+    setFileMessagesByRoom
+  });
   const roomNotices = useRoomNotices({
     roomId: selectedRoom.id,
     hostMessage,
@@ -888,37 +908,6 @@ export function App() {
     setProjectPathDraftsByRoom((current) => projectPath === currentProjectPath ? omitRecordKey(current, roomId) : { ...current, [roomId]: projectPath });
   }
 
-  function setFileQueryForRoom(roomId: string, query: string) {
-    setFileQueriesByRoom((current) => query ? { ...current, [roomId]: query } : omitRecordKey(current, roomId));
-  }
-
-  function setProjectFilesForRoom(roomId: string, files: ProjectFileEntry[]) {
-    setProjectFilesByRoom((current) => ({
-      ...current,
-      [roomId]: files
-    }));
-  }
-
-  function setSelectedFileForRoom(roomId: string, file: ProjectFileContent | null) {
-    setSelectedFilesByRoom((current) => file ? { ...current, [roomId]: file } : omitRecordKey(current, roomId));
-  }
-
-  function setSelectedDiffForRoom(roomId: string, diff: GitDiffResult | null) {
-    setSelectedDiffsByRoom((current) => diff ? { ...current, [roomId]: diff } : omitRecordKey(current, roomId));
-  }
-
-  function setFilePreviewTabForRoom(roomId: string, tab: FilePreviewTab) {
-    setFilePreviewTabsByRoom((current) => tab === "file" ? omitRecordKey(current, roomId) : { ...current, [roomId]: tab });
-  }
-
-  function setFileMessageForRoom(roomId: string, message: string | null) {
-    setFileMessagesByRoom((current) => message ? { ...current, [roomId]: message } : omitRecordKey(current, roomId));
-  }
-
-  function setSelectedFileMessage(message: string | null) {
-    setFileMessageForRoom(selectedRoom.id, message);
-  }
-
   function reportRoomFileActionInFlight(roomId: string): boolean {
     if (!isRoomFileActionInFlight(fileBusyRef.current, roomId)) return false;
     setFileMessageForRoom(roomId, roomFileActionInFlightMessage());
@@ -979,15 +968,6 @@ export function App() {
 
   function setSelectedInviteMessage(message: string | null) {
     setInviteMessageForRoom(selectedRoom.id, message);
-  }
-
-  function resetFileContextForRoom(roomId: string) {
-    setSelectedFileForRoom(roomId, null);
-    setSelectedDiffForRoom(roomId, null);
-    setFileQueryForRoom(roomId, "");
-    setProjectFilesByRoom((current) => omitRecordKey(current, roomId));
-    setFileBusyByRoom((current) => omitRecordKey(current, roomId));
-    setFileMessagesByRoom((current) => omitRecordKey(current, roomId));
   }
 
   function setSelectedGitWorkflowMessage(message: string | null) {
