@@ -87,8 +87,6 @@ import {
 import type { RelayClient } from "./lib/relayClient";
 import {
   createInvite,
-  createRoom,
-  createTeam,
   lookupInvite,
   updateRoomHost,
   updateRoomSettings
@@ -121,9 +119,7 @@ import {
   maxRoomProjectPathChars,
   normalizeCodexModel,
   normalizeProjectPath,
-  normalizeRoomName,
-  planRoomCreation,
-  planTeamCreation
+  normalizeRoomName
 } from "./lib/workspaceCreation";
 import {
   canAcceptRoomHostHandoff,
@@ -232,6 +228,7 @@ import { useBrowserActions } from "./hooks/useBrowserActions";
 import { useFileActions } from "./hooks/useFileActions";
 import { useTerminalActions } from "./hooks/useTerminalActions";
 import { useMemberActions } from "./hooks/useMemberActions";
+import { useWorkspaceCreationActions } from "./hooks/useWorkspaceCreationActions";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -1040,6 +1037,29 @@ export function App() {
     copyMarkdownWithFallback
   });
   const {
+    addTeam,
+    addRoom,
+    chooseNewRoomProjectPath
+  } = useWorkspaceCreationActions({
+    selectedTeam,
+    newTeamName,
+    newRoomName,
+    newRoomProjectPath,
+    setWorkspaceError,
+    setSelectedTeam,
+    setSelectedRoomId,
+    setNewTeamName,
+    setNewRoomName,
+    setNewRoomProjectPath,
+    setRevokedRoomIds,
+    setRevokedTeamIds,
+    setForgottenRoomIds,
+    setMessagesByRoom,
+    setInviteApprovalGateForRoom,
+    upsertTeam,
+    upsertRoom
+  });
+  const {
     openProjectFile,
     attachSelectedFileToMessage,
     removePendingAttachment,
@@ -1535,73 +1555,6 @@ export function App() {
       setDeviceIdentityMessage("Created new local device identity. Public key registration will refresh automatically.");
     } catch (error) {
       setDeviceIdentityMessage(`Device identity rotation failed: ${String(error)}`);
-    }
-  }
-
-  async function addTeam() {
-    let plan: ReturnType<typeof planTeamCreation>;
-    try {
-      plan = planTeamCreation(newTeamName);
-    } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : String(error));
-      return;
-    }
-    try {
-      const team = await createTeam(plan.name);
-      upsertTeam(team);
-      setSelectedTeam(team.id);
-      setNewTeamName("");
-      setWorkspaceError(null);
-    } catch (error) {
-      setWorkspaceError(String(error));
-    }
-  }
-
-  async function addRoom() {
-    let plan: ReturnType<typeof planRoomCreation>;
-    try {
-      plan = planRoomCreation(selectedTeam, newRoomName, newRoomProjectPath);
-    } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : String(error));
-      return;
-    }
-    try {
-      const teamDefaults = loadTeamRoomDefaults(plan.teamId);
-      const room = await createRoom(
-        plan.teamId,
-        plan.name,
-        plan.projectPath,
-        {
-          approvalPolicy: teamDefaults.approvalPolicy,
-          codexModel: teamDefaults.codexModel,
-          browserAllowedOrigins: teamDefaults.browserAllowedOrigins,
-          browserProfilePersistent: teamDefaults.browserProfilePersistent
-        }
-      );
-      upsertRoom(ensureRoomDefaults(room));
-      setRevokedRoomIds((current) => withoutSetValue(current, room.id));
-      setRevokedTeamIds((current) => withoutSetValue(current, room.teamId));
-      setForgottenRoomIds((current) => withoutSetValue(current, room.id));
-      setInviteApprovalGateForRoom(room.id, teamDefaults.inviteApprovalGate);
-      saveHistorySettings(room.id, loadTeamHistorySettings(plan.teamId));
-      setMessagesByRoom((current) => ({ ...current, [room.id]: [] }));
-      setSelectedRoomId(room.id);
-      setNewRoomName("");
-      setNewRoomProjectPath(plan.projectPath);
-      setWorkspaceError(null);
-    } catch (error) {
-      setWorkspaceError(String(error));
-    }
-  }
-
-  async function chooseNewRoomProjectPath() {
-    try {
-      const path = await chooseProjectFolder(newRoomProjectPath || defaultProjectPath);
-      if (!path) return;
-      setNewRoomProjectPath(path);
-      setWorkspaceError(null);
-    } catch (error) {
-      setWorkspaceError(String(error));
     }
   }
 
