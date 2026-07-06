@@ -77,7 +77,7 @@ export function RoomHeader({
     { id: "diff", label: "diff", icon: <GitBranch size={16} /> },
     { id: "terminal", label: "terminal", icon: <Terminal size={16} /> },
     { id: "browser", label: "browser", icon: <Globe2 size={16} /> },
-    { id: "room", label: `${onlineCount || 1}`, icon: <UsersRound size={16} /> }
+    { id: "room", label: "room", icon: <UsersRound size={16} /> }
   ];
 
   return (
