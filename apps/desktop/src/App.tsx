@@ -126,6 +126,7 @@ import { useCodexRoomState } from "./hooks/useCodexRoomState";
 import { useRoomRuntimeState } from "./hooks/useRoomRuntimeState";
 import { useAppRuntimeState } from "./hooks/useAppRuntimeState";
 import { useCodexBrowserOpenCommand } from "./hooks/useCodexBrowserOpenCommand";
+import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -431,6 +432,7 @@ export function App() {
     signOutGitHub
   } = useGitHubAuth(appConfig.relayHttpUrl);
   const { deviceId, localUser } = useLocalIdentity(currentUser);
+  const roomSettingsActor = useRoomSettingsActor(localUser);
 
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? emptyRoom;
@@ -1841,12 +1843,6 @@ export function App() {
     setSensitiveAttachmentReviewKey
   });
 
-  function roomSettingsActor() {
-    return {
-      requesterName: localUser.name,
-      requesterUserId: localUser.id
-    };
-  }
   return (
     <AppWorkspaceShell
       sidebarCollapsed={sidebarCollapsed}
