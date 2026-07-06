@@ -135,7 +135,10 @@ export function RoomSettingsDrawerPanel({
       />
 
       <section className="drawer-section relay-config-section">
-        <div className="drawer-section-title">Relay connection</div>
+        <div className="drawer-section-title">App server / relay</div>
+        <p className="drawer-help-text">
+          Local alpha builds use the dev relay at 127.0.0.1. Self-hosted builds can point this at their own relay.
+        </p>
         <label>
           <span>HTTP API URL</span>
           <input

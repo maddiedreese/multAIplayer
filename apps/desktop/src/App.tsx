@@ -5,7 +5,7 @@ import {
   ShieldAlert,
   X
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type {
   ChatPlaintextPayload,
   BrowserRequestPlaintextPayload,
@@ -642,6 +642,7 @@ export function App() {
   const [githubActionsEventsByRoom, setGitHubActionsEventsByRoom] = useState<Record<string, GitHubActionsEventPlaintextPayload[]>>({});
   const [draftsByRoom, setDraftsByRoom] = useState<Record<string, string>>({});
   const [selectedMessageIdsByRoom, setSelectedMessageIdsByRoom] = useState<Record<string, string[]>>({});
+  const [markdownSelectionMode, setMarkdownSelectionMode] = useState(false);
   const [pendingAttachmentsByRoom, setPendingAttachmentsByRoom] = useState<Record<string, ChatAttachment[]>>({});
   const [approvalVisibleByRoom, setApprovalVisibleByRoom] = useState<Record<string, boolean>>({});
   const [pendingCodexApprovalsByRoom, setPendingCodexApprovalsByRoom] = useState<Record<string, PendingCodexApproval>>({});
@@ -697,6 +698,10 @@ export function App() {
   const [keyRotationBusyByRoom, setKeyRotationBusyByRoom] = useState<Record<string, boolean>>({});
   const [inviteAdmissionsByRoom, setInviteAdmissionsByRoom] = useState<Record<string, string>>({});
   const [codexThreadIdsByRoom, setCodexThreadIdsByRoom] = useState<Record<string, string>>({});
+  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [inspectorWidth, setInspectorWidth] = useState(372);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
   const relayRef = useRef<RelayClient | null>(null);
   const seenEnvelopeIds = useRef(new Set<string>());
   const historyLoadedRoomIds = useRef(new Set<string>());
@@ -726,6 +731,10 @@ export function App() {
     localStorage.setItem("multaiplayer:theme", themeMode);
   }, [themeMode]);
 
+  useEffect(() => {
+    setMarkdownSelectionMode(false);
+  }, [selectedRoomId]);
+
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? emptyRoom;
   const inspectorTab = inspectorTabsByRoom[selectedRoom.id] ?? "files";
@@ -753,7 +762,9 @@ export function App() {
   const messages = messagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const draft = draftsByRoom[selectedRoom?.id ?? selectedRoomId] ?? "";
   const selectedMessageIds = selectedMessageIdsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
-  const selectedMessages = messages.filter((message) => selectedMessageIds.includes(message.id));
+  const selectedMessages = markdownSelectionMode
+    ? messages.filter((message) => selectedMessageIds.includes(message.id))
+    : [];
   const pendingAttachments = pendingAttachmentsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const pendingAttachmentBytes = embeddedAttachmentBytes(pendingAttachments);
   const browserRequests = browserRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
@@ -944,7 +955,7 @@ export function App() {
     role: message.role,
     body: message.body,
     time: message.time,
-    selected: selectedMessageIds.includes(message.id),
+    selected: markdownSelectionMode && selectedMessageIds.includes(message.id),
     attachments: (message.attachments ?? []).map((attachment) => ({
       id: attachment.id,
       name: attachment.name,
@@ -4392,6 +4403,51 @@ export function App() {
     }
   }
 
+  async function openInteractiveTerminal() {
+    if (!hasSelectedRoom) {
+      setSelectedTerminalError("Create or join a room before opening a terminal.");
+      return;
+    }
+    if (!isActiveHost) {
+      setSelectedTerminalError(hostGateMessage);
+      return;
+    }
+    if (!canReadLocalWorkspace) {
+      setSelectedTerminalError(localWorkspaceMessage);
+      return;
+    }
+    const room = selectedRoom;
+    const roomId = room.id;
+    const existingShell = roomTerminals.find((terminal) => terminal.name === "shell" && terminal.running);
+    if (existingShell) {
+      setSelectedTerminalIdForRoom(roomId, existingShell.id);
+      setTerminalErrorForRoom(roomId, "Opened existing interactive shell.");
+      return;
+    }
+    if (reportRoomTerminalActionInFlight(roomId)) return;
+    setTerminalBusyForRoom(roomId, true);
+    setTerminalErrorForRoom(roomId, null);
+    try {
+      const snapshot = await startTerminal(
+        roomId,
+        "shell",
+        room.projectPath,
+        "zsh -l"
+      );
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setTerminals((current) => upsertTerminal(current, snapshot));
+        setSelectedTerminalIdForRoom(roomId, snapshot.id);
+        setTerminalNameForRoom(roomId, "shell");
+        setTerminalCommandForRoom(roomId, "zsh -l");
+        setTerminalErrorForRoom(roomId, "Opened interactive shell in the room project.");
+      }
+    } catch (error) {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalErrorForRoom(roomId, String(error));
+    } finally {
+      setTerminalBusyForRoom(roomId, false);
+    }
+  }
+
   async function restartSelectedTerminal() {
     if (!hasSelectedRoom) {
       setSelectedTerminalError("Create or join a room before restarting terminals.");
@@ -4871,6 +4927,80 @@ export function App() {
         room.projectPath,
         roomRequest.url,
         `${room.name} - ${formatBrowserAccessLabel(roomRequest.url)}`,
+        room.browserProfilePersistent
+      );
+      setBrowserStatusByRoom((current) => ({
+        ...current,
+        [room.id]: {
+          profilePath: result.profilePath,
+          downloadsBlocked: result.downloadsBlocked,
+          clipboardBlocked: result.clipboardBlocked,
+          fileUploadsBlocked: result.fileUploadsBlocked
+        }
+      }));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
+        setBrowserMessageForRoom(
+          room.id,
+          result.reused
+            ? `Reused isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
+            : room.browserProfilePersistent
+              ? `Opened isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
+              : `Opened fresh isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
+        );
+      }
+    } catch (error) {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setBrowserMessageForRoom(room.id, String(error));
+    }
+  }
+
+  async function openRoomBrowserNow() {
+    if (!hasSelectedRoom) {
+      setSelectedBrowserMessage("Create or join a room before opening the room browser.");
+      return;
+    }
+    if (!isActiveHost) {
+      setSelectedBrowserMessage(hostGateMessage);
+      return;
+    }
+    if (!canHostBrowser) {
+      setSelectedBrowserMessage(browserAccessMessage);
+      return;
+    }
+    const room = selectedRoom;
+    const rawUrl = browserUrl.trim();
+    if (!rawUrl) {
+      setBrowserMessageForRoom(room.id, "Enter a URL to open in the room browser.");
+      return;
+    }
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(rawUrl);
+    } catch {
+      setBrowserMessageForRoom(room.id, "Enter a valid browser URL.");
+      return;
+    }
+    const request: BrowserAccessRequest = {
+      id: crypto.randomUUID(),
+      requester: localUser.name,
+      requesterUserId: localUser.id,
+      url: parsedUrl.toString(),
+      reason: browserReason.trim() || "Opened by the active host.",
+      requestedAt: new Date().toISOString(),
+      status: "approved"
+    };
+    appendBrowserRequest(room.id, request);
+    appendBrowserDecisionMessage(
+      room.id,
+      buildLocalRequestStatusPayload(request.id, "approved"),
+      request
+    );
+    setBrowserMessageForRoom(room.id, null);
+    try {
+      const result = await openBrowserView(
+        room.id,
+        room.projectPath,
+        request.url,
+        `${room.name} - ${formatBrowserAccessLabel(request.url)}`,
         room.browserProfilePersistent
       );
       setBrowserStatusByRoom((current) => ({
@@ -5764,8 +5894,47 @@ export function App() {
     }
   }
 
+  function beginShellResize(side: "sidebar" | "inspector", event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = side === "sidebar" ? sidebarWidth : inspectorWidth;
+
+    function onPointerMove(moveEvent: PointerEvent) {
+      if (side === "sidebar") {
+        setSidebarCollapsed(false);
+        setSidebarWidth(clamp(startWidth + moveEvent.clientX - startX, 220, 380));
+      } else {
+        setInspectorCollapsed(false);
+        setInspectorWidth(clamp(startWidth + startX - moveEvent.clientX, 320, 520));
+      }
+    }
+
+    function onPointerUp() {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    }
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp, { once: true });
+  }
+
+  function toggleMarkdownSelectionMode() {
+    setMarkdownSelectionMode((current) => {
+      if (current) clearSelectedMessages();
+      return !current;
+    });
+  }
+
+  const shellStyle = {
+    "--sidebar-width": sidebarCollapsed ? "52px" : `${sidebarWidth}px`,
+    "--rail-width": inspectorCollapsed ? "52px" : `${inspectorWidth}px`
+  } as CSSProperties;
+
   return (
-    <div className="app-shell">
+    <div
+      className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${inspectorCollapsed ? "inspector-collapsed" : ""}`}
+      style={shellStyle}
+    >
       <DesktopSidebar
         currentUser={currentUser}
         authBusy={authBusy}
@@ -5807,6 +5976,24 @@ export function App() {
         onSelectSidebarPanel={setActiveSidebarPanel}
         onToggleTheme={() => setThemeMode((current) => current === "dark" ? "light" : "dark")}
       />
+
+      <div
+        className="shell-resizer shell-resizer-left"
+        role="separator"
+        aria-label="Resize sidebar"
+        aria-orientation="vertical"
+        onPointerDown={(event) => beginShellResize("sidebar", event)}
+      >
+        <button
+          type="button"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {sidebarCollapsed ? ">" : "<"}
+        </button>
+      </div>
 
       {activeSidebarPanel && (
         <aside className="sidebar-drawer">
@@ -5933,12 +6120,14 @@ export function App() {
           browserEnabled={selectedRoom.mode.browser}
           projectLabel={selectedRoom.projectPath.split("/").slice(-1)[0]}
           selectedCount={selectedMessages.length}
+          markdownSelectionMode={markdownSelectionMode}
           activeInspectorTab={inspectorTab}
           onSetHost={setRoomHost}
           onSelectModel={setCodexModel}
           onSelectInspectorTab={(tab) => setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: tab }))}
           onCopyRoomMarkdown={copyRoomMarkdown}
           onCopySelectedMarkdown={copySelectedMessagesMarkdown}
+          onToggleMarkdownSelection={toggleMarkdownSelectionMode}
           onClearSelectedMessages={clearSelectedMessages}
         />
 
@@ -6003,6 +6192,7 @@ export function App() {
           draft={draft}
           pendingAttachments={pendingAttachmentRows}
           pendingAttachmentSummary={pendingAttachmentSummary}
+          markdownSelectionMode={markdownSelectionMode}
           onToggleMessageSelection={toggleMessageSelection}
           onCopyMessageMarkdown={(messageId) => {
             const message = messages.find((item) => item.id === messageId);
@@ -6033,6 +6223,24 @@ export function App() {
         />
       </main>
 
+      <div
+        className="shell-resizer shell-resizer-right"
+        role="separator"
+        aria-label="Resize context column"
+        aria-orientation="vertical"
+        onPointerDown={(event) => beginShellResize("inspector", event)}
+      >
+        <button
+          type="button"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => setInspectorCollapsed((collapsed) => !collapsed)}
+          aria-label={inspectorCollapsed ? "Expand context column" : "Collapse context column"}
+          title={inspectorCollapsed ? "Expand context column" : "Collapse context column"}
+        >
+          {inspectorCollapsed ? "<" : ">"}
+        </button>
+      </div>
+
       <RoomInspectorPanel
         activeTab={inspectorTab}
         browserPanel={(
@@ -6058,6 +6266,7 @@ export function App() {
             onSaveBrowserAllowedOrigins={saveBrowserAllowedOrigins}
             onBrowserUrlChange={(url) => setBrowserUrlForRoom(selectedRoom.id, url)}
             onBrowserReasonChange={(reason) => setBrowserReasonForRoom(selectedRoom.id, reason)}
+            onOpenBrowserNow={openRoomBrowserNow}
             onRequestBrowserAccess={requestBrowserAccess}
             onApproveBrowserRequest={approveBrowserRequest}
             onDenyBrowserRequest={denyBrowserRequest}
@@ -6279,6 +6488,7 @@ export function App() {
           canApproveTerminal={canReadLocalWorkspace && isActiveHost}
           onCopyMarkdown={copyTerminalMarkdown}
           onRunGitStatus={runApprovedTerminalCheck}
+          onOpenInteractiveTerminal={openInteractiveTerminal}
           onTerminalNameChange={(name) => setTerminalNameForRoom(selectedRoom.id, name)}
           onTerminalCommandChange={(command) => setTerminalCommandForRoom(selectedRoom.id, command)}
           onStartTerminal={startNamedTerminal}
@@ -6336,6 +6546,10 @@ function normalizeRoomDisplayName(name: string): string {
 
 function formatCodexModel(model: string): string {
   return codexModelOptions.find((option) => option.id === model)?.label ?? model;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 function formatTeamMeta(team: TeamRecord): string {

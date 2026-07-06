@@ -5063,3 +5063,185 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Usable tool surfaces and resizable shell controls. */
+.app-shell {
+  grid-template-columns: var(--sidebar-width) 8px minmax(520px, 1fr) 8px var(--rail-width);
+}
+
+.sidebar {
+  grid-column: 1;
+}
+
+.room {
+  grid-column: 3;
+}
+
+.inspector {
+  grid-column: 5;
+}
+
+.sidebar-drawer {
+  left: calc(var(--sidebar-width) + 8px);
+}
+
+.shell-resizer {
+  position: relative;
+  z-index: 16;
+  display: grid;
+  place-items: center;
+  min-width: 8px;
+  background: var(--border);
+  cursor: col-resize;
+  user-select: none;
+}
+
+.shell-resizer-left {
+  grid-column: 2;
+}
+
+.shell-resizer-right {
+  grid-column: 4;
+}
+
+.shell-resizer button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-strong);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.shell-resizer:hover,
+.shell-resizer:focus-within {
+  background: var(--border-strong);
+}
+
+.app-shell.sidebar-collapsed .sidebar {
+  align-items: center;
+  padding: 14px 6px;
+  overflow: hidden;
+}
+
+.app-shell.sidebar-collapsed .sidebar > :not(.brand) {
+  display: none;
+}
+
+.app-shell.sidebar-collapsed .brand {
+  justify-content: center;
+}
+
+.app-shell.sidebar-collapsed .brand > div {
+  display: none;
+}
+
+.app-shell.inspector-collapsed .inspector {
+  padding: 0;
+  overflow: hidden;
+}
+
+.app-shell.inspector-collapsed .inspector > * {
+  display: none;
+}
+
+.status-pill,
+.panel-state,
+.panel-count,
+.member-badges b,
+.member-badges button,
+.browser-policy-state span,
+.terminal-tabs span,
+.relay-dot,
+.header-copy,
+.host-controls button,
+.primary-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.member-badges b,
+.member-badges button {
+  min-height: 30px;
+  padding: 0 12px;
+}
+
+.member-badges button:has(svg) {
+  padding: 0;
+}
+
+.header-copy.active {
+  border-color: var(--border-strong);
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.message-meta {
+  align-items: center;
+}
+
+.message-select {
+  flex: 0 0 18px;
+}
+
+.drawer-help-text,
+.tool-panel-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 520;
+  line-height: 1.35;
+}
+
+.primary-tool {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.primary-tool:disabled {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
+.browser-panel .primary-wide + .ghost-wide {
+  margin-top: -2px;
+}
+
+.terminal-launcher {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.terminal-launcher .tool-panel-hint {
+  grid-column: 1 / -1;
+}
+
+.terminal-launcher button {
+  width: auto;
+  min-width: 0;
+}
+
+.terminal-panel .panel-title {
+  align-items: start;
+}
+
+.terminal-panel .panel-title-actions {
+  justify-content: flex-start;
+}

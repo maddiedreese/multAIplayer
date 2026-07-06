@@ -48,6 +48,7 @@ export function RoomChatPanel({
   draft,
   pendingAttachments,
   pendingAttachmentSummary,
+  markdownSelectionMode,
   onToggleMessageSelection,
   onCopyMessageMarkdown,
   onCopyCodexOutputMarkdown,
@@ -74,6 +75,7 @@ export function RoomChatPanel({
   draft: string;
   pendingAttachments: PendingAttachmentDisplay[];
   pendingAttachmentSummary: string;
+  markdownSelectionMode: boolean;
   onToggleMessageSelection: (messageId: string) => void;
   onCopyMessageMarkdown: (messageId: string) => void;
   onCopyCodexOutputMarkdown: (messageId: string) => void;
@@ -97,14 +99,16 @@ export function RoomChatPanel({
               <div className="avatar">{message.role === "codex" ? <Bot size={17} /> : message.author.slice(0, 1)}</div>
               <div className="bubble">
                 <div className="message-meta">
-                  <label className="message-select" title="Select message for Markdown copy">
-                    <input
-                      type="checkbox"
-                      checked={message.selected}
-                      onChange={() => onToggleMessageSelection(message.id)}
-                      aria-label={`Select message from ${message.author} at ${message.time}`}
-                    />
-                  </label>
+                  {markdownSelectionMode && (
+                    <label className="message-select" title="Select message for Markdown copy">
+                      <input
+                        type="checkbox"
+                        checked={message.selected}
+                        onChange={() => onToggleMessageSelection(message.id)}
+                        aria-label={`Select message from ${message.author} at ${message.time}`}
+                      />
+                    </label>
+                  )}
                   <strong>{message.author}</strong>
                   <span>{message.time}</span>
                   <button

@@ -46,6 +46,7 @@ export function TerminalPanel({
   canApproveTerminal,
   onCopyMarkdown,
   onRunGitStatus,
+  onOpenInteractiveTerminal,
   onTerminalNameChange,
   onTerminalCommandChange,
   onStartTerminal,
@@ -79,6 +80,7 @@ export function TerminalPanel({
   canApproveTerminal: boolean;
   onCopyMarkdown: () => void;
   onRunGitStatus: () => void;
+  onOpenInteractiveTerminal: () => void;
   onTerminalNameChange: (name: string) => void;
   onTerminalCommandChange: (command: string) => void;
   onStartTerminal: () => void;
@@ -96,6 +98,9 @@ export function TerminalPanel({
       <div className="panel-title">
         <span>Terminals</span>
         <div className="panel-title-actions">
+          <button className="primary-tool" onClick={onOpenInteractiveTerminal} disabled={!canReadLocalWorkspace || terminalBusy || !canApproveTerminal}>
+            <Terminal size={14} /> Open terminal
+          </button>
           <button className="ghost" onClick={onCopyMarkdown} disabled={!canReadLocalWorkspace}>
             <Copy size={14} /> Markdown
           </button>
@@ -106,6 +111,9 @@ export function TerminalPanel({
       </div>
 
       <div className="terminal-launcher">
+        <div className="tool-panel-hint">
+          Start a named foreground shell in this room's project folder, then type into it below.
+        </div>
         <input
           value={terminalName}
           onChange={(event) => onTerminalNameChange(event.target.value)}
