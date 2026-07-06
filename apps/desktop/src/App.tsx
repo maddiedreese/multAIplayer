@@ -298,7 +298,6 @@ import {
   formatMessageTime,
   formatSessionPersistence,
   formatTeamMemberName,
-  formatTeamMeta,
   formatTeamRole,
   formatTimestamp,
   validatePendingAttachments
@@ -312,6 +311,7 @@ import {
 } from "./lib/localPreview";
 import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessageRows } from "./lib/chatDisplayRows";
 import { buildRoomMemberRows, buildTeamMemberRows } from "./lib/rosterDisplayRows";
+import { buildSidebarMessageHitRows, buildSidebarRoomRows, buildSidebarTeamRows } from "./lib/sidebarDisplayRows";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -336,7 +336,7 @@ import { TerminalPanel, type CodexEventDisplay, type TerminalCommandRequestDispl
 import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
 import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
-import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarRoomDisplay, type SidebarTeamDisplay, type ThemeMode } from "./components/DesktopSidebar";
+import { DesktopSidebar, type ThemeMode } from "./components/DesktopSidebar";
 import { RoomChatPanel } from "./components/RoomChatPanel";
 import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
 import { LocalPreviewDialog } from "./components/LocalPreviewDialog";
@@ -1117,42 +1117,18 @@ export function App() {
   const visibleMessageHits = useMemo(() => {
     return searchActive ? findSidebarMessageHits(searchableMessagesByRoom, normalizedSidebarQuery) : [];
   }, [normalizedSidebarQuery, searchableMessagesByRoom, searchActive]);
-  const sidebarTeamRows: SidebarTeamDisplay[] = visibleTeams.map((team) => ({
-    id: team.id,
-    name: team.name,
-    meta: formatTeamMeta(team),
-    active: team.id === selectedTeam
-  }));
-  const sidebarRoomRows: SidebarRoomDisplay[] = visibleRooms.map((room) => {
-    const roomAttention = inspectorAttentionCounts({
-      approvalVisible: approvalVisibleByRoom[room.id] ?? false,
-      terminalRequests: terminalRequestsByRoom[room.id] ?? [],
-      browserRequests: browserRequestsByRoom[room.id] ?? []
-    });
-    const roomAttentionTotal = roomAttention.work + roomAttention.browser;
-    const team = teams.find((item) => item.id === room.teamId);
-
-    return {
-      id: room.id,
-      teamId: room.teamId,
-      name: room.name,
-      detail: searchActive ? team?.name ?? "Team" : room.projectPath.split("/").slice(-1)[0],
-      active: room.id === selectedRoomId,
-      attention: roomAttentionTotal,
-      unread: room.unread
-    };
+  const sidebarTeamRows = buildSidebarTeamRows(visibleTeams, selectedTeam);
+  const sidebarRoomRows = buildSidebarRoomRows({
+    rooms: visibleRooms,
+    allRooms: rooms,
+    teams,
+    searchActive,
+    selectedRoomId,
+    approvalVisibleByRoom,
+    terminalRequestsByRoom,
+    browserRequestsByRoom
   });
-  const sidebarMessageHitRows: SidebarMessageHitDisplay[] = visibleMessageHits.map((hit) => {
-    const room = rooms.find((item) => item.id === hit.roomId);
-
-    return {
-      key: `${hit.roomId}-${hit.message.id}`,
-      roomId: hit.roomId,
-      teamId: room?.teamId,
-      author: hit.message.author,
-      preview: `${room?.name ?? "Room"} · ${hit.message.body}`
-    };
-  });
+  const sidebarMessageHitRows = buildSidebarMessageHitRows(visibleMessageHits, rooms);
 
   useEffect(() => {
     roomsRef.current = rooms;
