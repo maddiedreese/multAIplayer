@@ -104,14 +104,7 @@ export function App() {
     setSidebarQuery,
     messagesByRoom,
     setMessagesByRoom,
-    appConfig,
-    relayHttpDraft,
-    relayWsDraft,
-    appConfigMessage,
-    setRelayHttpDraft,
-    setRelayWsDraft,
-    saveRelayConfiguration,
-    resetRelayConfiguration,
+    appConfigState,
     chatMessagesByRoom,
     setChatMessagesByRoom,
     draftsByRoom,
@@ -275,12 +268,7 @@ export function App() {
     setKeyRotationBusyByRoom,
     inviteAdmissionsByRoom,
     setInviteAdmissionsByRoom,
-    sidebarCollapsed,
-    inspectorCollapsed,
-    shellStyle,
-    beginShellResize,
-    toggleSidebarCollapsed,
-    toggleInspectorCollapsed
+    shellLayout
   } = useAppStateSlices({
     workspace: {
       initialTeams: seededTeams,
@@ -307,7 +295,7 @@ export function App() {
     terminalBusyByRoom,
     browserRequestsByRoom
   });
-  const githubAuth = useGitHubAuth(appConfig.relayHttpUrl);
+  const githubAuth = useGitHubAuth(appConfigState.appConfig.relayHttpUrl);
   const localIdentity = useLocalIdentity(githubAuth.currentUser);
   const roomSettingsActor = useRoomSettingsActor(localIdentity.localUser);
 
@@ -823,7 +811,7 @@ export function App() {
     },
     teamMembers: {
       selectedTeam,
-      relayHttpUrl: appConfig.relayHttpUrl,
+      relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
       setTeamMembersByTeam,
       setTeamMembersMessageByTeam
     }
@@ -831,7 +819,7 @@ export function App() {
   const workspaceFlow = useWorkspaceFlowContext({
     bootstrap: {
       workspace: {
-        relayHttpUrl: appConfig.relayHttpUrl,
+        relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
         setTeams,
         setRooms,
         setSelectedTeam,
@@ -843,7 +831,7 @@ export function App() {
         setRooms
       },
       deviceIdentity: {
-        relayHttpUrl: appConfig.relayHttpUrl,
+        relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
         deviceId: localIdentity.deviceId,
         userId: localIdentity.localUser.id,
         displayName: localIdentity.localUser.name,
@@ -1095,7 +1083,7 @@ export function App() {
     },
     relayRoomSync: {
       subscription: {
-        relayWsUrl: appConfig.relayWsUrl,
+        relayWsUrl: appConfigState.appConfig.relayWsUrl,
         deviceId: localIdentity.deviceId,
         localUser: localIdentity.localUser,
         devicePublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
@@ -1537,13 +1525,13 @@ export function App() {
   });
   const appView = useAppViewProps({
     shell: {
-      sidebarCollapsed,
-      inspectorCollapsed,
-      shellStyle,
-      onBeginSidebarResize: (event) => beginShellResize("sidebar", event),
-      onBeginInspectorResize: (event) => beginShellResize("inspector", event),
-      onToggleSidebarCollapsed: toggleSidebarCollapsed,
-      onToggleInspectorCollapsed: toggleInspectorCollapsed
+      sidebarCollapsed: shellLayout.sidebarCollapsed,
+      inspectorCollapsed: shellLayout.inspectorCollapsed,
+      shellStyle: shellLayout.shellStyle,
+      onBeginSidebarResize: (event) => shellLayout.beginShellResize("sidebar", event),
+      onBeginInspectorResize: (event) => shellLayout.beginShellResize("inspector", event),
+      onToggleSidebarCollapsed: shellLayout.toggleSidebarCollapsed,
+      onToggleInspectorCollapsed: shellLayout.toggleInspectorCollapsed
     },
     roomMainColumn: {
     teamRecords: teams,
@@ -1809,8 +1797,8 @@ export function App() {
     deviceIdentity,
     deviceIdentityMessage,
     relayStatus,
-    relayWsUrl: appConfig.relayWsUrl,
-    relayHttpUrl: appConfig.relayHttpUrl,
+    relayWsUrl: appConfigState.appConfig.relayWsUrl,
+    relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
     codexProbe,
     projectPath: selectedRoom.projectPath,
     selectedCodexModel,
@@ -1820,8 +1808,8 @@ export function App() {
     isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
     settingsBusy: selectedRuntime.settingsBusy,
     isActiveHost: roomInteraction.isActiveHost,
-    relayHttpDraft,
-    relayWsDraft,
+    relayHttpDraft: appConfigState.relayHttpDraft,
+    relayWsDraft: appConfigState.relayWsDraft,
     selectedRoomMode: selectedRoom.mode,
     roomSettingsGateMessage: roomInteraction.roomSettingsGateMessage,
     historySettings,
@@ -1830,7 +1818,7 @@ export function App() {
     teamDefaultCodexModel,
     teamDefaultBrowserProfilePersistent,
     teamDefaultInviteApprovalGate,
-    appConfigMessage,
+    appConfigMessage: appConfigState.appConfigMessage,
     roomSettingsMessage: settingsMessage,
     historyMessage: visibleHistoryMessage,
     onSignIn: githubAuth.beginGitHubSignIn,
@@ -1848,10 +1836,10 @@ export function App() {
     onToggleTheme: theme.toggleThemeMode,
     onRotateDeviceIdentity: roomRuntime.rotateDeviceIdentity,
     onChooseProject: roomRuntime.chooseProjectPath,
-    onRelayHttpDraftChange: setRelayHttpDraft,
-    onRelayWsDraftChange: setRelayWsDraft,
-    onResetRelay: resetRelayConfiguration,
-    onSaveRelay: saveRelayConfiguration,
+    onRelayHttpDraftChange: appConfigState.setRelayHttpDraft,
+    onRelayWsDraftChange: appConfigState.setRelayWsDraft,
+    onResetRelay: appConfigState.resetRelayConfiguration,
+    onSaveRelay: appConfigState.saveRelayConfiguration,
     onToggleRoomMode: roomRuntime.toggleRoomMode,
     onHistorySettingsChange: workspaceFlow.updateLocalHistorySettings,
     onClearRoomHistory: workspaceFlow.clearRoomHistory,
