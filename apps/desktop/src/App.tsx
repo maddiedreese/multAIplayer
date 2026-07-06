@@ -1,6 +1,3 @@
-import {
-  X
-} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type {
   ChatPlaintextPayload,
@@ -334,6 +331,7 @@ import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
 import { InlineSecretWarning } from "./components/common";
+import { ShellResizer, SidebarDrawer } from "./components/AppShellLayout";
 import { RoomHeader } from "./components/RoomHeader";
 import { ModelPanel } from "./components/ModelPanel";
 import { RoomModePanel } from "./components/RoomModePanel";
@@ -6118,36 +6116,21 @@ export function App() {
         onToggleTheme={() => setThemeMode((current) => current === "dark" ? "light" : "dark")}
       />
 
-      <div
-        className="shell-resizer shell-resizer-left"
-        role="separator"
-        aria-label="Resize sidebar"
-        aria-orientation="vertical"
-        onPointerDown={(event) => beginShellResize("sidebar", event)}
-      >
-        <button
-          type="button"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
-          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {sidebarCollapsed ? ">" : "<"}
-        </button>
-      </div>
+      <ShellResizer
+        side="left"
+        collapsed={sidebarCollapsed}
+        expandLabel="Expand sidebar"
+        collapseLabel="Collapse sidebar"
+        onBeginResize={(event) => beginShellResize("sidebar", event)}
+        onToggleCollapsed={() => setSidebarCollapsed((collapsed) => !collapsed)}
+      />
 
       {activeSidebarPanel && (
-        <aside className="sidebar-drawer">
-          <div className="drawer-header">
-            <div>
-              <span>{activeSidebarPanel === "profile" ? "Account" : "Room settings"}</span>
-              <strong>{activeSidebarPanel === "profile" ? localUser.name : selectedRoom.name}</strong>
-            </div>
-            <button onClick={() => setActiveSidebarPanel(null)} aria-label="Close panel">
-              <X size={16} />
-            </button>
-          </div>
-
+        <SidebarDrawer
+          label={activeSidebarPanel === "profile" ? "Account" : "Room settings"}
+          title={activeSidebarPanel === "profile" ? localUser.name : selectedRoom.name}
+          onClose={() => setActiveSidebarPanel(null)}
+        >
           {activeSidebarPanel === "profile" ? (
             <ProfileDrawerPanel
               currentUser={currentUser}
@@ -6236,7 +6219,7 @@ export function App() {
               onApplyTeamDefaultsToRoom={applyTeamDefaultsToRoom}
             />
           )}
-        </aside>
+        </SidebarDrawer>
       )}
 
       <main className="room">
@@ -6353,23 +6336,14 @@ export function App() {
         />
       </main>
 
-      <div
-        className="shell-resizer shell-resizer-right"
-        role="separator"
-        aria-label="Resize context column"
-        aria-orientation="vertical"
-        onPointerDown={(event) => beginShellResize("inspector", event)}
-      >
-        <button
-          type="button"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={() => setInspectorCollapsed((collapsed) => !collapsed)}
-          aria-label={inspectorCollapsed ? "Expand context column" : "Collapse context column"}
-          title={inspectorCollapsed ? "Expand context column" : "Collapse context column"}
-        >
-          {inspectorCollapsed ? "<" : ">"}
-        </button>
-      </div>
+      <ShellResizer
+        side="right"
+        collapsed={inspectorCollapsed}
+        expandLabel="Expand context column"
+        collapseLabel="Collapse context column"
+        onBeginResize={(event) => beginShellResize("inspector", event)}
+        onToggleCollapsed={() => setInspectorCollapsed((collapsed) => !collapsed)}
+      />
 
       <RoomInspectorPanel
         activeTab={inspectorTab}
