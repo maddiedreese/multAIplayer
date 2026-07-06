@@ -5,6 +5,7 @@ use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::{BufRead, BufReader, Read, Write};
+use std::net::{TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc;
@@ -27,8 +28,12 @@ const MAX_GIT_BRANCH_CHARS: usize = 200;
 const MAX_COMMIT_MESSAGE_CHARS: usize = 500;
 const MAX_PROJECT_PATH_CHARS: usize = 2_048;
 const MAX_ROOM_ID_CHARS: usize = 160;
+const MAX_PREVIEW_ID_CHARS: usize = 160;
+const MAX_PREVIEW_URL_CHARS: usize = 2_048;
 const MIN_CODEX_TIMEOUT_SECONDS: u64 = 10;
 const MAX_CODEX_TIMEOUT_SECONDS: u64 = 900;
+const LOCAL_PREVIEW_PORTS: [u16; 9] = [3000, 3001, 5173, 5174, 8000, 8080, 4200, 5000, 8888];
+const TRYCLOUDFLARE_MARKER: &str = ".trycloudflare.com";
 const ROOM_BROWSER_GUARD_SCRIPT: &str = r#"
 (() => {
   const blocked = () => Promise.reject(new DOMException("multAIplayer blocks room browser clipboard access by default.", "NotAllowedError"));
@@ -74,6 +79,24 @@ const ROOM_BROWSER_GUARD_SCRIPT: &str = r#"
 #[derive(Default)]
 struct TerminalState {
     sessions: Mutex<HashMap<String, TerminalSession>>,
+}
+
+#[derive(Default)]
+struct LocalPreviewState {
+    tunnels: Mutex<HashMap<String, LocalPreviewTunnel>>,
+}
+
+struct LocalPreviewTunnel {
+    id: String,
+    local_url: String,
+    public_url: String,
+    child: Child,
+}
+
+impl Drop for LocalPreviewTunnel {
+    fn drop(&mut self) {
+        terminate_child(&mut self.child);
+    }
 }
 
 struct TerminalSession {
@@ -212,6 +235,57 @@ struct CommandResult {
     status: Option<i32>,
     stdout: String,
     stderr: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalPreviewDetectedServer {
+    url: String,
+    host: String,
+    port: u16,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CloudflaredProbe {
+    available: bool,
+    version: Option<String>,
+    error: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalPreviewStartRequest {
+    id: String,
+    local_url: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalPreviewStartResult {
+    id: String,
+    local_url: String,
+    public_url: String,
+    startup_log: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalPreviewStopResult {
+    id: String,
+    local_url: String,
+    public_url: String,
+    stopped: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalPreviewStatusResult {
+    id: String,
+    local_url: String,
+    public_url: String,
+    running: bool,
+    exit_status: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -645,6 +719,207 @@ fn run_shell_command(request: ShellCommandRequest) -> Result<CommandResult, Stri
         status: output.status.code(),
         stdout: bound_command_output(&output.stdout),
         stderr: bound_command_output(&output.stderr),
+    })
+}
+
+#[tauri::command]
+fn detect_local_preview_servers() -> Result<Vec<LocalPreviewDetectedServer>, String> {
+    let mut servers = Vec::new();
+    for port in LOCAL_PREVIEW_PORTS {
+        for host in ["localhost", "127.0.0.1"] {
+            if local_port_reachable(host, port, Duration::from_millis(180)) {
+                servers.push(LocalPreviewDetectedServer {
+                    url: format!("http://{host}:{port}/"),
+                    host: host.to_string(),
+                    port,
+                });
+            }
+        }
+    }
+    Ok(servers)
+}
+
+#[tauri::command]
+fn probe_cloudflared() -> CloudflaredProbe {
+    match Command::new("cloudflared").arg("--version").output() {
+        Ok(output) if output.status.success() => {
+            let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            CloudflaredProbe {
+                available: true,
+                version: Some(version),
+                error: None,
+            }
+        }
+        Ok(output) => CloudflaredProbe {
+            available: false,
+            version: None,
+            error: Some(trim_command_output(&String::from_utf8_lossy(
+                &output.stderr,
+            ))),
+        },
+        Err(error) => CloudflaredProbe {
+            available: false,
+            version: None,
+            error: Some(format!(
+                "cloudflared is not installed or is not on PATH: {error}"
+            )),
+        },
+    }
+}
+
+#[tauri::command]
+fn local_preview_start(
+    state: State<'_, LocalPreviewState>,
+    request: LocalPreviewStartRequest,
+) -> Result<LocalPreviewStartResult, String> {
+    ensure_preview_id(&request.id)?;
+    let local_url = validate_local_preview_url(&request.local_url)?;
+    ensure_local_preview_reachable(&local_url)?;
+
+    {
+        let mut tunnels = state
+            .tunnels
+            .lock()
+            .map_err(|_| "Local preview state lock is poisoned".to_string())?;
+        if let Some(mut existing) = tunnels.remove(&request.id) {
+            terminate_child(&mut existing.child);
+        }
+    }
+
+    let mut child = Command::new("cloudflared")
+        .arg("tunnel")
+        .arg("--url")
+        .arg(&local_url)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("Failed to start Cloudflare Quick Tunnel: {error}"))?;
+
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "Failed to capture cloudflared stdout".to_string());
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "Failed to capture cloudflared stderr".to_string());
+    let (stdout, stderr) = match (stdout, stderr) {
+        (Ok(stdout), Ok(stderr)) => (stdout, stderr),
+        (Err(error), _) | (_, Err(error)) => {
+            terminate_child(&mut child);
+            return Err(error);
+        }
+    };
+
+    let (sender, receiver) = mpsc::channel::<String>();
+    capture_preview_stream(stdout, sender.clone());
+    capture_preview_stream(stderr, sender);
+
+    let start = Instant::now();
+    let mut startup_log = String::new();
+    let mut public_url: Option<String> = None;
+    while start.elapsed() < Duration::from_secs(20) {
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|error| format!("Failed to read cloudflared status: {error}"))?
+        {
+            terminate_child(&mut child);
+            return Err(format!(
+                "cloudflared exited before the tunnel was ready with status {status}. {}",
+                trim_command_output(&startup_log)
+            ));
+        }
+
+        match receiver.recv_timeout(Duration::from_millis(250)) {
+            Ok(line) => {
+                append_bounded(&mut startup_log, &line, MAX_COMMAND_OUTPUT_CHARS);
+                if let Some(url) = extract_trycloudflare_url(&line) {
+                    public_url = Some(url);
+                    break;
+                }
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+    }
+
+    let Some(public_url) = public_url else {
+        terminate_child(&mut child);
+        return Err(format!(
+            "cloudflared started but did not produce a trycloudflare.com URL. {}",
+            trim_command_output(&startup_log)
+        ));
+    };
+
+    {
+        let mut tunnels = state
+            .tunnels
+            .lock()
+            .map_err(|_| "Local preview state lock is poisoned".to_string())?;
+        tunnels.insert(
+            request.id.clone(),
+            LocalPreviewTunnel {
+                id: request.id.clone(),
+                local_url: local_url.clone(),
+                public_url: public_url.clone(),
+                child,
+            },
+        );
+    }
+
+    Ok(LocalPreviewStartResult {
+        id: request.id,
+        local_url,
+        public_url,
+        startup_log: trim_command_output(&startup_log),
+    })
+}
+
+#[tauri::command]
+fn local_preview_stop(
+    state: State<'_, LocalPreviewState>,
+    id: String,
+) -> Result<LocalPreviewStopResult, String> {
+    ensure_preview_id(&id)?;
+    let mut tunnels = state
+        .tunnels
+        .lock()
+        .map_err(|_| "Local preview state lock is poisoned".to_string())?;
+    let Some(mut tunnel) = tunnels.remove(&id) else {
+        return Err("Local preview tunnel is not running on this device.".to_string());
+    };
+    terminate_child(&mut tunnel.child);
+    Ok(LocalPreviewStopResult {
+        id: tunnel.id.clone(),
+        local_url: tunnel.local_url.clone(),
+        public_url: tunnel.public_url.clone(),
+        stopped: true,
+    })
+}
+
+#[tauri::command]
+fn local_preview_status(
+    state: State<'_, LocalPreviewState>,
+    id: String,
+) -> Result<LocalPreviewStatusResult, String> {
+    ensure_preview_id(&id)?;
+    let mut tunnels = state
+        .tunnels
+        .lock()
+        .map_err(|_| "Local preview state lock is poisoned".to_string())?;
+    let Some(tunnel) = tunnels.get_mut(&id) else {
+        return Err("Local preview tunnel is not running on this device.".to_string());
+    };
+    let status = tunnel
+        .child
+        .try_wait()
+        .map_err(|error| format!("Failed to read cloudflared status: {error}"))?;
+    Ok(LocalPreviewStatusResult {
+        id: tunnel.id.clone(),
+        local_url: tunnel.local_url.clone(),
+        public_url: tunnel.public_url.clone(),
+        running: status.is_none(),
+        exit_status: status.and_then(|status| status.code()),
     })
 }
 
@@ -1946,6 +2221,116 @@ fn validate_browser_url(value: &str) -> Result<tauri::Url, String> {
     Ok(url)
 }
 
+fn validate_local_preview_url(value: &str) -> Result<String, String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.len() > MAX_PREVIEW_URL_CHARS {
+        return Err("Local preview URL is invalid".to_string());
+    }
+    let url: tauri::Url = trimmed
+        .parse()
+        .map_err(|error| format!("Invalid local preview URL: {error}"))?;
+    match url.scheme() {
+        "http" | "https" => {}
+        scheme => return Err(format!("Local preview URL scheme is not allowed: {scheme}")),
+    }
+    match url.host_str() {
+        Some("localhost") | Some("127.0.0.1") => {}
+        _ => return Err("Local previews can only share localhost or 127.0.0.1 URLs.".to_string()),
+    }
+    if url.port().is_none() {
+        return Err("Local preview URL must include a port.".to_string());
+    }
+    Ok(url.to_string())
+}
+
+fn ensure_local_preview_reachable(value: &str) -> Result<(), String> {
+    let url: tauri::Url = value
+        .parse()
+        .map_err(|error| format!("Invalid local preview URL: {error}"))?;
+    let host = url
+        .host_str()
+        .ok_or_else(|| "Local preview URL must include a host.".to_string())?;
+    let port = url
+        .port()
+        .ok_or_else(|| "Local preview URL must include a port.".to_string())?;
+    if local_port_reachable(host, port, Duration::from_millis(450)) {
+        Ok(())
+    } else {
+        Err(format!("No local web server responded at {host}:{port}."))
+    }
+}
+
+fn local_port_reachable(host: &str, port: u16, timeout: Duration) -> bool {
+    match (host, port).to_socket_addrs() {
+        Ok(mut addresses) => {
+            addresses.any(|address| TcpStream::connect_timeout(&address, timeout).is_ok())
+        }
+        Err(_) => false,
+    }
+}
+
+fn ensure_preview_id(id: &str) -> Result<(), String> {
+    if id.is_empty() || id.len() > MAX_PREVIEW_ID_CHARS {
+        return Err("Local preview id is invalid".to_string());
+    }
+    if !id.chars().all(|character| {
+        character.is_ascii_alphanumeric()
+            || character == '-'
+            || character == '_'
+            || character == ':'
+    }) {
+        return Err("Local preview id contains unsupported characters".to_string());
+    }
+    Ok(())
+}
+
+fn capture_preview_stream<T>(stream: T, sender: mpsc::Sender<String>)
+where
+    T: Read + Send + 'static,
+{
+    thread::spawn(move || {
+        let reader = BufReader::new(stream);
+        for line in reader.lines().flatten() {
+            if sender.send(line).is_err() {
+                break;
+            }
+        }
+    });
+}
+
+fn extract_trycloudflare_url(line: &str) -> Option<String> {
+    line.split_whitespace()
+        .map(|part| {
+            part.trim_matches(|character: char| {
+                matches!(
+                    character,
+                    '"' | '\'' | '`' | '<' | '>' | '(' | ')' | '[' | ']' | ',' | '.'
+                )
+            })
+        })
+        .find(|part| part.starts_with("https://") && part.contains(TRYCLOUDFLARE_MARKER))
+        .map(|part| part.to_string())
+}
+
+fn append_bounded(output: &mut String, line: &str, max_chars: usize) {
+    if !output.is_empty() {
+        output.push('\n');
+    }
+    output.push_str(line);
+    if output.len() > max_chars {
+        let excess = output.len() - max_chars;
+        output.drain(..excess);
+    }
+}
+
+fn trim_command_output(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.len() <= 4_000 {
+        return trimmed.to_string();
+    }
+    format!("...{}", &trimmed[trimmed.len().saturating_sub(4_000)..])
+}
+
 fn keychain_account(room_id: &str) -> Result<String, String> {
     ensure_room_id(room_id)?;
     Ok(format!("room:{room_id}"))
@@ -1990,6 +2375,7 @@ fn ensure_device_identity_payload(identity: &str) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(TerminalState::default())
+        .manage(LocalPreviewState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
@@ -2008,6 +2394,11 @@ pub fn run() {
             terminal_read,
             terminal_write,
             terminal_stop,
+            detect_local_preview_servers,
+            probe_cloudflared,
+            local_preview_start,
+            local_preview_status,
+            local_preview_stop,
             open_browser_view,
             reset_browser_profile,
             room_secret_get,

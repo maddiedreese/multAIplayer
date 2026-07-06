@@ -17,6 +17,7 @@ import type {
   HostHandoffPlaintextPayload,
   InviteJoinRequestPlaintextPayload,
   InviteJoinStatusPlaintextPayload,
+  LocalPreviewPlaintextPayload,
   RelayEnvelope,
   RequestStatusPlaintextPayload,
   RoomSettingsPlaintextPayload,
@@ -40,6 +41,7 @@ import {
   maxEmbeddedAttachmentBytes,
   maxEmbeddedAttachmentBytesPerMessage,
   maxMessageAttachments,
+  LocalPreviewPlaintextPayload as LocalPreviewPlaintextPayloadSchema,
   RoomKeyRotationPlaintextPayload as RoomKeyRotationPlaintextPayloadSchema
 } from "@multaiplayer/protocol";
 import {
@@ -97,6 +99,8 @@ import {
   getGitStatus,
   listTerminals,
   probeCodex,
+  probeCloudflared,
+  readLocalPreviewTunnelStatus,
   readProjectFile,
   readTerminal,
   runCodexTurn,
@@ -104,6 +108,9 @@ import {
   runShellCommand,
   searchProjectFiles,
   startTerminal,
+  detectLocalPreviewServers,
+  startLocalPreviewTunnel,
+  stopLocalPreviewTunnel,
   stopTerminal,
   resetBrowserProfile,
   writeTerminal,
@@ -255,6 +262,14 @@ import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "
 import { replaceRoomTerminalSnapshots } from "./lib/terminalState";
 import { nextShellTerminalName, terminalInputForShellSubmit } from "./lib/terminalUi";
 import {
+  localPreviewLabel,
+  localPreviewStatusLabel,
+  normalizeLocalPreviewUrl,
+  quickTunnelDisclaimer,
+  quickTunnelSafetyText,
+  type LocalPreviewCandidate
+} from "./lib/localPreview";
+import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
   hasAcknowledgedRoomVisibilityWarning
@@ -278,7 +293,7 @@ import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
 import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
 import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarPanelName, type SidebarRoomDisplay, type SidebarTeamDisplay, type ThemeMode } from "./components/DesktopSidebar";
-import { RoomChatPanel, type PendingAttachmentDisplay, type RoomChatMessageDisplay } from "./components/RoomChatPanel";
+import { RoomChatPanel, type LocalPreviewCardDisplay, type PendingAttachmentDisplay, type RoomChatMessageDisplay } from "./components/RoomChatPanel";
 import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 
@@ -349,6 +364,19 @@ interface HostHandoffRecord extends HostHandoffPlaintextPayload {
   status: "available" | "accepted";
 }
 
+interface LocalPreviewRecord extends LocalPreviewPlaintextPayload {}
+
+interface LocalPreviewDialogState {
+  open: boolean;
+  phase: "select" | "confirm" | "install" | "starting";
+  roomId: string;
+  candidates: LocalPreviewCandidate[];
+  selectedUrl: string;
+  manualUrl: string;
+  error: string | null;
+  cloudflaredVersion: string | null;
+}
+
 interface MarkdownCopyFallback {
   title: string;
   markdown: string;
@@ -373,6 +401,7 @@ interface LocalRoomHistoryPayload {
   codexEvents: CodexRoomEvent[];
   gitWorkflowEvents: GitWorkflowEventPlaintextPayload[];
   githubActionsEvents: GitHubActionsEventPlaintextPayload[];
+  localPreviews: LocalPreviewRecord[];
   terminalSnapshots: TerminalSnapshot[];
   hostHandoffs: HostHandoffRecord[];
   codexThreadId?: string;
@@ -645,6 +674,18 @@ export function App() {
   const [codexEventsByRoom, setCodexEventsByRoom] = useState<Record<string, CodexRoomEvent[]>>({});
   const [gitWorkflowEventsByRoom, setGitWorkflowEventsByRoom] = useState<Record<string, GitWorkflowEventPlaintextPayload[]>>({});
   const [githubActionsEventsByRoom, setGitHubActionsEventsByRoom] = useState<Record<string, GitHubActionsEventPlaintextPayload[]>>({});
+  const [localPreviewsByRoom, setLocalPreviewsByRoom] = useState<Record<string, LocalPreviewRecord[]>>({});
+  const [localPreviewDialog, setLocalPreviewDialog] = useState<LocalPreviewDialogState>({
+    open: false,
+    phase: "select",
+    roomId: "",
+    candidates: [],
+    selectedUrl: "",
+    manualUrl: "",
+    error: null,
+    cloudflaredVersion: null
+  });
+  const [localPreviewBusyByRoom, setLocalPreviewBusyByRoom] = useState<Record<string, boolean>>({});
   const [draftsByRoom, setDraftsByRoom] = useState<Record<string, string>>({});
   const [selectedMessageIdsByRoom, setSelectedMessageIdsByRoom] = useState<Record<string, string[]>>({});
   const [markdownSelectionMode, setMarkdownSelectionMode] = useState(false);
@@ -721,6 +762,7 @@ export function App() {
   const gitWorkflowBusyRef = useRef(gitWorkflowBusyByRoom);
   const actionsBusyRef = useRef(actionsBusyByRoom);
   const terminalBusyRef = useRef(terminalBusyByRoom);
+  const localPreviewBusyRef = useRef(localPreviewBusyByRoom);
   const fileBusyRef = useRef(fileBusyByRoom);
   const browserRequestsRef = useRef(browserRequestsByRoom);
   const deviceId = useMemo(() => loadOrCreateDeviceId(), []);
@@ -929,6 +971,8 @@ export function App() {
   const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
   const hostHandoffs = hostHandoffsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const terminalRequests = terminalRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
+  const localPreviews = localPreviewsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
+  const localPreviewBusy = localPreviewBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const inspectorAttention = inspectorAttentionCounts({ approvalVisible, terminalRequests, browserRequests });
   const inviteRequests = inviteRequestsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const codexEvents = codexEventsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
@@ -971,6 +1015,16 @@ export function App() {
     name: attachment.name,
     encryptedBlob: Boolean(attachment.blobId)
   }));
+  const localPreviewCards: LocalPreviewCardDisplay[] = localPreviews.slice(-6).map((preview) => ({
+    id: preview.id,
+    sharedBy: preview.sharedBy,
+    sourceUrl: preview.sourceUrl,
+    publicUrl: preview.publicUrl,
+    status: preview.status,
+    statusLabel: localPreviewStatusLabel(preview.status),
+    message: preview.message,
+    canStop: preview.sharedByUserId === localUser.id && (preview.status === "live" || preview.status === "starting")
+  }));
   const pendingAttachmentSummary = `${pendingAttachments.length}/${maxMessageAttachments} files · ${formatBytes(pendingAttachmentBytes)}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`;
   const hostBusy = hostBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
   const settingsBusy = settingsBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
@@ -996,6 +1050,13 @@ export function App() {
       ? { ...actionsBusyRef.current, [roomId]: true }
       : omitRecordKey(actionsBusyRef.current, roomId);
     setActionsBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
+  }
+
+  function setLocalPreviewBusyForRoom(roomId: string, busy: boolean) {
+    localPreviewBusyRef.current = busy
+      ? { ...localPreviewBusyRef.current, [roomId]: true }
+      : omitRecordKey(localPreviewBusyRef.current, roomId);
+    setLocalPreviewBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
   function setHostBusyForRoom(roomId: string, busy: boolean) {
@@ -1255,6 +1316,19 @@ export function App() {
       return {
         ...current,
         [roomId]: [...roomEvents, event].slice(-50)
+      };
+    });
+  }
+
+  function appendLocalPreviewEvent(roomId: string, event: LocalPreviewRecord) {
+    setLocalPreviewsByRoom((current) => {
+      const roomEvents = current[roomId] ?? [];
+      const nextEvents = roomEvents.some((existing) => existing.id === event.id)
+        ? roomEvents.map((existing) => existing.id === event.id ? event : existing)
+        : [...roomEvents, event];
+      return {
+        ...current,
+        [roomId]: nextEvents.slice(-50)
       };
     });
   }
@@ -1598,6 +1672,11 @@ export function App() {
           ? { ...current, [selectedRoomId]: payload.githubActionsEvents }
           : current
       );
+      setLocalPreviewsByRoom((current) =>
+        payload.localPreviews.length
+          ? { ...current, [selectedRoomId]: payload.localPreviews }
+          : current
+      );
       const latestGitWorkflowEvent = payload.gitWorkflowEvents.at(-1);
       if (latestGitWorkflowEvent) {
         setGitWorkflowMessageForRoom(selectedRoomId, latestGitWorkflowEvent.message);
@@ -1864,6 +1943,20 @@ export function App() {
             const plaintext = await decryptJson<RequestStatusPlaintextPayload>(roomPayload, secret);
             updateBrowserRequestStatus(message.envelope.roomId, plaintext.requestId, plaintext.status);
           }
+          if (message.envelope.kind === "preview.event") {
+            const plaintext = await decryptJson<unknown>(roomPayload, secret);
+            if (isLocalPreviewPlaintextPayload(plaintext)) {
+              appendLocalPreviewEvent(message.envelope.roomId, plaintext);
+              setChatMessageForRoom(
+                message.envelope.roomId,
+                plaintext.status === "live"
+                  ? `${plaintext.sharedBy} shared a local preview.`
+                  : plaintext.status === "stopped"
+                    ? `${plaintext.sharedBy} stopped sharing a local preview.`
+                    : plaintext.message ?? "Local preview status changed."
+              );
+            }
+          }
           if (message.envelope.kind === "room.host") {
             const plaintext = await decryptJson<HostHandoffPlaintextPayload>(roomPayload, secret);
             if (plaintext.status === "accepted") {
@@ -1981,6 +2074,7 @@ export function App() {
       codexEvents,
       gitWorkflowEvents,
       githubActionsEvents,
+      localPreviews,
       terminalSnapshots: terminalsForLocalHistory(terminals.filter((terminal) => terminal.roomId === selectedRoomId)),
       hostHandoffs,
       ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
@@ -1997,6 +2091,7 @@ export function App() {
     codexEvents,
     gitWorkflowEvents,
     githubActionsEvents,
+    localPreviews,
     forgottenRoomIds,
     revokedRoomIds,
     revokedTeamIds,
@@ -2007,6 +2102,37 @@ export function App() {
     selectedRoomId,
     terminalRequests
   ]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      for (const [roomId, previews] of Object.entries(localPreviewsByRoom)) {
+        const room = roomsRef.current.find((item) => item.id === roomId);
+        if (!room) continue;
+        for (const preview of previews) {
+          if (preview.sharedByUserId !== localUser.id || preview.status !== "live") continue;
+          readLocalPreviewTunnelStatus(preview.id)
+            .then((status) => {
+              if (status.running) return;
+              void publishLocalPreviewEvent({
+                ...preview,
+                status: "error",
+                message: `Cloudflare Quick Tunnel exited${status.exitStatus === null ? "" : ` with status ${status.exitStatus}`}.`,
+                updatedAt: new Date().toISOString()
+              }, room);
+            })
+            .catch((error) => {
+              void publishLocalPreviewEvent({
+                ...preview,
+                status: "error",
+                message: `Cloudflare Quick Tunnel is no longer running on this device: ${String(error)}`,
+                updatedAt: new Date().toISOString()
+              }, room);
+            });
+        }
+      }
+    }, 5_000);
+    return () => window.clearInterval(interval);
+  }, [localPreviewsByRoom, localUser.id]);
 
   useEffect(() => {
     if (!hasSelectedRoom) {
@@ -2379,6 +2505,7 @@ export function App() {
   }
 
   async function signOut() {
+    await stopOwnedLocalPreviews("Stopped because the sharing user signed out.");
     await logout();
     setCurrentUser(null);
     setDeviceFlow(null);
@@ -3472,6 +3599,7 @@ export function App() {
         codexEvents,
         gitWorkflowEvents,
         githubActionsEvents,
+        localPreviews,
         terminalSnapshots: terminalsForLocalHistory(terminals.filter((terminal) => terminal.roomId === roomId)),
         hostHandoffs,
         ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
@@ -3483,6 +3611,7 @@ export function App() {
       setCodexEventsByRoom((current) => ({ ...current, [roomId]: payload.codexEvents }));
       setGitWorkflowEventsByRoom((current) => ({ ...current, [roomId]: payload.gitWorkflowEvents }));
       setGitHubActionsEventsByRoom((current) => ({ ...current, [roomId]: payload.githubActionsEvents }));
+      setLocalPreviewsByRoom((current) => ({ ...current, [roomId]: payload.localPreviews }));
       setTerminals((current) => replaceRoomTerminalSnapshots(current, roomId, payload.terminalSnapshots));
       setHostHandoffsByRoom((current) => ({ ...current, [roomId]: payload.hostHandoffs }));
     }
@@ -5186,6 +5315,185 @@ export function App() {
     client.publish({ type: "publish", envelope });
   }
 
+  async function publishLocalPreviewEvent(payload: LocalPreviewRecord, room: RoomRecord = selectedRoom) {
+    appendLocalPreviewEvent(room.id, payload);
+    const client = relayRef.current;
+    if (!client || relayStatus === "closed" || relayStatus === "error") return;
+    const secret = await loadOrCreateRoomSecret(room.id);
+    const envelope: RelayEnvelope = {
+      id: crypto.randomUUID(),
+      teamId: room.teamId,
+      roomId: room.id,
+      senderDeviceId: deviceId,
+      senderUserId: localUser.id,
+      createdAt: payload.updatedAt,
+      kind: "preview.event",
+      payload: await encryptJson(payload, secret)
+    };
+    seenEnvelopeIds.current.add(envelope.id);
+    client.publish({ type: "publish", envelope });
+  }
+
+  async function openLocalPreviewDialog() {
+    if (!hasSelectedRoom) return;
+    if (isSelectedRoomLocked) {
+      setSelectedChatMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
+    setLocalPreviewBusyForRoom(selectedRoom.id, true);
+    setLocalPreviewDialog({
+      open: true,
+      phase: "select",
+      roomId: selectedRoom.id,
+      candidates: [],
+      selectedUrl: "",
+      manualUrl: "",
+      error: null,
+      cloudflaredVersion: null
+    });
+    try {
+      const detected = await detectLocalPreviewServers();
+      const candidates = detected.map((server) => ({
+        url: server.url,
+        label: localPreviewLabel(server.url)
+      }));
+      setLocalPreviewDialog((current) => ({
+        ...current,
+        candidates,
+        selectedUrl: candidates[0]?.url ?? "",
+        error: candidates.length ? null : "No common local development servers were detected. Enter a local URL manually."
+      }));
+    } catch (error) {
+      setLocalPreviewDialog((current) => ({
+        ...current,
+        error: `Could not detect local web servers: ${String(error)}`
+      }));
+    } finally {
+      setLocalPreviewBusyForRoom(selectedRoom.id, false);
+    }
+  }
+
+  async function prepareLocalPreviewConfirmation() {
+    const room = rooms.find((item) => item.id === localPreviewDialog.roomId) ?? selectedRoom;
+    const selectedUrl = localPreviewDialog.manualUrl.trim() || localPreviewDialog.selectedUrl;
+    try {
+      const normalizedUrl = normalizeLocalPreviewUrl(selectedUrl);
+      setLocalPreviewDialog((current) => ({ ...current, error: null, selectedUrl: normalizedUrl }));
+      const cloudflared = await probeCloudflared();
+      if (!cloudflared.available) {
+        setLocalPreviewDialog((current) => ({
+          ...current,
+          phase: "install",
+          error: cloudflared.error ?? "cloudflared is not installed.",
+          cloudflaredVersion: null
+        }));
+        return;
+      }
+      setLocalPreviewDialog((current) => ({
+        ...current,
+        phase: "confirm",
+        roomId: room.id,
+        selectedUrl: normalizedUrl,
+        cloudflaredVersion: cloudflared.version,
+        error: null
+      }));
+    } catch (error) {
+      setLocalPreviewDialog((current) => ({ ...current, error: String(error) }));
+    }
+  }
+
+  async function confirmLocalPreviewShare() {
+    const room = rooms.find((item) => item.id === localPreviewDialog.roomId) ?? selectedRoom;
+    const previewId = crypto.randomUUID();
+    const sourceUrl = localPreviewDialog.selectedUrl;
+    const now = new Date().toISOString();
+    setLocalPreviewDialog((current) => ({ ...current, phase: "starting", error: null }));
+    setLocalPreviewBusyForRoom(room.id, true);
+    const startingPayload: LocalPreviewRecord = {
+      eventType: "local.preview",
+      id: previewId,
+      sharedBy: localUser.name,
+      sharedByUserId: localUser.id,
+      sourceUrl,
+      status: "starting",
+      message: "Starting Cloudflare Quick Tunnel...",
+      createdAt: now,
+      updatedAt: now
+    };
+    await publishLocalPreviewEvent(startingPayload, room);
+    try {
+      const tunnel = await startLocalPreviewTunnel(previewId, sourceUrl);
+      const livePayload: LocalPreviewRecord = {
+        ...startingPayload,
+        sourceUrl: tunnel.localUrl,
+        publicUrl: tunnel.publicUrl,
+        status: "live",
+        message: quickTunnelDisclaimer,
+        updatedAt: new Date().toISOString()
+      };
+      await publishLocalPreviewEvent(livePayload, room);
+      setLocalPreviewDialog((current) => ({ ...current, open: false }));
+      setChatMessageForRoom(room.id, `Shared local preview: ${tunnel.publicUrl}`);
+    } catch (error) {
+      const errorPayload: LocalPreviewRecord = {
+        ...startingPayload,
+        status: "error",
+        message: String(error),
+        updatedAt: new Date().toISOString()
+      };
+      await publishLocalPreviewEvent(errorPayload, room);
+      setLocalPreviewDialog((current) => ({ ...current, phase: "select", error: String(error) }));
+    } finally {
+      setLocalPreviewBusyForRoom(room.id, false);
+    }
+  }
+
+  async function stopLocalPreview(previewId: string) {
+    const room = selectedRoom;
+    const preview = (localPreviewsByRoom[room.id] ?? []).find((item) => item.id === previewId);
+    if (!preview) return;
+    setLocalPreviewBusyForRoom(room.id, true);
+    try {
+      await stopLocalPreviewTunnel(previewId);
+      await publishLocalPreviewEvent({
+        ...preview,
+        status: "stopped",
+        message: "This preview is no longer available.",
+        updatedAt: new Date().toISOString()
+      }, room);
+    } catch (error) {
+      await publishLocalPreviewEvent({
+        ...preview,
+        status: "error",
+        message: `Tunnel process could not be terminated: ${String(error)}`,
+        updatedAt: new Date().toISOString()
+      }, room);
+    } finally {
+      setLocalPreviewBusyForRoom(room.id, false);
+    }
+  }
+
+  async function stopOwnedLocalPreviews(message = "This preview is no longer available.") {
+    for (const [roomId, previews] of Object.entries(localPreviewsByRoom)) {
+      const room = rooms.find((item) => item.id === roomId);
+      if (!room) continue;
+      for (const preview of previews) {
+        if (preview.sharedByUserId !== localUser.id || (preview.status !== "live" && preview.status !== "starting")) continue;
+        try {
+          await stopLocalPreviewTunnel(preview.id);
+        } catch {
+          // The app may already be exiting or the tunnel may have already stopped.
+        }
+        await publishLocalPreviewEvent({
+          ...preview,
+          status: "stopped",
+          message,
+          updatedAt: new Date().toISOString()
+        }, room);
+      }
+    }
+  }
+
   async function publishTerminalResult(
     request: TerminalCommandRequest,
     result: {
@@ -6179,6 +6487,7 @@ export function App() {
           onCopySelectedMarkdown={copySelectedMessagesMarkdown}
           onToggleMarkdownSelection={toggleMarkdownSelectionMode}
           onClearSelectedMessages={clearSelectedMessages}
+          onShareLocalPreview={openLocalPreviewDialog}
         />
 
         {roomNotices.length > 0 && (
@@ -6249,6 +6558,7 @@ export function App() {
           chatEnabled={selectedRoom.mode.chat}
           draft={draft}
           pendingAttachments={pendingAttachmentRows}
+          localPreviewCards={localPreviewCards}
           pendingAttachmentSummary={pendingAttachmentSummary}
           markdownSelectionMode={markdownSelectionMode}
           onToggleMessageSelection={toggleMessageSelection}
@@ -6276,6 +6586,17 @@ export function App() {
           onApproveApproval={() => approveCodexTurn()}
           onInvokeCodex={() => handleCodexInvoke()}
           onRemovePendingAttachment={removePendingAttachment}
+          onOpenLocalPreview={(previewId) => {
+            const preview = localPreviews.find((item) => item.id === previewId);
+            if (preview?.publicUrl) window.open(preview.publicUrl, "_blank", "noopener,noreferrer");
+          }}
+          onCopyLocalPreviewLink={(previewId) => {
+            const preview = localPreviews.find((item) => item.id === previewId);
+            if (preview?.publicUrl) {
+              void copyMarkdownWithFallback("local preview link", preview.publicUrl, (message) => setChatMessageForRoom(selectedRoom.id, message), selectedRoom.id);
+            }
+          }}
+          onStopLocalPreview={(previewId) => void stopLocalPreview(previewId)}
           onDraftChange={(nextDraft) => setDraftForRoom(selectedRoom.id, nextDraft)}
           onSendMessage={sendMessage}
         />
@@ -6547,6 +6868,112 @@ export function App() {
           </>
         )}
       />
+      {localPreviewDialog.open && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="modal local-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="local-preview-title">
+            <div className="modal-header">
+              <div>
+                <span>Cloudflare Quick Tunnel</span>
+                <strong id="local-preview-title">Share Local Preview</strong>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLocalPreviewDialog((current) => ({ ...current, open: false }))}
+                aria-label="Close Share Local Preview"
+                disabled={localPreviewDialog.phase === "starting"}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {localPreviewDialog.phase === "select" && (
+              <>
+                <p className="modal-copy">{quickTunnelDisclaimer}</p>
+                {localPreviewDialog.candidates.length > 0 && (
+                  <label className="field-stack">
+                    <span>Detected local servers</span>
+                    <select
+                      value={localPreviewDialog.selectedUrl}
+                      onChange={(event) => setLocalPreviewDialog((current) => ({ ...current, selectedUrl: event.target.value }))}
+                    >
+                      {localPreviewDialog.candidates.map((candidate) => (
+                        <option key={candidate.url} value={candidate.url}>
+                          {candidate.label} · {candidate.url}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <label className="field-stack">
+                  <span>Manual local URL</span>
+                  <input
+                    value={localPreviewDialog.manualUrl}
+                    onChange={(event) => setLocalPreviewDialog((current) => ({ ...current, manualUrl: event.target.value }))}
+                    placeholder="http://localhost:3000"
+                  />
+                </label>
+                {localPreviewDialog.error && <div className="workflow-message">{localPreviewDialog.error}</div>}
+                <div className="modal-actions">
+                  <button type="button" onClick={() => setLocalPreviewDialog((current) => ({ ...current, open: false }))}>
+                    Cancel
+                  </button>
+                  <button type="button" className="primary" onClick={() => void prepareLocalPreviewConfirmation()} disabled={localPreviewBusy}>
+                    Continue
+                  </button>
+                </div>
+              </>
+            )}
+
+            {localPreviewDialog.phase === "install" && (
+              <>
+                <p className="modal-copy">cloudflared is required to start a Cloudflare Quick Tunnel.</p>
+                <pre className="install-snippet">brew install cloudflare/cloudflare/cloudflared</pre>
+                <a href="https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/" target="_blank" rel="noreferrer">
+                  Windows and Linux downloads
+                </a>
+                {localPreviewDialog.error && <div className="workflow-message">{localPreviewDialog.error}</div>}
+                <div className="modal-actions">
+                  <button type="button" onClick={() => setLocalPreviewDialog((current) => ({ ...current, phase: "select" }))}>
+                    Back
+                  </button>
+                  <button type="button" className="primary" onClick={() => void prepareLocalPreviewConfirmation()}>
+                    Check again
+                  </button>
+                </div>
+              </>
+            )}
+
+            {(localPreviewDialog.phase === "confirm" || localPreviewDialog.phase === "starting") && (
+              <>
+                <div className="confirmation-copy">
+                  {quickTunnelSafetyText.split("\n").map((line, index) => (
+                    line ? <p key={index}>{line}</p> : <br key={index} />
+                  ))}
+                </div>
+                <dl className="local-preview-summary">
+                  <div>
+                    <dt>Source</dt>
+                    <dd>{localPreviewDialog.selectedUrl}</dd>
+                  </div>
+                  <div>
+                    <dt>cloudflared</dt>
+                    <dd>{localPreviewDialog.cloudflaredVersion ?? "available"}</dd>
+                  </div>
+                </dl>
+                {localPreviewDialog.error && <div className="workflow-message">{localPreviewDialog.error}</div>}
+                <div className="modal-actions">
+                  <button type="button" onClick={() => setLocalPreviewDialog((current) => ({ ...current, phase: "select" }))} disabled={localPreviewDialog.phase === "starting"}>
+                    Back
+                  </button>
+                  <button type="button" className="primary" onClick={() => void confirmLocalPreviewShare()} disabled={localPreviewDialog.phase === "starting"}>
+                    {localPreviewDialog.phase === "starting" ? "Starting..." : "Start sharing"}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }
@@ -6804,6 +7231,7 @@ function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentionDays: 
     codexEvents: payload.codexEvents.filter((event) => isWithinRetention(event.createdAt, cutoffMs)),
     gitWorkflowEvents: payload.gitWorkflowEvents.filter((event) => isWithinRetention(event.createdAt, cutoffMs)),
     githubActionsEvents: payload.githubActionsEvents.filter((event) => isWithinRetention(event.checkedAt, cutoffMs)),
+    localPreviews: payload.localPreviews.filter((preview) => isWithinRetention(preview.updatedAt, cutoffMs)),
     terminalSnapshots: terminalsForLocalHistory(
       payload.terminalSnapshots.filter((terminal) => isWithinRetention(terminal.startedAt, cutoffMs))
     ),
@@ -6830,6 +7258,7 @@ function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistoryPayloa
       codexEvents: [],
       gitWorkflowEvents: [],
       githubActionsEvents: [],
+      localPreviews: [],
       terminalSnapshots: [],
       hostHandoffs: []
     };
@@ -6858,6 +7287,9 @@ function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistoryPayloa
       : [],
     githubActionsEvents: Array.isArray(value.githubActionsEvents)
       ? value.githubActionsEvents.filter(isGitHubActionsEventPlaintextPayload)
+      : [],
+    localPreviews: Array.isArray(value.localPreviews)
+      ? value.localPreviews.filter(isLocalPreviewPlaintextPayload)
       : [],
     terminalSnapshots: Array.isArray(value.terminalSnapshots)
       ? terminalsForLocalHistory(value.terminalSnapshots.filter(isTerminalSnapshot))
@@ -7046,6 +7478,10 @@ function isDeviceSealedPayload(value: unknown): value is {
 
 function isRoomKeyRotationPlaintextPayload(value: unknown): value is RoomKeyRotationPlaintextPayload {
   return RoomKeyRotationPlaintextPayloadSchema.safeParse(value).success;
+}
+
+function isLocalPreviewPlaintextPayload(value: unknown): value is LocalPreviewPlaintextPayload {
+  return LocalPreviewPlaintextPayloadSchema.safeParse(value).success;
 }
 
 function isCodexEventPlaintextPayload(value: unknown): value is CodexEventPlaintextPayload {

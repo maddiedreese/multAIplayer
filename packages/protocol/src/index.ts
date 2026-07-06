@@ -72,6 +72,7 @@ export const RelayEnvelope = z.object({
     "browser.event",
     "terminal.request",
     "terminal.event",
+    "preview.event",
     "git.event",
     "room.presence",
     "room.invite",
@@ -109,6 +110,19 @@ export const ChatReactionPlaintextPayload = z.object({
   reactor: z.string().min(1).max(maxDisplayNameChars),
   reactorUserId: z.string().min(1).max(maxUserIdChars),
   createdAt: z.string().datetime()
+});
+
+export const LocalPreviewPlaintextPayload = z.object({
+  eventType: z.literal("local.preview"),
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  sharedBy: z.string().min(1).max(maxDisplayNameChars),
+  sharedByUserId: z.string().min(1).max(maxUserIdChars),
+  sourceUrl: z.string().min(1).max(maxUrlChars),
+  publicUrl: z.string().min(1).max(maxUrlChars).optional(),
+  status: z.enum(["starting", "live", "stopped", "error"]),
+  message: z.string().max(maxMediumTextChars).optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
 });
 
 export const TerminalRequestPlaintextPayload = z.object({
@@ -485,6 +499,7 @@ export type CiphertextPayload = z.infer<typeof CiphertextPayload>;
 export type RelayEnvelope = z.infer<typeof RelayEnvelope>;
 export type ChatPlaintextPayload = z.infer<typeof ChatPlaintextPayload>;
 export type ChatReactionPlaintextPayload = z.infer<typeof ChatReactionPlaintextPayload>;
+export type LocalPreviewPlaintextPayload = z.infer<typeof LocalPreviewPlaintextPayload>;
 export type BrowserRequestPlaintextPayload = z.infer<typeof BrowserRequestPlaintextPayload>;
 export type TerminalRequestPlaintextPayload = z.infer<typeof TerminalRequestPlaintextPayload>;
 export type RequestStatusPlaintextPayload = z.infer<typeof RequestStatusPlaintextPayload>;
