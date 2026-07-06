@@ -1,11 +1,12 @@
 import cors, { type CorsOptions } from "cors";
 import cookieParser from "cookie-parser";
-import express, { type CookieOptions, type NextFunction, type Request, type Response } from "express";
+import express from "express";
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
-import { createServer, type IncomingMessage } from "node:http";
+import { createServer } from "node:http";
 import { nanoid } from "nanoid";
 import { WebSocketServer, type WebSocket } from "ws";
 import { normalizeGitHubBranchName, normalizeGitHubRepoRef, normalizePullRequestDraft } from "@multaiplayer/github";
+import { createRelayAuthSessionManager } from "./auth/session.js";
 import {
   AttachmentBlobRecord,
   CiphertextPayload,
@@ -33,6 +34,7 @@ import {
 } from "@multaiplayer/protocol";
 import { createRelayAuthz } from "./authz.js";
 import { loadRelayConfig } from "./config.js";
+import { createRelayRequestGuards } from "./http/middleware.js";
 import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
 import { createRelayPersistence } from "./persistence.js";
 import { createRelayStore, type AuthSession, type ClientSession, type PresenceRecord, type RoomKey } from "./state.js";
@@ -80,7 +82,6 @@ app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(requestLoggingMiddleware(structuredLogsEnabled));
 app.use(express.json({ limit: `${jsonBodyLimitBytes}b` }));
-app.use(rateLimitMiddleware);
 
 const server = createServer(app);
 const wss = new WebSocketServer({
@@ -123,7 +124,6 @@ const {
   transferTeamOwnership,
   canAccessRoom
 } = relayAuthz;
-const authSessionMaxAgeMs = 1000 * 60 * 60 * 24 * 30;
 const maxRoomProjectPathChars = 2048;
 const maxCodexModelChars = 80;
 const maxTeamNameChars = 120;
@@ -147,18 +147,6 @@ const maxAttachmentBlobIdChars = 160;
 const maxAttachmentBlobNameChars = 512;
 const maxAttachmentBlobTypeChars = 160;
 let saveTimer: NodeJS.Timeout | null = null;
-
-type RateLimitBucket = keyof typeof rateLimitCaps;
-
-function authCookieOptions(maxAge?: number): CookieOptions {
-  return {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: nodeEnv === "production",
-    path: "/",
-    ...(maxAge === undefined ? {} : { maxAge })
-  };
-}
 
 interface StoredAuthSession {
   sessionId: string;
@@ -201,6 +189,33 @@ interface NormalizedStoredAuthSession {
   sessionId: string;
   session: AuthSession;
 }
+
+const authSessionManager = createRelayAuthSessionManager({
+  authSessions,
+  mutationsRequireAuth,
+  nodeEnv,
+  normalizeSessionId: normalizeAuthSessionId,
+  scheduleStoreSave
+});
+const {
+  authSessionMaxAgeMs,
+  authCookieOptions,
+  getAuthSession,
+  getAuthSessionFromRequest,
+  allowRead,
+  allowMutation
+} = authSessionManager;
+const { rateLimitMiddleware, clientIdentityFromIncomingMessage, consumeRateLimit } = createRelayRequestGuards({
+  rateLimitsEnabled,
+  rateLimitWindowMs,
+  rateLimitCaps,
+  rateLimitStore,
+  trustProxyHeaders,
+  metrics: relayMetrics,
+  normalizeSessionId: normalizeAuthSessionId
+});
+
+app.use(rateLimitMiddleware);
 
 await loadRelayStore();
 seedWorkspace();
@@ -1471,129 +1486,8 @@ function roomKey(teamId: string, roomId: string): RoomKey {
   return `${teamId}:${roomId}`;
 }
 
-function rateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
-  const bucket = rateLimitBucketForRequest(req);
-  if (!bucket) {
-    next();
-    return;
-  }
-  const result = consumeRateLimit(bucket, clientIdentityFromRequest(req));
-  if (result.allowed) {
-    next();
-    return;
-  }
-  relayMetrics.recordRateLimitRejection();
-  res.setHeader("Retry-After", String(Math.ceil(Math.max(0, result.resetAt - Date.now()) / 1000)));
-  res.status(429).json({
-    error: "Rate limit exceeded. Slow down before retrying.",
-    bucket,
-    retryAfterSeconds: Math.ceil(Math.max(0, result.resetAt - Date.now()) / 1000)
-  });
-}
-
-function rateLimitBucketForRequest(req: Request): RateLimitBucket | null {
-  if (req.path === "/healthz" || req.path === "/readyz" || req.path === "/metrics" || req.path === "/auth/config") return null;
-  if (req.path.startsWith("/auth/")) return "auth";
-  if (req.path.startsWith("/attachment-blobs")) return "attachment";
-  if (req.method === "GET") return "read";
-  if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) return "mutation";
-  return null;
-}
-
-function consumeRateLimit(bucket: RateLimitBucket, clientId: string): { allowed: true; resetAt: number } | { allowed: false; resetAt: number } {
-  if (!rateLimitsEnabled) return { allowed: true, resetAt: Date.now() + rateLimitWindowMs };
-  const now = Date.now();
-  pruneRateLimitStore(now);
-  const key = `${bucket}:${clientId}`;
-  const current = rateLimitStore.get(key);
-  const resetAt = current && current.resetAt > now ? current.resetAt : now + rateLimitWindowMs;
-  const count = current && current.resetAt > now ? current.count + 1 : 1;
-  rateLimitStore.set(key, { count, resetAt });
-  return count <= rateLimitCaps[bucket]
-    ? { allowed: true, resetAt }
-    : { allowed: false, resetAt };
-}
-
-function pruneRateLimitStore(now = Date.now()) {
-  if (rateLimitStore.size < 10_000) return;
-  for (const [key, record] of rateLimitStore.entries()) {
-    if (record.resetAt <= now) rateLimitStore.delete(key);
-  }
-}
-
-function clientIdentityFromRequest(req: Request): string {
-  const sessionId = normalizeAuthSessionId(req.cookies?.multaiplayer_session);
-  if (sessionId) return `session:${sessionId}`;
-  return clientIdentityFromIncomingMessage(req);
-}
-
-function clientIdentityFromIncomingMessage(request: IncomingMessage): string {
-  const cookies = parseCookieHeader(request.headers.cookie);
-  const sessionId = normalizeAuthSessionId(cookies.get("multaiplayer_session"));
-  if (sessionId) return `session:${sessionId}`;
-  const forwardedIp = trustProxyHeaders ? firstForwardedForIp(request.headers["x-forwarded-for"]) : null;
-  const ip = forwardedIp || request.socket.remoteAddress || "unknown";
-  return `ip:${ip}`;
-}
-
-function firstForwardedForIp(header: string | string[] | undefined): string | null {
-  const value = Array.isArray(header) ? header[0] : header;
-  const ip = value?.split(",")[0]?.trim();
-  return ip || null;
-}
-
-function getAuthSession(sessionId: unknown): AuthSession | null {
-  const normalizedSessionId = normalizeAuthSessionId(sessionId);
-  if (!normalizedSessionId) return null;
-  const session = authSessions.get(normalizedSessionId);
-  if (!session) return null;
-  if (session.expiresAt <= Date.now()) {
-    authSessions.delete(normalizedSessionId);
-    scheduleStoreSave();
-    return null;
-  }
-  return session;
-}
-
 function normalizeAuthSessionId(value: unknown): string {
   return normalizeRelayId(value, maxAuthSessionIdChars) ?? "";
-}
-
-function getAuthSessionFromRequest(request: IncomingMessage): AuthSession | undefined {
-  const cookies = parseCookieHeader(request.headers.cookie);
-  return getAuthSession(cookies.get("multaiplayer_session")) ?? undefined;
-}
-
-function parseCookieHeader(header: string | undefined): Map<string, string> {
-  const cookies = new Map<string, string>();
-  for (const item of (header ?? "").split(";")) {
-    const [rawName, ...rawValue] = item.split("=");
-    const name = rawName?.trim();
-    if (!name) continue;
-    const value = safeDecodeCookieValue(rawValue.join("=").trim());
-    if (value !== null) cookies.set(name, value);
-  }
-  return cookies;
-}
-
-function safeDecodeCookieValue(value: string): string | null {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return null;
-  }
-}
-
-function allowRead(session: AuthSession | null, res: Response): boolean {
-  if (!mutationsRequireAuth || session) return true;
-  res.status(401).json({ error: "Sign in with GitHub before reading workspace state." });
-  return false;
-}
-
-function allowMutation(session: AuthSession | null, res: Response): boolean {
-  if (!mutationsRequireAuth || session) return true;
-  res.status(401).json({ error: "Sign in with GitHub before changing workspace state." });
-  return false;
 }
 
 function canJoinRoom(
