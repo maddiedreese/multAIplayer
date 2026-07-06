@@ -4883,6 +4883,12 @@ export function App() {
     }
   }
 
+  function closeRoomBrowser() {
+    if (!hasSelectedRoom) return;
+    setActiveBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setBrowserMessageForRoom(selectedRoom.id, null);
+  }
+
   async function resetRoomBrowserProfile() {
     if (!hasSelectedRoom) {
       setSelectedBrowserMessage("Create or join a room before resetting browser state.");
@@ -6118,6 +6124,7 @@ export function App() {
             onBrowserUrlChange={(url) => setBrowserUrlForRoom(selectedRoom.id, url)}
             onBrowserReasonChange={(reason) => setBrowserReasonForRoom(selectedRoom.id, reason)}
             onOpenBrowserNow={openRoomBrowserNow}
+            onCloseBrowser={closeRoomBrowser}
             onRequestBrowserAccess={requestBrowserAccess}
             onApproveBrowserRequest={approveBrowserRequest}
             onDenyBrowserRequest={denyBrowserRequest}
