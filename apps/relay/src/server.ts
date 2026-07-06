@@ -7,7 +7,6 @@ import { WebSocketServer, type WebSocket } from "ws";
 import { createRelayAuthSessionManager } from "./auth/session.js";
 import {
   AttachmentBlobRecord,
-  DevicePublicKeyJwk,
   InviteRecord,
   RelayEnvelope,
   RelayClientMessage,
@@ -15,7 +14,6 @@ import {
   defaultCodexModel,
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
-  codexModelOptions,
   maxMediumTextChars,
   maxShortTextChars,
   maxUrlChars,
@@ -41,12 +39,19 @@ import { registerOpsRoutes } from "./http/ops.js";
 import { registerRoomRoutes } from "./http/rooms.js";
 import { registerTeamRoutes, teamRecordForUser } from "./http/teams.js";
 import {
+  isApprovalPolicy,
   isJsonStringifiableWithin,
   isRecord,
+  isRoomMode,
   maxCiphertextCharactersForBlob,
+  normalizeBrowserAllowedOrigins,
+  normalizeCodexModel as normalizeCodexModelWithLimit,
+  normalizeDevicePublicKeyJwk as normalizeDevicePublicKeyJwkWithLimit,
   normalizeMetadataText,
   normalizeOptionalMetadataText,
   normalizeRelayId,
+  normalizeRoomProjectPath as normalizeRoomProjectPathWithLimit,
+  normalizeTeamRole,
   parseIntegerValue
 } from "./limits.js";
 import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
@@ -566,63 +571,16 @@ function isRoomHost(room: RoomRecord, requester: { id: string; name: string }): 
   return room.host === requester.name;
 }
 
-function isApprovalPolicy(value: string): value is RoomRecord["approvalPolicy"] {
-  return [
-    "ask_every_turn",
-    "auto_chat_only",
-    "auto_browser_allowed_sites",
-    "never_host"
-  ].includes(value);
-}
-
-function isRoomMode(value: unknown): value is RoomRecord["mode"] {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return ["chat", "code", "workspace", "browser"].every((key) => typeof candidate[key] === "boolean");
-}
-
 function normalizeDevicePublicKeyJwk(value: unknown): DevicePublicKeyJwkType | null {
-  if (!isJsonStringifiableWithin(value, maxPublicKeyJwkChars)) return null;
-  const parsed = DevicePublicKeyJwk.safeParse(value);
-  return parsed.success ? parsed.data : null;
+  return normalizeDevicePublicKeyJwkWithLimit(value, maxPublicKeyJwkChars);
 }
 
 function normalizeRoomProjectPath(value: unknown): string | null {
-  const projectPath = String(value ?? "").trim();
-  if (!projectPath || projectPath.length > maxRoomProjectPathChars) return null;
-  if (/[\u0000-\u001f\u007f]/.test(projectPath)) return null;
-  return projectPath;
+  return normalizeRoomProjectPathWithLimit(value, maxRoomProjectPathChars);
 }
 
 function normalizeCodexModel(value: unknown): string | null {
-  const model = String(value ?? "").trim();
-  if (!model || model.length > maxCodexModelChars) return null;
-  if (codexModelOptions.some((option) => option.id === model)) return model;
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/.test(model)) return null;
-  return model;
-}
-
-function normalizeTeamRole(value: unknown): TeamRole {
-  return value === "owner" || value === "admin" || value === "member" ? value : "member";
-}
-
-function normalizeBrowserAllowedOrigins(value: unknown): string[] | null {
-  if (!Array.isArray(value) || value.length > 20) return null;
-  const origins = new Set<string>();
-  for (const item of value) {
-    if (typeof item !== "string") return null;
-    const raw = item.trim();
-    if (!raw) continue;
-    try {
-      const parsed = new URL(raw);
-      if (!["http:", "https:"].includes(parsed.protocol)) return null;
-      if (parsed.pathname !== "/" || parsed.search || parsed.hash) return null;
-      origins.add(parsed.origin);
-    } catch {
-      return null;
-    }
-  }
-  return Array.from(origins);
+  return normalizeCodexModelWithLimit(value, maxCodexModelChars);
 }
 
 function deviceKey(userId: string, deviceId: string): string {
