@@ -37,7 +37,7 @@ import { useAppRoomDisplayContext } from "./hooks/useAppRoomDisplayContext";
 import { useThemeMode } from "./hooks/useThemeMode";
 import { useAppWorkspaceRecords } from "./hooks/useAppWorkspaceRecords";
 import { useAppHostHandoffActions } from "./hooks/useAppHostHandoffActions";
-import { useInviteActions } from "./hooks/useInviteActions";
+import { useAppInviteActions } from "./hooks/useAppInviteActions";
 import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
 import { useAppRefs } from "./hooks/useAppRefs";
 import { useAppSelectedRoomContext } from "./hooks/useAppSelectedRoomContext";
@@ -302,42 +302,16 @@ export function App() {
     roomSetters,
     roomSettingsActor
   });
-  const inviteActions = useInviteActions({
-    hasSelectedRoom,
-    selectedRoom,
-    selectedRoomIdRef: appRefs.selectedRoomIdRef,
-    isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
-    isSelectedRoomRevoked: roomInteraction.isSelectedRoomRevoked,
-    isActiveHost: roomInteraction.isActiveHost,
-    hostGateMessage: roomInteraction.hostGateMessage,
-    inviteApprovalGate,
-    inviteRequests: selectedRuntime.inviteRequests,
-    inviteSecretInput: invitePanelState.inviteSecretInput,
-    localUser: localIdentity.localUser,
-    deviceId: localIdentity.deviceId,
-    deviceIdentity: appRuntimeState.deviceIdentity,
-    relayStatus: appRuntimeState.relayStatus,
-    relayRef: appRefs.relayRef,
-    seenEnvelopeIds: appRefs.seenEnvelopeIds,
-    historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
-    reportRoomKeyRotationInFlight: roomInteraction.reportRoomKeyRotationInFlight,
-    upsertTeam: workspaceRecords.upsertTeam,
-    upsertRoom: workspaceRecords.upsertRoom,
-    appendInviteRequest,
-    updateInviteRequestStatus,
-    appendRoomMessage: roomChatMutations.appendRoomMessage,
-    setSelectedInviteMessage,
-    setInviteMessageForRoom,
-    setInviteLinkForRoom,
-    setInviteSecretInput: invitePanelState.setInviteSecretInput,
-    setSelectedTeam: workspaceState.setSelectedTeam,
-    setSelectedRoomId: workspaceState.setSelectedRoomId,
-    setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
-    setRevokedRoomIds: roomRuntimeState.setRevokedRoomIds,
-    setRevokedTeamIds: roomRuntimeState.setRevokedTeamIds,
-    setInviteAdmissionsByRoom: invitePanelState.setInviteAdmissionsByRoom,
-    setMessagesByRoom: workspaceState.setMessagesByRoom,
-    setKeyRotationBusyForRoom
+  const inviteActions = useAppInviteActions({
+    appState,
+    appRefs,
+    localIdentity,
+    selected: selectedContext,
+    selectedRuntime,
+    roomInteraction,
+    roomSetters,
+    roomChatMutations,
+    workspaceRecords
   });
 
   const roomDisplay = useAppRoomDisplayContext({
