@@ -135,6 +135,7 @@ import { useLocalPreviewState } from "./hooks/useLocalPreviewState";
 import { useInvitePanelState } from "./hooks/useInvitePanelState";
 import { useRoomSettingsState } from "./hooks/useRoomSettingsState";
 import { useRoomChatState } from "./hooks/useRoomChatState";
+import { useCodexRoomState } from "./hooks/useCodexRoomState";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -152,11 +153,9 @@ import type {
   ChatAttachment,
   ChatMessage,
   ChatReaction,
-  CodexRoomEvent,
   HostHandoffRecord,
   LocalPreviewRecord,
   NoSecretRoomInvite,
-  PendingCodexApproval,
   RelayStatus,
   RoomPresence,
   SidebarPanel,
@@ -275,7 +274,20 @@ export function App() {
   const [presenceByRoom, setPresenceByRoom] = useState<Record<string, Record<string, RoomPresence>>>({});
   const [hostHandoffsByRoom, setHostHandoffsByRoom] = useState<Record<string, HostHandoffRecord[]>>({});
   const [codexContinuationByRoom, setCodexContinuationByRoom] = useState<Record<string, HostHandoffRecord>>({});
-  const [codexEventsByRoom, setCodexEventsByRoom] = useState<Record<string, CodexRoomEvent[]>>({});
+  const {
+    codexEventsByRoom,
+    setCodexEventsByRoom,
+    approvalVisibleByRoom,
+    setApprovalVisibleByRoom,
+    pendingCodexApprovalsByRoom,
+    setPendingCodexApprovalsByRoom,
+    codexRunningByRoom,
+    setCodexRunningByRoom,
+    secretWarningsVisibleByRoom,
+    setSecretWarningsVisibleByRoom,
+    codexThreadIdsByRoom,
+    setCodexThreadIdsByRoom
+  } = useCodexRoomState();
   const [gitWorkflowEventsByRoom, setGitWorkflowEventsByRoom] = useState<Record<string, GitWorkflowEventPlaintextPayload[]>>({});
   const [githubActionsEventsByRoom, setGitHubActionsEventsByRoom] = useState<Record<string, GitHubActionsEventPlaintextPayload[]>>({});
   const {
@@ -286,10 +298,6 @@ export function App() {
     localPreviewBusyByRoom,
     setLocalPreviewBusyByRoom
   } = useLocalPreviewState();
-  const [approvalVisibleByRoom, setApprovalVisibleByRoom] = useState<Record<string, boolean>>({});
-  const [pendingCodexApprovalsByRoom, setPendingCodexApprovalsByRoom] = useState<Record<string, PendingCodexApproval>>({});
-  const [codexRunningByRoom, setCodexRunningByRoom] = useState<Record<string, boolean>>({});
-  const [secretWarningsVisibleByRoom, setSecretWarningsVisibleByRoom] = useState<Record<string, boolean>>({});
   const [codexProbe, setCodexProbe] = useState<CodexProbe | null>(null);
   const {
     terminalLinesByRoom,
@@ -384,7 +392,6 @@ export function App() {
     inviteAdmissionsByRoom,
     setInviteAdmissionsByRoom
   } = useInvitePanelState();
-  const [codexThreadIdsByRoom, setCodexThreadIdsByRoom] = useState<Record<string, string>>({});
   const {
     sidebarCollapsed,
     inspectorCollapsed,
