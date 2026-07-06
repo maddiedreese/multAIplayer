@@ -222,14 +222,12 @@ import { resolveFilePreviewTab, type FilePreviewTab } from "./lib/filePreview";
 import { copyTextToClipboard } from "./lib/clipboard";
 import {
   checkGitHubActionsReadiness,
-  checkGitHubWorkflowReadiness,
   gitHubActionsRefreshInFlightMessage,
   isGitHubActionsRefreshInFlight,
   type GitHubActionsTarget
 } from "./lib/githubWorkflowReadiness";
 import {
   defaultGitWorkflowDraft,
-  buildGitWorkflowApprovalPreview,
   gitWorkflowInFlightMessage,
   isGitWorkflowInFlight,
   parseGitHubRemoteUrl,
@@ -306,6 +304,7 @@ import { buildRoomMemberRows } from "./lib/rosterDisplayRows";
 import { buildCodexEventRows, buildTerminalOutputLines, buildTerminalRequestRows } from "./lib/terminalDisplayRows";
 import { useAppConfigState } from "./hooks/useAppConfigState";
 import { useLatestRef } from "./hooks/useLatestRef";
+import { useGitHubWorkflowState } from "./hooks/useGitHubWorkflowState";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useRoomAccess } from "./hooks/useRoomAccess";
@@ -700,27 +699,18 @@ export function App() {
     historySettings,
     inviteApprovalGate
   });
-  const actionsSummary = useMemo(() => summarizeActionRuns(actionRuns), [actionRuns]);
-  const githubWorkflowReadiness = useMemo(() => checkGitHubWorkflowReadiness({
-    pushEnabled: gitWorkflowDraft.pushEnabled,
+  const {
+    actionsSummary,
+    githubWorkflowReadiness,
+    githubActionsReadiness,
+    gitApprovalPreview
+  } = useGitHubWorkflowState({
+    actionRuns,
     authConfig,
     currentUser,
-    owner: gitWorkflowDraft.prOwner,
-    repo: gitWorkflowDraft.prRepo,
-    head: gitWorkflowDraft.branchName,
-    base: gitWorkflowDraft.prBase
-  }), [authConfig, currentUser, gitWorkflowDraft.branchName, gitWorkflowDraft.prBase, gitWorkflowDraft.prOwner, gitWorkflowDraft.prRepo, gitWorkflowDraft.pushEnabled]);
-  const githubActionsReadiness = useMemo(() => checkGitHubActionsReadiness({
-    authConfig,
-    currentUser,
-    owner: gitWorkflowDraft.prOwner,
-    repo: gitWorkflowDraft.prRepo,
-    branch: gitWorkflowDraft.branchName
-  }), [authConfig, currentUser, gitWorkflowDraft.branchName, gitWorkflowDraft.prOwner, gitWorkflowDraft.prRepo]);
-  const gitApprovalPreview = useMemo(
-    () => buildGitWorkflowApprovalPreview(selectedRoom.projectPath, gitWorkflowDraft),
-    [gitWorkflowDraft, selectedRoom.projectPath]
-  );
+    gitWorkflowDraft,
+    projectPath: selectedRoom.projectPath
+  });
   const roomTerminals = useMemo(
     () => terminals.filter((terminal) => terminal.roomId === selectedRoom.id),
     [terminals, selectedRoom.id]
