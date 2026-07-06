@@ -308,6 +308,7 @@ import { useRoomBusySetters } from "./hooks/useRoomBusySetters";
 import { useRoomCodexApprovalSetters } from "./hooks/useRoomCodexApprovalSetters";
 import { useRoomDraftSetters } from "./hooks/useRoomDraftSetters";
 import { useRoomFileSetters } from "./hooks/useRoomFileSetters";
+import { useRoomGitSetters } from "./hooks/useRoomGitSetters";
 import { useRoomInviteSetters } from "./hooks/useRoomInviteSetters";
 import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
 import { useRoomMessageSetters } from "./hooks/useRoomMessageSetters";
@@ -805,6 +806,15 @@ export function App() {
     setCustomCodexModelsByRoom,
     setProjectPathDraftsByRoom
   });
+  const {
+    setGitWorkflowMessageForRoom,
+    setSelectedGitWorkflowMessage,
+    setGitStatusForRoom
+  } = useRoomGitSetters({
+    selectedRoomId: selectedRoom.id,
+    setGitWorkflowMessagesByRoom,
+    setGitStatusByRoom
+  });
   const roomNotices = useRoomNotices({
     roomId: selectedRoom.id,
     hostMessage,
@@ -923,13 +933,6 @@ export function App() {
   });
   const roomCanUseChat = canUseRoomChat(selectedRoom, isSelectedRoomLocked);
 
-  function setGitWorkflowMessageForRoom(roomId: string, message: string | null) {
-    setGitWorkflowMessagesByRoom((current) => ({
-      ...current,
-      [roomId]: message
-    }));
-  }
-
   function reportRoomHostMutationInFlight(roomId: string): boolean {
     if (!isRoomHostMutationInFlight(hostBusyRef.current, roomId)) return false;
     setHostMessageForRoom(roomId, roomHostMutationInFlightMessage());
@@ -955,10 +958,6 @@ export function App() {
     if (!isRoomFileActionInFlight(fileBusyRef.current, roomId)) return false;
     setFileMessageForRoom(roomId, roomFileActionInFlightMessage());
     return true;
-  }
-
-  function setSelectedGitWorkflowMessage(message: string | null) {
-    setGitWorkflowMessageForRoom(selectedRoom.id, message);
   }
 
   function appendGitWorkflowEvent(roomId: string, event: GitWorkflowEventPlaintextPayload) {
@@ -3997,13 +3996,6 @@ export function App() {
         [roomId]: [...roomMessages, message]
       };
     });
-  }
-
-  function setGitStatusForRoom(roomId: string, status: GitStatusSummary | null) {
-    setGitStatusByRoom((current) => ({
-      ...current,
-      [roomId]: status
-    }));
   }
 
   function applyMessageReaction(roomId: string, reaction: ChatReactionPlaintextPayload) {
