@@ -282,8 +282,7 @@ import {
   buildCodexEventLine,
   buildGitHubActionsEventLines,
   buildGitWorkflowEventLines,
-  buildTerminalResultLines,
-  formatCodexEventStatus
+  buildTerminalResultLines
 } from "./lib/activityLines";
 import { nextShellTerminalName, terminalInputForShellSubmit } from "./lib/terminalUi";
 import {
@@ -312,6 +311,7 @@ import {
 import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessageRows } from "./lib/chatDisplayRows";
 import { buildRoomMemberRows, buildTeamMemberRows } from "./lib/rosterDisplayRows";
 import { buildSidebarMessageHitRows, buildSidebarRoomRows, buildSidebarTeamRows } from "./lib/sidebarDisplayRows";
+import { buildCodexEventRows, buildTerminalOutputLines, buildTerminalRequestRows } from "./lib/terminalDisplayRows";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -332,7 +332,7 @@ import { GitHubActionsPanel } from "./components/GitHubActionsPanel";
 import { GitHandoffPanel } from "./components/GitHandoffPanel";
 import { ProjectPanel } from "./components/ProjectPanel";
 import { RoomMembersPanel, TeamRosterPanel } from "./components/RosterPanels";
-import { TerminalPanel, type CodexEventDisplay, type TerminalCommandRequestDisplay, type TerminalOutputLineDisplay } from "./components/TerminalPanel";
+import { TerminalPanel } from "./components/TerminalPanel";
 import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
 import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
@@ -1064,26 +1064,9 @@ export function App() {
     : detectSecretRisks(terminalLines.join("\n"));
   const terminalCommandRisks = detectTerminalCommandRisks(terminalCommand);
   const selectedTerminalCanControl = canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked);
-  const terminalOutputLines: TerminalOutputLineDisplay[] = (selectedTerminal?.lines ?? terminalLines.map((line) => ({ stream: "system", text: line }))).map((line) => ({
-    ...line,
-    risks: detectSecretRisks(line.text)
-  }));
-  const terminalRequestRows: TerminalCommandRequestDisplay[] = terminalRequests.map((request) => ({
-    id: request.id,
-    command: request.command,
-    requester: request.requester,
-    cwd: request.cwd,
-    status: request.status,
-    risks: detectTerminalCommandRisks(request.command)
-  }));
-  const codexEventRows: CodexEventDisplay[] = codexEvents.slice(-5).reverse().map((event) => ({
-    key: `${event.turnId}-${event.createdAt}-${event.status}`,
-    status: event.status,
-    statusLabel: formatCodexEventStatus(event.status),
-    message: event.message,
-    detail: `${event.threadId ?? formatCodexModel(event.model)} · ${formatTimestamp(event.createdAt)}`,
-    host: event.host
-  }));
+  const terminalOutputLines = buildTerminalOutputLines(selectedTerminal?.lines ?? terminalLines);
+  const terminalRequestRows = buildTerminalRequestRows(terminalRequests);
+  const codexEventRows = buildCodexEventRows(codexEvents);
   const normalizedSidebarQuery = sidebarQuery.trim().toLowerCase();
   const searchActive = normalizedSidebarQuery.length > 0;
   const teamRooms = useMemo(
