@@ -1,14 +1,29 @@
+import type { ComponentProps } from "react";
+import { AppShellView } from "../components/AppShellView";
 import { useAppSidebarProps } from "./useAppSidebarProps";
 import { useLocalPreviewDialogProps } from "./useLocalPreviewDialogProps";
 import { useRoomInspectorPanelProps } from "./useRoomInspectorPanelProps";
 import { useRoomMainColumnProps } from "./useRoomMainColumnProps";
 
+type AppShellViewProps = ComponentProps<typeof AppShellView>;
+
 export function useAppViewProps({
+  shell,
   roomMainColumn,
   roomInspectorPanel,
   appSidebar,
   localPreviewDialog
 }: {
+  shell: Pick<
+    AppShellViewProps,
+    | "sidebarCollapsed"
+    | "inspectorCollapsed"
+    | "shellStyle"
+    | "onBeginSidebarResize"
+    | "onBeginInspectorResize"
+    | "onToggleSidebarCollapsed"
+    | "onToggleInspectorCollapsed"
+  >;
   roomMainColumn: Parameters<typeof useRoomMainColumnProps>[0];
   roomInspectorPanel: Parameters<typeof useRoomInspectorPanelProps>[0];
   appSidebar: Parameters<typeof useAppSidebarProps>[0];
@@ -20,11 +35,14 @@ export function useAppViewProps({
   const { localPreviewDialogOpen, localPreviewDialogProps } = useLocalPreviewDialogProps(localPreviewDialog);
 
   return {
-    roomMainColumnProps,
-    roomInspectorPanelProps,
-    sidebarProps,
-    drawerProps,
-    localPreviewDialogOpen,
-    localPreviewDialogProps
+    appShellViewProps: {
+      ...shell,
+      sidebarProps,
+      drawerProps,
+      roomMainColumnProps,
+      roomInspectorPanelProps,
+      localPreviewDialogOpen,
+      localPreviewDialogProps
+    }
   };
 }

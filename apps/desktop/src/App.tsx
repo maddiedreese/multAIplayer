@@ -1733,14 +1733,16 @@ export function App() {
       setSensitiveAttachmentReviewKey
     }
   });
-  const {
-    roomMainColumnProps,
-    roomInspectorPanelProps,
-    sidebarProps,
-    drawerProps,
-    localPreviewDialogOpen,
-    localPreviewDialogProps
-  } = useAppViewProps({
+  const { appShellViewProps } = useAppViewProps({
+    shell: {
+      sidebarCollapsed,
+      inspectorCollapsed,
+      shellStyle,
+      onBeginSidebarResize: (event) => beginShellResize("sidebar", event),
+      onBeginInspectorResize: (event) => beginShellResize("inspector", event),
+      onToggleSidebarCollapsed: toggleSidebarCollapsed,
+      onToggleInspectorCollapsed: toggleInspectorCollapsed
+    },
     roomMainColumn: {
     teams: teams.map((team) => ({ id: team.id, name: team.name })),
     selectedTeam,
@@ -2062,21 +2064,5 @@ export function App() {
     }
   });
 
-  return (
-    <AppShellView
-      sidebarCollapsed={sidebarCollapsed}
-      inspectorCollapsed={inspectorCollapsed}
-      shellStyle={shellStyle}
-      onBeginSidebarResize={(event) => beginShellResize("sidebar", event)}
-      onBeginInspectorResize={(event) => beginShellResize("inspector", event)}
-      onToggleSidebarCollapsed={toggleSidebarCollapsed}
-      onToggleInspectorCollapsed={toggleInspectorCollapsed}
-      sidebarProps={sidebarProps}
-      drawerProps={drawerProps}
-      roomMainColumnProps={roomMainColumnProps}
-      roomInspectorPanelProps={roomInspectorPanelProps}
-      localPreviewDialogOpen={localPreviewDialogOpen}
-      localPreviewDialogProps={localPreviewDialogProps}
-    />
-  );
+  return <AppShellView {...appShellViewProps} />;
 }
