@@ -181,7 +181,7 @@ import {
   roomHostMutationInFlightMessage,
   sameHandoffRepo
 } from "./lib/hostHandoff";
-import { detectBrowserSecretRisks, detectSecretRisks, detectTerminalCommandRisks } from "./lib/secretRisks";
+import { detectBrowserSecretRisks, detectSecretRisks } from "./lib/secretRisks";
 import {
   canActOnRoomInviteRequest,
   findRoomInviteRequest,
@@ -301,8 +301,8 @@ import {
 } from "./lib/localPreview";
 import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessageRows } from "./lib/chatDisplayRows";
 import { buildRoomMemberRows } from "./lib/rosterDisplayRows";
-import { buildCodexEventRows, buildTerminalOutputLines, buildTerminalRequestRows } from "./lib/terminalDisplayRows";
 import { useAppConfigState } from "./hooks/useAppConfigState";
+import { useFileTerminalDisplay } from "./hooks/useFileTerminalDisplay";
 import { useLatestRef } from "./hooks/useLatestRef";
 import { useGitHubWorkflowState } from "./hooks/useGitHubWorkflowState";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
@@ -1065,24 +1065,28 @@ export function App() {
     setGitWorkflowDraftsByRoom((current) => updateGitWorkflowDraftRecord(current, selectedRoom.id, patch));
   }
 
-  const selectedAttachmentReview = selectedFile
-    ? decideAttachmentReview(
-        selectedFile.content,
-        selectedFile.path,
-        reviewedAttachmentPathForScope(sensitiveAttachmentReviewKey, selectedRoom.id, selectedRoom.projectPath, selectedFile.path)
-      )
-    : null;
-  const selectedFileRisks = selectedAttachmentReview?.risks ?? [];
-  const selectedFileNeedsAttachmentReview = Boolean(selectedAttachmentReview?.requiresReview);
-  const selectedSensitiveFileReviewed = Boolean(selectedAttachmentReview?.reviewed);
-  const terminalRisks = selectedTerminal
-    ? detectSecretRisks(selectedTerminal.lines.map((line) => line.text).join("\n"))
-    : detectSecretRisks(terminalLines.join("\n"));
-  const terminalCommandRisks = detectTerminalCommandRisks(terminalCommand);
   const selectedTerminalCanControl = canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked);
-  const terminalOutputLines = buildTerminalOutputLines(selectedTerminal?.lines ?? terminalLines);
-  const terminalRequestRows = buildTerminalRequestRows(terminalRequests);
-  const codexEventRows = buildCodexEventRows(codexEvents);
+  const {
+    selectedAttachmentReview,
+    selectedFileRisks,
+    selectedFileNeedsAttachmentReview,
+    selectedSensitiveFileReviewed,
+    terminalRisks,
+    terminalCommandRisks,
+    terminalOutputLines,
+    terminalRequestRows,
+    codexEventRows
+  } = useFileTerminalDisplay({
+    selectedFile,
+    selectedRoomId: selectedRoom.id,
+    selectedRoomProjectPath: selectedRoom.projectPath,
+    sensitiveAttachmentReviewKey,
+    selectedTerminal,
+    terminalLines,
+    terminalCommand,
+    terminalRequests,
+    codexEvents
+  });
   const {
     searchActive,
     sidebarTeamRows,
