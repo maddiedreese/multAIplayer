@@ -3,8 +3,7 @@ import type {
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
   LocalPreviewPlaintextPayload,
-  RoomRecord,
-  ApprovalPolicy
+  RoomRecord
 } from "@multaiplayer/protocol";
 import {
   codexModelOptions,
@@ -12,11 +11,7 @@ import {
   defaultCodexModel,
 } from "@multaiplayer/protocol";
 import { decryptJson } from "@multaiplayer/crypto";
-import {
-  loadHistorySettings,
-  type LocalHistorySettings
-} from "./lib/localHistory";
-import { loadTeamRoomDefaults } from "./lib/teamRoomDefaults";
+import { loadHistorySettings } from "./lib/localHistory";
 import type { DeviceIdentity } from "./lib/deviceIdentity";
 import {
   loadTrustedDeviceKeys,
@@ -141,6 +136,7 @@ import { useRoomHeaderActions } from "./hooks/useRoomHeaderActions";
 import { useTerminalPanelActions } from "./hooks/useTerminalPanelActions";
 import { useWorkspaceFilesPanelActions } from "./hooks/useWorkspaceFilesPanelActions";
 import { useWorkspaceUiState } from "./hooks/useWorkspaceUiState";
+import { useHistoryDefaultsState } from "./hooks/useHistoryDefaultsState";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -243,28 +239,24 @@ export function App() {
   const [settingsMessagesByRoom, setSettingsMessagesByRoom] = useState<Record<string, string | null>>({});
   const [customCodexModelsByRoom, setCustomCodexModelsByRoom] = useState<Record<string, string>>({});
   const [projectPathDraftsByRoom, setProjectPathDraftsByRoom] = useState<Record<string, string>>({});
-  const [historySettings, setHistorySettings] = useState<LocalHistorySettings>({
-    enabled: true,
-    retentionDays: 30
-  });
-  const [teamHistorySettings, setTeamHistorySettings] = useState<LocalHistorySettings>({
-    enabled: true,
-    retentionDays: 30
-  });
-  const [teamDefaultApprovalPolicy, setTeamDefaultApprovalPolicy] = useState<ApprovalPolicy>(() =>
-    loadTeamRoomDefaults(seededTeams[0].id).approvalPolicy
-  );
-  const [teamDefaultCodexModel, setTeamDefaultCodexModel] = useState(() =>
-    loadTeamRoomDefaults(seededTeams[0].id).codexModel
-  );
-  const [teamDefaultBrowserProfilePersistent, setTeamDefaultBrowserProfilePersistent] = useState(() =>
-    loadTeamRoomDefaults(seededTeams[0].id).browserProfilePersistent
-  );
-  const [teamDefaultInviteApprovalGate, setTeamDefaultInviteApprovalGate] = useState(() =>
-    loadTeamRoomDefaults(seededTeams[0].id).inviteApprovalGate
-  );
-  const [historyMessagesByRoom, setHistoryMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [teamHistoryMessagesByTeam, setTeamHistoryMessagesByTeam] = useState<Record<string, string | null>>({});
+  const {
+    historySettings,
+    setHistorySettings,
+    teamHistorySettings,
+    setTeamHistorySettings,
+    teamDefaultApprovalPolicy,
+    setTeamDefaultApprovalPolicy,
+    teamDefaultCodexModel,
+    setTeamDefaultCodexModel,
+    teamDefaultBrowserProfilePersistent,
+    setTeamDefaultBrowserProfilePersistent,
+    teamDefaultInviteApprovalGate,
+    setTeamDefaultInviteApprovalGate,
+    historyMessagesByRoom,
+    setHistoryMessagesByRoom,
+    teamHistoryMessagesByTeam,
+    setTeamHistoryMessagesByTeam
+  } = useHistoryDefaultsState({ initialTeamId: seededTeams[0].id });
   const [inspectorTabsByRoom, setInspectorTabsByRoom] = useState<Record<string, InspectorTab>>({});
   const [forgottenRoomIds, setForgottenRoomIds] = useState<Set<string>>(() => new Set());
   const [revokedRoomIds, setRevokedRoomIds] = useState<Set<string>>(() => new Set());
