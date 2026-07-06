@@ -32,7 +32,7 @@ import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useRoomChatMutations } from "./hooks/useRoomChatMutations";
 import { useAppRoomInteractionContext } from "./hooks/useAppRoomInteractionContext";
 import { useAppRoomScopedSetters } from "./hooks/useAppRoomScopedSetters";
-import { useSelectedRoomRuntime } from "./hooks/useSelectedRoomRuntime";
+import { useAppSelectedRoomRuntime } from "./hooks/useAppSelectedRoomRuntime";
 import { useRoomDisplayContext } from "./hooks/useRoomDisplayContext";
 import { useThemeMode } from "./hooks/useThemeMode";
 import { useWorkspaceRecordActions } from "./hooks/useWorkspaceRecordActions";
@@ -299,34 +299,11 @@ export function App() {
     roomChatMutations,
     roomSetters
   });
-  const selectedRuntime = useSelectedRoomRuntime({
-    selectedRoom,
-    selectedRoomId: workspaceState.selectedRoomId,
-    markdownSelectionMode,
-    selectedMessageIds,
-    localUser: localIdentity.localUser,
-    isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
-    messages,
-    pendingAttachments,
-    pendingAttachmentBytes,
-    browserRequests,
-    roomTerminals,
-    selectedTerminalId,
-    pendingCodexApprovalsByRoom: codexRoomState.pendingCodexApprovalsByRoom,
-    approvalVisibleByRoom: codexRoomState.approvalVisibleByRoom,
-    hostHandoffsByRoom: roomRuntimeState.hostHandoffsByRoom,
-    terminalRequestsByRoom: terminalPanelState.terminalRequestsByRoom,
-    localPreviewsByRoom: localPreviewState.localPreviewsByRoom,
-    localPreviewBusyByRoom: localPreviewState.localPreviewBusyByRoom,
-    inviteRequestsByRoom: invitePanelState.inviteRequestsByRoom,
-    codexEventsByRoom: codexRoomState.codexEventsByRoom,
-    gitWorkflowEventsByRoom: roomRuntimeState.gitWorkflowEventsByRoom,
-    githubActionsEventsByRoom: roomRuntimeState.githubActionsEventsByRoom,
-    codexThreadIdsByRoom: codexRoomState.codexThreadIdsByRoom,
-    codexRunningByRoom: codexRoomState.codexRunningByRoom,
-    hostBusyByRoom: roomSettingsState.hostBusyByRoom,
-    settingsBusyByRoom: roomSettingsState.settingsBusyByRoom,
-    keyRotationBusyByRoom: invitePanelState.keyRotationBusyByRoom
+  const selectedRuntime = useAppSelectedRoomRuntime({
+    appState,
+    localIdentity,
+    selected: selectedContext,
+    roomInteraction
   });
   const hostHandoffActions = useHostHandoffActions({
     hasSelectedRoom,
