@@ -1,6 +1,13 @@
-import { codexModelOptions, maxEmbeddedAttachmentBytes, maxEmbeddedAttachmentBytesPerMessage, maxMessageAttachments, type TeamRecord } from "@multaiplayer/protocol";
-import type { SignedInUser } from "./authClient";
-import type { ChatAttachment } from "../types";
+import {
+  codexModelOptions,
+  maxEmbeddedAttachmentBytes,
+  maxEmbeddedAttachmentBytesPerMessage,
+  maxMessageAttachments,
+  type RoomRecord,
+  type TeamRecord
+} from "@multaiplayer/protocol";
+import type { GitHubAuthConfig, SignedInUser } from "./authClient";
+import type { ChatAttachment, RoomPresence } from "../types";
 
 export function formatCodexModel(model: string): string {
   return codexModelOptions.find((option) => option.id === model)?.label ?? model;
@@ -100,4 +107,41 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function formatSessionPersistence(value: GitHubAuthConfig["sessionPersistence"] | undefined): string {
+  if (value === "encrypted") return "Encrypted at rest";
+  if (value === "memory_only") return "Memory-only";
+  return "Unavailable";
+}
+
+export function attachmentTypeFromName(name: string): string {
+  const extension = name.split(".").at(-1)?.toLowerCase();
+  if (!extension) return "file";
+  if (["png", "jpg", "jpeg", "gif", "webp", "sketch"].includes(extension)) return "image";
+  if (["ts", "tsx", "js", "jsx", "rs", "py", "go", "md", "json"].includes(extension)) return "code";
+  return "file";
+}
+
+export function formatHostStatus(room: RoomRecord): string {
+  if (room.hostStatus === "active") return `Hosted by ${room.host}`;
+  if (room.hostStatus === "handoff") return `Handoff from ${room.host}`;
+  return "No active host";
+}
+
+export function formatMemberDeviceLabel(member: RoomPresence, localDeviceId: string, trusted = false): string {
+  const localLabel = member.deviceId === localDeviceId ? "This device" : "Online";
+  const fingerprint = member.publicKeyFingerprint ? shortFingerprint(member.publicKeyFingerprint) : "identity pending";
+  return `${localLabel} · ${fingerprint}${trusted ? " · locally trusted" : ""}`;
+}
+
+export function shortFingerprint(fingerprint: string): string {
+  if (fingerprint.length <= 18) return fingerprint;
+  return `${fingerprint.slice(0, 10)}...${fingerprint.slice(-6)}`;
+}
+
+export function isRoomHostMember(member: RoomPresence, room: RoomRecord): boolean {
+  if (room.hostStatus !== "active") return false;
+  if (room.hostUserId) return member.userId === room.hostUserId;
+  return member.displayName === room.host;
 }

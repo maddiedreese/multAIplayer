@@ -283,16 +283,21 @@ import {
   clamp,
   embeddedAttachmentBytes,
   encodedBytes,
+  attachmentTypeFromName,
   formatAttachmentMeta,
   formatBytes,
   formatCodexModel,
+  formatHostStatus,
+  formatMemberDeviceLabel,
   formatMessageTime,
+  formatSessionPersistence,
   formatTeamMemberInitial,
   formatTeamMemberJoinedAt,
   formatTeamMemberName,
   formatTeamMeta,
   formatTeamRole,
   formatTimestamp,
+  isRoomHostMember,
   validatePendingAttachments
 } from "./lib/appFormatters";
 import {
@@ -7219,41 +7224,4 @@ function normalizeBrowserLocationInput(value: string): string | null {
     return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
   }
   return normalizeBrowserCommandUrl(trimmed);
-}
-
-function formatSessionPersistence(value: GitHubAuthConfig["sessionPersistence"] | undefined): string {
-  if (value === "encrypted") return "Encrypted at rest";
-  if (value === "memory_only") return "Memory-only";
-  return "Unavailable";
-}
-
-function attachmentTypeFromName(name: string): string {
-  const extension = name.split(".").at(-1)?.toLowerCase();
-  if (!extension) return "file";
-  if (["png", "jpg", "jpeg", "gif", "webp", "sketch"].includes(extension)) return "image";
-  if (["ts", "tsx", "js", "jsx", "rs", "py", "go", "md", "json"].includes(extension)) return "code";
-  return "file";
-}
-
-function formatHostStatus(room: RoomRecord): string {
-  if (room.hostStatus === "active") return `Hosted by ${room.host}`;
-  if (room.hostStatus === "handoff") return `Handoff from ${room.host}`;
-  return "No active host";
-}
-
-function formatMemberDeviceLabel(member: RoomPresence, localDeviceId: string, trusted = false): string {
-  const localLabel = member.deviceId === localDeviceId ? "This device" : "Online";
-  const fingerprint = member.publicKeyFingerprint ? shortFingerprint(member.publicKeyFingerprint) : "identity pending";
-  return `${localLabel} · ${fingerprint}${trusted ? " · locally trusted" : ""}`;
-}
-
-function shortFingerprint(fingerprint: string): string {
-  if (fingerprint.length <= 18) return fingerprint;
-  return `${fingerprint.slice(0, 10)}...${fingerprint.slice(-6)}`;
-}
-
-function isRoomHostMember(member: RoomPresence, room: RoomRecord): boolean {
-  if (room.hostStatus !== "active") return false;
-  if (room.hostUserId) return member.userId === room.hostUserId;
-  return member.displayName === room.host;
 }
