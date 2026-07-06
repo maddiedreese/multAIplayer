@@ -300,7 +300,6 @@ import {
   type LocalPreviewCandidate
 } from "./lib/localPreview";
 import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessageRows } from "./lib/chatDisplayRows";
-import { buildRoomMemberRows } from "./lib/rosterDisplayRows";
 import { useAppConfigState } from "./hooks/useAppConfigState";
 import { useFileTerminalDisplay } from "./hooks/useFileTerminalDisplay";
 import { useLatestRef } from "./hooks/useLatestRef";
@@ -308,6 +307,7 @@ import { useGitHubWorkflowState } from "./hooks/useGitHubWorkflowState";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useRoomAccess } from "./hooks/useRoomAccess";
+import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
 import { useRoomNotices } from "./hooks/useRoomNotices";
 import { useShellLayout } from "./hooks/useShellLayout";
 import { useSelectedTeamData } from "./hooks/useSelectedTeamData";
@@ -719,9 +719,10 @@ export function App() {
   );
   const activeCodexApproval = pendingCodexApprovalsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const approvalVisible = approvalVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
-  const roomMemberRows = buildRoomMemberRows({
-    presence: presenceByRoom[selectedRoom?.id ?? selectedRoomId] ?? {},
-    room: selectedRoom,
+  const roomMemberRows = useRoomMemberRows({
+    presenceByRoom,
+    selectedRoom,
+    selectedRoomId,
     localUser,
     localDeviceId: deviceId,
     localPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
