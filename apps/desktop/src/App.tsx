@@ -13,7 +13,6 @@ import {
   type GitWorkflowResult,
 } from "./lib/localBackend";
 import type { GitHubActionRun } from "./lib/authClient";
-import { useWorkspaceHistoryEffects } from "./hooks/useWorkspaceHistoryEffects";
 import {
   normalizeRoomName
 } from "./lib/workspaceCreation";
@@ -1200,9 +1199,8 @@ export function App() {
         setPendingAttachmentsForRoom,
         setInspectorTabsByRoom
       }
-    }
-  });
-  useWorkspaceHistoryEffects({
+    },
+    historyEffects: {
     hydration: {
       hasSelectedRoom,
       selectedRoomId,
@@ -1235,6 +1233,7 @@ export function App() {
       revokedTeamIds,
       setHistorySearchMessagesByRoom,
       setHistorySearchBusy
+    }
     }
   });
 
