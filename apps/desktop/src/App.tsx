@@ -804,10 +804,13 @@ export function App() {
   const {
     setGitWorkflowMessageForRoom,
     setSelectedGitWorkflowMessage,
-    setGitStatusForRoom
+    setGitStatusForRoom,
+    updateSelectedGitWorkflowDraft
   } = useRoomGitSetters({
     selectedRoomId: selectedRoom.id,
+    hasSelectedRoom,
     setGitWorkflowMessagesByRoom,
+    setGitWorkflowDraftsByRoom,
     setGitStatusByRoom
   });
   const {
@@ -977,11 +980,6 @@ export function App() {
     keyRotationBusyByRoom
   });
   const roomCanUseChat = canUseRoomChat(selectedRoom, isSelectedRoomLocked);
-
-  function updateSelectedGitWorkflowDraft(patch: Partial<GitWorkflowDraft>) {
-    if (!hasSelectedRoom) return;
-    setGitWorkflowDraftsByRoom((current) => updateGitWorkflowDraftRecord(current, selectedRoom.id, patch));
-  }
 
   const selectedTerminalCanControl = canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked);
   const {
