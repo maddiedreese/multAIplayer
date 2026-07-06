@@ -313,6 +313,7 @@ import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
 import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarRoomDisplay, type SidebarTeamDisplay, type ThemeMode } from "./components/DesktopSidebar";
 import { RoomChatPanel, type LocalPreviewCardDisplay, type PendingAttachmentDisplay, type RoomChatMessageDisplay } from "./components/RoomChatPanel";
 import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
+import { LocalPreviewDialog } from "./components/LocalPreviewDialog";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 import type {
   BrowserAccessRequest,
@@ -6796,110 +6797,18 @@ export function App() {
         )}
       />
       {localPreviewDialog.open && (
-        <div className="modal-backdrop" role="presentation">
-          <section className="modal local-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="local-preview-title">
-            <div className="modal-header">
-              <div>
-                <span>Cloudflare Quick Tunnel</span>
-                <strong id="local-preview-title">Share Local Preview</strong>
-              </div>
-              <button
-                type="button"
-                onClick={() => setLocalPreviewDialog((current) => ({ ...current, open: false }))}
-                aria-label="Close Share Local Preview"
-                disabled={localPreviewDialog.phase === "starting"}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {localPreviewDialog.phase === "select" && (
-              <>
-                <p className="modal-copy">{quickTunnelDisclaimer}</p>
-                {localPreviewDialog.candidates.length > 0 && (
-                  <label className="field-stack">
-                    <span>Detected local servers</span>
-                    <select
-                      value={localPreviewDialog.selectedUrl}
-                      onChange={(event) => setLocalPreviewDialog((current) => ({ ...current, selectedUrl: event.target.value }))}
-                    >
-                      {localPreviewDialog.candidates.map((candidate) => (
-                        <option key={candidate.url} value={candidate.url}>
-                          {candidate.label} · {candidate.url}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-                <label className="field-stack">
-                  <span>Manual local URL</span>
-                  <input
-                    value={localPreviewDialog.manualUrl}
-                    onChange={(event) => setLocalPreviewDialog((current) => ({ ...current, manualUrl: event.target.value }))}
-                    placeholder="http://localhost:3000"
-                  />
-                </label>
-                {localPreviewDialog.error && <div className="workflow-message">{localPreviewDialog.error}</div>}
-                <div className="modal-actions">
-                  <button type="button" onClick={() => setLocalPreviewDialog((current) => ({ ...current, open: false }))}>
-                    Cancel
-                  </button>
-                  <button type="button" className="primary" onClick={() => void prepareLocalPreviewConfirmation()} disabled={localPreviewBusy}>
-                    Continue
-                  </button>
-                </div>
-              </>
-            )}
-
-            {localPreviewDialog.phase === "install" && (
-              <>
-                <p className="modal-copy">cloudflared is required to start a Cloudflare Quick Tunnel.</p>
-                <pre className="install-snippet">brew install cloudflare/cloudflare/cloudflared</pre>
-                <a href="https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/" target="_blank" rel="noreferrer">
-                  Windows and Linux downloads
-                </a>
-                {localPreviewDialog.error && <div className="workflow-message">{localPreviewDialog.error}</div>}
-                <div className="modal-actions">
-                  <button type="button" onClick={() => setLocalPreviewDialog((current) => ({ ...current, phase: "select" }))}>
-                    Back
-                  </button>
-                  <button type="button" className="primary" onClick={() => void prepareLocalPreviewConfirmation()}>
-                    Check again
-                  </button>
-                </div>
-              </>
-            )}
-
-            {(localPreviewDialog.phase === "confirm" || localPreviewDialog.phase === "starting") && (
-              <>
-                <div className="confirmation-copy">
-                  {quickTunnelSafetyText.split("\n").map((line, index) => (
-                    line ? <p key={index}>{line}</p> : <br key={index} />
-                  ))}
-                </div>
-                <dl className="local-preview-summary">
-                  <div>
-                    <dt>Source</dt>
-                    <dd>{localPreviewDialog.selectedUrl}</dd>
-                  </div>
-                  <div>
-                    <dt>cloudflared</dt>
-                    <dd>{localPreviewDialog.cloudflaredVersion ?? "available"}</dd>
-                  </div>
-                </dl>
-                {localPreviewDialog.error && <div className="workflow-message">{localPreviewDialog.error}</div>}
-                <div className="modal-actions">
-                  <button type="button" onClick={() => setLocalPreviewDialog((current) => ({ ...current, phase: "select" }))} disabled={localPreviewDialog.phase === "starting"}>
-                    Back
-                  </button>
-                  <button type="button" className="primary" onClick={() => void confirmLocalPreviewShare()} disabled={localPreviewDialog.phase === "starting"}>
-                    {localPreviewDialog.phase === "starting" ? "Starting..." : "Start sharing"}
-                  </button>
-                </div>
-              </>
-            )}
-          </section>
-        </div>
+        <LocalPreviewDialog
+          dialog={localPreviewDialog}
+          busy={localPreviewBusy}
+          disclaimer={quickTunnelDisclaimer}
+          safetyText={quickTunnelSafetyText}
+          onClose={() => setLocalPreviewDialog((current) => ({ ...current, open: false }))}
+          onSelectedUrlChange={(selectedUrl) => setLocalPreviewDialog((current) => ({ ...current, selectedUrl }))}
+          onManualUrlChange={(manualUrl) => setLocalPreviewDialog((current) => ({ ...current, manualUrl }))}
+          onBackToSelect={() => setLocalPreviewDialog((current) => ({ ...current, phase: "select" }))}
+          onContinue={() => void prepareLocalPreviewConfirmation()}
+          onStartSharing={() => void confirmLocalPreviewShare()}
+        />
       )}
     </div>
   );
