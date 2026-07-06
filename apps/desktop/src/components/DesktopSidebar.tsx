@@ -11,8 +11,9 @@ import {
   X
 } from "lucide-react";
 import { useState } from "react";
-import brandIcon from "../assets/multaiplayer-icon.png";
 import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
+
+const brandIcon = new URL("../assets/multaiplayer-icon.png", import.meta.url).href;
 
 export type SidebarPanelName = "profile" | "settings" | null;
 export type ThemeMode = "light" | "dark";
