@@ -134,6 +134,7 @@ import { useGitHubWorkflowPanelState } from "./hooks/useGitHubWorkflowPanelState
 import { useLocalPreviewState } from "./hooks/useLocalPreviewState";
 import { useInvitePanelState } from "./hooks/useInvitePanelState";
 import { useRoomSettingsState } from "./hooks/useRoomSettingsState";
+import { useRoomChatState } from "./hooks/useRoomChatState";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -225,7 +226,16 @@ export function App() {
     saveRelayConfiguration,
     resetRelayConfiguration
   } = useAppConfigState();
-  const [chatMessagesByRoom, setChatMessagesByRoom] = useState<Record<string, string | null>>({});
+  const {
+    chatMessagesByRoom,
+    setChatMessagesByRoom,
+    draftsByRoom,
+    setDraftsByRoom,
+    pendingAttachmentsByRoom,
+    setPendingAttachmentsByRoom,
+    sensitiveAttachmentReviewKey,
+    setSensitiveAttachmentReviewKey
+  } = useRoomChatState();
   const {
     hostBusyByRoom,
     setHostBusyByRoom,
@@ -276,8 +286,6 @@ export function App() {
     localPreviewBusyByRoom,
     setLocalPreviewBusyByRoom
   } = useLocalPreviewState();
-  const [draftsByRoom, setDraftsByRoom] = useState<Record<string, string>>({});
-  const [pendingAttachmentsByRoom, setPendingAttachmentsByRoom] = useState<Record<string, ChatAttachment[]>>({});
   const [approvalVisibleByRoom, setApprovalVisibleByRoom] = useState<Record<string, boolean>>({});
   const [pendingCodexApprovalsByRoom, setPendingCodexApprovalsByRoom] = useState<Record<string, PendingCodexApproval>>({});
   const [codexRunningByRoom, setCodexRunningByRoom] = useState<Record<string, boolean>>({});
@@ -360,7 +368,6 @@ export function App() {
   } = useFilePanelState();
   const [historySearchMessagesByRoom, setHistorySearchMessagesByRoom] = useState<Record<string, ChatMessage[]>>({});
   const [historySearchBusy, setHistorySearchBusy] = useState(false);
-  const [sensitiveAttachmentReviewKey, setSensitiveAttachmentReviewKey] = useState<string | null>(null);
   const {
     inviteRequestsByRoom,
     setInviteRequestsByRoom,
