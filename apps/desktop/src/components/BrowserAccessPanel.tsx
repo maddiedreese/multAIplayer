@@ -40,7 +40,6 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
   onBrowserUrlChange,
   onBrowserReasonChange,
   onOpenBrowserNow,
-  onCloseBrowser,
   onRequestBrowserAccess,
   onApproveBrowserRequest,
   onDenyBrowserRequest,
@@ -65,7 +64,6 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
   onBrowserUrlChange: (url: string) => void;
   onBrowserReasonChange: (reason: string) => void;
   onOpenBrowserNow: () => void;
-  onCloseBrowser: () => void;
   onRequestBrowserAccess: () => void;
   onApproveBrowserRequest: (request: T) => void;
   onDenyBrowserRequest: (requestId: string) => void;
@@ -152,15 +150,6 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
   if (activeBrowserUrl) {
     return (
       <section className="panel browser-panel browser-open" hidden={hidden}>
-        <div className="browser-chrome">
-          <div>
-            <strong>{formatBrowserAccessLabel(activeBrowserUrl)}</strong>
-            <span>Room browser context</span>
-          </div>
-          <button onClick={onCloseBrowser} aria-label="Close room browser" title="Close room browser">
-            <X size={15} />
-          </button>
-        </div>
         <div className="browser-viewport active" ref={browserViewportRef}>
           {!tauriRuntime ? (
             <iframe
@@ -176,8 +165,7 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
             </div>
           )}
         </div>
-        {browserSurfaceError && <div className="workflow-message browser-overlay-message">{browserSurfaceError}</div>}
-        {browserMessage && <div className="workflow-message browser-overlay-message">{browserMessage}</div>}
+        {browserSurfaceError && <div className="workflow-message">{browserSurfaceError}</div>}
       </section>
     );
   }
