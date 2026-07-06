@@ -39,10 +39,6 @@ import {
   attachmentTypeFromName,
   formatTimestamp
 } from "./lib/appFormatters";
-import {
-  quickTunnelDisclaimer,
-  quickTunnelSafetyText
-} from "./lib/localPreview";
 import { useAppConfigState } from "./hooks/useAppConfigState";
 import { useFileTerminalDisplay } from "./hooks/useFileTerminalDisplay";
 import { useGitHubWorkflowState } from "./hooks/useGitHubWorkflowState";
@@ -123,6 +119,7 @@ import { useRoomMainColumnProps } from "./hooks/useRoomMainColumnProps";
 import { useRoomInspectorPanelProps } from "./hooks/useRoomInspectorPanelProps";
 import { useSelectedRoomContext } from "./hooks/useSelectedRoomContext";
 import { useAppSidebarProps } from "./hooks/useAppSidebarProps";
+import { useLocalPreviewDialogProps } from "./hooks/useLocalPreviewDialogProps";
 import { InlineSecretWarning } from "./components/common";
 import { AppWorkspaceShell } from "./components/AppWorkspaceShell";
 import { AppSidebarDrawer } from "./components/AppSidebarDrawer";
@@ -2161,6 +2158,13 @@ export function App() {
     onApplyTeamDefaultsToRoom: applyTeamDefaultsToRoom,
     roomSources: rooms
   });
+  const { localPreviewDialogOpen, localPreviewDialogProps } = useLocalPreviewDialogProps({
+    localPreviewDialog,
+    setLocalPreviewDialog,
+    localPreviewBusy,
+    prepareLocalPreviewConfirmation,
+    confirmLocalPreviewShare
+  });
 
   return (
     <AppWorkspaceShell
@@ -2179,20 +2183,7 @@ export function App() {
       inspector={(
         <RoomInspectorPanel {...roomInspectorPanelProps} />
       )}
-      dialog={localPreviewDialog.open ? (
-        <LocalPreviewDialog
-          dialog={localPreviewDialog}
-          busy={localPreviewBusy}
-          disclaimer={quickTunnelDisclaimer}
-          safetyText={quickTunnelSafetyText}
-          onClose={() => setLocalPreviewDialog((current) => ({ ...current, open: false }))}
-          onSelectedUrlChange={(selectedUrl) => setLocalPreviewDialog((current) => ({ ...current, selectedUrl }))}
-          onManualUrlChange={(manualUrl) => setLocalPreviewDialog((current) => ({ ...current, manualUrl }))}
-          onBackToSelect={() => setLocalPreviewDialog((current) => ({ ...current, phase: "select" }))}
-          onContinue={() => void prepareLocalPreviewConfirmation()}
-          onStartSharing={() => void confirmLocalPreviewShare()}
-        />
-      ) : null}
+      dialog={localPreviewDialogOpen ? <LocalPreviewDialog {...localPreviewDialogProps} /> : null}
     />
   );
 }
