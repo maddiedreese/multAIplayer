@@ -131,6 +131,7 @@ import { defaultRelayHttpUrl, defaultRelayWsUrl } from "./lib/appConfig";
 import { useDeviceIdentityLifecycle } from "./hooks/useDeviceIdentityLifecycle";
 import { useSelectedTeamDefaults } from "./hooks/useSelectedTeamDefaults";
 import { useCodexProbe } from "./hooks/useCodexProbe";
+import { useRoomDraftCleanup } from "./hooks/useRoomDraftCleanup";
 import {
   canApproveCodexTurn,
   shouldAutoApproveChatOnlyTurn,
@@ -1776,15 +1777,14 @@ export function App() {
 
   useCodexProbe({ setCodexProbe });
 
-  useEffect(() => {
-    if (!hasSelectedRoom) return;
-    setCustomCodexModelsByRoom((current) => current[selectedRoom.id] === selectedCodexModel ? omitRecordKey(current, selectedRoom.id) : current);
-  }, [hasSelectedRoom, selectedCodexModel, selectedRoom.id]);
-
-  useEffect(() => {
-    if (!hasSelectedRoom) return;
-    setProjectPathDraftsByRoom((current) => current[selectedRoom.id] === selectedRoom.projectPath ? omitRecordKey(current, selectedRoom.id) : current);
-  }, [hasSelectedRoom, selectedRoom.id, selectedRoom.projectPath]);
+  useRoomDraftCleanup({
+    hasSelectedRoom,
+    selectedRoomId: selectedRoom.id,
+    selectedRoomProjectPath: selectedRoom.projectPath,
+    selectedCodexModel,
+    setCustomCodexModelsByRoom,
+    setProjectPathDraftsByRoom
+  });
 
   async function sendMessage() {
     if (!hasSelectedRoom) {
