@@ -54,21 +54,6 @@ export function useAppStateSlices({
     githubWorkflowPanelState,
     filePanelState,
     invitePanelState,
-    shellLayout,
-    ...workspaceState,
-    ...appConfigState,
-    ...roomChatState,
-    ...roomSettingsState,
-    ...historyDefaultsState,
-    ...roomRuntimeState,
-    ...codexRoomState,
-    ...localPreviewState,
-    ...appRuntimeState,
-    ...terminalPanelState,
-    ...browserPanelState,
-    ...githubWorkflowPanelState,
-    ...filePanelState,
-    ...invitePanelState,
-    ...shellLayout
+    shellLayout
   };
 }
