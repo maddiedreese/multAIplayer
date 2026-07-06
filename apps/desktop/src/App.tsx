@@ -142,7 +142,7 @@ import {
   updateRoomHost,
   updateRoomSettings
 } from "./lib/workspaceClient";
-import { defaultRelayHttpUrl, defaultRelayWsUrl, loadAppConfig, resetAppConfig, saveAppConfig, type AppConfig } from "./lib/appConfig";
+import { defaultRelayHttpUrl, defaultRelayWsUrl } from "./lib/appConfig";
 import {
   canApproveCodexTurn,
   shouldAutoApproveChatOnlyTurn,
@@ -310,6 +310,7 @@ import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessag
 import { buildRoomMemberRows, buildTeamMemberRows } from "./lib/rosterDisplayRows";
 import { buildSidebarMessageHitRows, buildSidebarRoomRows, buildSidebarTeamRows } from "./lib/sidebarDisplayRows";
 import { buildCodexEventRows, buildTerminalOutputLines, buildTerminalRequestRows } from "./lib/terminalDisplayRows";
+import { useAppConfigState } from "./hooks/useAppConfigState";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useShellLayout } from "./hooks/useShellLayout";
 import { useThemeMode } from "./hooks/useThemeMode";
@@ -388,10 +389,16 @@ export function App() {
   const [teamMembersBusyByTeam, setTeamMembersBusyByTeam] = useState<Record<string, boolean>>({});
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>(null);
-  const [appConfig, setAppConfig] = useState<AppConfig>(() => loadAppConfig());
-  const [relayHttpDraft, setRelayHttpDraft] = useState(() => loadAppConfig().relayHttpUrl);
-  const [relayWsDraft, setRelayWsDraft] = useState(() => loadAppConfig().relayWsUrl);
-  const [appConfigMessage, setAppConfigMessage] = useState<string | null>(null);
+  const {
+    appConfig,
+    relayHttpDraft,
+    relayWsDraft,
+    appConfigMessage,
+    setRelayHttpDraft,
+    setRelayWsDraft,
+    saveRelayConfiguration,
+    resetRelayConfiguration
+  } = useAppConfigState();
   const [hostBusyByRoom, setHostBusyByRoom] = useState<Record<string, boolean>>({});
   const [hostMessagesByRoom, setHostMessagesByRoom] = useState<Record<string, string | null>>({});
   const [chatMessagesByRoom, setChatMessagesByRoom] = useState<Record<string, string | null>>({});
@@ -2221,30 +2228,6 @@ export function App() {
       setDeviceIdentityMessage,
       selectedRoom.id
     );
-  }
-
-  function saveRelayConfiguration() {
-    setAppConfigMessage(null);
-    try {
-      const next = saveAppConfig({
-        relayHttpUrl: relayHttpDraft,
-        relayWsUrl: relayWsDraft
-      });
-      setAppConfig(next);
-      setRelayHttpDraft(next.relayHttpUrl);
-      setRelayWsDraft(next.relayWsUrl);
-      setAppConfigMessage("Relay configuration saved. Reconnecting rooms and reloading workspace metadata.");
-    } catch (error) {
-      setAppConfigMessage(String(error));
-    }
-  }
-
-  function resetRelayConfiguration() {
-    const next = resetAppConfig();
-    setAppConfig(next);
-    setRelayHttpDraft(next.relayHttpUrl);
-    setRelayWsDraft(next.relayWsUrl);
-    setAppConfigMessage("Relay configuration reset to the app defaults.");
   }
 
   async function addTeam() {
