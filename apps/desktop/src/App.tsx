@@ -114,18 +114,7 @@ export function App() {
     localPreviewState,
     appRuntimeState,
     terminalPanelState,
-    browserRequestsByRoom,
-    setBrowserRequestsByRoom,
-    browserUrlsByRoom,
-    setBrowserUrlsByRoom,
-    browserReasonsByRoom,
-    setBrowserReasonsByRoom,
-    browserMessagesByRoom,
-    setBrowserMessagesByRoom,
-    browserStatusByRoom,
-    setBrowserStatusByRoom,
-    activeBrowserUrlsByRoom,
-    setActiveBrowserUrlsByRoom,
+    browserPanelState,
     gitStatusByRoom,
     setGitStatusByRoom,
     gitWorkflowBusyByRoom,
@@ -197,7 +186,7 @@ export function App() {
     localPreviewBusyByRoom: localPreviewState.localPreviewBusyByRoom,
     fileBusyByRoom,
     terminalBusyByRoom: terminalPanelState.terminalBusyByRoom,
-    browserRequestsByRoom
+    browserRequestsByRoom: browserPanelState.browserRequestsByRoom
   });
   const githubAuth = useGitHubAuth(appConfigState.appConfig.relayHttpUrl);
   const localIdentity = useLocalIdentity(githubAuth.currentUser);
@@ -289,10 +278,10 @@ export function App() {
       messagesByRoom: workspaceState.messagesByRoom,
       draftsByRoom: roomChatState.draftsByRoom,
       pendingAttachmentsByRoom: roomChatState.pendingAttachmentsByRoom,
-      browserRequestsByRoom,
-      browserUrlsByRoom,
-      browserReasonsByRoom,
-      activeBrowserUrlsByRoom,
+      browserRequestsByRoom: browserPanelState.browserRequestsByRoom,
+      browserUrlsByRoom: browserPanelState.browserUrlsByRoom,
+      browserReasonsByRoom: browserPanelState.browserReasonsByRoom,
+      activeBrowserUrlsByRoom: browserPanelState.activeBrowserUrlsByRoom,
       gitStatusByRoom,
       gitWorkflowDraftsByRoom,
       gitWorkflowBusyByRoom,
@@ -454,9 +443,9 @@ export function App() {
       selectedRoomId: selectedRoom.id,
       defaultBrowserUrl,
       defaultBrowserReason,
-      setBrowserUrlsByRoom,
-      setBrowserReasonsByRoom,
-      setBrowserMessagesByRoom
+      setBrowserUrlsByRoom: browserPanelState.setBrowserUrlsByRoom,
+      setBrowserReasonsByRoom: browserPanelState.setBrowserReasonsByRoom,
+      setBrowserMessagesByRoom: browserPanelState.setBrowserMessagesByRoom
     },
     invites: {
       selectedRoomId: selectedRoom.id,
@@ -493,7 +482,7 @@ export function App() {
     requests: {
       setInviteRequestsByRoom,
       setTerminalRequestsByRoom: terminalPanelState.setTerminalRequestsByRoom,
-      setBrowserRequestsByRoom
+      setBrowserRequestsByRoom: browserPanelState.setBrowserRequestsByRoom
     }
   });
   const roomChatMutations = useRoomChatMutations({
@@ -632,7 +621,7 @@ export function App() {
     seenEnvelopeIds: appRefs.seenEnvelopeIds,
     messages,
     terminals: terminalPanelState.terminals,
-    browserRequestsByRoom,
+    browserRequestsByRoom: browserPanelState.browserRequestsByRoom,
     gitStatus,
     gitStatusByRoom,
     reportRoomHostMutationInFlight: roomInteraction.reportRoomHostMutationInFlight,
@@ -710,7 +699,7 @@ export function App() {
       historySearchMessagesByRoom: appRuntimeState.historySearchMessagesByRoom,
       approvalVisibleByRoom,
       terminalRequestsByRoom: terminalPanelState.terminalRequestsByRoom,
-      browserRequestsByRoom,
+      browserRequestsByRoom: browserPanelState.browserRequestsByRoom,
       approvalPolicyLabels
     },
     teamMembers: {
@@ -855,7 +844,7 @@ export function App() {
         setHistorySettings: historyDefaultsState.setHistorySettings,
         setMessagesByRoom: workspaceState.setMessagesByRoom,
         setTerminalRequestsByRoom: terminalPanelState.setTerminalRequestsByRoom,
-        setBrowserRequestsByRoom,
+        setBrowserRequestsByRoom: browserPanelState.setBrowserRequestsByRoom,
         setInviteRequestsByRoom,
         setCodexEventsByRoom,
         setGitWorkflowEventsByRoom,
@@ -864,8 +853,8 @@ export function App() {
         setTerminals: terminalPanelState.setTerminals,
         setHostHandoffsByRoom,
         setRooms: workspaceState.setRooms,
-        setBrowserStatusByRoom,
-        setActiveBrowserUrlsByRoom,
+        setBrowserStatusByRoom: browserPanelState.setBrowserStatusByRoom,
+        setActiveBrowserUrlsByRoom: browserPanelState.setActiveBrowserUrlsByRoom,
         setCodexThreadIdsByRoom,
         setActionRunsByRoom,
         setActionsLastCheckedByRoom,
@@ -901,9 +890,9 @@ export function App() {
         setTerminalCommandsByRoom: terminalPanelState.setTerminalCommandsByRoom,
         setTerminalInputsByRoom: terminalPanelState.setTerminalInputsByRoom,
         setTerminalErrorsByRoom: terminalPanelState.setTerminalErrorsByRoom,
-        setBrowserUrlsByRoom,
-        setBrowserReasonsByRoom,
-        setBrowserMessagesByRoom,
+        setBrowserUrlsByRoom: browserPanelState.setBrowserUrlsByRoom,
+        setBrowserReasonsByRoom: browserPanelState.setBrowserReasonsByRoom,
+        setBrowserMessagesByRoom: browserPanelState.setBrowserMessagesByRoom,
         setInviteLinksByRoom,
         setInviteApprovalGatesByRoom,
         setInviteMessagesByRoom,
@@ -944,7 +933,7 @@ export function App() {
       setHistorySettings: historyDefaultsState.setHistorySettings,
       setMessagesByRoom: workspaceState.setMessagesByRoom,
       setTerminalRequestsByRoom: terminalPanelState.setTerminalRequestsByRoom,
-      setBrowserRequestsByRoom,
+      setBrowserRequestsByRoom: browserPanelState.setBrowserRequestsByRoom,
       setInviteRequestsByRoom,
       setCodexEventsByRoom,
       setGitWorkflowEventsByRoom,
@@ -981,8 +970,8 @@ export function App() {
       appendBrowserRequest,
       setBrowserMessageForRoom,
       setBrowserUrlForRoom,
-      setActiveBrowserUrlsByRoom,
-      setBrowserStatusByRoom,
+      setActiveBrowserUrlsByRoom: browserPanelState.setActiveBrowserUrlsByRoom,
+      setBrowserStatusByRoom: browserPanelState.setBrowserStatusByRoom,
       setInspectorTabsByRoom
     },
     relayRoomSync: {
@@ -1010,7 +999,7 @@ export function App() {
         setRooms: workspaceState.setRooms,
         setMessagesByRoom: workspaceState.setMessagesByRoom,
         setTerminalRequestsByRoom: terminalPanelState.setTerminalRequestsByRoom,
-        setBrowserRequestsByRoom,
+        setBrowserRequestsByRoom: browserPanelState.setBrowserRequestsByRoom,
         setActionRunsByRoom,
         setActionsLastCheckedByRoom,
         setActionsMessagesByRoom,
@@ -1068,7 +1057,7 @@ export function App() {
       localUser: localIdentity.localUser,
       messagesByRoom: workspaceState.messagesByRoom,
       terminals: terminalPanelState.terminals,
-      browserRequestsByRoom,
+      browserRequestsByRoom: browserPanelState.browserRequestsByRoom,
       gitStatusByRoom,
       codexContinuationByRoom,
       codexThreadIdsByRoom,
@@ -1133,7 +1122,7 @@ export function App() {
       setSelectedBrowserMessage,
       setBrowserMessageForRoom,
       setRooms: workspaceState.setRooms,
-      setBrowserStatusByRoom,
+      setBrowserStatusByRoom: browserPanelState.setBrowserStatusByRoom,
       setProjectPathDraftForRoom,
       resetCodexApprovalForRoom,
       resetFileContextForRoom,
@@ -1262,8 +1251,8 @@ export function App() {
       appendBrowserRequest,
       updateBrowserRequestStatus,
       publishRequestStatus: relaySync.publishRequestStatus,
-      setActiveBrowserUrlsByRoom,
-      setBrowserStatusByRoom,
+      setActiveBrowserUrlsByRoom: browserPanelState.setActiveBrowserUrlsByRoom,
+      setBrowserStatusByRoom: browserPanelState.setBrowserStatusByRoom,
       setInspectorTabsByRoom
       }
     },
