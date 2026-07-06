@@ -132,6 +132,7 @@ import { useTerminalPanelState } from "./hooks/useTerminalPanelState";
 import { useFilePanelState } from "./hooks/useFilePanelState";
 import { useGitHubWorkflowPanelState } from "./hooks/useGitHubWorkflowPanelState";
 import { useLocalPreviewState } from "./hooks/useLocalPreviewState";
+import { useInvitePanelState } from "./hooks/useInvitePanelState";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -151,7 +152,6 @@ import type {
   ChatReaction,
   CodexRoomEvent,
   HostHandoffRecord,
-  InviteJoinRequest,
   LocalPreviewRecord,
   NoSecretRoomInvite,
   PendingCodexApproval,
@@ -256,7 +256,6 @@ export function App() {
   const [presenceByRoom, setPresenceByRoom] = useState<Record<string, Record<string, RoomPresence>>>({});
   const [hostHandoffsByRoom, setHostHandoffsByRoom] = useState<Record<string, HostHandoffRecord[]>>({});
   const [codexContinuationByRoom, setCodexContinuationByRoom] = useState<Record<string, HostHandoffRecord>>({});
-  const [inviteRequestsByRoom, setInviteRequestsByRoom] = useState<Record<string, InviteJoinRequest[]>>({});
   const [codexEventsByRoom, setCodexEventsByRoom] = useState<Record<string, CodexRoomEvent[]>>({});
   const [gitWorkflowEventsByRoom, setGitWorkflowEventsByRoom] = useState<Record<string, GitWorkflowEventPlaintextPayload[]>>({});
   const [githubActionsEventsByRoom, setGitHubActionsEventsByRoom] = useState<Record<string, GitHubActionsEventPlaintextPayload[]>>({});
@@ -353,12 +352,22 @@ export function App() {
   const [historySearchMessagesByRoom, setHistorySearchMessagesByRoom] = useState<Record<string, ChatMessage[]>>({});
   const [historySearchBusy, setHistorySearchBusy] = useState(false);
   const [sensitiveAttachmentReviewKey, setSensitiveAttachmentReviewKey] = useState<string | null>(null);
-  const [inviteSecretInput, setInviteSecretInput] = useState("");
-  const [inviteLinksByRoom, setInviteLinksByRoom] = useState<Record<string, string>>({});
-  const [inviteApprovalGatesByRoom, setInviteApprovalGatesByRoom] = useState<Record<string, boolean>>({});
-  const [inviteMessagesByRoom, setInviteMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [keyRotationBusyByRoom, setKeyRotationBusyByRoom] = useState<Record<string, boolean>>({});
-  const [inviteAdmissionsByRoom, setInviteAdmissionsByRoom] = useState<Record<string, string>>({});
+  const {
+    inviteRequestsByRoom,
+    setInviteRequestsByRoom,
+    inviteSecretInput,
+    setInviteSecretInput,
+    inviteLinksByRoom,
+    setInviteLinksByRoom,
+    inviteApprovalGatesByRoom,
+    setInviteApprovalGatesByRoom,
+    inviteMessagesByRoom,
+    setInviteMessagesByRoom,
+    keyRotationBusyByRoom,
+    setKeyRotationBusyByRoom,
+    inviteAdmissionsByRoom,
+    setInviteAdmissionsByRoom
+  } = useInvitePanelState();
   const [codexThreadIdsByRoom, setCodexThreadIdsByRoom] = useState<Record<string, string>>({});
   const {
     sidebarCollapsed,
