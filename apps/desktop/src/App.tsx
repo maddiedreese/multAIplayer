@@ -13,16 +13,7 @@ import {
   type GitWorkflowResult,
 } from "./lib/localBackend";
 import type { GitHubActionRun } from "./lib/authClient";
-import { useCodexProbe } from "./hooks/useCodexProbe";
-import { useRoomDraftCleanup } from "./hooks/useRoomDraftCleanup";
 import { useHistorySearch } from "./hooks/useHistorySearch";
-import { useRoomGitStatusRefresh } from "./hooks/useRoomGitStatusRefresh";
-import { useGitHubRemoteInference } from "./hooks/useGitHubRemoteInference";
-import { useGitHubActionsDraftReset } from "./hooks/useGitHubActionsDraftReset";
-import { useProjectFilesSearch } from "./hooks/useProjectFilesSearch";
-import { useTerminalLifecycle } from "./hooks/useTerminalLifecycle";
-import { useLocalHistoryPersistence } from "./hooks/useLocalHistoryPersistence";
-import { useTerminalAutoOpen } from "./hooks/useTerminalAutoOpen";
 import { useLocalHistoryHydration } from "./hooks/useLocalHistoryHydration";
 import {
   normalizeRoomName
@@ -67,7 +58,6 @@ import { useSidebarNavigation } from "./hooks/useSidebarNavigation";
 import { useRoomTerminalSetters } from "./hooks/useRoomTerminalSetters";
 import { useTeamMembersRefresh } from "./hooks/useTeamMembersRefresh";
 import { useThemeMode } from "./hooks/useThemeMode";
-import { useLocalPreviewPolling } from "./hooks/useLocalPreviewPolling";
 import { useRelaySubscription } from "./hooks/useRelaySubscription";
 import { useRelayPublishers } from "./hooks/useRelayPublishers";
 import { useLocalPreviewActions } from "./hooks/useLocalPreviewActions";
@@ -116,6 +106,7 @@ import { useSelectedRoomContext } from "./hooks/useSelectedRoomContext";
 import { useAppSidebarProps } from "./hooks/useAppSidebarProps";
 import { useLocalPreviewDialogProps } from "./hooks/useLocalPreviewDialogProps";
 import { useAppBootstrapEffects } from "./hooks/useAppBootstrapEffects";
+import { useRoomBackgroundEffects } from "./hooks/useRoomBackgroundEffects";
 import { InlineSecretWarning } from "./components/common";
 import { AppWorkspaceShell } from "./components/AppWorkspaceShell";
 import { AppSidebarDrawer } from "./components/AppSidebarDrawer";
@@ -1677,112 +1668,105 @@ export function App() {
     setInspectorTabsByRoom
   });
 
-  useLocalHistoryPersistence({
-    hasSelectedRoom,
-    selectedRoomId,
-    selectedRoomTeamId: selectedRoom.teamId,
-    forgottenRoomIds,
-    revokedRoomIds,
-    revokedTeamIds,
-    historyLoadedRoomIds,
-    historySettings,
-    messages,
-    terminalRequests,
-    browserRequests,
-    inviteRequests,
-    codexEvents,
-    gitWorkflowEvents,
-    githubActionsEvents,
-    localPreviews,
-    terminals,
-    hostHandoffs,
-    selectedCodexThreadId
-  });
-
-  useLocalPreviewPolling({
-    localPreviewsByRoom,
-    localUserId: localUser.id,
-    roomsRef,
-    publishLocalPreviewEvent
-  });
-
-  useRoomGitStatusRefresh({
-    hasSelectedRoom,
-    canReadLocalWorkspace,
-    selectedRoomId: selectedRoom.id,
-    selectedRoomProjectPath: selectedRoom.projectPath,
-    setGitStatusForRoom
-  });
-
-  useGitHubRemoteInference({
-    hasSelectedRoom,
-    canReadLocalWorkspace,
-    selectedRoomId: selectedRoom.id,
-    selectedRoomProjectPath: selectedRoom.projectPath,
-    selectedRoomIdRef,
-    gitWorkflowDraftsRef,
-    setGitWorkflowDraftsByRoom,
-    setGitWorkflowMessageForRoom
-  });
-
-  useGitHubActionsDraftReset({
-    hasSelectedRoom,
-    selectedRoomId: selectedRoom.id,
-    gitWorkflowDraft,
-    setActionRunsByRoom,
-    setActionsLastCheckedByRoom,
-    setActionsMessagesByRoom,
-    setActionsBusyByRoom
-  });
-
-  useProjectFilesSearch({
-    hasSelectedRoom,
-    canReadLocalWorkspace,
-    selectedRoomId: selectedRoom.id,
-    selectedRoomProjectPath: selectedRoom.projectPath,
-    fileQueriesByRoom,
-    localWorkspaceMessage,
-    setProjectFilesForRoom,
-    setSelectedFileForRoom,
-    setSelectedDiffForRoom,
-    setFileBusyForRoom,
-    setFileMessageForRoom
-  });
-
-  useTerminalLifecycle({
-    hasSelectedRoom,
-    canReadLocalWorkspace,
-    selectedRoomId: selectedRoom.id,
-    selectedTerminalId,
-    selectedTerminalRunning: selectedTerminal?.running,
-    setTerminals,
-    setSelectedTerminalIdsByRoom,
-    setSelectedTerminalIdForRoom,
-    setTerminalErrorForRoom
-  });
-
-  useTerminalAutoOpen({
-    inspectorTab,
-    hasSelectedRoom,
-    isActiveHost,
-    canReadLocalWorkspace,
-    isSelectedRoomLocked,
-    terminalBusy,
-    roomTerminalCount: roomTerminals.length,
-    selectedRoomId: selectedRoom.id,
-    terminalAutoOpenedRoomsRef,
-    openInteractiveTerminal
-  });
-
-  useCodexProbe({ setCodexProbe });
-
-  useRoomDraftCleanup({
-    hasSelectedRoom,
-    selectedRoomId: selectedRoom.id,
-    selectedRoomProjectPath: selectedRoom.projectPath,
-    selectedCodexModel,
-    setCustomCodexModelsByRoom,
-    setProjectPathDraftsByRoom
+  useRoomBackgroundEffects({
+    localHistoryPersistence: {
+      hasSelectedRoom,
+      selectedRoomId,
+      selectedRoomTeamId: selectedRoom.teamId,
+      forgottenRoomIds,
+      revokedRoomIds,
+      revokedTeamIds,
+      historyLoadedRoomIds,
+      historySettings,
+      messages,
+      terminalRequests,
+      browserRequests,
+      inviteRequests,
+      codexEvents,
+      gitWorkflowEvents,
+      githubActionsEvents,
+      localPreviews,
+      terminals,
+      hostHandoffs,
+      selectedCodexThreadId
+    },
+    localPreviewPolling: {
+      localPreviewsByRoom,
+      localUserId: localUser.id,
+      roomsRef,
+      publishLocalPreviewEvent
+    },
+    roomGitStatusRefresh: {
+      hasSelectedRoom,
+      canReadLocalWorkspace,
+      selectedRoomId: selectedRoom.id,
+      selectedRoomProjectPath: selectedRoom.projectPath,
+      setGitStatusForRoom
+    },
+    gitHubRemoteInference: {
+      hasSelectedRoom,
+      canReadLocalWorkspace,
+      selectedRoomId: selectedRoom.id,
+      selectedRoomProjectPath: selectedRoom.projectPath,
+      selectedRoomIdRef,
+      gitWorkflowDraftsRef,
+      setGitWorkflowDraftsByRoom,
+      setGitWorkflowMessageForRoom
+    },
+    gitHubActionsDraftReset: {
+      hasSelectedRoom,
+      selectedRoomId: selectedRoom.id,
+      gitWorkflowDraft,
+      setActionRunsByRoom,
+      setActionsLastCheckedByRoom,
+      setActionsMessagesByRoom,
+      setActionsBusyByRoom
+    },
+    projectFilesSearch: {
+      hasSelectedRoom,
+      canReadLocalWorkspace,
+      selectedRoomId: selectedRoom.id,
+      selectedRoomProjectPath: selectedRoom.projectPath,
+      fileQueriesByRoom,
+      localWorkspaceMessage,
+      setProjectFilesForRoom,
+      setSelectedFileForRoom,
+      setSelectedDiffForRoom,
+      setFileBusyForRoom,
+      setFileMessageForRoom
+    },
+    terminalLifecycle: {
+      hasSelectedRoom,
+      canReadLocalWorkspace,
+      selectedRoomId: selectedRoom.id,
+      selectedTerminalId,
+      selectedTerminalRunning: selectedTerminal?.running,
+      setTerminals,
+      setSelectedTerminalIdsByRoom,
+      setSelectedTerminalIdForRoom,
+      setTerminalErrorForRoom
+    },
+    terminalAutoOpen: {
+      inspectorTab,
+      hasSelectedRoom,
+      isActiveHost,
+      canReadLocalWorkspace,
+      isSelectedRoomLocked,
+      terminalBusy,
+      roomTerminalCount: roomTerminals.length,
+      selectedRoomId: selectedRoom.id,
+      terminalAutoOpenedRoomsRef,
+      openInteractiveTerminal
+    },
+    codexProbe: { setCodexProbe },
+    roomDraftCleanup: {
+      hasSelectedRoom,
+      selectedRoomId: selectedRoom.id,
+      selectedRoomProjectPath: selectedRoom.projectPath,
+      selectedCodexModel,
+      setCustomCodexModelsByRoom,
+      setProjectPathDraftsByRoom
+    }
   });
 
   const roomChatPanelActions = useRoomChatPanelActions({
