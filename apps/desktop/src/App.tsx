@@ -76,34 +76,7 @@ import {
 export function App() {
   const theme = useThemeMode();
   const {
-    teams,
-    setTeams,
-    rooms,
-    setRooms,
-    teamMembersByTeam,
-    setTeamMembersByTeam,
-    teamMembersMessageByTeam,
-    setTeamMembersMessageByTeam,
-    teamMembersBusyByTeam,
-    setTeamMembersBusyByTeam,
-    workspaceError,
-    setWorkspaceError,
-    activeSidebarPanel,
-    setActiveSidebarPanel,
-    newTeamName,
-    setNewTeamName,
-    newRoomName,
-    setNewRoomName,
-    newRoomProjectPath,
-    setNewRoomProjectPath,
-    selectedTeam,
-    setSelectedTeam,
-    selectedRoomId,
-    setSelectedRoomId,
-    sidebarQuery,
-    setSidebarQuery,
-    messagesByRoom,
-    setMessagesByRoom,
+    workspaceState,
     appConfigState,
     chatMessagesByRoom,
     setChatMessagesByRoom,
@@ -282,8 +255,8 @@ export function App() {
     terminals: { initialTerminalLinesByRoom }
   });
   const appRefs = useAppRefs({
-    rooms,
-    selectedRoomId,
+    rooms: workspaceState.rooms,
+    selectedRoomId: workspaceState.selectedRoomId,
     gitWorkflowDraftsByRoom,
     hostBusyByRoom,
     settingsBusyByRoom,
@@ -358,31 +331,31 @@ export function App() {
     markdownCopyFallback
   } = useAppSelectedContext({
     roomContext: {
-      rooms,
-      selectedRoomId,
+      rooms: workspaceState.rooms,
+      selectedRoomId: workspaceState.selectedRoomId,
       fallbackRoom: emptyRoom,
       inspectorTabsByRoom,
       secretWarningsVisibleByRoom,
       terminals
     },
     markdownSelection: {
-      resetKey: selectedRoomId
+      resetKey: workspaceState.selectedRoomId
     },
     teamData: {
-      teams,
-      selectedTeam,
-      teamMembersByTeam,
-      teamMembersMessageByTeam,
-      teamMembersBusyByTeam,
+      teams: workspaceState.teams,
+      selectedTeam: workspaceState.selectedTeam,
+      teamMembersByTeam: workspaceState.teamMembersByTeam,
+      teamMembersMessageByTeam: workspaceState.teamMembersMessageByTeam,
+      teamMembersBusyByTeam: workspaceState.teamMembersBusyByTeam,
       currentUser: githubAuth.currentUser,
       localUserId: localIdentity.localUser.id
     },
     roomValues: {
-      selectedRoomId,
-      selectedTeam,
+      selectedRoomId: workspaceState.selectedRoomId,
+      selectedTeam: workspaceState.selectedTeam,
       customCodexModelsByRoom,
       projectPathDraftsByRoom,
-      messagesByRoom,
+      messagesByRoom: workspaceState.messagesByRoom,
       draftsByRoom,
       pendingAttachmentsByRoom,
       browserRequestsByRoom,
@@ -494,7 +467,7 @@ export function App() {
   } = useRoomScopedSetters({
     messages: {
       selectedRoomId: selectedRoom.id,
-      selectedTeamId: selectedTeam,
+      selectedTeamId: workspaceState.selectedTeam,
       setHostMessagesByRoom,
       setChatMessagesByRoom,
       setMarkdownCopyFallbacksByRoom,
@@ -593,16 +566,16 @@ export function App() {
     }
   });
   const roomChatMutations = useRoomChatMutations({
-    setMessagesByRoom
+    setMessagesByRoom: workspaceState.setMessagesByRoom
   });
   const workspaceRecords = useWorkspaceRecordActions({
     hasSelectedRoom,
     selectedRoom,
     localUser: localIdentity.localUser,
     roomsRef: appRefs.roomsRef,
-    setTeams,
-    setTeamMembersByTeam,
-    setRooms,
+    setTeams: workspaceState.setTeams,
+    setTeamMembersByTeam: workspaceState.setTeamMembersByTeam,
+    setRooms: workspaceState.setRooms,
     resetCodexApprovalForRoom,
     setRevokedRoomIds,
     setRevokedTeamIds,
@@ -613,7 +586,7 @@ export function App() {
     setInviteMessageForRoom,
     setChatMessageForRoom,
     setHostMessageForRoom,
-    setWorkspaceError
+    setWorkspaceError: workspaceState.setWorkspaceError
   });
   const roomInteraction = useRoomInteractionContext({
     inFlightReporters: {
@@ -676,7 +649,7 @@ export function App() {
     memberRows: {
       presenceByRoom,
       selectedRoom,
-      selectedRoomId,
+      selectedRoomId: workspaceState.selectedRoomId,
       localUser: localIdentity.localUser,
       localDeviceId: localIdentity.deviceId,
       localPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
@@ -685,7 +658,7 @@ export function App() {
   });
   const selectedRuntime = useSelectedRoomRuntime({
     selectedRoom,
-    selectedRoomId,
+    selectedRoomId: workspaceState.selectedRoomId,
     markdownSelectionMode,
     selectedMessageIds,
     localUser: localIdentity.localUser,
@@ -733,7 +706,7 @@ export function App() {
     gitStatusByRoom,
     reportRoomHostMutationInFlight: roomInteraction.reportRoomHostMutationInFlight,
     roomSettingsActor,
-    setRooms,
+    setRooms: workspaceState.setRooms,
     setCodexContinuationByRoom,
     setHostHandoffsByRoom,
     setHostBusyForRoom,
@@ -774,13 +747,13 @@ export function App() {
     setInviteMessageForRoom,
     setInviteLinkForRoom,
     setInviteSecretInput,
-    setSelectedTeam,
-    setSelectedRoomId,
+    setSelectedTeam: workspaceState.setSelectedTeam,
+    setSelectedRoomId: workspaceState.setSelectedRoomId,
     setForgottenRoomIds,
     setRevokedRoomIds,
     setRevokedTeamIds,
     setInviteAdmissionsByRoom,
-    setMessagesByRoom,
+    setMessagesByRoom: workspaceState.setMessagesByRoom,
     setKeyRotationBusyForRoom
   });
 
@@ -797,12 +770,12 @@ export function App() {
       codexEvents: selectedRuntime.codexEvents
     },
     sidebar: {
-      sidebarQuery,
-      rooms,
-      teams,
-      selectedTeam,
-      selectedRoomId,
-      messagesByRoom,
+      sidebarQuery: workspaceState.sidebarQuery,
+      rooms: workspaceState.rooms,
+      teams: workspaceState.teams,
+      selectedTeam: workspaceState.selectedTeam,
+      selectedRoomId: workspaceState.selectedRoomId,
+      messagesByRoom: workspaceState.messagesByRoom,
       historySearchMessagesByRoom,
       approvalVisibleByRoom,
       terminalRequestsByRoom,
@@ -810,25 +783,25 @@ export function App() {
       approvalPolicyLabels
     },
     teamMembers: {
-      selectedTeam,
+      selectedTeam: workspaceState.selectedTeam,
       relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
-      setTeamMembersByTeam,
-      setTeamMembersMessageByTeam
+      setTeamMembersByTeam: workspaceState.setTeamMembersByTeam,
+      setTeamMembersMessageByTeam: workspaceState.setTeamMembersMessageByTeam
     }
   });
   const workspaceFlow = useWorkspaceFlowContext({
     bootstrap: {
       workspace: {
         relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
-        setTeams,
-        setRooms,
-        setSelectedTeam,
-        setSelectedRoomId,
-        setWorkspaceError
+        setTeams: workspaceState.setTeams,
+        setRooms: workspaceState.setRooms,
+        setSelectedTeam: workspaceState.setSelectedTeam,
+        setSelectedRoomId: workspaceState.setSelectedRoomId,
+        setWorkspaceError: workspaceState.setWorkspaceError
       },
       selectedRoomReadReceipt: {
-        selectedRoomId,
-        setRooms
+        selectedRoomId: workspaceState.selectedRoomId,
+        setRooms: workspaceState.setRooms
       },
       deviceIdentity: {
         relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
@@ -840,7 +813,7 @@ export function App() {
         setDeviceIdentityMessage
       },
       selectedTeamDefaults: {
-        selectedTeam,
+        selectedTeam: workspaceState.selectedTeam,
         setTeamHistorySettings,
         setTeamDefaultApprovalPolicy,
         setTeamDefaultCodexModel,
@@ -858,7 +831,7 @@ export function App() {
       canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
       localWorkspaceMessage: roomInteraction.localWorkspaceMessage,
       selectedRoom,
-      teams,
+      teams: workspaceState.teams,
       messages,
       selectedMessages,
       gitStatus,
@@ -880,7 +853,7 @@ export function App() {
     },
     workspaceRoomActions: {
       members: {
-        selectedTeam,
+        selectedTeam: workspaceState.selectedTeam,
         selectedTeamName,
         selectedTeamMembersBusy,
         selectedRoom,
@@ -888,32 +861,32 @@ export function App() {
         currentUser: githubAuth.currentUser,
         setDeviceIdentityMessage,
         setTrustedDeviceKeys,
-        setTeamMembersBusyByTeam,
-        setTeamMembersMessageByTeam,
-        setTeamMembersByTeam,
-        setTeams
+        setTeamMembersBusyByTeam: workspaceState.setTeamMembersBusyByTeam,
+        setTeamMembersMessageByTeam: workspaceState.setTeamMembersMessageByTeam,
+        setTeamMembersByTeam: workspaceState.setTeamMembersByTeam,
+        setTeams: workspaceState.setTeams
       },
       workspaceCreation: {
-        selectedTeam,
-        newTeamName,
-        newRoomName,
-        newRoomProjectPath,
-        setWorkspaceError,
-        setSelectedTeam,
-        setSelectedRoomId,
-        setNewTeamName,
-        setNewRoomName,
-        setNewRoomProjectPath,
+        selectedTeam: workspaceState.selectedTeam,
+        newTeamName: workspaceState.newTeamName,
+        newRoomName: workspaceState.newRoomName,
+        newRoomProjectPath: workspaceState.newRoomProjectPath,
+        setWorkspaceError: workspaceState.setWorkspaceError,
+        setSelectedTeam: workspaceState.setSelectedTeam,
+        setSelectedRoomId: workspaceState.setSelectedRoomId,
+        setNewTeamName: workspaceState.setNewTeamName,
+        setNewRoomName: workspaceState.setNewRoomName,
+        setNewRoomProjectPath: workspaceState.setNewRoomProjectPath,
         setRevokedRoomIds,
         setRevokedTeamIds,
         setForgottenRoomIds,
-        setMessagesByRoom,
+        setMessagesByRoom: workspaceState.setMessagesByRoom,
         setInviteApprovalGateForRoom,
         upsertTeam: workspaceRecords.upsertTeam,
         upsertRoom: workspaceRecords.upsertRoom
       },
       teamDefaults: {
-        selectedTeam,
+        selectedTeam: workspaceState.selectedTeam,
         approvalPolicyLabels,
         setSelectedTeamHistoryMessage,
         setTeamHistoryMessageForTeam,
@@ -949,7 +922,7 @@ export function App() {
         setSettingsBusyForRoom,
         setSecretWarningVisibleForRoom,
         setHistorySettings,
-        setMessagesByRoom,
+        setMessagesByRoom: workspaceState.setMessagesByRoom,
         setTerminalRequestsByRoom,
         setBrowserRequestsByRoom,
         setInviteRequestsByRoom,
@@ -959,7 +932,7 @@ export function App() {
         setLocalPreviewsByRoom,
         setTerminals,
         setHostHandoffsByRoom,
-        setRooms,
+        setRooms: workspaceState.setRooms,
         setBrowserStatusByRoom,
         setActiveBrowserUrlsByRoom,
         setCodexThreadIdsByRoom,
@@ -1033,12 +1006,12 @@ export function App() {
     historyEffects: {
     hydration: {
       hasSelectedRoom,
-      selectedRoomId,
+      selectedRoomId: workspaceState.selectedRoomId,
       selectedRoomTeamId: selectedRoom.teamId,
       forgottenRoomIds,
       historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
       setHistorySettings,
-      setMessagesByRoom,
+      setMessagesByRoom: workspaceState.setMessagesByRoom,
       setTerminalRequestsByRoom,
       setBrowserRequestsByRoom,
       setInviteRequestsByRoom,
@@ -1057,7 +1030,7 @@ export function App() {
     },
     search: {
       searchActive: roomDisplay.searchActive,
-      rooms,
+      rooms: workspaceState.rooms,
       forgottenRoomIds,
       revokedRoomIds,
       revokedTeamIds,
@@ -1087,7 +1060,7 @@ export function App() {
         deviceId: localIdentity.deviceId,
         localUser: localIdentity.localUser,
         devicePublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
-        selectedTeam,
+        selectedTeam: workspaceState.selectedTeam,
         selectedRoom,
         hasSelectedRoom,
         isActiveHost: roomInteraction.isActiveHost,
@@ -1103,8 +1076,8 @@ export function App() {
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
         setRelayStatus,
         setPresenceByRoom,
-        setRooms,
-        setMessagesByRoom,
+        setRooms: workspaceState.setRooms,
+        setMessagesByRoom: workspaceState.setMessagesByRoom,
         setTerminalRequestsByRoom,
         setBrowserRequestsByRoom,
         setActionRunsByRoom,
@@ -1162,7 +1135,7 @@ export function App() {
       revokedRoomIds,
       revokedTeamIds,
       localUser: localIdentity.localUser,
-      messagesByRoom,
+      messagesByRoom: workspaceState.messagesByRoom,
       terminals,
       browserRequestsByRoom,
       gitStatusByRoom,
@@ -1175,7 +1148,7 @@ export function App() {
       appendTerminalLinesForRoom,
       setCodexThreadIdsByRoom,
       setCodexContinuationByRoom,
-      setRooms,
+      setRooms: workspaceState.setRooms,
       publishCodexEvent: relaySync.publishCodexEvent,
       publishChatMessage: roomInteraction.publishChatMessage,
       publishHostHandoff: hostHandoffActions.publishHostHandoff
@@ -1228,7 +1201,7 @@ export function App() {
       setSettingsMessageForRoom,
       setSelectedBrowserMessage,
       setBrowserMessageForRoom,
-      setRooms,
+      setRooms: workspaceState.setRooms,
       setBrowserStatusByRoom,
       setProjectPathDraftForRoom,
       resetCodexApprovalForRoom,
@@ -1278,7 +1251,7 @@ export function App() {
       isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
       isSelectedRoomRevoked: roomInteraction.isSelectedRoomRevoked,
       selectedRoom,
-      rooms,
+      rooms: workspaceState.rooms,
       localUser: localIdentity.localUser,
       localPreviewDialog,
       localPreviewsByRoom,
@@ -1366,7 +1339,7 @@ export function App() {
     backgroundEffects: {
       localHistoryPersistence: {
       hasSelectedRoom,
-      selectedRoomId,
+      selectedRoomId: workspaceState.selectedRoomId,
       selectedRoomTeamId: selectedRoom.teamId,
       forgottenRoomIds,
       revokedRoomIds,
@@ -1483,12 +1456,12 @@ export function App() {
       setDraftForRoom
     },
     header: {
-      rooms,
-      selectedRoomId,
+      rooms: workspaceState.rooms,
+      selectedRoomId: workspaceState.selectedRoomId,
       selectedRoomIdForTabs: selectedRoom.id,
       activeBrowserUrl,
-      setSelectedTeam,
-      setSelectedRoomId,
+      setSelectedTeam: workspaceState.setSelectedTeam,
+      setSelectedRoomId: workspaceState.setSelectedRoomId,
       setInspectorTabsByRoom,
       openRoomBrowserNow: roomRuntime.openRoomBrowserNow
     },
@@ -1534,8 +1507,8 @@ export function App() {
       onToggleInspectorCollapsed: shellLayout.toggleInspectorCollapsed
     },
     roomMainColumn: {
-    teamRecords: teams,
-    selectedTeam,
+    teamRecords: workspaceState.teams,
+    selectedTeam: workspaceState.selectedTeam,
     selectedRoom,
     localUser: localIdentity.localUser,
     hostBusy: selectedRuntime.hostBusy,
@@ -1600,7 +1573,7 @@ export function App() {
     onUpdateProjectPath: roomRuntime.updateProjectPath,
     teamRoster: {
       members: selectedTeamMemberRows,
-      hasSelectedTeam: Boolean(selectedTeam),
+      hasSelectedTeam: Boolean(workspaceState.selectedTeam),
       busy: selectedTeamMembersBusy,
       message: selectedTeamMembersMessage,
       onPromote: (member) => workspaceFlow.changeTeamMemberRole(member, "admin"),
@@ -1665,7 +1638,7 @@ export function App() {
     localHistory: {
       historySettings,
       teamHistorySettings,
-      selectedTeam: Boolean(selectedTeam),
+      selectedTeam: Boolean(workspaceState.selectedTeam),
       hasSelectedRoom,
       settingsBusy: selectedRuntime.settingsBusy,
       teamDefaultApprovalPolicy,
@@ -1778,18 +1751,18 @@ export function App() {
     authConfig: githubAuth.authConfig,
     authError: githubAuth.authError,
     deviceFlow: githubAuth.deviceFlow,
-    sidebarQuery,
+    sidebarQuery: workspaceState.sidebarQuery,
     searchActive: roomDisplay.searchActive,
-    workspaceError,
-    newTeamName,
-    newRoomName,
-    newRoomProjectPath,
-    selectedTeamId: selectedTeam,
+    workspaceError: workspaceState.workspaceError,
+    newTeamName: workspaceState.newTeamName,
+    newRoomName: workspaceState.newRoomName,
+    newRoomProjectPath: workspaceState.newRoomProjectPath,
+    selectedTeamId: workspaceState.selectedTeam,
     teams: roomDisplay.sidebarTeamRows,
     rooms: roomDisplay.sidebarRoomRows,
     messageHits: roomDisplay.sidebarMessageHitRows,
     historySearchBusy,
-    activeSidebarPanel,
+    activeSidebarPanel: workspaceState.activeSidebarPanel,
     themeMode: theme.themeMode,
     localUserName: localIdentity.localUser.name,
     selectedRoomName: selectedRoom.name,
@@ -1823,16 +1796,16 @@ export function App() {
     historyMessage: visibleHistoryMessage,
     onSignIn: githubAuth.beginGitHubSignIn,
     onSignOut: roomRuntime.signOut,
-    onSidebarQueryChange: setSidebarQuery,
-    onNewTeamNameChange: setNewTeamName,
+    onSidebarQueryChange: workspaceState.setSidebarQuery,
+    onNewTeamNameChange: workspaceState.setNewTeamName,
     onCreateTeam: workspaceFlow.addTeam,
-    onSelectTeam: setSelectedTeam,
-    onNewRoomNameChange: setNewRoomName,
-    onNewRoomProjectPathChange: setNewRoomProjectPath,
+    onSelectTeam: workspaceState.setSelectedTeam,
+    onNewRoomNameChange: workspaceState.setNewRoomName,
+    onNewRoomProjectPathChange: workspaceState.setNewRoomProjectPath,
     onChooseNewRoomProjectPath: workspaceFlow.chooseNewRoomProjectPath,
     onCreateRoom: workspaceFlow.addRoom,
-    onSelectRoom: setSelectedRoomId,
-    onSelectSidebarPanel: setActiveSidebarPanel,
+    onSelectRoom: workspaceState.setSelectedRoomId,
+    onSelectSidebarPanel: workspaceState.setActiveSidebarPanel,
     onToggleTheme: theme.toggleThemeMode,
     onRotateDeviceIdentity: roomRuntime.rotateDeviceIdentity,
     onChooseProject: roomRuntime.chooseProjectPath,
@@ -1850,7 +1823,7 @@ export function App() {
     onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent,
     onTeamDefaultInviteApprovalGateChange: workspaceFlow.updateTeamDefaultInviteApprovalGate,
     onApplyTeamDefaultsToRoom: workspaceFlow.applyTeamDefaultsToRoom,
-    roomRecords: rooms
+    roomRecords: workspaceState.rooms
     },
     localPreviewDialog: {
     localPreviewDialog,
