@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ChatPlaintextPayload,
   BrowserRequestPlaintextPayload,
@@ -286,7 +286,6 @@ import {
 import { nextShellTerminalName, terminalInputForShellSubmit } from "./lib/terminalUi";
 import {
   canOpenProjectAttachment,
-  clamp,
   embeddedAttachmentBytes,
   encodedBytes,
   attachmentTypeFromName,
@@ -311,6 +310,7 @@ import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessag
 import { buildRoomMemberRows, buildTeamMemberRows } from "./lib/rosterDisplayRows";
 import { buildSidebarMessageHitRows, buildSidebarRoomRows, buildSidebarTeamRows } from "./lib/sidebarDisplayRows";
 import { buildCodexEventRows, buildTerminalOutputLines, buildTerminalRequestRows } from "./lib/terminalDisplayRows";
+import { useShellLayout } from "./hooks/useShellLayout";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -509,10 +509,14 @@ export function App() {
   const [keyRotationBusyByRoom, setKeyRotationBusyByRoom] = useState<Record<string, boolean>>({});
   const [inviteAdmissionsByRoom, setInviteAdmissionsByRoom] = useState<Record<string, string>>({});
   const [codexThreadIdsByRoom, setCodexThreadIdsByRoom] = useState<Record<string, string>>({});
-  const [sidebarWidth, setSidebarWidth] = useState(280);
-  const [inspectorWidth, setInspectorWidth] = useState(372);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  const {
+    sidebarCollapsed,
+    inspectorCollapsed,
+    shellStyle,
+    beginShellResize,
+    toggleSidebarCollapsed,
+    toggleInspectorCollapsed
+  } = useShellLayout();
   const relayRef = useRef<RelayClient | null>(null);
   const seenEnvelopeIds = useRef(new Set<string>());
   const historyLoadedRoomIds = useRef(new Set<string>());
@@ -5905,41 +5909,12 @@ export function App() {
     }
   }
 
-  function beginShellResize(side: "sidebar" | "inspector", event: ReactPointerEvent<HTMLDivElement>) {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = side === "sidebar" ? sidebarWidth : inspectorWidth;
-
-    function onPointerMove(moveEvent: PointerEvent) {
-      if (side === "sidebar") {
-        setSidebarCollapsed(false);
-        setSidebarWidth(clamp(startWidth + moveEvent.clientX - startX, 220, 380));
-      } else {
-        setInspectorCollapsed(false);
-        setInspectorWidth(clamp(startWidth + startX - moveEvent.clientX, 320, 520));
-      }
-    }
-
-    function onPointerUp() {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-    }
-
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp, { once: true });
-  }
-
   function toggleMarkdownSelectionMode() {
     setMarkdownSelectionMode((current) => {
       if (current) clearSelectedMessages();
       return !current;
     });
   }
-
-  const shellStyle = {
-    "--sidebar-width": sidebarCollapsed ? "52px" : `${sidebarWidth}px`,
-    "--rail-width": inspectorCollapsed ? "52px" : `${inspectorWidth}px`
-  } as CSSProperties;
 
   return (
     <div
@@ -5994,7 +5969,7 @@ export function App() {
         expandLabel="Expand sidebar"
         collapseLabel="Collapse sidebar"
         onBeginResize={(event) => beginShellResize("sidebar", event)}
-        onToggleCollapsed={() => setSidebarCollapsed((collapsed) => !collapsed)}
+        onToggleCollapsed={toggleSidebarCollapsed}
       />
 
       {activeSidebarPanel && (
@@ -6214,7 +6189,7 @@ export function App() {
         expandLabel="Expand context column"
         collapseLabel="Collapse context column"
         onBeginResize={(event) => beginShellResize("inspector", event)}
-        onToggleCollapsed={() => setInspectorCollapsed((collapsed) => !collapsed)}
+        onToggleCollapsed={toggleInspectorCollapsed}
       />
 
       <RoomInspectorPanel
