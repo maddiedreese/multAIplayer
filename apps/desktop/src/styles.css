@@ -4811,3 +4811,255 @@ select {
   padding-inline: 8px;
   font-size: 12px;
 }
+
+/* Round-two density fixes from real app screenshots. Keep panels clipped horizontally, never vertically. */
+.inspector .panel,
+.sidebar-drawer .drawer-section {
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+.sidebar-drawer {
+  min-width: 0;
+}
+
+.drawer-content {
+  grid-auto-rows: max-content;
+  align-items: start;
+}
+
+.drawer-content > * {
+  align-self: start;
+}
+
+.drawer-section {
+  min-width: 0;
+  padding: 14px 16px;
+  gap: 10px;
+}
+
+.info-row {
+  grid-template-columns: minmax(76px, 0.52fr) minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.info-row span,
+.info-row strong {
+  min-width: 0;
+  line-height: 1.28;
+}
+
+.info-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-tool-nav,
+.header-actions,
+.host-controls {
+  min-width: 0;
+}
+
+.header-actions {
+  align-items: center;
+  gap: 10px;
+}
+
+.header-model-switcher {
+  min-width: 126px;
+  max-width: 168px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.header-model-switcher select {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  padding: 0 30px 0 12px;
+  appearance: none;
+  border: 0;
+  border-radius: inherit;
+  background-color: transparent;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) 50%,
+    calc(100% - 11px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  color: inherit;
+  font: 650 13px/1 var(--font-sans);
+}
+
+.header-model-switcher:has(select:disabled) {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
+.history-panel {
+  padding-bottom: 16px;
+}
+
+.history-panel .ghost-wide,
+.history-panel .primary-wide {
+  width: 100%;
+  justify-content: center;
+  min-height: 42px;
+  padding-inline: 14px;
+  white-space: normal;
+}
+
+.history-retention {
+  grid-template-columns: minmax(108px, 0.72fr) minmax(128px, 1fr);
+  align-items: center;
+}
+
+.history-defaults {
+  align-items: start;
+}
+
+.history-defaults > div {
+  min-width: 0;
+}
+
+.history-defaults strong,
+.history-defaults span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browser-allowlist textarea {
+  display: block;
+}
+
+.member-list {
+  min-width: 0;
+}
+
+.member-row {
+  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-areas:
+    "avatar identity"
+    "avatar badges";
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 78px;
+  padding: 14px;
+}
+
+.member-row > img,
+.member-row > span {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+.member-row > div:first-of-type {
+  align-self: end;
+}
+
+.member-badges {
+  justify-content: flex-start;
+}
+
+.member-badges b,
+.member-badges button {
+  min-height: 28px;
+  padding: 0 11px;
+  font-size: 12px;
+}
+
+.member-badges button:has(svg) {
+  width: 30px;
+  min-width: 30px;
+}
+
+.team-member-row {
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "avatar identity badges"
+    "avatar joined badges";
+  min-height: 102px;
+  align-items: center;
+}
+
+.team-member-row > div:first-of-type {
+  grid-area: identity;
+  align-self: end;
+}
+
+.team-member-row .member-badges {
+  grid-area: badges;
+  align-self: center;
+  justify-content: flex-end;
+  max-width: 150px;
+}
+
+.team-member-row > small {
+  grid-area: joined;
+  align-self: start;
+  min-width: 0;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-member-row > img,
+.team-member-row > span {
+  width: 42px;
+  height: 42px;
+}
+
+.team-member-row strong {
+  font-size: 14px;
+}
+
+.team-member-row small {
+  font-size: 12px;
+}
+
+.team-button,
+.sidebar-room {
+  min-height: 54px;
+  padding-inline: 14px;
+  overflow: hidden;
+}
+
+.team-button > *,
+.sidebar-room > * {
+  min-width: 0;
+}
+
+.team-button small,
+.sidebar-room small {
+  justify-self: end;
+  max-width: 82px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-footer {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sidebar-footer button {
+  min-height: 40px;
+  justify-content: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
