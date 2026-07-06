@@ -134,16 +134,7 @@ import {
 } from "./lib/codexApproval";
 import { buildCodexApprovalSnapshot, buildCodexTurnInput, buildCodexTurnSummary } from "./lib/codexTurn";
 import { normalizeCodexThreadId } from "./lib/codexThread";
-import {
-  buildCodexOutputMarkdown,
-  buildDiffSummaryMarkdown,
-  buildMessageMarkdown,
-  buildProjectMarkdown,
-  buildPullRequestBody,
-  buildRoomMarkdown,
-  buildSelectedMessagesMarkdown,
-  buildTerminalMarkdown
-} from "./lib/markdownExport";
+import { buildPullRequestBody } from "./lib/markdownExport";
 import {
   maxCodexModelChars,
   maxRoomProjectPathChars,
@@ -162,7 +153,6 @@ import {
   roomHostHandoffMessage,
   sameHandoffRepo
 } from "./lib/hostHandoff";
-import { detectBrowserSecretRisks, detectSecretRisks } from "./lib/secretRisks";
 import {
   canActOnRoomInviteRequest,
   findRoomInviteRequest,
@@ -194,7 +184,6 @@ import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from 
 import { extractCodexBrowserOpenUrl, messageInvokesCodex } from "./lib/codexInvoke";
 import { classifyCodexFailure, codexUsageLimitMessage } from "./lib/codexFailure";
 import { resolveFilePreviewTab, type FilePreviewTab } from "./lib/filePreview";
-import { copyTextToClipboard } from "./lib/clipboard";
 import {
   checkGitHubActionsReadiness,
   gitHubActionsRefreshInFlightMessage,
@@ -285,6 +274,7 @@ import { useInviteUrlBootstrap } from "./hooks/useInviteUrlBootstrap";
 import { useRelaySubscription } from "./hooks/useRelaySubscription";
 import { useRelayPublishers } from "./hooks/useRelayPublishers";
 import { useLocalPreviewActions } from "./hooks/useLocalPreviewActions";
+import { useMarkdownCopyActions } from "./hooks/useMarkdownCopyActions";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -1034,6 +1024,41 @@ export function App() {
     requestNoSecretInviteAccess,
     acceptInvite,
     setSelectedInviteMessage
+  });
+  const {
+    copyMarkdownWithFallback,
+    copyProjectMarkdown,
+    copyRoomMarkdown,
+    copySelectedMessagesMarkdown,
+    copyMessageMarkdown,
+    copyCodexOutputMarkdown,
+    copyTerminalMarkdown,
+    copyDiffSummaryMarkdown,
+    copyPullRequestDraftMarkdown
+  } = useMarkdownCopyActions({
+    hasSelectedRoom,
+    canReadLocalWorkspace,
+    localWorkspaceMessage,
+    selectedRoom,
+    teams,
+    messages,
+    selectedMessages,
+    gitStatus,
+    selectedFile,
+    selectedDiff,
+    selectedFileRisks,
+    selectedTerminal,
+    terminalLines,
+    terminalRisks,
+    setMarkdownCopyFallbackForRoom,
+    setSelectedChatMessage,
+    setChatMessageForRoom,
+    setSelectedFileMessage,
+    setFileMessageForRoom,
+    setSelectedTerminalError,
+    setTerminalErrorForRoom,
+    setSelectedGitWorkflowMessage,
+    setGitWorkflowMessageForRoom
   });
 
   useLocalHistoryHydration({
@@ -4022,31 +4047,6 @@ export function App() {
     }
   }
 
-  async function copyProjectMarkdown() {
-    if (!hasSelectedRoom) {
-      setSelectedFileMessage("Create or join a room before copying project context.");
-      return;
-    }
-    if (!canReadLocalWorkspace) {
-      setSelectedFileMessage(localWorkspaceMessage);
-      return;
-    }
-    const roomId = selectedRoom.id;
-    const markdown = buildProjectMarkdown(
-      selectedRoom.name,
-      selectedRoom.projectPath,
-      gitStatus?.files ?? [],
-      selectedFile,
-      selectedDiff,
-      selectedFile
-        ? selectedFileRisks
-        : selectedDiff
-          ? detectSecretRisks(selectedDiff.diff, selectedDiff.path)
-          : []
-    );
-    await copyMarkdownWithFallback("project context", markdown, (message) => setFileMessageForRoom(roomId, message), roomId);
-  }
-
   async function attachSelectedFileToMessage() {
     if (!hasSelectedRoom) {
       setSelectedFileMessage("Create or join a room before attaching project files.");
@@ -4213,111 +4213,6 @@ export function App() {
     } finally {
       setFileBusyForRoom(room.id, false);
     }
-  }
-
-  async function copyMarkdownWithFallback(
-    title: string,
-    markdown: string,
-    onMessage: (message: string) => void,
-    roomId = selectedRoom.id
-  ) {
-    const result = await copyTextToClipboard(markdown);
-    if (result.status === "copied") {
-      setMarkdownCopyFallbackForRoom(roomId, null);
-      onMessage(`Copied ${title} as Markdown.`);
-      return;
-    }
-    setMarkdownCopyFallbackForRoom(roomId, { title, markdown });
-    onMessage(`${title} Markdown is ready below because copying was blocked.`);
-  }
-
-  async function copyRoomMarkdown() {
-    if (!hasSelectedRoom) {
-      setSelectedChatMessage("Create or join a room before copying room chat.");
-      return;
-    }
-    const roomId = selectedRoom.id;
-    const markdown = buildRoomMarkdown(selectedRoom, teams.find((team) => team.id === selectedRoom.teamId)?.name ?? "Unknown team", messages);
-    await copyMarkdownWithFallback("room chat", markdown, (message) => setChatMessageForRoom(roomId, message), roomId);
-  }
-
-  async function copySelectedMessagesMarkdown() {
-    if (!hasSelectedRoom) {
-      setSelectedChatMessage("Create or join a room before copying selected messages.");
-      return;
-    }
-    const roomId = selectedRoom.id;
-    if (selectedMessages.length === 0) {
-      setChatMessageForRoom(roomId, "Select one or more messages to copy.");
-      return;
-    }
-    const markdown = buildSelectedMessagesMarkdown(selectedRoom, selectedMessages);
-    await copyMarkdownWithFallback("selected messages", markdown, (message) => setChatMessageForRoom(roomId, message), roomId);
-  }
-
-  async function copyMessageMarkdown(message: ChatMessage) {
-    const roomId = selectedRoom.id;
-    const markdown = buildMessageMarkdown(message);
-    await copyMarkdownWithFallback("message", markdown, (copyMessage) => setChatMessageForRoom(roomId, copyMessage), roomId);
-  }
-
-  async function copyCodexOutputMarkdown(message: ChatMessage) {
-    if (!hasSelectedRoom) {
-      setSelectedChatMessage("Create or join a room before copying Codex output.");
-      return;
-    }
-    const roomId = selectedRoom.id;
-    const markdown = buildCodexOutputMarkdown(selectedRoom, message, messages);
-    await copyMarkdownWithFallback("Codex turn output", markdown, (copyMessage) => setChatMessageForRoom(roomId, copyMessage), roomId);
-  }
-
-  async function copyTerminalMarkdown() {
-    if (!hasSelectedRoom) {
-      setSelectedTerminalError("Create or join a room before copying terminal output.");
-      return;
-    }
-    if (!canReadLocalWorkspace) {
-      setSelectedTerminalError(localWorkspaceMessage);
-      return;
-    }
-    const roomId = selectedRoom.id;
-    const lines = selectedTerminal?.lines ?? terminalLines.map((line) => ({ stream: "system", text: line }));
-    const markdown = buildTerminalMarkdown(selectedRoom, selectedTerminal, lines, terminalRisks);
-    await copyMarkdownWithFallback("terminal output", markdown, (message) => setTerminalErrorForRoom(roomId, message), roomId);
-  }
-
-  async function copyDiffSummaryMarkdown() {
-    if (!hasSelectedRoom) {
-      setSelectedFileMessage("Create or join a room before copying a diff summary.");
-      return;
-    }
-    if (!canReadLocalWorkspace) {
-      setSelectedFileMessage(localWorkspaceMessage);
-      return;
-    }
-    const roomId = selectedRoom.id;
-    const markdown = buildDiffSummaryMarkdown(
-      selectedRoom,
-      gitStatus?.branch ?? "unknown",
-      gitStatus?.files ?? [],
-      selectedDiff,
-      selectedDiff ? detectSecretRisks(selectedDiff.diff, selectedDiff.path) : []
-    );
-    await copyMarkdownWithFallback("diff summary", markdown, (message) => setFileMessageForRoom(roomId, message), roomId);
-  }
-
-  async function copyPullRequestDraftMarkdown() {
-    if (!hasSelectedRoom) {
-      setSelectedGitWorkflowMessage("Create or join a room before copying a PR draft.");
-      return;
-    }
-    const roomId = selectedRoom.id;
-    if (!canReadLocalWorkspace) {
-      setGitWorkflowMessageForRoom(roomId, localWorkspaceMessage);
-      return;
-    }
-    const markdown = buildPullRequestBody(messages, gitStatus?.files ?? []);
-    await copyMarkdownWithFallback("PR description draft", markdown, (message) => setGitWorkflowMessageForRoom(roomId, message), roomId);
   }
 
   async function approveGitWorkflow() {
