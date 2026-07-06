@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import type {
   LocalPreviewPlaintextPayload
 } from "@multaiplayer/protocol";
@@ -126,9 +125,7 @@ import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
 import { useAppRefs } from "./hooks/useAppRefs";
 import { useRoomMainColumnProps } from "./hooks/useRoomMainColumnProps";
 import { useRoomInspectorPanelProps } from "./hooks/useRoomInspectorPanelProps";
-import {
-  hasAcknowledgedRoomVisibilityWarning
-} from "./lib/roomVisibilityWarning";
+import { useSelectedRoomContext } from "./hooks/useSelectedRoomContext";
 import { InlineSecretWarning } from "./components/common";
 import { AppWorkspaceShell } from "./components/AppWorkspaceShell";
 import { AppSidebarDrawer } from "./components/AppSidebarDrawer";
@@ -446,8 +443,20 @@ export function App() {
   const { deviceId, localUser } = useLocalIdentity(currentUser);
   const roomSettingsActor = useRoomSettingsActor(localUser);
 
-  const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
-  const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? emptyRoom;
+  const {
+    hasSelectedRoom,
+    selectedRoom,
+    inspectorTab,
+    secretWarningVisible,
+    roomTerminals
+  } = useSelectedRoomContext({
+    rooms,
+    selectedRoomId,
+    fallbackRoom: emptyRoom,
+    inspectorTabsByRoom,
+    secretWarningsVisibleByRoom,
+    terminals
+  });
   const {
     markdownSelectionMode,
     selectedMessageIds,
@@ -459,9 +468,6 @@ export function App() {
     enabled: hasSelectedRoom,
     resetKey: selectedRoomId
   });
-  const inspectorTab = inspectorTabsByRoom[selectedRoom.id] === "diff"
-    ? "files"
-    : inspectorTabsByRoom[selectedRoom.id] ?? "files";
   const {
     selectedTeamRecord,
     selectedTeamName,
@@ -802,10 +808,6 @@ export function App() {
     setHostMessageForRoom,
     setChatMessageForRoom
   });
-  const secretWarningVisible = hasSelectedRoom && (
-    secretWarningsVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ??
-    !hasAcknowledgedRoomVisibilityWarning(selectedRoom?.id ?? selectedRoomId)
-  );
   const { acknowledgeRoomVisibilityWarning } = useRoomVisibilityWarningActions({
     hasSelectedRoom,
     selectedRoomId: selectedRoom.id,
@@ -870,10 +872,6 @@ export function App() {
     gitWorkflowDraft,
     projectPath: selectedRoom.projectPath
   });
-  const roomTerminals = useMemo(
-    () => terminals.filter((terminal) => terminal.roomId === selectedRoom.id),
-    [terminals, selectedRoom.id]
-  );
   const roomMemberRows = useRoomMemberRows({
     presenceByRoom,
     selectedRoom,
