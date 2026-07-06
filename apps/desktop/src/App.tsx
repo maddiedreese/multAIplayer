@@ -58,8 +58,6 @@ import { useSidebarNavigation } from "./hooks/useSidebarNavigation";
 import { useRoomTerminalSetters } from "./hooks/useRoomTerminalSetters";
 import { useTeamMembersRefresh } from "./hooks/useTeamMembersRefresh";
 import { useThemeMode } from "./hooks/useThemeMode";
-import { useRelaySubscription } from "./hooks/useRelaySubscription";
-import { useRelayPublishers } from "./hooks/useRelayPublishers";
 import { useLocalPreviewActions } from "./hooks/useLocalPreviewActions";
 import { useMarkdownCopyActions } from "./hooks/useMarkdownCopyActions";
 import { useGitHubActionsRefresh } from "./hooks/useGitHubActionsRefresh";
@@ -104,6 +102,7 @@ import { useLocalPreviewDialogProps } from "./hooks/useLocalPreviewDialogProps";
 import { useAppBootstrapEffects } from "./hooks/useAppBootstrapEffects";
 import { useRoomBackgroundEffects } from "./hooks/useRoomBackgroundEffects";
 import { useRoomPanelActions } from "./hooks/useRoomPanelActions";
+import { useRelayRoomSync } from "./hooks/useRelayRoomSync";
 import { InlineSecretWarning } from "./components/common";
 import { AppWorkspaceShell } from "./components/AppWorkspaceShell";
 import { AppSidebarDrawer } from "./components/AppSidebarDrawer";
@@ -1344,58 +1343,6 @@ export function App() {
     setInspectorTabsByRoom
   });
 
-  useRelaySubscription({
-    relayWsUrl: appConfig.relayWsUrl,
-    deviceId,
-    localUser,
-    devicePublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
-    selectedTeam,
-    selectedRoom,
-    hasSelectedRoom,
-    isActiveHost,
-    inviteAdmissionsByRoom,
-    revokedRoomIds,
-    revokedTeamIds,
-    approvalPolicyLabels,
-    roomModeLabels,
-    relayRef,
-    seenEnvelopeIds,
-    roomsRef,
-    selectedRoomIdRef,
-    historyLoadedRoomIds,
-    setRelayStatus,
-    setPresenceByRoom,
-    setRooms,
-    setMessagesByRoom,
-    setTerminalRequestsByRoom,
-    setBrowserRequestsByRoom,
-    setActionRunsByRoom,
-    setActionsLastCheckedByRoom,
-    setActionsMessagesByRoom,
-    setForgottenRoomIds,
-    handleRelayError,
-    upsertRoom,
-    upsertTeam,
-    refreshTeamMembers,
-    decryptInviteEnvelope,
-    handleInviteEnvelopePlaintext,
-    handleCodexBrowserOpenCommand,
-    applyMessageReaction,
-    updateTerminalRequestStatus,
-    appendTerminalLinesForRoom,
-    appendGitWorkflowEvent,
-    setGitWorkflowMessageForRoom,
-    appendGitHubActionsEvent,
-    appendCodexEvent,
-    updateBrowserRequestStatus,
-    appendLocalPreviewEvent,
-    setChatMessageForRoom,
-    markHostHandoffAccepted,
-    setHostMessageForRoom,
-    appendHostHandoff,
-    appendRoomMessage,
-    setInviteMessageForRoom
-  });
   const {
     publishRequestStatus,
     publishLocalPreviewEvent,
@@ -1404,21 +1351,75 @@ export function App() {
     publishCodexEvent,
     publishRoomSettingsEvent,
     publishGitHubActionsEvent
-  } = useRelayPublishers({
-    relayRef,
-    seenEnvelopeIds,
-    relayStatus,
-    selectedRoom,
-    deviceId,
-    localUser,
-    approvalPolicyLabels,
-    roomModeLabels,
-    appendLocalPreviewEvent,
-    appendGitWorkflowEvent,
-    appendCodexEvent,
-    appendTerminalLinesForRoom,
-    appendRoomMessage,
-    appendGitHubActionsEvent
+  } = useRelayRoomSync({
+    subscription: {
+      relayWsUrl: appConfig.relayWsUrl,
+      deviceId,
+      localUser,
+      devicePublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
+      selectedTeam,
+      selectedRoom,
+      hasSelectedRoom,
+      isActiveHost,
+      inviteAdmissionsByRoom,
+      revokedRoomIds,
+      revokedTeamIds,
+      approvalPolicyLabels,
+      roomModeLabels,
+      relayRef,
+      seenEnvelopeIds,
+      roomsRef,
+      selectedRoomIdRef,
+      historyLoadedRoomIds,
+      setRelayStatus,
+      setPresenceByRoom,
+      setRooms,
+      setMessagesByRoom,
+      setTerminalRequestsByRoom,
+      setBrowserRequestsByRoom,
+      setActionRunsByRoom,
+      setActionsLastCheckedByRoom,
+      setActionsMessagesByRoom,
+      setForgottenRoomIds,
+      handleRelayError,
+      upsertRoom,
+      upsertTeam,
+      refreshTeamMembers,
+      decryptInviteEnvelope,
+      handleInviteEnvelopePlaintext,
+      handleCodexBrowserOpenCommand,
+      applyMessageReaction,
+      updateTerminalRequestStatus,
+      appendTerminalLinesForRoom,
+      appendGitWorkflowEvent,
+      setGitWorkflowMessageForRoom,
+      appendGitHubActionsEvent,
+      appendCodexEvent,
+      updateBrowserRequestStatus,
+      appendLocalPreviewEvent,
+      setChatMessageForRoom,
+      markHostHandoffAccepted,
+      setHostMessageForRoom,
+      appendHostHandoff,
+      appendRoomMessage,
+      setInviteMessageForRoom
+    },
+    publishers: {
+      relayRef,
+      seenEnvelopeIds,
+      relayStatus,
+      selectedRoom,
+      deviceId,
+      localUser,
+      approvalPolicyLabels,
+      roomModeLabels,
+      appendLocalPreviewEvent,
+      appendGitWorkflowEvent,
+      appendCodexEvent,
+      appendTerminalLinesForRoom,
+      appendRoomMessage,
+      appendGitHubActionsEvent
+    }
   });
   const { approveCodexTurn } = useCodexTurnActions({
     selectedRoom,
