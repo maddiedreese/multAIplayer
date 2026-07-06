@@ -58,22 +58,15 @@ import { useSidebarNavigation } from "./hooks/useSidebarNavigation";
 import { useRoomTerminalSetters } from "./hooks/useRoomTerminalSetters";
 import { useTeamMembersRefresh } from "./hooks/useTeamMembersRefresh";
 import { useThemeMode } from "./hooks/useThemeMode";
-import { useLocalPreviewActions } from "./hooks/useLocalPreviewActions";
 import { useMarkdownCopyActions } from "./hooks/useMarkdownCopyActions";
-import { useGitHubActionsRefresh } from "./hooks/useGitHubActionsRefresh";
-import { useBrowserActions } from "./hooks/useBrowserActions";
 import { useFileActions } from "./hooks/useFileActions";
-import { useTerminalActions } from "./hooks/useTerminalActions";
 import { useMemberActions } from "./hooks/useMemberActions";
 import { useWorkspaceCreationActions } from "./hooks/useWorkspaceCreationActions";
-import { useRoomSettingsActions } from "./hooks/useRoomSettingsActions";
 import { useTeamDefaultActions } from "./hooks/useTeamDefaultActions";
 import { useLocalHistoryActions } from "./hooks/useLocalHistoryActions";
 import { useWorkspaceRecordActions } from "./hooks/useWorkspaceRecordActions";
-import { useAccountActions } from "./hooks/useAccountActions";
 import { useHostHandoffActions } from "./hooks/useHostHandoffActions";
 import { useInviteActions } from "./hooks/useInviteActions";
-import { useGitWorkflowActions } from "./hooks/useGitWorkflowActions";
 import { useChatActions } from "./hooks/useChatActions";
 import { useRoomVisibilityWarningActions } from "./hooks/useRoomVisibilityWarningActions";
 import { useWorkspaceUiState } from "./hooks/useWorkspaceUiState";
@@ -102,6 +95,7 @@ import { useRoomBackgroundEffects } from "./hooks/useRoomBackgroundEffects";
 import { useRoomPanelActions } from "./hooks/useRoomPanelActions";
 import { useRelayRoomSync } from "./hooks/useRelayRoomSync";
 import { useCodexRoomActions } from "./hooks/useCodexRoomActions";
+import { useRoomToolActions } from "./hooks/useRoomToolActions";
 import { InlineSecretWarning } from "./components/common";
 import { AppWorkspaceShell } from "./components/AppWorkspaceShell";
 import { AppSidebarDrawer } from "./components/AppSidebarDrawer";
@@ -1487,34 +1481,7 @@ export function App() {
     renameRoom,
     setBrowserProfilePersistence,
     updateProjectPath,
-    chooseProjectPath
-  } = useRoomSettingsActions({
-    hasSelectedRoom,
-    isSelectedRoomLocked,
-    isSelectedRoomRevoked,
-    isActiveHost,
-    selectedRoom,
-    selectedRoomIdRef,
-    selectedCodexModel,
-    projectPathDraft,
-    approvalPolicyLabels,
-    roomModeLabels,
-    roomSettingsGateMessage,
-    roomSettingsActor,
-    reportRoomSettingsMutationInFlight,
-    setSettingsBusyForRoom,
-    setSelectedSettingsMessage,
-    setSettingsMessageForRoom,
-    setSelectedBrowserMessage,
-    setBrowserMessageForRoom,
-    setRooms,
-    setBrowserStatusByRoom,
-    setProjectPathDraftForRoom,
-    resetCodexApprovalForRoom,
-    resetFileContextForRoom,
-    publishRoomSettingsEvent
-  });
-  const {
+    chooseProjectPath,
     runApprovedTerminalCheck,
     startNamedTerminal,
     openInteractiveTerminal,
@@ -1523,148 +1490,176 @@ export function App() {
     sendTerminalInput,
     requestTerminalCommand,
     approveTerminalRequest,
-    denyTerminalRequest
-  } = useTerminalActions({
-    hasSelectedRoom,
-    isActiveHost,
-    canReadLocalWorkspace,
-    canRequestWorkspace,
-    hostGateMessage,
-    localWorkspaceMessage,
-    workspaceRequestMessage,
-    selectedRoom,
-    selectedRoomIdRef,
-    isSelectedRoomLocked,
-    localUser,
-    deviceId,
-    relayStatus,
-    relayRef,
-    seenEnvelopeIds,
-    roomTerminals,
-    selectedTerminal,
-    terminalName,
-    terminalCommand,
-    terminalInput,
-    terminalRequests,
-    reportRoomTerminalActionInFlight,
-    setTerminalBusyForRoom,
-    setSelectedTerminalError,
-    setTerminalErrorForRoom,
-    appendTerminalLinesForRoom,
-    setGitStatusForRoom,
-    setTerminals,
-    setSelectedTerminalIdForRoom,
-    setTerminalNameForRoom,
-    setTerminalCommandForRoom,
-    setTerminalInputForRoom,
-    appendTerminalRequest,
-    updateTerminalRequestStatus,
-    publishRequestStatus,
-    publishTerminalResult
-  });
-  const {
+    denyTerminalRequest,
     openLocalPreviewDialog,
     prepareLocalPreviewConfirmation,
     confirmLocalPreviewShare,
     stopLocalPreview,
-    stopOwnedLocalPreviews
-  } = useLocalPreviewActions({
-    hasSelectedRoom,
-    isSelectedRoomLocked,
-    isSelectedRoomRevoked,
-    selectedRoom,
-    rooms,
-    localUser,
-    localPreviewDialog,
-    localPreviewsByRoom,
-    setLocalPreviewDialog,
-    setLocalPreviewBusyForRoom,
-    setSelectedChatMessage,
-    setChatMessageForRoom,
-    publishLocalPreviewEvent
-  });
-  const { signOut, rotateDeviceIdentity } = useAccountActions({
-    selectedRoomId: selectedRoom.id,
-    deviceId,
     stopOwnedLocalPreviews,
-    signOutGitHub,
-    setDeviceIdentity,
-    setDeviceIdentityMessage,
-    setTrustedDeviceKeys
-  });
-  const { refreshGitHubActions } = useGitHubActionsRefresh({
-    hasSelectedRoom,
-    selectedRoom,
-    roomsRef,
-    actionsBusyRef,
-    gitWorkflowDraftsRef,
-    forgottenRoomIds,
-    revokedRoomIds,
-    revokedTeamIds,
-    localUser,
-    authConfig,
-    currentUser,
-    setActionsBusyForRoom,
-    setActionsMessagesByRoom,
-    setActionRunsByRoom,
-    setActionsLastCheckedByRoom,
-    publishGitHubActionsEvent
-  });
-  const { approveGitWorkflow } = useGitWorkflowActions({
-    hasSelectedRoom,
-    isActiveHost,
-    canReadLocalWorkspace,
-    hostGateMessage,
-    localWorkspaceMessage,
-    selectedRoom,
-    gitWorkflowBusyRef,
-    gitWorkflowDraft,
-    gitApprovalPreview,
-    githubWorkflowReadiness,
-    messages,
-    gitStatus,
-    setSelectedGitWorkflowMessage,
-    setGitWorkflowMessageForRoom,
-    setGitWorkflowBusyForRoom,
-    appendTerminalLinesForRoom,
-    setGitStatusForRoom,
-    publishGitWorkflowEvent,
-    refreshGitHubActions
-  });
-  const {
+    signOut,
+    rotateDeviceIdentity,
+    refreshGitHubActions,
+    approveGitWorkflow,
     requestBrowserAccess,
     approveBrowserRequest,
     denyBrowserRequest,
     openApprovedBrowserRequest,
     openRoomBrowserNow,
     resetRoomBrowserProfile
-  } = useBrowserActions({
-    hasSelectedRoom,
-    isActiveHost,
-    canRequestBrowser,
-    canHostBrowser,
-    browserAccessMessage,
-    hostGateMessage,
-    selectedRoom,
-    selectedRoomIdRef,
-    browserUrl,
-    browserReason,
-    browserRequests,
-    localUser,
-    deviceId,
-    relayStatus,
-    relayRef,
-    seenEnvelopeIds,
-    defaultBrowserStatus,
-    setSelectedBrowserMessage,
-    setBrowserMessageForRoom,
-    setBrowserUrlForRoom,
-    appendBrowserRequest,
-    updateBrowserRequestStatus,
-    publishRequestStatus,
-    setActiveBrowserUrlsByRoom,
-    setBrowserStatusByRoom,
-    setInspectorTabsByRoom
+  } = useRoomToolActions({
+    settings: {
+      hasSelectedRoom,
+      isSelectedRoomLocked,
+      isSelectedRoomRevoked,
+      isActiveHost,
+      selectedRoom,
+      selectedRoomIdRef,
+      selectedCodexModel,
+      projectPathDraft,
+      approvalPolicyLabels,
+      roomModeLabels,
+      roomSettingsGateMessage,
+      roomSettingsActor,
+      reportRoomSettingsMutationInFlight,
+      setSettingsBusyForRoom,
+      setSelectedSettingsMessage,
+      setSettingsMessageForRoom,
+      setSelectedBrowserMessage,
+      setBrowserMessageForRoom,
+      setRooms,
+      setBrowserStatusByRoom,
+      setProjectPathDraftForRoom,
+      resetCodexApprovalForRoom,
+      resetFileContextForRoom,
+      publishRoomSettingsEvent
+    },
+    terminal: {
+      hasSelectedRoom,
+      isActiveHost,
+      canReadLocalWorkspace,
+      canRequestWorkspace,
+      hostGateMessage,
+      localWorkspaceMessage,
+      workspaceRequestMessage,
+      selectedRoom,
+      selectedRoomIdRef,
+      isSelectedRoomLocked,
+      localUser,
+      deviceId,
+      relayStatus,
+      relayRef,
+      seenEnvelopeIds,
+      roomTerminals,
+      selectedTerminal,
+      terminalName,
+      terminalCommand,
+      terminalInput,
+      terminalRequests,
+      reportRoomTerminalActionInFlight,
+      setTerminalBusyForRoom,
+      setSelectedTerminalError,
+      setTerminalErrorForRoom,
+      appendTerminalLinesForRoom,
+      setGitStatusForRoom,
+      setTerminals,
+      setSelectedTerminalIdForRoom,
+      setTerminalNameForRoom,
+      setTerminalCommandForRoom,
+      setTerminalInputForRoom,
+      appendTerminalRequest,
+      updateTerminalRequestStatus,
+      publishRequestStatus,
+      publishTerminalResult
+    },
+    localPreview: {
+      hasSelectedRoom,
+      isSelectedRoomLocked,
+      isSelectedRoomRevoked,
+      selectedRoom,
+      rooms,
+      localUser,
+      localPreviewDialog,
+      localPreviewsByRoom,
+      setLocalPreviewDialog,
+      setLocalPreviewBusyForRoom,
+      setSelectedChatMessage,
+      setChatMessageForRoom,
+      publishLocalPreviewEvent
+    },
+    account: {
+      selectedRoomId: selectedRoom.id,
+      deviceId,
+      signOutGitHub,
+      setDeviceIdentity,
+      setDeviceIdentityMessage,
+      setTrustedDeviceKeys
+    },
+    githubActions: {
+      hasSelectedRoom,
+      selectedRoom,
+      roomsRef,
+      actionsBusyRef,
+      gitWorkflowDraftsRef,
+      forgottenRoomIds,
+      revokedRoomIds,
+      revokedTeamIds,
+      localUser,
+      authConfig,
+      currentUser,
+      setActionsBusyForRoom,
+      setActionsMessagesByRoom,
+      setActionRunsByRoom,
+      setActionsLastCheckedByRoom,
+      publishGitHubActionsEvent
+    },
+    gitWorkflow: {
+      hasSelectedRoom,
+      isActiveHost,
+      canReadLocalWorkspace,
+      hostGateMessage,
+      localWorkspaceMessage,
+      selectedRoom,
+      gitWorkflowBusyRef,
+      gitWorkflowDraft,
+      gitApprovalPreview,
+      githubWorkflowReadiness,
+      messages,
+      gitStatus,
+      setSelectedGitWorkflowMessage,
+      setGitWorkflowMessageForRoom,
+      setGitWorkflowBusyForRoom,
+      appendTerminalLinesForRoom,
+      setGitStatusForRoom,
+      publishGitWorkflowEvent
+    },
+    browser: {
+      hasSelectedRoom,
+      isActiveHost,
+      canRequestBrowser,
+      canHostBrowser,
+      browserAccessMessage,
+      hostGateMessage,
+      selectedRoom,
+      selectedRoomIdRef,
+      browserUrl,
+      browserReason,
+      browserRequests,
+      localUser,
+      deviceId,
+      relayStatus,
+      relayRef,
+      seenEnvelopeIds,
+      defaultBrowserStatus,
+      setSelectedBrowserMessage,
+      setBrowserMessageForRoom,
+      setBrowserUrlForRoom,
+      appendBrowserRequest,
+      updateBrowserRequestStatus,
+      publishRequestStatus,
+      setActiveBrowserUrlsByRoom,
+      setBrowserStatusByRoom,
+      setInspectorTabsByRoom
+    }
   });
 
   useRoomBackgroundEffects({
