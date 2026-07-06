@@ -44,6 +44,7 @@ import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js
 import { createRelayPersistence } from "./persistence.js";
 import { createRelayStore, type AuthSession, type ClientSession, type PresenceRecord, type RoomKey } from "./state.js";
 import { createRelayFanout } from "./ws/fanout.js";
+import { createRelayRoomSocketManager } from "./ws/rooms.js";
 
 const relayConfig = loadRelayConfig();
 const {
@@ -233,6 +234,36 @@ const {
   teamMembers,
   roomKey,
   teamRecordForUser
+});
+const {
+  joinRoom,
+  subscribeTeam,
+  subscribeWorkspace,
+  isKnownRoom,
+  canJoinRoom,
+  canSubscribeTeam,
+  canSubscribeWorkspace,
+  leaveRoom,
+  leaveTeams,
+  leaveWorkspace,
+  revokeTeamMemberSessions
+} = createRelayRoomSocketManager({
+  roomSockets,
+  teamSockets,
+  workspaceSockets,
+  roomPresence,
+  sessions,
+  teams,
+  rooms,
+  invites,
+  mutationsRequireAuth,
+  roomKey,
+  canAccessRoom,
+  isTeamMember,
+  addTeamMember,
+  scheduleStoreSave,
+  send,
+  broadcast
 });
 
 app.use(rateLimitMiddleware);
@@ -510,34 +541,6 @@ wss.on("connection", (socket, request) => {
   });
 });
 
-function joinRoom(session: ClientSession, teamId: string, roomId: string, userId: string, deviceId: string) {
-  leaveRoom(session);
-  session.teamId = teamId;
-  session.roomId = roomId;
-  session.userId = userId;
-  session.deviceId = deviceId;
-  const key = roomKey(teamId, roomId);
-  const sockets = roomSockets.get(key) ?? new Set<WebSocket>();
-  sockets.add(session.socket);
-  roomSockets.set(key, sockets);
-}
-
-function subscribeTeam(session: ClientSession, teamId: string) {
-  session.subscribedTeamIds.add(teamId);
-  const sockets = teamSockets.get(teamId) ?? new Set<WebSocket>();
-  sockets.add(session.socket);
-  teamSockets.set(teamId, sockets);
-}
-
-function subscribeWorkspace(session: ClientSession) {
-  session.workspaceSubscribed = true;
-  workspaceSockets.add(session.socket);
-}
-
-function isKnownRoom(teamId: string, roomId: string): boolean {
-  return rooms.get(roomId)?.teamId === teamId;
-}
-
 function canPublishEnvelope(session: ClientSession, envelope: RelayEnvelope): boolean {
   return (
     session.teamId === envelope.teamId &&
@@ -654,55 +657,6 @@ function isPresenceForJoinedSession(
   );
 }
 
-function leaveRoom(session: ClientSession) {
-  if (!session.teamId || !session.roomId) return;
-  const key = roomKey(session.teamId, session.roomId);
-  if (session.deviceId) {
-    const roster = roomPresence.get(key);
-    const presence = roster?.get(session.deviceId);
-    if (presence) {
-      roster?.delete(session.deviceId);
-      if (roster?.size === 0) roomPresence.delete(key);
-      broadcast(key, { type: "presence", ...presence, status: "offline" });
-    }
-  }
-  const sockets = roomSockets.get(key);
-  sockets?.delete(session.socket);
-  if (sockets?.size === 0) roomSockets.delete(key);
-}
-
-function leaveTeams(session: ClientSession) {
-  for (const teamId of session.subscribedTeamIds) {
-    const sockets = teamSockets.get(teamId);
-    sockets?.delete(session.socket);
-    if (sockets?.size === 0) teamSockets.delete(teamId);
-  }
-  session.subscribedTeamIds.clear();
-}
-
-function leaveWorkspace(session: ClientSession) {
-  if (!session.workspaceSubscribed) return;
-  workspaceSockets.delete(session.socket);
-  session.workspaceSubscribed = false;
-}
-
-function revokeTeamMemberSessions(teamId: string, userId: string) {
-  for (const session of Array.from(sessions.values())) {
-    if (session.authSession?.user.id !== userId && session.userId !== userId) continue;
-
-    const joinedRemovedTeam = session.teamId === teamId;
-    const subscribedRemovedTeam = session.subscribedTeamIds.has(teamId);
-    const workspaceSubscribed = session.workspaceSubscribed;
-    if (!joinedRemovedTeam && !subscribedRemovedTeam && !workspaceSubscribed) continue;
-
-    send(session.socket, { type: "error", message: "Your team membership was removed. Rejoin with a fresh invite before continuing." });
-    leaveRoom(session);
-    leaveTeams(session);
-    leaveWorkspace(session);
-    session.socket.close(1008, "Team membership removed");
-  }
-}
-
 function revokeTeamInvites(teamId: string) {
   let revoked = false;
   for (const [inviteId, invite] of invites.entries()) {
@@ -769,42 +723,6 @@ function roomKey(teamId: string, roomId: string): RoomKey {
 
 function normalizeAuthSessionId(value: unknown): string {
   return normalizeRelayId(value, maxAuthSessionIdChars) ?? "";
-}
-
-function canJoinRoom(
-  session: ClientSession,
-  teamId: string,
-  roomId: string,
-  userId: string,
-  inviteId?: string
-): boolean {
-  if (!mutationsRequireAuth) return true;
-  if (!session.authSession || session.authSession.user.id !== userId) return false;
-  if (canAccessRoom(teamId, roomId, userId)) return true;
-  if (!inviteId || !isValidInviteForRoom(inviteId, teamId, roomId)) return false;
-  addTeamMember(teamId, userId);
-  return true;
-}
-
-function canSubscribeTeam(session: ClientSession, teamId: string, userId: string): boolean {
-  if (!mutationsRequireAuth) return true;
-  return Boolean(session.authSession && session.authSession.user.id === userId && isTeamMember(teamId, userId));
-}
-
-function canSubscribeWorkspace(session: ClientSession, userId: string): boolean {
-  if (!mutationsRequireAuth) return true;
-  return Boolean(session.authSession && session.authSession.user.id === userId);
-}
-
-function isValidInviteForRoom(inviteId: string, teamId: string, roomId: string): boolean {
-  const invite = invites.get(inviteId);
-  if (!invite || invite.teamId !== teamId || invite.roomId !== roomId) return false;
-  if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
-    invites.delete(invite.id);
-    scheduleStoreSave();
-    return false;
-  }
-  return true;
 }
 
 function requesterFromRequest(body: unknown, sessionId: unknown): { id: string; name: string } {
