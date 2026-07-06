@@ -1535,7 +1535,7 @@ export function App() {
       setSensitiveAttachmentReviewKey
     }
   });
-  const { appShellViewProps } = useAppViewProps({
+  const appView = useAppViewProps({
     shell: {
       sidebarCollapsed,
       inspectorCollapsed,
@@ -1873,5 +1873,5 @@ export function App() {
     }
   });
 
-  return <AppShellView {...appShellViewProps} />;
+  return <AppShellView {...appView.appShellViewProps} />;
 }
