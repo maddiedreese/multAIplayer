@@ -303,6 +303,7 @@ import { useGitHubWorkflowState } from "./hooks/useGitHubWorkflowState";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useRoomAccess } from "./hooks/useRoomAccess";
+import { useRoomBusySetters } from "./hooks/useRoomBusySetters";
 import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
 import { useRoomMessageSetters } from "./hooks/useRoomMessageSetters";
 import { useRoomNotices } from "./hooks/useRoomNotices";
@@ -682,6 +683,33 @@ export function App() {
     setTeamHistoryMessagesByTeam,
     setSettingsMessagesByRoom
   });
+  const {
+    setGitWorkflowBusyForRoom,
+    setActionsBusyForRoom,
+    setLocalPreviewBusyForRoom,
+    setHostBusyForRoom,
+    setSettingsBusyForRoom,
+    setKeyRotationBusyForRoom,
+    setFileBusyForRoom,
+    setTerminalBusyForRoom
+  } = useRoomBusySetters({
+    gitWorkflowBusyRef,
+    actionsBusyRef,
+    localPreviewBusyRef,
+    hostBusyRef,
+    settingsBusyRef,
+    keyRotationBusyRef,
+    fileBusyRef,
+    terminalBusyRef,
+    setGitWorkflowBusyByRoom,
+    setActionsBusyByRoom,
+    setLocalPreviewBusyByRoom,
+    setHostBusyByRoom,
+    setSettingsBusyByRoom,
+    setKeyRotationBusyByRoom,
+    setFileBusyByRoom,
+    setTerminalBusyByRoom
+  });
   const roomNotices = useRoomNotices({
     roomId: selectedRoom.id,
     hostMessage,
@@ -807,45 +835,10 @@ export function App() {
     }));
   }
 
-  function setGitWorkflowBusyForRoom(roomId: string, busy: boolean) {
-    gitWorkflowBusyRef.current = busy
-      ? { ...gitWorkflowBusyRef.current, [roomId]: true }
-      : omitRecordKey(gitWorkflowBusyRef.current, roomId);
-    setGitWorkflowBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
-  }
-
-  function setActionsBusyForRoom(roomId: string, busy: boolean) {
-    actionsBusyRef.current = busy
-      ? { ...actionsBusyRef.current, [roomId]: true }
-      : omitRecordKey(actionsBusyRef.current, roomId);
-    setActionsBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
-  }
-
-  function setLocalPreviewBusyForRoom(roomId: string, busy: boolean) {
-    localPreviewBusyRef.current = busy
-      ? { ...localPreviewBusyRef.current, [roomId]: true }
-      : omitRecordKey(localPreviewBusyRef.current, roomId);
-    setLocalPreviewBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
-  }
-
-  function setHostBusyForRoom(roomId: string, busy: boolean) {
-    hostBusyRef.current = busy
-      ? { ...hostBusyRef.current, [roomId]: true }
-      : omitRecordKey(hostBusyRef.current, roomId);
-    setHostBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
-  }
-
   function reportRoomHostMutationInFlight(roomId: string): boolean {
     if (!isRoomHostMutationInFlight(hostBusyRef.current, roomId)) return false;
     setHostMessageForRoom(roomId, roomHostMutationInFlightMessage());
     return true;
-  }
-
-  function setSettingsBusyForRoom(roomId: string, busy: boolean) {
-    settingsBusyRef.current = busy
-      ? { ...settingsBusyRef.current, [roomId]: true }
-      : omitRecordKey(settingsBusyRef.current, roomId);
-    setSettingsBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
   function reportRoomSettingsMutationInFlight(
@@ -855,13 +848,6 @@ export function App() {
     if (!isRoomSettingsMutationInFlight(settingsBusyRef.current, roomId)) return false;
     setMessage(roomId, roomSettingsMutationInFlightMessage());
     return true;
-  }
-
-  function setKeyRotationBusyForRoom(roomId: string, busy: boolean) {
-    keyRotationBusyRef.current = busy
-      ? { ...keyRotationBusyRef.current, [roomId]: true }
-      : omitRecordKey(keyRotationBusyRef.current, roomId);
-    setKeyRotationBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
   function reportRoomKeyRotationInFlight(roomId: string): boolean {
@@ -923,13 +909,6 @@ export function App() {
 
   function setFilePreviewTabForRoom(roomId: string, tab: FilePreviewTab) {
     setFilePreviewTabsByRoom((current) => tab === "file" ? omitRecordKey(current, roomId) : { ...current, [roomId]: tab });
-  }
-
-  function setFileBusyForRoom(roomId: string, busy: boolean) {
-    fileBusyRef.current = busy
-      ? { ...fileBusyRef.current, [roomId]: true }
-      : omitRecordKey(fileBusyRef.current, roomId);
-    setFileBusyByRoom((current) => busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
   }
 
   function setFileMessageForRoom(roomId: string, message: string | null) {
@@ -1980,16 +1959,6 @@ export function App() {
         ...current,
         [roomId]: [...roomLines, ...lines].slice(-maxTerminalActivityLines)
       };
-    });
-  }
-
-  function setTerminalBusyForRoom(roomId: string, busy: boolean) {
-    terminalBusyRef.current = busy
-      ? { ...terminalBusyRef.current, [roomId]: true }
-      : omitRecordKey(terminalBusyRef.current, roomId);
-    setTerminalBusyByRoom((current) => {
-      if (busy) return { ...current, [roomId]: true };
-      return omitRecordKey(current, roomId);
     });
   }
 
