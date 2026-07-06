@@ -21,6 +21,9 @@ import { formatApprovalAttachments, formatApprovalMessages } from "../lib/codexA
 import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessageRows } from "../lib/chatDisplayRows";
 import { messagesSinceLastCodex } from "../lib/codexTurn";
 import { inspectorAttentionCounts } from "../lib/inspectorAttention";
+import { canUseRoomChat } from "../lib/chatPolicy";
+import { canControlRoomTerminal } from "../lib/terminalAccess";
+import type { LocalHostUser } from "../lib/roomHost";
 import type { RoomRecord } from "@multaiplayer/protocol";
 
 interface UseSelectedRoomRuntimeOptions {
@@ -28,7 +31,8 @@ interface UseSelectedRoomRuntimeOptions {
   selectedRoomId: string;
   markdownSelectionMode: boolean;
   selectedMessageIds: string[];
-  localUserId: string;
+  localUser: LocalHostUser;
+  isSelectedRoomLocked: boolean;
   messages: ChatMessage[];
   pendingAttachments: ChatAttachment[];
   pendingAttachmentBytes: number;
@@ -57,7 +61,8 @@ export function useSelectedRoomRuntime({
   selectedRoomId,
   markdownSelectionMode,
   selectedMessageIds,
-  localUserId,
+  localUser,
+  isSelectedRoomLocked,
   messages,
   pendingAttachments,
   pendingAttachmentBytes,
@@ -85,6 +90,7 @@ export function useSelectedRoomRuntime({
   const approvalVisible = approvalVisibleByRoom[roomId] ?? false;
   const selectedTerminal = roomTerminals.find((terminal) => terminal.id === selectedTerminalId) ?? null;
   const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
+  const selectedTerminalCanControl = canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked);
   const hostHandoffs = hostHandoffsByRoom[roomId] ?? [];
   const terminalRequests = terminalRequestsByRoom[roomId] ?? [];
   const localPreviews = localPreviewsByRoom[roomId] ?? [];
@@ -105,10 +111,10 @@ export function useSelectedRoomRuntime({
     messages,
     markdownSelectionMode,
     selectedMessageIds,
-    localUserId
+    localUserId: localUser.id
   });
   const pendingAttachmentRows = buildPendingAttachmentRows(pendingAttachments);
-  const localPreviewCards = buildLocalPreviewCards(localPreviews, localUserId);
+  const localPreviewCards = buildLocalPreviewCards(localPreviews, localUser.id);
   const pendingAttachmentSummary =
     `${pendingAttachments.length}/${maxMessageAttachments} files · ` +
     `${formatBytes(pendingAttachmentBytes)}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`;
@@ -116,12 +122,14 @@ export function useSelectedRoomRuntime({
   const settingsBusy = settingsBusyByRoom[roomId] ?? false;
   const keyRotationBusy = keyRotationBusyByRoom[roomId] ?? false;
   const hostStatusLabel = formatHostStatus(selectedRoom);
+  const roomCanUseChat = canUseRoomChat(selectedRoom, isSelectedRoomLocked);
 
   return {
     activeCodexApproval,
     approvalVisible,
     selectedTerminal,
     selectedTerminalCanRestart,
+    selectedTerminalCanControl,
     hostHandoffs,
     terminalRequests,
     localPreviews,
@@ -142,6 +150,7 @@ export function useSelectedRoomRuntime({
     hostBusy,
     settingsBusy,
     keyRotationBusy,
-    hostStatusLabel
+    hostStatusLabel,
+    roomCanUseChat
   };
 }

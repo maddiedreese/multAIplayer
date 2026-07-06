@@ -34,11 +34,10 @@ import { canApproveCodexTurn } from "./lib/codexApproval";
 import {
   normalizeRoomName
 } from "./lib/workspaceCreation";
-import { canControlRoomTerminal } from "./lib/terminalAccess";
 import { canHostBrowserAction } from "./lib/browserPolicy";
 import { attachmentReviewScopeKey } from "./lib/attachmentPolicy";
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
-import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
+import { canStageRoomChatAttachment, roomChatGateMessage } from "./lib/chatPolicy";
 import { extractCodexBrowserOpenUrl } from "./lib/codexInvoke";
 import type { GitHubActionsTarget } from "./lib/githubWorkflowReadiness";
 import type { GitWorkflowDraft } from "./lib/gitWorkflowDraft";
@@ -883,6 +882,7 @@ export function App() {
     terminalRequests,
     localPreviews,
     localPreviewBusy,
+    selectedTerminalCanControl,
     inspectorAttention,
     inviteRequests,
     codexEvents,
@@ -899,13 +899,15 @@ export function App() {
     hostBusy,
     settingsBusy,
     keyRotationBusy,
-    hostStatusLabel
+    hostStatusLabel,
+    roomCanUseChat
   } = useSelectedRoomRuntime({
     selectedRoom,
     selectedRoomId,
     markdownSelectionMode,
     selectedMessageIds,
-    localUserId: localUser.id,
+    localUser,
+    isSelectedRoomLocked,
     messages,
     pendingAttachments,
     pendingAttachmentBytes,
@@ -928,7 +930,6 @@ export function App() {
     settingsBusyByRoom,
     keyRotationBusyByRoom
   });
-  const roomCanUseChat = canUseRoomChat(selectedRoom, isSelectedRoomLocked);
   const {
     setRoomHost,
     acceptHostHandoff,
@@ -1015,7 +1016,6 @@ export function App() {
     setKeyRotationBusyForRoom
   });
 
-  const selectedTerminalCanControl = canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked);
   const {
     selectedAttachmentReview,
     selectedFileRisks,
