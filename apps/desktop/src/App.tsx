@@ -75,8 +75,6 @@ import { useHostHandoffActions } from "./hooks/useHostHandoffActions";
 import { useInviteActions } from "./hooks/useInviteActions";
 import { useGitWorkflowActions } from "./hooks/useGitWorkflowActions";
 import { useChatActions } from "./hooks/useChatActions";
-import { useCodexInvokeActions } from "./hooks/useCodexInvokeActions";
-import { useCodexTurnActions } from "./hooks/useCodexTurnActions";
 import { useRoomVisibilityWarningActions } from "./hooks/useRoomVisibilityWarningActions";
 import { useWorkspaceUiState } from "./hooks/useWorkspaceUiState";
 import { useHistoryDefaultsState } from "./hooks/useHistoryDefaultsState";
@@ -103,6 +101,7 @@ import { useAppBootstrapEffects } from "./hooks/useAppBootstrapEffects";
 import { useRoomBackgroundEffects } from "./hooks/useRoomBackgroundEffects";
 import { useRoomPanelActions } from "./hooks/useRoomPanelActions";
 import { useRelayRoomSync } from "./hooks/useRelayRoomSync";
+import { useCodexRoomActions } from "./hooks/useCodexRoomActions";
 import { InlineSecretWarning } from "./components/common";
 import { AppWorkspaceShell } from "./components/AppWorkspaceShell";
 import { AppSidebarDrawer } from "./components/AppSidebarDrawer";
@@ -1421,63 +1420,65 @@ export function App() {
       appendGitHubActionsEvent
     }
   });
-  const { approveCodexTurn } = useCodexTurnActions({
-    selectedRoom,
-    activeCodexApproval,
-    roomsRef,
-    selectedRoomIdRef,
-    forgottenRoomIds,
-    revokedRoomIds,
-    revokedTeamIds,
-    localUser,
-    messagesByRoom,
-    terminals,
-    browserRequestsByRoom,
-    gitStatusByRoom,
-    codexContinuationByRoom,
-    codexThreadIdsByRoom,
-    setHostMessageForRoom,
-    setPendingCodexApprovalForRoom,
-    setApprovalVisibleForRoom,
-    setCodexRunningForRoom,
-    appendTerminalLinesForRoom,
-    setCodexThreadIdsByRoom,
-    setCodexContinuationByRoom,
-    setRooms,
-    publishCodexEvent,
-    publishChatMessage,
-    publishHostHandoff
-  });
   const {
+    approveCodexTurn,
     handleCodexInvoke,
     sendMessage
-  } = useCodexInvokeActions({
-    hasSelectedRoom,
-    selectedRoom,
-    selectedRoomIdRef,
-    isSelectedRoomLocked,
-    isSelectedRoomRevoked,
-    isActiveHost,
-    canReadLocalWorkspace,
-    hostGateMessage,
-    localUser,
-    draft,
-    pendingAttachments,
-    messages,
-    roomTerminals,
-    browserRequests,
-    gitStatus,
-    publishChatMessage,
-    handleCodexBrowserOpenCommand,
-    approveCodexTurn,
-    setSelectedChatMessage,
-    setChatMessageForRoom,
-    setSelectedHostMessage,
-    setHostMessageForRoom,
-    setPendingCodexApprovalForRoom,
-    setApprovalVisibleForRoom,
-    setDraftForRoom,
-    setPendingAttachmentsForRoom
+  } = useCodexRoomActions({
+    turn: {
+      selectedRoom,
+      activeCodexApproval,
+      roomsRef,
+      selectedRoomIdRef,
+      forgottenRoomIds,
+      revokedRoomIds,
+      revokedTeamIds,
+      localUser,
+      messagesByRoom,
+      terminals,
+      browserRequestsByRoom,
+      gitStatusByRoom,
+      codexContinuationByRoom,
+      codexThreadIdsByRoom,
+      setHostMessageForRoom,
+      setPendingCodexApprovalForRoom,
+      setApprovalVisibleForRoom,
+      setCodexRunningForRoom,
+      appendTerminalLinesForRoom,
+      setCodexThreadIdsByRoom,
+      setCodexContinuationByRoom,
+      setRooms,
+      publishCodexEvent,
+      publishChatMessage,
+      publishHostHandoff
+    },
+    invoke: {
+      hasSelectedRoom,
+      selectedRoom,
+      selectedRoomIdRef,
+      isSelectedRoomLocked,
+      isSelectedRoomRevoked,
+      isActiveHost,
+      canReadLocalWorkspace,
+      hostGateMessage,
+      localUser,
+      draft,
+      pendingAttachments,
+      messages,
+      roomTerminals,
+      browserRequests,
+      gitStatus,
+      publishChatMessage,
+      handleCodexBrowserOpenCommand,
+      setSelectedChatMessage,
+      setChatMessageForRoom,
+      setSelectedHostMessage,
+      setHostMessageForRoom,
+      setPendingCodexApprovalForRoom,
+      setApprovalVisibleForRoom,
+      setDraftForRoom,
+      setPendingAttachmentsForRoom
+    }
   });
   const {
     setApprovalPolicy,
