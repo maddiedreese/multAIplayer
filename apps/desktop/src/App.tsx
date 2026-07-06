@@ -35,27 +35,16 @@ import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useRoomAccess } from "./hooks/useRoomAccess";
-import { useRoomBrowserSetters } from "./hooks/useRoomBrowserSetters";
-import { useRoomBusySetters } from "./hooks/useRoomBusySetters";
 import { useRoomChatMutations } from "./hooks/useRoomChatMutations";
-import { useRoomCodexApprovalSetters } from "./hooks/useRoomCodexApprovalSetters";
-import { useRoomDraftSetters } from "./hooks/useRoomDraftSetters";
-import { useRoomEventAppenders } from "./hooks/useRoomEventAppenders";
-import { useRoomFileSetters } from "./hooks/useRoomFileSetters";
-import { useRoomGitSetters } from "./hooks/useRoomGitSetters";
-import { useRoomInviteSetters } from "./hooks/useRoomInviteSetters";
 import { useRoomInFlightReporters } from "./hooks/useRoomInFlightReporters";
 import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
-import { useRoomMessageSetters } from "./hooks/useRoomMessageSetters";
 import { useRoomNotices } from "./hooks/useRoomNotices";
-import { useRoomProjectSetters } from "./hooks/useRoomProjectSetters";
-import { useRoomRequestSetters } from "./hooks/useRoomRequestSetters";
+import { useRoomScopedSetters } from "./hooks/useRoomScopedSetters";
 import { useShellLayout } from "./hooks/useShellLayout";
 import { useSelectedTeamData } from "./hooks/useSelectedTeamData";
 import { useSelectedRoomValues } from "./hooks/useSelectedRoomValues";
 import { useSelectedRoomRuntime } from "./hooks/useSelectedRoomRuntime";
 import { useSidebarNavigation } from "./hooks/useSidebarNavigation";
-import { useRoomTerminalSetters } from "./hooks/useRoomTerminalSetters";
 import { useTeamMembersRefresh } from "./hooks/useTeamMembersRefresh";
 import { useThemeMode } from "./hooks/useThemeMode";
 import { useMarkdownCopyActions } from "./hooks/useMarkdownCopyActions";
@@ -554,19 +543,7 @@ export function App() {
     setTeamHistoryMessageForTeam,
     setSelectedTeamHistoryMessage,
     setSettingsMessageForRoom,
-    setSelectedSettingsMessage
-  } = useRoomMessageSetters({
-    selectedRoomId: selectedRoom.id,
-    selectedTeamId: selectedTeam,
-    setHostMessagesByRoom,
-    setChatMessagesByRoom,
-    setMarkdownCopyFallbacksByRoom,
-    setSecretWarningsVisibleByRoom,
-    setHistoryMessagesByRoom,
-    setTeamHistoryMessagesByTeam,
-    setSettingsMessagesByRoom
-  });
-  const {
+    setSelectedSettingsMessage,
     setGitWorkflowBusyForRoom,
     setActionsBusyForRoom,
     setLocalPreviewBusyForRoom,
@@ -574,26 +551,7 @@ export function App() {
     setSettingsBusyForRoom,
     setKeyRotationBusyForRoom,
     setFileBusyForRoom,
-    setTerminalBusyForRoom
-  } = useRoomBusySetters({
-    gitWorkflowBusyRef,
-    actionsBusyRef,
-    localPreviewBusyRef,
-    hostBusyRef,
-    settingsBusyRef,
-    keyRotationBusyRef,
-    fileBusyRef,
-    terminalBusyRef,
-    setGitWorkflowBusyByRoom,
-    setActionsBusyByRoom,
-    setLocalPreviewBusyByRoom,
-    setHostBusyByRoom,
-    setSettingsBusyByRoom,
-    setKeyRotationBusyByRoom,
-    setFileBusyByRoom,
-    setTerminalBusyByRoom
-  });
-  const {
+    setTerminalBusyForRoom,
     setFileQueryForRoom,
     setProjectFilesForRoom,
     setSelectedFileForRoom,
@@ -601,123 +559,145 @@ export function App() {
     setFilePreviewTabForRoom,
     setFileMessageForRoom,
     setSelectedFileMessage,
-    resetFileContextForRoom
-  } = useRoomFileSetters({
-    selectedRoomId: selectedRoom.id,
-    setFileQueriesByRoom,
-    setProjectFilesByRoom,
-    setSelectedFilesByRoom,
-    setSelectedDiffsByRoom,
-    setFilePreviewTabsByRoom,
-    setFileBusyByRoom,
-    setFileMessagesByRoom
-  });
-  const {
+    resetFileContextForRoom,
     setSelectedTerminalIdForRoom,
     setTerminalNameForRoom,
     setTerminalCommandForRoom,
     setTerminalInputForRoom,
     setTerminalErrorForRoom,
     setSelectedTerminalError,
-    appendTerminalLinesForRoom
-  } = useRoomTerminalSetters({
-    selectedRoomId: selectedRoom.id,
-    maxTerminalActivityLines,
-    setSelectedTerminalIdsByRoom,
-    setTerminalNamesByRoom,
-    setTerminalCommandsByRoom,
-    setTerminalInputsByRoom,
-    setTerminalErrorsByRoom,
-    setTerminalLinesByRoom
-  });
-  const {
+    appendTerminalLinesForRoom,
     setApprovalVisibleForRoom,
     setPendingCodexApprovalForRoom,
     resetCodexApprovalForRoom,
-    setCodexRunningForRoom
-  } = useRoomCodexApprovalSetters({
-    setApprovalVisibleByRoom,
-    setPendingCodexApprovalsByRoom,
-    setCodexRunningByRoom
-  });
-  const {
+    setCodexRunningForRoom,
     setBrowserUrlForRoom,
     setBrowserReasonForRoom,
     setBrowserMessageForRoom,
-    setSelectedBrowserMessage
-  } = useRoomBrowserSetters({
-    selectedRoomId: selectedRoom.id,
-    defaultBrowserUrl,
-    defaultBrowserReason,
-    setBrowserUrlsByRoom,
-    setBrowserReasonsByRoom,
-    setBrowserMessagesByRoom
-  });
-  const {
+    setSelectedBrowserMessage,
     setInviteLinkForRoom,
     setInviteApprovalGateForRoom,
     setInviteMessageForRoom,
-    setSelectedInviteMessage
-  } = useRoomInviteSetters({
-    selectedRoomId: selectedRoom.id,
-    setInviteLinksByRoom,
-    setInviteApprovalGatesByRoom,
-    setInviteMessagesByRoom
-  });
-  const {
+    setSelectedInviteMessage,
     setPendingAttachmentsForRoom,
-    setDraftForRoom
-  } = useRoomDraftSetters({
-    setPendingAttachmentsByRoom,
-    setDraftsByRoom
-  });
-  const {
+    setDraftForRoom,
     setCustomCodexModelForRoom,
-    setProjectPathDraftForRoom
-  } = useRoomProjectSetters({
-    roomsRef,
-    defaultCodexModel,
-    defaultProjectPath,
-    setCustomCodexModelsByRoom,
-    setProjectPathDraftsByRoom
-  });
-  const {
+    setProjectPathDraftForRoom,
     setGitWorkflowMessageForRoom,
     setSelectedGitWorkflowMessage,
     setGitStatusForRoom,
-    updateSelectedGitWorkflowDraft
-  } = useRoomGitSetters({
-    selectedRoomId: selectedRoom.id,
-    hasSelectedRoom,
-    setGitWorkflowMessagesByRoom,
-    setGitWorkflowDraftsByRoom,
-    setGitStatusByRoom
-  });
-  const {
+    updateSelectedGitWorkflowDraft,
     appendGitWorkflowEvent,
     appendGitHubActionsEvent,
     appendLocalPreviewEvent,
     appendHostHandoff,
     appendInviteRequest,
-    appendCodexEvent
-  } = useRoomEventAppenders({
-    setGitWorkflowEventsByRoom,
-    setGitHubActionsEventsByRoom,
-    setLocalPreviewsByRoom,
-    setHostHandoffsByRoom,
-    setInviteRequestsByRoom,
-    setCodexEventsByRoom
-  });
-  const {
+    appendCodexEvent,
     updateInviteRequestStatus,
     appendTerminalRequest,
     updateTerminalRequestStatus,
     appendBrowserRequest,
     updateBrowserRequestStatus
-  } = useRoomRequestSetters({
-    setInviteRequestsByRoom,
-    setTerminalRequestsByRoom,
-    setBrowserRequestsByRoom
+  } = useRoomScopedSetters({
+    messages: {
+      selectedRoomId: selectedRoom.id,
+      selectedTeamId: selectedTeam,
+      setHostMessagesByRoom,
+      setChatMessagesByRoom,
+      setMarkdownCopyFallbacksByRoom,
+      setSecretWarningsVisibleByRoom,
+      setHistoryMessagesByRoom,
+      setTeamHistoryMessagesByTeam,
+      setSettingsMessagesByRoom
+    },
+    busy: {
+      gitWorkflowBusyRef,
+      actionsBusyRef,
+      localPreviewBusyRef,
+      hostBusyRef,
+      settingsBusyRef,
+      keyRotationBusyRef,
+      fileBusyRef,
+      terminalBusyRef,
+      setGitWorkflowBusyByRoom,
+      setActionsBusyByRoom,
+      setLocalPreviewBusyByRoom,
+      setHostBusyByRoom,
+      setSettingsBusyByRoom,
+      setKeyRotationBusyByRoom,
+      setFileBusyByRoom,
+      setTerminalBusyByRoom
+    },
+    files: {
+      selectedRoomId: selectedRoom.id,
+      setFileQueriesByRoom,
+      setProjectFilesByRoom,
+      setSelectedFilesByRoom,
+      setSelectedDiffsByRoom,
+      setFilePreviewTabsByRoom,
+      setFileBusyByRoom,
+      setFileMessagesByRoom
+    },
+    terminals: {
+      selectedRoomId: selectedRoom.id,
+      maxTerminalActivityLines,
+      setSelectedTerminalIdsByRoom,
+      setTerminalNamesByRoom,
+      setTerminalCommandsByRoom,
+      setTerminalInputsByRoom,
+      setTerminalErrorsByRoom,
+      setTerminalLinesByRoom
+    },
+    codexApprovals: {
+      setApprovalVisibleByRoom,
+      setPendingCodexApprovalsByRoom,
+      setCodexRunningByRoom
+    },
+    browser: {
+      selectedRoomId: selectedRoom.id,
+      defaultBrowserUrl,
+      defaultBrowserReason,
+      setBrowserUrlsByRoom,
+      setBrowserReasonsByRoom,
+      setBrowserMessagesByRoom
+    },
+    invites: {
+      selectedRoomId: selectedRoom.id,
+      setInviteLinksByRoom,
+      setInviteApprovalGatesByRoom,
+      setInviteMessagesByRoom
+    },
+    drafts: {
+      setPendingAttachmentsByRoom,
+      setDraftsByRoom
+    },
+    project: {
+      roomsRef,
+      defaultCodexModel,
+      defaultProjectPath,
+      setCustomCodexModelsByRoom,
+      setProjectPathDraftsByRoom
+    },
+    git: {
+      selectedRoomId: selectedRoom.id,
+      hasSelectedRoom,
+      setGitWorkflowMessagesByRoom,
+      setGitWorkflowDraftsByRoom,
+      setGitStatusByRoom
+    },
+    events: {
+      setGitWorkflowEventsByRoom,
+      setGitHubActionsEventsByRoom,
+      setLocalPreviewsByRoom,
+      setHostHandoffsByRoom,
+      setInviteRequestsByRoom,
+      setCodexEventsByRoom
+    },
+    requests: {
+      setInviteRequestsByRoom,
+      setTerminalRequestsByRoom,
+      setBrowserRequestsByRoom
+    }
   });
   const {
     appendRoomMessage,
