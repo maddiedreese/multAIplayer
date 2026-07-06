@@ -142,10 +142,9 @@ import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
 import { InlineSecretWarning } from "./components/common";
-import { ShellResizer, SidebarDrawer } from "./components/AppShellLayout";
+import { ShellResizer } from "./components/AppShellLayout";
 import { BrowserAccessPanel } from "./components/BrowserAccessPanel";
-import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
-import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
+import { AppSidebarDrawer } from "./components/AppSidebarDrawer";
 import { DesktopSidebar } from "./components/DesktopSidebar";
 import { RoomMainColumn } from "./components/RoomMainColumn";
 import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
@@ -1764,102 +1763,93 @@ export function App() {
         onToggleCollapsed={toggleSidebarCollapsed}
       />
 
-      {activeSidebarPanel && (
-        <SidebarDrawer
-          label={activeSidebarPanel === "profile" ? "Account" : "Room settings"}
-          title={activeSidebarPanel === "profile" ? localUser.name : selectedRoom.name}
-          onClose={() => setActiveSidebarPanel(null)}
-        >
-          {activeSidebarPanel === "profile" ? (
-            <ProfileDrawerPanel
-              currentUser={currentUser}
-              authConfig={authConfig}
-              authBusy={authBusy}
-              authError={authError}
-              deviceFlow={deviceFlow}
-              deviceId={deviceId}
-              deviceIdentity={deviceIdentity}
-              deviceIdentityMessage={deviceIdentityMessage}
-              relaySessionPersistence={formatSessionPersistence(authConfig?.sessionPersistence)}
-              onRotateDeviceIdentity={rotateDeviceIdentity}
-              onSignIn={beginGitHubSignIn}
-              onSignOut={signOut}
-            />
-          ) : (
-            <RoomSettingsDrawerPanel
-              relaySummary={`${relayStatus} · ${appConfig.relayWsUrl}`}
-              relayApi={appConfig.relayHttpUrl}
-              codexSummary={codexProbe?.available ? codexProbe.version ?? "Available" : codexProbe?.error ?? "Not connected"}
-              projectPath={selectedRoom.projectPath}
-              modelLabel={formatCodexModel(selectedCodexModel)}
-              approvalLabel={approvalPolicyLabels[selectedRoom.approvalPolicy]}
-              roomKeysLabel={roomSecretStorageLabel()}
-              posture={roomPosture}
-              chooseProjectDisabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-              relayHttpDraft={relayHttpDraft}
-              relayWsDraft={relayWsDraft}
-              defaultRelayHttpUrl={defaultRelayHttpUrl}
-              defaultRelayWsUrl={defaultRelayWsUrl}
-              saveRelayDisabled={!relayHttpDraft.trim() || !relayWsDraft.trim()}
-              roomMode={selectedRoom.mode}
-              roomModeLabels={roomModeLabels}
-              roomModesDisabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-              showRoomSettingsGate={!isActiveHost && hasSelectedRoom}
-              roomSettingsGateMessage={roomSettingsGateMessage}
-              historySettings={historySettings}
-              teamHistorySettings={teamHistorySettings}
-              hasSelectedRoom={hasSelectedRoom}
-              selectedTeam={Boolean(selectedTeam)}
-              settingsBusy={settingsBusy}
-              teamDefaultApprovalPolicy={teamDefaultApprovalPolicy}
-              approvalPolicyLabels={approvalPolicyLabels}
-              teamDefaultCodexModel={teamDefaultCodexModel}
-              defaultCodexModel={defaultCodexModel}
-              codexModelOptions={codexModelOptions}
-              teamDefaultBrowserProfilePersistent={teamDefaultBrowserProfilePersistent}
-              teamDefaultInviteApprovalGate={teamDefaultInviteApprovalGate}
-              message={appConfigMessage ?? settingsMessage ?? visibleHistoryMessage}
-              onChooseProject={chooseProjectPath}
-              onRelayHttpDraftChange={setRelayHttpDraft}
-              onRelayWsDraftChange={setRelayWsDraft}
-              onResetRelay={resetRelayConfiguration}
-              onSaveRelay={saveRelayConfiguration}
-              onToggleRoomMode={toggleRoomMode}
-              onHistoryEnabledChange={(enabled) =>
-                updateLocalHistorySettings({
-                  ...historySettings,
-                  enabled
-                })
-              }
-              onHistoryRetentionDaysChange={(retentionDays) =>
-                updateLocalHistorySettings({
-                  ...historySettings,
-                  retentionDays
-                })
-              }
-              onClearRoomHistory={clearRoomHistory}
-              onForgetRoomLocalData={forgetSelectedRoomLocalData}
-              onTeamHistoryEnabledChange={(enabled) =>
-                updateTeamHistoryDefaults({
-                  ...teamHistorySettings,
-                  enabled
-                })
-              }
-              onTeamHistoryRetentionDaysChange={(retentionDays) =>
-                updateTeamHistoryDefaults({
-                  ...teamHistorySettings,
-                  retentionDays
-                })
-              }
-              onTeamDefaultApprovalPolicyChange={updateTeamDefaultApprovalPolicy}
-              onTeamDefaultCodexModelChange={updateTeamDefaultCodexModel}
-              onTeamDefaultBrowserProfilePersistentChange={setTeamDefaultBrowserProfilePersistent}
-              onTeamDefaultInviteApprovalGateChange={updateTeamDefaultInviteApprovalGate}
-              onApplyTeamDefaultsToRoom={applyTeamDefaultsToRoom}
-            />
-          )}
-        </SidebarDrawer>
-      )}
+      <AppSidebarDrawer
+        activePanel={activeSidebarPanel}
+        profileTitle={localUser.name}
+        settingsTitle={selectedRoom.name}
+        profile={{
+          currentUser,
+          authConfig,
+          authBusy,
+          authError,
+          deviceFlow,
+          deviceId,
+          deviceIdentity,
+          deviceIdentityMessage,
+          relaySessionPersistence: formatSessionPersistence(authConfig?.sessionPersistence),
+          onRotateDeviceIdentity: rotateDeviceIdentity,
+          onSignIn: beginGitHubSignIn,
+          onSignOut: signOut
+        }}
+        settings={{
+          relaySummary: `${relayStatus} · ${appConfig.relayWsUrl}`,
+          relayApi: appConfig.relayHttpUrl,
+          codexSummary: codexProbe?.available ? codexProbe.version ?? "Available" : codexProbe?.error ?? "Not connected",
+          projectPath: selectedRoom.projectPath,
+          modelLabel: formatCodexModel(selectedCodexModel),
+          approvalLabel: approvalPolicyLabels[selectedRoom.approvalPolicy],
+          roomKeysLabel: roomSecretStorageLabel(),
+          posture: roomPosture,
+          chooseProjectDisabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
+          relayHttpDraft,
+          relayWsDraft,
+          defaultRelayHttpUrl,
+          defaultRelayWsUrl,
+          saveRelayDisabled: !relayHttpDraft.trim() || !relayWsDraft.trim(),
+          roomMode: selectedRoom.mode,
+          roomModeLabels,
+          roomModesDisabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
+          showRoomSettingsGate: !isActiveHost && hasSelectedRoom,
+          roomSettingsGateMessage,
+          historySettings,
+          teamHistorySettings,
+          hasSelectedRoom,
+          selectedTeam: Boolean(selectedTeam),
+          settingsBusy,
+          teamDefaultApprovalPolicy,
+          approvalPolicyLabels,
+          teamDefaultCodexModel,
+          defaultCodexModel,
+          codexModelOptions,
+          teamDefaultBrowserProfilePersistent,
+          teamDefaultInviteApprovalGate,
+          message: appConfigMessage ?? settingsMessage ?? visibleHistoryMessage,
+          onChooseProject: chooseProjectPath,
+          onRelayHttpDraftChange: setRelayHttpDraft,
+          onRelayWsDraftChange: setRelayWsDraft,
+          onResetRelay: resetRelayConfiguration,
+          onSaveRelay: saveRelayConfiguration,
+          onToggleRoomMode: toggleRoomMode,
+          onHistoryEnabledChange: (enabled) =>
+            updateLocalHistorySettings({
+              ...historySettings,
+              enabled
+            }),
+          onHistoryRetentionDaysChange: (retentionDays) =>
+            updateLocalHistorySettings({
+              ...historySettings,
+              retentionDays
+            }),
+          onClearRoomHistory: clearRoomHistory,
+          onForgetRoomLocalData: forgetSelectedRoomLocalData,
+          onTeamHistoryEnabledChange: (enabled) =>
+            updateTeamHistoryDefaults({
+              ...teamHistorySettings,
+              enabled
+            }),
+          onTeamHistoryRetentionDaysChange: (retentionDays) =>
+            updateTeamHistoryDefaults({
+              ...teamHistorySettings,
+              retentionDays
+            }),
+          onTeamDefaultApprovalPolicyChange: updateTeamDefaultApprovalPolicy,
+          onTeamDefaultCodexModelChange: updateTeamDefaultCodexModel,
+          onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent,
+          onTeamDefaultInviteApprovalGateChange: updateTeamDefaultInviteApprovalGate,
+          onApplyTeamDefaultsToRoom: applyTeamDefaultsToRoom
+        }}
+        onClose={() => setActiveSidebarPanel(null)}
+      />
 
       <RoomMainColumn
         headerProps={{
