@@ -315,6 +315,7 @@ import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
 import { useRoomMessageSetters } from "./hooks/useRoomMessageSetters";
 import { useRoomNotices } from "./hooks/useRoomNotices";
 import { useRoomProjectSetters } from "./hooks/useRoomProjectSetters";
+import { useRoomRequestSetters } from "./hooks/useRoomRequestSetters";
 import { useShellLayout } from "./hooks/useShellLayout";
 import { useSelectedTeamData } from "./hooks/useSelectedTeamData";
 import { useSelectedRoomValues } from "./hooks/useSelectedRoomValues";
@@ -830,6 +831,17 @@ export function App() {
     setHostHandoffsByRoom,
     setInviteRequestsByRoom,
     setCodexEventsByRoom
+  });
+  const {
+    updateInviteRequestStatus,
+    appendTerminalRequest,
+    updateTerminalRequestStatus,
+    appendBrowserRequest,
+    updateBrowserRequestStatus
+  } = useRoomRequestSetters({
+    setInviteRequestsByRoom,
+    setTerminalRequestsByRoom,
+    setBrowserRequestsByRoom
   });
   const roomNotices = useRoomNotices({
     roomId: selectedRoom.id,
@@ -2535,19 +2547,6 @@ export function App() {
     };
     seenEnvelopeIds.current.add(envelope.id);
     client.publish({ type: "publish", envelope });
-  }
-
-  function updateInviteRequestStatus(
-    roomId: string,
-    requestId: string,
-    status: InviteJoinRequest["status"]
-  ) {
-    setInviteRequestsByRoom((current) => ({
-      ...current,
-      [roomId]: (current[roomId] ?? []).map((request) =>
-        request.id === requestId ? { ...request, status } : request
-      )
-    }));
   }
 
   async function publishInviteJoinRequest(
@@ -4402,30 +4401,6 @@ export function App() {
     });
   }
 
-  function appendTerminalRequest(roomId: string, request: TerminalCommandRequest) {
-    setTerminalRequestsByRoom((current) => {
-      const roomRequests = current[roomId] ?? [];
-      if (roomRequests.some((existing) => existing.id === request.id)) return current;
-      return {
-        ...current,
-        [roomId]: [...roomRequests, request]
-      };
-    });
-  }
-
-  function updateTerminalRequestStatus(
-    roomId: string,
-    requestId: string,
-    status: TerminalCommandRequest["status"]
-  ) {
-    setTerminalRequestsByRoom((current) => ({
-      ...current,
-      [roomId]: (current[roomId] ?? []).map((request) =>
-        request.id === requestId ? { ...request, status } : request
-      )
-    }));
-  }
-
   async function requestBrowserAccess() {
     if (!hasSelectedRoom) {
       setSelectedBrowserMessage("Create or join a room before requesting browser access.");
@@ -4679,30 +4654,6 @@ export function App() {
     }
     saveRoomVisibilityWarningAcknowledgement(selectedRoom.id);
     setSecretWarningVisibleForRoom(selectedRoom.id, false);
-  }
-
-  function appendBrowserRequest(roomId: string, request: BrowserAccessRequest) {
-    setBrowserRequestsByRoom((current) => {
-      const roomRequests = current[roomId] ?? [];
-      if (roomRequests.some((existing) => existing.id === request.id)) return current;
-      return {
-        ...current,
-        [roomId]: [...roomRequests, request]
-      };
-    });
-  }
-
-  function updateBrowserRequestStatus(
-    roomId: string,
-    requestId: string,
-    status: BrowserAccessRequest["status"]
-  ) {
-    setBrowserRequestsByRoom((current) => ({
-      ...current,
-      [roomId]: (current[roomId] ?? []).map((request) =>
-        request.id === requestId ? { ...request, status } : request
-      )
-    }));
   }
 
   function buildLocalRequestStatusPayload(
