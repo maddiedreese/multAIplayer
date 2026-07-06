@@ -28,15 +28,13 @@ import {
   formatTimestamp
 } from "./lib/appFormatters";
 import { useAppStateSlices } from "./hooks/useAppStateSlices";
-import { useFileTerminalDisplay } from "./hooks/useFileTerminalDisplay";
 import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useRoomChatMutations } from "./hooks/useRoomChatMutations";
 import { useRoomInteractionContext } from "./hooks/useRoomInteractionContext";
 import { useRoomScopedSetters } from "./hooks/useRoomScopedSetters";
 import { useSelectedRoomRuntime } from "./hooks/useSelectedRoomRuntime";
-import { useSidebarNavigation } from "./hooks/useSidebarNavigation";
-import { useTeamMembersRefresh } from "./hooks/useTeamMembersRefresh";
+import { useRoomDisplayContext } from "./hooks/useRoomDisplayContext";
 import { useThemeMode } from "./hooks/useThemeMode";
 import { useMarkdownCopyActions } from "./hooks/useMarkdownCopyActions";
 import { useWorkspaceRecordActions } from "./hooks/useWorkspaceRecordActions";
@@ -923,41 +921,43 @@ export function App() {
     terminalCommandRisks,
     terminalOutputLines,
     terminalRequestRows,
-    codexEventRows
-  } = useFileTerminalDisplay({
-    selectedFile,
-    selectedRoomId: selectedRoom.id,
-    selectedRoomProjectPath: selectedRoom.projectPath,
-    sensitiveAttachmentReviewKey,
-    selectedTerminal,
-    terminalLines,
-    terminalCommand,
-    terminalRequests,
-    codexEvents
-  });
-  const {
+    codexEventRows,
     searchActive,
     sidebarTeamRows,
     sidebarRoomRows,
-    sidebarMessageHitRows
-  } = useSidebarNavigation({
-    sidebarQuery,
-    rooms,
-    teams,
-    selectedTeam,
-    selectedRoomId,
-    messagesByRoom,
-    historySearchMessagesByRoom,
-    approvalVisibleByRoom,
-    terminalRequestsByRoom,
-    browserRequestsByRoom,
-    approvalPolicyLabels
-  });
-  const { refreshTeamMembers } = useTeamMembersRefresh({
-    selectedTeam,
-    relayHttpUrl: appConfig.relayHttpUrl,
-    setTeamMembersByTeam,
-    setTeamMembersMessageByTeam
+    sidebarMessageHitRows,
+    refreshTeamMembers
+  } = useRoomDisplayContext({
+    fileTerminal: {
+      selectedFile,
+      selectedRoomId: selectedRoom.id,
+      selectedRoomProjectPath: selectedRoom.projectPath,
+      sensitiveAttachmentReviewKey,
+      selectedTerminal,
+      terminalLines,
+      terminalCommand,
+      terminalRequests,
+      codexEvents
+    },
+    sidebar: {
+      sidebarQuery,
+      rooms,
+      teams,
+      selectedTeam,
+      selectedRoomId,
+      messagesByRoom,
+      historySearchMessagesByRoom,
+      approvalVisibleByRoom,
+      terminalRequestsByRoom,
+      browserRequestsByRoom,
+      approvalPolicyLabels
+    },
+    teamMembers: {
+      selectedTeam,
+      relayHttpUrl: appConfig.relayHttpUrl,
+      setTeamMembersByTeam,
+      setTeamMembersMessageByTeam
+    }
   });
   useAppBootstrapEffects({
     workspace: {
