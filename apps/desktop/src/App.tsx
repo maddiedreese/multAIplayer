@@ -71,7 +71,6 @@ import {
 import { loadOrCreateDeviceIdentity, resetDeviceIdentity, type DeviceIdentity } from "./lib/deviceIdentity";
 import {
   buildDeviceFingerprintMarkdown,
-  isDeviceKeyTrusted,
   loadTrustedDeviceKeys,
   trustDeviceKey,
   untrustDeviceKey,
@@ -286,12 +285,6 @@ import {
   buildTerminalResultLines,
   formatCodexEventStatus
 } from "./lib/activityLines";
-import {
-  canDemoteTeamMember,
-  canPromoteTeamMember,
-  canRemoveTeamMember,
-  canTransferTeamOwnership
-} from "./lib/teamMemberPermissions";
 import { nextShellTerminalName, terminalInputForShellSubmit } from "./lib/terminalUi";
 import {
   canOpenProjectAttachment,
@@ -302,16 +295,12 @@ import {
   formatBytes,
   formatCodexModel,
   formatHostStatus,
-  formatMemberDeviceLabel,
   formatMessageTime,
   formatSessionPersistence,
-  formatTeamMemberInitial,
-  formatTeamMemberJoinedAt,
   formatTeamMemberName,
   formatTeamMeta,
   formatTeamRole,
   formatTimestamp,
-  isRoomHostMember,
   validatePendingAttachments
 } from "./lib/appFormatters";
 import {
@@ -322,6 +311,7 @@ import {
   type LocalPreviewCandidate
 } from "./lib/localPreview";
 import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessageRows } from "./lib/chatDisplayRows";
+import { buildRoomMemberRows, buildTeamMemberRows } from "./lib/rosterDisplayRows";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -341,7 +331,7 @@ import { WorkspaceFilesPanel } from "./components/WorkspaceFilesPanel";
 import { GitHubActionsPanel } from "./components/GitHubActionsPanel";
 import { GitHandoffPanel } from "./components/GitHandoffPanel";
 import { ProjectPanel } from "./components/ProjectPanel";
-import { RoomMembersPanel, TeamRosterPanel, type RoomMemberDisplay, type TeamMemberDisplay } from "./components/RosterPanels";
+import { RoomMembersPanel, TeamRosterPanel } from "./components/RosterPanels";
 import { TerminalPanel, type CodexEventDisplay, type TerminalCommandRequestDisplay, type TerminalOutputLineDisplay } from "./components/TerminalPanel";
 import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
 import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
@@ -568,17 +558,12 @@ export function App() {
   const selectedTeamMembers = teamMembersByTeam[selectedTeam] ?? [];
   const selectedTeamMembersMessage = teamMembersMessageByTeam[selectedTeam] ?? null;
   const selectedTeamMembersBusy = teamMembersBusyByTeam[selectedTeam] ?? false;
-  const selectedTeamMemberRows: TeamMemberDisplay[] = selectedTeamMembers.map((member) => ({
-    member,
-    initial: formatTeamMemberInitial(member.userId),
-    name: formatTeamMemberName(member.userId, currentUser),
-    roleLabel: formatTeamRole(member.role),
-    joinedLabel: formatTeamMemberJoinedAt(member.joinedAt),
-    canPromote: canPromoteTeamMember(selectedTeamRecord, member),
-    canDemote: canDemoteTeamMember(selectedTeamRecord, member),
-    canTransferOwnership: canTransferTeamOwnership(selectedTeamRecord, member, localUser.id),
-    canRemove: canRemoveTeamMember(selectedTeamRecord, member)
-  }));
+  const selectedTeamMemberRows = buildTeamMemberRows({
+    members: selectedTeamMembers,
+    team: selectedTeamRecord,
+    currentUser,
+    localUserId: localUser.id
+  });
   const selectedCodexModel = selectedRoom?.codexModel ?? defaultCodexModel;
   const customCodexModel = customCodexModelsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedCodexModel;
   const projectPathDraft = projectPathDraftsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedRoom.projectPath;
@@ -716,30 +701,13 @@ export function App() {
   );
   const activeCodexApproval = pendingCodexApprovalsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const approvalVisible = approvalVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
-  const roomMembers = Object.values(presenceByRoom[selectedRoom?.id ?? selectedRoomId] ?? {})
-    .filter((member) => member.status === "online")
-    .sort((a, b) => a.displayName.localeCompare(b.displayName));
-  const visibleRoomMembers: RoomPresence[] = roomMembers.length ? roomMembers : [{
-    userId: localUser.id,
-    deviceId,
-    displayName: localUser.name,
-    avatarUrl: localUser.avatarUrl,
-    publicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
-    status: "online" as const
-  }];
-  const roomMemberRows: RoomMemberDisplay[] = visibleRoomMembers.map((member) => {
-    const trusted = isDeviceKeyTrusted(
-      trustedDeviceKeys,
-      selectedRoom.id,
-      member.deviceId,
-      member.publicKeyFingerprint
-    );
-    return {
-      ...member,
-      trusted,
-      isHost: isRoomHostMember(member, selectedRoom),
-      deviceLabel: formatMemberDeviceLabel(member, deviceId, trusted)
-    };
+  const roomMemberRows = buildRoomMemberRows({
+    presence: presenceByRoom[selectedRoom?.id ?? selectedRoomId] ?? {},
+    room: selectedRoom,
+    localUser,
+    localDeviceId: deviceId,
+    localPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
+    trustedDeviceKeys
   });
   const selectedTerminal = roomTerminals.find((terminal) => terminal.id === selectedTerminalId) ?? null;
   const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
