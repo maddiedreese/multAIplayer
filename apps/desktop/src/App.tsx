@@ -134,6 +134,7 @@ import { useGitHubActionsDraftReset } from "./hooks/useGitHubActionsDraftReset";
 import { useProjectFilesSearch } from "./hooks/useProjectFilesSearch";
 import { useTerminalLifecycle } from "./hooks/useTerminalLifecycle";
 import { useLocalHistoryPersistence } from "./hooks/useLocalHistoryPersistence";
+import { useTerminalAutoOpen } from "./hooks/useTerminalAutoOpen";
 import {
   canApproveCodexTurn,
   shouldAutoApproveChatOnlyTurn,
@@ -1562,32 +1563,18 @@ export function App() {
     setTerminalErrorForRoom
   });
 
-  useEffect(() => {
-    if (
-      inspectorTab !== "terminal" ||
-      !hasSelectedRoom ||
-      !isActiveHost ||
-      !canReadLocalWorkspace ||
-      isSelectedRoomLocked ||
-      terminalBusy ||
-      roomTerminals.length > 0 ||
-      terminalAutoOpenedRoomsRef.current.has(selectedRoom.id)
-    ) {
-      return;
-    }
-
-    terminalAutoOpenedRoomsRef.current.add(selectedRoom.id);
-    void openInteractiveTerminal({ reuseExisting: true, quiet: true });
-  }, [
-    canReadLocalWorkspace,
-    hasSelectedRoom,
+  useTerminalAutoOpen({
     inspectorTab,
+    hasSelectedRoom,
     isActiveHost,
+    canReadLocalWorkspace,
     isSelectedRoomLocked,
-    roomTerminals.length,
-    selectedRoom.id,
-    terminalBusy
-  ]);
+    terminalBusy,
+    roomTerminalCount: roomTerminals.length,
+    selectedRoomId: selectedRoom.id,
+    terminalAutoOpenedRoomsRef,
+    openInteractiveTerminal
+  });
 
   useCodexProbe({ setCodexProbe });
 
