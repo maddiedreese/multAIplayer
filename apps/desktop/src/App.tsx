@@ -28,7 +28,6 @@ import { useTerminalLifecycle } from "./hooks/useTerminalLifecycle";
 import { useLocalHistoryPersistence } from "./hooks/useLocalHistoryPersistence";
 import { useTerminalAutoOpen } from "./hooks/useTerminalAutoOpen";
 import { useLocalHistoryHydration } from "./hooks/useLocalHistoryHydration";
-import { canApproveCodexTurn } from "./lib/codexApproval";
 import {
   normalizeRoomName
 } from "./lib/workspaceCreation";
@@ -36,7 +35,7 @@ import { attachmentReviewScopeKey } from "./lib/attachmentPolicy";
 import { canStageRoomChatAttachment, roomChatGateMessage } from "./lib/chatPolicy";
 import type { GitHubActionsTarget } from "./lib/githubWorkflowReadiness";
 import type { GitWorkflowDraft } from "./lib/gitWorkflowDraft";
-import { roomLockMessage, roomSecretStorageLabel } from "./lib/appRuntime";
+import { roomSecretStorageLabel } from "./lib/appRuntime";
 import {
   embeddedAttachmentBytes,
   encodedBytes,
@@ -126,6 +125,7 @@ import { useAppRuntimeState } from "./hooks/useAppRuntimeState";
 import { useCodexBrowserOpenCommand } from "./hooks/useCodexBrowserOpenCommand";
 import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
 import { useAppRefs } from "./hooks/useAppRefs";
+import { useRoomMainColumnProps } from "./hooks/useRoomMainColumnProps";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -1856,6 +1856,57 @@ export function App() {
     setSelectedDiffForRoom,
     setSensitiveAttachmentReviewKey
   });
+  const roomMainColumnProps = useRoomMainColumnProps({
+    teams: teams.map((team) => ({ id: team.id, name: team.name })),
+    selectedTeam,
+    selectedRoom,
+    localUser,
+    hostBusy,
+    isActiveHost,
+    isSelectedRoomLocked,
+    isSelectedRoomRevoked,
+    hasSelectedRoom,
+    selectedCodexModel,
+    modelOptions: codexModelOptions,
+    settingsBusy,
+    selectedMessageCount: selectedMessages.length,
+    markdownSelectionMode,
+    inspectorTab,
+    roomHeaderActions,
+    onSetHost: setRoomHost,
+    onRenameRoom: renameRoom,
+    onSelectModel: setCodexModel,
+    onCopyRoomMarkdown: copyRoomMarkdown,
+    onCopySelectedMarkdown: copySelectedMessagesMarkdown,
+    onToggleMarkdownSelection: toggleMarkdownSelectionMode,
+    onClearSelectedMessages: clearSelectedMessages,
+    onShareLocalPreview: openLocalPreviewDialog,
+    notices: roomNotices,
+    secretWarningVisible,
+    onAcknowledgeSecretWarning: acknowledgeRoomVisibilityWarning,
+    markdownCopyFallback,
+    onRetryMarkdownCopy: (title, markdown) => copyMarkdownWithFallback(
+      title,
+      markdown,
+      (message) => setChatMessageForRoom(selectedRoom.id, message),
+      selectedRoom.id
+    ),
+    onDismissMarkdownFallback: () => setMarkdownCopyFallbackForRoom(selectedRoom.id, null),
+    messages: chatMessageRows,
+    approvalVisible,
+    approvalSummary: codexApprovalSummaryDisplay,
+    codexRunning,
+    roomCanUseChat,
+    draft,
+    pendingAttachmentCount: pendingAttachments.length,
+    pendingAttachments: pendingAttachmentRows,
+    localPreviewCards,
+    pendingAttachmentSummary,
+    onToggleMessageSelection: toggleMessageSelection,
+    onRemovePendingAttachment: removePendingAttachment,
+    onSendMessage: sendMessage,
+    roomChatPanelActions
+  });
 
   return (
     <AppWorkspaceShell
@@ -1999,73 +2050,7 @@ export function App() {
       />
       )}
       main={(
-        <RoomMainColumn
-        headerProps={{
-          teams: teams.map((team) => ({ id: team.id, name: team.name })),
-          selectedTeamId: selectedTeam,
-          roomName: selectedRoom.name,
-          hostStatus: selectedRoom.hostStatus,
-          hostBusy,
-          isActiveHost,
-          roomLocked: isSelectedRoomLocked,
-          hasRoom: hasSelectedRoom,
-          selectedModel: selectedCodexModel,
-          modelLabel: formatCodexModel(selectedCodexModel),
-          modelOptions: codexModelOptions,
-          settingsBusy,
-          selectedCount: selectedMessages.length,
-          markdownSelectionMode,
-          activeInspectorTab: inspectorTab,
-          onSetHost: setRoomHost,
-          onRenameRoom: renameRoom,
-          onSelectModel: setCodexModel,
-          onCopyRoomMarkdown: copyRoomMarkdown,
-          onCopySelectedMarkdown: copySelectedMessagesMarkdown,
-          onToggleMarkdownSelection: toggleMarkdownSelectionMode,
-          onClearSelectedMessages: clearSelectedMessages,
-          onShareLocalPreview: openLocalPreviewDialog,
-          ...roomHeaderActions
-        }}
-        statusProps={{
-          notices: roomNotices,
-          secretWarningVisible,
-          lockedMessage: isSelectedRoomLocked ? roomLockMessage(selectedRoom, isSelectedRoomRevoked) : null,
-          onAcknowledgeSecretWarning: acknowledgeRoomVisibilityWarning
-        }}
-        markdownFallbackProps={markdownCopyFallback ? {
-          title: markdownCopyFallback.title,
-          markdown: markdownCopyFallback.markdown,
-          onRetryCopy: () => copyMarkdownWithFallback(
-            markdownCopyFallback.title,
-            markdownCopyFallback.markdown,
-            (message) => setChatMessageForRoom(selectedRoom.id, message),
-            selectedRoom.id
-          ),
-          onDismiss: () => setMarkdownCopyFallbackForRoom(selectedRoom.id, null)
-        } : null}
-        chatProps={{
-          messages: chatMessageRows,
-          approvalVisible,
-          approvalSummary: codexApprovalSummaryDisplay,
-          isActiveHost,
-          codexRunning,
-          canApproveCodex: hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked),
-          canUseChat: roomCanUseChat,
-          canSendMessage: roomCanUseChat && (Boolean(draft.trim()) || pendingAttachments.length > 0),
-          roomLocked: isSelectedRoomLocked,
-          lockedPlaceholder: roomLockMessage(selectedRoom, isSelectedRoomRevoked),
-          chatEnabled: selectedRoom.mode.chat,
-          draft,
-          pendingAttachments: pendingAttachmentRows,
-          localPreviewCards,
-          pendingAttachmentSummary,
-          markdownSelectionMode,
-          onToggleMessageSelection: toggleMessageSelection,
-          onRemovePendingAttachment: removePendingAttachment,
-          onSendMessage: sendMessage,
-          ...roomChatPanelActions
-        }}
-      />
+        <RoomMainColumn {...roomMainColumnProps} />
       )}
       inspector={(
         <RoomInspectorPanel
