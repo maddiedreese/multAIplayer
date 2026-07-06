@@ -139,6 +139,7 @@ import { useCodexInvokeActions } from "./hooks/useCodexInvokeActions";
 import { useCodexTurnActions } from "./hooks/useCodexTurnActions";
 import { useRoomVisibilityWarningActions } from "./hooks/useRoomVisibilityWarningActions";
 import { useRoomChatPanelActions } from "./hooks/useRoomChatPanelActions";
+import { useRoomHeaderActions } from "./hooks/useRoomHeaderActions";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -1704,6 +1705,16 @@ export function App() {
     stopLocalPreview,
     setDraftForRoom
   });
+  const roomHeaderActions = useRoomHeaderActions({
+    rooms,
+    selectedRoomId,
+    selectedRoomIdForTabs: selectedRoom.id,
+    activeBrowserUrl,
+    setSelectedTeam,
+    setSelectedRoomId,
+    setInspectorTabsByRoom,
+    openRoomBrowserNow
+  });
 
   function handleCodexBrowserOpenCommand(message: ChatMessage, room: RoomRecord): boolean {
     const url = extractCodexBrowserOpenUrl(message.body);
@@ -1888,21 +1899,14 @@ export function App() {
           markdownSelectionMode,
           activeInspectorTab: inspectorTab,
           onSetHost: setRoomHost,
-          onSelectTeam: (teamId) => {
-            setSelectedTeam(teamId);
-            setSelectedRoomId(rooms.find((room) => room.teamId === teamId)?.id ?? selectedRoomId);
-          },
           onRenameRoom: renameRoom,
           onSelectModel: setCodexModel,
-          onSelectInspectorTab: (tab) => {
-            setInspectorTabsByRoom((current) => ({ ...current, [selectedRoom.id]: tab }));
-            if (tab === "browser" && !activeBrowserUrl) openRoomBrowserNow();
-          },
           onCopyRoomMarkdown: copyRoomMarkdown,
           onCopySelectedMarkdown: copySelectedMessagesMarkdown,
           onToggleMarkdownSelection: toggleMarkdownSelectionMode,
           onClearSelectedMessages: clearSelectedMessages,
-          onShareLocalPreview: openLocalPreviewDialog
+          onShareLocalPreview: openLocalPreviewDialog,
+          ...roomHeaderActions
         }}
         statusProps={{
           notices: roomNotices,
