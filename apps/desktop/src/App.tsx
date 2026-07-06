@@ -311,6 +311,7 @@ import { buildRoomMemberRows, buildTeamMemberRows } from "./lib/rosterDisplayRow
 import { buildSidebarMessageHitRows, buildSidebarRoomRows, buildSidebarTeamRows } from "./lib/sidebarDisplayRows";
 import { buildCodexEventRows, buildTerminalOutputLines, buildTerminalRequestRows } from "./lib/terminalDisplayRows";
 import { useAppConfigState } from "./hooks/useAppConfigState";
+import { useLatestRef } from "./hooks/useLatestRef";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useShellLayout } from "./hooks/useShellLayout";
@@ -527,18 +528,18 @@ export function App() {
   const relayRef = useRef<RelayClient | null>(null);
   const seenEnvelopeIds = useRef(new Set<string>());
   const historyLoadedRoomIds = useRef(new Set<string>());
-  const roomsRef = useRef<RoomRecord[]>(rooms);
-  const selectedRoomIdRef = useRef(selectedRoomId);
-  const gitWorkflowDraftsRef = useRef(gitWorkflowDraftsByRoom);
-  const hostBusyRef = useRef(hostBusyByRoom);
-  const settingsBusyRef = useRef(settingsBusyByRoom);
-  const keyRotationBusyRef = useRef(keyRotationBusyByRoom);
-  const gitWorkflowBusyRef = useRef(gitWorkflowBusyByRoom);
-  const actionsBusyRef = useRef(actionsBusyByRoom);
-  const terminalBusyRef = useRef(terminalBusyByRoom);
+  const roomsRef = useLatestRef(rooms);
+  const selectedRoomIdRef = useLatestRef(selectedRoomId);
+  const gitWorkflowDraftsRef = useLatestRef(gitWorkflowDraftsByRoom);
+  const hostBusyRef = useLatestRef(hostBusyByRoom);
+  const settingsBusyRef = useLatestRef(settingsBusyByRoom);
+  const keyRotationBusyRef = useLatestRef(keyRotationBusyByRoom);
+  const gitWorkflowBusyRef = useLatestRef(gitWorkflowBusyByRoom);
+  const actionsBusyRef = useLatestRef(actionsBusyByRoom);
+  const terminalBusyRef = useLatestRef(terminalBusyByRoom);
   const localPreviewBusyRef = useRef(localPreviewBusyByRoom);
-  const fileBusyRef = useRef(fileBusyByRoom);
-  const browserRequestsRef = useRef(browserRequestsByRoom);
+  const fileBusyRef = useLatestRef(fileBusyByRoom);
+  const browserRequestsRef = useLatestRef(browserRequestsByRoom);
   const { deviceId, localUser } = useLocalIdentity(currentUser);
 
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
@@ -1095,50 +1096,6 @@ export function App() {
     browserRequestsByRoom
   });
   const sidebarMessageHitRows = buildSidebarMessageHitRows(visibleMessageHits, rooms);
-
-  useEffect(() => {
-    roomsRef.current = rooms;
-  }, [rooms]);
-
-  useEffect(() => {
-    selectedRoomIdRef.current = selectedRoomId;
-  }, [selectedRoomId]);
-
-  useEffect(() => {
-    gitWorkflowDraftsRef.current = gitWorkflowDraftsByRoom;
-  }, [gitWorkflowDraftsByRoom]);
-
-  useEffect(() => {
-    hostBusyRef.current = hostBusyByRoom;
-  }, [hostBusyByRoom]);
-
-  useEffect(() => {
-    settingsBusyRef.current = settingsBusyByRoom;
-  }, [settingsBusyByRoom]);
-
-  useEffect(() => {
-    keyRotationBusyRef.current = keyRotationBusyByRoom;
-  }, [keyRotationBusyByRoom]);
-
-  useEffect(() => {
-    gitWorkflowBusyRef.current = gitWorkflowBusyByRoom;
-  }, [gitWorkflowBusyByRoom]);
-
-  useEffect(() => {
-    actionsBusyRef.current = actionsBusyByRoom;
-  }, [actionsBusyByRoom]);
-
-  useEffect(() => {
-    terminalBusyRef.current = terminalBusyByRoom;
-  }, [terminalBusyByRoom]);
-
-  useEffect(() => {
-    fileBusyRef.current = fileBusyByRoom;
-  }, [fileBusyByRoom]);
-
-  useEffect(() => {
-    browserRequestsRef.current = browserRequestsByRoom;
-  }, [browserRequestsByRoom]);
 
   useEffect(() => {
     if (!selectedRoomId) return;
