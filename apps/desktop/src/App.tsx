@@ -254,6 +254,7 @@ import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread
 import { isRoomKeyRotationInFlight, roomKeyRotationInFlightMessage } from "./lib/roomKeyRotation";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import { roomPostureSummary } from "./lib/roomPosture";
+import { withoutSetValue } from "./lib/setUtils";
 import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "./lib/sidebarSearch";
 import {
   mergeTerminalSnapshots,
@@ -7273,10 +7274,4 @@ function isRoomHostMember(member: RoomPresence, room: RoomRecord): boolean {
   if (room.hostStatus !== "active") return false;
   if (room.hostUserId) return member.userId === room.hostUserId;
   return member.displayName === room.host;
-}
-
-function withoutSetValue<T>(current: Set<T>, value: T): Set<T> {
-  const next = new Set(current);
-  next.delete(value);
-  return next;
 }
