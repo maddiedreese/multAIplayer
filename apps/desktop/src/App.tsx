@@ -20,11 +20,8 @@ import {
 import {
   defaultProjectPath,
   type CodexProbe,
-  type GitDiffResult,
   type GitWorkflowResult,
   type GitStatusSummary,
-  type ProjectFileContent,
-  type ProjectFileEntry
 } from "./lib/localBackend";
 import {
   type GitHubActionRun,
@@ -54,7 +51,6 @@ import { attachmentReviewScopeKey } from "./lib/attachmentPolicy";
 import { shouldApplyRoomScopedUiUpdate } from "./lib/roomScopedUi";
 import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "./lib/chatPolicy";
 import { extractCodexBrowserOpenUrl } from "./lib/codexInvoke";
-import type { FilePreviewTab } from "./lib/filePreview";
 import type { GitHubActionsTarget } from "./lib/githubWorkflowReadiness";
 import {
   type GitWorkflowDraft
@@ -138,6 +134,7 @@ import { useWorkspaceUiState } from "./hooks/useWorkspaceUiState";
 import { useHistoryDefaultsState } from "./hooks/useHistoryDefaultsState";
 import { useBrowserPanelState } from "./hooks/useBrowserPanelState";
 import { useTerminalPanelState } from "./hooks/useTerminalPanelState";
+import { useFilePanelState } from "./hooks/useFilePanelState";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -160,7 +157,6 @@ import type {
   InviteJoinRequest,
   LocalPreviewDialogState,
   LocalPreviewRecord,
-  MarkdownCopyFallback,
   NoSecretRoomInvite,
   PendingCodexApproval,
   RelayStatus,
@@ -334,14 +330,24 @@ export function App() {
   const [actionRunsByRoom, setActionRunsByRoom] = useState<Record<string, GitHubActionRun[]>>({});
   const [actionsLastCheckedByRoom, setActionsLastCheckedByRoom] = useState<Record<string, string | null>>({});
   const [gitWorkflowDraftsByRoom, setGitWorkflowDraftsByRoom] = useState<Record<string, Partial<GitWorkflowDraft>>>({});
-  const [fileQueriesByRoom, setFileQueriesByRoom] = useState<Record<string, string>>({});
-  const [projectFilesByRoom, setProjectFilesByRoom] = useState<Record<string, ProjectFileEntry[]>>({});
-  const [selectedFilesByRoom, setSelectedFilesByRoom] = useState<Record<string, ProjectFileContent | null>>({});
-  const [selectedDiffsByRoom, setSelectedDiffsByRoom] = useState<Record<string, GitDiffResult | null>>({});
-  const [filePreviewTabsByRoom, setFilePreviewTabsByRoom] = useState<Record<string, FilePreviewTab>>({});
-  const [fileBusyByRoom, setFileBusyByRoom] = useState<Record<string, boolean>>({});
-  const [fileMessagesByRoom, setFileMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [markdownCopyFallbacksByRoom, setMarkdownCopyFallbacksByRoom] = useState<Record<string, MarkdownCopyFallback | null>>({});
+  const {
+    fileQueriesByRoom,
+    setFileQueriesByRoom,
+    projectFilesByRoom,
+    setProjectFilesByRoom,
+    selectedFilesByRoom,
+    setSelectedFilesByRoom,
+    selectedDiffsByRoom,
+    setSelectedDiffsByRoom,
+    filePreviewTabsByRoom,
+    setFilePreviewTabsByRoom,
+    fileBusyByRoom,
+    setFileBusyByRoom,
+    fileMessagesByRoom,
+    setFileMessagesByRoom,
+    markdownCopyFallbacksByRoom,
+    setMarkdownCopyFallbacksByRoom
+  } = useFilePanelState();
   const [historySearchMessagesByRoom, setHistorySearchMessagesByRoom] = useState<Record<string, ChatMessage[]>>({});
   const [historySearchBusy, setHistorySearchBusy] = useState(false);
   const [sensitiveAttachmentReviewKey, setSensitiveAttachmentReviewKey] = useState<string | null>(null);
