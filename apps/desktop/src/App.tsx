@@ -74,7 +74,7 @@ import {
 } from "./seedData";
 
 export function App() {
-  const { themeMode, toggleThemeMode } = useThemeMode();
+  const theme = useThemeMode();
   const {
     teams,
     setTeams,
@@ -1802,7 +1802,7 @@ export function App() {
     messageHits: roomDisplay.sidebarMessageHitRows,
     historySearchBusy,
     activeSidebarPanel,
-    themeMode,
+    themeMode: theme.themeMode,
     localUserName: localUser.name,
     selectedRoomName: selectedRoom.name,
     deviceId,
@@ -1845,7 +1845,7 @@ export function App() {
     onCreateRoom: workspaceFlow.addRoom,
     onSelectRoom: setSelectedRoomId,
     onSelectSidebarPanel: setActiveSidebarPanel,
-    onToggleTheme: toggleThemeMode,
+    onToggleTheme: theme.toggleThemeMode,
     onRotateDeviceIdentity: roomRuntime.rotateDeviceIdentity,
     onChooseProject: roomRuntime.chooseProjectPath,
     onRelayHttpDraftChange: setRelayHttpDraft,
