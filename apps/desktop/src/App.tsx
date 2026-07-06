@@ -312,6 +312,7 @@ import { useRoomInviteSetters } from "./hooks/useRoomInviteSetters";
 import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
 import { useRoomMessageSetters } from "./hooks/useRoomMessageSetters";
 import { useRoomNotices } from "./hooks/useRoomNotices";
+import { useRoomProjectSetters } from "./hooks/useRoomProjectSetters";
 import { useShellLayout } from "./hooks/useShellLayout";
 import { useSelectedTeamData } from "./hooks/useSelectedTeamData";
 import { useSelectedRoomValues } from "./hooks/useSelectedRoomValues";
@@ -794,6 +795,16 @@ export function App() {
     setPendingAttachmentsByRoom,
     setDraftsByRoom
   });
+  const {
+    setCustomCodexModelForRoom,
+    setProjectPathDraftForRoom
+  } = useRoomProjectSetters({
+    roomsRef,
+    defaultCodexModel,
+    defaultProjectPath,
+    setCustomCodexModelsByRoom,
+    setProjectPathDraftsByRoom
+  });
   const roomNotices = useRoomNotices({
     roomId: selectedRoom.id,
     hostMessage,
@@ -938,18 +949,6 @@ export function App() {
     if (!isRoomKeyRotationInFlight(keyRotationBusyRef.current, roomId)) return false;
     setInviteMessageForRoom(roomId, roomKeyRotationInFlightMessage());
     return true;
-  }
-
-  function setCustomCodexModelForRoom(roomId: string, model: string) {
-    const room = roomsRef.current.find((item) => item.id === roomId);
-    const currentModel = room?.codexModel ?? defaultCodexModel;
-    setCustomCodexModelsByRoom((current) => model === currentModel ? omitRecordKey(current, roomId) : { ...current, [roomId]: model });
-  }
-
-  function setProjectPathDraftForRoom(roomId: string, projectPath: string) {
-    const room = roomsRef.current.find((item) => item.id === roomId);
-    const currentProjectPath = room?.projectPath ?? defaultProjectPath;
-    setProjectPathDraftsByRoom((current) => projectPath === currentProjectPath ? omitRecordKey(current, roomId) : { ...current, [roomId]: projectPath });
   }
 
   function reportRoomFileActionInFlight(roomId: string): boolean {
