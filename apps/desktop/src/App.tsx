@@ -292,123 +292,30 @@ import { TerminalPanel, type CodexEventDisplay, type TerminalCommandRequestDispl
 import { MarkdownFallbackPanel } from "./components/MarkdownFallbackPanel";
 import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
-import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarPanelName, type SidebarRoomDisplay, type SidebarTeamDisplay, type ThemeMode } from "./components/DesktopSidebar";
+import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarRoomDisplay, type SidebarTeamDisplay, type ThemeMode } from "./components/DesktopSidebar";
 import { RoomChatPanel, type LocalPreviewCardDisplay, type PendingAttachmentDisplay, type RoomChatMessageDisplay } from "./components/RoomChatPanel";
 import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
-
-interface ChatMessage {
-  id: string;
-  author: string;
-  role: "human" | "codex" | "system";
-  body: string;
-  time: string;
-  createdAt?: string;
-  attachments?: ChatAttachment[];
-  reactions?: ChatReaction[];
-}
-
-interface ChatReaction {
-  emoji: string;
-  reactors: Array<{ userId: string; name: string }>;
-}
-
-interface ChatAttachment {
-  id: string;
-  name: string;
-  type: string;
-  size: number;
-  content?: string;
-  blobId?: string;
-  blobBytes?: number;
-  truncated?: boolean;
-}
-
-interface PendingCodexApproval {
-  roomId: string;
-  messages: ChatMessage[];
-  summary: CodexTurnSummary;
-}
-
-interface RoomPresence {
-  userId: string;
-  deviceId: string;
-  displayName: string;
-  avatarUrl?: string;
-  publicKeyFingerprint?: string;
-  status: "online" | "offline";
-}
-
-interface TerminalCommandRequest extends TerminalRequestPlaintextPayload {
-  status: "pending" | "approved" | "denied";
-}
-
-interface BrowserAccessRequest extends BrowserRequestPlaintextPayload {
-  status: "pending" | "approved" | "denied";
-}
-
-interface BrowserStatus {
-  profilePath: string | null;
-  downloadsBlocked: boolean;
-  clipboardBlocked: boolean;
-  fileUploadsBlocked: boolean;
-}
-
-interface InviteJoinRequest extends InviteJoinRequestPlaintextPayload {
-  status: "pending" | "approved" | "denied";
-}
-
-interface CodexRoomEvent extends CodexEventPlaintextPayload {}
-
-interface HostHandoffRecord extends HostHandoffPlaintextPayload {
-  status: "available" | "accepted";
-}
-
-interface LocalPreviewRecord extends LocalPreviewPlaintextPayload {}
-
-interface LocalPreviewDialogState {
-  open: boolean;
-  phase: "select" | "confirm" | "install" | "starting";
-  roomId: string;
-  candidates: LocalPreviewCandidate[];
-  selectedUrl: string;
-  manualUrl: string;
-  error: string | null;
-  cloudflaredVersion: string | null;
-}
-
-interface MarkdownCopyFallback {
-  title: string;
-  markdown: string;
-}
-
-interface NoSecretRoomInvite {
-  version: 1;
-  teamId: string;
-  roomId: string;
-  roomName: string;
-  hostDeviceId: string;
-  hostPublicKeyJwk: DevicePublicKeyJwkType;
-  hostPublicKeyFingerprint: string;
-}
-
-interface LocalRoomHistoryPayload {
-  version: 3;
-  messages: ChatMessage[];
-  terminalRequests: TerminalCommandRequest[];
-  browserRequests: BrowserAccessRequest[];
-  inviteRequests: InviteJoinRequest[];
-  codexEvents: CodexRoomEvent[];
-  gitWorkflowEvents: GitWorkflowEventPlaintextPayload[];
-  githubActionsEvents: GitHubActionsEventPlaintextPayload[];
-  localPreviews: LocalPreviewRecord[];
-  terminalSnapshots: TerminalSnapshot[];
-  hostHandoffs: HostHandoffRecord[];
-  codexThreadId?: string;
-}
-
-type RelayStatus = "connecting" | "open" | "closed" | "error";
-type SidebarPanel = SidebarPanelName;
+import type {
+  BrowserAccessRequest,
+  BrowserStatus,
+  ChatAttachment,
+  ChatMessage,
+  ChatReaction,
+  CodexRoomEvent,
+  HostHandoffRecord,
+  InviteJoinRequest,
+  LocalPreviewDialogState,
+  LocalPreviewRecord,
+  LocalRoomHistoryPayload,
+  MarkdownCopyFallback,
+  NoSecretRoomInvite,
+  PendingCodexApproval,
+  RelayStatus,
+  RoomPresence,
+  SidebarPanel,
+  TerminalCommandRequest
+} from "./types";
 
 const fallbackUser = {
   id: "github:maddiedreese",
