@@ -111,16 +111,8 @@ import {
 } from "./lib/localBackend";
 import {
   createPullRequest,
-  getAuthConfig,
-  getCurrentUser,
   listGitHubActionRuns,
-  logout,
-  pollGitHubDeviceFlow,
-  startGitHubDeviceFlow,
-  type GitHubAuthConfig,
   type GitHubActionRun,
-  type GitHubDeviceStart,
-  type SignedInUser
 } from "./lib/authClient";
 import { connectRelay, type RelayClient } from "./lib/relayClient";
 import {
@@ -290,6 +282,7 @@ import { useAppConfigState } from "./hooks/useAppConfigState";
 import { useFileTerminalDisplay } from "./hooks/useFileTerminalDisplay";
 import { useLatestRef } from "./hooks/useLatestRef";
 import { useGitHubWorkflowState } from "./hooks/useGitHubWorkflowState";
+import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useRoomAccess } from "./hooks/useRoomAccess";
@@ -480,14 +473,9 @@ export function App() {
   const [browserStatusByRoom, setBrowserStatusByRoom] = useState<Record<string, BrowserStatus>>({});
   const [activeBrowserUrlsByRoom, setActiveBrowserUrlsByRoom] = useState<Record<string, string | null>>({});
   const [relayStatus, setRelayStatus] = useState<RelayStatus>("closed");
-  const [authConfig, setAuthConfig] = useState<GitHubAuthConfig | null>(null);
-  const [currentUser, setCurrentUser] = useState<SignedInUser | null>(null);
-  const [deviceFlow, setDeviceFlow] = useState<GitHubDeviceStart | null>(null);
   const [deviceIdentity, setDeviceIdentity] = useState<DeviceIdentity | null>(null);
   const [deviceIdentityMessage, setDeviceIdentityMessage] = useState<string | null>(null);
   const [trustedDeviceKeys, setTrustedDeviceKeys] = useState<TrustedDeviceKey[]>(() => loadTrustedDeviceKeys());
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [authBusy, setAuthBusy] = useState(false);
   const [gitWorkflowBusyByRoom, setGitWorkflowBusyByRoom] = useState<Record<string, boolean>>({});
   const [gitWorkflowMessagesByRoom, setGitWorkflowMessagesByRoom] = useState<Record<string, string | null>>({});
   const [actionsBusyByRoom, setActionsBusyByRoom] = useState<Record<string, boolean>>({});
@@ -536,6 +524,15 @@ export function App() {
   const localPreviewBusyRef = useRef(localPreviewBusyByRoom);
   const fileBusyRef = useLatestRef(fileBusyByRoom);
   const browserRequestsRef = useLatestRef(browserRequestsByRoom);
+  const {
+    authConfig,
+    currentUser,
+    deviceFlow,
+    authError,
+    authBusy,
+    beginGitHubSignIn,
+    signOutGitHub
+  } = useGitHubAuth(appConfig.relayHttpUrl);
   const { deviceId, localUser } = useLocalIdentity(currentUser);
 
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
@@ -1034,22 +1031,6 @@ export function App() {
   }, [selectedRoomId]);
 
   useEffect(() => {
-    setAuthError(null);
-    getAuthConfig().then(setAuthConfig).catch((error) => {
-      setAuthConfig({
-        provider: "github",
-        configured: false,
-        scopes: ["read:user"],
-        mutationsRequireAuth: false,
-        allowedOrigins: [],
-        sessionPersistence: "memory_only"
-      });
-      setAuthError(String(error));
-    });
-    getCurrentUser().then(setCurrentUser).catch(() => setCurrentUser(null));
-  }, [appConfig.relayHttpUrl]);
-
-  useEffect(() => {
     loadOrCreateDeviceIdentity()
       .then((identity) => {
         setDeviceIdentity(identity);
@@ -1105,32 +1086,6 @@ export function App() {
     acceptInvite(invitePayload.encoded, invitePayload.inviteId, invitePayload.approvalRequested)
       .catch((error) => setSelectedInviteMessage(`Invite could not be read: ${String(error)}`));
   }, []);
-
-  useEffect(() => {
-    if (!deviceFlow || currentUser) return;
-    let cancelled = false;
-    const intervalMs = Math.max(1, deviceFlow.interval) * 1000;
-    const timer = window.setInterval(() => {
-      pollGitHubDeviceFlow(deviceFlow.device_code)
-        .then((user) => {
-          if (cancelled || !user) return;
-          setCurrentUser(user);
-          setDeviceFlow(null);
-          setAuthBusy(false);
-          setAuthError(null);
-        })
-        .catch((error) => {
-          if (cancelled) return;
-          setAuthBusy(false);
-          setAuthError(String(error));
-          setDeviceFlow(null);
-        });
-    }, intervalMs);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [currentUser, deviceFlow]);
 
   useEffect(() => {
     if (!selectedTeam) return;
@@ -1971,25 +1926,9 @@ export function App() {
     return true;
   }
 
-  async function beginGitHubSignIn() {
-    setAuthBusy(true);
-    setAuthError(null);
-    try {
-      const flow = await startGitHubDeviceFlow();
-      setDeviceFlow(flow);
-      window.open(flow.verification_uri, "_blank", "noopener,noreferrer");
-    } catch (error) {
-      setAuthError(String(error));
-      setAuthBusy(false);
-    }
-  }
-
   async function signOut() {
     await stopOwnedLocalPreviews("Stopped because the sharing user signed out.");
-    await logout();
-    setCurrentUser(null);
-    setDeviceFlow(null);
-    setAuthBusy(false);
+    await signOutGitHub();
   }
 
   async function rotateDeviceIdentity() {
