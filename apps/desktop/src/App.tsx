@@ -80,22 +80,7 @@ export function App() {
     appConfigState,
     roomChatState,
     roomSettingsState,
-    historySettings,
-    setHistorySettings,
-    teamHistorySettings,
-    setTeamHistorySettings,
-    teamDefaultApprovalPolicy,
-    setTeamDefaultApprovalPolicy,
-    teamDefaultCodexModel,
-    setTeamDefaultCodexModel,
-    teamDefaultBrowserProfilePersistent,
-    setTeamDefaultBrowserProfilePersistent,
-    teamDefaultInviteApprovalGate,
-    setTeamDefaultInviteApprovalGate,
-    historyMessagesByRoom,
-    setHistoryMessagesByRoom,
-    teamHistoryMessagesByTeam,
-    setTeamHistoryMessagesByTeam,
+    historyDefaultsState,
     inspectorTabsByRoom,
     setInspectorTabsByRoom,
     forgottenRoomIds,
@@ -359,8 +344,8 @@ export function App() {
       hostMessagesByRoom: roomSettingsState.hostMessagesByRoom,
       chatMessagesByRoom: roomChatState.chatMessagesByRoom,
       settingsMessagesByRoom: roomSettingsState.settingsMessagesByRoom,
-      historyMessagesByRoom,
-      teamHistoryMessagesByTeam,
+      historyMessagesByRoom: historyDefaultsState.historyMessagesByRoom,
+      teamHistoryMessagesByTeam: historyDefaultsState.teamHistoryMessagesByTeam,
       markdownCopyFallbacksByRoom,
       defaultBrowserUrl,
       defaultBrowserReason
@@ -441,8 +426,8 @@ export function App() {
       setChatMessagesByRoom: roomChatState.setChatMessagesByRoom,
       setMarkdownCopyFallbacksByRoom,
       setSecretWarningsVisibleByRoom,
-      setHistoryMessagesByRoom,
-      setTeamHistoryMessagesByTeam,
+      setHistoryMessagesByRoom: historyDefaultsState.setHistoryMessagesByRoom,
+      setTeamHistoryMessagesByTeam: historyDefaultsState.setTeamHistoryMessagesByTeam,
       setSettingsMessagesByRoom: roomSettingsState.setSettingsMessagesByRoom
     },
     busy: {
@@ -589,7 +574,7 @@ export function App() {
       forgottenRoomIds,
       revokedRoomIds,
       revokedTeamIds,
-      historySettings,
+      historySettings: historyDefaultsState.historySettings,
       inviteApprovalGate
     },
     chat: {
@@ -783,11 +768,11 @@ export function App() {
       },
       selectedTeamDefaults: {
         selectedTeam: workspaceState.selectedTeam,
-        setTeamHistorySettings,
-        setTeamDefaultApprovalPolicy,
-        setTeamDefaultCodexModel,
-        setTeamDefaultBrowserProfilePersistent,
-        setTeamDefaultInviteApprovalGate
+        setTeamHistorySettings: historyDefaultsState.setTeamHistorySettings,
+        setTeamDefaultApprovalPolicy: historyDefaultsState.setTeamDefaultApprovalPolicy,
+        setTeamDefaultCodexModel: historyDefaultsState.setTeamDefaultCodexModel,
+        setTeamDefaultBrowserProfilePersistent: historyDefaultsState.setTeamDefaultBrowserProfilePersistent,
+        setTeamDefaultInviteApprovalGate: historyDefaultsState.setTeamDefaultInviteApprovalGate
       },
       inviteUrl: {
         requestNoSecretInviteAccess: inviteActions.requestNoSecretInviteAccess,
@@ -859,11 +844,11 @@ export function App() {
         approvalPolicyLabels,
         setSelectedTeamHistoryMessage,
         setTeamHistoryMessageForTeam,
-        setTeamHistorySettings,
-        setTeamDefaultApprovalPolicy,
-        setTeamDefaultCodexModel,
-        setTeamDefaultBrowserProfilePersistent,
-        setTeamDefaultInviteApprovalGate
+        setTeamHistorySettings: historyDefaultsState.setTeamHistorySettings,
+        setTeamDefaultApprovalPolicy: historyDefaultsState.setTeamDefaultApprovalPolicy,
+        setTeamDefaultCodexModel: historyDefaultsState.setTeamDefaultCodexModel,
+        setTeamDefaultBrowserProfilePersistent: historyDefaultsState.setTeamDefaultBrowserProfilePersistent,
+        setTeamDefaultInviteApprovalGate: historyDefaultsState.setTeamDefaultInviteApprovalGate
       },
       localHistory: {
         hasSelectedRoom,
@@ -890,7 +875,7 @@ export function App() {
         setInviteApprovalGateForRoom,
         setSettingsBusyForRoom,
         setSecretWarningVisibleForRoom,
-        setHistorySettings,
+        setHistorySettings: historyDefaultsState.setHistorySettings,
         setMessagesByRoom: workspaceState.setMessagesByRoom,
         setTerminalRequestsByRoom,
         setBrowserRequestsByRoom,
@@ -915,7 +900,7 @@ export function App() {
         setChatMessagesByRoom: roomChatState.setChatMessagesByRoom,
         setMarkdownCopyFallbacksByRoom,
         setSecretWarningsVisibleByRoom,
-        setHistoryMessagesByRoom,
+        setHistoryMessagesByRoom: historyDefaultsState.setHistoryMessagesByRoom,
         setSettingsBusyByRoom: roomSettingsState.setSettingsBusyByRoom,
         setSettingsMessagesByRoom: roomSettingsState.setSettingsMessagesByRoom,
         setCustomCodexModelsByRoom: roomSettingsState.setCustomCodexModelsByRoom,
@@ -979,7 +964,7 @@ export function App() {
       selectedRoomTeamId: selectedRoom.teamId,
       forgottenRoomIds,
       historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
-      setHistorySettings,
+      setHistorySettings: historyDefaultsState.setHistorySettings,
       setMessagesByRoom: workspaceState.setMessagesByRoom,
       setTerminalRequestsByRoom,
       setBrowserRequestsByRoom,
@@ -1314,7 +1299,7 @@ export function App() {
       revokedRoomIds,
       revokedTeamIds,
       historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
-      historySettings,
+      historySettings: historyDefaultsState.historySettings,
       messages,
       terminalRequests: selectedRuntime.terminalRequests,
       browserRequests,
@@ -1605,27 +1590,27 @@ export function App() {
       onApplyCustomModel: () => roomRuntime.setCodexModel(customCodexModel)
     },
     localHistory: {
-      historySettings,
-      teamHistorySettings,
+      historySettings: historyDefaultsState.historySettings,
+      teamHistorySettings: historyDefaultsState.teamHistorySettings,
       selectedTeam: Boolean(workspaceState.selectedTeam),
       hasSelectedRoom,
       settingsBusy: selectedRuntime.settingsBusy,
-      teamDefaultApprovalPolicy,
+      teamDefaultApprovalPolicy: historyDefaultsState.teamDefaultApprovalPolicy,
       approvalPolicyLabels,
-      teamDefaultCodexModel,
+      teamDefaultCodexModel: historyDefaultsState.teamDefaultCodexModel,
       defaultCodexModel,
       codexModelOptions,
-      teamDefaultBrowserProfilePersistent,
-      teamDefaultInviteApprovalGate,
+      teamDefaultBrowserProfilePersistent: historyDefaultsState.teamDefaultBrowserProfilePersistent,
+      teamDefaultInviteApprovalGate: historyDefaultsState.teamDefaultInviteApprovalGate,
       message: visibleHistoryMessage,
       onHistoryEnabledChange: (enabled) =>
         workspaceFlow.updateLocalHistorySettings({
-          ...historySettings,
+          ...historyDefaultsState.historySettings,
           enabled
         }),
       onHistoryRetentionDaysChange: (retentionDays) =>
         workspaceFlow.updateLocalHistorySettings({
-          ...historySettings,
+          ...historyDefaultsState.historySettings,
           retentionDays
         }),
       onClearRoomHistory: workspaceFlow.clearRoomHistory,
@@ -1633,17 +1618,17 @@ export function App() {
       onApplyTeamDefaultsToRoom: workspaceFlow.applyTeamDefaultsToRoom,
       onTeamHistoryEnabledChange: (enabled) =>
         workspaceFlow.updateTeamHistoryDefaults({
-          ...teamHistorySettings,
+          ...historyDefaultsState.teamHistorySettings,
           enabled
         }),
       onTeamHistoryRetentionDaysChange: (retentionDays) =>
         workspaceFlow.updateTeamHistoryDefaults({
-          ...teamHistorySettings,
+          ...historyDefaultsState.teamHistorySettings,
           retentionDays
         }),
       onTeamDefaultApprovalPolicyChange: workspaceFlow.updateTeamDefaultApprovalPolicy,
       onTeamDefaultCodexModelChange: workspaceFlow.updateTeamDefaultCodexModel,
-      onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent,
+      onTeamDefaultBrowserProfilePersistentChange: historyDefaultsState.setTeamDefaultBrowserProfilePersistent,
       onTeamDefaultInviteApprovalGateChange: workspaceFlow.updateTeamDefaultInviteApprovalGate
     },
     workspaceFiles: {
@@ -1754,12 +1739,12 @@ export function App() {
     relayWsDraft: appConfigState.relayWsDraft,
     selectedRoomMode: selectedRoom.mode,
     roomSettingsGateMessage: roomInteraction.roomSettingsGateMessage,
-    historySettings,
-    teamHistorySettings,
-    teamDefaultApprovalPolicy,
-    teamDefaultCodexModel,
-    teamDefaultBrowserProfilePersistent,
-    teamDefaultInviteApprovalGate,
+    historySettings: historyDefaultsState.historySettings,
+    teamHistorySettings: historyDefaultsState.teamHistorySettings,
+    teamDefaultApprovalPolicy: historyDefaultsState.teamDefaultApprovalPolicy,
+    teamDefaultCodexModel: historyDefaultsState.teamDefaultCodexModel,
+    teamDefaultBrowserProfilePersistent: historyDefaultsState.teamDefaultBrowserProfilePersistent,
+    teamDefaultInviteApprovalGate: historyDefaultsState.teamDefaultInviteApprovalGate,
     appConfigMessage: appConfigState.appConfigMessage,
     roomSettingsMessage: settingsMessage,
     historyMessage: visibleHistoryMessage,
@@ -1789,7 +1774,7 @@ export function App() {
     onTeamHistoryDefaultsChange: workspaceFlow.updateTeamHistoryDefaults,
     onTeamDefaultApprovalPolicyChange: workspaceFlow.updateTeamDefaultApprovalPolicy,
     onTeamDefaultCodexModelChange: workspaceFlow.updateTeamDefaultCodexModel,
-    onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent,
+    onTeamDefaultBrowserProfilePersistentChange: historyDefaultsState.setTeamDefaultBrowserProfilePersistent,
     onTeamDefaultInviteApprovalGateChange: workspaceFlow.updateTeamDefaultInviteApprovalGate,
     onApplyTeamDefaultsToRoom: workspaceFlow.applyTeamDefaultsToRoom,
     roomRecords: workspaceState.rooms
