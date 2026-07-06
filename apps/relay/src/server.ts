@@ -62,6 +62,7 @@ import {
 } from "./limits.js";
 import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
 import { createRelayPersistence } from "./persistence.js";
+import { seedWorkspace } from "./seed.js";
 import { createRelayStore, type AuthSession, type ClientSession, type PresenceRecord, type RoomKey } from "./state.js";
 import { registerRelayWebSocketConnection } from "./ws/connection.js";
 import { createRelayFanout } from "./ws/fanout.js";
@@ -473,7 +474,11 @@ registerRelayWebSocketConnection({
 });
 
 await loadRelayStore();
-seedWorkspace();
+seedWorkspace({
+  store: relayStore,
+  seedDemoWorkspace,
+  scheduleStoreSave
+});
 
 function canPublishEnvelope(session: ClientSession, envelope: RelayEnvelope): boolean {
   return (
@@ -825,90 +830,6 @@ async function saveRelayStore() {
       .filter((item) => item.envelopes.length > 0)
   };
   await relayPersistence.save(state);
-}
-
-function seedWorkspace() {
-  if (!seedDemoWorkspace) return;
-
-  const core: TeamRecord = { id: "team-core", name: "Core Team", members: 4 };
-  const labs: TeamRecord = { id: "team-labs", name: "Labs", members: 2 };
-  if (!teams.has(core.id)) teams.set(core.id, core);
-  if (!teams.has(labs.id)) teams.set(labs.id, labs);
-  if (!teamMembers.has(core.id)) {
-    teamMembers.set(core.id, new Map([
-      ["github:maddiedreese", seedTeamMember(core.id, "github:maddiedreese", "owner")],
-      ["github:alex", seedTeamMember(core.id, "github:alex", "admin")],
-      ["github:tester", seedTeamMember(core.id, "github:tester", "member")],
-      ["github:design", seedTeamMember(core.id, "github:design", "member")]
-    ]));
-  }
-  if (!teamMembers.has(labs.id)) {
-    teamMembers.set(labs.id, new Map([
-      ["github:labs", seedTeamMember(labs.id, "github:labs", "owner")],
-      ["github:research", seedTeamMember(labs.id, "github:research", "member")]
-    ]));
-  }
-
-  const seedRooms: RoomRecord[] = [
-    {
-      id: "room-desktop",
-      teamId: core.id,
-      name: "Desktop client",
-      projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
-      host: "Maddie",
-      hostUserId: "github:maddiedreese",
-      hostStatus: "active",
-      approvalPolicy: "ask_every_turn",
-      mode: { ...defaultRoomMode, browser: true },
-      codexModel: defaultCodexModel,
-      browserAllowedOrigins: defaultBrowserAllowedOrigins,
-      browserProfilePersistent: defaultBrowserProfilePersistent,
-      unread: 0
-    },
-    {
-      id: "room-relay",
-      teamId: core.id,
-      name: "Relay + E2EE",
-      projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
-      host: "Alex",
-      hostUserId: "github:alex",
-      hostStatus: "handoff",
-      approvalPolicy: "auto_chat_only",
-      mode: defaultRoomMode,
-      codexModel: "gpt-5.4-mini",
-      browserAllowedOrigins: defaultBrowserAllowedOrigins,
-      browserProfilePersistent: defaultBrowserProfilePersistent,
-      unread: 2
-    },
-    {
-      id: "room-github",
-      teamId: labs.id,
-      name: "GitHub flow",
-      projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
-      host: "No host",
-      hostUserId: undefined,
-      hostStatus: "offline",
-      approvalPolicy: "never_host",
-      mode: defaultRoomMode,
-      codexModel: "gpt-5.4-thinking",
-      browserAllowedOrigins: defaultBrowserAllowedOrigins,
-      browserProfilePersistent: defaultBrowserProfilePersistent,
-      unread: 0
-    }
-  ];
-  for (const room of seedRooms) {
-    if (!rooms.has(room.id)) rooms.set(room.id, room);
-  }
-  scheduleStoreSave();
-}
-
-function seedTeamMember(teamId: string, userId: string, role: TeamRole): TeamMemberRecord {
-  return {
-    teamId,
-    userId,
-    role,
-    joinedAt: "2026-07-04T00:00:00.000Z"
-  };
 }
 
 function normalizeRoom(room: unknown): RoomRecord | null {
