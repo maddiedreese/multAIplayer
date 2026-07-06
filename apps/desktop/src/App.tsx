@@ -131,6 +131,7 @@ import { useBrowserPanelState } from "./hooks/useBrowserPanelState";
 import { useTerminalPanelState } from "./hooks/useTerminalPanelState";
 import { useFilePanelState } from "./hooks/useFilePanelState";
 import { useGitHubWorkflowPanelState } from "./hooks/useGitHubWorkflowPanelState";
+import { useLocalPreviewState } from "./hooks/useLocalPreviewState";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -151,7 +152,6 @@ import type {
   CodexRoomEvent,
   HostHandoffRecord,
   InviteJoinRequest,
-  LocalPreviewDialogState,
   LocalPreviewRecord,
   NoSecretRoomInvite,
   PendingCodexApproval,
@@ -260,18 +260,14 @@ export function App() {
   const [codexEventsByRoom, setCodexEventsByRoom] = useState<Record<string, CodexRoomEvent[]>>({});
   const [gitWorkflowEventsByRoom, setGitWorkflowEventsByRoom] = useState<Record<string, GitWorkflowEventPlaintextPayload[]>>({});
   const [githubActionsEventsByRoom, setGitHubActionsEventsByRoom] = useState<Record<string, GitHubActionsEventPlaintextPayload[]>>({});
-  const [localPreviewsByRoom, setLocalPreviewsByRoom] = useState<Record<string, LocalPreviewRecord[]>>({});
-  const [localPreviewDialog, setLocalPreviewDialog] = useState<LocalPreviewDialogState>({
-    open: false,
-    phase: "select",
-    roomId: "",
-    candidates: [],
-    selectedUrl: "",
-    manualUrl: "",
-    error: null,
-    cloudflaredVersion: null
-  });
-  const [localPreviewBusyByRoom, setLocalPreviewBusyByRoom] = useState<Record<string, boolean>>({});
+  const {
+    localPreviewsByRoom,
+    setLocalPreviewsByRoom,
+    localPreviewDialog,
+    setLocalPreviewDialog,
+    localPreviewBusyByRoom,
+    setLocalPreviewBusyByRoom
+  } = useLocalPreviewState();
   const [draftsByRoom, setDraftsByRoom] = useState<Record<string, string>>({});
   const [pendingAttachmentsByRoom, setPendingAttachmentsByRoom] = useState<Record<string, ChatAttachment[]>>({});
   const [approvalVisibleByRoom, setApprovalVisibleByRoom] = useState<Record<string, boolean>>({});
