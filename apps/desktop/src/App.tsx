@@ -121,7 +121,6 @@ import {
   createRoom,
   createTeam,
   loadAttachmentBlob,
-  loadWorkspace,
   lookupInvite,
   registerDevice,
   removeTeamMember,
@@ -309,6 +308,7 @@ import { useSidebarNavigation } from "./hooks/useSidebarNavigation";
 import { useRoomTerminalSetters } from "./hooks/useRoomTerminalSetters";
 import { useTeamMembersRefresh } from "./hooks/useTeamMembersRefresh";
 import { useThemeMode } from "./hooks/useThemeMode";
+import { useWorkspaceBootstrap } from "./hooks/useWorkspaceBootstrap";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -1024,6 +1024,14 @@ export function App() {
     setTeamMembersByTeam,
     setTeamMembersMessageByTeam
   });
+  useWorkspaceBootstrap({
+    relayHttpUrl: appConfig.relayHttpUrl,
+    setTeams,
+    setRooms,
+    setSelectedTeam,
+    setSelectedRoomId,
+    setWorkspaceError
+  });
 
   useEffect(() => {
     if (!selectedRoomId) return;
@@ -1053,25 +1061,6 @@ export function App() {
       .then(() => setDeviceIdentityMessage("Device identity registered with relay."))
       .catch((error) => setDeviceIdentityMessage(`Device identity registration pending: ${String(error)}`));
   }, [appConfig.relayHttpUrl, deviceId, deviceIdentity, localUser.id, localUser.name]);
-
-  useEffect(() => {
-    loadWorkspace()
-      .then((snapshot) => {
-        const nextRooms = snapshot.rooms.map(ensureRoomDefaults);
-        setTeams(snapshot.teams);
-        setRooms(nextRooms);
-        setSelectedTeam((current) =>
-          snapshot.teams.some((team) => team.id === current) ? current : snapshot.teams[0]?.id ?? ""
-        );
-        setSelectedRoomId((current) =>
-          nextRooms.some((room) => room.id === current) ? current : nextRooms[0]?.id ?? ""
-        );
-        setWorkspaceError(null);
-      })
-      .catch((error) => {
-        setWorkspaceError(`Using local starter rooms: ${String(error)}`);
-      });
-  }, [appConfig.relayHttpUrl]);
 
   useEffect(() => {
     const invitePayload = readInviteUrlPayload(window.location);
