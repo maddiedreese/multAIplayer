@@ -1,4 +1,5 @@
 import { Check, Copy, MessageSquare, Play, Terminal, X } from "lucide-react";
+import { useRef } from "react";
 import type { TerminalLine, TerminalSnapshot } from "../lib/localBackend";
 import { InlineSecretWarning } from "./common";
 
@@ -93,6 +94,8 @@ export function TerminalPanel({
   onRestartTerminal: () => void;
   onStopTerminal: () => void;
 }) {
+  const terminalInputRef = useRef<HTMLInputElement | null>(null);
+
   return (
     <section className="panel terminal-panel">
       <div className="panel-title">
@@ -225,7 +228,7 @@ export function TerminalPanel({
         </div>
       )}
 
-      <div className="terminal-output">
+      <div className="terminal-output" onClick={() => terminalInputRef.current?.focus()}>
         {terminalRisks.length > 0 && <InlineSecretWarning risks={terminalRisks} compact />}
         {terminalOutputLines.map((line, index) => (
           <div className={`terminal-line ${line.stream} ${line.risks.length ? "sensitive" : ""}`} key={`${line.stream}-${index}-${line.text}`}>
@@ -245,6 +248,7 @@ export function TerminalPanel({
             <span>{selectedTerminal.name}</span>
             <b>$</b>
             <input
+              ref={terminalInputRef}
               value={terminalInput}
               onChange={(event) => onTerminalInputChange(event.target.value)}
               placeholder={selectedTerminal.running ? "type a command" : "terminal stopped"}
