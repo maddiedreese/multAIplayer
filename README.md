@@ -7,7 +7,7 @@ People chat normally, like iMessage or Slack. When the group needs help, someone
 Short version: group chat for coding with Codex. Private by default. Open source.
 
 See [docs/product-architecture.md](docs/product-architecture.md) for the initial product and architecture spec.
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidance, [SECURITY.md](SECURITY.md) for the alpha security policy, [docs/threat-model.md](docs/threat-model.md) for privacy boundaries, [docs/codex-hosting.md](docs/codex-hosting.md) for how host-side Codex works, [docs/self-hosting.md](docs/self-hosting.md) for relay deployment, [docs/release-hardening.md](docs/release-hardening.md) for release checks, and [docs/alpha-limitations.md](docs/alpha-limitations.md) for current alpha limits.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidance, [SECURITY.md](SECURITY.md) for the alpha security policy, [docs/threat-model.md](docs/threat-model.md) for privacy boundaries, [docs/codex-hosting.md](docs/codex-hosting.md) for how host-side Codex works, [docs/self-hosting.md](docs/self-hosting.md) for relay deployment, [docs/official-relay-deployment-checklist.md](docs/official-relay-deployment-checklist.md) for the hosted relay launch checklist, [docs/release-hardening.md](docs/release-hardening.md) for release checks, [docs/public-alpha-maintainer-guide.md](docs/public-alpha-maintainer-guide.md) for maintainer launch tasks, [docs/next-alpha-release-notes.md](docs/next-alpha-release-notes.md) for draft release notes, and [docs/alpha-limitations.md](docs/alpha-limitations.md) for current alpha limits.
 
 ## Download
 

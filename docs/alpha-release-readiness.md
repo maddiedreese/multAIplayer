@@ -16,6 +16,8 @@ For an internet-facing relay, run this in the production relay environment:
 npm run doctor:production-relay
 ```
 
+Use [official-relay-deployment-checklist.md](official-relay-deployment-checklist.md) for the hosted relay launch checklist and [public-alpha-maintainer-guide.md](public-alpha-maintainer-guide.md) for maintainer-owned setup work.
+
 Expected automated coverage:
 
 - TypeScript and package builds.
