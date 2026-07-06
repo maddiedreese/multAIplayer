@@ -1,3 +1,4 @@
+import type { MutableRefObject } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { buildCodexApprovalSnapshot } from "../lib/codexTurn";
 import { shouldAutoApproveChatOnlyTurn } from "../lib/codexApproval";
@@ -28,7 +29,7 @@ interface LocalUser {
 interface UseCodexInvokeActionsOptions {
   hasSelectedRoom: boolean;
   selectedRoom: RoomRecord;
-  selectedRoomIdRef: React.MutableRefObject<string>;
+  selectedRoomIdRef: MutableRefObject<string>;
   isSelectedRoomLocked: boolean;
   isSelectedRoomRevoked: boolean;
   isActiveHost: boolean;
