@@ -1,8 +1,4 @@
 import {
-  Bell,
-  Check,
-  Lock,
-  ShieldAlert,
   X
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
@@ -314,6 +310,7 @@ import { DesktopSidebar, type SidebarMessageHitDisplay, type SidebarRoomDisplay,
 import { RoomChatPanel, type LocalPreviewCardDisplay, type PendingAttachmentDisplay, type RoomChatMessageDisplay } from "./components/RoomChatPanel";
 import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
 import { LocalPreviewDialog } from "./components/LocalPreviewDialog";
+import { RoomStatusBanners } from "./components/RoomStatusBanners";
 import { inspectorAttentionCounts } from "./lib/inspectorAttention";
 import type {
   BrowserAccessRequest,
@@ -6229,45 +6226,12 @@ export function App() {
           onShareLocalPreview={openLocalPreviewDialog}
         />
 
-        {roomNotices.length > 0 && (
-          <div className="room-notice-stack">
-            {roomNotices.map((notice) => (
-              <div className="room-notice" key={notice.key}>
-                <strong>{notice.label}</strong>
-                <span>{notice.message}</span>
-                <button onClick={notice.onDismiss} aria-label={`Dismiss ${notice.label} notice`}>
-                  <X size={13} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {secretWarningVisible && (
-          <div className="warning-banner">
-            <ShieldAlert size={18} />
-            <span>Everyone in this room can see Codex events, terminal output, diffs, and tool logs. Secrets may be exposed.</span>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                acknowledgeRoomVisibilityWarning();
-              }}
-              aria-label="Acknowledge room visibility warning"
-            >
-              <Check size={16} />
-              <span>I understand</span>
-            </button>
-          </div>
-        )}
-
-        {isSelectedRoomLocked && (
-          <div className="warning-banner local-lock-banner">
-            <Lock size={18} />
-            <span>{roomLockMessage(selectedRoom, isSelectedRoomRevoked)}</span>
-          </div>
-        )}
+        <RoomStatusBanners
+          notices={roomNotices}
+          secretWarningVisible={secretWarningVisible}
+          lockedMessage={isSelectedRoomLocked ? roomLockMessage(selectedRoom, isSelectedRoomRevoked) : null}
+          onAcknowledgeSecretWarning={acknowledgeRoomVisibilityWarning}
+        />
 
         {markdownCopyFallback && (
           <MarkdownFallbackPanel
