@@ -45,11 +45,9 @@ import {
 } from "@multaiplayer/crypto";
 import {
   exportRoomSecret,
-  hasHistorySettings,
   importRoomSecret,
   loadHistorySettings,
   loadTeamHistorySettings,
-  loadEncryptedHistory,
   loadOrCreateRoomSecret,
   saveHistorySettings,
   saveTeamHistorySettings,
@@ -135,6 +133,7 @@ import { useProjectFilesSearch } from "./hooks/useProjectFilesSearch";
 import { useTerminalLifecycle } from "./hooks/useTerminalLifecycle";
 import { useLocalHistoryPersistence } from "./hooks/useLocalHistoryPersistence";
 import { useTerminalAutoOpen } from "./hooks/useTerminalAutoOpen";
+import { useLocalHistoryHydration } from "./hooks/useLocalHistoryHydration";
 import {
   canApproveCodexTurn,
   shouldAutoApproveChatOnlyTurn,
@@ -245,7 +244,6 @@ import {
   isRoomKeyRotationPlaintextPayload,
   isRoomSettingsPlaintextPayload,
   isTerminalResultPlaintextPayload,
-  normalizeLocalRoomHistory,
   pruneLocalRoomHistory
 } from "./lib/localRoomHistoryPayload";
 import { roomLockMessage, roomSecretStorageLabel } from "./lib/appRuntime";
@@ -350,7 +348,6 @@ import type {
   InviteJoinRequest,
   LocalPreviewDialogState,
   LocalPreviewRecord,
-  LocalRoomHistoryPayload,
   MarkdownCopyFallback,
   NoSecretRoomInvite,
   PendingCodexApproval,
@@ -1065,111 +1062,30 @@ export function App() {
     setSelectedInviteMessage
   });
 
-  useEffect(() => {
-    if (!hasSelectedRoom) return;
-    if (forgottenRoomIds.has(selectedRoomId)) {
-      setHistorySettings(loadHistorySettings(selectedRoomId));
-      return;
-    }
-    let cancelled = false;
-    const settings = hasHistorySettings(selectedRoomId)
-      ? loadHistorySettings(selectedRoomId)
-      : loadTeamHistorySettings(selectedRoom.teamId);
-    if (!hasHistorySettings(selectedRoomId)) {
-      saveHistorySettings(selectedRoomId, settings);
-    }
-    setHistorySettings(settings);
-    loadEncryptedHistory<ChatMessage[] | LocalRoomHistoryPayload>(selectedRoomId).then((storedHistory) => {
-      if (cancelled || !storedHistory) return;
-      const payload = pruneLocalRoomHistory(normalizeLocalRoomHistory(storedHistory), settings.retentionDays);
-      if (payload.messages.length) {
-        setMessagesByRoom((current) => ({
-          ...current,
-          [selectedRoomId]: payload.messages
-        }));
-      }
-      setTerminalRequestsByRoom((current) =>
-        payload.terminalRequests.length
-          ? { ...current, [selectedRoomId]: payload.terminalRequests }
-          : current
-      );
-      setBrowserRequestsByRoom((current) =>
-        payload.browserRequests.length
-          ? { ...current, [selectedRoomId]: payload.browserRequests }
-          : current
-      );
-      setInviteRequestsByRoom((current) =>
-        payload.inviteRequests.length
-          ? { ...current, [selectedRoomId]: payload.inviteRequests }
-          : current
-      );
-      setCodexEventsByRoom((current) =>
-        payload.codexEvents.length
-          ? { ...current, [selectedRoomId]: payload.codexEvents }
-          : current
-      );
-      setGitWorkflowEventsByRoom((current) =>
-        payload.gitWorkflowEvents.length
-          ? { ...current, [selectedRoomId]: payload.gitWorkflowEvents }
-          : current
-      );
-      setGitHubActionsEventsByRoom((current) =>
-        payload.githubActionsEvents.length
-          ? { ...current, [selectedRoomId]: payload.githubActionsEvents }
-          : current
-      );
-      setLocalPreviewsByRoom((current) =>
-        payload.localPreviews.length
-          ? { ...current, [selectedRoomId]: payload.localPreviews }
-          : current
-      );
-      const latestGitWorkflowEvent = payload.gitWorkflowEvents.at(-1);
-      if (latestGitWorkflowEvent) {
-        setGitWorkflowMessageForRoom(selectedRoomId, latestGitWorkflowEvent.message);
-      }
-      const latestGitHubActionsEvent = payload.githubActionsEvents.at(-1);
-      if (latestGitHubActionsEvent) {
-        setActionRunsByRoom((current) => ({
-          ...current,
-          [selectedRoomId]: latestGitHubActionsEvent.runs
-        }));
-        setActionsLastCheckedByRoom((current) => ({
-          ...current,
-          [selectedRoomId]: latestGitHubActionsEvent.checkedAt
-        }));
-        setActionsMessagesByRoom((current) => ({
-          ...current,
-          [selectedRoomId]: `${latestGitHubActionsEvent.summary.label}: ${latestGitHubActionsEvent.message}`
-        }));
-      }
-      if (payload.terminalSnapshots.length) {
-        setTerminals((current) => replaceRoomTerminalSnapshots(current, selectedRoomId, payload.terminalSnapshots));
-        setSelectedTerminalIdsByRoom((current) => {
-          const currentTerminalId = current[selectedRoomId] ?? null;
-          const nextTerminalId = currentTerminalId && payload.terminalSnapshots.some((terminal) => terminal.id === currentTerminalId)
-            ? currentTerminalId
-            : payload.terminalSnapshots[0]?.id ?? null;
-          return nextTerminalId ? { ...current, [selectedRoomId]: nextTerminalId } : current;
-        });
-      }
-      setHostHandoffsByRoom((current) =>
-        payload.hostHandoffs.length
-          ? { ...current, [selectedRoomId]: payload.hostHandoffs }
-          : current
-      );
-      setCodexThreadIdsByRoom((current) => {
-        const codexThreadId = normalizeCodexThreadId(payload.codexThreadId);
-        return codexThreadId ? { ...current, [selectedRoomId]: codexThreadId } : current;
-      });
-    }).catch((error) => {
-      if (!cancelled) console.warn("Failed to load encrypted local history", error);
-    }).finally(() => {
-      if (!cancelled) historyLoadedRoomIds.current.add(selectedRoomId);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [forgottenRoomIds, hasSelectedRoom, selectedRoom.teamId, selectedRoomId]);
+  useLocalHistoryHydration({
+    hasSelectedRoom,
+    selectedRoomId,
+    selectedRoomTeamId: selectedRoom.teamId,
+    forgottenRoomIds,
+    historyLoadedRoomIds,
+    setHistorySettings,
+    setMessagesByRoom,
+    setTerminalRequestsByRoom,
+    setBrowserRequestsByRoom,
+    setInviteRequestsByRoom,
+    setCodexEventsByRoom,
+    setGitWorkflowEventsByRoom,
+    setGitHubActionsEventsByRoom,
+    setLocalPreviewsByRoom,
+    setGitWorkflowMessageForRoom,
+    setActionRunsByRoom,
+    setActionsLastCheckedByRoom,
+    setActionsMessagesByRoom,
+    setTerminals,
+    setSelectedTerminalIdsByRoom,
+    setHostHandoffsByRoom,
+    setCodexThreadIdsByRoom
+  });
 
   useHistorySearch({
     searchActive,
