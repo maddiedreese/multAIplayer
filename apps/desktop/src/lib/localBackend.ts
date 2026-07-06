@@ -23,6 +23,28 @@ export interface GitDiffResult {
   diff: string;
 }
 
+export interface GitPatchResult {
+  patch: string;
+  truncated: boolean;
+  dirtyFiles: string[];
+}
+
+export interface GitCloneResult {
+  path: string;
+  command: string;
+  status: number | null;
+  stdout: string;
+  stderr: string;
+}
+
+export interface GitApplyPatchResult {
+  command: string;
+  cwd: string;
+  status: number | null;
+  stdout: string;
+  stderr: string;
+}
+
 export interface ProjectFileEntry {
   path: string;
   size: number;
@@ -146,6 +168,57 @@ export async function getGitDiff(cwd: string, path: string): Promise<GitDiffResu
       "+export const diffView = 'reviewable red and green file changes';",
       "+export const hostApproval = true;"
     ].join("\n")
+  };
+}
+
+export async function createGitPatch(cwd: string): Promise<GitPatchResult> {
+  if (isTauriRuntime()) {
+    return invoke<GitPatchResult>("git_create_patch", { cwd });
+  }
+
+  return {
+    patch: [
+      "diff --git a/apps/desktop/src/App.tsx b/apps/desktop/src/App.tsx",
+      "--- a/apps/desktop/src/App.tsx",
+      "+++ b/apps/desktop/src/App.tsx",
+      "@@ -1 +1 @@",
+      "-preview",
+      "+preview handoff patch"
+    ].join("\n"),
+    truncated: false,
+    dirtyFiles: ["apps/desktop/src/App.tsx"]
+  };
+}
+
+export async function cloneGitRepository(remoteUrl: string, parentDir: string, branch?: string): Promise<GitCloneResult> {
+  if (isTauriRuntime()) {
+    return invoke<GitCloneResult>("git_clone_repository", {
+      request: { remoteUrl, parentDir, branch }
+    });
+  }
+
+  return {
+    path: `${parentDir.replace(/\/$/, "")}/multaiplayer-preview-clone`,
+    command: `git clone ${remoteUrl}`,
+    status: 0,
+    stdout: "Preview mode: repository would be cloned in the native app.\n",
+    stderr: ""
+  };
+}
+
+export async function applyGitPatch(cwd: string, patch: string): Promise<GitApplyPatchResult> {
+  if (isTauriRuntime()) {
+    return invoke<GitApplyPatchResult>("git_apply_patch", {
+      request: { cwd, patch }
+    });
+  }
+
+  return {
+    cwd,
+    command: "git apply --whitespace=nowarn",
+    status: 0,
+    stdout: "Preview mode: handoff patch would be applied in the native app.\n",
+    stderr: ""
   };
 }
 

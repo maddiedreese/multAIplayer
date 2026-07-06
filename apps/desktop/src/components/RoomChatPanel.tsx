@@ -1,4 +1,4 @@
-import { Bot, Copy, ExternalLink, FileCode2, Send, X } from "lucide-react";
+import { Bot, Copy, FileCode2, Send, X } from "lucide-react";
 import { CodexApprovalCard, type CodexApprovalSummaryDisplay } from "./CodexApprovalCard";
 
 export interface RoomChatAttachmentDisplay {
@@ -130,21 +130,19 @@ export function RoomChatPanel({
                 </div>
                 <p>{message.body}</p>
                 {message.attachments.map((attachment) => (
-                  <div className="attachment" key={attachment.id}>
+                  <button
+                    className="attachment"
+                    key={attachment.id}
+                    onClick={() => {
+                      if (attachment.canPreview && !roomLocked) onOpenAttachment(message.id, attachment.id);
+                    }}
+                    title={attachment.canPreview ? "Open in file viewer" : undefined}
+                    disabled={!attachment.canPreview || roomLocked}
+                  >
                     <FileCode2 size={15} />
                     <span>{attachment.name}</span>
                     <small>{attachment.meta}</small>
-                    {attachment.canPreview && (
-                      <button
-                        onClick={() => onOpenAttachment(message.id, attachment.id)}
-                        title={attachment.encryptedBlob ? "Decrypt and preview encrypted attachment" : "Preview inline attachment"}
-                        aria-label={`Preview ${attachment.name}`}
-                        disabled={roomLocked}
-                      >
-                        <ExternalLink size={12} />
-                      </button>
-                    )}
-                  </div>
+                  </button>
                 ))}
                 {visibleReactions.length > 0 && (
                   <div className="reaction-row">

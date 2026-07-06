@@ -4,9 +4,13 @@ import {
   canAcceptRoomHostHandoff,
   createHandoffSettingsPatch,
   findRoomHostHandoff,
+  handoffRepoIdentity,
+  hostHandoffDetail,
+  hostHandoffTitle,
   isRoomHostMutationInFlight,
   roomHostHandoffMessage,
-  roomHostMutationInFlightMessage
+  roomHostMutationInFlightMessage,
+  sameHandoffRepo
 } from "../src/lib/hostHandoff";
 import type { HostHandoffPlaintextPayload } from "@multaiplayer/protocol";
 
@@ -61,6 +65,29 @@ test("host handoff acceptance requires an available handoff from the current roo
   assert.equal(
     roomHostHandoffMessage(handoffs, "missing"),
     "Host handoff is no longer available in this room."
+  );
+});
+
+test("host handoff helpers describe usage-limit continuation", () => {
+  const handoff = {
+    ...baseHandoff,
+    reason: "usage_limit" as const,
+    gitRepoOwner: "maddiedreese",
+    gitRepoName: "multAIplayer",
+    gitBranch: "main",
+    gitPatch: "diff --git a/README.md b/README.md\n",
+    gitPatchTruncated: false
+  };
+
+  assert.deepEqual(handoffRepoIdentity(handoff), {
+    owner: "maddiedreese",
+    repo: "multAIplayer"
+  });
+  assert.equal(sameHandoffRepo(handoffRepoIdentity(handoff), { owner: "MADDIEDREESE", repo: "multaiplayer" }), true);
+  assert.equal(hostHandoffTitle(handoff), "Continue with another host");
+  assert.equal(
+    hostHandoffDetail(handoff),
+    "Maddie is out of Codex usage. Attach maddiedreese/multAIplayer@main to continue from the room context."
   );
 });
 

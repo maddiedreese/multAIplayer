@@ -1,4 +1,6 @@
 import {
+  ChevronDown,
+  ChevronRight,
   Circle,
   ExternalLink,
   FolderGit2,
@@ -111,6 +113,7 @@ export function DesktopSidebar({
 }) {
   const [teamCreateOpen, setTeamCreateOpen] = useState(false);
   const [roomCreateOpen, setRoomCreateOpen] = useState(false);
+  const [collapsedTeams, setCollapsedTeams] = useState<Record<string, boolean>>({});
 
   const teamFormVisible = !searchActive && teamCreateOpen;
   const roomFormVisible = !searchActive && roomCreateOpen;
@@ -198,17 +201,60 @@ export function DesktopSidebar({
             </button>
           </div>
         )}
-        <div className="team-list">
+        <div className="team-list nested-team-list">
           {teams.map((team) => (
-            <button
-              className={`team-button ${team.active ? "active" : ""}`}
-              key={team.id}
-              onClick={() => onSelectTeam(team.id)}
-            >
-              <UsersRound size={16} />
-              <span>{team.name}</span>
-              <small>{team.meta}</small>
-            </button>
+            <div className="team-group" key={team.id}>
+              <div className={`team-button ${team.active ? "active" : ""}`}>
+                <button
+                  type="button"
+                  className="team-disclosure"
+                  aria-label={collapsedTeams[team.id] ? `Expand ${team.name}` : `Collapse ${team.name}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setCollapsedTeams((current) => ({ ...current, [team.id]: !current[team.id] }));
+                  }}
+                >
+                  {collapsedTeams[team.id] ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                </button>
+                <button
+                  type="button"
+                  className="team-select"
+                  onClick={() => {
+                    onSelectTeam(team.id);
+                    setCollapsedTeams((current) => ({ ...current, [team.id]: false }));
+                  }}
+                >
+                  <UsersRound size={16} />
+                  <span>{team.name}</span>
+                  <small>{team.meta}</small>
+                </button>
+              </div>
+              {!collapsedTeams[team.id] && (
+                <div className="nested-room-list">
+                  {rooms.filter((room) => room.teamId === team.id).map((room) => (
+                    <button
+                      key={room.id}
+                      className={`room-button nested ${room.active ? "active" : ""}`}
+                      onClick={() => onSelectRoom(room.id, room.teamId)}
+                    >
+                      <div>
+                        <strong>{room.name}</strong>
+                        <span>{room.detail}</span>
+                      </div>
+                      <div className="room-indicators">
+                        {room.attention > 0 && <b className="attention">{room.attention}</b>}
+                        {room.unread > 0 ? <b>{room.unread}</b> : room.attention === 0 ? <Circle size={8} /> : null}
+                      </div>
+                    </button>
+                  ))}
+                  {rooms.filter((room) => room.teamId === team.id).length === 0 && (
+                    <div className="sidebar-empty nested-empty">
+                      {team.active && !searchActive ? "No rooms yet. Create one for this team." : "No visible rooms."}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           ))}
           {teams.length === 0 && (
             <div className="sidebar-empty">
@@ -218,9 +264,9 @@ export function DesktopSidebar({
         </div>
       </section>
 
-      <section className="sidebar-section rooms">
+      <section className="sidebar-section rooms room-create-section">
         <div className="section-title">
-          <span>{searchActive ? "Matching rooms" : "Rooms"}</span>
+          <span>New room</span>
           {!searchActive && (
             <button
               onClick={() => setRoomCreateOpen((open) => !open)}
@@ -262,29 +308,9 @@ export function DesktopSidebar({
             </button>
           </div>
         )}
-        {rooms.map((room) => (
-          <button
-            key={room.id}
-            className={`room-button ${room.active ? "active" : ""}`}
-            onClick={() => onSelectRoom(room.id, room.teamId)}
-          >
-            <div>
-              <strong>{room.name}</strong>
-              <span>{room.detail}</span>
-            </div>
-            <div className="room-indicators">
-              {room.attention > 0 && <b className="attention">{room.attention}</b>}
-              {room.unread > 0 ? <b>{room.unread}</b> : room.attention === 0 ? <Circle size={8} /> : null}
-            </div>
-          </button>
-        ))}
-        {rooms.length === 0 && (
+        {!roomFormVisible && !searchActive && (
           <div className="sidebar-empty">
-            {searchActive
-              ? "No rooms or projects found."
-              : selectedTeam
-                ? "No rooms yet. Create one for this team."
-                : "Create a team before adding rooms."}
+            {selectedTeam ? "Create a room inside the selected team." : "Create a team before adding rooms."}
           </div>
         )}
       </section>

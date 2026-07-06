@@ -148,6 +148,7 @@ export async function updateRoomHost(
 export async function updateRoomSettings(
   roomId: string,
   settings: {
+    name?: string;
     approvalPolicy?: RoomRecord["approvalPolicy"];
     mode?: RoomRecord["mode"];
     codexModel?: string;

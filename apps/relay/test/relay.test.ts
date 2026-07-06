@@ -81,6 +81,7 @@ test("relay broadcasts room.updated after room settings change", async () => {
       body: JSON.stringify({
         requesterName: "Maddie",
         requesterUserId: "github:maddiedreese",
+        name: "Renamed desktop app",
         codexModel: "gpt-5.4-thinking",
         browserProfilePersistent: false
       })
@@ -89,6 +90,7 @@ test("relay broadcasts room.updated after room settings change", async () => {
 
     const updatedRoom = await updatePromise;
     assert.equal(updatedRoom.id, "room-desktop");
+    assert.equal(updatedRoom.name, "Renamed desktop app");
     assert.equal(updatedRoom.codexModel, "gpt-5.4-thinking");
     assert.equal(updatedRoom.browserProfilePersistent, false);
   } finally {
