@@ -310,6 +310,7 @@ import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessag
 import { buildRoomMemberRows, buildTeamMemberRows } from "./lib/rosterDisplayRows";
 import { buildSidebarMessageHitRows, buildSidebarRoomRows, buildSidebarTeamRows } from "./lib/sidebarDisplayRows";
 import { buildCodexEventRows, buildTerminalOutputLines, buildTerminalRequestRows } from "./lib/terminalDisplayRows";
+import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useShellLayout } from "./hooks/useShellLayout";
 import { useThemeMode } from "./hooks/useThemeMode";
 import {
@@ -451,8 +452,6 @@ export function App() {
   });
   const [localPreviewBusyByRoom, setLocalPreviewBusyByRoom] = useState<Record<string, boolean>>({});
   const [draftsByRoom, setDraftsByRoom] = useState<Record<string, string>>({});
-  const [selectedMessageIdsByRoom, setSelectedMessageIdsByRoom] = useState<Record<string, string[]>>({});
-  const [markdownSelectionMode, setMarkdownSelectionMode] = useState(false);
   const [pendingAttachmentsByRoom, setPendingAttachmentsByRoom] = useState<Record<string, ChatAttachment[]>>({});
   const [approvalVisibleByRoom, setApprovalVisibleByRoom] = useState<Record<string, boolean>>({});
   const [pendingCodexApprovalsByRoom, setPendingCodexApprovalsByRoom] = useState<Record<string, PendingCodexApproval>>({});
@@ -543,12 +542,19 @@ export function App() {
     [currentUser]
   );
 
-  useEffect(() => {
-    setMarkdownSelectionMode(false);
-  }, [selectedRoomId]);
-
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? emptyRoom;
+  const {
+    markdownSelectionMode,
+    selectedMessageIds,
+    clearSelectedMessages,
+    toggleMarkdownSelectionMode,
+    toggleMessageSelection
+  } = useMarkdownSelection({
+    activeRoomId: selectedRoom.id,
+    enabled: hasSelectedRoom,
+    resetKey: selectedRoomId
+  });
   const inspectorTab = inspectorTabsByRoom[selectedRoom.id] === "diff"
     ? "files"
     : inspectorTabsByRoom[selectedRoom.id] ?? "files";
@@ -568,7 +574,6 @@ export function App() {
   const projectPathDraft = projectPathDraftsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedRoom.projectPath;
   const messages = messagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const draft = draftsByRoom[selectedRoom?.id ?? selectedRoomId] ?? "";
-  const selectedMessageIds = selectedMessageIdsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const selectedMessages = markdownSelectionMode
     ? messages.filter((message) => selectedMessageIds.includes(message.id))
     : [];
@@ -5560,24 +5565,6 @@ export function App() {
     await copyMarkdownWithFallback("room chat", markdown, (message) => setChatMessageForRoom(roomId, message), roomId);
   }
 
-  function toggleMessageSelection(messageId: string) {
-    if (!hasSelectedRoom) return;
-    setSelectedMessageIdsByRoom((current) => {
-      const roomIds = current[selectedRoom.id] ?? [];
-      const nextIds = roomIds.includes(messageId)
-        ? roomIds.filter((id) => id !== messageId)
-        : [...roomIds, messageId];
-      return {
-        ...current,
-        [selectedRoom.id]: nextIds
-      };
-    });
-  }
-
-  function clearSelectedMessages() {
-    setSelectedMessageIdsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-  }
-
   async function copySelectedMessagesMarkdown() {
     if (!hasSelectedRoom) {
       setSelectedChatMessage("Create or join a room before copying selected messages.");
@@ -5903,13 +5890,6 @@ export function App() {
     } finally {
       setActionsBusyForRoom(roomId, false);
     }
-  }
-
-  function toggleMarkdownSelectionMode() {
-    setMarkdownSelectionMode((current) => {
-      if (current) clearSelectedMessages();
-      return !current;
-    });
   }
 
   return (
