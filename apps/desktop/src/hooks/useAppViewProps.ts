@@ -7,6 +7,7 @@ import { useRoomMainColumnProps } from "./useRoomMainColumnProps";
 
 type AppShellViewProps = ComponentProps<typeof AppShellView>;
 type RoomMainColumnOptions = Parameters<typeof useRoomMainColumnProps>[0];
+type AppSidebarOptions = Parameters<typeof useAppSidebarProps>[0];
 
 type RoomMainColumnInput = Omit<
   RoomMainColumnOptions,
@@ -32,6 +33,14 @@ type RoomMainColumnInput = Omit<
   ) => void;
 };
 
+type AppSidebarInput = Omit<AppSidebarOptions, "selectedTeam" | "settingsMessage" | "roomSources"> & {
+  selectedTeamId: string;
+  appConfigMessage: string | null;
+  roomSettingsMessage: string | null;
+  historyMessage: string | null;
+  roomRecords: Array<{ id: string; teamId: string }>;
+};
+
 export function useAppViewProps({
   shell,
   roomMainColumn,
@@ -51,7 +60,7 @@ export function useAppViewProps({
   >;
   roomMainColumn: RoomMainColumnInput;
   roomInspectorPanel: Parameters<typeof useRoomInspectorPanelProps>[0];
-  appSidebar: Parameters<typeof useAppSidebarProps>[0];
+  appSidebar: AppSidebarInput;
   localPreviewDialog: Parameters<typeof useLocalPreviewDialogProps>[0];
 }) {
   const {
@@ -78,7 +87,20 @@ export function useAppViewProps({
       setMarkdownCopyFallbackForRoom(roomMainColumnOptions.selectedRoom.id, null)
   });
   const roomInspectorPanelProps = useRoomInspectorPanelProps(roomInspectorPanel);
-  const { sidebarProps, drawerProps } = useAppSidebarProps(appSidebar);
+  const {
+    selectedTeamId,
+    appConfigMessage,
+    roomSettingsMessage,
+    historyMessage,
+    roomRecords,
+    ...appSidebarOptions
+  } = appSidebar;
+  const { sidebarProps, drawerProps } = useAppSidebarProps({
+    ...appSidebarOptions,
+    selectedTeam: Boolean(selectedTeamId),
+    settingsMessage: appConfigMessage ?? roomSettingsMessage ?? historyMessage,
+    roomSources: roomRecords.map((room) => ({ id: room.id, teamId: room.teamId }))
+  });
   const { localPreviewDialogOpen, localPreviewDialogProps } = useLocalPreviewDialogProps(localPreviewDialog);
 
   return {

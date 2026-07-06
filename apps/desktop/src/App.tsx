@@ -1985,7 +1985,7 @@ export function App() {
     newTeamName,
     newRoomName,
     newRoomProjectPath,
-    selectedTeam: Boolean(selectedTeam),
+    selectedTeamId: selectedTeam,
     teams: sidebarTeamRows,
     rooms: sidebarRoomRows,
     messageHits: sidebarMessageHitRows,
@@ -2019,7 +2019,9 @@ export function App() {
     teamDefaultCodexModel,
     teamDefaultBrowserProfilePersistent,
     teamDefaultInviteApprovalGate,
-    settingsMessage: appConfigMessage ?? settingsMessage ?? visibleHistoryMessage,
+    appConfigMessage,
+    roomSettingsMessage: settingsMessage,
+    historyMessage: visibleHistoryMessage,
     onSignIn: beginGitHubSignIn,
     onSignOut: signOut,
     onSidebarQueryChange: setSidebarQuery,
@@ -2049,7 +2051,7 @@ export function App() {
     onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent,
     onTeamDefaultInviteApprovalGateChange: updateTeamDefaultInviteApprovalGate,
     onApplyTeamDefaultsToRoom: applyTeamDefaultsToRoom,
-    roomSources: rooms
+    roomRecords: rooms
     },
     localPreviewDialog: {
     localPreviewDialog,
