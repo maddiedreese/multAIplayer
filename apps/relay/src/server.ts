@@ -34,6 +34,7 @@ import { createRelayAuthz } from "./authz.js";
 import { loadRelayConfig } from "./config.js";
 import { registerAttachmentRoutes } from "./http/attachments.js";
 import { registerDebugRoutes } from "./http/debug.js";
+import { registerDeviceRoutes } from "./http/devices.js";
 import { registerGitHubRoutes } from "./http/github.js";
 import { registerInviteRoutes } from "./http/invites.js";
 import { createRelayRequestGuards } from "./http/middleware.js";
@@ -309,6 +310,21 @@ registerTeamRoutes({
   normalizeMetadataText,
   maxTeamNameChars
 });
+registerDeviceRoutes({
+  app,
+  devices,
+  getAuthSession,
+  allowMutation,
+  scheduleStoreSave,
+  normalizeMetadataText,
+  normalizeOptionalMetadataText,
+  displayNameForUser,
+  maxDisplayNameChars,
+  maxDeviceIdChars,
+  maxPublicKeyFingerprintChars,
+  maxPublicKeyJwkChars,
+  maxUserIdChars
+});
 
 await loadRelayStore();
 seedWorkspace();
@@ -323,52 +339,6 @@ app.get("/readyz", (_req, res) => {
 
 app.get("/metrics", (_req, res) => {
   res.json(relayMetrics.snapshot(sessions.size));
-});
-
-app.post("/devices", (req, res) => {
-  const session = getAuthSession(req.cookies?.multaiplayer_session);
-  if (!allowMutation(session, res)) return;
-
-  const requestedUserId = normalizeOptionalMetadataText(req.body?.userId, maxUserIdChars);
-  if (requestedUserId === null) {
-    res.status(400).json({ error: `userId must be up to ${maxUserIdChars} characters without control characters` });
-    return;
-  }
-  if (session && requestedUserId && requestedUserId !== session.user.id) {
-    res.status(403).json({ error: "Device user id must match the signed-in GitHub user." });
-    return;
-  }
-  const userId = session?.user.id ?? requestedUserId;
-  const deviceId = normalizeMetadataText(req.body?.deviceId, maxDeviceIdChars);
-  const displayName = session
-    ? normalizeMetadataText(displayNameForUser(session.user), maxDisplayNameChars)
-    : normalizeMetadataText(req.body?.displayName, maxDisplayNameChars);
-  const publicKeyJwk = normalizeDevicePublicKeyJwk(req.body?.publicKeyJwk);
-  const publicKeyFingerprint = normalizeMetadataText(req.body?.publicKeyFingerprint, maxPublicKeyFingerprintChars);
-  if (!userId || !deviceId || !displayName) {
-    res.status(400).json({ error: "userId, deviceId, and displayName are required" });
-    return;
-  }
-  if (!publicKeyJwk || !publicKeyFingerprint) {
-    res.status(400).json({ error: "A public key JWK and fingerprint are required" });
-    return;
-  }
-
-  const now = new Date().toISOString();
-  const key = deviceKey(userId, deviceId);
-  const existing = devices.get(key);
-  const device: DeviceRecord = {
-    userId,
-    deviceId,
-    displayName,
-    publicKeyJwk,
-    publicKeyFingerprint,
-    registeredAt: existing?.registeredAt ?? now,
-    lastSeenAt: now
-  };
-  devices.set(key, device);
-  scheduleStoreSave();
-  res.status(existing ? 200 : 201).json({ device });
 });
 
 app.post("/rooms", (req, res) => {
