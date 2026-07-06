@@ -122,7 +122,6 @@ import {
   createTeam,
   loadAttachmentBlob,
   lookupInvite,
-  registerDevice,
   removeTeamMember,
   transferTeamOwnership,
   updateTeamMemberRole,
@@ -130,6 +129,7 @@ import {
   updateRoomSettings
 } from "./lib/workspaceClient";
 import { defaultRelayHttpUrl, defaultRelayWsUrl } from "./lib/appConfig";
+import { useDeviceIdentityLifecycle } from "./hooks/useDeviceIdentityLifecycle";
 import {
   canApproveCodexTurn,
   shouldAutoApproveChatOnlyTurn,
@@ -1037,30 +1037,15 @@ export function App() {
     selectedRoomId,
     setRooms
   });
-
-  useEffect(() => {
-    loadOrCreateDeviceIdentity()
-      .then((identity) => {
-        setDeviceIdentity(identity);
-        setDeviceIdentityMessage(null);
-      })
-      .catch((error) => {
-        setDeviceIdentityMessage(`Device identity unavailable: ${String(error)}`);
-      });
-  }, []);
-
-  useEffect(() => {
-    if (!deviceIdentity) return;
-    registerDevice({
-      userId: localUser.id,
-      deviceId,
-      displayName: localUser.name,
-      publicKeyJwk: deviceIdentity.publicKeyJwk,
-      publicKeyFingerprint: deviceIdentity.publicKeyFingerprint
-    })
-      .then(() => setDeviceIdentityMessage("Device identity registered with relay."))
-      .catch((error) => setDeviceIdentityMessage(`Device identity registration pending: ${String(error)}`));
-  }, [appConfig.relayHttpUrl, deviceId, deviceIdentity, localUser.id, localUser.name]);
+  useDeviceIdentityLifecycle({
+    relayHttpUrl: appConfig.relayHttpUrl,
+    deviceId,
+    userId: localUser.id,
+    displayName: localUser.name,
+    deviceIdentity,
+    setDeviceIdentity,
+    setDeviceIdentityMessage
+  });
 
   useEffect(() => {
     const invitePayload = readInviteUrlPayload(window.location);
