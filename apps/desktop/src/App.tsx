@@ -306,6 +306,7 @@ import { useRoomAccess } from "./hooks/useRoomAccess";
 import { useRoomBrowserSetters } from "./hooks/useRoomBrowserSetters";
 import { useRoomBusySetters } from "./hooks/useRoomBusySetters";
 import { useRoomCodexApprovalSetters } from "./hooks/useRoomCodexApprovalSetters";
+import { useRoomDraftSetters } from "./hooks/useRoomDraftSetters";
 import { useRoomFileSetters } from "./hooks/useRoomFileSetters";
 import { useRoomInviteSetters } from "./hooks/useRoomInviteSetters";
 import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
@@ -785,6 +786,13 @@ export function App() {
     setInviteLinksByRoom,
     setInviteApprovalGatesByRoom,
     setInviteMessagesByRoom
+  });
+  const {
+    setPendingAttachmentsForRoom,
+    setDraftForRoom
+  } = useRoomDraftSetters({
+    setPendingAttachmentsByRoom,
+    setDraftsByRoom
   });
   const roomNotices = useRoomNotices({
     roomId: selectedRoom.id,
@@ -1889,27 +1897,6 @@ export function App() {
     if (!hasSelectedRoom) return;
     setProjectPathDraftsByRoom((current) => current[selectedRoom.id] === selectedRoom.projectPath ? omitRecordKey(current, selectedRoom.id) : current);
   }, [hasSelectedRoom, selectedRoom.id, selectedRoom.projectPath]);
-
-  function setPendingAttachmentsForRoom(
-    roomId: string,
-    updater: ChatAttachment[] | ((current: ChatAttachment[]) => ChatAttachment[])
-  ) {
-    setPendingAttachmentsByRoom((current) => {
-      const currentAttachments = current[roomId] ?? [];
-      const nextAttachments = typeof updater === "function" ? updater(currentAttachments) : updater;
-      return {
-        ...current,
-        [roomId]: nextAttachments
-      };
-    });
-  }
-
-  function setDraftForRoom(roomId: string, value: string) {
-    setDraftsByRoom((current) => ({
-      ...current,
-      [roomId]: value
-    }));
-  }
 
   function reportRoomTerminalActionInFlight(roomId: string): boolean {
     if (!isRoomTerminalActionInFlight(terminalBusyRef.current, roomId)) return false;
