@@ -1,3 +1,6 @@
+import { createGitWorkflowApprovalPlan, formatGitWorkflowApprovalPreview } from "@multaiplayer/git";
+import { normalizeGitHubBranchName } from "@multaiplayer/github";
+
 export interface GitWorkflowDraft {
   branchName: string;
   commitMessage: string;
@@ -54,6 +57,33 @@ export function updateGitWorkflowDraftRecord(
       ...patch
     }
   };
+}
+
+export function buildGitWorkflowApprovalPreview(projectPath: string, draft: GitWorkflowDraft) {
+  try {
+    const plan = createGitWorkflowApprovalPlan(
+      projectPath,
+      draft.branchName,
+      draft.commitMessage,
+      draft.pushEnabled
+    );
+    const normalizedBase = draft.pushEnabled
+      ? normalizeGitHubBranchName(draft.prBase.trim() || "main")
+      : draft.prBase.trim();
+    return {
+      plan,
+      normalizedBase,
+      steps: formatGitWorkflowApprovalPreview(plan),
+      error: null
+    };
+  } catch (error) {
+    return {
+      plan: null,
+      normalizedBase: draft.prBase.trim(),
+      steps: [],
+      error: String(error)
+    };
+  }
 }
 
 export function parseGitHubRemoteUrl(remoteUrl: string): GitRemoteRepoRef | null {
