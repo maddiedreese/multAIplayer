@@ -83,7 +83,6 @@ import {
   getGitRemoteOrigin,
   getGitStatus,
   listTerminals,
-  probeCodex,
   probeCloudflared,
   readLocalPreviewTunnelStatus,
   readProjectFile,
@@ -131,6 +130,7 @@ import {
 import { defaultRelayHttpUrl, defaultRelayWsUrl } from "./lib/appConfig";
 import { useDeviceIdentityLifecycle } from "./hooks/useDeviceIdentityLifecycle";
 import { useSelectedTeamDefaults } from "./hooks/useSelectedTeamDefaults";
+import { useCodexProbe } from "./hooks/useCodexProbe";
 import {
   canApproveCodexTurn,
   shouldAutoApproveChatOnlyTurn,
@@ -1774,11 +1774,7 @@ export function App() {
     terminalBusy
   ]);
 
-  useEffect(() => {
-    probeCodex().then(setCodexProbe).catch((error) => {
-      setCodexProbe({ available: false, version: null, error: String(error) });
-    });
-  }, []);
+  useCodexProbe({ setCodexProbe });
 
   useEffect(() => {
     if (!hasSelectedRoom) return;
