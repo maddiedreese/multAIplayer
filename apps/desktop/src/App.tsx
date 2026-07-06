@@ -138,6 +138,7 @@ import { useChatActions } from "./hooks/useChatActions";
 import { useCodexInvokeActions } from "./hooks/useCodexInvokeActions";
 import { useCodexTurnActions } from "./hooks/useCodexTurnActions";
 import { useRoomVisibilityWarningActions } from "./hooks/useRoomVisibilityWarningActions";
+import { useRoomChatPanelActions } from "./hooks/useRoomChatPanelActions";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -1686,6 +1687,24 @@ export function App() {
     setProjectPathDraftsByRoom
   });
 
+  const roomChatPanelActions = useRoomChatPanelActions({
+    selectedRoomId: selectedRoom.id,
+    messages,
+    localPreviews,
+    copyMessageMarkdown,
+    copyCodexOutputMarkdown,
+    openEncryptedAttachmentBlob,
+    toggleMessageReaction,
+    setPendingCodexApprovalForRoom,
+    setApprovalVisibleForRoom,
+    approveCodexTurn,
+    handleCodexInvoke,
+    copyMarkdownWithFallback,
+    setChatMessageForRoom,
+    stopLocalPreview,
+    setDraftForRoom
+  });
+
   function handleCodexBrowserOpenCommand(message: ChatMessage, room: RoomRecord): boolean {
     const url = extractCodexBrowserOpenUrl(message.body);
     if (!url) return false;
@@ -1920,43 +1939,9 @@ export function App() {
           pendingAttachmentSummary,
           markdownSelectionMode,
           onToggleMessageSelection: toggleMessageSelection,
-          onCopyMessageMarkdown: (messageId) => {
-            const message = messages.find((item) => item.id === messageId);
-            if (message) copyMessageMarkdown(message);
-          },
-          onCopyCodexOutputMarkdown: (messageId) => {
-            const message = messages.find((item) => item.id === messageId);
-            if (message) copyCodexOutputMarkdown(message);
-          },
-          onOpenAttachment: (messageId, attachmentId) => {
-            const message = messages.find((item) => item.id === messageId);
-            const attachment = message?.attachments?.find((item) => item.id === attachmentId);
-            if (attachment) openEncryptedAttachmentBlob(attachment);
-          },
-          onToggleReaction: (messageId, emoji) => {
-            const message = messages.find((item) => item.id === messageId);
-            if (message) toggleMessageReaction(message, emoji);
-          },
-          onDenyApproval: () => {
-            setPendingCodexApprovalForRoom(selectedRoom.id, null);
-            setApprovalVisibleForRoom(selectedRoom.id, false);
-          },
-          onApproveApproval: () => approveCodexTurn(),
-          onInvokeCodex: () => handleCodexInvoke(),
           onRemovePendingAttachment: removePendingAttachment,
-          onOpenLocalPreview: (previewId) => {
-            const preview = localPreviews.find((item) => item.id === previewId);
-            if (preview?.publicUrl) window.open(preview.publicUrl, "_blank", "noopener,noreferrer");
-          },
-          onCopyLocalPreviewLink: (previewId) => {
-            const preview = localPreviews.find((item) => item.id === previewId);
-            if (preview?.publicUrl) {
-              void copyMarkdownWithFallback("local preview link", preview.publicUrl, (message) => setChatMessageForRoom(selectedRoom.id, message), selectedRoom.id);
-            }
-          },
-          onStopLocalPreview: (previewId) => void stopLocalPreview(previewId),
-          onDraftChange: (nextDraft) => setDraftForRoom(selectedRoom.id, nextDraft),
-          onSendMessage: sendMessage
+          onSendMessage: sendMessage,
+          ...roomChatPanelActions
         }}
       />
 
