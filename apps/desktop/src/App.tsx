@@ -183,7 +183,6 @@ import {
   terminalRequestForApprovedRun
 } from "./lib/terminalApproval";
 import { canControlRoomTerminal, roomTerminalControlMessage } from "./lib/terminalAccess";
-import { readInviteUrlPayload } from "./lib/inviteUrl";
 import { displayableInviteLink } from "./lib/invitePrivacy";
 import { canCreateRoomInvite } from "./lib/invitePolicy";
 import {
@@ -312,6 +311,7 @@ import { useTeamMembersRefresh } from "./hooks/useTeamMembersRefresh";
 import { useThemeMode } from "./hooks/useThemeMode";
 import { useWorkspaceBootstrap } from "./hooks/useWorkspaceBootstrap";
 import { useLocalPreviewPolling } from "./hooks/useLocalPreviewPolling";
+import { useInviteUrlBootstrap } from "./hooks/useInviteUrlBootstrap";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -1058,19 +1058,11 @@ export function App() {
     setTeamDefaultInviteApprovalGate
   });
 
-  useEffect(() => {
-    const invitePayload = readInviteUrlPayload(window.location);
-    if (!invitePayload) return;
-    window.history.replaceState(null, "", invitePayload.cleanupPath);
-    if (invitePayload.kind === "join") {
-      requestNoSecretInviteAccess(invitePayload.encoded, invitePayload.inviteId)
-        .catch((error) => setSelectedInviteMessage(`Invite could not be read: ${String(error)}`));
-      return;
-    }
-
-    acceptInvite(invitePayload.encoded, invitePayload.inviteId, invitePayload.approvalRequested)
-      .catch((error) => setSelectedInviteMessage(`Invite could not be read: ${String(error)}`));
-  }, []);
+  useInviteUrlBootstrap({
+    requestNoSecretInviteAccess,
+    acceptInvite,
+    setSelectedInviteMessage
+  });
 
   useEffect(() => {
     if (!hasSelectedRoom) return;
