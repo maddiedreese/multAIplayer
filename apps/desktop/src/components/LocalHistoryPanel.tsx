@@ -23,7 +23,6 @@ export function LocalHistoryPanel({
   defaultCodexModel,
   codexModelOptions,
   teamDefaultBrowserProfilePersistent,
-  teamDefaultBrowserAllowedOriginsDraft,
   teamDefaultInviteApprovalGate,
   message,
   onHistoryEnabledChange,
@@ -36,8 +35,6 @@ export function LocalHistoryPanel({
   onTeamDefaultApprovalPolicyChange,
   onTeamDefaultCodexModelChange,
   onTeamDefaultBrowserProfilePersistentChange,
-  onTeamDefaultBrowserAllowedOriginsDraftChange,
-  onSaveTeamDefaultBrowserPolicy,
   onTeamDefaultInviteApprovalGateChange
 }: {
   historySettings: HistorySettingsDisplay;
@@ -51,7 +48,6 @@ export function LocalHistoryPanel({
   defaultCodexModel: string;
   codexModelOptions: readonly CodexModelOptionDisplay[];
   teamDefaultBrowserProfilePersistent: boolean;
-  teamDefaultBrowserAllowedOriginsDraft: string;
   teamDefaultInviteApprovalGate: boolean;
   message: string | null;
   onHistoryEnabledChange: (enabled: boolean) => void;
@@ -64,8 +60,6 @@ export function LocalHistoryPanel({
   onTeamDefaultApprovalPolicyChange: (policy: ApprovalPolicy) => void;
   onTeamDefaultCodexModelChange: (model: string) => void;
   onTeamDefaultBrowserProfilePersistentChange: (persistent: boolean) => void;
-  onTeamDefaultBrowserAllowedOriginsDraftChange: (draft: string) => void;
-  onSaveTeamDefaultBrowserPolicy: () => void;
   onTeamDefaultInviteApprovalGateChange: (enabled: boolean) => void;
 }) {
   return (
@@ -167,21 +161,6 @@ export function LocalHistoryPanel({
         />
         <span>Persist browser profiles in new team rooms</span>
       </label>
-      <div className="browser-allowlist">
-        <label>
-          <span>New room allowed browser sites</span>
-          <textarea
-            value={teamDefaultBrowserAllowedOriginsDraft}
-            disabled={!selectedTeam}
-            onChange={(event) => onTeamDefaultBrowserAllowedOriginsDraftChange(event.target.value)}
-            placeholder="https://github.com"
-          />
-        </label>
-        <button className="ghost-wide" onClick={onSaveTeamDefaultBrowserPolicy} disabled={!selectedTeam}>
-          <Check size={15} />
-          Save browser defaults
-        </button>
-      </div>
       <label className="checkbox-row">
         <input
           type="checkbox"

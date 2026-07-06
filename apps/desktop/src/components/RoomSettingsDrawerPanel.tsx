@@ -39,7 +39,6 @@ export function RoomSettingsDrawerPanel({
   defaultCodexModel,
   codexModelOptions,
   teamDefaultBrowserProfilePersistent,
-  teamDefaultBrowserAllowedOriginsDraft,
   teamDefaultInviteApprovalGate,
   message,
   onChooseProject,
@@ -57,8 +56,6 @@ export function RoomSettingsDrawerPanel({
   onTeamDefaultApprovalPolicyChange,
   onTeamDefaultCodexModelChange,
   onTeamDefaultBrowserProfilePersistentChange,
-  onTeamDefaultBrowserAllowedOriginsDraftChange,
-  onSaveTeamDefaultBrowserPolicy,
   onTeamDefaultInviteApprovalGateChange,
   onApplyTeamDefaultsToRoom
 }: {
@@ -92,7 +89,6 @@ export function RoomSettingsDrawerPanel({
   defaultCodexModel: string;
   codexModelOptions: readonly CodexModelOptionDisplay[];
   teamDefaultBrowserProfilePersistent: boolean;
-  teamDefaultBrowserAllowedOriginsDraft: string;
   teamDefaultInviteApprovalGate: boolean;
   message: string | null;
   onChooseProject: () => void;
@@ -110,8 +106,6 @@ export function RoomSettingsDrawerPanel({
   onTeamDefaultApprovalPolicyChange: (policy: ApprovalPolicy) => void;
   onTeamDefaultCodexModelChange: (model: string) => void;
   onTeamDefaultBrowserProfilePersistentChange: (persistent: boolean) => void;
-  onTeamDefaultBrowserAllowedOriginsDraftChange: (draft: string) => void;
-  onSaveTeamDefaultBrowserPolicy: () => void;
   onTeamDefaultInviteApprovalGateChange: (enabled: boolean) => void;
   onApplyTeamDefaultsToRoom: () => void;
 }) {
@@ -273,24 +267,9 @@ export function RoomSettingsDrawerPanel({
             checked={teamDefaultBrowserProfilePersistent}
             disabled={!selectedTeam}
             onChange={(event) => onTeamDefaultBrowserProfilePersistentChange(event.target.checked)}
-          />
-          <span>Persist browser profiles in new team rooms</span>
-        </label>
-        <div className="browser-allowlist">
-          <label>
-            <span>New room allowed browser sites</span>
-            <textarea
-              value={teamDefaultBrowserAllowedOriginsDraft}
-              disabled={!selectedTeam}
-              onChange={(event) => onTeamDefaultBrowserAllowedOriginsDraftChange(event.target.value)}
-              placeholder="https://github.com"
-            />
-          </label>
-          <button className="ghost-wide" onClick={onSaveTeamDefaultBrowserPolicy} disabled={!selectedTeam}>
-            <Check size={15} />
-            Save browser defaults
-          </button>
-        </div>
+        />
+        <span>Persist browser profiles in new team rooms</span>
+      </label>
         <label className="checkbox-row">
           <input
             type="checkbox"

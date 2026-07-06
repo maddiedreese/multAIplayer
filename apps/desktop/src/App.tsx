@@ -93,7 +93,6 @@ import {
   getGitRemoteOrigin,
   getGitStatus,
   listTerminals,
-  openBrowserView,
   probeCodex,
   readProjectFile,
   readTerminal,
@@ -597,7 +596,6 @@ export function App() {
   const [settingsMessagesByRoom, setSettingsMessagesByRoom] = useState<Record<string, string | null>>({});
   const [customCodexModelsByRoom, setCustomCodexModelsByRoom] = useState<Record<string, string>>({});
   const [projectPathDraftsByRoom, setProjectPathDraftsByRoom] = useState<Record<string, string>>({});
-  const [browserAllowedOriginsDraftsByRoom, setBrowserAllowedOriginsDraftsByRoom] = useState<Record<string, string>>({});
   const [historySettings, setHistorySettings] = useState<LocalHistorySettings>({
     enabled: true,
     retentionDays: 30
@@ -611,9 +609,6 @@ export function App() {
   );
   const [teamDefaultCodexModel, setTeamDefaultCodexModel] = useState(() =>
     loadTeamRoomDefaults(seededTeams[0].id).codexModel
-  );
-  const [teamDefaultBrowserAllowedOriginsDraft, setTeamDefaultBrowserAllowedOriginsDraft] = useState(() =>
-    loadTeamRoomDefaults(seededTeams[0].id).browserAllowedOrigins.join("\n")
   );
   const [teamDefaultBrowserProfilePersistent, setTeamDefaultBrowserProfilePersistent] = useState(() =>
     loadTeamRoomDefaults(seededTeams[0].id).browserProfilePersistent
@@ -664,6 +659,7 @@ export function App() {
   const [browserReasonsByRoom, setBrowserReasonsByRoom] = useState<Record<string, string>>({});
   const [browserMessagesByRoom, setBrowserMessagesByRoom] = useState<Record<string, string | null>>({});
   const [browserStatusByRoom, setBrowserStatusByRoom] = useState<Record<string, BrowserStatus>>({});
+  const [activeBrowserUrlsByRoom, setActiveBrowserUrlsByRoom] = useState<Record<string, string | null>>({});
   const [relayStatus, setRelayStatus] = useState<RelayStatus>("closed");
   const [authConfig, setAuthConfig] = useState<GitHubAuthConfig | null>(null);
   const [currentUser, setCurrentUser] = useState<SignedInUser | null>(null);
@@ -755,10 +751,8 @@ export function App() {
     canRemove: canRemoveTeamMember(selectedTeamRecord, member)
   }));
   const selectedCodexModel = selectedRoom?.codexModel ?? defaultCodexModel;
-  const selectedBrowserAllowedOrigins = selectedRoom.browserAllowedOrigins ?? defaultBrowserAllowedOrigins;
   const customCodexModel = customCodexModelsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedCodexModel;
   const projectPathDraft = projectPathDraftsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedRoom.projectPath;
-  const browserAllowedOriginsDraft = browserAllowedOriginsDraftsByRoom[selectedRoom?.id ?? selectedRoomId] ?? selectedBrowserAllowedOrigins.join("\n");
   const messages = messagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
   const draft = draftsByRoom[selectedRoom?.id ?? selectedRoomId] ?? "";
   const selectedMessageIds = selectedMessageIdsByRoom[selectedRoom?.id ?? selectedRoomId] ?? [];
@@ -772,6 +766,7 @@ export function App() {
   const browserReason = browserReasonsByRoom[selectedRoom?.id ?? selectedRoomId] ?? defaultBrowserReason;
   const browserMessage = browserMessagesByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const browserStatus = browserStatusByRoom[selectedRoom?.id ?? selectedRoomId] ?? defaultBrowserStatus;
+  const activeBrowserUrl = activeBrowserUrlsByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const gitStatus = gitStatusByRoom[selectedRoom?.id ?? selectedRoomId] ?? null;
   const gitWorkflowDraft = resolveGitWorkflowDraft(gitWorkflowDraftsByRoom, selectedRoom?.id ?? selectedRoomId);
   const gitWorkflowBusy = gitWorkflowBusyByRoom[selectedRoom?.id ?? selectedRoomId] ?? false;
@@ -1125,13 +1120,6 @@ export function App() {
     const room = roomsRef.current.find((item) => item.id === roomId);
     const currentProjectPath = room?.projectPath ?? defaultProjectPath;
     setProjectPathDraftsByRoom((current) => projectPath === currentProjectPath ? omitRecordKey(current, roomId) : { ...current, [roomId]: projectPath });
-  }
-
-  function setBrowserAllowedOriginsDraftForRoom(roomId: string, draftValue: string) {
-    const room = roomsRef.current.find((item) => item.id === roomId);
-    const currentOrigins = room?.browserAllowedOrigins ?? defaultBrowserAllowedOrigins;
-    const currentDraft = currentOrigins.join("\n");
-    setBrowserAllowedOriginsDraftsByRoom((current) => draftValue === currentDraft ? omitRecordKey(current, roomId) : { ...current, [roomId]: draftValue });
   }
 
   function setFileQueryForRoom(roomId: string, query: string) {
@@ -1554,7 +1542,6 @@ export function App() {
     setTeamHistorySettings(loadTeamHistorySettings(selectedTeam));
     setTeamDefaultApprovalPolicy(teamRoomDefaults.approvalPolicy);
     setTeamDefaultCodexModel(teamRoomDefaults.codexModel);
-    setTeamDefaultBrowserAllowedOriginsDraft(teamRoomDefaults.browserAllowedOrigins.join("\n"));
     setTeamDefaultBrowserProfilePersistent(teamRoomDefaults.browserProfilePersistent);
     setTeamDefaultInviteApprovalGate(teamRoomDefaults.inviteApprovalGate);
   }, [selectedTeam]);
@@ -2207,12 +2194,6 @@ export function App() {
     if (!hasSelectedRoom) return;
     setCustomCodexModelsByRoom((current) => current[selectedRoom.id] === selectedCodexModel ? omitRecordKey(current, selectedRoom.id) : current);
   }, [hasSelectedRoom, selectedCodexModel, selectedRoom.id]);
-
-  useEffect(() => {
-    if (!hasSelectedRoom) return;
-    const currentDraft = selectedBrowserAllowedOrigins.join("\n");
-    setBrowserAllowedOriginsDraftsByRoom((current) => current[selectedRoom.id] === currentDraft ? omitRecordKey(current, selectedRoom.id) : current);
-  }, [hasSelectedRoom, selectedBrowserAllowedOrigins, selectedRoom.id]);
 
   useEffect(() => {
     if (!hasSelectedRoom) return;
@@ -3167,59 +3148,6 @@ export function App() {
     }
   }
 
-  async function saveBrowserAllowedOrigins() {
-    if (!hasSelectedRoom) {
-      setSelectedBrowserMessage("Create or join a room before changing browser site permissions.");
-      return;
-    }
-    if (isSelectedRoomLocked) {
-      setSelectedBrowserMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedBrowserMessage(roomSettingsGateMessage);
-      return;
-    }
-    const normalized = normalizeBrowserAllowedOrigins(browserAllowedOriginsDraft);
-    if (!normalized) {
-      setSelectedBrowserMessage("Use one http(s) origin per line, such as https://github.com.");
-      return;
-    }
-    const roomId = selectedRoom.id;
-    if (reportRoomSettingsMutationInFlight(roomId, setBrowserMessageForRoom)) return;
-    setSettingsBusyForRoom(roomId, true);
-    setBrowserMessageForRoom(roomId, null);
-    try {
-      const previousOrigins = selectedRoom.browserAllowedOrigins ?? [];
-      const room = await updateRoomSettings(roomId, {
-        ...roomSettingsActor(),
-        browserAllowedOrigins: normalized
-      });
-      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
-      await publishRoomSettingsEvent(room, {
-        id: crypto.randomUUID(),
-        setting: "browserAllowedOrigins",
-        previousValue: previousOrigins.join(","),
-        nextValue: normalized.join(","),
-        changedAt: new Date().toISOString()
-      });
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setBrowserAllowedOriginsDraftForRoom(roomId, normalized.join("\n"));
-        setBrowserMessageForRoom(
-          roomId,
-          normalized.length
-            ? `Allowed browser sites saved: ${normalized.map(formatBrowserAccessLabel).join(", ")}.`
-            : "Allowed browser site list is empty. Browser requests will require manual approval."
-        );
-      }
-      resetCodexApprovalForRoom(roomId);
-    } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessageForRoom(roomId, String(error));
-    } finally {
-      setSettingsBusyForRoom(roomId, false);
-    }
-  }
-
   async function setBrowserProfilePersistence(browserProfilePersistent: boolean) {
     if (!hasSelectedRoom) {
       setSelectedBrowserMessage("Create or join a room before changing browser profile persistence.");
@@ -3423,7 +3351,6 @@ export function App() {
     });
     setTeamDefaultApprovalPolicy(saved.approvalPolicy);
     setTeamDefaultCodexModel(saved.codexModel);
-    setTeamDefaultBrowserAllowedOriginsDraft(saved.browserAllowedOrigins.join("\n"));
     setTeamDefaultBrowserProfilePersistent(saved.browserProfilePersistent);
     setTeamDefaultInviteApprovalGate(saved.inviteApprovalGate);
     setTeamHistoryMessageForTeam(
@@ -3443,40 +3370,11 @@ export function App() {
     });
     setTeamDefaultApprovalPolicy(saved.approvalPolicy);
     setTeamDefaultCodexModel(saved.codexModel);
-    setTeamDefaultBrowserAllowedOriginsDraft(saved.browserAllowedOrigins.join("\n"));
     setTeamDefaultBrowserProfilePersistent(saved.browserProfilePersistent);
     setTeamDefaultInviteApprovalGate(saved.inviteApprovalGate);
     setTeamHistoryMessageForTeam(
       selectedTeam,
       `New rooms in this team will default to ${formatCodexModel(saved.codexModel)}.`
-    );
-  }
-
-  function saveTeamDefaultBrowserPolicy() {
-    if (!selectedTeam) {
-      setSelectedTeamHistoryMessage("Create or select a team before changing team defaults.");
-      return;
-    }
-    const browserAllowedOrigins = normalizeBrowserAllowedOrigins(teamDefaultBrowserAllowedOriginsDraft);
-    if (!browserAllowedOrigins) {
-      setSelectedTeamHistoryMessage("Use one http(s) browser origin per line for new rooms, such as https://github.com.");
-      return;
-    }
-    const saved = saveTeamRoomDefaults(selectedTeam, {
-      ...loadTeamRoomDefaults(selectedTeam),
-      browserAllowedOrigins,
-      browserProfilePersistent: teamDefaultBrowserProfilePersistent
-    });
-    setTeamDefaultApprovalPolicy(saved.approvalPolicy);
-    setTeamDefaultCodexModel(saved.codexModel);
-    setTeamDefaultBrowserAllowedOriginsDraft(saved.browserAllowedOrigins.join("\n"));
-    setTeamDefaultBrowserProfilePersistent(saved.browserProfilePersistent);
-    setTeamDefaultInviteApprovalGate(saved.inviteApprovalGate);
-    setTeamHistoryMessageForTeam(
-      selectedTeam,
-      saved.browserAllowedOrigins.length
-        ? `New rooms will allow ${saved.browserAllowedOrigins.map(formatBrowserAccessLabel).join(", ")} by default.`
-        : "New rooms will start with an empty browser allowlist."
     );
   }
 
@@ -3491,7 +3389,6 @@ export function App() {
     });
     setTeamDefaultApprovalPolicy(saved.approvalPolicy);
     setTeamDefaultCodexModel(saved.codexModel);
-    setTeamDefaultBrowserAllowedOriginsDraft(saved.browserAllowedOrigins.join("\n"));
     setTeamDefaultBrowserProfilePersistent(saved.browserProfilePersistent);
     setTeamDefaultInviteApprovalGate(saved.inviteApprovalGate);
     setTeamHistoryMessageForTeam(
@@ -3533,9 +3430,9 @@ export function App() {
         ...roomSettings
       });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
-      setBrowserAllowedOriginsDraftForRoom(roomId, roomSettings.browserAllowedOrigins.join("\n"));
       if (!roomSettings.browserProfilePersistent) {
         setBrowserStatusByRoom((current) => omitRecordKey(current, roomId));
+        setActiveBrowserUrlsByRoom((current) => omitRecordKey(current, roomId));
       }
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setHistoryMessageForRoom(roomId, "Applied team defaults to this room.");
@@ -3602,12 +3499,12 @@ export function App() {
     setSettingsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setProjectPathDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setBrowserAllowedOriginsDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setKeyRotationBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setApprovalVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setPendingCodexApprovalsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setCodexRunningByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setActiveBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setFileQueriesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setProjectFilesByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -3696,12 +3593,12 @@ export function App() {
     setSettingsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setProjectPathDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setBrowserAllowedOriginsDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setKeyRotationBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setApprovalVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setPendingCodexApprovalsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setCodexRunningByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
+    setActiveBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setFileQueriesByRoom((current) => omitRecordKey(current, selectedRoom.id));
     setProjectFilesByRoom((current) => omitRecordKey(current, selectedRoom.id));
@@ -4921,36 +4818,7 @@ export function App() {
       return;
     }
     setBrowserMessageForRoom(room.id, null);
-    try {
-      const result = await openBrowserView(
-        room.id,
-        room.projectPath,
-        roomRequest.url,
-        `${room.name} - ${formatBrowserAccessLabel(roomRequest.url)}`,
-        room.browserProfilePersistent
-      );
-      setBrowserStatusByRoom((current) => ({
-        ...current,
-        [room.id]: {
-          profilePath: result.profilePath,
-          downloadsBlocked: result.downloadsBlocked,
-          clipboardBlocked: result.clipboardBlocked,
-          fileUploadsBlocked: result.fileUploadsBlocked
-        }
-      }));
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
-        setBrowserMessageForRoom(
-          room.id,
-          result.reused
-            ? `Reused isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
-            : room.browserProfilePersistent
-              ? `Opened isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
-              : `Opened fresh isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
-        );
-      }
-    } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setBrowserMessageForRoom(room.id, String(error));
-    }
+    openEmbeddedRoomBrowser(room, roomRequest.url);
   }
 
   async function openRoomBrowserNow() {
@@ -4995,35 +4863,23 @@ export function App() {
       request
     );
     setBrowserMessageForRoom(room.id, null);
-    try {
-      const result = await openBrowserView(
-        room.id,
-        room.projectPath,
-        request.url,
-        `${room.name} - ${formatBrowserAccessLabel(request.url)}`,
-        room.browserProfilePersistent
-      );
-      setBrowserStatusByRoom((current) => ({
-        ...current,
-        [room.id]: {
-          profilePath: result.profilePath,
-          downloadsBlocked: result.downloadsBlocked,
-          clipboardBlocked: result.clipboardBlocked,
-          fileUploadsBlocked: result.fileUploadsBlocked
-        }
-      }));
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
-        setBrowserMessageForRoom(
-          room.id,
-          result.reused
-            ? `Reused isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
-            : room.browserProfilePersistent
-              ? `Opened isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
-              : `Opened fresh isolated room browser for ${formatBrowserAccessLabel(result.url)}.`
-        );
+    openEmbeddedRoomBrowser(room, request.url);
+  }
+
+  function openEmbeddedRoomBrowser(room: RoomRecord, url: string) {
+    setActiveBrowserUrlsByRoom((current) => ({ ...current, [room.id]: url }));
+    setBrowserStatusByRoom((current) => ({
+      ...current,
+      [room.id]: {
+        profilePath: "Embedded in this room",
+        downloadsBlocked: false,
+        clipboardBlocked: false,
+        fileUploadsBlocked: false
       }
-    } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setBrowserMessageForRoom(room.id, String(error));
+    }));
+    if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
+      setBrowserMessageForRoom(room.id, `Opened in-room browser for ${formatBrowserAccessLabel(url)}.`);
+      setInspectorTabsByRoom((current) => ({ ...current, [room.id]: "browser" }));
     }
   }
 
@@ -5051,6 +4907,7 @@ export function App() {
           profilePath: result.profilePath
         }
       }));
+      setActiveBrowserUrlsByRoom((current) => omitRecordKey(current, room.id));
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
         setBrowserMessageForRoom(room.id, "Reset isolated room browser state. The next approved page opens with a fresh profile.");
       }
@@ -6054,7 +5911,6 @@ export function App() {
               defaultCodexModel={defaultCodexModel}
               codexModelOptions={codexModelOptions}
               teamDefaultBrowserProfilePersistent={teamDefaultBrowserProfilePersistent}
-              teamDefaultBrowserAllowedOriginsDraft={teamDefaultBrowserAllowedOriginsDraft}
               teamDefaultInviteApprovalGate={teamDefaultInviteApprovalGate}
               message={appConfigMessage ?? settingsMessage ?? visibleHistoryMessage}
               onChooseProject={chooseProjectPath}
@@ -6092,8 +5948,6 @@ export function App() {
               onTeamDefaultApprovalPolicyChange={updateTeamDefaultApprovalPolicy}
               onTeamDefaultCodexModelChange={updateTeamDefaultCodexModel}
               onTeamDefaultBrowserProfilePersistentChange={setTeamDefaultBrowserProfilePersistent}
-              onTeamDefaultBrowserAllowedOriginsDraftChange={setTeamDefaultBrowserAllowedOriginsDraft}
-              onSaveTeamDefaultBrowserPolicy={saveTeamDefaultBrowserPolicy}
               onTeamDefaultInviteApprovalGateChange={updateTeamDefaultInviteApprovalGate}
               onApplyTeamDefaultsToRoom={applyTeamDefaultsToRoom}
             />
@@ -6245,13 +6099,12 @@ export function App() {
         activeTab={inspectorTab}
         browserPanel={(
           <BrowserAccessPanel
-            hidden={false}
+            hidden={inspectorTab !== "browser"}
             browserEnabled={selectedRoom.mode.browser}
             browserStatus={browserStatus}
             browserProfilePersistent={selectedRoom.browserProfilePersistent}
             browserProfileDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
-            browserAllowedOriginsDraft={browserAllowedOriginsDraft}
-            browserAllowedOriginsDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || settingsBusy}
+            activeBrowserUrl={activeBrowserUrl}
             browserUrl={browserUrl}
             browserReason={browserReason}
             canRequestBrowser={canRequestBrowser}
@@ -6262,8 +6115,6 @@ export function App() {
             detectBrowserSecretRisks={detectBrowserSecretRisks}
             onResetBrowserProfile={resetRoomBrowserProfile}
             onBrowserProfilePersistenceChange={setBrowserProfilePersistence}
-            onBrowserAllowedOriginsDraftChange={(draft) => setBrowserAllowedOriginsDraftForRoom(selectedRoom.id, draft)}
-            onSaveBrowserAllowedOrigins={saveBrowserAllowedOrigins}
             onBrowserUrlChange={(url) => setBrowserUrlForRoom(selectedRoom.id, url)}
             onBrowserReasonChange={(reason) => setBrowserReasonForRoom(selectedRoom.id, reason)}
             onOpenBrowserNow={openRoomBrowserNow}
@@ -6374,7 +6225,6 @@ export function App() {
           defaultCodexModel={defaultCodexModel}
           codexModelOptions={codexModelOptions}
           teamDefaultBrowserProfilePersistent={teamDefaultBrowserProfilePersistent}
-          teamDefaultBrowserAllowedOriginsDraft={teamDefaultBrowserAllowedOriginsDraft}
           teamDefaultInviteApprovalGate={teamDefaultInviteApprovalGate}
           message={visibleHistoryMessage}
           onHistoryEnabledChange={(enabled) =>
@@ -6407,8 +6257,6 @@ export function App() {
           onTeamDefaultApprovalPolicyChange={updateTeamDefaultApprovalPolicy}
           onTeamDefaultCodexModelChange={updateTeamDefaultCodexModel}
           onTeamDefaultBrowserProfilePersistentChange={setTeamDefaultBrowserProfilePersistent}
-          onTeamDefaultBrowserAllowedOriginsDraftChange={setTeamDefaultBrowserAllowedOriginsDraft}
-          onSaveTeamDefaultBrowserPolicy={saveTeamDefaultBrowserPolicy}
           onTeamDefaultInviteApprovalGateChange={updateTeamDefaultInviteApprovalGate}
         />
 
