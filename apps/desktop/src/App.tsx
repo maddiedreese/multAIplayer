@@ -137,8 +137,8 @@ import { useGitWorkflowActions } from "./hooks/useGitWorkflowActions";
 import { useChatActions } from "./hooks/useChatActions";
 import { useCodexInvokeActions } from "./hooks/useCodexInvokeActions";
 import { useCodexTurnActions } from "./hooks/useCodexTurnActions";
+import { useRoomVisibilityWarningActions } from "./hooks/useRoomVisibilityWarningActions";
 import {
-  acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
 import { InlineSecretWarning } from "./components/common";
@@ -721,6 +721,11 @@ export function App() {
     secretWarningsVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ??
     !hasAcknowledgedRoomVisibilityWarning(selectedRoom?.id ?? selectedRoomId)
   );
+  const { acknowledgeRoomVisibilityWarning } = useRoomVisibilityWarningActions({
+    hasSelectedRoom,
+    selectedRoomId: selectedRoom.id,
+    setSecretWarningVisibleForRoom
+  });
   const {
     isActiveHost,
     isSelectedRoomForgotten,
@@ -1714,14 +1719,6 @@ export function App() {
       requesterUserId: localUser.id
     };
   }
-  function acknowledgeRoomVisibilityWarning() {
-    if (!hasSelectedRoom) {
-      return;
-    }
-    saveRoomVisibilityWarningAcknowledgement(selectedRoom.id);
-    setSecretWarningVisibleForRoom(selectedRoom.id, false);
-  }
-
   return (
     <div
       className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${inspectorCollapsed ? "inspector-collapsed" : ""}`}
