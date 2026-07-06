@@ -8,6 +8,12 @@ export interface CodexModelOptionDisplay {
   label: string;
 }
 
+const selectableApprovalPolicies: ApprovalPolicy[] = [
+  "ask_every_turn",
+  "auto_chat_only",
+  "never_host"
+];
+
 export function RoomSettingsDrawerPanel({
   relaySummary,
   relayApi,
@@ -244,7 +250,7 @@ export function RoomSettingsDrawerPanel({
             disabled={!selectedTeam}
             onChange={(event) => onTeamDefaultApprovalPolicyChange(event.target.value as ApprovalPolicy)}
           >
-            {(Object.keys(approvalPolicyLabels) as ApprovalPolicy[]).map((policy) => (
+            {selectableApprovalPolicies.map((policy) => (
               <option key={policy} value={policy}>{approvalPolicyLabels[policy]}</option>
             ))}
           </select>

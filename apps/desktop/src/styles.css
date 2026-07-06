@@ -1595,17 +1595,6 @@ button:disabled {
   gap: 6px;
 }
 
-.browser-allowlist {
-  display: grid;
-  gap: 7px;
-}
-
-.browser-allowlist textarea {
-  min-height: 54px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
-}
-
 .browser-panel input:disabled,
 .browser-panel textarea:disabled {
   background: #f0f2ef;
@@ -4539,20 +4528,6 @@ select {
   width: 100%;
 }
 
-.browser-allowlist {
-  display: grid;
-  gap: 8px;
-}
-
-.browser-allowlist label {
-  display: grid;
-  gap: 6px;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 560;
-}
-
-.browser-allowlist textarea,
 .browser-panel textarea,
 .invite-panel textarea {
   width: 100%;
@@ -4953,10 +4928,6 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.browser-allowlist textarea {
-  display: block;
 }
 
 .member-list {

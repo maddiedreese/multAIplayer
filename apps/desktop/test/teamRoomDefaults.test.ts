@@ -130,7 +130,7 @@ test("team room defaults sanitize browser policy", () => {
     browserAllowedOrigins: ["https://github.com/path"],
     browserProfilePersistent: "yes" as never
   }), {
-    approvalPolicy: "auto_browser_allowed_sites",
+    approvalPolicy: "ask_every_turn",
     codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
@@ -144,7 +144,7 @@ test("team room defaults sanitize browser policy", () => {
     browserProfilePersistent: false,
     inviteApprovalGate: true
   }), {
-    approvalPolicy: "auto_browser_allowed_sites",
+    approvalPolicy: "ask_every_turn",
     codexModel: "gpt-5.4-mini",
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: false,
@@ -170,7 +170,7 @@ test("team room defaults sanitize invite policy", () => {
 
 test("team defaults room settings include only host-controlled room settings", () => {
   const defaults = {
-    approvalPolicy: "auto_browser_allowed_sites" as const,
+    approvalPolicy: "ask_every_turn" as const,
     codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: ["https://github.com", "https://example.com"],
     browserProfilePersistent: false,
@@ -179,7 +179,7 @@ test("team defaults room settings include only host-controlled room settings", (
   const settings = teamDefaultsRoomSettings(defaults);
 
   assert.deepEqual(settings, {
-    approvalPolicy: "auto_browser_allowed_sites",
+    approvalPolicy: "ask_every_turn",
     codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: ["https://github.com", "https://example.com"],
     browserProfilePersistent: false

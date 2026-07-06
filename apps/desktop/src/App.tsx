@@ -213,8 +213,7 @@ import {
   canRequestBrowserAccess,
   findRoomBrowserRequest,
   normalizeBrowserAllowedOrigins,
-  roomBrowserRequestMessage,
-  shouldAutoApproveBrowserRequest
+  roomBrowserRequestMessage
 } from "./lib/browserPolicy";
 import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
@@ -554,7 +553,7 @@ const initialMessagesByRoom: Record<string, ChatMessage[]> = {
 const approvalPolicyLabels: Record<ApprovalPolicy, string> = {
   ask_every_turn: "Ask every Codex turn",
   auto_chat_only: "Auto-approve chat-only turns",
-  auto_browser_allowed_sites: "Auto-approve allowed browser sites",
+  auto_browser_allowed_sites: "Legacy browser auto-approval",
   never_host: "Never host this room"
 };
 
@@ -1851,14 +1850,7 @@ export function App() {
           if (message.envelope.kind === "browser.request") {
             const plaintext = await decryptJson<BrowserRequestPlaintextPayload>(roomPayload, secret);
             const envelopeRoom = roomsRef.current.find((room) => room.id === message.envelope.roomId);
-            const status =
-              envelopeRoom && shouldAutoApproveBrowserRequest(
-                plaintext.url,
-                envelopeRoom,
-                isLocalUserActiveHostForRoom(envelopeRoom, localUser)
-              )
-                ? "approved"
-                : "pending";
+            const status = "pending";
             setBrowserRequestsByRoom((current) => {
               const roomRequests = current[message.envelope.roomId] ?? [];
               if (roomRequests.some((existing) => existing.id === plaintext.id)) return current;
@@ -1867,14 +1859,6 @@ export function App() {
                 [message.envelope.roomId]: [...roomRequests, { ...plaintext, status }]
               };
             });
-            if (status === "approved" && envelopeRoom) {
-              publishRequestStatus("browser.event", plaintext.id, "approved", envelopeRoom).catch((error) => {
-                if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, envelopeRoom.id)) setBrowserMessageForRoom(envelopeRoom.id, String(error));
-              });
-              if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, envelopeRoom.id)) {
-                setBrowserMessageForRoom(envelopeRoom.id, `Auto-approved allowed browser site ${formatBrowserAccessLabel(plaintext.url)}.`);
-              }
-            }
           }
           if (message.envelope.kind === "browser.event") {
             const plaintext = await decryptJson<RequestStatusPlaintextPayload>(roomPayload, secret);
@@ -4909,7 +4893,6 @@ export function App() {
       return;
     }
 
-    const autoApproved = shouldAutoApproveBrowserRequest(parsedUrl.toString(), room, activeHost);
     const request: BrowserAccessRequest = {
       id: crypto.randomUUID(),
       requester: localUser.name,
@@ -4917,7 +4900,7 @@ export function App() {
       url: parsedUrl.toString(),
       reason: browserReason.trim() || "No reason provided.",
       requestedAt: new Date().toISOString(),
-      status: autoApproved ? "approved" : "pending"
+      status: "pending"
     };
 
     const client = relayRef.current;
@@ -4926,9 +4909,7 @@ export function App() {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setBrowserMessageForRoom(
           roomId,
-          autoApproved
-            ? `Auto-approved allowed browser site ${formatBrowserAccessLabel(request.url)} locally because the relay is not connected.`
-            : "Saved browser request locally because the relay is not connected."
+          "Saved browser request locally because the relay is not connected."
         );
       }
       return;
@@ -4957,15 +4938,10 @@ export function App() {
       seenEnvelopeIds.current.add(envelope.id);
       client.publish({ type: "publish", envelope });
       appendBrowserRequest(room.id, request);
-      if (autoApproved) {
-        await publishRequestStatus("browser.event", request.id, "approved", room);
-      }
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setBrowserMessageForRoom(
           roomId,
-          autoApproved
-            ? `Auto-approved allowed browser site ${formatBrowserAccessLabel(request.url)}.`
-            : `Requested browser access to ${formatBrowserAccessLabel(request.url)}.`
+          `Requested browser access to ${formatBrowserAccessLabel(request.url)}.`
         );
       }
     } catch (error) {
@@ -7272,7 +7248,7 @@ function buildRoomSettingsMessageBody(event: RoomSettingsPlaintextPayload): stri
     case "projectPath":
       return `${event.changedBy} changed the project folder from ${event.previousValue} to ${event.nextValue}.`;
     case "browserAllowedOrigins":
-      return `${event.changedBy} changed allowed browser sites from ${formatOriginList(event.previousValue)} to ${formatOriginList(event.nextValue)}.`;
+      return `${event.changedBy} changed legacy browser origin metadata from ${formatOriginList(event.previousValue)} to ${formatOriginList(event.nextValue)}.`;
     case "browserProfilePersistent":
       return `${event.changedBy} changed browser profile mode from ${formatBrowserProfilePersistence(event.previousValue)} to ${formatBrowserProfilePersistence(event.nextValue)}.`;
   }

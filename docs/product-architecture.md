@@ -83,7 +83,7 @@ The relay bounds metadata before storage and broadcast: team names, room names, 
 
 The desktop client mirrors those bounds before creating teams/rooms, changing project paths or model ids, and accepting host handoff settings, so most invalid metadata is caught locally before it reaches the relay.
 
-When the active host changes approval policy, room mode, Codex model, project path, browser allowlist, or browser profile persistence, the relay metadata updates for routing/sidebar freshness and the desktop also sends an encrypted `room.settings` activity event. Room members see a system transcript message after local decryption, while the relay cannot read the human-readable before/after activity text.
+When the active host changes approval policy, room mode, Codex model, project path, or browser profile persistence, the relay metadata updates for routing/sidebar freshness and the desktop also sends an encrypted `room.settings` activity event. Room members see a system transcript message after local decryption, while the relay cannot read the human-readable before/after activity text.
 
 ### Active Codex Host
 
@@ -159,7 +159,6 @@ Initial room approval presets:
 
 - Ask every Codex turn.
 - Auto-approve chat-only turns.
-- Auto-approve browser on allowed sites.
 - Never host this room.
 
 Approval policies are host-side. They do not grant other users access to the host's Codex credentials, project files, browser state, or shell.
@@ -190,13 +189,11 @@ The macOS alpha bounds approved one-shot terminal commands, persistent terminal 
 
 ### Browser Requests
 
-Browser mode is room-scoped. Members request specific URLs with a short reason, and those requests are routed as encrypted room events. The host approves or denies each URL before it appears in the Codex turn context. Auto-approval for allowed browser sites is evaluated against the request's room, host, approval policy, and origin allowlist, never against whichever room happens to be selected in the app.
+Browser mode is room-scoped. The active host can open a normal in-app browser column for the room, and Codex can ask to open a URL such as localhost in that same column. Browser URLs and signed-in pages are treated as host-visible room context, so Codex browser use stays behind the host approval boundary.
 
 Browser access requests require an unlocked browser-enabled room. Browser approvals, denials, isolated browser opens, and browser profile resets require the current device to be the active host for that unlocked browser-enabled room.
 
-The relay can see that a `browser.request` or `browser.event` envelope exists, but not the requested URL, reason, or decision details. Browser approval and denial decisions render as local system transcript messages after decryption, so room members can see the host-side browser audit trail without exposing it to the relay. Approved URLs can be opened in a room/project-scoped Tauri WebView window on the host machine. Browser profile persistence is a host-controlled room setting: profiles persist by default, hosts can reset them manually, and refresh mode closes and clears the room/project browser profile before each approved open. The alpha keeps this as an explicit host action; deeper browser automation can be added behind the same approval boundary.
-
-Auto-approve browser on allowed sites is intentionally conservative. It only applies for the active host, only when the URL origin is on the room allowlist, and it refuses URLs that look like signed-in account, token, billing, security, or credential pages. Those pages fall back to manual host review and show inline warnings.
+The relay can see that a `browser.request` or `browser.event` envelope exists, but not the requested URL, reason, or decision details. Browser approval and denial decisions render as local system transcript messages after decryption, so room members can see the host-side browser audit trail without exposing it to the relay. Approved URLs can be opened in a room/project-scoped Tauri WebView surface on the host machine. Browser profile persistence is a host-controlled room setting: profiles persist by default, hosts can reset them manually, and refresh mode closes and clears the room/project browser profile before each approved open. The alpha keeps this as an explicit host action; deeper browser automation can be added behind the same approval boundary.
 
 ### GitHub And Git
 
@@ -341,7 +338,6 @@ Security model:
 - no access to the user's normal Chrome profile, cookies, passwords, extensions, or tabs;
 - browser engine behavior follows the host platform WebView; the security boundary is room/project profile isolation plus host approvals and native guards, not a separate consumer-browser account container;
 - explicit host approval before Codex can use a site;
-- origin allowlist per room;
 - downloads are blocked by the native room browser download handler;
 - page Clipboard API calls are blocked by the native room browser guard script;
 - file inputs and file drag/drop are blocked by the native room browser guard script until a later host-approved upload flow is designed;
@@ -575,7 +571,6 @@ docs/
 ### Milestone 6: Isolated Browser
 
 - Per-room native WebView profile.
-- Site allowlist.
 - Browser approval flow.
 - Browser state persistence setting plus refresh/reset.
 

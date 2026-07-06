@@ -1,6 +1,12 @@
 import { Check, KeyRound, X } from "lucide-react";
 import type { ApprovalPolicy } from "@multaiplayer/protocol";
 
+const selectableApprovalPolicies: ApprovalPolicy[] = [
+  "ask_every_turn",
+  "auto_chat_only",
+  "never_host"
+];
+
 export interface HistorySettingsDisplay {
   enabled: boolean;
   retentionDays: number;
@@ -135,7 +141,7 @@ export function LocalHistoryPanel({
           disabled={!selectedTeam}
           onChange={(event) => onTeamDefaultApprovalPolicyChange(event.target.value as ApprovalPolicy)}
         >
-          {(Object.keys(approvalPolicyLabels) as ApprovalPolicy[]).map((policy) => (
+          {selectableApprovalPolicies.map((policy) => (
             <option key={policy} value={policy}>{approvalPolicyLabels[policy]}</option>
           ))}
         </select>
