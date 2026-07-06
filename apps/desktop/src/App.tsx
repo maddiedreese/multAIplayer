@@ -143,24 +143,13 @@ import {
 } from "./lib/roomVisibilityWarning";
 import { InlineSecretWarning } from "./components/common";
 import { ShellResizer, SidebarDrawer } from "./components/AppShellLayout";
-import { ModelPanel } from "./components/ModelPanel";
-import { RoomModePanel } from "./components/RoomModePanel";
-import { ApprovalPolicyPanel } from "./components/ApprovalPolicyPanel";
-import { HostHandoffPanel } from "./components/HostHandoffPanel";
-import { EncryptedInvitePanel } from "./components/EncryptedInvitePanel";
-import { LocalHistoryPanel } from "./components/LocalHistoryPanel";
 import { BrowserAccessPanel } from "./components/BrowserAccessPanel";
-import { WorkspaceFilesPanel } from "./components/WorkspaceFilesPanel";
-import { GitHubActionsPanel } from "./components/GitHubActionsPanel";
-import { GitHandoffPanel } from "./components/GitHandoffPanel";
-import { ProjectPanel } from "./components/ProjectPanel";
-import { RoomMembersPanel, TeamRosterPanel } from "./components/RosterPanels";
-import { TerminalPanel } from "./components/TerminalPanel";
 import { ProfileDrawerPanel } from "./components/ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./components/RoomSettingsDrawerPanel";
 import { DesktopSidebar } from "./components/DesktopSidebar";
 import { RoomMainColumn } from "./components/RoomMainColumn";
 import { RoomInspectorPanel, type InspectorTab } from "./components/RoomInspectorPanel";
+import { RoomInspectorWorkPanel } from "./components/RoomInspectorWorkPanel";
 import { LocalPreviewDialog } from "./components/LocalPreviewDialog";
 import type {
   BrowserAccessRequest,
@@ -2003,239 +1992,223 @@ export function App() {
           />
         )}
         workPanel={(
-          <>
-        <ProjectPanel
-          projectPath={selectedRoom.projectPath}
-          projectPathDraft={projectPathDraft}
-          branchLabel={gitStatus?.branch ?? "loading"}
-          disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-          attachDisabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost || !projectPathDraft.trim() || projectPathDraft.trim() === selectedRoom.projectPath}
-          onProjectPathDraftChange={(path) => setProjectPathDraftForRoom(selectedRoom.id, path)}
-          onChooseProjectPath={chooseProjectPath}
-          onUseDefaultProjectPath={() => setProjectPathDraftForRoom(selectedRoom.id, defaultProjectPath)}
-          onUpdateProjectPath={updateProjectPath}
-        />
-
-        <TeamRosterPanel
-          members={selectedTeamMemberRows}
-          hasSelectedTeam={Boolean(selectedTeam)}
-          busy={selectedTeamMembersBusy}
-          message={selectedTeamMembersMessage}
-          onPromote={(member) => changeTeamMemberRole(member, "admin")}
-          onDemote={(member) => changeTeamMemberRole(member, "member")}
-          onTransferOwnership={transferOwnershipToTeamMember}
-          onRemove={removeMemberFromTeam}
-        />
-
-        <RoomMembersPanel
-          members={roomMemberRows}
-          localDeviceId={deviceId}
-          message={deviceIdentityMessage}
-          onCopyFingerprint={(member) => copyRoomMemberDeviceFingerprint(member, member.trusted)}
-          onTrust={trustRoomMemberDevice}
-          onUntrust={untrustRoomMemberDevice}
-        />
-
-        <HostHandoffPanel
-          handoffs={hostHandoffs}
-          acceptDisabled={!hasSelectedRoom || isSelectedRoomLocked || hostBusy}
-          onAcceptHandoff={acceptHostHandoff}
-          formatModel={formatCodexModel}
-        />
-
-        <EncryptedInvitePanel
-          inviteApprovalGate={inviteApprovalGate}
-          copyDisabled={!canCopyRoomInvite}
-          inviteSecretInput={inviteSecretInput}
-          inviteRequests={inviteRequests}
-          localDeviceId={deviceId}
-          gateDisabled={!hasSelectedRoom || isSelectedRoomLocked}
-          importDisabled={!inviteSecretInput.trim()}
-          rotateDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || keyRotationBusy}
-          approvalDisabled={!hasSelectedRoom || isSelectedRoomLocked || !isActiveHost}
-          keyRotationBusy={keyRotationBusy}
-          inviteLink={inviteLink}
-          inviteMessage={inviteMessage}
-          onCopyInvite={copyInviteLink}
-          onInviteApprovalGateChange={(enabled) => setInviteApprovalGateForRoom(selectedRoom.id, enabled)}
-          onInviteSecretInputChange={setInviteSecretInput}
-          onImportInvite={joinInviteSecret}
-          onRotateRoomKey={rotateSelectedRoomKey}
-          onDecideInviteRequest={decideInviteJoinRequest}
-        />
-
-        <ApprovalPolicyPanel
-          selectedPolicy={selectedRoom.approvalPolicy}
-          labels={approvalPolicyLabels}
-          disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-          message={settingsMessage}
-          onSelectPolicy={setApprovalPolicy}
-        />
-
-        <RoomModePanel
-          mode={selectedRoom.mode}
-          labels={roomModeLabels}
-          disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-          onToggleMode={toggleRoomMode}
-        />
-
-        <ModelPanel
-          selectedModel={selectedCodexModel}
-          selectedModelLabel={formatCodexModel(selectedCodexModel)}
-          customModel={customCodexModel}
-          modelOptions={codexModelOptions}
-          disabled={!hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost}
-          canApplyCustomModel={Boolean(customCodexModel.trim()) && customCodexModel.trim() !== selectedCodexModel}
-          onSelectModel={setCodexModel}
-          onCustomModelChange={(model) => setCustomCodexModelForRoom(selectedRoom.id, model)}
-          onApplyCustomModel={() => setCodexModel(customCodexModel)}
-        />
-
-        <LocalHistoryPanel
-          historySettings={historySettings}
-          teamHistorySettings={teamHistorySettings}
-          selectedTeam={Boolean(selectedTeam)}
-          hasSelectedRoom={hasSelectedRoom}
-          settingsBusy={settingsBusy}
-          teamDefaultApprovalPolicy={teamDefaultApprovalPolicy}
-          approvalPolicyLabels={approvalPolicyLabels}
-          teamDefaultCodexModel={teamDefaultCodexModel}
-          defaultCodexModel={defaultCodexModel}
-          codexModelOptions={codexModelOptions}
-          teamDefaultBrowserProfilePersistent={teamDefaultBrowserProfilePersistent}
-          teamDefaultInviteApprovalGate={teamDefaultInviteApprovalGate}
-          message={visibleHistoryMessage}
-          onHistoryEnabledChange={(enabled) =>
-            updateLocalHistorySettings({
-              ...historySettings,
-              enabled
-            })
-          }
-          onHistoryRetentionDaysChange={(retentionDays) =>
-            updateLocalHistorySettings({
-              ...historySettings,
-              retentionDays
-            })
-          }
-          onClearRoomHistory={clearRoomHistory}
-          onForgetRoomLocalData={forgetSelectedRoomLocalData}
-          onApplyTeamDefaultsToRoom={applyTeamDefaultsToRoom}
-          onTeamHistoryEnabledChange={(enabled) =>
-            updateTeamHistoryDefaults({
-              ...teamHistorySettings,
-              enabled
-            })
-          }
-          onTeamHistoryRetentionDaysChange={(retentionDays) =>
-            updateTeamHistoryDefaults({
-              ...teamHistorySettings,
-              retentionDays
-            })
-          }
-          onTeamDefaultApprovalPolicyChange={updateTeamDefaultApprovalPolicy}
-          onTeamDefaultCodexModelChange={updateTeamDefaultCodexModel}
-          onTeamDefaultBrowserProfilePersistentChange={setTeamDefaultBrowserProfilePersistent}
-          onTeamDefaultInviteApprovalGateChange={updateTeamDefaultInviteApprovalGate}
-        />
-
-        <WorkspaceFilesPanel
-          fileQuery={fileQuery}
-          projectFiles={projectFiles}
-          selectedFile={selectedFile}
-          gitStatus={gitStatus}
-          selectedDiff={selectedDiff}
-          fileBusy={fileBusy}
-          fileMessage={fileMessage}
-          canReadLocalWorkspace={canReadLocalWorkspace}
-          canAttachSelectedFile={canStageRoomChatAttachment(selectedRoom, isSelectedRoomLocked)}
-          selectedFileRisks={selectedFileRisks}
-          selectedFileNeedsAttachmentReview={selectedFileNeedsAttachmentReview}
-          selectedSensitiveFileReviewed={selectedSensitiveFileReviewed}
-          selectedAttachmentActionLabel={selectedAttachmentReview?.actionLabel ?? "Attach"}
-          selectedAttachmentWarningDetail={selectedAttachmentReview?.warningDetail ?? undefined}
-          filePreviewTab={filePreviewTab}
-          formatBytes={formatBytes}
-          onCopyProjectMarkdown={copyProjectMarkdown}
-          onFileQueryChange={(query) => setFileQueryForRoom(selectedRoom.id, query)}
-          onOpenProjectFile={openProjectFile}
-          onCopyDiffSummaryMarkdown={copyDiffSummaryMarkdown}
-          onAttachSelectedFileToMessage={attachSelectedFileToMessage}
-          onFilePreviewTabChange={(tab) => setFilePreviewTabForRoom(selectedRoom.id, tab)}
-          onCloseFileViewer={() => {
-            setSelectedFileForRoom(selectedRoom.id, null);
-            setSelectedDiffForRoom(selectedRoom.id, null);
-            setSensitiveAttachmentReviewKey(null);
-          }}
-        />
-
-        <GitHandoffPanel
-          draft={gitWorkflowDraft}
-          preview={gitApprovalPreview}
-          readiness={githubWorkflowReadiness}
-          canReadLocalWorkspace={canReadLocalWorkspace}
-          gitWorkflowBusy={gitWorkflowBusy}
-          isActiveHost={isActiveHost}
-          message={gitWorkflowMessage}
-          onDraftChange={updateSelectedGitWorkflowDraft}
-          onCopyPullRequestDraftMarkdown={copyPullRequestDraftMarkdown}
-          onApproveGitWorkflow={approveGitWorkflow}
-        />
-
-        <GitHubActionsPanel
-          summary={actionsSummary}
-          readiness={githubActionsReadiness}
-          runs={actionRuns}
-          owner={gitWorkflowDraft.prOwner}
-          repo={gitWorkflowDraft.prRepo}
-          branch={gitWorkflowDraft.branchName}
-          lastChecked={actionsLastChecked}
-          busy={actionsBusy}
-          refreshDisabled={!canReadLocalWorkspace || actionsBusy || !isActiveHost || !githubActionsReadiness.ready}
-          currentUserSignedIn={Boolean(currentUser)}
-          message={actionsMessage}
-          formatTimestamp={formatTimestamp}
-          onRefresh={() => refreshGitHubActions()}
-        />
-
-        <TerminalPanel
-          terminalName={terminalName}
-          terminalCommand={terminalCommand}
-          terminalInput={terminalInput}
-          terminalBusy={terminalBusy}
-          terminalError={terminalError}
-          terminalCommandRisks={terminalCommandRisks}
-          terminalRisks={terminalRisks}
-          codexEvents={codexEventRows}
-          commandRequests={terminalRequestRows}
-          roomTerminals={roomTerminals}
-          selectedTerminal={selectedTerminal}
-          selectedTerminalId={selectedTerminalId}
-          selectedTerminalCanControl={selectedTerminalCanControl}
-          selectedTerminalCanRestart={selectedTerminalCanRestart}
-          terminalOutputLines={terminalOutputLines}
-          codexRunning={codexRunning}
-          canReadLocalWorkspace={canReadLocalWorkspace}
-          canRequestWorkspace={canRequestWorkspace}
-          canApproveTerminal={canReadLocalWorkspace && isActiveHost}
-          onCopyMarkdown={copyTerminalMarkdown}
-          onRunGitStatus={runApprovedTerminalCheck}
-          onOpenInteractiveTerminal={() => openInteractiveTerminal({ reuseExisting: false })}
-          onTerminalNameChange={(name) => setTerminalNameForRoom(selectedRoom.id, name)}
-          onTerminalCommandChange={(command) => setTerminalCommandForRoom(selectedRoom.id, command)}
-          onStartTerminal={startNamedTerminal}
-          onRequestTerminalCommand={requestTerminalCommand}
-          onApproveTerminalRequest={(requestId) => {
-            const request = terminalRequests.find((item) => item.id === requestId);
-            if (request) approveTerminalRequest(request);
-          }}
-          onDenyTerminalRequest={denyTerminalRequest}
-          onSelectTerminal={(terminalId) => setSelectedTerminalIdForRoom(selectedRoom.id, terminalId)}
-          onTerminalInputChange={(input) => setTerminalInputForRoom(selectedRoom.id, input)}
-          onSendTerminalInput={sendTerminalInput}
-          onRestartTerminal={restartSelectedTerminal}
-          onStopTerminal={stopSelectedTerminal}
-        />
-          </>
+          <RoomInspectorWorkPanel
+            project={{
+              projectPath: selectedRoom.projectPath,
+              projectPathDraft,
+              branchLabel: gitStatus?.branch ?? "loading",
+              disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
+              attachDisabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost || !projectPathDraft.trim() || projectPathDraft.trim() === selectedRoom.projectPath,
+              onProjectPathDraftChange: (path) => setProjectPathDraftForRoom(selectedRoom.id, path),
+              onChooseProjectPath: chooseProjectPath,
+              onUseDefaultProjectPath: () => setProjectPathDraftForRoom(selectedRoom.id, defaultProjectPath),
+              onUpdateProjectPath: updateProjectPath
+            }}
+            teamRoster={{
+              members: selectedTeamMemberRows,
+              hasSelectedTeam: Boolean(selectedTeam),
+              busy: selectedTeamMembersBusy,
+              message: selectedTeamMembersMessage,
+              onPromote: (member) => changeTeamMemberRole(member, "admin"),
+              onDemote: (member) => changeTeamMemberRole(member, "member"),
+              onTransferOwnership: transferOwnershipToTeamMember,
+              onRemove: removeMemberFromTeam
+            }}
+            roomMembers={{
+              members: roomMemberRows,
+              localDeviceId: deviceId,
+              message: deviceIdentityMessage,
+              onCopyFingerprint: (member) => copyRoomMemberDeviceFingerprint(member, member.trusted),
+              onTrust: trustRoomMemberDevice,
+              onUntrust: untrustRoomMemberDevice
+            }}
+            hostHandoff={{
+              handoffs: hostHandoffs,
+              acceptDisabled: !hasSelectedRoom || isSelectedRoomLocked || hostBusy,
+              onAcceptHandoff: acceptHostHandoff,
+              formatModel: formatCodexModel
+            }}
+            encryptedInvite={{
+              inviteApprovalGate,
+              copyDisabled: !canCopyRoomInvite,
+              inviteSecretInput,
+              inviteRequests,
+              localDeviceId: deviceId,
+              gateDisabled: !hasSelectedRoom || isSelectedRoomLocked,
+              importDisabled: !inviteSecretInput.trim(),
+              rotateDisabled: !hasSelectedRoom || isSelectedRoomLocked || !isActiveHost || keyRotationBusy,
+              approvalDisabled: !hasSelectedRoom || isSelectedRoomLocked || !isActiveHost,
+              keyRotationBusy,
+              inviteLink,
+              inviteMessage,
+              onCopyInvite: copyInviteLink,
+              onInviteApprovalGateChange: (enabled) => setInviteApprovalGateForRoom(selectedRoom.id, enabled),
+              onInviteSecretInputChange: setInviteSecretInput,
+              onImportInvite: joinInviteSecret,
+              onRotateRoomKey: rotateSelectedRoomKey,
+              onDecideInviteRequest: decideInviteJoinRequest
+            }}
+            approvalPolicy={{
+              selectedPolicy: selectedRoom.approvalPolicy,
+              labels: approvalPolicyLabels,
+              disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
+              message: settingsMessage,
+              onSelectPolicy: setApprovalPolicy
+            }}
+            roomMode={{
+              mode: selectedRoom.mode,
+              labels: roomModeLabels,
+              disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
+              onToggleMode: toggleRoomMode
+            }}
+            model={{
+              selectedModel: selectedCodexModel,
+              selectedModelLabel: formatCodexModel(selectedCodexModel),
+              customModel: customCodexModel,
+              modelOptions: codexModelOptions,
+              disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
+              canApplyCustomModel: Boolean(customCodexModel.trim()) && customCodexModel.trim() !== selectedCodexModel,
+              onSelectModel: setCodexModel,
+              onCustomModelChange: (model) => setCustomCodexModelForRoom(selectedRoom.id, model),
+              onApplyCustomModel: () => setCodexModel(customCodexModel)
+            }}
+            localHistory={{
+              historySettings,
+              teamHistorySettings,
+              selectedTeam: Boolean(selectedTeam),
+              hasSelectedRoom,
+              settingsBusy,
+              teamDefaultApprovalPolicy,
+              approvalPolicyLabels,
+              teamDefaultCodexModel,
+              defaultCodexModel,
+              codexModelOptions,
+              teamDefaultBrowserProfilePersistent,
+              teamDefaultInviteApprovalGate,
+              message: visibleHistoryMessage,
+              onHistoryEnabledChange: (enabled) =>
+                updateLocalHistorySettings({
+                  ...historySettings,
+                  enabled
+                }),
+              onHistoryRetentionDaysChange: (retentionDays) =>
+                updateLocalHistorySettings({
+                  ...historySettings,
+                  retentionDays
+                }),
+              onClearRoomHistory: clearRoomHistory,
+              onForgetRoomLocalData: forgetSelectedRoomLocalData,
+              onApplyTeamDefaultsToRoom: applyTeamDefaultsToRoom,
+              onTeamHistoryEnabledChange: (enabled) =>
+                updateTeamHistoryDefaults({
+                  ...teamHistorySettings,
+                  enabled
+                }),
+              onTeamHistoryRetentionDaysChange: (retentionDays) =>
+                updateTeamHistoryDefaults({
+                  ...teamHistorySettings,
+                  retentionDays
+                }),
+              onTeamDefaultApprovalPolicyChange: updateTeamDefaultApprovalPolicy,
+              onTeamDefaultCodexModelChange: updateTeamDefaultCodexModel,
+              onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent,
+              onTeamDefaultInviteApprovalGateChange: updateTeamDefaultInviteApprovalGate
+            }}
+            workspaceFiles={{
+              fileQuery,
+              projectFiles,
+              selectedFile,
+              gitStatus,
+              selectedDiff,
+              fileBusy,
+              fileMessage,
+              canReadLocalWorkspace,
+              canAttachSelectedFile: canStageRoomChatAttachment(selectedRoom, isSelectedRoomLocked),
+              selectedFileRisks,
+              selectedFileNeedsAttachmentReview,
+              selectedSensitiveFileReviewed,
+              selectedAttachmentActionLabel: selectedAttachmentReview?.actionLabel ?? "Attach",
+              selectedAttachmentWarningDetail: selectedAttachmentReview?.warningDetail ?? undefined,
+              filePreviewTab,
+              formatBytes,
+              onCopyProjectMarkdown: copyProjectMarkdown,
+              onFileQueryChange: (query) => setFileQueryForRoom(selectedRoom.id, query),
+              onOpenProjectFile: openProjectFile,
+              onCopyDiffSummaryMarkdown: copyDiffSummaryMarkdown,
+              onAttachSelectedFileToMessage: attachSelectedFileToMessage,
+              onFilePreviewTabChange: (tab) => setFilePreviewTabForRoom(selectedRoom.id, tab),
+              onCloseFileViewer: () => {
+                setSelectedFileForRoom(selectedRoom.id, null);
+                setSelectedDiffForRoom(selectedRoom.id, null);
+                setSensitiveAttachmentReviewKey(null);
+              }
+            }}
+            gitHandoff={{
+              draft: gitWorkflowDraft,
+              preview: gitApprovalPreview,
+              readiness: githubWorkflowReadiness,
+              canReadLocalWorkspace,
+              gitWorkflowBusy,
+              isActiveHost,
+              message: gitWorkflowMessage,
+              onDraftChange: updateSelectedGitWorkflowDraft,
+              onCopyPullRequestDraftMarkdown: copyPullRequestDraftMarkdown,
+              onApproveGitWorkflow: approveGitWorkflow
+            }}
+            githubActions={{
+              summary: actionsSummary,
+              readiness: githubActionsReadiness,
+              runs: actionRuns,
+              owner: gitWorkflowDraft.prOwner,
+              repo: gitWorkflowDraft.prRepo,
+              branch: gitWorkflowDraft.branchName,
+              lastChecked: actionsLastChecked,
+              busy: actionsBusy,
+              refreshDisabled: !canReadLocalWorkspace || actionsBusy || !isActiveHost || !githubActionsReadiness.ready,
+              currentUserSignedIn: Boolean(currentUser),
+              message: actionsMessage,
+              formatTimestamp,
+              onRefresh: () => refreshGitHubActions()
+            }}
+            terminal={{
+              terminalName,
+              terminalCommand,
+              terminalInput,
+              terminalBusy,
+              terminalError,
+              terminalCommandRisks,
+              terminalRisks,
+              codexEvents: codexEventRows,
+              commandRequests: terminalRequestRows,
+              roomTerminals,
+              selectedTerminal,
+              selectedTerminalId,
+              selectedTerminalCanControl,
+              selectedTerminalCanRestart,
+              terminalOutputLines,
+              codexRunning,
+              canReadLocalWorkspace,
+              canRequestWorkspace,
+              canApproveTerminal: canReadLocalWorkspace && isActiveHost,
+              onCopyMarkdown: copyTerminalMarkdown,
+              onRunGitStatus: runApprovedTerminalCheck,
+              onOpenInteractiveTerminal: () => openInteractiveTerminal({ reuseExisting: false }),
+              onTerminalNameChange: (name) => setTerminalNameForRoom(selectedRoom.id, name),
+              onTerminalCommandChange: (command) => setTerminalCommandForRoom(selectedRoom.id, command),
+              onStartTerminal: startNamedTerminal,
+              onRequestTerminalCommand: requestTerminalCommand,
+              onApproveTerminalRequest: (requestId) => {
+                const request = terminalRequests.find((item) => item.id === requestId);
+                if (request) approveTerminalRequest(request);
+              },
+              onDenyTerminalRequest: denyTerminalRequest,
+              onSelectTerminal: (terminalId) => setSelectedTerminalIdForRoom(selectedRoom.id, terminalId),
+              onTerminalInputChange: (input) => setTerminalInputForRoom(selectedRoom.id, input),
+              onSendTerminalInput: sendTerminalInput,
+              onRestartTerminal: restartSelectedTerminal,
+              onStopTerminal: stopSelectedTerminal
+            }}
+          />
         )}
       />
       {localPreviewDialog.open && (
