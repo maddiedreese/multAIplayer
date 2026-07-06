@@ -215,7 +215,6 @@ import {
   canHostBrowserAction,
   canRequestBrowserAccess,
   findRoomBrowserRequest,
-  normalizeBrowserAllowedOrigins,
   roomBrowserRequestMessage
 } from "./lib/browserPolicy";
 import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
@@ -252,6 +251,7 @@ import {
 } from "./lib/gitWorkflowDraft";
 import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "./lib/roomUnread";
 import { isRoomKeyRotationInFlight, roomKeyRotationInFlightMessage } from "./lib/roomKeyRotation";
+import { ensureRoomDefaults } from "./lib/roomDefaults";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import { roomPostureSummary } from "./lib/roomPosture";
 import { withoutSetValue } from "./lib/setUtils";
@@ -6622,24 +6622,6 @@ function loadThemeMode(): ThemeMode {
   const stored = localStorage.getItem("multaiplayer:theme");
   if (stored === "light" || stored === "dark") return stored;
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
-
-function ensureRoomDefaults(room: RoomRecord): RoomRecord {
-  return {
-    ...room,
-    name: normalizeRoomDisplayName(room.name),
-    codexModel: room.codexModel || defaultCodexModel,
-    browserAllowedOrigins: normalizeBrowserAllowedOrigins(room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins) ?? defaultBrowserAllowedOrigins,
-    browserProfilePersistent: typeof room.browserProfilePersistent === "boolean"
-      ? room.browserProfilePersistent
-      : defaultBrowserProfilePersistent
-  };
-}
-
-function normalizeRoomDisplayName(name: string): string {
-  if (name === "Relay + E2EE") return "Relay ops";
-  if (name === "Desktop client") return "Desktop app";
-  return name;
 }
 
 function roomLockMessage(room: RoomRecord, revoked: boolean): string {
