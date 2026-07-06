@@ -43,7 +43,7 @@ import { useAppRefs } from "./hooks/useAppRefs";
 import { useAppSelectedRoomContext } from "./hooks/useAppSelectedRoomContext";
 import { useAppViewModel } from "./hooks/useAppViewModel";
 import { useAppWorkspaceFlow } from "./hooks/useAppWorkspaceFlow";
-import { useRelaySyncContext } from "./hooks/useRelaySyncContext";
+import { useAppRelaySync } from "./hooks/useAppRelaySync";
 import { useRoomRuntimeContext } from "./hooks/useRoomRuntimeContext";
 import { useAppRoomPanelActions } from "./hooks/useAppRoomPanelActions";
 import { InlineSecretWarning } from "./components/common";
@@ -335,89 +335,18 @@ export function App() {
     roomSettingsActor
   });
 
-  const relaySync = useRelaySyncContext({
-    browserOpenCommand: {
-      localUser: localIdentity.localUser,
-      selectedRoomIdRef: appRefs.selectedRoomIdRef,
-      forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
-      revokedRoomIds: roomRuntimeState.revokedRoomIds,
-      revokedTeamIds: roomRuntimeState.revokedTeamIds,
-      appendBrowserRequest,
-      setBrowserMessageForRoom,
-      setBrowserUrlForRoom,
-      setActiveBrowserUrlsByRoom: browserPanelState.setActiveBrowserUrlsByRoom,
-      setBrowserStatusByRoom: browserPanelState.setBrowserStatusByRoom,
-      setInspectorTabsByRoom: roomRuntimeState.setInspectorTabsByRoom
-    },
-    relayRoomSync: {
-      subscription: {
-        relayWsUrl: appConfigState.appConfig.relayWsUrl,
-        deviceId: localIdentity.deviceId,
-        localUser: localIdentity.localUser,
-        devicePublicKeyFingerprint: appRuntimeState.deviceIdentity?.publicKeyFingerprint,
-        selectedTeam: workspaceState.selectedTeam,
-        selectedRoom,
-        hasSelectedRoom,
-        isActiveHost: roomInteraction.isActiveHost,
-        inviteAdmissionsByRoom: invitePanelState.inviteAdmissionsByRoom,
-        revokedRoomIds: roomRuntimeState.revokedRoomIds,
-        revokedTeamIds: roomRuntimeState.revokedTeamIds,
-        approvalPolicyLabels,
-        roomModeLabels,
-        relayRef: appRefs.relayRef,
-        seenEnvelopeIds: appRefs.seenEnvelopeIds,
-        roomsRef: appRefs.roomsRef,
-        selectedRoomIdRef: appRefs.selectedRoomIdRef,
-        historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
-        setRelayStatus: appRuntimeState.setRelayStatus,
-        setPresenceByRoom: roomRuntimeState.setPresenceByRoom,
-        setRooms: workspaceState.setRooms,
-        setMessagesByRoom: workspaceState.setMessagesByRoom,
-        setTerminalRequestsByRoom: terminalPanelState.setTerminalRequestsByRoom,
-        setBrowserRequestsByRoom: browserPanelState.setBrowserRequestsByRoom,
-        setActionRunsByRoom: githubWorkflowPanelState.setActionRunsByRoom,
-        setActionsLastCheckedByRoom: githubWorkflowPanelState.setActionsLastCheckedByRoom,
-        setActionsMessagesByRoom: githubWorkflowPanelState.setActionsMessagesByRoom,
-        setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
-        handleRelayError: workspaceRecords.handleRelayError,
-        upsertRoom: workspaceRecords.upsertRoom,
-        upsertTeam: workspaceRecords.upsertTeam,
-        refreshTeamMembers: roomDisplay.refreshTeamMembers,
-        decryptInviteEnvelope: inviteActions.decryptInviteEnvelope,
-        handleInviteEnvelopePlaintext: inviteActions.handleInviteEnvelopePlaintext,
-        applyMessageReaction: roomChatMutations.applyMessageReaction,
-        updateTerminalRequestStatus,
-        appendTerminalLinesForRoom,
-        appendGitWorkflowEvent,
-        setGitWorkflowMessageForRoom,
-        appendGitHubActionsEvent,
-        appendCodexEvent,
-        updateBrowserRequestStatus,
-        appendLocalPreviewEvent,
-        setChatMessageForRoom,
-        markHostHandoffAccepted: hostHandoffActions.markHostHandoffAccepted,
-        setHostMessageForRoom,
-        appendHostHandoff,
-        appendRoomMessage: roomChatMutations.appendRoomMessage,
-        setInviteMessageForRoom
-      },
-      publishers: {
-        relayRef: appRefs.relayRef,
-        seenEnvelopeIds: appRefs.seenEnvelopeIds,
-        relayStatus: appRuntimeState.relayStatus,
-        selectedRoom,
-        deviceId: localIdentity.deviceId,
-        localUser: localIdentity.localUser,
-        approvalPolicyLabels,
-        roomModeLabels,
-        appendLocalPreviewEvent,
-        appendGitWorkflowEvent,
-        appendCodexEvent,
-        appendTerminalLinesForRoom,
-        appendRoomMessage: roomChatMutations.appendRoomMessage,
-        appendGitHubActionsEvent
-      }
-    }
+  const relaySync = useAppRelaySync({
+    appState,
+    appRefs,
+    localIdentity,
+    selected: selectedContext,
+    roomInteraction,
+    roomSetters,
+    workspaceRecords,
+    roomDisplay,
+    inviteActions,
+    hostHandoffActions,
+    roomChatMutations
   });
   const roomRuntime = useRoomRuntimeContext({
     codexActions: {
