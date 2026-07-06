@@ -773,7 +773,7 @@ fn terminal_write(
     if !existing_is_running(session) {
         return Err(format!("Terminal {} is not running", session.name));
     }
-    writeln!(session.writer, "{}", request.input)
+    write!(session.writer, "{}", request.input)
         .map_err(|error| format!("Failed to write terminal input: {error}"))?;
     session
         .writer
@@ -783,7 +783,7 @@ fn terminal_write(
         &session.output,
         TerminalLine {
             stream: "stdin".to_string(),
-            text: request.input,
+            text: request.input.trim_end_matches('\n').to_string(),
         },
     );
     snapshot_terminal(&request.id, session)

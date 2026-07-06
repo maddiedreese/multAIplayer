@@ -1,4 +1,4 @@
-import { FileText, GitBranch, Globe2, Terminal, UsersRound } from "lucide-react";
+import { FileText, Globe2, Terminal, UsersRound } from "lucide-react";
 import type { ReactNode } from "react";
 
 export type InspectorTab = "files" | "diff" | "terminal" | "browser" | "room";
@@ -24,8 +24,7 @@ export function InspectorTabs({
     icon: ReactNode;
     count: number;
   }> = [
-    { id: "files", label: "files", icon: <FileText size={15} />, count: 0 },
-    { id: "diff", label: "diff", icon: <GitBranch size={15} />, count: diffAttentionCount },
+    { id: "files", label: "files", icon: <FileText size={15} />, count: diffAttentionCount },
     { id: "terminal", label: "terminal", icon: <Terminal size={15} />, count: terminalAttentionCount },
     { id: "browser", label: "browser", icon: <Globe2 size={15} />, count: browserAttentionCount },
     { id: "room", label: "room", icon: <UsersRound size={15} />, count: roomAttentionCount }

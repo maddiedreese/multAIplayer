@@ -1,4 +1,4 @@
-import { Check, Copy, MessageSquare, Play, Terminal, X } from "lucide-react";
+import { Check, Copy, MessageSquare, Plus, Play, Square, Terminal, X } from "lucide-react";
 import { useRef } from "react";
 import type { TerminalLine, TerminalSnapshot } from "../lib/localBackend";
 import { InlineSecretWarning } from "./common";
@@ -102,7 +102,7 @@ export function TerminalPanel({
         <span>Terminals</span>
         <div className="panel-title-actions">
           <button className="primary-tool" onClick={onOpenInteractiveTerminal} disabled={!canReadLocalWorkspace || terminalBusy || !canApproveTerminal}>
-            <Terminal size={14} /> Open terminal
+            <Plus size={14} /> New terminal
           </button>
           <button className="ghost" onClick={onCopyMarkdown} disabled={!canReadLocalWorkspace}>
             <Copy size={14} /> Markdown
@@ -113,19 +113,16 @@ export function TerminalPanel({
         </div>
       </div>
 
-      <div className="terminal-launcher">
-        <div className="tool-panel-hint">
-          Start a named foreground shell in this room's project folder, then type into it below.
-        </div>
+      <div className="terminal-launcher compact">
         <input
           value={terminalName}
           onChange={(event) => onTerminalNameChange(event.target.value)}
-          placeholder="name"
+          placeholder="terminal name"
         />
         <input
           value={terminalCommand}
           onChange={(event) => onTerminalCommandChange(event.target.value)}
-          placeholder="command"
+          placeholder="command to run or request"
         />
         <button
           onClick={onStartTerminal}
@@ -152,65 +149,58 @@ export function TerminalPanel({
         )}
       </div>
 
-      <div className="terminal-requests">
-        {codexEvents.map((event) => (
-          <div className={`terminal-request ${event.status === "failed" ? "denied" : event.status === "completed" ? "approved" : "pending"}`} key={event.key}>
-            <div>
-              <strong>{event.statusLabel}</strong>
-              <span>{event.message}</span>
-              <small>{event.detail}</small>
-            </div>
-            <small>{event.host}</small>
-          </div>
-        ))}
-        {codexEvents.length === 0 && (
-          <div className="empty-state compact">No Codex events in this room.</div>
-        )}
-      </div>
-
-      <div className="terminal-requests">
-        {commandRequests.map((request) => (
-          <div className={`terminal-request ${request.status}`} key={request.id}>
-            <div>
-              <strong>{request.command}</strong>
-              <span>{request.requester} · {request.cwd}</span>
-            </div>
-            <small>{request.status}</small>
-            {request.status === "pending" && (
+      {(codexEvents.length > 0 || commandRequests.length > 0) && (
+        <div className="terminal-requests">
+          {codexEvents.map((event) => (
+            <div className={`terminal-request ${event.status === "failed" ? "denied" : event.status === "completed" ? "approved" : "pending"}`} key={event.key}>
               <div>
-                <button
-                  onClick={() => onApproveTerminalRequest(request.id)}
-                  disabled={!canApproveTerminal || terminalBusy}
-                  title={`Approve ${request.command}`}
-                  aria-label={`Approve ${request.command}`}
-                >
-                  <Check size={13} />
-                </button>
-                <button
-                  onClick={() => onDenyTerminalRequest(request.id)}
-                  disabled={!canApproveTerminal || terminalBusy}
-                  title={`Deny ${request.command}`}
-                  aria-label={`Deny ${request.command}`}
-                >
-                  <X size={13} />
-                </button>
+                <strong>{event.statusLabel}</strong>
+                <span>{event.message}</span>
+                <small>{event.detail}</small>
               </div>
-            )}
-            {request.risks.length > 0 && (
-              <div className="terminal-request-warning">
-                <InlineSecretWarning
-                  risks={request.risks}
-                  detail="Review before approving this command on the host machine."
-                  compact
-                />
+              <small>{event.host}</small>
+            </div>
+          ))}
+          {commandRequests.map((request) => (
+            <div className={`terminal-request ${request.status}`} key={request.id}>
+              <div>
+                <strong>{request.command}</strong>
+                <span>{request.requester} · {request.cwd}</span>
               </div>
-            )}
-          </div>
-        ))}
-        {commandRequests.length === 0 && (
-          <div className="empty-state compact">No command requests in this room.</div>
-        )}
-      </div>
+              <small>{request.status}</small>
+              {request.status === "pending" && (
+                <div>
+                  <button
+                    onClick={() => onApproveTerminalRequest(request.id)}
+                    disabled={!canApproveTerminal || terminalBusy}
+                    title={`Approve ${request.command}`}
+                    aria-label={`Approve ${request.command}`}
+                  >
+                    <Check size={13} />
+                  </button>
+                  <button
+                    onClick={() => onDenyTerminalRequest(request.id)}
+                    disabled={!canApproveTerminal || terminalBusy}
+                    title={`Deny ${request.command}`}
+                    aria-label={`Deny ${request.command}`}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              )}
+              {request.risks.length > 0 && (
+                <div className="terminal-request-warning">
+                  <InlineSecretWarning
+                    risks={request.risks}
+                    detail="Review before approving this command on the host machine."
+                    compact
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {roomTerminals.length > 0 && (
         <div className="terminal-tabs">
@@ -237,7 +227,7 @@ export function TerminalPanel({
           </div>
         ))}
         {codexRunning && <div className="terminal-active">Codex is preparing a foreground terminal...</div>}
-        {selectedTerminal && (
+        {selectedTerminal ? (
           <form
             className="terminal-command-line"
             onSubmit={(event) => {
@@ -258,6 +248,8 @@ export function TerminalPanel({
               spellCheck={false}
             />
           </form>
+        ) : (
+          <div className="terminal-active">Opening shell...</div>
         )}
       </div>
 
@@ -279,7 +271,7 @@ export function TerminalPanel({
             title={`Stop ${selectedTerminal.name}`}
             aria-label={`Stop ${selectedTerminal.name}`}
           >
-            <X size={14} />
+            <Square size={14} />
             Stop
           </button>
         </div>

@@ -5889,16 +5889,26 @@ select {
 
 .sidebar .nested-team-list .team-select {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) max-content;
+  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 2px;
 }
 
-.sidebar .nested-team-list .team-select span {
+.sidebar .nested-team-list .team-select svg {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.sidebar .nested-team-list .team-select span,
+.sidebar .nested-team-list .team-select small {
   min-width: 0;
+  max-width: none;
   overflow: hidden;
-  text-overflow: clip;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .sidebar .nested-team-list .team-select small {
-  min-width: max-content;
+  justify-self: start;
 }

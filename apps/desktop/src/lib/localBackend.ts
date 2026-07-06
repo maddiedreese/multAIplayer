@@ -300,8 +300,8 @@ export async function startTerminal(
     name,
     cwd,
     command,
-    running: false,
-    exitStatus: 0,
+    running: true,
+    exitStatus: null,
     startedAt: String(Date.now()),
     lines: [
       { stream: "system", text: `$ ${command}` },
@@ -340,7 +340,7 @@ export async function writeTerminal(id: string, input: string): Promise<Terminal
   const snapshot = await readTerminal(id);
   const updated = {
     ...snapshot,
-    lines: [...snapshot.lines, { stream: "stdin", text: input }]
+    lines: [...snapshot.lines, { stream: "stdin", text: input.replace(/\n$/, "") }]
   };
   previewTerminals.set(id, updated);
   return updated;
