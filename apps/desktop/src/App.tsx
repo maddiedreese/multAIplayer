@@ -31,7 +31,7 @@ import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useRoomChatMutations } from "./hooks/useRoomChatMutations";
 import { useRoomInteractionContext } from "./hooks/useRoomInteractionContext";
-import { useRoomScopedSetters } from "./hooks/useRoomScopedSetters";
+import { useAppRoomScopedSetters } from "./hooks/useAppRoomScopedSetters";
 import { useSelectedRoomRuntime } from "./hooks/useSelectedRoomRuntime";
 import { useRoomDisplayContext } from "./hooks/useRoomDisplayContext";
 import { useThemeMode } from "./hooks/useThemeMode";
@@ -75,6 +75,18 @@ import {
 
 export function App() {
   const theme = useThemeMode();
+  const appState = useAppStateSlices({
+    workspace: {
+      initialTeams: seededTeams,
+      initialRooms: seededRooms,
+      initialTeamMembersByTeam: seededTeamMembers,
+      initialProjectPath: defaultProjectPath,
+      initialRoomId: "room-desktop",
+      initialMessagesByRoom
+    },
+    historyDefaults: { initialTeamId: seededTeams[0].id },
+    terminals: { initialTerminalLinesByRoom }
+  });
   const {
     workspaceState,
     appConfigState,
@@ -91,18 +103,7 @@ export function App() {
     filePanelState,
     invitePanelState,
     shellLayout
-  } = useAppStateSlices({
-    workspace: {
-      initialTeams: seededTeams,
-      initialRooms: seededRooms,
-      initialTeamMembersByTeam: seededTeamMembers,
-      initialProjectPath: defaultProjectPath,
-      initialRoomId: "room-desktop",
-      initialMessagesByRoom
-    },
-    historyDefaults: { initialTeamId: seededTeams[0].id },
-    terminals: { initialTerminalLinesByRoom }
-  });
+  } = appState;
   const appRefs = useAppRefs({
     rooms: workspaceState.rooms,
     selectedRoomId: workspaceState.selectedRoomId,
@@ -313,106 +314,16 @@ export function App() {
     updateTerminalRequestStatus,
     appendBrowserRequest,
     updateBrowserRequestStatus
-  } = useRoomScopedSetters({
-    messages: {
-      selectedRoomId: selectedRoom.id,
-      selectedTeamId: workspaceState.selectedTeam,
-      setHostMessagesByRoom: roomSettingsState.setHostMessagesByRoom,
-      setChatMessagesByRoom: roomChatState.setChatMessagesByRoom,
-      setMarkdownCopyFallbacksByRoom: filePanelState.setMarkdownCopyFallbacksByRoom,
-      setSecretWarningsVisibleByRoom: codexRoomState.setSecretWarningsVisibleByRoom,
-      setHistoryMessagesByRoom: historyDefaultsState.setHistoryMessagesByRoom,
-      setTeamHistoryMessagesByTeam: historyDefaultsState.setTeamHistoryMessagesByTeam,
-      setSettingsMessagesByRoom: roomSettingsState.setSettingsMessagesByRoom
-    },
-    busy: {
-      gitWorkflowBusyRef: appRefs.gitWorkflowBusyRef,
-      actionsBusyRef: appRefs.actionsBusyRef,
-      localPreviewBusyRef: appRefs.localPreviewBusyRef,
-      hostBusyRef: appRefs.hostBusyRef,
-      settingsBusyRef: appRefs.settingsBusyRef,
-      keyRotationBusyRef: appRefs.keyRotationBusyRef,
-      fileBusyRef: appRefs.fileBusyRef,
-      terminalBusyRef: appRefs.terminalBusyRef,
-      setGitWorkflowBusyByRoom: githubWorkflowPanelState.setGitWorkflowBusyByRoom,
-      setActionsBusyByRoom: githubWorkflowPanelState.setActionsBusyByRoom,
-      setLocalPreviewBusyByRoom: localPreviewState.setLocalPreviewBusyByRoom,
-      setHostBusyByRoom: roomSettingsState.setHostBusyByRoom,
-      setSettingsBusyByRoom: roomSettingsState.setSettingsBusyByRoom,
-      setKeyRotationBusyByRoom: invitePanelState.setKeyRotationBusyByRoom,
-      setFileBusyByRoom: filePanelState.setFileBusyByRoom,
-      setTerminalBusyByRoom: terminalPanelState.setTerminalBusyByRoom
-    },
-    files: {
-      selectedRoomId: selectedRoom.id,
-      setFileQueriesByRoom: filePanelState.setFileQueriesByRoom,
-      setProjectFilesByRoom: filePanelState.setProjectFilesByRoom,
-      setSelectedFilesByRoom: filePanelState.setSelectedFilesByRoom,
-      setSelectedDiffsByRoom: filePanelState.setSelectedDiffsByRoom,
-      setFilePreviewTabsByRoom: filePanelState.setFilePreviewTabsByRoom,
-      setFileBusyByRoom: filePanelState.setFileBusyByRoom,
-      setFileMessagesByRoom: filePanelState.setFileMessagesByRoom
-    },
-    terminals: {
-      selectedRoomId: selectedRoom.id,
-      maxTerminalActivityLines,
-      setSelectedTerminalIdsByRoom: terminalPanelState.setSelectedTerminalIdsByRoom,
-      setTerminalNamesByRoom: terminalPanelState.setTerminalNamesByRoom,
-      setTerminalCommandsByRoom: terminalPanelState.setTerminalCommandsByRoom,
-      setTerminalInputsByRoom: terminalPanelState.setTerminalInputsByRoom,
-      setTerminalErrorsByRoom: terminalPanelState.setTerminalErrorsByRoom,
-      setTerminalLinesByRoom: terminalPanelState.setTerminalLinesByRoom
-    },
-    codexApprovals: {
-      setApprovalVisibleByRoom: codexRoomState.setApprovalVisibleByRoom,
-      setPendingCodexApprovalsByRoom: codexRoomState.setPendingCodexApprovalsByRoom,
-      setCodexRunningByRoom: codexRoomState.setCodexRunningByRoom
-    },
-    browser: {
-      selectedRoomId: selectedRoom.id,
-      defaultBrowserUrl,
-      defaultBrowserReason,
-      setBrowserUrlsByRoom: browserPanelState.setBrowserUrlsByRoom,
-      setBrowserReasonsByRoom: browserPanelState.setBrowserReasonsByRoom,
-      setBrowserMessagesByRoom: browserPanelState.setBrowserMessagesByRoom
-    },
-    invites: {
-      selectedRoomId: selectedRoom.id,
-      setInviteLinksByRoom: invitePanelState.setInviteLinksByRoom,
-      setInviteApprovalGatesByRoom: invitePanelState.setInviteApprovalGatesByRoom,
-      setInviteMessagesByRoom: invitePanelState.setInviteMessagesByRoom
-    },
-    drafts: {
-      setPendingAttachmentsByRoom: roomChatState.setPendingAttachmentsByRoom,
-      setDraftsByRoom: roomChatState.setDraftsByRoom
-    },
-    project: {
-      roomsRef: appRefs.roomsRef,
-      defaultCodexModel,
-      defaultProjectPath,
-      setCustomCodexModelsByRoom: roomSettingsState.setCustomCodexModelsByRoom,
-      setProjectPathDraftsByRoom: roomSettingsState.setProjectPathDraftsByRoom
-    },
-    git: {
-      selectedRoomId: selectedRoom.id,
-      hasSelectedRoom,
-      setGitWorkflowMessagesByRoom: githubWorkflowPanelState.setGitWorkflowMessagesByRoom,
-      setGitWorkflowDraftsByRoom: githubWorkflowPanelState.setGitWorkflowDraftsByRoom,
-      setGitStatusByRoom: githubWorkflowPanelState.setGitStatusByRoom
-    },
-    events: {
-      setGitWorkflowEventsByRoom: roomRuntimeState.setGitWorkflowEventsByRoom,
-      setGitHubActionsEventsByRoom: roomRuntimeState.setGitHubActionsEventsByRoom,
-      setLocalPreviewsByRoom: localPreviewState.setLocalPreviewsByRoom,
-      setHostHandoffsByRoom: roomRuntimeState.setHostHandoffsByRoom,
-      setInviteRequestsByRoom: invitePanelState.setInviteRequestsByRoom,
-      setCodexEventsByRoom: codexRoomState.setCodexEventsByRoom
-    },
-    requests: {
-      setInviteRequestsByRoom: invitePanelState.setInviteRequestsByRoom,
-      setTerminalRequestsByRoom: terminalPanelState.setTerminalRequestsByRoom,
-      setBrowserRequestsByRoom: browserPanelState.setBrowserRequestsByRoom
-    }
+  } = useAppRoomScopedSetters({
+    appState,
+    appRefs,
+    selectedRoom,
+    hasSelectedRoom,
+    maxTerminalActivityLines,
+    defaultBrowserUrl,
+    defaultBrowserReason,
+    defaultCodexModel,
+    defaultProjectPath
   });
   const roomChatMutations = useRoomChatMutations({
     setMessagesByRoom: workspaceState.setMessagesByRoom
