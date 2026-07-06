@@ -97,8 +97,7 @@ import { useTerminalAutoOpen } from "./hooks/useTerminalAutoOpen";
 import { useLocalHistoryHydration } from "./hooks/useLocalHistoryHydration";
 import {
   canApproveCodexTurn,
-  shouldAutoApproveChatOnlyTurn,
-  shouldResetCodexApprovalForRoomUpdate
+  shouldAutoApproveChatOnlyTurn
 } from "./lib/codexApproval";
 import { buildCodexApprovalSnapshot, buildCodexTurnInput, buildCodexTurnSummary } from "./lib/codexTurn";
 import { normalizeCodexThreadId } from "./lib/codexThread";
@@ -138,9 +137,7 @@ import {
   parseGitHubRemoteUrl,
   type GitWorkflowDraft
 } from "./lib/gitWorkflowDraft";
-import { upsertRoomPreservingUnread } from "./lib/roomUnread";
 import { ensureRoomDefaults } from "./lib/roomDefaults";
-import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
 import { omitRecordKey, withoutSetValue } from "./lib/setUtils";
 import {
   isDeviceSealedPayload,
@@ -212,6 +209,7 @@ import { useWorkspaceCreationActions } from "./hooks/useWorkspaceCreationActions
 import { useRoomSettingsActions } from "./hooks/useRoomSettingsActions";
 import { useTeamDefaultActions } from "./hooks/useTeamDefaultActions";
 import { useLocalHistoryActions } from "./hooks/useLocalHistoryActions";
+import { useWorkspaceRecordActions } from "./hooks/useWorkspaceRecordActions";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   hasAcknowledgedRoomVisibilityWarning
@@ -742,6 +740,30 @@ export function App() {
     applyMessageReaction
   } = useRoomChatMutations({
     setMessagesByRoom
+  });
+  const {
+    upsertTeam,
+    upsertRoom,
+    handleRelayError
+  } = useWorkspaceRecordActions({
+    hasSelectedRoom,
+    selectedRoom,
+    localUser,
+    roomsRef,
+    setTeams,
+    setTeamMembersByTeam,
+    setRooms,
+    resetCodexApprovalForRoom,
+    setRevokedRoomIds,
+    setRevokedTeamIds,
+    setForgottenRoomIds,
+    setInviteAdmissionsByRoom,
+    setPresenceByRoom,
+    setInviteLinkForRoom,
+    setInviteMessageForRoom,
+    setChatMessageForRoom,
+    setHostMessageForRoom,
+    setWorkspaceError
   });
   const {
     reportRoomHostMutationInFlight,
@@ -1677,56 +1699,6 @@ export function App() {
     } catch (error) {
       setDeviceIdentityMessage(`Device identity rotation failed: ${String(error)}`);
     }
-  }
-
-  function upsertTeam(team: TeamRecord) {
-    setTeams((current) => {
-      if (current.some((item) => item.id === team.id)) {
-        return current.map((item) => (item.id === team.id ? team : item));
-      }
-      return [...current, team];
-    });
-    if (team.role) {
-      setTeamMembersByTeam((current) => {
-        if (current[team.id]?.some((member) => member.userId === localUser.id)) return current;
-        return {
-          ...current,
-          [team.id]: [{
-            teamId: team.id,
-            userId: localUser.id,
-            role: team.role ?? "member",
-            joinedAt: new Date().toISOString()
-          }]
-        };
-      });
-    }
-  }
-
-  function upsertRoom(room: RoomRecord) {
-    const nextRoom = ensureRoomDefaults(room);
-    const previousRoom = roomsRef.current.find((existing) => existing.id === nextRoom.id);
-    if (previousRoom && shouldResetCodexApprovalForRoomUpdate(ensureRoomDefaults(previousRoom), nextRoom)) {
-      resetCodexApprovalForRoom(nextRoom.id);
-    }
-    setRooms((current) => upsertRoomPreservingUnread(current, nextRoom));
-  }
-
-  function handleRelayError(message: string) {
-    console.warn("Relay error", message);
-    if (!isMembershipRemovedRelayError(message) || !hasSelectedRoom) return;
-
-    const room = selectedRoom;
-    const userMessage = membershipRemovedRoomMessage(room.name);
-    setRevokedRoomIds((current) => new Set(current).add(room.id));
-    setRevokedTeamIds((current) => new Set(current).add(room.teamId));
-    setForgottenRoomIds((current) => new Set(current).add(room.id));
-    setInviteAdmissionsByRoom((current) => omitRecordKey(current, room.id));
-    setPresenceByRoom((current) => omitRecordKey(current, room.id));
-    setInviteLinkForRoom(room.id, "");
-    setInviteMessageForRoom(room.id, userMessage);
-    setChatMessageForRoom(room.id, userMessage);
-    setHostMessageForRoom(room.id, userMessage);
-    setWorkspaceError(userMessage);
   }
 
   async function setRoomHost(hostStatus: RoomRecord["hostStatus"]) {
