@@ -1321,42 +1321,7 @@ export function App() {
       }
     }
   });
-  const {
-    approveCodexTurn,
-    handleCodexInvoke,
-    sendMessage,
-    setApprovalPolicy,
-    toggleRoomMode,
-    setCodexModel,
-    renameRoom,
-    setBrowserProfilePersistence,
-    updateProjectPath,
-    chooseProjectPath,
-    runApprovedTerminalCheck,
-    startNamedTerminal,
-    openInteractiveTerminal,
-    restartSelectedTerminal,
-    stopSelectedTerminal,
-    sendTerminalInput,
-    requestTerminalCommand,
-    approveTerminalRequest,
-    denyTerminalRequest,
-    openLocalPreviewDialog,
-    prepareLocalPreviewConfirmation,
-    confirmLocalPreviewShare,
-    stopLocalPreview,
-    stopOwnedLocalPreviews,
-    signOut,
-    rotateDeviceIdentity,
-    refreshGitHubActions,
-    approveGitWorkflow,
-    requestBrowserAccess,
-    approveBrowserRequest,
-    denyBrowserRequest,
-    openApprovedBrowserRequest,
-    openRoomBrowserNow,
-    resetRoomBrowserProfile
-  } = useRoomRuntimeContext({
+  const roomRuntime = useRoomRuntimeContext({
     codexActions: {
       turn: {
       selectedRoom,
@@ -1685,11 +1650,11 @@ export function App() {
       toggleMessageReaction,
       setPendingCodexApprovalForRoom,
       setApprovalVisibleForRoom,
-      approveCodexTurn,
-      handleCodexInvoke,
+      approveCodexTurn: roomRuntime.approveCodexTurn,
+      handleCodexInvoke: roomRuntime.handleCodexInvoke,
       copyMarkdownWithFallback,
       setChatMessageForRoom,
-      stopLocalPreview,
+      stopLocalPreview: roomRuntime.stopLocalPreview,
       setDraftForRoom
     },
     header: {
@@ -1700,25 +1665,25 @@ export function App() {
       setSelectedTeam,
       setSelectedRoomId,
       setInspectorTabsByRoom,
-      openRoomBrowserNow
+      openRoomBrowserNow: roomRuntime.openRoomBrowserNow
     },
     terminal: {
       selectedRoomId: selectedRoom.id,
       terminalRequests,
       copyTerminalMarkdown,
-      runApprovedTerminalCheck,
-      openInteractiveTerminal,
+      runApprovedTerminalCheck: roomRuntime.runApprovedTerminalCheck,
+      openInteractiveTerminal: roomRuntime.openInteractiveTerminal,
       setTerminalNameForRoom,
       setTerminalCommandForRoom,
-      startNamedTerminal,
-      requestTerminalCommand,
-      approveTerminalRequest,
-      denyTerminalRequest,
+      startNamedTerminal: roomRuntime.startNamedTerminal,
+      requestTerminalCommand: roomRuntime.requestTerminalCommand,
+      approveTerminalRequest: roomRuntime.approveTerminalRequest,
+      denyTerminalRequest: roomRuntime.denyTerminalRequest,
       setSelectedTerminalIdForRoom,
       setTerminalInputForRoom,
-      sendTerminalInput,
-      restartSelectedTerminal,
-      stopSelectedTerminal
+      sendTerminalInput: roomRuntime.sendTerminalInput,
+      restartSelectedTerminal: roomRuntime.restartSelectedTerminal,
+      stopSelectedTerminal: roomRuntime.stopSelectedTerminal
     },
     workspaceFiles: {
       selectedRoomId: selectedRoom.id,
@@ -1761,13 +1726,13 @@ export function App() {
     inspectorTab,
     roomHeaderActions,
     onSetHost: setRoomHost,
-    onRenameRoom: renameRoom,
-    onSelectModel: setCodexModel,
+    onRenameRoom: roomRuntime.renameRoom,
+    onSelectModel: roomRuntime.setCodexModel,
     onCopyRoomMarkdown: copyRoomMarkdown,
     onCopySelectedMarkdown: copySelectedMessagesMarkdown,
     onToggleMarkdownSelection: toggleMarkdownSelectionMode,
     onClearSelectedMessages: clearSelectedMessages,
-    onShareLocalPreview: openLocalPreviewDialog,
+    onShareLocalPreview: roomRuntime.openLocalPreviewDialog,
     notices: roomNotices,
     secretWarningVisible,
     onAcknowledgeSecretWarning: acknowledgeRoomVisibilityWarning,
@@ -1787,7 +1752,7 @@ export function App() {
     pendingAttachmentSummary,
     onToggleMessageSelection: toggleMessageSelection,
     onRemovePendingAttachment: removePendingAttachment,
-    onSendMessage: sendMessage,
+    onSendMessage: roomRuntime.sendMessage,
     roomChatPanelActions
     },
     roomInspectorPanel: {
@@ -1796,7 +1761,7 @@ export function App() {
     browserUrl,
     canHostBrowser,
     onBrowserUrlChange: (url) => setBrowserUrlForRoom(selectedRoom.id, url),
-    onOpenBrowserNow: openRoomBrowserNow,
+    onOpenBrowserNow: roomRuntime.openRoomBrowserNow,
     selectedRoom,
     projectPathDraft,
     gitStatus,
@@ -1806,8 +1771,8 @@ export function App() {
     isActiveHost,
     defaultProjectPath,
     onProjectPathDraftChange: (path) => setProjectPathDraftForRoom(selectedRoom.id, path),
-    onChooseProjectPath: chooseProjectPath,
-    onUpdateProjectPath: updateProjectPath,
+    onChooseProjectPath: roomRuntime.chooseProjectPath,
+    onUpdateProjectPath: roomRuntime.updateProjectPath,
     teamRoster: {
       members: selectedTeamMemberRows,
       hasSelectedTeam: Boolean(selectedTeam),
@@ -1852,20 +1817,20 @@ export function App() {
     approvalPolicy: {
       labels: approvalPolicyLabels,
       message: settingsMessage,
-      onSelectPolicy: setApprovalPolicy
+      onSelectPolicy: roomRuntime.setApprovalPolicy
     },
     roomMode: {
       labels: roomModeLabels,
-      onToggleMode: toggleRoomMode
+      onToggleMode: roomRuntime.toggleRoomMode
     },
     selectedCodexModel,
     customCodexModel,
     model: {
       customModel: customCodexModel,
       modelOptions: codexModelOptions,
-      onSelectModel: setCodexModel,
+      onSelectModel: roomRuntime.setCodexModel,
       onCustomModelChange: (model) => setCustomCodexModelForRoom(selectedRoom.id, model),
-      onApplyCustomModel: () => setCodexModel(customCodexModel)
+      onApplyCustomModel: () => roomRuntime.setCodexModel(customCodexModel)
     },
     localHistory: {
       historySettings,
@@ -1935,7 +1900,7 @@ export function App() {
       message: gitWorkflowMessage,
       onDraftChange: updateSelectedGitWorkflowDraft,
       onCopyPullRequestDraftMarkdown: copyPullRequestDraftMarkdown,
-      onApproveGitWorkflow: approveGitWorkflow
+      onApproveGitWorkflow: roomRuntime.approveGitWorkflow
     },
     githubActions: {
       summary: actionsSummary,
@@ -1949,7 +1914,7 @@ export function App() {
       refreshDisabled: !canReadLocalWorkspace || actionsBusy || !isActiveHost || !githubActionsReadiness.ready,
       currentUserSignedIn: Boolean(currentUser),
       message: actionsMessage,
-      onRefresh: () => refreshGitHubActions()
+      onRefresh: () => roomRuntime.refreshGitHubActions()
     },
     terminal: {
       terminalName,
@@ -2023,7 +1988,7 @@ export function App() {
     roomSettingsMessage: settingsMessage,
     historyMessage: visibleHistoryMessage,
     onSignIn: beginGitHubSignIn,
-    onSignOut: signOut,
+    onSignOut: roomRuntime.signOut,
     onSidebarQueryChange: setSidebarQuery,
     onNewTeamNameChange: setNewTeamName,
     onCreateTeam: addTeam,
@@ -2035,13 +2000,13 @@ export function App() {
     onSelectRoom: setSelectedRoomId,
     onSelectSidebarPanel: setActiveSidebarPanel,
     onToggleTheme: toggleThemeMode,
-    onRotateDeviceIdentity: rotateDeviceIdentity,
-    onChooseProject: chooseProjectPath,
+    onRotateDeviceIdentity: roomRuntime.rotateDeviceIdentity,
+    onChooseProject: roomRuntime.chooseProjectPath,
     onRelayHttpDraftChange: setRelayHttpDraft,
     onRelayWsDraftChange: setRelayWsDraft,
     onResetRelay: resetRelayConfiguration,
     onSaveRelay: saveRelayConfiguration,
-    onToggleRoomMode: toggleRoomMode,
+    onToggleRoomMode: roomRuntime.toggleRoomMode,
     onHistorySettingsChange: updateLocalHistorySettings,
     onClearRoomHistory: clearRoomHistory,
     onForgetRoomLocalData: forgetSelectedRoomLocalData,
@@ -2057,8 +2022,8 @@ export function App() {
     localPreviewDialog,
     setLocalPreviewDialog,
     localPreviewBusy,
-    prepareLocalPreviewConfirmation,
-    confirmLocalPreviewShare
+    prepareLocalPreviewConfirmation: roomRuntime.prepareLocalPreviewConfirmation,
+    confirmLocalPreviewShare: roomRuntime.confirmLocalPreviewShare
     }
   });
 
