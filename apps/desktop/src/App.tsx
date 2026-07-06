@@ -200,17 +200,14 @@ import { readInviteUrlPayload } from "./lib/inviteUrl";
 import { displayableInviteLink } from "./lib/invitePrivacy";
 import { canCreateRoomInvite } from "./lib/invitePolicy";
 import {
-  browserAccessGateMessage,
   canActOnRoomBrowserRequest,
   canHostBrowserAction,
-  canRequestBrowserAccess,
   findRoomBrowserRequest,
   roomBrowserRequestMessage
 } from "./lib/browserPolicy";
 import { attachmentReviewMessage, attachmentReviewScopeKey, decideAttachmentReview, reviewedAttachmentPathForScope } from "./lib/attachmentPolicy";
 import { isLocalUserActiveHostForRoom } from "./lib/roomHost";
 import {
-  canRequestWorkspaceAction,
   canUseLocalWorkspace,
   isRoomFileActionInFlight,
   localWorkspaceGateMessage,
@@ -244,7 +241,6 @@ import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread
 import { isRoomKeyRotationInFlight, roomKeyRotationInFlightMessage } from "./lib/roomKeyRotation";
 import { ensureRoomDefaults } from "./lib/roomDefaults";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./lib/relayAccess";
-import { roomPostureSummary } from "./lib/roomPosture";
 import { omitRecordKey, withoutSetValue } from "./lib/setUtils";
 import {
   mergeTerminalSnapshots,
@@ -312,6 +308,7 @@ import { useAppConfigState } from "./hooks/useAppConfigState";
 import { useLatestRef } from "./hooks/useLatestRef";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
+import { useRoomAccess } from "./hooks/useRoomAccess";
 import { useShellLayout } from "./hooks/useShellLayout";
 import { useSelectedTeamData } from "./hooks/useSelectedTeamData";
 import { useSelectedRoomValues } from "./hooks/useSelectedRoomValues";
@@ -677,36 +674,32 @@ export function App() {
     secretWarningsVisibleByRoom[selectedRoom?.id ?? selectedRoomId] ??
     !hasAcknowledgedRoomVisibilityWarning(selectedRoom?.id ?? selectedRoomId)
   );
-  const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser);
-  const isSelectedRoomForgotten = forgottenRoomIds.has(selectedRoom.id);
-  const isSelectedRoomRevoked = revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId);
-  const isSelectedRoomLocked = isSelectedRoomForgotten || isSelectedRoomRevoked;
-  const canReadLocalWorkspace = hasSelectedRoom && canUseLocalWorkspace(selectedRoom, localUser, isSelectedRoomLocked);
-  const canRequestWorkspace = hasSelectedRoom && canRequestWorkspaceAction(selectedRoom, isSelectedRoomLocked);
-  const canRequestBrowser = hasSelectedRoom && canRequestBrowserAccess(selectedRoom, isSelectedRoomLocked);
-  const canHostBrowser = hasSelectedRoom && canHostBrowserAction(selectedRoom, localUser, isSelectedRoomLocked);
-  const canCopyRoomInvite = hasSelectedRoom && canCreateRoomInvite(selectedRoom, localUser, isSelectedRoomLocked, inviteApprovalGate);
-  const localWorkspaceMessage = localWorkspaceGateMessage(selectedRoom, isSelectedRoomLocked);
-  const roomPosture = roomPostureSummary({
-    locked: isSelectedRoomLocked,
+  const {
     isActiveHost,
+    isSelectedRoomForgotten,
+    isSelectedRoomRevoked,
+    isSelectedRoomLocked,
     canReadLocalWorkspace,
+    canRequestWorkspace,
+    canRequestBrowser,
+    canHostBrowser,
+    canCopyRoomInvite,
+    localWorkspaceMessage,
+    roomPosture,
+    browserAccessMessage,
+    workspaceRequestMessage,
+    hostGateMessage,
+    roomSettingsGateMessage
+  } = useRoomAccess({
+    hasSelectedRoom,
+    selectedRoom,
+    localUser,
+    forgottenRoomIds,
+    revokedRoomIds,
+    revokedTeamIds,
     historySettings,
-    browserProfilePersistent: selectedRoom.browserProfilePersistent,
-    mode: selectedRoom.mode
+    inviteApprovalGate
   });
-  const browserAccessMessage = browserAccessGateMessage(selectedRoom, isSelectedRoomLocked);
-  const workspaceRequestMessage = isSelectedRoomLocked
-    ? roomLockMessage(selectedRoom, isSelectedRoomRevoked)
-    : "Workspace mode is disabled for this room.";
-  const hostGateMessage =
-    selectedRoom.hostStatus === "active"
-      ? `Only ${selectedRoom.host} can approve host-side actions in this room.`
-      : "Claim host before approving host-side actions in this room.";
-  const roomSettingsGateMessage =
-    selectedRoom.hostStatus === "active"
-      ? `Only ${selectedRoom.host} can change room host settings.`
-      : "Claim host before changing room host settings.";
   const actionsSummary = useMemo(() => summarizeActionRuns(actionRuns), [actionRuns]);
   const githubWorkflowReadiness = useMemo(() => checkGitHubWorkflowReadiness({
     pushEnabled: gitWorkflowDraft.pushEnabled,
