@@ -751,12 +751,7 @@ export function App() {
     settingsBusyByRoom,
     keyRotationBusyByRoom
   });
-  const {
-    setRoomHost,
-    acceptHostHandoff,
-    publishHostHandoff,
-    markHostHandoffAccepted
-  } = useHostHandoffActions({
+  const hostHandoffActions = useHostHandoffActions({
     hasSelectedRoom,
     selectedRoom,
     selectedRoomIdRef,
@@ -1189,7 +1184,7 @@ export function App() {
         updateBrowserRequestStatus,
         appendLocalPreviewEvent,
         setChatMessageForRoom,
-        markHostHandoffAccepted,
+        markHostHandoffAccepted: hostHandoffActions.markHostHandoffAccepted,
         setHostMessageForRoom,
         appendHostHandoff,
         appendRoomMessage,
@@ -1240,7 +1235,7 @@ export function App() {
       setRooms,
       publishCodexEvent,
       publishChatMessage: roomInteraction.publishChatMessage,
-      publishHostHandoff
+      publishHostHandoff: hostHandoffActions.publishHostHandoff
     },
       invoke: {
       hasSelectedRoom,
@@ -1612,7 +1607,7 @@ export function App() {
     markdownSelectionMode,
     inspectorTab,
     roomHeaderActions: roomPanels.roomHeaderActions,
-    onSetHost: setRoomHost,
+    onSetHost: hostHandoffActions.setRoomHost,
     onRenameRoom: roomRuntime.renameRoom,
     onSelectModel: roomRuntime.setCodexModel,
     onCopyRoomMarkdown: workspaceFlow.copyRoomMarkdown,
@@ -1680,7 +1675,7 @@ export function App() {
     },
     hostHandoffs: selectedRuntime.hostHandoffs,
     hostBusy: selectedRuntime.hostBusy,
-    onAcceptHandoff: acceptHostHandoff,
+    onAcceptHandoff: hostHandoffActions.acceptHostHandoff,
     encryptedInvite: {
       inviteApprovalGate,
       copyDisabled: !roomInteraction.canCopyRoomInvite,
