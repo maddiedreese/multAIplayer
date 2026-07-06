@@ -152,6 +152,7 @@ export interface LocalPreviewStatusResult {
   localUrl: string;
   publicUrl: string;
   running: boolean;
+  localReachable: boolean;
   exitStatus: number | null;
 }
 
@@ -452,6 +453,7 @@ export async function readLocalPreviewTunnelStatus(id: string): Promise<LocalPre
     localUrl: "http://localhost:5173/",
     publicUrl: "https://example.trycloudflare.com",
     running: true,
+    localReachable: true,
     exitStatus: null
   };
 }

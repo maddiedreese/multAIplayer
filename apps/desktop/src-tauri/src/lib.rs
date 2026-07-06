@@ -285,6 +285,7 @@ struct LocalPreviewStatusResult {
     local_url: String,
     public_url: String,
     running: bool,
+    local_reachable: bool,
     exit_status: Option<i32>,
 }
 
@@ -919,6 +920,7 @@ fn local_preview_status(
         local_url: tunnel.local_url.clone(),
         public_url: tunnel.public_url.clone(),
         running: status.is_none(),
+        local_reachable: local_preview_reachable(&tunnel.local_url),
         exit_status: status.and_then(|status| status.code()),
     })
 }
@@ -2244,20 +2246,31 @@ fn validate_local_preview_url(value: &str) -> Result<String, String> {
 }
 
 fn ensure_local_preview_reachable(value: &str) -> Result<(), String> {
-    let url: tauri::Url = value
-        .parse()
-        .map_err(|error| format!("Invalid local preview URL: {error}"))?;
-    let host = url
-        .host_str()
-        .ok_or_else(|| "Local preview URL must include a host.".to_string())?;
-    let port = url
-        .port()
-        .ok_or_else(|| "Local preview URL must include a port.".to_string())?;
-    if local_port_reachable(host, port, Duration::from_millis(450)) {
+    if local_preview_reachable(value) {
         Ok(())
     } else {
+        let url: tauri::Url = value
+            .parse()
+            .map_err(|error| format!("Invalid local preview URL: {error}"))?;
+        let host = url
+            .host_str()
+            .ok_or_else(|| "Local preview URL must include a host.".to_string())?;
+        let port = url
+            .port()
+            .ok_or_else(|| "Local preview URL must include a port.".to_string())?;
         Err(format!("No local web server responded at {host}:{port}."))
     }
+}
+
+fn local_preview_reachable(value: &str) -> bool {
+    let endpoint = value
+        .parse()
+        .ok()
+        .and_then(|url: tauri::Url| Some((url.host_str()?.to_string(), url.port()?)));
+    let Some((host, port)) = endpoint else {
+        return false;
+    };
+    local_port_reachable(&host, port, Duration::from_millis(450))
 }
 
 fn local_port_reachable(host: &str, port: u16, timeout: Duration) -> bool {

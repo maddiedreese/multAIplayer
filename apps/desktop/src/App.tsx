@@ -2112,11 +2112,13 @@ export function App() {
           if (preview.sharedByUserId !== localUser.id || preview.status !== "live") continue;
           readLocalPreviewTunnelStatus(preview.id)
             .then((status) => {
-              if (status.running) return;
+              if (status.running && status.localReachable) return;
               void publishLocalPreviewEvent({
                 ...preview,
                 status: "error",
-                message: `Cloudflare Quick Tunnel exited${status.exitStatus === null ? "" : ` with status ${status.exitStatus}`}.`,
+                message: status.running
+                  ? "The local web server stopped responding. Stop sharing and restart the preview after the app is running again."
+                  : `Cloudflare Quick Tunnel exited${status.exitStatus === null ? "" : ` with status ${status.exitStatus}`}.`,
                 updatedAt: new Date().toISOString()
               }, room);
             })
