@@ -307,6 +307,7 @@ import { useRoomBrowserSetters } from "./hooks/useRoomBrowserSetters";
 import { useRoomBusySetters } from "./hooks/useRoomBusySetters";
 import { useRoomCodexApprovalSetters } from "./hooks/useRoomCodexApprovalSetters";
 import { useRoomFileSetters } from "./hooks/useRoomFileSetters";
+import { useRoomInviteSetters } from "./hooks/useRoomInviteSetters";
 import { useRoomMemberRows } from "./hooks/useRoomMemberRows";
 import { useRoomMessageSetters } from "./hooks/useRoomMessageSetters";
 import { useRoomNotices } from "./hooks/useRoomNotices";
@@ -774,6 +775,17 @@ export function App() {
     setBrowserReasonsByRoom,
     setBrowserMessagesByRoom
   });
+  const {
+    setInviteLinkForRoom,
+    setInviteApprovalGateForRoom,
+    setInviteMessageForRoom,
+    setSelectedInviteMessage
+  } = useRoomInviteSetters({
+    selectedRoomId: selectedRoom.id,
+    setInviteLinksByRoom,
+    setInviteApprovalGatesByRoom,
+    setInviteMessagesByRoom
+  });
   const roomNotices = useRoomNotices({
     roomId: selectedRoom.id,
     hostMessage,
@@ -936,22 +948,6 @@ export function App() {
     if (!isRoomFileActionInFlight(fileBusyRef.current, roomId)) return false;
     setFileMessageForRoom(roomId, roomFileActionInFlightMessage());
     return true;
-  }
-
-  function setInviteLinkForRoom(roomId: string, link: string) {
-    setInviteLinksByRoom((current) => link ? { ...current, [roomId]: link } : omitRecordKey(current, roomId));
-  }
-
-  function setInviteApprovalGateForRoom(roomId: string, enabled: boolean) {
-    setInviteApprovalGatesByRoom((current) => enabled ? { ...current, [roomId]: true } : omitRecordKey(current, roomId));
-  }
-
-  function setInviteMessageForRoom(roomId: string, message: string | null) {
-    setInviteMessagesByRoom((current) => message ? { ...current, [roomId]: message } : omitRecordKey(current, roomId));
-  }
-
-  function setSelectedInviteMessage(message: string | null) {
-    setInviteMessageForRoom(selectedRoom.id, message);
   }
 
   function setSelectedGitWorkflowMessage(message: string | null) {
