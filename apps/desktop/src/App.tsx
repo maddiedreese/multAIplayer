@@ -83,7 +83,6 @@ import {
   getGitRemoteOrigin,
   getGitStatus,
   probeCloudflared,
-  readLocalPreviewTunnelStatus,
   readProjectFile,
   runCodexTurn,
   runGitWorkflow,
@@ -312,6 +311,7 @@ import { useRoomTerminalSetters } from "./hooks/useRoomTerminalSetters";
 import { useTeamMembersRefresh } from "./hooks/useTeamMembersRefresh";
 import { useThemeMode } from "./hooks/useThemeMode";
 import { useWorkspaceBootstrap } from "./hooks/useWorkspaceBootstrap";
+import { useLocalPreviewPolling } from "./hooks/useLocalPreviewPolling";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   clearRoomVisibilityWarningAcknowledgement,
@@ -1528,38 +1528,12 @@ export function App() {
     terminalRequests
   ]);
 
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      for (const [roomId, previews] of Object.entries(localPreviewsByRoom)) {
-        const room = roomsRef.current.find((item) => item.id === roomId);
-        if (!room) continue;
-        for (const preview of previews) {
-          if (preview.sharedByUserId !== localUser.id || preview.status !== "live") continue;
-          readLocalPreviewTunnelStatus(preview.id)
-            .then((status) => {
-              if (status.running && status.localReachable) return;
-              void publishLocalPreviewEvent({
-                ...preview,
-                status: "error",
-                message: status.running
-                  ? "The local web server stopped responding. Stop sharing and restart the preview after the app is running again."
-                  : `Cloudflare Quick Tunnel exited${status.exitStatus === null ? "" : ` with status ${status.exitStatus}`}.`,
-                updatedAt: new Date().toISOString()
-              }, room);
-            })
-            .catch((error) => {
-              void publishLocalPreviewEvent({
-                ...preview,
-                status: "error",
-                message: `Cloudflare Quick Tunnel is no longer running on this device: ${String(error)}`,
-                updatedAt: new Date().toISOString()
-              }, room);
-            });
-        }
-      }
-    }, 5_000);
-    return () => window.clearInterval(interval);
-  }, [localPreviewsByRoom, localUser.id]);
+  useLocalPreviewPolling({
+    localPreviewsByRoom,
+    localUserId: localUser.id,
+    roomsRef,
+    publishLocalPreviewEvent
+  });
 
   useRoomGitStatusRefresh({
     hasSelectedRoom,
