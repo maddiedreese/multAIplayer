@@ -21,6 +21,7 @@ export interface RelayConfig {
   mutationsRequireAuth: boolean;
   rateLimitsEnabled: boolean;
   trustProxyHeaders: boolean;
+  structuredLogsEnabled: boolean;
   rateLimitWindowMs: number;
   rateLimitCaps: {
     auth: number;
@@ -68,6 +69,10 @@ export function loadRelayConfig(): RelayConfig {
     mutationsRequireAuth: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_REQUIRE_AUTH, nodeEnv === "production"),
     rateLimitsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMITS, true),
     trustProxyHeaders: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS, false),
+    structuredLogsEnabled: parseBooleanEnv(
+      process.env.MULTAIPLAYER_RELAY_STRUCTURED_LOGS,
+      nodeEnv === "production"
+    ),
     rateLimitWindowMs: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS, 60_000, 1_000, 3_600_000),
     rateLimitCaps: {
       auth: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_AUTH, 30, 1, 10_000),

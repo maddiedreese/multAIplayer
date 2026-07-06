@@ -61,6 +61,29 @@ test("relay rejects non-host takeover and allows explicit handoff", async () => 
   }
 });
 
+test("relay exposes content-free operational metrics", async () => {
+  const relay = await startRelay();
+  try {
+    const response = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(response.status, 200);
+    const body = await response.json() as {
+      activeSockets?: unknown;
+      envelopesPublishedTotal?: unknown;
+      rateLimitRejectionsTotal?: unknown;
+      startedAt?: unknown;
+      uptimeSeconds?: unknown;
+    };
+
+    assert.equal(body.activeSockets, 0);
+    assert.equal(body.envelopesPublishedTotal, 0);
+    assert.equal(body.rateLimitRejectionsTotal, 0);
+    assert.equal(typeof body.startedAt, "string");
+    assert.equal(typeof body.uptimeSeconds, "number");
+  } finally {
+    await relay.close();
+  }
+});
+
 test("relay broadcasts room.updated after room settings change", async () => {
   const relay = await startRelay();
   const socket = new WebSocket(relay.wsUrl);

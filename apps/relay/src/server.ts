@@ -35,6 +35,7 @@ import {
 } from "@multaiplayer/protocol";
 import { createRelayAuthz } from "./authz.js";
 import { loadRelayConfig } from "./config.js";
+import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
 import { createRelayStore, type AuthSession, type ClientSession, type PresenceRecord, type RoomKey } from "./state.js";
 
 const relayConfig = loadRelayConfig();
@@ -58,9 +59,11 @@ const {
   mutationsRequireAuth,
   rateLimitsEnabled,
   trustProxyHeaders,
+  structuredLogsEnabled,
   rateLimitWindowMs,
   rateLimitCaps
 } = relayConfig;
+const relayMetrics = createRelayMetrics();
 const corsOptions: CorsOptions = {
   credentials: true,
   origin(origin, callback) {
@@ -74,6 +77,7 @@ const corsOptions: CorsOptions = {
 const app = express();
 app.use(cors(corsOptions));
 app.use(cookieParser());
+app.use(requestLoggingMiddleware(structuredLogsEnabled));
 app.use(express.json({ limit: `${jsonBodyLimitBytes}b` }));
 app.use(rateLimitMiddleware);
 
@@ -206,6 +210,10 @@ app.get("/healthz", (_req, res) => {
 
 app.get("/readyz", (_req, res) => {
   res.json({ ok: true, dataPath });
+});
+
+app.get("/metrics", (_req, res) => {
+  res.json(relayMetrics.snapshot(sessions.size));
 });
 
 app.get("/auth/config", (_req, res) => {
@@ -1377,6 +1385,7 @@ function publishEnvelope(envelope: RelayEnvelope) {
   if (backlog.some((existing) => existing.id === envelope.id)) return;
   backlog.push(envelope);
   encryptedBacklog.set(key, pruneEncryptedBacklog(backlog));
+  relayMetrics.recordEnvelopePublished();
   scheduleStoreSave();
   broadcast(key, { type: "envelope", envelope });
 }
@@ -1472,6 +1481,7 @@ function rateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
     next();
     return;
   }
+  relayMetrics.recordRateLimitRejection();
   res.setHeader("Retry-After", String(Math.ceil(Math.max(0, result.resetAt - Date.now()) / 1000)));
   res.status(429).json({
     error: "Rate limit exceeded. Slow down before retrying.",
@@ -1481,7 +1491,7 @@ function rateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
 }
 
 function rateLimitBucketForRequest(req: Request): RateLimitBucket | null {
-  if (req.path === "/healthz" || req.path === "/readyz" || req.path === "/auth/config") return null;
+  if (req.path === "/healthz" || req.path === "/readyz" || req.path === "/metrics" || req.path === "/auth/config") return null;
   if (req.path.startsWith("/auth/")) return "auth";
   if (req.path.startsWith("/attachment-blobs")) return "attachment";
   if (req.method === "GET") return "read";
