@@ -946,38 +946,7 @@ export function App() {
       setTeamMembersMessageByTeam
     }
   });
-  const {
-    copyMarkdownWithFallback,
-    copyProjectMarkdown,
-    copyRoomMarkdown,
-    copySelectedMessagesMarkdown,
-    copyMessageMarkdown,
-    copyCodexOutputMarkdown,
-    copyTerminalMarkdown,
-    copyDiffSummaryMarkdown,
-    copyPullRequestDraftMarkdown,
-    trustRoomMemberDevice,
-    untrustRoomMemberDevice,
-    copyRoomMemberDeviceFingerprint,
-    changeTeamMemberRole,
-    transferOwnershipToTeamMember,
-    removeMemberFromTeam,
-    addTeam,
-    addRoom,
-    chooseNewRoomProjectPath,
-    updateTeamHistoryDefaults,
-    updateTeamDefaultApprovalPolicy,
-    updateTeamDefaultCodexModel,
-    updateTeamDefaultInviteApprovalGate,
-    updateLocalHistorySettings,
-    applyTeamDefaultsToRoom,
-    clearRoomHistory,
-    forgetSelectedRoomLocalData,
-    openProjectFile,
-    attachSelectedFileToMessage,
-    removePendingAttachment,
-    openEncryptedAttachmentBlob
-  } = useWorkspaceFlowContext({
+  const workspaceFlow = useWorkspaceFlowContext({
     bootstrap: {
       workspace: {
         relayHttpUrl: appConfig.relayHttpUrl,
@@ -1644,15 +1613,15 @@ export function App() {
       selectedRoomId: selectedRoom.id,
       messages,
       localPreviews,
-      copyMessageMarkdown,
-      copyCodexOutputMarkdown,
-      openEncryptedAttachmentBlob,
+      copyMessageMarkdown: workspaceFlow.copyMessageMarkdown,
+      copyCodexOutputMarkdown: workspaceFlow.copyCodexOutputMarkdown,
+      openEncryptedAttachmentBlob: workspaceFlow.openEncryptedAttachmentBlob,
       toggleMessageReaction,
       setPendingCodexApprovalForRoom,
       setApprovalVisibleForRoom,
       approveCodexTurn: roomRuntime.approveCodexTurn,
       handleCodexInvoke: roomRuntime.handleCodexInvoke,
-      copyMarkdownWithFallback,
+      copyMarkdownWithFallback: workspaceFlow.copyMarkdownWithFallback,
       setChatMessageForRoom,
       stopLocalPreview: roomRuntime.stopLocalPreview,
       setDraftForRoom
@@ -1670,7 +1639,7 @@ export function App() {
     terminal: {
       selectedRoomId: selectedRoom.id,
       terminalRequests,
-      copyTerminalMarkdown,
+      copyTerminalMarkdown: workspaceFlow.copyTerminalMarkdown,
       runApprovedTerminalCheck: roomRuntime.runApprovedTerminalCheck,
       openInteractiveTerminal: roomRuntime.openInteractiveTerminal,
       setTerminalNameForRoom,
@@ -1687,11 +1656,11 @@ export function App() {
     },
     workspaceFiles: {
       selectedRoomId: selectedRoom.id,
-      copyProjectMarkdown,
+      copyProjectMarkdown: workspaceFlow.copyProjectMarkdown,
       setFileQueryForRoom,
-      openProjectFile,
-      copyDiffSummaryMarkdown,
-      attachSelectedFileToMessage,
+      openProjectFile: workspaceFlow.openProjectFile,
+      copyDiffSummaryMarkdown: workspaceFlow.copyDiffSummaryMarkdown,
+      attachSelectedFileToMessage: workspaceFlow.attachSelectedFileToMessage,
       setFilePreviewTabForRoom,
       setSelectedFileForRoom,
       setSelectedDiffForRoom,
@@ -1728,8 +1697,8 @@ export function App() {
     onSetHost: setRoomHost,
     onRenameRoom: roomRuntime.renameRoom,
     onSelectModel: roomRuntime.setCodexModel,
-    onCopyRoomMarkdown: copyRoomMarkdown,
-    onCopySelectedMarkdown: copySelectedMessagesMarkdown,
+    onCopyRoomMarkdown: workspaceFlow.copyRoomMarkdown,
+    onCopySelectedMarkdown: workspaceFlow.copySelectedMessagesMarkdown,
     onToggleMarkdownSelection: toggleMarkdownSelectionMode,
     onClearSelectedMessages: clearSelectedMessages,
     onShareLocalPreview: roomRuntime.openLocalPreviewDialog,
@@ -1737,7 +1706,7 @@ export function App() {
     secretWarningVisible,
     onAcknowledgeSecretWarning: acknowledgeRoomVisibilityWarning,
     markdownCopyFallback,
-    copyMarkdownWithFallback,
+    copyMarkdownWithFallback: workspaceFlow.copyMarkdownWithFallback,
     setChatMessageForRoom,
     setMarkdownCopyFallbackForRoom,
     messages: chatMessageRows,
@@ -1751,7 +1720,7 @@ export function App() {
     localPreviewCards,
     pendingAttachmentSummary,
     onToggleMessageSelection: toggleMessageSelection,
-    onRemovePendingAttachment: removePendingAttachment,
+    onRemovePendingAttachment: workspaceFlow.removePendingAttachment,
     onSendMessage: roomRuntime.sendMessage,
     roomChatPanelActions
     },
@@ -1778,18 +1747,18 @@ export function App() {
       hasSelectedTeam: Boolean(selectedTeam),
       busy: selectedTeamMembersBusy,
       message: selectedTeamMembersMessage,
-      onPromote: (member) => changeTeamMemberRole(member, "admin"),
-      onDemote: (member) => changeTeamMemberRole(member, "member"),
-      onTransferOwnership: transferOwnershipToTeamMember,
-      onRemove: removeMemberFromTeam
+      onPromote: (member) => workspaceFlow.changeTeamMemberRole(member, "admin"),
+      onDemote: (member) => workspaceFlow.changeTeamMemberRole(member, "member"),
+      onTransferOwnership: workspaceFlow.transferOwnershipToTeamMember,
+      onRemove: workspaceFlow.removeMemberFromTeam
     },
     roomMembers: {
       members: roomMemberRows,
       localDeviceId: deviceId,
       message: deviceIdentityMessage,
-      onCopyFingerprint: (member) => copyRoomMemberDeviceFingerprint(member, member.trusted),
-      onTrust: trustRoomMemberDevice,
-      onUntrust: untrustRoomMemberDevice
+      onCopyFingerprint: (member) => workspaceFlow.copyRoomMemberDeviceFingerprint(member, member.trusted),
+      onTrust: workspaceFlow.trustRoomMemberDevice,
+      onUntrust: workspaceFlow.untrustRoomMemberDevice
     },
     hostHandoffs,
     hostBusy,
@@ -1847,32 +1816,32 @@ export function App() {
       teamDefaultInviteApprovalGate,
       message: visibleHistoryMessage,
       onHistoryEnabledChange: (enabled) =>
-        updateLocalHistorySettings({
+        workspaceFlow.updateLocalHistorySettings({
           ...historySettings,
           enabled
         }),
       onHistoryRetentionDaysChange: (retentionDays) =>
-        updateLocalHistorySettings({
+        workspaceFlow.updateLocalHistorySettings({
           ...historySettings,
           retentionDays
         }),
-      onClearRoomHistory: clearRoomHistory,
-      onForgetRoomLocalData: forgetSelectedRoomLocalData,
-      onApplyTeamDefaultsToRoom: applyTeamDefaultsToRoom,
+      onClearRoomHistory: workspaceFlow.clearRoomHistory,
+      onForgetRoomLocalData: workspaceFlow.forgetSelectedRoomLocalData,
+      onApplyTeamDefaultsToRoom: workspaceFlow.applyTeamDefaultsToRoom,
       onTeamHistoryEnabledChange: (enabled) =>
-        updateTeamHistoryDefaults({
+        workspaceFlow.updateTeamHistoryDefaults({
           ...teamHistorySettings,
           enabled
         }),
       onTeamHistoryRetentionDaysChange: (retentionDays) =>
-        updateTeamHistoryDefaults({
+        workspaceFlow.updateTeamHistoryDefaults({
           ...teamHistorySettings,
           retentionDays
         }),
-      onTeamDefaultApprovalPolicyChange: updateTeamDefaultApprovalPolicy,
-      onTeamDefaultCodexModelChange: updateTeamDefaultCodexModel,
+      onTeamDefaultApprovalPolicyChange: workspaceFlow.updateTeamDefaultApprovalPolicy,
+      onTeamDefaultCodexModelChange: workspaceFlow.updateTeamDefaultCodexModel,
       onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent,
-      onTeamDefaultInviteApprovalGateChange: updateTeamDefaultInviteApprovalGate
+      onTeamDefaultInviteApprovalGateChange: workspaceFlow.updateTeamDefaultInviteApprovalGate
     },
     workspaceFiles: {
       fileQuery,
@@ -1899,7 +1868,7 @@ export function App() {
       isActiveHost,
       message: gitWorkflowMessage,
       onDraftChange: updateSelectedGitWorkflowDraft,
-      onCopyPullRequestDraftMarkdown: copyPullRequestDraftMarkdown,
+      onCopyPullRequestDraftMarkdown: workspaceFlow.copyPullRequestDraftMarkdown,
       onApproveGitWorkflow: roomRuntime.approveGitWorkflow
     },
     githubActions: {
@@ -1991,12 +1960,12 @@ export function App() {
     onSignOut: roomRuntime.signOut,
     onSidebarQueryChange: setSidebarQuery,
     onNewTeamNameChange: setNewTeamName,
-    onCreateTeam: addTeam,
+    onCreateTeam: workspaceFlow.addTeam,
     onSelectTeam: setSelectedTeam,
     onNewRoomNameChange: setNewRoomName,
     onNewRoomProjectPathChange: setNewRoomProjectPath,
-    onChooseNewRoomProjectPath: chooseNewRoomProjectPath,
-    onCreateRoom: addRoom,
+    onChooseNewRoomProjectPath: workspaceFlow.chooseNewRoomProjectPath,
+    onCreateRoom: workspaceFlow.addRoom,
     onSelectRoom: setSelectedRoomId,
     onSelectSidebarPanel: setActiveSidebarPanel,
     onToggleTheme: toggleThemeMode,
@@ -2007,15 +1976,15 @@ export function App() {
     onResetRelay: resetRelayConfiguration,
     onSaveRelay: saveRelayConfiguration,
     onToggleRoomMode: roomRuntime.toggleRoomMode,
-    onHistorySettingsChange: updateLocalHistorySettings,
-    onClearRoomHistory: clearRoomHistory,
-    onForgetRoomLocalData: forgetSelectedRoomLocalData,
-    onTeamHistoryDefaultsChange: updateTeamHistoryDefaults,
-    onTeamDefaultApprovalPolicyChange: updateTeamDefaultApprovalPolicy,
-    onTeamDefaultCodexModelChange: updateTeamDefaultCodexModel,
+    onHistorySettingsChange: workspaceFlow.updateLocalHistorySettings,
+    onClearRoomHistory: workspaceFlow.clearRoomHistory,
+    onForgetRoomLocalData: workspaceFlow.forgetSelectedRoomLocalData,
+    onTeamHistoryDefaultsChange: workspaceFlow.updateTeamHistoryDefaults,
+    onTeamDefaultApprovalPolicyChange: workspaceFlow.updateTeamDefaultApprovalPolicy,
+    onTeamDefaultCodexModelChange: workspaceFlow.updateTeamDefaultCodexModel,
     onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent,
-    onTeamDefaultInviteApprovalGateChange: updateTeamDefaultInviteApprovalGate,
-    onApplyTeamDefaultsToRoom: applyTeamDefaultsToRoom,
+    onTeamDefaultInviteApprovalGateChange: workspaceFlow.updateTeamDefaultInviteApprovalGate,
+    onApplyTeamDefaultsToRoom: workspaceFlow.applyTeamDefaultsToRoom,
     roomRecords: rooms
     },
     localPreviewDialog: {
