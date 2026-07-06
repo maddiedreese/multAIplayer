@@ -307,6 +307,7 @@ import { useRoomBrowserSetters } from "./hooks/useRoomBrowserSetters";
 import { useRoomBusySetters } from "./hooks/useRoomBusySetters";
 import { useRoomCodexApprovalSetters } from "./hooks/useRoomCodexApprovalSetters";
 import { useRoomDraftSetters } from "./hooks/useRoomDraftSetters";
+import { useRoomEventAppenders } from "./hooks/useRoomEventAppenders";
 import { useRoomFileSetters } from "./hooks/useRoomFileSetters";
 import { useRoomGitSetters } from "./hooks/useRoomGitSetters";
 import { useRoomInviteSetters } from "./hooks/useRoomInviteSetters";
@@ -815,6 +816,21 @@ export function App() {
     setGitWorkflowMessagesByRoom,
     setGitStatusByRoom
   });
+  const {
+    appendGitWorkflowEvent,
+    appendGitHubActionsEvent,
+    appendLocalPreviewEvent,
+    appendHostHandoff,
+    appendInviteRequest,
+    appendCodexEvent
+  } = useRoomEventAppenders({
+    setGitWorkflowEventsByRoom,
+    setGitHubActionsEventsByRoom,
+    setLocalPreviewsByRoom,
+    setHostHandoffsByRoom,
+    setInviteRequestsByRoom,
+    setCodexEventsByRoom
+  });
   const roomNotices = useRoomNotices({
     roomId: selectedRoom.id,
     hostMessage,
@@ -958,45 +974,6 @@ export function App() {
     if (!isRoomFileActionInFlight(fileBusyRef.current, roomId)) return false;
     setFileMessageForRoom(roomId, roomFileActionInFlightMessage());
     return true;
-  }
-
-  function appendGitWorkflowEvent(roomId: string, event: GitWorkflowEventPlaintextPayload) {
-    setGitWorkflowEventsByRoom((current) => {
-      const roomEvents = current[roomId] ?? [];
-      if (roomEvents.some((existing) => existing.createdAt === event.createdAt && existing.status === event.status && existing.message === event.message)) {
-        return current;
-      }
-      return {
-        ...current,
-        [roomId]: [...roomEvents, event].slice(-100)
-      };
-    });
-  }
-
-  function appendGitHubActionsEvent(roomId: string, event: GitHubActionsEventPlaintextPayload) {
-    setGitHubActionsEventsByRoom((current) => {
-      const roomEvents = current[roomId] ?? [];
-      if (roomEvents.some((existing) => existing.checkedAt === event.checkedAt && existing.owner === event.owner && existing.repo === event.repo && existing.branch === event.branch)) {
-        return current;
-      }
-      return {
-        ...current,
-        [roomId]: [...roomEvents, event].slice(-50)
-      };
-    });
-  }
-
-  function appendLocalPreviewEvent(roomId: string, event: LocalPreviewRecord) {
-    setLocalPreviewsByRoom((current) => {
-      const roomEvents = current[roomId] ?? [];
-      const nextEvents = roomEvents.some((existing) => existing.id === event.id)
-        ? roomEvents.map((existing) => existing.id === event.id ? event : existing)
-        : [...roomEvents, event];
-      return {
-        ...current,
-        [roomId]: nextEvents.slice(-50)
-      };
-    });
   }
 
   function updateSelectedGitWorkflowDraft(patch: Partial<GitWorkflowDraft>) {
@@ -2558,46 +2535,6 @@ export function App() {
     };
     seenEnvelopeIds.current.add(envelope.id);
     client.publish({ type: "publish", envelope });
-  }
-
-  function appendHostHandoff(roomId: string, handoff: HostHandoffRecord) {
-    setHostHandoffsByRoom((current) => {
-      const roomHandoffs = current[roomId] ?? [];
-      if (roomHandoffs.some((existing) => existing.id === handoff.id)) return current;
-      return {
-        ...current,
-        [roomId]: [...roomHandoffs, handoff]
-      };
-    });
-  }
-
-  function appendInviteRequest(roomId: string, request: InviteJoinRequest) {
-    setInviteRequestsByRoom((current) => {
-      const roomRequests = current[roomId] ?? [];
-      if (roomRequests.some((existing) => existing.id === request.id)) return current;
-      return {
-        ...current,
-        [roomId]: [...roomRequests, request]
-      };
-    });
-  }
-
-  function appendCodexEvent(roomId: string, event: CodexRoomEvent) {
-    setCodexEventsByRoom((current) => {
-      const roomEvents = current[roomId] ?? [];
-      if (roomEvents.some((existing) =>
-        existing.turnId === event.turnId &&
-        existing.createdAt === event.createdAt &&
-        existing.status === event.status &&
-        existing.message === event.message
-      )) {
-        return current;
-      }
-      return {
-        ...current,
-        [roomId]: [...roomEvents, event].slice(-80)
-      };
-    });
   }
 
   function updateInviteRequestStatus(
