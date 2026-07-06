@@ -1,4 +1,8 @@
 import { Check, ExternalLink, Globe2, RefreshCw, X } from "lucide-react";
+import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
+import { Webview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useEffect, useRef, useState } from "react";
 import { InlineSecretWarning } from "./common";
 
 export interface BrowserStatusDisplay {
@@ -22,8 +26,7 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
   browserStatus,
   browserProfilePersistent,
   browserProfileDisabled,
-  browserAllowedOriginsDraft,
-  browserAllowedOriginsDisabled,
+  activeBrowserUrl,
   browserUrl,
   browserReason,
   canRequestBrowser,
@@ -34,8 +37,6 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
   detectBrowserSecretRisks,
   onResetBrowserProfile,
   onBrowserProfilePersistenceChange,
-  onBrowserAllowedOriginsDraftChange,
-  onSaveBrowserAllowedOrigins,
   onBrowserUrlChange,
   onBrowserReasonChange,
   onOpenBrowserNow,
@@ -49,8 +50,7 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
   browserStatus: BrowserStatusDisplay;
   browserProfilePersistent: boolean;
   browserProfileDisabled: boolean;
-  browserAllowedOriginsDraft: string;
-  browserAllowedOriginsDisabled: boolean;
+  activeBrowserUrl: string | null;
   browserUrl: string;
   browserReason: string;
   canRequestBrowser: boolean;
@@ -61,8 +61,6 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
   detectBrowserSecretRisks: (url: string) => string[];
   onResetBrowserProfile: () => void;
   onBrowserProfilePersistenceChange: (persistent: boolean) => void;
-  onBrowserAllowedOriginsDraftChange: (draft: string) => void;
-  onSaveBrowserAllowedOrigins: () => void;
   onBrowserUrlChange: (url: string) => void;
   onBrowserReasonChange: (reason: string) => void;
   onOpenBrowserNow: () => void;
@@ -71,6 +69,84 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
   onDenyBrowserRequest: (requestId: string) => void;
   onOpenApprovedBrowserRequest: (request: T) => void;
 }) {
+  const browserViewportRef = useRef<HTMLDivElement | null>(null);
+  const browserWebviewRef = useRef<Webview | null>(null);
+  const [browserSurfaceError, setBrowserSurfaceError] = useState<string | null>(null);
+  const tauriRuntime = "__TAURI_INTERNALS__" in window;
+
+  useEffect(() => {
+    let cancelled = false;
+    let cleanupPositioning: (() => void) | null = null;
+
+    async function closeBrowserWebview() {
+      const webview = browserWebviewRef.current;
+      browserWebviewRef.current = null;
+      if (webview) {
+        await webview.close().catch(() => undefined);
+      }
+    }
+
+    async function positionBrowserWebview(webview: Webview) {
+      const slot = browserViewportRef.current;
+      if (!slot) return;
+      const rect = slot.getBoundingClientRect();
+      const width = Math.max(1, Math.round(rect.width));
+      const height = Math.max(1, Math.round(rect.height));
+      await webview.setPosition(new LogicalPosition(Math.round(rect.left), Math.round(rect.top)));
+      await webview.setSize(new LogicalSize(width, height));
+    }
+
+    if (!tauriRuntime || hidden || !activeBrowserUrl) {
+      void closeBrowserWebview();
+      return;
+    }
+
+    setBrowserSurfaceError(null);
+    void closeBrowserWebview().then(async () => {
+      if (cancelled || !browserViewportRef.current) return;
+      const rect = browserViewportRef.current.getBoundingClientRect();
+      const webview = new Webview(getCurrentWindow(), "room_browser", {
+        url: activeBrowserUrl,
+        x: Math.round(rect.left),
+        y: Math.round(rect.top),
+        width: Math.max(1, Math.round(rect.width)),
+        height: Math.max(1, Math.round(rect.height)),
+        focus: true,
+        dragDropEnabled: false
+      });
+
+      browserWebviewRef.current = webview;
+      await webview.once("tauri://error", (event) => {
+        setBrowserSurfaceError(`Could not open in-app browser: ${String(event.payload)}`);
+      });
+      await webview.once("tauri://created", () => {
+        void positionBrowserWebview(webview);
+        void webview.setFocus();
+      });
+
+      const reposition = () => {
+        const current = browserWebviewRef.current;
+        if (current) void positionBrowserWebview(current);
+      };
+      const observer = new ResizeObserver(reposition);
+      observer.observe(browserViewportRef.current);
+      window.addEventListener("resize", reposition);
+      window.addEventListener("scroll", reposition, true);
+
+      cleanupPositioning = () => {
+        observer.disconnect();
+        window.removeEventListener("resize", reposition);
+        window.removeEventListener("scroll", reposition, true);
+      };
+    });
+
+    return () => {
+      cancelled = true;
+      cleanupPositioning?.();
+      void closeBrowserWebview();
+    };
+  }, [activeBrowserUrl, hidden, tauriRuntime]);
+
   return (
     <section className="panel browser-panel" hidden={hidden}>
       <div className="panel-title">
@@ -101,29 +177,10 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
         <span>Persist room browser profile</span>
       </label>
       <div className="browser-policy-state" aria-label="Browser safety policy">
-        <span>{browserStatus.downloadsBlocked ? "Downloads blocked" : "Downloads blocked in native browser"}</span>
-        <span>{browserStatus.clipboardBlocked ? "Clipboard blocked" : "Clipboard blocked in native browser"}</span>
-        <span>{browserStatus.fileUploadsBlocked ? "File uploads blocked" : "File uploads blocked in native browser"}</span>
+        <span>{browserStatus.downloadsBlocked ? "Downloads blocked where supported" : "Downloads stay on this device"}</span>
+        <span>{browserStatus.clipboardBlocked ? "Clipboard blocked where supported" : "Clipboard follows browser permissions"}</span>
+        <span>{browserStatus.fileUploadsBlocked ? "File uploads blocked where supported" : "File uploads need host care"}</span>
         <strong>Signed-in pages are shared with room context.</strong>
-      </div>
-      <div className="browser-allowlist">
-        <label>
-          <span>Allowed sites</span>
-          <textarea
-            value={browserAllowedOriginsDraft}
-            disabled={browserAllowedOriginsDisabled}
-            onChange={(event) => onBrowserAllowedOriginsDraftChange(event.target.value)}
-            placeholder="https://github.com"
-          />
-        </label>
-        <button
-          className="ghost-wide"
-          onClick={onSaveBrowserAllowedOrigins}
-          disabled={browserAllowedOriginsDisabled}
-        >
-          <Check size={15} />
-          Save allowed sites
-        </button>
       </div>
       <label>
         <span>URL</span>
@@ -159,6 +216,28 @@ export function BrowserAccessPanel<T extends BrowserAccessRequestDisplay>({
         <Globe2 size={15} />
         Request browser access
       </button>
+      <div className={`browser-viewport ${activeBrowserUrl ? "active" : ""}`} ref={browserViewportRef}>
+        {activeBrowserUrl && !tauriRuntime ? (
+          <iframe
+            title="Room browser"
+            src={activeBrowserUrl}
+            sandbox="allow-forms allow-modals allow-popups allow-same-origin allow-scripts"
+          />
+        ) : activeBrowserUrl ? (
+          <div>
+            <Globe2 size={18} />
+            <strong>Browser open</strong>
+            <span>The page is active in this in-app browser surface.</span>
+          </div>
+        ) : (
+          <div>
+            <Globe2 size={18} />
+            <strong>No page open</strong>
+            <span>Open an approved URL to browse inside this room.</span>
+          </div>
+        )}
+      </div>
+      {browserSurfaceError && <div className="workflow-message">{browserSurfaceError}</div>}
       <div className="browser-requests">
         {browserRequests.slice(-4).reverse().map((request) => {
           const risks = detectBrowserSecretRisks(request.url);

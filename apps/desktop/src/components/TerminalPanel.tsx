@@ -1,4 +1,4 @@
-import { Check, Copy, MessageSquare, Play, Send, Terminal, X } from "lucide-react";
+import { Check, Copy, MessageSquare, Play, Terminal, X } from "lucide-react";
 import type { TerminalLine, TerminalSnapshot } from "../lib/localBackend";
 import { InlineSecretWarning } from "./common";
 
@@ -234,30 +234,31 @@ export function TerminalPanel({
           </div>
         ))}
         {codexRunning && <div className="terminal-active">Codex is preparing a foreground terminal...</div>}
+        {selectedTerminal && (
+          <form
+            className="terminal-command-line"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onSendTerminalInput();
+            }}
+          >
+            <span>{selectedTerminal.name}</span>
+            <b>$</b>
+            <input
+              value={terminalInput}
+              onChange={(event) => onTerminalInputChange(event.target.value)}
+              placeholder={selectedTerminal.running ? "type a command" : "terminal stopped"}
+              disabled={!selectedTerminalCanControl || !selectedTerminal.running}
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+          </form>
+        )}
       </div>
 
       {selectedTerminal && (
-        <div className="terminal-input-row">
-          <input
-            value={terminalInput}
-            onChange={(event) => onTerminalInputChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                onSendTerminalInput();
-              }
-            }}
-            placeholder={`Send input to ${selectedTerminal.name}`}
-            disabled={!selectedTerminalCanControl || !selectedTerminal.running}
-          />
-          <button
-            onClick={onSendTerminalInput}
-            disabled={!selectedTerminalCanControl || !selectedTerminal.running || !terminalInput.trim()}
-            title={`Send input to ${selectedTerminal.name}`}
-            aria-label={`Send input to ${selectedTerminal.name}`}
-          >
-            <Send size={14} />
-          </button>
+        <div className="terminal-session-actions">
           {selectedTerminalCanRestart && (
             <button
               onClick={onRestartTerminal}
@@ -265,6 +266,7 @@ export function TerminalPanel({
               title={`Restart ${selectedTerminal.name}`}
             >
               <Play size={14} />
+              Restart
             </button>
           )}
           <button
@@ -274,6 +276,7 @@ export function TerminalPanel({
             aria-label={`Stop ${selectedTerminal.name}`}
           >
             <X size={14} />
+            Stop
           </button>
         </div>
       )}
