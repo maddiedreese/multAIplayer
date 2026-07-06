@@ -1,17 +1,20 @@
 import { useState } from "react";
 import type { GitHubActionRun } from "../lib/authClient";
-import type { GitStatusSummary } from "../lib/localBackend";
-import type { GitWorkflowDraft } from "../lib/gitWorkflowDraft";
+import { useAppStore } from "../store/appStore";
 
 export function useGitHubWorkflowPanelState() {
-  const [gitStatusByRoom, setGitStatusByRoom] = useState<Record<string, GitStatusSummary | null>>({});
-  const [gitWorkflowBusyByRoom, setGitWorkflowBusyByRoom] = useState<Record<string, boolean>>({});
-  const [gitWorkflowMessagesByRoom, setGitWorkflowMessagesByRoom] = useState<Record<string, string | null>>({});
+  const gitStatusByRoom = useAppStore((state) => state.gitStatusByRoom);
+  const setGitStatusByRoom = useAppStore((state) => state.setGitStatusByRoom);
+  const gitWorkflowBusyByRoom = useAppStore((state) => state.gitWorkflowBusyByRoom);
+  const setGitWorkflowBusyByRoom = useAppStore((state) => state.setGitWorkflowBusyByRoom);
+  const gitWorkflowMessagesByRoom = useAppStore((state) => state.gitWorkflowMessagesByRoom);
+  const setGitWorkflowMessagesByRoom = useAppStore((state) => state.setGitWorkflowMessagesByRoom);
+  const gitWorkflowDraftsByRoom = useAppStore((state) => state.gitWorkflowDraftsByRoom);
+  const setGitWorkflowDraftsByRoom = useAppStore((state) => state.setGitWorkflowDraftsByRoom);
   const [actionsBusyByRoom, setActionsBusyByRoom] = useState<Record<string, boolean>>({});
   const [actionsMessagesByRoom, setActionsMessagesByRoom] = useState<Record<string, string | null>>({});
   const [actionRunsByRoom, setActionRunsByRoom] = useState<Record<string, GitHubActionRun[]>>({});
   const [actionsLastCheckedByRoom, setActionsLastCheckedByRoom] = useState<Record<string, string | null>>({});
-  const [gitWorkflowDraftsByRoom, setGitWorkflowDraftsByRoom] = useState<Record<string, Partial<GitWorkflowDraft>>>({});
 
   return {
     gitStatusByRoom,
