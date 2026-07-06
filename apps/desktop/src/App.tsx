@@ -4,8 +4,6 @@ import type {
   GitWorkflowEventPlaintextPayload,
   LocalPreviewPlaintextPayload,
   RoomRecord,
-  TeamMemberRecord,
-  TeamRecord,
   ApprovalPolicy
 } from "@multaiplayer/protocol";
 import {
@@ -142,6 +140,7 @@ import { useRoomChatPanelActions } from "./hooks/useRoomChatPanelActions";
 import { useRoomHeaderActions } from "./hooks/useRoomHeaderActions";
 import { useTerminalPanelActions } from "./hooks/useTerminalPanelActions";
 import { useWorkspaceFilesPanelActions } from "./hooks/useWorkspaceFilesPanelActions";
+import { useWorkspaceUiState } from "./hooks/useWorkspaceUiState";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -190,13 +189,43 @@ import {
 
 export function App() {
   const { themeMode, toggleThemeMode } = useThemeMode();
-  const [teams, setTeams] = useState<TeamRecord[]>(seededTeams);
-  const [rooms, setRooms] = useState<RoomRecord[]>(seededRooms);
-  const [teamMembersByTeam, setTeamMembersByTeam] = useState<Record<string, TeamMemberRecord[]>>(seededTeamMembers);
-  const [teamMembersMessageByTeam, setTeamMembersMessageByTeam] = useState<Record<string, string | null>>({});
-  const [teamMembersBusyByTeam, setTeamMembersBusyByTeam] = useState<Record<string, boolean>>({});
-  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
-  const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>(null);
+  const {
+    teams,
+    setTeams,
+    rooms,
+    setRooms,
+    teamMembersByTeam,
+    setTeamMembersByTeam,
+    teamMembersMessageByTeam,
+    setTeamMembersMessageByTeam,
+    teamMembersBusyByTeam,
+    setTeamMembersBusyByTeam,
+    workspaceError,
+    setWorkspaceError,
+    activeSidebarPanel,
+    setActiveSidebarPanel,
+    newTeamName,
+    setNewTeamName,
+    newRoomName,
+    setNewRoomName,
+    newRoomProjectPath,
+    setNewRoomProjectPath,
+    selectedTeam,
+    setSelectedTeam,
+    selectedRoomId,
+    setSelectedRoomId,
+    sidebarQuery,
+    setSidebarQuery,
+    messagesByRoom,
+    setMessagesByRoom
+  } = useWorkspaceUiState({
+    initialTeams: seededTeams,
+    initialRooms: seededRooms,
+    initialTeamMembersByTeam: seededTeamMembers,
+    initialProjectPath: defaultProjectPath,
+    initialRoomId: "room-desktop",
+    initialMessagesByRoom
+  });
   const {
     appConfig,
     relayHttpDraft,
@@ -236,14 +265,7 @@ export function App() {
   );
   const [historyMessagesByRoom, setHistoryMessagesByRoom] = useState<Record<string, string | null>>({});
   const [teamHistoryMessagesByTeam, setTeamHistoryMessagesByTeam] = useState<Record<string, string | null>>({});
-  const [newTeamName, setNewTeamName] = useState("");
-  const [newRoomName, setNewRoomName] = useState("");
-  const [newRoomProjectPath, setNewRoomProjectPath] = useState(defaultProjectPath);
-  const [selectedTeam, setSelectedTeam] = useState(seededTeams[0].id);
-  const [selectedRoomId, setSelectedRoomId] = useState("room-desktop");
   const [inspectorTabsByRoom, setInspectorTabsByRoom] = useState<Record<string, InspectorTab>>({});
-  const [sidebarQuery, setSidebarQuery] = useState("");
-  const [messagesByRoom, setMessagesByRoom] = useState<Record<string, ChatMessage[]>>(initialMessagesByRoom);
   const [forgottenRoomIds, setForgottenRoomIds] = useState<Set<string>>(() => new Set());
   const [revokedRoomIds, setRevokedRoomIds] = useState<Set<string>>(() => new Set());
   const [revokedTeamIds, setRevokedTeamIds] = useState<Set<string>>(() => new Set());
