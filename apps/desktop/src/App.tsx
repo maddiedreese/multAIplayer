@@ -303,6 +303,7 @@ import { useGitHubWorkflowState } from "./hooks/useGitHubWorkflowState";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useMarkdownSelection } from "./hooks/useMarkdownSelection";
 import { useRoomAccess } from "./hooks/useRoomAccess";
+import { useRoomBrowserSetters } from "./hooks/useRoomBrowserSetters";
 import { useRoomBusySetters } from "./hooks/useRoomBusySetters";
 import { useRoomCodexApprovalSetters } from "./hooks/useRoomCodexApprovalSetters";
 import { useRoomFileSetters } from "./hooks/useRoomFileSetters";
@@ -760,6 +761,19 @@ export function App() {
     setPendingCodexApprovalsByRoom,
     setCodexRunningByRoom
   });
+  const {
+    setBrowserUrlForRoom,
+    setBrowserReasonForRoom,
+    setBrowserMessageForRoom,
+    setSelectedBrowserMessage
+  } = useRoomBrowserSetters({
+    selectedRoomId: selectedRoom.id,
+    defaultBrowserUrl,
+    defaultBrowserReason,
+    setBrowserUrlsByRoom,
+    setBrowserReasonsByRoom,
+    setBrowserMessagesByRoom
+  });
   const roomNotices = useRoomNotices({
     roomId: selectedRoom.id,
     hostMessage,
@@ -922,22 +936,6 @@ export function App() {
     if (!isRoomFileActionInFlight(fileBusyRef.current, roomId)) return false;
     setFileMessageForRoom(roomId, roomFileActionInFlightMessage());
     return true;
-  }
-
-  function setBrowserUrlForRoom(roomId: string, url: string) {
-    setBrowserUrlsByRoom((current) => url === defaultBrowserUrl ? omitRecordKey(current, roomId) : { ...current, [roomId]: url });
-  }
-
-  function setBrowserReasonForRoom(roomId: string, reason: string) {
-    setBrowserReasonsByRoom((current) => reason === defaultBrowserReason ? omitRecordKey(current, roomId) : { ...current, [roomId]: reason });
-  }
-
-  function setBrowserMessageForRoom(roomId: string, message: string | null) {
-    setBrowserMessagesByRoom((current) => message ? { ...current, [roomId]: message } : omitRecordKey(current, roomId));
-  }
-
-  function setSelectedBrowserMessage(message: string | null) {
-    setBrowserMessageForRoom(selectedRoom.id, message);
   }
 
   function setInviteLinkForRoom(roomId: string, link: string) {
