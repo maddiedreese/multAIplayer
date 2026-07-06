@@ -38,6 +38,7 @@ import { registerDeviceRoutes } from "./http/devices.js";
 import { registerGitHubRoutes } from "./http/github.js";
 import { registerInviteRoutes } from "./http/invites.js";
 import { createRelayRequestGuards } from "./http/middleware.js";
+import { registerOpsRoutes } from "./http/ops.js";
 import { registerTeamRoutes, teamRecordForUser } from "./http/teams.js";
 import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
 import { createRelayPersistence } from "./persistence.js";
@@ -325,21 +326,15 @@ registerDeviceRoutes({
   maxPublicKeyJwkChars,
   maxUserIdChars
 });
+registerOpsRoutes({
+  app,
+  dataPath,
+  metrics: relayMetrics,
+  sessions
+});
 
 await loadRelayStore();
 seedWorkspace();
-
-app.get("/healthz", (_req, res) => {
-  res.json({ ok: true, service: "multaiplayer-relay" });
-});
-
-app.get("/readyz", (_req, res) => {
-  res.json({ ok: true, dataPath });
-});
-
-app.get("/metrics", (_req, res) => {
-  res.json(relayMetrics.snapshot(sessions.size));
-});
 
 app.post("/rooms", (req, res) => {
   const session = getAuthSession(req.cookies?.multaiplayer_session);
