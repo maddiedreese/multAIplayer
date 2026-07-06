@@ -130,6 +130,7 @@ import {
 } from "./lib/workspaceClient";
 import { defaultRelayHttpUrl, defaultRelayWsUrl } from "./lib/appConfig";
 import { useDeviceIdentityLifecycle } from "./hooks/useDeviceIdentityLifecycle";
+import { useSelectedTeamDefaults } from "./hooks/useSelectedTeamDefaults";
 import {
   canApproveCodexTurn,
   shouldAutoApproveChatOnlyTurn,
@@ -1047,6 +1048,15 @@ export function App() {
     setDeviceIdentityMessage
   });
 
+  useSelectedTeamDefaults({
+    selectedTeam,
+    setTeamHistorySettings,
+    setTeamDefaultApprovalPolicy,
+    setTeamDefaultCodexModel,
+    setTeamDefaultBrowserProfilePersistent,
+    setTeamDefaultInviteApprovalGate
+  });
+
   useEffect(() => {
     const invitePayload = readInviteUrlPayload(window.location);
     if (!invitePayload) return;
@@ -1060,16 +1070,6 @@ export function App() {
     acceptInvite(invitePayload.encoded, invitePayload.inviteId, invitePayload.approvalRequested)
       .catch((error) => setSelectedInviteMessage(`Invite could not be read: ${String(error)}`));
   }, []);
-
-  useEffect(() => {
-    if (!selectedTeam) return;
-    const teamRoomDefaults = loadTeamRoomDefaults(selectedTeam);
-    setTeamHistorySettings(loadTeamHistorySettings(selectedTeam));
-    setTeamDefaultApprovalPolicy(teamRoomDefaults.approvalPolicy);
-    setTeamDefaultCodexModel(teamRoomDefaults.codexModel);
-    setTeamDefaultBrowserProfilePersistent(teamRoomDefaults.browserProfilePersistent);
-    setTeamDefaultInviteApprovalGate(teamRoomDefaults.inviteApprovalGate);
-  }, [selectedTeam]);
 
   useEffect(() => {
     if (!hasSelectedRoom) return;
