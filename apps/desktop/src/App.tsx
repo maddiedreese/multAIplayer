@@ -13,7 +13,6 @@ import {
   type GitWorkflowResult,
 } from "./lib/localBackend";
 import type { GitHubActionRun } from "./lib/authClient";
-import { defaultRelayHttpUrl, defaultRelayWsUrl } from "./lib/appConfig";
 import { useDeviceIdentityLifecycle } from "./hooks/useDeviceIdentityLifecycle";
 import { useSelectedTeamDefaults } from "./hooks/useSelectedTeamDefaults";
 import { useCodexProbe } from "./hooks/useCodexProbe";
@@ -34,13 +33,10 @@ import { attachmentReviewScopeKey } from "./lib/attachmentPolicy";
 import { roomChatGateMessage } from "./lib/chatPolicy";
 import type { GitHubActionsTarget } from "./lib/githubWorkflowReadiness";
 import type { GitWorkflowDraft } from "./lib/gitWorkflowDraft";
-import { roomSecretStorageLabel } from "./lib/appRuntime";
 import {
   embeddedAttachmentBytes,
   encodedBytes,
   attachmentTypeFromName,
-  formatCodexModel,
-  formatSessionPersistence,
   formatTimestamp
 } from "./lib/appFormatters";
 import {
@@ -126,6 +122,7 @@ import { useAppRefs } from "./hooks/useAppRefs";
 import { useRoomMainColumnProps } from "./hooks/useRoomMainColumnProps";
 import { useRoomInspectorPanelProps } from "./hooks/useRoomInspectorPanelProps";
 import { useSelectedRoomContext } from "./hooks/useSelectedRoomContext";
+import { useAppSidebarProps } from "./hooks/useAppSidebarProps";
 import { InlineSecretWarning } from "./components/common";
 import { AppWorkspaceShell } from "./components/AppWorkspaceShell";
 import { AppSidebarDrawer } from "./components/AppSidebarDrawer";
@@ -2086,6 +2083,84 @@ export function App() {
       ...terminalPanelActions
     }
   });
+  const { sidebarProps, drawerProps } = useAppSidebarProps({
+    currentUser,
+    authBusy,
+    authConfig,
+    authError,
+    deviceFlow,
+    sidebarQuery,
+    searchActive,
+    workspaceError,
+    newTeamName,
+    newRoomName,
+    newRoomProjectPath,
+    selectedTeam: Boolean(selectedTeam),
+    teams: sidebarTeamRows,
+    rooms: sidebarRoomRows,
+    messageHits: sidebarMessageHitRows,
+    historySearchBusy,
+    activeSidebarPanel,
+    themeMode,
+    localUserName: localUser.name,
+    selectedRoomName: selectedRoom.name,
+    deviceId,
+    deviceIdentity,
+    deviceIdentityMessage,
+    relayStatus,
+    relayWsUrl: appConfig.relayWsUrl,
+    relayHttpUrl: appConfig.relayHttpUrl,
+    codexProbe,
+    projectPath: selectedRoom.projectPath,
+    selectedCodexModel,
+    selectedRoomApprovalPolicy: selectedRoom.approvalPolicy,
+    roomPosture,
+    hasSelectedRoom,
+    isSelectedRoomLocked,
+    settingsBusy,
+    isActiveHost,
+    relayHttpDraft,
+    relayWsDraft,
+    selectedRoomMode: selectedRoom.mode,
+    roomSettingsGateMessage,
+    historySettings,
+    teamHistorySettings,
+    teamDefaultApprovalPolicy,
+    teamDefaultCodexModel,
+    teamDefaultBrowserProfilePersistent,
+    teamDefaultInviteApprovalGate,
+    settingsMessage: appConfigMessage ?? settingsMessage ?? visibleHistoryMessage,
+    onSignIn: beginGitHubSignIn,
+    onSignOut: signOut,
+    onSidebarQueryChange: setSidebarQuery,
+    onNewTeamNameChange: setNewTeamName,
+    onCreateTeam: addTeam,
+    onSelectTeam: setSelectedTeam,
+    onNewRoomNameChange: setNewRoomName,
+    onNewRoomProjectPathChange: setNewRoomProjectPath,
+    onChooseNewRoomProjectPath: chooseNewRoomProjectPath,
+    onCreateRoom: addRoom,
+    onSelectRoom: setSelectedRoomId,
+    onSelectSidebarPanel: setActiveSidebarPanel,
+    onToggleTheme: toggleThemeMode,
+    onRotateDeviceIdentity: rotateDeviceIdentity,
+    onChooseProject: chooseProjectPath,
+    onRelayHttpDraftChange: setRelayHttpDraft,
+    onRelayWsDraftChange: setRelayWsDraft,
+    onResetRelay: resetRelayConfiguration,
+    onSaveRelay: saveRelayConfiguration,
+    onToggleRoomMode: toggleRoomMode,
+    onHistorySettingsChange: updateLocalHistorySettings,
+    onClearRoomHistory: clearRoomHistory,
+    onForgetRoomLocalData: forgetSelectedRoomLocalData,
+    onTeamHistoryDefaultsChange: updateTeamHistoryDefaults,
+    onTeamDefaultApprovalPolicyChange: updateTeamDefaultApprovalPolicy,
+    onTeamDefaultCodexModelChange: updateTeamDefaultCodexModel,
+    onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent,
+    onTeamDefaultInviteApprovalGateChange: updateTeamDefaultInviteApprovalGate,
+    onApplyTeamDefaultsToRoom: applyTeamDefaultsToRoom,
+    roomSources: rooms
+  });
 
   return (
     <AppWorkspaceShell
@@ -2096,138 +2171,8 @@ export function App() {
       onBeginInspectorResize={(event) => beginShellResize("inspector", event)}
       onToggleSidebarCollapsed={toggleSidebarCollapsed}
       onToggleInspectorCollapsed={toggleInspectorCollapsed}
-      sidebar={(
-        <DesktopSidebar
-        currentUser={currentUser}
-        authBusy={authBusy}
-        authConfig={authConfig}
-        authError={authError}
-        deviceFlow={deviceFlow}
-        sidebarQuery={sidebarQuery}
-        searchActive={searchActive}
-        workspaceError={workspaceError}
-        newTeamName={newTeamName}
-        newRoomName={newRoomName}
-        newRoomProjectPath={newRoomProjectPath}
-        defaultProjectPath={defaultProjectPath}
-        selectedTeam={Boolean(selectedTeam)}
-        teams={sidebarTeamRows}
-        rooms={sidebarRoomRows}
-        messageHits={sidebarMessageHitRows}
-        historySearchBusy={historySearchBusy}
-        activeSidebarPanel={activeSidebarPanel}
-        themeMode={themeMode}
-        onSignIn={beginGitHubSignIn}
-        onSignOut={signOut}
-        onSidebarQueryChange={setSidebarQuery}
-        onClearSidebarQuery={() => setSidebarQuery("")}
-        onNewTeamNameChange={setNewTeamName}
-        onCreateTeam={addTeam}
-        onSelectTeam={(teamId) => {
-          setSelectedTeam(teamId);
-          setSelectedRoomId(rooms.find((room) => room.teamId === teamId)?.id ?? rooms[0]?.id ?? "");
-        }}
-        onNewRoomNameChange={setNewRoomName}
-        onNewRoomProjectPathChange={setNewRoomProjectPath}
-        onChooseNewRoomProjectPath={chooseNewRoomProjectPath}
-        onCreateRoom={addRoom}
-        onSelectRoom={(roomId, teamId) => {
-          if (teamId) setSelectedTeam(teamId);
-          setSelectedRoomId(roomId);
-        }}
-        onSelectSidebarPanel={setActiveSidebarPanel}
-        onToggleTheme={toggleThemeMode}
-      />
-      )}
-      drawer={(
-        <AppSidebarDrawer
-        activePanel={activeSidebarPanel}
-        profileTitle={localUser.name}
-        settingsTitle={selectedRoom.name}
-        profile={{
-          currentUser,
-          authConfig,
-          authBusy,
-          authError,
-          deviceFlow,
-          deviceId,
-          deviceIdentity,
-          deviceIdentityMessage,
-          relaySessionPersistence: formatSessionPersistence(authConfig?.sessionPersistence),
-          onRotateDeviceIdentity: rotateDeviceIdentity,
-          onSignIn: beginGitHubSignIn,
-          onSignOut: signOut
-        }}
-        settings={{
-          relaySummary: `${relayStatus} · ${appConfig.relayWsUrl}`,
-          relayApi: appConfig.relayHttpUrl,
-          codexSummary: codexProbe?.available ? codexProbe.version ?? "Available" : codexProbe?.error ?? "Not connected",
-          projectPath: selectedRoom.projectPath,
-          modelLabel: formatCodexModel(selectedCodexModel),
-          approvalLabel: approvalPolicyLabels[selectedRoom.approvalPolicy],
-          roomKeysLabel: roomSecretStorageLabel(),
-          posture: roomPosture,
-          chooseProjectDisabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
-          relayHttpDraft,
-          relayWsDraft,
-          defaultRelayHttpUrl,
-          defaultRelayWsUrl,
-          saveRelayDisabled: !relayHttpDraft.trim() || !relayWsDraft.trim(),
-          roomMode: selectedRoom.mode,
-          roomModeLabels,
-          roomModesDisabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
-          showRoomSettingsGate: !isActiveHost && hasSelectedRoom,
-          roomSettingsGateMessage,
-          historySettings,
-          teamHistorySettings,
-          hasSelectedRoom,
-          selectedTeam: Boolean(selectedTeam),
-          settingsBusy,
-          teamDefaultApprovalPolicy,
-          approvalPolicyLabels,
-          teamDefaultCodexModel,
-          defaultCodexModel,
-          codexModelOptions,
-          teamDefaultBrowserProfilePersistent,
-          teamDefaultInviteApprovalGate,
-          message: appConfigMessage ?? settingsMessage ?? visibleHistoryMessage,
-          onChooseProject: chooseProjectPath,
-          onRelayHttpDraftChange: setRelayHttpDraft,
-          onRelayWsDraftChange: setRelayWsDraft,
-          onResetRelay: resetRelayConfiguration,
-          onSaveRelay: saveRelayConfiguration,
-          onToggleRoomMode: toggleRoomMode,
-          onHistoryEnabledChange: (enabled) =>
-            updateLocalHistorySettings({
-              ...historySettings,
-              enabled
-            }),
-          onHistoryRetentionDaysChange: (retentionDays) =>
-            updateLocalHistorySettings({
-              ...historySettings,
-              retentionDays
-            }),
-          onClearRoomHistory: clearRoomHistory,
-          onForgetRoomLocalData: forgetSelectedRoomLocalData,
-          onTeamHistoryEnabledChange: (enabled) =>
-            updateTeamHistoryDefaults({
-              ...teamHistorySettings,
-              enabled
-            }),
-          onTeamHistoryRetentionDaysChange: (retentionDays) =>
-            updateTeamHistoryDefaults({
-              ...teamHistorySettings,
-              retentionDays
-            }),
-          onTeamDefaultApprovalPolicyChange: updateTeamDefaultApprovalPolicy,
-          onTeamDefaultCodexModelChange: updateTeamDefaultCodexModel,
-          onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent,
-          onTeamDefaultInviteApprovalGateChange: updateTeamDefaultInviteApprovalGate,
-          onApplyTeamDefaultsToRoom: applyTeamDefaultsToRoom
-        }}
-        onClose={() => setActiveSidebarPanel(null)}
-      />
-      )}
+      sidebar={<DesktopSidebar {...sidebarProps} />}
+      drawer={<AppSidebarDrawer {...drawerProps} />}
       main={(
         <RoomMainColumn {...roomMainColumnProps} />
       )}
