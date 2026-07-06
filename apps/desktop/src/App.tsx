@@ -137,6 +137,7 @@ import { useTerminalPanelActions } from "./hooks/useTerminalPanelActions";
 import { useWorkspaceFilesPanelActions } from "./hooks/useWorkspaceFilesPanelActions";
 import { useWorkspaceUiState } from "./hooks/useWorkspaceUiState";
 import { useHistoryDefaultsState } from "./hooks/useHistoryDefaultsState";
+import { useBrowserPanelState } from "./hooks/useBrowserPanelState";
 import {
   hasAcknowledgedRoomVisibilityWarning
 } from "./lib/roomVisibilityWarning";
@@ -151,7 +152,6 @@ import { RoomInspectorWorkPanel } from "./components/RoomInspectorWorkPanel";
 import { LocalPreviewDialog } from "./components/LocalPreviewDialog";
 import type {
   BrowserAccessRequest,
-  BrowserStatus,
   ChatAttachment,
   ChatMessage,
   ChatReaction,
@@ -298,12 +298,20 @@ export function App() {
   const [terminalInputsByRoom, setTerminalInputsByRoom] = useState<Record<string, string>>({});
   const [terminalErrorsByRoom, setTerminalErrorsByRoom] = useState<Record<string, string | null>>({});
   const terminalAutoOpenedRoomsRef = useRef<Set<string>>(new Set());
-  const [browserRequestsByRoom, setBrowserRequestsByRoom] = useState<Record<string, BrowserAccessRequest[]>>({});
-  const [browserUrlsByRoom, setBrowserUrlsByRoom] = useState<Record<string, string>>({});
-  const [browserReasonsByRoom, setBrowserReasonsByRoom] = useState<Record<string, string>>({});
-  const [browserMessagesByRoom, setBrowserMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [browserStatusByRoom, setBrowserStatusByRoom] = useState<Record<string, BrowserStatus>>({});
-  const [activeBrowserUrlsByRoom, setActiveBrowserUrlsByRoom] = useState<Record<string, string | null>>({});
+  const {
+    browserRequestsByRoom,
+    setBrowserRequestsByRoom,
+    browserUrlsByRoom,
+    setBrowserUrlsByRoom,
+    browserReasonsByRoom,
+    setBrowserReasonsByRoom,
+    browserMessagesByRoom,
+    setBrowserMessagesByRoom,
+    browserStatusByRoom,
+    setBrowserStatusByRoom,
+    activeBrowserUrlsByRoom,
+    setActiveBrowserUrlsByRoom
+  } = useBrowserPanelState();
   const [relayStatus, setRelayStatus] = useState<RelayStatus>("closed");
   const [deviceIdentity, setDeviceIdentity] = useState<DeviceIdentity | null>(null);
   const [deviceIdentityMessage, setDeviceIdentityMessage] = useState<string | null>(null);
