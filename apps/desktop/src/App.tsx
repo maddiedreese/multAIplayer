@@ -79,18 +79,7 @@ export function App() {
     workspaceState,
     appConfigState,
     roomChatState,
-    hostBusyByRoom,
-    setHostBusyByRoom,
-    hostMessagesByRoom,
-    setHostMessagesByRoom,
-    settingsBusyByRoom,
-    setSettingsBusyByRoom,
-    settingsMessagesByRoom,
-    setSettingsMessagesByRoom,
-    customCodexModelsByRoom,
-    setCustomCodexModelsByRoom,
-    projectPathDraftsByRoom,
-    setProjectPathDraftsByRoom,
+    roomSettingsState,
     historySettings,
     setHistorySettings,
     teamHistorySettings,
@@ -251,8 +240,8 @@ export function App() {
     rooms: workspaceState.rooms,
     selectedRoomId: workspaceState.selectedRoomId,
     gitWorkflowDraftsByRoom,
-    hostBusyByRoom,
-    settingsBusyByRoom,
+    hostBusyByRoom: roomSettingsState.hostBusyByRoom,
+    settingsBusyByRoom: roomSettingsState.settingsBusyByRoom,
     keyRotationBusyByRoom,
     gitWorkflowBusyByRoom,
     actionsBusyByRoom,
@@ -346,8 +335,8 @@ export function App() {
     roomValues: {
       selectedRoomId: workspaceState.selectedRoomId,
       selectedTeam: workspaceState.selectedTeam,
-      customCodexModelsByRoom,
-      projectPathDraftsByRoom,
+      customCodexModelsByRoom: roomSettingsState.customCodexModelsByRoom,
+      projectPathDraftsByRoom: roomSettingsState.projectPathDraftsByRoom,
       messagesByRoom: workspaceState.messagesByRoom,
       draftsByRoom: roomChatState.draftsByRoom,
       pendingAttachmentsByRoom: roomChatState.pendingAttachmentsByRoom,
@@ -380,9 +369,9 @@ export function App() {
       inviteLinksByRoom,
       inviteApprovalGatesByRoom,
       inviteMessagesByRoom,
-      hostMessagesByRoom,
+      hostMessagesByRoom: roomSettingsState.hostMessagesByRoom,
       chatMessagesByRoom: roomChatState.chatMessagesByRoom,
-      settingsMessagesByRoom,
+      settingsMessagesByRoom: roomSettingsState.settingsMessagesByRoom,
       historyMessagesByRoom,
       teamHistoryMessagesByTeam,
       markdownCopyFallbacksByRoom,
@@ -461,13 +450,13 @@ export function App() {
     messages: {
       selectedRoomId: selectedRoom.id,
       selectedTeamId: workspaceState.selectedTeam,
-      setHostMessagesByRoom,
+      setHostMessagesByRoom: roomSettingsState.setHostMessagesByRoom,
       setChatMessagesByRoom: roomChatState.setChatMessagesByRoom,
       setMarkdownCopyFallbacksByRoom,
       setSecretWarningsVisibleByRoom,
       setHistoryMessagesByRoom,
       setTeamHistoryMessagesByTeam,
-      setSettingsMessagesByRoom
+      setSettingsMessagesByRoom: roomSettingsState.setSettingsMessagesByRoom
     },
     busy: {
       gitWorkflowBusyRef: appRefs.gitWorkflowBusyRef,
@@ -481,8 +470,8 @@ export function App() {
       setGitWorkflowBusyByRoom,
       setActionsBusyByRoom,
       setLocalPreviewBusyByRoom,
-      setHostBusyByRoom,
-      setSettingsBusyByRoom,
+      setHostBusyByRoom: roomSettingsState.setHostBusyByRoom,
+      setSettingsBusyByRoom: roomSettingsState.setSettingsBusyByRoom,
       setKeyRotationBusyByRoom,
       setFileBusyByRoom,
       setTerminalBusyByRoom
@@ -534,8 +523,8 @@ export function App() {
       roomsRef: appRefs.roomsRef,
       defaultCodexModel,
       defaultProjectPath,
-      setCustomCodexModelsByRoom,
-      setProjectPathDraftsByRoom
+      setCustomCodexModelsByRoom: roomSettingsState.setCustomCodexModelsByRoom,
+      setProjectPathDraftsByRoom: roomSettingsState.setProjectPathDraftsByRoom
     },
     git: {
       selectedRoomId: selectedRoom.id,
@@ -674,8 +663,8 @@ export function App() {
     githubActionsEventsByRoom,
     codexThreadIdsByRoom,
     codexRunningByRoom,
-    hostBusyByRoom,
-    settingsBusyByRoom,
+    hostBusyByRoom: roomSettingsState.hostBusyByRoom,
+    settingsBusyByRoom: roomSettingsState.settingsBusyByRoom,
     keyRotationBusyByRoom
   });
   const hostHandoffActions = useHostHandoffActions({
@@ -934,16 +923,16 @@ export function App() {
         setActionsMessagesByRoom,
         setActionsBusyByRoom,
         setGitWorkflowBusyByRoom,
-        setHostBusyByRoom,
-        setHostMessagesByRoom,
+        setHostBusyByRoom: roomSettingsState.setHostBusyByRoom,
+        setHostMessagesByRoom: roomSettingsState.setHostMessagesByRoom,
         setChatMessagesByRoom: roomChatState.setChatMessagesByRoom,
         setMarkdownCopyFallbacksByRoom,
         setSecretWarningsVisibleByRoom,
         setHistoryMessagesByRoom,
-        setSettingsBusyByRoom,
-        setSettingsMessagesByRoom,
-        setCustomCodexModelsByRoom,
-        setProjectPathDraftsByRoom,
+        setSettingsBusyByRoom: roomSettingsState.setSettingsBusyByRoom,
+        setSettingsMessagesByRoom: roomSettingsState.setSettingsMessagesByRoom,
+        setCustomCodexModelsByRoom: roomSettingsState.setCustomCodexModelsByRoom,
+        setProjectPathDraftsByRoom: roomSettingsState.setProjectPathDraftsByRoom,
         setKeyRotationBusyByRoom,
         setApprovalVisibleByRoom,
         setPendingCodexApprovalsByRoom,
@@ -1424,8 +1413,8 @@ export function App() {
       selectedRoomId: selectedRoom.id,
       selectedRoomProjectPath: selectedRoom.projectPath,
       selectedCodexModel,
-      setCustomCodexModelsByRoom,
-      setProjectPathDraftsByRoom
+      setCustomCodexModelsByRoom: roomSettingsState.setCustomCodexModelsByRoom,
+      setProjectPathDraftsByRoom: roomSettingsState.setProjectPathDraftsByRoom
       }
     }
   });
