@@ -634,11 +634,7 @@ export function App() {
   } = useRoomChatMutations({
     setMessagesByRoom
   });
-  const {
-    upsertTeam,
-    upsertRoom,
-    handleRelayError
-  } = useWorkspaceRecordActions({
+  const workspaceRecords = useWorkspaceRecordActions({
     hasSelectedRoom,
     selectedRoom,
     localUser,
@@ -852,8 +848,8 @@ export function App() {
     seenEnvelopeIds,
     historyLoadedRoomIds,
     reportRoomKeyRotationInFlight,
-    upsertTeam,
-    upsertRoom,
+    upsertTeam: workspaceRecords.upsertTeam,
+    upsertRoom: workspaceRecords.upsertRoom,
     appendInviteRequest,
     updateInviteRequestStatus,
     appendRoomMessage,
@@ -1011,8 +1007,8 @@ export function App() {
         setForgottenRoomIds,
         setMessagesByRoom,
         setInviteApprovalGateForRoom,
-        upsertTeam,
-        upsertRoom
+        upsertTeam: workspaceRecords.upsertTeam,
+        upsertRoom: workspaceRecords.upsertRoom
       },
       teamDefaults: {
         selectedTeam,
@@ -1222,9 +1218,9 @@ export function App() {
         setActionsLastCheckedByRoom,
         setActionsMessagesByRoom,
         setForgottenRoomIds,
-        handleRelayError,
-        upsertRoom,
-        upsertTeam,
+        handleRelayError: workspaceRecords.handleRelayError,
+        upsertRoom: workspaceRecords.upsertRoom,
+        upsertTeam: workspaceRecords.upsertTeam,
         refreshTeamMembers,
         decryptInviteEnvelope,
         handleInviteEnvelopePlaintext,
