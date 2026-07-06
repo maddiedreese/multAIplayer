@@ -57,8 +57,7 @@ import {
   forgetRoomLocalData,
   loadRoomSecret,
   replaceRoomSecret,
-  type LocalHistorySettings,
-  saveEncryptedHistory
+  type LocalHistorySettings
 } from "./lib/localHistory";
 import {
   loadTeamRoomDefaults,
@@ -134,6 +133,7 @@ import { useGitHubRemoteInference } from "./hooks/useGitHubRemoteInference";
 import { useGitHubActionsDraftReset } from "./hooks/useGitHubActionsDraftReset";
 import { useProjectFilesSearch } from "./hooks/useProjectFilesSearch";
 import { useTerminalLifecycle } from "./hooks/useTerminalLifecycle";
+import { useLocalHistoryPersistence } from "./hooks/useLocalHistoryPersistence";
 import {
   canApproveCodexTurn,
   shouldAutoApproveChatOnlyTurn,
@@ -1486,47 +1486,27 @@ export function App() {
     selectedTeam
   ]);
 
-  useEffect(() => {
-    if (!hasSelectedRoom) return;
-    if (forgottenRoomIds.has(selectedRoomId) || revokedRoomIds.has(selectedRoomId) || revokedTeamIds.has(selectedRoom.teamId)) return;
-    if (!historyLoadedRoomIds.current.has(selectedRoomId)) return;
-    const payload = pruneLocalRoomHistory({
-      version: 3,
-      messages,
-      terminalRequests,
-      browserRequests,
-      inviteRequests,
-      codexEvents,
-      gitWorkflowEvents,
-      githubActionsEvents,
-      localPreviews,
-      terminalSnapshots: terminalsForLocalHistory(terminals.filter((terminal) => terminal.roomId === selectedRoomId)),
-      hostHandoffs,
-      ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
-    }, historySettings.retentionDays);
-    saveEncryptedHistory(selectedRoomId, payload satisfies LocalRoomHistoryPayload).catch((error) => {
-      console.warn("Failed to save encrypted local history", error);
-    });
-  }, [
+  useLocalHistoryPersistence({
+    hasSelectedRoom,
+    selectedRoomId,
+    selectedRoomTeamId: selectedRoom.teamId,
+    forgottenRoomIds,
+    revokedRoomIds,
+    revokedTeamIds,
+    historyLoadedRoomIds,
+    historySettings,
+    messages,
+    terminalRequests,
     browserRequests,
-    historySettings.enabled,
-    historySettings.retentionDays,
-    hostHandoffs,
     inviteRequests,
     codexEvents,
     gitWorkflowEvents,
     githubActionsEvents,
     localPreviews,
-    forgottenRoomIds,
-    revokedRoomIds,
-    revokedTeamIds,
     terminals,
-    messages,
-    hasSelectedRoom,
-    selectedCodexThreadId,
-    selectedRoomId,
-    terminalRequests
-  ]);
+    hostHandoffs,
+    selectedCodexThreadId
+  });
 
   useLocalPreviewPolling({
     localPreviewsByRoom,
