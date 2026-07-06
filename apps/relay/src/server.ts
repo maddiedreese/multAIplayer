@@ -39,8 +39,10 @@ import { registerOpsRoutes } from "./http/ops.js";
 import { registerRoomRoutes } from "./http/rooms.js";
 import { registerTeamRoutes, teamRecordForUser } from "./http/teams.js";
 import {
+  isAllowedEnvelopePayload as isAllowedEnvelopePayloadWithLimits,
   isApprovalPolicy,
   isJsonStringifiableWithin,
+  isRelayEnvelopeWithinLimits as isRelayEnvelopeWithinConfiguredLimits,
   isRecord,
   isRoomMode,
   maxCiphertextCharactersForBlob,
@@ -52,7 +54,8 @@ import {
   normalizeRelayId,
   normalizeRoomProjectPath as normalizeRoomProjectPathWithLimit,
   normalizeTeamRole,
-  parseIntegerValue
+  parseIntegerValue,
+  pruneEncryptedBacklog as pruneEncryptedBacklogWithLimits
 } from "./limits.js";
 import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
 import { createRelayPersistence } from "./persistence.js";
@@ -482,20 +485,19 @@ function canPublishEnvelope(session: ClientSession, envelope: RelayEnvelope): bo
 }
 
 function isAllowedEnvelopePayload(envelope: RelayEnvelope): boolean {
-  if (envelope.payload.algorithm === "AES-GCM-256") return true;
-  return envelope.kind === "room.invite";
+  return isAllowedEnvelopePayloadWithLimits(envelope);
 }
 
 function isRelayEnvelopeWithinLimits(envelope: RelayEnvelope): boolean {
-  if (!normalizeMetadataText(envelope.id, maxEnvelopeIdChars)) return false;
-  if (!normalizeMetadataText(envelope.senderUserId, maxUserIdChars)) return false;
-  if (!normalizeMetadataText(envelope.senderDeviceId, maxDeviceIdChars)) return false;
-  if (!normalizeMetadataText(envelope.payload.nonce, maxEnvelopeNonceChars)) return false;
-  if (!envelope.payload.ciphertext || envelope.payload.ciphertext.length > maxEnvelopeCiphertextChars) return false;
-  if (envelope.payload.algorithm === "ECDH-P256-HKDF-SHA256-AES-GCM-256") {
-    if (!isJsonStringifiableWithin(envelope.payload.ephemeralPublicKeyJwk, maxPublicKeyJwkChars)) return false;
-  }
-  return Buffer.byteLength(JSON.stringify(envelope), "utf8") <= encryptedEnvelopeMaxBytes;
+  return isRelayEnvelopeWithinConfiguredLimits(envelope, {
+    encryptedEnvelopeMaxBytes,
+    maxEnvelopeCiphertextChars,
+    maxDeviceIdChars,
+    maxEnvelopeIdChars,
+    maxEnvelopeNonceChars,
+    maxPublicKeyJwkChars,
+    maxUserIdChars
+  });
 }
 
 function revokeTeamInvites(teamId: string) {
@@ -656,13 +658,17 @@ function isExpiredAttachmentBlob(blob: AttachmentBlobRecordType): boolean {
 }
 
 function pruneEncryptedBacklog(envelopes: RelayEnvelope[]): RelayEnvelope[] {
-  const cutoffMs = Date.now() - encryptedBacklogRetentionDays * 24 * 60 * 60 * 1000;
-  return envelopes
-    .filter((envelope) => {
-      const createdAtMs = Date.parse(envelope.createdAt);
-      return Number.isFinite(createdAtMs) && createdAtMs >= cutoffMs && isRelayEnvelopeWithinLimits(envelope);
-    })
-    .slice(-encryptedBacklogLimit);
+  return pruneEncryptedBacklogWithLimits(envelopes, {
+    encryptedBacklogLimit,
+    encryptedBacklogRetentionDays,
+    encryptedEnvelopeMaxBytes,
+    maxEnvelopeCiphertextChars,
+    maxDeviceIdChars,
+    maxEnvelopeIdChars,
+    maxEnvelopeNonceChars,
+    maxPublicKeyJwkChars,
+    maxUserIdChars
+  });
 }
 
 function normalizeStoredBacklog(item: unknown): { key: RoomKey; envelopes: RelayEnvelope[] } | null {
