@@ -1,12 +1,9 @@
 import { useMemo, useRef, useState } from "react";
 import type {
-  ChatPlaintextPayload,
-  ChatReactionPlaintextPayload,
   CodexTurnSummary,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
   LocalPreviewPlaintextPayload,
-  RelayEnvelope,
   RoomRecord,
   TeamMemberRecord,
   TeamRecord,
@@ -17,13 +14,9 @@ import {
   defaultBrowserProfilePersistent,
   defaultCodexModel,
 } from "@multaiplayer/protocol";
-import {
-  decryptJson,
-  encryptJson,
-} from "@multaiplayer/crypto";
+import { decryptJson } from "@multaiplayer/crypto";
 import {
   loadHistorySettings,
-  loadOrCreateRoomSecret,
   type LocalHistorySettings
 } from "./lib/localHistory";
 import { loadTeamRoomDefaults } from "./lib/teamRoomDefaults";
@@ -157,6 +150,7 @@ import { useAccountActions } from "./hooks/useAccountActions";
 import { useHostHandoffActions } from "./hooks/useHostHandoffActions";
 import { useInviteActions } from "./hooks/useInviteActions";
 import { useGitWorkflowActions } from "./hooks/useGitWorkflowActions";
+import { useChatActions } from "./hooks/useChatActions";
 import {
   acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement,
   hasAcknowledgedRoomVisibilityWarning
@@ -766,6 +760,27 @@ export function App() {
     revokedTeamIds,
     historySettings,
     inviteApprovalGate
+  });
+  const {
+    publishChatMessage,
+    toggleMessageReaction
+  } = useChatActions({
+    hasSelectedRoom,
+    selectedRoom,
+    isSelectedRoomLocked,
+    isSelectedRoomRevoked,
+    forgottenRoomIds,
+    revokedRoomIds,
+    revokedTeamIds,
+    localUser,
+    deviceId,
+    relayStatus,
+    relayRef,
+    seenEnvelopeIds,
+    appendRoomMessage,
+    applyMessageReaction,
+    setChatMessageForRoom,
+    setSelectedChatMessage
   });
   const {
     actionsSummary,
@@ -1938,82 +1953,6 @@ export function App() {
     if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
       setHostMessageForRoom(roomId, codexUsageLimitMessage(room.host));
     }
-  }
-
-  async function publishChatMessage(message: ChatMessage, room: RoomRecord = selectedRoom) {
-    const revoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
-    if (forgottenRoomIds.has(room.id) || revoked) {
-      setChatMessageForRoom(room.id, roomLockMessage(room, revoked));
-      return;
-    }
-    const client = relayRef.current;
-    if (!client || relayStatus === "closed" || relayStatus === "error") {
-      appendRoomMessage(room.id, message);
-      return;
-    }
-
-    const secret = await loadOrCreateRoomSecret(room.id);
-    const envelope: RelayEnvelope = {
-      id: crypto.randomUUID(),
-      teamId: room.teamId,
-      roomId: room.id,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
-      createdAt: new Date().toISOString(),
-      kind: "chat.message",
-      payload: await encryptJson(message satisfies ChatPlaintextPayload, secret)
-    };
-    seenEnvelopeIds.current.add(envelope.id);
-    client.publish({ type: "publish", envelope });
-    appendRoomMessage(room.id, message);
-  }
-
-  async function toggleMessageReaction(message: ChatMessage, emoji: string) {
-    if (!hasSelectedRoom) {
-      setSelectedChatMessage("Create or join a room before reacting to messages.");
-      return;
-    }
-    const roomId = selectedRoom.id;
-    if (isSelectedRoomLocked) {
-      setChatMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
-      return;
-    }
-    if (!canUseRoomChat(selectedRoom)) {
-      setChatMessageForRoom(roomId, roomChatGateMessage(selectedRoom));
-      return;
-    }
-    const hasReacted = message.reactions
-      ?.find((reaction) => reaction.emoji === emoji)
-      ?.reactors.some((reactor) => reactor.userId === localUser.id) ?? false;
-    const payload: ChatReactionPlaintextPayload = {
-      id: crypto.randomUUID(),
-      messageId: message.id,
-      emoji,
-      action: hasReacted ? "remove" : "add",
-      reactor: localUser.name,
-      reactorUserId: localUser.id,
-      createdAt: new Date().toISOString()
-    };
-    applyMessageReaction(roomId, payload);
-
-    const client = relayRef.current;
-    if (!client || relayStatus === "closed" || relayStatus === "error") {
-      setChatMessageForRoom(roomId, "Saved reaction locally because the relay is not connected.");
-      return;
-    }
-    const secret = await loadOrCreateRoomSecret(roomId);
-    const envelope: RelayEnvelope = {
-      id: crypto.randomUUID(),
-      teamId: selectedRoom.teamId,
-      roomId,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
-      createdAt: payload.createdAt,
-      kind: "chat.reaction",
-      payload: await encryptJson(payload, secret)
-    };
-    seenEnvelopeIds.current.add(envelope.id);
-    client.publish({ type: "publish", envelope });
   }
 
   function acknowledgeRoomVisibilityWarning() {
