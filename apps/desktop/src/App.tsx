@@ -13,8 +13,6 @@ import {
   type GitWorkflowResult,
 } from "./lib/localBackend";
 import type { GitHubActionRun } from "./lib/authClient";
-import { useDeviceIdentityLifecycle } from "./hooks/useDeviceIdentityLifecycle";
-import { useSelectedTeamDefaults } from "./hooks/useSelectedTeamDefaults";
 import { useCodexProbe } from "./hooks/useCodexProbe";
 import { useRoomDraftCleanup } from "./hooks/useRoomDraftCleanup";
 import { useHistorySearch } from "./hooks/useHistorySearch";
@@ -65,14 +63,11 @@ import { useShellLayout } from "./hooks/useShellLayout";
 import { useSelectedTeamData } from "./hooks/useSelectedTeamData";
 import { useSelectedRoomValues } from "./hooks/useSelectedRoomValues";
 import { useSelectedRoomRuntime } from "./hooks/useSelectedRoomRuntime";
-import { useSelectedRoomReadReceipt } from "./hooks/useSelectedRoomReadReceipt";
 import { useSidebarNavigation } from "./hooks/useSidebarNavigation";
 import { useRoomTerminalSetters } from "./hooks/useRoomTerminalSetters";
 import { useTeamMembersRefresh } from "./hooks/useTeamMembersRefresh";
 import { useThemeMode } from "./hooks/useThemeMode";
-import { useWorkspaceBootstrap } from "./hooks/useWorkspaceBootstrap";
 import { useLocalPreviewPolling } from "./hooks/useLocalPreviewPolling";
-import { useInviteUrlBootstrap } from "./hooks/useInviteUrlBootstrap";
 import { useRelaySubscription } from "./hooks/useRelaySubscription";
 import { useRelayPublishers } from "./hooks/useRelayPublishers";
 import { useLocalPreviewActions } from "./hooks/useLocalPreviewActions";
@@ -120,6 +115,7 @@ import { useRoomInspectorPanelProps } from "./hooks/useRoomInspectorPanelProps";
 import { useSelectedRoomContext } from "./hooks/useSelectedRoomContext";
 import { useAppSidebarProps } from "./hooks/useAppSidebarProps";
 import { useLocalPreviewDialogProps } from "./hooks/useLocalPreviewDialogProps";
+import { useAppBootstrapEffects } from "./hooks/useAppBootstrapEffects";
 import { InlineSecretWarning } from "./components/common";
 import { AppWorkspaceShell } from "./components/AppWorkspaceShell";
 import { AppSidebarDrawer } from "./components/AppSidebarDrawer";
@@ -1063,41 +1059,41 @@ export function App() {
     setTeamMembersByTeam,
     setTeamMembersMessageByTeam
   });
-  useWorkspaceBootstrap({
-    relayHttpUrl: appConfig.relayHttpUrl,
-    setTeams,
-    setRooms,
-    setSelectedTeam,
-    setSelectedRoomId,
-    setWorkspaceError
-  });
-  useSelectedRoomReadReceipt({
-    selectedRoomId,
-    setRooms
-  });
-  useDeviceIdentityLifecycle({
-    relayHttpUrl: appConfig.relayHttpUrl,
-    deviceId,
-    userId: localUser.id,
-    displayName: localUser.name,
-    deviceIdentity,
-    setDeviceIdentity,
-    setDeviceIdentityMessage
-  });
-
-  useSelectedTeamDefaults({
-    selectedTeam,
-    setTeamHistorySettings,
-    setTeamDefaultApprovalPolicy,
-    setTeamDefaultCodexModel,
-    setTeamDefaultBrowserProfilePersistent,
-    setTeamDefaultInviteApprovalGate
-  });
-
-  useInviteUrlBootstrap({
-    requestNoSecretInviteAccess,
-    acceptInvite,
-    setSelectedInviteMessage
+  useAppBootstrapEffects({
+    workspace: {
+      relayHttpUrl: appConfig.relayHttpUrl,
+      setTeams,
+      setRooms,
+      setSelectedTeam,
+      setSelectedRoomId,
+      setWorkspaceError
+    },
+    selectedRoomReadReceipt: {
+      selectedRoomId,
+      setRooms
+    },
+    deviceIdentity: {
+      relayHttpUrl: appConfig.relayHttpUrl,
+      deviceId,
+      userId: localUser.id,
+      displayName: localUser.name,
+      deviceIdentity,
+      setDeviceIdentity,
+      setDeviceIdentityMessage
+    },
+    selectedTeamDefaults: {
+      selectedTeam,
+      setTeamHistorySettings,
+      setTeamDefaultApprovalPolicy,
+      setTeamDefaultCodexModel,
+      setTeamDefaultBrowserProfilePersistent,
+      setTeamDefaultInviteApprovalGate
+    },
+    inviteUrl: {
+      requestNoSecretInviteAccess,
+      acceptInvite,
+      setSelectedInviteMessage
+    }
   });
   const {
     copyMarkdownWithFallback,
