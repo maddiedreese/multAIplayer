@@ -1106,16 +1106,7 @@ export function App() {
     }
   });
 
-  const {
-    handleCodexBrowserOpenCommand,
-    publishRequestStatus,
-    publishLocalPreviewEvent,
-    publishTerminalResult,
-    publishGitWorkflowEvent,
-    publishCodexEvent,
-    publishRoomSettingsEvent,
-    publishGitHubActionsEvent
-  } = useRelaySyncContext({
+  const relaySync = useRelaySyncContext({
     browserOpenCommand: {
       localUser,
       selectedRoomIdRef,
@@ -1224,7 +1215,7 @@ export function App() {
       setCodexThreadIdsByRoom,
       setCodexContinuationByRoom,
       setRooms,
-      publishCodexEvent,
+      publishCodexEvent: relaySync.publishCodexEvent,
       publishChatMessage: roomInteraction.publishChatMessage,
       publishHostHandoff: hostHandoffActions.publishHostHandoff
     },
@@ -1245,7 +1236,7 @@ export function App() {
       browserRequests,
       gitStatus,
       publishChatMessage: roomInteraction.publishChatMessage,
-      handleCodexBrowserOpenCommand,
+      handleCodexBrowserOpenCommand: relaySync.handleCodexBrowserOpenCommand,
       setSelectedChatMessage,
       setChatMessageForRoom,
       setSelectedHostMessage,
@@ -1281,7 +1272,7 @@ export function App() {
       setProjectPathDraftForRoom,
       resetCodexApprovalForRoom,
       resetFileContextForRoom,
-      publishRoomSettingsEvent
+      publishRoomSettingsEvent: relaySync.publishRoomSettingsEvent
     },
     terminal: {
       hasSelectedRoom,
@@ -1318,8 +1309,8 @@ export function App() {
       setTerminalInputForRoom,
       appendTerminalRequest,
       updateTerminalRequestStatus,
-      publishRequestStatus,
-      publishTerminalResult
+      publishRequestStatus: relaySync.publishRequestStatus,
+      publishTerminalResult: relaySync.publishTerminalResult
     },
     localPreview: {
       hasSelectedRoom,
@@ -1334,7 +1325,7 @@ export function App() {
       setLocalPreviewBusyForRoom,
       setSelectedChatMessage,
       setChatMessageForRoom,
-      publishLocalPreviewEvent
+      publishLocalPreviewEvent: relaySync.publishLocalPreviewEvent
     },
     account: {
       selectedRoomId: selectedRoom.id,
@@ -1360,7 +1351,7 @@ export function App() {
       setActionsMessagesByRoom,
       setActionRunsByRoom,
       setActionsLastCheckedByRoom,
-      publishGitHubActionsEvent
+      publishGitHubActionsEvent: relaySync.publishGitHubActionsEvent
     },
     gitWorkflow: {
       hasSelectedRoom,
@@ -1380,7 +1371,7 @@ export function App() {
       setGitWorkflowBusyForRoom,
       appendTerminalLinesForRoom,
       setGitStatusForRoom,
-      publishGitWorkflowEvent
+      publishGitWorkflowEvent: relaySync.publishGitWorkflowEvent
     },
     browser: {
       hasSelectedRoom,
@@ -1405,7 +1396,7 @@ export function App() {
       setBrowserUrlForRoom,
       appendBrowserRequest,
       updateBrowserRequestStatus,
-      publishRequestStatus,
+      publishRequestStatus: relaySync.publishRequestStatus,
       setActiveBrowserUrlsByRoom,
       setBrowserStatusByRoom,
       setInspectorTabsByRoom
@@ -1437,7 +1428,7 @@ export function App() {
       localPreviewsByRoom,
       localUserId: localUser.id,
       roomsRef,
-      publishLocalPreviewEvent
+      publishLocalPreviewEvent: relaySync.publishLocalPreviewEvent
     },
     roomGitStatusRefresh: {
       hasSelectedRoom,
