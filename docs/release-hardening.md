@@ -21,7 +21,7 @@ The production relay doctor must pass before using an official hosted relay. It 
 
 ## Release Artifacts
 
-The GitHub release workflow builds macOS artifacts and writes `SHA256SUMS.txt`. When Apple signing secrets are configured, it passes Developer ID signing and notarization environment variables to Tauri, then verifies the resulting app with `codesign` and `spctl` before packaging.
+The GitHub release workflow builds macOS artifacts and writes `SHA256SUMS.txt`. Public macOS release artifacts must be Developer ID signed and notarized. The workflow imports the Developer ID Application certificate into a temporary CI keychain, passes notarization credentials to Tauri, verifies the app with `codesign`, validates stapled tickets on both the `.app` and `.dmg`, and runs Gatekeeper checks with `spctl` before packaging.
 
 Required GitHub secrets for signed/notarized releases:
 
@@ -30,14 +30,10 @@ Required GitHub secrets for signed/notarized releases:
 - `APPLE_SIGNING_IDENTITY`: Developer ID Application signing identity;
 - `APPLE_ID`: Apple ID email used for notarization;
 - `APPLE_PASSWORD`: app-specific password for that Apple ID;
-- `APPLE_TEAM_ID`: Apple Developer team id.
+- `APPLE_TEAM_ID`: Apple Developer team id;
+- `KEYCHAIN_PASSWORD`: temporary CI keychain password.
 
-If any required Apple signing secret is missing, the workflow falls back to unsigned macOS artifacts. In that case, every release note must clearly state:
-
-- the app is unsigned and not notarized;
-- macOS Gatekeeper may require manual approval;
-- users should prefer test/self-hosted rooms before using private projects;
-- checksums are provided for integrity checking, not as a substitute for signing.
+If any required Apple signing secret is missing, the release workflow fails before building artifacts. Do not publish unsigned public alpha builds.
 
 Do not attach ad hoc local builds to public releases. Release artifacts should come from GitHub Actions so the source commit, workflow logs, and checksums are visible.
 
@@ -74,7 +70,6 @@ Manual release dispatches must point at an existing tag that starts with `v` and
 
 Before presenting multAIplayer as production-ready, the project should add:
 
-- Apple Developer ID signing and notarization;
 - documented maintainer release key custody;
 - stronger member-removal key epochs;
 - database-backed relay storage and backup/restore drills;
