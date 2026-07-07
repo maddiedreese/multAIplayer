@@ -347,6 +347,11 @@ interface AppStoreState {
   setKeyRotationBusyForRoom: (roomId: string, busy: boolean) => void;
   setFileBusyForRoom: (roomId: string, busy: boolean) => void;
   setTerminalBusyForRoom: (roomId: string, busy: boolean) => void;
+  updateInviteRequestStatus: (roomId: string, requestId: string, status: InviteJoinRequest["status"]) => void;
+  appendTerminalRequest: (roomId: string, request: TerminalCommandRequest) => void;
+  updateTerminalRequestStatus: (roomId: string, requestId: string, status: TerminalCommandRequest["status"]) => void;
+  appendBrowserRequest: (roomId: string, request: BrowserAccessRequest) => void;
+  updateBrowserRequestStatus: (roomId: string, requestId: string, status: BrowserAccessRequest["status"]) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   setMarkdownCopyFallbackForRoom: (roomId: string, fallback: MarkdownCopyFallback | null) => void;
@@ -769,6 +774,60 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setTerminalBusyForRoom: (roomId, busy) => {
     set((state) => ({
       terminalBusyByRoom: updateRoomBusyMap(state.terminalBusyByRoom, roomId, busy)
+    }));
+  },
+  updateInviteRequestStatus: (roomId, requestId, status) => {
+    set((state) => ({
+      inviteRequestsByRoom: {
+        ...state.inviteRequestsByRoom,
+        [roomId]: (state.inviteRequestsByRoom[roomId] ?? []).map((request) =>
+          request.id === requestId ? { ...request, status } : request
+        )
+      }
+    }));
+  },
+  appendTerminalRequest: (roomId, request) => {
+    set((state) => {
+      const roomRequests = state.terminalRequestsByRoom[roomId] ?? [];
+      if (roomRequests.some((existing) => existing.id === request.id)) return state;
+      return {
+        terminalRequestsByRoom: {
+          ...state.terminalRequestsByRoom,
+          [roomId]: [...roomRequests, request]
+        }
+      };
+    });
+  },
+  updateTerminalRequestStatus: (roomId, requestId, status) => {
+    set((state) => ({
+      terminalRequestsByRoom: {
+        ...state.terminalRequestsByRoom,
+        [roomId]: (state.terminalRequestsByRoom[roomId] ?? []).map((request) =>
+          request.id === requestId ? { ...request, status } : request
+        )
+      }
+    }));
+  },
+  appendBrowserRequest: (roomId, request) => {
+    set((state) => {
+      const roomRequests = state.browserRequestsByRoom[roomId] ?? [];
+      if (roomRequests.some((existing) => existing.id === request.id)) return state;
+      return {
+        browserRequestsByRoom: {
+          ...state.browserRequestsByRoom,
+          [roomId]: [...roomRequests, request]
+        }
+      };
+    });
+  },
+  updateBrowserRequestStatus: (roomId, requestId, status) => {
+    set((state) => ({
+      browserRequestsByRoom: {
+        ...state.browserRequestsByRoom,
+        [roomId]: (state.browserRequestsByRoom[roomId] ?? []).map((request) =>
+          request.id === requestId ? { ...request, status } : request
+        )
+      }
     }));
   },
   setHostMessageForRoom: (roomId, message) => {

@@ -79,6 +79,60 @@ test("desktop store exposes room busy actions", () => {
   assert.equal(state.terminalBusyByRoom["room-a"], true);
 });
 
+test("desktop store exposes room request actions", () => {
+  const store = useAppStore.getState();
+
+  store.setInviteRequestsByRoom({
+    "room-a": [
+      {
+        eventType: "invite.request",
+        id: "invite-request-a",
+        requester: "Avery",
+        requesterUserId: "github:avery",
+        requesterDeviceId: "device-a",
+        requestedAt: "2026-07-06T00:02:00.000Z",
+        status: "pending"
+      }
+    ]
+  });
+  store.updateInviteRequestStatus("room-a", "invite-request-a", "approved");
+  store.appendTerminalRequest("room-a", {
+    id: "terminal-request-a",
+    requester: "Avery",
+    requesterUserId: "github:avery",
+    command: "npm test",
+    cwd: "/Users/maddiedreese/Documents/MultAIplayer",
+    requestedAt: "2026-07-06T00:03:00.000Z",
+    status: "pending"
+  });
+  store.appendTerminalRequest("room-a", {
+    id: "terminal-request-a",
+    requester: "Avery",
+    requesterUserId: "github:avery",
+    command: "npm test",
+    cwd: "/Users/maddiedreese/Documents/MultAIplayer",
+    requestedAt: "2026-07-06T00:03:00.000Z",
+    status: "pending"
+  });
+  store.updateTerminalRequestStatus("room-a", "terminal-request-a", "denied");
+  store.appendBrowserRequest("room-a", {
+    id: "browser-request-a",
+    requester: "Jordan",
+    requesterUserId: "github:jordan",
+    url: "http://localhost:5173",
+    reason: "Inspect local preview",
+    requestedAt: "2026-07-06T00:04:00.000Z",
+    status: "pending"
+  });
+  store.updateBrowserRequestStatus("room-a", "browser-request-a", "approved");
+
+  const state = useAppStore.getState();
+  assert.equal(state.inviteRequestsByRoom["room-a"]?.[0]?.status, "approved");
+  assert.equal(state.terminalRequestsByRoom["room-a"]?.length, 1);
+  assert.equal(state.terminalRequestsByRoom["room-a"]?.[0]?.status, "denied");
+  assert.equal(state.browserRequestsByRoom["room-a"]?.[0]?.status, "approved");
+});
+
 test("desktop store keeps GitHub Actions state room scoped", () => {
   const store = useAppStore.getState();
 
