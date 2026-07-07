@@ -571,3 +571,43 @@ test("desktop store keeps terminal panel state room scoped", () => {
   assert.equal(state.terminalErrorsByRoom["room-a"], null);
   assert.equal(state.terminalErrorsByRoom["room-b"], "Host approval required");
 });
+
+test("desktop store keeps workspace maps scoped", () => {
+  const store = useAppStore.getState();
+
+  store.setTeamMembersByTeam({
+    "team-core": [
+      {
+        teamId: "team-core",
+        userId: "github:maddie",
+        role: "owner",
+        joinedAt: "2026-07-06T00:17:00.000Z"
+      }
+    ],
+    "team-labs": []
+  });
+  store.setTeamMembersMessageByTeam({ "team-core": null, "team-labs": "Could not refresh members" });
+  store.setTeamMembersBusyByTeam({ "team-core": true, "team-labs": false });
+  store.setMessagesByRoom({
+    "room-a": [
+      {
+        id: "message-a",
+        author: "Avery",
+        role: "human",
+        body: "Ship the store slice.",
+        time: "10:17"
+      }
+    ],
+    "room-b": []
+  });
+
+  const state = useAppStore.getState();
+  assert.equal(state.teamMembersByTeam["team-core"]?.[0]?.role, "owner");
+  assert.deepEqual(state.teamMembersByTeam["team-labs"], []);
+  assert.equal(state.teamMembersMessageByTeam["team-core"], null);
+  assert.equal(state.teamMembersMessageByTeam["team-labs"], "Could not refresh members");
+  assert.equal(state.teamMembersBusyByTeam["team-core"], true);
+  assert.equal(state.teamMembersBusyByTeam["team-labs"], false);
+  assert.equal(state.messagesByRoom["room-a"]?.[0]?.body, "Ship the store slice.");
+  assert.deepEqual(state.messagesByRoom["room-b"], []);
+});

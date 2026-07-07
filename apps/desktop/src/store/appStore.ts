@@ -28,7 +28,8 @@ import type { MarkdownCopyFallback } from "../types";
 import type { InspectorTab } from "../components/RoomInspectorPanel";
 import type {
   GitHubActionsEventPlaintextPayload,
-  GitWorkflowEventPlaintextPayload
+  GitWorkflowEventPlaintextPayload,
+  TeamMemberRecord
 } from "@multaiplayer/protocol";
 
 type GitStatusByRoom = Record<string, GitStatusSummary | null>;
@@ -95,6 +96,10 @@ type TerminalNamesByRoom = Record<string, string>;
 type TerminalCommandsByRoom = Record<string, string>;
 type TerminalInputsByRoom = Record<string, string>;
 type TerminalErrorsByRoom = Record<string, string | null>;
+type TeamMembersByTeam = Record<string, TeamMemberRecord[]>;
+type TeamMembersMessageByTeam = Record<string, string | null>;
+type TeamMembersBusyByTeam = Record<string, boolean>;
+type MessagesByRoom = Record<string, ChatMessage[]>;
 
 const emptyLocalPreviewDialog: LocalPreviewDialogState = {
   open: false,
@@ -174,7 +179,11 @@ const emptyAppStoreState = {
   terminalNamesByRoom: {},
   terminalCommandsByRoom: {},
   terminalInputsByRoom: {},
-  terminalErrorsByRoom: {}
+  terminalErrorsByRoom: {},
+  teamMembersByTeam: {},
+  teamMembersMessageByTeam: {},
+  teamMembersBusyByTeam: {},
+  messagesByRoom: {}
 };
 
 function resolveSetStateAction<T>(current: T, action: SetStateAction<T>): T {
@@ -249,6 +258,10 @@ interface AppStoreState {
   terminalCommandsByRoom: TerminalCommandsByRoom;
   terminalInputsByRoom: TerminalInputsByRoom;
   terminalErrorsByRoom: TerminalErrorsByRoom;
+  teamMembersByTeam: TeamMembersByTeam;
+  teamMembersMessageByTeam: TeamMembersMessageByTeam;
+  teamMembersBusyByTeam: TeamMembersBusyByTeam;
+  messagesByRoom: MessagesByRoom;
   setGitStatusByRoom: (action: SetStateAction<GitStatusByRoom>) => void;
   setGitWorkflowBusyByRoom: (action: SetStateAction<GitWorkflowBusyByRoom>) => void;
   setGitWorkflowMessagesByRoom: (action: SetStateAction<GitWorkflowMessagesByRoom>) => void;
@@ -316,6 +329,10 @@ interface AppStoreState {
   setTerminalCommandsByRoom: (action: SetStateAction<TerminalCommandsByRoom>) => void;
   setTerminalInputsByRoom: (action: SetStateAction<TerminalInputsByRoom>) => void;
   setTerminalErrorsByRoom: (action: SetStateAction<TerminalErrorsByRoom>) => void;
+  setTeamMembersByTeam: (action: SetStateAction<TeamMembersByTeam>) => void;
+  setTeamMembersMessageByTeam: (action: SetStateAction<TeamMembersMessageByTeam>) => void;
+  setTeamMembersBusyByTeam: (action: SetStateAction<TeamMembersBusyByTeam>) => void;
+  setMessagesByRoom: (action: SetStateAction<MessagesByRoom>) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
 }
@@ -655,6 +672,26 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setTerminalErrorsByRoom: (action) => {
     set((state) => ({
       terminalErrorsByRoom: resolveSetStateAction(state.terminalErrorsByRoom, action)
+    }));
+  },
+  setTeamMembersByTeam: (action) => {
+    set((state) => ({
+      teamMembersByTeam: resolveSetStateAction(state.teamMembersByTeam, action)
+    }));
+  },
+  setTeamMembersMessageByTeam: (action) => {
+    set((state) => ({
+      teamMembersMessageByTeam: resolveSetStateAction(state.teamMembersMessageByTeam, action)
+    }));
+  },
+  setTeamMembersBusyByTeam: (action) => {
+    set((state) => ({
+      teamMembersBusyByTeam: resolveSetStateAction(state.teamMembersBusyByTeam, action)
+    }));
+  },
+  setMessagesByRoom: (action) => {
+    set((state) => ({
+      messagesByRoom: resolveSetStateAction(state.messagesByRoom, action)
     }));
   },
   resetAppStore: () => set(emptyAppStoreState),
