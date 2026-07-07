@@ -31,6 +31,7 @@ import type {
   GitWorkflowEventPlaintextPayload,
   TeamMemberRecord
 } from "@multaiplayer/protocol";
+import { omitRecordKey } from "../lib/setUtils";
 
 type GitStatusByRoom = Record<string, GitStatusSummary | null>;
 type GitWorkflowBusyByRoom = Record<string, boolean>;
@@ -333,6 +334,18 @@ interface AppStoreState {
   setTeamMembersMessageByTeam: (action: SetStateAction<TeamMembersMessageByTeam>) => void;
   setTeamMembersBusyByTeam: (action: SetStateAction<TeamMembersBusyByTeam>) => void;
   setMessagesByRoom: (action: SetStateAction<MessagesByRoom>) => void;
+  setHostMessageForRoom: (roomId: string, message: string | null) => void;
+  setChatMessageForRoom: (roomId: string, message: string | null) => void;
+  setMarkdownCopyFallbackForRoom: (roomId: string, fallback: MarkdownCopyFallback | null) => void;
+  setSecretWarningVisibleForRoom: (roomId: string, visible: boolean) => void;
+  setHistoryMessageForRoom: (roomId: string, message: string | null) => void;
+  setTeamHistoryMessageForTeam: (teamId: string, message: string | null) => void;
+  setSettingsMessageForRoom: (roomId: string, message: string | null) => void;
+  setPendingAttachmentsForRoom: (
+    roomId: string,
+    updater: ChatAttachment[] | ((current: ChatAttachment[]) => ChatAttachment[])
+  ) => void;
+  setDraftForRoom: (roomId: string, value: string) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
 }
@@ -692,6 +705,76 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setMessagesByRoom: (action) => {
     set((state) => ({
       messagesByRoom: resolveSetStateAction(state.messagesByRoom, action)
+    }));
+  },
+  setHostMessageForRoom: (roomId, message) => {
+    set((state) => ({
+      hostMessagesByRoom: message
+        ? { ...state.hostMessagesByRoom, [roomId]: message }
+        : omitRecordKey(state.hostMessagesByRoom, roomId)
+    }));
+  },
+  setChatMessageForRoom: (roomId, message) => {
+    set((state) => ({
+      chatMessagesByRoom: message
+        ? { ...state.chatMessagesByRoom, [roomId]: message }
+        : omitRecordKey(state.chatMessagesByRoom, roomId)
+    }));
+  },
+  setMarkdownCopyFallbackForRoom: (roomId, fallback) => {
+    set((state) => ({
+      markdownCopyFallbacksByRoom: fallback
+        ? { ...state.markdownCopyFallbacksByRoom, [roomId]: fallback }
+        : omitRecordKey(state.markdownCopyFallbacksByRoom, roomId)
+    }));
+  },
+  setSecretWarningVisibleForRoom: (roomId, visible) => {
+    set((state) => ({
+      secretWarningsVisibleByRoom: visible
+        ? { ...state.secretWarningsVisibleByRoom, [roomId]: true }
+        : omitRecordKey(state.secretWarningsVisibleByRoom, roomId)
+    }));
+  },
+  setHistoryMessageForRoom: (roomId, message) => {
+    set((state) => ({
+      historyMessagesByRoom: message
+        ? { ...state.historyMessagesByRoom, [roomId]: message }
+        : omitRecordKey(state.historyMessagesByRoom, roomId)
+    }));
+  },
+  setTeamHistoryMessageForTeam: (teamId, message) => {
+    const key = teamId || "__no-team";
+    set((state) => ({
+      teamHistoryMessagesByTeam: message
+        ? { ...state.teamHistoryMessagesByTeam, [key]: message }
+        : omitRecordKey(state.teamHistoryMessagesByTeam, key)
+    }));
+  },
+  setSettingsMessageForRoom: (roomId, message) => {
+    set((state) => ({
+      settingsMessagesByRoom: message
+        ? { ...state.settingsMessagesByRoom, [roomId]: message }
+        : omitRecordKey(state.settingsMessagesByRoom, roomId)
+    }));
+  },
+  setPendingAttachmentsForRoom: (roomId, updater) => {
+    set((state) => {
+      const currentAttachments = state.pendingAttachmentsByRoom[roomId] ?? [];
+      const nextAttachments = typeof updater === "function" ? updater(currentAttachments) : updater;
+      return {
+        pendingAttachmentsByRoom: {
+          ...state.pendingAttachmentsByRoom,
+          [roomId]: nextAttachments
+        }
+      };
+    });
+  },
+  setDraftForRoom: (roomId, value) => {
+    set((state) => ({
+      draftsByRoom: {
+        ...state.draftsByRoom,
+        [roomId]: value
+      }
     }));
   },
   resetAppStore: () => set(emptyAppStoreState),
