@@ -1,7 +1,13 @@
 import { create } from "zustand";
 import type { SetStateAction } from "react";
 import type { GitHubActionRun } from "../lib/authClient";
-import type { GitDiffResult, GitStatusSummary, ProjectFileContent, ProjectFileEntry } from "../lib/localBackend";
+import type {
+  GitDiffResult,
+  GitStatusSummary,
+  ProjectFileContent,
+  ProjectFileEntry,
+  TerminalSnapshot
+} from "../lib/localBackend";
 import type { GitWorkflowDraft } from "../lib/gitWorkflowDraft";
 import type {
   BrowserAccessRequest,
@@ -14,7 +20,8 @@ import type {
   LocalPreviewDialogState,
   LocalPreviewRecord,
   PendingCodexApproval,
-  RoomPresence
+  RoomPresence,
+  TerminalCommandRequest
 } from "../types";
 import type { FilePreviewTab } from "../lib/filePreview";
 import type { MarkdownCopyFallback } from "../types";
@@ -79,6 +86,15 @@ type HostHandoffsByRoom = Record<string, HostHandoffRecord[]>;
 type CodexContinuationByRoom = Record<string, HostHandoffRecord>;
 type GitWorkflowEventsByRoom = Record<string, GitWorkflowEventPlaintextPayload[]>;
 type GitHubActionsEventsByRoom = Record<string, GitHubActionsEventPlaintextPayload[]>;
+type TerminalLinesByRoom = Record<string, string[]>;
+type TerminalBusyByRoom = Record<string, boolean>;
+type Terminals = TerminalSnapshot[];
+type TerminalRequestsByRoom = Record<string, TerminalCommandRequest[]>;
+type SelectedTerminalIdsByRoom = Record<string, string | null>;
+type TerminalNamesByRoom = Record<string, string>;
+type TerminalCommandsByRoom = Record<string, string>;
+type TerminalInputsByRoom = Record<string, string>;
+type TerminalErrorsByRoom = Record<string, string | null>;
 
 const emptyLocalPreviewDialog: LocalPreviewDialogState = {
   open: false,
@@ -149,7 +165,16 @@ const emptyAppStoreState = {
   hostHandoffsByRoom: {},
   codexContinuationByRoom: {},
   gitWorkflowEventsByRoom: {},
-  githubActionsEventsByRoom: {}
+  githubActionsEventsByRoom: {},
+  terminalLinesByRoom: {},
+  terminalBusyByRoom: {},
+  terminals: [],
+  terminalRequestsByRoom: {},
+  selectedTerminalIdsByRoom: {},
+  terminalNamesByRoom: {},
+  terminalCommandsByRoom: {},
+  terminalInputsByRoom: {},
+  terminalErrorsByRoom: {}
 };
 
 function resolveSetStateAction<T>(current: T, action: SetStateAction<T>): T {
@@ -215,6 +240,15 @@ interface AppStoreState {
   codexContinuationByRoom: CodexContinuationByRoom;
   gitWorkflowEventsByRoom: GitWorkflowEventsByRoom;
   githubActionsEventsByRoom: GitHubActionsEventsByRoom;
+  terminalLinesByRoom: TerminalLinesByRoom;
+  terminalBusyByRoom: TerminalBusyByRoom;
+  terminals: Terminals;
+  terminalRequestsByRoom: TerminalRequestsByRoom;
+  selectedTerminalIdsByRoom: SelectedTerminalIdsByRoom;
+  terminalNamesByRoom: TerminalNamesByRoom;
+  terminalCommandsByRoom: TerminalCommandsByRoom;
+  terminalInputsByRoom: TerminalInputsByRoom;
+  terminalErrorsByRoom: TerminalErrorsByRoom;
   setGitStatusByRoom: (action: SetStateAction<GitStatusByRoom>) => void;
   setGitWorkflowBusyByRoom: (action: SetStateAction<GitWorkflowBusyByRoom>) => void;
   setGitWorkflowMessagesByRoom: (action: SetStateAction<GitWorkflowMessagesByRoom>) => void;
@@ -273,6 +307,15 @@ interface AppStoreState {
   setCodexContinuationByRoom: (action: SetStateAction<CodexContinuationByRoom>) => void;
   setGitWorkflowEventsByRoom: (action: SetStateAction<GitWorkflowEventsByRoom>) => void;
   setGitHubActionsEventsByRoom: (action: SetStateAction<GitHubActionsEventsByRoom>) => void;
+  setTerminalLinesByRoom: (action: SetStateAction<TerminalLinesByRoom>) => void;
+  setTerminalBusyByRoom: (action: SetStateAction<TerminalBusyByRoom>) => void;
+  setTerminals: (action: SetStateAction<Terminals>) => void;
+  setTerminalRequestsByRoom: (action: SetStateAction<TerminalRequestsByRoom>) => void;
+  setSelectedTerminalIdsByRoom: (action: SetStateAction<SelectedTerminalIdsByRoom>) => void;
+  setTerminalNamesByRoom: (action: SetStateAction<TerminalNamesByRoom>) => void;
+  setTerminalCommandsByRoom: (action: SetStateAction<TerminalCommandsByRoom>) => void;
+  setTerminalInputsByRoom: (action: SetStateAction<TerminalInputsByRoom>) => void;
+  setTerminalErrorsByRoom: (action: SetStateAction<TerminalErrorsByRoom>) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
 }
@@ -567,6 +610,51 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setGitHubActionsEventsByRoom: (action) => {
     set((state) => ({
       githubActionsEventsByRoom: resolveSetStateAction(state.githubActionsEventsByRoom, action)
+    }));
+  },
+  setTerminalLinesByRoom: (action) => {
+    set((state) => ({
+      terminalLinesByRoom: resolveSetStateAction(state.terminalLinesByRoom, action)
+    }));
+  },
+  setTerminalBusyByRoom: (action) => {
+    set((state) => ({
+      terminalBusyByRoom: resolveSetStateAction(state.terminalBusyByRoom, action)
+    }));
+  },
+  setTerminals: (action) => {
+    set((state) => ({
+      terminals: resolveSetStateAction(state.terminals, action)
+    }));
+  },
+  setTerminalRequestsByRoom: (action) => {
+    set((state) => ({
+      terminalRequestsByRoom: resolveSetStateAction(state.terminalRequestsByRoom, action)
+    }));
+  },
+  setSelectedTerminalIdsByRoom: (action) => {
+    set((state) => ({
+      selectedTerminalIdsByRoom: resolveSetStateAction(state.selectedTerminalIdsByRoom, action)
+    }));
+  },
+  setTerminalNamesByRoom: (action) => {
+    set((state) => ({
+      terminalNamesByRoom: resolveSetStateAction(state.terminalNamesByRoom, action)
+    }));
+  },
+  setTerminalCommandsByRoom: (action) => {
+    set((state) => ({
+      terminalCommandsByRoom: resolveSetStateAction(state.terminalCommandsByRoom, action)
+    }));
+  },
+  setTerminalInputsByRoom: (action) => {
+    set((state) => ({
+      terminalInputsByRoom: resolveSetStateAction(state.terminalInputsByRoom, action)
+    }));
+  },
+  setTerminalErrorsByRoom: (action) => {
+    set((state) => ({
+      terminalErrorsByRoom: resolveSetStateAction(state.terminalErrorsByRoom, action)
     }));
   },
   resetAppStore: () => set(emptyAppStoreState),

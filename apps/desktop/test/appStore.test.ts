@@ -516,3 +516,58 @@ test("desktop store keeps room runtime state room scoped", () => {
   assert.equal(state.gitWorkflowEventsByRoom["room-a"]?.[0]?.branch, "codex/runtime-state");
   assert.equal(state.githubActionsEventsByRoom["room-b"]?.[0]?.summary.tone, "green");
 });
+
+test("desktop store keeps terminal panel state room scoped", () => {
+  const store = useAppStore.getState();
+
+  store.setTerminalLinesByRoom({
+    "room-a": ["system $ npm run dev", "stdout Ready"],
+    "room-b": ["system $ git status"]
+  });
+  store.setTerminalBusyByRoom({ "room-a": true, "room-b": false });
+  store.setTerminals([
+    {
+      id: "terminal-a",
+      roomId: "room-a",
+      name: "shell",
+      cwd: "/Users/maddiedreese/Documents/MultAIplayer",
+      command: "zsh -l",
+      running: true,
+      exitStatus: null,
+      startedAt: "2026-07-06T00:15:00.000Z",
+      lines: [{ stream: "system", text: "$ zsh -l" }]
+    }
+  ]);
+  store.setTerminalRequestsByRoom({
+    "room-b": [
+      {
+        id: "terminal-request-1",
+        requester: "Jordan",
+        requesterUserId: "github:jordan",
+        command: "npm test",
+        cwd: "/Users/jordan/project",
+        requestedAt: "2026-07-06T00:16:00.000Z",
+        status: "pending"
+      }
+    ]
+  });
+  store.setSelectedTerminalIdsByRoom({ "room-a": "terminal-a", "room-b": null });
+  store.setTerminalNamesByRoom({ "room-a": "dev-server" });
+  store.setTerminalCommandsByRoom({ "room-a": "npm run dev:desktop" });
+  store.setTerminalInputsByRoom({ "room-a": "git status" });
+  store.setTerminalErrorsByRoom({ "room-a": null, "room-b": "Host approval required" });
+
+  const state = useAppStore.getState();
+  assert.equal(state.terminalLinesByRoom["room-a"]?.[1], "stdout Ready");
+  assert.equal(state.terminalBusyByRoom["room-a"], true);
+  assert.equal(state.terminalBusyByRoom["room-b"], false);
+  assert.equal(state.terminals[0]?.name, "shell");
+  assert.equal(state.terminalRequestsByRoom["room-b"]?.[0]?.command, "npm test");
+  assert.equal(state.selectedTerminalIdsByRoom["room-a"], "terminal-a");
+  assert.equal(state.selectedTerminalIdsByRoom["room-b"], null);
+  assert.equal(state.terminalNamesByRoom["room-a"], "dev-server");
+  assert.equal(state.terminalCommandsByRoom["room-a"], "npm run dev:desktop");
+  assert.equal(state.terminalInputsByRoom["room-a"], "git status");
+  assert.equal(state.terminalErrorsByRoom["room-a"], null);
+  assert.equal(state.terminalErrorsByRoom["room-b"], "Host approval required");
+});
