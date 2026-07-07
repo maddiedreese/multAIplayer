@@ -64,6 +64,8 @@ type SecretWarningsVisibleByRoom = Record<string, boolean>;
 type CodexThreadIdsByRoom = Record<string, string>;
 type SelectedMessageIdsByRoom = Record<string, string[]>;
 type HistorySearchMessagesByRoom = Record<string, ChatMessage[]>;
+type HistoryMessagesByRoom = Record<string, string | null>;
+type TeamHistoryMessagesByTeam = Record<string, string | null>;
 
 const emptyLocalPreviewDialog: LocalPreviewDialogState = {
   open: false,
@@ -126,7 +128,9 @@ const emptyAppStoreState = {
   secretWarningsVisibleByRoom: {},
   codexThreadIdsByRoom: {},
   selectedMessageIdsByRoom: {},
-  historySearchMessagesByRoom: {}
+  historySearchMessagesByRoom: {},
+  historyMessagesByRoom: {},
+  teamHistoryMessagesByTeam: {}
 };
 
 function resolveSetStateAction<T>(current: T, action: SetStateAction<T>): T {
@@ -184,6 +188,8 @@ interface AppStoreState {
   codexThreadIdsByRoom: CodexThreadIdsByRoom;
   selectedMessageIdsByRoom: SelectedMessageIdsByRoom;
   historySearchMessagesByRoom: HistorySearchMessagesByRoom;
+  historyMessagesByRoom: HistoryMessagesByRoom;
+  teamHistoryMessagesByTeam: TeamHistoryMessagesByTeam;
   setGitStatusByRoom: (action: SetStateAction<GitStatusByRoom>) => void;
   setGitWorkflowBusyByRoom: (action: SetStateAction<GitWorkflowBusyByRoom>) => void;
   setGitWorkflowMessagesByRoom: (action: SetStateAction<GitWorkflowMessagesByRoom>) => void;
@@ -234,6 +240,8 @@ interface AppStoreState {
   setCodexThreadIdsByRoom: (action: SetStateAction<CodexThreadIdsByRoom>) => void;
   setSelectedMessageIdsByRoom: (action: SetStateAction<SelectedMessageIdsByRoom>) => void;
   setHistorySearchMessagesByRoom: (action: SetStateAction<HistorySearchMessagesByRoom>) => void;
+  setHistoryMessagesByRoom: (action: SetStateAction<HistoryMessagesByRoom>) => void;
+  setTeamHistoryMessagesByTeam: (action: SetStateAction<TeamHistoryMessagesByTeam>) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
 }
@@ -488,6 +496,16 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setHistorySearchMessagesByRoom: (action) => {
     set((state) => ({
       historySearchMessagesByRoom: resolveSetStateAction(state.historySearchMessagesByRoom, action)
+    }));
+  },
+  setHistoryMessagesByRoom: (action) => {
+    set((state) => ({
+      historyMessagesByRoom: resolveSetStateAction(state.historyMessagesByRoom, action)
+    }));
+  },
+  setTeamHistoryMessagesByTeam: (action) => {
+    set((state) => ({
+      teamHistoryMessagesByTeam: resolveSetStateAction(state.teamHistoryMessagesByTeam, action)
     }));
   },
   resetAppStore: () => set(emptyAppStoreState),
