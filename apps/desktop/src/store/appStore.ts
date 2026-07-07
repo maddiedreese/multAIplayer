@@ -13,6 +13,11 @@ import {
   emptyHistoryPresenceState,
   type HistoryPresenceSlice
 } from "./slices/historyPresenceSlice";
+import {
+  createLocalPreviewSlice,
+  emptyLocalPreviewState,
+  type LocalPreviewSlice
+} from "./slices/localPreviewSlice";
 import { createRoomChatSlice, emptyRoomChatState, type RoomChatSlice } from "./slices/roomChatSlice";
 import { createTerminalSlice, emptyTerminalState, type TerminalSlice } from "./slices/terminalSlice";
 import type {
@@ -20,8 +25,6 @@ import type {
   CodexRoomEvent,
   HostHandoffRecord,
   InviteJoinRequest,
-  LocalPreviewDialogState,
-  LocalPreviewRecord,
   LocalRoomHistoryPayload,
   PendingCodexApproval,
   RoomGoal,
@@ -48,8 +51,6 @@ type SettingsBusyByRoom = Record<string, boolean>;
 type SettingsMessagesByRoom = Record<string, string | null>;
 type CustomCodexModelsByRoom = Record<string, string>;
 type ProjectPathDraftsByRoom = Record<string, string>;
-type LocalPreviewsByRoom = Record<string, LocalPreviewRecord[]>;
-type LocalPreviewBusyByRoom = Record<string, boolean>;
 type InviteRequestsByRoom = Record<string, InviteJoinRequest[]>;
 type InviteLinksByRoom = Record<string, string>;
 type InviteApprovalGatesByRoom = Record<string, boolean>;
@@ -72,23 +73,11 @@ type TeamMembersMessageByTeam = Record<string, string | null>;
 type TeamMembersBusyByTeam = Record<string, boolean>;
 type MessagesByRoom = Record<string, ChatMessage[]>;
 type RoomBusyByRoom = Record<string, boolean>;
-type LocalPreviewCandidate = LocalPreviewDialogState["candidates"][number];
 
 interface WorkspaceInitialData {
   teamMembersByTeam: TeamMembersByTeam;
   messagesByRoom: MessagesByRoom;
 }
-
-const emptyLocalPreviewDialog: LocalPreviewDialogState = {
-  open: false,
-  phase: "select",
-  roomId: "",
-  candidates: [],
-  selectedUrl: "",
-  manualUrl: "",
-  error: null,
-  cloudflaredVersion: null
-};
 
 const emptyAppStoreState = {
   gitStatusByRoom: {},
@@ -108,9 +97,7 @@ const emptyAppStoreState = {
   settingsMessagesByRoom: {},
   customCodexModelsByRoom: {},
   projectPathDraftsByRoom: {},
-  localPreviewsByRoom: {},
-  localPreviewDialog: emptyLocalPreviewDialog,
-  localPreviewBusyByRoom: {},
+  ...emptyLocalPreviewState,
   inviteRequestsByRoom: {},
   inviteSecretInput: "",
   inviteLinksByRoom: {},
@@ -141,7 +128,13 @@ function updateRoomBusyMap(current: RoomBusyByRoom, roomId: string, busy: boolea
   return busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId);
 }
 
-export interface AppStoreState extends BrowserSlice, FilePanelSlice, HistoryPresenceSlice, RoomChatSlice, TerminalSlice {
+export interface AppStoreState
+  extends BrowserSlice,
+    FilePanelSlice,
+    HistoryPresenceSlice,
+    LocalPreviewSlice,
+    RoomChatSlice,
+    TerminalSlice {
   gitStatusByRoom: GitStatusByRoom;
   gitWorkflowBusyByRoom: GitWorkflowBusyByRoom;
   gitWorkflowMessagesByRoom: GitWorkflowMessagesByRoom;
@@ -156,9 +149,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, HistoryPres
   settingsMessagesByRoom: SettingsMessagesByRoom;
   customCodexModelsByRoom: CustomCodexModelsByRoom;
   projectPathDraftsByRoom: ProjectPathDraftsByRoom;
-  localPreviewsByRoom: LocalPreviewsByRoom;
-  localPreviewDialog: LocalPreviewDialogState;
-  localPreviewBusyByRoom: LocalPreviewBusyByRoom;
   inviteRequestsByRoom: InviteRequestsByRoom;
   inviteSecretInput: string;
   inviteLinksByRoom: InviteLinksByRoom;
@@ -185,14 +175,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, HistoryPres
   setActionRunsForRoom: (roomId: string, runs: GitHubActionRun[]) => void;
   setActionsLastCheckedForRoom: (roomId: string, checkedAt: string | null) => void;
   resetGitHubActionsStateForRoom: (roomId: string) => void;
-  openLocalPreviewDialogForRoom: (roomId: string) => void;
-  closeLocalPreviewDialog: () => void;
-  setLocalPreviewDialogCandidates: (candidates: LocalPreviewCandidate[], error: string | null) => void;
-  setLocalPreviewDialogSelectedUrl: (selectedUrl: string) => void;
-  setLocalPreviewDialogManualUrl: (manualUrl: string) => void;
-  setLocalPreviewDialogPhase: (phase: LocalPreviewDialogState["phase"], error?: string | null) => void;
-  setLocalPreviewDialogConfirmation: (roomId: string, selectedUrl: string, cloudflaredVersion: string | null) => void;
-  setLocalPreviewDialogError: (error: string | null) => void;
   setInviteRequestsForRoom: (roomId: string, requests: InviteJoinRequest[]) => void;
   setInviteSecretInputValue: (value: string) => void;
   clearInviteSecretInput: () => void;
@@ -209,14 +191,12 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, HistoryPres
   applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
   setGitWorkflowBusyForRoom: (roomId: string, busy: boolean) => void;
   setActionsBusyForRoom: (roomId: string, busy: boolean) => void;
-  setLocalPreviewBusyForRoom: (roomId: string, busy: boolean) => void;
   setHostBusyForRoom: (roomId: string, busy: boolean) => void;
   setSettingsBusyForRoom: (roomId: string, busy: boolean) => void;
   setKeyRotationBusyForRoom: (roomId: string, busy: boolean) => void;
   updateInviteRequestStatus: (roomId: string, requestId: string, status: InviteJoinRequest["status"]) => void;
   appendGitWorkflowEvent: (roomId: string, event: GitWorkflowEventPlaintextPayload) => void;
   appendGitHubActionsEvent: (roomId: string, event: GitHubActionsEventPlaintextPayload) => void;
-  appendLocalPreviewEvent: (roomId: string, event: LocalPreviewRecord) => void;
   appendHostHandoff: (roomId: string, handoff: HostHandoffRecord) => void;
   markHostHandoffAcceptedForRoom: (roomId: string, handoffId: string) => void;
   markLatestHostHandoffAcceptedForRoom: (roomId: string) => void;
@@ -250,6 +230,7 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   ...createBrowserSlice(set, get, api),
   ...createFilePanelSlice(set, get, api),
   ...createHistoryPresenceSlice(set, get, api),
+  ...createLocalPreviewSlice(set, get, api),
   ...createRoomChatSlice(set, get, api),
   ...createTerminalSlice(set, get, api),
   setActionsMessageForRoom: (roomId, message) => {
@@ -283,78 +264,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       actionsLastCheckedByRoom: omitRecordKey(state.actionsLastCheckedByRoom, roomId),
       actionsMessagesByRoom: omitRecordKey(state.actionsMessagesByRoom, roomId),
       actionsBusyByRoom: omitRecordKey(state.actionsBusyByRoom, roomId)
-    }));
-  },
-  openLocalPreviewDialogForRoom: (roomId) => {
-    set({
-      localPreviewDialog: {
-        ...emptyLocalPreviewDialog,
-        open: true,
-        roomId
-      }
-    });
-  },
-  closeLocalPreviewDialog: () => {
-    set((state) => ({
-      localPreviewDialog: {
-        ...state.localPreviewDialog,
-        open: false
-      }
-    }));
-  },
-  setLocalPreviewDialogCandidates: (candidates, error) => {
-    set((state) => ({
-      localPreviewDialog: {
-        ...state.localPreviewDialog,
-        candidates,
-        selectedUrl: candidates[0]?.url ?? "",
-        error
-      }
-    }));
-  },
-  setLocalPreviewDialogSelectedUrl: (selectedUrl) => {
-    set((state) => ({
-      localPreviewDialog: {
-        ...state.localPreviewDialog,
-        selectedUrl
-      }
-    }));
-  },
-  setLocalPreviewDialogManualUrl: (manualUrl) => {
-    set((state) => ({
-      localPreviewDialog: {
-        ...state.localPreviewDialog,
-        manualUrl
-      }
-    }));
-  },
-  setLocalPreviewDialogPhase: (phase, error = null) => {
-    set((state) => ({
-      localPreviewDialog: {
-        ...state.localPreviewDialog,
-        phase,
-        error
-      }
-    }));
-  },
-  setLocalPreviewDialogConfirmation: (roomId, selectedUrl, cloudflaredVersion) => {
-    set((state) => ({
-      localPreviewDialog: {
-        ...state.localPreviewDialog,
-        phase: "confirm",
-        roomId,
-        selectedUrl,
-        cloudflaredVersion,
-        error: null
-      }
-    }));
-  },
-  setLocalPreviewDialogError: (error) => {
-    set((state) => ({
-      localPreviewDialog: {
-        ...state.localPreviewDialog,
-        error
-      }
     }));
   },
   setInviteRequestsForRoom: (roomId, requests) => {
@@ -559,11 +468,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       actionsBusyByRoom: updateRoomBusyMap(state.actionsBusyByRoom, roomId, busy)
     }));
   },
-  setLocalPreviewBusyForRoom: (roomId, busy) => {
-    set((state) => ({
-      localPreviewBusyByRoom: updateRoomBusyMap(state.localPreviewBusyByRoom, roomId, busy)
-    }));
-  },
   setHostBusyForRoom: (roomId, busy) => {
     set((state) => ({
       hostBusyByRoom: updateRoomBusyMap(state.hostBusyByRoom, roomId, busy)
@@ -626,20 +530,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
         githubActionsEventsByRoom: {
           ...state.githubActionsEventsByRoom,
           [roomId]: [...roomEvents, event].slice(-50)
-        }
-      };
-    });
-  },
-  appendLocalPreviewEvent: (roomId, event) => {
-    set((state) => {
-      const roomEvents = state.localPreviewsByRoom[roomId] ?? [];
-      const nextEvents = roomEvents.some((existing) => existing.id === event.id)
-        ? roomEvents.map((existing) => existing.id === event.id ? event : existing)
-        : [...roomEvents, event];
-      return {
-        localPreviewsByRoom: {
-          ...state.localPreviewsByRoom,
-          [roomId]: nextEvents.slice(-50)
         }
       };
     });
