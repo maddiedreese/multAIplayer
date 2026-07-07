@@ -8,8 +8,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tauri::State;
 
-use crate::terminate_child;
-use crate::trim_command_output;
+use crate::process::{terminate_child, trim_command_output};
 use crate::validation::{
     ensure_local_preview_reachable, ensure_preview_id, local_port_reachable,
     local_preview_reachable, validate_local_preview_url, MAX_COMMAND_OUTPUT_CHARS,

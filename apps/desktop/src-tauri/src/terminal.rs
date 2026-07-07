@@ -6,11 +6,11 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use tauri::State;
 
-use crate::ensure_existing_dir;
 use crate::validation::{
     ensure_room_id, ensure_terminal_command, ensure_terminal_id, ensure_terminal_input,
     ensure_terminal_name,
 };
+use crate::workspace::ensure_existing_dir;
 
 #[derive(Default)]
 pub(crate) struct TerminalState {

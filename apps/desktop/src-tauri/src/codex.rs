@@ -6,8 +6,9 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use crate::process::terminate_child;
 use crate::validation::{codex_timeout, ensure_codex_input, normalize_codex_thread_id};
-use crate::{ensure_existing_dir, terminate_child};
+use crate::workspace::ensure_existing_dir;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
