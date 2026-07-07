@@ -631,6 +631,16 @@ test("desktop store keeps Codex room state room scoped", () => {
     }
   });
   store.setCodexRunningByRoom({ "room-a": true, "room-b": false });
+  store.setRoomGoalsByRoom({
+    "room-a": {
+      id: "goal-a",
+      text: "Finish the room",
+      status: "running",
+      startedAt: "2026-07-06T00:08:00.000Z",
+      updatedAt: "2026-07-06T00:08:00.000Z",
+      elapsedMs: 0
+    }
+  });
   store.setSecretWarningsVisibleByRoom({ "room-a": true });
   store.setCodexThreadIdsByRoom((current) => ({
     ...current,
@@ -645,6 +655,7 @@ test("desktop store keeps Codex room state room scoped", () => {
   assert.equal(state.pendingCodexApprovalsByRoom["room-a"]?.summary.workspacePath, "/Users/maddiedreese/Documents/MultAIplayer");
   assert.equal(state.codexRunningByRoom["room-a"], true);
   assert.equal(state.codexRunningByRoom["room-b"], false);
+  assert.equal(state.roomGoalsByRoom["room-a"]?.text, "Finish the room");
   assert.equal(state.secretWarningsVisibleByRoom["room-a"], true);
   assert.equal(state.codexThreadIdsByRoom["room-a"], "thread-room-a");
 });
@@ -675,14 +686,24 @@ test("desktop store exposes room Codex approval actions", () => {
   store.setApprovalVisibleForRoom("room-a", true);
   store.setPendingCodexApprovalForRoom("room-a", approval);
   store.setCodexRunningForRoom("room-a", true);
+  store.setRoomGoalForRoom("room-a", {
+    id: "goal-a",
+    text: "Refactor the UI",
+    status: "running",
+    startedAt: "2026-07-06T00:08:00.000Z",
+    updatedAt: "2026-07-06T00:08:00.000Z",
+    elapsedMs: 0
+  });
   store.setApprovalVisibleForRoom("room-b", true);
   store.resetCodexApprovalForRoom("room-a");
   store.setCodexRunningForRoom("room-a", false);
+  store.setRoomGoalForRoom("room-a", null);
 
   const state = useAppStore.getState();
   assert.equal(state.approvalVisibleByRoom["room-a"], undefined);
   assert.equal(state.pendingCodexApprovalsByRoom["room-a"], undefined);
   assert.equal(state.codexRunningByRoom["room-a"], undefined);
+  assert.equal(state.roomGoalsByRoom["room-a"], undefined);
   assert.equal(state.approvalVisibleByRoom["room-b"], true);
 });
 
@@ -799,6 +820,8 @@ test("desktop store keeps room runtime state room scoped", () => {
         projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
         codexModel: "GPT-5.4",
         approvalPolicy: "Ask every Codex turn",
+  approvalDelegationPolicy: "host_only",
+  trustedApproverUserIds: [],
         messagesSinceLastCodex: 3,
         attachmentNames: ["docs/plan.md"],
         terminals: ["shell"],
@@ -816,6 +839,8 @@ test("desktop store keeps room runtime state room scoped", () => {
       projectPath: "/Users/avery/project",
       codexModel: "GPT-5.4",
       approvalPolicy: "Ask every Codex turn",
+  approvalDelegationPolicy: "host_only",
+  trustedApproverUserIds: [],
       messagesSinceLastCodex: 1,
       attachmentNames: [],
       terminals: [],
@@ -948,6 +973,8 @@ test("desktop store exposes room event append actions", () => {
     projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
     codexModel: "gpt-5.4",
     approvalPolicy: "ask",
+  approvalDelegationPolicy: "host_only",
+  trustedApproverUserIds: [],
     messagesSinceLastCodex: 4,
     attachmentNames: [],
     terminals: [],
@@ -1007,6 +1034,8 @@ test("desktop store exposes host handoff actions", () => {
     projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
     codexModel: "gpt-5.4",
     approvalPolicy: "ask",
+  approvalDelegationPolicy: "host_only",
+  trustedApproverUserIds: [],
     messagesSinceLastCodex: 1,
     attachmentNames: [],
     terminals: [],
@@ -1387,6 +1416,8 @@ test("desktop store hydrates local room history through one room-scoped action",
         projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
         codexModel: "gpt-5.4",
         approvalPolicy: "ask",
+  approvalDelegationPolicy: "host_only",
+  trustedApproverUserIds: [],
         messagesSinceLastCodex: 4,
         attachmentNames: [],
         terminals: [],

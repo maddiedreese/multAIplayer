@@ -1,15 +1,21 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type {
+  CodexApprovalPlaintextPayload,
   CodexEventPlaintextPayload,
   RoomRecord
 } from "@multaiplayer/protocol";
 import { defaultCodexModel } from "@multaiplayer/protocol";
 import {
   runCodexTurn,
+  shutdownCodexRoom,
   type GitStatusSummary,
   type TerminalSnapshot
 } from "../lib/localBackend";
-import { canApproveCodexTurn } from "../lib/codexApproval";
+import {
+  canApproveCodexTurn,
+  canDelegateApproveCodexTurn,
+  isDelegatedApprovalExecutionPolicy
+} from "../lib/codexApproval";
 import {
   buildCodexTurnInput,
   buildCodexTurnSummary
@@ -66,6 +72,10 @@ interface UseCodexTurnActionsOptions {
     event: Omit<CodexEventPlaintextPayload, "eventType" | "host" | "hostUserId" | "createdAt">,
     room?: RoomRecord
   ) => Promise<void>;
+  publishCodexApproval: (
+    event: Omit<CodexApprovalPlaintextPayload, "eventType" | "approver" | "approverUserId" | "approvedAt">,
+    room?: RoomRecord
+  ) => Promise<void>;
   publishChatMessage: (message: ChatMessage, room?: RoomRecord) => Promise<void>;
   publishHostHandoff: (
     room: RoomRecord,
@@ -96,6 +106,7 @@ export function useCodexTurnActions({
   appendTerminalLinesForRoom,
   setRooms,
   publishCodexEvent,
+  publishCodexApproval,
   publishChatMessage,
   publishHostHandoff
 }: UseCodexTurnActionsOptions) {
@@ -137,6 +148,22 @@ export function useCodexTurnActions({
       return;
     }
     if (!canApproveCodexTurn(room, localUser, roomLocked)) {
+      if (canDelegateApproveCodexTurn(room, localUser, roomLocked)) {
+        if (!isDelegatedApprovalExecutionPolicy(room.approvalDelegationPolicy)) {
+          setHostMessageForRoom(roomId, "This room is not configured for delegated Codex approvals.");
+          return;
+        }
+        await publishCodexApproval({
+          approvalId: crypto.randomUUID(),
+          roomId,
+          delegationPolicy: room.approvalDelegationPolicy,
+          message: `${localUser.name} approved this Codex turn. The active host device will execute it.`
+        }, room);
+        setPendingCodexApprovalForRoom(roomId, null);
+        setApprovalVisibleForRoom(roomId, false);
+        setHostMessageForRoom(roomId, "Approval sent to the active host device.");
+        return;
+      }
       setHostMessageForRoom(roomId, roomHostGateMessage);
       setPendingCodexApprovalForRoom(roomId, null);
       setApprovalVisibleForRoom(roomId, false);
@@ -176,7 +203,7 @@ export function useCodexTurnActions({
           : `Started Codex turn with ${formatCodexModel(model)}.`,
         model
       }, room);
-      const result = await runCodexTurn(projectPath, input, model, previousThreadId);
+      const result = await runCodexTurn(roomId, projectPath, input, model, previousThreadId);
       if (classifyCodexFailure([result.status, result.stderr, result.transcript, ...result.events]) === "usage_limit") {
         await handleCodexUsageLimit(room, turnId, model, turnMessages, result.events, result.stderr);
         return;
@@ -277,6 +304,7 @@ export function useCodexTurnActions({
     }, room);
     try {
       const handedOff = await updateRoomHost(roomId, room.host, room.hostUserId ?? localUser.id, "handoff");
+      void shutdownCodexRoom(roomId);
       setRooms((current) => current.map((item) => (item.id === handedOff.id ? ensureRoomDefaults(handedOff) : item)));
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {

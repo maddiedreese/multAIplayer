@@ -1,6 +1,7 @@
 import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import type {
   BrowserRequestPlaintextPayload,
+  CodexApprovalPlaintextPayload,
   ChatPlaintextPayload,
   ChatReactionPlaintextPayload,
   GitHubActionsEventPlaintextPayload,
@@ -28,6 +29,7 @@ import {
 } from "../lib/activityLines";
 import {
   isChatReactionPlaintextPayload,
+  isCodexApprovalPlaintextPayload,
   isCodexEventPlaintextPayload,
   isGitHubActionsEventPlaintextPayload,
   isGitWorkflowEventPlaintextPayload,
@@ -71,6 +73,7 @@ interface UseRelaySubscriptionOptions {
   revokedRoomIds: Set<string>;
   revokedTeamIds: Set<string>;
   approvalPolicyLabels: Record<string, string>;
+  approvalDelegationPolicyLabels: Record<string, string>;
   roomModeLabels: Record<string, string>;
   relayRef: MutableRefObject<RelayClient | null>;
   seenEnvelopeIds: MutableRefObject<Set<string>>;
@@ -89,6 +92,7 @@ interface UseRelaySubscriptionOptions {
   decryptInviteEnvelope: (envelope: RelayEnvelope) => Promise<unknown | null>;
   handleInviteEnvelopePlaintext: (roomId: string, plaintext: unknown) => Promise<void>;
   handleCodexBrowserOpenCommand: (message: ChatMessage, room: RoomRecord) => boolean;
+  handleCodexApprovalEvent: (event: CodexApprovalPlaintextPayload, roomId: string) => void;
   applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
   appendTerminalRequest: (roomId: string, request: TerminalCommandRequest) => void;
   updateTerminalRequestStatus: (roomId: string, requestId: string, status: TerminalCommandRequest["status"]) => void;
@@ -124,6 +128,7 @@ export function useRelaySubscription({
   revokedRoomIds,
   revokedTeamIds,
   approvalPolicyLabels,
+  approvalDelegationPolicyLabels,
   roomModeLabels,
   relayRef,
   seenEnvelopeIds,
@@ -142,6 +147,7 @@ export function useRelaySubscription({
   decryptInviteEnvelope,
   handleInviteEnvelopePlaintext,
   handleCodexBrowserOpenCommand,
+  handleCodexApprovalEvent,
   applyMessageReaction,
   appendTerminalRequest,
   updateTerminalRequestStatus,
@@ -295,6 +301,12 @@ export function useRelaySubscription({
               appendTerminalLinesForRoom(message.envelope.roomId, [buildCodexEventLine(plaintext)]);
             }
           }
+          if (message.envelope.kind === "codex.approval") {
+            const plaintext = await decryptJson<unknown>(roomPayload, secret);
+            if (isCodexApprovalPlaintextPayload(plaintext)) {
+              handleCodexApprovalEvent(plaintext, message.envelope.roomId);
+            }
+          }
           if (message.envelope.kind === "browser.request") {
             const plaintext = await decryptJson<BrowserRequestPlaintextPayload>(roomPayload, secret);
             appendBrowserRequest(message.envelope.roomId, { ...plaintext, status: "pending" });
@@ -334,7 +346,11 @@ export function useRelaySubscription({
             if (isRoomSettingsPlaintextPayload(plaintext)) {
               appendRoomMessage(
                 message.envelope.roomId,
-                buildRoomSettingsSystemMessage(plaintext, { approvalPolicyLabels, roomModeLabels })
+                buildRoomSettingsSystemMessage(plaintext, {
+                  approvalPolicyLabels,
+                  approvalDelegationPolicyLabels,
+                  roomModeLabels
+                })
               );
             }
           }
@@ -411,12 +427,17 @@ export function useRelaySubscription({
     localUser.avatarUrl,
     localUser.id,
     localUser.name,
+    handleCodexApprovalEvent,
+    approvalDelegationPolicyLabels,
+    approvalPolicyLabels,
+    roomModeLabels,
     devicePublicKeyFingerprint,
     inviteAdmissionsByRoom,
     refreshTeamMembers,
     revokedRoomIds,
     revokedTeamIds,
     selectedRoom.approvalPolicy,
+    selectedRoom.approvalDelegationPolicy,
     selectedRoom.browserAllowedOrigins,
     selectedRoom.id,
     selectedRoom.name,

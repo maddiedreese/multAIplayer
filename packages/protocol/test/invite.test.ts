@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  CodexApprovalPlaintextPayload,
   DevicePublicKeyJwk,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
@@ -168,6 +169,8 @@ test("room settings payloads cover host-controlled room settings", () => {
   const settings = [
     "roomName",
     "approvalPolicy",
+    "approvalDelegationPolicy",
+    "trustedApprovers",
     "roomMode",
     "codexModel",
     "projectPath",
@@ -189,6 +192,25 @@ test("room settings payloads cover host-controlled room settings", () => {
 
     assert.equal(parsed.setting, setting);
   }
+});
+
+test("Codex approval payloads carry delegated host execution authorization", () => {
+  const parsed = CodexApprovalPlaintextPayload.parse({
+    eventType: "codex.approval",
+    approvalId: "approval-1",
+    roomId: "room-desktop",
+    approver: "Jordan",
+    approverUserId: "github:jordan",
+    approvedAt: "2026-07-04T12:00:00.000Z",
+    delegationPolicy: "members_can_approve",
+    message: "Jordan approved this turn."
+  });
+
+  assert.equal(parsed.delegationPolicy, "members_can_approve");
+  assert.equal(CodexApprovalPlaintextPayload.safeParse({
+    ...parsed,
+    delegationPolicy: "host_only"
+  }).success, false);
 });
 
 test("invite join request accepts optional requester device public key", () => {

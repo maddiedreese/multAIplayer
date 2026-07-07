@@ -1,6 +1,7 @@
 import {
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
+  defaultApprovalDelegationPolicy,
   defaultCodexModel,
   type RoomRecord
 } from "@multaiplayer/protocol";
@@ -11,6 +12,8 @@ export function ensureRoomDefaults(room: RoomRecord): RoomRecord {
     ...room,
     name: normalizeRoomDisplayName(room.name),
     codexModel: room.codexModel || defaultCodexModel,
+    approvalDelegationPolicy: room.approvalDelegationPolicy ?? defaultApprovalDelegationPolicy,
+    trustedApproverUserIds: Array.isArray(room.trustedApproverUserIds) ? room.trustedApproverUserIds : [],
     browserAllowedOrigins: normalizeBrowserAllowedOrigins(room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins) ?? defaultBrowserAllowedOrigins,
     browserProfilePersistent: typeof room.browserProfilePersistent === "boolean"
       ? room.browserProfilePersistent

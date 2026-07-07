@@ -32,6 +32,7 @@ import { registerRoomRoutes } from "./http/rooms.js";
 import { registerTeamRoutes, teamRecordForUser } from "./http/teams.js";
 import {
   isAllowedEnvelopePayload as isAllowedEnvelopePayloadWithLimits,
+  isApprovalDelegationPolicy,
   isApprovalPolicy,
   isJsonStringifiableWithin,
   isRelayEnvelopeWithinLimits as isRelayEnvelopeWithinConfiguredLimits,
@@ -407,6 +408,7 @@ registerRoomRoutes({
   requesterFromRequest,
   isRoomHost,
   isApprovalPolicy,
+  isApprovalDelegationPolicy,
   isRoomMode,
   normalizeMetadataText,
   normalizeOptionalMetadataText,

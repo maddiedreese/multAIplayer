@@ -57,6 +57,11 @@ export interface ProjectFileContent {
   content: string;
 }
 
+export interface ProjectFileWriteResult {
+  path: string;
+  size: number;
+}
+
 export interface CommandResult {
   command: string;
   cwd: string;
@@ -298,6 +303,23 @@ export async function readProjectFile(
       "",
       "export const multAIplayer = 'private group chat for coding with Codex';"
     ].join("\n")
+  };
+}
+
+export async function writeProjectFile(
+  cwd: string,
+  path: string,
+  content: string
+): Promise<ProjectFileWriteResult> {
+  if (isTauriRuntime()) {
+    return invoke<ProjectFileWriteResult>("project_file_write", {
+      request: { cwd, path, content }
+    });
+  }
+
+  return {
+    path,
+    size: new TextEncoder().encode(content).length
   };
 }
 
@@ -563,6 +585,7 @@ export async function chooseProjectFolder(defaultPath: string): Promise<string |
 }
 
 export async function runCodexTurn(
+  roomId: string,
   cwd: string,
   input: string,
   model = "gpt-5.4",
@@ -572,6 +595,7 @@ export async function runCodexTurn(
   if (isTauriRuntime()) {
     return invoke<CodexTurnResult>("run_codex_turn", {
       request: {
+        roomId,
         cwd,
         input,
         model,
@@ -594,6 +618,13 @@ export async function runCodexTurn(
     ],
     stderr: ""
   };
+}
+
+export async function shutdownCodexRoom(roomId: string): Promise<number> {
+  if (!isTauriRuntime()) return 0;
+  return invoke<number>("shutdown_codex_room", {
+    request: { roomId }
+  });
 }
 
 

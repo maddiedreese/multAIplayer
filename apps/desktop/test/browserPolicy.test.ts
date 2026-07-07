@@ -23,6 +23,8 @@ const room: RoomRecord = {
   hostUserId: "github:maddiedreese",
   hostStatus: "active",
   approvalPolicy: "auto_browser_allowed_sites",
+  approvalDelegationPolicy: "host_only",
+  trustedApproverUserIds: [],
   mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.4",
   browserAllowedOrigins: ["https://docs.example.com", "https://github.com"],

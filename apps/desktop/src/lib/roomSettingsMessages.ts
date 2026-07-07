@@ -1,10 +1,16 @@
-import type { ApprovalPolicy, RoomMode, RoomSettingsPlaintextPayload } from "@multaiplayer/protocol";
+import type {
+  ApprovalDelegationPolicy,
+  ApprovalPolicy,
+  RoomMode,
+  RoomSettingsPlaintextPayload
+} from "@multaiplayer/protocol";
 import type { ChatMessage } from "../types";
 import { formatCodexModel, formatMessageTime } from "./appFormatters";
 import { formatBrowserAccessLabel } from "./browserUi";
 
 interface RoomSettingsMessageLabels {
   approvalPolicyLabels: Record<ApprovalPolicy, string>;
+  approvalDelegationPolicyLabels?: Record<ApprovalDelegationPolicy, string>;
   roomModeLabels: Record<keyof RoomMode, string>;
 }
 
@@ -31,6 +37,10 @@ export function buildRoomSettingsMessageBody(
       return `${event.changedBy} changed the room title from ${event.previousValue} to ${event.nextValue}.`;
     case "approvalPolicy":
       return `${event.changedBy} changed the approval policy from ${formatApprovalPolicy(event.previousValue, labels)} to ${formatApprovalPolicy(event.nextValue, labels)}.`;
+    case "approvalDelegationPolicy":
+      return `${event.changedBy} changed delegated approval from ${formatApprovalDelegationPolicy(event.previousValue, labels)} to ${formatApprovalDelegationPolicy(event.nextValue, labels)}.`;
+    case "trustedApprovers":
+      return `${event.changedBy} changed trusted Codex approvers.`;
     case "roomMode":
       return `${event.changedBy} ${formatRoomModeChange(event.nextValue, labels)}.`;
     case "codexModel":
@@ -46,6 +56,10 @@ export function buildRoomSettingsMessageBody(
 
 function formatApprovalPolicy(value: string, labels: RoomSettingsMessageLabels): string {
   return labels.approvalPolicyLabels[value as ApprovalPolicy] ?? value;
+}
+
+function formatApprovalDelegationPolicy(value: string, labels: RoomSettingsMessageLabels): string {
+  return labels.approvalDelegationPolicyLabels?.[value as ApprovalDelegationPolicy] ?? value;
 }
 
 function formatRoomModeChange(value: string, labels: RoomSettingsMessageLabels): string {

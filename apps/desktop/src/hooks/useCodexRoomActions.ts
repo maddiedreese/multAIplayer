@@ -12,7 +12,15 @@ export function useCodexRoomActions({
   invoke: CodexInvokeActionsOptions;
 }) {
   const { approveCodexTurn } = useCodexTurnActions(turn);
-  const { handleCodexInvoke, sendMessage } = useCodexInvokeActions({
+  const {
+    handleCodexInvoke,
+    sendMessage,
+    pauseGoal,
+    resumeGoal,
+    editGoal,
+    deleteGoal,
+    tickGoalElapsed
+  } = useCodexInvokeActions({
     ...invoke,
     approveCodexTurn
   });
@@ -20,6 +28,11 @@ export function useCodexRoomActions({
   return {
     approveCodexTurn,
     handleCodexInvoke,
-    sendMessage
+    sendMessage,
+    pauseGoal,
+    resumeGoal,
+    editGoal,
+    deleteGoal,
+    tickGoalElapsed
   };
 }

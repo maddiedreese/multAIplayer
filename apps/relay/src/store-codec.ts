@@ -4,6 +4,7 @@ import {
   RelayEnvelope,
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
+  defaultApprovalDelegationPolicy,
   defaultCodexModel,
   defaultRoomMode,
   type AttachmentBlobRecord as AttachmentBlobRecordType,
@@ -16,6 +17,7 @@ import {
 import type { NormalizedStoredAuthSession, StoredAuthSession } from "./auth/session.js";
 import {
   isApprovalPolicy,
+  isApprovalDelegationPolicy,
   isRecord,
   isRoomMode,
   maxCiphertextCharactersForBlob,
@@ -217,6 +219,17 @@ export function createRelayStoreCodec(options: {
     const approvalPolicy = typeof room.approvalPolicy === "string" && isApprovalPolicy(room.approvalPolicy)
       ? room.approvalPolicy
       : "ask_every_turn";
+    const approvalDelegationPolicy =
+      typeof (room as { approvalDelegationPolicy?: unknown }).approvalDelegationPolicy === "string" &&
+      isApprovalDelegationPolicy((room as { approvalDelegationPolicy: string }).approvalDelegationPolicy)
+        ? (room as { approvalDelegationPolicy: RoomRecord["approvalDelegationPolicy"] }).approvalDelegationPolicy
+        : defaultApprovalDelegationPolicy;
+    const trustedApproverUserIds = Array.isArray((room as { trustedApproverUserIds?: unknown }).trustedApproverUserIds)
+      ? (room as { trustedApproverUserIds: unknown[] }).trustedApproverUserIds
+          .map((item) => normalizeMetadataText(item, options.maxUserIdChars))
+          .filter((item): item is string => Boolean(item))
+          .slice(0, 50)
+      : [];
     const mode = isRoomMode(room.mode) ? room.mode : defaultRoomMode;
     const unread = typeof room.unread === "number" && Number.isSafeInteger(room.unread) && room.unread >= 0
       ? room.unread
@@ -230,6 +243,8 @@ export function createRelayStoreCodec(options: {
       hostUserId,
       hostStatus,
       approvalPolicy,
+      approvalDelegationPolicy,
+      trustedApproverUserIds,
       mode,
       codexModel: normalizeModel(room.codexModel) ?? defaultCodexModel,
       browserAllowedOrigins: normalizeBrowserAllowedOrigins((room as { browserAllowedOrigins?: unknown }).browserAllowedOrigins)

@@ -12,9 +12,15 @@ export function useRoomChatPanelActions({
   setApprovalVisibleForRoom,
   approveCodexTurn,
   handleCodexInvoke,
+  pauseGoal,
+  resumeGoal,
+  editGoal,
+  deleteGoal,
+  tickGoalElapsed,
   copyMarkdownWithFallback,
   setChatMessageForRoom,
   stopLocalPreview,
+  setInspectorTabForRoom,
   setDraftForRoom
 }: {
   selectedRoomId: string;
@@ -28,6 +34,11 @@ export function useRoomChatPanelActions({
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   approveCodexTurn: () => void;
   handleCodexInvoke: () => void;
+  pauseGoal: () => void;
+  resumeGoal: () => void;
+  editGoal: (text: string) => void;
+  deleteGoal: () => void;
+  tickGoalElapsed: () => void;
   copyMarkdownWithFallback: (
     title: string,
     markdown: string,
@@ -36,6 +47,7 @@ export function useRoomChatPanelActions({
   ) => Promise<void>;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   stopLocalPreview: (previewId: string) => Promise<void>;
+  setInspectorTabForRoom: (roomId: string, tab: "files") => void;
   setDraftForRoom: (roomId: string, draft: string) => void;
 }) {
   function onCopyMessageMarkdown(messageId: string) {
@@ -89,9 +101,15 @@ export function useRoomChatPanelActions({
     onDenyApproval,
     onApproveApproval: () => approveCodexTurn(),
     onInvokeCodex: () => handleCodexInvoke(),
+    onPauseGoal: pauseGoal,
+    onResumeGoal: resumeGoal,
+    onEditGoal: editGoal,
+    onDeleteGoal: deleteGoal,
+    onTickGoalElapsed: tickGoalElapsed,
     onOpenLocalPreview,
     onCopyLocalPreviewLink,
     onStopLocalPreview: (previewId: string) => void stopLocalPreview(previewId),
+    onOpenFileSelector: () => setInspectorTabForRoom(selectedRoomId, "files"),
     onDraftChange: (nextDraft: string) => setDraftForRoom(selectedRoomId, nextDraft)
   };
 }

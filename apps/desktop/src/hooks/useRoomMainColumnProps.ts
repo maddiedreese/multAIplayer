@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { canApproveCodexTurn } from "../lib/codexApproval";
+import { canApproveCodexTurn, canDelegateApproveCodexTurn } from "../lib/codexApproval";
 import { roomLockMessage } from "../lib/appRuntime";
 import { formatCodexModel } from "../lib/appFormatters";
 import type { LocalHostUser } from "../lib/roomHost";
@@ -55,6 +55,7 @@ interface UseRoomMainColumnPropsOptions {
   codexRunning: boolean;
   roomCanUseChat: boolean;
   draft: string;
+  roomGoal: ChatProps["roomGoal"];
   pendingAttachmentCount: number;
   pendingAttachments: ChatProps["pendingAttachments"];
   localPreviewCards: ChatProps["localPreviewCards"];
@@ -76,6 +77,7 @@ interface UseRoomMainColumnPropsOptions {
     | "lockedPlaceholder"
     | "chatEnabled"
     | "draft"
+    | "roomGoal"
     | "pendingAttachments"
     | "localPreviewCards"
     | "pendingAttachmentSummary"
@@ -123,6 +125,7 @@ export function useRoomMainColumnProps({
   codexRunning,
   roomCanUseChat,
   draft,
+  roomGoal,
   pendingAttachmentCount,
   pendingAttachments,
   localPreviewCards,
@@ -177,13 +180,19 @@ export function useRoomMainColumnProps({
       approvalSummary,
       isActiveHost,
       codexRunning,
-      canApproveCodex: hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked),
+      canApproveCodex:
+        hasSelectedRoom &&
+        (
+          canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked) ||
+          canDelegateApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked)
+        ),
       canUseChat: roomCanUseChat,
       canSendMessage: roomCanUseChat && (Boolean(draft.trim()) || pendingAttachmentCount > 0),
       roomLocked: isSelectedRoomLocked,
       lockedPlaceholder: roomLockMessage(selectedRoom, isSelectedRoomRevoked),
       chatEnabled: selectedRoom.mode.chat,
       draft,
+      roomGoal,
       pendingAttachments,
       localPreviewCards,
       pendingAttachmentSummary,

@@ -7,6 +7,7 @@ export function useWorkspaceFilesPanelActions({
   openProjectFile,
   copyDiffSummaryMarkdown,
   attachSelectedFileToMessage,
+  saveSelectedFileContent,
   setFilePreviewTabForRoom,
   setSelectedFileForRoom,
   setSelectedDiffForRoom,
@@ -18,6 +19,7 @@ export function useWorkspaceFilesPanelActions({
   openProjectFile: (path: string, preferredPreview?: FilePreviewTab) => void;
   copyDiffSummaryMarkdown: () => void;
   attachSelectedFileToMessage: () => void;
+  saveSelectedFileContent: (content: string) => void;
   setFilePreviewTabForRoom: (roomId: string, tab: FilePreviewTab) => void;
   setSelectedFileForRoom: (roomId: string, file: null) => void;
   setSelectedDiffForRoom: (roomId: string, diff: null) => void;
@@ -35,6 +37,7 @@ export function useWorkspaceFilesPanelActions({
     onOpenProjectFile: openProjectFile,
     onCopyDiffSummaryMarkdown: copyDiffSummaryMarkdown,
     onAttachSelectedFileToMessage: attachSelectedFileToMessage,
+    onSaveSelectedFileContent: saveSelectedFileContent,
     onFilePreviewTabChange: (tab: FilePreviewTab) => setFilePreviewTabForRoom(selectedRoomId, tab),
     onCloseFileViewer
   };

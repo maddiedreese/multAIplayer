@@ -7,7 +7,7 @@ import {
 import { decryptJson, encryptJson } from "@multaiplayer/crypto";
 import { createAttachmentBlob, loadAttachmentBlob } from "../lib/workspaceClient";
 import { loadOrCreateRoomSecret } from "../lib/localHistory";
-import { getGitDiff, readProjectFile, type GitDiffResult, type ProjectFileContent } from "../lib/localBackend";
+import { getGitDiff, readProjectFile, writeProjectFile, type GitDiffResult, type ProjectFileContent } from "../lib/localBackend";
 import { resolveFilePreviewTab, type FilePreviewTab } from "../lib/filePreview";
 import {
   attachmentReviewMessage,
@@ -211,6 +211,50 @@ export function useFileActions({
     });
   }
 
+  async function saveSelectedFileContent(content: string) {
+    if (!hasSelectedRoom) {
+      setSelectedFileMessage("Create or join a room before editing project files.");
+      return;
+    }
+    if (!canReadLocalWorkspace) {
+      setSelectedFileMessage(localWorkspaceMessage);
+      return;
+    }
+    if (isSelectedRoomLocked) {
+      setSelectedFileMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
+    if (!selectedFile) {
+      setSelectedFileMessage("Select a project file before saving changes.");
+      return;
+    }
+    const room = selectedRoom;
+    const path = selectedFile.path;
+    if (reportRoomFileActionInFlight(room.id)) return;
+    setFileBusyForRoom(room.id, true);
+    setFileMessageForRoom(room.id, null);
+    try {
+      const saved = await writeProjectFile(room.projectPath, path, content);
+      const [file, diff] = await Promise.all([
+        readProjectFile(room.projectPath, path),
+        getGitDiff(room.projectPath, path).catch(() => null)
+      ]);
+      if (selectedRoomIdRef.current !== room.id) return;
+      setSelectedFileForRoom(room.id, {
+        ...file,
+        path: saved.path,
+        size: saved.size
+      });
+      setSelectedDiffForRoom(room.id, diff);
+      setFilePreviewTabForRoom(room.id, "file");
+      setFileMessageForRoom(room.id, `Saved ${path}.`);
+    } catch (error) {
+      if (selectedRoomIdRef.current === room.id) setFileMessageForRoom(room.id, String(error));
+    } finally {
+      setFileBusyForRoom(room.id, false);
+    }
+  }
+
   function removePendingAttachment(attachmentId: string) {
     setPendingAttachmentsForRoom(selectedRoom.id, (current) =>
       current.filter((attachment) => attachment.id !== attachmentId)
@@ -280,6 +324,7 @@ export function useFileActions({
 
   return {
     openProjectFile,
+    saveSelectedFileContent,
     attachSelectedFileToMessage,
     removePendingAttachment,
     openEncryptedAttachmentBlob

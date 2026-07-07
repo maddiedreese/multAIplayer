@@ -1,7 +1,10 @@
+import { useEffect } from "react";
 import {
   approvalPolicyLabels,
   roomModeLabels
 } from "../seedData";
+import { canUserApprovalAuthorizeHostExecution } from "../lib/codexApproval";
+import { isLocalUserActiveHostForRoom } from "../lib/roomHost";
 import type { useAppHostHandoffActions } from "./useAppHostHandoffActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRelaySync } from "./useAppRelaySync";
@@ -74,6 +77,7 @@ export function useAppRoomRuntime({
     projectPathDraft,
     messages,
     draft,
+    roomGoal,
     pendingAttachments,
     browserRequests,
     browserUrl,
@@ -113,6 +117,7 @@ export function useAppRoomRuntime({
     setPendingCodexApprovalForRoom,
     resetCodexApprovalForRoom,
     setCodexRunningForRoom,
+    setRoomGoalForRoom,
     setBrowserUrlForRoom,
     setBrowserMessageForRoom,
     setSelectedBrowserMessage,
@@ -128,7 +133,7 @@ export function useAppRoomRuntime({
     updateBrowserRequestStatus
   } = roomActions;
 
-  return useRoomRuntimeContext({
+  const runtime = useRoomRuntimeContext({
     codexActions: {
       turn: {
         selectedRoom,
@@ -152,6 +157,7 @@ export function useAppRoomRuntime({
         appendTerminalLinesForRoom,
         setRooms: workspaceState.setRooms,
         publishCodexEvent: relaySync.publishCodexEvent,
+        publishCodexApproval: relaySync.publishCodexApproval,
         publishChatMessage: roomInteraction.publishChatMessage,
         publishHostHandoff: hostHandoffActions.publishHostHandoff
       },
@@ -166,6 +172,7 @@ export function useAppRoomRuntime({
         hostGateMessage: roomInteraction.hostGateMessage,
         localUser: localIdentity.localUser,
         draft,
+        roomGoal,
         pendingAttachments,
         messages,
         roomTerminals,
@@ -180,6 +187,7 @@ export function useAppRoomRuntime({
         setPendingCodexApprovalForRoom,
         setApprovalVisibleForRoom,
         setDraftForRoom,
+        setRoomGoalForRoom,
         setPendingAttachmentsForRoom
       }
     },
@@ -422,4 +430,43 @@ export function useAppRoomRuntime({
       }
     }
   });
+
+  useEffect(() => {
+    appRefs.delegatedCodexApprovalHandlerRef.current = (event, roomId) => {
+      const room = appRefs.roomsRef.current.find((item) => item.id === roomId);
+      if (!room) return;
+      if (!isLocalUserActiveHostForRoom(room, localIdentity.localUser)) return;
+      if (event.roomId !== roomId) {
+        setHostMessageForRoom(roomId, "Ignored delegated Codex approval for a different room.");
+        return;
+      }
+      if (!canUserApprovalAuthorizeHostExecution(room, event.approverUserId)) {
+        setHostMessageForRoom(roomId, `${event.approver} is not allowed to approve Codex turns for this host.`);
+        return;
+      }
+      const approval = codexRoomState.pendingCodexApprovalsByRoom[roomId] ?? null;
+      if (!approval) {
+        setHostMessageForRoom(roomId, `Received delegated Codex approval from ${event.approver}, but no Codex turn is waiting.`);
+        return;
+      }
+      setHostMessageForRoom(roomId, `${event.approver} approved this Codex turn. Running it on this host.`);
+      runtime.approveCodexTurn(approval).catch((error) => {
+        setHostMessageForRoom(roomId, `Delegated Codex approval could not run: ${String(error)}`);
+      });
+    };
+    return () => {
+      if (appRefs.delegatedCodexApprovalHandlerRef.current) {
+        appRefs.delegatedCodexApprovalHandlerRef.current = null;
+      }
+    };
+  }, [
+    appRefs.delegatedCodexApprovalHandlerRef,
+    appRefs.roomsRef,
+    codexRoomState.pendingCodexApprovalsByRoom,
+    localIdentity.localUser,
+    runtime,
+    setHostMessageForRoom
+  ]);
+
+  return runtime;
 }

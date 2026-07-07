@@ -114,6 +114,8 @@ export async function createRoom(
   projectPath: string,
   settings: {
     approvalPolicy?: ApprovalPolicy;
+    approvalDelegationPolicy?: RoomRecord["approvalDelegationPolicy"];
+    trustedApproverUserIds?: string[];
     codexModel?: string;
     browserAllowedOrigins?: string[];
     browserProfilePersistent?: boolean;
@@ -150,6 +152,8 @@ export async function updateRoomSettings(
   settings: {
     name?: string;
     approvalPolicy?: RoomRecord["approvalPolicy"];
+    approvalDelegationPolicy?: RoomRecord["approvalDelegationPolicy"];
+    trustedApproverUserIds?: string[];
     mode?: RoomRecord["mode"];
     codexModel?: string;
     projectPath?: string;

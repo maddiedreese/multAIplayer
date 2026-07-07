@@ -2275,6 +2275,15 @@ button:disabled {
   gap: 6px;
 }
 
+.panel-subtitle {
+  margin: 12px 0 6px;
+  color: #5f665f;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .policy-options button {
   min-height: 34px;
   padding: 7px 9px;
@@ -2288,9 +2297,21 @@ button:disabled {
 }
 
 .policy-options button.active {
-  border-color: #ead79a;
-  background: #fff8dc;
-  color: #6d4b00;
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
+.warning-card {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #b8b8b8;
+  border-radius: 8px;
+  background: #f3f3f3;
+  color: #171717;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .mode-options {
@@ -3306,7 +3327,7 @@ button:not(:disabled):active {
   position: sticky;
   bottom: 0;
   flex: 0 0 auto;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: end;
   gap: 10px;
   margin: 0;
@@ -3814,6 +3835,80 @@ button:not(:disabled):active {
   background: var(--bg);
 }
 
+.room-goal {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.room-goal-status {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.room-goal-status span {
+  color: var(--text-muted);
+}
+
+.room-goal p {
+  grid-column: 1;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-goal-actions {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.room-goal-actions button,
+.room-goal-edit button {
+  display: inline-flex;
+  min-width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: 7px;
+}
+
+.room-goal-edit {
+  grid-column: 1;
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+}
+
+.room-goal-edit input {
+  min-width: 0;
+  flex: 1;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font: inherit;
+}
+
 .composer-body {
   max-width: 100%;
 }
@@ -4240,7 +4335,7 @@ select {
 
 .composer {
   display: grid;
-  grid-template-columns: var(--control-height) minmax(0, 1fr) var(--control-height);
+  grid-template-columns: var(--control-height) var(--control-height) minmax(0, 1fr) var(--control-height);
   gap: 10px;
   padding: 12px var(--page-gutter) 18px;
 }
@@ -5579,6 +5674,37 @@ select {
   border-bottom: 1px solid var(--border);
 }
 
+.file-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.file-editor-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.file-editor-actions .primary {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--surface);
+}
+
+.file-editor-actions .primary:disabled {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
 .file-viewer-body {
   flex: 1;
   min-height: 0;
@@ -5602,6 +5728,28 @@ select {
   background: #101010;
   font-size: 12px;
   line-height: 1.55;
+}
+
+.file-editor {
+  width: 100%;
+  min-height: 100%;
+  resize: none;
+  padding: 14px;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: #101010;
+  color: #f4f4f4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.file-editor:disabled {
+  color: #b8b8b8;
+  background: #151515;
 }
 
 .inspector-panel-group:has(.file-viewer-open) {

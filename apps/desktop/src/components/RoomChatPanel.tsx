@@ -1,5 +1,8 @@
-import { Bot, Copy, ExternalLink, FileCode2, Send, Square, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bot, Copy, ExternalLink, FileCode2, Paperclip, Pause, Pencil, Play, Send, Square, Trash2, X } from "lucide-react";
 import { CodexApprovalCard, type CodexApprovalSummaryDisplay } from "./CodexApprovalCard";
+import { formatRoomGoalDuration } from "../lib/roomGoals";
+import type { RoomGoal } from "../types";
 
 export interface RoomChatAttachmentDisplay {
   id: string;
@@ -58,6 +61,7 @@ export function RoomChatPanel({
   chatEnabled,
   draft,
   pendingAttachments,
+  roomGoal,
   localPreviewCards = [],
   pendingAttachmentSummary,
   markdownSelectionMode,
@@ -70,9 +74,15 @@ export function RoomChatPanel({
   onApproveApproval,
   onInvokeCodex,
   onRemovePendingAttachment,
+  onPauseGoal,
+  onResumeGoal,
+  onEditGoal,
+  onDeleteGoal,
+  onTickGoalElapsed,
   onOpenLocalPreview,
   onCopyLocalPreviewLink,
   onStopLocalPreview,
+  onOpenFileSelector,
   onDraftChange,
   onSendMessage
 }: {
@@ -89,6 +99,7 @@ export function RoomChatPanel({
   chatEnabled: boolean;
   draft: string;
   pendingAttachments: PendingAttachmentDisplay[];
+  roomGoal: RoomGoal | null;
   localPreviewCards: LocalPreviewCardDisplay[];
   pendingAttachmentSummary: string;
   markdownSelectionMode: boolean;
@@ -101,12 +112,24 @@ export function RoomChatPanel({
   onApproveApproval: () => void;
   onInvokeCodex: () => void;
   onRemovePendingAttachment: (attachmentId: string) => void;
+  onPauseGoal: () => void;
+  onResumeGoal: () => void;
+  onEditGoal: (text: string) => void;
+  onDeleteGoal: () => void;
+  onTickGoalElapsed: () => void;
   onOpenLocalPreview: (previewId: string) => void;
   onCopyLocalPreviewLink: (previewId: string) => void;
   onStopLocalPreview: (previewId: string) => void;
+  onOpenFileSelector: () => void;
   onDraftChange: (draft: string) => void;
   onSendMessage: () => void;
 }) {
+  useEffect(() => {
+    if (roomGoal?.status !== "running") return undefined;
+    const interval = window.setInterval(onTickGoalElapsed, 1000);
+    return () => window.clearInterval(interval);
+  }, [onTickGoalElapsed, roomGoal?.id, roomGoal?.status]);
+
   return (
     <>
       <div className="chat-scroll">
@@ -247,8 +270,25 @@ export function RoomChatPanel({
       </div>
 
       <footer className="composer">
+        {roomGoal && (
+          <RoomGoalPopup
+            goal={roomGoal}
+            onPause={onPauseGoal}
+            onResume={onResumeGoal}
+            onEdit={onEditGoal}
+            onDelete={onDeleteGoal}
+          />
+        )}
         <button title="Invoke Codex" aria-label="Invoke Codex" onClick={onInvokeCodex} disabled={!canUseChat}>
           <Bot size={18} />
+        </button>
+        <button
+          title="Attach project file"
+          aria-label="Attach project file"
+          onClick={onOpenFileSelector}
+          disabled={!canUseChat || roomLocked}
+        >
+          <Paperclip size={18} />
         </button>
         <div className="composer-body">
           {pendingAttachments.length > 0 && (
@@ -289,5 +329,78 @@ export function RoomChatPanel({
         </button>
       </footer>
     </>
+  );
+}
+
+function RoomGoalPopup({
+  goal,
+  onPause,
+  onResume,
+  onEdit,
+  onDelete
+}: {
+  goal: RoomGoal;
+  onPause: () => void;
+  onResume: () => void;
+  onEdit: (text: string) => void;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(goal.text);
+
+  useEffect(() => {
+    setDraft(goal.text);
+    setEditing(false);
+  }, [goal.id, goal.text]);
+
+  function saveEdit() {
+    const next = draft.trim();
+    if (!next) return;
+    onEdit(next);
+    setEditing(false);
+  }
+
+  return (
+    <section className={`room-goal ${goal.status}`} aria-label="Room goal">
+      <div className="room-goal-status">
+        <Bot size={15} />
+        <strong>{goal.status === "running" ? "Goal running" : "Goal paused"}</strong>
+        <span>{formatRoomGoalDuration(goal.elapsedMs)}</span>
+      </div>
+      {editing ? (
+        <div className="room-goal-edit">
+          <input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") saveEdit();
+              if (event.key === "Escape") setEditing(false);
+            }}
+            aria-label="Edit room goal"
+            autoFocus
+          />
+          <button onClick={saveEdit}>Save</button>
+        </div>
+      ) : (
+        <p>{goal.text}</p>
+      )}
+      <div className="room-goal-actions">
+        {goal.status === "running" ? (
+          <button onClick={onPause} title="Pause goal" aria-label="Pause goal">
+            <Pause size={14} />
+          </button>
+        ) : (
+          <button onClick={onResume} title="Resume goal" aria-label="Resume goal">
+            <Play size={14} />
+          </button>
+        )}
+        <button onClick={() => setEditing((current) => !current)} title="Edit goal" aria-label="Edit goal">
+          <Pencil size={14} />
+        </button>
+        <button onClick={onDelete} title="Delete goal" aria-label="Delete goal">
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </section>
   );
 }

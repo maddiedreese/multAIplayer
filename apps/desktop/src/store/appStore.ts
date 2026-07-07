@@ -24,6 +24,7 @@ import type {
   LocalRoomHistoryPayload,
   PendingCodexApproval,
   RoomPresence,
+  RoomGoal,
   TerminalCommandRequest
 } from "../types";
 import type { FilePreviewTab } from "../lib/filePreview";
@@ -80,6 +81,7 @@ type CodexEventsByRoom = Record<string, CodexRoomEvent[]>;
 type ApprovalVisibleByRoom = Record<string, boolean>;
 type PendingCodexApprovalsByRoom = Record<string, PendingCodexApproval>;
 type CodexRunningByRoom = Record<string, boolean>;
+type RoomGoalsByRoom = Record<string, RoomGoal>;
 type SecretWarningsVisibleByRoom = Record<string, boolean>;
 type CodexThreadIdsByRoom = Record<string, string>;
 type SelectedMessageIdsByRoom = Record<string, string[]>;
@@ -165,6 +167,7 @@ const emptyAppStoreState = {
   approvalVisibleByRoom: {},
   pendingCodexApprovalsByRoom: {},
   codexRunningByRoom: {},
+  roomGoalsByRoom: {},
   secretWarningsVisibleByRoom: {},
   codexThreadIdsByRoom: {},
   selectedMessageIdsByRoom: {},
@@ -247,6 +250,7 @@ interface AppStoreState {
   approvalVisibleByRoom: ApprovalVisibleByRoom;
   pendingCodexApprovalsByRoom: PendingCodexApprovalsByRoom;
   codexRunningByRoom: CodexRunningByRoom;
+  roomGoalsByRoom: RoomGoalsByRoom;
   secretWarningsVisibleByRoom: SecretWarningsVisibleByRoom;
   codexThreadIdsByRoom: CodexThreadIdsByRoom;
   selectedMessageIdsByRoom: SelectedMessageIdsByRoom;
@@ -327,6 +331,7 @@ interface AppStoreState {
   setApprovalVisibleByRoom: (action: SetStateAction<ApprovalVisibleByRoom>) => void;
   setPendingCodexApprovalsByRoom: (action: SetStateAction<PendingCodexApprovalsByRoom>) => void;
   setCodexRunningByRoom: (action: SetStateAction<CodexRunningByRoom>) => void;
+  setRoomGoalsByRoom: (action: SetStateAction<RoomGoalsByRoom>) => void;
   setSecretWarningsVisibleByRoom: (action: SetStateAction<SecretWarningsVisibleByRoom>) => void;
   setCodexThreadIdsByRoom: (action: SetStateAction<CodexThreadIdsByRoom>) => void;
   setSelectedMessageIdsByRoom: (action: SetStateAction<SelectedMessageIdsByRoom>) => void;
@@ -389,6 +394,7 @@ interface AppStoreState {
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
   resetCodexApprovalForRoom: (roomId: string) => void;
   setCodexRunningForRoom: (roomId: string, running: boolean) => void;
+  setRoomGoalForRoom: (roomId: string, goal: RoomGoal | null) => void;
   setCodexThreadIdForRoom: (roomId: string, threadId: string | null) => void;
   setFileQueryForRoom: (roomId: string, query: string) => void;
   setProjectFilesForRoom: (roomId: string, files: ProjectFileEntry[]) => void;
@@ -746,6 +752,11 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setCodexRunningByRoom: (action) => {
     set((state) => ({
       codexRunningByRoom: resolveSetStateAction(state.codexRunningByRoom, action)
+    }));
+  },
+  setRoomGoalsByRoom: (action) => {
+    set((state) => ({
+      roomGoalsByRoom: resolveSetStateAction(state.roomGoalsByRoom, action)
     }));
   },
   setSecretWarningsVisibleByRoom: (action) => {
@@ -1306,6 +1317,13 @@ export const useAppStore = create<AppStoreState>((set) => ({
         : omitRecordKey(state.codexRunningByRoom, roomId)
     }));
   },
+  setRoomGoalForRoom: (roomId, goal) => {
+    set((state) => ({
+      roomGoalsByRoom: goal
+        ? { ...state.roomGoalsByRoom, [roomId]: goal }
+        : omitRecordKey(state.roomGoalsByRoom, roomId)
+    }));
+  },
   setCodexThreadIdForRoom: (roomId, threadId) => {
     set((state) => ({
       codexThreadIdsByRoom: threadId
@@ -1596,6 +1614,7 @@ export const useAppStore = create<AppStoreState>((set) => ({
       approvalVisibleByRoom: omitRecordKey(state.approvalVisibleByRoom, roomId),
       pendingCodexApprovalsByRoom: omitRecordKey(state.pendingCodexApprovalsByRoom, roomId),
       codexRunningByRoom: omitRecordKey(state.codexRunningByRoom, roomId),
+      roomGoalsByRoom: omitRecordKey(state.roomGoalsByRoom, roomId),
       browserStatusByRoom: omitRecordKey(state.browserStatusByRoom, roomId),
       activeBrowserUrlsByRoom: omitRecordKey(state.activeBrowserUrlsByRoom, roomId),
       gitStatusByRoom: omitRecordKey(state.gitStatusByRoom, roomId),

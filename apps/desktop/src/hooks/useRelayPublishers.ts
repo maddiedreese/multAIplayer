@@ -1,5 +1,6 @@
 import type { MutableRefObject } from "react";
 import type {
+  CodexApprovalPlaintextPayload,
   CodexEventPlaintextPayload,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
@@ -35,6 +36,7 @@ interface UseRelayPublishersOptions {
   deviceId: string;
   localUser: LocalUser;
   approvalPolicyLabels: Record<string, string>;
+  approvalDelegationPolicyLabels: Record<string, string>;
   roomModeLabels: Record<string, string>;
   appendLocalPreviewEvent: (roomId: string, event: LocalPreviewRecord) => void;
   appendGitWorkflowEvent: (roomId: string, event: GitWorkflowEventPlaintextPayload) => void;
@@ -52,6 +54,7 @@ export function useRelayPublishers({
   deviceId,
   localUser,
   approvalPolicyLabels,
+  approvalDelegationPolicyLabels,
   roomModeLabels,
   appendLocalPreviewEvent,
   appendGitWorkflowEvent,
@@ -216,6 +219,36 @@ export function useRelayPublishers({
     });
   }
 
+  async function publishCodexApproval(
+    event: Omit<CodexApprovalPlaintextPayload, "eventType" | "approver" | "approverUserId" | "approvedAt">,
+    room: RoomRecord = selectedRoom
+  ) {
+    const payload: CodexApprovalPlaintextPayload = {
+      eventType: "codex.approval",
+      approver: localUser.name,
+      approverUserId: localUser.id,
+      approvedAt: new Date().toISOString(),
+      ...event
+    };
+    appendTerminalLinesForRoom(room.id, [
+      `Codex approval delegated by ${payload.approver}; host device will execute if this room still allows delegated approvals.`
+    ]);
+
+    const client = relayRef.current;
+    if (!client || relayStatus === "closed" || relayStatus === "error") return;
+    const secret = await loadOrCreateRoomSecret(room.id);
+    await publishEnvelope({
+      id: crypto.randomUUID(),
+      teamId: room.teamId,
+      roomId: room.id,
+      senderDeviceId: deviceId,
+      senderUserId: localUser.id,
+      createdAt: payload.approvedAt,
+      kind: "codex.approval",
+      payload: await encryptJson(payload, secret)
+    });
+  }
+
   async function publishRoomSettingsEvent(
     room: RoomRecord,
     event: Omit<RoomSettingsPlaintextPayload, "eventType" | "changedBy" | "changedByUserId">
@@ -226,7 +259,11 @@ export function useRelayPublishers({
       changedByUserId: localUser.id,
       ...event
     };
-    appendRoomMessage(room.id, buildRoomSettingsSystemMessage(payload, { approvalPolicyLabels, roomModeLabels }));
+    appendRoomMessage(room.id, buildRoomSettingsSystemMessage(payload, {
+      approvalPolicyLabels,
+      approvalDelegationPolicyLabels,
+      roomModeLabels
+    }));
 
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
@@ -275,6 +312,7 @@ export function useRelayPublishers({
     publishTerminalResult,
     publishGitWorkflowEvent,
     publishCodexEvent,
+    publishCodexApproval,
     publishRoomSettingsEvent,
     publishGitHubActionsEvent
   };

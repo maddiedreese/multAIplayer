@@ -52,6 +52,7 @@ export function useAppRoomPanelActions({
     setSelectedTerminalIdForRoom,
     setTerminalInputForRoom,
     setFileQueryForRoom,
+    setInspectorTabForRoom,
     setFilePreviewTabForRoom,
     setSelectedFileForRoom,
     setSelectedDiffForRoom
@@ -70,9 +71,15 @@ export function useAppRoomPanelActions({
       setApprovalVisibleForRoom,
       approveCodexTurn: roomRuntime.approveCodexTurn,
       handleCodexInvoke: roomRuntime.handleCodexInvoke,
+      pauseGoal: roomRuntime.pauseGoal,
+      resumeGoal: roomRuntime.resumeGoal,
+      editGoal: roomRuntime.editGoal,
+      deleteGoal: roomRuntime.deleteGoal,
+      tickGoalElapsed: roomRuntime.tickGoalElapsed,
       copyMarkdownWithFallback: workspaceFlow.copyMarkdownWithFallback,
       setChatMessageForRoom,
       stopLocalPreview: roomRuntime.stopLocalPreview,
+      setInspectorTabForRoom,
       setDraftForRoom
     },
     header: {
@@ -109,6 +116,7 @@ export function useAppRoomPanelActions({
       openProjectFile: workspaceFlow.openProjectFile,
       copyDiffSummaryMarkdown: workspaceFlow.copyDiffSummaryMarkdown,
       attachSelectedFileToMessage: workspaceFlow.attachSelectedFileToMessage,
+      saveSelectedFileContent: workspaceFlow.saveSelectedFileContent,
       setFilePreviewTabForRoom,
       setSelectedFileForRoom,
       setSelectedDiffForRoom,

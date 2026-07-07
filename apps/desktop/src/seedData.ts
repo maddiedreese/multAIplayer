@@ -3,6 +3,7 @@ import {
   defaultBrowserProfilePersistent,
   defaultCodexModel,
   defaultRoomMode,
+  type ApprovalDelegationPolicy,
   type ApprovalPolicy,
   type RoomMode,
   type RoomRecord,
@@ -45,6 +46,8 @@ export const seededRooms: RoomRecord[] = [
     hostUserId: fallbackUser.id,
     hostStatus: "active",
     approvalPolicy: "ask_every_turn",
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
     mode: { ...defaultRoomMode, browser: true },
     codexModel: defaultCodexModel,
     browserAllowedOrigins: defaultBrowserAllowedOrigins,
@@ -60,6 +63,8 @@ export const seededRooms: RoomRecord[] = [
     hostUserId: "github:alex",
     hostStatus: "handoff",
     approvalPolicy: "auto_chat_only",
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
     mode: defaultRoomMode,
     codexModel: "gpt-5.4-mini",
     browserAllowedOrigins: defaultBrowserAllowedOrigins,
@@ -75,6 +80,8 @@ export const seededRooms: RoomRecord[] = [
     hostUserId: undefined,
     hostStatus: "offline",
     approvalPolicy: "never_host",
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
     mode: defaultRoomMode,
     codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: defaultBrowserAllowedOrigins,
@@ -92,6 +99,8 @@ export const emptyRoom: RoomRecord = {
   hostUserId: undefined,
   hostStatus: "offline",
   approvalPolicy: "ask_every_turn",
+  approvalDelegationPolicy: "host_only",
+  trustedApproverUserIds: [],
   mode: defaultRoomMode,
   codexModel: defaultCodexModel,
   browserAllowedOrigins: defaultBrowserAllowedOrigins,
@@ -186,6 +195,13 @@ export const approvalPolicyLabels: Record<ApprovalPolicy, string> = {
   auto_chat_only: "Auto-approve chat-only turns",
   auto_browser_allowed_sites: "Legacy browser auto-approval",
   never_host: "Never host this room"
+};
+
+export const approvalDelegationPolicyLabels: Record<ApprovalDelegationPolicy, string> = {
+  host_only: "Host only",
+  members_can_request: "Members can request, host approves",
+  members_can_approve: "Room members can approve",
+  trusted_members_only: "Trusted members only"
 };
 
 export const roomModeLabels: Record<keyof RoomMode, string> = {

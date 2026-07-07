@@ -212,6 +212,20 @@ export const CodexEventPlaintextPayload = z.object({
   createdAt: z.string().datetime()
 });
 
+export const CodexApprovalPlaintextPayload = z.object({
+  eventType: z.literal("codex.approval"),
+  approvalId: z.string().min(1).max(maxEnvelopeIdChars),
+  roomId: RoomId,
+  approver: z.string().min(1).max(maxDisplayNameChars),
+  approverUserId: z.string().min(1).max(maxUserIdChars),
+  approvedAt: z.string().datetime(),
+  delegationPolicy: z.enum([
+    "members_can_approve",
+    "trusted_members_only"
+  ]),
+  message: z.string().max(maxMediumTextChars).optional()
+});
+
 export const TerminalResultPlaintextPayload = z.object({
   eventType: z.literal("terminal.result"),
   requestId: z.string().min(1).max(maxEnvelopeIdChars),
@@ -312,6 +326,8 @@ export const RoomSettingsPlaintextPayload = z.object({
   setting: z.enum([
     "roomName",
     "approvalPolicy",
+    "approvalDelegationPolicy",
+    "trustedApprovers",
     "roomMode",
     "codexModel",
     "projectPath",
@@ -342,6 +358,13 @@ export type ApprovalPolicy =
   | "auto_browser_allowed_sites"
   | "never_host";
 
+export type ApprovalDelegationPolicy =
+  | "host_only"
+  | "members_can_request"
+  | "members_can_approve"
+  | "trusted_members_only";
+
+export const defaultApprovalDelegationPolicy: ApprovalDelegationPolicy = "host_only";
 export const defaultCodexModel = "gpt-5.4";
 export const defaultBrowserAllowedOrigins = ["https://github.com"];
 export const defaultBrowserProfilePersistent = true;
@@ -399,6 +422,13 @@ export const RoomRecord = z.object({
     "auto_browser_allowed_sites",
     "never_host"
   ]),
+  approvalDelegationPolicy: z.enum([
+    "host_only",
+    "members_can_request",
+    "members_can_approve",
+    "trusted_members_only"
+  ]),
+  trustedApproverUserIds: z.array(UserId).max(50),
   mode: RoomModeSchema,
   codexModel: z.string().min(1).max(maxCodexModelChars),
   browserAllowedOrigins: z.array(z.string().min(1).max(maxUrlChars)).max(20),
@@ -508,6 +538,7 @@ export type InviteJoinStatusPlaintextPayload = z.infer<typeof InviteJoinStatusPl
 export type WrappedRoomSecretPayload = z.infer<typeof WrappedRoomSecretPayload>;
 export type RoomKeyRotationPlaintextPayload = z.infer<typeof RoomKeyRotationPlaintextPayload>;
 export type CodexEventPlaintextPayload = z.infer<typeof CodexEventPlaintextPayload>;
+export type CodexApprovalPlaintextPayload = z.infer<typeof CodexApprovalPlaintextPayload>;
 export type TerminalResultPlaintextPayload = z.infer<typeof TerminalResultPlaintextPayload>;
 export type GitWorkflowEventPlaintextPayload = z.infer<typeof GitWorkflowEventPlaintextPayload>;
 export type GitHubActionsEventPlaintextPayload = z.infer<typeof GitHubActionsEventPlaintextPayload>;
