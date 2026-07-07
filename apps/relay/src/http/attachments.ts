@@ -4,13 +4,11 @@ import {
   CiphertextPayload,
   type AttachmentBlobRecord as AttachmentBlobRecordType
 } from "@multaiplayer/protocol";
-import type { AuthSession } from "../state.js";
+import type { AuthSession, RelayStore } from "../state.js";
 
 interface RegisterAttachmentRoutesOptions {
   app: Express;
-  teams: Map<string, unknown>;
-  rooms: Map<string, { teamId: string }>;
-  attachmentBlobs: Map<string, AttachmentBlobRecordType>;
+  store: RelayStore;
   attachmentBlobMaxBytes: number;
   attachmentBlobTtlDays: number;
   maxAttachmentBlobNameChars: number;
@@ -28,9 +26,7 @@ interface RegisterAttachmentRoutesOptions {
 
 export function registerAttachmentRoutes({
   app,
-  teams,
-  rooms,
-  attachmentBlobs,
+  store,
   attachmentBlobMaxBytes,
   attachmentBlobTtlDays,
   maxAttachmentBlobNameChars,
@@ -51,11 +47,11 @@ export function registerAttachmentRoutes({
 
     const teamId = String(req.body?.teamId ?? "");
     const roomId = String(req.body?.roomId ?? "");
-    if (!teams.has(teamId)) {
+    if (!store.hasTeam(teamId)) {
       res.status(404).json({ error: "Team not found" });
       return;
     }
-    if (!rooms.has(roomId) || rooms.get(roomId)?.teamId !== teamId) {
+    if (store.getRoom(roomId)?.teamId !== teamId) {
       res.status(404).json({ error: "Room not found" });
       return;
     }
@@ -109,13 +105,13 @@ export function registerAttachmentRoutes({
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + attachmentBlobTtlDays * 24 * 60 * 60 * 1000).toISOString()
     };
-    attachmentBlobs.set(blob.id, blob);
+    store.setAttachmentBlob(blob);
     scheduleStoreSave();
     res.status(201).json({ blob });
   });
 
   app.get("/attachment-blobs/:blobId", (req, res) => {
-    const blob = attachmentBlobs.get(req.params.blobId);
+    const blob = store.getAttachmentBlob(req.params.blobId);
     if (!blob) {
       res.status(404).json({ error: "Attachment blob not found" });
       return;
@@ -137,7 +133,7 @@ export function registerAttachmentRoutes({
       return;
     }
     if (isExpiredAttachmentBlob(blob)) {
-      attachmentBlobs.delete(blob.id);
+      store.deleteAttachmentBlob(blob.id);
       scheduleStoreSave();
       res.status(410).json({ error: "Attachment blob expired" });
       return;

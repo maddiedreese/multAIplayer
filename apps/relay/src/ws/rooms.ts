@@ -1,22 +1,14 @@
 import type { WebSocket } from "ws";
-import type {
-  InviteRecord,
-  RoomRecord,
-  TeamMemberRecord,
-  TeamRecord,
-  TeamRole
-} from "@multaiplayer/protocol";
-import type { ClientSession, PresenceRecord, RoomKey } from "../state.js";
+import type { TeamRole } from "@multaiplayer/protocol";
+import type { ClientSession, PresenceRecord, RelayStore, RoomKey } from "../state.js";
 
 interface CreateRelayRoomSocketManagerOptions {
+  store: RelayStore;
   roomSockets: Map<RoomKey, Set<WebSocket>>;
   teamSockets: Map<string, Set<WebSocket>>;
   workspaceSockets: Set<WebSocket>;
   roomPresence: Map<RoomKey, Map<string, PresenceRecord>>;
   sessions: Map<WebSocket, ClientSession>;
-  teams: Map<string, TeamRecord>;
-  rooms: Map<string, RoomRecord>;
-  invites: Map<string, InviteRecord>;
   mutationsRequireAuth: boolean;
   roomKey: (teamId: string, roomId: string) => RoomKey;
   canAccessRoom: (teamId: string, roomId: string, userId: string) => boolean;
@@ -28,14 +20,12 @@ interface CreateRelayRoomSocketManagerOptions {
 }
 
 export function createRelayRoomSocketManager({
+  store,
   roomSockets,
   teamSockets,
   workspaceSockets,
   roomPresence,
   sessions,
-  teams,
-  rooms,
-  invites,
   mutationsRequireAuth,
   roomKey,
   canAccessRoom,
@@ -70,7 +60,7 @@ export function createRelayRoomSocketManager({
   }
 
   function isKnownRoom(teamId: string, roomId: string): boolean {
-    return teams.has(teamId) && rooms.get(roomId)?.teamId === teamId;
+    return store.hasTeam(teamId) && store.getRoom(roomId)?.teamId === teamId;
   }
 
   function canJoinRoom(
@@ -148,10 +138,10 @@ export function createRelayRoomSocketManager({
   }
 
   function isValidInviteForRoom(inviteId: string, teamId: string, roomId: string): boolean {
-    const invite = invites.get(inviteId);
+    const invite = store.getInvite(inviteId);
     if (!invite || invite.teamId !== teamId || invite.roomId !== roomId) return false;
     if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
-      invites.delete(invite.id);
+      store.deleteInvite(invite.id);
       scheduleStoreSave();
       return false;
     }

@@ -78,6 +78,12 @@ export interface RelayStore {
   allRooms(): RoomRecord[];
   getRoom(roomId: string): RoomRecord | undefined;
   setRoom(room: RoomRecord): void;
+  getInvite(inviteId: string): InviteRecord | undefined;
+  setInvite(invite: InviteRecord): void;
+  deleteInvite(inviteId: string): boolean;
+  getAttachmentBlob(blobId: string): AttachmentBlobRecord | undefined;
+  setAttachmentBlob(blob: AttachmentBlobRecord): void;
+  deleteAttachmentBlob(blobId: string): boolean;
 }
 
 export class InMemoryRelayStore implements RelayStore {
@@ -146,6 +152,30 @@ export class InMemoryRelayStore implements RelayStore {
 
   setRoom(room: RoomRecord): void {
     this.rooms.set(room.id, room);
+  }
+
+  getInvite(inviteId: string): InviteRecord | undefined {
+    return this.invites.get(inviteId);
+  }
+
+  setInvite(invite: InviteRecord): void {
+    this.invites.set(invite.id, invite);
+  }
+
+  deleteInvite(inviteId: string): boolean {
+    return this.invites.delete(inviteId);
+  }
+
+  getAttachmentBlob(blobId: string): AttachmentBlobRecord | undefined {
+    return this.attachmentBlobs.get(blobId);
+  }
+
+  setAttachmentBlob(blob: AttachmentBlobRecord): void {
+    this.attachmentBlobs.set(blob.id, blob);
+  }
+
+  deleteAttachmentBlob(blobId: string): boolean {
+    return this.attachmentBlobs.delete(blobId);
   }
 }
 
