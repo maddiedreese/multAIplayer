@@ -1,8 +1,7 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type { MutableRefObject } from "react";
 import type { GitHubActionsEventPlaintextPayload, RoomRecord } from "@multaiplayer/protocol";
 import {
   listGitHubActionRuns,
-  type GitHubActionRun,
   type GitHubAuthConfig,
   type SignedInUser
 } from "../lib/authClient";
@@ -19,7 +18,7 @@ import {
 import { summarizeActionRuns } from "../lib/githubActionsSummary";
 import { isLocalUserActiveHostForRoom } from "../lib/roomHost";
 import { canUseLocalWorkspace, localWorkspaceGateMessage } from "../lib/workspaceAccess";
-import { omitRecordKey } from "../lib/setUtils";
+import { useAppStore } from "../store/appStore";
 
 interface LocalUser {
   id: string;
@@ -39,9 +38,6 @@ interface UseGitHubActionsRefreshOptions {
   authConfig: GitHubAuthConfig | null;
   currentUser: SignedInUser | null;
   setActionsBusyForRoom: (roomId: string, busy: boolean) => void;
-  setActionsMessagesByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setActionRunsByRoom: Dispatch<SetStateAction<Record<string, GitHubActionRun[]>>>;
-  setActionsLastCheckedByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
   publishGitHubActionsEvent: (
     event: Omit<GitHubActionsEventPlaintextPayload, "eventType" | "checkedBy" | "checkedByUserId">,
     room?: RoomRecord
@@ -61,11 +57,12 @@ export function useGitHubActionsRefresh({
   authConfig,
   currentUser,
   setActionsBusyForRoom,
-  setActionsMessagesByRoom,
-  setActionRunsByRoom,
-  setActionsLastCheckedByRoom,
   publishGitHubActionsEvent
 }: UseGitHubActionsRefreshOptions) {
+  const setActionsMessageForRoom = useAppStore((state) => state.setActionsMessageForRoom);
+  const setActionRunsForRoom = useAppStore((state) => state.setActionRunsForRoom);
+  const setActionsLastCheckedForRoom = useAppStore((state) => state.setActionsLastCheckedForRoom);
+
   async function refreshGitHubActions(roomArg?: RoomRecord, targetArg?: GitHubActionsTarget) {
     const room = roomArg ?? (hasSelectedRoom ? selectedRoom : null);
     if (!room) {
@@ -73,17 +70,11 @@ export function useGitHubActionsRefresh({
     }
     const roomId = room.id;
     if (isGitHubActionsRefreshInFlight(actionsBusyRef.current, roomId)) {
-      setActionsMessagesByRoom((current) => ({
-        ...current,
-        [roomId]: gitHubActionsRefreshInFlightMessage()
-      }));
+      setActionsMessageForRoom(roomId, gitHubActionsRefreshInFlightMessage());
       return;
     }
     if (!roomsRef.current.some((item) => item.id === roomId)) {
-      setActionsMessagesByRoom((current) => ({
-        ...current,
-        [roomId]: "This room is no longer available for GitHub Actions refresh."
-      }));
+      setActionsMessageForRoom(roomId, "This room is no longer available for GitHub Actions refresh.");
       return;
     }
     const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
@@ -95,17 +86,11 @@ export function useGitHubActionsRefresh({
         room.hostStatus === "active"
           ? `Only ${room.host} can refresh GitHub Actions in this room.`
           : "Claim host before refreshing GitHub Actions in this room.";
-      setActionsMessagesByRoom((current) => ({
-        ...current,
-        [roomId]: roomHostGateMessage
-      }));
+      setActionsMessageForRoom(roomId, roomHostGateMessage);
       return;
     }
     if (!roomCanReadLocalWorkspace) {
-      setActionsMessagesByRoom((current) => ({
-        ...current,
-        [roomId]: localWorkspaceGateMessage(room, roomLocked)
-      }));
+      setActionsMessageForRoom(roomId, localWorkspaceGateMessage(room, roomLocked));
       return;
     }
     const workflowDraft = resolveGitWorkflowDraft(gitWorkflowDraftsRef.current, roomId);
@@ -117,41 +102,26 @@ export function useGitHubActionsRefresh({
       branch: targetArg?.branch ?? workflowDraft.branchName
     });
     if (!readiness.ready) {
-      setActionsMessagesByRoom((current) => ({
-        ...current,
-        [roomId]: readiness.messages.join(" ")
-      }));
+      setActionsMessageForRoom(roomId, readiness.messages.join(" "));
       return;
     }
     const actionsTarget = readiness.normalizedTarget;
     if (!actionsTarget) {
-      setActionsMessagesByRoom((current) => ({
-        ...current,
-        [roomId]: "GitHub Actions target could not be normalized."
-      }));
+      setActionsMessageForRoom(roomId, "GitHub Actions target could not be normalized.");
       return;
     }
     setActionsBusyForRoom(roomId, true);
-    setActionsMessagesByRoom((current) => omitRecordKey(current, roomId));
+    setActionsMessageForRoom(roomId, null);
     try {
       const result = await listGitHubActionRuns(actionsTarget.owner, actionsTarget.repo, actionsTarget.branch);
       const checkedAt = new Date().toISOString();
-      setActionRunsByRoom((current) => ({
-        ...current,
-        [roomId]: result.runs
-      }));
-      setActionsLastCheckedByRoom((current) => ({
-        ...current,
-        [roomId]: checkedAt
-      }));
+      setActionRunsForRoom(roomId, result.runs);
+      setActionsLastCheckedForRoom(roomId, checkedAt);
       const summary = summarizeActionRuns(result.runs);
       const message = result.runs.length
         ? `Loaded ${result.runs.length} workflow runs for ${actionsTarget.branch}.`
         : `No workflow runs found for ${actionsTarget.branch}. GitHub may still be scheduling the branch.`;
-      setActionsMessagesByRoom((current) => ({
-        ...current,
-        [roomId]: `${summary.label}: ${message}`
-      }));
+      setActionsMessageForRoom(roomId, `${summary.label}: ${message}`);
       publishGitHubActionsEvent({
         owner: actionsTarget.owner,
         repo: actionsTarget.repo,
@@ -164,10 +134,7 @@ export function useGitHubActionsRefresh({
         console.warn("Failed to publish GitHub Actions event", error);
       });
     } catch (error) {
-      setActionsMessagesByRoom((current) => ({
-        ...current,
-        [roomId]: String(error)
-      }));
+      setActionsMessageForRoom(roomId, String(error));
     } finally {
       setActionsBusyForRoom(roomId, false);
     }

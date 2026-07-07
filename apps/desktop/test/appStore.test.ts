@@ -166,6 +166,38 @@ test("desktop store keeps GitHub Actions state room scoped", () => {
   assert.equal(state.actionsLastCheckedByRoom["room-a"], "2026-07-06T00:02:00.000Z");
 });
 
+test("desktop store exposes GitHub Actions room actions", () => {
+  const store = useAppStore.getState();
+  const run = {
+    id: 42,
+    name: "macOS desktop package",
+    status: "completed",
+    conclusion: "success",
+    url: "https://github.com/maddiedreese/multAIplayer/actions/runs/42",
+    createdAt: "2026-07-06T00:00:00.000Z",
+    updatedAt: "2026-07-06T00:01:00.000Z"
+  };
+
+  store.setActionsBusyForRoom("room-a", true);
+  store.setActionsMessageForRoom("room-a", "Checking Actions");
+  store.setActionRunsForRoom("room-a", [run]);
+  store.setActionsLastCheckedForRoom("room-a", "2026-07-06T00:01:00.000Z");
+
+  let state = useAppStore.getState();
+  assert.equal(state.actionsBusyByRoom["room-a"], true);
+  assert.equal(state.actionsMessagesByRoom["room-a"], "Checking Actions");
+  assert.equal(state.actionRunsByRoom["room-a"]?.[0]?.id, 42);
+  assert.equal(state.actionsLastCheckedByRoom["room-a"], "2026-07-06T00:01:00.000Z");
+
+  store.resetGitHubActionsStateForRoom("room-a");
+
+  state = useAppStore.getState();
+  assert.deepEqual(state.actionRunsByRoom["room-a"], []);
+  assert.equal(state.actionsBusyByRoom["room-a"], undefined);
+  assert.equal(state.actionsMessagesByRoom["room-a"], undefined);
+  assert.equal(state.actionsLastCheckedByRoom["room-a"], undefined);
+});
+
 test("desktop store keeps browser panel state room scoped", () => {
   const store = useAppStore.getState();
 

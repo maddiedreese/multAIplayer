@@ -285,9 +285,6 @@ export function useAppRoomRuntime({
         authConfig: githubAuth.authConfig,
         currentUser: githubAuth.currentUser,
         setActionsBusyForRoom,
-        setActionsMessagesByRoom: githubWorkflowPanelState.setActionsMessagesByRoom,
-        setActionRunsByRoom: githubWorkflowPanelState.setActionRunsByRoom,
-        setActionsLastCheckedByRoom: githubWorkflowPanelState.setActionsLastCheckedByRoom,
         publishGitHubActionsEvent: relaySync.publishGitHubActionsEvent
       },
       gitWorkflow: {
@@ -387,11 +384,7 @@ export function useAppRoomRuntime({
       gitHubActionsDraftReset: {
         hasSelectedRoom,
         selectedRoomId: selectedRoom.id,
-        gitWorkflowDraft,
-        setActionRunsByRoom: githubWorkflowPanelState.setActionRunsByRoom,
-        setActionsLastCheckedByRoom: githubWorkflowPanelState.setActionsLastCheckedByRoom,
-        setActionsMessagesByRoom: githubWorkflowPanelState.setActionsMessagesByRoom,
-        setActionsBusyByRoom: githubWorkflowPanelState.setActionsBusyByRoom
+        gitWorkflowDraft
       },
       projectFilesSearch: {
         hasSelectedRoom,

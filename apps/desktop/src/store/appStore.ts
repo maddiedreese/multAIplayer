@@ -277,6 +277,10 @@ interface AppStoreState {
   setActionsMessagesByRoom: (action: SetStateAction<ActionsMessagesByRoom>) => void;
   setActionRunsByRoom: (action: SetStateAction<ActionRunsByRoom>) => void;
   setActionsLastCheckedByRoom: (action: SetStateAction<ActionsLastCheckedByRoom>) => void;
+  setActionsMessageForRoom: (roomId: string, message: string | null) => void;
+  setActionRunsForRoom: (roomId: string, runs: GitHubActionRun[]) => void;
+  setActionsLastCheckedForRoom: (roomId: string, checkedAt: string | null) => void;
+  resetGitHubActionsStateForRoom: (roomId: string) => void;
   setBrowserRequestsByRoom: (action: SetStateAction<BrowserRequestsByRoom>) => void;
   setBrowserUrlsByRoom: (action: SetStateAction<BrowserUrlsByRoom>) => void;
   setBrowserReasonsByRoom: (action: SetStateAction<BrowserReasonsByRoom>) => void;
@@ -450,6 +454,39 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setActionsLastCheckedByRoom: (action) => {
     set((state) => ({
       actionsLastCheckedByRoom: resolveSetStateAction(state.actionsLastCheckedByRoom, action)
+    }));
+  },
+  setActionsMessageForRoom: (roomId, message) => {
+    set((state) => ({
+      actionsMessagesByRoom: message
+        ? { ...state.actionsMessagesByRoom, [roomId]: message }
+        : omitRecordKey(state.actionsMessagesByRoom, roomId)
+    }));
+  },
+  setActionRunsForRoom: (roomId, runs) => {
+    set((state) => ({
+      actionRunsByRoom: {
+        ...state.actionRunsByRoom,
+        [roomId]: runs
+      }
+    }));
+  },
+  setActionsLastCheckedForRoom: (roomId, checkedAt) => {
+    set((state) => ({
+      actionsLastCheckedByRoom: checkedAt
+        ? { ...state.actionsLastCheckedByRoom, [roomId]: checkedAt }
+        : omitRecordKey(state.actionsLastCheckedByRoom, roomId)
+    }));
+  },
+  resetGitHubActionsStateForRoom: (roomId) => {
+    set((state) => ({
+      actionRunsByRoom: {
+        ...state.actionRunsByRoom,
+        [roomId]: []
+      },
+      actionsLastCheckedByRoom: omitRecordKey(state.actionsLastCheckedByRoom, roomId),
+      actionsMessagesByRoom: omitRecordKey(state.actionsMessagesByRoom, roomId),
+      actionsBusyByRoom: omitRecordKey(state.actionsBusyByRoom, roomId)
     }));
   },
   setBrowserRequestsByRoom: (action) => {
