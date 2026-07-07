@@ -52,16 +52,6 @@ export function useAppRoomScopedSetters({
       fileBusyRef: appRefs.fileBusyRef,
       terminalBusyRef: appRefs.terminalBusyRef
     },
-    files: {
-      selectedRoomId: selectedRoom.id,
-      setFileQueriesByRoom: filePanelState.setFileQueriesByRoom,
-      setProjectFilesByRoom: filePanelState.setProjectFilesByRoom,
-      setSelectedFilesByRoom: filePanelState.setSelectedFilesByRoom,
-      setSelectedDiffsByRoom: filePanelState.setSelectedDiffsByRoom,
-      setFilePreviewTabsByRoom: filePanelState.setFilePreviewTabsByRoom,
-      setFileBusyByRoom: filePanelState.setFileBusyByRoom,
-      setFileMessagesByRoom: filePanelState.setFileMessagesByRoom
-    },
     terminals: {
       selectedRoomId: selectedRoom.id,
       maxTerminalActivityLines,

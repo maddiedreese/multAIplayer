@@ -356,6 +356,13 @@ interface AppStoreState {
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
   resetCodexApprovalForRoom: (roomId: string) => void;
   setCodexRunningForRoom: (roomId: string, running: boolean) => void;
+  setFileQueryForRoom: (roomId: string, query: string) => void;
+  setProjectFilesForRoom: (roomId: string, files: ProjectFileEntry[]) => void;
+  setSelectedFileForRoom: (roomId: string, file: ProjectFileContent | null) => void;
+  setSelectedDiffForRoom: (roomId: string, diff: GitDiffResult | null) => void;
+  setFilePreviewTabForRoom: (roomId: string, tab: FilePreviewTab) => void;
+  setFileMessageForRoom: (roomId: string, message: string | null) => void;
+  resetFileContextForRoom: (roomId: string) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   setMarkdownCopyFallbackForRoom: (roomId: string, fallback: MarkdownCopyFallback | null) => void;
@@ -859,6 +866,59 @@ export const useAppStore = create<AppStoreState>((set) => ({
       codexRunningByRoom: running
         ? { ...state.codexRunningByRoom, [roomId]: true }
         : omitRecordKey(state.codexRunningByRoom, roomId)
+    }));
+  },
+  setFileQueryForRoom: (roomId, query) => {
+    set((state) => ({
+      fileQueriesByRoom: query
+        ? { ...state.fileQueriesByRoom, [roomId]: query }
+        : omitRecordKey(state.fileQueriesByRoom, roomId)
+    }));
+  },
+  setProjectFilesForRoom: (roomId, files) => {
+    set((state) => ({
+      projectFilesByRoom: {
+        ...state.projectFilesByRoom,
+        [roomId]: files
+      }
+    }));
+  },
+  setSelectedFileForRoom: (roomId, file) => {
+    set((state) => ({
+      selectedFilesByRoom: file
+        ? { ...state.selectedFilesByRoom, [roomId]: file }
+        : omitRecordKey(state.selectedFilesByRoom, roomId)
+    }));
+  },
+  setSelectedDiffForRoom: (roomId, diff) => {
+    set((state) => ({
+      selectedDiffsByRoom: diff
+        ? { ...state.selectedDiffsByRoom, [roomId]: diff }
+        : omitRecordKey(state.selectedDiffsByRoom, roomId)
+    }));
+  },
+  setFilePreviewTabForRoom: (roomId, tab) => {
+    set((state) => ({
+      filePreviewTabsByRoom: tab === "file"
+        ? omitRecordKey(state.filePreviewTabsByRoom, roomId)
+        : { ...state.filePreviewTabsByRoom, [roomId]: tab }
+    }));
+  },
+  setFileMessageForRoom: (roomId, message) => {
+    set((state) => ({
+      fileMessagesByRoom: message
+        ? { ...state.fileMessagesByRoom, [roomId]: message }
+        : omitRecordKey(state.fileMessagesByRoom, roomId)
+    }));
+  },
+  resetFileContextForRoom: (roomId) => {
+    set((state) => ({
+      selectedFilesByRoom: omitRecordKey(state.selectedFilesByRoom, roomId),
+      selectedDiffsByRoom: omitRecordKey(state.selectedDiffsByRoom, roomId),
+      fileQueriesByRoom: omitRecordKey(state.fileQueriesByRoom, roomId),
+      projectFilesByRoom: omitRecordKey(state.projectFilesByRoom, roomId),
+      fileBusyByRoom: omitRecordKey(state.fileBusyByRoom, roomId),
+      fileMessagesByRoom: omitRecordKey(state.fileMessagesByRoom, roomId)
     }));
   },
   setHostMessageForRoom: (roomId, message) => {

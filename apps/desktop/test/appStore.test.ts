@@ -277,6 +277,39 @@ test("desktop store keeps file panel state room scoped", () => {
   assert.equal(state.markdownCopyFallbacksByRoom["room-a"]?.title, "README.md");
 });
 
+test("desktop store exposes room file panel actions", () => {
+  const store = useAppStore.getState();
+
+  store.setFileQueryForRoom("room-a", "README");
+  store.setProjectFilesForRoom("room-a", [{ path: "README.md", size: 2048 }]);
+  store.setSelectedFileForRoom("room-a", {
+    path: "README.md",
+    size: 2048,
+    truncated: false,
+    content: "# multAIplayer"
+  });
+  store.setSelectedDiffForRoom("room-a", {
+    path: "README.md",
+    diff: "@@ -1 +1 @@\n-old\n+new"
+  });
+  store.setFilePreviewTabForRoom("room-a", "diff");
+  store.setFileBusyForRoom("room-a", true);
+  store.setFileMessageForRoom("room-a", "Loaded README.md");
+  store.setFileQueryForRoom("room-b", "LICENSE");
+  store.setFilePreviewTabForRoom("room-b", "file");
+  store.resetFileContextForRoom("room-a");
+
+  const state = useAppStore.getState();
+  assert.equal(state.fileQueriesByRoom["room-a"], undefined);
+  assert.equal(state.projectFilesByRoom["room-a"], undefined);
+  assert.equal(state.selectedFilesByRoom["room-a"], undefined);
+  assert.equal(state.selectedDiffsByRoom["room-a"], undefined);
+  assert.equal(state.fileBusyByRoom["room-a"], undefined);
+  assert.equal(state.fileMessagesByRoom["room-a"], undefined);
+  assert.equal(state.fileQueriesByRoom["room-b"], "LICENSE");
+  assert.equal(state.filePreviewTabsByRoom["room-b"], undefined);
+});
+
 test("desktop store keeps room settings state room scoped", () => {
   const store = useAppStore.getState();
 
