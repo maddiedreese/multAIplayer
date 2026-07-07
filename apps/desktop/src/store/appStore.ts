@@ -8,6 +8,11 @@ import { normalizeCodexThreadId } from "../lib/codexThread";
 import { replaceRoomTerminalSnapshots } from "../lib/terminalState";
 import { createBrowserSlice, emptyBrowserState, type BrowserSlice } from "./slices/browserSlice";
 import { createFilePanelSlice, emptyFilePanelState, type FilePanelSlice } from "./slices/filePanelSlice";
+import {
+  createHistoryPresenceSlice,
+  emptyHistoryPresenceState,
+  type HistoryPresenceSlice
+} from "./slices/historyPresenceSlice";
 import { createRoomChatSlice, emptyRoomChatState, type RoomChatSlice } from "./slices/roomChatSlice";
 import { createTerminalSlice, emptyTerminalState, type TerminalSlice } from "./slices/terminalSlice";
 import type {
@@ -19,10 +24,8 @@ import type {
   LocalPreviewRecord,
   LocalRoomHistoryPayload,
   PendingCodexApproval,
-  RoomPresence,
   RoomGoal,
 } from "../types";
-import type { InspectorTab } from "../components/RoomInspectorPanel";
 import type {
   ChatReactionPlaintextPayload,
   GitHubActionsEventPlaintextPayload,
@@ -60,11 +63,6 @@ type CodexRunningByRoom = Record<string, boolean>;
 type RoomGoalsByRoom = Record<string, RoomGoal>;
 type SecretWarningsVisibleByRoom = Record<string, boolean>;
 type CodexThreadIdsByRoom = Record<string, string>;
-type HistorySearchMessagesByRoom = Record<string, ChatMessage[]>;
-type HistoryMessagesByRoom = Record<string, string | null>;
-type TeamHistoryMessagesByTeam = Record<string, string | null>;
-type InspectorTabsByRoom = Record<string, InspectorTab>;
-type PresenceByRoom = Record<string, Record<string, RoomPresence>>;
 type HostHandoffsByRoom = Record<string, HostHandoffRecord[]>;
 type CodexContinuationByRoom = Record<string, HostHandoffRecord>;
 type GitWorkflowEventsByRoom = Record<string, GitWorkflowEventPlaintextPayload[]>;
@@ -103,6 +101,7 @@ const emptyAppStoreState = {
   actionsLastCheckedByRoom: {},
   ...emptyBrowserState,
   ...emptyFilePanelState,
+  ...emptyHistoryPresenceState,
   hostBusyByRoom: {},
   hostMessagesByRoom: {},
   settingsBusyByRoom: {},
@@ -127,11 +126,6 @@ const emptyAppStoreState = {
   roomGoalsByRoom: {},
   secretWarningsVisibleByRoom: {},
   codexThreadIdsByRoom: {},
-  historySearchMessagesByRoom: {},
-  historyMessagesByRoom: {},
-  teamHistoryMessagesByTeam: {},
-  inspectorTabsByRoom: {},
-  presenceByRoom: {},
   hostHandoffsByRoom: {},
   codexContinuationByRoom: {},
   gitWorkflowEventsByRoom: {},
@@ -147,7 +141,7 @@ function updateRoomBusyMap(current: RoomBusyByRoom, roomId: string, busy: boolea
   return busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId);
 }
 
-export interface AppStoreState extends BrowserSlice, FilePanelSlice, RoomChatSlice, TerminalSlice {
+export interface AppStoreState extends BrowserSlice, FilePanelSlice, HistoryPresenceSlice, RoomChatSlice, TerminalSlice {
   gitStatusByRoom: GitStatusByRoom;
   gitWorkflowBusyByRoom: GitWorkflowBusyByRoom;
   gitWorkflowMessagesByRoom: GitWorkflowMessagesByRoom;
@@ -179,11 +173,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, RoomChatSli
   roomGoalsByRoom: RoomGoalsByRoom;
   secretWarningsVisibleByRoom: SecretWarningsVisibleByRoom;
   codexThreadIdsByRoom: CodexThreadIdsByRoom;
-  historySearchMessagesByRoom: HistorySearchMessagesByRoom;
-  historyMessagesByRoom: HistoryMessagesByRoom;
-  teamHistoryMessagesByTeam: TeamHistoryMessagesByTeam;
-  inspectorTabsByRoom: InspectorTabsByRoom;
-  presenceByRoom: PresenceByRoom;
   hostHandoffsByRoom: HostHandoffsByRoom;
   codexContinuationByRoom: CodexContinuationByRoom;
   gitWorkflowEventsByRoom: GitWorkflowEventsByRoom;
@@ -196,7 +185,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, RoomChatSli
   setActionRunsForRoom: (roomId: string, runs: GitHubActionRun[]) => void;
   setActionsLastCheckedForRoom: (roomId: string, checkedAt: string | null) => void;
   resetGitHubActionsStateForRoom: (roomId: string) => void;
-  setInspectorTabForRoom: (roomId: string, tab: InspectorTab) => void;
   openLocalPreviewDialogForRoom: (roomId: string) => void;
   closeLocalPreviewDialog: () => void;
   setLocalPreviewDialogCandidates: (candidates: LocalPreviewCandidate[], error: string | null) => void;
@@ -210,10 +198,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, RoomChatSli
   clearInviteSecretInput: () => void;
   setInviteAdmissionForRoom: (roomId: string, inviteId: string | null) => void;
   clearInviteAdmissionForRoom: (roomId: string) => void;
-  replaceHistorySearchMessagesByRoom: (messagesByRoom: HistorySearchMessagesByRoom) => void;
-  clearPresenceByRoom: () => void;
-  clearPresenceForRoom: (roomId: string) => void;
-  setRoomPresenceForDevice: (roomId: string, deviceId: string, presence: RoomPresence | null) => void;
   seedWorkspaceInitialDataIfEmpty: (initialData: WorkspaceInitialData) => void;
   setTeamMembersForTeam: (teamId: string, members: TeamMemberRecord[]) => void;
   setTeamMembersMessageForTeam: (teamId: string, message: string | null) => void;
@@ -247,8 +231,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, RoomChatSli
   setCodexThreadIdForRoom: (roomId: string, threadId: string | null) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setSecretWarningVisibleForRoom: (roomId: string, visible: boolean) => void;
-  setHistoryMessageForRoom: (roomId: string, message: string | null) => void;
-  setTeamHistoryMessageForTeam: (teamId: string, message: string | null) => void;
   setSettingsMessageForRoom: (roomId: string, message: string | null) => void;
   setGitWorkflowMessageForRoom: (roomId: string, message: string | null) => void;
   setGitStatusForRoom: (roomId: string, status: GitStatusSummary | null) => void;
@@ -267,6 +249,7 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   ...emptyAppStoreState,
   ...createBrowserSlice(set, get, api),
   ...createFilePanelSlice(set, get, api),
+  ...createHistoryPresenceSlice(set, get, api),
   ...createRoomChatSlice(set, get, api),
   ...createTerminalSlice(set, get, api),
   setActionsMessageForRoom: (roomId, message) => {
@@ -300,14 +283,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       actionsLastCheckedByRoom: omitRecordKey(state.actionsLastCheckedByRoom, roomId),
       actionsMessagesByRoom: omitRecordKey(state.actionsMessagesByRoom, roomId),
       actionsBusyByRoom: omitRecordKey(state.actionsBusyByRoom, roomId)
-    }));
-  },
-  setInspectorTabForRoom: (roomId, tab) => {
-    set((state) => ({
-      inspectorTabsByRoom: {
-        ...state.inspectorTabsByRoom,
-        [roomId]: tab
-      }
     }));
   },
   openLocalPreviewDialogForRoom: (roomId) => {
@@ -407,31 +382,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
     set((state) => ({
       inviteAdmissionsByRoom: omitRecordKey(state.inviteAdmissionsByRoom, roomId)
     }));
-  },
-  replaceHistorySearchMessagesByRoom: (messagesByRoom) => {
-    set({ historySearchMessagesByRoom: messagesByRoom });
-  },
-  clearPresenceByRoom: () => {
-    set({ presenceByRoom: {} });
-  },
-  clearPresenceForRoom: (roomId) => {
-    set((state) => ({
-      presenceByRoom: omitRecordKey(state.presenceByRoom, roomId)
-    }));
-  },
-  setRoomPresenceForDevice: (roomId, deviceId, presence) => {
-    set((state) => {
-      const roomPresence = state.presenceByRoom[roomId] ?? {};
-      const nextRoomPresence = presence
-        ? { ...roomPresence, [deviceId]: presence }
-        : omitRecordKey(roomPresence, deviceId);
-      return {
-        presenceByRoom: {
-          ...state.presenceByRoom,
-          [roomId]: nextRoomPresence
-        }
-      };
-    });
   },
   seedWorkspaceInitialDataIfEmpty: ({ teamMembersByTeam, messagesByRoom }) => {
     set((state) => {
@@ -828,21 +778,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       secretWarningsVisibleByRoom: visible
         ? { ...state.secretWarningsVisibleByRoom, [roomId]: true }
         : omitRecordKey(state.secretWarningsVisibleByRoom, roomId)
-    }));
-  },
-  setHistoryMessageForRoom: (roomId, message) => {
-    set((state) => ({
-      historyMessagesByRoom: message
-        ? { ...state.historyMessagesByRoom, [roomId]: message }
-        : omitRecordKey(state.historyMessagesByRoom, roomId)
-    }));
-  },
-  setTeamHistoryMessageForTeam: (teamId, message) => {
-    const key = teamId || "__no-team";
-    set((state) => ({
-      teamHistoryMessagesByTeam: message
-        ? { ...state.teamHistoryMessagesByTeam, [key]: message }
-        : omitRecordKey(state.teamHistoryMessagesByTeam, key)
     }));
   },
   setSettingsMessageForRoom: (roomId, message) => {
