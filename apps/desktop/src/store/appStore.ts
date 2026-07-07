@@ -350,6 +350,8 @@ interface AppStoreState {
   setInviteLinkForRoom: (roomId: string, link: string) => void;
   setInviteApprovalGateForRoom: (roomId: string, enabled: boolean) => void;
   setInviteMessageForRoom: (roomId: string, message: string | null) => void;
+  setCustomCodexModelForRoom: (roomId: string, model: string, currentModel: string) => void;
+  setProjectPathDraftForRoom: (roomId: string, projectPath: string, currentProjectPath: string) => void;
   setPendingAttachmentsForRoom: (
     roomId: string,
     updater: ChatAttachment[] | ((current: ChatAttachment[]) => ChatAttachment[])
@@ -827,6 +829,20 @@ export const useAppStore = create<AppStoreState>((set) => ({
       inviteMessagesByRoom: message
         ? { ...state.inviteMessagesByRoom, [roomId]: message }
         : omitRecordKey(state.inviteMessagesByRoom, roomId)
+    }));
+  },
+  setCustomCodexModelForRoom: (roomId, model, currentModel) => {
+    set((state) => ({
+      customCodexModelsByRoom: model === currentModel
+        ? omitRecordKey(state.customCodexModelsByRoom, roomId)
+        : { ...state.customCodexModelsByRoom, [roomId]: model }
+    }));
+  },
+  setProjectPathDraftForRoom: (roomId, projectPath, currentProjectPath) => {
+    set((state) => ({
+      projectPathDraftsByRoom: projectPath === currentProjectPath
+        ? omitRecordKey(state.projectPathDraftsByRoom, roomId)
+        : { ...state.projectPathDraftsByRoom, [roomId]: projectPath }
     }));
   },
   setPendingAttachmentsForRoom: (roomId, updater) => {
