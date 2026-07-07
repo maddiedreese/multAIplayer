@@ -1507,7 +1507,8 @@ export const useAppStore = create<AppStoreState>((set) => ({
   },
   clearBrowserStatusForRoom: (roomId) => {
     set((state) => ({
-      browserStatusByRoom: omitRecordKey(state.browserStatusByRoom, roomId)
+      browserStatusByRoom: omitRecordKey(state.browserStatusByRoom, roomId),
+      activeBrowserUrlsByRoom: omitRecordKey(state.activeBrowserUrlsByRoom, roomId)
     }));
   },
   setInviteLinkForRoom: (roomId, link) => {

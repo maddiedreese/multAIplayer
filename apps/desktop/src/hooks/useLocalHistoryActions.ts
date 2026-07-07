@@ -23,7 +23,6 @@ import {
 import { ensureRoomDefaults } from "../lib/roomDefaults";
 import { roomLockMessage } from "../lib/appRuntime";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
-import { omitRecordKey } from "../lib/setUtils";
 import {
   terminalsForLocalHistory
 } from "../lib/terminalState";
@@ -32,7 +31,6 @@ import { clearRoomVisibilityWarningAcknowledgement } from "../lib/roomVisibility
 import { useAppStore } from "../store/appStore";
 import type {
   BrowserAccessRequest,
-  BrowserStatus,
   ChatMessage,
   CodexRoomEvent,
   HostHandoffRecord,
@@ -75,8 +73,7 @@ interface UseLocalHistoryActionsOptions {
   setHistorySettings: Dispatch<SetStateAction<LocalHistorySettings>>;
   hydrateLocalRoomHistoryForRoom: (roomId: string, payload: ReturnType<typeof pruneLocalRoomHistory>) => void;
   setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
-  setBrowserStatusByRoom: Dispatch<SetStateAction<Record<string, BrowserStatus>>>;
-  setActiveBrowserUrlsByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
+  clearBrowserStatusForRoom: (roomId: string) => void;
   setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
   historyLoadedRoomIds: MutableRefObject<Set<string>>;
 }
@@ -109,8 +106,7 @@ export function useLocalHistoryActions({
   setHistorySettings,
   hydrateLocalRoomHistoryForRoom,
   setRooms,
-  setBrowserStatusByRoom,
-  setActiveBrowserUrlsByRoom,
+  clearBrowserStatusForRoom,
   setForgottenRoomIds,
   historyLoadedRoomIds
 }: UseLocalHistoryActionsOptions) {
@@ -181,8 +177,7 @@ export function useLocalHistoryActions({
       });
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
       if (!roomSettings.browserProfilePersistent) {
-        setBrowserStatusByRoom((current) => omitRecordKey(current, roomId));
-        setActiveBrowserUrlsByRoom((current) => omitRecordKey(current, roomId));
+        clearBrowserStatusForRoom(roomId);
       }
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setHistoryMessageForRoom(roomId, "Applied team defaults to this room.");

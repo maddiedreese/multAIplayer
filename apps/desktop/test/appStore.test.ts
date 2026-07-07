@@ -263,7 +263,7 @@ test("desktop store exposes room browser actions", () => {
   assert.equal(state.browserMessagesByRoom["room-a"], undefined);
   assert.equal(state.browserUrlsByRoom["room-b"], undefined);
   assert.equal(state.browserReasonsByRoom["room-b"], undefined);
-  assert.equal(state.activeBrowserUrlsByRoom["room-a"], "http://localhost:5173");
+  assert.equal(state.activeBrowserUrlsByRoom["room-a"], undefined);
   assert.equal(state.browserStatusByRoom["room-a"], undefined);
   assert.equal(state.inspectorTabsByRoom["room-a"], "browser");
   assert.equal(state.activeBrowserUrlsByRoom["room-b"], undefined);
