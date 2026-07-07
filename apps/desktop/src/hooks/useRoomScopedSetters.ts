@@ -2,7 +2,6 @@ import { useRoomBusySetters } from "./useRoomBusySetters";
 import { useRoomCodexApprovalSetters } from "./useRoomCodexApprovalSetters";
 import { useRoomEventAppenders } from "./useRoomEventAppenders";
 import { useRoomFileSetters } from "./useRoomFileSetters";
-import { useRoomInviteSetters } from "./useRoomInviteSetters";
 import { useRoomProjectSetters } from "./useRoomProjectSetters";
 import { useRoomRequestSetters } from "./useRoomRequestSetters";
 import { useRoomTerminalSetters } from "./useRoomTerminalSetters";
@@ -16,7 +15,6 @@ export function useRoomScopedSetters({
   terminals,
   codexApprovals,
   browser,
-  invites,
   project,
   events,
   requests
@@ -31,7 +29,6 @@ export function useRoomScopedSetters({
     defaultBrowserUrl: string;
     defaultBrowserReason: string;
   };
-  invites: Parameters<typeof useRoomInviteSetters>[0];
   project: Parameters<typeof useRoomProjectSetters>[0];
   events: Parameters<typeof useRoomEventAppenders>[0];
   requests: Parameters<typeof useRoomRequestSetters>[0];
@@ -51,6 +48,9 @@ export function useRoomScopedSetters({
   const setBrowserUrlForRoom = useAppStore((state) => state.setBrowserUrlForRoom);
   const setBrowserReasonForRoom = useAppStore((state) => state.setBrowserReasonForRoom);
   const setBrowserMessageForRoom = useAppStore((state) => state.setBrowserMessageForRoom);
+  const setInviteLinkForRoom = useAppStore((state) => state.setInviteLinkForRoom);
+  const setInviteApprovalGateForRoom = useAppStore((state) => state.setInviteApprovalGateForRoom);
+  const setInviteMessageForRoom = useAppStore((state) => state.setInviteMessageForRoom);
 
   return {
     setHostMessageForRoom,
@@ -79,13 +79,16 @@ export function useRoomScopedSetters({
       setBrowserReasonForRoom(roomId, reason, browser.defaultBrowserReason),
     setBrowserMessageForRoom,
     setSelectedBrowserMessage: (message: string | null) => setBrowserMessageForRoom(selectedRoomId, message),
+    setInviteLinkForRoom,
+    setInviteApprovalGateForRoom,
+    setInviteMessageForRoom,
+    setSelectedInviteMessage: (message: string | null) => setInviteMessageForRoom(selectedRoomId, message),
     setPendingAttachmentsForRoom,
     setDraftForRoom,
     ...useRoomBusySetters(busy),
     ...useRoomFileSetters(files),
     ...useRoomTerminalSetters(terminals),
     ...useRoomCodexApprovalSetters(codexApprovals),
-    ...useRoomInviteSetters(invites),
     ...useRoomProjectSetters(project),
     ...useRoomEventAppenders(events),
     ...useRoomRequestSetters(requests)

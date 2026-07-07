@@ -300,6 +300,24 @@ test("desktop store keeps invite panel state room scoped", () => {
   assert.equal(state.inviteAdmissionsByRoom["room-a"], "Admitted Jordan");
 });
 
+test("desktop store exposes room invite actions", () => {
+  const store = useAppStore.getState();
+
+  store.setInviteLinkForRoom("room-a", "https://multaiplayer.com/invite/room-a");
+  store.setInviteApprovalGateForRoom("room-a", true);
+  store.setInviteMessageForRoom("room-a", "Invite created");
+  store.setInviteLinkForRoom("room-b", "");
+  store.setInviteApprovalGateForRoom("room-b", false);
+  store.setInviteMessageForRoom("room-a", null);
+
+  const state = useAppStore.getState();
+  assert.equal(state.inviteLinksByRoom["room-a"], "https://multaiplayer.com/invite/room-a");
+  assert.equal(state.inviteApprovalGatesByRoom["room-a"], true);
+  assert.equal(state.inviteMessagesByRoom["room-a"], undefined);
+  assert.equal(state.inviteLinksByRoom["room-b"], undefined);
+  assert.equal(state.inviteApprovalGatesByRoom["room-b"], undefined);
+});
+
 test("desktop store keeps room chat composition state room scoped", () => {
   const store = useAppStore.getState();
 
