@@ -248,6 +248,7 @@ const {
   publishEnvelope,
   publishPresence
 } = createRelayFanout({
+  store: relayStore,
   roomSockets,
   teamSockets,
   workspaceSockets,
@@ -255,7 +256,6 @@ const {
   encryptedBacklog,
   roomPresence,
   devices,
-  teamMembers,
   metrics: relayMetrics,
   roomKey,
   deviceKey,
@@ -367,7 +367,6 @@ registerInviteRoutes({
 registerTeamRoutes({
   app,
   store: relayStore,
-  teamMembers,
   getAuthSession,
   allowRead,
   allowMutation,
@@ -518,7 +517,7 @@ function addTeamMember(teamId: string, userId: string, role: TeamRole = "member"
   if (!userId) return;
   const team = relayStore.getTeam(teamId);
   if (!team) return;
-  const members = teamMembers.get(teamId) ?? new Map<string, TeamMemberRecord>();
+  const members = relayStore.getTeamMembers(teamId) ?? new Map<string, TeamMemberRecord>();
   if (members.has(userId)) return;
   members.set(userId, {
     teamId,
@@ -526,7 +525,7 @@ function addTeamMember(teamId: string, userId: string, role: TeamRole = "member"
     role,
     joinedAt: new Date().toISOString()
   });
-  teamMembers.set(teamId, members);
+  relayStore.setTeamMembers(teamId, members);
   const updated: TeamRecord = {
     ...team,
     members: members.size

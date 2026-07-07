@@ -70,6 +70,11 @@ export interface RelayStore {
   getTeam(teamId: string): TeamRecord | undefined;
   hasTeam(teamId: string): boolean;
   setTeam(team: TeamRecord): void;
+  getTeamMembers(teamId: string): Map<string, TeamMemberRecord> | undefined;
+  setTeamMembers(teamId: string, members: Map<string, TeamMemberRecord>): void;
+  getTeamMember(teamId: string, userId: string): TeamMemberRecord | undefined;
+  hasTeamMember(teamId: string, userId: string): boolean;
+  teamIdsForMember(userId: string): Set<string>;
   allRooms(): RoomRecord[];
   getRoom(roomId: string): RoomRecord | undefined;
   setRoom(room: RoomRecord): void;
@@ -105,6 +110,30 @@ export class InMemoryRelayStore implements RelayStore {
 
   setTeam(team: TeamRecord): void {
     this.teams.set(team.id, team);
+  }
+
+  getTeamMembers(teamId: string): Map<string, TeamMemberRecord> | undefined {
+    return this.teamMembers.get(teamId);
+  }
+
+  setTeamMembers(teamId: string, members: Map<string, TeamMemberRecord>): void {
+    this.teamMembers.set(teamId, members);
+  }
+
+  getTeamMember(teamId: string, userId: string): TeamMemberRecord | undefined {
+    return this.teamMembers.get(teamId)?.get(userId);
+  }
+
+  hasTeamMember(teamId: string, userId: string): boolean {
+    return this.teamMembers.get(teamId)?.has(userId) ?? false;
+  }
+
+  teamIdsForMember(userId: string): Set<string> {
+    const visible = new Set<string>();
+    for (const [teamId, members] of this.teamMembers.entries()) {
+      if (members.has(userId)) visible.add(teamId);
+    }
+    return visible;
   }
 
   allRooms(): RoomRecord[] {

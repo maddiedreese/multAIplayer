@@ -13,16 +13,12 @@ export interface RelayAuthz {
 
 export function createRelayAuthz(store: RelayStore): RelayAuthz {
   function isTeamMember(teamId: string, userId: string): boolean {
-    return store.teamMembers.get(teamId)?.has(userId) ?? false;
+    return store.hasTeamMember(teamId, userId);
   }
 
   return {
     teamIdsForUser(userId) {
-      const visible = new Set<string>();
-      for (const [teamId, members] of store.teamMembers.entries()) {
-        if (members.has(userId)) visible.add(teamId);
-      }
-      return visible;
+      return store.teamIdsForMember(userId);
     },
     isTeamMember,
     teamRoleRank(role) {
@@ -52,7 +48,7 @@ export function createRelayAuthz(store: RelayStore): RelayAuthz {
       return members;
     },
     canAccessRoom(teamId, roomId, userId) {
-      return store.rooms.get(roomId)?.teamId === teamId && isTeamMember(teamId, userId);
+      return store.getRoom(roomId)?.teamId === teamId && isTeamMember(teamId, userId);
     }
   };
 }

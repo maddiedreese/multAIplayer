@@ -4,13 +4,13 @@ import type {
   RelayEnvelope,
   RelayServerMessage,
   RoomRecord,
-  TeamMemberRecord,
   TeamRecord
 } from "@multaiplayer/protocol";
 import type { RelayMetrics } from "../observability.js";
-import type { ClientSession, PresenceRecord, RoomKey } from "../state.js";
+import type { ClientSession, PresenceRecord, RelayStore, RoomKey } from "../state.js";
 
 interface CreateRelayFanoutOptions {
+  store: RelayStore;
   roomSockets: Map<RoomKey, Set<WebSocket>>;
   teamSockets: Map<string, Set<WebSocket>>;
   workspaceSockets: Set<WebSocket>;
@@ -18,7 +18,6 @@ interface CreateRelayFanoutOptions {
   encryptedBacklog: Map<RoomKey, RelayEnvelope[]>;
   roomPresence: Map<RoomKey, Map<string, PresenceRecord>>;
   devices: Map<string, DeviceRecord>;
-  teamMembers: Map<string, Map<string, TeamMemberRecord>>;
   metrics: RelayMetrics;
   roomKey: (teamId: string, roomId: string) => RoomKey;
   deviceKey: (userId: string, deviceId: string) => string;
@@ -27,12 +26,13 @@ interface CreateRelayFanoutOptions {
   scheduleStoreSave: () => void;
   teamRecordForUser: (
     team: TeamRecord,
-    teamMembers: Map<string, Map<string, TeamMemberRecord>>,
+    store: Pick<RelayStore, "getTeamMember">,
     userId: string | undefined
   ) => TeamRecord;
 }
 
 export function createRelayFanout({
+  store,
   roomSockets,
   teamSockets,
   workspaceSockets,
@@ -40,7 +40,6 @@ export function createRelayFanout({
   encryptedBacklog,
   roomPresence,
   devices,
-  teamMembers,
   metrics,
   roomKey,
   deviceKey,
@@ -73,7 +72,7 @@ export function createRelayFanout({
   function broadcastWorkspaceUpdated(team: TeamRecord) {
     for (const socket of workspaceSockets) {
       const session = sessions.get(socket);
-      send(socket, { type: "team.updated", team: teamRecordForUser(team, teamMembers, session?.authSession?.user.id ?? session?.userId) });
+      send(socket, { type: "team.updated", team: teamRecordForUser(team, store, session?.authSession?.user.id ?? session?.userId) });
     }
   }
 

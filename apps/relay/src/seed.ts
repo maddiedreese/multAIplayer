@@ -17,21 +17,20 @@ export function seedWorkspace(options: {
 }) {
   if (!options.seedDemoWorkspace) return;
 
-  const { rooms, teams, teamMembers } = options.store;
   const core: TeamRecord = { id: "team-core", name: "Core Team", members: 4 };
   const labs: TeamRecord = { id: "team-labs", name: "Labs", members: 2 };
-  if (!teams.has(core.id)) teams.set(core.id, core);
-  if (!teams.has(labs.id)) teams.set(labs.id, labs);
-  if (!teamMembers.has(core.id)) {
-    teamMembers.set(core.id, new Map([
+  if (!options.store.hasTeam(core.id)) options.store.setTeam(core);
+  if (!options.store.hasTeam(labs.id)) options.store.setTeam(labs);
+  if (!options.store.getTeamMembers(core.id)) {
+    options.store.setTeamMembers(core.id, new Map([
       ["github:maddiedreese", seedTeamMember(core.id, "github:maddiedreese", "owner")],
       ["github:alex", seedTeamMember(core.id, "github:alex", "admin")],
       ["github:tester", seedTeamMember(core.id, "github:tester", "member")],
       ["github:design", seedTeamMember(core.id, "github:design", "member")]
     ]));
   }
-  if (!teamMembers.has(labs.id)) {
-    teamMembers.set(labs.id, new Map([
+  if (!options.store.getTeamMembers(labs.id)) {
+    options.store.setTeamMembers(labs.id, new Map([
       ["github:labs", seedTeamMember(labs.id, "github:labs", "owner")],
       ["github:research", seedTeamMember(labs.id, "github:research", "member")]
     ]));
@@ -85,7 +84,7 @@ export function seedWorkspace(options: {
     }
   ];
   for (const room of seedRooms) {
-    if (!rooms.has(room.id)) rooms.set(room.id, room);
+    if (!options.store.getRoom(room.id)) options.store.setRoom(room);
   }
   options.scheduleStoreSave();
 }
