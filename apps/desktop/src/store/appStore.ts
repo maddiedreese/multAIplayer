@@ -27,6 +27,7 @@ import type { FilePreviewTab } from "../lib/filePreview";
 import type { MarkdownCopyFallback } from "../types";
 import type { InspectorTab } from "../components/RoomInspectorPanel";
 import type {
+  ChatReactionPlaintextPayload,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
   TeamMemberRecord
@@ -339,6 +340,8 @@ interface AppStoreState {
   setTeamMembersMessageByTeam: (action: SetStateAction<TeamMembersMessageByTeam>) => void;
   setTeamMembersBusyByTeam: (action: SetStateAction<TeamMembersBusyByTeam>) => void;
   setMessagesByRoom: (action: SetStateAction<MessagesByRoom>) => void;
+  appendRoomMessage: (roomId: string, message: ChatMessage) => void;
+  applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
   setGitWorkflowBusyForRoom: (roomId: string, busy: boolean) => void;
   setActionsBusyForRoom: (roomId: string, busy: boolean) => void;
   setLocalPreviewBusyForRoom: (roomId: string, busy: boolean) => void;
@@ -763,6 +766,44 @@ export const useAppStore = create<AppStoreState>((set) => ({
     set((state) => ({
       messagesByRoom: resolveSetStateAction(state.messagesByRoom, action)
     }));
+  },
+  appendRoomMessage: (roomId, message) => {
+    set((state) => {
+      const roomMessages = state.messagesByRoom[roomId] ?? [];
+      if (roomMessages.some((existing) => existing.id === message.id)) return state;
+      return {
+        messagesByRoom: {
+          ...state.messagesByRoom,
+          [roomId]: [...roomMessages, message]
+        }
+      };
+    });
+  },
+  applyMessageReaction: (roomId, reaction) => {
+    set((state) => {
+      const roomMessages = state.messagesByRoom[roomId] ?? [];
+      return {
+        messagesByRoom: {
+          ...state.messagesByRoom,
+          [roomId]: roomMessages.map((message) => {
+            if (message.id !== reaction.messageId) return message;
+            const reactions = message.reactions ?? [];
+            const existing = reactions.find((item) => item.emoji === reaction.emoji);
+            const reactors = existing?.reactors.filter((reactor) => reactor.userId !== reaction.reactorUserId) ?? [];
+            const nextReactors = reaction.action === "add"
+              ? [...reactors, { userId: reaction.reactorUserId, name: reaction.reactor }]
+              : reactors;
+            return {
+              ...message,
+              reactions: [
+                ...reactions.filter((item) => item.emoji !== reaction.emoji),
+                ...(nextReactors.length ? [{ emoji: reaction.emoji, reactors: nextReactors }] : [])
+              ]
+            };
+          })
+        }
+      };
+    });
   },
   setGitWorkflowBusyForRoom: (roomId, busy) => {
     set((state) => ({
