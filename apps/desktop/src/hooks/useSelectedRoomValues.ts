@@ -11,6 +11,10 @@ import { resolveFilePreviewTab, type FilePreviewTab } from "../lib/filePreview";
 import { resolveGitWorkflowDraft, type GitWorkflowDraft } from "../lib/gitWorkflowDraft";
 import { embeddedAttachmentBytes } from "../lib/appFormatters";
 import type {
+  TerminalUiByRoom,
+  TerminalRoomUiState
+} from "../store/slices/terminalSlice";
+import type {
   BrowserAccessRequest,
   ChatAttachment,
   ChatMessage,
@@ -47,10 +51,7 @@ interface UseSelectedRoomValuesOptions {
   terminalLinesByRoom: Record<string, string[]>;
   terminalBusyByRoom: Record<string, boolean>;
   selectedTerminalIdsByRoom: Record<string, string | null>;
-  terminalNamesByRoom: Record<string, string>;
-  terminalCommandsByRoom: Record<string, string>;
-  terminalInputsByRoom: Record<string, string>;
-  terminalErrorsByRoom: Record<string, string | null>;
+  terminalUiByRoom: TerminalUiByRoom;
   fileQueriesByRoom: Record<string, string>;
   projectFilesByRoom: Record<string, ProjectFileEntry[]>;
   selectedFilesByRoom: Record<string, ProjectFileContent | null>;
@@ -98,10 +99,7 @@ export function useSelectedRoomValues({
   terminalLinesByRoom,
   terminalBusyByRoom,
   selectedTerminalIdsByRoom,
-  terminalNamesByRoom,
-  terminalCommandsByRoom,
-  terminalInputsByRoom,
-  terminalErrorsByRoom,
+  terminalUiByRoom,
   fileQueriesByRoom,
   projectFilesByRoom,
   selectedFilesByRoom,
@@ -127,6 +125,7 @@ export function useSelectedRoomValues({
   const selectedDiff = selectedDiffsByRoom[roomId] ?? null;
   const historyMessage = historyMessagesByRoom[roomId] ?? null;
   const teamHistoryMessage = teamHistoryMessagesByTeam[selectedTeam || "__no-team"] ?? null;
+  const terminalUi: TerminalRoomUiState = terminalUiByRoom[roomId] ?? {};
 
   return {
     selectedCodexModel,
@@ -155,10 +154,10 @@ export function useSelectedRoomValues({
     terminalLines: terminalLinesByRoom[roomId] ?? [],
     terminalBusy: terminalBusyByRoom[roomId] ?? false,
     selectedTerminalId: selectedTerminalIdsByRoom[roomId] ?? null,
-    terminalName: terminalNamesByRoom[roomId] ?? "dev-server",
-    terminalCommand: terminalCommandsByRoom[roomId] ?? "npm run dev:desktop",
-    terminalInput: terminalInputsByRoom[roomId] ?? "",
-    terminalError: terminalErrorsByRoom[roomId] ?? null,
+    terminalName: terminalUi.name ?? "dev-server",
+    terminalCommand: terminalUi.command ?? "npm run dev:desktop",
+    terminalInput: terminalUi.input ?? "",
+    terminalError: terminalUi.error ?? null,
     fileQuery: fileQueriesByRoom[roomId] ?? "",
     projectFiles: projectFilesByRoom[roomId] ?? [],
     selectedFile: selectedFilesByRoom[roomId] ?? null,

@@ -67,7 +67,7 @@ test("desktop store exposes room busy actions", () => {
   const state = useAppStore.getState();
   assert.equal(state.gitWorkflowBusyByRoom["room-a"], undefined);
   assert.equal(state.gitWorkflowBusyByRoom["room-b"], true);
-  assert.equal(state.actionsBusyByRoom["room-a"], true);
+  assert.equal(state.githubActionsByRoom["room-a"]?.busy, true);
   assert.equal(state.localPreviewBusyByRoom["room-a"], true);
   assert.equal(state.hostBusyByRoom["room-a"], true);
   assert.equal(state.settingsBusyByRoom["room-a"], true);
@@ -148,11 +148,25 @@ test("desktop store keeps GitHub Actions state room scoped", () => {
   store.setActionsLastCheckedForRoom("room-a", "2026-07-06T00:02:00.000Z");
 
   const state = useAppStore.getState();
-  assert.equal(state.actionsBusyByRoom["room-a"], true);
-  assert.equal(state.actionsMessagesByRoom["room-a"], "Refreshing Actions");
-  assert.equal(state.actionsMessagesByRoom["room-b"], undefined);
-  assert.equal(state.actionRunsByRoom["room-a"]?.[0]?.name, "CI");
-  assert.equal(state.actionsLastCheckedByRoom["room-a"], "2026-07-06T00:02:00.000Z");
+  assert.deepEqual(state.githubActionsByRoom["room-a"], {
+    busy: true,
+    message: "Refreshing Actions",
+    runs: [
+      {
+        id: 18,
+        name: "CI",
+        status: "completed",
+        conclusion: "success",
+        url: "https://github.com/maddiedreese/multAIplayer/actions/runs/18",
+        branch: "main",
+        event: "push",
+        createdAt: "2026-07-06T00:00:00.000Z",
+        updatedAt: "2026-07-06T00:01:00.000Z"
+      }
+    ],
+    lastChecked: "2026-07-06T00:02:00.000Z"
+  });
+  assert.equal(state.githubActionsByRoom["room-b"], undefined);
 });
 
 test("desktop store exposes GitHub Actions room actions", () => {
@@ -173,18 +187,17 @@ test("desktop store exposes GitHub Actions room actions", () => {
   store.setActionsLastCheckedForRoom("room-a", "2026-07-06T00:01:00.000Z");
 
   let state = useAppStore.getState();
-  assert.equal(state.actionsBusyByRoom["room-a"], true);
-  assert.equal(state.actionsMessagesByRoom["room-a"], "Checking Actions");
-  assert.equal(state.actionRunsByRoom["room-a"]?.[0]?.id, 42);
-  assert.equal(state.actionsLastCheckedByRoom["room-a"], "2026-07-06T00:01:00.000Z");
+  assert.deepEqual(state.githubActionsByRoom["room-a"], {
+    busy: true,
+    message: "Checking Actions",
+    runs: [run],
+    lastChecked: "2026-07-06T00:01:00.000Z"
+  });
 
   store.resetGitHubActionsStateForRoom("room-a");
 
   state = useAppStore.getState();
-  assert.deepEqual(state.actionRunsByRoom["room-a"], []);
-  assert.equal(state.actionsBusyByRoom["room-a"], undefined);
-  assert.equal(state.actionsMessagesByRoom["room-a"], undefined);
-  assert.equal(state.actionsLastCheckedByRoom["room-a"], undefined);
+  assert.deepEqual(state.githubActionsByRoom["room-a"], { runs: [] });
 });
 
 test("desktop store keeps browser panel state room scoped", () => {
@@ -1043,11 +1056,14 @@ test("desktop store keeps terminal panel state room scoped", () => {
   assert.equal(state.terminalRequestsByRoom["room-b"]?.[0]?.command, "npm test");
   assert.equal(state.selectedTerminalIdsByRoom["room-a"], "terminal-a");
   assert.equal(state.selectedTerminalIdsByRoom["room-b"], undefined);
-  assert.equal(state.terminalNamesByRoom["room-a"], "shell");
-  assert.equal(state.terminalCommandsByRoom["room-a"], "zsh -l");
-  assert.equal(state.terminalInputsByRoom["room-a"], "git status");
-  assert.equal(state.terminalErrorsByRoom["room-a"], undefined);
-  assert.equal(state.terminalErrorsByRoom["room-b"], "Host approval required");
+  assert.deepEqual(state.terminalUiByRoom["room-a"], {
+    name: "shell",
+    command: "zsh -l",
+    input: "git status"
+  });
+  assert.deepEqual(state.terminalUiByRoom["room-b"], {
+    error: "Host approval required"
+  });
 });
 
 test("desktop store exposes room terminal actions", () => {
@@ -1069,12 +1085,11 @@ test("desktop store exposes room terminal actions", () => {
   const state = useAppStore.getState();
   assert.equal(state.selectedTerminalIdsByRoom["room-a"], "terminal-a");
   assert.equal(state.selectedTerminalIdsByRoom["room-b"], undefined);
-  assert.equal(state.terminalNamesByRoom["room-a"], "shell");
-  assert.equal(state.terminalNamesByRoom["room-b"], undefined);
-  assert.equal(state.terminalCommandsByRoom["room-a"], "zsh -l");
-  assert.equal(state.terminalCommandsByRoom["room-b"], undefined);
-  assert.equal(state.terminalInputsByRoom["room-a"], undefined);
-  assert.equal(state.terminalErrorsByRoom["room-a"], undefined);
+  assert.deepEqual(state.terminalUiByRoom["room-a"], {
+    name: "shell",
+    command: "zsh -l"
+  });
+  assert.equal(state.terminalUiByRoom["room-b"], undefined);
   assert.deepEqual(state.terminalLinesByRoom["room-a"], ["two", "three", "four"]);
 });
 
@@ -1227,9 +1242,7 @@ test("desktop store clears local room-scoped state", () => {
   assert.deepEqual(state.githubActionsEventsByRoom["room-a"], []);
   assert.deepEqual(state.hostHandoffsByRoom["room-a"], []);
   assert.equal(state.codexThreadIdsByRoom["room-a"], undefined);
-  assert.equal(state.actionRunsByRoom["room-a"], undefined);
-  assert.equal(state.actionsLastCheckedByRoom["room-a"], undefined);
-  assert.equal(state.actionsMessagesByRoom["room-a"], undefined);
+  assert.equal(state.githubActionsByRoom["room-a"], undefined);
   assert.equal(state.gitWorkflowBusyByRoom["room-a"], undefined);
   assert.equal(state.hostMessagesByRoom["room-a"], undefined);
   assert.equal(state.secretWarningsVisibleByRoom["room-a"], undefined);
@@ -1494,9 +1507,9 @@ test("desktop store hydrates local room history through one room-scoped action",
   assert.equal(state.gitWorkflowEventsByRoom["room-a"]?.[0]?.branch, "codex/history-hydration");
   assert.equal(state.gitWorkflowMessagesByRoom["room-a"], "Opened draft PR");
   assert.equal(state.githubActionsEventsByRoom["room-a"]?.[0]?.runs[0]?.name, "Web, relay, and packages");
-  assert.equal(state.actionRunsByRoom["room-a"]?.[0]?.id, 18);
-  assert.equal(state.actionsLastCheckedByRoom["room-a"], "2026-07-06T00:08:00.000Z");
-  assert.equal(state.actionsMessagesByRoom["room-a"], "CI: Checked Actions");
+  assert.equal(state.githubActionsByRoom["room-a"]?.runs?.[0]?.id, 18);
+  assert.equal(state.githubActionsByRoom["room-a"]?.lastChecked, "2026-07-06T00:08:00.000Z");
+  assert.equal(state.githubActionsByRoom["room-a"]?.message, "CI: Checked Actions");
   assert.equal(state.localPreviewsByRoom["room-a"]?.[0]?.status, "live");
   assert.equal(state.terminals.some((terminal) => terminal.id === "terminal-a"), true);
   assert.equal(state.terminals.some((terminal) => terminal.id === "terminal-b"), true);

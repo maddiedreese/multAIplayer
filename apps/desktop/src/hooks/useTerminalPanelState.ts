@@ -15,10 +15,7 @@ export function useTerminalPanelState({
   const upsertTerminalSnapshot = useAppStore((state) => state.upsertTerminalSnapshot);
   const terminalRequestsByRoom = useAppStore((state) => state.terminalRequestsByRoom);
   const selectedTerminalIdsByRoom = useAppStore((state) => state.selectedTerminalIdsByRoom);
-  const terminalNamesByRoom = useAppStore((state) => state.terminalNamesByRoom);
-  const terminalCommandsByRoom = useAppStore((state) => state.terminalCommandsByRoom);
-  const terminalInputsByRoom = useAppStore((state) => state.terminalInputsByRoom);
-  const terminalErrorsByRoom = useAppStore((state) => state.terminalErrorsByRoom);
+  const terminalUiByRoom = useAppStore((state) => state.terminalUiByRoom);
   const terminalAutoOpenedRoomsRef = useRef<Set<string>>(new Set());
 
   useLayoutEffect(() => {
@@ -34,10 +31,7 @@ export function useTerminalPanelState({
     upsertTerminalSnapshot,
     terminalRequestsByRoom,
     selectedTerminalIdsByRoom,
-    terminalNamesByRoom,
-    terminalCommandsByRoom,
-    terminalInputsByRoom,
-    terminalErrorsByRoom,
+    terminalUiByRoom,
     terminalAutoOpenedRoomsRef
   };
 }

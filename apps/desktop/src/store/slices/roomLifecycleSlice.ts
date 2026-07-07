@@ -46,18 +46,16 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         githubActionsEventsByRoom: payload.githubActionsEvents.length
           ? { ...state.githubActionsEventsByRoom, [roomId]: payload.githubActionsEvents }
           : state.githubActionsEventsByRoom,
-        actionRunsByRoom: latestGitHubActionsEvent
-          ? { ...state.actionRunsByRoom, [roomId]: latestGitHubActionsEvent.runs }
-          : state.actionRunsByRoom,
-        actionsLastCheckedByRoom: latestGitHubActionsEvent
-          ? { ...state.actionsLastCheckedByRoom, [roomId]: latestGitHubActionsEvent.checkedAt }
-          : state.actionsLastCheckedByRoom,
-        actionsMessagesByRoom: latestGitHubActionsEvent
+        githubActionsByRoom: latestGitHubActionsEvent
           ? {
-              ...state.actionsMessagesByRoom,
-              [roomId]: `${latestGitHubActionsEvent.summary.label}: ${latestGitHubActionsEvent.message}`
+              ...state.githubActionsByRoom,
+              [roomId]: {
+                runs: latestGitHubActionsEvent.runs,
+                lastChecked: latestGitHubActionsEvent.checkedAt,
+                message: `${latestGitHubActionsEvent.summary.label}: ${latestGitHubActionsEvent.message}`
+              }
             }
-          : state.actionsMessagesByRoom,
+          : state.githubActionsByRoom,
         localPreviewsByRoom: payload.localPreviews.length
           ? { ...state.localPreviewsByRoom, [roomId]: payload.localPreviews }
           : state.localPreviewsByRoom,
@@ -87,10 +85,7 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       githubActionsEventsByRoom: { ...state.githubActionsEventsByRoom, [roomId]: [] },
       hostHandoffsByRoom: { ...state.hostHandoffsByRoom, [roomId]: [] },
       codexThreadIdsByRoom: omitRecordKey(state.codexThreadIdsByRoom, roomId),
-      actionRunsByRoom: omitRecordKey(state.actionRunsByRoom, roomId),
-      actionsLastCheckedByRoom: omitRecordKey(state.actionsLastCheckedByRoom, roomId),
-      actionsMessagesByRoom: omitRecordKey(state.actionsMessagesByRoom, roomId),
-      actionsBusyByRoom: omitRecordKey(state.actionsBusyByRoom, roomId),
+      githubActionsByRoom: omitRecordKey(state.githubActionsByRoom, roomId),
       gitWorkflowBusyByRoom: omitRecordKey(state.gitWorkflowBusyByRoom, roomId),
       hostBusyByRoom: omitRecordKey(state.hostBusyByRoom, roomId),
       hostMessagesByRoom: omitRecordKey(state.hostMessagesByRoom, roomId),
@@ -120,10 +115,7 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       terminalLinesByRoom: omitRecordKey(state.terminalLinesByRoom, roomId),
       terminalBusyByRoom: omitRecordKey(state.terminalBusyByRoom, roomId),
       selectedTerminalIdsByRoom: omitRecordKey(state.selectedTerminalIdsByRoom, roomId),
-      terminalNamesByRoom: omitRecordKey(state.terminalNamesByRoom, roomId),
-      terminalCommandsByRoom: omitRecordKey(state.terminalCommandsByRoom, roomId),
-      terminalInputsByRoom: omitRecordKey(state.terminalInputsByRoom, roomId),
-      terminalErrorsByRoom: omitRecordKey(state.terminalErrorsByRoom, roomId),
+      terminalUiByRoom: omitRecordKey(state.terminalUiByRoom, roomId),
       terminals: state.terminals.filter((terminal) => terminal.roomId !== roomId),
       browserUrlsByRoom: omitRecordKey(state.browserUrlsByRoom, roomId),
       browserReasonsByRoom: omitRecordKey(state.browserReasonsByRoom, roomId),

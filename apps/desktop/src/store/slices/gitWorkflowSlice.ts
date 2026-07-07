@@ -13,16 +13,31 @@ type GitStatusByRoom = Record<string, GitStatusSummary | null>;
 type GitWorkflowBusyByRoom = Record<string, boolean>;
 type GitWorkflowMessagesByRoom = Record<string, string | null>;
 type GitWorkflowDraftsByRoom = Record<string, Partial<GitWorkflowDraft>>;
-type ActionsBusyByRoom = Record<string, boolean>;
-type ActionsMessagesByRoom = Record<string, string | null>;
-type ActionRunsByRoom = Record<string, GitHubActionRun[]>;
-type ActionsLastCheckedByRoom = Record<string, string | null>;
 type GitWorkflowEventsByRoom = Record<string, GitWorkflowEventPlaintextPayload[]>;
 type GitHubActionsEventsByRoom = Record<string, GitHubActionsEventPlaintextPayload[]>;
 type RoomBusyByRoom = Record<string, boolean>;
 
+export interface GitHubActionsRoomState {
+  busy?: boolean;
+  message?: string;
+  runs?: GitHubActionRun[];
+  lastChecked?: string;
+}
+
+export type GitHubActionsByRoom = Record<string, GitHubActionsRoomState>;
+
 function updateRoomBusyMap(current: RoomBusyByRoom, roomId: string, busy: boolean): RoomBusyByRoom {
   return busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId);
+}
+
+function updateGitHubActionsForRoom(
+  current: GitHubActionsByRoom,
+  roomId: string,
+  update: (roomActions: GitHubActionsRoomState) => GitHubActionsRoomState
+): GitHubActionsByRoom {
+  const nextRoomActions = update(current[roomId] ?? {});
+  if (Object.keys(nextRoomActions).length === 0) return omitRecordKey(current, roomId);
+  return { ...current, [roomId]: nextRoomActions };
 }
 
 export interface GitWorkflowSlice {
@@ -30,10 +45,7 @@ export interface GitWorkflowSlice {
   gitWorkflowBusyByRoom: GitWorkflowBusyByRoom;
   gitWorkflowMessagesByRoom: GitWorkflowMessagesByRoom;
   gitWorkflowDraftsByRoom: GitWorkflowDraftsByRoom;
-  actionsBusyByRoom: ActionsBusyByRoom;
-  actionsMessagesByRoom: ActionsMessagesByRoom;
-  actionRunsByRoom: ActionRunsByRoom;
-  actionsLastCheckedByRoom: ActionsLastCheckedByRoom;
+  githubActionsByRoom: GitHubActionsByRoom;
   gitWorkflowEventsByRoom: GitWorkflowEventsByRoom;
   githubActionsEventsByRoom: GitHubActionsEventsByRoom;
   setActionsMessageForRoom: (roomId: string, message: string | null) => void;
@@ -55,10 +67,7 @@ export const emptyGitWorkflowState: Pick<
   | "gitWorkflowBusyByRoom"
   | "gitWorkflowMessagesByRoom"
   | "gitWorkflowDraftsByRoom"
-  | "actionsBusyByRoom"
-  | "actionsMessagesByRoom"
-  | "actionRunsByRoom"
-  | "actionsLastCheckedByRoom"
+  | "githubActionsByRoom"
   | "gitWorkflowEventsByRoom"
   | "githubActionsEventsByRoom"
 > = {
@@ -66,10 +75,7 @@ export const emptyGitWorkflowState: Pick<
   gitWorkflowBusyByRoom: {},
   gitWorkflowMessagesByRoom: {},
   gitWorkflowDraftsByRoom: {},
-  actionsBusyByRoom: {},
-  actionsMessagesByRoom: {},
-  actionRunsByRoom: {},
-  actionsLastCheckedByRoom: {},
+  githubActionsByRoom: {},
   gitWorkflowEventsByRoom: {},
   githubActionsEventsByRoom: {}
 };
@@ -78,35 +84,34 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
   ...emptyGitWorkflowState,
   setActionsMessageForRoom: (roomId, message) => {
     set((state) => ({
-      actionsMessagesByRoom: message
-        ? { ...state.actionsMessagesByRoom, [roomId]: message }
-        : omitRecordKey(state.actionsMessagesByRoom, roomId)
+      githubActionsByRoom: updateGitHubActionsForRoom(state.githubActionsByRoom, roomId, (roomActions) => {
+        const { message: _message, ...rest } = roomActions;
+        return message ? { ...rest, message } : rest;
+      })
     }));
   },
   setActionRunsForRoom: (roomId, runs) => {
     set((state) => ({
-      actionRunsByRoom: {
-        ...state.actionRunsByRoom,
-        [roomId]: runs
-      }
+      githubActionsByRoom: updateGitHubActionsForRoom(state.githubActionsByRoom, roomId, (roomActions) => ({
+        ...roomActions,
+        runs
+      }))
     }));
   },
   setActionsLastCheckedForRoom: (roomId, checkedAt) => {
     set((state) => ({
-      actionsLastCheckedByRoom: checkedAt
-        ? { ...state.actionsLastCheckedByRoom, [roomId]: checkedAt }
-        : omitRecordKey(state.actionsLastCheckedByRoom, roomId)
+      githubActionsByRoom: updateGitHubActionsForRoom(state.githubActionsByRoom, roomId, (roomActions) => {
+        const { lastChecked: _lastChecked, ...rest } = roomActions;
+        return checkedAt ? { ...rest, lastChecked: checkedAt } : rest;
+      })
     }));
   },
   resetGitHubActionsStateForRoom: (roomId) => {
     set((state) => ({
-      actionRunsByRoom: {
-        ...state.actionRunsByRoom,
-        [roomId]: []
-      },
-      actionsLastCheckedByRoom: omitRecordKey(state.actionsLastCheckedByRoom, roomId),
-      actionsMessagesByRoom: omitRecordKey(state.actionsMessagesByRoom, roomId),
-      actionsBusyByRoom: omitRecordKey(state.actionsBusyByRoom, roomId)
+      githubActionsByRoom: {
+        ...omitRecordKey(state.githubActionsByRoom, roomId),
+        [roomId]: { runs: [] }
+      }
     }));
   },
   setGitWorkflowBusyForRoom: (roomId, busy) => {
@@ -116,7 +121,10 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
   },
   setActionsBusyForRoom: (roomId, busy) => {
     set((state) => ({
-      actionsBusyByRoom: updateRoomBusyMap(state.actionsBusyByRoom, roomId, busy)
+      githubActionsByRoom: updateGitHubActionsForRoom(state.githubActionsByRoom, roomId, (roomActions) => {
+        const { busy: _busy, ...rest } = roomActions;
+        return busy ? { ...rest, busy: true } : rest;
+      })
     }));
   },
   appendGitWorkflowEvent: (roomId, event) => {

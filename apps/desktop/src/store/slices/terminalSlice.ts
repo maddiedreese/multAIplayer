@@ -10,10 +10,25 @@ type TerminalBusyByRoom = Record<string, boolean>;
 type Terminals = TerminalSnapshot[];
 type TerminalRequestsByRoom = Record<string, TerminalCommandRequest[]>;
 type SelectedTerminalIdsByRoom = Record<string, string | null>;
-type TerminalNamesByRoom = Record<string, string>;
-type TerminalCommandsByRoom = Record<string, string>;
-type TerminalInputsByRoom = Record<string, string>;
-type TerminalErrorsByRoom = Record<string, string | null>;
+
+export interface TerminalRoomUiState {
+  name?: string;
+  command?: string;
+  input?: string;
+  error?: string;
+}
+
+export type TerminalUiByRoom = Record<string, TerminalRoomUiState>;
+
+function updateTerminalUiForRoom(
+  current: TerminalUiByRoom,
+  roomId: string,
+  update: (roomUi: TerminalRoomUiState) => TerminalRoomUiState
+): TerminalUiByRoom {
+  const nextRoomUi = update(current[roomId] ?? {});
+  if (Object.keys(nextRoomUi).length === 0) return omitRecordKey(current, roomId);
+  return { ...current, [roomId]: nextRoomUi };
+}
 
 export interface TerminalSlice {
   terminalLinesByRoom: TerminalLinesByRoom;
@@ -21,10 +36,7 @@ export interface TerminalSlice {
   terminals: Terminals;
   terminalRequestsByRoom: TerminalRequestsByRoom;
   selectedTerminalIdsByRoom: SelectedTerminalIdsByRoom;
-  terminalNamesByRoom: TerminalNamesByRoom;
-  terminalCommandsByRoom: TerminalCommandsByRoom;
-  terminalInputsByRoom: TerminalInputsByRoom;
-  terminalErrorsByRoom: TerminalErrorsByRoom;
+  terminalUiByRoom: TerminalUiByRoom;
   clearTerminalSnapshots: () => void;
   replaceTerminalSnapshotsForRoom: (roomId: string, snapshots: Terminals) => void;
   upsertTerminalSnapshot: (snapshot: TerminalSnapshot) => void;
@@ -47,20 +59,14 @@ export const emptyTerminalState: Pick<
   | "terminals"
   | "terminalRequestsByRoom"
   | "selectedTerminalIdsByRoom"
-  | "terminalNamesByRoom"
-  | "terminalCommandsByRoom"
-  | "terminalInputsByRoom"
-  | "terminalErrorsByRoom"
+  | "terminalUiByRoom"
 > = {
   terminalLinesByRoom: {},
   terminalBusyByRoom: {},
   terminals: [],
   terminalRequestsByRoom: {},
   selectedTerminalIdsByRoom: {},
-  terminalNamesByRoom: {},
-  terminalCommandsByRoom: {},
-  terminalInputsByRoom: {},
-  terminalErrorsByRoom: {}
+  terminalUiByRoom: {}
 };
 
 export const createTerminalSlice: StateCreator<AppStoreState, [], [], TerminalSlice> = (set) => ({
@@ -124,30 +130,34 @@ export const createTerminalSlice: StateCreator<AppStoreState, [], [], TerminalSl
   },
   setTerminalNameForRoom: (roomId, name) => {
     set((state) => ({
-      terminalNamesByRoom: name === "dev-server"
-        ? omitRecordKey(state.terminalNamesByRoom, roomId)
-        : { ...state.terminalNamesByRoom, [roomId]: name }
+      terminalUiByRoom: updateTerminalUiForRoom(state.terminalUiByRoom, roomId, (roomUi) => {
+        const { name: _name, ...rest } = roomUi;
+        return name === "dev-server" ? rest : { ...rest, name };
+      })
     }));
   },
   setTerminalCommandForRoom: (roomId, command) => {
     set((state) => ({
-      terminalCommandsByRoom: command === "npm run dev:desktop"
-        ? omitRecordKey(state.terminalCommandsByRoom, roomId)
-        : { ...state.terminalCommandsByRoom, [roomId]: command }
+      terminalUiByRoom: updateTerminalUiForRoom(state.terminalUiByRoom, roomId, (roomUi) => {
+        const { command: _command, ...rest } = roomUi;
+        return command === "npm run dev:desktop" ? rest : { ...rest, command };
+      })
     }));
   },
   setTerminalInputForRoom: (roomId, input) => {
     set((state) => ({
-      terminalInputsByRoom: input
-        ? { ...state.terminalInputsByRoom, [roomId]: input }
-        : omitRecordKey(state.terminalInputsByRoom, roomId)
+      terminalUiByRoom: updateTerminalUiForRoom(state.terminalUiByRoom, roomId, (roomUi) => {
+        const { input: _input, ...rest } = roomUi;
+        return input ? { ...rest, input } : rest;
+      })
     }));
   },
   setTerminalErrorForRoom: (roomId, error) => {
     set((state) => ({
-      terminalErrorsByRoom: error
-        ? { ...state.terminalErrorsByRoom, [roomId]: error }
-        : omitRecordKey(state.terminalErrorsByRoom, roomId)
+      terminalUiByRoom: updateTerminalUiForRoom(state.terminalUiByRoom, roomId, (roomUi) => {
+        const { error: _error, ...rest } = roomUi;
+        return error ? { ...rest, error } : rest;
+      })
     }));
   },
   appendTerminalLinesForRoom: (roomId, lines, maxTerminalActivityLines) => {
