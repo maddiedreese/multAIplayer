@@ -246,7 +246,7 @@ export function useAppRoomRuntime({
         setTerminalErrorForRoom,
         appendTerminalLinesForRoom,
         setGitStatusForRoom,
-        setTerminals: terminalPanelState.setTerminals,
+        upsertTerminalSnapshot: terminalPanelState.upsertTerminalSnapshot,
         setSelectedTerminalIdForRoom,
         setTerminalNameForRoom,
         setTerminalCommandForRoom,
@@ -407,7 +407,9 @@ export function useAppRoomRuntime({
         selectedRoomId: selectedRoom.id,
         selectedTerminalId,
         selectedTerminalRunning: selectedRuntime.selectedTerminal?.running,
-        setTerminals: terminalPanelState.setTerminals,
+        clearTerminalSnapshots: terminalPanelState.clearTerminalSnapshots,
+        replaceTerminalSnapshotsForRoom: terminalPanelState.replaceTerminalSnapshotsForRoom,
+        upsertTerminalSnapshot: terminalPanelState.upsertTerminalSnapshot,
         setTerminalErrorForRoom
       },
       terminalAutoOpen: {

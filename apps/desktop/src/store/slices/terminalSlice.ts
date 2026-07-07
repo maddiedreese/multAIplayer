@@ -1,10 +1,9 @@
-import type { SetStateAction } from "react";
 import type { StateCreator } from "zustand";
 import type { TerminalSnapshot } from "../../lib/localBackend";
 import { omitRecordKey } from "../../lib/setUtils";
+import { replaceRoomTerminalSnapshots, upsertTerminal } from "../../lib/terminalState";
 import type { TerminalCommandRequest } from "../../types";
 import type { AppStoreState } from "../appStore";
-import { resolveSetStateAction } from "../storeUtils";
 
 type TerminalLinesByRoom = Record<string, string[]>;
 type TerminalBusyByRoom = Record<string, boolean>;
@@ -26,7 +25,9 @@ export interface TerminalSlice {
   terminalCommandsByRoom: TerminalCommandsByRoom;
   terminalInputsByRoom: TerminalInputsByRoom;
   terminalErrorsByRoom: TerminalErrorsByRoom;
-  setTerminals: (action: SetStateAction<Terminals>) => void;
+  clearTerminalSnapshots: () => void;
+  replaceTerminalSnapshotsForRoom: (roomId: string, snapshots: Terminals) => void;
+  upsertTerminalSnapshot: (snapshot: TerminalSnapshot) => void;
   initializeTerminalLinesByRoom: (linesByRoom: TerminalLinesByRoom) => void;
   setTerminalBusyForRoom: (roomId: string, busy: boolean) => void;
   appendTerminalRequest: (roomId: string, request: TerminalCommandRequest) => void;
@@ -64,9 +65,17 @@ export const emptyTerminalState: Pick<
 
 export const createTerminalSlice: StateCreator<AppStoreState, [], [], TerminalSlice> = (set) => ({
   ...emptyTerminalState,
-  setTerminals: (action) => {
+  clearTerminalSnapshots: () => {
+    set({ terminals: [] });
+  },
+  replaceTerminalSnapshotsForRoom: (roomId, snapshots) => {
     set((state) => ({
-      terminals: resolveSetStateAction(state.terminals, action)
+      terminals: replaceRoomTerminalSnapshots(state.terminals, roomId, snapshots)
+    }));
+  },
+  upsertTerminalSnapshot: (snapshot) => {
+    set((state) => ({
+      terminals: upsertTerminal(state.terminals, snapshot)
     }));
   },
   initializeTerminalLinesByRoom: (linesByRoom) => {

@@ -1,4 +1,4 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type { MutableRefObject } from "react";
 import type { RelayEnvelope, RoomRecord, TerminalRequestPlaintextPayload } from "@multaiplayer/protocol";
 import { encryptJson } from "@multaiplayer/crypto";
 import {
@@ -21,7 +21,6 @@ import {
 } from "../lib/terminalApproval";
 import { canControlRoomTerminal, roomTerminalControlMessage } from "../lib/terminalAccess";
 import { nextShellTerminalName, terminalInputForShellSubmit } from "../lib/terminalUi";
-import { upsertTerminal } from "../lib/terminalState";
 import type { RelayStatus, TerminalCommandRequest } from "../types";
 
 interface LocalUser {
@@ -57,7 +56,7 @@ interface UseTerminalActionsOptions {
   setTerminalErrorForRoom: (roomId: string, message: string | null) => void;
   appendTerminalLinesForRoom: (roomId: string, lines: string[]) => void;
   setGitStatusForRoom: (roomId: string, status: GitStatusSummary | null) => void;
-  setTerminals: Dispatch<SetStateAction<TerminalSnapshot[]>>;
+  upsertTerminalSnapshot: (snapshot: TerminalSnapshot) => void;
   setSelectedTerminalIdForRoom: (roomId: string, terminalId: string | null) => void;
   setTerminalNameForRoom: (roomId: string, name: string) => void;
   setTerminalCommandForRoom: (roomId: string, command: string) => void;
@@ -112,7 +111,7 @@ export function useTerminalActions({
   setTerminalErrorForRoom,
   appendTerminalLinesForRoom,
   setGitStatusForRoom,
-  setTerminals,
+  upsertTerminalSnapshot,
   setSelectedTerminalIdForRoom,
   setTerminalNameForRoom,
   setTerminalCommandForRoom,
@@ -185,7 +184,7 @@ export function useTerminalActions({
         command
       );
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setTerminals((current) => upsertTerminal(current, snapshot));
+        upsertTerminalSnapshot(snapshot);
         setSelectedTerminalIdForRoom(roomId, snapshot.id);
       }
     } catch (error) {
@@ -228,7 +227,7 @@ export function useTerminalActions({
         "zsh -l"
       );
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setTerminals((current) => upsertTerminal(current, snapshot));
+        upsertTerminalSnapshot(snapshot);
         setSelectedTerminalIdForRoom(roomId, snapshot.id);
         setTerminalNameForRoom(roomId, name);
         setTerminalCommandForRoom(roomId, "zsh -l");
@@ -272,7 +271,7 @@ export function useTerminalActions({
         terminal.command
       );
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setTerminals((current) => upsertTerminal(current, snapshot));
+        upsertTerminalSnapshot(snapshot);
         setSelectedTerminalIdForRoom(roomId, snapshot.id);
       }
     } catch (error) {
@@ -309,7 +308,7 @@ export function useTerminalActions({
     try {
       const snapshot = await stopTerminal(terminalId);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setTerminals((current) => upsertTerminal(current, snapshot));
+        upsertTerminalSnapshot(snapshot);
       }
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalErrorForRoom(roomId, String(error));
@@ -346,7 +345,7 @@ export function useTerminalActions({
     try {
       const snapshot = await writeTerminal(terminalId, input);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setTerminals((current) => upsertTerminal(current, snapshot));
+        upsertTerminalSnapshot(snapshot);
         setTerminalInputForRoom(roomId, "");
       }
     } catch (error) {

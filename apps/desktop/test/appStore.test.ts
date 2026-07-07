@@ -1055,19 +1055,17 @@ test("desktop store keeps terminal panel state room scoped", () => {
   });
   store.setTerminalBusyForRoom("room-a", true);
   store.setTerminalBusyForRoom("room-b", false);
-  store.setTerminals([
-    {
-      id: "terminal-a",
-      roomId: "room-a",
-      name: "shell",
-      cwd: "/Users/maddiedreese/Documents/MultAIplayer",
-      command: "zsh -l",
-      running: true,
-      exitStatus: null,
-      startedAt: "2026-07-06T00:15:00.000Z",
-      lines: [{ stream: "system", text: "$ zsh -l" }]
-    }
-  ]);
+  store.upsertTerminalSnapshot({
+    id: "terminal-a",
+    roomId: "room-a",
+    name: "shell",
+    cwd: "/Users/maddiedreese/Documents/MultAIplayer",
+    command: "zsh -l",
+    running: true,
+    exitStatus: null,
+    startedAt: "2026-07-06T00:15:00.000Z",
+    lines: [{ stream: "system", text: "$ zsh -l" }]
+  });
   store.appendTerminalRequest("room-b", {
     id: "terminal-request-1",
     requester: "Jordan",
@@ -1187,7 +1185,7 @@ test("desktop store clears local room-scoped state", () => {
   store.setProjectFilesForRoom("room-b", []);
   store.setSelectedTerminalIdForRoom("room-a", "terminal-a");
   store.setSelectedTerminalIdForRoom("room-b", "terminal-b");
-  store.setTerminals([
+  store.replaceTerminalSnapshotsForRoom("room-a", [
     {
       id: "terminal-a",
       roomId: "room-a",
@@ -1196,7 +1194,9 @@ test("desktop store clears local room-scoped state", () => {
       command: "zsh -l",
       status: "running",
       output: []
-    },
+    }
+  ]);
+  store.replaceTerminalSnapshotsForRoom("room-b", [
     {
       id: "terminal-b",
       roomId: "room-b",
@@ -1295,7 +1295,7 @@ test("desktop store hydrates local room history through one room-scoped action",
   });
   store.setSelectedTerminalIdForRoom("room-a", "terminal-a");
   store.setSelectedTerminalIdForRoom("room-b", "terminal-b");
-  store.setTerminals([
+  store.replaceTerminalSnapshotsForRoom("room-b", [
     {
       id: "terminal-b",
       roomId: "room-b",

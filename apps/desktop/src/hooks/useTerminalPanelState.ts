@@ -10,7 +10,9 @@ export function useTerminalPanelState({
   const initializeTerminalLinesByRoom = useAppStore((state) => state.initializeTerminalLinesByRoom);
   const terminalBusyByRoom = useAppStore((state) => state.terminalBusyByRoom);
   const terminals = useAppStore((state) => state.terminals);
-  const setTerminals = useAppStore((state) => state.setTerminals);
+  const clearTerminalSnapshots = useAppStore((state) => state.clearTerminalSnapshots);
+  const replaceTerminalSnapshotsForRoom = useAppStore((state) => state.replaceTerminalSnapshotsForRoom);
+  const upsertTerminalSnapshot = useAppStore((state) => state.upsertTerminalSnapshot);
   const terminalRequestsByRoom = useAppStore((state) => state.terminalRequestsByRoom);
   const selectedTerminalIdsByRoom = useAppStore((state) => state.selectedTerminalIdsByRoom);
   const terminalNamesByRoom = useAppStore((state) => state.terminalNamesByRoom);
@@ -27,7 +29,9 @@ export function useTerminalPanelState({
     terminalLinesByRoom,
     terminalBusyByRoom,
     terminals,
-    setTerminals,
+    clearTerminalSnapshots,
+    replaceTerminalSnapshotsForRoom,
+    upsertTerminalSnapshot,
     terminalRequestsByRoom,
     selectedTerminalIdsByRoom,
     terminalNamesByRoom,
