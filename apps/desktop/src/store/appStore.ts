@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import type { SetStateAction } from "react";
 import type { GitHubActionRun } from "../lib/authClient";
-import type { GitStatusSummary } from "../lib/localBackend";
+import type { GitDiffResult, GitStatusSummary, ProjectFileContent, ProjectFileEntry } from "../lib/localBackend";
 import type { GitWorkflowDraft } from "../lib/gitWorkflowDraft";
 import type { BrowserAccessRequest, BrowserStatus } from "../types";
+import type { FilePreviewTab } from "../lib/filePreview";
+import type { MarkdownCopyFallback } from "../types";
 
 type GitStatusByRoom = Record<string, GitStatusSummary | null>;
 type GitWorkflowBusyByRoom = Record<string, boolean>;
@@ -19,6 +21,14 @@ type BrowserReasonsByRoom = Record<string, string>;
 type BrowserMessagesByRoom = Record<string, string | null>;
 type BrowserStatusByRoom = Record<string, BrowserStatus>;
 type ActiveBrowserUrlsByRoom = Record<string, string | null>;
+type FileQueriesByRoom = Record<string, string>;
+type ProjectFilesByRoom = Record<string, ProjectFileEntry[]>;
+type SelectedFilesByRoom = Record<string, ProjectFileContent | null>;
+type SelectedDiffsByRoom = Record<string, GitDiffResult | null>;
+type FilePreviewTabsByRoom = Record<string, FilePreviewTab>;
+type FileBusyByRoom = Record<string, boolean>;
+type FileMessagesByRoom = Record<string, string | null>;
+type MarkdownCopyFallbacksByRoom = Record<string, MarkdownCopyFallback | null>;
 
 const emptyAppStoreState = {
   gitStatusByRoom: {},
@@ -34,7 +44,15 @@ const emptyAppStoreState = {
   browserReasonsByRoom: {},
   browserMessagesByRoom: {},
   browserStatusByRoom: {},
-  activeBrowserUrlsByRoom: {}
+  activeBrowserUrlsByRoom: {},
+  fileQueriesByRoom: {},
+  projectFilesByRoom: {},
+  selectedFilesByRoom: {},
+  selectedDiffsByRoom: {},
+  filePreviewTabsByRoom: {},
+  fileBusyByRoom: {},
+  fileMessagesByRoom: {},
+  markdownCopyFallbacksByRoom: {}
 };
 
 function resolveSetStateAction<T>(current: T, action: SetStateAction<T>): T {
@@ -56,6 +74,14 @@ interface AppStoreState {
   browserMessagesByRoom: BrowserMessagesByRoom;
   browserStatusByRoom: BrowserStatusByRoom;
   activeBrowserUrlsByRoom: ActiveBrowserUrlsByRoom;
+  fileQueriesByRoom: FileQueriesByRoom;
+  projectFilesByRoom: ProjectFilesByRoom;
+  selectedFilesByRoom: SelectedFilesByRoom;
+  selectedDiffsByRoom: SelectedDiffsByRoom;
+  filePreviewTabsByRoom: FilePreviewTabsByRoom;
+  fileBusyByRoom: FileBusyByRoom;
+  fileMessagesByRoom: FileMessagesByRoom;
+  markdownCopyFallbacksByRoom: MarkdownCopyFallbacksByRoom;
   setGitStatusByRoom: (action: SetStateAction<GitStatusByRoom>) => void;
   setGitWorkflowBusyByRoom: (action: SetStateAction<GitWorkflowBusyByRoom>) => void;
   setGitWorkflowMessagesByRoom: (action: SetStateAction<GitWorkflowMessagesByRoom>) => void;
@@ -70,6 +96,14 @@ interface AppStoreState {
   setBrowserMessagesByRoom: (action: SetStateAction<BrowserMessagesByRoom>) => void;
   setBrowserStatusByRoom: (action: SetStateAction<BrowserStatusByRoom>) => void;
   setActiveBrowserUrlsByRoom: (action: SetStateAction<ActiveBrowserUrlsByRoom>) => void;
+  setFileQueriesByRoom: (action: SetStateAction<FileQueriesByRoom>) => void;
+  setProjectFilesByRoom: (action: SetStateAction<ProjectFilesByRoom>) => void;
+  setSelectedFilesByRoom: (action: SetStateAction<SelectedFilesByRoom>) => void;
+  setSelectedDiffsByRoom: (action: SetStateAction<SelectedDiffsByRoom>) => void;
+  setFilePreviewTabsByRoom: (action: SetStateAction<FilePreviewTabsByRoom>) => void;
+  setFileBusyByRoom: (action: SetStateAction<FileBusyByRoom>) => void;
+  setFileMessagesByRoom: (action: SetStateAction<FileMessagesByRoom>) => void;
+  setMarkdownCopyFallbacksByRoom: (action: SetStateAction<MarkdownCopyFallbacksByRoom>) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
 }
@@ -144,6 +178,46 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setActiveBrowserUrlsByRoom: (action) => {
     set((state) => ({
       activeBrowserUrlsByRoom: resolveSetStateAction(state.activeBrowserUrlsByRoom, action)
+    }));
+  },
+  setFileQueriesByRoom: (action) => {
+    set((state) => ({
+      fileQueriesByRoom: resolveSetStateAction(state.fileQueriesByRoom, action)
+    }));
+  },
+  setProjectFilesByRoom: (action) => {
+    set((state) => ({
+      projectFilesByRoom: resolveSetStateAction(state.projectFilesByRoom, action)
+    }));
+  },
+  setSelectedFilesByRoom: (action) => {
+    set((state) => ({
+      selectedFilesByRoom: resolveSetStateAction(state.selectedFilesByRoom, action)
+    }));
+  },
+  setSelectedDiffsByRoom: (action) => {
+    set((state) => ({
+      selectedDiffsByRoom: resolveSetStateAction(state.selectedDiffsByRoom, action)
+    }));
+  },
+  setFilePreviewTabsByRoom: (action) => {
+    set((state) => ({
+      filePreviewTabsByRoom: resolveSetStateAction(state.filePreviewTabsByRoom, action)
+    }));
+  },
+  setFileBusyByRoom: (action) => {
+    set((state) => ({
+      fileBusyByRoom: resolveSetStateAction(state.fileBusyByRoom, action)
+    }));
+  },
+  setFileMessagesByRoom: (action) => {
+    set((state) => ({
+      fileMessagesByRoom: resolveSetStateAction(state.fileMessagesByRoom, action)
+    }));
+  },
+  setMarkdownCopyFallbacksByRoom: (action) => {
+    set((state) => ({
+      markdownCopyFallbacksByRoom: resolveSetStateAction(state.markdownCopyFallbacksByRoom, action)
     }));
   },
   resetAppStore: () => set(emptyAppStoreState),
