@@ -277,14 +277,12 @@ const {
   leaveWorkspace,
   revokeTeamMemberSessions
 } = createRelayRoomSocketManager({
+  store: relayStore,
   roomSockets,
   teamSockets,
   workspaceSockets,
   roomPresence,
   sessions,
-  teams,
-  rooms,
-  invites,
   mutationsRequireAuth,
   roomKey,
   canAccessRoom,
@@ -336,9 +334,7 @@ registerDebugRoutes({
 });
 registerAttachmentRoutes({
   app,
-  teams,
-  rooms,
-  attachmentBlobs,
+  store: relayStore,
   attachmentBlobMaxBytes,
   attachmentBlobTtlDays,
   maxAttachmentBlobNameChars,
@@ -355,9 +351,7 @@ registerAttachmentRoutes({
 });
 registerInviteRoutes({
   app,
-  teams,
-  rooms,
-  invites,
+  store: relayStore,
   inviteTtlDays,
   getAuthSession,
   allowMutation,
