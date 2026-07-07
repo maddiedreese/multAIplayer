@@ -737,83 +737,67 @@ test("desktop store keeps history status messages scoped", () => {
 test("desktop store keeps room runtime state room scoped", () => {
   const store = useAppStore.getState();
 
-  store.setInspectorTabsByRoom({ "room-a": "files", "room-b": "terminal" });
-  store.setPresenceByRoom({
-    "room-a": {
-      "device-a": {
-        userId: "github:avery",
-        deviceId: "device-a",
-        displayName: "Avery",
-        status: "online"
-      }
-    },
-    "room-b": {
-      "device-b": {
-        userId: "github:jordan",
-        deviceId: "device-b",
-        displayName: "Jordan",
-        status: "online"
-      }
-    }
+  store.setInspectorTabForRoom("room-a", "files");
+  store.setInspectorTabForRoom("room-b", "terminal");
+  store.setRoomPresenceForDevice("room-a", "device-a", {
+    userId: "github:avery",
+    deviceId: "device-a",
+    displayName: "Avery",
+    status: "online"
+  });
+  store.setRoomPresenceForDevice("room-b", "device-b", {
+    userId: "github:jordan",
+    deviceId: "device-b",
+    displayName: "Jordan",
+    status: "online"
   });
   store.clearPresenceForRoom("room-a");
-  store.setHostHandoffsByRoom({
-    "room-a": [
-      {
-        id: "handoff-1",
-        fromHost: "Maddie",
-        fromUserId: "github:maddie",
-        reason: "usage_limit",
-        projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
-        codexModel: "GPT-5.4",
-        approvalPolicy: "Ask every Codex turn",
-  approvalDelegationPolicy: "host_only",
-  trustedApproverUserIds: [],
-        messagesSinceLastCodex: 3,
-        attachmentNames: ["docs/plan.md"],
-        terminals: ["shell"],
-        createdAt: "2026-07-06T00:10:00.000Z",
-        status: "available"
-      }
-    ]
+  store.appendHostHandoff("room-a", {
+    id: "handoff-1",
+    fromHost: "Maddie",
+    fromUserId: "github:maddie",
+    reason: "usage_limit",
+    projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
+    codexModel: "GPT-5.4",
+    approvalPolicy: "Ask every Codex turn",
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
+    messagesSinceLastCodex: 3,
+    attachmentNames: ["docs/plan.md"],
+    terminals: ["shell"],
+    createdAt: "2026-07-06T00:10:00.000Z",
+    status: "available"
   });
-  store.setCodexContinuationByRoom((current) => ({
-    ...current,
-    "room-b": {
-      id: "handoff-2",
-      fromHost: "Avery",
-      fromUserId: "github:avery",
-      projectPath: "/Users/avery/project",
-      codexModel: "GPT-5.4",
-      approvalPolicy: "Ask every Codex turn",
-  approvalDelegationPolicy: "host_only",
-  trustedApproverUserIds: [],
-      messagesSinceLastCodex: 1,
-      attachmentNames: [],
-      terminals: [],
-      createdAt: "2026-07-06T00:11:00.000Z",
-      status: "accepted",
-      acceptedBy: "Jordan",
-      acceptedByUserId: "github:jordan",
-      acceptedAt: "2026-07-06T00:12:00.000Z"
-    }
-  }));
-  store.setGitWorkflowEventsByRoom({
-    "room-a": [
-      {
-        eventType: "git.workflow",
-        status: "completed",
-        branch: "codex/runtime-state",
-        push: true,
-        message: "Opened draft PR",
-        runner: "Maddie",
-        runnerUserId: "github:maddie",
-        createdAt: "2026-07-06T00:13:00.000Z"
-      }
-    ]
+  store.setCodexContinuationForRoom("room-b", {
+    id: "handoff-2",
+    fromHost: "Avery",
+    fromUserId: "github:avery",
+    projectPath: "/Users/avery/project",
+    codexModel: "GPT-5.4",
+    approvalPolicy: "Ask every Codex turn",
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
+    messagesSinceLastCodex: 1,
+    attachmentNames: [],
+    terminals: [],
+    createdAt: "2026-07-06T00:11:00.000Z",
+    status: "accepted",
+    acceptedBy: "Jordan",
+    acceptedByUserId: "github:jordan",
+    acceptedAt: "2026-07-06T00:12:00.000Z"
   });
-  store.setGitHubActionsEventsByRoom({
-    "room-b": [
+  store.appendGitWorkflowEvent("room-a", {
+    eventType: "git.workflow",
+    status: "completed",
+    branch: "codex/runtime-state",
+    push: true,
+    message: "Opened draft PR",
+    runner: "Maddie",
+    runnerUserId: "github:maddie",
+    createdAt: "2026-07-06T00:13:00.000Z"
+  });
+  store.appendGitHubActionsEvent(
+    "room-b",
       {
         eventType: "github.actions",
         owner: "maddiedreese",
@@ -836,8 +820,7 @@ test("desktop store keeps room runtime state room scoped", () => {
           }
         ]
       }
-    ]
-  });
+  );
 
   const state = useAppStore.getState();
   assert.equal(state.inspectorTabsByRoom["room-a"], "files");
@@ -1152,9 +1135,43 @@ test("desktop store clears local room-scoped state", () => {
     status: "started",
     createdAt: "2026-07-06T00:24:00.000Z"
   });
-  store.setGitWorkflowEventsByRoom({ "room-a": [], "room-b": [] });
-  store.setGitHubActionsEventsByRoom({ "room-a": [], "room-b": [] });
-  store.setHostHandoffsByRoom({ "room-a": [], "room-b": [] });
+  store.appendGitWorkflowEvent("room-b", {
+    eventType: "git.workflow",
+    status: "completed",
+    branch: "codex/keep",
+    push: true,
+    message: "Keep this event",
+    runner: "Maddie",
+    runnerUserId: "github:maddie",
+    createdAt: "2026-07-06T00:25:00.000Z"
+  });
+  store.appendGitHubActionsEvent("room-b", {
+    eventType: "github.actions",
+    owner: "maddiedreese",
+    repo: "multAIplayer",
+    branch: "main",
+    summary: { label: "CI", detail: "Keep", tone: "green" },
+    message: "Keep this event",
+    checkedBy: "Maddie",
+    checkedByUserId: "github:maddie",
+    checkedAt: "2026-07-06T00:26:00.000Z",
+    runs: []
+  });
+  store.appendHostHandoff("room-b", {
+    id: "handoff-keep",
+    fromHost: "Maddie",
+    fromUserId: "github:maddie",
+    projectPath: "/tmp/b",
+    codexModel: "GPT-5.4",
+    approvalPolicy: "Ask every Codex turn",
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
+    messagesSinceLastCodex: 1,
+    attachmentNames: [],
+    terminals: [],
+    createdAt: "2026-07-06T00:27:00.000Z",
+    status: "available"
+  });
   store.setCodexThreadIdForRoom("room-a", "thread-a");
   store.setCodexThreadIdForRoom("room-b", "thread-b");
   store.setActionRunsForRoom("room-a", []);

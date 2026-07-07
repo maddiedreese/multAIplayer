@@ -200,15 +200,9 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, RoomChatSli
   setInviteAdmissionForRoom: (roomId: string, inviteId: string | null) => void;
   clearInviteAdmissionForRoom: (roomId: string) => void;
   replaceHistorySearchMessagesByRoom: (messagesByRoom: HistorySearchMessagesByRoom) => void;
-  setInspectorTabsByRoom: (action: SetStateAction<InspectorTabsByRoom>) => void;
-  setPresenceByRoom: (action: SetStateAction<PresenceByRoom>) => void;
   clearPresenceByRoom: () => void;
   clearPresenceForRoom: (roomId: string) => void;
   setRoomPresenceForDevice: (roomId: string, deviceId: string, presence: RoomPresence | null) => void;
-  setHostHandoffsByRoom: (action: SetStateAction<HostHandoffsByRoom>) => void;
-  setCodexContinuationByRoom: (action: SetStateAction<CodexContinuationByRoom>) => void;
-  setGitWorkflowEventsByRoom: (action: SetStateAction<GitWorkflowEventsByRoom>) => void;
-  setGitHubActionsEventsByRoom: (action: SetStateAction<GitHubActionsEventsByRoom>) => void;
   setTeamMembersByTeam: (action: SetStateAction<TeamMembersByTeam>) => void;
   setTeamMembersMessageByTeam: (action: SetStateAction<TeamMembersMessageByTeam>) => void;
   setTeamMembersBusyByTeam: (action: SetStateAction<TeamMembersBusyByTeam>) => void;
@@ -342,16 +336,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   replaceHistorySearchMessagesByRoom: (messagesByRoom) => {
     set({ historySearchMessagesByRoom: messagesByRoom });
   },
-  setInspectorTabsByRoom: (action) => {
-    set((state) => ({
-      inspectorTabsByRoom: resolveSetStateAction(state.inspectorTabsByRoom, action)
-    }));
-  },
-  setPresenceByRoom: (action) => {
-    set((state) => ({
-      presenceByRoom: resolveSetStateAction(state.presenceByRoom, action)
-    }));
-  },
   clearPresenceByRoom: () => {
     set({ presenceByRoom: {} });
   },
@@ -373,26 +357,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
         }
       };
     });
-  },
-  setHostHandoffsByRoom: (action) => {
-    set((state) => ({
-      hostHandoffsByRoom: resolveSetStateAction(state.hostHandoffsByRoom, action)
-    }));
-  },
-  setCodexContinuationByRoom: (action) => {
-    set((state) => ({
-      codexContinuationByRoom: resolveSetStateAction(state.codexContinuationByRoom, action)
-    }));
-  },
-  setGitWorkflowEventsByRoom: (action) => {
-    set((state) => ({
-      gitWorkflowEventsByRoom: resolveSetStateAction(state.gitWorkflowEventsByRoom, action)
-    }));
-  },
-  setGitHubActionsEventsByRoom: (action) => {
-    set((state) => ({
-      githubActionsEventsByRoom: resolveSetStateAction(state.githubActionsEventsByRoom, action)
-    }));
   },
   setTeamMembersByTeam: (action) => {
     set((state) => ({
