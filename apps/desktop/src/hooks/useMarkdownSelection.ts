@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { omitRecordKey } from "../lib/setUtils";
+import { useAppStore } from "../store/appStore";
 
 interface UseMarkdownSelectionOptions {
   activeRoomId: string;
@@ -8,8 +9,9 @@ interface UseMarkdownSelectionOptions {
 }
 
 export function useMarkdownSelection({ activeRoomId, enabled, resetKey }: UseMarkdownSelectionOptions) {
-  const [selectedMessageIdsByRoom, setSelectedMessageIdsByRoom] = useState<Record<string, string[]>>({});
   const [markdownSelectionMode, setMarkdownSelectionMode] = useState(false);
+  const selectedMessageIdsByRoom = useAppStore((state) => state.selectedMessageIdsByRoom);
+  const setSelectedMessageIdsByRoom = useAppStore((state) => state.setSelectedMessageIdsByRoom);
 
   useEffect(() => {
     setMarkdownSelectionMode(false);

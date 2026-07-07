@@ -344,3 +344,20 @@ test("desktop store keeps Codex room state room scoped", () => {
   assert.equal(state.secretWarningsVisibleByRoom["room-a"], true);
   assert.equal(state.codexThreadIdsByRoom["room-a"], "thread-room-a");
 });
+
+test("desktop store keeps markdown message selection room scoped", () => {
+  const store = useAppStore.getState();
+
+  store.setSelectedMessageIdsByRoom({
+    "room-a": ["message-1", "message-2"],
+    "room-b": ["message-9"]
+  });
+  store.setSelectedMessageIdsByRoom((current) => ({
+    ...current,
+    "room-a": current["room-a"]?.filter((id) => id !== "message-1") ?? []
+  }));
+
+  const state = useAppStore.getState();
+  assert.deepEqual(state.selectedMessageIdsByRoom["room-a"], ["message-2"]);
+  assert.deepEqual(state.selectedMessageIdsByRoom["room-b"], ["message-9"]);
+});
