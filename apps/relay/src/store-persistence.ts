@@ -1,0 +1,65 @@
+import { isRecord } from "./limits.js";
+import type { RelayPersistence } from "./persistence.js";
+import type { RelayStoreCodec } from "./store-codec.js";
+
+export interface RelayStorePersistenceCoordinator {
+  loadRelayStore(): Promise<void>;
+  scheduleStoreSave(): void;
+  saveRelayStore(): Promise<void>;
+  flushRelayStore(): Promise<void>;
+}
+
+export function createRelayStorePersistenceCoordinator(options: {
+  dataPath: string;
+  persistence: RelayPersistence;
+  storeCodec: RelayStoreCodec;
+}): RelayStorePersistenceCoordinator {
+  let saveTimer: NodeJS.Timeout | null = null;
+
+  async function loadRelayStore() {
+    try {
+      const stored = await options.persistence.load();
+      if (stored === null) return;
+      if (!isRecord(stored) || stored.version !== 1) {
+        console.warn(`Ignoring unsupported relay store version at ${options.dataPath}`);
+        await options.persistence.quarantine("unsupported-version");
+        return;
+      }
+      options.storeCodec.applyStoredRelayState(stored);
+      console.log(`Loaded multAIplayer relay store from ${options.dataPath}`);
+    } catch (error) {
+      console.warn(`Could not load relay store at ${options.dataPath}:`, error);
+      await options.persistence.quarantine("unreadable");
+    }
+  }
+
+  function scheduleStoreSave() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      saveRelayStore().catch((error) => {
+        console.error("Failed to save relay store:", error);
+      });
+    }, 100);
+  }
+
+  async function saveRelayStore() {
+    options.storeCodec.pruneExpiredRelayState();
+    await options.persistence.save(options.storeCodec.toStoredRelayState());
+  }
+
+  async function flushRelayStore() {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    await saveRelayStore();
+  }
+
+  return {
+    loadRelayStore,
+    scheduleStoreSave,
+    saveRelayStore,
+    flushRelayStore
+  };
+}
