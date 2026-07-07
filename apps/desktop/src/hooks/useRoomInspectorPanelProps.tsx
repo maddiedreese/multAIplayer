@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react";
+import React, { type ComponentProps } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { canStageRoomChatAttachment } from "../lib/chatPolicy";
 import { formatBytes, formatCodexModel, formatTimestamp } from "../lib/appFormatters";

@@ -77,6 +77,11 @@ type TeamMembersBusyByTeam = Record<string, boolean>;
 type MessagesByRoom = Record<string, ChatMessage[]>;
 type RoomBusyByRoom = Record<string, boolean>;
 
+interface WorkspaceInitialData {
+  teamMembersByTeam: TeamMembersByTeam;
+  messagesByRoom: MessagesByRoom;
+}
+
 const emptyLocalPreviewDialog: LocalPreviewDialogState = {
   open: false,
   phase: "select",
@@ -203,14 +208,11 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, RoomChatSli
   clearPresenceByRoom: () => void;
   clearPresenceForRoom: (roomId: string) => void;
   setRoomPresenceForDevice: (roomId: string, deviceId: string, presence: RoomPresence | null) => void;
-  setTeamMembersByTeam: (action: SetStateAction<TeamMembersByTeam>) => void;
-  setTeamMembersMessageByTeam: (action: SetStateAction<TeamMembersMessageByTeam>) => void;
-  setTeamMembersBusyByTeam: (action: SetStateAction<TeamMembersBusyByTeam>) => void;
+  seedWorkspaceInitialDataIfEmpty: (initialData: WorkspaceInitialData) => void;
   setTeamMembersForTeam: (teamId: string, members: TeamMemberRecord[]) => void;
   setTeamMembersMessageForTeam: (teamId: string, message: string | null) => void;
   setTeamMembersBusyForTeam: (teamId: string, busy: boolean) => void;
   ensureLocalTeamMemberForTeam: (teamId: string, userId: string, role: TeamMemberRecord["role"]) => void;
-  setMessagesByRoom: (action: SetStateAction<MessagesByRoom>) => void;
   initializeMessagesForRoom: (roomId: string) => void;
   hydrateLocalRoomHistoryForRoom: (roomId: string, payload: LocalRoomHistoryPayload) => void;
   appendRoomMessage: (roomId: string, message: ChatMessage) => void;
@@ -358,20 +360,17 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       };
     });
   },
-  setTeamMembersByTeam: (action) => {
-    set((state) => ({
-      teamMembersByTeam: resolveSetStateAction(state.teamMembersByTeam, action)
-    }));
-  },
-  setTeamMembersMessageByTeam: (action) => {
-    set((state) => ({
-      teamMembersMessageByTeam: resolveSetStateAction(state.teamMembersMessageByTeam, action)
-    }));
-  },
-  setTeamMembersBusyByTeam: (action) => {
-    set((state) => ({
-      teamMembersBusyByTeam: resolveSetStateAction(state.teamMembersBusyByTeam, action)
-    }));
+  seedWorkspaceInitialDataIfEmpty: ({ teamMembersByTeam, messagesByRoom }) => {
+    set((state) => {
+      const shouldSeedTeamMembers =
+        Object.keys(teamMembersByTeam).length > 0 && Object.keys(state.teamMembersByTeam).length === 0;
+      const shouldSeedMessages = Object.keys(messagesByRoom).length > 0 && Object.keys(state.messagesByRoom).length === 0;
+      if (!shouldSeedTeamMembers && !shouldSeedMessages) return state;
+      return {
+        ...(shouldSeedTeamMembers ? { teamMembersByTeam } : {}),
+        ...(shouldSeedMessages ? { messagesByRoom } : {})
+      };
+    });
   },
   setTeamMembersForTeam: (teamId, members) => {
     set((state) => ({
@@ -412,11 +411,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
         }
       };
     });
-  },
-  setMessagesByRoom: (action) => {
-    set((state) => ({
-      messagesByRoom: resolveSetStateAction(state.messagesByRoom, action)
-    }));
   },
   initializeMessagesForRoom: (roomId) => {
     set((state) => {

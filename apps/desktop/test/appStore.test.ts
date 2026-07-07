@@ -1081,10 +1081,8 @@ test("desktop store exposes room terminal actions", () => {
 test("desktop store clears local room-scoped state", () => {
   const store = useAppStore.getState();
 
-  store.setMessagesByRoom({
-    "room-a": [{ id: "message-a", author: "Avery", role: "human", body: "hello", time: "9:41" }],
-    "room-b": [{ id: "message-b", author: "Jordan", role: "human", body: "keep", time: "9:42" }]
-  });
+  store.appendRoomMessage("room-a", { id: "message-a", author: "Avery", role: "human", body: "hello", time: "9:41" });
+  store.appendRoomMessage("room-b", { id: "message-b", author: "Jordan", role: "human", body: "keep", time: "9:42" });
   store.appendTerminalRequest("room-a", {
     id: "terminal-request-room-a",
     requester: "Avery",
@@ -1249,31 +1247,27 @@ test("desktop store clears local room-scoped state", () => {
 test("desktop store keeps workspace maps scoped", () => {
   const store = useAppStore.getState();
 
-  store.setTeamMembersByTeam({
-    "team-core": [
-      {
-        teamId: "team-core",
-        userId: "github:maddie",
-        role: "owner",
-        joinedAt: "2026-07-06T00:17:00.000Z"
-      }
-    ],
-    "team-labs": []
+  store.setTeamMembersForTeam("team-core", [
+    {
+      teamId: "team-core",
+      userId: "github:maddie",
+      role: "owner",
+      joinedAt: "2026-07-06T00:17:00.000Z"
+    }
+  ]);
+  store.setTeamMembersForTeam("team-labs", []);
+  store.setTeamMembersMessageForTeam("team-core", null);
+  store.setTeamMembersMessageForTeam("team-labs", "Could not refresh members");
+  store.setTeamMembersBusyForTeam("team-core", true);
+  store.setTeamMembersBusyForTeam("team-labs", false);
+  store.appendRoomMessage("room-a", {
+    id: "message-a",
+    author: "Avery",
+    role: "human",
+    body: "Ship the store slice.",
+    time: "10:17"
   });
-  store.setTeamMembersMessageByTeam({ "team-core": null, "team-labs": "Could not refresh members" });
-  store.setTeamMembersBusyByTeam({ "team-core": true, "team-labs": false });
-  store.setMessagesByRoom({
-    "room-a": [
-      {
-        id: "message-a",
-        author: "Avery",
-        role: "human",
-        body: "Ship the store slice.",
-        time: "10:17"
-      }
-    ],
-    "room-b": []
-  });
+  store.initializeMessagesForRoom("room-b");
 
   const state = useAppStore.getState();
   assert.equal(state.teamMembersByTeam["team-core"]?.[0]?.role, "owner");
@@ -1286,19 +1280,59 @@ test("desktop store keeps workspace maps scoped", () => {
   assert.deepEqual(state.messagesByRoom["room-b"], []);
 });
 
+test("desktop store seeds initial workspace data only when maps are empty", () => {
+  const store = useAppStore.getState();
+
+  store.seedWorkspaceInitialDataIfEmpty({
+    teamMembersByTeam: {
+      "team-core": [
+        {
+          teamId: "team-core",
+          userId: "github:maddie",
+          role: "owner",
+          joinedAt: "2026-07-06T00:17:00.000Z"
+        }
+      ]
+    },
+    messagesByRoom: {
+      "room-a": [{ id: "message-a", author: "Avery", role: "human", body: "Seeded", time: "10:17" }]
+    }
+  });
+
+  let state = useAppStore.getState();
+  assert.equal(state.teamMembersByTeam["team-core"]?.[0]?.userId, "github:maddie");
+  assert.equal(state.messagesByRoom["room-a"]?.[0]?.body, "Seeded");
+
+  store.seedWorkspaceInitialDataIfEmpty({
+    teamMembersByTeam: {
+      "team-labs": [
+        {
+          teamId: "team-labs",
+          userId: "github:labs",
+          role: "member",
+          joinedAt: "2026-07-06T00:18:00.000Z"
+        }
+      ]
+    },
+    messagesByRoom: {
+      "room-b": [{ id: "message-b", author: "Jordan", role: "human", body: "Do not merge", time: "10:18" }]
+    }
+  });
+
+  state = useAppStore.getState();
+  assert.equal(state.teamMembersByTeam["team-labs"], undefined);
+  assert.equal(state.messagesByRoom["room-b"], undefined);
+});
+
 test("desktop store hydrates local room history through one room-scoped action", () => {
   const store = useAppStore.getState();
 
-  store.setMessagesByRoom({
-    "room-b": [
-      {
-        id: "message-b",
-        author: "Jordan",
-        role: "human",
-        body: "Keep this room alone.",
-        time: "10:16"
-      }
-    ]
+  store.appendRoomMessage("room-b", {
+    id: "message-b",
+    author: "Jordan",
+    role: "human",
+    body: "Keep this room alone.",
+    time: "10:16"
   });
   store.setSelectedTerminalIdForRoom("room-a", "terminal-a");
   store.setSelectedTerminalIdForRoom("room-b", "terminal-b");
