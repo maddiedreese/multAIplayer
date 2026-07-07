@@ -53,6 +53,32 @@ test("desktop store exposes room git workflow actions", () => {
   assert.equal(state.gitWorkflowDraftsByRoom["room-a"]?.prBase, "main");
 });
 
+test("desktop store exposes room busy actions", () => {
+  const store = useAppStore.getState();
+
+  store.setGitWorkflowBusyForRoom("room-a", true);
+  store.setActionsBusyForRoom("room-a", true);
+  store.setLocalPreviewBusyForRoom("room-a", true);
+  store.setHostBusyForRoom("room-a", true);
+  store.setSettingsBusyForRoom("room-a", true);
+  store.setKeyRotationBusyForRoom("room-a", true);
+  store.setFileBusyForRoom("room-a", true);
+  store.setTerminalBusyForRoom("room-a", true);
+  store.setGitWorkflowBusyForRoom("room-b", true);
+  store.setGitWorkflowBusyForRoom("room-a", false);
+
+  const state = useAppStore.getState();
+  assert.equal(state.gitWorkflowBusyByRoom["room-a"], undefined);
+  assert.equal(state.gitWorkflowBusyByRoom["room-b"], true);
+  assert.equal(state.actionsBusyByRoom["room-a"], true);
+  assert.equal(state.localPreviewBusyByRoom["room-a"], true);
+  assert.equal(state.hostBusyByRoom["room-a"], true);
+  assert.equal(state.settingsBusyByRoom["room-a"], true);
+  assert.equal(state.keyRotationBusyByRoom["room-a"], true);
+  assert.equal(state.fileBusyByRoom["room-a"], true);
+  assert.equal(state.terminalBusyByRoom["room-a"], true);
+});
+
 test("desktop store keeps GitHub Actions state room scoped", () => {
   const store = useAppStore.getState();
 

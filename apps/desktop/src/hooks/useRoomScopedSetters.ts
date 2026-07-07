@@ -1,4 +1,4 @@
-import { useRoomBusySetters } from "./useRoomBusySetters";
+import type { MutableRefObject } from "react";
 import { useRoomCodexApprovalSetters } from "./useRoomCodexApprovalSetters";
 import { useRoomEventAppenders } from "./useRoomEventAppenders";
 import { useRoomFileSetters } from "./useRoomFileSetters";
@@ -6,6 +6,24 @@ import { useRoomRequestSetters } from "./useRoomRequestSetters";
 import { useRoomTerminalSetters } from "./useRoomTerminalSetters";
 import { useAppStore } from "../store/appStore";
 import type { RoomRecord } from "@multaiplayer/protocol";
+import { omitRecordKey } from "../lib/setUtils";
+
+type BusyMap = Record<string, boolean>;
+
+interface RoomBusySettersOptions {
+  gitWorkflowBusyRef: MutableRefObject<BusyMap>;
+  actionsBusyRef: MutableRefObject<BusyMap>;
+  localPreviewBusyRef: MutableRefObject<BusyMap>;
+  hostBusyRef: MutableRefObject<BusyMap>;
+  settingsBusyRef: MutableRefObject<BusyMap>;
+  keyRotationBusyRef: MutableRefObject<BusyMap>;
+  fileBusyRef: MutableRefObject<BusyMap>;
+  terminalBusyRef: MutableRefObject<BusyMap>;
+}
+
+function updateBusyRef(ref: MutableRefObject<BusyMap>, roomId: string, busy: boolean) {
+  ref.current = busy ? { ...ref.current, [roomId]: true } : omitRecordKey(ref.current, roomId);
+}
 
 export function useRoomScopedSetters({
   selectedRoomId,
@@ -21,7 +39,7 @@ export function useRoomScopedSetters({
 }: {
   selectedRoomId: string;
   selectedTeamId: string;
-  busy: Parameters<typeof useRoomBusySetters>[0];
+  busy: RoomBusySettersOptions;
   files: Parameters<typeof useRoomFileSetters>[0];
   terminals: Parameters<typeof useRoomTerminalSetters>[0];
   codexApprovals: Parameters<typeof useRoomCodexApprovalSetters>[0];
@@ -57,6 +75,24 @@ export function useRoomScopedSetters({
   const setInviteMessageForRoom = useAppStore((state) => state.setInviteMessageForRoom);
   const setCustomCodexModelForRoom = useAppStore((state) => state.setCustomCodexModelForRoom);
   const setProjectPathDraftForRoom = useAppStore((state) => state.setProjectPathDraftForRoom);
+  const setGitWorkflowBusyForRoom = useAppStore((state) => state.setGitWorkflowBusyForRoom);
+  const setActionsBusyForRoom = useAppStore((state) => state.setActionsBusyForRoom);
+  const setLocalPreviewBusyForRoom = useAppStore((state) => state.setLocalPreviewBusyForRoom);
+  const setHostBusyForRoom = useAppStore((state) => state.setHostBusyForRoom);
+  const setSettingsBusyForRoom = useAppStore((state) => state.setSettingsBusyForRoom);
+  const setKeyRotationBusyForRoom = useAppStore((state) => state.setKeyRotationBusyForRoom);
+  const setFileBusyForRoom = useAppStore((state) => state.setFileBusyForRoom);
+  const setTerminalBusyForRoom = useAppStore((state) => state.setTerminalBusyForRoom);
+
+  const applyBusyForRoom = (
+    ref: MutableRefObject<BusyMap>,
+    action: (roomId: string, busy: boolean) => void,
+    roomId: string,
+    isBusy: boolean
+  ) => {
+    updateBusyRef(ref, roomId, isBusy);
+    action(roomId, isBusy);
+  };
 
   return {
     setHostMessageForRoom,
@@ -99,7 +135,22 @@ export function useRoomScopedSetters({
     },
     setPendingAttachmentsForRoom,
     setDraftForRoom,
-    ...useRoomBusySetters(busy),
+    setGitWorkflowBusyForRoom: (roomId: string, isBusy: boolean) =>
+      applyBusyForRoom(busy.gitWorkflowBusyRef, setGitWorkflowBusyForRoom, roomId, isBusy),
+    setActionsBusyForRoom: (roomId: string, isBusy: boolean) =>
+      applyBusyForRoom(busy.actionsBusyRef, setActionsBusyForRoom, roomId, isBusy),
+    setLocalPreviewBusyForRoom: (roomId: string, isBusy: boolean) =>
+      applyBusyForRoom(busy.localPreviewBusyRef, setLocalPreviewBusyForRoom, roomId, isBusy),
+    setHostBusyForRoom: (roomId: string, isBusy: boolean) =>
+      applyBusyForRoom(busy.hostBusyRef, setHostBusyForRoom, roomId, isBusy),
+    setSettingsBusyForRoom: (roomId: string, isBusy: boolean) =>
+      applyBusyForRoom(busy.settingsBusyRef, setSettingsBusyForRoom, roomId, isBusy),
+    setKeyRotationBusyForRoom: (roomId: string, isBusy: boolean) =>
+      applyBusyForRoom(busy.keyRotationBusyRef, setKeyRotationBusyForRoom, roomId, isBusy),
+    setFileBusyForRoom: (roomId: string, isBusy: boolean) =>
+      applyBusyForRoom(busy.fileBusyRef, setFileBusyForRoom, roomId, isBusy),
+    setTerminalBusyForRoom: (roomId: string, isBusy: boolean) =>
+      applyBusyForRoom(busy.terminalBusyRef, setTerminalBusyForRoom, roomId, isBusy),
     ...useRoomFileSetters(files),
     ...useRoomTerminalSetters(terminals),
     ...useRoomCodexApprovalSetters(codexApprovals),
