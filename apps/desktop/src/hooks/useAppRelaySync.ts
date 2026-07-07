@@ -1,4 +1,7 @@
+import { useCallback } from "react";
+import type { CodexApprovalPlaintextPayload } from "@multaiplayer/protocol";
 import {
+  approvalDelegationPolicyLabels,
   approvalPolicyLabels,
   roomModeLabels
 } from "../seedData";
@@ -84,6 +87,14 @@ export function useAppRelaySync({
     appendHostHandoff,
     setInviteMessageForRoom
   } = roomActions;
+  const handleCodexApprovalEvent = useCallback((event: CodexApprovalPlaintextPayload, roomId: string) => {
+    const handler = appRefs.delegatedCodexApprovalHandlerRef.current;
+    if (handler) {
+      handler(event, roomId);
+    } else {
+      setHostMessageForRoom(roomId, "Received delegated Codex approval before the host runtime was ready.");
+    }
+  }, [appRefs.delegatedCodexApprovalHandlerRef, setHostMessageForRoom]);
 
   return useRelaySyncContext({
     browserOpenCommand: {
@@ -110,6 +121,7 @@ export function useAppRelaySync({
         revokedRoomIds: roomRuntimeState.revokedRoomIds,
         revokedTeamIds: roomRuntimeState.revokedTeamIds,
         approvalPolicyLabels,
+        approvalDelegationPolicyLabels,
         roomModeLabels,
         relayRef: appRefs.relayRef,
         seenEnvelopeIds: appRefs.seenEnvelopeIds,
@@ -127,6 +139,7 @@ export function useAppRelaySync({
         refreshTeamMembers: roomDisplay.refreshTeamMembers,
         decryptInviteEnvelope: inviteActions.decryptInviteEnvelope,
         handleInviteEnvelopePlaintext: inviteActions.handleInviteEnvelopePlaintext,
+        handleCodexApprovalEvent,
         applyMessageReaction: roomChatMutations.applyMessageReaction,
         appendTerminalRequest,
         updateTerminalRequestStatus,
@@ -156,6 +169,7 @@ export function useAppRelaySync({
         deviceId: localIdentity.deviceId,
         localUser: localIdentity.localUser,
         approvalPolicyLabels,
+        approvalDelegationPolicyLabels,
         roomModeLabels,
         appendLocalPreviewEvent,
         appendGitWorkflowEvent,

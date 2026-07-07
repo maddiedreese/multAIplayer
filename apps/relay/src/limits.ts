@@ -1,8 +1,10 @@
 import {
   DevicePublicKeyJwk,
+  defaultApprovalDelegationPolicy,
   type RelayEnvelope,
   codexModelOptions,
   type DevicePublicKeyJwk as DevicePublicKeyJwkType,
+  type ApprovalDelegationPolicy,
   type RoomRecord,
   type TeamRole
 } from "@multaiplayer/protocol";
@@ -71,6 +73,15 @@ export function isApprovalPolicy(value: string): value is RoomRecord["approvalPo
     "auto_browser_allowed_sites",
     "never_host"
   ].includes(value);
+}
+
+export function isApprovalDelegationPolicy(value: string): value is ApprovalDelegationPolicy {
+  return [
+    defaultApprovalDelegationPolicy,
+    "members_can_request",
+    "members_can_approve",
+    "trusted_members_only"
+  ].includes(value as ApprovalDelegationPolicy);
 }
 
 export function isRoomMode(value: unknown): value is RoomRecord["mode"] {

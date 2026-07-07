@@ -1,5 +1,11 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
-import type { ApprovalPolicy, RoomMode, RoomRecord, RoomSettingsPlaintextPayload } from "@multaiplayer/protocol";
+import type {
+  ApprovalDelegationPolicy,
+  ApprovalPolicy,
+  RoomMode,
+  RoomRecord,
+  RoomSettingsPlaintextPayload
+} from "@multaiplayer/protocol";
 import { chooseProjectFolder } from "../lib/localBackend";
 import { updateRoomSettings } from "../lib/workspaceClient";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
@@ -104,6 +110,45 @@ export function useRoomSettingsActions({
       });
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setSettingsMessageForRoom(roomId, `Approval policy set to ${approvalPolicyLabels[approvalPolicy]}.`);
+      }
+      resetCodexApprovalForRoom(roomId);
+    } catch (error) {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
+    } finally {
+      setSettingsBusyForRoom(roomId, false);
+    }
+  }
+
+  async function setApprovalDelegationPolicy(approvalDelegationPolicy: ApprovalDelegationPolicy) {
+    if (!hasSelectedRoom) {
+      setSelectedSettingsMessage("Create or join a room before changing room settings.");
+      return;
+    }
+    if (isSelectedRoomLocked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
+    if (!isActiveHost) {
+      setSelectedSettingsMessage(roomSettingsGateMessage);
+      return;
+    }
+    const roomId = selectedRoom.id;
+    if (reportRoomSettingsMutationInFlight(roomId)) return;
+    setSettingsBusyForRoom(roomId, true);
+    setSettingsMessageForRoom(roomId, null);
+    try {
+      const previousPolicy = selectedRoom.approvalDelegationPolicy;
+      const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), approvalDelegationPolicy });
+      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      await publishRoomSettingsEvent(room, {
+        id: crypto.randomUUID(),
+        setting: "approvalDelegationPolicy",
+        previousValue: previousPolicy,
+        nextValue: approvalDelegationPolicy,
+        changedAt: new Date().toISOString()
+      });
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setSettingsMessageForRoom(roomId, "Approval delegation updated.");
       }
       resetCodexApprovalForRoom(roomId);
     } catch (error) {
@@ -371,6 +416,7 @@ export function useRoomSettingsActions({
 
   return {
     setApprovalPolicy,
+    setApprovalDelegationPolicy,
     toggleRoomMode,
     setCodexModel,
     renameRoom,

@@ -3,8 +3,10 @@ import { nanoid } from "nanoid";
 import {
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
+  defaultApprovalDelegationPolicy,
   defaultCodexModel,
   defaultRoomMode,
+  type ApprovalDelegationPolicy,
   type RoomRecord
 } from "@multaiplayer/protocol";
 import type { AuthSession, RelayStore } from "../state.js";
@@ -21,6 +23,7 @@ interface RegisterRoomRoutesOptions {
   requesterFromRequest: (body: unknown, sessionId: unknown) => { id: string; name: string };
   isRoomHost: (room: RoomRecord, requester: { id: string; name: string }) => boolean;
   isApprovalPolicy: (value: string) => value is RoomRecord["approvalPolicy"];
+  isApprovalDelegationPolicy: (value: string) => value is ApprovalDelegationPolicy;
   isRoomMode: (value: unknown) => value is RoomRecord["mode"];
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
   normalizeOptionalMetadataText: (value: unknown, maxChars: number) => string | null;
@@ -47,6 +50,7 @@ export function registerRoomRoutes({
   requesterFromRequest,
   isRoomHost,
   isApprovalPolicy,
+  isApprovalDelegationPolicy,
   isRoomMode,
   normalizeMetadataText,
   normalizeOptionalMetadataText,
@@ -68,6 +72,11 @@ export function registerRoomRoutes({
     const name = normalizeMetadataText(req.body?.name, maxRoomNameChars);
     const projectPath = normalizeRoomProjectPath(req.body?.projectPath);
     const approvalPolicy = req.body?.approvalPolicy === undefined ? "ask_every_turn" : String(req.body.approvalPolicy);
+    const approvalDelegationPolicy =
+      req.body?.approvalDelegationPolicy === undefined
+        ? defaultApprovalDelegationPolicy
+        : String(req.body.approvalDelegationPolicy);
+    const trustedApproverUserIds = normalizeTrustedApproverUserIds(req.body?.trustedApproverUserIds, maxUserIdChars);
     const codexModel = req.body?.codexModel === undefined ? defaultCodexModel : normalizeCodexModel(req.body.codexModel);
     const browserAllowedOrigins = req.body?.browserAllowedOrigins;
     const browserProfilePersistent = req.body?.browserProfilePersistent;
@@ -89,6 +98,14 @@ export function registerRoomRoutes({
     }
     if (!isApprovalPolicy(approvalPolicy)) {
       res.status(400).json({ error: "approvalPolicy is invalid" });
+      return;
+    }
+    if (!isApprovalDelegationPolicy(approvalDelegationPolicy)) {
+      res.status(400).json({ error: "approvalDelegationPolicy is invalid" });
+      return;
+    }
+    if (trustedApproverUserIds === null) {
+      res.status(400).json({ error: "trustedApproverUserIds must be up to 50 user ids" });
       return;
     }
     if (!codexModel) {
@@ -116,6 +133,8 @@ export function registerRoomRoutes({
       host: "No host",
       hostStatus: "offline",
       approvalPolicy,
+      approvalDelegationPolicy,
+      trustedApproverUserIds,
       mode: defaultRoomMode,
       codexModel,
       browserAllowedOrigins: normalizedBrowserAllowedOrigins,
@@ -191,6 +210,12 @@ export function registerRoomRoutes({
     const roomId = String(req.params.roomId ?? "");
     const name = req.body?.name === undefined ? undefined : normalizeMetadataText(req.body.name, maxRoomNameChars);
     const approvalPolicy = req.body?.approvalPolicy === undefined ? undefined : String(req.body.approvalPolicy);
+    const approvalDelegationPolicy =
+      req.body?.approvalDelegationPolicy === undefined ? undefined : String(req.body.approvalDelegationPolicy);
+    const trustedApproverUserIds =
+      req.body?.trustedApproverUserIds === undefined
+        ? undefined
+        : normalizeTrustedApproverUserIds(req.body.trustedApproverUserIds, maxUserIdChars);
     const mode = req.body?.mode;
     const codexModel = req.body?.codexModel === undefined ? undefined : normalizeCodexModel(req.body.codexModel);
     const projectPath = req.body?.projectPath === undefined ? undefined : normalizeRoomProjectPath(req.body.projectPath);
@@ -216,6 +241,14 @@ export function registerRoomRoutes({
     }
     if (approvalPolicy !== undefined && !isApprovalPolicy(approvalPolicy)) {
       res.status(400).json({ error: "approvalPolicy is invalid" });
+      return;
+    }
+    if (approvalDelegationPolicy !== undefined && !isApprovalDelegationPolicy(approvalDelegationPolicy)) {
+      res.status(400).json({ error: "approvalDelegationPolicy is invalid" });
+      return;
+    }
+    if (trustedApproverUserIds === null) {
+      res.status(400).json({ error: "trustedApproverUserIds must be up to 50 user ids" });
       return;
     }
     if (mode !== undefined && !isRoomMode(mode)) {
@@ -247,6 +280,8 @@ export function registerRoomRoutes({
       name: name ?? room.name,
       projectPath: projectPath ?? room.projectPath,
       approvalPolicy: approvalPolicy ?? room.approvalPolicy,
+      approvalDelegationPolicy: approvalDelegationPolicy ?? room.approvalDelegationPolicy,
+      trustedApproverUserIds: trustedApproverUserIds ?? room.trustedApproverUserIds,
       mode: mode ?? room.mode,
       codexModel: codexModel ?? room.codexModel,
       browserAllowedOrigins: normalizedBrowserAllowedOrigins ?? room.browserAllowedOrigins,
@@ -257,4 +292,16 @@ export function registerRoomRoutes({
     broadcastRoomUpdated(updated);
     res.json({ room: updated });
   });
+}
+
+function normalizeTrustedApproverUserIds(value: unknown, maxUserIdChars: number): string[] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 50) return null;
+  const ids = new Set<string>();
+  for (const item of value) {
+    const normalized = typeof item === "string" ? item.trim() : "";
+    if (!normalized || normalized.length > maxUserIdChars || /[\u0000-\u001f\u007f]/.test(normalized)) return null;
+    ids.add(normalized);
+  }
+  return [...ids];
 }

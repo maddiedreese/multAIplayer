@@ -35,7 +35,7 @@ interface UseRoomInspectorPanelPropsOptions {
   encryptedInvite: Omit<WorkProps["encryptedInvite"], "onInviteApprovalGateChange"> & {
     onInviteApprovalGateChange: (enabled: boolean) => void;
   };
-  approvalPolicy: Omit<WorkProps["approvalPolicy"], "selectedPolicy" | "disabled">;
+  approvalPolicy: Omit<WorkProps["approvalPolicy"], "selectedPolicy" | "selectedDelegationPolicy" | "disabled">;
   roomMode: Omit<WorkProps["roomMode"], "mode" | "disabled">;
   selectedCodexModel: string;
   model: Omit<WorkProps["model"], "selectedModel" | "selectedModelLabel" | "disabled" | "canApplyCustomModel">;
@@ -139,6 +139,7 @@ export function useRoomInspectorPanelProps({
         approvalPolicy={{
           ...approvalPolicy,
           selectedPolicy: selectedRoom.approvalPolicy,
+          selectedDelegationPolicy: selectedRoom.approvalDelegationPolicy,
           disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost
         }}
         roomMode={{

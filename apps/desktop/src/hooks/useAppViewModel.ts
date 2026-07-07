@@ -4,6 +4,7 @@ import {
 } from "@multaiplayer/protocol";
 import { defaultProjectPath } from "../lib/localBackend";
 import {
+  approvalDelegationPolicyLabels,
   approvalPolicyLabels,
   roomModeLabels
 } from "../seedData";
@@ -261,8 +262,10 @@ export function useAppViewModel({
       },
       approvalPolicy: {
         labels: approvalPolicyLabels,
+        delegationLabels: approvalDelegationPolicyLabels,
         message: settingsMessage,
-        onSelectPolicy: roomRuntime.setApprovalPolicy
+        onSelectPolicy: roomRuntime.setApprovalPolicy,
+        onSelectDelegationPolicy: roomRuntime.setApprovalDelegationPolicy
       },
       roomMode: {
         labels: roomModeLabels,

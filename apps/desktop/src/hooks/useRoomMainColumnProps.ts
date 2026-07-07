@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { canApproveCodexTurn } from "../lib/codexApproval";
+import { canApproveCodexTurn, canDelegateApproveCodexTurn } from "../lib/codexApproval";
 import { roomLockMessage } from "../lib/appRuntime";
 import { formatCodexModel } from "../lib/appFormatters";
 import type { LocalHostUser } from "../lib/roomHost";
@@ -177,7 +177,12 @@ export function useRoomMainColumnProps({
       approvalSummary,
       isActiveHost,
       codexRunning,
-      canApproveCodex: hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked),
+      canApproveCodex:
+        hasSelectedRoom &&
+        (
+          canApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked) ||
+          canDelegateApproveCodexTurn(selectedRoom, localUser, isSelectedRoomLocked)
+        ),
       canUseChat: roomCanUseChat,
       canSendMessage: roomCanUseChat && (Boolean(draft.trim()) || pendingAttachmentCount > 0),
       roomLocked: isSelectedRoomLocked,

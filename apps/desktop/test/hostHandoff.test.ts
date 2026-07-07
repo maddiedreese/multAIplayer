@@ -21,6 +21,8 @@ const baseHandoff: HostHandoffPlaintextPayload = {
   projectPath: " /tmp/multaiplayer ",
   codexModel: " gpt-5.4-thinking ",
   approvalPolicy: "auto_chat_only",
+  approvalDelegationPolicy: "host_only",
+  trustedApproverUserIds: [],
   messagesSinceLastCodex: 3,
   attachmentNames: ["README.md"],
   terminals: ["tests"],

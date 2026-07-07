@@ -1,8 +1,10 @@
 import {
   DevicePublicKeyJwk,
+  CodexApprovalPlaintextPayload as CodexApprovalPlaintextPayloadSchema,
   LocalPreviewPlaintextPayload as LocalPreviewPlaintextPayloadSchema,
   RoomKeyRotationPlaintextPayload as RoomKeyRotationPlaintextPayloadSchema,
   type ChatReactionPlaintextPayload,
+  type CodexApprovalPlaintextPayload,
   type CodexEventPlaintextPayload,
   type DevicePublicKeyJwk as DevicePublicKeyJwkType,
   type GitHubActionsEventPlaintextPayload,
@@ -109,6 +111,10 @@ export function isChatReactionPlaintextPayload(value: unknown): value is ChatRea
     typeof value.reactorUserId === "string" &&
     typeof value.createdAt === "string"
   );
+}
+
+export function isCodexApprovalPlaintextPayload(value: unknown): value is CodexApprovalPlaintextPayload {
+  return CodexApprovalPlaintextPayloadSchema.safeParse(value).success;
 }
 
 export function isAttachmentBlobContent(value: unknown): value is {

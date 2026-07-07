@@ -2275,6 +2275,15 @@ button:disabled {
   gap: 6px;
 }
 
+.panel-subtitle {
+  margin: 12px 0 6px;
+  color: #5f665f;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .policy-options button {
   min-height: 34px;
   padding: 7px 9px;
@@ -2288,9 +2297,21 @@ button:disabled {
 }
 
 .policy-options button.active {
-  border-color: #ead79a;
-  background: #fff8dc;
-  color: #6d4b00;
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
+.warning-card {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #b8b8b8;
+  border-radius: 8px;
+  background: #f3f3f3;
+  color: #171717;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .mode-options {
