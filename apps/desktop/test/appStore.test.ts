@@ -988,6 +988,80 @@ test("desktop store exposes room terminal actions", () => {
   assert.deepEqual(state.terminalLinesByRoom["room-a"], ["two", "three", "four"]);
 });
 
+test("desktop store clears local room-scoped state", () => {
+  const store = useAppStore.getState();
+
+  store.setMessagesByRoom({
+    "room-a": [{ id: "message-a", author: "Avery", role: "human", body: "hello", time: "9:41" }],
+    "room-b": [{ id: "message-b", author: "Jordan", role: "human", body: "keep", time: "9:42" }]
+  });
+  store.setTerminalRequestsByRoom({ "room-a": [], "room-b": [] });
+  store.setBrowserRequestsByRoom({ "room-a": [], "room-b": [] });
+  store.setInviteRequestsByRoom({ "room-a": [], "room-b": [] });
+  store.setCodexEventsByRoom({ "room-a": [], "room-b": [] });
+  store.setGitWorkflowEventsByRoom({ "room-a": [], "room-b": [] });
+  store.setGitHubActionsEventsByRoom({ "room-a": [], "room-b": [] });
+  store.setHostHandoffsByRoom({ "room-a": [], "room-b": [] });
+  store.setCodexThreadIdsByRoom({ "room-a": "thread-a", "room-b": "thread-b" });
+  store.setActionRunsByRoom({ "room-a": [], "room-b": [] });
+  store.setActionsLastCheckedByRoom({ "room-a": "now", "room-b": "later" });
+  store.setActionsMessagesByRoom({ "room-a": "Checking", "room-b": "Keep" });
+  store.setGitWorkflowBusyByRoom({ "room-a": true, "room-b": true });
+  store.setHostMessagesByRoom({ "room-a": "Host busy", "room-b": "Keep" });
+  store.setSecretWarningsVisibleByRoom({ "room-a": true, "room-b": true });
+  store.setProjectFilesByRoom({ "room-a": [{ path: "README.md", size: 1 }], "room-b": [] });
+  store.setSelectedTerminalIdsByRoom({ "room-a": "terminal-a", "room-b": "terminal-b" });
+  store.setTerminals([
+    {
+      id: "terminal-a",
+      roomId: "room-a",
+      name: "shell",
+      cwd: "/tmp/a",
+      command: "zsh -l",
+      status: "running",
+      output: []
+    },
+    {
+      id: "terminal-b",
+      roomId: "room-b",
+      name: "shell",
+      cwd: "/tmp/b",
+      command: "zsh -l",
+      status: "running",
+      output: []
+    }
+  ]);
+  store.setBrowserUrlsByRoom({ "room-a": "https://github.com", "room-b": "https://example.com" });
+  store.setDraftsByRoom({ "room-a": "clear me", "room-b": "keep me" });
+
+  store.clearRoomScopedStateForRoom("room-a");
+
+  const state = useAppStore.getState();
+  assert.deepEqual(state.messagesByRoom["room-a"], []);
+  assert.deepEqual(state.terminalRequestsByRoom["room-a"], []);
+  assert.deepEqual(state.browserRequestsByRoom["room-a"], []);
+  assert.deepEqual(state.inviteRequestsByRoom["room-a"], []);
+  assert.deepEqual(state.codexEventsByRoom["room-a"], []);
+  assert.deepEqual(state.gitWorkflowEventsByRoom["room-a"], []);
+  assert.deepEqual(state.githubActionsEventsByRoom["room-a"], []);
+  assert.deepEqual(state.hostHandoffsByRoom["room-a"], []);
+  assert.equal(state.codexThreadIdsByRoom["room-a"], undefined);
+  assert.equal(state.actionRunsByRoom["room-a"], undefined);
+  assert.equal(state.actionsLastCheckedByRoom["room-a"], undefined);
+  assert.equal(state.actionsMessagesByRoom["room-a"], undefined);
+  assert.equal(state.gitWorkflowBusyByRoom["room-a"], undefined);
+  assert.equal(state.hostMessagesByRoom["room-a"], undefined);
+  assert.equal(state.secretWarningsVisibleByRoom["room-a"], undefined);
+  assert.equal(state.projectFilesByRoom["room-a"], undefined);
+  assert.equal(state.selectedTerminalIdsByRoom["room-a"], undefined);
+  assert.equal(state.terminals.some((terminal) => terminal.roomId === "room-a"), false);
+  assert.equal(state.browserUrlsByRoom["room-a"], undefined);
+  assert.equal(state.draftsByRoom["room-a"], undefined);
+  assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "keep");
+  assert.equal(state.codexThreadIdsByRoom["room-b"], "thread-b");
+  assert.equal(state.terminals.some((terminal) => terminal.roomId === "room-b"), true);
+});
+
 test("desktop store keeps workspace maps scoped", () => {
   const store = useAppStore.getState();
 
