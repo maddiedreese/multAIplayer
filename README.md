@@ -11,9 +11,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidance, [SECURITY.md](S
 
 ## Download
 
-The first public prerelease is [v0.1.0-alpha.0](https://github.com/maddiedreese/multAIplayer/releases/tag/v0.1.0-alpha.0).
+The first experimental prerelease is [v0.1.0-alpha.0](https://github.com/maddiedreese/multAIplayer/releases/tag/v0.1.0-alpha.0).
 
-The macOS artifact is unsigned and not notarized yet. Gatekeeper may require manual approval to open it. Treat this as security-sensitive alpha software and prefer test/self-hosted rooms before using private projects.
+Public macOS alpha artifacts are expected to be Developer ID signed and notarized. Treat every build as security-sensitive alpha software and prefer test/self-hosted rooms before using private projects.
 
 ## Run the Alpha
 
@@ -54,6 +54,6 @@ npm run verify
 npm run tauri:build -w @multaiplayer/desktop
 ```
 
-`npm run verify` type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the relay/desktop web artifacts. The macOS job runs on the pinned `macos-15` runner, then builds an unsigned Tauri app and uploads both the `.app` bundle and `.dmg` as workflow artifacts.
+`npm run verify` type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the relay/desktop web artifacts. The macOS CI job runs on the pinned `macos-15` runner, then builds an unsigned Tauri app and uploads both the `.app` bundle and `.dmg` as workflow artifacts for inspection only.
 
-Tagged versions matching `v*` run the release workflow. It verifies the repo on the pinned `macos-15` runner, builds the macOS app, packages the `.app` bundle and `.dmg`, writes `SHA256SUMS.txt`, and creates a GitHub Release. If Apple signing/notarization secrets are configured, the workflow signs and notarizes before packaging; otherwise it publishes clearly labeled unsigned alpha artifacts. Tags containing `alpha`, `beta`, or `rc` are published as prereleases.
+Tagged versions matching `v*` run the release workflow. It verifies the repo on the pinned `macos-15` runner, requires Apple Developer ID signing/notarization secrets, builds the signed and notarized macOS app, validates the stapled app and DMG tickets, packages the `.app` bundle and `.dmg`, writes `SHA256SUMS.txt`, and creates a GitHub Release. Tags containing `alpha`, `beta`, or `rc` are published as prereleases.
