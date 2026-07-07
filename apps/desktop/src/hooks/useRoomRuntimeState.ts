@@ -9,6 +9,8 @@ export function useRoomRuntimeState() {
   const [revokedTeamIds, setRevokedTeamIds] = useState<Set<string>>(() => new Set());
   const presenceByRoom = useAppStore((state) => state.presenceByRoom);
   const setPresenceByRoom = useAppStore((state) => state.setPresenceByRoom);
+  const clearPresenceByRoom = useAppStore((state) => state.clearPresenceByRoom);
+  const setRoomPresenceForDevice = useAppStore((state) => state.setRoomPresenceForDevice);
   const hostHandoffsByRoom = useAppStore((state) => state.hostHandoffsByRoom);
   const setHostHandoffsByRoom = useAppStore((state) => state.setHostHandoffsByRoom);
   const codexContinuationByRoom = useAppStore((state) => state.codexContinuationByRoom);
@@ -29,6 +31,8 @@ export function useRoomRuntimeState() {
     setRevokedTeamIds,
     presenceByRoom,
     setPresenceByRoom,
+    clearPresenceByRoom,
+    setRoomPresenceForDevice,
     hostHandoffsByRoom,
     setHostHandoffsByRoom,
     codexContinuationByRoom,

@@ -878,6 +878,34 @@ test("desktop store keeps room runtime state room scoped", () => {
   assert.equal(state.githubActionsEventsByRoom["room-b"]?.[0]?.summary.tone, "green");
 });
 
+test("desktop store exposes room presence actions", () => {
+  const store = useAppStore.getState();
+
+  store.setRoomPresenceForDevice("room-a", "device-a", {
+    userId: "github:maddie",
+    deviceId: "device-a",
+    displayName: "Maddie",
+    publicKeyFingerprint: "1234:abcd",
+    status: "online"
+  });
+  store.setRoomPresenceForDevice("room-b", "device-b", {
+    userId: "github:jordan",
+    deviceId: "device-b",
+    displayName: "Jordan",
+    status: "online"
+  });
+  store.setRoomPresenceForDevice("room-a", "device-a", null);
+
+  let state = useAppStore.getState();
+  assert.deepEqual(state.presenceByRoom["room-a"], {});
+  assert.equal(state.presenceByRoom["room-b"]?.["device-b"]?.displayName, "Jordan");
+
+  store.clearPresenceByRoom();
+
+  state = useAppStore.getState();
+  assert.deepEqual(state.presenceByRoom, {});
+});
+
 test("desktop store exposes room event append actions", () => {
   const store = useAppStore.getState();
   const gitEvent = {
