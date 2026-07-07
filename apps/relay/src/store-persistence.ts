@@ -34,6 +34,12 @@ export function createRelayStorePersistenceCoordinator(options: {
   }
 
   function scheduleStoreSave() {
+    if (options.persistence.flushMode === "immediate") {
+      saveRelayStore().catch((error) => {
+        console.error("Failed to save relay store:", error);
+      });
+      return;
+    }
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveTimer = null;
