@@ -352,6 +352,12 @@ interface AppStoreState {
   updateTerminalRequestStatus: (roomId: string, requestId: string, status: TerminalCommandRequest["status"]) => void;
   appendBrowserRequest: (roomId: string, request: BrowserAccessRequest) => void;
   updateBrowserRequestStatus: (roomId: string, requestId: string, status: BrowserAccessRequest["status"]) => void;
+  appendGitWorkflowEvent: (roomId: string, event: GitWorkflowEventPlaintextPayload) => void;
+  appendGitHubActionsEvent: (roomId: string, event: GitHubActionsEventPlaintextPayload) => void;
+  appendLocalPreviewEvent: (roomId: string, event: LocalPreviewRecord) => void;
+  appendHostHandoff: (roomId: string, handoff: HostHandoffRecord) => void;
+  appendInviteRequest: (roomId: string, request: InviteJoinRequest) => void;
+  appendCodexEvent: (roomId: string, event: CodexRoomEvent) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
   resetCodexApprovalForRoom: (roomId: string) => void;
@@ -846,6 +852,106 @@ export const useAppStore = create<AppStoreState>((set) => ({
         )
       }
     }));
+  },
+  appendGitWorkflowEvent: (roomId, event) => {
+    set((state) => {
+      const roomEvents = state.gitWorkflowEventsByRoom[roomId] ?? [];
+      if (
+        roomEvents.some((existing) =>
+          existing.createdAt === event.createdAt &&
+          existing.status === event.status &&
+          existing.message === event.message
+        )
+      ) {
+        return state;
+      }
+      return {
+        gitWorkflowEventsByRoom: {
+          ...state.gitWorkflowEventsByRoom,
+          [roomId]: [...roomEvents, event].slice(-100)
+        }
+      };
+    });
+  },
+  appendGitHubActionsEvent: (roomId, event) => {
+    set((state) => {
+      const roomEvents = state.githubActionsEventsByRoom[roomId] ?? [];
+      if (
+        roomEvents.some((existing) =>
+          existing.checkedAt === event.checkedAt &&
+          existing.owner === event.owner &&
+          existing.repo === event.repo &&
+          existing.branch === event.branch
+        )
+      ) {
+        return state;
+      }
+      return {
+        githubActionsEventsByRoom: {
+          ...state.githubActionsEventsByRoom,
+          [roomId]: [...roomEvents, event].slice(-50)
+        }
+      };
+    });
+  },
+  appendLocalPreviewEvent: (roomId, event) => {
+    set((state) => {
+      const roomEvents = state.localPreviewsByRoom[roomId] ?? [];
+      const nextEvents = roomEvents.some((existing) => existing.id === event.id)
+        ? roomEvents.map((existing) => existing.id === event.id ? event : existing)
+        : [...roomEvents, event];
+      return {
+        localPreviewsByRoom: {
+          ...state.localPreviewsByRoom,
+          [roomId]: nextEvents.slice(-50)
+        }
+      };
+    });
+  },
+  appendHostHandoff: (roomId, handoff) => {
+    set((state) => {
+      const roomHandoffs = state.hostHandoffsByRoom[roomId] ?? [];
+      if (roomHandoffs.some((existing) => existing.id === handoff.id)) return state;
+      return {
+        hostHandoffsByRoom: {
+          ...state.hostHandoffsByRoom,
+          [roomId]: [...roomHandoffs, handoff]
+        }
+      };
+    });
+  },
+  appendInviteRequest: (roomId, request) => {
+    set((state) => {
+      const roomRequests = state.inviteRequestsByRoom[roomId] ?? [];
+      if (roomRequests.some((existing) => existing.id === request.id)) return state;
+      return {
+        inviteRequestsByRoom: {
+          ...state.inviteRequestsByRoom,
+          [roomId]: [...roomRequests, request]
+        }
+      };
+    });
+  },
+  appendCodexEvent: (roomId, event) => {
+    set((state) => {
+      const roomEvents = state.codexEventsByRoom[roomId] ?? [];
+      if (
+        roomEvents.some((existing) =>
+          existing.turnId === event.turnId &&
+          existing.createdAt === event.createdAt &&
+          existing.status === event.status &&
+          existing.message === event.message
+        )
+      ) {
+        return state;
+      }
+      return {
+        codexEventsByRoom: {
+          ...state.codexEventsByRoom,
+          [roomId]: [...roomEvents, event].slice(-80)
+        }
+      };
+    });
   },
   setApprovalVisibleForRoom: (roomId, visible) => {
     set((state) => ({
