@@ -84,6 +84,8 @@ export interface RelayStore {
   getAttachmentBlob(blobId: string): AttachmentBlobRecord | undefined;
   setAttachmentBlob(blob: AttachmentBlobRecord): void;
   deleteAttachmentBlob(blobId: string): boolean;
+  getDevice(userId: string, deviceId: string): DeviceRecord | undefined;
+  setDevice(device: DeviceRecord): void;
 }
 
 export class InMemoryRelayStore implements RelayStore {
@@ -177,8 +179,20 @@ export class InMemoryRelayStore implements RelayStore {
   deleteAttachmentBlob(blobId: string): boolean {
     return this.attachmentBlobs.delete(blobId);
   }
+
+  getDevice(userId: string, deviceId: string): DeviceRecord | undefined {
+    return this.devices.get(deviceKey(userId, deviceId));
+  }
+
+  setDevice(device: DeviceRecord): void {
+    this.devices.set(deviceKey(device.userId, device.deviceId), device);
+  }
 }
 
 export function createRelayStore(): RelayStore {
   return new InMemoryRelayStore();
+}
+
+function deviceKey(userId: string, deviceId: string): string {
+  return `${userId}:${deviceId}`;
 }

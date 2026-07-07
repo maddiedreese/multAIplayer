@@ -1,6 +1,5 @@
 import type { WebSocket } from "ws";
 import type {
-  DeviceRecord,
   RelayEnvelope,
   RelayServerMessage,
   RoomRecord,
@@ -17,10 +16,8 @@ interface CreateRelayFanoutOptions {
   sessions: Map<WebSocket, ClientSession>;
   encryptedBacklog: Map<RoomKey, RelayEnvelope[]>;
   roomPresence: Map<RoomKey, Map<string, PresenceRecord>>;
-  devices: Map<string, DeviceRecord>;
   metrics: RelayMetrics;
   roomKey: (teamId: string, roomId: string) => RoomKey;
-  deviceKey: (userId: string, deviceId: string) => string;
   pruneEncryptedBacklog: (envelopes: RelayEnvelope[]) => RelayEnvelope[];
   addTeamMember: (teamId: string, userId: string) => void;
   scheduleStoreSave: () => void;
@@ -39,10 +36,8 @@ export function createRelayFanout({
   sessions,
   encryptedBacklog,
   roomPresence,
-  devices,
   metrics,
   roomKey,
-  deviceKey,
   pruneEncryptedBacklog,
   addTeamMember,
   scheduleStoreSave,
@@ -91,7 +86,7 @@ export function createRelayFanout({
     session.displayName = presence.displayName;
     session.avatarUrl = presence.avatarUrl;
     addTeamMember(teamId, presence.userId);
-    const registeredDevice = devices.get(deviceKey(presence.userId, presence.deviceId));
+    const registeredDevice = store.getDevice(presence.userId, presence.deviceId);
     const verifiedPresence: PresenceRecord = {
       ...presence,
       publicKeyFingerprint: registeredDevice?.publicKeyFingerprint ?? presence.publicKeyFingerprint
