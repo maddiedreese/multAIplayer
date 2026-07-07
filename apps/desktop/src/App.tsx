@@ -266,9 +266,7 @@ export function App() {
     appendBrowserRequest,
     updateBrowserRequestStatus
   } = roomActions;
-  const roomChatMutations = useRoomChatMutations({
-    setMessagesByRoom: workspaceState.setMessagesByRoom
-  });
+  const roomChatMutations = useRoomChatMutations();
   const workspaceRecords = useAppWorkspaceRecords({
     appState,
     appRefs,

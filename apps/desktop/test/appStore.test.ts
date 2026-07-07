@@ -1153,3 +1153,41 @@ test("desktop store keeps workspace maps scoped", () => {
   assert.equal(state.messagesByRoom["room-a"]?.[0]?.body, "Ship the store slice.");
   assert.deepEqual(state.messagesByRoom["room-b"], []);
 });
+
+test("desktop store exposes room chat message actions", () => {
+  const store = useAppStore.getState();
+  const message = {
+    id: "message-a",
+    author: "Avery",
+    role: "human" as const,
+    body: "Ship the store slice.",
+    time: "10:17"
+  };
+
+  store.appendRoomMessage("room-a", message);
+  store.appendRoomMessage("room-a", message);
+  store.applyMessageReaction("room-a", {
+    eventType: "chat.reaction",
+    messageId: message.id,
+    emoji: "+1",
+    reactor: "Maddie",
+    reactorUserId: "github:maddie",
+    action: "add"
+  });
+
+  let state = useAppStore.getState();
+  assert.equal(state.messagesByRoom["room-a"]?.length, 1);
+  assert.equal(state.messagesByRoom["room-a"]?.[0]?.reactions?.[0]?.reactors[0]?.name, "Maddie");
+
+  store.applyMessageReaction("room-a", {
+    eventType: "chat.reaction",
+    messageId: message.id,
+    emoji: "+1",
+    reactor: "Maddie",
+    reactorUserId: "github:maddie",
+    action: "remove"
+  });
+
+  state = useAppStore.getState();
+  assert.deepEqual(state.messagesByRoom["room-a"]?.[0]?.reactions, []);
+});
