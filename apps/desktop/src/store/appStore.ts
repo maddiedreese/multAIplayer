@@ -347,6 +347,9 @@ interface AppStoreState {
   setBrowserUrlForRoom: (roomId: string, url: string, defaultBrowserUrl: string) => void;
   setBrowserReasonForRoom: (roomId: string, reason: string, defaultBrowserReason: string) => void;
   setBrowserMessageForRoom: (roomId: string, message: string | null) => void;
+  setInviteLinkForRoom: (roomId: string, link: string) => void;
+  setInviteApprovalGateForRoom: (roomId: string, enabled: boolean) => void;
+  setInviteMessageForRoom: (roomId: string, message: string | null) => void;
   setPendingAttachmentsForRoom: (
     roomId: string,
     updater: ChatAttachment[] | ((current: ChatAttachment[]) => ChatAttachment[])
@@ -803,6 +806,27 @@ export const useAppStore = create<AppStoreState>((set) => ({
       browserMessagesByRoom: message
         ? { ...state.browserMessagesByRoom, [roomId]: message }
         : omitRecordKey(state.browserMessagesByRoom, roomId)
+    }));
+  },
+  setInviteLinkForRoom: (roomId, link) => {
+    set((state) => ({
+      inviteLinksByRoom: link
+        ? { ...state.inviteLinksByRoom, [roomId]: link }
+        : omitRecordKey(state.inviteLinksByRoom, roomId)
+    }));
+  },
+  setInviteApprovalGateForRoom: (roomId, enabled) => {
+    set((state) => ({
+      inviteApprovalGatesByRoom: enabled
+        ? { ...state.inviteApprovalGatesByRoom, [roomId]: true }
+        : omitRecordKey(state.inviteApprovalGatesByRoom, roomId)
+    }));
+  },
+  setInviteMessageForRoom: (roomId, message) => {
+    set((state) => ({
+      inviteMessagesByRoom: message
+        ? { ...state.inviteMessagesByRoom, [roomId]: message }
+        : omitRecordKey(state.inviteMessagesByRoom, roomId)
     }));
   },
   setPendingAttachmentsForRoom: (roomId, updater) => {

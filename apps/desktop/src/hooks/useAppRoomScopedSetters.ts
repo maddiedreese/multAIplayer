@@ -89,12 +89,6 @@ export function useAppRoomScopedSetters({
       defaultBrowserUrl,
       defaultBrowserReason
     },
-    invites: {
-      selectedRoomId: selectedRoom.id,
-      setInviteLinksByRoom: invitePanelState.setInviteLinksByRoom,
-      setInviteApprovalGatesByRoom: invitePanelState.setInviteApprovalGatesByRoom,
-      setInviteMessagesByRoom: invitePanelState.setInviteMessagesByRoom
-    },
     project: {
       roomsRef: appRefs.roomsRef,
       defaultCodexModel,
