@@ -704,7 +704,7 @@ test("desktop store keeps markdown message selection room scoped", () => {
 test("desktop store keeps history search messages room scoped", () => {
   const store = useAppStore.getState();
 
-  store.setHistorySearchMessagesByRoom({
+  store.replaceHistorySearchMessagesByRoom({
     "room-a": [
       {
         id: "history-message-1",
@@ -716,8 +716,8 @@ test("desktop store keeps history search messages room scoped", () => {
     ],
     "room-b": []
   });
-  store.setHistorySearchMessagesByRoom((current) => ({
-    ...current,
+  store.replaceHistorySearchMessagesByRoom({
+    ...useAppStore.getState().historySearchMessagesByRoom,
     "room-b": [
       {
         id: "history-message-2",
@@ -727,7 +727,7 @@ test("desktop store keeps history search messages room scoped", () => {
         time: "Jul 6"
       }
     ]
-  }));
+  });
 
   const state = useAppStore.getState();
   assert.equal(state.historySearchMessagesByRoom["room-a"]?.[0]?.body, "Find the old setup note");

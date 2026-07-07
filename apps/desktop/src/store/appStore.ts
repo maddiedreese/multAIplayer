@@ -235,7 +235,7 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, TerminalSli
   setCodexThreadIdsByRoom: (action: SetStateAction<CodexThreadIdsByRoom>) => void;
   toggleSelectedMessageForRoom: (roomId: string, messageId: string) => void;
   clearSelectedMessagesForRoom: (roomId: string) => void;
-  setHistorySearchMessagesByRoom: (action: SetStateAction<HistorySearchMessagesByRoom>) => void;
+  replaceHistorySearchMessagesByRoom: (messagesByRoom: HistorySearchMessagesByRoom) => void;
   setHistoryMessagesByRoom: (action: SetStateAction<HistoryMessagesByRoom>) => void;
   setTeamHistoryMessagesByTeam: (action: SetStateAction<TeamHistoryMessagesByTeam>) => void;
   setInspectorTabsByRoom: (action: SetStateAction<InspectorTabsByRoom>) => void;
@@ -507,10 +507,8 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       selectedMessageIdsByRoom: omitRecordKey(state.selectedMessageIdsByRoom, roomId)
     }));
   },
-  setHistorySearchMessagesByRoom: (action) => {
-    set((state) => ({
-      historySearchMessagesByRoom: resolveSetStateAction(state.historySearchMessagesByRoom, action)
-    }));
+  replaceHistorySearchMessagesByRoom: (messagesByRoom) => {
+    set({ historySearchMessagesByRoom: messagesByRoom });
   },
   setHistoryMessagesByRoom: (action) => {
     set((state) => ({
