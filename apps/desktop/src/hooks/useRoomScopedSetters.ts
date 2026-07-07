@@ -1,6 +1,5 @@
 import type { MutableRefObject } from "react";
 import { useRoomEventAppenders } from "./useRoomEventAppenders";
-import { useRoomFileSetters } from "./useRoomFileSetters";
 import { useRoomTerminalSetters } from "./useRoomTerminalSetters";
 import { useAppStore } from "../store/appStore";
 import type { RoomRecord } from "@multaiplayer/protocol";
@@ -27,7 +26,6 @@ export function useRoomScopedSetters({
   selectedRoomId,
   selectedTeamId,
   busy,
-  files,
   terminals,
   browser,
   project,
@@ -36,7 +34,6 @@ export function useRoomScopedSetters({
   selectedRoomId: string;
   selectedTeamId: string;
   busy: RoomBusySettersOptions;
-  files: Parameters<typeof useRoomFileSetters>[0];
   terminals: Parameters<typeof useRoomTerminalSetters>[0];
   browser: {
     defaultBrowserUrl: string;
@@ -86,6 +83,13 @@ export function useRoomScopedSetters({
   const setPendingCodexApprovalForRoom = useAppStore((state) => state.setPendingCodexApprovalForRoom);
   const resetCodexApprovalForRoom = useAppStore((state) => state.resetCodexApprovalForRoom);
   const setCodexRunningForRoom = useAppStore((state) => state.setCodexRunningForRoom);
+  const setFileQueryForRoom = useAppStore((state) => state.setFileQueryForRoom);
+  const setProjectFilesForRoom = useAppStore((state) => state.setProjectFilesForRoom);
+  const setSelectedFileForRoom = useAppStore((state) => state.setSelectedFileForRoom);
+  const setSelectedDiffForRoom = useAppStore((state) => state.setSelectedDiffForRoom);
+  const setFilePreviewTabForRoom = useAppStore((state) => state.setFilePreviewTabForRoom);
+  const setFileMessageForRoom = useAppStore((state) => state.setFileMessageForRoom);
+  const resetFileContextForRoom = useAppStore((state) => state.resetFileContextForRoom);
 
   const applyBusyForRoom = (
     ref: MutableRefObject<BusyMap>,
@@ -154,7 +158,14 @@ export function useRoomScopedSetters({
       applyBusyForRoom(busy.fileBusyRef, setFileBusyForRoom, roomId, isBusy),
     setTerminalBusyForRoom: (roomId: string, isBusy: boolean) =>
       applyBusyForRoom(busy.terminalBusyRef, setTerminalBusyForRoom, roomId, isBusy),
-    ...useRoomFileSetters(files),
+    setFileQueryForRoom,
+    setProjectFilesForRoom,
+    setSelectedFileForRoom,
+    setSelectedDiffForRoom,
+    setFilePreviewTabForRoom,
+    setFileMessageForRoom,
+    setSelectedFileMessage: (message: string | null) => setFileMessageForRoom(selectedRoomId, message),
+    resetFileContextForRoom,
     ...useRoomTerminalSetters(terminals),
     setApprovalVisibleForRoom,
     setPendingCodexApprovalForRoom,
