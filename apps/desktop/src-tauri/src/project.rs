@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
 use crate::output::{bound_git_diff, untracked_file_diff};
@@ -37,6 +37,21 @@ pub(crate) struct ProjectFileReadRequest {
     pub(crate) cwd: String,
     pub(crate) path: String,
     pub(crate) max_bytes: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProjectFileWriteRequest {
+    pub(crate) cwd: String,
+    pub(crate) path: String,
+    pub(crate) content: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProjectFileWriteResult {
+    pub(crate) path: String,
+    pub(crate) size: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -94,6 +109,62 @@ pub(crate) fn project_file_read(
         truncated,
         content,
     })
+}
+
+#[tauri::command]
+pub(crate) fn project_file_write(
+    request: ProjectFileWriteRequest,
+) -> Result<ProjectFileWriteResult, String> {
+    ensure_existing_dir(&request.cwd)?;
+    let root = canonical_project_root(&request.cwd)?;
+    let requested = safe_project_write_path(&root, &request.path)?;
+    if request.content.len() > 1_000_000 {
+        return Err("File content is too large to save from the editor".to_string());
+    }
+    fs::write(&requested, request.content.as_bytes())
+        .map_err(|error| format!("Failed to write file: {error}"))?;
+    let metadata = fs::metadata(&requested)
+        .map_err(|error| format!("Failed to read saved file metadata: {error}"))?;
+    Ok(ProjectFileWriteResult {
+        path: request.path,
+        size: metadata.len(),
+    })
+}
+
+fn safe_project_write_path(root: &Path, relative_path: &str) -> Result<PathBuf, String> {
+    if relative_path.trim() != relative_path || relative_path.trim().is_empty() {
+        return Err("File path must stay inside the project".to_string());
+    }
+    let relative = Path::new(relative_path);
+    if relative.is_absolute() {
+        return Err("File path must stay inside the project".to_string());
+    }
+    let mut normalized = PathBuf::new();
+    for component in relative.components() {
+        match component {
+            Component::Normal(part) => normalized.push(part),
+            _ => return Err("File path must stay inside the project".to_string()),
+        }
+    }
+    let requested = root.join(&normalized);
+    if requested.exists() {
+        return safe_project_path(root, relative_path);
+    }
+    let parent = requested
+        .parent()
+        .ok_or_else(|| "File path must stay inside the project".to_string())?;
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("Failed to create file directory: {error}"))?;
+    let parent = fs::canonicalize(parent)
+        .map_err(|error| format!("Failed to resolve file directory: {error}"))?;
+    if !parent.starts_with(root) {
+        return Err("File path must stay inside the project".to_string());
+    }
+    Ok(parent.join(
+        normalized
+            .file_name()
+            .ok_or_else(|| "File path must stay inside the project".to_string())?,
+    ))
 }
 
 #[tauri::command]

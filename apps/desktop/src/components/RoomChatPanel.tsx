@@ -1,4 +1,4 @@
-import { Bot, Copy, ExternalLink, FileCode2, Send, Square, X } from "lucide-react";
+import { Bot, Copy, ExternalLink, FileCode2, Paperclip, Send, Square, X } from "lucide-react";
 import { CodexApprovalCard, type CodexApprovalSummaryDisplay } from "./CodexApprovalCard";
 
 export interface RoomChatAttachmentDisplay {
@@ -73,6 +73,7 @@ export function RoomChatPanel({
   onOpenLocalPreview,
   onCopyLocalPreviewLink,
   onStopLocalPreview,
+  onOpenFileSelector,
   onDraftChange,
   onSendMessage
 }: {
@@ -104,6 +105,7 @@ export function RoomChatPanel({
   onOpenLocalPreview: (previewId: string) => void;
   onCopyLocalPreviewLink: (previewId: string) => void;
   onStopLocalPreview: (previewId: string) => void;
+  onOpenFileSelector: () => void;
   onDraftChange: (draft: string) => void;
   onSendMessage: () => void;
 }) {
@@ -249,6 +251,14 @@ export function RoomChatPanel({
       <footer className="composer">
         <button title="Invoke Codex" aria-label="Invoke Codex" onClick={onInvokeCodex} disabled={!canUseChat}>
           <Bot size={18} />
+        </button>
+        <button
+          title="Attach project file"
+          aria-label="Attach project file"
+          onClick={onOpenFileSelector}
+          disabled={!canUseChat || roomLocked}
+        >
+          <Paperclip size={18} />
         </button>
         <div className="composer-body">
           {pendingAttachments.length > 0 && (

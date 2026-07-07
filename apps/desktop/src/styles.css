@@ -3306,7 +3306,7 @@ button:not(:disabled):active {
   position: sticky;
   bottom: 0;
   flex: 0 0 auto;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: end;
   gap: 10px;
   margin: 0;
@@ -4240,7 +4240,7 @@ select {
 
 .composer {
   display: grid;
-  grid-template-columns: var(--control-height) minmax(0, 1fr) var(--control-height);
+  grid-template-columns: var(--control-height) var(--control-height) minmax(0, 1fr) var(--control-height);
   gap: 10px;
   padding: 12px var(--page-gutter) 18px;
 }
@@ -5579,6 +5579,37 @@ select {
   border-bottom: 1px solid var(--border);
 }
 
+.file-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.file-editor-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.file-editor-actions .primary {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--surface);
+}
+
+.file-editor-actions .primary:disabled {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
 .file-viewer-body {
   flex: 1;
   min-height: 0;
@@ -5602,6 +5633,28 @@ select {
   background: #101010;
   font-size: 12px;
   line-height: 1.55;
+}
+
+.file-editor {
+  width: 100%;
+  min-height: 100%;
+  resize: none;
+  padding: 14px;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: #101010;
+  color: #f4f4f4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.file-editor:disabled {
+  color: #b8b8b8;
+  background: #151515;
 }
 
 .inspector-panel-group:has(.file-viewer-open) {

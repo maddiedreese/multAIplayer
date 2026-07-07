@@ -45,6 +45,7 @@ export function useRoomActions({
   const setHostMessageForRoom = useAppStore((state) => state.setHostMessageForRoom);
   const setChatMessageForRoom = useAppStore((state) => state.setChatMessageForRoom);
   const setMarkdownCopyFallbackForRoom = useAppStore((state) => state.setMarkdownCopyFallbackForRoom);
+  const setInspectorTabForRoom = useAppStore((state) => state.setInspectorTabForRoom);
   const setSecretWarningVisibleForRoom = useAppStore((state) => state.setSecretWarningVisibleForRoom);
   const setHistoryMessageForRoom = useAppStore((state) => state.setHistoryMessageForRoom);
   const setTeamHistoryMessageForTeam = useAppStore((state) => state.setTeamHistoryMessageForTeam);
@@ -120,6 +121,7 @@ export function useRoomActions({
     setChatMessageForRoom,
     setSelectedChatMessage: (message: string | null) => setChatMessageForRoom(selectedRoomId, message),
     setMarkdownCopyFallbackForRoom,
+    setInspectorTabForRoom,
     setSecretWarningVisibleForRoom,
     setHistoryMessageForRoom,
     setSelectedHistoryMessage: (message: string | null) => setHistoryMessageForRoom(selectedRoomId, message),

@@ -57,6 +57,11 @@ export interface ProjectFileContent {
   content: string;
 }
 
+export interface ProjectFileWriteResult {
+  path: string;
+  size: number;
+}
+
 export interface CommandResult {
   command: string;
   cwd: string;
@@ -298,6 +303,23 @@ export async function readProjectFile(
       "",
       "export const multAIplayer = 'private group chat for coding with Codex';"
     ].join("\n")
+  };
+}
+
+export async function writeProjectFile(
+  cwd: string,
+  path: string,
+  content: string
+): Promise<ProjectFileWriteResult> {
+  if (isTauriRuntime()) {
+    return invoke<ProjectFileWriteResult>("project_file_write", {
+      request: { cwd, path, content }
+    });
+  }
+
+  return {
+    path,
+    size: new TextEncoder().encode(content).length
   };
 }
 

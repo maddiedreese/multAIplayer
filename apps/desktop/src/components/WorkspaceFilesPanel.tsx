@@ -1,4 +1,5 @@
-import { Copy, FileCode2, Plus, Search, ShieldAlert, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Copy, FileCode2, Plus, RotateCcw, Save, Search, ShieldAlert, X } from "lucide-react";
 import type {
   GitDiffResult,
   GitStatusSummary,
@@ -31,6 +32,7 @@ export function WorkspaceFilesPanel({
   onOpenProjectFile,
   onCopyDiffSummaryMarkdown,
   onAttachSelectedFileToMessage,
+  onSaveSelectedFileContent,
   onFilePreviewTabChange,
   onCloseFileViewer
 }: {
@@ -55,9 +57,16 @@ export function WorkspaceFilesPanel({
   onOpenProjectFile: (path: string, tab: FilePreviewTab) => void;
   onCopyDiffSummaryMarkdown: () => void;
   onAttachSelectedFileToMessage: () => void;
+  onSaveSelectedFileContent: (content: string) => void;
   onFilePreviewTabChange: (tab: FilePreviewTab) => void;
   onCloseFileViewer: () => void;
 }) {
+  const [editorContent, setEditorContent] = useState(selectedFile?.content ?? "");
+  const selectedFileKey = selectedFile ? `${selectedFile.path}:${selectedFile.size}:${selectedFile.content}` : "";
+  useEffect(() => {
+    setEditorContent(selectedFile?.content ?? "");
+  }, [selectedFileKey, selectedFile]);
+  const editorDirty = Boolean(selectedFile && editorContent !== selectedFile.content);
   const viewerPath = selectedFile?.path ?? selectedDiff?.path ?? null;
   if (viewerPath) {
     const selectedFileName = viewerPath.split("/").at(-1) ?? viewerPath;
@@ -140,13 +149,31 @@ export function WorkspaceFilesPanel({
             hasDiff={Boolean(selectedDiff?.diff.trim())}
             onSelectTab={onFilePreviewTabChange}
           />
-          <small className={selectedFile?.truncated ? "panel-state attention" : "panel-state"}>
-            {selectedFile
-              ? selectedFile.truncated
-                ? "Truncated"
-                : formatBytes(selectedFile.size)
-              : "Diff only"}
-          </small>
+          <div className="file-editor-actions">
+            <small className={selectedFile?.truncated ? "panel-state attention" : "panel-state"}>
+              {selectedFile
+                ? selectedFile.truncated
+                  ? "Truncated"
+                  : `${formatBytes(selectedFile.size)}${editorDirty ? " · unsaved" : ""}`
+                : "Diff only"}
+            </small>
+            <button
+              className="ghost"
+              onClick={() => setEditorContent(selectedFile?.content ?? "")}
+              disabled={!selectedFile || !editorDirty || fileBusy}
+            >
+              <RotateCcw size={14} />
+              Revert
+            </button>
+            <button
+              className="primary"
+              onClick={() => onSaveSelectedFileContent(editorContent)}
+              disabled={!selectedFile || !editorDirty || fileBusy || selectedFile.truncated || !canReadLocalWorkspace}
+            >
+              <Save size={14} />
+              Save
+            </button>
+          </div>
         </div>
         <div className="file-viewer-body">
           {filePreviewTab === "diff" && selectedDiff?.diff.trim() ? (
@@ -160,11 +187,14 @@ export function WorkspaceFilesPanel({
             </div>
           ) : (
             selectedFile ? (
-              <pre>
-                <code>
-{selectedFile.content}
-                </code>
-              </pre>
+              <textarea
+                className="file-editor"
+                value={editorContent}
+                onChange={(event) => setEditorContent(event.target.value)}
+                spellCheck={false}
+                disabled={!canReadLocalWorkspace || selectedFile.truncated || fileBusy}
+                aria-label={`Edit ${selectedFile.path}`}
+              />
             ) : (
               <div className="empty-state compact">No current file content is available for this diff.</div>
             )

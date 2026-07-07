@@ -41,6 +41,7 @@ pub fn run() {
             git_diff_file,
             project_files,
             project_file_read,
+            project_file_write,
             run_shell_command,
             terminal_start,
             terminal_list,
@@ -165,6 +166,33 @@ mod tests {
 
         let _ = fs::remove_dir_all(root);
         let _ = fs::remove_dir_all(outside);
+    }
+
+    #[test]
+    fn project_file_write_saves_inside_project_and_rejects_escape() {
+        let root = test_temp_dir("project-file-write");
+        let cwd = root.to_str().expect("utf8 temp path").to_string();
+
+        let written = project_file_write(project::ProjectFileWriteRequest {
+            cwd: cwd.clone(),
+            path: "src/new-file.ts".to_string(),
+            content: "export const saved = true;\n".to_string(),
+        })
+        .expect("write project file");
+
+        assert_eq!(written.path, "src/new-file.ts");
+        assert_eq!(
+            fs::read_to_string(root.join("src/new-file.ts")).expect("read saved file"),
+            "export const saved = true;\n"
+        );
+        assert!(project_file_write(project::ProjectFileWriteRequest {
+            cwd,
+            path: "../secret.txt".to_string(),
+            content: "nope".to_string(),
+        })
+        .is_err());
+
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

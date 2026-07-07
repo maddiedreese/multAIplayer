@@ -15,6 +15,7 @@ export function useRoomChatPanelActions({
   copyMarkdownWithFallback,
   setChatMessageForRoom,
   stopLocalPreview,
+  setInspectorTabForRoom,
   setDraftForRoom
 }: {
   selectedRoomId: string;
@@ -36,6 +37,7 @@ export function useRoomChatPanelActions({
   ) => Promise<void>;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   stopLocalPreview: (previewId: string) => Promise<void>;
+  setInspectorTabForRoom: (roomId: string, tab: "files") => void;
   setDraftForRoom: (roomId: string, draft: string) => void;
 }) {
   function onCopyMessageMarkdown(messageId: string) {
@@ -92,6 +94,7 @@ export function useRoomChatPanelActions({
     onOpenLocalPreview,
     onCopyLocalPreviewLink,
     onStopLocalPreview: (previewId: string) => void stopLocalPreview(previewId),
+    onOpenFileSelector: () => setInspectorTabForRoom(selectedRoomId, "files"),
     onDraftChange: (nextDraft: string) => setDraftForRoom(selectedRoomId, nextDraft)
   };
 }
