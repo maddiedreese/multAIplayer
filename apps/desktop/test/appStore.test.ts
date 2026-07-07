@@ -642,6 +642,16 @@ test("desktop store exposes room Codex approval actions", () => {
   assert.equal(state.approvalVisibleByRoom["room-b"], true);
 });
 
+test("desktop store exposes room Codex thread actions", () => {
+  const store = useAppStore.getState();
+
+  store.setCodexThreadIdForRoom("room-a", "thread-room-a");
+  assert.equal(useAppStore.getState().codexThreadIdsByRoom["room-a"], "thread-room-a");
+
+  store.setCodexThreadIdForRoom("room-a", null);
+  assert.equal(useAppStore.getState().codexThreadIdsByRoom["room-a"], undefined);
+});
+
 test("desktop store keeps markdown message selection room scoped", () => {
   const store = useAppStore.getState();
 

@@ -151,8 +151,6 @@ export function useAppRoomRuntime({
         setApprovalVisibleForRoom,
         setCodexRunningForRoom,
         appendTerminalLinesForRoom,
-        setCodexThreadIdsByRoom: codexRoomState.setCodexThreadIdsByRoom,
-        setCodexContinuationByRoom: roomRuntimeState.setCodexContinuationByRoom,
         setRooms: workspaceState.setRooms,
         publishCodexEvent: relaySync.publishCodexEvent,
         publishChatMessage: roomInteraction.publishChatMessage,
