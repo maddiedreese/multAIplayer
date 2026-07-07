@@ -1,21 +1,22 @@
 import { useState } from "react";
-import type {
-  GitHubActionsEventPlaintextPayload,
-  GitWorkflowEventPlaintextPayload
-} from "@multaiplayer/protocol";
-import type { InspectorTab } from "../components/RoomInspectorPanel";
-import type { HostHandoffRecord, RoomPresence } from "../types";
+import { useAppStore } from "../store/appStore";
 
 export function useRoomRuntimeState() {
-  const [inspectorTabsByRoom, setInspectorTabsByRoom] = useState<Record<string, InspectorTab>>({});
+  const inspectorTabsByRoom = useAppStore((state) => state.inspectorTabsByRoom);
+  const setInspectorTabsByRoom = useAppStore((state) => state.setInspectorTabsByRoom);
   const [forgottenRoomIds, setForgottenRoomIds] = useState<Set<string>>(() => new Set());
   const [revokedRoomIds, setRevokedRoomIds] = useState<Set<string>>(() => new Set());
   const [revokedTeamIds, setRevokedTeamIds] = useState<Set<string>>(() => new Set());
-  const [presenceByRoom, setPresenceByRoom] = useState<Record<string, Record<string, RoomPresence>>>({});
-  const [hostHandoffsByRoom, setHostHandoffsByRoom] = useState<Record<string, HostHandoffRecord[]>>({});
-  const [codexContinuationByRoom, setCodexContinuationByRoom] = useState<Record<string, HostHandoffRecord>>({});
-  const [gitWorkflowEventsByRoom, setGitWorkflowEventsByRoom] = useState<Record<string, GitWorkflowEventPlaintextPayload[]>>({});
-  const [githubActionsEventsByRoom, setGitHubActionsEventsByRoom] = useState<Record<string, GitHubActionsEventPlaintextPayload[]>>({});
+  const presenceByRoom = useAppStore((state) => state.presenceByRoom);
+  const setPresenceByRoom = useAppStore((state) => state.setPresenceByRoom);
+  const hostHandoffsByRoom = useAppStore((state) => state.hostHandoffsByRoom);
+  const setHostHandoffsByRoom = useAppStore((state) => state.setHostHandoffsByRoom);
+  const codexContinuationByRoom = useAppStore((state) => state.codexContinuationByRoom);
+  const setCodexContinuationByRoom = useAppStore((state) => state.setCodexContinuationByRoom);
+  const gitWorkflowEventsByRoom = useAppStore((state) => state.gitWorkflowEventsByRoom);
+  const setGitWorkflowEventsByRoom = useAppStore((state) => state.setGitWorkflowEventsByRoom);
+  const githubActionsEventsByRoom = useAppStore((state) => state.githubActionsEventsByRoom);
+  const setGitHubActionsEventsByRoom = useAppStore((state) => state.setGitHubActionsEventsByRoom);
 
   return {
     inspectorTabsByRoom,
