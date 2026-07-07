@@ -66,6 +66,7 @@ export function useAppSelectedRoomContext({
       messagesByRoom: workspaceState.messagesByRoom,
       draftsByRoom: roomChatState.draftsByRoom,
       pendingAttachmentsByRoom: roomChatState.pendingAttachmentsByRoom,
+      roomGoalsByRoom: codexRoomState.roomGoalsByRoom,
       browserRequestsByRoom: browserPanelState.browserRequestsByRoom,
       browserUrlsByRoom: browserPanelState.browserUrlsByRoom,
       browserReasonsByRoom: browserPanelState.browserReasonsByRoom,

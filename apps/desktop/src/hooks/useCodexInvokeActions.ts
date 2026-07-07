@@ -10,11 +10,20 @@ import {
   validatePendingAttachments
 } from "../lib/appFormatters";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
+import {
+  createRoomGoal,
+  editRoomGoal,
+  parseRoomGoalCommand,
+  pauseRoomGoal,
+  resumeRoomGoal,
+  updateRoomGoalElapsed
+} from "../lib/roomGoals";
 import type {
   BrowserAccessRequest,
   ChatAttachment,
   ChatMessage,
-  PendingCodexApproval
+  PendingCodexApproval,
+  RoomGoal
 } from "../types";
 import type {
   GitStatusSummary,
@@ -37,6 +46,7 @@ interface UseCodexInvokeActionsOptions {
   hostGateMessage: string;
   localUser: LocalUser;
   draft: string;
+  roomGoal: RoomGoal | null;
   pendingAttachments: ChatAttachment[];
   messages: ChatMessage[];
   roomTerminals: TerminalSnapshot[];
@@ -52,6 +62,7 @@ interface UseCodexInvokeActionsOptions {
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   setDraftForRoom: (roomId: string, draft: string) => void;
+  setRoomGoalForRoom: (roomId: string, goal: RoomGoal | null) => void;
   setPendingAttachmentsForRoom: (roomId: string, attachments: ChatAttachment[]) => void;
 }
 
@@ -66,6 +77,7 @@ export function useCodexInvokeActions({
   hostGateMessage,
   localUser,
   draft,
+  roomGoal,
   pendingAttachments,
   messages,
   roomTerminals,
@@ -81,8 +93,43 @@ export function useCodexInvokeActions({
   setPendingCodexApprovalForRoom,
   setApprovalVisibleForRoom,
   setDraftForRoom,
+  setRoomGoalForRoom,
   setPendingAttachmentsForRoom
 }: UseCodexInvokeActionsOptions) {
+  function startRoomGoal(text: string) {
+    const roomId = selectedRoom.id;
+    setRoomGoalForRoom(roomId, createRoomGoal(text));
+    setDraftForRoom(roomId, "");
+    setPendingAttachmentsForRoom(roomId, []);
+    setChatMessageForRoom(roomId, "Goal started.");
+  }
+
+  function pauseGoal() {
+    if (!roomGoal) return;
+    setRoomGoalForRoom(selectedRoom.id, pauseRoomGoal(roomGoal));
+  }
+
+  function resumeGoal() {
+    if (!roomGoal) return;
+    setRoomGoalForRoom(selectedRoom.id, resumeRoomGoal(roomGoal));
+  }
+
+  function editGoal(text: string) {
+    if (!roomGoal) return;
+    const nextText = text.trim();
+    if (!nextText) return;
+    setRoomGoalForRoom(selectedRoom.id, editRoomGoal(roomGoal, nextText));
+  }
+
+  function deleteGoal() {
+    setRoomGoalForRoom(selectedRoom.id, null);
+  }
+
+  function tickGoalElapsed() {
+    if (!roomGoal || roomGoal.status !== "running") return;
+    setRoomGoalForRoom(selectedRoom.id, updateRoomGoalElapsed(roomGoal));
+  }
+
   async function sendMessage() {
     if (!hasSelectedRoom) {
       setSelectedChatMessage("Create or join a room before sending messages.");
@@ -100,6 +147,11 @@ export function useCodexInvokeActions({
     const attachments = pendingAttachments;
     const body = draft.trim();
     if (!body && attachments.length === 0) return;
+    const goalText = parseRoomGoalCommand(body);
+    if (goalText) {
+      startRoomGoal(goalText);
+      return;
+    }
     const attachmentError = validatePendingAttachments(attachments);
     if (attachmentError) {
       setChatMessageForRoom(roomId, attachmentError);
@@ -180,6 +232,11 @@ export function useCodexInvokeActions({
 
   return {
     handleCodexInvoke,
-    sendMessage
+    sendMessage,
+    pauseGoal,
+    resumeGoal,
+    editGoal,
+    deleteGoal,
+    tickGoalElapsed
   };
 }

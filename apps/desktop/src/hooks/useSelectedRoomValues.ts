@@ -16,6 +16,7 @@ import type {
   ChatMessage,
   InviteJoinRequest,
   MarkdownCopyFallback,
+  RoomGoal,
   TerminalCommandRequest
 } from "../types";
 
@@ -30,6 +31,7 @@ interface UseSelectedRoomValuesOptions {
   messagesByRoom: Record<string, ChatMessage[]>;
   draftsByRoom: Record<string, string>;
   pendingAttachmentsByRoom: Record<string, ChatAttachment[]>;
+  roomGoalsByRoom: Record<string, RoomGoal>;
   browserRequestsByRoom: Record<string, BrowserAccessRequest[]>;
   browserUrlsByRoom: Record<string, string>;
   browserReasonsByRoom: Record<string, string>;
@@ -80,6 +82,7 @@ export function useSelectedRoomValues({
   messagesByRoom,
   draftsByRoom,
   pendingAttachmentsByRoom,
+  roomGoalsByRoom,
   browserRequestsByRoom,
   browserUrlsByRoom,
   browserReasonsByRoom,
@@ -135,6 +138,7 @@ export function useSelectedRoomValues({
       ? messages.filter((message) => selectedMessageIds.includes(message.id))
       : [],
     pendingAttachments: pendingAttachmentsByRoom[roomId] ?? [],
+    roomGoal: roomGoalsByRoom[roomId] ?? null,
     pendingAttachmentBytes: embeddedAttachmentBytes(pendingAttachmentsByRoom[roomId] ?? []),
     browserRequests: browserRequestsByRoom[roomId] ?? [],
     browserUrl: browserUrlsByRoom[roomId] ?? defaultBrowserUrl,

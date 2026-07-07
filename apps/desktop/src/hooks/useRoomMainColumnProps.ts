@@ -55,6 +55,7 @@ interface UseRoomMainColumnPropsOptions {
   codexRunning: boolean;
   roomCanUseChat: boolean;
   draft: string;
+  roomGoal: ChatProps["roomGoal"];
   pendingAttachmentCount: number;
   pendingAttachments: ChatProps["pendingAttachments"];
   localPreviewCards: ChatProps["localPreviewCards"];
@@ -76,6 +77,7 @@ interface UseRoomMainColumnPropsOptions {
     | "lockedPlaceholder"
     | "chatEnabled"
     | "draft"
+    | "roomGoal"
     | "pendingAttachments"
     | "localPreviewCards"
     | "pendingAttachmentSummary"
@@ -123,6 +125,7 @@ export function useRoomMainColumnProps({
   codexRunning,
   roomCanUseChat,
   draft,
+  roomGoal,
   pendingAttachmentCount,
   pendingAttachments,
   localPreviewCards,
@@ -189,6 +192,7 @@ export function useRoomMainColumnProps({
       lockedPlaceholder: roomLockMessage(selectedRoom, isSelectedRoomRevoked),
       chatEnabled: selectedRoom.mode.chat,
       draft,
+      roomGoal,
       pendingAttachments,
       localPreviewCards,
       pendingAttachmentSummary,

@@ -12,6 +12,11 @@ export function useRoomChatPanelActions({
   setApprovalVisibleForRoom,
   approveCodexTurn,
   handleCodexInvoke,
+  pauseGoal,
+  resumeGoal,
+  editGoal,
+  deleteGoal,
+  tickGoalElapsed,
   copyMarkdownWithFallback,
   setChatMessageForRoom,
   stopLocalPreview,
@@ -29,6 +34,11 @@ export function useRoomChatPanelActions({
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   approveCodexTurn: () => void;
   handleCodexInvoke: () => void;
+  pauseGoal: () => void;
+  resumeGoal: () => void;
+  editGoal: (text: string) => void;
+  deleteGoal: () => void;
+  tickGoalElapsed: () => void;
   copyMarkdownWithFallback: (
     title: string,
     markdown: string,
@@ -91,6 +101,11 @@ export function useRoomChatPanelActions({
     onDenyApproval,
     onApproveApproval: () => approveCodexTurn(),
     onInvokeCodex: () => handleCodexInvoke(),
+    onPauseGoal: pauseGoal,
+    onResumeGoal: resumeGoal,
+    onEditGoal: editGoal,
+    onDeleteGoal: deleteGoal,
+    onTickGoalElapsed: tickGoalElapsed,
     onOpenLocalPreview,
     onCopyLocalPreviewLink,
     onStopLocalPreview: (previewId: string) => void stopLocalPreview(previewId),

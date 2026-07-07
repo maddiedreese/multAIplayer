@@ -41,6 +41,15 @@ export interface ChatAttachment {
   truncated?: boolean;
 }
 
+export interface RoomGoal {
+  id: string;
+  text: string;
+  status: "running" | "paused";
+  startedAt: string;
+  updatedAt: string;
+  elapsedMs: number;
+}
+
 export interface PendingCodexApproval {
   roomId: string;
   messages: ChatMessage[];

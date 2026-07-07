@@ -77,6 +77,7 @@ export function useAppRoomRuntime({
     projectPathDraft,
     messages,
     draft,
+    roomGoal,
     pendingAttachments,
     browserRequests,
     browserUrl,
@@ -116,6 +117,7 @@ export function useAppRoomRuntime({
     setPendingCodexApprovalForRoom,
     resetCodexApprovalForRoom,
     setCodexRunningForRoom,
+    setRoomGoalForRoom,
     setBrowserUrlForRoom,
     setBrowserMessageForRoom,
     setSelectedBrowserMessage,
@@ -170,6 +172,7 @@ export function useAppRoomRuntime({
         hostGateMessage: roomInteraction.hostGateMessage,
         localUser: localIdentity.localUser,
         draft,
+        roomGoal,
         pendingAttachments,
         messages,
         roomTerminals,
@@ -184,6 +187,7 @@ export function useAppRoomRuntime({
         setPendingCodexApprovalForRoom,
         setApprovalVisibleForRoom,
         setDraftForRoom,
+        setRoomGoalForRoom,
         setPendingAttachmentsForRoom
       }
     },

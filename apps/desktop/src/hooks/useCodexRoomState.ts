@@ -9,6 +9,8 @@ export function useCodexRoomState() {
   const setPendingCodexApprovalsByRoom = useAppStore((state) => state.setPendingCodexApprovalsByRoom);
   const codexRunningByRoom = useAppStore((state) => state.codexRunningByRoom);
   const setCodexRunningByRoom = useAppStore((state) => state.setCodexRunningByRoom);
+  const roomGoalsByRoom = useAppStore((state) => state.roomGoalsByRoom);
+  const setRoomGoalsByRoom = useAppStore((state) => state.setRoomGoalsByRoom);
   const secretWarningsVisibleByRoom = useAppStore((state) => state.secretWarningsVisibleByRoom);
   const setSecretWarningsVisibleByRoom = useAppStore((state) => state.setSecretWarningsVisibleByRoom);
   const codexThreadIdsByRoom = useAppStore((state) => state.codexThreadIdsByRoom);
@@ -23,6 +25,8 @@ export function useCodexRoomState() {
     setPendingCodexApprovalsByRoom,
     codexRunningByRoom,
     setCodexRunningByRoom,
+    roomGoalsByRoom,
+    setRoomGoalsByRoom,
     secretWarningsVisibleByRoom,
     setSecretWarningsVisibleByRoom,
     codexThreadIdsByRoom,

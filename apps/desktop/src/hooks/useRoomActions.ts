@@ -85,6 +85,7 @@ export function useRoomActions({
   const setPendingCodexApprovalForRoom = useAppStore((state) => state.setPendingCodexApprovalForRoom);
   const resetCodexApprovalForRoom = useAppStore((state) => state.resetCodexApprovalForRoom);
   const setCodexRunningForRoom = useAppStore((state) => state.setCodexRunningForRoom);
+  const setRoomGoalForRoom = useAppStore((state) => state.setRoomGoalForRoom);
   const setFileQueryForRoom = useAppStore((state) => state.setFileQueryForRoom);
   const setProjectFilesForRoom = useAppStore((state) => state.setProjectFilesForRoom);
   const setSelectedFileForRoom = useAppStore((state) => state.setSelectedFileForRoom);
@@ -198,6 +199,7 @@ export function useRoomActions({
     setPendingCodexApprovalForRoom,
     resetCodexApprovalForRoom,
     setCodexRunningForRoom,
+    setRoomGoalForRoom,
     appendGitWorkflowEvent,
     appendGitHubActionsEvent,
     appendLocalPreviewEvent,
