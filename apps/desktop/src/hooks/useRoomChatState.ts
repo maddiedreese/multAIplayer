@@ -1,11 +1,14 @@
-import { useState } from "react";
-import type { ChatAttachment } from "../types";
+import { useAppStore } from "../store/appStore";
 
 export function useRoomChatState() {
-  const [chatMessagesByRoom, setChatMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [draftsByRoom, setDraftsByRoom] = useState<Record<string, string>>({});
-  const [pendingAttachmentsByRoom, setPendingAttachmentsByRoom] = useState<Record<string, ChatAttachment[]>>({});
-  const [sensitiveAttachmentReviewKey, setSensitiveAttachmentReviewKey] = useState<string | null>(null);
+  const chatMessagesByRoom = useAppStore((state) => state.chatMessagesByRoom);
+  const setChatMessagesByRoom = useAppStore((state) => state.setChatMessagesByRoom);
+  const draftsByRoom = useAppStore((state) => state.draftsByRoom);
+  const setDraftsByRoom = useAppStore((state) => state.setDraftsByRoom);
+  const pendingAttachmentsByRoom = useAppStore((state) => state.pendingAttachmentsByRoom);
+  const setPendingAttachmentsByRoom = useAppStore((state) => state.setPendingAttachmentsByRoom);
+  const sensitiveAttachmentReviewKey = useAppStore((state) => state.sensitiveAttachmentReviewKey);
+  const setSensitiveAttachmentReviewKey = useAppStore((state) => state.setSensitiveAttachmentReviewKey);
 
   return {
     chatMessagesByRoom,
