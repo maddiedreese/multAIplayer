@@ -9,6 +9,8 @@ import type {
   TerminalSnapshot
 } from "../lib/localBackend";
 import { updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "../lib/gitWorkflowDraft";
+import { normalizeCodexThreadId } from "../lib/codexThread";
+import { replaceRoomTerminalSnapshots } from "../lib/terminalState";
 import type {
   BrowserAccessRequest,
   BrowserStatus,
@@ -19,6 +21,7 @@ import type {
   InviteJoinRequest,
   LocalPreviewDialogState,
   LocalPreviewRecord,
+  LocalRoomHistoryPayload,
   PendingCodexApproval,
   RoomPresence,
   TerminalCommandRequest
@@ -357,6 +360,7 @@ interface AppStoreState {
   ensureLocalTeamMemberForTeam: (teamId: string, userId: string, role: TeamMemberRecord["role"]) => void;
   setMessagesByRoom: (action: SetStateAction<MessagesByRoom>) => void;
   initializeMessagesForRoom: (roomId: string) => void;
+  hydrateLocalRoomHistoryForRoom: (roomId: string, payload: LocalRoomHistoryPayload) => void;
   appendRoomMessage: (roomId: string, message: ChatMessage) => void;
   applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
   setGitWorkflowBusyForRoom: (roomId: string, busy: boolean) => void;
@@ -939,6 +943,71 @@ export const useAppStore = create<AppStoreState>((set) => ({
           ...state.messagesByRoom,
           [roomId]: []
         }
+      };
+    });
+  },
+  hydrateLocalRoomHistoryForRoom: (roomId, payload) => {
+    set((state) => {
+      const latestGitWorkflowEvent = payload.gitWorkflowEvents.at(-1);
+      const latestGitHubActionsEvent = payload.githubActionsEvents.at(-1);
+      const currentTerminalId = state.selectedTerminalIdsByRoom[roomId] ?? null;
+      const nextTerminalId = currentTerminalId && payload.terminalSnapshots.some((terminal) => terminal.id === currentTerminalId)
+        ? currentTerminalId
+        : payload.terminalSnapshots[0]?.id ?? null;
+      const codexThreadId = normalizeCodexThreadId(payload.codexThreadId);
+
+      return {
+        messagesByRoom: payload.messages.length
+          ? { ...state.messagesByRoom, [roomId]: payload.messages }
+          : state.messagesByRoom,
+        terminalRequestsByRoom: payload.terminalRequests.length
+          ? { ...state.terminalRequestsByRoom, [roomId]: payload.terminalRequests }
+          : state.terminalRequestsByRoom,
+        browserRequestsByRoom: payload.browserRequests.length
+          ? { ...state.browserRequestsByRoom, [roomId]: payload.browserRequests }
+          : state.browserRequestsByRoom,
+        inviteRequestsByRoom: payload.inviteRequests.length
+          ? { ...state.inviteRequestsByRoom, [roomId]: payload.inviteRequests }
+          : state.inviteRequestsByRoom,
+        codexEventsByRoom: payload.codexEvents.length
+          ? { ...state.codexEventsByRoom, [roomId]: payload.codexEvents }
+          : state.codexEventsByRoom,
+        gitWorkflowEventsByRoom: payload.gitWorkflowEvents.length
+          ? { ...state.gitWorkflowEventsByRoom, [roomId]: payload.gitWorkflowEvents }
+          : state.gitWorkflowEventsByRoom,
+        gitWorkflowMessagesByRoom: latestGitWorkflowEvent
+          ? { ...state.gitWorkflowMessagesByRoom, [roomId]: latestGitWorkflowEvent.message }
+          : state.gitWorkflowMessagesByRoom,
+        githubActionsEventsByRoom: payload.githubActionsEvents.length
+          ? { ...state.githubActionsEventsByRoom, [roomId]: payload.githubActionsEvents }
+          : state.githubActionsEventsByRoom,
+        actionRunsByRoom: latestGitHubActionsEvent
+          ? { ...state.actionRunsByRoom, [roomId]: latestGitHubActionsEvent.runs }
+          : state.actionRunsByRoom,
+        actionsLastCheckedByRoom: latestGitHubActionsEvent
+          ? { ...state.actionsLastCheckedByRoom, [roomId]: latestGitHubActionsEvent.checkedAt }
+          : state.actionsLastCheckedByRoom,
+        actionsMessagesByRoom: latestGitHubActionsEvent
+          ? {
+              ...state.actionsMessagesByRoom,
+              [roomId]: `${latestGitHubActionsEvent.summary.label}: ${latestGitHubActionsEvent.message}`
+            }
+          : state.actionsMessagesByRoom,
+        localPreviewsByRoom: payload.localPreviews.length
+          ? { ...state.localPreviewsByRoom, [roomId]: payload.localPreviews }
+          : state.localPreviewsByRoom,
+        terminals: payload.terminalSnapshots.length
+          ? replaceRoomTerminalSnapshots(state.terminals, roomId, payload.terminalSnapshots)
+          : state.terminals,
+        selectedTerminalIdsByRoom: payload.terminalSnapshots.length && nextTerminalId
+          ? { ...state.selectedTerminalIdsByRoom, [roomId]: nextTerminalId }
+          : state.selectedTerminalIdsByRoom,
+        hostHandoffsByRoom: payload.hostHandoffs.length
+          ? { ...state.hostHandoffsByRoom, [roomId]: payload.hostHandoffs }
+          : state.hostHandoffsByRoom,
+        codexThreadIdsByRoom: codexThreadId
+          ? { ...state.codexThreadIdsByRoom, [roomId]: codexThreadId }
+          : state.codexThreadIdsByRoom
       };
     });
   },
