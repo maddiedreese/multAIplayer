@@ -27,7 +27,7 @@ import {
   validatePendingAttachments
 } from "../lib/appFormatters";
 import type { ChatAttachment } from "../types";
-import type { InspectorTab } from "../components/RoomInspectorPanel";
+import { useAppStore } from "../store/appStore";
 
 interface UseFileActionsOptions {
   hasSelectedRoom: boolean;
@@ -52,7 +52,6 @@ interface UseFileActionsOptions {
     roomId: string,
     updater: ChatAttachment[] | ((current: ChatAttachment[]) => ChatAttachment[])
   ) => void;
-  setInspectorTabsByRoom: Dispatch<SetStateAction<Record<string, InspectorTab>>>;
 }
 
 export function useFileActions({
@@ -74,9 +73,10 @@ export function useFileActions({
   setFilePreviewTabForRoom,
   setSelectedFileMessage,
   setFileMessageForRoom,
-  setPendingAttachmentsForRoom,
-  setInspectorTabsByRoom
+  setPendingAttachmentsForRoom
 }: UseFileActionsOptions) {
+  const setInspectorTabForRoom = useAppStore((state) => state.setInspectorTabForRoom);
+
   async function openProjectFile(path: string, preferredPreview: FilePreviewTab = "file") {
     if (!hasSelectedRoom) {
       setSelectedFileMessage("Create or join a room before opening project files.");
@@ -237,7 +237,7 @@ export function useFileActions({
           truncated: Boolean(attachment.truncated),
           content: attachment.content
         });
-        setInspectorTabsByRoom((current) => ({ ...current, [room.id]: "files" }));
+        setInspectorTabForRoom(room.id, "files");
         setFileMessageForRoom(room.id, `Opened inline attachment ${attachment.name}.`);
       } else if (canOpenProjectAttachment(attachment)) {
         await openProjectFile(attachment.name, "file");
@@ -267,7 +267,7 @@ export function useFileActions({
         truncated: Boolean(decrypted.truncated),
         content: decrypted.content
       });
-      setInspectorTabsByRoom((current) => ({ ...current, [room.id]: "files" }));
+      setInspectorTabForRoom(room.id, "files");
       setFileMessageForRoom(room.id, `Opened encrypted attachment ${decrypted.name || attachment.name}.`);
     } catch (error) {
       if (selectedRoomIdRef.current === room.id) {

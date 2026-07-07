@@ -274,8 +274,7 @@ export function useAppWorkspaceFlow({
         setFilePreviewTabForRoom,
         setSelectedFileMessage,
         setFileMessageForRoom,
-        setPendingAttachmentsForRoom,
-        setInspectorTabsByRoom: roomRuntimeState.setInspectorTabsByRoom
+        setPendingAttachmentsForRoom
       }
     },
     historyEffects: {
