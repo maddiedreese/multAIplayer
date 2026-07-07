@@ -15,10 +15,12 @@ use tauri::State;
 mod browser;
 mod keychain;
 mod output;
+mod project;
 mod validation;
 use browser::*;
 use keychain::*;
 use output::*;
+use project::*;
 use validation::*;
 
 const LOCAL_PREVIEW_PORTS: [u16; 9] = [3000, 3001, 5173, 5174, 8000, 8080, 4200, 5000, 8888];
@@ -114,45 +116,6 @@ struct GitApplyPatchResult {
     stderr: String,
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ProjectFileEntry {
-    path: String,
-    size: u64,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ProjectFileContent {
-    path: String,
-    size: u64,
-    truncated: bool,
-    content: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ProjectFileSearchRequest {
-    cwd: String,
-    query: String,
-    limit: Option<usize>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ProjectFileReadRequest {
-    cwd: String,
-    path: String,
-    max_bytes: Option<usize>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GitDiffRequest {
-    cwd: String,
-    path: String,
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GitCloneRequest {
@@ -166,13 +129,6 @@ struct GitCloneRequest {
 struct GitApplyPatchRequest {
     cwd: String,
     patch: String,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GitDiffResult {
-    path: String,
-    diff: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -516,92 +472,6 @@ fn git_apply_patch(request: GitApplyPatchRequest) -> Result<GitApplyPatchResult,
         status: output.status.code(),
         stdout: bound_command_output(&output.stdout),
         stderr: bound_command_output(&output.stderr),
-    })
-}
-
-#[tauri::command]
-fn project_files(request: ProjectFileSearchRequest) -> Result<Vec<ProjectFileEntry>, String> {
-    ensure_existing_dir(&request.cwd)?;
-    let root = canonical_project_root(&request.cwd)?;
-    let query = request.query.trim().to_lowercase();
-    let limit = request.limit.unwrap_or(80).clamp(1, 200);
-    let mut results = Vec::new();
-    collect_project_files(&root, &root, &query, limit, &mut results)?;
-    results.sort_by(|left, right| left.path.cmp(&right.path));
-    Ok(results)
-}
-
-#[tauri::command]
-fn project_file_read(request: ProjectFileReadRequest) -> Result<ProjectFileContent, String> {
-    ensure_existing_dir(&request.cwd)?;
-    let root = canonical_project_root(&request.cwd)?;
-    let requested = safe_project_path(&root, &request.path)?;
-    let metadata = fs::metadata(&requested)
-        .map_err(|error| format!("Failed to read file metadata: {error}"))?;
-    if !metadata.is_file() {
-        return Err(format!("{} is not a file", request.path));
-    }
-    let max_bytes = request.max_bytes.unwrap_or(80_000).clamp(1_024, 250_000);
-    let bytes = fs::read(&requested).map_err(|error| format!("Failed to read file: {error}"))?;
-    let truncated = bytes.len() > max_bytes;
-    let slice = if truncated {
-        &bytes[..max_bytes]
-    } else {
-        &bytes
-    };
-    let content = String::from_utf8_lossy(slice).to_string();
-    Ok(ProjectFileContent {
-        path: request.path,
-        size: metadata.len(),
-        truncated,
-        content,
-    })
-}
-
-#[tauri::command]
-fn git_diff_file(request: GitDiffRequest) -> Result<GitDiffResult, String> {
-    ensure_existing_dir(&request.cwd)?;
-    let root = canonical_project_root(&request.cwd)?;
-    let requested = safe_project_path(&root, &request.path)?;
-
-    let status_output = Command::new("git")
-        .args([
-            "-C",
-            &request.cwd,
-            "status",
-            "--porcelain=v1",
-            "--",
-            &request.path,
-        ])
-        .output()
-        .map_err(|error| format!("Failed to run git status: {error}"))?;
-    if !status_output.status.success() {
-        return Err(String::from_utf8_lossy(&status_output.stderr)
-            .trim()
-            .to_string());
-    }
-
-    let status = String::from_utf8_lossy(&status_output.stdout);
-    let untracked = status.lines().any(|line| line.starts_with("??"));
-    if untracked {
-        let diff = untracked_file_diff(&requested, &request.path)?;
-        return Ok(GitDiffResult {
-            path: request.path,
-            diff,
-        });
-    }
-
-    let output = Command::new("git")
-        .args(["-C", &request.cwd, "diff", "--", &request.path])
-        .output()
-        .map_err(|error| format!("Failed to run git diff: {error}"))?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
-    }
-
-    Ok(GitDiffResult {
-        path: request.path,
-        diff: bound_git_diff(&String::from_utf8_lossy(&output.stdout)),
     })
 }
 
@@ -1314,75 +1184,6 @@ fn next_available_clone_path(parent_dir: &Path, repo_name: &str) -> Result<PathB
         }
     }
     Err("Could not find an available clone folder name.".to_string())
-}
-
-fn collect_project_files(
-    root: &Path,
-    dir: &Path,
-    query: &str,
-    limit: usize,
-    results: &mut Vec<ProjectFileEntry>,
-) -> Result<(), String> {
-    if results.len() >= limit {
-        return Ok(());
-    }
-    let entries =
-        fs::read_dir(dir).map_err(|error| format!("Failed to read project directory: {error}"))?;
-    for entry in entries {
-        if results.len() >= limit {
-            break;
-        }
-        let entry = entry.map_err(|error| format!("Failed to read project entry: {error}"))?;
-        let path = entry.path();
-        let file_name = entry.file_name().to_string_lossy().to_string();
-        if should_skip_project_entry(&file_name) {
-            continue;
-        }
-        let file_type = entry
-            .file_type()
-            .map_err(|error| format!("Failed to read project entry type: {error}"))?;
-        if file_type.is_symlink() {
-            continue;
-        }
-        let metadata = entry
-            .metadata()
-            .map_err(|error| format!("Failed to read project entry metadata: {error}"))?;
-        if metadata.is_dir() {
-            collect_project_files(root, &path, query, limit, results)?;
-            continue;
-        }
-        if !metadata.is_file() {
-            continue;
-        }
-        let relative = path
-            .strip_prefix(root)
-            .map_err(|error| format!("Failed to resolve relative path: {error}"))?
-            .to_string_lossy()
-            .replace('\\', "/");
-        if query.is_empty() || relative.to_lowercase().contains(query) {
-            results.push(ProjectFileEntry {
-                path: relative,
-                size: metadata.len(),
-            });
-        }
-    }
-    Ok(())
-}
-
-fn should_skip_project_entry(name: &str) -> bool {
-    matches!(
-        name,
-        ".git"
-            | "node_modules"
-            | "target"
-            | "dist"
-            | ".next"
-            | ".turbo"
-            | ".cache"
-            | ".DS_Store"
-            | "Cargo.lock"
-            | "package-lock.json"
-    )
 }
 
 fn codex_thread_request(
