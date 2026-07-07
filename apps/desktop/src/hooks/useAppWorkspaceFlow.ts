@@ -63,7 +63,6 @@ export function useAppWorkspaceFlow({
     roomRuntimeState,
     appRuntimeState,
     terminalPanelState,
-    browserPanelState,
     filePanelState
   } = appState;
   const {
@@ -102,7 +101,8 @@ export function useAppWorkspaceFlow({
     setSelectedDiffForRoom,
     setFilePreviewTabForRoom,
     setPendingAttachmentsForRoom,
-    hydrateLocalRoomHistoryForRoom
+    hydrateLocalRoomHistoryForRoom,
+    clearBrowserStatusForRoom
   } = roomActions;
 
   return useWorkspaceFlowContext({
@@ -236,8 +236,7 @@ export function useAppWorkspaceFlow({
         setHistorySettings: historyDefaultsState.setHistorySettings,
         hydrateLocalRoomHistoryForRoom,
         setRooms: workspaceState.setRooms,
-        setBrowserStatusByRoom: browserPanelState.setBrowserStatusByRoom,
-        setActiveBrowserUrlsByRoom: browserPanelState.setActiveBrowserUrlsByRoom,
+        clearBrowserStatusForRoom,
         setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds
       },
