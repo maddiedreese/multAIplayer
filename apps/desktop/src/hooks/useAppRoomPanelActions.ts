@@ -1,5 +1,5 @@
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
-import type { useAppRoomScopedSetters } from "./useAppRoomScopedSetters";
+import type { useAppRoomActions } from "./useAppRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { useAppStateSlices } from "./useAppStateSlices";
@@ -11,7 +11,7 @@ type AppStateSlices = ReturnType<typeof useAppStateSlices>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
-type RoomSetters = ReturnType<typeof useAppRoomScopedSetters>;
+type RoomActions = ReturnType<typeof useAppRoomActions>;
 type RoomRuntime = ReturnType<typeof useRoomRuntimeContext>;
 type WorkspaceFlow = ReturnType<typeof useWorkspaceFlowContext>;
 
@@ -20,7 +20,7 @@ export function useAppRoomPanelActions({
   selected,
   selectedRuntime,
   roomInteraction,
-  roomSetters,
+  roomActions,
   roomRuntime,
   workspaceFlow
 }: {
@@ -28,7 +28,7 @@ export function useAppRoomPanelActions({
   selected: SelectedRoomContext;
   selectedRuntime: SelectedRoomRuntime;
   roomInteraction: RoomInteraction;
-  roomSetters: RoomSetters;
+  roomActions: RoomActions;
   roomRuntime: RoomRuntime;
   workspaceFlow: WorkspaceFlow;
 }) {
@@ -55,7 +55,7 @@ export function useAppRoomPanelActions({
     setFilePreviewTabForRoom,
     setSelectedFileForRoom,
     setSelectedDiffForRoom
-  } = roomSetters;
+  } = roomActions;
 
   return useRoomPanelActions({
     chat: {

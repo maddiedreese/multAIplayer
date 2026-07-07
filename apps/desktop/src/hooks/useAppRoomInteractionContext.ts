@@ -1,5 +1,5 @@
 import type { useAppRefs } from "./useAppRefs";
-import type { useAppRoomScopedSetters } from "./useAppRoomScopedSetters";
+import type { useAppRoomActions } from "./useAppRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppStateSlices } from "./useAppStateSlices";
 import type { useGitHubAuth } from "./useGitHubAuth";
@@ -13,7 +13,7 @@ type GitHubAuth = ReturnType<typeof useGitHubAuth>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type RoomChatMutations = ReturnType<typeof useRoomChatMutations>;
-type RoomSetters = ReturnType<typeof useAppRoomScopedSetters>;
+type RoomActions = ReturnType<typeof useAppRoomActions>;
 
 export function useAppRoomInteractionContext({
   appState,
@@ -22,7 +22,7 @@ export function useAppRoomInteractionContext({
   localIdentity,
   selected,
   roomChatMutations,
-  roomSetters
+  roomActions
 }: {
   appState: AppStateSlices;
   appRefs: AppRefs;
@@ -30,7 +30,7 @@ export function useAppRoomInteractionContext({
   localIdentity: LocalIdentity;
   selected: SelectedRoomContext;
   roomChatMutations: RoomChatMutations;
-  roomSetters: RoomSetters;
+  roomActions: RoomActions;
 }) {
   const {
     workspaceState,
@@ -56,7 +56,7 @@ export function useAppRoomInteractionContext({
     setChatMessageForRoom,
     setSelectedChatMessage,
     setSecretWarningVisibleForRoom
-  } = roomSetters;
+  } = roomActions;
 
   return useRoomInteractionContext({
     inFlightReporters: {

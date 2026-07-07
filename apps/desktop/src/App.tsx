@@ -31,7 +31,7 @@ import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useRoomChatMutations } from "./hooks/useRoomChatMutations";
 import { useAppRoomInteractionContext } from "./hooks/useAppRoomInteractionContext";
-import { useAppRoomScopedSetters } from "./hooks/useAppRoomScopedSetters";
+import { useAppRoomActions } from "./hooks/useAppRoomActions";
 import { useAppSelectedRoomRuntime } from "./hooks/useAppSelectedRoomRuntime";
 import { useAppRoomDisplayContext } from "./hooks/useAppRoomDisplayContext";
 import { useThemeMode } from "./hooks/useThemeMode";
@@ -188,7 +188,7 @@ export function App() {
     visibleHistoryMessage,
     markdownCopyFallback
   } = selectedContext;
-  const roomSetters = useAppRoomScopedSetters({
+  const roomActions = useAppRoomActions({
     appState,
     appRefs,
     selectedRoom,
@@ -265,7 +265,7 @@ export function App() {
     updateTerminalRequestStatus,
     appendBrowserRequest,
     updateBrowserRequestStatus
-  } = roomSetters;
+  } = roomActions;
   const roomChatMutations = useRoomChatMutations({
     setMessagesByRoom: workspaceState.setMessagesByRoom
   });
@@ -274,7 +274,7 @@ export function App() {
     appRefs,
     localIdentity,
     selected: selectedContext,
-    roomSetters
+    roomActions
   });
   const roomInteraction = useAppRoomInteractionContext({
     appState,
@@ -283,7 +283,7 @@ export function App() {
     localIdentity,
     selected: selectedContext,
     roomChatMutations,
-    roomSetters
+    roomActions
   });
   const selectedRuntime = useAppSelectedRoomRuntime({
     appState,
@@ -298,7 +298,7 @@ export function App() {
     selected: selectedContext,
     selectedRuntime,
     roomInteraction,
-    roomSetters,
+    roomActions,
     roomSettingsActor
   });
   const inviteActions = useAppInviteActions({
@@ -308,7 +308,7 @@ export function App() {
     selected: selectedContext,
     selectedRuntime,
     roomInteraction,
-    roomSetters,
+    roomActions,
     roomChatMutations,
     workspaceRecords
   });
@@ -327,7 +327,7 @@ export function App() {
     selected: selectedContext,
     selectedRuntime,
     roomInteraction,
-    roomSetters,
+    roomActions,
     workspaceRecords,
     inviteActions,
     roomDisplay,
@@ -340,7 +340,7 @@ export function App() {
     localIdentity,
     selected: selectedContext,
     roomInteraction,
-    roomSetters,
+    roomActions,
     workspaceRecords,
     roomDisplay,
     inviteActions,
@@ -355,7 +355,7 @@ export function App() {
     selected: selectedContext,
     selectedRuntime,
     roomInteraction,
-    roomSetters,
+    roomActions,
     relaySync,
     hostHandoffActions,
     roomSettingsActor
@@ -366,7 +366,7 @@ export function App() {
     selected: selectedContext,
     selectedRuntime,
     roomInteraction,
-    roomSetters,
+    roomActions,
     roomRuntime,
     workspaceFlow
   });
@@ -378,7 +378,7 @@ export function App() {
     selected: selectedContext,
     selectedRuntime,
     roomInteraction,
-    roomSetters,
+    roomActions,
     roomDisplay,
     roomPanels,
     roomRuntime,
