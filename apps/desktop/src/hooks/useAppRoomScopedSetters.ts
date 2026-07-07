@@ -52,16 +52,7 @@ export function useAppRoomScopedSetters({
       fileBusyRef: appRefs.fileBusyRef,
       terminalBusyRef: appRefs.terminalBusyRef
     },
-    terminals: {
-      selectedRoomId: selectedRoom.id,
-      maxTerminalActivityLines,
-      setSelectedTerminalIdsByRoom: terminalPanelState.setSelectedTerminalIdsByRoom,
-      setTerminalNamesByRoom: terminalPanelState.setTerminalNamesByRoom,
-      setTerminalCommandsByRoom: terminalPanelState.setTerminalCommandsByRoom,
-      setTerminalInputsByRoom: terminalPanelState.setTerminalInputsByRoom,
-      setTerminalErrorsByRoom: terminalPanelState.setTerminalErrorsByRoom,
-      setTerminalLinesByRoom: terminalPanelState.setTerminalLinesByRoom
-    },
+    maxTerminalActivityLines,
     browser: {
       defaultBrowserUrl,
       defaultBrowserReason
