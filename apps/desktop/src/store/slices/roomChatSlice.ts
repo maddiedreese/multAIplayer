@@ -19,7 +19,7 @@ export interface RoomChatSlice {
   setChatMessagesByRoom: (action: SetStateAction<ChatMessagesByRoom>) => void;
   setDraftsByRoom: (action: SetStateAction<DraftsByRoom>) => void;
   setPendingAttachmentsByRoom: (action: SetStateAction<PendingAttachmentsByRoom>) => void;
-  setSensitiveAttachmentReviewKey: (action: SetStateAction<string | null>) => void;
+  setSensitiveAttachmentReviewKey: (key: string | null) => void;
   toggleSelectedMessageForRoom: (roomId: string, messageId: string) => void;
   clearSelectedMessagesForRoom: (roomId: string) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
@@ -62,10 +62,8 @@ export const createRoomChatSlice: StateCreator<AppStoreState, [], [], RoomChatSl
       pendingAttachmentsByRoom: resolveSetStateAction(state.pendingAttachmentsByRoom, action)
     }));
   },
-  setSensitiveAttachmentReviewKey: (action) => {
-    set((state) => ({
-      sensitiveAttachmentReviewKey: resolveSetStateAction(state.sensitiveAttachmentReviewKey, action)
-    }));
+  setSensitiveAttachmentReviewKey: (key) => {
+    set({ sensitiveAttachmentReviewKey: key });
   },
   toggleSelectedMessageForRoom: (roomId, messageId) => {
     set((state) => {

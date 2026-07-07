@@ -1,4 +1,4 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type { MutableRefObject } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import {
   maxEmbeddedAttachmentBytes,
@@ -40,7 +40,7 @@ interface UseFileActionsOptions {
   selectedFile: ProjectFileContent | null;
   pendingAttachmentsByRoom: Record<string, ChatAttachment[]>;
   sensitiveAttachmentReviewKey: string | null;
-  setSensitiveAttachmentReviewKey: Dispatch<SetStateAction<string | null>>;
+  setSensitiveAttachmentReviewKey: (key: string | null) => void;
   reportRoomFileActionInFlight: (roomId: string) => boolean;
   setFileBusyForRoom: (roomId: string, busy: boolean) => void;
   setSelectedFileForRoom: (roomId: string, file: ProjectFileContent | null) => void;
