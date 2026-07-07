@@ -72,11 +72,6 @@ export function useAppRoomScopedSetters({
       setTerminalErrorsByRoom: terminalPanelState.setTerminalErrorsByRoom,
       setTerminalLinesByRoom: terminalPanelState.setTerminalLinesByRoom
     },
-    codexApprovals: {
-      setApprovalVisibleByRoom: codexRoomState.setApprovalVisibleByRoom,
-      setPendingCodexApprovalsByRoom: codexRoomState.setPendingCodexApprovalsByRoom,
-      setCodexRunningByRoom: codexRoomState.setCodexRunningByRoom
-    },
     browser: {
       defaultBrowserUrl,
       defaultBrowserReason
