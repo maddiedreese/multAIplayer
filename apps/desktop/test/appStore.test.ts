@@ -179,3 +179,42 @@ test("desktop store keeps room settings state room scoped", () => {
   assert.equal(state.customCodexModelsByRoom["room-a"], "gpt-5.4");
   assert.equal(state.projectPathDraftsByRoom["room-b"], "/tmp/example");
 });
+
+test("desktop store keeps local preview state room scoped", () => {
+  const store = useAppStore.getState();
+
+  store.setLocalPreviewsByRoom({
+    "room-a": [
+      {
+        eventType: "local.preview",
+        id: "preview-1",
+        sharedBy: "Avery",
+        sharedByUserId: "github:avery",
+        sourceUrl: "http://localhost:5173/",
+        publicUrl: "https://preview.trycloudflare.com",
+        status: "live",
+        message: "Preview is live",
+        createdAt: "2026-07-06T00:04:00.000Z",
+        updatedAt: "2026-07-06T00:05:00.000Z"
+      }
+    ]
+  });
+  store.setLocalPreviewBusyByRoom({ "room-a": true, "room-b": false });
+  store.setLocalPreviewDialog({
+    open: true,
+    phase: "confirm",
+    roomId: "room-a",
+    candidates: [{ url: "http://localhost:5173/", label: "localhost:5173" }],
+    selectedUrl: "http://localhost:5173/",
+    manualUrl: "",
+    error: null,
+    cloudflaredVersion: "2026.7.0"
+  });
+
+  const state = useAppStore.getState();
+  assert.equal(state.localPreviewsByRoom["room-a"]?.[0]?.status, "live");
+  assert.equal(state.localPreviewBusyByRoom["room-a"], true);
+  assert.equal(state.localPreviewBusyByRoom["room-b"], false);
+  assert.equal(state.localPreviewDialog.open, true);
+  assert.equal(state.localPreviewDialog.candidates[0]?.label, "localhost:5173");
+});
