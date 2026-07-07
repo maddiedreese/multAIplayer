@@ -8,7 +8,7 @@ import type {
   ProjectFileEntry,
   TerminalSnapshot
 } from "../lib/localBackend";
-import type { GitWorkflowDraft } from "../lib/gitWorkflowDraft";
+import { updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "../lib/gitWorkflowDraft";
 import type {
   BrowserAccessRequest,
   BrowserStatus,
@@ -341,6 +341,9 @@ interface AppStoreState {
   setHistoryMessageForRoom: (roomId: string, message: string | null) => void;
   setTeamHistoryMessageForTeam: (teamId: string, message: string | null) => void;
   setSettingsMessageForRoom: (roomId: string, message: string | null) => void;
+  setGitWorkflowMessageForRoom: (roomId: string, message: string | null) => void;
+  setGitStatusForRoom: (roomId: string, status: GitStatusSummary | null) => void;
+  updateGitWorkflowDraftForRoom: (roomId: string, patch: Partial<GitWorkflowDraft>) => void;
   setPendingAttachmentsForRoom: (
     roomId: string,
     updater: ChatAttachment[] | ((current: ChatAttachment[]) => ChatAttachment[])
@@ -755,6 +758,27 @@ export const useAppStore = create<AppStoreState>((set) => ({
       settingsMessagesByRoom: message
         ? { ...state.settingsMessagesByRoom, [roomId]: message }
         : omitRecordKey(state.settingsMessagesByRoom, roomId)
+    }));
+  },
+  setGitWorkflowMessageForRoom: (roomId, message) => {
+    set((state) => ({
+      gitWorkflowMessagesByRoom: {
+        ...state.gitWorkflowMessagesByRoom,
+        [roomId]: message
+      }
+    }));
+  },
+  setGitStatusForRoom: (roomId, status) => {
+    set((state) => ({
+      gitStatusByRoom: {
+        ...state.gitStatusByRoom,
+        [roomId]: status
+      }
+    }));
+  },
+  updateGitWorkflowDraftForRoom: (roomId, patch) => {
+    set((state) => ({
+      gitWorkflowDraftsByRoom: updateGitWorkflowDraftRecord(state.gitWorkflowDraftsByRoom, roomId, patch)
     }));
   },
   setPendingAttachmentsForRoom: (roomId, updater) => {

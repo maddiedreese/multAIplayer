@@ -192,7 +192,6 @@ export function App() {
     appState,
     appRefs,
     selectedRoom,
-    hasSelectedRoom,
     maxTerminalActivityLines,
     defaultBrowserUrl,
     defaultBrowserReason,

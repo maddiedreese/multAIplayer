@@ -30,6 +30,29 @@ test("desktop store keeps git workflow state room scoped", () => {
   assert.deepEqual(state.gitWorkflowDraftsByRoom["room-b"], { branchName: "multaiplayer/alpha" });
 });
 
+test("desktop store exposes room git workflow actions", () => {
+  const store = useAppStore.getState();
+
+  store.setGitWorkflowMessageForRoom("room-a", "Creating PR");
+  store.setGitWorkflowMessageForRoom("room-b", null);
+  store.setGitStatusForRoom("room-a", {
+    branch: "main",
+    files: [{ path: "apps/desktop/src/App.tsx", status: "modified", added: 2, removed: 1 }]
+  });
+  store.setGitStatusForRoom("room-b", null);
+  store.updateGitWorkflowDraftForRoom("room-a", { branchName: "multaiplayer/alpha" });
+  store.updateGitWorkflowDraftForRoom("room-a", { commitMessage: "Build alpha" });
+
+  const state = useAppStore.getState();
+  assert.equal(state.gitWorkflowMessagesByRoom["room-a"], "Creating PR");
+  assert.equal(state.gitWorkflowMessagesByRoom["room-b"], null);
+  assert.equal(state.gitStatusByRoom["room-a"]?.files[0]?.path, "apps/desktop/src/App.tsx");
+  assert.equal(state.gitStatusByRoom["room-b"], null);
+  assert.equal(state.gitWorkflowDraftsByRoom["room-a"]?.branchName, "multaiplayer/alpha");
+  assert.equal(state.gitWorkflowDraftsByRoom["room-a"]?.commitMessage, "Build alpha");
+  assert.equal(state.gitWorkflowDraftsByRoom["room-a"]?.prBase, "main");
+});
+
 test("desktop store keeps GitHub Actions state room scoped", () => {
   const store = useAppStore.getState();
 
