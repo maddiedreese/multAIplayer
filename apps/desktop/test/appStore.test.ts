@@ -129,6 +129,26 @@ test("desktop store keeps browser panel state room scoped", () => {
   assert.equal(state.activeBrowserUrlsByRoom["room-b"], null);
 });
 
+test("desktop store exposes room browser actions", () => {
+  const store = useAppStore.getState();
+  const defaultUrl = "https://github.com/maddiedreese/multAIplayer";
+  const defaultReason = "Use this page as Codex browser context.";
+
+  store.setBrowserUrlForRoom("room-a", "http://localhost:5173", defaultUrl);
+  store.setBrowserReasonForRoom("room-a", "Inspect local preview", defaultReason);
+  store.setBrowserMessageForRoom("room-a", "Opened browser");
+  store.setBrowserUrlForRoom("room-b", defaultUrl, defaultUrl);
+  store.setBrowserReasonForRoom("room-b", defaultReason, defaultReason);
+  store.setBrowserMessageForRoom("room-a", null);
+
+  const state = useAppStore.getState();
+  assert.equal(state.browserUrlsByRoom["room-a"], "http://localhost:5173");
+  assert.equal(state.browserReasonsByRoom["room-a"], "Inspect local preview");
+  assert.equal(state.browserMessagesByRoom["room-a"], undefined);
+  assert.equal(state.browserUrlsByRoom["room-b"], undefined);
+  assert.equal(state.browserReasonsByRoom["room-b"], undefined);
+});
+
 test("desktop store keeps file panel state room scoped", () => {
   const store = useAppStore.getState();
 

@@ -344,6 +344,9 @@ interface AppStoreState {
   setGitWorkflowMessageForRoom: (roomId: string, message: string | null) => void;
   setGitStatusForRoom: (roomId: string, status: GitStatusSummary | null) => void;
   updateGitWorkflowDraftForRoom: (roomId: string, patch: Partial<GitWorkflowDraft>) => void;
+  setBrowserUrlForRoom: (roomId: string, url: string, defaultBrowserUrl: string) => void;
+  setBrowserReasonForRoom: (roomId: string, reason: string, defaultBrowserReason: string) => void;
+  setBrowserMessageForRoom: (roomId: string, message: string | null) => void;
   setPendingAttachmentsForRoom: (
     roomId: string,
     updater: ChatAttachment[] | ((current: ChatAttachment[]) => ChatAttachment[])
@@ -779,6 +782,27 @@ export const useAppStore = create<AppStoreState>((set) => ({
   updateGitWorkflowDraftForRoom: (roomId, patch) => {
     set((state) => ({
       gitWorkflowDraftsByRoom: updateGitWorkflowDraftRecord(state.gitWorkflowDraftsByRoom, roomId, patch)
+    }));
+  },
+  setBrowserUrlForRoom: (roomId, url, defaultBrowserUrl) => {
+    set((state) => ({
+      browserUrlsByRoom: url === defaultBrowserUrl
+        ? omitRecordKey(state.browserUrlsByRoom, roomId)
+        : { ...state.browserUrlsByRoom, [roomId]: url }
+    }));
+  },
+  setBrowserReasonForRoom: (roomId, reason, defaultBrowserReason) => {
+    set((state) => ({
+      browserReasonsByRoom: reason === defaultBrowserReason
+        ? omitRecordKey(state.browserReasonsByRoom, roomId)
+        : { ...state.browserReasonsByRoom, [roomId]: reason }
+    }));
+  },
+  setBrowserMessageForRoom: (roomId, message) => {
+    set((state) => ({
+      browserMessagesByRoom: message
+        ? { ...state.browserMessagesByRoom, [roomId]: message }
+        : omitRecordKey(state.browserMessagesByRoom, roomId)
     }));
   },
   setPendingAttachmentsForRoom: (roomId, updater) => {
