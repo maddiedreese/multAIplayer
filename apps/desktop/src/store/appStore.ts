@@ -1,13 +1,13 @@
 import { create } from "zustand";
-import type { GitHubActionRun } from "../lib/authClient";
-import type {
-  GitStatusSummary
-} from "../lib/localBackend";
-import { updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "../lib/gitWorkflowDraft";
 import { normalizeCodexThreadId } from "../lib/codexThread";
 import { replaceRoomTerminalSnapshots } from "../lib/terminalState";
 import { createBrowserSlice, emptyBrowserState, type BrowserSlice } from "./slices/browserSlice";
 import { createFilePanelSlice, emptyFilePanelState, type FilePanelSlice } from "./slices/filePanelSlice";
+import {
+  createGitWorkflowSlice,
+  emptyGitWorkflowState,
+  type GitWorkflowSlice
+} from "./slices/gitWorkflowSlice";
 import {
   createHistoryPresenceSlice,
   emptyHistoryPresenceState,
@@ -31,20 +31,10 @@ import type {
 } from "../types";
 import type {
   ChatReactionPlaintextPayload,
-  GitHubActionsEventPlaintextPayload,
-  GitWorkflowEventPlaintextPayload,
   TeamMemberRecord
 } from "@multaiplayer/protocol";
 import { omitRecordKey } from "../lib/setUtils";
 
-type GitStatusByRoom = Record<string, GitStatusSummary | null>;
-type GitWorkflowBusyByRoom = Record<string, boolean>;
-type GitWorkflowMessagesByRoom = Record<string, string | null>;
-type GitWorkflowDraftsByRoom = Record<string, Partial<GitWorkflowDraft>>;
-type ActionsBusyByRoom = Record<string, boolean>;
-type ActionsMessagesByRoom = Record<string, string | null>;
-type ActionRunsByRoom = Record<string, GitHubActionRun[]>;
-type ActionsLastCheckedByRoom = Record<string, string | null>;
 type HostBusyByRoom = Record<string, boolean>;
 type HostMessagesByRoom = Record<string, string | null>;
 type SettingsBusyByRoom = Record<string, boolean>;
@@ -66,8 +56,6 @@ type SecretWarningsVisibleByRoom = Record<string, boolean>;
 type CodexThreadIdsByRoom = Record<string, string>;
 type HostHandoffsByRoom = Record<string, HostHandoffRecord[]>;
 type CodexContinuationByRoom = Record<string, HostHandoffRecord>;
-type GitWorkflowEventsByRoom = Record<string, GitWorkflowEventPlaintextPayload[]>;
-type GitHubActionsEventsByRoom = Record<string, GitHubActionsEventPlaintextPayload[]>;
 type TeamMembersByTeam = Record<string, TeamMemberRecord[]>;
 type TeamMembersMessageByTeam = Record<string, string | null>;
 type TeamMembersBusyByTeam = Record<string, boolean>;
@@ -80,14 +68,7 @@ interface WorkspaceInitialData {
 }
 
 const emptyAppStoreState = {
-  gitStatusByRoom: {},
-  gitWorkflowBusyByRoom: {},
-  gitWorkflowMessagesByRoom: {},
-  gitWorkflowDraftsByRoom: {},
-  actionsBusyByRoom: {},
-  actionsMessagesByRoom: {},
-  actionRunsByRoom: {},
-  actionsLastCheckedByRoom: {},
+  ...emptyGitWorkflowState,
   ...emptyBrowserState,
   ...emptyFilePanelState,
   ...emptyHistoryPresenceState,
@@ -115,8 +96,6 @@ const emptyAppStoreState = {
   codexThreadIdsByRoom: {},
   hostHandoffsByRoom: {},
   codexContinuationByRoom: {},
-  gitWorkflowEventsByRoom: {},
-  githubActionsEventsByRoom: {},
   ...emptyTerminalState,
   teamMembersByTeam: {},
   teamMembersMessageByTeam: {},
@@ -131,18 +110,11 @@ function updateRoomBusyMap(current: RoomBusyByRoom, roomId: string, busy: boolea
 export interface AppStoreState
   extends BrowserSlice,
     FilePanelSlice,
+    GitWorkflowSlice,
     HistoryPresenceSlice,
     LocalPreviewSlice,
     RoomChatSlice,
     TerminalSlice {
-  gitStatusByRoom: GitStatusByRoom;
-  gitWorkflowBusyByRoom: GitWorkflowBusyByRoom;
-  gitWorkflowMessagesByRoom: GitWorkflowMessagesByRoom;
-  gitWorkflowDraftsByRoom: GitWorkflowDraftsByRoom;
-  actionsBusyByRoom: ActionsBusyByRoom;
-  actionsMessagesByRoom: ActionsMessagesByRoom;
-  actionRunsByRoom: ActionRunsByRoom;
-  actionsLastCheckedByRoom: ActionsLastCheckedByRoom;
   hostBusyByRoom: HostBusyByRoom;
   hostMessagesByRoom: HostMessagesByRoom;
   settingsBusyByRoom: SettingsBusyByRoom;
@@ -165,16 +137,10 @@ export interface AppStoreState
   codexThreadIdsByRoom: CodexThreadIdsByRoom;
   hostHandoffsByRoom: HostHandoffsByRoom;
   codexContinuationByRoom: CodexContinuationByRoom;
-  gitWorkflowEventsByRoom: GitWorkflowEventsByRoom;
-  githubActionsEventsByRoom: GitHubActionsEventsByRoom;
   teamMembersByTeam: TeamMembersByTeam;
   teamMembersMessageByTeam: TeamMembersMessageByTeam;
   teamMembersBusyByTeam: TeamMembersBusyByTeam;
   messagesByRoom: MessagesByRoom;
-  setActionsMessageForRoom: (roomId: string, message: string | null) => void;
-  setActionRunsForRoom: (roomId: string, runs: GitHubActionRun[]) => void;
-  setActionsLastCheckedForRoom: (roomId: string, checkedAt: string | null) => void;
-  resetGitHubActionsStateForRoom: (roomId: string) => void;
   setInviteRequestsForRoom: (roomId: string, requests: InviteJoinRequest[]) => void;
   setInviteSecretInputValue: (value: string) => void;
   clearInviteSecretInput: () => void;
@@ -189,14 +155,10 @@ export interface AppStoreState
   hydrateLocalRoomHistoryForRoom: (roomId: string, payload: LocalRoomHistoryPayload) => void;
   appendRoomMessage: (roomId: string, message: ChatMessage) => void;
   applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
-  setGitWorkflowBusyForRoom: (roomId: string, busy: boolean) => void;
-  setActionsBusyForRoom: (roomId: string, busy: boolean) => void;
   setHostBusyForRoom: (roomId: string, busy: boolean) => void;
   setSettingsBusyForRoom: (roomId: string, busy: boolean) => void;
   setKeyRotationBusyForRoom: (roomId: string, busy: boolean) => void;
   updateInviteRequestStatus: (roomId: string, requestId: string, status: InviteJoinRequest["status"]) => void;
-  appendGitWorkflowEvent: (roomId: string, event: GitWorkflowEventPlaintextPayload) => void;
-  appendGitHubActionsEvent: (roomId: string, event: GitHubActionsEventPlaintextPayload) => void;
   appendHostHandoff: (roomId: string, handoff: HostHandoffRecord) => void;
   markHostHandoffAcceptedForRoom: (roomId: string, handoffId: string) => void;
   markLatestHostHandoffAcceptedForRoom: (roomId: string) => void;
@@ -212,9 +174,6 @@ export interface AppStoreState
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setSecretWarningVisibleForRoom: (roomId: string, visible: boolean) => void;
   setSettingsMessageForRoom: (roomId: string, message: string | null) => void;
-  setGitWorkflowMessageForRoom: (roomId: string, message: string | null) => void;
-  setGitStatusForRoom: (roomId: string, status: GitStatusSummary | null) => void;
-  updateGitWorkflowDraftForRoom: (roomId: string, patch: Partial<GitWorkflowDraft>) => void;
   setInviteLinkForRoom: (roomId: string, link: string) => void;
   setInviteApprovalGateForRoom: (roomId: string, enabled: boolean) => void;
   setInviteMessageForRoom: (roomId: string, message: string | null) => void;
@@ -229,43 +188,11 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   ...emptyAppStoreState,
   ...createBrowserSlice(set, get, api),
   ...createFilePanelSlice(set, get, api),
+  ...createGitWorkflowSlice(set, get, api),
   ...createHistoryPresenceSlice(set, get, api),
   ...createLocalPreviewSlice(set, get, api),
   ...createRoomChatSlice(set, get, api),
   ...createTerminalSlice(set, get, api),
-  setActionsMessageForRoom: (roomId, message) => {
-    set((state) => ({
-      actionsMessagesByRoom: message
-        ? { ...state.actionsMessagesByRoom, [roomId]: message }
-        : omitRecordKey(state.actionsMessagesByRoom, roomId)
-    }));
-  },
-  setActionRunsForRoom: (roomId, runs) => {
-    set((state) => ({
-      actionRunsByRoom: {
-        ...state.actionRunsByRoom,
-        [roomId]: runs
-      }
-    }));
-  },
-  setActionsLastCheckedForRoom: (roomId, checkedAt) => {
-    set((state) => ({
-      actionsLastCheckedByRoom: checkedAt
-        ? { ...state.actionsLastCheckedByRoom, [roomId]: checkedAt }
-        : omitRecordKey(state.actionsLastCheckedByRoom, roomId)
-    }));
-  },
-  resetGitHubActionsStateForRoom: (roomId) => {
-    set((state) => ({
-      actionRunsByRoom: {
-        ...state.actionRunsByRoom,
-        [roomId]: []
-      },
-      actionsLastCheckedByRoom: omitRecordKey(state.actionsLastCheckedByRoom, roomId),
-      actionsMessagesByRoom: omitRecordKey(state.actionsMessagesByRoom, roomId),
-      actionsBusyByRoom: omitRecordKey(state.actionsBusyByRoom, roomId)
-    }));
-  },
   setInviteRequestsForRoom: (roomId, requests) => {
     set((state) => ({
       inviteRequestsByRoom: {
@@ -458,16 +385,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       };
     });
   },
-  setGitWorkflowBusyForRoom: (roomId, busy) => {
-    set((state) => ({
-      gitWorkflowBusyByRoom: updateRoomBusyMap(state.gitWorkflowBusyByRoom, roomId, busy)
-    }));
-  },
-  setActionsBusyForRoom: (roomId, busy) => {
-    set((state) => ({
-      actionsBusyByRoom: updateRoomBusyMap(state.actionsBusyByRoom, roomId, busy)
-    }));
-  },
   setHostBusyForRoom: (roomId, busy) => {
     set((state) => ({
       hostBusyByRoom: updateRoomBusyMap(state.hostBusyByRoom, roomId, busy)
@@ -492,47 +409,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
         )
       }
     }));
-  },
-  appendGitWorkflowEvent: (roomId, event) => {
-    set((state) => {
-      const roomEvents = state.gitWorkflowEventsByRoom[roomId] ?? [];
-      if (
-        roomEvents.some((existing) =>
-          existing.createdAt === event.createdAt &&
-          existing.status === event.status &&
-          existing.message === event.message
-        )
-      ) {
-        return state;
-      }
-      return {
-        gitWorkflowEventsByRoom: {
-          ...state.gitWorkflowEventsByRoom,
-          [roomId]: [...roomEvents, event].slice(-100)
-        }
-      };
-    });
-  },
-  appendGitHubActionsEvent: (roomId, event) => {
-    set((state) => {
-      const roomEvents = state.githubActionsEventsByRoom[roomId] ?? [];
-      if (
-        roomEvents.some((existing) =>
-          existing.checkedAt === event.checkedAt &&
-          existing.owner === event.owner &&
-          existing.repo === event.repo &&
-          existing.branch === event.branch
-        )
-      ) {
-        return state;
-      }
-      return {
-        githubActionsEventsByRoom: {
-          ...state.githubActionsEventsByRoom,
-          [roomId]: [...roomEvents, event].slice(-50)
-        }
-      };
-    });
   },
   appendHostHandoff: (roomId, handoff) => {
     set((state) => {
@@ -675,27 +551,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       settingsMessagesByRoom: message
         ? { ...state.settingsMessagesByRoom, [roomId]: message }
         : omitRecordKey(state.settingsMessagesByRoom, roomId)
-    }));
-  },
-  setGitWorkflowMessageForRoom: (roomId, message) => {
-    set((state) => ({
-      gitWorkflowMessagesByRoom: {
-        ...state.gitWorkflowMessagesByRoom,
-        [roomId]: message
-      }
-    }));
-  },
-  setGitStatusForRoom: (roomId, status) => {
-    set((state) => ({
-      gitStatusByRoom: {
-        ...state.gitStatusByRoom,
-        [roomId]: status
-      }
-    }));
-  },
-  updateGitWorkflowDraftForRoom: (roomId, patch) => {
-    set((state) => ({
-      gitWorkflowDraftsByRoom: updateGitWorkflowDraftRecord(state.gitWorkflowDraftsByRoom, roomId, patch)
     }));
   },
   setInviteLinkForRoom: (roomId, link) => {
