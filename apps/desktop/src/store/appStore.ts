@@ -14,6 +14,11 @@ import {
   type HistoryPresenceSlice
 } from "./slices/historyPresenceSlice";
 import {
+  createInviteSlice,
+  emptyInviteState,
+  type InviteSlice
+} from "./slices/inviteSlice";
+import {
   createLocalPreviewSlice,
   emptyLocalPreviewState,
   type LocalPreviewSlice
@@ -24,7 +29,6 @@ import type {
   ChatMessage,
   CodexRoomEvent,
   HostHandoffRecord,
-  InviteJoinRequest,
   LocalRoomHistoryPayload,
   PendingCodexApproval,
   RoomGoal,
@@ -41,12 +45,6 @@ type SettingsBusyByRoom = Record<string, boolean>;
 type SettingsMessagesByRoom = Record<string, string | null>;
 type CustomCodexModelsByRoom = Record<string, string>;
 type ProjectPathDraftsByRoom = Record<string, string>;
-type InviteRequestsByRoom = Record<string, InviteJoinRequest[]>;
-type InviteLinksByRoom = Record<string, string>;
-type InviteApprovalGatesByRoom = Record<string, boolean>;
-type InviteMessagesByRoom = Record<string, string | null>;
-type KeyRotationBusyByRoom = Record<string, boolean>;
-type InviteAdmissionsByRoom = Record<string, string>;
 type CodexEventsByRoom = Record<string, CodexRoomEvent[]>;
 type ApprovalVisibleByRoom = Record<string, boolean>;
 type PendingCodexApprovalsByRoom = Record<string, PendingCodexApproval>;
@@ -79,13 +77,7 @@ const emptyAppStoreState = {
   customCodexModelsByRoom: {},
   projectPathDraftsByRoom: {},
   ...emptyLocalPreviewState,
-  inviteRequestsByRoom: {},
-  inviteSecretInput: "",
-  inviteLinksByRoom: {},
-  inviteApprovalGatesByRoom: {},
-  inviteMessagesByRoom: {},
-  keyRotationBusyByRoom: {},
-  inviteAdmissionsByRoom: {},
+  ...emptyInviteState,
   ...emptyRoomChatState,
   codexEventsByRoom: {},
   approvalVisibleByRoom: {},
@@ -112,6 +104,7 @@ export interface AppStoreState
     FilePanelSlice,
     GitWorkflowSlice,
     HistoryPresenceSlice,
+    InviteSlice,
     LocalPreviewSlice,
     RoomChatSlice,
     TerminalSlice {
@@ -121,13 +114,6 @@ export interface AppStoreState
   settingsMessagesByRoom: SettingsMessagesByRoom;
   customCodexModelsByRoom: CustomCodexModelsByRoom;
   projectPathDraftsByRoom: ProjectPathDraftsByRoom;
-  inviteRequestsByRoom: InviteRequestsByRoom;
-  inviteSecretInput: string;
-  inviteLinksByRoom: InviteLinksByRoom;
-  inviteApprovalGatesByRoom: InviteApprovalGatesByRoom;
-  inviteMessagesByRoom: InviteMessagesByRoom;
-  keyRotationBusyByRoom: KeyRotationBusyByRoom;
-  inviteAdmissionsByRoom: InviteAdmissionsByRoom;
   codexEventsByRoom: CodexEventsByRoom;
   approvalVisibleByRoom: ApprovalVisibleByRoom;
   pendingCodexApprovalsByRoom: PendingCodexApprovalsByRoom;
@@ -141,11 +127,6 @@ export interface AppStoreState
   teamMembersMessageByTeam: TeamMembersMessageByTeam;
   teamMembersBusyByTeam: TeamMembersBusyByTeam;
   messagesByRoom: MessagesByRoom;
-  setInviteRequestsForRoom: (roomId: string, requests: InviteJoinRequest[]) => void;
-  setInviteSecretInputValue: (value: string) => void;
-  clearInviteSecretInput: () => void;
-  setInviteAdmissionForRoom: (roomId: string, inviteId: string | null) => void;
-  clearInviteAdmissionForRoom: (roomId: string) => void;
   seedWorkspaceInitialDataIfEmpty: (initialData: WorkspaceInitialData) => void;
   setTeamMembersForTeam: (teamId: string, members: TeamMemberRecord[]) => void;
   setTeamMembersMessageForTeam: (teamId: string, message: string | null) => void;
@@ -157,13 +138,10 @@ export interface AppStoreState
   applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
   setHostBusyForRoom: (roomId: string, busy: boolean) => void;
   setSettingsBusyForRoom: (roomId: string, busy: boolean) => void;
-  setKeyRotationBusyForRoom: (roomId: string, busy: boolean) => void;
-  updateInviteRequestStatus: (roomId: string, requestId: string, status: InviteJoinRequest["status"]) => void;
   appendHostHandoff: (roomId: string, handoff: HostHandoffRecord) => void;
   markHostHandoffAcceptedForRoom: (roomId: string, handoffId: string) => void;
   markLatestHostHandoffAcceptedForRoom: (roomId: string) => void;
   setCodexContinuationForRoom: (roomId: string, handoff: HostHandoffRecord | null) => void;
-  appendInviteRequest: (roomId: string, request: InviteJoinRequest) => void;
   appendCodexEvent: (roomId: string, event: CodexRoomEvent) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
@@ -174,9 +152,6 @@ export interface AppStoreState
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setSecretWarningVisibleForRoom: (roomId: string, visible: boolean) => void;
   setSettingsMessageForRoom: (roomId: string, message: string | null) => void;
-  setInviteLinkForRoom: (roomId: string, link: string) => void;
-  setInviteApprovalGateForRoom: (roomId: string, enabled: boolean) => void;
-  setInviteMessageForRoom: (roomId: string, message: string | null) => void;
   setCustomCodexModelForRoom: (roomId: string, model: string, currentModel: string) => void;
   setProjectPathDraftForRoom: (roomId: string, projectPath: string, currentProjectPath: string) => void;
   clearRoomScopedStateForRoom: (roomId: string) => void;
@@ -190,35 +165,10 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   ...createFilePanelSlice(set, get, api),
   ...createGitWorkflowSlice(set, get, api),
   ...createHistoryPresenceSlice(set, get, api),
+  ...createInviteSlice(set, get, api),
   ...createLocalPreviewSlice(set, get, api),
   ...createRoomChatSlice(set, get, api),
   ...createTerminalSlice(set, get, api),
-  setInviteRequestsForRoom: (roomId, requests) => {
-    set((state) => ({
-      inviteRequestsByRoom: {
-        ...state.inviteRequestsByRoom,
-        [roomId]: requests
-      }
-    }));
-  },
-  setInviteSecretInputValue: (value) => {
-    set({ inviteSecretInput: value });
-  },
-  clearInviteSecretInput: () => {
-    set({ inviteSecretInput: "" });
-  },
-  setInviteAdmissionForRoom: (roomId, inviteId) => {
-    set((state) => ({
-      inviteAdmissionsByRoom: inviteId
-        ? { ...state.inviteAdmissionsByRoom, [roomId]: inviteId }
-        : omitRecordKey(state.inviteAdmissionsByRoom, roomId)
-    }));
-  },
-  clearInviteAdmissionForRoom: (roomId) => {
-    set((state) => ({
-      inviteAdmissionsByRoom: omitRecordKey(state.inviteAdmissionsByRoom, roomId)
-    }));
-  },
   seedWorkspaceInitialDataIfEmpty: ({ teamMembersByTeam, messagesByRoom }) => {
     set((state) => {
       const shouldSeedTeamMembers =
@@ -395,21 +345,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       settingsBusyByRoom: updateRoomBusyMap(state.settingsBusyByRoom, roomId, busy)
     }));
   },
-  setKeyRotationBusyForRoom: (roomId, busy) => {
-    set((state) => ({
-      keyRotationBusyByRoom: updateRoomBusyMap(state.keyRotationBusyByRoom, roomId, busy)
-    }));
-  },
-  updateInviteRequestStatus: (roomId, requestId, status) => {
-    set((state) => ({
-      inviteRequestsByRoom: {
-        ...state.inviteRequestsByRoom,
-        [roomId]: (state.inviteRequestsByRoom[roomId] ?? []).map((request) =>
-          request.id === requestId ? { ...request, status } : request
-        )
-      }
-    }));
-  },
   appendHostHandoff: (roomId, handoff) => {
     set((state) => {
       const roomHandoffs = state.hostHandoffsByRoom[roomId] ?? [];
@@ -457,18 +392,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
         ? { ...state.codexContinuationByRoom, [roomId]: handoff }
         : omitRecordKey(state.codexContinuationByRoom, roomId)
     }));
-  },
-  appendInviteRequest: (roomId, request) => {
-    set((state) => {
-      const roomRequests = state.inviteRequestsByRoom[roomId] ?? [];
-      if (roomRequests.some((existing) => existing.id === request.id)) return state;
-      return {
-        inviteRequestsByRoom: {
-          ...state.inviteRequestsByRoom,
-          [roomId]: [...roomRequests, request]
-        }
-      };
-    });
   },
   appendCodexEvent: (roomId, event) => {
     set((state) => {
@@ -551,27 +474,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       settingsMessagesByRoom: message
         ? { ...state.settingsMessagesByRoom, [roomId]: message }
         : omitRecordKey(state.settingsMessagesByRoom, roomId)
-    }));
-  },
-  setInviteLinkForRoom: (roomId, link) => {
-    set((state) => ({
-      inviteLinksByRoom: link
-        ? { ...state.inviteLinksByRoom, [roomId]: link }
-        : omitRecordKey(state.inviteLinksByRoom, roomId)
-    }));
-  },
-  setInviteApprovalGateForRoom: (roomId, enabled) => {
-    set((state) => ({
-      inviteApprovalGatesByRoom: enabled
-        ? { ...state.inviteApprovalGatesByRoom, [roomId]: true }
-        : omitRecordKey(state.inviteApprovalGatesByRoom, roomId)
-    }));
-  },
-  setInviteMessageForRoom: (roomId, message) => {
-    set((state) => ({
-      inviteMessagesByRoom: message
-        ? { ...state.inviteMessagesByRoom, [roomId]: message }
-        : omitRecordKey(state.inviteMessagesByRoom, roomId)
     }));
   },
   setCustomCodexModelForRoom: (roomId, model, currentModel) => {
