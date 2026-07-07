@@ -258,7 +258,7 @@ const {
   roomKey,
   pruneEncryptedBacklog,
   addTeamMember,
-  scheduleStoreSave,
+  saveEncryptedBacklog: (roomKey, envelopes) => relayStorePersistence.saveEncryptedBacklog(roomKey, envelopes),
   teamRecordForUser
 });
 const {

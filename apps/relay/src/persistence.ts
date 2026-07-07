@@ -2,6 +2,8 @@ import Database from "better-sqlite3";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { nanoid } from "nanoid";
+import type { RelayEnvelope } from "@multaiplayer/protocol";
+import type { RoomKey } from "./state.js";
 
 export type RelayStorageBackend = "json" | "sqlite";
 
@@ -9,6 +11,7 @@ export interface RelayPersistence {
   readonly flushMode: "debounced" | "immediate";
   load(): Promise<unknown | null>;
   save(state: unknown): Promise<void>;
+  saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): Promise<boolean>;
   quarantine(reason: string): Promise<void>;
   close(): void;
 }
@@ -44,6 +47,10 @@ class JsonFileRelayPersistence implements RelayPersistence {
     await rename(tempPath, this.dataPath);
   }
 
+  async saveEncryptedBacklog(): Promise<boolean> {
+    return false;
+  }
+
   async quarantine(reason: string): Promise<void> {
     await quarantinePath(this.dataPath, reason);
   }
@@ -72,6 +79,12 @@ class SqliteRelayPersistence implements RelayPersistence {
   async save(state: unknown): Promise<void> {
     await mkdir(dirname(this.dataPath), { recursive: true });
     saveNormalizedRelayState(this.getDb(), state);
+  }
+
+  async saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): Promise<boolean> {
+    await mkdir(dirname(this.dataPath), { recursive: true });
+    saveEncryptedBacklogRows(this.getDb(), roomKey, envelopes);
+    return true;
   }
 
   async quarantine(reason: string): Promise<void> {
@@ -129,8 +142,17 @@ class SqliteRelayPersistence implements RelayPersistence {
       create table if not exists relay_encrypted_backlog (
         room_key text primary key,
         data_json text not null
+      );
+      create table if not exists relay_encrypted_envelopes (
+        room_key text not null,
+        envelope_id text not null,
+        sort_order integer not null,
+        created_at text not null,
+        data_json text not null,
+        primary key (room_key, envelope_id)
       )
     `);
+    migrateLegacyEncryptedBacklogRows(db);
     this.db = db;
     return db;
   }
@@ -159,7 +181,7 @@ function loadNormalizedRelayState(db: Database.Database): unknown | null {
     teamMembers: loadJsonRows(db, "relay_team_members", "team_id"),
     authSessions: loadJsonRows(db, "relay_auth_sessions", "session_id"),
     attachmentBlobs: loadJsonRows(db, "relay_attachment_blobs", "id"),
-    encryptedBacklog: loadJsonRows(db, "relay_encrypted_backlog", "room_key")
+    encryptedBacklog: loadEncryptedBacklogRows(db)
   };
 }
 
@@ -183,7 +205,6 @@ function saveNormalizedRelayState(db: Database.Database, state: unknown) {
     saveJsonRows(db, "relay_team_members", "team_id", state.teamMembers, (item) => relayId(item, "teamId"));
     saveJsonRows(db, "relay_auth_sessions", "session_id", state.authSessions, (item) => relayId(item, "sessionId"));
     saveJsonRows(db, "relay_attachment_blobs", "id", state.attachmentBlobs, (item) => relayId(item, "id"));
-    saveJsonRows(db, "relay_encrypted_backlog", "room_key", state.encryptedBacklog, (item) => relayId(item, "key"));
   })();
 }
 
@@ -196,11 +217,84 @@ function clearNormalizedRelayTables(db: Database.Database) {
     "relay_devices",
     "relay_team_members",
     "relay_auth_sessions",
-    "relay_attachment_blobs",
-    "relay_encrypted_backlog"
+    "relay_attachment_blobs"
   ]) {
     db.prepare(`delete from ${table}`).run();
   }
+}
+
+function loadEncryptedBacklogRows(db: Database.Database): unknown[] {
+  const rows = db
+    .prepare("select room_key, data_json from relay_encrypted_envelopes order by room_key, sort_order, envelope_id")
+    .all() as Array<{ room_key?: unknown; data_json?: unknown }>;
+  if (rows.length === 0) return loadJsonRows(db, "relay_encrypted_backlog", "room_key");
+
+  const backlog = new Map<string, unknown[]>();
+  for (const row of rows) {
+    if (typeof row.room_key !== "string" || typeof row.data_json !== "string") continue;
+    try {
+      const envelopes = backlog.get(row.room_key) ?? [];
+      envelopes.push(JSON.parse(row.data_json) as unknown);
+      backlog.set(row.room_key, envelopes);
+    } catch {
+      // The store codec validates each envelope; skip a malformed row so one
+      // damaged envelope cannot hide the rest of the room backlog.
+    }
+  }
+  return Array.from(backlog.entries()).map(([key, envelopes]) => ({ key, envelopes }));
+}
+
+function migrateLegacyEncryptedBacklogRows(db: Database.Database) {
+  const existing = db.prepare("select count(*) as count from relay_encrypted_envelopes").get() as
+    | { count?: unknown }
+    | undefined;
+  if (typeof existing?.count === "number" && existing.count > 0) return;
+
+  const legacyRows = loadJsonRows(db, "relay_encrypted_backlog", "room_key");
+  if (legacyRows.length === 0) return;
+  db.transaction(() => {
+    for (const item of legacyRows) {
+      if (!isRecord(item) || typeof item.key !== "string" || !Array.isArray(item.envelopes)) continue;
+      for (const [index, envelope] of item.envelopes.entries()) {
+        if (!isRecord(envelope) || typeof envelope.id !== "string" || typeof envelope.createdAt !== "string") continue;
+        db.prepare(`
+          insert or ignore into relay_encrypted_envelopes (room_key, envelope_id, sort_order, created_at, data_json)
+          values (?, ?, ?, ?, ?)
+        `).run(item.key, envelope.id, index, envelope.createdAt, JSON.stringify(envelope));
+      }
+    }
+  })();
+}
+
+function saveEncryptedBacklogRows(db: Database.Database, roomKey: RoomKey, envelopes: RelayEnvelope[]) {
+  db.transaction(() => {
+    if (envelopes.length === 0) {
+      db.prepare("delete from relay_encrypted_envelopes where room_key = ?").run(roomKey);
+      return;
+    }
+    const envelopeIds = new Set(envelopes.map((envelope) => envelope.id));
+    const existing = db
+      .prepare("select envelope_id from relay_encrypted_envelopes where room_key = ?")
+      .all(roomKey) as Array<{ envelope_id?: unknown }>;
+    const deleteEnvelope = db.prepare("delete from relay_encrypted_envelopes where room_key = ? and envelope_id = ?");
+    for (const row of existing) {
+      if (typeof row.envelope_id === "string" && !envelopeIds.has(row.envelope_id)) {
+        deleteEnvelope.run(roomKey, row.envelope_id);
+      }
+    }
+
+    const upsert = db.prepare(`
+      insert into relay_encrypted_envelopes (room_key, envelope_id, sort_order, created_at, data_json)
+      values (?, ?, ?, ?, ?)
+      on conflict(room_key, envelope_id) do update set
+        sort_order = excluded.sort_order,
+        created_at = excluded.created_at,
+        data_json = excluded.data_json
+    `);
+    for (const [index, envelope] of envelopes.entries()) {
+      upsert.run(roomKey, envelope.id, index, envelope.createdAt, JSON.stringify(envelope));
+    }
+  })();
 }
 
 function loadJsonRows(db: Database.Database, table: string, keyColumn: string): unknown[] {

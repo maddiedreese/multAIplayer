@@ -2990,6 +2990,57 @@ test("relay persists workspace state through SQLite storage", async () => {
   }
 });
 
+test("relay persists SQLite encrypted backlog as individual envelope rows", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-sqlite-backlog-"));
+  const dataPath = join(tempDir, "relay-store.sqlite");
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+    MULTAIPLAYER_RELAY_BACKLOG_LIMIT: "1"
+  }, undefined, dataPath);
+  const sender = new WebSocket(relay.wsUrl);
+  try {
+    await onceOpen(sender);
+    sender.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:tester",
+      deviceId: "device-test-123"
+    }));
+    await waitForJoined(sender);
+
+    sender.send(JSON.stringify({
+      type: "publish",
+      envelope: testEnvelope({ id: "sqlite-backlog-first", createdAt: "2026-07-07T00:00:02.000Z" })
+    }));
+    await waitForSqliteBacklogRows(dataPath, (rows) => rows.length === 1 && rows[0]?.envelope_id === "sqlite-backlog-first");
+
+    sender.send(JSON.stringify({
+      type: "publish",
+      envelope: testEnvelope({ id: "sqlite-backlog-second", createdAt: "2026-07-07T00:00:01.000Z" })
+    }));
+
+    const rows = await waitForSqliteBacklogRows(dataPath, (currentRows) => (
+      currentRows.length === 1 &&
+      currentRows[0]?.envelope_id === "sqlite-backlog-second" &&
+      currentRows[0]?.sort_order === 0
+    ));
+    assert.equal(JSON.parse(rows[0]?.data_json ?? "{}").id, "sqlite-backlog-second");
+
+    const db = new Database(dataPath, { readonly: true });
+    try {
+      const legacyRows = db.prepare("select data_json from relay_encrypted_backlog").all() as Array<{ data_json: string }>;
+      assert.deepEqual(legacyRows, []);
+    } finally {
+      db.close();
+    }
+  } finally {
+    sender.close();
+    await relay.close();
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("relay disables debug endpoints in production unless explicitly enabled", async () => {
   const productionRelay = await startRelay({ NODE_ENV: "production" });
   try {
@@ -3254,6 +3305,32 @@ async function waitForSqliteRows(
     await delay(50);
   }
   assert.fail(`Timed out waiting for SQLite relay rows: ${String(lastError)}`);
+}
+
+async function waitForSqliteBacklogRows(
+  dataPath: string,
+  predicate: (rows: Array<{ envelope_id: string; sort_order: number; data_json: string }>) => boolean
+): Promise<Array<{ envelope_id: string; sort_order: number; data_json: string }>> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    let db: Database.Database | null = null;
+    try {
+      db = new Database(dataPath, { readonly: true });
+      const rows = db.prepare(`
+        select envelope_id, sort_order, data_json
+        from relay_encrypted_envelopes
+        where room_key = ?
+        order by sort_order, envelope_id
+      `).all("team-core:room-desktop") as Array<{ envelope_id: string; sort_order: number; data_json: string }>;
+      if (predicate(rows)) return rows;
+    } catch (error) {
+      lastError = error;
+    } finally {
+      db?.close();
+    }
+    await delay(50);
+  }
+  assert.fail(`Timed out waiting for SQLite backlog rows: ${String(lastError)}`);
 }
 
 async function waitForDebugBacklog(baseUrl: string, envelopes: number) {

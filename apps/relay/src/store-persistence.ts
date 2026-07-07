@@ -1,10 +1,13 @@
 import { isRecord } from "./limits.js";
+import type { RelayEnvelope } from "@multaiplayer/protocol";
 import type { RelayPersistence } from "./persistence.js";
+import type { RoomKey } from "./state.js";
 import type { RelayStoreCodec } from "./store-codec.js";
 
 export interface RelayStorePersistenceCoordinator {
   loadRelayStore(): Promise<void>;
   scheduleStoreSave(): void;
+  saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): void;
   saveRelayStore(): Promise<void>;
   flushRelayStore(): Promise<void>;
   closeRelayStore(): Promise<void>;
@@ -50,6 +53,17 @@ export function createRelayStorePersistenceCoordinator(options: {
     }, 100);
   }
 
+  function saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]) {
+    options.persistence.saveEncryptedBacklog(roomKey, envelopes)
+      .then((handled) => {
+        if (!handled) scheduleStoreSave();
+      })
+      .catch((error) => {
+        console.error("Failed to save encrypted relay backlog:", error);
+        scheduleStoreSave();
+      });
+  }
+
   async function saveRelayStore() {
     options.storeCodec.pruneExpiredRelayState();
     await options.persistence.save(options.storeCodec.toStoredRelayState());
@@ -71,6 +85,7 @@ export function createRelayStorePersistenceCoordinator(options: {
   return {
     loadRelayStore,
     scheduleStoreSave,
+    saveEncryptedBacklog,
     saveRelayStore,
     flushRelayStore,
     closeRelayStore
