@@ -7,6 +7,7 @@ import type {
   BrowserAccessRequest,
   BrowserStatus,
   ChatAttachment,
+  ChatMessage,
   CodexRoomEvent,
   InviteJoinRequest,
   LocalPreviewDialogState,
@@ -62,6 +63,7 @@ type CodexRunningByRoom = Record<string, boolean>;
 type SecretWarningsVisibleByRoom = Record<string, boolean>;
 type CodexThreadIdsByRoom = Record<string, string>;
 type SelectedMessageIdsByRoom = Record<string, string[]>;
+type HistorySearchMessagesByRoom = Record<string, ChatMessage[]>;
 
 const emptyLocalPreviewDialog: LocalPreviewDialogState = {
   open: false,
@@ -123,7 +125,8 @@ const emptyAppStoreState = {
   codexRunningByRoom: {},
   secretWarningsVisibleByRoom: {},
   codexThreadIdsByRoom: {},
-  selectedMessageIdsByRoom: {}
+  selectedMessageIdsByRoom: {},
+  historySearchMessagesByRoom: {}
 };
 
 function resolveSetStateAction<T>(current: T, action: SetStateAction<T>): T {
@@ -180,6 +183,7 @@ interface AppStoreState {
   secretWarningsVisibleByRoom: SecretWarningsVisibleByRoom;
   codexThreadIdsByRoom: CodexThreadIdsByRoom;
   selectedMessageIdsByRoom: SelectedMessageIdsByRoom;
+  historySearchMessagesByRoom: HistorySearchMessagesByRoom;
   setGitStatusByRoom: (action: SetStateAction<GitStatusByRoom>) => void;
   setGitWorkflowBusyByRoom: (action: SetStateAction<GitWorkflowBusyByRoom>) => void;
   setGitWorkflowMessagesByRoom: (action: SetStateAction<GitWorkflowMessagesByRoom>) => void;
@@ -229,6 +233,7 @@ interface AppStoreState {
   setSecretWarningsVisibleByRoom: (action: SetStateAction<SecretWarningsVisibleByRoom>) => void;
   setCodexThreadIdsByRoom: (action: SetStateAction<CodexThreadIdsByRoom>) => void;
   setSelectedMessageIdsByRoom: (action: SetStateAction<SelectedMessageIdsByRoom>) => void;
+  setHistorySearchMessagesByRoom: (action: SetStateAction<HistorySearchMessagesByRoom>) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
 }
@@ -478,6 +483,11 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setSelectedMessageIdsByRoom: (action) => {
     set((state) => ({
       selectedMessageIdsByRoom: resolveSetStateAction(state.selectedMessageIdsByRoom, action)
+    }));
+  },
+  setHistorySearchMessagesByRoom: (action) => {
+    set((state) => ({
+      historySearchMessagesByRoom: resolveSetStateAction(state.historySearchMessagesByRoom, action)
     }));
   },
   resetAppStore: () => set(emptyAppStoreState),
