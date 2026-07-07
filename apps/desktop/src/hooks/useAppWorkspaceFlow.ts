@@ -181,9 +181,6 @@ export function useAppWorkspaceFlow({
         currentUser: githubAuth.currentUser,
         setDeviceIdentityMessage: appRuntimeState.setDeviceIdentityMessage,
         setTrustedDeviceKeys: appRuntimeState.setTrustedDeviceKeys,
-        setTeamMembersBusyByTeam: workspaceState.setTeamMembersBusyByTeam,
-        setTeamMembersMessageByTeam: workspaceState.setTeamMembersMessageByTeam,
-        setTeamMembersByTeam: workspaceState.setTeamMembersByTeam,
         setTeams: workspaceState.setTeams
       },
       workspaceCreation: {

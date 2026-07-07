@@ -343,6 +343,10 @@ interface AppStoreState {
   setTeamMembersByTeam: (action: SetStateAction<TeamMembersByTeam>) => void;
   setTeamMembersMessageByTeam: (action: SetStateAction<TeamMembersMessageByTeam>) => void;
   setTeamMembersBusyByTeam: (action: SetStateAction<TeamMembersBusyByTeam>) => void;
+  setTeamMembersForTeam: (teamId: string, members: TeamMemberRecord[]) => void;
+  setTeamMembersMessageForTeam: (teamId: string, message: string | null) => void;
+  setTeamMembersBusyForTeam: (teamId: string, busy: boolean) => void;
+  ensureLocalTeamMemberForTeam: (teamId: string, userId: string, role: TeamMemberRecord["role"]) => void;
   setMessagesByRoom: (action: SetStateAction<MessagesByRoom>) => void;
   appendRoomMessage: (roomId: string, message: ChatMessage) => void;
   applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
@@ -798,6 +802,46 @@ export const useAppStore = create<AppStoreState>((set) => ({
     set((state) => ({
       teamMembersBusyByTeam: resolveSetStateAction(state.teamMembersBusyByTeam, action)
     }));
+  },
+  setTeamMembersForTeam: (teamId, members) => {
+    set((state) => ({
+      teamMembersByTeam: {
+        ...state.teamMembersByTeam,
+        [teamId]: members
+      }
+    }));
+  },
+  setTeamMembersMessageForTeam: (teamId, message) => {
+    set((state) => ({
+      teamMembersMessageByTeam: {
+        ...state.teamMembersMessageByTeam,
+        [teamId]: message
+      }
+    }));
+  },
+  setTeamMembersBusyForTeam: (teamId, busy) => {
+    set((state) => ({
+      teamMembersBusyByTeam: {
+        ...state.teamMembersBusyByTeam,
+        [teamId]: busy
+      }
+    }));
+  },
+  ensureLocalTeamMemberForTeam: (teamId, userId, role) => {
+    set((state) => {
+      if (state.teamMembersByTeam[teamId]?.some((member) => member.userId === userId)) return state;
+      return {
+        teamMembersByTeam: {
+          ...state.teamMembersByTeam,
+          [teamId]: [{
+            teamId,
+            userId,
+            role,
+            joinedAt: new Date().toISOString()
+          }]
+        }
+      };
+    });
   },
   setMessagesByRoom: (action) => {
     set((state) => ({

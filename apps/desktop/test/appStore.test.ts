@@ -1186,6 +1186,31 @@ test("desktop store keeps workspace maps scoped", () => {
   assert.deepEqual(state.messagesByRoom["room-b"], []);
 });
 
+test("desktop store exposes team member actions", () => {
+  const store = useAppStore.getState();
+  const members = [
+    {
+      teamId: "team-core",
+      userId: "github:maddie",
+      role: "owner" as const,
+      joinedAt: "2026-07-06T00:17:00.000Z"
+    }
+  ];
+
+  store.setTeamMembersForTeam("team-core", members);
+  store.setTeamMembersMessageForTeam("team-core", "Members refreshed");
+  store.setTeamMembersBusyForTeam("team-core", true);
+  store.ensureLocalTeamMemberForTeam("team-labs", "github:maddie", "admin");
+  store.ensureLocalTeamMemberForTeam("team-labs", "github:maddie", "member");
+
+  const state = useAppStore.getState();
+  assert.equal(state.teamMembersByTeam["team-core"]?.[0]?.role, "owner");
+  assert.equal(state.teamMembersMessageByTeam["team-core"], "Members refreshed");
+  assert.equal(state.teamMembersBusyByTeam["team-core"], true);
+  assert.equal(state.teamMembersByTeam["team-labs"]?.length, 1);
+  assert.equal(state.teamMembersByTeam["team-labs"]?.[0]?.role, "admin");
+});
+
 test("desktop store exposes room chat message actions", () => {
   const store = useAppStore.getState();
   const message = {

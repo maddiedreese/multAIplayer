@@ -47,7 +47,6 @@ export function useAppWorkspaceRecords({
     localUser: localIdentity.localUser,
     roomsRef: appRefs.roomsRef,
     setTeams: workspaceState.setTeams,
-    setTeamMembersByTeam: workspaceState.setTeamMembersByTeam,
     setRooms: workspaceState.setRooms,
     resetCodexApprovalForRoom,
     setRevokedRoomIds: roomRuntimeState.setRevokedRoomIds,
