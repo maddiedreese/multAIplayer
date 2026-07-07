@@ -17,7 +17,7 @@ For an internet-facing relay, run the production relay doctor in the same enviro
 npm run doctor:production-relay
 ```
 
-The production relay doctor must pass before using an official hosted relay. It checks for GitHub OAuth, a strong durable session secret, explicit exact HTTP(S) allowed origins, auth-required mode, disabled debug endpoints, disabled demo seeding, enabled rate limits, persistent relay storage, and conservative proxy-header handling.
+The production relay doctor must pass before using an official hosted relay. It checks for GitHub OAuth, a strong durable session secret, explicit exact HTTP(S) allowed origins, auth-required mode, disabled debug endpoints, disabled demo seeding, enabled rate limits, SQLite relay storage on a persistent path, and conservative proxy-header handling.
 
 ## Release Artifacts
 
@@ -49,7 +49,7 @@ Before advertising an official relay, verify the exact environment that will run
 NODE_ENV=production npm run doctor:production-relay
 ```
 
-For Docker deployments, build from the repository root with `apps/relay/Dockerfile`, mount persistent storage at `/data`, and set `MULTAIPLAYER_RELAY_ALLOWED_ORIGINS` to bare origins only, such as `https://multaiplayer.com`. Do not use `*`, path-scoped origins, `/tmp` storage, or disabled rate limits for public relays.
+For Docker deployments, build from the repository root with `apps/relay/Dockerfile`, mount persistent storage at `/data`, and set `MULTAIPLAYER_RELAY_ALLOWED_ORIGINS` to bare origins only, such as `https://multaiplayer.com`. The image defaults to SQLite at `/data/relay-store.sqlite`; do not use JSON storage, `*`, path-scoped origins, `/tmp` storage, or disabled rate limits for public relays.
 
 ## Secrets
 

@@ -15,7 +15,8 @@ FROM node:24-bookworm-slim AS runtime
 
 ENV NODE_ENV=production
 ENV PORT=4321
-ENV MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.json
+ENV MULTAIPLAYER_RELAY_STORAGE=sqlite
+ENV MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
 
 WORKDIR /app
 
