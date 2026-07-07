@@ -255,10 +255,8 @@ const {
   sessions,
   encryptedBacklog,
   roomPresence,
-  devices,
   metrics: relayMetrics,
   roomKey,
-  deviceKey,
   pruneEncryptedBacklog,
   addTeamMember,
   scheduleStoreSave,
@@ -380,7 +378,7 @@ registerTeamRoutes({
 });
 registerDeviceRoutes({
   app,
-  devices,
+  store: relayStore,
   getAuthSession,
   allowMutation,
   scheduleStoreSave,

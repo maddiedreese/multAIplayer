@@ -4,11 +4,11 @@ import {
   type DeviceRecord,
   type DevicePublicKeyJwk as DevicePublicKeyJwkType
 } from "@multaiplayer/protocol";
-import type { AuthSession } from "../state.js";
+import type { AuthSession, RelayStore } from "../state.js";
 
 interface RegisterDeviceRoutesOptions {
   app: Express;
-  devices: Map<string, DeviceRecord>;
+  store: RelayStore;
   getAuthSession: (sessionId: unknown) => AuthSession | null;
   allowMutation: (session: AuthSession | null, res: Response) => boolean;
   scheduleStoreSave: () => void;
@@ -24,7 +24,7 @@ interface RegisterDeviceRoutesOptions {
 
 export function registerDeviceRoutes({
   app,
-  devices,
+  store,
   getAuthSession,
   allowMutation,
   scheduleStoreSave,
@@ -67,8 +67,7 @@ export function registerDeviceRoutes({
     }
 
     const now = new Date().toISOString();
-    const key = deviceKey(userId, deviceId);
-    const existing = devices.get(key);
+    const existing = store.getDevice(userId, deviceId);
     const device: DeviceRecord = {
       userId,
       deviceId,
@@ -78,7 +77,7 @@ export function registerDeviceRoutes({
       registeredAt: existing?.registeredAt ?? now,
       lastSeenAt: now
     };
-    devices.set(key, device);
+    store.setDevice(device);
     scheduleStoreSave();
     res.status(existing ? 200 : 201).json({ device });
   });
@@ -96,8 +95,4 @@ function normalizeDevicePublicKeyJwk(value: unknown, maxPublicKeyJwkChars: numbe
   if (!isJsonStringifiableWithin(value, maxPublicKeyJwkChars)) return null;
   const parsed = DevicePublicKeyJwk.safeParse(value);
   return parsed.success ? parsed.data : null;
-}
-
-function deviceKey(userId: string, deviceId: string): string {
-  return `${userId}:${deviceId}`;
 }
