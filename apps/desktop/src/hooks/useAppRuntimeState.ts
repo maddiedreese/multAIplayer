@@ -2,7 +2,8 @@ import { useState } from "react";
 import type { DeviceIdentity } from "../lib/deviceIdentity";
 import { loadTrustedDeviceKeys, type TrustedDeviceKey } from "../lib/deviceTrust";
 import type { CodexProbe } from "../lib/localBackend";
-import type { ChatMessage, RelayStatus } from "../types";
+import { useAppStore } from "../store/appStore";
+import type { RelayStatus } from "../types";
 
 export function useAppRuntimeState() {
   const [codexProbe, setCodexProbe] = useState<CodexProbe | null>(null);
@@ -10,8 +11,9 @@ export function useAppRuntimeState() {
   const [deviceIdentity, setDeviceIdentity] = useState<DeviceIdentity | null>(null);
   const [deviceIdentityMessage, setDeviceIdentityMessage] = useState<string | null>(null);
   const [trustedDeviceKeys, setTrustedDeviceKeys] = useState<TrustedDeviceKey[]>(() => loadTrustedDeviceKeys());
-  const [historySearchMessagesByRoom, setHistorySearchMessagesByRoom] = useState<Record<string, ChatMessage[]>>({});
   const [historySearchBusy, setHistorySearchBusy] = useState(false);
+  const historySearchMessagesByRoom = useAppStore((state) => state.historySearchMessagesByRoom);
+  const setHistorySearchMessagesByRoom = useAppStore((state) => state.setHistorySearchMessagesByRoom);
 
   return {
     codexProbe,

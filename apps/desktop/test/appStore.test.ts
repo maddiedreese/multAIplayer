@@ -361,3 +361,36 @@ test("desktop store keeps markdown message selection room scoped", () => {
   assert.deepEqual(state.selectedMessageIdsByRoom["room-a"], ["message-2"]);
   assert.deepEqual(state.selectedMessageIdsByRoom["room-b"], ["message-9"]);
 });
+
+test("desktop store keeps history search messages room scoped", () => {
+  const store = useAppStore.getState();
+
+  store.setHistorySearchMessagesByRoom({
+    "room-a": [
+      {
+        id: "history-message-1",
+        author: "Jordan",
+        role: "human",
+        body: "Find the old setup note",
+        time: "Yesterday"
+      }
+    ],
+    "room-b": []
+  });
+  store.setHistorySearchMessagesByRoom((current) => ({
+    ...current,
+    "room-b": [
+      {
+        id: "history-message-2",
+        author: "Codex",
+        role: "codex",
+        body: "Previous plan summary",
+        time: "Jul 6"
+      }
+    ]
+  }));
+
+  const state = useAppStore.getState();
+  assert.equal(state.historySearchMessagesByRoom["room-a"]?.[0]?.body, "Find the old setup note");
+  assert.equal(state.historySearchMessagesByRoom["room-b"]?.[0]?.author, "Codex");
+});
