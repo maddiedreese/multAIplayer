@@ -1,14 +1,20 @@
-import { useState } from "react";
-import type { InviteJoinRequest } from "../types";
+import { useAppStore } from "../store/appStore";
 
 export function useInvitePanelState() {
-  const [inviteRequestsByRoom, setInviteRequestsByRoom] = useState<Record<string, InviteJoinRequest[]>>({});
-  const [inviteSecretInput, setInviteSecretInput] = useState("");
-  const [inviteLinksByRoom, setInviteLinksByRoom] = useState<Record<string, string>>({});
-  const [inviteApprovalGatesByRoom, setInviteApprovalGatesByRoom] = useState<Record<string, boolean>>({});
-  const [inviteMessagesByRoom, setInviteMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [keyRotationBusyByRoom, setKeyRotationBusyByRoom] = useState<Record<string, boolean>>({});
-  const [inviteAdmissionsByRoom, setInviteAdmissionsByRoom] = useState<Record<string, string>>({});
+  const inviteRequestsByRoom = useAppStore((state) => state.inviteRequestsByRoom);
+  const setInviteRequestsByRoom = useAppStore((state) => state.setInviteRequestsByRoom);
+  const inviteSecretInput = useAppStore((state) => state.inviteSecretInput);
+  const setInviteSecretInput = useAppStore((state) => state.setInviteSecretInput);
+  const inviteLinksByRoom = useAppStore((state) => state.inviteLinksByRoom);
+  const setInviteLinksByRoom = useAppStore((state) => state.setInviteLinksByRoom);
+  const inviteApprovalGatesByRoom = useAppStore((state) => state.inviteApprovalGatesByRoom);
+  const setInviteApprovalGatesByRoom = useAppStore((state) => state.setInviteApprovalGatesByRoom);
+  const inviteMessagesByRoom = useAppStore((state) => state.inviteMessagesByRoom);
+  const setInviteMessagesByRoom = useAppStore((state) => state.setInviteMessagesByRoom);
+  const keyRotationBusyByRoom = useAppStore((state) => state.keyRotationBusyByRoom);
+  const setKeyRotationBusyByRoom = useAppStore((state) => state.setKeyRotationBusyByRoom);
+  const inviteAdmissionsByRoom = useAppStore((state) => state.inviteAdmissionsByRoom);
+  const setInviteAdmissionsByRoom = useAppStore((state) => state.setInviteAdmissionsByRoom);
 
   return {
     inviteRequestsByRoom,

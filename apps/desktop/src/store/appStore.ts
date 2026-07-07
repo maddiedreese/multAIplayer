@@ -3,7 +3,13 @@ import type { SetStateAction } from "react";
 import type { GitHubActionRun } from "../lib/authClient";
 import type { GitDiffResult, GitStatusSummary, ProjectFileContent, ProjectFileEntry } from "../lib/localBackend";
 import type { GitWorkflowDraft } from "../lib/gitWorkflowDraft";
-import type { BrowserAccessRequest, BrowserStatus, LocalPreviewDialogState, LocalPreviewRecord } from "../types";
+import type {
+  BrowserAccessRequest,
+  BrowserStatus,
+  InviteJoinRequest,
+  LocalPreviewDialogState,
+  LocalPreviewRecord
+} from "../types";
 import type { FilePreviewTab } from "../lib/filePreview";
 import type { MarkdownCopyFallback } from "../types";
 
@@ -37,6 +43,12 @@ type CustomCodexModelsByRoom = Record<string, string>;
 type ProjectPathDraftsByRoom = Record<string, string>;
 type LocalPreviewsByRoom = Record<string, LocalPreviewRecord[]>;
 type LocalPreviewBusyByRoom = Record<string, boolean>;
+type InviteRequestsByRoom = Record<string, InviteJoinRequest[]>;
+type InviteLinksByRoom = Record<string, string>;
+type InviteApprovalGatesByRoom = Record<string, boolean>;
+type InviteMessagesByRoom = Record<string, string | null>;
+type KeyRotationBusyByRoom = Record<string, boolean>;
+type InviteAdmissionsByRoom = Record<string, string>;
 
 const emptyLocalPreviewDialog: LocalPreviewDialogState = {
   open: false,
@@ -80,7 +92,14 @@ const emptyAppStoreState = {
   projectPathDraftsByRoom: {},
   localPreviewsByRoom: {},
   localPreviewDialog: emptyLocalPreviewDialog,
-  localPreviewBusyByRoom: {}
+  localPreviewBusyByRoom: {},
+  inviteRequestsByRoom: {},
+  inviteSecretInput: "",
+  inviteLinksByRoom: {},
+  inviteApprovalGatesByRoom: {},
+  inviteMessagesByRoom: {},
+  keyRotationBusyByRoom: {},
+  inviteAdmissionsByRoom: {}
 };
 
 function resolveSetStateAction<T>(current: T, action: SetStateAction<T>): T {
@@ -119,6 +138,13 @@ interface AppStoreState {
   localPreviewsByRoom: LocalPreviewsByRoom;
   localPreviewDialog: LocalPreviewDialogState;
   localPreviewBusyByRoom: LocalPreviewBusyByRoom;
+  inviteRequestsByRoom: InviteRequestsByRoom;
+  inviteSecretInput: string;
+  inviteLinksByRoom: InviteLinksByRoom;
+  inviteApprovalGatesByRoom: InviteApprovalGatesByRoom;
+  inviteMessagesByRoom: InviteMessagesByRoom;
+  keyRotationBusyByRoom: KeyRotationBusyByRoom;
+  inviteAdmissionsByRoom: InviteAdmissionsByRoom;
   setGitStatusByRoom: (action: SetStateAction<GitStatusByRoom>) => void;
   setGitWorkflowBusyByRoom: (action: SetStateAction<GitWorkflowBusyByRoom>) => void;
   setGitWorkflowMessagesByRoom: (action: SetStateAction<GitWorkflowMessagesByRoom>) => void;
@@ -150,6 +176,13 @@ interface AppStoreState {
   setLocalPreviewsByRoom: (action: SetStateAction<LocalPreviewsByRoom>) => void;
   setLocalPreviewDialog: (action: SetStateAction<LocalPreviewDialogState>) => void;
   setLocalPreviewBusyByRoom: (action: SetStateAction<LocalPreviewBusyByRoom>) => void;
+  setInviteRequestsByRoom: (action: SetStateAction<InviteRequestsByRoom>) => void;
+  setInviteSecretInput: (action: SetStateAction<string>) => void;
+  setInviteLinksByRoom: (action: SetStateAction<InviteLinksByRoom>) => void;
+  setInviteApprovalGatesByRoom: (action: SetStateAction<InviteApprovalGatesByRoom>) => void;
+  setInviteMessagesByRoom: (action: SetStateAction<InviteMessagesByRoom>) => void;
+  setKeyRotationBusyByRoom: (action: SetStateAction<KeyRotationBusyByRoom>) => void;
+  setInviteAdmissionsByRoom: (action: SetStateAction<InviteAdmissionsByRoom>) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
 }
@@ -309,6 +342,41 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setLocalPreviewBusyByRoom: (action) => {
     set((state) => ({
       localPreviewBusyByRoom: resolveSetStateAction(state.localPreviewBusyByRoom, action)
+    }));
+  },
+  setInviteRequestsByRoom: (action) => {
+    set((state) => ({
+      inviteRequestsByRoom: resolveSetStateAction(state.inviteRequestsByRoom, action)
+    }));
+  },
+  setInviteSecretInput: (action) => {
+    set((state) => ({
+      inviteSecretInput: resolveSetStateAction(state.inviteSecretInput, action)
+    }));
+  },
+  setInviteLinksByRoom: (action) => {
+    set((state) => ({
+      inviteLinksByRoom: resolveSetStateAction(state.inviteLinksByRoom, action)
+    }));
+  },
+  setInviteApprovalGatesByRoom: (action) => {
+    set((state) => ({
+      inviteApprovalGatesByRoom: resolveSetStateAction(state.inviteApprovalGatesByRoom, action)
+    }));
+  },
+  setInviteMessagesByRoom: (action) => {
+    set((state) => ({
+      inviteMessagesByRoom: resolveSetStateAction(state.inviteMessagesByRoom, action)
+    }));
+  },
+  setKeyRotationBusyByRoom: (action) => {
+    set((state) => ({
+      keyRotationBusyByRoom: resolveSetStateAction(state.keyRotationBusyByRoom, action)
+    }));
+  },
+  setInviteAdmissionsByRoom: (action) => {
+    set((state) => ({
+      inviteAdmissionsByRoom: resolveSetStateAction(state.inviteAdmissionsByRoom, action)
     }));
   },
   resetAppStore: () => set(emptyAppStoreState),
