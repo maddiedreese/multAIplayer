@@ -61,6 +61,7 @@ type PendingCodexApprovalsByRoom = Record<string, PendingCodexApproval>;
 type CodexRunningByRoom = Record<string, boolean>;
 type SecretWarningsVisibleByRoom = Record<string, boolean>;
 type CodexThreadIdsByRoom = Record<string, string>;
+type SelectedMessageIdsByRoom = Record<string, string[]>;
 
 const emptyLocalPreviewDialog: LocalPreviewDialogState = {
   open: false,
@@ -121,7 +122,8 @@ const emptyAppStoreState = {
   pendingCodexApprovalsByRoom: {},
   codexRunningByRoom: {},
   secretWarningsVisibleByRoom: {},
-  codexThreadIdsByRoom: {}
+  codexThreadIdsByRoom: {},
+  selectedMessageIdsByRoom: {}
 };
 
 function resolveSetStateAction<T>(current: T, action: SetStateAction<T>): T {
@@ -177,6 +179,7 @@ interface AppStoreState {
   codexRunningByRoom: CodexRunningByRoom;
   secretWarningsVisibleByRoom: SecretWarningsVisibleByRoom;
   codexThreadIdsByRoom: CodexThreadIdsByRoom;
+  selectedMessageIdsByRoom: SelectedMessageIdsByRoom;
   setGitStatusByRoom: (action: SetStateAction<GitStatusByRoom>) => void;
   setGitWorkflowBusyByRoom: (action: SetStateAction<GitWorkflowBusyByRoom>) => void;
   setGitWorkflowMessagesByRoom: (action: SetStateAction<GitWorkflowMessagesByRoom>) => void;
@@ -225,6 +228,7 @@ interface AppStoreState {
   setCodexRunningByRoom: (action: SetStateAction<CodexRunningByRoom>) => void;
   setSecretWarningsVisibleByRoom: (action: SetStateAction<SecretWarningsVisibleByRoom>) => void;
   setCodexThreadIdsByRoom: (action: SetStateAction<CodexThreadIdsByRoom>) => void;
+  setSelectedMessageIdsByRoom: (action: SetStateAction<SelectedMessageIdsByRoom>) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
 }
@@ -469,6 +473,11 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setCodexThreadIdsByRoom: (action) => {
     set((state) => ({
       codexThreadIdsByRoom: resolveSetStateAction(state.codexThreadIdsByRoom, action)
+    }));
+  },
+  setSelectedMessageIdsByRoom: (action) => {
+    set((state) => ({
+      selectedMessageIdsByRoom: resolveSetStateAction(state.selectedMessageIdsByRoom, action)
     }));
   },
   resetAppStore: () => set(emptyAppStoreState),
