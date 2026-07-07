@@ -321,23 +321,24 @@ test("desktop store exposes room file panel actions", () => {
 test("desktop store keeps room settings state room scoped", () => {
   const store = useAppStore.getState();
 
-  store.setHostBusyByRoom({ "room-a": true });
-  store.setHostMessagesByRoom({ "room-a": "Host updated", "room-b": null });
-  store.setSettingsBusyByRoom({ "room-b": true });
-  store.setSettingsMessagesByRoom((current) => ({
-    ...current,
-    "room-a": "Settings saved"
-  }));
-  store.setCustomCodexModelsByRoom({ "room-a": "gpt-5.4", "room-b": "o4-mini" });
-  store.setProjectPathDraftsByRoom({
-    "room-a": "/Users/maddiedreese/Documents/MultAIplayer",
-    "room-b": "/tmp/example"
-  });
+  store.setHostBusyForRoom("room-a", true);
+  store.setHostMessageForRoom("room-a", "Host updated");
+  store.setHostMessageForRoom("room-b", null);
+  store.setSettingsBusyForRoom("room-b", true);
+  store.setSettingsMessageForRoom("room-a", "Settings saved");
+  store.setCustomCodexModelForRoom("room-a", "gpt-5.4", "gpt-5.3");
+  store.setCustomCodexModelForRoom("room-b", "o4-mini", "gpt-5.3");
+  store.setProjectPathDraftForRoom(
+    "room-a",
+    "/Users/maddiedreese/Documents/MultAIplayer",
+    "/tmp/current-project"
+  );
+  store.setProjectPathDraftForRoom("room-b", "/tmp/example", "/tmp/current-project");
 
   const state = useAppStore.getState();
   assert.equal(state.hostBusyByRoom["room-a"], true);
   assert.equal(state.hostMessagesByRoom["room-a"], "Host updated");
-  assert.equal(state.hostMessagesByRoom["room-b"], null);
+  assert.equal(state.hostMessagesByRoom["room-b"], undefined);
   assert.equal(state.settingsBusyByRoom["room-b"], true);
   assert.equal(state.settingsMessagesByRoom["room-a"], "Settings saved");
   assert.equal(state.customCodexModelsByRoom["room-a"], "gpt-5.4");
@@ -1164,7 +1165,8 @@ test("desktop store clears local room-scoped state", () => {
   store.setActionsMessageForRoom("room-b", "Keep");
   store.setGitWorkflowBusyForRoom("room-a", true);
   store.setGitWorkflowBusyForRoom("room-b", true);
-  store.setHostMessagesByRoom({ "room-a": "Host busy", "room-b": "Keep" });
+  store.setHostMessageForRoom("room-a", "Host busy");
+  store.setHostMessageForRoom("room-b", "Keep");
   store.setSecretWarningVisibleForRoom("room-a", true);
   store.setSecretWarningVisibleForRoom("room-b", true);
   store.setProjectFilesForRoom("room-a", [{ path: "README.md", size: 1 }]);

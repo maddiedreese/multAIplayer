@@ -193,12 +193,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, RoomChatSli
   setActionsLastCheckedForRoom: (roomId: string, checkedAt: string | null) => void;
   resetGitHubActionsStateForRoom: (roomId: string) => void;
   setInspectorTabForRoom: (roomId: string, tab: InspectorTab) => void;
-  setHostBusyByRoom: (action: SetStateAction<HostBusyByRoom>) => void;
-  setHostMessagesByRoom: (action: SetStateAction<HostMessagesByRoom>) => void;
-  setSettingsBusyByRoom: (action: SetStateAction<SettingsBusyByRoom>) => void;
-  setSettingsMessagesByRoom: (action: SetStateAction<SettingsMessagesByRoom>) => void;
-  setCustomCodexModelsByRoom: (action: SetStateAction<CustomCodexModelsByRoom>) => void;
-  setProjectPathDraftsByRoom: (action: SetStateAction<ProjectPathDraftsByRoom>) => void;
   setLocalPreviewDialog: (action: SetStateAction<LocalPreviewDialogState>) => void;
   setInviteRequestsForRoom: (roomId: string, requests: InviteJoinRequest[]) => void;
   setInviteSecretInputValue: (value: string) => void;
@@ -312,36 +306,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
         ...state.inspectorTabsByRoom,
         [roomId]: tab
       }
-    }));
-  },
-  setHostBusyByRoom: (action) => {
-    set((state) => ({
-      hostBusyByRoom: resolveSetStateAction(state.hostBusyByRoom, action)
-    }));
-  },
-  setHostMessagesByRoom: (action) => {
-    set((state) => ({
-      hostMessagesByRoom: resolveSetStateAction(state.hostMessagesByRoom, action)
-    }));
-  },
-  setSettingsBusyByRoom: (action) => {
-    set((state) => ({
-      settingsBusyByRoom: resolveSetStateAction(state.settingsBusyByRoom, action)
-    }));
-  },
-  setSettingsMessagesByRoom: (action) => {
-    set((state) => ({
-      settingsMessagesByRoom: resolveSetStateAction(state.settingsMessagesByRoom, action)
-    }));
-  },
-  setCustomCodexModelsByRoom: (action) => {
-    set((state) => ({
-      customCodexModelsByRoom: resolveSetStateAction(state.customCodexModelsByRoom, action)
-    }));
-  },
-  setProjectPathDraftsByRoom: (action) => {
-    set((state) => ({
-      projectPathDraftsByRoom: resolveSetStateAction(state.projectPathDraftsByRoom, action)
     }));
   },
   setLocalPreviewDialog: (action) => {
