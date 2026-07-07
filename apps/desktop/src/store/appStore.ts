@@ -6,6 +6,7 @@ import type { GitWorkflowDraft } from "../lib/gitWorkflowDraft";
 import type {
   BrowserAccessRequest,
   BrowserStatus,
+  ChatAttachment,
   InviteJoinRequest,
   LocalPreviewDialogState,
   LocalPreviewRecord
@@ -49,6 +50,9 @@ type InviteApprovalGatesByRoom = Record<string, boolean>;
 type InviteMessagesByRoom = Record<string, string | null>;
 type KeyRotationBusyByRoom = Record<string, boolean>;
 type InviteAdmissionsByRoom = Record<string, string>;
+type ChatMessagesByRoom = Record<string, string | null>;
+type DraftsByRoom = Record<string, string>;
+type PendingAttachmentsByRoom = Record<string, ChatAttachment[]>;
 
 const emptyLocalPreviewDialog: LocalPreviewDialogState = {
   open: false,
@@ -99,7 +103,11 @@ const emptyAppStoreState = {
   inviteApprovalGatesByRoom: {},
   inviteMessagesByRoom: {},
   keyRotationBusyByRoom: {},
-  inviteAdmissionsByRoom: {}
+  inviteAdmissionsByRoom: {},
+  chatMessagesByRoom: {},
+  draftsByRoom: {},
+  pendingAttachmentsByRoom: {},
+  sensitiveAttachmentReviewKey: null
 };
 
 function resolveSetStateAction<T>(current: T, action: SetStateAction<T>): T {
@@ -145,6 +153,10 @@ interface AppStoreState {
   inviteMessagesByRoom: InviteMessagesByRoom;
   keyRotationBusyByRoom: KeyRotationBusyByRoom;
   inviteAdmissionsByRoom: InviteAdmissionsByRoom;
+  chatMessagesByRoom: ChatMessagesByRoom;
+  draftsByRoom: DraftsByRoom;
+  pendingAttachmentsByRoom: PendingAttachmentsByRoom;
+  sensitiveAttachmentReviewKey: string | null;
   setGitStatusByRoom: (action: SetStateAction<GitStatusByRoom>) => void;
   setGitWorkflowBusyByRoom: (action: SetStateAction<GitWorkflowBusyByRoom>) => void;
   setGitWorkflowMessagesByRoom: (action: SetStateAction<GitWorkflowMessagesByRoom>) => void;
@@ -183,6 +195,10 @@ interface AppStoreState {
   setInviteMessagesByRoom: (action: SetStateAction<InviteMessagesByRoom>) => void;
   setKeyRotationBusyByRoom: (action: SetStateAction<KeyRotationBusyByRoom>) => void;
   setInviteAdmissionsByRoom: (action: SetStateAction<InviteAdmissionsByRoom>) => void;
+  setChatMessagesByRoom: (action: SetStateAction<ChatMessagesByRoom>) => void;
+  setDraftsByRoom: (action: SetStateAction<DraftsByRoom>) => void;
+  setPendingAttachmentsByRoom: (action: SetStateAction<PendingAttachmentsByRoom>) => void;
+  setSensitiveAttachmentReviewKey: (action: SetStateAction<string | null>) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
 }
@@ -377,6 +393,26 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setInviteAdmissionsByRoom: (action) => {
     set((state) => ({
       inviteAdmissionsByRoom: resolveSetStateAction(state.inviteAdmissionsByRoom, action)
+    }));
+  },
+  setChatMessagesByRoom: (action) => {
+    set((state) => ({
+      chatMessagesByRoom: resolveSetStateAction(state.chatMessagesByRoom, action)
+    }));
+  },
+  setDraftsByRoom: (action) => {
+    set((state) => ({
+      draftsByRoom: resolveSetStateAction(state.draftsByRoom, action)
+    }));
+  },
+  setPendingAttachmentsByRoom: (action) => {
+    set((state) => ({
+      pendingAttachmentsByRoom: resolveSetStateAction(state.pendingAttachmentsByRoom, action)
+    }));
+  },
+  setSensitiveAttachmentReviewKey: (action) => {
+    set((state) => ({
+      sensitiveAttachmentReviewKey: resolveSetStateAction(state.sensitiveAttachmentReviewKey, action)
     }));
   },
   resetAppStore: () => set(emptyAppStoreState),

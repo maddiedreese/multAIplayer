@@ -256,3 +256,31 @@ test("desktop store keeps invite panel state room scoped", () => {
   assert.equal(state.keyRotationBusyByRoom["room-a"], true);
   assert.equal(state.inviteAdmissionsByRoom["room-a"], "Admitted Jordan");
 });
+
+test("desktop store keeps room chat composition state room scoped", () => {
+  const store = useAppStore.getState();
+
+  store.setChatMessagesByRoom({ "room-a": "Sending message", "room-b": null });
+  store.setDraftsByRoom({ "room-a": "@Codex draft a test plan", "room-b": "Looks good" });
+  store.setPendingAttachmentsByRoom((current) => ({
+    ...current,
+    "room-a": [
+      {
+        id: "attachment-1",
+        name: "README.md",
+        type: "text/markdown",
+        size: 18,
+        content: "# multAIplayer"
+      }
+    ]
+  }));
+  store.setSensitiveAttachmentReviewKey("room-a:.env");
+
+  const state = useAppStore.getState();
+  assert.equal(state.chatMessagesByRoom["room-a"], "Sending message");
+  assert.equal(state.chatMessagesByRoom["room-b"], null);
+  assert.equal(state.draftsByRoom["room-a"], "@Codex draft a test plan");
+  assert.equal(state.draftsByRoom["room-b"], "Looks good");
+  assert.equal(state.pendingAttachmentsByRoom["room-a"]?.[0]?.name, "README.md");
+  assert.equal(state.sensitiveAttachmentReviewKey, "room-a:.env");
+});
