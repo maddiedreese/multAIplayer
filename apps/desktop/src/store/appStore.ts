@@ -332,7 +332,9 @@ interface AppStoreState {
   setTeamHistoryMessagesByTeam: (action: SetStateAction<TeamHistoryMessagesByTeam>) => void;
   setInspectorTabsByRoom: (action: SetStateAction<InspectorTabsByRoom>) => void;
   setPresenceByRoom: (action: SetStateAction<PresenceByRoom>) => void;
+  clearPresenceByRoom: () => void;
   clearPresenceForRoom: (roomId: string) => void;
+  setRoomPresenceForDevice: (roomId: string, deviceId: string, presence: RoomPresence | null) => void;
   setHostHandoffsByRoom: (action: SetStateAction<HostHandoffsByRoom>) => void;
   setCodexContinuationByRoom: (action: SetStateAction<CodexContinuationByRoom>) => void;
   setGitWorkflowEventsByRoom: (action: SetStateAction<GitWorkflowEventsByRoom>) => void;
@@ -782,10 +784,27 @@ export const useAppStore = create<AppStoreState>((set) => ({
       presenceByRoom: resolveSetStateAction(state.presenceByRoom, action)
     }));
   },
+  clearPresenceByRoom: () => {
+    set({ presenceByRoom: {} });
+  },
   clearPresenceForRoom: (roomId) => {
     set((state) => ({
       presenceByRoom: omitRecordKey(state.presenceByRoom, roomId)
     }));
+  },
+  setRoomPresenceForDevice: (roomId, deviceId, presence) => {
+    set((state) => {
+      const roomPresence = state.presenceByRoom[roomId] ?? {};
+      const nextRoomPresence = presence
+        ? { ...roomPresence, [deviceId]: presence }
+        : omitRecordKey(roomPresence, deviceId);
+      return {
+        presenceByRoom: {
+          ...state.presenceByRoom,
+          [roomId]: nextRoomPresence
+        }
+      };
+    });
   },
   setHostHandoffsByRoom: (action) => {
     set((state) => ({

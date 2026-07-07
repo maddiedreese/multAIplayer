@@ -51,7 +51,6 @@ import type {
 } from "../types";
 
 type StatusSetter = Dispatch<SetStateAction<RelayStatus>>;
-type PresenceByRoom = Record<string, Record<string, RoomPresence>>;
 
 interface LocalUser {
   id: string;
@@ -79,7 +78,8 @@ interface UseRelaySubscriptionOptions {
   selectedRoomIdRef: MutableRefObject<string>;
   historyLoadedRoomIds: MutableRefObject<Set<string>>;
   setRelayStatus: StatusSetter;
-  setPresenceByRoom: Dispatch<SetStateAction<PresenceByRoom>>;
+  clearPresenceByRoom: () => void;
+  setRoomPresenceForDevice: (roomId: string, deviceId: string, presence: RoomPresence | null) => void;
   setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
   setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
   handleRelayError: (message: string) => void;
@@ -131,7 +131,8 @@ export function useRelaySubscription({
   selectedRoomIdRef,
   historyLoadedRoomIds,
   setRelayStatus,
-  setPresenceByRoom,
+  clearPresenceByRoom,
+  setRoomPresenceForDevice,
   setRooms,
   setForgottenRoomIds,
   handleRelayError,
@@ -165,7 +166,7 @@ export function useRelaySubscription({
   useEffect(() => {
     void isActiveHost;
     let cancelled = false;
-    setPresenceByRoom({});
+    clearPresenceByRoom();
     const client = connectRelay(
       relayWsUrl,
       async (message) => {
@@ -186,26 +187,20 @@ export function useRelaySubscription({
           return;
         }
         if (message.type === "presence") {
-          setPresenceByRoom((current) => {
-            const roomPresence = current[message.roomId] ?? {};
-            const nextRoomPresence = { ...roomPresence };
-            if (message.status === "offline") {
-              delete nextRoomPresence[message.deviceId];
-            } else {
-              nextRoomPresence[message.deviceId] = {
-                userId: message.userId,
-                deviceId: message.deviceId,
-                displayName: message.displayName,
-                avatarUrl: message.avatarUrl,
-                publicKeyFingerprint: message.publicKeyFingerprint,
-                status: message.status
-              };
-            }
-            return {
-              ...current,
-              [message.roomId]: nextRoomPresence
-            };
-          });
+          setRoomPresenceForDevice(
+            message.roomId,
+            message.deviceId,
+            message.status === "offline"
+              ? null
+              : {
+                  userId: message.userId,
+                  deviceId: message.deviceId,
+                  displayName: message.displayName,
+                  avatarUrl: message.avatarUrl,
+                  publicKeyFingerprint: message.publicKeyFingerprint,
+                  status: message.status
+                }
+          );
           return;
         }
         if (message.type === "room.updated") {
