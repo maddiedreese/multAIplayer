@@ -63,7 +63,7 @@ interface UseCodexInvokeActionsOptions {
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   setDraftForRoom: (roomId: string, draft: string) => void;
   setRoomGoalForRoom: (roomId: string, goal: RoomGoal | null) => void;
-  setPendingAttachmentsForRoom: (roomId: string, attachments: ChatAttachment[]) => void;
+  clearPendingAttachmentsForRoom: (roomId: string) => void;
 }
 
 export function useCodexInvokeActions({
@@ -94,13 +94,13 @@ export function useCodexInvokeActions({
   setApprovalVisibleForRoom,
   setDraftForRoom,
   setRoomGoalForRoom,
-  setPendingAttachmentsForRoom
+  clearPendingAttachmentsForRoom
 }: UseCodexInvokeActionsOptions) {
   function startRoomGoal(text: string) {
     const roomId = selectedRoom.id;
     setRoomGoalForRoom(roomId, createRoomGoal(text));
     setDraftForRoom(roomId, "");
-    setPendingAttachmentsForRoom(roomId, []);
+    clearPendingAttachmentsForRoom(roomId);
     setChatMessageForRoom(roomId, "Goal started.");
   }
 
@@ -173,7 +173,7 @@ export function useCodexInvokeActions({
       if (!handleCodexBrowserOpenCommand(message, selectedRoom)) handleCodexInvoke(message);
     }
     setDraftForRoom(roomId, "");
-    setPendingAttachmentsForRoom(roomId, []);
+    clearPendingAttachmentsForRoom(roomId);
   }
 
   function handleCodexInvoke(pendingMessage?: ChatMessage) {

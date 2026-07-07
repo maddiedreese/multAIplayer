@@ -478,29 +478,36 @@ test("desktop store exposes room draft actions", () => {
   const store = useAppStore.getState();
 
   store.setDraftForRoom("room-a", "@Codex summarize this");
-  store.setPendingAttachmentsForRoom("room-a", [
-    {
-      id: "attachment-1",
-      name: "README.md",
-      type: "text/markdown",
-      size: 18,
-      content: "# multAIplayer"
-    }
-  ]);
-  store.setPendingAttachmentsForRoom("room-a", (current) => [
-    ...current,
-    {
-      id: "attachment-2",
-      name: "plan.md",
-      type: "text/markdown",
-      size: 12,
-      content: "Ship it"
-    }
-  ]);
+  const readmeAttachment = {
+    id: "attachment-1",
+    name: "README.md",
+    type: "text/markdown",
+    size: 18,
+    content: "# multAIplayer"
+  };
+  const planAttachment = {
+    id: "attachment-2",
+    name: "plan.md",
+    type: "text/markdown",
+    size: 12,
+    content: "Ship it"
+  };
 
-  const state = useAppStore.getState();
+  store.setPendingAttachmentsForRoom("room-a", [readmeAttachment]);
+  store.appendPendingAttachmentForRoom("room-a", planAttachment);
+  store.appendPendingAttachmentForRoom("room-a", planAttachment);
+
+  let state = useAppStore.getState();
   assert.equal(state.draftsByRoom["room-a"], "@Codex summarize this");
   assert.deepEqual(state.pendingAttachmentsByRoom["room-a"]?.map((attachment) => attachment.name), ["README.md", "plan.md"]);
+
+  store.removePendingAttachmentForRoom("room-a", "attachment-1");
+  state = useAppStore.getState();
+  assert.deepEqual(state.pendingAttachmentsByRoom["room-a"]?.map((attachment) => attachment.name), ["plan.md"]);
+
+  store.clearPendingAttachmentsForRoom("room-a");
+  state = useAppStore.getState();
+  assert.equal(state.pendingAttachmentsByRoom["room-a"], undefined);
 });
 
 test("desktop store exposes room message actions", () => {

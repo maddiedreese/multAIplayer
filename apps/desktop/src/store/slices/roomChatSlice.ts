@@ -18,10 +18,10 @@ export interface RoomChatSlice {
   toggleSelectedMessageForRoom: (roomId: string, messageId: string) => void;
   clearSelectedMessagesForRoom: (roomId: string) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
-  setPendingAttachmentsForRoom: (
-    roomId: string,
-    updater: ChatAttachment[] | ((current: ChatAttachment[]) => ChatAttachment[])
-  ) => void;
+  setPendingAttachmentsForRoom: (roomId: string, attachments: ChatAttachment[]) => void;
+  appendPendingAttachmentForRoom: (roomId: string, attachment: ChatAttachment) => void;
+  removePendingAttachmentForRoom: (roomId: string, attachmentId: string) => void;
+  clearPendingAttachmentsForRoom: (roomId: string) => void;
   setDraftForRoom: (roomId: string, value: string) => void;
 }
 
@@ -71,17 +71,38 @@ export const createRoomChatSlice: StateCreator<AppStoreState, [], [], RoomChatSl
         : omitRecordKey(state.chatMessagesByRoom, roomId)
     }));
   },
-  setPendingAttachmentsForRoom: (roomId, updater) => {
+  setPendingAttachmentsForRoom: (roomId, attachments) => {
+    set((state) => ({
+      pendingAttachmentsByRoom: {
+        ...state.pendingAttachmentsByRoom,
+        [roomId]: attachments
+      }
+    }));
+  },
+  appendPendingAttachmentForRoom: (roomId, attachment) => {
     set((state) => {
       const currentAttachments = state.pendingAttachmentsByRoom[roomId] ?? [];
-      const nextAttachments = typeof updater === "function" ? updater(currentAttachments) : updater;
+      if (currentAttachments.some((item) => item.id === attachment.id)) return state;
       return {
         pendingAttachmentsByRoom: {
           ...state.pendingAttachmentsByRoom,
-          [roomId]: nextAttachments
+          [roomId]: [...currentAttachments, attachment]
         }
       };
     });
+  },
+  removePendingAttachmentForRoom: (roomId, attachmentId) => {
+    set((state) => ({
+      pendingAttachmentsByRoom: {
+        ...state.pendingAttachmentsByRoom,
+        [roomId]: (state.pendingAttachmentsByRoom[roomId] ?? []).filter((attachment) => attachment.id !== attachmentId)
+      }
+    }));
+  },
+  clearPendingAttachmentsForRoom: (roomId) => {
+    set((state) => ({
+      pendingAttachmentsByRoom: omitRecordKey(state.pendingAttachmentsByRoom, roomId)
+    }));
   },
   setDraftForRoom: (roomId, value) => {
     set((state) => ({

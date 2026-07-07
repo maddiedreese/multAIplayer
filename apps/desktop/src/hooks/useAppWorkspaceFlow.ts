@@ -100,7 +100,8 @@ export function useAppWorkspaceFlow({
     setSelectedFileForRoom,
     setSelectedDiffForRoom,
     setFilePreviewTabForRoom,
-    setPendingAttachmentsForRoom,
+    appendPendingAttachmentForRoom,
+    removePendingAttachmentForRoom,
     hydrateLocalRoomHistoryForRoom,
     clearBrowserStatusForRoom
   } = roomActions;
@@ -259,7 +260,8 @@ export function useAppWorkspaceFlow({
         setFilePreviewTabForRoom,
         setSelectedFileMessage,
         setFileMessageForRoom,
-        setPendingAttachmentsForRoom
+        appendPendingAttachmentForRoom,
+        removePendingAttachmentForRoom
       }
     },
     historyEffects: {

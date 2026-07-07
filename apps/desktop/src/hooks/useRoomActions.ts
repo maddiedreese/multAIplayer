@@ -51,6 +51,9 @@ export function useRoomActions({
   const setTeamHistoryMessageForTeam = useAppStore((state) => state.setTeamHistoryMessageForTeam);
   const setSettingsMessageForRoom = useAppStore((state) => state.setSettingsMessageForRoom);
   const setPendingAttachmentsForRoom = useAppStore((state) => state.setPendingAttachmentsForRoom);
+  const appendPendingAttachmentForRoom = useAppStore((state) => state.appendPendingAttachmentForRoom);
+  const removePendingAttachmentForRoom = useAppStore((state) => state.removePendingAttachmentForRoom);
+  const clearPendingAttachmentsForRoom = useAppStore((state) => state.clearPendingAttachmentsForRoom);
   const setDraftForRoom = useAppStore((state) => state.setDraftForRoom);
   const hydrateLocalRoomHistoryForRoom = useAppStore((state) => state.hydrateLocalRoomHistoryForRoom);
   const setGitWorkflowMessageForRoom = useAppStore((state) => state.setGitWorkflowMessageForRoom);
@@ -161,6 +164,9 @@ export function useRoomActions({
       setProjectPathDraftForRoom(roomId, projectPath, room?.projectPath ?? project.defaultProjectPath);
     },
     setPendingAttachmentsForRoom,
+    appendPendingAttachmentForRoom,
+    removePendingAttachmentForRoom,
+    clearPendingAttachmentsForRoom,
     setDraftForRoom,
     hydrateLocalRoomHistoryForRoom,
     setGitWorkflowBusyForRoom: (roomId: string, isBusy: boolean) =>

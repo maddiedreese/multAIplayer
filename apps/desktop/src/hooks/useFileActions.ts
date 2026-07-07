@@ -48,10 +48,8 @@ interface UseFileActionsOptions {
   setFilePreviewTabForRoom: (roomId: string, tab: FilePreviewTab) => void;
   setSelectedFileMessage: (message: string | null) => void;
   setFileMessageForRoom: (roomId: string, message: string | null) => void;
-  setPendingAttachmentsForRoom: (
-    roomId: string,
-    updater: ChatAttachment[] | ((current: ChatAttachment[]) => ChatAttachment[])
-  ) => void;
+  appendPendingAttachmentForRoom: (roomId: string, attachment: ChatAttachment) => void;
+  removePendingAttachmentForRoom: (roomId: string, attachmentId: string) => void;
 }
 
 export function useFileActions({
@@ -73,7 +71,8 @@ export function useFileActions({
   setFilePreviewTabForRoom,
   setSelectedFileMessage,
   setFileMessageForRoom,
-  setPendingAttachmentsForRoom
+  appendPendingAttachmentForRoom,
+  removePendingAttachmentForRoom
 }: UseFileActionsOptions) {
   const setInspectorTabForRoom = useAppStore((state) => state.setInspectorTabForRoom);
 
@@ -188,27 +187,19 @@ export function useFileActions({
         setFileBusyForRoom(roomId, false);
       }
     }
-    setPendingAttachmentsForRoom(roomId, (current) => {
-      if (current.some((item) => item.name === attachment.name)) {
-        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setFileMessageForRoom(roomId, `${attachment.name} is already attached to the next room message.`);
-        }
-        return current;
-      }
-      const next = [...current, attachment];
-      const validationError = validatePendingAttachments(next);
-      if (validationError) {
-        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setFileMessageForRoom(roomId, validationError);
-        return current;
-      }
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setSensitiveAttachmentReviewKey(null);
-        setFileMessageForRoom(roomId, attachment.blobId
-          ? `Attached ${fileToAttach.path} as an encrypted blob for the next room message.`
-          : `Attached ${fileToAttach.path} to the next room message.`);
-      }
-      return next;
-    });
+    const nextPendingAttachments = [...roomPendingAttachments, attachment];
+    const validationError = validatePendingAttachments(nextPendingAttachments);
+    if (validationError) {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setFileMessageForRoom(roomId, validationError);
+      return;
+    }
+    appendPendingAttachmentForRoom(roomId, attachment);
+    if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+      setSensitiveAttachmentReviewKey(null);
+      setFileMessageForRoom(roomId, attachment.blobId
+        ? `Attached ${fileToAttach.path} as an encrypted blob for the next room message.`
+        : `Attached ${fileToAttach.path} to the next room message.`);
+    }
   }
 
   async function saveSelectedFileContent(content: string) {
@@ -256,9 +247,7 @@ export function useFileActions({
   }
 
   function removePendingAttachment(attachmentId: string) {
-    setPendingAttachmentsForRoom(selectedRoom.id, (current) =>
-      current.filter((attachment) => attachment.id !== attachmentId)
-    );
+    removePendingAttachmentForRoom(selectedRoom.id, attachmentId);
   }
 
   async function openEncryptedAttachmentBlob(attachment: ChatAttachment) {

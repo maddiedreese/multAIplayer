@@ -121,7 +121,7 @@ export function useAppRoomRuntime({
     setBrowserUrlForRoom,
     setBrowserMessageForRoom,
     setSelectedBrowserMessage,
-    setPendingAttachmentsForRoom,
+    clearPendingAttachmentsForRoom,
     setDraftForRoom,
     setProjectPathDraftForRoom,
     setGitWorkflowMessageForRoom,
@@ -188,7 +188,7 @@ export function useAppRoomRuntime({
         setApprovalVisibleForRoom,
         setDraftForRoom,
         setRoomGoalForRoom,
-        setPendingAttachmentsForRoom
+        clearPendingAttachmentsForRoom
       }
     },
     toolActions: {
