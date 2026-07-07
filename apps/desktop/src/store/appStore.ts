@@ -9,10 +9,10 @@ import { normalizeCodexThreadId } from "../lib/codexThread";
 import { replaceRoomTerminalSnapshots } from "../lib/terminalState";
 import { createBrowserSlice, emptyBrowserState, type BrowserSlice } from "./slices/browserSlice";
 import { createFilePanelSlice, emptyFilePanelState, type FilePanelSlice } from "./slices/filePanelSlice";
+import { createRoomChatSlice, emptyRoomChatState, type RoomChatSlice } from "./slices/roomChatSlice";
 import { createTerminalSlice, emptyTerminalState, type TerminalSlice } from "./slices/terminalSlice";
 import { resolveSetStateAction } from "./storeUtils";
 import type {
-  ChatAttachment,
   ChatMessage,
   CodexRoomEvent,
   HostHandoffRecord,
@@ -55,9 +55,6 @@ type InviteApprovalGatesByRoom = Record<string, boolean>;
 type InviteMessagesByRoom = Record<string, string | null>;
 type KeyRotationBusyByRoom = Record<string, boolean>;
 type InviteAdmissionsByRoom = Record<string, string>;
-type ChatMessagesByRoom = Record<string, string | null>;
-type DraftsByRoom = Record<string, string>;
-type PendingAttachmentsByRoom = Record<string, ChatAttachment[]>;
 type CodexEventsByRoom = Record<string, CodexRoomEvent[]>;
 type ApprovalVisibleByRoom = Record<string, boolean>;
 type PendingCodexApprovalsByRoom = Record<string, PendingCodexApproval>;
@@ -65,7 +62,6 @@ type CodexRunningByRoom = Record<string, boolean>;
 type RoomGoalsByRoom = Record<string, RoomGoal>;
 type SecretWarningsVisibleByRoom = Record<string, boolean>;
 type CodexThreadIdsByRoom = Record<string, string>;
-type SelectedMessageIdsByRoom = Record<string, string[]>;
 type HistorySearchMessagesByRoom = Record<string, ChatMessage[]>;
 type HistoryMessagesByRoom = Record<string, string | null>;
 type TeamHistoryMessagesByTeam = Record<string, string | null>;
@@ -119,10 +115,7 @@ const emptyAppStoreState = {
   inviteMessagesByRoom: {},
   keyRotationBusyByRoom: {},
   inviteAdmissionsByRoom: {},
-  chatMessagesByRoom: {},
-  draftsByRoom: {},
-  pendingAttachmentsByRoom: {},
-  sensitiveAttachmentReviewKey: null,
+  ...emptyRoomChatState,
   codexEventsByRoom: {},
   approvalVisibleByRoom: {},
   pendingCodexApprovalsByRoom: {},
@@ -130,7 +123,6 @@ const emptyAppStoreState = {
   roomGoalsByRoom: {},
   secretWarningsVisibleByRoom: {},
   codexThreadIdsByRoom: {},
-  selectedMessageIdsByRoom: {},
   historySearchMessagesByRoom: {},
   historyMessagesByRoom: {},
   teamHistoryMessagesByTeam: {},
@@ -151,7 +143,7 @@ function updateRoomBusyMap(current: RoomBusyByRoom, roomId: string, busy: boolea
   return busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId);
 }
 
-export interface AppStoreState extends BrowserSlice, FilePanelSlice, TerminalSlice {
+export interface AppStoreState extends BrowserSlice, FilePanelSlice, RoomChatSlice, TerminalSlice {
   gitStatusByRoom: GitStatusByRoom;
   gitWorkflowBusyByRoom: GitWorkflowBusyByRoom;
   gitWorkflowMessagesByRoom: GitWorkflowMessagesByRoom;
@@ -176,10 +168,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, TerminalSli
   inviteMessagesByRoom: InviteMessagesByRoom;
   keyRotationBusyByRoom: KeyRotationBusyByRoom;
   inviteAdmissionsByRoom: InviteAdmissionsByRoom;
-  chatMessagesByRoom: ChatMessagesByRoom;
-  draftsByRoom: DraftsByRoom;
-  pendingAttachmentsByRoom: PendingAttachmentsByRoom;
-  sensitiveAttachmentReviewKey: string | null;
   codexEventsByRoom: CodexEventsByRoom;
   approvalVisibleByRoom: ApprovalVisibleByRoom;
   pendingCodexApprovalsByRoom: PendingCodexApprovalsByRoom;
@@ -187,7 +175,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, TerminalSli
   roomGoalsByRoom: RoomGoalsByRoom;
   secretWarningsVisibleByRoom: SecretWarningsVisibleByRoom;
   codexThreadIdsByRoom: CodexThreadIdsByRoom;
-  selectedMessageIdsByRoom: SelectedMessageIdsByRoom;
   historySearchMessagesByRoom: HistorySearchMessagesByRoom;
   historyMessagesByRoom: HistoryMessagesByRoom;
   teamHistoryMessagesByTeam: TeamHistoryMessagesByTeam;
@@ -218,12 +205,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, TerminalSli
   clearInviteSecretInput: () => void;
   setInviteAdmissionForRoom: (roomId: string, inviteId: string | null) => void;
   clearInviteAdmissionForRoom: (roomId: string) => void;
-  setChatMessagesByRoom: (action: SetStateAction<ChatMessagesByRoom>) => void;
-  setDraftsByRoom: (action: SetStateAction<DraftsByRoom>) => void;
-  setPendingAttachmentsByRoom: (action: SetStateAction<PendingAttachmentsByRoom>) => void;
-  setSensitiveAttachmentReviewKey: (action: SetStateAction<string | null>) => void;
-  toggleSelectedMessageForRoom: (roomId: string, messageId: string) => void;
-  clearSelectedMessagesForRoom: (roomId: string) => void;
   replaceHistorySearchMessagesByRoom: (messagesByRoom: HistorySearchMessagesByRoom) => void;
   setInspectorTabsByRoom: (action: SetStateAction<InspectorTabsByRoom>) => void;
   setPresenceByRoom: (action: SetStateAction<PresenceByRoom>) => void;
@@ -269,7 +250,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, TerminalSli
   setRoomGoalForRoom: (roomId: string, goal: RoomGoal | null) => void;
   setCodexThreadIdForRoom: (roomId: string, threadId: string | null) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
-  setChatMessageForRoom: (roomId: string, message: string | null) => void;
   setSecretWarningVisibleForRoom: (roomId: string, visible: boolean) => void;
   setHistoryMessageForRoom: (roomId: string, message: string | null) => void;
   setTeamHistoryMessageForTeam: (teamId: string, message: string | null) => void;
@@ -282,11 +262,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, TerminalSli
   setInviteMessageForRoom: (roomId: string, message: string | null) => void;
   setCustomCodexModelForRoom: (roomId: string, model: string, currentModel: string) => void;
   setProjectPathDraftForRoom: (roomId: string, projectPath: string, currentProjectPath: string) => void;
-  setPendingAttachmentsForRoom: (
-    roomId: string,
-    updater: ChatAttachment[] | ((current: ChatAttachment[]) => ChatAttachment[])
-  ) => void;
-  setDraftForRoom: (roomId: string, value: string) => void;
   clearRoomScopedStateForRoom: (roomId: string) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
@@ -296,6 +271,7 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   ...emptyAppStoreState,
   ...createBrowserSlice(set, get, api),
   ...createFilePanelSlice(set, get, api),
+  ...createRoomChatSlice(set, get, api),
   ...createTerminalSlice(set, get, api),
   setActionsMessageForRoom: (roomId, message) => {
     set((state) => ({
@@ -397,45 +373,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   clearInviteAdmissionForRoom: (roomId) => {
     set((state) => ({
       inviteAdmissionsByRoom: omitRecordKey(state.inviteAdmissionsByRoom, roomId)
-    }));
-  },
-  setChatMessagesByRoom: (action) => {
-    set((state) => ({
-      chatMessagesByRoom: resolveSetStateAction(state.chatMessagesByRoom, action)
-    }));
-  },
-  setDraftsByRoom: (action) => {
-    set((state) => ({
-      draftsByRoom: resolveSetStateAction(state.draftsByRoom, action)
-    }));
-  },
-  setPendingAttachmentsByRoom: (action) => {
-    set((state) => ({
-      pendingAttachmentsByRoom: resolveSetStateAction(state.pendingAttachmentsByRoom, action)
-    }));
-  },
-  setSensitiveAttachmentReviewKey: (action) => {
-    set((state) => ({
-      sensitiveAttachmentReviewKey: resolveSetStateAction(state.sensitiveAttachmentReviewKey, action)
-    }));
-  },
-  toggleSelectedMessageForRoom: (roomId, messageId) => {
-    set((state) => {
-      const roomIds = state.selectedMessageIdsByRoom[roomId] ?? [];
-      const nextIds = roomIds.includes(messageId)
-        ? roomIds.filter((id) => id !== messageId)
-        : [...roomIds, messageId];
-      return {
-        selectedMessageIdsByRoom: {
-          ...state.selectedMessageIdsByRoom,
-          [roomId]: nextIds
-        }
-      };
-    });
-  },
-  clearSelectedMessagesForRoom: (roomId) => {
-    set((state) => ({
-      selectedMessageIdsByRoom: omitRecordKey(state.selectedMessageIdsByRoom, roomId)
     }));
   },
   replaceHistorySearchMessagesByRoom: (messagesByRoom) => {
@@ -891,13 +828,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
         : omitRecordKey(state.hostMessagesByRoom, roomId)
     }));
   },
-  setChatMessageForRoom: (roomId, message) => {
-    set((state) => ({
-      chatMessagesByRoom: message
-        ? { ...state.chatMessagesByRoom, [roomId]: message }
-        : omitRecordKey(state.chatMessagesByRoom, roomId)
-    }));
-  },
   setSecretWarningVisibleForRoom: (roomId, visible) => {
     set((state) => ({
       secretWarningsVisibleByRoom: visible
@@ -981,26 +911,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       projectPathDraftsByRoom: projectPath === currentProjectPath
         ? omitRecordKey(state.projectPathDraftsByRoom, roomId)
         : { ...state.projectPathDraftsByRoom, [roomId]: projectPath }
-    }));
-  },
-  setPendingAttachmentsForRoom: (roomId, updater) => {
-    set((state) => {
-      const currentAttachments = state.pendingAttachmentsByRoom[roomId] ?? [];
-      const nextAttachments = typeof updater === "function" ? updater(currentAttachments) : updater;
-      return {
-        pendingAttachmentsByRoom: {
-          ...state.pendingAttachmentsByRoom,
-          [roomId]: nextAttachments
-        }
-      };
-    });
-  },
-  setDraftForRoom: (roomId, value) => {
-    set((state) => ({
-      draftsByRoom: {
-        ...state.draftsByRoom,
-        [roomId]: value
-      }
     }));
   },
   clearRoomScopedStateForRoom: (roomId) => {
