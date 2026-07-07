@@ -24,7 +24,6 @@ import type {
   RoomPresence,
   RoomGoal,
 } from "../types";
-import type { MarkdownCopyFallback } from "../types";
 import type { InspectorTab } from "../components/RoomInspectorPanel";
 import type {
   ChatReactionPlaintextPayload,
@@ -293,7 +292,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, TerminalSli
   setCodexThreadIdForRoom: (roomId: string, threadId: string | null) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
-  setMarkdownCopyFallbackForRoom: (roomId: string, fallback: MarkdownCopyFallback | null) => void;
   setSecretWarningVisibleForRoom: (roomId: string, visible: boolean) => void;
   setHistoryMessageForRoom: (roomId: string, message: string | null) => void;
   setTeamHistoryMessageForTeam: (teamId: string, message: string | null) => void;
@@ -1024,13 +1022,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       chatMessagesByRoom: message
         ? { ...state.chatMessagesByRoom, [roomId]: message }
         : omitRecordKey(state.chatMessagesByRoom, roomId)
-    }));
-  },
-  setMarkdownCopyFallbackForRoom: (roomId, fallback) => {
-    set((state) => ({
-      markdownCopyFallbacksByRoom: fallback
-        ? { ...state.markdownCopyFallbacksByRoom, [roomId]: fallback }
-        : omitRecordKey(state.markdownCopyFallbacksByRoom, roomId)
     }));
   },
   setSecretWarningVisibleForRoom: (roomId, visible) => {

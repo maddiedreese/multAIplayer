@@ -273,48 +273,40 @@ test("desktop store exposes room browser actions", () => {
 test("desktop store keeps file panel state room scoped", () => {
   const store = useAppStore.getState();
 
-  store.setFileQueriesByRoom({ "room-a": "README", "room-b": ".env" });
-  store.setProjectFilesByRoom({
-    "room-a": [
-      { path: "README.md", size: 2048 },
-      { path: "apps/desktop/src/App.tsx", size: 4096 }
-    ]
+  store.setFileQueryForRoom("room-a", "README");
+  store.setFileQueryForRoom("room-b", ".env");
+  store.setProjectFilesForRoom("room-a", [
+    { path: "README.md", size: 2048 },
+    { path: "apps/desktop/src/App.tsx", size: 4096 }
+  ]);
+  store.setSelectedFileForRoom("room-a", {
+    path: "README.md",
+    size: 2048,
+    truncated: false,
+    content: "# multAIplayer"
   });
-  store.setSelectedFilesByRoom({
-    "room-a": {
-      path: "README.md",
-      size: 2048,
-      truncated: false,
-      content: "# multAIplayer"
-    },
-    "room-b": null
+  store.setSelectedDiffForRoom("room-a", {
+    path: "README.md",
+    diff: "@@ -1 +1 @@\n-old\n+new"
   });
-  store.setSelectedDiffsByRoom({
-    "room-a": {
-      path: "README.md",
-      diff: "@@ -1 +1 @@\n-old\n+new"
-    }
-  });
-  store.setFilePreviewTabsByRoom({ "room-a": "diff" });
-  store.setFileBusyByRoom({ "room-a": true });
-  store.setFileMessagesByRoom({ "room-a": "Loaded README.md", "room-b": null });
-  store.setMarkdownCopyFallbacksByRoom({
-    "room-a": {
-      title: "README.md",
-      markdown: "# multAIplayer"
-    }
+  store.setFilePreviewTabForRoom("room-a", "diff");
+  store.setFileBusyForRoom("room-a", true);
+  store.setFileMessageForRoom("room-a", "Loaded README.md");
+  store.setMarkdownCopyFallbackForRoom("room-a", {
+    title: "README.md",
+    markdown: "# multAIplayer"
   });
 
   const state = useAppStore.getState();
   assert.equal(state.fileQueriesByRoom["room-b"], ".env");
   assert.equal(state.projectFilesByRoom["room-a"]?.[1]?.path, "apps/desktop/src/App.tsx");
   assert.equal(state.selectedFilesByRoom["room-a"]?.content, "# multAIplayer");
-  assert.equal(state.selectedFilesByRoom["room-b"], null);
+  assert.equal(state.selectedFilesByRoom["room-b"], undefined);
   assert.equal(state.selectedDiffsByRoom["room-a"]?.path, "README.md");
   assert.equal(state.filePreviewTabsByRoom["room-a"], "diff");
   assert.equal(state.fileBusyByRoom["room-a"], true);
   assert.equal(state.fileMessagesByRoom["room-a"], "Loaded README.md");
-  assert.equal(state.fileMessagesByRoom["room-b"], null);
+  assert.equal(state.fileMessagesByRoom["room-b"], undefined);
   assert.equal(state.markdownCopyFallbacksByRoom["room-a"]?.title, "README.md");
 });
 
@@ -1172,7 +1164,8 @@ test("desktop store clears local room-scoped state", () => {
   store.setGitWorkflowBusyByRoom({ "room-a": true, "room-b": true });
   store.setHostMessagesByRoom({ "room-a": "Host busy", "room-b": "Keep" });
   store.setSecretWarningsVisibleByRoom({ "room-a": true, "room-b": true });
-  store.setProjectFilesByRoom({ "room-a": [{ path: "README.md", size: 1 }], "room-b": [] });
+  store.setProjectFilesForRoom("room-a", [{ path: "README.md", size: 1 }]);
+  store.setProjectFilesForRoom("room-b", []);
   store.setSelectedTerminalIdsByRoom({ "room-a": "terminal-a", "room-b": "terminal-b" });
   store.setTerminals([
     {
