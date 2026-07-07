@@ -1,34 +1,29 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
-import { omitRecordKey } from "../lib/setUtils";
+import { useEffect } from "react";
+import { useAppStore } from "../store/appStore";
 
 interface UseRoomDraftCleanupOptions {
   hasSelectedRoom: boolean;
   selectedRoomId: string;
   selectedRoomProjectPath: string;
   selectedCodexModel: string;
-  setCustomCodexModelsByRoom: Dispatch<SetStateAction<Record<string, string>>>;
-  setProjectPathDraftsByRoom: Dispatch<SetStateAction<Record<string, string>>>;
 }
 
 export function useRoomDraftCleanup({
   hasSelectedRoom,
   selectedRoomId,
   selectedRoomProjectPath,
-  selectedCodexModel,
-  setCustomCodexModelsByRoom,
-  setProjectPathDraftsByRoom
+  selectedCodexModel
 }: UseRoomDraftCleanupOptions) {
-  useEffect(() => {
-    if (!hasSelectedRoom) return;
-    setCustomCodexModelsByRoom((current) =>
-      current[selectedRoomId] === selectedCodexModel ? omitRecordKey(current, selectedRoomId) : current
-    );
-  }, [hasSelectedRoom, selectedCodexModel, selectedRoomId, setCustomCodexModelsByRoom]);
+  const setCustomCodexModelForRoom = useAppStore((state) => state.setCustomCodexModelForRoom);
+  const setProjectPathDraftForRoom = useAppStore((state) => state.setProjectPathDraftForRoom);
 
   useEffect(() => {
     if (!hasSelectedRoom) return;
-    setProjectPathDraftsByRoom((current) =>
-      current[selectedRoomId] === selectedRoomProjectPath ? omitRecordKey(current, selectedRoomId) : current
-    );
-  }, [hasSelectedRoom, selectedRoomId, selectedRoomProjectPath, setProjectPathDraftsByRoom]);
+    setCustomCodexModelForRoom(selectedRoomId, selectedCodexModel, selectedCodexModel);
+  }, [hasSelectedRoom, selectedCodexModel, selectedRoomId, setCustomCodexModelForRoom]);
+
+  useEffect(() => {
+    if (!hasSelectedRoom) return;
+    setProjectPathDraftForRoom(selectedRoomId, selectedRoomProjectPath, selectedRoomProjectPath);
+  }, [hasSelectedRoom, selectedRoomId, selectedRoomProjectPath, setProjectPathDraftForRoom]);
 }

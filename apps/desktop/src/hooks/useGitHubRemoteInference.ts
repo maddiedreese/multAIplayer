@@ -1,13 +1,13 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect } from "react";
 import { getGitRemoteOrigin } from "../lib/localBackend";
 import {
   defaultGitWorkflowDraft,
   parseGitHubRemoteUrl,
   resolveGitWorkflowDraft,
-  updateGitWorkflowDraftRecord,
   type GitWorkflowDraft
 } from "../lib/gitWorkflowDraft";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
+import { useAppStore } from "../store/appStore";
 
 interface LatestRef<T> {
   current: T;
@@ -20,7 +20,6 @@ interface UseGitHubRemoteInferenceOptions {
   selectedRoomProjectPath: string;
   selectedRoomIdRef: LatestRef<string>;
   gitWorkflowDraftsRef: LatestRef<Record<string, Partial<GitWorkflowDraft>>>;
-  setGitWorkflowDraftsByRoom: Dispatch<SetStateAction<Record<string, Partial<GitWorkflowDraft>>>>;
   setGitWorkflowMessageForRoom: (roomId: string, message: string | null) => void;
 }
 
@@ -31,9 +30,10 @@ export function useGitHubRemoteInference({
   selectedRoomProjectPath,
   selectedRoomIdRef,
   gitWorkflowDraftsRef,
-  setGitWorkflowDraftsByRoom,
   setGitWorkflowMessageForRoom
 }: UseGitHubRemoteInferenceOptions) {
+  const updateGitWorkflowDraftForRoom = useAppStore((state) => state.updateGitWorkflowDraftForRoom);
+
   useEffect(() => {
     if (!hasSelectedRoom) return;
     if (!canReadLocalWorkspace) return;
@@ -51,12 +51,10 @@ export function useGitHubRemoteInference({
           currentDraft.prRepo === defaultGitWorkflowDraft.prRepo;
         const alreadyMatches = currentDraft.prOwner === repo.owner && currentDraft.prRepo === repo.repo;
         if (!isDefaultTarget || alreadyMatches) return;
-        setGitWorkflowDraftsByRoom((current) =>
-          updateGitWorkflowDraftRecord(current, roomId, {
-            prOwner: repo.owner,
-            prRepo: repo.repo
-          })
-        );
+        updateGitWorkflowDraftForRoom(roomId, {
+          prOwner: repo.owner,
+          prRepo: repo.repo
+        });
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
           setGitWorkflowMessageForRoom(roomId, `Detected GitHub remote ${repo.owner}/${repo.repo} for PRs and Actions.`);
         }
@@ -67,5 +65,5 @@ export function useGitHubRemoteInference({
     return () => {
       cancelled = true;
     };
-  }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoomId, selectedRoomProjectPath]);
+  }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoomId, selectedRoomProjectPath, updateGitWorkflowDraftForRoom]);
 }

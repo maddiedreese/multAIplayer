@@ -373,7 +373,6 @@ export function useAppRoomRuntime({
         selectedRoomProjectPath: selectedRoom.projectPath,
         selectedRoomIdRef: appRefs.selectedRoomIdRef,
         gitWorkflowDraftsRef: appRefs.gitWorkflowDraftsRef,
-        setGitWorkflowDraftsByRoom: githubWorkflowPanelState.setGitWorkflowDraftsByRoom,
         setGitWorkflowMessageForRoom
       },
       gitHubActionsDraftReset: {
@@ -421,9 +420,7 @@ export function useAppRoomRuntime({
         hasSelectedRoom,
         selectedRoomId: selectedRoom.id,
         selectedRoomProjectPath: selectedRoom.projectPath,
-        selectedCodexModel,
-        setCustomCodexModelsByRoom: roomSettingsState.setCustomCodexModelsByRoom,
-        setProjectPathDraftsByRoom: roomSettingsState.setProjectPathDraftsByRoom
+        selectedCodexModel
       }
     }
   });
