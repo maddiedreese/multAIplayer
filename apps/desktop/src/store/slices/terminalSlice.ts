@@ -26,15 +26,8 @@ export interface TerminalSlice {
   terminalCommandsByRoom: TerminalCommandsByRoom;
   terminalInputsByRoom: TerminalInputsByRoom;
   terminalErrorsByRoom: TerminalErrorsByRoom;
-  setTerminalLinesByRoom: (action: SetStateAction<TerminalLinesByRoom>) => void;
-  setTerminalBusyByRoom: (action: SetStateAction<TerminalBusyByRoom>) => void;
   setTerminals: (action: SetStateAction<Terminals>) => void;
-  setTerminalRequestsByRoom: (action: SetStateAction<TerminalRequestsByRoom>) => void;
-  setSelectedTerminalIdsByRoom: (action: SetStateAction<SelectedTerminalIdsByRoom>) => void;
-  setTerminalNamesByRoom: (action: SetStateAction<TerminalNamesByRoom>) => void;
-  setTerminalCommandsByRoom: (action: SetStateAction<TerminalCommandsByRoom>) => void;
-  setTerminalInputsByRoom: (action: SetStateAction<TerminalInputsByRoom>) => void;
-  setTerminalErrorsByRoom: (action: SetStateAction<TerminalErrorsByRoom>) => void;
+  initializeTerminalLinesByRoom: (linesByRoom: TerminalLinesByRoom) => void;
   setTerminalBusyForRoom: (roomId: string, busy: boolean) => void;
   appendTerminalRequest: (roomId: string, request: TerminalCommandRequest) => void;
   updateTerminalRequestStatus: (roomId: string, requestId: string, status: TerminalCommandRequest["status"]) => void;
@@ -71,50 +64,18 @@ export const emptyTerminalState: Pick<
 
 export const createTerminalSlice: StateCreator<AppStoreState, [], [], TerminalSlice> = (set) => ({
   ...emptyTerminalState,
-  setTerminalLinesByRoom: (action) => {
-    set((state) => ({
-      terminalLinesByRoom: resolveSetStateAction(state.terminalLinesByRoom, action)
-    }));
-  },
-  setTerminalBusyByRoom: (action) => {
-    set((state) => ({
-      terminalBusyByRoom: resolveSetStateAction(state.terminalBusyByRoom, action)
-    }));
-  },
   setTerminals: (action) => {
     set((state) => ({
       terminals: resolveSetStateAction(state.terminals, action)
     }));
   },
-  setTerminalRequestsByRoom: (action) => {
-    set((state) => ({
-      terminalRequestsByRoom: resolveSetStateAction(state.terminalRequestsByRoom, action)
-    }));
-  },
-  setSelectedTerminalIdsByRoom: (action) => {
-    set((state) => ({
-      selectedTerminalIdsByRoom: resolveSetStateAction(state.selectedTerminalIdsByRoom, action)
-    }));
-  },
-  setTerminalNamesByRoom: (action) => {
-    set((state) => ({
-      terminalNamesByRoom: resolveSetStateAction(state.terminalNamesByRoom, action)
-    }));
-  },
-  setTerminalCommandsByRoom: (action) => {
-    set((state) => ({
-      terminalCommandsByRoom: resolveSetStateAction(state.terminalCommandsByRoom, action)
-    }));
-  },
-  setTerminalInputsByRoom: (action) => {
-    set((state) => ({
-      terminalInputsByRoom: resolveSetStateAction(state.terminalInputsByRoom, action)
-    }));
-  },
-  setTerminalErrorsByRoom: (action) => {
-    set((state) => ({
-      terminalErrorsByRoom: resolveSetStateAction(state.terminalErrorsByRoom, action)
-    }));
+  initializeTerminalLinesByRoom: (linesByRoom) => {
+    if (Object.keys(linesByRoom).length === 0) return;
+    set((state) => (
+      Object.keys(state.terminalLinesByRoom).length === 0
+        ? { terminalLinesByRoom: linesByRoom }
+        : state
+    ));
   },
   setTerminalBusyForRoom: (roomId, busy) => {
     set((state) => ({

@@ -1049,11 +1049,12 @@ test("desktop store exposes host handoff actions", () => {
 test("desktop store keeps terminal panel state room scoped", () => {
   const store = useAppStore.getState();
 
-  store.setTerminalLinesByRoom({
+  store.initializeTerminalLinesByRoom({
     "room-a": ["system $ npm run dev", "stdout Ready"],
     "room-b": ["system $ git status"]
   });
-  store.setTerminalBusyByRoom({ "room-a": true, "room-b": false });
+  store.setTerminalBusyForRoom("room-a", true);
+  store.setTerminalBusyForRoom("room-b", false);
   store.setTerminals([
     {
       id: "terminal-a",
@@ -1067,37 +1068,35 @@ test("desktop store keeps terminal panel state room scoped", () => {
       lines: [{ stream: "system", text: "$ zsh -l" }]
     }
   ]);
-  store.setTerminalRequestsByRoom({
-    "room-b": [
-      {
-        id: "terminal-request-1",
-        requester: "Jordan",
-        requesterUserId: "github:jordan",
-        command: "npm test",
-        cwd: "/Users/jordan/project",
-        requestedAt: "2026-07-06T00:16:00.000Z",
-        status: "pending"
-      }
-    ]
+  store.appendTerminalRequest("room-b", {
+    id: "terminal-request-1",
+    requester: "Jordan",
+    requesterUserId: "github:jordan",
+    command: "npm test",
+    cwd: "/Users/jordan/project",
+    requestedAt: "2026-07-06T00:16:00.000Z",
+    status: "pending"
   });
-  store.setSelectedTerminalIdsByRoom({ "room-a": "terminal-a", "room-b": null });
-  store.setTerminalNamesByRoom({ "room-a": "dev-server" });
-  store.setTerminalCommandsByRoom({ "room-a": "npm run dev:desktop" });
-  store.setTerminalInputsByRoom({ "room-a": "git status" });
-  store.setTerminalErrorsByRoom({ "room-a": null, "room-b": "Host approval required" });
+  store.setSelectedTerminalIdForRoom("room-a", "terminal-a");
+  store.setSelectedTerminalIdForRoom("room-b", null);
+  store.setTerminalNameForRoom("room-a", "shell");
+  store.setTerminalCommandForRoom("room-a", "zsh -l");
+  store.setTerminalInputForRoom("room-a", "git status");
+  store.setTerminalErrorForRoom("room-a", null);
+  store.setTerminalErrorForRoom("room-b", "Host approval required");
 
   const state = useAppStore.getState();
   assert.equal(state.terminalLinesByRoom["room-a"]?.[1], "stdout Ready");
   assert.equal(state.terminalBusyByRoom["room-a"], true);
-  assert.equal(state.terminalBusyByRoom["room-b"], false);
+  assert.equal(state.terminalBusyByRoom["room-b"], undefined);
   assert.equal(state.terminals[0]?.name, "shell");
   assert.equal(state.terminalRequestsByRoom["room-b"]?.[0]?.command, "npm test");
   assert.equal(state.selectedTerminalIdsByRoom["room-a"], "terminal-a");
-  assert.equal(state.selectedTerminalIdsByRoom["room-b"], null);
-  assert.equal(state.terminalNamesByRoom["room-a"], "dev-server");
-  assert.equal(state.terminalCommandsByRoom["room-a"], "npm run dev:desktop");
+  assert.equal(state.selectedTerminalIdsByRoom["room-b"], undefined);
+  assert.equal(state.terminalNamesByRoom["room-a"], "shell");
+  assert.equal(state.terminalCommandsByRoom["room-a"], "zsh -l");
   assert.equal(state.terminalInputsByRoom["room-a"], "git status");
-  assert.equal(state.terminalErrorsByRoom["room-a"], null);
+  assert.equal(state.terminalErrorsByRoom["room-a"], undefined);
   assert.equal(state.terminalErrorsByRoom["room-b"], "Host approval required");
 });
 
@@ -1136,7 +1135,24 @@ test("desktop store clears local room-scoped state", () => {
     "room-a": [{ id: "message-a", author: "Avery", role: "human", body: "hello", time: "9:41" }],
     "room-b": [{ id: "message-b", author: "Jordan", role: "human", body: "keep", time: "9:42" }]
   });
-  store.setTerminalRequestsByRoom({ "room-a": [], "room-b": [] });
+  store.appendTerminalRequest("room-a", {
+    id: "terminal-request-room-a",
+    requester: "Avery",
+    requesterUserId: "github:avery",
+    command: "npm test",
+    cwd: "/tmp/a",
+    requestedAt: "2026-07-06T00:20:00.000Z",
+    status: "pending"
+  });
+  store.appendTerminalRequest("room-b", {
+    id: "terminal-request-room-b",
+    requester: "Jordan",
+    requesterUserId: "github:jordan",
+    command: "npm run dev",
+    cwd: "/tmp/b",
+    requestedAt: "2026-07-06T00:21:00.000Z",
+    status: "pending"
+  });
   store.appendBrowserRequest("room-a", {
     id: "browser-request-room-a",
     requester: "Avery",
@@ -1169,7 +1185,8 @@ test("desktop store clears local room-scoped state", () => {
   store.setSecretWarningsVisibleByRoom({ "room-a": true, "room-b": true });
   store.setProjectFilesForRoom("room-a", [{ path: "README.md", size: 1 }]);
   store.setProjectFilesForRoom("room-b", []);
-  store.setSelectedTerminalIdsByRoom({ "room-a": "terminal-a", "room-b": "terminal-b" });
+  store.setSelectedTerminalIdForRoom("room-a", "terminal-a");
+  store.setSelectedTerminalIdForRoom("room-b", "terminal-b");
   store.setTerminals([
     {
       id: "terminal-a",
@@ -1276,7 +1293,8 @@ test("desktop store hydrates local room history through one room-scoped action",
       }
     ]
   });
-  store.setSelectedTerminalIdsByRoom({ "room-a": "terminal-a", "room-b": "terminal-b" });
+  store.setSelectedTerminalIdForRoom("room-a", "terminal-a");
+  store.setSelectedTerminalIdForRoom("room-b", "terminal-b");
   store.setTerminals([
     {
       id: "terminal-b",
