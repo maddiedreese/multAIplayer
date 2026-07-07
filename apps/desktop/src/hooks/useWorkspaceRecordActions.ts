@@ -1,10 +1,11 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
-import type { RoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "../lib/relayAccess";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
 import { shouldResetCodexApprovalForRoomUpdate } from "../lib/codexApproval";
 import { upsertRoomPreservingUnread } from "../lib/roomUnread";
 import { omitRecordKey } from "../lib/setUtils";
+import { useAppStore } from "../store/appStore";
 import type { RoomPresence } from "../types";
 
 interface LocalUser {
@@ -19,7 +20,6 @@ interface UseWorkspaceRecordActionsOptions {
   localUser: LocalUser;
   roomsRef: MutableRefObject<RoomRecord[]>;
   setTeams: Dispatch<SetStateAction<TeamRecord[]>>;
-  setTeamMembersByTeam: Dispatch<SetStateAction<Record<string, TeamMemberRecord[]>>>;
   setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
   resetCodexApprovalForRoom: (roomId: string) => void;
   setRevokedRoomIds: Dispatch<SetStateAction<Set<string>>>;
@@ -40,7 +40,6 @@ export function useWorkspaceRecordActions({
   localUser,
   roomsRef,
   setTeams,
-  setTeamMembersByTeam,
   setRooms,
   resetCodexApprovalForRoom,
   setRevokedRoomIds,
@@ -54,6 +53,8 @@ export function useWorkspaceRecordActions({
   setHostMessageForRoom,
   setWorkspaceError
 }: UseWorkspaceRecordActionsOptions) {
+  const ensureLocalTeamMemberForTeam = useAppStore((state) => state.ensureLocalTeamMemberForTeam);
+
   function upsertTeam(team: TeamRecord) {
     setTeams((current) => {
       if (current.some((item) => item.id === team.id)) {
@@ -62,18 +63,7 @@ export function useWorkspaceRecordActions({
       return [...current, team];
     });
     if (team.role) {
-      setTeamMembersByTeam((current) => {
-        if (current[team.id]?.some((member) => member.userId === localUser.id)) return current;
-        return {
-          ...current,
-          [team.id]: [{
-            teamId: team.id,
-            userId: localUser.id,
-            role: team.role ?? "member",
-            joinedAt: new Date().toISOString()
-          }]
-        };
-      });
+      ensureLocalTeamMemberForTeam(team.id, localUser.id, team.role);
     }
   }
 

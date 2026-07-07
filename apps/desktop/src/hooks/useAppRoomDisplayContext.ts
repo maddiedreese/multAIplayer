@@ -61,9 +61,7 @@ export function useAppRoomDisplayContext({
     },
     teamMembers: {
       selectedTeam: workspaceState.selectedTeam,
-      relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
-      setTeamMembersByTeam: workspaceState.setTeamMembersByTeam,
-      setTeamMembersMessageByTeam: workspaceState.setTeamMembersMessageByTeam
+      relayHttpUrl: appConfigState.appConfig.relayHttpUrl
     }
   });
 }

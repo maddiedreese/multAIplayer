@@ -1,32 +1,31 @@
-import { useCallback, useEffect, type Dispatch, type SetStateAction } from "react";
-import type { TeamMemberRecord } from "@multaiplayer/protocol";
+import { useCallback, useEffect } from "react";
 import { loadTeamMembers } from "../lib/workspaceClient";
+import { useAppStore } from "../store/appStore";
 
 interface UseTeamMembersRefreshOptions {
   selectedTeam: string;
   relayHttpUrl: string;
-  setTeamMembersByTeam: Dispatch<SetStateAction<Record<string, TeamMemberRecord[]>>>;
-  setTeamMembersMessageByTeam: Dispatch<SetStateAction<Record<string, string | null>>>;
 }
 
 export function useTeamMembersRefresh({
   selectedTeam,
-  relayHttpUrl,
-  setTeamMembersByTeam,
-  setTeamMembersMessageByTeam
+  relayHttpUrl
 }: UseTeamMembersRefreshOptions) {
+  const setTeamMembersForTeam = useAppStore((state) => state.setTeamMembersForTeam);
+  const setTeamMembersMessageForTeam = useAppStore((state) => state.setTeamMembersMessageForTeam);
+
   const refreshTeamMembers = useCallback(async (teamId: string, showErrors = true): Promise<void> => {
     if (!teamId) return;
     try {
       const members = await loadTeamMembers(teamId);
-      setTeamMembersByTeam((current) => ({ ...current, [teamId]: members }));
-      setTeamMembersMessageByTeam((current) => ({ ...current, [teamId]: null }));
+      setTeamMembersForTeam(teamId, members);
+      setTeamMembersMessageForTeam(teamId, null);
     } catch (error) {
       if (showErrors) {
-        setTeamMembersMessageByTeam((current) => ({ ...current, [teamId]: String(error) }));
+        setTeamMembersMessageForTeam(teamId, String(error));
       }
     }
-  }, [relayHttpUrl, setTeamMembersByTeam, setTeamMembersMessageByTeam]);
+  }, [relayHttpUrl, setTeamMembersForTeam, setTeamMembersMessageForTeam]);
 
   useEffect(() => {
     if (!selectedTeam) return;
