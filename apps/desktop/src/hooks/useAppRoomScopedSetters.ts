@@ -86,12 +86,8 @@ export function useAppRoomScopedSetters({
       setCodexRunningByRoom: codexRoomState.setCodexRunningByRoom
     },
     browser: {
-      selectedRoomId: selectedRoom.id,
       defaultBrowserUrl,
-      defaultBrowserReason,
-      setBrowserUrlsByRoom: browserPanelState.setBrowserUrlsByRoom,
-      setBrowserReasonsByRoom: browserPanelState.setBrowserReasonsByRoom,
-      setBrowserMessagesByRoom: browserPanelState.setBrowserMessagesByRoom
+      defaultBrowserReason
     },
     invites: {
       selectedRoomId: selectedRoom.id,

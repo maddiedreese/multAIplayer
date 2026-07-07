@@ -1,4 +1,3 @@
-import { useRoomBrowserSetters } from "./useRoomBrowserSetters";
 import { useRoomBusySetters } from "./useRoomBusySetters";
 import { useRoomCodexApprovalSetters } from "./useRoomCodexApprovalSetters";
 import { useRoomEventAppenders } from "./useRoomEventAppenders";
@@ -28,7 +27,10 @@ export function useRoomScopedSetters({
   files: Parameters<typeof useRoomFileSetters>[0];
   terminals: Parameters<typeof useRoomTerminalSetters>[0];
   codexApprovals: Parameters<typeof useRoomCodexApprovalSetters>[0];
-  browser: Parameters<typeof useRoomBrowserSetters>[0];
+  browser: {
+    defaultBrowserUrl: string;
+    defaultBrowserReason: string;
+  };
   invites: Parameters<typeof useRoomInviteSetters>[0];
   project: Parameters<typeof useRoomProjectSetters>[0];
   events: Parameters<typeof useRoomEventAppenders>[0];
@@ -46,6 +48,9 @@ export function useRoomScopedSetters({
   const setGitWorkflowMessageForRoom = useAppStore((state) => state.setGitWorkflowMessageForRoom);
   const setGitStatusForRoom = useAppStore((state) => state.setGitStatusForRoom);
   const updateGitWorkflowDraftForRoom = useAppStore((state) => state.updateGitWorkflowDraftForRoom);
+  const setBrowserUrlForRoom = useAppStore((state) => state.setBrowserUrlForRoom);
+  const setBrowserReasonForRoom = useAppStore((state) => state.setBrowserReasonForRoom);
+  const setBrowserMessageForRoom = useAppStore((state) => state.setBrowserMessageForRoom);
 
   return {
     setHostMessageForRoom,
@@ -68,13 +73,18 @@ export function useRoomScopedSetters({
       if (!selectedRoomId) return;
       updateGitWorkflowDraftForRoom(selectedRoomId, patch);
     },
+    setBrowserUrlForRoom: (roomId: string, url: string) =>
+      setBrowserUrlForRoom(roomId, url, browser.defaultBrowserUrl),
+    setBrowserReasonForRoom: (roomId: string, reason: string) =>
+      setBrowserReasonForRoom(roomId, reason, browser.defaultBrowserReason),
+    setBrowserMessageForRoom,
+    setSelectedBrowserMessage: (message: string | null) => setBrowserMessageForRoom(selectedRoomId, message),
     setPendingAttachmentsForRoom,
     setDraftForRoom,
     ...useRoomBusySetters(busy),
     ...useRoomFileSetters(files),
     ...useRoomTerminalSetters(terminals),
     ...useRoomCodexApprovalSetters(codexApprovals),
-    ...useRoomBrowserSetters(browser),
     ...useRoomInviteSetters(invites),
     ...useRoomProjectSetters(project),
     ...useRoomEventAppenders(events),
