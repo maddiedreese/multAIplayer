@@ -1,9 +1,7 @@
-import type { SetStateAction } from "react";
 import type { StateCreator } from "zustand";
 import { omitRecordKey } from "../../lib/setUtils";
 import type { ChatAttachment } from "../../types";
 import type { AppStoreState } from "../appStore";
-import { resolveSetStateAction } from "../storeUtils";
 
 type ChatMessagesByRoom = Record<string, string | null>;
 type DraftsByRoom = Record<string, string>;
@@ -16,9 +14,6 @@ export interface RoomChatSlice {
   pendingAttachmentsByRoom: PendingAttachmentsByRoom;
   sensitiveAttachmentReviewKey: string | null;
   selectedMessageIdsByRoom: SelectedMessageIdsByRoom;
-  setChatMessagesByRoom: (action: SetStateAction<ChatMessagesByRoom>) => void;
-  setDraftsByRoom: (action: SetStateAction<DraftsByRoom>) => void;
-  setPendingAttachmentsByRoom: (action: SetStateAction<PendingAttachmentsByRoom>) => void;
   setSensitiveAttachmentReviewKey: (key: string | null) => void;
   toggleSelectedMessageForRoom: (roomId: string, messageId: string) => void;
   clearSelectedMessagesForRoom: (roomId: string) => void;
@@ -47,21 +42,6 @@ export const emptyRoomChatState: Pick<
 
 export const createRoomChatSlice: StateCreator<AppStoreState, [], [], RoomChatSlice> = (set) => ({
   ...emptyRoomChatState,
-  setChatMessagesByRoom: (action) => {
-    set((state) => ({
-      chatMessagesByRoom: resolveSetStateAction(state.chatMessagesByRoom, action)
-    }));
-  },
-  setDraftsByRoom: (action) => {
-    set((state) => ({
-      draftsByRoom: resolveSetStateAction(state.draftsByRoom, action)
-    }));
-  },
-  setPendingAttachmentsByRoom: (action) => {
-    set((state) => ({
-      pendingAttachmentsByRoom: resolveSetStateAction(state.pendingAttachmentsByRoom, action)
-    }));
-  },
   setSensitiveAttachmentReviewKey: (key) => {
     set({ sensitiveAttachmentReviewKey: key });
   },
