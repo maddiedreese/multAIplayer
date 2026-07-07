@@ -407,6 +407,7 @@ interface AppStoreState {
   setBrowserUrlForRoom: (roomId: string, url: string, defaultBrowserUrl: string) => void;
   setBrowserReasonForRoom: (roomId: string, reason: string, defaultBrowserReason: string) => void;
   setBrowserMessageForRoom: (roomId: string, message: string | null) => void;
+  clearBrowserStatusForRoom: (roomId: string) => void;
   setInviteLinkForRoom: (roomId: string, link: string) => void;
   setInviteApprovalGateForRoom: (roomId: string, enabled: boolean) => void;
   setInviteMessageForRoom: (roomId: string, message: string | null) => void;
@@ -1394,6 +1395,11 @@ export const useAppStore = create<AppStoreState>((set) => ({
       browserMessagesByRoom: message
         ? { ...state.browserMessagesByRoom, [roomId]: message }
         : omitRecordKey(state.browserMessagesByRoom, roomId)
+    }));
+  },
+  clearBrowserStatusForRoom: (roomId) => {
+    set((state) => ({
+      browserStatusByRoom: omitRecordKey(state.browserStatusByRoom, roomId)
     }));
   },
   setInviteLinkForRoom: (roomId, link) => {

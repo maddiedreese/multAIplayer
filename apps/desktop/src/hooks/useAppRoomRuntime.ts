@@ -204,7 +204,7 @@ export function useAppRoomRuntime({
         setSelectedBrowserMessage,
         setBrowserMessageForRoom,
         setRooms: workspaceState.setRooms,
-        setBrowserStatusByRoom: browserPanelState.setBrowserStatusByRoom,
+        clearBrowserStatusForRoom: roomActions.clearBrowserStatusForRoom,
         setProjectPathDraftForRoom,
         resetCodexApprovalForRoom,
         resetFileContextForRoom,
