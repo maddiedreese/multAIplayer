@@ -26,9 +26,7 @@ export function useHistoryDefaultsState({ initialTeamId }: { initialTeamId: stri
     loadTeamRoomDefaults(initialTeamId).inviteApprovalGate
   );
   const historyMessagesByRoom = useAppStore((state) => state.historyMessagesByRoom);
-  const setHistoryMessagesByRoom = useAppStore((state) => state.setHistoryMessagesByRoom);
   const teamHistoryMessagesByTeam = useAppStore((state) => state.teamHistoryMessagesByTeam);
-  const setTeamHistoryMessagesByTeam = useAppStore((state) => state.setTeamHistoryMessagesByTeam);
 
   return {
     historySettings,
@@ -44,8 +42,6 @@ export function useHistoryDefaultsState({ initialTeamId }: { initialTeamId: stri
     teamDefaultInviteApprovalGate,
     setTeamDefaultInviteApprovalGate,
     historyMessagesByRoom,
-    setHistoryMessagesByRoom,
-    teamHistoryMessagesByTeam,
-    setTeamHistoryMessagesByTeam
+    teamHistoryMessagesByTeam
   };
 }

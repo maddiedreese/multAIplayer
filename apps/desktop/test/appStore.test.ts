@@ -737,21 +737,16 @@ test("desktop store keeps history search messages room scoped", () => {
 test("desktop store keeps history status messages scoped", () => {
   const store = useAppStore.getState();
 
-  store.setHistoryMessagesByRoom({
-    "room-a": "Local history saved",
-    "room-b": null
-  });
-  store.setTeamHistoryMessagesByTeam((current) => ({
-    ...current,
-    "team-core": "Team defaults saved",
-    "__no-team": null
-  }));
+  store.setHistoryMessageForRoom("room-a", "Local history saved");
+  store.setHistoryMessageForRoom("room-b", null);
+  store.setTeamHistoryMessageForTeam("team-core", "Team defaults saved");
+  store.setTeamHistoryMessageForTeam("__no-team", null);
 
   const state = useAppStore.getState();
   assert.equal(state.historyMessagesByRoom["room-a"], "Local history saved");
-  assert.equal(state.historyMessagesByRoom["room-b"], null);
+  assert.equal(state.historyMessagesByRoom["room-b"], undefined);
   assert.equal(state.teamHistoryMessagesByTeam["team-core"], "Team defaults saved");
-  assert.equal(state.teamHistoryMessagesByTeam["__no-team"], null);
+  assert.equal(state.teamHistoryMessagesByTeam["__no-team"], undefined);
 });
 
 test("desktop store keeps room runtime state room scoped", () => {
