@@ -201,14 +201,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, TerminalSli
   teamMembersMessageByTeam: TeamMembersMessageByTeam;
   teamMembersBusyByTeam: TeamMembersBusyByTeam;
   messagesByRoom: MessagesByRoom;
-  setGitStatusByRoom: (action: SetStateAction<GitStatusByRoom>) => void;
-  setGitWorkflowBusyByRoom: (action: SetStateAction<GitWorkflowBusyByRoom>) => void;
-  setGitWorkflowMessagesByRoom: (action: SetStateAction<GitWorkflowMessagesByRoom>) => void;
-  setGitWorkflowDraftsByRoom: (action: SetStateAction<GitWorkflowDraftsByRoom>) => void;
-  setActionsBusyByRoom: (action: SetStateAction<ActionsBusyByRoom>) => void;
-  setActionsMessagesByRoom: (action: SetStateAction<ActionsMessagesByRoom>) => void;
-  setActionRunsByRoom: (action: SetStateAction<ActionRunsByRoom>) => void;
-  setActionsLastCheckedByRoom: (action: SetStateAction<ActionsLastCheckedByRoom>) => void;
   setActionsMessageForRoom: (roomId: string, message: string | null) => void;
   setActionRunsForRoom: (roomId: string, runs: GitHubActionRun[]) => void;
   setActionsLastCheckedForRoom: (roomId: string, checkedAt: string | null) => void;
@@ -317,46 +309,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   ...createBrowserSlice(set, get, api),
   ...createFilePanelSlice(set, get, api),
   ...createTerminalSlice(set, get, api),
-  setGitStatusByRoom: (action) => {
-    set((state) => ({
-      gitStatusByRoom: resolveSetStateAction(state.gitStatusByRoom, action)
-    }));
-  },
-  setGitWorkflowBusyByRoom: (action) => {
-    set((state) => ({
-      gitWorkflowBusyByRoom: resolveSetStateAction(state.gitWorkflowBusyByRoom, action)
-    }));
-  },
-  setGitWorkflowMessagesByRoom: (action) => {
-    set((state) => ({
-      gitWorkflowMessagesByRoom: resolveSetStateAction(state.gitWorkflowMessagesByRoom, action)
-    }));
-  },
-  setGitWorkflowDraftsByRoom: (action) => {
-    set((state) => ({
-      gitWorkflowDraftsByRoom: resolveSetStateAction(state.gitWorkflowDraftsByRoom, action)
-    }));
-  },
-  setActionsBusyByRoom: (action) => {
-    set((state) => ({
-      actionsBusyByRoom: resolveSetStateAction(state.actionsBusyByRoom, action)
-    }));
-  },
-  setActionsMessagesByRoom: (action) => {
-    set((state) => ({
-      actionsMessagesByRoom: resolveSetStateAction(state.actionsMessagesByRoom, action)
-    }));
-  },
-  setActionRunsByRoom: (action) => {
-    set((state) => ({
-      actionRunsByRoom: resolveSetStateAction(state.actionRunsByRoom, action)
-    }));
-  },
-  setActionsLastCheckedByRoom: (action) => {
-    set((state) => ({
-      actionsLastCheckedByRoom: resolveSetStateAction(state.actionsLastCheckedByRoom, action)
-    }));
-  },
   setActionsMessageForRoom: (roomId, message) => {
     set((state) => ({
       actionsMessagesByRoom: message
