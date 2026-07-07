@@ -1,12 +1,11 @@
 import type { CookieOptions, Express } from "express";
 import { nanoid } from "nanoid";
-import type { RelayEnvelope } from "@multaiplayer/protocol";
-import type { AuthSession, RoomKey } from "../state.js";
+import type { AuthSession, RelayStore } from "../state.js";
 
 interface RegisterDebugRoutesOptions {
   app: Express;
   debugEndpointsEnabled: boolean;
-  encryptedBacklog: Map<RoomKey, RelayEnvelope[]>;
+  store: Pick<RelayStore, "allEncryptedBacklogEntries">;
   invites: Map<string, unknown>;
   attachmentBlobs: Map<string, unknown>;
   authSessions: Map<string, AuthSession>;
@@ -23,7 +22,7 @@ interface RegisterDebugRoutesOptions {
 export function registerDebugRoutes({
   app,
   debugEndpointsEnabled,
-  encryptedBacklog,
+  store,
   invites,
   attachmentBlobs,
   authSessions,
@@ -45,7 +44,7 @@ export function registerDebugRoutes({
     res.json({
       invites: invites.size,
       attachmentBlobs: attachmentBlobs.size,
-      rooms: Array.from(encryptedBacklog.entries()).map(([key, envelopes]) => ({
+      rooms: store.allEncryptedBacklogEntries().map(([key, envelopes]) => ({
         key,
         envelopes: envelopes.length,
         sample: envelopes.at(-1)

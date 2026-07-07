@@ -122,7 +122,6 @@ const {
   teamSockets,
   workspaceSockets,
   roomPresence,
-  encryptedBacklog,
   authSessions,
   teams,
   rooms,
@@ -253,7 +252,6 @@ const {
   teamSockets,
   workspaceSockets,
   sessions,
-  encryptedBacklog,
   roomPresence,
   metrics: relayMetrics,
   roomKey,
@@ -317,7 +315,7 @@ registerGitHubRoutes({
 registerDebugRoutes({
   app,
   debugEndpointsEnabled,
-  encryptedBacklog,
+  store: relayStore,
   invites,
   attachmentBlobs,
   authSessions,
@@ -424,8 +422,8 @@ registerRoomRoutes({
 });
 registerRelayWebSocketConnection({
   wss,
+  store: relayStore,
   sessions,
-  encryptedBacklog,
   roomPresence,
   encryptedEnvelopeMaxBytes,
   maxDisplayNameChars,
