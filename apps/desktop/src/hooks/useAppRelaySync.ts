@@ -118,7 +118,6 @@ export function useAppRelaySync({
         setRelayStatus: appRuntimeState.setRelayStatus,
         setPresenceByRoom: roomRuntimeState.setPresenceByRoom,
         setRooms: workspaceState.setRooms,
-        setMessagesByRoom: workspaceState.setMessagesByRoom,
         setTerminalRequestsByRoom: terminalPanelState.setTerminalRequestsByRoom,
         setBrowserRequestsByRoom: browserPanelState.setBrowserRequestsByRoom,
         setActionRunsByRoom: githubWorkflowPanelState.setActionRunsByRoom,

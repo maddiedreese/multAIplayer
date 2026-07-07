@@ -82,7 +82,6 @@ interface UseRelaySubscriptionOptions {
   setRelayStatus: StatusSetter;
   setPresenceByRoom: Dispatch<SetStateAction<PresenceByRoom>>;
   setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
-  setMessagesByRoom: Dispatch<SetStateAction<Record<string, ChatMessage[]>>>;
   setTerminalRequestsByRoom: Dispatch<SetStateAction<Record<string, TerminalCommandRequest[]>>>;
   setBrowserRequestsByRoom: Dispatch<SetStateAction<Record<string, BrowserAccessRequest[]>>>;
   setActionRunsByRoom: Dispatch<SetStateAction<Record<string, GitHubActionRun[]>>>;
@@ -135,7 +134,6 @@ export function useRelaySubscription({
   setRelayStatus,
   setPresenceByRoom,
   setRooms,
-  setMessagesByRoom,
   setTerminalRequestsByRoom,
   setBrowserRequestsByRoom,
   setActionRunsByRoom,
@@ -258,14 +256,7 @@ export function useRelaySubscription({
                 deviceId
               )
             );
-            setMessagesByRoom((current) => {
-              const roomMessages = current[message.envelope.roomId] ?? [];
-              if (roomMessages.some((existing) => existing.id === chatMessage.id)) return current;
-              return {
-                ...current,
-                [message.envelope.roomId]: [...roomMessages, chatMessage]
-              };
-            });
+            appendRoomMessage(message.envelope.roomId, chatMessage);
             const envelopeRoom = roomsRef.current.find((room) => room.id === message.envelope.roomId);
             if (envelopeRoom) handleCodexBrowserOpenCommand(chatMessage, envelopeRoom);
           }
