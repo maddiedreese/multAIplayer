@@ -57,7 +57,6 @@ export function useAppRelaySync({
     appConfigState,
     roomRuntimeState,
     appRuntimeState,
-    githubWorkflowPanelState,
     invitePanelState
   } = appState;
   const {
@@ -75,6 +74,9 @@ export function useAppRelaySync({
     appendGitWorkflowEvent,
     setGitWorkflowMessageForRoom,
     appendGitHubActionsEvent,
+    setActionRunsForRoom,
+    setActionsLastCheckedForRoom,
+    setActionsMessageForRoom,
     appendCodexEvent,
     appendLocalPreviewEvent,
     setChatMessageForRoom,
@@ -117,9 +119,6 @@ export function useAppRelaySync({
         setRelayStatus: appRuntimeState.setRelayStatus,
         setPresenceByRoom: roomRuntimeState.setPresenceByRoom,
         setRooms: workspaceState.setRooms,
-        setActionRunsByRoom: githubWorkflowPanelState.setActionRunsByRoom,
-        setActionsLastCheckedByRoom: githubWorkflowPanelState.setActionsLastCheckedByRoom,
-        setActionsMessagesByRoom: githubWorkflowPanelState.setActionsMessagesByRoom,
         setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
         handleRelayError: workspaceRecords.handleRelayError,
         upsertRoom: workspaceRecords.upsertRoom,
@@ -134,6 +133,9 @@ export function useAppRelaySync({
         appendGitWorkflowEvent,
         setGitWorkflowMessageForRoom,
         appendGitHubActionsEvent,
+        setActionRunsForRoom,
+        setActionsLastCheckedForRoom,
+        setActionsMessageForRoom,
         appendCodexEvent,
         appendBrowserRequest,
         updateBrowserRequestStatus,
