@@ -220,9 +220,7 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, TerminalSli
   setSettingsMessagesByRoom: (action: SetStateAction<SettingsMessagesByRoom>) => void;
   setCustomCodexModelsByRoom: (action: SetStateAction<CustomCodexModelsByRoom>) => void;
   setProjectPathDraftsByRoom: (action: SetStateAction<ProjectPathDraftsByRoom>) => void;
-  setLocalPreviewsByRoom: (action: SetStateAction<LocalPreviewsByRoom>) => void;
   setLocalPreviewDialog: (action: SetStateAction<LocalPreviewDialogState>) => void;
-  setLocalPreviewBusyByRoom: (action: SetStateAction<LocalPreviewBusyByRoom>) => void;
   setInviteRequestsByRoom: (action: SetStateAction<InviteRequestsByRoom>) => void;
   setInviteSecretInput: (action: SetStateAction<string>) => void;
   setInviteLinksByRoom: (action: SetStateAction<InviteLinksByRoom>) => void;
@@ -430,19 +428,9 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       projectPathDraftsByRoom: resolveSetStateAction(state.projectPathDraftsByRoom, action)
     }));
   },
-  setLocalPreviewsByRoom: (action) => {
-    set((state) => ({
-      localPreviewsByRoom: resolveSetStateAction(state.localPreviewsByRoom, action)
-    }));
-  },
   setLocalPreviewDialog: (action) => {
     set((state) => ({
       localPreviewDialog: resolveSetStateAction(state.localPreviewDialog, action)
-    }));
-  },
-  setLocalPreviewBusyByRoom: (action) => {
-    set((state) => ({
-      localPreviewBusyByRoom: resolveSetStateAction(state.localPreviewBusyByRoom, action)
     }));
   },
   setInviteRequestsByRoom: (action) => {

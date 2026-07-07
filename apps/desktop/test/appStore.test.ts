@@ -374,23 +374,20 @@ test("desktop store exposes room project override actions", () => {
 test("desktop store keeps local preview state room scoped", () => {
   const store = useAppStore.getState();
 
-  store.setLocalPreviewsByRoom({
-    "room-a": [
-      {
-        eventType: "local.preview",
-        id: "preview-1",
-        sharedBy: "Avery",
-        sharedByUserId: "github:avery",
-        sourceUrl: "http://localhost:5173/",
-        publicUrl: "https://preview.trycloudflare.com",
-        status: "live",
-        message: "Preview is live",
-        createdAt: "2026-07-06T00:04:00.000Z",
-        updatedAt: "2026-07-06T00:05:00.000Z"
-      }
-    ]
+  store.appendLocalPreviewEvent("room-a", {
+    eventType: "local.preview",
+    id: "preview-1",
+    sharedBy: "Avery",
+    sharedByUserId: "github:avery",
+    sourceUrl: "http://localhost:5173/",
+    publicUrl: "https://preview.trycloudflare.com",
+    status: "live",
+    message: "Preview is live",
+    createdAt: "2026-07-06T00:04:00.000Z",
+    updatedAt: "2026-07-06T00:05:00.000Z"
   });
-  store.setLocalPreviewBusyByRoom({ "room-a": true, "room-b": false });
+  store.setLocalPreviewBusyForRoom("room-a", true);
+  store.setLocalPreviewBusyForRoom("room-b", false);
   store.setLocalPreviewDialog({
     open: true,
     phase: "confirm",
@@ -405,7 +402,7 @@ test("desktop store keeps local preview state room scoped", () => {
   const state = useAppStore.getState();
   assert.equal(state.localPreviewsByRoom["room-a"]?.[0]?.status, "live");
   assert.equal(state.localPreviewBusyByRoom["room-a"], true);
-  assert.equal(state.localPreviewBusyByRoom["room-b"], false);
+  assert.equal(state.localPreviewBusyByRoom["room-b"], undefined);
   assert.equal(state.localPreviewDialog.open, true);
   assert.equal(state.localPreviewDialog.candidates[0]?.label, "localhost:5173");
 });
