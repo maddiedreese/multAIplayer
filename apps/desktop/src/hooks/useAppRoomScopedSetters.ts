@@ -93,11 +93,6 @@ export function useAppRoomScopedSetters({
       setHostHandoffsByRoom: roomRuntimeState.setHostHandoffsByRoom,
       setInviteRequestsByRoom: invitePanelState.setInviteRequestsByRoom,
       setCodexEventsByRoom: codexRoomState.setCodexEventsByRoom
-    },
-    requests: {
-      setInviteRequestsByRoom: invitePanelState.setInviteRequestsByRoom,
-      setTerminalRequestsByRoom: terminalPanelState.setTerminalRequestsByRoom,
-      setBrowserRequestsByRoom: browserPanelState.setBrowserRequestsByRoom
     }
   });
 }

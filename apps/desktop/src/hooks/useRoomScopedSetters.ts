@@ -2,7 +2,6 @@ import type { MutableRefObject } from "react";
 import { useRoomCodexApprovalSetters } from "./useRoomCodexApprovalSetters";
 import { useRoomEventAppenders } from "./useRoomEventAppenders";
 import { useRoomFileSetters } from "./useRoomFileSetters";
-import { useRoomRequestSetters } from "./useRoomRequestSetters";
 import { useRoomTerminalSetters } from "./useRoomTerminalSetters";
 import { useAppStore } from "../store/appStore";
 import type { RoomRecord } from "@multaiplayer/protocol";
@@ -34,8 +33,7 @@ export function useRoomScopedSetters({
   codexApprovals,
   browser,
   project,
-  events,
-  requests
+  events
 }: {
   selectedRoomId: string;
   selectedTeamId: string;
@@ -53,7 +51,6 @@ export function useRoomScopedSetters({
     defaultProjectPath: string;
   };
   events: Parameters<typeof useRoomEventAppenders>[0];
-  requests: Parameters<typeof useRoomRequestSetters>[0];
 }) {
   const setHostMessageForRoom = useAppStore((state) => state.setHostMessageForRoom);
   const setChatMessageForRoom = useAppStore((state) => state.setChatMessageForRoom);
@@ -83,6 +80,11 @@ export function useRoomScopedSetters({
   const setKeyRotationBusyForRoom = useAppStore((state) => state.setKeyRotationBusyForRoom);
   const setFileBusyForRoom = useAppStore((state) => state.setFileBusyForRoom);
   const setTerminalBusyForRoom = useAppStore((state) => state.setTerminalBusyForRoom);
+  const updateInviteRequestStatus = useAppStore((state) => state.updateInviteRequestStatus);
+  const appendTerminalRequest = useAppStore((state) => state.appendTerminalRequest);
+  const updateTerminalRequestStatus = useAppStore((state) => state.updateTerminalRequestStatus);
+  const appendBrowserRequest = useAppStore((state) => state.appendBrowserRequest);
+  const updateBrowserRequestStatus = useAppStore((state) => state.updateBrowserRequestStatus);
 
   const applyBusyForRoom = (
     ref: MutableRefObject<BusyMap>,
@@ -155,6 +157,10 @@ export function useRoomScopedSetters({
     ...useRoomTerminalSetters(terminals),
     ...useRoomCodexApprovalSetters(codexApprovals),
     ...useRoomEventAppenders(events),
-    ...useRoomRequestSetters(requests)
+    updateInviteRequestStatus,
+    appendTerminalRequest,
+    updateTerminalRequestStatus,
+    appendBrowserRequest,
+    updateBrowserRequestStatus
   };
 }
