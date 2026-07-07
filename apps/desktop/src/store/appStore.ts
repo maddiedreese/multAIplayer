@@ -356,6 +356,9 @@ interface AppStoreState {
   appendGitHubActionsEvent: (roomId: string, event: GitHubActionsEventPlaintextPayload) => void;
   appendLocalPreviewEvent: (roomId: string, event: LocalPreviewRecord) => void;
   appendHostHandoff: (roomId: string, handoff: HostHandoffRecord) => void;
+  markHostHandoffAcceptedForRoom: (roomId: string, handoffId: string) => void;
+  markLatestHostHandoffAcceptedForRoom: (roomId: string) => void;
+  setCodexContinuationForRoom: (roomId: string, handoff: HostHandoffRecord | null) => void;
   appendInviteRequest: (roomId: string, request: InviteJoinRequest) => void;
   appendCodexEvent: (roomId: string, event: CodexRoomEvent) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
@@ -920,6 +923,42 @@ export const useAppStore = create<AppStoreState>((set) => ({
         }
       };
     });
+  },
+  markHostHandoffAcceptedForRoom: (roomId, handoffId) => {
+    set((state) => {
+      const roomHandoffs = state.hostHandoffsByRoom[roomId] ?? [];
+      if (!roomHandoffs.some((handoff) => handoff.id === handoffId)) return state;
+      return {
+        hostHandoffsByRoom: {
+          ...state.hostHandoffsByRoom,
+          [roomId]: roomHandoffs.map((handoff) =>
+            handoff.id === handoffId ? { ...handoff, status: "accepted" } : handoff
+          )
+        }
+      };
+    });
+  },
+  markLatestHostHandoffAcceptedForRoom: (roomId) => {
+    set((state) => {
+      const roomHandoffs = state.hostHandoffsByRoom[roomId] ?? [];
+      const latestAvailable = [...roomHandoffs].reverse().find((handoff) => handoff.status === "available");
+      if (!latestAvailable) return state;
+      return {
+        hostHandoffsByRoom: {
+          ...state.hostHandoffsByRoom,
+          [roomId]: roomHandoffs.map((handoff) =>
+            handoff.id === latestAvailable.id ? { ...handoff, status: "accepted" } : handoff
+          )
+        }
+      };
+    });
+  },
+  setCodexContinuationForRoom: (roomId, handoff) => {
+    set((state) => ({
+      codexContinuationByRoom: handoff
+        ? { ...state.codexContinuationByRoom, [roomId]: handoff }
+        : omitRecordKey(state.codexContinuationByRoom, roomId)
+    }));
   },
   appendInviteRequest: (roomId, request) => {
     set((state) => {

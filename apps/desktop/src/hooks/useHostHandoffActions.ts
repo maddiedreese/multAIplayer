@@ -33,9 +33,9 @@ import {
 import { parseGitHubRemoteUrl } from "../lib/gitWorkflowDraft";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
-import { omitRecordKey } from "../lib/setUtils";
 import { roomLockMessage } from "../lib/appRuntime";
 import { formatCodexModel } from "../lib/appFormatters";
+import { useAppStore } from "../store/appStore";
 import type { RelayClient } from "../lib/relayClient";
 import type {
   BrowserAccessRequest,
@@ -81,8 +81,6 @@ interface UseHostHandoffActionsOptions {
     requesterUserId: string;
   };
   setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
-  setCodexContinuationByRoom: Dispatch<SetStateAction<Record<string, HostHandoffRecord>>>;
-  setHostHandoffsByRoom: Dispatch<SetStateAction<Record<string, HostHandoffRecord[]>>>;
   setHostBusyForRoom: (roomId: string, busy: boolean) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setSelectedHostMessage: (message: string | null) => void;
@@ -116,8 +114,6 @@ export function useHostHandoffActions({
   reportRoomHostMutationInFlight,
   roomSettingsActor,
   setRooms,
-  setCodexContinuationByRoom,
-  setHostHandoffsByRoom,
   setHostBusyForRoom,
   setHostMessageForRoom,
   setSelectedHostMessage,
@@ -128,6 +124,10 @@ export function useHostHandoffActions({
   resetCodexApprovalForRoom,
   appendHostHandoff
 }: UseHostHandoffActionsOptions) {
+  const markHostHandoffAcceptedForRoom = useAppStore((state) => state.markHostHandoffAcceptedForRoom);
+  const markLatestHostHandoffAcceptedForRoom = useAppStore((state) => state.markLatestHostHandoffAcceptedForRoom);
+  const setCodexContinuationForRoom = useAppStore((state) => state.setCodexContinuationForRoom);
+
   async function setRoomHost(hostStatus: RoomRecord["hostStatus"]) {
     if (!hasSelectedRoom) {
       setSelectedHostMessage("Create or join a room before changing the host.");
@@ -164,8 +164,8 @@ export function useHostHandoffActions({
         await publishHostHandoff(room);
       }
       if (hostStatus === "active") {
-        markLatestHostHandoffAccepted(room.id);
-        setCodexContinuationByRoom((current) => omitRecordKey(current, room.id));
+        markLatestHostHandoffAcceptedForRoom(room.id);
+        setCodexContinuationForRoom(room.id, null);
       }
       resetCodexApprovalForRoom(roomId);
     } catch (error) {
@@ -216,9 +216,7 @@ export function useHostHandoffActions({
       setRooms((current) => current.map((item) => (item.id === claimed.id ? ensureRoomDefaults(claimed) : item)));
       markHostHandoffAccepted(roomId, roomHandoff.id);
       await publishHostHandoffAccepted(selectedRoom, roomHandoff);
-      setCodexContinuationByRoom((current) =>
-        roomHandoff.reason === "usage_limit" ? { ...current, [roomId]: roomHandoff } : omitRecordKey(current, roomId)
-      );
+      setCodexContinuationForRoom(roomId, roomHandoff.reason === "usage_limit" ? roomHandoff : null);
       resetFileContextForRoom(roomId);
       resetCodexApprovalForRoom(roomId);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
@@ -428,31 +426,11 @@ export function useHostHandoffActions({
   }
 
   function markLatestHostHandoffAccepted(roomId: string) {
-    setHostHandoffsByRoom((current) => {
-      const roomHandoffs = current[roomId] ?? [];
-      const latestAvailable = [...roomHandoffs].reverse().find((handoff) => handoff.status === "available");
-      if (!latestAvailable) return current;
-      return markHostHandoffAcceptedInState(current, roomId, latestAvailable.id);
-    });
+    markLatestHostHandoffAcceptedForRoom(roomId);
   }
 
   function markHostHandoffAccepted(roomId: string, handoffId: string) {
-    setHostHandoffsByRoom((current) => markHostHandoffAcceptedInState(current, roomId, handoffId));
-  }
-
-  function markHostHandoffAcceptedInState(
-    current: Record<string, HostHandoffRecord[]>,
-    roomId: string,
-    handoffId: string
-  ): Record<string, HostHandoffRecord[]> {
-    const roomHandoffs = current[roomId] ?? [];
-    if (!roomHandoffs.some((handoff) => handoff.id === handoffId)) return current;
-    return {
-      ...current,
-      [roomId]: roomHandoffs.map((handoff) =>
-        handoff.id === handoffId ? { ...handoff, status: "accepted" } : handoff
-      )
-    };
+    markHostHandoffAcceptedForRoom(roomId, handoffId);
   }
 
   return {

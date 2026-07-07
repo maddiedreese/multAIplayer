@@ -85,8 +85,6 @@ export function useAppHostHandoffActions({
     reportRoomHostMutationInFlight: roomInteraction.reportRoomHostMutationInFlight,
     roomSettingsActor,
     setRooms: workspaceState.setRooms,
-    setCodexContinuationByRoom: roomRuntimeState.setCodexContinuationByRoom,
-    setHostHandoffsByRoom: roomRuntimeState.setHostHandoffsByRoom,
     setHostBusyForRoom,
     setHostMessageForRoom,
     setSelectedHostMessage,

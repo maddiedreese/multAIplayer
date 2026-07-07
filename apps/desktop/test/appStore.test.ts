@@ -905,6 +905,48 @@ test("desktop store exposes room event append actions", () => {
   assert.equal(state.codexEventsByRoom["room-a"]?.length, 1);
 });
 
+test("desktop store exposes host handoff actions", () => {
+  const store = useAppStore.getState();
+  const olderHandoff = {
+    id: "handoff-older",
+    fromHost: "Maddie",
+    fromUserId: "github:maddie",
+    reason: "manual" as const,
+    projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
+    codexModel: "gpt-5.4",
+    approvalPolicy: "ask",
+    messagesSinceLastCodex: 1,
+    attachmentNames: [],
+    terminals: [],
+    createdAt: "2026-07-06T00:15:00.000Z",
+    status: "available" as const
+  };
+  const latestHandoff = {
+    ...olderHandoff,
+    id: "handoff-latest",
+    reason: "usage_limit" as const,
+    messagesSinceLastCodex: 4,
+    createdAt: "2026-07-06T00:16:00.000Z"
+  };
+
+  store.appendHostHandoff("room-a", olderHandoff);
+  store.appendHostHandoff("room-a", latestHandoff);
+  store.markHostHandoffAcceptedForRoom("room-a", olderHandoff.id);
+  store.setCodexContinuationForRoom("room-a", latestHandoff);
+
+  let state = useAppStore.getState();
+  assert.equal(state.hostHandoffsByRoom["room-a"]?.[0]?.status, "accepted");
+  assert.equal(state.hostHandoffsByRoom["room-a"]?.[1]?.status, "available");
+  assert.equal(state.codexContinuationByRoom["room-a"]?.id, latestHandoff.id);
+
+  store.markLatestHostHandoffAcceptedForRoom("room-a");
+  store.setCodexContinuationForRoom("room-a", null);
+
+  state = useAppStore.getState();
+  assert.equal(state.hostHandoffsByRoom["room-a"]?.[1]?.status, "accepted");
+  assert.equal(state.codexContinuationByRoom["room-a"], undefined);
+});
+
 test("desktop store keeps terminal panel state room scoped", () => {
   const store = useAppStore.getState();
 
