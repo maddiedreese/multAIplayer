@@ -201,44 +201,30 @@ test("desktop store exposes GitHub Actions room actions", () => {
 test("desktop store keeps browser panel state room scoped", () => {
   const store = useAppStore.getState();
 
-  store.setBrowserRequestsByRoom({
-    "room-a": [
-      {
-        id: "browser-request-1",
-        requester: "Avery",
-        requesterUserId: "github:avery",
-        url: "http://localhost:3000",
-        reason: "Inspect local preview",
-        requestedAt: "2026-07-06T00:03:00.000Z",
-        status: "pending"
-      }
-    ]
+  store.appendBrowserRequest("room-a", {
+    id: "browser-request-1",
+    requester: "Avery",
+    requesterUserId: "github:avery",
+    url: "http://localhost:3000",
+    reason: "Inspect local preview",
+    requestedAt: "2026-07-06T00:03:00.000Z",
+    status: "pending"
   });
-  store.setBrowserUrlsByRoom({ "room-a": "https://github.com", "room-b": "http://localhost:5173" });
-  store.setBrowserReasonsByRoom((current) => ({
-    ...current,
-    "room-b": "Open app preview"
-  }));
-  store.setBrowserMessagesByRoom({ "room-a": "Opened browser", "room-b": null });
-  store.setBrowserStatusByRoom({
-    "room-a": {
-      profilePath: "/Users/maddiedreese/Library/Application Support/multAIplayer/browser/room-a",
-      downloadsBlocked: true,
-      clipboardBlocked: true,
-      fileUploadsBlocked: true
-    }
-  });
-  store.setActiveBrowserUrlsByRoom({ "room-a": "https://github.com", "room-b": null });
+  store.setBrowserUrlForRoom("room-a", "https://github.com", "http://localhost:3000");
+  store.setBrowserUrlForRoom("room-b", "http://localhost:5173", "http://localhost:3000");
+  store.setBrowserReasonForRoom("room-b", "Open app preview", "Use this page as Codex browser context.");
+  store.setBrowserMessageForRoom("room-a", "Opened browser");
+  store.openEmbeddedBrowserForRoom("room-a", "https://github.com");
 
   const state = useAppStore.getState();
   assert.equal(state.browserRequestsByRoom["room-a"]?.[0]?.url, "http://localhost:3000");
   assert.equal(state.browserUrlsByRoom["room-b"], "http://localhost:5173");
   assert.equal(state.browserReasonsByRoom["room-b"], "Open app preview");
   assert.equal(state.browserMessagesByRoom["room-a"], "Opened browser");
-  assert.equal(state.browserMessagesByRoom["room-b"], null);
-  assert.equal(state.browserStatusByRoom["room-a"]?.downloadsBlocked, true);
+  assert.equal(state.browserMessagesByRoom["room-b"], undefined);
+  assert.equal(state.browserStatusByRoom["room-a"]?.profilePath, "Embedded in this room");
   assert.equal(state.activeBrowserUrlsByRoom["room-a"], "https://github.com");
-  assert.equal(state.activeBrowserUrlsByRoom["room-b"], null);
+  assert.equal(state.activeBrowserUrlsByRoom["room-b"], undefined);
 });
 
 test("desktop store exposes room browser actions", () => {
@@ -1151,7 +1137,24 @@ test("desktop store clears local room-scoped state", () => {
     "room-b": [{ id: "message-b", author: "Jordan", role: "human", body: "keep", time: "9:42" }]
   });
   store.setTerminalRequestsByRoom({ "room-a": [], "room-b": [] });
-  store.setBrowserRequestsByRoom({ "room-a": [], "room-b": [] });
+  store.appendBrowserRequest("room-a", {
+    id: "browser-request-room-a",
+    requester: "Avery",
+    requesterUserId: "github:avery",
+    url: "https://github.com",
+    reason: "Review",
+    requestedAt: "2026-07-06T00:20:00.000Z",
+    status: "pending"
+  });
+  store.appendBrowserRequest("room-b", {
+    id: "browser-request-room-b",
+    requester: "Jordan",
+    requesterUserId: "github:jordan",
+    url: "https://example.com",
+    reason: "Keep",
+    requestedAt: "2026-07-06T00:21:00.000Z",
+    status: "pending"
+  });
   store.setInviteRequestsByRoom({ "room-a": [], "room-b": [] });
   store.setCodexEventsByRoom({ "room-a": [], "room-b": [] });
   store.setGitWorkflowEventsByRoom({ "room-a": [], "room-b": [] });
@@ -1187,7 +1190,8 @@ test("desktop store clears local room-scoped state", () => {
       output: []
     }
   ]);
-  store.setBrowserUrlsByRoom({ "room-a": "https://github.com", "room-b": "https://example.com" });
+  store.setBrowserUrlForRoom("room-a", "https://github.com", "http://localhost:3000");
+  store.setBrowserUrlForRoom("room-b", "https://example.com", "http://localhost:3000");
   store.setDraftsByRoom({ "room-a": "clear me", "room-b": "keep me" });
 
   store.clearRoomScopedStateForRoom("room-a");

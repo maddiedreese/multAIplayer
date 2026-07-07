@@ -1,9 +1,7 @@
-import type { SetStateAction } from "react";
 import type { StateCreator } from "zustand";
 import { omitRecordKey } from "../../lib/setUtils";
 import type { BrowserAccessRequest, BrowserStatus } from "../../types";
 import type { AppStoreState } from "../appStore";
-import { resolveSetStateAction } from "../storeUtils";
 
 type BrowserRequestsByRoom = Record<string, BrowserAccessRequest[]>;
 type BrowserUrlsByRoom = Record<string, string>;
@@ -19,12 +17,6 @@ export interface BrowserSlice {
   browserMessagesByRoom: BrowserMessagesByRoom;
   browserStatusByRoom: BrowserStatusByRoom;
   activeBrowserUrlsByRoom: ActiveBrowserUrlsByRoom;
-  setBrowserRequestsByRoom: (action: SetStateAction<BrowserRequestsByRoom>) => void;
-  setBrowserUrlsByRoom: (action: SetStateAction<BrowserUrlsByRoom>) => void;
-  setBrowserReasonsByRoom: (action: SetStateAction<BrowserReasonsByRoom>) => void;
-  setBrowserMessagesByRoom: (action: SetStateAction<BrowserMessagesByRoom>) => void;
-  setBrowserStatusByRoom: (action: SetStateAction<BrowserStatusByRoom>) => void;
-  setActiveBrowserUrlsByRoom: (action: SetStateAction<ActiveBrowserUrlsByRoom>) => void;
   appendBrowserRequest: (roomId: string, request: BrowserAccessRequest) => void;
   updateBrowserRequestStatus: (roomId: string, requestId: string, status: BrowserAccessRequest["status"]) => void;
   openEmbeddedBrowserForRoom: (roomId: string, url: string) => void;
@@ -54,36 +46,6 @@ export const emptyBrowserState: Pick<
 
 export const createBrowserSlice: StateCreator<AppStoreState, [], [], BrowserSlice> = (set) => ({
   ...emptyBrowserState,
-  setBrowserRequestsByRoom: (action) => {
-    set((state) => ({
-      browserRequestsByRoom: resolveSetStateAction(state.browserRequestsByRoom, action)
-    }));
-  },
-  setBrowserUrlsByRoom: (action) => {
-    set((state) => ({
-      browserUrlsByRoom: resolveSetStateAction(state.browserUrlsByRoom, action)
-    }));
-  },
-  setBrowserReasonsByRoom: (action) => {
-    set((state) => ({
-      browserReasonsByRoom: resolveSetStateAction(state.browserReasonsByRoom, action)
-    }));
-  },
-  setBrowserMessagesByRoom: (action) => {
-    set((state) => ({
-      browserMessagesByRoom: resolveSetStateAction(state.browserMessagesByRoom, action)
-    }));
-  },
-  setBrowserStatusByRoom: (action) => {
-    set((state) => ({
-      browserStatusByRoom: resolveSetStateAction(state.browserStatusByRoom, action)
-    }));
-  },
-  setActiveBrowserUrlsByRoom: (action) => {
-    set((state) => ({
-      activeBrowserUrlsByRoom: resolveSetStateAction(state.activeBrowserUrlsByRoom, action)
-    }));
-  },
   appendBrowserRequest: (roomId, request) => {
     set((state) => {
       const roomRequests = state.browserRequestsByRoom[roomId] ?? [];
