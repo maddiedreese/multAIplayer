@@ -869,6 +869,34 @@ test("desktop store keeps terminal panel state room scoped", () => {
   assert.equal(state.terminalErrorsByRoom["room-b"], "Host approval required");
 });
 
+test("desktop store exposes room terminal actions", () => {
+  const store = useAppStore.getState();
+
+  store.setSelectedTerminalIdForRoom("room-a", "terminal-a");
+  store.setTerminalNameForRoom("room-a", "shell");
+  store.setTerminalCommandForRoom("room-a", "zsh -l");
+  store.setTerminalInputForRoom("room-a", "git status");
+  store.setTerminalErrorForRoom("room-a", "Host approval required");
+  store.appendTerminalLinesForRoom("room-a", ["one", "two"], 3);
+  store.appendTerminalLinesForRoom("room-a", ["three", "four"], 3);
+  store.setSelectedTerminalIdForRoom("room-b", null);
+  store.setTerminalNameForRoom("room-b", "dev-server");
+  store.setTerminalCommandForRoom("room-b", "npm run dev:desktop");
+  store.setTerminalInputForRoom("room-a", "");
+  store.setTerminalErrorForRoom("room-a", null);
+
+  const state = useAppStore.getState();
+  assert.equal(state.selectedTerminalIdsByRoom["room-a"], "terminal-a");
+  assert.equal(state.selectedTerminalIdsByRoom["room-b"], undefined);
+  assert.equal(state.terminalNamesByRoom["room-a"], "shell");
+  assert.equal(state.terminalNamesByRoom["room-b"], undefined);
+  assert.equal(state.terminalCommandsByRoom["room-a"], "zsh -l");
+  assert.equal(state.terminalCommandsByRoom["room-b"], undefined);
+  assert.equal(state.terminalInputsByRoom["room-a"], undefined);
+  assert.equal(state.terminalErrorsByRoom["room-a"], undefined);
+  assert.deepEqual(state.terminalLinesByRoom["room-a"], ["two", "three", "four"]);
+});
+
 test("desktop store keeps workspace maps scoped", () => {
   const store = useAppStore.getState();
 

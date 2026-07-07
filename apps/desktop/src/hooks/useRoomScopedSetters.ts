@@ -1,6 +1,5 @@
 import type { MutableRefObject } from "react";
 import { useRoomEventAppenders } from "./useRoomEventAppenders";
-import { useRoomTerminalSetters } from "./useRoomTerminalSetters";
 import { useAppStore } from "../store/appStore";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { omitRecordKey } from "../lib/setUtils";
@@ -26,7 +25,7 @@ export function useRoomScopedSetters({
   selectedRoomId,
   selectedTeamId,
   busy,
-  terminals,
+  maxTerminalActivityLines,
   browser,
   project,
   events
@@ -34,7 +33,7 @@ export function useRoomScopedSetters({
   selectedRoomId: string;
   selectedTeamId: string;
   busy: RoomBusySettersOptions;
-  terminals: Parameters<typeof useRoomTerminalSetters>[0];
+  maxTerminalActivityLines: number;
   browser: {
     defaultBrowserUrl: string;
     defaultBrowserReason: string;
@@ -90,6 +89,12 @@ export function useRoomScopedSetters({
   const setFilePreviewTabForRoom = useAppStore((state) => state.setFilePreviewTabForRoom);
   const setFileMessageForRoom = useAppStore((state) => state.setFileMessageForRoom);
   const resetFileContextForRoom = useAppStore((state) => state.resetFileContextForRoom);
+  const setSelectedTerminalIdForRoom = useAppStore((state) => state.setSelectedTerminalIdForRoom);
+  const setTerminalNameForRoom = useAppStore((state) => state.setTerminalNameForRoom);
+  const setTerminalCommandForRoom = useAppStore((state) => state.setTerminalCommandForRoom);
+  const setTerminalInputForRoom = useAppStore((state) => state.setTerminalInputForRoom);
+  const setTerminalErrorForRoom = useAppStore((state) => state.setTerminalErrorForRoom);
+  const appendTerminalLinesForRoom = useAppStore((state) => state.appendTerminalLinesForRoom);
 
   const applyBusyForRoom = (
     ref: MutableRefObject<BusyMap>,
@@ -166,7 +171,14 @@ export function useRoomScopedSetters({
     setFileMessageForRoom,
     setSelectedFileMessage: (message: string | null) => setFileMessageForRoom(selectedRoomId, message),
     resetFileContextForRoom,
-    ...useRoomTerminalSetters(terminals),
+    setSelectedTerminalIdForRoom,
+    setTerminalNameForRoom,
+    setTerminalCommandForRoom,
+    setTerminalInputForRoom,
+    setTerminalErrorForRoom,
+    setSelectedTerminalError: (error: string | null) => setTerminalErrorForRoom(selectedRoomId, error),
+    appendTerminalLinesForRoom: (roomId: string, lines: string[]) =>
+      appendTerminalLinesForRoom(roomId, lines, maxTerminalActivityLines),
     setApprovalVisibleForRoom,
     setPendingCodexApprovalForRoom,
     resetCodexApprovalForRoom,

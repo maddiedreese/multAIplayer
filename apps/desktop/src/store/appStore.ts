@@ -363,6 +363,12 @@ interface AppStoreState {
   setFilePreviewTabForRoom: (roomId: string, tab: FilePreviewTab) => void;
   setFileMessageForRoom: (roomId: string, message: string | null) => void;
   resetFileContextForRoom: (roomId: string) => void;
+  setSelectedTerminalIdForRoom: (roomId: string, terminalId: string | null) => void;
+  setTerminalNameForRoom: (roomId: string, name: string) => void;
+  setTerminalCommandForRoom: (roomId: string, command: string) => void;
+  setTerminalInputForRoom: (roomId: string, input: string) => void;
+  setTerminalErrorForRoom: (roomId: string, error: string | null) => void;
+  appendTerminalLinesForRoom: (roomId: string, lines: string[], maxTerminalActivityLines: number) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   setMarkdownCopyFallbackForRoom: (roomId: string, fallback: MarkdownCopyFallback | null) => void;
@@ -920,6 +926,53 @@ export const useAppStore = create<AppStoreState>((set) => ({
       fileBusyByRoom: omitRecordKey(state.fileBusyByRoom, roomId),
       fileMessagesByRoom: omitRecordKey(state.fileMessagesByRoom, roomId)
     }));
+  },
+  setSelectedTerminalIdForRoom: (roomId, terminalId) => {
+    set((state) => ({
+      selectedTerminalIdsByRoom: terminalId
+        ? { ...state.selectedTerminalIdsByRoom, [roomId]: terminalId }
+        : omitRecordKey(state.selectedTerminalIdsByRoom, roomId)
+    }));
+  },
+  setTerminalNameForRoom: (roomId, name) => {
+    set((state) => ({
+      terminalNamesByRoom: name === "dev-server"
+        ? omitRecordKey(state.terminalNamesByRoom, roomId)
+        : { ...state.terminalNamesByRoom, [roomId]: name }
+    }));
+  },
+  setTerminalCommandForRoom: (roomId, command) => {
+    set((state) => ({
+      terminalCommandsByRoom: command === "npm run dev:desktop"
+        ? omitRecordKey(state.terminalCommandsByRoom, roomId)
+        : { ...state.terminalCommandsByRoom, [roomId]: command }
+    }));
+  },
+  setTerminalInputForRoom: (roomId, input) => {
+    set((state) => ({
+      terminalInputsByRoom: input
+        ? { ...state.terminalInputsByRoom, [roomId]: input }
+        : omitRecordKey(state.terminalInputsByRoom, roomId)
+    }));
+  },
+  setTerminalErrorForRoom: (roomId, error) => {
+    set((state) => ({
+      terminalErrorsByRoom: error
+        ? { ...state.terminalErrorsByRoom, [roomId]: error }
+        : omitRecordKey(state.terminalErrorsByRoom, roomId)
+    }));
+  },
+  appendTerminalLinesForRoom: (roomId, lines, maxTerminalActivityLines) => {
+    if (lines.length === 0) return;
+    set((state) => {
+      const roomLines = state.terminalLinesByRoom[roomId] ?? [];
+      return {
+        terminalLinesByRoom: {
+          ...state.terminalLinesByRoom,
+          [roomId]: [...roomLines, ...lines].slice(-maxTerminalActivityLines)
+        }
+      };
+    });
   },
   setHostMessageForRoom: (roomId, message) => {
     set((state) => ({
