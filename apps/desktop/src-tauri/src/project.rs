@@ -5,7 +5,7 @@ use std::process::Command;
 
 use crate::output::{bound_git_diff, untracked_file_diff};
 use crate::validation::safe_project_path;
-use crate::{canonical_project_root, ensure_existing_dir};
+use crate::workspace::{canonical_project_root, ensure_existing_dir};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

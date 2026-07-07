@@ -11,7 +11,7 @@ use crate::validation::{
     ensure_git_patch, ensure_git_remote_url, ensure_safe_branch_name, normalize_commit_message,
     repo_name_from_remote_url, safe_project_path, MAX_GIT_PATCH_CHARS,
 };
-use crate::{canonical_project_root, ensure_existing_dir};
+use crate::workspace::{canonical_project_root, ensure_existing_dir};
 
 use crate::shell::CommandResult;
 

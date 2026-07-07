@@ -1,17 +1,15 @@
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Child;
-
 mod browser;
 mod codex;
 mod git;
 mod keychain;
 mod local_preview;
 mod output;
+mod process;
 mod project;
 mod shell;
 mod terminal;
 mod validation;
+mod workspace;
 use browser::*;
 use codex::*;
 use git::*;
@@ -20,39 +18,10 @@ use local_preview::*;
 use project::*;
 use shell::*;
 use terminal::*;
-use validation::*;
 
 #[tauri::command]
 fn app_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
-}
-
-fn ensure_existing_dir(cwd: &str) -> Result<(), String> {
-    ensure_project_path(cwd)?;
-    let path = Path::new(cwd);
-    if path.is_dir() {
-        Ok(())
-    } else {
-        Err(format!("{cwd} is not an existing directory"))
-    }
-}
-
-fn canonical_project_root(cwd: &str) -> Result<PathBuf, String> {
-    ensure_project_path(cwd)?;
-    fs::canonicalize(cwd).map_err(|error| format!("Failed to resolve project path: {error}"))
-}
-
-fn terminate_child(child: &mut Child) {
-    let _ = child.kill();
-    let _ = child.wait();
-}
-
-fn trim_command_output(value: &str) -> String {
-    let trimmed = value.trim();
-    if trimmed.len() <= 4_000 {
-        return trimmed.to_string();
-    }
-    format!("...{}", &trimmed[trimmed.len().saturating_sub(4_000)..])
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -103,7 +72,10 @@ pub fn run() {
 mod tests {
     use super::*;
     use crate::output::*;
-    use std::fs::{create_dir_all, write};
+    use crate::validation::*;
+    use crate::workspace::ensure_existing_dir;
+    use std::fs::{self, create_dir_all, write};
+    use std::path::PathBuf;
     use std::process::Command;
     use std::sync::{Arc, Mutex};
     use std::time::{Duration, SystemTime, UNIX_EPOCH};

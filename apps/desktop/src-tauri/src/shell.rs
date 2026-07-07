@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 
-use crate::ensure_existing_dir;
 use crate::output::bound_command_output;
 use crate::validation::ensure_terminal_command;
+use crate::workspace::ensure_existing_dir;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
