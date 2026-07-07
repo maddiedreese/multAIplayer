@@ -2,6 +2,7 @@ import { useEffect, type Dispatch, type SetStateAction } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { loadEncryptedHistory, loadHistorySettings } from "../lib/localHistory";
 import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
+import { useAppStore } from "../store/appStore";
 import type { ChatMessage, LocalRoomHistoryPayload } from "../types";
 
 interface UseHistorySearchOptions {
@@ -10,7 +11,6 @@ interface UseHistorySearchOptions {
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
   revokedTeamIds: Set<string>;
-  setHistorySearchMessagesByRoom: Dispatch<SetStateAction<Record<string, ChatMessage[]>>>;
   setHistorySearchBusy: Dispatch<SetStateAction<boolean>>;
 }
 
@@ -20,9 +20,10 @@ export function useHistorySearch({
   forgottenRoomIds,
   revokedRoomIds,
   revokedTeamIds,
-  setHistorySearchMessagesByRoom,
   setHistorySearchBusy
 }: UseHistorySearchOptions) {
+  const setHistorySearchMessagesByRoom = useAppStore((state) => state.setHistorySearchMessagesByRoom);
+
   useEffect(() => {
     if (!searchActive) {
       setHistorySearchMessagesByRoom({});

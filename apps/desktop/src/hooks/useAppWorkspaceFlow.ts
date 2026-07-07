@@ -309,7 +309,6 @@ export function useAppWorkspaceFlow({
         forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
         revokedRoomIds: roomRuntimeState.revokedRoomIds,
         revokedTeamIds: roomRuntimeState.revokedTeamIds,
-        setHistorySearchMessagesByRoom: appRuntimeState.setHistorySearchMessagesByRoom,
         setHistorySearchBusy: appRuntimeState.setHistorySearchBusy
       }
     }

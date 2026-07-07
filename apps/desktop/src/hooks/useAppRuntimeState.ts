@@ -13,7 +13,6 @@ export function useAppRuntimeState() {
   const [trustedDeviceKeys, setTrustedDeviceKeys] = useState<TrustedDeviceKey[]>(() => loadTrustedDeviceKeys());
   const [historySearchBusy, setHistorySearchBusy] = useState(false);
   const historySearchMessagesByRoom = useAppStore((state) => state.historySearchMessagesByRoom);
-  const setHistorySearchMessagesByRoom = useAppStore((state) => state.setHistorySearchMessagesByRoom);
 
   return {
     codexProbe,
@@ -27,7 +26,6 @@ export function useAppRuntimeState() {
     trustedDeviceKeys,
     setTrustedDeviceKeys,
     historySearchMessagesByRoom,
-    setHistorySearchMessagesByRoom,
     historySearchBusy,
     setHistorySearchBusy
   };
