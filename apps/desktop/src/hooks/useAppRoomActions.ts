@@ -26,18 +26,7 @@ export function useAppRoomActions({
   defaultCodexModel: string;
   defaultProjectPath: string;
 }) {
-  const {
-    workspaceState,
-    roomSettingsState,
-    roomRuntimeState,
-    codexRoomState,
-    localPreviewState,
-    terminalPanelState,
-    browserPanelState,
-    githubWorkflowPanelState,
-    filePanelState,
-    invitePanelState
-  } = appState;
+  const { workspaceState } = appState;
 
   return useRoomActions({
     selectedRoomId: selectedRoom.id,
@@ -61,14 +50,6 @@ export function useAppRoomActions({
       roomsRef: appRefs.roomsRef,
       defaultCodexModel,
       defaultProjectPath
-    },
-    events: {
-      setGitWorkflowEventsByRoom: roomRuntimeState.setGitWorkflowEventsByRoom,
-      setGitHubActionsEventsByRoom: roomRuntimeState.setGitHubActionsEventsByRoom,
-      setLocalPreviewsByRoom: localPreviewState.setLocalPreviewsByRoom,
-      setHostHandoffsByRoom: roomRuntimeState.setHostHandoffsByRoom,
-      setInviteRequestsByRoom: invitePanelState.setInviteRequestsByRoom,
-      setCodexEventsByRoom: codexRoomState.setCodexEventsByRoom
     }
   });
 }

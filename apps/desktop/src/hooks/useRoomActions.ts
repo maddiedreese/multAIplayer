@@ -1,5 +1,4 @@
 import type { MutableRefObject } from "react";
-import { useRoomEventAppenders } from "./useRoomEventAppenders";
 import { useAppStore } from "../store/appStore";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { omitRecordKey } from "../lib/setUtils";
@@ -27,8 +26,7 @@ export function useRoomActions({
   busy,
   maxTerminalActivityLines,
   browser,
-  project,
-  events
+  project
 }: {
   selectedRoomId: string;
   selectedTeamId: string;
@@ -43,7 +41,6 @@ export function useRoomActions({
     defaultCodexModel: string;
     defaultProjectPath: string;
   };
-  events: Parameters<typeof useRoomEventAppenders>[0];
 }) {
   const setHostMessageForRoom = useAppStore((state) => state.setHostMessageForRoom);
   const setChatMessageForRoom = useAppStore((state) => state.setChatMessageForRoom);
@@ -95,6 +92,12 @@ export function useRoomActions({
   const setTerminalInputForRoom = useAppStore((state) => state.setTerminalInputForRoom);
   const setTerminalErrorForRoom = useAppStore((state) => state.setTerminalErrorForRoom);
   const appendTerminalLinesForRoom = useAppStore((state) => state.appendTerminalLinesForRoom);
+  const appendGitWorkflowEvent = useAppStore((state) => state.appendGitWorkflowEvent);
+  const appendGitHubActionsEvent = useAppStore((state) => state.appendGitHubActionsEvent);
+  const appendLocalPreviewEvent = useAppStore((state) => state.appendLocalPreviewEvent);
+  const appendHostHandoff = useAppStore((state) => state.appendHostHandoff);
+  const appendInviteRequest = useAppStore((state) => state.appendInviteRequest);
+  const appendCodexEvent = useAppStore((state) => state.appendCodexEvent);
 
   const applyBusyForRoom = (
     ref: MutableRefObject<BusyMap>,
@@ -183,7 +186,12 @@ export function useRoomActions({
     setPendingCodexApprovalForRoom,
     resetCodexApprovalForRoom,
     setCodexRunningForRoom,
-    ...useRoomEventAppenders(events),
+    appendGitWorkflowEvent,
+    appendGitHubActionsEvent,
+    appendLocalPreviewEvent,
+    appendHostHandoff,
+    appendInviteRequest,
+    appendCodexEvent,
     updateInviteRequestStatus,
     appendTerminalRequest,
     updateTerminalRequestStatus,

@@ -814,6 +814,97 @@ test("desktop store keeps room runtime state room scoped", () => {
   assert.equal(state.githubActionsEventsByRoom["room-b"]?.[0]?.summary.tone, "green");
 });
 
+test("desktop store exposes room event append actions", () => {
+  const store = useAppStore.getState();
+  const gitEvent = {
+    eventType: "git.workflow" as const,
+    status: "completed" as const,
+    branch: "codex/events",
+    push: true,
+    message: "Opened draft PR",
+    runner: "Maddie",
+    runnerUserId: "github:maddie",
+    createdAt: "2026-07-06T00:13:00.000Z"
+  };
+  const actionsEvent = {
+    eventType: "github.actions" as const,
+    owner: "maddiedreese",
+    repo: "multAIplayer",
+    branch: "main",
+    summary: { label: "CI", detail: "All checks passed", tone: "green" as const },
+    message: "Checked Actions",
+    checkedBy: "Maddie",
+    checkedByUserId: "github:maddie",
+    checkedAt: "2026-07-06T00:14:00.000Z",
+    runs: []
+  };
+  const localPreview = {
+    eventType: "local.preview" as const,
+    id: "preview-1",
+    sharedBy: "Maddie",
+    sharedByUserId: "github:maddie",
+    sourceUrl: "http://127.0.0.1:5173",
+    status: "starting" as const,
+    createdAt: "2026-07-06T00:15:00.000Z",
+    updatedAt: "2026-07-06T00:15:00.000Z"
+  };
+  const handoff = {
+    id: "handoff-1",
+    fromHost: "Maddie",
+    fromUserId: "github:maddie",
+    reason: "usage_limit" as const,
+    projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
+    codexModel: "gpt-5.4",
+    approvalPolicy: "ask",
+    messagesSinceLastCodex: 4,
+    attachmentNames: [],
+    terminals: [],
+    createdAt: "2026-07-06T00:16:00.000Z",
+    status: "available" as const
+  };
+  const inviteRequest = {
+    eventType: "invite.request" as const,
+    id: "invite-request-1",
+    requester: "Jordan",
+    requesterUserId: "github:jordan",
+    requesterDeviceId: "device-jordan",
+    requestedAt: "2026-07-06T00:17:00.000Z",
+    status: "pending" as const
+  };
+  const codexEvent = {
+    eventType: "codex.turn" as const,
+    turnId: "turn-1",
+    status: "event" as const,
+    message: "Reading context",
+    model: "gpt-5.4",
+    host: "Maddie",
+    hostUserId: "github:maddie",
+    createdAt: "2026-07-06T00:18:00.000Z"
+  };
+
+  store.appendGitWorkflowEvent("room-a", gitEvent);
+  store.appendGitWorkflowEvent("room-a", gitEvent);
+  store.appendGitHubActionsEvent("room-a", actionsEvent);
+  store.appendGitHubActionsEvent("room-a", actionsEvent);
+  store.appendLocalPreviewEvent("room-a", localPreview);
+  store.appendLocalPreviewEvent("room-a", { ...localPreview, status: "live", updatedAt: "2026-07-06T00:16:00.000Z" });
+  store.appendHostHandoff("room-a", handoff);
+  store.appendHostHandoff("room-a", handoff);
+  store.appendInviteRequest("room-a", inviteRequest);
+  store.appendInviteRequest("room-a", inviteRequest);
+  store.appendCodexEvent("room-a", codexEvent);
+  store.appendCodexEvent("room-a", codexEvent);
+
+  const state = useAppStore.getState();
+  assert.equal(state.gitWorkflowEventsByRoom["room-a"]?.length, 1);
+  assert.equal(state.githubActionsEventsByRoom["room-a"]?.length, 1);
+  assert.equal(state.localPreviewsByRoom["room-a"]?.length, 1);
+  assert.equal(state.localPreviewsByRoom["room-a"]?.[0]?.status, "live");
+  assert.equal(state.hostHandoffsByRoom["room-a"]?.length, 1);
+  assert.equal(state.inviteRequestsByRoom["room-a"]?.length, 1);
+  assert.equal(state.codexEventsByRoom["room-a"]?.length, 1);
+});
+
 test("desktop store keeps terminal panel state room scoped", () => {
   const store = useAppStore.getState();
 
