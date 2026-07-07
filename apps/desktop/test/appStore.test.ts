@@ -252,6 +252,9 @@ test("desktop store exposes room browser actions", () => {
   store.setBrowserUrlForRoom("room-b", defaultUrl, defaultUrl);
   store.setBrowserReasonForRoom("room-b", defaultReason, defaultReason);
   store.setBrowserMessageForRoom("room-a", null);
+  store.openEmbeddedBrowserForRoom("room-a", "http://localhost:5173");
+  store.setInspectorTabForRoom("room-a", "browser");
+  store.resetEmbeddedBrowserForRoom("room-b", "/tmp/browser-profile");
 
   const state = useAppStore.getState();
   assert.equal(state.browserUrlsByRoom["room-a"], "http://localhost:5173");
@@ -259,6 +262,11 @@ test("desktop store exposes room browser actions", () => {
   assert.equal(state.browserMessagesByRoom["room-a"], undefined);
   assert.equal(state.browserUrlsByRoom["room-b"], undefined);
   assert.equal(state.browserReasonsByRoom["room-b"], undefined);
+  assert.equal(state.activeBrowserUrlsByRoom["room-a"], "http://localhost:5173");
+  assert.equal(state.browserStatusByRoom["room-a"]?.profilePath, "Embedded in this room");
+  assert.equal(state.inspectorTabsByRoom["room-a"], "browser");
+  assert.equal(state.activeBrowserUrlsByRoom["room-b"], undefined);
+  assert.equal(state.browserStatusByRoom["room-b"]?.profilePath, "/tmp/browser-profile");
 });
 
 test("desktop store keeps file panel state room scoped", () => {

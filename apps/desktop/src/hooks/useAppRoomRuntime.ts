@@ -1,6 +1,5 @@
 import {
   approvalPolicyLabels,
-  defaultBrowserStatus,
   roomModeLabels
 } from "../seedData";
 import type { useAppHostHandoffActions } from "./useAppHostHandoffActions";
@@ -324,16 +323,12 @@ export function useAppRoomRuntime({
         relayStatus: appRuntimeState.relayStatus,
         relayRef: appRefs.relayRef,
         seenEnvelopeIds: appRefs.seenEnvelopeIds,
-        defaultBrowserStatus,
         setSelectedBrowserMessage,
         setBrowserMessageForRoom,
         setBrowserUrlForRoom,
         appendBrowserRequest,
         updateBrowserRequestStatus,
-        publishRequestStatus: relaySync.publishRequestStatus,
-        setActiveBrowserUrlsByRoom: browserPanelState.setActiveBrowserUrlsByRoom,
-        setBrowserStatusByRoom: browserPanelState.setBrowserStatusByRoom,
-        setInspectorTabsByRoom: roomRuntimeState.setInspectorTabsByRoom
+        publishRequestStatus: relaySync.publishRequestStatus
       }
     },
     backgroundEffects: {

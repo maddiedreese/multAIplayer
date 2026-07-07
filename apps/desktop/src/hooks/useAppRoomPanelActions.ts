@@ -82,7 +82,6 @@ export function useAppRoomPanelActions({
       activeBrowserUrl,
       setSelectedTeam: workspaceState.setSelectedTeam,
       setSelectedRoomId: workspaceState.setSelectedRoomId,
-      setInspectorTabsByRoom: roomRuntimeState.setInspectorTabsByRoom,
       openRoomBrowserNow: roomRuntime.openRoomBrowserNow
     },
     terminal: {

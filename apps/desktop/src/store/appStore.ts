@@ -287,6 +287,9 @@ interface AppStoreState {
   setBrowserMessagesByRoom: (action: SetStateAction<BrowserMessagesByRoom>) => void;
   setBrowserStatusByRoom: (action: SetStateAction<BrowserStatusByRoom>) => void;
   setActiveBrowserUrlsByRoom: (action: SetStateAction<ActiveBrowserUrlsByRoom>) => void;
+  openEmbeddedBrowserForRoom: (roomId: string, url: string) => void;
+  resetEmbeddedBrowserForRoom: (roomId: string, profilePath: string | null) => void;
+  setInspectorTabForRoom: (roomId: string, tab: InspectorTab) => void;
   setFileQueriesByRoom: (action: SetStateAction<FileQueriesByRoom>) => void;
   setProjectFilesByRoom: (action: SetStateAction<ProjectFilesByRoom>) => void;
   setSelectedFilesByRoom: (action: SetStateAction<SelectedFilesByRoom>) => void;
@@ -521,6 +524,45 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setActiveBrowserUrlsByRoom: (action) => {
     set((state) => ({
       activeBrowserUrlsByRoom: resolveSetStateAction(state.activeBrowserUrlsByRoom, action)
+    }));
+  },
+  openEmbeddedBrowserForRoom: (roomId, url) => {
+    set((state) => ({
+      activeBrowserUrlsByRoom: {
+        ...state.activeBrowserUrlsByRoom,
+        [roomId]: url
+      },
+      browserStatusByRoom: {
+        ...state.browserStatusByRoom,
+        [roomId]: {
+          profilePath: "Embedded in this room",
+          downloadsBlocked: false,
+          clipboardBlocked: false,
+          fileUploadsBlocked: false
+        }
+      }
+    }));
+  },
+  resetEmbeddedBrowserForRoom: (roomId, profilePath) => {
+    set((state) => ({
+      activeBrowserUrlsByRoom: omitRecordKey(state.activeBrowserUrlsByRoom, roomId),
+      browserStatusByRoom: {
+        ...state.browserStatusByRoom,
+        [roomId]: {
+          profilePath,
+          downloadsBlocked: false,
+          clipboardBlocked: false,
+          fileUploadsBlocked: false
+        }
+      }
+    }));
+  },
+  setInspectorTabForRoom: (roomId, tab) => {
+    set((state) => ({
+      inspectorTabsByRoom: {
+        ...state.inspectorTabsByRoom,
+        [roomId]: tab
+      }
     }));
   },
   setFileQueriesByRoom: (action) => {

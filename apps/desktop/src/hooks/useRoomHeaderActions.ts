@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import type { InspectorTab } from "../components/RoomInspectorPanel";
+import { useAppStore } from "../store/appStore";
 
 export function useRoomHeaderActions({
   rooms,
@@ -9,7 +10,6 @@ export function useRoomHeaderActions({
   activeBrowserUrl,
   setSelectedTeam,
   setSelectedRoomId,
-  setInspectorTabsByRoom,
   openRoomBrowserNow
 }: {
   rooms: RoomRecord[];
@@ -18,16 +18,17 @@ export function useRoomHeaderActions({
   activeBrowserUrl: string | null;
   setSelectedTeam: Dispatch<SetStateAction<string>>;
   setSelectedRoomId: Dispatch<SetStateAction<string>>;
-  setInspectorTabsByRoom: Dispatch<SetStateAction<Record<string, InspectorTab>>>;
   openRoomBrowserNow: () => void;
 }) {
+  const setInspectorTabForRoom = useAppStore((state) => state.setInspectorTabForRoom);
+
   function onSelectTeam(teamId: string) {
     setSelectedTeam(teamId);
     setSelectedRoomId(rooms.find((room) => room.teamId === teamId)?.id ?? selectedRoomId);
   }
 
   function onSelectInspectorTab(tab: InspectorTab) {
-    setInspectorTabsByRoom((current) => ({ ...current, [selectedRoomIdForTabs]: tab }));
+    setInspectorTabForRoom(selectedRoomIdForTabs, tab);
     if (tab === "browser" && !activeBrowserUrl) openRoomBrowserNow();
   }
 
