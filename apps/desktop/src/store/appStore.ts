@@ -23,6 +23,11 @@ import {
   emptyLocalPreviewState,
   type LocalPreviewSlice
 } from "./slices/localPreviewSlice";
+import {
+  createRoomSettingsSlice,
+  emptyRoomSettingsState,
+  type RoomSettingsSlice
+} from "./slices/roomSettingsSlice";
 import { createRoomChatSlice, emptyRoomChatState, type RoomChatSlice } from "./slices/roomChatSlice";
 import { createTerminalSlice, emptyTerminalState, type TerminalSlice } from "./slices/terminalSlice";
 import type {
@@ -39,12 +44,6 @@ import type {
 } from "@multaiplayer/protocol";
 import { omitRecordKey } from "../lib/setUtils";
 
-type HostBusyByRoom = Record<string, boolean>;
-type HostMessagesByRoom = Record<string, string | null>;
-type SettingsBusyByRoom = Record<string, boolean>;
-type SettingsMessagesByRoom = Record<string, string | null>;
-type CustomCodexModelsByRoom = Record<string, string>;
-type ProjectPathDraftsByRoom = Record<string, string>;
 type CodexEventsByRoom = Record<string, CodexRoomEvent[]>;
 type ApprovalVisibleByRoom = Record<string, boolean>;
 type PendingCodexApprovalsByRoom = Record<string, PendingCodexApproval>;
@@ -58,7 +57,6 @@ type TeamMembersByTeam = Record<string, TeamMemberRecord[]>;
 type TeamMembersMessageByTeam = Record<string, string | null>;
 type TeamMembersBusyByTeam = Record<string, boolean>;
 type MessagesByRoom = Record<string, ChatMessage[]>;
-type RoomBusyByRoom = Record<string, boolean>;
 
 interface WorkspaceInitialData {
   teamMembersByTeam: TeamMembersByTeam;
@@ -70,12 +68,7 @@ const emptyAppStoreState = {
   ...emptyBrowserState,
   ...emptyFilePanelState,
   ...emptyHistoryPresenceState,
-  hostBusyByRoom: {},
-  hostMessagesByRoom: {},
-  settingsBusyByRoom: {},
-  settingsMessagesByRoom: {},
-  customCodexModelsByRoom: {},
-  projectPathDraftsByRoom: {},
+  ...emptyRoomSettingsState,
   ...emptyLocalPreviewState,
   ...emptyInviteState,
   ...emptyRoomChatState,
@@ -95,10 +88,6 @@ const emptyAppStoreState = {
   messagesByRoom: {}
 };
 
-function updateRoomBusyMap(current: RoomBusyByRoom, roomId: string, busy: boolean): RoomBusyByRoom {
-  return busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId);
-}
-
 export interface AppStoreState
   extends BrowserSlice,
     FilePanelSlice,
@@ -106,14 +95,9 @@ export interface AppStoreState
     HistoryPresenceSlice,
     InviteSlice,
     LocalPreviewSlice,
+    RoomSettingsSlice,
     RoomChatSlice,
     TerminalSlice {
-  hostBusyByRoom: HostBusyByRoom;
-  hostMessagesByRoom: HostMessagesByRoom;
-  settingsBusyByRoom: SettingsBusyByRoom;
-  settingsMessagesByRoom: SettingsMessagesByRoom;
-  customCodexModelsByRoom: CustomCodexModelsByRoom;
-  projectPathDraftsByRoom: ProjectPathDraftsByRoom;
   codexEventsByRoom: CodexEventsByRoom;
   approvalVisibleByRoom: ApprovalVisibleByRoom;
   pendingCodexApprovalsByRoom: PendingCodexApprovalsByRoom;
@@ -136,8 +120,6 @@ export interface AppStoreState
   hydrateLocalRoomHistoryForRoom: (roomId: string, payload: LocalRoomHistoryPayload) => void;
   appendRoomMessage: (roomId: string, message: ChatMessage) => void;
   applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
-  setHostBusyForRoom: (roomId: string, busy: boolean) => void;
-  setSettingsBusyForRoom: (roomId: string, busy: boolean) => void;
   appendHostHandoff: (roomId: string, handoff: HostHandoffRecord) => void;
   markHostHandoffAcceptedForRoom: (roomId: string, handoffId: string) => void;
   markLatestHostHandoffAcceptedForRoom: (roomId: string) => void;
@@ -149,11 +131,7 @@ export interface AppStoreState
   setCodexRunningForRoom: (roomId: string, running: boolean) => void;
   setRoomGoalForRoom: (roomId: string, goal: RoomGoal | null) => void;
   setCodexThreadIdForRoom: (roomId: string, threadId: string | null) => void;
-  setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setSecretWarningVisibleForRoom: (roomId: string, visible: boolean) => void;
-  setSettingsMessageForRoom: (roomId: string, message: string | null) => void;
-  setCustomCodexModelForRoom: (roomId: string, model: string, currentModel: string) => void;
-  setProjectPathDraftForRoom: (roomId: string, projectPath: string, currentProjectPath: string) => void;
   clearRoomScopedStateForRoom: (roomId: string) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
@@ -167,6 +145,7 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   ...createHistoryPresenceSlice(set, get, api),
   ...createInviteSlice(set, get, api),
   ...createLocalPreviewSlice(set, get, api),
+  ...createRoomSettingsSlice(set, get, api),
   ...createRoomChatSlice(set, get, api),
   ...createTerminalSlice(set, get, api),
   seedWorkspaceInitialDataIfEmpty: ({ teamMembersByTeam, messagesByRoom }) => {
@@ -335,16 +314,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       };
     });
   },
-  setHostBusyForRoom: (roomId, busy) => {
-    set((state) => ({
-      hostBusyByRoom: updateRoomBusyMap(state.hostBusyByRoom, roomId, busy)
-    }));
-  },
-  setSettingsBusyForRoom: (roomId, busy) => {
-    set((state) => ({
-      settingsBusyByRoom: updateRoomBusyMap(state.settingsBusyByRoom, roomId, busy)
-    }));
-  },
   appendHostHandoff: (roomId, handoff) => {
     set((state) => {
       const roomHandoffs = state.hostHandoffsByRoom[roomId] ?? [];
@@ -455,39 +424,11 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
         : omitRecordKey(state.codexThreadIdsByRoom, roomId)
     }));
   },
-  setHostMessageForRoom: (roomId, message) => {
-    set((state) => ({
-      hostMessagesByRoom: message
-        ? { ...state.hostMessagesByRoom, [roomId]: message }
-        : omitRecordKey(state.hostMessagesByRoom, roomId)
-    }));
-  },
   setSecretWarningVisibleForRoom: (roomId, visible) => {
     set((state) => ({
       secretWarningsVisibleByRoom: visible
         ? { ...state.secretWarningsVisibleByRoom, [roomId]: true }
         : omitRecordKey(state.secretWarningsVisibleByRoom, roomId)
-    }));
-  },
-  setSettingsMessageForRoom: (roomId, message) => {
-    set((state) => ({
-      settingsMessagesByRoom: message
-        ? { ...state.settingsMessagesByRoom, [roomId]: message }
-        : omitRecordKey(state.settingsMessagesByRoom, roomId)
-    }));
-  },
-  setCustomCodexModelForRoom: (roomId, model, currentModel) => {
-    set((state) => ({
-      customCodexModelsByRoom: model === currentModel
-        ? omitRecordKey(state.customCodexModelsByRoom, roomId)
-        : { ...state.customCodexModelsByRoom, [roomId]: model }
-    }));
-  },
-  setProjectPathDraftForRoom: (roomId, projectPath, currentProjectPath) => {
-    set((state) => ({
-      projectPathDraftsByRoom: projectPath === currentProjectPath
-        ? omitRecordKey(state.projectPathDraftsByRoom, roomId)
-        : { ...state.projectPathDraftsByRoom, [roomId]: projectPath }
     }));
   },
   clearRoomScopedStateForRoom: (roomId) => {
