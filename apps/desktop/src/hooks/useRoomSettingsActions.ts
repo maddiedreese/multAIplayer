@@ -13,9 +13,7 @@ import {
 import { shouldResetCodexApprovalForRoomModeChange } from "../lib/codexApproval";
 import { roomLockMessage } from "../lib/appRuntime";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
-import { omitRecordKey } from "../lib/setUtils";
 import { formatCodexModel } from "../lib/appFormatters";
-import type { BrowserStatus } from "../types";
 
 interface UseRoomSettingsActionsOptions {
   hasSelectedRoom: boolean;
@@ -40,7 +38,7 @@ interface UseRoomSettingsActionsOptions {
   setSelectedBrowserMessage: (message: string | null) => void;
   setBrowserMessageForRoom: (roomId: string, message: string | null) => void;
   setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
-  setBrowserStatusByRoom: Dispatch<SetStateAction<Record<string, BrowserStatus>>>;
+  clearBrowserStatusForRoom: (roomId: string) => void;
   setProjectPathDraftForRoom: (roomId: string, path: string) => void;
   resetCodexApprovalForRoom: (roomId: string) => void;
   resetFileContextForRoom: (roomId: string) => void;
@@ -70,7 +68,7 @@ export function useRoomSettingsActions({
   setSelectedBrowserMessage,
   setBrowserMessageForRoom,
   setRooms,
-  setBrowserStatusByRoom,
+  clearBrowserStatusForRoom,
   setProjectPathDraftForRoom,
   resetCodexApprovalForRoom,
   resetFileContextForRoom,
@@ -275,7 +273,7 @@ export function useRoomSettingsActions({
         changedAt: new Date().toISOString()
       });
       if (!browserProfilePersistent) {
-        setBrowserStatusByRoom((current) => omitRecordKey(current, roomId));
+        clearBrowserStatusForRoom(roomId);
       }
       resetCodexApprovalForRoom(roomId);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {

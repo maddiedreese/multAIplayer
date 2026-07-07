@@ -57,6 +57,7 @@ export function useRoomActions({
   const setBrowserUrlForRoom = useAppStore((state) => state.setBrowserUrlForRoom);
   const setBrowserReasonForRoom = useAppStore((state) => state.setBrowserReasonForRoom);
   const setBrowserMessageForRoom = useAppStore((state) => state.setBrowserMessageForRoom);
+  const clearBrowserStatusForRoom = useAppStore((state) => state.clearBrowserStatusForRoom);
   const setInviteLinkForRoom = useAppStore((state) => state.setInviteLinkForRoom);
   const setInviteApprovalGateForRoom = useAppStore((state) => state.setInviteApprovalGateForRoom);
   const setInviteMessageForRoom = useAppStore((state) => state.setInviteMessageForRoom);
@@ -135,6 +136,7 @@ export function useRoomActions({
     setBrowserReasonForRoom: (roomId: string, reason: string) =>
       setBrowserReasonForRoom(roomId, reason, browser.defaultBrowserReason),
     setBrowserMessageForRoom,
+    clearBrowserStatusForRoom,
     setSelectedBrowserMessage: (message: string | null) => setBrowserMessageForRoom(selectedRoomId, message),
     setInviteLinkForRoom,
     setInviteApprovalGateForRoom,
