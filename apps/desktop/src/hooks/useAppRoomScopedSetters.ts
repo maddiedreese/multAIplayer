@@ -92,9 +92,7 @@ export function useAppRoomScopedSetters({
     project: {
       roomsRef: appRefs.roomsRef,
       defaultCodexModel,
-      defaultProjectPath,
-      setCustomCodexModelsByRoom: roomSettingsState.setCustomCodexModelsByRoom,
-      setProjectPathDraftsByRoom: roomSettingsState.setProjectPathDraftsByRoom
+      defaultProjectPath
     },
     events: {
       setGitWorkflowEventsByRoom: roomRuntimeState.setGitWorkflowEventsByRoom,

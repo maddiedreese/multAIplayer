@@ -223,6 +223,22 @@ test("desktop store keeps room settings state room scoped", () => {
   assert.equal(state.projectPathDraftsByRoom["room-b"], "/tmp/example");
 });
 
+test("desktop store exposes room project override actions", () => {
+  const store = useAppStore.getState();
+
+  store.setCustomCodexModelForRoom("room-a", "gpt-5.4", "gpt-5.3");
+  store.setProjectPathDraftForRoom("room-a", "/tmp/example", "/Users/maddiedreese/Documents/MultAIplayer");
+  store.setCustomCodexModelForRoom("room-b", "gpt-5.4", "gpt-5.4");
+  store.setProjectPathDraftForRoom("room-b", "/tmp/example", "/tmp/example");
+  store.setCustomCodexModelForRoom("room-a", "gpt-5.3", "gpt-5.3");
+
+  const state = useAppStore.getState();
+  assert.equal(state.customCodexModelsByRoom["room-a"], undefined);
+  assert.equal(state.projectPathDraftsByRoom["room-a"], "/tmp/example");
+  assert.equal(state.customCodexModelsByRoom["room-b"], undefined);
+  assert.equal(state.projectPathDraftsByRoom["room-b"], undefined);
+});
+
 test("desktop store keeps local preview state room scoped", () => {
   const store = useAppStore.getState();
 

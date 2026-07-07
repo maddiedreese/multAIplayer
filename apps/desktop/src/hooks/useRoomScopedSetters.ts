@@ -2,10 +2,10 @@ import { useRoomBusySetters } from "./useRoomBusySetters";
 import { useRoomCodexApprovalSetters } from "./useRoomCodexApprovalSetters";
 import { useRoomEventAppenders } from "./useRoomEventAppenders";
 import { useRoomFileSetters } from "./useRoomFileSetters";
-import { useRoomProjectSetters } from "./useRoomProjectSetters";
 import { useRoomRequestSetters } from "./useRoomRequestSetters";
 import { useRoomTerminalSetters } from "./useRoomTerminalSetters";
 import { useAppStore } from "../store/appStore";
+import type { RoomRecord } from "@multaiplayer/protocol";
 
 export function useRoomScopedSetters({
   selectedRoomId,
@@ -29,7 +29,11 @@ export function useRoomScopedSetters({
     defaultBrowserUrl: string;
     defaultBrowserReason: string;
   };
-  project: Parameters<typeof useRoomProjectSetters>[0];
+  project: {
+    roomsRef: { current: RoomRecord[] };
+    defaultCodexModel: string;
+    defaultProjectPath: string;
+  };
   events: Parameters<typeof useRoomEventAppenders>[0];
   requests: Parameters<typeof useRoomRequestSetters>[0];
 }) {
@@ -51,6 +55,8 @@ export function useRoomScopedSetters({
   const setInviteLinkForRoom = useAppStore((state) => state.setInviteLinkForRoom);
   const setInviteApprovalGateForRoom = useAppStore((state) => state.setInviteApprovalGateForRoom);
   const setInviteMessageForRoom = useAppStore((state) => state.setInviteMessageForRoom);
+  const setCustomCodexModelForRoom = useAppStore((state) => state.setCustomCodexModelForRoom);
+  const setProjectPathDraftForRoom = useAppStore((state) => state.setProjectPathDraftForRoom);
 
   return {
     setHostMessageForRoom,
@@ -83,13 +89,20 @@ export function useRoomScopedSetters({
     setInviteApprovalGateForRoom,
     setInviteMessageForRoom,
     setSelectedInviteMessage: (message: string | null) => setInviteMessageForRoom(selectedRoomId, message),
+    setCustomCodexModelForRoom: (roomId: string, model: string) => {
+      const room = project.roomsRef.current.find((item) => item.id === roomId);
+      setCustomCodexModelForRoom(roomId, model, room?.codexModel ?? project.defaultCodexModel);
+    },
+    setProjectPathDraftForRoom: (roomId: string, projectPath: string) => {
+      const room = project.roomsRef.current.find((item) => item.id === roomId);
+      setProjectPathDraftForRoom(roomId, projectPath, room?.projectPath ?? project.defaultProjectPath);
+    },
     setPendingAttachmentsForRoom,
     setDraftForRoom,
     ...useRoomBusySetters(busy),
     ...useRoomFileSetters(files),
     ...useRoomTerminalSetters(terminals),
     ...useRoomCodexApprovalSetters(codexApprovals),
-    ...useRoomProjectSetters(project),
     ...useRoomEventAppenders(events),
     ...useRoomRequestSetters(requests)
   };
