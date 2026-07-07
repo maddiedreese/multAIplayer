@@ -366,8 +366,7 @@ registerInviteRoutes({
 });
 registerTeamRoutes({
   app,
-  teams,
-  rooms,
+  store: relayStore,
   teamMembers,
   getAuthSession,
   allowRead,
@@ -409,8 +408,7 @@ registerOpsRoutes({
 });
 registerRoomRoutes({
   app,
-  teams,
-  rooms,
+  store: relayStore,
   getAuthSession,
   allowMutation,
   isTeamMember,
@@ -458,7 +456,7 @@ registerRelayWebSocketConnection({
   joinRoom,
   canSubscribeTeam,
   subscribeTeam,
-  hasTeam: (teamId) => teams.has(teamId),
+  hasTeam: (teamId) => relayStore.hasTeam(teamId),
   canSubscribeWorkspace,
   subscribeWorkspace,
   canPublishEnvelope,
@@ -518,7 +516,7 @@ function revokeTeamInvites(teamId: string) {
 
 function addTeamMember(teamId: string, userId: string, role: TeamRole = "member") {
   if (!userId) return;
-  const team = teams.get(teamId);
+  const team = relayStore.getTeam(teamId);
   if (!team) return;
   const members = teamMembers.get(teamId) ?? new Map<string, TeamMemberRecord>();
   if (members.has(userId)) return;
@@ -533,7 +531,7 @@ function addTeamMember(teamId: string, userId: string, role: TeamRole = "member"
     ...team,
     members: members.size
   };
-  teams.set(teamId, updated);
+  relayStore.setTeam(updated);
   scheduleStoreSave();
   broadcastWorkspaceUpdated(updated);
 }

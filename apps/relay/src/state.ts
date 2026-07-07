@@ -66,6 +66,13 @@ export interface RelayStore {
   attachmentBlobs: Map<string, AttachmentBlobRecord>;
   teamMembers: Map<string, Map<string, TeamMemberRecord>>;
   rateLimitStore: Map<string, RateLimitRecord>;
+  allTeams(): TeamRecord[];
+  getTeam(teamId: string): TeamRecord | undefined;
+  hasTeam(teamId: string): boolean;
+  setTeam(team: TeamRecord): void;
+  allRooms(): RoomRecord[];
+  getRoom(roomId: string): RoomRecord | undefined;
+  setRoom(room: RoomRecord): void;
 }
 
 export class InMemoryRelayStore implements RelayStore {
@@ -83,6 +90,34 @@ export class InMemoryRelayStore implements RelayStore {
   readonly attachmentBlobs = new Map<string, AttachmentBlobRecord>();
   readonly teamMembers = new Map<string, Map<string, TeamMemberRecord>>();
   readonly rateLimitStore = new Map<string, RateLimitRecord>();
+
+  allTeams(): TeamRecord[] {
+    return Array.from(this.teams.values());
+  }
+
+  getTeam(teamId: string): TeamRecord | undefined {
+    return this.teams.get(teamId);
+  }
+
+  hasTeam(teamId: string): boolean {
+    return this.teams.has(teamId);
+  }
+
+  setTeam(team: TeamRecord): void {
+    this.teams.set(team.id, team);
+  }
+
+  allRooms(): RoomRecord[] {
+    return Array.from(this.rooms.values());
+  }
+
+  getRoom(roomId: string): RoomRecord | undefined {
+    return this.rooms.get(roomId);
+  }
+
+  setRoom(room: RoomRecord): void {
+    this.rooms.set(room.id, room);
+  }
 }
 
 export function createRelayStore(): RelayStore {
