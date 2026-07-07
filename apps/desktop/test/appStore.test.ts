@@ -153,3 +153,29 @@ test("desktop store keeps file panel state room scoped", () => {
   assert.equal(state.fileMessagesByRoom["room-b"], null);
   assert.equal(state.markdownCopyFallbacksByRoom["room-a"]?.title, "README.md");
 });
+
+test("desktop store keeps room settings state room scoped", () => {
+  const store = useAppStore.getState();
+
+  store.setHostBusyByRoom({ "room-a": true });
+  store.setHostMessagesByRoom({ "room-a": "Host updated", "room-b": null });
+  store.setSettingsBusyByRoom({ "room-b": true });
+  store.setSettingsMessagesByRoom((current) => ({
+    ...current,
+    "room-a": "Settings saved"
+  }));
+  store.setCustomCodexModelsByRoom({ "room-a": "gpt-5.4", "room-b": "o4-mini" });
+  store.setProjectPathDraftsByRoom({
+    "room-a": "/Users/maddiedreese/Documents/MultAIplayer",
+    "room-b": "/tmp/example"
+  });
+
+  const state = useAppStore.getState();
+  assert.equal(state.hostBusyByRoom["room-a"], true);
+  assert.equal(state.hostMessagesByRoom["room-a"], "Host updated");
+  assert.equal(state.hostMessagesByRoom["room-b"], null);
+  assert.equal(state.settingsBusyByRoom["room-b"], true);
+  assert.equal(state.settingsMessagesByRoom["room-a"], "Settings saved");
+  assert.equal(state.customCodexModelsByRoom["room-a"], "gpt-5.4");
+  assert.equal(state.projectPathDraftsByRoom["room-b"], "/tmp/example");
+});

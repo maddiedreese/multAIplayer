@@ -1,12 +1,18 @@
-import { useState } from "react";
+import { useAppStore } from "../store/appStore";
 
 export function useRoomSettingsState() {
-  const [hostBusyByRoom, setHostBusyByRoom] = useState<Record<string, boolean>>({});
-  const [hostMessagesByRoom, setHostMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [settingsBusyByRoom, setSettingsBusyByRoom] = useState<Record<string, boolean>>({});
-  const [settingsMessagesByRoom, setSettingsMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [customCodexModelsByRoom, setCustomCodexModelsByRoom] = useState<Record<string, string>>({});
-  const [projectPathDraftsByRoom, setProjectPathDraftsByRoom] = useState<Record<string, string>>({});
+  const hostBusyByRoom = useAppStore((state) => state.hostBusyByRoom);
+  const setHostBusyByRoom = useAppStore((state) => state.setHostBusyByRoom);
+  const hostMessagesByRoom = useAppStore((state) => state.hostMessagesByRoom);
+  const setHostMessagesByRoom = useAppStore((state) => state.setHostMessagesByRoom);
+  const settingsBusyByRoom = useAppStore((state) => state.settingsBusyByRoom);
+  const setSettingsBusyByRoom = useAppStore((state) => state.setSettingsBusyByRoom);
+  const settingsMessagesByRoom = useAppStore((state) => state.settingsMessagesByRoom);
+  const setSettingsMessagesByRoom = useAppStore((state) => state.setSettingsMessagesByRoom);
+  const customCodexModelsByRoom = useAppStore((state) => state.customCodexModelsByRoom);
+  const setCustomCodexModelsByRoom = useAppStore((state) => state.setCustomCodexModelsByRoom);
+  const projectPathDraftsByRoom = useAppStore((state) => state.projectPathDraftsByRoom);
+  const setProjectPathDraftsByRoom = useAppStore((state) => state.setProjectPathDraftsByRoom);
 
   return {
     hostBusyByRoom,

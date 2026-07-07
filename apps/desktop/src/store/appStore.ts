@@ -29,6 +29,12 @@ type FilePreviewTabsByRoom = Record<string, FilePreviewTab>;
 type FileBusyByRoom = Record<string, boolean>;
 type FileMessagesByRoom = Record<string, string | null>;
 type MarkdownCopyFallbacksByRoom = Record<string, MarkdownCopyFallback | null>;
+type HostBusyByRoom = Record<string, boolean>;
+type HostMessagesByRoom = Record<string, string | null>;
+type SettingsBusyByRoom = Record<string, boolean>;
+type SettingsMessagesByRoom = Record<string, string | null>;
+type CustomCodexModelsByRoom = Record<string, string>;
+type ProjectPathDraftsByRoom = Record<string, string>;
 
 const emptyAppStoreState = {
   gitStatusByRoom: {},
@@ -52,7 +58,13 @@ const emptyAppStoreState = {
   filePreviewTabsByRoom: {},
   fileBusyByRoom: {},
   fileMessagesByRoom: {},
-  markdownCopyFallbacksByRoom: {}
+  markdownCopyFallbacksByRoom: {},
+  hostBusyByRoom: {},
+  hostMessagesByRoom: {},
+  settingsBusyByRoom: {},
+  settingsMessagesByRoom: {},
+  customCodexModelsByRoom: {},
+  projectPathDraftsByRoom: {}
 };
 
 function resolveSetStateAction<T>(current: T, action: SetStateAction<T>): T {
@@ -82,6 +94,12 @@ interface AppStoreState {
   fileBusyByRoom: FileBusyByRoom;
   fileMessagesByRoom: FileMessagesByRoom;
   markdownCopyFallbacksByRoom: MarkdownCopyFallbacksByRoom;
+  hostBusyByRoom: HostBusyByRoom;
+  hostMessagesByRoom: HostMessagesByRoom;
+  settingsBusyByRoom: SettingsBusyByRoom;
+  settingsMessagesByRoom: SettingsMessagesByRoom;
+  customCodexModelsByRoom: CustomCodexModelsByRoom;
+  projectPathDraftsByRoom: ProjectPathDraftsByRoom;
   setGitStatusByRoom: (action: SetStateAction<GitStatusByRoom>) => void;
   setGitWorkflowBusyByRoom: (action: SetStateAction<GitWorkflowBusyByRoom>) => void;
   setGitWorkflowMessagesByRoom: (action: SetStateAction<GitWorkflowMessagesByRoom>) => void;
@@ -104,6 +122,12 @@ interface AppStoreState {
   setFileBusyByRoom: (action: SetStateAction<FileBusyByRoom>) => void;
   setFileMessagesByRoom: (action: SetStateAction<FileMessagesByRoom>) => void;
   setMarkdownCopyFallbacksByRoom: (action: SetStateAction<MarkdownCopyFallbacksByRoom>) => void;
+  setHostBusyByRoom: (action: SetStateAction<HostBusyByRoom>) => void;
+  setHostMessagesByRoom: (action: SetStateAction<HostMessagesByRoom>) => void;
+  setSettingsBusyByRoom: (action: SetStateAction<SettingsBusyByRoom>) => void;
+  setSettingsMessagesByRoom: (action: SetStateAction<SettingsMessagesByRoom>) => void;
+  setCustomCodexModelsByRoom: (action: SetStateAction<CustomCodexModelsByRoom>) => void;
+  setProjectPathDraftsByRoom: (action: SetStateAction<ProjectPathDraftsByRoom>) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
 }
@@ -218,6 +242,36 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setMarkdownCopyFallbacksByRoom: (action) => {
     set((state) => ({
       markdownCopyFallbacksByRoom: resolveSetStateAction(state.markdownCopyFallbacksByRoom, action)
+    }));
+  },
+  setHostBusyByRoom: (action) => {
+    set((state) => ({
+      hostBusyByRoom: resolveSetStateAction(state.hostBusyByRoom, action)
+    }));
+  },
+  setHostMessagesByRoom: (action) => {
+    set((state) => ({
+      hostMessagesByRoom: resolveSetStateAction(state.hostMessagesByRoom, action)
+    }));
+  },
+  setSettingsBusyByRoom: (action) => {
+    set((state) => ({
+      settingsBusyByRoom: resolveSetStateAction(state.settingsBusyByRoom, action)
+    }));
+  },
+  setSettingsMessagesByRoom: (action) => {
+    set((state) => ({
+      settingsMessagesByRoom: resolveSetStateAction(state.settingsMessagesByRoom, action)
+    }));
+  },
+  setCustomCodexModelsByRoom: (action) => {
+    set((state) => ({
+      customCodexModelsByRoom: resolveSetStateAction(state.customCodexModelsByRoom, action)
+    }));
+  },
+  setProjectPathDraftsByRoom: (action) => {
+    set((state) => ({
+      projectPathDraftsByRoom: resolveSetStateAction(state.projectPathDraftsByRoom, action)
     }));
   },
   resetAppStore: () => set(emptyAppStoreState),
