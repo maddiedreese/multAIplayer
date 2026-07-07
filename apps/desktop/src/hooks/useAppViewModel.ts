@@ -257,7 +257,7 @@ export function useAppViewModel({
         inviteMessage,
         onCopyInvite: inviteActions.copyInviteLink,
         onInviteApprovalGateChange: (enabled) => setInviteApprovalGateForRoom(selectedRoom.id, enabled),
-        onInviteSecretInputChange: invitePanelState.setInviteSecretInput,
+        onInviteSecretInputChange: invitePanelState.setInviteSecretInputValue,
         onImportInvite: inviteActions.joinInviteSecret,
         onRotateRoomKey: inviteActions.rotateSelectedRoomKey,
         onDecideInviteRequest: inviteActions.decideInviteJoinRequest

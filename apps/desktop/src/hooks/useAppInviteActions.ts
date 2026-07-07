@@ -87,7 +87,7 @@ export function useAppInviteActions({
     setSelectedInviteMessage,
     setInviteMessageForRoom,
     setInviteLinkForRoom,
-    setInviteSecretInput: invitePanelState.setInviteSecretInput,
+    clearInviteSecretInput: invitePanelState.clearInviteSecretInput,
     setSelectedTeam: workspaceState.setSelectedTeam,
     setSelectedRoomId: workspaceState.setSelectedRoomId,
     setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,

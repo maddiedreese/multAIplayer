@@ -97,7 +97,7 @@ interface UseInviteActionsOptions {
   setSelectedInviteMessage: (message: string | null) => void;
   setInviteMessageForRoom: (roomId: string, message: string | null) => void;
   setInviteLinkForRoom: (roomId: string, link: string) => void;
-  setInviteSecretInput: Dispatch<SetStateAction<string>>;
+  clearInviteSecretInput: () => void;
   setSelectedTeam: Dispatch<SetStateAction<string>>;
   setSelectedRoomId: Dispatch<SetStateAction<string>>;
   setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
@@ -133,7 +133,7 @@ export function useInviteActions({
   setSelectedInviteMessage,
   setInviteMessageForRoom,
   setInviteLinkForRoom,
-  setInviteSecretInput,
+  clearInviteSecretInput,
   setSelectedTeam,
   setSelectedRoomId,
   setForgottenRoomIds,
@@ -477,7 +477,7 @@ export function useInviteActions({
     initializeMessagesForRoom(inviteSecret.roomId);
     setSelectedTeam(inviteSecret.teamId);
     setSelectedRoomId(inviteSecret.roomId);
-    setInviteSecretInput("");
+    clearInviteSecretInput();
     const requestedAt = new Date().toISOString();
     const request: InviteJoinRequest = {
       eventType: "invite.request",
@@ -556,7 +556,7 @@ export function useInviteActions({
     initializeMessagesForRoom(inviteSecret.roomId);
     setSelectedTeam(inviteSecret.teamId);
     setSelectedRoomId(inviteSecret.roomId);
-    setInviteSecretInput("");
+    clearInviteSecretInput();
     if (approvalRequested) {
       const requestedAt = new Date().toISOString();
       const request: InviteJoinRequest = {
@@ -597,7 +597,7 @@ export function useInviteActions({
     const raw = inviteSecretInput.trim();
     if (!raw) return;
     setSelectedInviteMessage(null);
-    setInviteSecretInput("");
+    clearInviteSecretInput();
     try {
       const [beforeHash, afterHash] = raw.includes("#") ? raw.split("#") : ["", raw];
       const inviteId = beforeHash.includes("?")

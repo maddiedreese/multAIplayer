@@ -79,18 +79,14 @@ test("desktop store exposes room busy actions", () => {
 test("desktop store exposes room request actions", () => {
   const store = useAppStore.getState();
 
-  store.setInviteRequestsByRoom({
-    "room-a": [
-      {
-        eventType: "invite.request",
-        id: "invite-request-a",
-        requester: "Avery",
-        requesterUserId: "github:avery",
-        requesterDeviceId: "device-a",
-        requestedAt: "2026-07-06T00:02:00.000Z",
-        status: "pending"
-      }
-    ]
+  store.appendInviteRequest("room-a", {
+    eventType: "invite.request",
+    id: "invite-request-a",
+    requester: "Avery",
+    requesterUserId: "github:avery",
+    requesterDeviceId: "device-a",
+    requestedAt: "2026-07-06T00:02:00.000Z",
+    status: "pending"
   });
   store.updateInviteRequestStatus("room-a", "invite-request-a", "approved");
   store.appendTerminalRequest("room-a", {
@@ -403,28 +399,26 @@ test("desktop store keeps local preview state room scoped", () => {
 test("desktop store keeps invite panel state room scoped", () => {
   const store = useAppStore.getState();
 
-  store.setInviteRequestsByRoom({
-    "room-a": [
-      {
-        eventType: "invite.request",
-        id: "invite-request-1",
-        inviteId: "invite-1",
-        requester: "Jordan",
-        requesterUserId: "github:jordan",
-        requesterDeviceId: "device-jordan",
-        requesterPublicKeyFingerprint: "1234567890abcdef",
-        requestedAt: "2026-07-06T00:06:00.000Z",
-        note: "Joining from laptop",
-        status: "pending"
-      }
-    ]
-  });
-  store.setInviteSecretInput("multaiplayer://invite#secret");
-  store.setInviteLinksByRoom({ "room-a": "https://multaiplayer.com/invite/room-a" });
-  store.setInviteApprovalGatesByRoom({ "room-a": true, "room-b": false });
-  store.setInviteMessagesByRoom({ "room-a": "Invite created", "room-b": null });
-  store.setKeyRotationBusyByRoom({ "room-a": true });
-  store.setInviteAdmissionsByRoom({ "room-a": "Admitted Jordan" });
+  store.setInviteRequestsForRoom("room-a", [{
+    eventType: "invite.request",
+    id: "invite-request-1",
+    inviteId: "invite-1",
+    requester: "Jordan",
+    requesterUserId: "github:jordan",
+    requesterDeviceId: "device-jordan",
+    requesterPublicKeyFingerprint: "1234567890abcdef",
+    requestedAt: "2026-07-06T00:06:00.000Z",
+    note: "Joining from laptop",
+    status: "pending"
+  }]);
+  store.setInviteSecretInputValue("multaiplayer://invite#secret");
+  store.setInviteLinkForRoom("room-a", "https://multaiplayer.com/invite/room-a");
+  store.setInviteApprovalGateForRoom("room-a", true);
+  store.setInviteApprovalGateForRoom("room-b", false);
+  store.setInviteMessageForRoom("room-a", "Invite created");
+  store.setInviteMessageForRoom("room-b", null);
+  store.setKeyRotationBusyForRoom("room-a", true);
+  store.setInviteAdmissionForRoom("room-a", "Admitted Jordan");
   store.setInviteAdmissionForRoom("room-b", "Admitted Avery");
   store.setInviteAdmissionForRoom("room-a", null);
 
@@ -433,9 +427,9 @@ test("desktop store keeps invite panel state room scoped", () => {
   assert.equal(state.inviteSecretInput, "multaiplayer://invite#secret");
   assert.equal(state.inviteLinksByRoom["room-a"], "https://multaiplayer.com/invite/room-a");
   assert.equal(state.inviteApprovalGatesByRoom["room-a"], true);
-  assert.equal(state.inviteApprovalGatesByRoom["room-b"], false);
+  assert.equal(state.inviteApprovalGatesByRoom["room-b"], undefined);
   assert.equal(state.inviteMessagesByRoom["room-a"], "Invite created");
-  assert.equal(state.inviteMessagesByRoom["room-b"], null);
+  assert.equal(state.inviteMessagesByRoom["room-b"], undefined);
   assert.equal(state.keyRotationBusyByRoom["room-a"], true);
   assert.equal(state.inviteAdmissionsByRoom["room-a"], undefined);
   assert.equal(state.inviteAdmissionsByRoom["room-b"], "Admitted Avery");
@@ -1153,7 +1147,8 @@ test("desktop store clears local room-scoped state", () => {
     requestedAt: "2026-07-06T00:21:00.000Z",
     status: "pending"
   });
-  store.setInviteRequestsByRoom({ "room-a": [], "room-b": [] });
+  store.setInviteRequestsForRoom("room-a", []);
+  store.setInviteRequestsForRoom("room-b", []);
   store.setCodexEventsByRoom({ "room-a": [], "room-b": [] });
   store.setGitWorkflowEventsByRoom({ "room-a": [], "room-b": [] });
   store.setGitHubActionsEventsByRoom({ "room-a": [], "room-b": [] });

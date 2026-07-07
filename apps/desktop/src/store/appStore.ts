@@ -213,13 +213,9 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, TerminalSli
   setCustomCodexModelsByRoom: (action: SetStateAction<CustomCodexModelsByRoom>) => void;
   setProjectPathDraftsByRoom: (action: SetStateAction<ProjectPathDraftsByRoom>) => void;
   setLocalPreviewDialog: (action: SetStateAction<LocalPreviewDialogState>) => void;
-  setInviteRequestsByRoom: (action: SetStateAction<InviteRequestsByRoom>) => void;
-  setInviteSecretInput: (action: SetStateAction<string>) => void;
-  setInviteLinksByRoom: (action: SetStateAction<InviteLinksByRoom>) => void;
-  setInviteApprovalGatesByRoom: (action: SetStateAction<InviteApprovalGatesByRoom>) => void;
-  setInviteMessagesByRoom: (action: SetStateAction<InviteMessagesByRoom>) => void;
-  setKeyRotationBusyByRoom: (action: SetStateAction<KeyRotationBusyByRoom>) => void;
-  setInviteAdmissionsByRoom: (action: SetStateAction<InviteAdmissionsByRoom>) => void;
+  setInviteRequestsForRoom: (roomId: string, requests: InviteJoinRequest[]) => void;
+  setInviteSecretInputValue: (value: string) => void;
+  clearInviteSecretInput: () => void;
   setInviteAdmissionForRoom: (roomId: string, inviteId: string | null) => void;
   clearInviteAdmissionForRoom: (roomId: string) => void;
   setChatMessagesByRoom: (action: SetStateAction<ChatMessagesByRoom>) => void;
@@ -384,40 +380,19 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       localPreviewDialog: resolveSetStateAction(state.localPreviewDialog, action)
     }));
   },
-  setInviteRequestsByRoom: (action) => {
+  setInviteRequestsForRoom: (roomId, requests) => {
     set((state) => ({
-      inviteRequestsByRoom: resolveSetStateAction(state.inviteRequestsByRoom, action)
+      inviteRequestsByRoom: {
+        ...state.inviteRequestsByRoom,
+        [roomId]: requests
+      }
     }));
   },
-  setInviteSecretInput: (action) => {
-    set((state) => ({
-      inviteSecretInput: resolveSetStateAction(state.inviteSecretInput, action)
-    }));
+  setInviteSecretInputValue: (value) => {
+    set({ inviteSecretInput: value });
   },
-  setInviteLinksByRoom: (action) => {
-    set((state) => ({
-      inviteLinksByRoom: resolveSetStateAction(state.inviteLinksByRoom, action)
-    }));
-  },
-  setInviteApprovalGatesByRoom: (action) => {
-    set((state) => ({
-      inviteApprovalGatesByRoom: resolveSetStateAction(state.inviteApprovalGatesByRoom, action)
-    }));
-  },
-  setInviteMessagesByRoom: (action) => {
-    set((state) => ({
-      inviteMessagesByRoom: resolveSetStateAction(state.inviteMessagesByRoom, action)
-    }));
-  },
-  setKeyRotationBusyByRoom: (action) => {
-    set((state) => ({
-      keyRotationBusyByRoom: resolveSetStateAction(state.keyRotationBusyByRoom, action)
-    }));
-  },
-  setInviteAdmissionsByRoom: (action) => {
-    set((state) => ({
-      inviteAdmissionsByRoom: resolveSetStateAction(state.inviteAdmissionsByRoom, action)
-    }));
+  clearInviteSecretInput: () => {
+    set({ inviteSecretInput: "" });
   },
   setInviteAdmissionForRoom: (roomId, inviteId) => {
     set((state) => ({
