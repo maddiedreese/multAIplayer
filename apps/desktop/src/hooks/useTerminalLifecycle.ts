@@ -1,7 +1,7 @@
 import { useEffect, type Dispatch, type SetStateAction } from "react";
 import { listTerminals, readTerminal, type TerminalSnapshot } from "../lib/localBackend";
-import { omitRecordKey } from "../lib/setUtils";
 import { mergeTerminalSnapshots, replaceRoomTerminalSnapshots, upsertTerminal } from "../lib/terminalState";
+import { useAppStore } from "../store/appStore";
 
 interface UseTerminalLifecycleOptions {
   hasSelectedRoom: boolean;
@@ -10,8 +10,6 @@ interface UseTerminalLifecycleOptions {
   selectedTerminalId: string | null;
   selectedTerminalRunning: boolean | undefined;
   setTerminals: Dispatch<SetStateAction<TerminalSnapshot[]>>;
-  setSelectedTerminalIdsByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setSelectedTerminalIdForRoom: (roomId: string, terminalId: string | null) => void;
   setTerminalErrorForRoom: (roomId: string, message: string | null) => void;
 }
 
@@ -22,10 +20,10 @@ export function useTerminalLifecycle({
   selectedTerminalId,
   selectedTerminalRunning,
   setTerminals,
-  setSelectedTerminalIdsByRoom,
-  setSelectedTerminalIdForRoom,
   setTerminalErrorForRoom
 }: UseTerminalLifecycleOptions) {
+  const setSelectedTerminalIdForRoom = useAppStore((state) => state.setSelectedTerminalIdForRoom);
+
   useEffect(() => {
     if (!hasSelectedRoom) {
       setTerminals([]);
@@ -49,13 +47,11 @@ export function useTerminalLifecycle({
           );
           return replaceRoomTerminalSnapshots(current, roomId, mergedSnapshots);
         });
-        setSelectedTerminalIdsByRoom((current) => {
-          const currentTerminalId = current[roomId] ?? null;
-          const nextTerminalId = currentTerminalId && mergedSnapshots.some((terminal) => terminal.id === currentTerminalId)
-            ? currentTerminalId
-            : mergedSnapshots[0]?.id ?? null;
-          return nextTerminalId ? { ...current, [roomId]: nextTerminalId } : omitRecordKey(current, roomId);
-        });
+        const currentTerminalId = useAppStore.getState().selectedTerminalIdsByRoom[roomId] ?? null;
+        const nextTerminalId = currentTerminalId && mergedSnapshots.some((terminal) => terminal.id === currentTerminalId)
+          ? currentTerminalId
+          : mergedSnapshots[0]?.id ?? null;
+        setSelectedTerminalIdForRoom(roomId, nextTerminalId);
       })
       .catch((error) => {
         if (!cancelled) setTerminalErrorForRoom(roomId, String(error));
@@ -63,7 +59,7 @@ export function useTerminalLifecycle({
     return () => {
       cancelled = true;
     };
-  }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoomId]);
+  }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoomId, setSelectedTerminalIdForRoom]);
 
   useEffect(() => {
     if (!canReadLocalWorkspace || !selectedTerminalId || !selectedTerminalRunning) return;

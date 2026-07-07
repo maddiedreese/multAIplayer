@@ -400,8 +400,6 @@ export function useAppRoomRuntime({
         selectedTerminalId,
         selectedTerminalRunning: selectedRuntime.selectedTerminal?.running,
         setTerminals: terminalPanelState.setTerminals,
-        setSelectedTerminalIdsByRoom: terminalPanelState.setSelectedTerminalIdsByRoom,
-        setSelectedTerminalIdForRoom,
         setTerminalErrorForRoom
       },
       terminalAutoOpen: {
