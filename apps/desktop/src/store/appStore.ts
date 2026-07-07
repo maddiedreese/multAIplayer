@@ -35,25 +35,13 @@ import {
 } from "./slices/roomSettingsSlice";
 import { createRoomChatSlice, emptyRoomChatState, type RoomChatSlice } from "./slices/roomChatSlice";
 import { createTerminalSlice, emptyTerminalState, type TerminalSlice } from "./slices/terminalSlice";
-import type {
-  ChatMessage,
-  LocalRoomHistoryPayload,
-} from "../types";
-import type {
-  ChatReactionPlaintextPayload,
-  TeamMemberRecord
-} from "@multaiplayer/protocol";
+import {
+  createWorkspaceDataSlice,
+  emptyWorkspaceDataState,
+  type WorkspaceDataSlice
+} from "./slices/workspaceDataSlice";
+import type { LocalRoomHistoryPayload } from "../types";
 import { omitRecordKey } from "../lib/setUtils";
-
-type TeamMembersByTeam = Record<string, TeamMemberRecord[]>;
-type TeamMembersMessageByTeam = Record<string, string | null>;
-type TeamMembersBusyByTeam = Record<string, boolean>;
-type MessagesByRoom = Record<string, ChatMessage[]>;
-
-interface WorkspaceInitialData {
-  teamMembersByTeam: TeamMembersByTeam;
-  messagesByRoom: MessagesByRoom;
-}
 
 const emptyAppStoreState = {
   ...emptyGitWorkflowState,
@@ -66,10 +54,7 @@ const emptyAppStoreState = {
   ...emptyRoomChatState,
   ...emptyCodexHostHandoffState,
   ...emptyTerminalState,
-  teamMembersByTeam: {},
-  teamMembersMessageByTeam: {},
-  teamMembersBusyByTeam: {},
-  messagesByRoom: {}
+  ...emptyWorkspaceDataState
 };
 
 export interface AppStoreState
@@ -82,20 +67,9 @@ export interface AppStoreState
     LocalPreviewSlice,
     RoomSettingsSlice,
     RoomChatSlice,
-    TerminalSlice {
-  teamMembersByTeam: TeamMembersByTeam;
-  teamMembersMessageByTeam: TeamMembersMessageByTeam;
-  teamMembersBusyByTeam: TeamMembersBusyByTeam;
-  messagesByRoom: MessagesByRoom;
-  seedWorkspaceInitialDataIfEmpty: (initialData: WorkspaceInitialData) => void;
-  setTeamMembersForTeam: (teamId: string, members: TeamMemberRecord[]) => void;
-  setTeamMembersMessageForTeam: (teamId: string, message: string | null) => void;
-  setTeamMembersBusyForTeam: (teamId: string, busy: boolean) => void;
-  ensureLocalTeamMemberForTeam: (teamId: string, userId: string, role: TeamMemberRecord["role"]) => void;
-  initializeMessagesForRoom: (roomId: string) => void;
+    TerminalSlice,
+    WorkspaceDataSlice {
   hydrateLocalRoomHistoryForRoom: (roomId: string, payload: LocalRoomHistoryPayload) => void;
-  appendRoomMessage: (roomId: string, message: ChatMessage) => void;
-  applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
   clearRoomScopedStateForRoom: (roomId: string) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
@@ -113,69 +87,7 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   ...createRoomSettingsSlice(set, get, api),
   ...createRoomChatSlice(set, get, api),
   ...createTerminalSlice(set, get, api),
-  seedWorkspaceInitialDataIfEmpty: ({ teamMembersByTeam, messagesByRoom }) => {
-    set((state) => {
-      const shouldSeedTeamMembers =
-        Object.keys(teamMembersByTeam).length > 0 && Object.keys(state.teamMembersByTeam).length === 0;
-      const shouldSeedMessages = Object.keys(messagesByRoom).length > 0 && Object.keys(state.messagesByRoom).length === 0;
-      if (!shouldSeedTeamMembers && !shouldSeedMessages) return state;
-      return {
-        ...(shouldSeedTeamMembers ? { teamMembersByTeam } : {}),
-        ...(shouldSeedMessages ? { messagesByRoom } : {})
-      };
-    });
-  },
-  setTeamMembersForTeam: (teamId, members) => {
-    set((state) => ({
-      teamMembersByTeam: {
-        ...state.teamMembersByTeam,
-        [teamId]: members
-      }
-    }));
-  },
-  setTeamMembersMessageForTeam: (teamId, message) => {
-    set((state) => ({
-      teamMembersMessageByTeam: {
-        ...state.teamMembersMessageByTeam,
-        [teamId]: message
-      }
-    }));
-  },
-  setTeamMembersBusyForTeam: (teamId, busy) => {
-    set((state) => ({
-      teamMembersBusyByTeam: {
-        ...state.teamMembersBusyByTeam,
-        [teamId]: busy
-      }
-    }));
-  },
-  ensureLocalTeamMemberForTeam: (teamId, userId, role) => {
-    set((state) => {
-      if (state.teamMembersByTeam[teamId]?.some((member) => member.userId === userId)) return state;
-      return {
-        teamMembersByTeam: {
-          ...state.teamMembersByTeam,
-          [teamId]: [{
-            teamId,
-            userId,
-            role,
-            joinedAt: new Date().toISOString()
-          }]
-        }
-      };
-    });
-  },
-  initializeMessagesForRoom: (roomId) => {
-    set((state) => {
-      if (state.messagesByRoom[roomId]) return state;
-      return {
-        messagesByRoom: {
-          ...state.messagesByRoom,
-          [roomId]: []
-        }
-      };
-    });
-  },
+  ...createWorkspaceDataSlice(set, get, api),
   hydrateLocalRoomHistoryForRoom: (roomId, payload) => {
     set((state) => {
       const latestGitWorkflowEvent = payload.gitWorkflowEvents.at(-1);
@@ -238,44 +150,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
         codexThreadIdsByRoom: codexThreadId
           ? { ...state.codexThreadIdsByRoom, [roomId]: codexThreadId }
           : state.codexThreadIdsByRoom
-      };
-    });
-  },
-  appendRoomMessage: (roomId, message) => {
-    set((state) => {
-      const roomMessages = state.messagesByRoom[roomId] ?? [];
-      if (roomMessages.some((existing) => existing.id === message.id)) return state;
-      return {
-        messagesByRoom: {
-          ...state.messagesByRoom,
-          [roomId]: [...roomMessages, message]
-        }
-      };
-    });
-  },
-  applyMessageReaction: (roomId, reaction) => {
-    set((state) => {
-      const roomMessages = state.messagesByRoom[roomId] ?? [];
-      return {
-        messagesByRoom: {
-          ...state.messagesByRoom,
-          [roomId]: roomMessages.map((message) => {
-            if (message.id !== reaction.messageId) return message;
-            const reactions = message.reactions ?? [];
-            const existing = reactions.find((item) => item.emoji === reaction.emoji);
-            const reactors = existing?.reactors.filter((reactor) => reactor.userId !== reaction.reactorUserId) ?? [];
-            const nextReactors = reaction.action === "add"
-              ? [...reactors, { userId: reaction.reactorUserId, name: reaction.reactor }]
-              : reactors;
-            return {
-              ...message,
-              reactions: [
-                ...reactions.filter((item) => item.emoji !== reaction.emoji),
-                ...(nextReactors.length ? [{ emoji: reaction.emoji, reactors: nextReactors }] : [])
-              ]
-            };
-          })
-        }
       };
     });
   },
