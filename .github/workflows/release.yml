@@ -85,47 +85,77 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          can_sign=false
-          can_notarize=false
-          if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_CERTIFICATE_PASSWORD" ] && [ -n "$APPLE_SIGNING_IDENTITY" ]; then
-            can_sign=true
+          missing=()
+          for name in \
+            APPLE_CERTIFICATE \
+            APPLE_CERTIFICATE_PASSWORD \
+            APPLE_SIGNING_IDENTITY \
+            APPLE_ID \
+            APPLE_PASSWORD \
+            APPLE_TEAM_ID \
+            KEYCHAIN_PASSWORD
+          do
+            if [ -z "${!name}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing Apple signing/notarization secret(s): %s\n' "${missing[*]}" >&2
+            echo "Public release artifacts must be Developer ID signed and notarized." >&2
+            exit 1
           fi
-          if [ "$can_sign" = "true" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
-            can_notarize=true
-          fi
-          echo "can_sign=$can_sign" >> "$GITHUB_OUTPUT"
-          echo "can_notarize=$can_notarize" >> "$GITHUB_OUTPUT"
-          if [ "$can_notarize" = "true" ]; then
-            echo "Release build will use Developer ID signing and notarization."
-          else
-            echo "Release build will remain unsigned/not notarized because Apple signing secrets are incomplete."
-          fi
+          echo "Release build will use Developer ID signing and notarization."
+
+      - name: Import Apple Developer ID certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          security import certificate.p12 \
+            -k build.keychain \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            build.keychain
+          security find-identity -v -p codesigning build.keychain
+          rm -f certificate.p12
 
       - name: Verify
         run: npm run verify
 
       - name: Build signed and notarized Tauri app
-        if: steps.signing.outputs.can_notarize == 'true'
         env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run tauri:build -w @multaiplayer/desktop
 
-      - name: Build unsigned Tauri app
-        if: steps.signing.outputs.can_notarize != 'true'
-        run: npm run tauri:build -w @multaiplayer/desktop
-
       - name: Verify signed and notarized app
-        if: steps.signing.outputs.can_notarize == 'true'
         run: |
           app_path="apps/desktop/src-tauri/target/release/bundle/macos/multAIplayer.app"
+          dmg_path="$(find apps/desktop/src-tauri/target/release/bundle/dmg -maxdepth 1 -type f -name '*.dmg' | head -n 1)"
+          if [ -z "$dmg_path" ]; then
+            echo "No DMG found." >&2
+            exit 1
+          fi
           codesign --verify --deep --strict --verbose=2 "$app_path"
+          xcrun stapler validate "$app_path"
+          xcrun stapler validate "$dmg_path"
           spctl -a -vvv -t install "$app_path"
+          spctl -a -vvv -t open --context context:primary-signature "$dmg_path"
 
       - name: Package release assets
         run: |
@@ -146,29 +176,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_PRERELEASE: ${{ steps.release.outputs.prerelease }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
-          RELEASE_CAN_NOTARIZE: ${{ steps.signing.outputs.can_notarize }}
         run: |
           args=()
           if [ "$RELEASE_PRERELEASE" = "true" ]; then
             args+=(--prerelease)
           fi
-          if [ "$RELEASE_CAN_NOTARIZE" = "true" ]; then
-            signing_notes="$(cat <<'EOF'
+          signing_notes="$(cat <<'EOF'
           Important alpha notes:
           - This macOS app is Developer ID signed and notarized.
           - Treat it as security-sensitive alpha software and prefer test/self-hosted rooms before using private projects.
           - See `SHA256SUMS.txt` for release asset checksums.
           EOF
           )"
-          else
-            signing_notes="$(cat <<'EOF'
-          Important alpha notes:
-          - This app is unsigned and not notarized yet. macOS Gatekeeper may require manual approval to open it.
-          - Treat it as security-sensitive alpha software and prefer test/self-hosted rooms before using private projects.
-          - See `SHA256SUMS.txt` for release asset checksums.
-          EOF
-          )"
-          fi
           gh release create "$RELEASE_TAG" release-assets/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "multAIplayer $RELEASE_TAG" \
@@ -176,3 +195,8 @@ jobs:
 
           $signing_notes" \
             "${args[@]}"
+
+      - name: Delete temporary keychain
+        if: always()
+        run: |
+          security delete-keychain build.keychain 2>/dev/null || true

@@ -37,7 +37,7 @@ These require a maintainer account, secret, device, or product decision:
 - Choose the official hosted relay provider and deploy it behind HTTPS/WSS.
 - Configure `multAIplayer.com` and final callback/origin values.
 - Create and store production relay secrets.
-- Set up Apple Developer ID signing and notarization.
+- Set up Apple Developer ID signing and notarization secrets.
 - Decide release cadence, support expectations, and disclosure contact.
 - Run a real multi-user test with at least two GitHub accounts and two machines.
 - Review final security/trust copy before public announcement.
@@ -60,7 +60,7 @@ Before a wider alpha, manually run these in the native macOS app:
 
 ## Alpha-Only Limitations To Keep Visible
 
-- Builds are unsigned and not notarized until Apple Developer ID setup is complete.
+- Public macOS alpha artifacts are expected to be Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
 - Production-grade cryptographic member removal still needs key epochs and per-device key delivery.
 - The JSON relay store is acceptable for alpha/self-hosting but should become database-backed before production claims.
 - Rate limiting is process-local; multi-instance hosting needs an edge or shared-store limiter.

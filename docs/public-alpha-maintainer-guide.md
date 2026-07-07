@@ -85,6 +85,7 @@ APPLE_SIGNING_IDENTITY
 APPLE_ID
 APPLE_PASSWORD
 APPLE_TEAM_ID
+KEYCHAIN_PASSWORD
 ```
 
 `APPLE_CERTIFICATE` should be the base64 encoded `.p12` export:
@@ -93,9 +94,9 @@ APPLE_TEAM_ID
 openssl base64 -A -in /path/to/developer-id-application.p12 -out certificate-base64.txt
 ```
 
-Use an app-specific password for `APPLE_PASSWORD`. The release workflow falls back to unsigned artifacts if any signing/notarization secret is missing; do a dry-run tag before the announcement tag.
+Use an app-specific password for `APPLE_PASSWORD`. Use a generated random value for `KEYCHAIN_PASSWORD`; it only protects the temporary CI keychain during a release job. The release workflow fails if any signing/notarization secret is missing, so do a dry-run tag before the announcement tag.
 
-After the first signed release succeeds, update README download copy and release notes so they no longer say the current artifact is unsigned.
+After the first signed release succeeds, verify the GitHub Release says the artifact is Developer ID signed and notarized.
 
 ## Two-Person Dogfood
 

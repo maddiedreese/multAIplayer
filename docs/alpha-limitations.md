@@ -4,7 +4,7 @@ multAIplayer is an honest alpha. It is useful for local and trusted-team testing
 
 ## Release And Installation
 
-- macOS builds are unsigned and not notarized until Apple Developer ID signing is configured.
+- Public macOS alpha artifacts are expected to be Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
 - Release checksums help verify artifact integrity, but they do not replace signing.
 - Public releases should come from GitHub Actions, not ad hoc local builds.
 
@@ -37,6 +37,5 @@ multAIplayer is an honest alpha. It is useful for local and trusted-team testing
 ## Known Product Gaps
 
 - Real multi-device, multi-account dogfooding is still required before a public alpha should be promoted broadly.
-- Apple signing/notarization is not configured.
 - Official relay hosting decisions, domains, secrets, and OAuth callback choices still need maintainer input.
 - The visual design should continue to be reviewed in the native app on real screens, especially resizable columns and embedded browser behavior.

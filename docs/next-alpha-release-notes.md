@@ -11,20 +11,20 @@ These notes are a draft for the next public alpha after `v0.1.0-alpha.0`. Keep t
 - Terminal UX has been tightened toward an actual room shell: foreground terminal state, copy-as-Markdown support, and clearer empty/error states.
 - Host handoff now has an alpha path for Codex usage exhaustion: the room can mark the current host as limited, another eligible member can accept hosting, and the replacement host receives reconstructed room context.
 - Local preview sharing was added so a host can expose a local development server through room context during collaborative coding.
-- Release hardening now includes production relay checks, branch protection, stronger issue templates, and clearer alpha launch documentation.
+- Release hardening now includes production relay checks, branch protection, stronger issue templates, signed/notarized macOS release enforcement, and clearer alpha launch documentation.
 
 ## Security And Privacy Notes
 
 - The relay still routes encrypted room traffic and must not receive plaintext room transcripts, attachments, Codex credentials, OpenAI credentials, repo contents, terminal output, or browser contents.
-- GitHub OAuth tokens stay on the relay. When `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured, durable GitHub sessions are encrypted before being written to the alpha JSON store.
+- GitHub OAuth tokens stay on the relay. When `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured, durable GitHub sessions are encrypted before being written to the alpha relay store.
 - The active Codex host still controls local project, terminal, browser, Git, GitHub, and Codex access for a room.
 - Browser, terminal, private repo, signed-in web page, `.env`, credential, and secret-output warnings remain part of the alpha trust model. Users should assume host-visible local tool context can be sensitive.
 
 ## Known Alpha Limitations
 
-- macOS builds are unsigned and not notarized unless the release explicitly says otherwise. Gatekeeper may require manual approval.
+- Public macOS alpha artifacts are expected to be Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
 - Member removal does not yet provide production-grade cryptographic key epochs.
-- The official/self-host relay uses a JSON store in this alpha. It needs database-backed storage, backup/restore drills, and external/shared rate limiting before production claims.
+- The official/self-host relay uses SQLite snapshot storage in this alpha. It needs route-level database tables, backup/restore drills, and external/shared rate limiting before production claims.
 - Rate limiting is process-local.
 - Host handoff reconstructs context from room state; it still needs real two-person testing against actual Codex usage-limit failures.
 - Browser and terminal behavior is powerful and intentionally host-local, but it should continue to receive security review before private or regulated work.
@@ -53,4 +53,3 @@ Recommended manual smoke test:
 - Type in a terminal, copy Markdown, and restart the terminal.
 - Create a branch, commit, push, open a draft PR, and refresh Actions.
 - Simulate or trigger usage exhaustion and accept host handoff on the second device.
-
