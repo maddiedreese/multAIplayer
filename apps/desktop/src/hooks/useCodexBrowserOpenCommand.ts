@@ -1,11 +1,11 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type { MutableRefObject } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { canHostBrowserAction } from "../lib/browserPolicy";
 import { extractCodexBrowserOpenUrl } from "../lib/codexInvoke";
 import { formatBrowserAccessLabel } from "../lib/browserUi";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
-import type { BrowserAccessRequest, BrowserStatus, ChatMessage } from "../types";
-import type { InspectorTab } from "../components/RoomInspectorPanel";
+import type { BrowserAccessRequest, ChatMessage } from "../types";
+import { useAppStore } from "../store/appStore";
 
 interface LocalUser {
   id: string;
@@ -21,9 +21,6 @@ interface UseCodexBrowserOpenCommandOptions {
   appendBrowserRequest: (roomId: string, request: BrowserAccessRequest) => void;
   setBrowserMessageForRoom: (roomId: string, message: string | null) => void;
   setBrowserUrlForRoom: (roomId: string, url: string) => void;
-  setActiveBrowserUrlsByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setBrowserStatusByRoom: Dispatch<SetStateAction<Record<string, BrowserStatus>>>;
-  setInspectorTabsByRoom: Dispatch<SetStateAction<Record<string, InspectorTab>>>;
 }
 
 export function useCodexBrowserOpenCommand({
@@ -34,11 +31,11 @@ export function useCodexBrowserOpenCommand({
   revokedTeamIds,
   appendBrowserRequest,
   setBrowserMessageForRoom,
-  setBrowserUrlForRoom,
-  setActiveBrowserUrlsByRoom,
-  setBrowserStatusByRoom,
-  setInspectorTabsByRoom
+  setBrowserUrlForRoom
 }: UseCodexBrowserOpenCommandOptions) {
+  const openEmbeddedBrowserForRoom = useAppStore((state) => state.openEmbeddedBrowserForRoom);
+  const setInspectorTabForRoom = useAppStore((state) => state.setInspectorTabForRoom);
+
   function handleCodexBrowserOpenCommand(message: ChatMessage, room: RoomRecord): boolean {
     const url = extractCodexBrowserOpenUrl(message.body);
     if (!url) return false;
@@ -63,19 +60,10 @@ export function useCodexBrowserOpenCommand({
     appendBrowserRequest(room.id, request);
     setBrowserMessageForRoom(room.id, null);
     setBrowserUrlForRoom(room.id, request.url);
-    setActiveBrowserUrlsByRoom((current) => ({ ...current, [room.id]: request.url }));
-    setBrowserStatusByRoom((current) => ({
-      ...current,
-      [room.id]: {
-        profilePath: "Embedded in this room",
-        downloadsBlocked: false,
-        clipboardBlocked: false,
-        fileUploadsBlocked: false
-      }
-    }));
+    openEmbeddedBrowserForRoom(room.id, request.url);
     if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
       setBrowserMessageForRoom(room.id, `Opened in-room browser for ${formatBrowserAccessLabel(request.url)}.`);
-      setInspectorTabsByRoom((current) => ({ ...current, [room.id]: "browser" }));
+      setInspectorTabForRoom(room.id, "browser");
     }
     return true;
   }

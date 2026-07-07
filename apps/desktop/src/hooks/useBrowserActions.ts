@@ -1,4 +1,4 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type { MutableRefObject } from "react";
 import type { BrowserRequestPlaintextPayload, RelayEnvelope, RoomRecord } from "@multaiplayer/protocol";
 import { encryptJson } from "@multaiplayer/crypto";
 import { resetBrowserProfile } from "../lib/localBackend";
@@ -11,9 +11,8 @@ import {
 } from "../lib/browserPolicy";
 import { formatBrowserAccessLabel, normalizeBrowserLocationInput } from "../lib/browserUi";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
-import { omitRecordKey } from "../lib/setUtils";
-import type { BrowserAccessRequest, BrowserStatus } from "../types";
-import type { InspectorTab } from "../components/RoomInspectorPanel";
+import type { BrowserAccessRequest } from "../types";
+import { useAppStore } from "../store/appStore";
 
 interface LocalUser {
   id: string;
@@ -37,7 +36,6 @@ interface UseBrowserActionsOptions {
   relayStatus: "connecting" | "open" | "closed" | "error";
   relayRef: MutableRefObject<RelayClient | null>;
   seenEnvelopeIds: MutableRefObject<Set<string>>;
-  defaultBrowserStatus: BrowserStatus;
   setSelectedBrowserMessage: (message: string | null) => void;
   setBrowserMessageForRoom: (roomId: string, message: string | null) => void;
   setBrowserUrlForRoom: (roomId: string, url: string) => void;
@@ -49,9 +47,6 @@ interface UseBrowserActionsOptions {
     status: "approved" | "denied",
     room?: RoomRecord
   ) => Promise<void>;
-  setActiveBrowserUrlsByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setBrowserStatusByRoom: Dispatch<SetStateAction<Record<string, BrowserStatus>>>;
-  setInspectorTabsByRoom: Dispatch<SetStateAction<Record<string, InspectorTab>>>;
 }
 
 export function useBrowserActions({
@@ -71,17 +66,17 @@ export function useBrowserActions({
   relayStatus,
   relayRef,
   seenEnvelopeIds,
-  defaultBrowserStatus,
   setSelectedBrowserMessage,
   setBrowserMessageForRoom,
   setBrowserUrlForRoom,
   appendBrowserRequest,
   updateBrowserRequestStatus,
-  publishRequestStatus,
-  setActiveBrowserUrlsByRoom,
-  setBrowserStatusByRoom,
-  setInspectorTabsByRoom
+  publishRequestStatus
 }: UseBrowserActionsOptions) {
+  const openEmbeddedBrowserForRoom = useAppStore((state) => state.openEmbeddedBrowserForRoom);
+  const resetEmbeddedBrowserForRoom = useAppStore((state) => state.resetEmbeddedBrowserForRoom);
+  const setInspectorTabForRoom = useAppStore((state) => state.setInspectorTabForRoom);
+
   async function requestBrowserAccess() {
     if (!hasSelectedRoom) {
       setSelectedBrowserMessage("Create or join a room before requesting browser access.");
@@ -279,19 +274,10 @@ export function useBrowserActions({
   }
 
   function openEmbeddedRoomBrowser(room: RoomRecord, url: string) {
-    setActiveBrowserUrlsByRoom((current) => ({ ...current, [room.id]: url }));
-    setBrowserStatusByRoom((current) => ({
-      ...current,
-      [room.id]: {
-        profilePath: "Embedded in this room",
-        downloadsBlocked: false,
-        clipboardBlocked: false,
-        fileUploadsBlocked: false
-      }
-    }));
+    openEmbeddedBrowserForRoom(room.id, url);
     if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
       setBrowserMessageForRoom(room.id, `Opened in-room browser for ${formatBrowserAccessLabel(url)}.`);
-      setInspectorTabsByRoom((current) => ({ ...current, [room.id]: "browser" }));
+      setInspectorTabForRoom(room.id, "browser");
     }
   }
 
@@ -312,14 +298,7 @@ export function useBrowserActions({
     setBrowserMessageForRoom(room.id, null);
     try {
       const result = await resetBrowserProfile(room.id, room.projectPath);
-      setBrowserStatusByRoom((current) => ({
-        ...current,
-        [room.id]: {
-          ...defaultBrowserStatus,
-          profilePath: result.profilePath
-        }
-      }));
-      setActiveBrowserUrlsByRoom((current) => omitRecordKey(current, room.id));
+      resetEmbeddedBrowserForRoom(room.id, result.profilePath);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
         setBrowserMessageForRoom(room.id, "Reset isolated room browser state. The next approved page opens with a fresh profile.");
       }

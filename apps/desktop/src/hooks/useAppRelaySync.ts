@@ -93,10 +93,7 @@ export function useAppRelaySync({
       revokedTeamIds: roomRuntimeState.revokedTeamIds,
       appendBrowserRequest,
       setBrowserMessageForRoom,
-      setBrowserUrlForRoom,
-      setActiveBrowserUrlsByRoom: browserPanelState.setActiveBrowserUrlsByRoom,
-      setBrowserStatusByRoom: browserPanelState.setBrowserStatusByRoom,
-      setInspectorTabsByRoom: roomRuntimeState.setInspectorTabsByRoom
+      setBrowserUrlForRoom
     },
     relayRoomSync: {
       subscription: {
