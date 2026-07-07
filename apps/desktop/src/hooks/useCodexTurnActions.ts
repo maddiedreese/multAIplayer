@@ -27,8 +27,8 @@ import { roomLockMessage } from "../lib/appRuntime";
 import { canUseLocalWorkspace } from "../lib/workspaceAccess";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
-import { omitRecordKey } from "../lib/setUtils";
 import { updateRoomHost } from "../lib/workspaceClient";
+import { useAppStore } from "../store/appStore";
 import type {
   BrowserAccessRequest,
   ChatMessage,
@@ -61,8 +61,6 @@ interface UseCodexTurnActionsOptions {
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   setCodexRunningForRoom: (roomId: string, running: boolean) => void;
   appendTerminalLinesForRoom: (roomId: string, lines: string[]) => void;
-  setCodexThreadIdsByRoom: Dispatch<SetStateAction<Record<string, string>>>;
-  setCodexContinuationByRoom: Dispatch<SetStateAction<Record<string, HostHandoffRecord>>>;
   setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
   publishCodexEvent: (
     event: Omit<CodexEventPlaintextPayload, "eventType" | "host" | "hostUserId" | "createdAt">,
@@ -96,13 +94,14 @@ export function useCodexTurnActions({
   setApprovalVisibleForRoom,
   setCodexRunningForRoom,
   appendTerminalLinesForRoom,
-  setCodexThreadIdsByRoom,
-  setCodexContinuationByRoom,
   setRooms,
   publishCodexEvent,
   publishChatMessage,
   publishHostHandoff
 }: UseCodexTurnActionsOptions) {
+  const setCodexThreadIdForRoom = useAppStore((state) => state.setCodexThreadIdForRoom);
+  const setCodexContinuationForRoom = useAppStore((state) => state.setCodexContinuationForRoom);
+
   async function approveCodexTurn(approval: PendingCodexApproval | null = activeCodexApproval) {
     const roomId = approval?.roomId ?? selectedRoom.id;
     const room = roomsRef.current.find((item) => item.id === roomId);
@@ -184,10 +183,7 @@ export function useCodexTurnActions({
       }
       const threadId = normalizeCodexThreadId(result.threadId);
       if (threadId) {
-        setCodexThreadIdsByRoom((current) => ({
-          ...current,
-          [roomId]: threadId
-        }));
+        setCodexThreadIdForRoom(roomId, threadId);
       }
       for (const eventName of result.events.slice(-16)) {
         await publishCodexEvent({
@@ -245,7 +241,7 @@ export function useCodexTurnActions({
       appendTerminalLinesForRoom(roomId, [`Codex error: ${String(error)}`]);
     } finally {
       if (continuationHandoff) {
-        setCodexContinuationByRoom((current) => omitRecordKey(current, roomId));
+        setCodexContinuationForRoom(roomId, null);
       }
       setCodexRunningForRoom(roomId, false);
     }

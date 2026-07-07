@@ -365,6 +365,7 @@ interface AppStoreState {
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
   resetCodexApprovalForRoom: (roomId: string) => void;
   setCodexRunningForRoom: (roomId: string, running: boolean) => void;
+  setCodexThreadIdForRoom: (roomId: string, threadId: string | null) => void;
   setFileQueryForRoom: (roomId: string, query: string) => void;
   setProjectFilesForRoom: (roomId: string, files: ProjectFileEntry[]) => void;
   setSelectedFileForRoom: (roomId: string, file: ProjectFileContent | null) => void;
@@ -1018,6 +1019,13 @@ export const useAppStore = create<AppStoreState>((set) => ({
       codexRunningByRoom: running
         ? { ...state.codexRunningByRoom, [roomId]: true }
         : omitRecordKey(state.codexRunningByRoom, roomId)
+    }));
+  },
+  setCodexThreadIdForRoom: (roomId, threadId) => {
+    set((state) => ({
+      codexThreadIdsByRoom: threadId
+        ? { ...state.codexThreadIdsByRoom, [roomId]: threadId }
+        : omitRecordKey(state.codexThreadIdsByRoom, roomId)
     }));
   },
   setFileQueryForRoom: (roomId, query) => {
