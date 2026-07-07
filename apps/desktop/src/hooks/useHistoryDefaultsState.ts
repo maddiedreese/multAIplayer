@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ApprovalPolicy } from "@multaiplayer/protocol";
 import type { LocalHistorySettings } from "../lib/localHistory";
 import { loadTeamRoomDefaults } from "../lib/teamRoomDefaults";
+import { useAppStore } from "../store/appStore";
 
 export function useHistoryDefaultsState({ initialTeamId }: { initialTeamId: string }) {
   const [historySettings, setHistorySettings] = useState<LocalHistorySettings>({
@@ -24,8 +25,10 @@ export function useHistoryDefaultsState({ initialTeamId }: { initialTeamId: stri
   const [teamDefaultInviteApprovalGate, setTeamDefaultInviteApprovalGate] = useState(() =>
     loadTeamRoomDefaults(initialTeamId).inviteApprovalGate
   );
-  const [historyMessagesByRoom, setHistoryMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [teamHistoryMessagesByTeam, setTeamHistoryMessagesByTeam] = useState<Record<string, string | null>>({});
+  const historyMessagesByRoom = useAppStore((state) => state.historyMessagesByRoom);
+  const setHistoryMessagesByRoom = useAppStore((state) => state.setHistoryMessagesByRoom);
+  const teamHistoryMessagesByTeam = useAppStore((state) => state.teamHistoryMessagesByTeam);
+  const setTeamHistoryMessagesByTeam = useAppStore((state) => state.setTeamHistoryMessagesByTeam);
 
   return {
     historySettings,
