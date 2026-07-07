@@ -197,7 +197,6 @@ export function useAppWorkspaceFlow({
         setRevokedRoomIds: roomRuntimeState.setRevokedRoomIds,
         setRevokedTeamIds: roomRuntimeState.setRevokedTeamIds,
         setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
-        setMessagesByRoom: workspaceState.setMessagesByRoom,
         setInviteApprovalGateForRoom,
         upsertTeam: workspaceRecords.upsertTeam,
         upsertRoom: workspaceRecords.upsertRoom

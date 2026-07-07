@@ -7,7 +7,7 @@ import { loadTeamHistorySettings, saveHistorySettings } from "../lib/localHistor
 import { planRoomCreation, planTeamCreation } from "../lib/workspaceCreation";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
 import { withoutSetValue } from "../lib/setUtils";
-import type { ChatMessage } from "../types";
+import { useAppStore } from "../store/appStore";
 
 interface UseWorkspaceCreationActionsOptions {
   selectedTeam: string;
@@ -23,7 +23,6 @@ interface UseWorkspaceCreationActionsOptions {
   setRevokedRoomIds: Dispatch<SetStateAction<Set<string>>>;
   setRevokedTeamIds: Dispatch<SetStateAction<Set<string>>>;
   setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
-  setMessagesByRoom: Dispatch<SetStateAction<Record<string, ChatMessage[]>>>;
   setInviteApprovalGateForRoom: (roomId: string, inviteApprovalGate: boolean) => void;
   upsertTeam: (team: TeamRecord) => void;
   upsertRoom: (room: RoomRecord) => void;
@@ -43,11 +42,12 @@ export function useWorkspaceCreationActions({
   setRevokedRoomIds,
   setRevokedTeamIds,
   setForgottenRoomIds,
-  setMessagesByRoom,
   setInviteApprovalGateForRoom,
   upsertTeam,
   upsertRoom
 }: UseWorkspaceCreationActionsOptions) {
+  const initializeMessagesForRoom = useAppStore((state) => state.initializeMessagesForRoom);
+
   async function addTeam() {
     let plan: ReturnType<typeof planTeamCreation>;
     try {
@@ -94,7 +94,7 @@ export function useWorkspaceCreationActions({
       setForgottenRoomIds((current) => withoutSetValue(current, room.id));
       setInviteApprovalGateForRoom(room.id, teamDefaults.inviteApprovalGate);
       saveHistorySettings(room.id, loadTeamHistorySettings(plan.teamId));
-      setMessagesByRoom((current) => ({ ...current, [room.id]: [] }));
+      initializeMessagesForRoom(room.id);
       setSelectedRoomId(room.id);
       setNewRoomName("");
       setNewRoomProjectPath(plan.projectPath);
