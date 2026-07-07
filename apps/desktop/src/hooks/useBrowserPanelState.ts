@@ -1,13 +1,18 @@
-import { useState } from "react";
-import type { BrowserAccessRequest, BrowserStatus } from "../types";
+import { useAppStore } from "../store/appStore";
 
 export function useBrowserPanelState() {
-  const [browserRequestsByRoom, setBrowserRequestsByRoom] = useState<Record<string, BrowserAccessRequest[]>>({});
-  const [browserUrlsByRoom, setBrowserUrlsByRoom] = useState<Record<string, string>>({});
-  const [browserReasonsByRoom, setBrowserReasonsByRoom] = useState<Record<string, string>>({});
-  const [browserMessagesByRoom, setBrowserMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [browserStatusByRoom, setBrowserStatusByRoom] = useState<Record<string, BrowserStatus>>({});
-  const [activeBrowserUrlsByRoom, setActiveBrowserUrlsByRoom] = useState<Record<string, string | null>>({});
+  const browserRequestsByRoom = useAppStore((state) => state.browserRequestsByRoom);
+  const setBrowserRequestsByRoom = useAppStore((state) => state.setBrowserRequestsByRoom);
+  const browserUrlsByRoom = useAppStore((state) => state.browserUrlsByRoom);
+  const setBrowserUrlsByRoom = useAppStore((state) => state.setBrowserUrlsByRoom);
+  const browserReasonsByRoom = useAppStore((state) => state.browserReasonsByRoom);
+  const setBrowserReasonsByRoom = useAppStore((state) => state.setBrowserReasonsByRoom);
+  const browserMessagesByRoom = useAppStore((state) => state.browserMessagesByRoom);
+  const setBrowserMessagesByRoom = useAppStore((state) => state.setBrowserMessagesByRoom);
+  const browserStatusByRoom = useAppStore((state) => state.browserStatusByRoom);
+  const setBrowserStatusByRoom = useAppStore((state) => state.setBrowserStatusByRoom);
+  const activeBrowserUrlsByRoom = useAppStore((state) => state.activeBrowserUrlsByRoom);
+  const setActiveBrowserUrlsByRoom = useAppStore((state) => state.setActiveBrowserUrlsByRoom);
 
   return {
     browserRequestsByRoom,
