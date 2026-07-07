@@ -11,7 +11,6 @@ export function useAppRoomScopedSetters({
   appState,
   appRefs,
   selectedRoom,
-  hasSelectedRoom,
   maxTerminalActivityLines,
   defaultBrowserUrl,
   defaultBrowserReason,
@@ -21,7 +20,6 @@ export function useAppRoomScopedSetters({
   appState: AppStateSlices;
   appRefs: AppRefs;
   selectedRoom: SelectedRoom;
-  hasSelectedRoom: boolean;
   maxTerminalActivityLines: number;
   defaultBrowserUrl: string;
   defaultBrowserReason: string;
@@ -107,13 +105,6 @@ export function useAppRoomScopedSetters({
       defaultProjectPath,
       setCustomCodexModelsByRoom: roomSettingsState.setCustomCodexModelsByRoom,
       setProjectPathDraftsByRoom: roomSettingsState.setProjectPathDraftsByRoom
-    },
-    git: {
-      selectedRoomId: selectedRoom.id,
-      hasSelectedRoom,
-      setGitWorkflowMessagesByRoom: githubWorkflowPanelState.setGitWorkflowMessagesByRoom,
-      setGitWorkflowDraftsByRoom: githubWorkflowPanelState.setGitWorkflowDraftsByRoom,
-      setGitStatusByRoom: githubWorkflowPanelState.setGitStatusByRoom
     },
     events: {
       setGitWorkflowEventsByRoom: roomRuntimeState.setGitWorkflowEventsByRoom,

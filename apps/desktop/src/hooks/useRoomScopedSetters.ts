@@ -3,7 +3,6 @@ import { useRoomBusySetters } from "./useRoomBusySetters";
 import { useRoomCodexApprovalSetters } from "./useRoomCodexApprovalSetters";
 import { useRoomEventAppenders } from "./useRoomEventAppenders";
 import { useRoomFileSetters } from "./useRoomFileSetters";
-import { useRoomGitSetters } from "./useRoomGitSetters";
 import { useRoomInviteSetters } from "./useRoomInviteSetters";
 import { useRoomProjectSetters } from "./useRoomProjectSetters";
 import { useRoomRequestSetters } from "./useRoomRequestSetters";
@@ -20,7 +19,6 @@ export function useRoomScopedSetters({
   browser,
   invites,
   project,
-  git,
   events,
   requests
 }: {
@@ -33,7 +31,6 @@ export function useRoomScopedSetters({
   browser: Parameters<typeof useRoomBrowserSetters>[0];
   invites: Parameters<typeof useRoomInviteSetters>[0];
   project: Parameters<typeof useRoomProjectSetters>[0];
-  git: Parameters<typeof useRoomGitSetters>[0];
   events: Parameters<typeof useRoomEventAppenders>[0];
   requests: Parameters<typeof useRoomRequestSetters>[0];
 }) {
@@ -46,6 +43,9 @@ export function useRoomScopedSetters({
   const setSettingsMessageForRoom = useAppStore((state) => state.setSettingsMessageForRoom);
   const setPendingAttachmentsForRoom = useAppStore((state) => state.setPendingAttachmentsForRoom);
   const setDraftForRoom = useAppStore((state) => state.setDraftForRoom);
+  const setGitWorkflowMessageForRoom = useAppStore((state) => state.setGitWorkflowMessageForRoom);
+  const setGitStatusForRoom = useAppStore((state) => state.setGitStatusForRoom);
+  const updateGitWorkflowDraftForRoom = useAppStore((state) => state.updateGitWorkflowDraftForRoom);
 
   return {
     setHostMessageForRoom,
@@ -61,6 +61,13 @@ export function useRoomScopedSetters({
       setTeamHistoryMessageForTeam(selectedTeamId || "__no-team", message),
     setSettingsMessageForRoom,
     setSelectedSettingsMessage: (message: string | null) => setSettingsMessageForRoom(selectedRoomId, message),
+    setGitWorkflowMessageForRoom,
+    setSelectedGitWorkflowMessage: (message: string | null) => setGitWorkflowMessageForRoom(selectedRoomId, message),
+    setGitStatusForRoom,
+    updateSelectedGitWorkflowDraft: (patch: Parameters<typeof updateGitWorkflowDraftForRoom>[1]) => {
+      if (!selectedRoomId) return;
+      updateGitWorkflowDraftForRoom(selectedRoomId, patch);
+    },
     setPendingAttachmentsForRoom,
     setDraftForRoom,
     ...useRoomBusySetters(busy),
@@ -70,7 +77,6 @@ export function useRoomScopedSetters({
     ...useRoomBrowserSetters(browser),
     ...useRoomInviteSetters(invites),
     ...useRoomProjectSetters(project),
-    ...useRoomGitSetters(git),
     ...useRoomEventAppenders(events),
     ...useRoomRequestSetters(requests)
   };
