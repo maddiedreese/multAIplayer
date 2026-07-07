@@ -3041,6 +3041,53 @@ test("relay persists SQLite encrypted backlog as individual envelope rows", asyn
   }
 });
 
+test("relay appends SQLite encrypted backlog rows without rewriting retained rows", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-sqlite-backlog-delta-"));
+  const dataPath = join(tempDir, "relay-store.sqlite");
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+    MULTAIPLAYER_RELAY_BACKLOG_LIMIT: "2"
+  }, undefined, dataPath);
+  const sender = new WebSocket(relay.wsUrl);
+  try {
+    await onceOpen(sender);
+    sender.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:tester",
+      deviceId: "device-test-123"
+    }));
+    await waitForJoined(sender);
+
+    for (const id of ["sqlite-delta-first", "sqlite-delta-second"]) {
+      sender.send(JSON.stringify({
+        type: "publish",
+        envelope: testEnvelope({ id, createdAt: `2026-07-07T00:00:0${id.endsWith("first") ? "1" : "2"}.000Z` })
+      }));
+    }
+    await waitForSqliteBacklogRows(dataPath, (rows) => rows.length === 2);
+
+    sender.send(JSON.stringify({
+      type: "publish",
+      envelope: testEnvelope({ id: "sqlite-delta-third", createdAt: "2026-07-07T00:00:03.000Z" })
+    }));
+
+    const rows = await waitForSqliteBacklogRows(dataPath, (currentRows) => {
+      const ids = currentRows.map((row) => row.envelope_id);
+      return currentRows.length === 2 &&
+        !ids.includes("sqlite-delta-first") &&
+        ids.includes("sqlite-delta-second") &&
+        ids.includes("sqlite-delta-third");
+    });
+    assert.deepEqual(rows.map((row) => JSON.parse(row.data_json).id), ["sqlite-delta-second", "sqlite-delta-third"]);
+  } finally {
+    sender.close();
+    await relay.close();
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("relay disables debug endpoints in production unless explicitly enabled", async () => {
   const productionRelay = await startRelay({ NODE_ENV: "production" });
   try {

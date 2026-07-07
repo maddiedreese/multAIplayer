@@ -12,6 +12,7 @@ export interface RelayPersistence {
   load(): Promise<unknown | null>;
   save(state: unknown): Promise<void>;
   saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): Promise<boolean>;
+  saveEncryptedEnvelope(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]): Promise<boolean>;
   quarantine(reason: string): Promise<void>;
   close(): void;
 }
@@ -51,6 +52,10 @@ class JsonFileRelayPersistence implements RelayPersistence {
     return false;
   }
 
+  async saveEncryptedEnvelope(): Promise<boolean> {
+    return false;
+  }
+
   async quarantine(reason: string): Promise<void> {
     await quarantinePath(this.dataPath, reason);
   }
@@ -84,6 +89,12 @@ class SqliteRelayPersistence implements RelayPersistence {
   async saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): Promise<boolean> {
     await mkdir(dirname(this.dataPath), { recursive: true });
     saveEncryptedBacklogRows(this.getDb(), roomKey, envelopes);
+    return true;
+  }
+
+  async saveEncryptedEnvelope(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]): Promise<boolean> {
+    await mkdir(dirname(this.dataPath), { recursive: true });
+    appendEncryptedBacklogRow(this.getDb(), roomKey, envelope, prunedEnvelopeIds);
     return true;
   }
 
@@ -294,6 +305,29 @@ function saveEncryptedBacklogRows(db: Database.Database, roomKey: RoomKey, envel
     for (const [index, envelope] of envelopes.entries()) {
       upsert.run(roomKey, envelope.id, index, envelope.createdAt, JSON.stringify(envelope));
     }
+  })();
+}
+
+function appendEncryptedBacklogRow(
+  db: Database.Database,
+  roomKey: RoomKey,
+  envelope: RelayEnvelope,
+  prunedEnvelopeIds: string[]
+) {
+  db.transaction(() => {
+    const deleteEnvelope = db.prepare("delete from relay_encrypted_envelopes where room_key = ? and envelope_id = ?");
+    for (const envelopeId of prunedEnvelopeIds) {
+      deleteEnvelope.run(roomKey, envelopeId);
+    }
+
+    const latest = db
+      .prepare("select max(sort_order) as sort_order from relay_encrypted_envelopes where room_key = ?")
+      .get(roomKey) as { sort_order?: unknown } | undefined;
+    const nextSortOrder = typeof latest?.sort_order === "number" ? latest.sort_order + 1 : 0;
+    db.prepare(`
+      insert or ignore into relay_encrypted_envelopes (room_key, envelope_id, sort_order, created_at, data_json)
+      values (?, ?, ?, ?, ?)
+    `).run(roomKey, envelope.id, nextSortOrder, envelope.createdAt, JSON.stringify(envelope));
   })();
 }
 

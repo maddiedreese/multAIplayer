@@ -8,6 +8,7 @@ export interface RelayStorePersistenceCoordinator {
   loadRelayStore(): Promise<void>;
   scheduleStoreSave(): void;
   saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): void;
+  saveEncryptedEnvelope(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]): void;
   saveRelayStore(): Promise<void>;
   flushRelayStore(): Promise<void>;
   closeRelayStore(): Promise<void>;
@@ -64,6 +65,17 @@ export function createRelayStorePersistenceCoordinator(options: {
       });
   }
 
+  function saveEncryptedEnvelope(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]) {
+    options.persistence.saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds)
+      .then((handled) => {
+        if (!handled) scheduleStoreSave();
+      })
+      .catch((error) => {
+        console.error("Failed to append encrypted relay envelope:", error);
+        scheduleStoreSave();
+      });
+  }
+
   async function saveRelayStore() {
     options.storeCodec.pruneExpiredRelayState();
     await options.persistence.save(options.storeCodec.toStoredRelayState());
@@ -86,6 +98,7 @@ export function createRelayStorePersistenceCoordinator(options: {
     loadRelayStore,
     scheduleStoreSave,
     saveEncryptedBacklog,
+    saveEncryptedEnvelope,
     saveRelayStore,
     flushRelayStore,
     closeRelayStore

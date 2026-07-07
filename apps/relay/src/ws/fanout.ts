@@ -19,7 +19,7 @@ interface CreateRelayFanoutOptions {
   roomKey: (teamId: string, roomId: string) => RoomKey;
   pruneEncryptedBacklog: (envelopes: RelayEnvelope[]) => RelayEnvelope[];
   addTeamMember: (teamId: string, userId: string) => void;
-  saveEncryptedBacklog: (roomKey: RoomKey, envelopes: RelayEnvelope[]) => void;
+  saveEncryptedEnvelope: (roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]) => void;
   teamRecordForUser: (
     team: TeamRecord,
     store: Pick<RelayStore, "getTeamMember">,
@@ -38,7 +38,7 @@ export function createRelayFanout({
   roomKey,
   pruneEncryptedBacklog,
   addTeamMember,
-  saveEncryptedBacklog,
+  saveEncryptedEnvelope,
   teamRecordForUser
 }: CreateRelayFanoutOptions) {
   function send(socket: WebSocket, message: RelayServerMessage) {
@@ -75,9 +75,13 @@ export function createRelayFanout({
     if (backlog.some((existing) => existing.id === envelope.id)) return;
     backlog.push(envelope);
     const prunedBacklog = pruneEncryptedBacklog(backlog);
+    const retainedIds = new Set(prunedBacklog.map((item) => item.id));
+    const prunedEnvelopeIds = backlog
+      .filter((item) => item.id !== envelope.id && !retainedIds.has(item.id))
+      .map((item) => item.id);
     store.setEncryptedBacklog(key, prunedBacklog);
     metrics.recordEnvelopePublished();
-    saveEncryptedBacklog(key, prunedBacklog);
+    saveEncryptedEnvelope(key, envelope, prunedEnvelopeIds);
     broadcast(key, { type: "envelope", envelope });
   }
 
