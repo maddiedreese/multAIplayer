@@ -3,7 +3,7 @@ import type { SetStateAction } from "react";
 import type { GitHubActionRun } from "../lib/authClient";
 import type { GitDiffResult, GitStatusSummary, ProjectFileContent, ProjectFileEntry } from "../lib/localBackend";
 import type { GitWorkflowDraft } from "../lib/gitWorkflowDraft";
-import type { BrowserAccessRequest, BrowserStatus } from "../types";
+import type { BrowserAccessRequest, BrowserStatus, LocalPreviewDialogState, LocalPreviewRecord } from "../types";
 import type { FilePreviewTab } from "../lib/filePreview";
 import type { MarkdownCopyFallback } from "../types";
 
@@ -35,6 +35,19 @@ type SettingsBusyByRoom = Record<string, boolean>;
 type SettingsMessagesByRoom = Record<string, string | null>;
 type CustomCodexModelsByRoom = Record<string, string>;
 type ProjectPathDraftsByRoom = Record<string, string>;
+type LocalPreviewsByRoom = Record<string, LocalPreviewRecord[]>;
+type LocalPreviewBusyByRoom = Record<string, boolean>;
+
+const emptyLocalPreviewDialog: LocalPreviewDialogState = {
+  open: false,
+  phase: "select",
+  roomId: "",
+  candidates: [],
+  selectedUrl: "",
+  manualUrl: "",
+  error: null,
+  cloudflaredVersion: null
+};
 
 const emptyAppStoreState = {
   gitStatusByRoom: {},
@@ -64,7 +77,10 @@ const emptyAppStoreState = {
   settingsBusyByRoom: {},
   settingsMessagesByRoom: {},
   customCodexModelsByRoom: {},
-  projectPathDraftsByRoom: {}
+  projectPathDraftsByRoom: {},
+  localPreviewsByRoom: {},
+  localPreviewDialog: emptyLocalPreviewDialog,
+  localPreviewBusyByRoom: {}
 };
 
 function resolveSetStateAction<T>(current: T, action: SetStateAction<T>): T {
@@ -100,6 +116,9 @@ interface AppStoreState {
   settingsMessagesByRoom: SettingsMessagesByRoom;
   customCodexModelsByRoom: CustomCodexModelsByRoom;
   projectPathDraftsByRoom: ProjectPathDraftsByRoom;
+  localPreviewsByRoom: LocalPreviewsByRoom;
+  localPreviewDialog: LocalPreviewDialogState;
+  localPreviewBusyByRoom: LocalPreviewBusyByRoom;
   setGitStatusByRoom: (action: SetStateAction<GitStatusByRoom>) => void;
   setGitWorkflowBusyByRoom: (action: SetStateAction<GitWorkflowBusyByRoom>) => void;
   setGitWorkflowMessagesByRoom: (action: SetStateAction<GitWorkflowMessagesByRoom>) => void;
@@ -128,6 +147,9 @@ interface AppStoreState {
   setSettingsMessagesByRoom: (action: SetStateAction<SettingsMessagesByRoom>) => void;
   setCustomCodexModelsByRoom: (action: SetStateAction<CustomCodexModelsByRoom>) => void;
   setProjectPathDraftsByRoom: (action: SetStateAction<ProjectPathDraftsByRoom>) => void;
+  setLocalPreviewsByRoom: (action: SetStateAction<LocalPreviewsByRoom>) => void;
+  setLocalPreviewDialog: (action: SetStateAction<LocalPreviewDialogState>) => void;
+  setLocalPreviewBusyByRoom: (action: SetStateAction<LocalPreviewBusyByRoom>) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
 }
@@ -272,6 +294,21 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setProjectPathDraftsByRoom: (action) => {
     set((state) => ({
       projectPathDraftsByRoom: resolveSetStateAction(state.projectPathDraftsByRoom, action)
+    }));
+  },
+  setLocalPreviewsByRoom: (action) => {
+    set((state) => ({
+      localPreviewsByRoom: resolveSetStateAction(state.localPreviewsByRoom, action)
+    }));
+  },
+  setLocalPreviewDialog: (action) => {
+    set((state) => ({
+      localPreviewDialog: resolveSetStateAction(state.localPreviewDialog, action)
+    }));
+  },
+  setLocalPreviewBusyByRoom: (action) => {
+    set((state) => ({
+      localPreviewBusyByRoom: resolveSetStateAction(state.localPreviewBusyByRoom, action)
     }));
   },
   resetAppStore: () => set(emptyAppStoreState),
