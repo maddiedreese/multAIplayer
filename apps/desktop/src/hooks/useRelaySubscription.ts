@@ -82,8 +82,6 @@ interface UseRelaySubscriptionOptions {
   setRelayStatus: StatusSetter;
   setPresenceByRoom: Dispatch<SetStateAction<PresenceByRoom>>;
   setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
-  setTerminalRequestsByRoom: Dispatch<SetStateAction<Record<string, TerminalCommandRequest[]>>>;
-  setBrowserRequestsByRoom: Dispatch<SetStateAction<Record<string, BrowserAccessRequest[]>>>;
   setActionRunsByRoom: Dispatch<SetStateAction<Record<string, GitHubActionRun[]>>>;
   setActionsLastCheckedByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
   setActionsMessagesByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
@@ -96,12 +94,14 @@ interface UseRelaySubscriptionOptions {
   handleInviteEnvelopePlaintext: (roomId: string, plaintext: unknown) => Promise<void>;
   handleCodexBrowserOpenCommand: (message: ChatMessage, room: RoomRecord) => boolean;
   applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
+  appendTerminalRequest: (roomId: string, request: TerminalCommandRequest) => void;
   updateTerminalRequestStatus: (roomId: string, requestId: string, status: TerminalCommandRequest["status"]) => void;
   appendTerminalLinesForRoom: (roomId: string, lines: string[]) => void;
   appendGitWorkflowEvent: (roomId: string, event: GitWorkflowEventPlaintextPayload) => void;
   setGitWorkflowMessageForRoom: (roomId: string, message: string | null) => void;
   appendGitHubActionsEvent: (roomId: string, event: GitHubActionsEventPlaintextPayload) => void;
   appendCodexEvent: (roomId: string, event: CodexRoomEvent) => void;
+  appendBrowserRequest: (roomId: string, request: BrowserAccessRequest) => void;
   updateBrowserRequestStatus: (roomId: string, requestId: string, status: BrowserAccessRequest["status"]) => void;
   appendLocalPreviewEvent: (roomId: string, event: LocalPreviewRecord) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
@@ -134,8 +134,6 @@ export function useRelaySubscription({
   setRelayStatus,
   setPresenceByRoom,
   setRooms,
-  setTerminalRequestsByRoom,
-  setBrowserRequestsByRoom,
   setActionRunsByRoom,
   setActionsLastCheckedByRoom,
   setActionsMessagesByRoom,
@@ -148,12 +146,14 @@ export function useRelaySubscription({
   handleInviteEnvelopePlaintext,
   handleCodexBrowserOpenCommand,
   applyMessageReaction,
+  appendTerminalRequest,
   updateTerminalRequestStatus,
   appendTerminalLinesForRoom,
   appendGitWorkflowEvent,
   setGitWorkflowMessageForRoom,
   appendGitHubActionsEvent,
   appendCodexEvent,
+  appendBrowserRequest,
   updateBrowserRequestStatus,
   appendLocalPreviewEvent,
   setChatMessageForRoom,
@@ -268,14 +268,7 @@ export function useRelaySubscription({
           }
           if (message.envelope.kind === "terminal.request") {
             const plaintext = await decryptJson<TerminalRequestPlaintextPayload>(roomPayload, secret);
-            setTerminalRequestsByRoom((current) => {
-              const roomRequests = current[message.envelope.roomId] ?? [];
-              if (roomRequests.some((existing) => existing.id === plaintext.id)) return current;
-              return {
-                ...current,
-                [message.envelope.roomId]: [...roomRequests, { ...plaintext, status: "pending" }]
-              };
-            });
+            appendTerminalRequest(message.envelope.roomId, { ...plaintext, status: "pending" });
           }
           if (message.envelope.kind === "terminal.event") {
             const plaintext = await decryptJson<unknown>(roomPayload, secret);
@@ -319,15 +312,7 @@ export function useRelaySubscription({
           }
           if (message.envelope.kind === "browser.request") {
             const plaintext = await decryptJson<BrowserRequestPlaintextPayload>(roomPayload, secret);
-            const status = "pending";
-            setBrowserRequestsByRoom((current) => {
-              const roomRequests = current[message.envelope.roomId] ?? [];
-              if (roomRequests.some((existing) => existing.id === plaintext.id)) return current;
-              return {
-                ...current,
-                [message.envelope.roomId]: [...roomRequests, { ...plaintext, status }]
-              };
-            });
+            appendBrowserRequest(message.envelope.roomId, { ...plaintext, status: "pending" });
           }
           if (message.envelope.kind === "browser.event") {
             const plaintext = await decryptJson<RequestStatusPlaintextPayload>(roomPayload, secret);
