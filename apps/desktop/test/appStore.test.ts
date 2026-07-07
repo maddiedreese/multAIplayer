@@ -456,7 +456,8 @@ test("desktop store keeps invite panel state room scoped", () => {
   store.setInviteApprovalGatesByRoom({ "room-a": true, "room-b": false });
   store.setInviteMessagesByRoom({ "room-a": "Invite created", "room-b": null });
   store.setKeyRotationBusyByRoom({ "room-a": true });
-  store.setInviteAdmissionsByRoom({ "room-a": "Admitted Jordan" });
+  store.setInviteAdmissionsByRoom({ "room-a": "Admitted Jordan", "room-b": "Admitted Avery" });
+  store.clearInviteAdmissionForRoom("room-a");
 
   const state = useAppStore.getState();
   assert.equal(state.inviteRequestsByRoom["room-a"]?.[0]?.requester, "Jordan");
@@ -467,7 +468,8 @@ test("desktop store keeps invite panel state room scoped", () => {
   assert.equal(state.inviteMessagesByRoom["room-a"], "Invite created");
   assert.equal(state.inviteMessagesByRoom["room-b"], null);
   assert.equal(state.keyRotationBusyByRoom["room-a"], true);
-  assert.equal(state.inviteAdmissionsByRoom["room-a"], "Admitted Jordan");
+  assert.equal(state.inviteAdmissionsByRoom["room-a"], undefined);
+  assert.equal(state.inviteAdmissionsByRoom["room-b"], "Admitted Avery");
 });
 
 test("desktop store exposes room invite actions", () => {
@@ -775,8 +777,17 @@ test("desktop store keeps room runtime state room scoped", () => {
         displayName: "Avery",
         status: "online"
       }
+    },
+    "room-b": {
+      "device-b": {
+        userId: "github:jordan",
+        deviceId: "device-b",
+        displayName: "Jordan",
+        status: "online"
+      }
     }
   });
+  store.clearPresenceForRoom("room-a");
   store.setHostHandoffsByRoom({
     "room-a": [
       {
@@ -858,7 +869,8 @@ test("desktop store keeps room runtime state room scoped", () => {
   const state = useAppStore.getState();
   assert.equal(state.inspectorTabsByRoom["room-a"], "files");
   assert.equal(state.inspectorTabsByRoom["room-b"], "terminal");
-  assert.equal(state.presenceByRoom["room-a"]?.["device-a"]?.displayName, "Avery");
+  assert.equal(state.presenceByRoom["room-a"], undefined);
+  assert.equal(state.presenceByRoom["room-b"]?.["device-b"]?.displayName, "Jordan");
   assert.equal(state.hostHandoffsByRoom["room-a"]?.[0]?.reason, "usage_limit");
   assert.equal(state.codexContinuationByRoom["room-b"]?.acceptedBy, "Jordan");
   assert.equal(state.gitWorkflowEventsByRoom["room-a"]?.[0]?.branch, "codex/runtime-state");

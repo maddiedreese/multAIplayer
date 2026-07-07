@@ -26,8 +26,7 @@ export function useAppWorkspaceRecords({
 }) {
   const {
     workspaceState,
-    roomRuntimeState,
-    invitePanelState
+    roomRuntimeState
   } = appState;
   const {
     hasSelectedRoom,
@@ -52,8 +51,6 @@ export function useAppWorkspaceRecords({
     setRevokedRoomIds: roomRuntimeState.setRevokedRoomIds,
     setRevokedTeamIds: roomRuntimeState.setRevokedTeamIds,
     setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
-    setInviteAdmissionsByRoom: invitePanelState.setInviteAdmissionsByRoom,
-    setPresenceByRoom: roomRuntimeState.setPresenceByRoom,
     setInviteLinkForRoom,
     setInviteMessageForRoom,
     setChatMessageForRoom,
