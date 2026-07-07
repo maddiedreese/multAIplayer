@@ -13,7 +13,6 @@ import type {
   TerminalRequestPlaintextPayload
 } from "@multaiplayer/protocol";
 import { decryptJson } from "@multaiplayer/crypto";
-import type { GitHubActionRun } from "../lib/authClient";
 import { connectRelay, type RelayClient } from "../lib/relayClient";
 import { buildRoomSettingsSystemMessage } from "../lib/roomSettingsMessages";
 import { loadRoomSecret, replaceRoomSecret } from "../lib/localHistory";
@@ -82,9 +81,6 @@ interface UseRelaySubscriptionOptions {
   setRelayStatus: StatusSetter;
   setPresenceByRoom: Dispatch<SetStateAction<PresenceByRoom>>;
   setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
-  setActionRunsByRoom: Dispatch<SetStateAction<Record<string, GitHubActionRun[]>>>;
-  setActionsLastCheckedByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setActionsMessagesByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
   setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
   handleRelayError: (message: string) => void;
   upsertRoom: (room: RoomRecord) => void;
@@ -100,6 +96,9 @@ interface UseRelaySubscriptionOptions {
   appendGitWorkflowEvent: (roomId: string, event: GitWorkflowEventPlaintextPayload) => void;
   setGitWorkflowMessageForRoom: (roomId: string, message: string | null) => void;
   appendGitHubActionsEvent: (roomId: string, event: GitHubActionsEventPlaintextPayload) => void;
+  setActionRunsForRoom: (roomId: string, runs: GitHubActionsEventPlaintextPayload["runs"]) => void;
+  setActionsLastCheckedForRoom: (roomId: string, checkedAt: string | null) => void;
+  setActionsMessageForRoom: (roomId: string, message: string | null) => void;
   appendCodexEvent: (roomId: string, event: CodexRoomEvent) => void;
   appendBrowserRequest: (roomId: string, request: BrowserAccessRequest) => void;
   updateBrowserRequestStatus: (roomId: string, requestId: string, status: BrowserAccessRequest["status"]) => void;
@@ -134,9 +133,6 @@ export function useRelaySubscription({
   setRelayStatus,
   setPresenceByRoom,
   setRooms,
-  setActionRunsByRoom,
-  setActionsLastCheckedByRoom,
-  setActionsMessagesByRoom,
   setForgottenRoomIds,
   handleRelayError,
   upsertRoom,
@@ -152,6 +148,9 @@ export function useRelaySubscription({
   appendGitWorkflowEvent,
   setGitWorkflowMessageForRoom,
   appendGitHubActionsEvent,
+  setActionRunsForRoom,
+  setActionsLastCheckedForRoom,
+  setActionsMessageForRoom,
   appendCodexEvent,
   appendBrowserRequest,
   updateBrowserRequestStatus,
@@ -288,18 +287,9 @@ export function useRelaySubscription({
             }
             if (isGitHubActionsEventPlaintextPayload(plaintext)) {
               appendGitHubActionsEvent(message.envelope.roomId, plaintext);
-              setActionRunsByRoom((current) => ({
-                ...current,
-                [message.envelope.roomId]: plaintext.runs
-              }));
-              setActionsLastCheckedByRoom((current) => ({
-                ...current,
-                [message.envelope.roomId]: plaintext.checkedAt
-              }));
-              setActionsMessagesByRoom((current) => ({
-                ...current,
-                [message.envelope.roomId]: `${plaintext.summary.label}: ${plaintext.message}`
-              }));
+              setActionRunsForRoom(message.envelope.roomId, plaintext.runs);
+              setActionsLastCheckedForRoom(message.envelope.roomId, plaintext.checkedAt);
+              setActionsMessageForRoom(message.envelope.roomId, `${plaintext.summary.label}: ${plaintext.message}`);
               appendTerminalLinesForRoom(message.envelope.roomId, buildGitHubActionsEventLines(plaintext));
             }
           }
