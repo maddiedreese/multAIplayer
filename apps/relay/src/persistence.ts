@@ -10,6 +10,7 @@ export interface RelayPersistence {
   load(): Promise<unknown | null>;
   save(state: unknown): Promise<void>;
   quarantine(reason: string): Promise<void>;
+  close(): void;
 }
 
 export function createRelayPersistence(options: {
@@ -46,40 +47,35 @@ class JsonFileRelayPersistence implements RelayPersistence {
   async quarantine(reason: string): Promise<void> {
     await quarantinePath(this.dataPath, reason);
   }
+
+  close() {}
 }
 
 class SqliteRelayPersistence implements RelayPersistence {
-  readonly flushMode = "immediate";
+  readonly flushMode = "debounced";
+  private db: Database.Database | null = null;
 
   constructor(private readonly dataPath: string) {}
 
   async load(): Promise<unknown | null> {
     await mkdir(dirname(this.dataPath), { recursive: true });
-    const db = this.open();
-    try {
-      const normalized = loadNormalizedRelayState(db);
-      if (normalized !== null) return normalized;
-      const row = db.prepare("select state_json from relay_snapshots where id = ?").get("current") as
-        | { state_json?: unknown }
-        | undefined;
-      if (typeof row?.state_json !== "string") return null;
-      return JSON.parse(row.state_json) as unknown;
-    } finally {
-      db.close();
-    }
+    const db = this.getDb();
+    const normalized = loadNormalizedRelayState(db);
+    if (normalized !== null) return normalized;
+    const row = db.prepare("select state_json from relay_snapshots where id = ?").get("current") as
+      | { state_json?: unknown }
+      | undefined;
+    if (typeof row?.state_json !== "string") return null;
+    return JSON.parse(row.state_json) as unknown;
   }
 
   async save(state: unknown): Promise<void> {
     await mkdir(dirname(this.dataPath), { recursive: true });
-    const db = this.open();
-    try {
-      saveNormalizedRelayState(db, state);
-    } finally {
-      db.close();
-    }
+    saveNormalizedRelayState(this.getDb(), state);
   }
 
   async quarantine(reason: string): Promise<void> {
+    this.close();
     await Promise.all([
       quarantinePath(this.dataPath, reason),
       quarantinePath(`${this.dataPath}-wal`, reason),
@@ -87,7 +83,8 @@ class SqliteRelayPersistence implements RelayPersistence {
     ]);
   }
 
-  private open(): Database.Database {
+  private getDb(): Database.Database {
+    if (this.db) return this.db;
     const db = new Database(this.dataPath);
     db.pragma("journal_mode = WAL");
     db.pragma("foreign_keys = ON");
@@ -134,7 +131,13 @@ class SqliteRelayPersistence implements RelayPersistence {
         data_json text not null
       )
     `);
+    this.db = db;
     return db;
+  }
+
+  close() {
+    this.db?.close();
+    this.db = null;
   }
 }
 

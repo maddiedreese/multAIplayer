@@ -2961,17 +2961,13 @@ test("relay persists workspace state through SQLite storage", async () => {
     });
     assert.equal(createRoom.status, 201);
 
-    const db = new Database(dataPath, { readonly: true });
-    try {
-      const teams = db.prepare("select data_json from relay_teams").all() as Array<{ data_json: string }>;
-      const rooms = db.prepare("select data_json from relay_rooms").all() as Array<{ data_json: string }>;
-      const snapshots = db.prepare("select state_json from relay_snapshots").all() as Array<{ state_json: string }>;
-      assert.ok(teams.some((item) => JSON.parse(item.data_json).name === "SQLite Team"));
-      assert.ok(rooms.some((item) => JSON.parse(item.data_json).name === "SQLite Room"));
-      assert.deepEqual(snapshots, []);
-    } finally {
-      db.close();
-    }
+    await waitForSqliteRows(dataPath, ({ teams, rooms, snapshots }) => {
+      return (
+        teams.some((item) => JSON.parse(item.data_json).name === "SQLite Team") &&
+        rooms.some((item) => JSON.parse(item.data_json).name === "SQLite Room") &&
+        snapshots.length === 0
+      );
+    });
 
     await relay.close({ preserveData: true });
 
@@ -3229,6 +3225,35 @@ async function waitForStoredState(
     await delay(50);
   }
   assert.fail(`Timed out waiting for stored relay state: ${String(lastError)}`);
+}
+
+async function waitForSqliteRows(
+  dataPath: string,
+  predicate: (state: {
+    teams: Array<{ data_json: string }>;
+    rooms: Array<{ data_json: string }>;
+    snapshots: Array<{ state_json: string }>;
+  }) => boolean
+) {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    let db: Database.Database | null = null;
+    try {
+      db = new Database(dataPath, { readonly: true });
+      const state = {
+        teams: db.prepare("select data_json from relay_teams").all() as Array<{ data_json: string }>,
+        rooms: db.prepare("select data_json from relay_rooms").all() as Array<{ data_json: string }>,
+        snapshots: db.prepare("select state_json from relay_snapshots").all() as Array<{ state_json: string }>
+      };
+      if (predicate(state)) return;
+    } catch (error) {
+      lastError = error;
+    } finally {
+      db?.close();
+    }
+    await delay(50);
+  }
+  assert.fail(`Timed out waiting for SQLite relay rows: ${String(lastError)}`);
 }
 
 async function waitForDebugBacklog(baseUrl: string, envelopes: number) {

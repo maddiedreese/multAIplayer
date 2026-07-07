@@ -7,6 +7,7 @@ export interface RelayStorePersistenceCoordinator {
   scheduleStoreSave(): void;
   saveRelayStore(): Promise<void>;
   flushRelayStore(): Promise<void>;
+  closeRelayStore(): Promise<void>;
 }
 
 export function createRelayStorePersistenceCoordinator(options: {
@@ -62,10 +63,16 @@ export function createRelayStorePersistenceCoordinator(options: {
     await saveRelayStore();
   }
 
+  async function closeRelayStore() {
+    await flushRelayStore();
+    options.persistence.close();
+  }
+
   return {
     loadRelayStore,
     scheduleStoreSave,
     saveRelayStore,
-    flushRelayStore
+    flushRelayStore,
+    closeRelayStore
   };
 }

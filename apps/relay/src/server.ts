@@ -608,6 +608,10 @@ export async function flushRelayStore() {
   await relayStorePersistence.flushRelayStore();
 }
 
+export async function closeRelayStore() {
+  await relayStorePersistence.closeRelayStore();
+}
+
 export function closeRelayServer() {
   return new Promise<void>((resolve, reject) => {
     server.close((error) => {

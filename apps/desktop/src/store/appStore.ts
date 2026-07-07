@@ -2,18 +2,16 @@ import { create } from "zustand";
 import type { SetStateAction } from "react";
 import type { GitHubActionRun } from "../lib/authClient";
 import type {
-  GitDiffResult,
-  GitStatusSummary,
-  ProjectFileContent,
-  ProjectFileEntry,
-  TerminalSnapshot
+  GitStatusSummary
 } from "../lib/localBackend";
 import { updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "../lib/gitWorkflowDraft";
 import { normalizeCodexThreadId } from "../lib/codexThread";
 import { replaceRoomTerminalSnapshots } from "../lib/terminalState";
+import { createBrowserSlice, emptyBrowserState, type BrowserSlice } from "./slices/browserSlice";
+import { createFilePanelSlice, emptyFilePanelState, type FilePanelSlice } from "./slices/filePanelSlice";
+import { createTerminalSlice, emptyTerminalState, type TerminalSlice } from "./slices/terminalSlice";
+import { resolveSetStateAction } from "./storeUtils";
 import type {
-  BrowserAccessRequest,
-  BrowserStatus,
   ChatAttachment,
   ChatMessage,
   CodexRoomEvent,
@@ -25,9 +23,7 @@ import type {
   PendingCodexApproval,
   RoomPresence,
   RoomGoal,
-  TerminalCommandRequest
 } from "../types";
-import type { FilePreviewTab } from "../lib/filePreview";
 import type { MarkdownCopyFallback } from "../types";
 import type { InspectorTab } from "../components/RoomInspectorPanel";
 import type {
@@ -46,20 +42,6 @@ type ActionsBusyByRoom = Record<string, boolean>;
 type ActionsMessagesByRoom = Record<string, string | null>;
 type ActionRunsByRoom = Record<string, GitHubActionRun[]>;
 type ActionsLastCheckedByRoom = Record<string, string | null>;
-type BrowserRequestsByRoom = Record<string, BrowserAccessRequest[]>;
-type BrowserUrlsByRoom = Record<string, string>;
-type BrowserReasonsByRoom = Record<string, string>;
-type BrowserMessagesByRoom = Record<string, string | null>;
-type BrowserStatusByRoom = Record<string, BrowserStatus>;
-type ActiveBrowserUrlsByRoom = Record<string, string | null>;
-type FileQueriesByRoom = Record<string, string>;
-type ProjectFilesByRoom = Record<string, ProjectFileEntry[]>;
-type SelectedFilesByRoom = Record<string, ProjectFileContent | null>;
-type SelectedDiffsByRoom = Record<string, GitDiffResult | null>;
-type FilePreviewTabsByRoom = Record<string, FilePreviewTab>;
-type FileBusyByRoom = Record<string, boolean>;
-type FileMessagesByRoom = Record<string, string | null>;
-type MarkdownCopyFallbacksByRoom = Record<string, MarkdownCopyFallback | null>;
 type HostBusyByRoom = Record<string, boolean>;
 type HostMessagesByRoom = Record<string, string | null>;
 type SettingsBusyByRoom = Record<string, boolean>;
@@ -94,15 +76,6 @@ type HostHandoffsByRoom = Record<string, HostHandoffRecord[]>;
 type CodexContinuationByRoom = Record<string, HostHandoffRecord>;
 type GitWorkflowEventsByRoom = Record<string, GitWorkflowEventPlaintextPayload[]>;
 type GitHubActionsEventsByRoom = Record<string, GitHubActionsEventPlaintextPayload[]>;
-type TerminalLinesByRoom = Record<string, string[]>;
-type TerminalBusyByRoom = Record<string, boolean>;
-type Terminals = TerminalSnapshot[];
-type TerminalRequestsByRoom = Record<string, TerminalCommandRequest[]>;
-type SelectedTerminalIdsByRoom = Record<string, string | null>;
-type TerminalNamesByRoom = Record<string, string>;
-type TerminalCommandsByRoom = Record<string, string>;
-type TerminalInputsByRoom = Record<string, string>;
-type TerminalErrorsByRoom = Record<string, string | null>;
 type TeamMembersByTeam = Record<string, TeamMemberRecord[]>;
 type TeamMembersMessageByTeam = Record<string, string | null>;
 type TeamMembersBusyByTeam = Record<string, boolean>;
@@ -129,20 +102,8 @@ const emptyAppStoreState = {
   actionsMessagesByRoom: {},
   actionRunsByRoom: {},
   actionsLastCheckedByRoom: {},
-  browserRequestsByRoom: {},
-  browserUrlsByRoom: {},
-  browserReasonsByRoom: {},
-  browserMessagesByRoom: {},
-  browserStatusByRoom: {},
-  activeBrowserUrlsByRoom: {},
-  fileQueriesByRoom: {},
-  projectFilesByRoom: {},
-  selectedFilesByRoom: {},
-  selectedDiffsByRoom: {},
-  filePreviewTabsByRoom: {},
-  fileBusyByRoom: {},
-  fileMessagesByRoom: {},
-  markdownCopyFallbacksByRoom: {},
+  ...emptyBrowserState,
+  ...emptyFilePanelState,
   hostBusyByRoom: {},
   hostMessagesByRoom: {},
   settingsBusyByRoom: {},
@@ -180,30 +141,18 @@ const emptyAppStoreState = {
   codexContinuationByRoom: {},
   gitWorkflowEventsByRoom: {},
   githubActionsEventsByRoom: {},
-  terminalLinesByRoom: {},
-  terminalBusyByRoom: {},
-  terminals: [],
-  terminalRequestsByRoom: {},
-  selectedTerminalIdsByRoom: {},
-  terminalNamesByRoom: {},
-  terminalCommandsByRoom: {},
-  terminalInputsByRoom: {},
-  terminalErrorsByRoom: {},
+  ...emptyTerminalState,
   teamMembersByTeam: {},
   teamMembersMessageByTeam: {},
   teamMembersBusyByTeam: {},
   messagesByRoom: {}
 };
 
-function resolveSetStateAction<T>(current: T, action: SetStateAction<T>): T {
-  return typeof action === "function" ? (action as (current: T) => T)(current) : action;
-}
-
 function updateRoomBusyMap(current: RoomBusyByRoom, roomId: string, busy: boolean): RoomBusyByRoom {
   return busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId);
 }
 
-interface AppStoreState {
+export interface AppStoreState extends BrowserSlice, FilePanelSlice, TerminalSlice {
   gitStatusByRoom: GitStatusByRoom;
   gitWorkflowBusyByRoom: GitWorkflowBusyByRoom;
   gitWorkflowMessagesByRoom: GitWorkflowMessagesByRoom;
@@ -212,20 +161,6 @@ interface AppStoreState {
   actionsMessagesByRoom: ActionsMessagesByRoom;
   actionRunsByRoom: ActionRunsByRoom;
   actionsLastCheckedByRoom: ActionsLastCheckedByRoom;
-  browserRequestsByRoom: BrowserRequestsByRoom;
-  browserUrlsByRoom: BrowserUrlsByRoom;
-  browserReasonsByRoom: BrowserReasonsByRoom;
-  browserMessagesByRoom: BrowserMessagesByRoom;
-  browserStatusByRoom: BrowserStatusByRoom;
-  activeBrowserUrlsByRoom: ActiveBrowserUrlsByRoom;
-  fileQueriesByRoom: FileQueriesByRoom;
-  projectFilesByRoom: ProjectFilesByRoom;
-  selectedFilesByRoom: SelectedFilesByRoom;
-  selectedDiffsByRoom: SelectedDiffsByRoom;
-  filePreviewTabsByRoom: FilePreviewTabsByRoom;
-  fileBusyByRoom: FileBusyByRoom;
-  fileMessagesByRoom: FileMessagesByRoom;
-  markdownCopyFallbacksByRoom: MarkdownCopyFallbacksByRoom;
   hostBusyByRoom: HostBusyByRoom;
   hostMessagesByRoom: HostMessagesByRoom;
   settingsBusyByRoom: SettingsBusyByRoom;
@@ -263,15 +198,6 @@ interface AppStoreState {
   codexContinuationByRoom: CodexContinuationByRoom;
   gitWorkflowEventsByRoom: GitWorkflowEventsByRoom;
   githubActionsEventsByRoom: GitHubActionsEventsByRoom;
-  terminalLinesByRoom: TerminalLinesByRoom;
-  terminalBusyByRoom: TerminalBusyByRoom;
-  terminals: Terminals;
-  terminalRequestsByRoom: TerminalRequestsByRoom;
-  selectedTerminalIdsByRoom: SelectedTerminalIdsByRoom;
-  terminalNamesByRoom: TerminalNamesByRoom;
-  terminalCommandsByRoom: TerminalCommandsByRoom;
-  terminalInputsByRoom: TerminalInputsByRoom;
-  terminalErrorsByRoom: TerminalErrorsByRoom;
   teamMembersByTeam: TeamMembersByTeam;
   teamMembersMessageByTeam: TeamMembersMessageByTeam;
   teamMembersBusyByTeam: TeamMembersBusyByTeam;
@@ -288,23 +214,7 @@ interface AppStoreState {
   setActionRunsForRoom: (roomId: string, runs: GitHubActionRun[]) => void;
   setActionsLastCheckedForRoom: (roomId: string, checkedAt: string | null) => void;
   resetGitHubActionsStateForRoom: (roomId: string) => void;
-  setBrowserRequestsByRoom: (action: SetStateAction<BrowserRequestsByRoom>) => void;
-  setBrowserUrlsByRoom: (action: SetStateAction<BrowserUrlsByRoom>) => void;
-  setBrowserReasonsByRoom: (action: SetStateAction<BrowserReasonsByRoom>) => void;
-  setBrowserMessagesByRoom: (action: SetStateAction<BrowserMessagesByRoom>) => void;
-  setBrowserStatusByRoom: (action: SetStateAction<BrowserStatusByRoom>) => void;
-  setActiveBrowserUrlsByRoom: (action: SetStateAction<ActiveBrowserUrlsByRoom>) => void;
-  openEmbeddedBrowserForRoom: (roomId: string, url: string) => void;
-  resetEmbeddedBrowserForRoom: (roomId: string, profilePath: string | null) => void;
   setInspectorTabForRoom: (roomId: string, tab: InspectorTab) => void;
-  setFileQueriesByRoom: (action: SetStateAction<FileQueriesByRoom>) => void;
-  setProjectFilesByRoom: (action: SetStateAction<ProjectFilesByRoom>) => void;
-  setSelectedFilesByRoom: (action: SetStateAction<SelectedFilesByRoom>) => void;
-  setSelectedDiffsByRoom: (action: SetStateAction<SelectedDiffsByRoom>) => void;
-  setFilePreviewTabsByRoom: (action: SetStateAction<FilePreviewTabsByRoom>) => void;
-  setFileBusyByRoom: (action: SetStateAction<FileBusyByRoom>) => void;
-  setFileMessagesByRoom: (action: SetStateAction<FileMessagesByRoom>) => void;
-  setMarkdownCopyFallbacksByRoom: (action: SetStateAction<MarkdownCopyFallbacksByRoom>) => void;
   setHostBusyByRoom: (action: SetStateAction<HostBusyByRoom>) => void;
   setHostMessagesByRoom: (action: SetStateAction<HostMessagesByRoom>) => void;
   setSettingsBusyByRoom: (action: SetStateAction<SettingsBusyByRoom>) => void;
@@ -347,15 +257,6 @@ interface AppStoreState {
   setCodexContinuationByRoom: (action: SetStateAction<CodexContinuationByRoom>) => void;
   setGitWorkflowEventsByRoom: (action: SetStateAction<GitWorkflowEventsByRoom>) => void;
   setGitHubActionsEventsByRoom: (action: SetStateAction<GitHubActionsEventsByRoom>) => void;
-  setTerminalLinesByRoom: (action: SetStateAction<TerminalLinesByRoom>) => void;
-  setTerminalBusyByRoom: (action: SetStateAction<TerminalBusyByRoom>) => void;
-  setTerminals: (action: SetStateAction<Terminals>) => void;
-  setTerminalRequestsByRoom: (action: SetStateAction<TerminalRequestsByRoom>) => void;
-  setSelectedTerminalIdsByRoom: (action: SetStateAction<SelectedTerminalIdsByRoom>) => void;
-  setTerminalNamesByRoom: (action: SetStateAction<TerminalNamesByRoom>) => void;
-  setTerminalCommandsByRoom: (action: SetStateAction<TerminalCommandsByRoom>) => void;
-  setTerminalInputsByRoom: (action: SetStateAction<TerminalInputsByRoom>) => void;
-  setTerminalErrorsByRoom: (action: SetStateAction<TerminalErrorsByRoom>) => void;
   setTeamMembersByTeam: (action: SetStateAction<TeamMembersByTeam>) => void;
   setTeamMembersMessageByTeam: (action: SetStateAction<TeamMembersMessageByTeam>) => void;
   setTeamMembersBusyByTeam: (action: SetStateAction<TeamMembersBusyByTeam>) => void;
@@ -374,13 +275,7 @@ interface AppStoreState {
   setHostBusyForRoom: (roomId: string, busy: boolean) => void;
   setSettingsBusyForRoom: (roomId: string, busy: boolean) => void;
   setKeyRotationBusyForRoom: (roomId: string, busy: boolean) => void;
-  setFileBusyForRoom: (roomId: string, busy: boolean) => void;
-  setTerminalBusyForRoom: (roomId: string, busy: boolean) => void;
   updateInviteRequestStatus: (roomId: string, requestId: string, status: InviteJoinRequest["status"]) => void;
-  appendTerminalRequest: (roomId: string, request: TerminalCommandRequest) => void;
-  updateTerminalRequestStatus: (roomId: string, requestId: string, status: TerminalCommandRequest["status"]) => void;
-  appendBrowserRequest: (roomId: string, request: BrowserAccessRequest) => void;
-  updateBrowserRequestStatus: (roomId: string, requestId: string, status: BrowserAccessRequest["status"]) => void;
   appendGitWorkflowEvent: (roomId: string, event: GitWorkflowEventPlaintextPayload) => void;
   appendGitHubActionsEvent: (roomId: string, event: GitHubActionsEventPlaintextPayload) => void;
   appendLocalPreviewEvent: (roomId: string, event: LocalPreviewRecord) => void;
@@ -396,19 +291,6 @@ interface AppStoreState {
   setCodexRunningForRoom: (roomId: string, running: boolean) => void;
   setRoomGoalForRoom: (roomId: string, goal: RoomGoal | null) => void;
   setCodexThreadIdForRoom: (roomId: string, threadId: string | null) => void;
-  setFileQueryForRoom: (roomId: string, query: string) => void;
-  setProjectFilesForRoom: (roomId: string, files: ProjectFileEntry[]) => void;
-  setSelectedFileForRoom: (roomId: string, file: ProjectFileContent | null) => void;
-  setSelectedDiffForRoom: (roomId: string, diff: GitDiffResult | null) => void;
-  setFilePreviewTabForRoom: (roomId: string, tab: FilePreviewTab) => void;
-  setFileMessageForRoom: (roomId: string, message: string | null) => void;
-  resetFileContextForRoom: (roomId: string) => void;
-  setSelectedTerminalIdForRoom: (roomId: string, terminalId: string | null) => void;
-  setTerminalNameForRoom: (roomId: string, name: string) => void;
-  setTerminalCommandForRoom: (roomId: string, command: string) => void;
-  setTerminalInputForRoom: (roomId: string, input: string) => void;
-  setTerminalErrorForRoom: (roomId: string, error: string | null) => void;
-  appendTerminalLinesForRoom: (roomId: string, lines: string[], maxTerminalActivityLines: number) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   setMarkdownCopyFallbackForRoom: (roomId: string, fallback: MarkdownCopyFallback | null) => void;
@@ -419,10 +301,6 @@ interface AppStoreState {
   setGitWorkflowMessageForRoom: (roomId: string, message: string | null) => void;
   setGitStatusForRoom: (roomId: string, status: GitStatusSummary | null) => void;
   updateGitWorkflowDraftForRoom: (roomId: string, patch: Partial<GitWorkflowDraft>) => void;
-  setBrowserUrlForRoom: (roomId: string, url: string, defaultBrowserUrl: string) => void;
-  setBrowserReasonForRoom: (roomId: string, reason: string, defaultBrowserReason: string) => void;
-  setBrowserMessageForRoom: (roomId: string, message: string | null) => void;
-  clearBrowserStatusForRoom: (roomId: string) => void;
   setInviteLinkForRoom: (roomId: string, link: string) => void;
   setInviteApprovalGateForRoom: (roomId: string, enabled: boolean) => void;
   setInviteMessageForRoom: (roomId: string, message: string | null) => void;
@@ -438,8 +316,11 @@ interface AppStoreState {
   resetGitWorkflowState: () => void;
 }
 
-export const useAppStore = create<AppStoreState>((set) => ({
+export const useAppStore = create<AppStoreState>((set, get, api) => ({
   ...emptyAppStoreState,
+  ...createBrowserSlice(set, get, api),
+  ...createFilePanelSlice(set, get, api),
+  ...createTerminalSlice(set, get, api),
   setGitStatusByRoom: (action) => {
     set((state) => ({
       gitStatusByRoom: resolveSetStateAction(state.gitStatusByRoom, action)
@@ -513,113 +394,12 @@ export const useAppStore = create<AppStoreState>((set) => ({
       actionsBusyByRoom: omitRecordKey(state.actionsBusyByRoom, roomId)
     }));
   },
-  setBrowserRequestsByRoom: (action) => {
-    set((state) => ({
-      browserRequestsByRoom: resolveSetStateAction(state.browserRequestsByRoom, action)
-    }));
-  },
-  setBrowserUrlsByRoom: (action) => {
-    set((state) => ({
-      browserUrlsByRoom: resolveSetStateAction(state.browserUrlsByRoom, action)
-    }));
-  },
-  setBrowserReasonsByRoom: (action) => {
-    set((state) => ({
-      browserReasonsByRoom: resolveSetStateAction(state.browserReasonsByRoom, action)
-    }));
-  },
-  setBrowserMessagesByRoom: (action) => {
-    set((state) => ({
-      browserMessagesByRoom: resolveSetStateAction(state.browserMessagesByRoom, action)
-    }));
-  },
-  setBrowserStatusByRoom: (action) => {
-    set((state) => ({
-      browserStatusByRoom: resolveSetStateAction(state.browserStatusByRoom, action)
-    }));
-  },
-  setActiveBrowserUrlsByRoom: (action) => {
-    set((state) => ({
-      activeBrowserUrlsByRoom: resolveSetStateAction(state.activeBrowserUrlsByRoom, action)
-    }));
-  },
-  openEmbeddedBrowserForRoom: (roomId, url) => {
-    set((state) => ({
-      activeBrowserUrlsByRoom: {
-        ...state.activeBrowserUrlsByRoom,
-        [roomId]: url
-      },
-      browserStatusByRoom: {
-        ...state.browserStatusByRoom,
-        [roomId]: {
-          profilePath: "Embedded in this room",
-          downloadsBlocked: false,
-          clipboardBlocked: false,
-          fileUploadsBlocked: false
-        }
-      }
-    }));
-  },
-  resetEmbeddedBrowserForRoom: (roomId, profilePath) => {
-    set((state) => ({
-      activeBrowserUrlsByRoom: omitRecordKey(state.activeBrowserUrlsByRoom, roomId),
-      browserStatusByRoom: {
-        ...state.browserStatusByRoom,
-        [roomId]: {
-          profilePath,
-          downloadsBlocked: false,
-          clipboardBlocked: false,
-          fileUploadsBlocked: false
-        }
-      }
-    }));
-  },
   setInspectorTabForRoom: (roomId, tab) => {
     set((state) => ({
       inspectorTabsByRoom: {
         ...state.inspectorTabsByRoom,
         [roomId]: tab
       }
-    }));
-  },
-  setFileQueriesByRoom: (action) => {
-    set((state) => ({
-      fileQueriesByRoom: resolveSetStateAction(state.fileQueriesByRoom, action)
-    }));
-  },
-  setProjectFilesByRoom: (action) => {
-    set((state) => ({
-      projectFilesByRoom: resolveSetStateAction(state.projectFilesByRoom, action)
-    }));
-  },
-  setSelectedFilesByRoom: (action) => {
-    set((state) => ({
-      selectedFilesByRoom: resolveSetStateAction(state.selectedFilesByRoom, action)
-    }));
-  },
-  setSelectedDiffsByRoom: (action) => {
-    set((state) => ({
-      selectedDiffsByRoom: resolveSetStateAction(state.selectedDiffsByRoom, action)
-    }));
-  },
-  setFilePreviewTabsByRoom: (action) => {
-    set((state) => ({
-      filePreviewTabsByRoom: resolveSetStateAction(state.filePreviewTabsByRoom, action)
-    }));
-  },
-  setFileBusyByRoom: (action) => {
-    set((state) => ({
-      fileBusyByRoom: resolveSetStateAction(state.fileBusyByRoom, action)
-    }));
-  },
-  setFileMessagesByRoom: (action) => {
-    set((state) => ({
-      fileMessagesByRoom: resolveSetStateAction(state.fileMessagesByRoom, action)
-    }));
-  },
-  setMarkdownCopyFallbacksByRoom: (action) => {
-    set((state) => ({
-      markdownCopyFallbacksByRoom: resolveSetStateAction(state.markdownCopyFallbacksByRoom, action)
     }));
   },
   setHostBusyByRoom: (action) => {
@@ -841,51 +621,6 @@ export const useAppStore = create<AppStoreState>((set) => ({
       githubActionsEventsByRoom: resolveSetStateAction(state.githubActionsEventsByRoom, action)
     }));
   },
-  setTerminalLinesByRoom: (action) => {
-    set((state) => ({
-      terminalLinesByRoom: resolveSetStateAction(state.terminalLinesByRoom, action)
-    }));
-  },
-  setTerminalBusyByRoom: (action) => {
-    set((state) => ({
-      terminalBusyByRoom: resolveSetStateAction(state.terminalBusyByRoom, action)
-    }));
-  },
-  setTerminals: (action) => {
-    set((state) => ({
-      terminals: resolveSetStateAction(state.terminals, action)
-    }));
-  },
-  setTerminalRequestsByRoom: (action) => {
-    set((state) => ({
-      terminalRequestsByRoom: resolveSetStateAction(state.terminalRequestsByRoom, action)
-    }));
-  },
-  setSelectedTerminalIdsByRoom: (action) => {
-    set((state) => ({
-      selectedTerminalIdsByRoom: resolveSetStateAction(state.selectedTerminalIdsByRoom, action)
-    }));
-  },
-  setTerminalNamesByRoom: (action) => {
-    set((state) => ({
-      terminalNamesByRoom: resolveSetStateAction(state.terminalNamesByRoom, action)
-    }));
-  },
-  setTerminalCommandsByRoom: (action) => {
-    set((state) => ({
-      terminalCommandsByRoom: resolveSetStateAction(state.terminalCommandsByRoom, action)
-    }));
-  },
-  setTerminalInputsByRoom: (action) => {
-    set((state) => ({
-      terminalInputsByRoom: resolveSetStateAction(state.terminalInputsByRoom, action)
-    }));
-  },
-  setTerminalErrorsByRoom: (action) => {
-    set((state) => ({
-      terminalErrorsByRoom: resolveSetStateAction(state.terminalErrorsByRoom, action)
-    }));
-  },
   setTeamMembersByTeam: (action) => {
     set((state) => ({
       teamMembersByTeam: resolveSetStateAction(state.teamMembersByTeam, action)
@@ -1090,65 +825,11 @@ export const useAppStore = create<AppStoreState>((set) => ({
       keyRotationBusyByRoom: updateRoomBusyMap(state.keyRotationBusyByRoom, roomId, busy)
     }));
   },
-  setFileBusyForRoom: (roomId, busy) => {
-    set((state) => ({
-      fileBusyByRoom: updateRoomBusyMap(state.fileBusyByRoom, roomId, busy)
-    }));
-  },
-  setTerminalBusyForRoom: (roomId, busy) => {
-    set((state) => ({
-      terminalBusyByRoom: updateRoomBusyMap(state.terminalBusyByRoom, roomId, busy)
-    }));
-  },
   updateInviteRequestStatus: (roomId, requestId, status) => {
     set((state) => ({
       inviteRequestsByRoom: {
         ...state.inviteRequestsByRoom,
         [roomId]: (state.inviteRequestsByRoom[roomId] ?? []).map((request) =>
-          request.id === requestId ? { ...request, status } : request
-        )
-      }
-    }));
-  },
-  appendTerminalRequest: (roomId, request) => {
-    set((state) => {
-      const roomRequests = state.terminalRequestsByRoom[roomId] ?? [];
-      if (roomRequests.some((existing) => existing.id === request.id)) return state;
-      return {
-        terminalRequestsByRoom: {
-          ...state.terminalRequestsByRoom,
-          [roomId]: [...roomRequests, request]
-        }
-      };
-    });
-  },
-  updateTerminalRequestStatus: (roomId, requestId, status) => {
-    set((state) => ({
-      terminalRequestsByRoom: {
-        ...state.terminalRequestsByRoom,
-        [roomId]: (state.terminalRequestsByRoom[roomId] ?? []).map((request) =>
-          request.id === requestId ? { ...request, status } : request
-        )
-      }
-    }));
-  },
-  appendBrowserRequest: (roomId, request) => {
-    set((state) => {
-      const roomRequests = state.browserRequestsByRoom[roomId] ?? [];
-      if (roomRequests.some((existing) => existing.id === request.id)) return state;
-      return {
-        browserRequestsByRoom: {
-          ...state.browserRequestsByRoom,
-          [roomId]: [...roomRequests, request]
-        }
-      };
-    });
-  },
-  updateBrowserRequestStatus: (roomId, requestId, status) => {
-    set((state) => ({
-      browserRequestsByRoom: {
-        ...state.browserRequestsByRoom,
-        [roomId]: (state.browserRequestsByRoom[roomId] ?? []).map((request) =>
           request.id === requestId ? { ...request, status } : request
         )
       }
@@ -1331,106 +1012,6 @@ export const useAppStore = create<AppStoreState>((set) => ({
         : omitRecordKey(state.codexThreadIdsByRoom, roomId)
     }));
   },
-  setFileQueryForRoom: (roomId, query) => {
-    set((state) => ({
-      fileQueriesByRoom: query
-        ? { ...state.fileQueriesByRoom, [roomId]: query }
-        : omitRecordKey(state.fileQueriesByRoom, roomId)
-    }));
-  },
-  setProjectFilesForRoom: (roomId, files) => {
-    set((state) => ({
-      projectFilesByRoom: {
-        ...state.projectFilesByRoom,
-        [roomId]: files
-      }
-    }));
-  },
-  setSelectedFileForRoom: (roomId, file) => {
-    set((state) => ({
-      selectedFilesByRoom: file
-        ? { ...state.selectedFilesByRoom, [roomId]: file }
-        : omitRecordKey(state.selectedFilesByRoom, roomId)
-    }));
-  },
-  setSelectedDiffForRoom: (roomId, diff) => {
-    set((state) => ({
-      selectedDiffsByRoom: diff
-        ? { ...state.selectedDiffsByRoom, [roomId]: diff }
-        : omitRecordKey(state.selectedDiffsByRoom, roomId)
-    }));
-  },
-  setFilePreviewTabForRoom: (roomId, tab) => {
-    set((state) => ({
-      filePreviewTabsByRoom: tab === "file"
-        ? omitRecordKey(state.filePreviewTabsByRoom, roomId)
-        : { ...state.filePreviewTabsByRoom, [roomId]: tab }
-    }));
-  },
-  setFileMessageForRoom: (roomId, message) => {
-    set((state) => ({
-      fileMessagesByRoom: message
-        ? { ...state.fileMessagesByRoom, [roomId]: message }
-        : omitRecordKey(state.fileMessagesByRoom, roomId)
-    }));
-  },
-  resetFileContextForRoom: (roomId) => {
-    set((state) => ({
-      selectedFilesByRoom: omitRecordKey(state.selectedFilesByRoom, roomId),
-      selectedDiffsByRoom: omitRecordKey(state.selectedDiffsByRoom, roomId),
-      fileQueriesByRoom: omitRecordKey(state.fileQueriesByRoom, roomId),
-      projectFilesByRoom: omitRecordKey(state.projectFilesByRoom, roomId),
-      fileBusyByRoom: omitRecordKey(state.fileBusyByRoom, roomId),
-      fileMessagesByRoom: omitRecordKey(state.fileMessagesByRoom, roomId)
-    }));
-  },
-  setSelectedTerminalIdForRoom: (roomId, terminalId) => {
-    set((state) => ({
-      selectedTerminalIdsByRoom: terminalId
-        ? { ...state.selectedTerminalIdsByRoom, [roomId]: terminalId }
-        : omitRecordKey(state.selectedTerminalIdsByRoom, roomId)
-    }));
-  },
-  setTerminalNameForRoom: (roomId, name) => {
-    set((state) => ({
-      terminalNamesByRoom: name === "dev-server"
-        ? omitRecordKey(state.terminalNamesByRoom, roomId)
-        : { ...state.terminalNamesByRoom, [roomId]: name }
-    }));
-  },
-  setTerminalCommandForRoom: (roomId, command) => {
-    set((state) => ({
-      terminalCommandsByRoom: command === "npm run dev:desktop"
-        ? omitRecordKey(state.terminalCommandsByRoom, roomId)
-        : { ...state.terminalCommandsByRoom, [roomId]: command }
-    }));
-  },
-  setTerminalInputForRoom: (roomId, input) => {
-    set((state) => ({
-      terminalInputsByRoom: input
-        ? { ...state.terminalInputsByRoom, [roomId]: input }
-        : omitRecordKey(state.terminalInputsByRoom, roomId)
-    }));
-  },
-  setTerminalErrorForRoom: (roomId, error) => {
-    set((state) => ({
-      terminalErrorsByRoom: error
-        ? { ...state.terminalErrorsByRoom, [roomId]: error }
-        : omitRecordKey(state.terminalErrorsByRoom, roomId)
-    }));
-  },
-  appendTerminalLinesForRoom: (roomId, lines, maxTerminalActivityLines) => {
-    if (lines.length === 0) return;
-    set((state) => {
-      const roomLines = state.terminalLinesByRoom[roomId] ?? [];
-      return {
-        terminalLinesByRoom: {
-          ...state.terminalLinesByRoom,
-          [roomId]: [...roomLines, ...lines].slice(-maxTerminalActivityLines)
-        }
-      };
-    });
-  },
   setHostMessageForRoom: (roomId, message) => {
     set((state) => ({
       hostMessagesByRoom: message
@@ -1500,33 +1081,6 @@ export const useAppStore = create<AppStoreState>((set) => ({
   updateGitWorkflowDraftForRoom: (roomId, patch) => {
     set((state) => ({
       gitWorkflowDraftsByRoom: updateGitWorkflowDraftRecord(state.gitWorkflowDraftsByRoom, roomId, patch)
-    }));
-  },
-  setBrowserUrlForRoom: (roomId, url, defaultBrowserUrl) => {
-    set((state) => ({
-      browserUrlsByRoom: url === defaultBrowserUrl
-        ? omitRecordKey(state.browserUrlsByRoom, roomId)
-        : { ...state.browserUrlsByRoom, [roomId]: url }
-    }));
-  },
-  setBrowserReasonForRoom: (roomId, reason, defaultBrowserReason) => {
-    set((state) => ({
-      browserReasonsByRoom: reason === defaultBrowserReason
-        ? omitRecordKey(state.browserReasonsByRoom, roomId)
-        : { ...state.browserReasonsByRoom, [roomId]: reason }
-    }));
-  },
-  setBrowserMessageForRoom: (roomId, message) => {
-    set((state) => ({
-      browserMessagesByRoom: message
-        ? { ...state.browserMessagesByRoom, [roomId]: message }
-        : omitRecordKey(state.browserMessagesByRoom, roomId)
-    }));
-  },
-  clearBrowserStatusForRoom: (roomId) => {
-    set((state) => ({
-      browserStatusByRoom: omitRecordKey(state.browserStatusByRoom, roomId),
-      activeBrowserUrlsByRoom: omitRecordKey(state.activeBrowserUrlsByRoom, roomId)
     }));
   },
   setInviteLinkForRoom: (roomId, link) => {
