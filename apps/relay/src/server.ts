@@ -52,6 +52,7 @@ import { createRelayPersistence } from "./persistence.js";
 import { seedWorkspace } from "./seed.js";
 import { createRelayStore, type AuthSession, type ClientSession, type PresenceRecord, type RoomKey } from "./state.js";
 import { createRelayStoreCodec } from "./store-codec.js";
+import { createRelayStorePersistenceCoordinator, type RelayStorePersistenceCoordinator } from "./store-persistence.js";
 import { registerRelayWebSocketConnection } from "./ws/connection.js";
 import { createRelayFanout } from "./ws/fanout.js";
 import { createRelayRoomSocketManager } from "./ws/rooms.js";
@@ -163,7 +164,7 @@ const maxEnvelopeCiphertextChars = Math.ceil(encryptedEnvelopeMaxBytes * 4 / 3) 
 const maxAttachmentBlobIdChars = 160;
 const maxAttachmentBlobNameChars = 512;
 const maxAttachmentBlobTypeChars = 160;
-let saveTimer: NodeJS.Timeout | null = null;
+let relayStorePersistence: RelayStorePersistenceCoordinator;
 
 const authSessionManager = createRelayAuthSessionManager({
   authSessions,
@@ -223,10 +224,13 @@ const relayStoreCodec = createRelayStoreCodec({
 const {
   isExpiredInvite,
   isExpiredAttachmentBlob,
-  applyStoredRelayState,
-  pruneExpiredRelayState,
-  toStoredRelayState
+  pruneExpiredRelayState
 } = relayStoreCodec;
+relayStorePersistence = createRelayStorePersistenceCoordinator({
+  dataPath,
+  persistence: relayPersistence,
+  storeCodec: relayStoreCodec
+});
 const { rateLimitMiddleware, clientIdentityFromIncomingMessage, consumeRateLimit } = createRelayRequestGuards({
   rateLimitsEnabled,
   rateLimitWindowMs,
@@ -469,7 +473,7 @@ registerRelayWebSocketConnection({
   isRecord
 });
 
-await loadRelayStore();
+await relayStorePersistence.loadRelayStore();
 seedWorkspace({
   store: relayStore,
   seedDemoWorkspace,
@@ -600,36 +604,8 @@ function pruneEncryptedBacklog(envelopes: RelayEnvelope[]): RelayEnvelope[] {
   });
 }
 
-async function loadRelayStore() {
-  try {
-    const stored = await relayPersistence.load();
-    if (stored === null) return;
-    if (!isRecord(stored) || stored.version !== 1) {
-      console.warn(`Ignoring unsupported relay store version at ${dataPath}`);
-      await relayPersistence.quarantine("unsupported-version");
-      return;
-    }
-    applyStoredRelayState(stored);
-    console.log(`Loaded multAIplayer relay store from ${dataPath}`);
-  } catch (error) {
-    console.warn(`Could not load relay store at ${dataPath}:`, error);
-    await relayPersistence.quarantine("unreadable");
-  }
-}
-
 function scheduleStoreSave() {
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-    saveRelayStore().catch((error) => {
-      console.error("Failed to save relay store:", error);
-    });
-  }, 100);
-}
-
-async function saveRelayStore() {
-  pruneExpiredRelayState();
-  await relayPersistence.save(toStoredRelayState());
+  relayStorePersistence.scheduleStoreSave();
 }
 
 export function listenRelayServer() {
@@ -640,11 +616,7 @@ export function listenRelayServer() {
 }
 
 export async function flushRelayStore() {
-  if (saveTimer) {
-    clearTimeout(saveTimer);
-    saveTimer = null;
-  }
-  await saveRelayStore();
+  await relayStorePersistence.flushRelayStore();
 }
 
 export function closeRelayServer() {
