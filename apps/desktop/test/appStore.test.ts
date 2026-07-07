@@ -105,3 +105,51 @@ test("desktop store keeps browser panel state room scoped", () => {
   assert.equal(state.activeBrowserUrlsByRoom["room-a"], "https://github.com");
   assert.equal(state.activeBrowserUrlsByRoom["room-b"], null);
 });
+
+test("desktop store keeps file panel state room scoped", () => {
+  const store = useAppStore.getState();
+
+  store.setFileQueriesByRoom({ "room-a": "README", "room-b": ".env" });
+  store.setProjectFilesByRoom({
+    "room-a": [
+      { path: "README.md", size: 2048 },
+      { path: "apps/desktop/src/App.tsx", size: 4096 }
+    ]
+  });
+  store.setSelectedFilesByRoom({
+    "room-a": {
+      path: "README.md",
+      size: 2048,
+      truncated: false,
+      content: "# multAIplayer"
+    },
+    "room-b": null
+  });
+  store.setSelectedDiffsByRoom({
+    "room-a": {
+      path: "README.md",
+      diff: "@@ -1 +1 @@\n-old\n+new"
+    }
+  });
+  store.setFilePreviewTabsByRoom({ "room-a": "diff" });
+  store.setFileBusyByRoom({ "room-a": true });
+  store.setFileMessagesByRoom({ "room-a": "Loaded README.md", "room-b": null });
+  store.setMarkdownCopyFallbacksByRoom({
+    "room-a": {
+      title: "README.md",
+      markdown: "# multAIplayer"
+    }
+  });
+
+  const state = useAppStore.getState();
+  assert.equal(state.fileQueriesByRoom["room-b"], ".env");
+  assert.equal(state.projectFilesByRoom["room-a"]?.[1]?.path, "apps/desktop/src/App.tsx");
+  assert.equal(state.selectedFilesByRoom["room-a"]?.content, "# multAIplayer");
+  assert.equal(state.selectedFilesByRoom["room-b"], null);
+  assert.equal(state.selectedDiffsByRoom["room-a"]?.path, "README.md");
+  assert.equal(state.filePreviewTabsByRoom["room-a"], "diff");
+  assert.equal(state.fileBusyByRoom["room-a"], true);
+  assert.equal(state.fileMessagesByRoom["room-a"], "Loaded README.md");
+  assert.equal(state.fileMessagesByRoom["room-b"], null);
+  assert.equal(state.markdownCopyFallbacksByRoom["room-a"]?.title, "README.md");
+});
