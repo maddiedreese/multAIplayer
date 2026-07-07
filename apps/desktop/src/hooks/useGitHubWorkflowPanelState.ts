@@ -1,5 +1,3 @@
-import { useState } from "react";
-import type { GitHubActionRun } from "../lib/authClient";
 import { useAppStore } from "../store/appStore";
 
 export function useGitHubWorkflowPanelState() {
@@ -11,10 +9,14 @@ export function useGitHubWorkflowPanelState() {
   const setGitWorkflowMessagesByRoom = useAppStore((state) => state.setGitWorkflowMessagesByRoom);
   const gitWorkflowDraftsByRoom = useAppStore((state) => state.gitWorkflowDraftsByRoom);
   const setGitWorkflowDraftsByRoom = useAppStore((state) => state.setGitWorkflowDraftsByRoom);
-  const [actionsBusyByRoom, setActionsBusyByRoom] = useState<Record<string, boolean>>({});
-  const [actionsMessagesByRoom, setActionsMessagesByRoom] = useState<Record<string, string | null>>({});
-  const [actionRunsByRoom, setActionRunsByRoom] = useState<Record<string, GitHubActionRun[]>>({});
-  const [actionsLastCheckedByRoom, setActionsLastCheckedByRoom] = useState<Record<string, string | null>>({});
+  const actionsBusyByRoom = useAppStore((state) => state.actionsBusyByRoom);
+  const setActionsBusyByRoom = useAppStore((state) => state.setActionsBusyByRoom);
+  const actionsMessagesByRoom = useAppStore((state) => state.actionsMessagesByRoom);
+  const setActionsMessagesByRoom = useAppStore((state) => state.setActionsMessagesByRoom);
+  const actionRunsByRoom = useAppStore((state) => state.actionRunsByRoom);
+  const setActionRunsByRoom = useAppStore((state) => state.setActionRunsByRoom);
+  const actionsLastCheckedByRoom = useAppStore((state) => state.actionsLastCheckedByRoom);
+  const setActionsLastCheckedByRoom = useAppStore((state) => state.setActionsLastCheckedByRoom);
 
   return {
     gitStatusByRoom,
