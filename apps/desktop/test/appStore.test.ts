@@ -285,6 +285,76 @@ test("desktop store keeps room chat composition state room scoped", () => {
   assert.equal(state.sensitiveAttachmentReviewKey, "room-a:.env");
 });
 
+test("desktop store exposes room draft actions", () => {
+  const store = useAppStore.getState();
+
+  store.setDraftForRoom("room-a", "@Codex summarize this");
+  store.setPendingAttachmentsForRoom("room-a", [
+    {
+      id: "attachment-1",
+      name: "README.md",
+      type: "text/markdown",
+      size: 18,
+      content: "# multAIplayer"
+    }
+  ]);
+  store.setPendingAttachmentsForRoom("room-a", (current) => [
+    ...current,
+    {
+      id: "attachment-2",
+      name: "plan.md",
+      type: "text/markdown",
+      size: 12,
+      content: "Ship it"
+    }
+  ]);
+
+  const state = useAppStore.getState();
+  assert.equal(state.draftsByRoom["room-a"], "@Codex summarize this");
+  assert.deepEqual(state.pendingAttachmentsByRoom["room-a"]?.map((attachment) => attachment.name), ["README.md", "plan.md"]);
+});
+
+test("desktop store exposes room message actions", () => {
+  const store = useAppStore.getState();
+
+  store.setHostMessageForRoom("room-a", "Host saved");
+  store.setChatMessageForRoom("room-a", "Message sent");
+  store.setMarkdownCopyFallbackForRoom("room-a", {
+    title: "Selected messages",
+    markdown: "## Room"
+  });
+  store.setSecretWarningVisibleForRoom("room-a", true);
+  store.setHistoryMessageForRoom("room-a", "History saved");
+  store.setTeamHistoryMessageForTeam("team-a", "Team defaults saved");
+  store.setSettingsMessageForRoom("room-a", "Settings saved");
+
+  let state = useAppStore.getState();
+  assert.equal(state.hostMessagesByRoom["room-a"], "Host saved");
+  assert.equal(state.chatMessagesByRoom["room-a"], "Message sent");
+  assert.equal(state.markdownCopyFallbacksByRoom["room-a"]?.title, "Selected messages");
+  assert.equal(state.secretWarningsVisibleByRoom["room-a"], true);
+  assert.equal(state.historyMessagesByRoom["room-a"], "History saved");
+  assert.equal(state.teamHistoryMessagesByTeam["team-a"], "Team defaults saved");
+  assert.equal(state.settingsMessagesByRoom["room-a"], "Settings saved");
+
+  store.setHostMessageForRoom("room-a", null);
+  store.setChatMessageForRoom("room-a", null);
+  store.setMarkdownCopyFallbackForRoom("room-a", null);
+  store.setSecretWarningVisibleForRoom("room-a", false);
+  store.setHistoryMessageForRoom("room-a", null);
+  store.setTeamHistoryMessageForTeam("team-a", null);
+  store.setSettingsMessageForRoom("room-a", null);
+
+  state = useAppStore.getState();
+  assert.equal("room-a" in state.hostMessagesByRoom, false);
+  assert.equal("room-a" in state.chatMessagesByRoom, false);
+  assert.equal("room-a" in state.markdownCopyFallbacksByRoom, false);
+  assert.equal("room-a" in state.secretWarningsVisibleByRoom, false);
+  assert.equal("room-a" in state.historyMessagesByRoom, false);
+  assert.equal("team-a" in state.teamHistoryMessagesByTeam, false);
+  assert.equal("room-a" in state.settingsMessagesByRoom, false);
+});
+
 test("desktop store keeps Codex room state room scoped", () => {
   const store = useAppStore.getState();
 

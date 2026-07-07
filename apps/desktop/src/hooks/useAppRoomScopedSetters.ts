@@ -30,9 +30,7 @@ export function useAppRoomScopedSetters({
 }) {
   const {
     workspaceState,
-    roomChatState,
     roomSettingsState,
-    historyDefaultsState,
     roomRuntimeState,
     codexRoomState,
     localPreviewState,
@@ -44,17 +42,8 @@ export function useAppRoomScopedSetters({
   } = appState;
 
   return useRoomScopedSetters({
-    messages: {
-      selectedRoomId: selectedRoom.id,
-      selectedTeamId: workspaceState.selectedTeam,
-      setHostMessagesByRoom: roomSettingsState.setHostMessagesByRoom,
-      setChatMessagesByRoom: roomChatState.setChatMessagesByRoom,
-      setMarkdownCopyFallbacksByRoom: filePanelState.setMarkdownCopyFallbacksByRoom,
-      setSecretWarningsVisibleByRoom: codexRoomState.setSecretWarningsVisibleByRoom,
-      setHistoryMessagesByRoom: historyDefaultsState.setHistoryMessagesByRoom,
-      setTeamHistoryMessagesByTeam: historyDefaultsState.setTeamHistoryMessagesByTeam,
-      setSettingsMessagesByRoom: roomSettingsState.setSettingsMessagesByRoom
-    },
+    selectedRoomId: selectedRoom.id,
+    selectedTeamId: workspaceState.selectedTeam,
     busy: {
       gitWorkflowBusyRef: appRefs.gitWorkflowBusyRef,
       actionsBusyRef: appRefs.actionsBusyRef,
@@ -111,10 +100,6 @@ export function useAppRoomScopedSetters({
       setInviteLinksByRoom: invitePanelState.setInviteLinksByRoom,
       setInviteApprovalGatesByRoom: invitePanelState.setInviteApprovalGatesByRoom,
       setInviteMessagesByRoom: invitePanelState.setInviteMessagesByRoom
-    },
-    drafts: {
-      setPendingAttachmentsByRoom: roomChatState.setPendingAttachmentsByRoom,
-      setDraftsByRoom: roomChatState.setDraftsByRoom
     },
     project: {
       roomsRef: appRefs.roomsRef,
