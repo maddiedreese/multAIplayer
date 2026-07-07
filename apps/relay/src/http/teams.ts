@@ -1,17 +1,15 @@
 import type { Express, Response } from "express";
 import { nanoid } from "nanoid";
 import type {
-  RoomRecord,
   TeamMemberRecord,
   TeamRecord,
   TeamRole
 } from "@multaiplayer/protocol";
-import type { AuthSession } from "../state.js";
+import type { AuthSession, RelayStore } from "../state.js";
 
 interface RegisterTeamRoutesOptions {
   app: Express;
-  teams: Map<string, TeamRecord>;
-  rooms: Map<string, RoomRecord>;
+  store: RelayStore;
   teamMembers: Map<string, Map<string, TeamMemberRecord>>;
   getAuthSession: (sessionId: unknown) => AuthSession | null;
   allowRead: (session: AuthSession | null, res: Response) => boolean;
@@ -33,8 +31,7 @@ interface RegisterTeamRoutesOptions {
 
 export function registerTeamRoutes({
   app,
-  teams,
-  rooms,
+  store,
   teamMembers,
   getAuthSession,
   allowRead,
@@ -56,12 +53,12 @@ export function registerTeamRoutes({
   app.get("/teams", (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowRead(session, res)) return;
-    const visibleTeamIds = session ? teamIdsForUser(session.user.id) : new Set(teams.keys());
+    const visibleTeamIds = session ? teamIdsForUser(session.user.id) : new Set(store.allTeams().map((team) => team.id));
     res.json({
-      teams: Array.from(teams.values())
+      teams: store.allTeams()
         .filter((team) => visibleTeamIds.has(team.id))
         .map((team) => teamRecordForUser(team, teamMembers, session?.user.id)),
-      rooms: Array.from(rooms.values()).filter((room) => visibleTeamIds.has(room.teamId))
+      rooms: store.allRooms().filter((room) => visibleTeamIds.has(room.teamId))
     });
   });
 
@@ -70,7 +67,7 @@ export function registerTeamRoutes({
     if (!allowRead(session, res)) return;
 
     const teamId = String(req.params.teamId ?? "");
-    if (!teams.has(teamId)) {
+    if (!store.hasTeam(teamId)) {
       res.status(404).json({ error: "Team not found" });
       return;
     }
@@ -88,7 +85,7 @@ export function registerTeamRoutes({
     const teamId = String(req.params.teamId ?? "");
     const userId = String(req.params.userId ?? "");
     const role = parseRequestedTeamRole(req.body?.role);
-    if (!teams.has(teamId)) {
+    if (!store.hasTeam(teamId)) {
       res.status(404).json({ error: "Team not found" });
       return;
     }
@@ -120,7 +117,7 @@ export function registerTeamRoutes({
 
     const teamId = String(req.params.teamId ?? "");
     const userId = String(req.params.userId ?? "");
-    if (!teams.has(teamId)) {
+    if (!store.hasTeam(teamId)) {
       res.status(404).json({ error: "Team not found" });
       return;
     }
@@ -141,7 +138,7 @@ export function registerTeamRoutes({
     }
 
     const updatedMembers = transferTeamOwnership(members, userId);
-    const team = teams.get(teamId);
+    const team = store.getTeam(teamId);
     if (team) broadcastWorkspaceUpdated(team);
     scheduleStoreSave();
     res.json({ member: updatedMembers.get(userId), members: listTeamMembers(teamId, teamMembers, teamRoleRank) });
@@ -153,7 +150,7 @@ export function registerTeamRoutes({
 
     const teamId = String(req.params.teamId ?? "");
     const userId = String(req.params.userId ?? "");
-    if (!teams.has(teamId)) {
+    if (!store.hasTeam(teamId)) {
       res.status(404).json({ error: "Team not found" });
       return;
     }
@@ -170,10 +167,10 @@ export function registerTeamRoutes({
     }
 
     members.delete(userId);
-    const team = teams.get(teamId);
+    const team = store.getTeam(teamId);
     if (team) {
       const updatedTeam = { ...team, members: members.size };
-      teams.set(teamId, updatedTeam);
+      store.setTeam(updatedTeam);
       revokeTeamInvites(teamId);
       revokeTeamMemberSessions(teamId, userId);
       broadcastWorkspaceUpdated(updatedTeam);
@@ -196,14 +193,14 @@ export function registerTeamRoutes({
       name,
       members: 1
     };
-    teams.set(team.id, team);
+    store.setTeam(team);
     if (session) {
       addTeamMember(team.id, session.user.id, "owner");
     } else {
       scheduleStoreSave();
       broadcastWorkspaceUpdated(team);
     }
-    res.status(201).json({ team: teamRecordForUser(teams.get(team.id) ?? team, teamMembers, session?.user.id) });
+    res.status(201).json({ team: teamRecordForUser(store.getTeam(team.id) ?? team, teamMembers, session?.user.id) });
   });
 }
 

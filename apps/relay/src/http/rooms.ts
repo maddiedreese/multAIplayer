@@ -5,15 +5,13 @@ import {
   defaultBrowserProfilePersistent,
   defaultCodexModel,
   defaultRoomMode,
-  type RoomRecord,
-  type TeamRecord
+  type RoomRecord
 } from "@multaiplayer/protocol";
-import type { AuthSession } from "../state.js";
+import type { AuthSession, RelayStore } from "../state.js";
 
 interface RegisterRoomRoutesOptions {
   app: Express;
-  teams: Map<string, TeamRecord>;
-  rooms: Map<string, RoomRecord>;
+  store: RelayStore;
   getAuthSession: (sessionId: unknown) => AuthSession | null;
   allowMutation: (session: AuthSession | null, res: Response) => boolean;
   isTeamMember: (teamId: string, userId: string) => boolean;
@@ -39,8 +37,7 @@ interface RegisterRoomRoutesOptions {
 
 export function registerRoomRoutes({
   app,
-  teams,
-  rooms,
+  store,
   getAuthSession,
   allowMutation,
   isTeamMember,
@@ -74,7 +71,7 @@ export function registerRoomRoutes({
     const codexModel = req.body?.codexModel === undefined ? defaultCodexModel : normalizeCodexModel(req.body.codexModel);
     const browserAllowedOrigins = req.body?.browserAllowedOrigins;
     const browserProfilePersistent = req.body?.browserProfilePersistent;
-    if (!teams.has(teamId)) {
+    if (!store.hasTeam(teamId)) {
       res.status(404).json({ error: "Team not found" });
       return;
     }
@@ -125,7 +122,7 @@ export function registerRoomRoutes({
       browserProfilePersistent: browserProfilePersistent ?? defaultBrowserProfilePersistent,
       unread: 0
     };
-    rooms.set(room.id, room);
+    store.setRoom(room);
     scheduleStoreSave();
     broadcastRoomUpdated(room);
     res.status(201).json({ room });
@@ -147,7 +144,7 @@ export function registerRoomRoutes({
       id: session?.user.id ?? requestedHostUserId,
       name: session ? (normalizeMetadataText(displayNameForUser(session.user), maxHostNameChars) ?? "") : host
     };
-    const room = rooms.get(roomId);
+    const room = store.getRoom(roomId);
     if (!room) {
       res.status(404).json({ error: "Room not found" });
       return;
@@ -181,7 +178,7 @@ export function registerRoomRoutes({
       hostUserId: hostStatus === "offline" ? undefined : hostStatus === "active" ? requester.id : room.hostUserId,
       hostStatus: hostStatus as RoomRecord["hostStatus"]
     };
-    rooms.set(roomId, updated);
+    store.setRoom(updated);
     scheduleStoreSave();
     broadcastRoomUpdated(updated);
     res.json({ room: updated });
@@ -200,7 +197,7 @@ export function registerRoomRoutes({
     const browserAllowedOrigins = req.body?.browserAllowedOrigins;
     const browserProfilePersistent = req.body?.browserProfilePersistent;
     const requester = requesterFromRequest(req.body, req.cookies?.multaiplayer_session);
-    const room = rooms.get(roomId);
+    const room = store.getRoom(roomId);
     if (!room) {
       res.status(404).json({ error: "Room not found" });
       return;
@@ -255,7 +252,7 @@ export function registerRoomRoutes({
       browserAllowedOrigins: normalizedBrowserAllowedOrigins ?? room.browserAllowedOrigins,
       browserProfilePersistent: browserProfilePersistent ?? room.browserProfilePersistent
     };
-    rooms.set(roomId, updated);
+    store.setRoom(updated);
     scheduleStoreSave();
     broadcastRoomUpdated(updated);
     res.json({ room: updated });
