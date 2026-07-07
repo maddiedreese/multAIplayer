@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
+import Database from "better-sqlite3";
 import { WebSocket } from "ws";
 
 interface RelayHarness {
@@ -2960,7 +2961,18 @@ test("relay persists workspace state through SQLite storage", async () => {
     });
     assert.equal(createRoom.status, 201);
 
-    await delay(250);
+    const db = new Database(dataPath, { readonly: true });
+    try {
+      const teams = db.prepare("select data_json from relay_teams").all() as Array<{ data_json: string }>;
+      const rooms = db.prepare("select data_json from relay_rooms").all() as Array<{ data_json: string }>;
+      const snapshots = db.prepare("select state_json from relay_snapshots").all() as Array<{ state_json: string }>;
+      assert.ok(teams.some((item) => JSON.parse(item.data_json).name === "SQLite Team"));
+      assert.ok(rooms.some((item) => JSON.parse(item.data_json).name === "SQLite Room"));
+      assert.deepEqual(snapshots, []);
+    } finally {
+      db.close();
+    }
+
     await relay.close({ preserveData: true });
 
     restarted = await startRelay({

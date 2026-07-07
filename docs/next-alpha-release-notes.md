@@ -24,7 +24,7 @@ These notes are a draft for the next public alpha after `v0.1.0-alpha.0`. Keep t
 
 - Public macOS alpha artifacts are expected to be Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
 - Member removal does not yet provide production-grade cryptographic key epochs.
-- The official/self-host relay uses SQLite snapshot storage in this alpha. It needs route-level database tables, backup/restore drills, and external/shared rate limiting before production claims.
+- The official/self-host relay uses SQLite table storage in this alpha. It still needs backup/restore drills and external/shared rate limiting before production claims.
 - Rate limiting is process-local.
 - Host handoff reconstructs context from room state; it still needs real two-person testing against actual Codex usage-limit failures.
 - Browser and terminal behavior is powerful and intentionally host-local, but it should continue to receive security review before private or regulated work.

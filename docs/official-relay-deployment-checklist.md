@@ -58,7 +58,7 @@ The check must pass. It verifies GitHub OAuth presence, strong durable session e
 - Do not use `/tmp` for `MULTAIPLAYER_RELAY_DATA_PATH`.
 - Use `MULTAIPLAYER_RELAY_STORAGE=sqlite` for the official hosted alpha relay.
 - Back up the relay SQLite store before deploys and before any migration.
-- Treat the SQLite snapshot store as alpha infrastructure. Plan route-level tables, backup/restore drills, and shared/external rate limiting before production claims or multi-instance hosting.
+- Treat the SQLite relay store as alpha infrastructure. Plan backup/restore drills, migration rehearsals, and shared/external rate limiting before production claims or multi-instance hosting.
 
 ## Network And Proxy
 
