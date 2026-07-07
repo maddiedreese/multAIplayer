@@ -25,7 +25,6 @@ import { roomLockMessage } from "../lib/appRuntime";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
 import { omitRecordKey } from "../lib/setUtils";
 import {
-  replaceRoomTerminalSnapshots,
   terminalsForLocalHistory
 } from "../lib/terminalState";
 import { pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
@@ -74,16 +73,7 @@ interface UseLocalHistoryActionsOptions {
   setSettingsBusyForRoom: (roomId: string, busy: boolean) => void;
   setSecretWarningVisibleForRoom: (roomId: string, visible: boolean) => void;
   setHistorySettings: Dispatch<SetStateAction<LocalHistorySettings>>;
-  setMessagesByRoom: Dispatch<SetStateAction<Record<string, ChatMessage[]>>>;
-  setTerminalRequestsByRoom: Dispatch<SetStateAction<Record<string, TerminalCommandRequest[]>>>;
-  setBrowserRequestsByRoom: Dispatch<SetStateAction<Record<string, BrowserAccessRequest[]>>>;
-  setInviteRequestsByRoom: Dispatch<SetStateAction<Record<string, InviteJoinRequest[]>>>;
-  setCodexEventsByRoom: Dispatch<SetStateAction<Record<string, CodexRoomEvent[]>>>;
-  setGitWorkflowEventsByRoom: Dispatch<SetStateAction<Record<string, GitWorkflowEventPlaintextPayload[]>>>;
-  setGitHubActionsEventsByRoom: Dispatch<SetStateAction<Record<string, GitHubActionsEventPlaintextPayload[]>>>;
-  setLocalPreviewsByRoom: Dispatch<SetStateAction<Record<string, LocalPreviewRecord[]>>>;
-  setTerminals: Dispatch<SetStateAction<TerminalSnapshot[]>>;
-  setHostHandoffsByRoom: Dispatch<SetStateAction<Record<string, HostHandoffRecord[]>>>;
+  hydrateLocalRoomHistoryForRoom: (roomId: string, payload: ReturnType<typeof pruneLocalRoomHistory>) => void;
   setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
   setBrowserStatusByRoom: Dispatch<SetStateAction<Record<string, BrowserStatus>>>;
   setActiveBrowserUrlsByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
@@ -117,16 +107,7 @@ export function useLocalHistoryActions({
   setSettingsBusyForRoom,
   setSecretWarningVisibleForRoom,
   setHistorySettings,
-  setMessagesByRoom,
-  setTerminalRequestsByRoom,
-  setBrowserRequestsByRoom,
-  setInviteRequestsByRoom,
-  setCodexEventsByRoom,
-  setGitWorkflowEventsByRoom,
-  setGitHubActionsEventsByRoom,
-  setLocalPreviewsByRoom,
-  setTerminals,
-  setHostHandoffsByRoom,
+  hydrateLocalRoomHistoryForRoom,
   setRooms,
   setBrowserStatusByRoom,
   setActiveBrowserUrlsByRoom,
@@ -158,16 +139,7 @@ export function useLocalHistoryActions({
         hostHandoffs,
         ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
       }, saved.retentionDays);
-      setMessagesByRoom((current) => ({ ...current, [roomId]: payload.messages }));
-      setTerminalRequestsByRoom((current) => ({ ...current, [roomId]: payload.terminalRequests }));
-      setBrowserRequestsByRoom((current) => ({ ...current, [roomId]: payload.browserRequests }));
-      setInviteRequestsByRoom((current) => ({ ...current, [roomId]: payload.inviteRequests }));
-      setCodexEventsByRoom((current) => ({ ...current, [roomId]: payload.codexEvents }));
-      setGitWorkflowEventsByRoom((current) => ({ ...current, [roomId]: payload.gitWorkflowEvents }));
-      setGitHubActionsEventsByRoom((current) => ({ ...current, [roomId]: payload.githubActionsEvents }));
-      setLocalPreviewsByRoom((current) => ({ ...current, [roomId]: payload.localPreviews }));
-      setTerminals((current) => replaceRoomTerminalSnapshots(current, roomId, payload.terminalSnapshots));
-      setHostHandoffsByRoom((current) => ({ ...current, [roomId]: payload.hostHandoffs }));
+      hydrateLocalRoomHistoryForRoom(roomId, payload);
     }
     setHistoryMessageForRoom(
       roomId,
