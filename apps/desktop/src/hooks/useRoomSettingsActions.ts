@@ -6,7 +6,7 @@ import type {
   RoomRecord,
   RoomSettingsPlaintextPayload
 } from "@multaiplayer/protocol";
-import { chooseProjectFolder } from "../lib/localBackend";
+import { chooseProjectFolder, shutdownCodexRoom } from "../lib/localBackend";
 import { updateRoomSettings } from "../lib/workspaceClient";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
 import {
@@ -230,6 +230,7 @@ export function useRoomSettingsActions({
     try {
       const previousModel = selectedCodexModel;
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), codexModel: nextModel });
+      void shutdownCodexRoom(roomId);
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
       await publishRoomSettingsEvent(room, {
         id: crypto.randomUUID(),
@@ -362,6 +363,7 @@ export function useRoomSettingsActions({
     try {
       const previousProjectPath = selectedRoom.projectPath;
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), projectPath: nextProjectPath });
+      void shutdownCodexRoom(roomId);
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
       await publishRoomSettingsEvent(room, {
         id: crypto.randomUUID(),

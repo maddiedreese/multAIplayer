@@ -7,6 +7,7 @@ import type {
 import { defaultCodexModel } from "@multaiplayer/protocol";
 import {
   runCodexTurn,
+  shutdownCodexRoom,
   type GitStatusSummary,
   type TerminalSnapshot
 } from "../lib/localBackend";
@@ -202,7 +203,7 @@ export function useCodexTurnActions({
           : `Started Codex turn with ${formatCodexModel(model)}.`,
         model
       }, room);
-      const result = await runCodexTurn(projectPath, input, model, previousThreadId);
+      const result = await runCodexTurn(roomId, projectPath, input, model, previousThreadId);
       if (classifyCodexFailure([result.status, result.stderr, result.transcript, ...result.events]) === "usage_limit") {
         await handleCodexUsageLimit(room, turnId, model, turnMessages, result.events, result.stderr);
         return;
@@ -303,6 +304,7 @@ export function useCodexTurnActions({
     }, room);
     try {
       const handedOff = await updateRoomHost(roomId, room.host, room.hostUserId ?? localUser.id, "handoff");
+      void shutdownCodexRoom(roomId);
       setRooms((current) => current.map((item) => (item.id === handedOff.id ? ensureRoomDefaults(handedOff) : item)));
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {

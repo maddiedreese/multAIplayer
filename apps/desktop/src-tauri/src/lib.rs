@@ -63,7 +63,8 @@ pub fn run() {
             device_identity_delete,
             run_git_workflow,
             probe_codex,
-            run_codex_turn
+            run_codex_turn,
+            shutdown_codex_room
         ])
         .run(tauri::generate_context!())
         .expect("error while running multAIplayer");
@@ -559,6 +560,49 @@ mod tests {
         assert_eq!(resume["params"]["cwd"], "/tmp/project");
         assert_eq!(resume["params"]["model"], "gpt-5.4");
         assert_eq!(resume["params"]["excludeTurns"], true);
+    }
+
+    #[test]
+    fn codex_server_key_is_scoped_to_room_project_and_model() {
+        let base = codex_server_key(Some("room-alpha"), "/tmp/project", "gpt-5.4")
+            .expect("valid codex session key");
+        let same = codex_server_key(Some("room-alpha"), "/tmp/project", "gpt-5.4")
+            .expect("same codex session key");
+        let different_room = codex_server_key(Some("room-beta"), "/tmp/project", "gpt-5.4")
+            .expect("different room key");
+        let different_project = codex_server_key(Some("room-alpha"), "/tmp/other", "gpt-5.4")
+            .expect("different project key");
+        let different_model = codex_server_key(Some("room-alpha"), "/tmp/project", "gpt-5.4-mini")
+            .expect("different model key");
+
+        assert_eq!(base, same);
+        assert_ne!(base, different_room);
+        assert_ne!(base, different_project);
+        assert_ne!(base, different_model);
+        assert!(codex_server_key(Some("room/alpha"), "/tmp/project", "gpt-5.4").is_err());
+    }
+
+    #[test]
+    fn codex_room_shutdown_matches_all_sessions_for_room_only() {
+        let room_a_main = codex_server_key(Some("room-alpha"), "/tmp/project", "gpt-5.4")
+            .expect("room alpha key");
+        let room_a_model = codex_server_key(Some("room-alpha"), "/tmp/project", "gpt-5.4-mini")
+            .expect("room alpha model key");
+        let room_b =
+            codex_server_key(Some("room-beta"), "/tmp/project", "gpt-5.4").expect("room beta key");
+
+        assert!(should_shutdown_codex_session_for_room(
+            &room_a_main,
+            "room-alpha"
+        ));
+        assert!(should_shutdown_codex_session_for_room(
+            &room_a_model,
+            "room-alpha"
+        ));
+        assert!(!should_shutdown_codex_session_for_room(
+            &room_b,
+            "room-alpha"
+        ));
     }
 
     #[test]

@@ -585,6 +585,7 @@ export async function chooseProjectFolder(defaultPath: string): Promise<string |
 }
 
 export async function runCodexTurn(
+  roomId: string,
   cwd: string,
   input: string,
   model = "gpt-5.4",
@@ -594,6 +595,7 @@ export async function runCodexTurn(
   if (isTauriRuntime()) {
     return invoke<CodexTurnResult>("run_codex_turn", {
       request: {
+        roomId,
         cwd,
         input,
         model,
@@ -616,6 +618,13 @@ export async function runCodexTurn(
     ],
     stderr: ""
   };
+}
+
+export async function shutdownCodexRoom(roomId: string): Promise<number> {
+  if (!isTauriRuntime()) return 0;
+  return invoke<number>("shutdown_codex_room", {
+    request: { roomId }
+  });
 }
 
 

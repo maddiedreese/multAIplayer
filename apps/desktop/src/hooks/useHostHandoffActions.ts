@@ -13,6 +13,7 @@ import {
   createGitPatch,
   defaultProjectPath,
   getGitRemoteOrigin,
+  shutdownCodexRoom,
   type GitApplyPatchResult,
   type GitCloneResult,
   type GitStatusSummary,
@@ -149,6 +150,7 @@ export function useHostHandoffActions({
       const host = hostStatus === "active" ? localUser.name : hostStatus === "handoff" ? selectedRoom.host : "No host";
       const hostUserId = hostStatus === "active" ? localUser.id : selectedRoom.hostUserId ?? localUser.id;
       const room = await updateRoomHost(roomId, host, hostUserId, hostStatus);
+      if (hostStatus !== "active") void shutdownCodexRoom(roomId);
       setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setHostMessageForRoom(
@@ -213,6 +215,7 @@ export function useHostHandoffActions({
         projectPath: handoffProjectPath
       });
       const claimed = await updateRoomHost(updatedSettings.id, localUser.name, localUser.id, "active");
+      void shutdownCodexRoom(roomId);
       setRooms((current) => current.map((item) => (item.id === claimed.id ? ensureRoomDefaults(claimed) : item)));
       markHostHandoffAccepted(roomId, roomHandoff.id);
       await publishHostHandoffAccepted(selectedRoom, roomHandoff);
