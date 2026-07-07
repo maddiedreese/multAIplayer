@@ -602,6 +602,55 @@ test("relay ignores duplicate encrypted envelopes by room id", async () => {
   }
 });
 
+test("relay replays encrypted backlog after restart when a client rejoins", async () => {
+  const relay = await startRelay();
+  const sender = new WebSocket(relay.wsUrl);
+  let restarted: RelayHarness | null = null;
+  try {
+    await onceOpen(sender);
+    sender.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:tester",
+      deviceId: "device-test-123"
+    }));
+    await waitForJoined(sender);
+
+    const envelope = testEnvelope({ id: "envelope-restart-backlog" });
+    sender.send(JSON.stringify({ type: "publish", envelope }));
+    await waitForDebugBacklog(relay.baseUrl, 1);
+
+    sender.close();
+    await relay.close({ preserveData: true });
+    restarted = await startRelay({}, undefined, relay.dataPath);
+
+    const receiver = new WebSocket(restarted.wsUrl);
+    try {
+      await onceOpen(receiver);
+      const replayedEnvelope = waitForEnvelope(receiver, "browser.event");
+      receiver.send(JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-restart-456"
+      }));
+      await waitForJoined(receiver);
+      assert.equal((await replayedEnvelope).id, envelope.id);
+    } finally {
+      receiver.close();
+    }
+  } finally {
+    sender.close();
+    if (restarted) {
+      await restarted.close();
+    } else {
+      await relay.close().catch(() => {});
+    }
+  }
+});
+
 test("relay accepts and broadcasts encrypted terminal result events", async () => {
   const relay = await startRelay();
   const receiver = new WebSocket(relay.wsUrl);
