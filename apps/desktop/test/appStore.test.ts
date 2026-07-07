@@ -456,8 +456,9 @@ test("desktop store keeps invite panel state room scoped", () => {
   store.setInviteApprovalGatesByRoom({ "room-a": true, "room-b": false });
   store.setInviteMessagesByRoom({ "room-a": "Invite created", "room-b": null });
   store.setKeyRotationBusyByRoom({ "room-a": true });
-  store.setInviteAdmissionsByRoom({ "room-a": "Admitted Jordan", "room-b": "Admitted Avery" });
-  store.clearInviteAdmissionForRoom("room-a");
+  store.setInviteAdmissionsByRoom({ "room-a": "Admitted Jordan" });
+  store.setInviteAdmissionForRoom("room-b", "Admitted Avery");
+  store.setInviteAdmissionForRoom("room-a", null);
 
   const state = useAppStore.getState();
   assert.equal(state.inviteRequestsByRoom["room-a"]?.[0]?.requester, "Jordan");

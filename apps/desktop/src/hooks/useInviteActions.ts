@@ -57,6 +57,7 @@ import {
 } from "../lib/noSecretRoomInvite";
 import { formatMessageTime } from "../lib/appFormatters";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
+import { useAppStore } from "../store/appStore";
 import type { RelayClient } from "../lib/relayClient";
 import type {
   ChatMessage,
@@ -102,8 +103,6 @@ interface UseInviteActionsOptions {
   setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
   setRevokedRoomIds: Dispatch<SetStateAction<Set<string>>>;
   setRevokedTeamIds: Dispatch<SetStateAction<Set<string>>>;
-  setInviteAdmissionsByRoom: Dispatch<SetStateAction<Record<string, string>>>;
-  setMessagesByRoom: Dispatch<SetStateAction<Record<string, ChatMessage[]>>>;
   setKeyRotationBusyForRoom: (roomId: string, busy: boolean) => void;
 }
 
@@ -140,10 +139,11 @@ export function useInviteActions({
   setForgottenRoomIds,
   setRevokedRoomIds,
   setRevokedTeamIds,
-  setInviteAdmissionsByRoom,
-  setMessagesByRoom,
   setKeyRotationBusyForRoom
 }: UseInviteActionsOptions) {
+  const setInviteAdmissionForRoom = useAppStore((state) => state.setInviteAdmissionForRoom);
+  const initializeMessagesForRoom = useAppStore((state) => state.initializeMessagesForRoom);
+
   async function publishInviteJoinRequest(
     teamId: string,
     roomId: string,
@@ -449,10 +449,7 @@ export function useInviteActions({
       acceptedRoomName = metadata.room.name;
       setRevokedRoomIds((current) => withoutSetValue(current, inviteSecret.roomId));
       setRevokedTeamIds((current) => withoutSetValue(current, inviteSecret.teamId));
-      setInviteAdmissionsByRoom((current) => ({
-        ...current,
-        [inviteSecret.roomId]: inviteId
-      }));
+      setInviteAdmissionForRoom(inviteSecret.roomId, inviteId);
     } else {
       upsertTeam({
         id: inviteSecret.teamId,
@@ -475,10 +472,7 @@ export function useInviteActions({
       }));
     }
 
-    setMessagesByRoom((current) => ({
-      ...current,
-      [inviteSecret.roomId]: current[inviteSecret.roomId] ?? []
-    }));
+    initializeMessagesForRoom(inviteSecret.roomId);
     setSelectedTeam(inviteSecret.teamId);
     setSelectedRoomId(inviteSecret.roomId);
     setInviteSecretInput("");
@@ -553,15 +547,9 @@ export function useInviteActions({
     await importRoomSecret(inviteSecret.roomId, inviteSecret.secret);
     setForgottenRoomIds((current) => withoutSetValue(current, inviteSecret.roomId));
     if (inviteId) {
-      setInviteAdmissionsByRoom((current) => ({
-        ...current,
-        [inviteSecret.roomId]: inviteId
-      }));
+      setInviteAdmissionForRoom(inviteSecret.roomId, inviteId);
     }
-    setMessagesByRoom((current) => ({
-      ...current,
-      [inviteSecret.roomId]: current[inviteSecret.roomId] ?? []
-    }));
+    initializeMessagesForRoom(inviteSecret.roomId);
     setSelectedTeam(inviteSecret.teamId);
     setSelectedRoomId(inviteSecret.roomId);
     setInviteSecretInput("");

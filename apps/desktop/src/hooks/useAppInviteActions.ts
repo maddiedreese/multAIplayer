@@ -93,8 +93,6 @@ export function useAppInviteActions({
     setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
     setRevokedRoomIds: roomRuntimeState.setRevokedRoomIds,
     setRevokedTeamIds: roomRuntimeState.setRevokedTeamIds,
-    setInviteAdmissionsByRoom: invitePanelState.setInviteAdmissionsByRoom,
-    setMessagesByRoom: workspaceState.setMessagesByRoom,
     setKeyRotationBusyForRoom
   });
 }

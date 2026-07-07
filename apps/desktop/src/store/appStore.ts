@@ -314,6 +314,7 @@ interface AppStoreState {
   setInviteMessagesByRoom: (action: SetStateAction<InviteMessagesByRoom>) => void;
   setKeyRotationBusyByRoom: (action: SetStateAction<KeyRotationBusyByRoom>) => void;
   setInviteAdmissionsByRoom: (action: SetStateAction<InviteAdmissionsByRoom>) => void;
+  setInviteAdmissionForRoom: (roomId: string, inviteId: string | null) => void;
   clearInviteAdmissionForRoom: (roomId: string) => void;
   setChatMessagesByRoom: (action: SetStateAction<ChatMessagesByRoom>) => void;
   setDraftsByRoom: (action: SetStateAction<DraftsByRoom>) => void;
@@ -687,6 +688,13 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setInviteAdmissionsByRoom: (action) => {
     set((state) => ({
       inviteAdmissionsByRoom: resolveSetStateAction(state.inviteAdmissionsByRoom, action)
+    }));
+  },
+  setInviteAdmissionForRoom: (roomId, inviteId) => {
+    set((state) => ({
+      inviteAdmissionsByRoom: inviteId
+        ? { ...state.inviteAdmissionsByRoom, [roomId]: inviteId }
+        : omitRecordKey(state.inviteAdmissionsByRoom, roomId)
     }));
   },
   clearInviteAdmissionForRoom: (roomId) => {
