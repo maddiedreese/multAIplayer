@@ -1,4 +1,3 @@
-import type { Dispatch, SetStateAction } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import {
   detectLocalPreviewServers,
@@ -28,7 +27,13 @@ interface UseLocalPreviewActionsOptions {
   localUser: LocalUser;
   localPreviewDialog: LocalPreviewDialogState;
   localPreviewsByRoom: Record<string, LocalPreviewRecord[]>;
-  setLocalPreviewDialog: Dispatch<SetStateAction<LocalPreviewDialogState>>;
+  openLocalPreviewDialogForRoom: (roomId: string) => void;
+  closeLocalPreviewDialog: () => void;
+  setLocalPreviewDialogCandidates: (candidates: LocalPreviewDialogState["candidates"], error: string | null) => void;
+  setLocalPreviewDialogSelectedUrl: (selectedUrl: string) => void;
+  setLocalPreviewDialogPhase: (phase: LocalPreviewDialogState["phase"], error?: string | null) => void;
+  setLocalPreviewDialogConfirmation: (roomId: string, selectedUrl: string, cloudflaredVersion: string | null) => void;
+  setLocalPreviewDialogError: (error: string | null) => void;
   setLocalPreviewBusyForRoom: (roomId: string, busy: boolean) => void;
   setSelectedChatMessage: (message: string | null) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
@@ -44,7 +49,13 @@ export function useLocalPreviewActions({
   localUser,
   localPreviewDialog,
   localPreviewsByRoom,
-  setLocalPreviewDialog,
+  openLocalPreviewDialogForRoom,
+  closeLocalPreviewDialog,
+  setLocalPreviewDialogCandidates,
+  setLocalPreviewDialogSelectedUrl,
+  setLocalPreviewDialogPhase,
+  setLocalPreviewDialogConfirmation,
+  setLocalPreviewDialogError,
   setLocalPreviewBusyForRoom,
   setSelectedChatMessage,
   setChatMessageForRoom,
@@ -57,33 +68,19 @@ export function useLocalPreviewActions({
       return;
     }
     setLocalPreviewBusyForRoom(selectedRoom.id, true);
-    setLocalPreviewDialog({
-      open: true,
-      phase: "select",
-      roomId: selectedRoom.id,
-      candidates: [],
-      selectedUrl: "",
-      manualUrl: "",
-      error: null,
-      cloudflaredVersion: null
-    });
+    openLocalPreviewDialogForRoom(selectedRoom.id);
     try {
       const detected = await detectLocalPreviewServers();
       const candidates = detected.map((server) => ({
         url: server.url,
         label: localPreviewLabel(server.url)
       }));
-      setLocalPreviewDialog((current) => ({
-        ...current,
+      setLocalPreviewDialogCandidates(
         candidates,
-        selectedUrl: candidates[0]?.url ?? "",
-        error: candidates.length ? null : "No common local development servers were detected. Enter a local URL manually."
-      }));
+        candidates.length ? null : "No common local development servers were detected. Enter a local URL manually."
+      );
     } catch (error) {
-      setLocalPreviewDialog((current) => ({
-        ...current,
-        error: `Could not detect local web servers: ${String(error)}`
-      }));
+      setLocalPreviewDialogError(`Could not detect local web servers: ${String(error)}`);
     } finally {
       setLocalPreviewBusyForRoom(selectedRoom.id, false);
     }
@@ -94,27 +91,16 @@ export function useLocalPreviewActions({
     const selectedUrl = localPreviewDialog.manualUrl.trim() || localPreviewDialog.selectedUrl;
     try {
       const normalizedUrl = normalizeLocalPreviewUrl(selectedUrl);
-      setLocalPreviewDialog((current) => ({ ...current, error: null, selectedUrl: normalizedUrl }));
+      setLocalPreviewDialogError(null);
+      setLocalPreviewDialogSelectedUrl(normalizedUrl);
       const cloudflared = await probeCloudflared();
       if (!cloudflared.available) {
-        setLocalPreviewDialog((current) => ({
-          ...current,
-          phase: "install",
-          error: cloudflared.error ?? "cloudflared is not installed.",
-          cloudflaredVersion: null
-        }));
+        setLocalPreviewDialogPhase("install", cloudflared.error ?? "cloudflared is not installed.");
         return;
       }
-      setLocalPreviewDialog((current) => ({
-        ...current,
-        phase: "confirm",
-        roomId: room.id,
-        selectedUrl: normalizedUrl,
-        cloudflaredVersion: cloudflared.version,
-        error: null
-      }));
+      setLocalPreviewDialogConfirmation(room.id, normalizedUrl, cloudflared.version);
     } catch (error) {
-      setLocalPreviewDialog((current) => ({ ...current, error: String(error) }));
+      setLocalPreviewDialogError(String(error));
     }
   }
 
@@ -123,7 +109,7 @@ export function useLocalPreviewActions({
     const previewId = crypto.randomUUID();
     const sourceUrl = localPreviewDialog.selectedUrl;
     const now = new Date().toISOString();
-    setLocalPreviewDialog((current) => ({ ...current, phase: "starting", error: null }));
+    setLocalPreviewDialogPhase("starting");
     setLocalPreviewBusyForRoom(room.id, true);
     const startingPayload: LocalPreviewRecord = {
       eventType: "local.preview",
@@ -148,7 +134,7 @@ export function useLocalPreviewActions({
         updatedAt: new Date().toISOString()
       };
       await publishLocalPreviewEvent(livePayload, room);
-      setLocalPreviewDialog((current) => ({ ...current, open: false }));
+      closeLocalPreviewDialog();
       setChatMessageForRoom(room.id, `Shared local preview: ${tunnel.publicUrl}`);
     } catch (error) {
       const errorPayload: LocalPreviewRecord = {
@@ -158,7 +144,7 @@ export function useLocalPreviewActions({
         updatedAt: new Date().toISOString()
       };
       await publishLocalPreviewEvent(errorPayload, room);
-      setLocalPreviewDialog((current) => ({ ...current, phase: "select", error: String(error) }));
+      setLocalPreviewDialogPhase("select", String(error));
     } finally {
       setLocalPreviewBusyForRoom(room.id, false);
     }

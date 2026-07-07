@@ -378,16 +378,9 @@ test("desktop store keeps local preview state room scoped", () => {
   });
   store.setLocalPreviewBusyForRoom("room-a", true);
   store.setLocalPreviewBusyForRoom("room-b", false);
-  store.setLocalPreviewDialog({
-    open: true,
-    phase: "confirm",
-    roomId: "room-a",
-    candidates: [{ url: "http://localhost:5173/", label: "localhost:5173" }],
-    selectedUrl: "http://localhost:5173/",
-    manualUrl: "",
-    error: null,
-    cloudflaredVersion: "2026.7.0"
-  });
+  store.openLocalPreviewDialogForRoom("room-a");
+  store.setLocalPreviewDialogCandidates([{ url: "http://localhost:5173/", label: "localhost:5173" }], null);
+  store.setLocalPreviewDialogConfirmation("room-a", "http://localhost:5173/", "2026.7.0");
 
   const state = useAppStore.getState();
   assert.equal(state.localPreviewsByRoom["room-a"]?.[0]?.status, "live");

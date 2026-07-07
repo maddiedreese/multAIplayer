@@ -474,7 +474,10 @@ export function useAppViewModel({
     },
     localPreviewDialog: {
       localPreviewDialog: localPreviewState.localPreviewDialog,
-      setLocalPreviewDialog: localPreviewState.setLocalPreviewDialog,
+      closeLocalPreviewDialog: localPreviewState.closeLocalPreviewDialog,
+      setLocalPreviewDialogSelectedUrl: localPreviewState.setLocalPreviewDialogSelectedUrl,
+      setLocalPreviewDialogManualUrl: localPreviewState.setLocalPreviewDialogManualUrl,
+      setLocalPreviewDialogPhase: localPreviewState.setLocalPreviewDialogPhase,
       localPreviewBusy: selectedRuntime.localPreviewBusy,
       prepareLocalPreviewConfirmation: roomRuntime.prepareLocalPreviewConfirmation,
       confirmLocalPreviewShare: roomRuntime.confirmLocalPreviewShare

@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import type { SetStateAction } from "react";
 import type { GitHubActionRun } from "../lib/authClient";
 import type {
   GitStatusSummary
@@ -11,7 +10,6 @@ import { createBrowserSlice, emptyBrowserState, type BrowserSlice } from "./slic
 import { createFilePanelSlice, emptyFilePanelState, type FilePanelSlice } from "./slices/filePanelSlice";
 import { createRoomChatSlice, emptyRoomChatState, type RoomChatSlice } from "./slices/roomChatSlice";
 import { createTerminalSlice, emptyTerminalState, type TerminalSlice } from "./slices/terminalSlice";
-import { resolveSetStateAction } from "./storeUtils";
 import type {
   ChatMessage,
   CodexRoomEvent,
@@ -76,6 +74,7 @@ type TeamMembersMessageByTeam = Record<string, string | null>;
 type TeamMembersBusyByTeam = Record<string, boolean>;
 type MessagesByRoom = Record<string, ChatMessage[]>;
 type RoomBusyByRoom = Record<string, boolean>;
+type LocalPreviewCandidate = LocalPreviewDialogState["candidates"][number];
 
 interface WorkspaceInitialData {
   teamMembersByTeam: TeamMembersByTeam;
@@ -198,7 +197,14 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, RoomChatSli
   setActionsLastCheckedForRoom: (roomId: string, checkedAt: string | null) => void;
   resetGitHubActionsStateForRoom: (roomId: string) => void;
   setInspectorTabForRoom: (roomId: string, tab: InspectorTab) => void;
-  setLocalPreviewDialog: (action: SetStateAction<LocalPreviewDialogState>) => void;
+  openLocalPreviewDialogForRoom: (roomId: string) => void;
+  closeLocalPreviewDialog: () => void;
+  setLocalPreviewDialogCandidates: (candidates: LocalPreviewCandidate[], error: string | null) => void;
+  setLocalPreviewDialogSelectedUrl: (selectedUrl: string) => void;
+  setLocalPreviewDialogManualUrl: (manualUrl: string) => void;
+  setLocalPreviewDialogPhase: (phase: LocalPreviewDialogState["phase"], error?: string | null) => void;
+  setLocalPreviewDialogConfirmation: (roomId: string, selectedUrl: string, cloudflaredVersion: string | null) => void;
+  setLocalPreviewDialogError: (error: string | null) => void;
   setInviteRequestsForRoom: (roomId: string, requests: InviteJoinRequest[]) => void;
   setInviteSecretInputValue: (value: string) => void;
   clearInviteSecretInput: () => void;
@@ -304,9 +310,76 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       }
     }));
   },
-  setLocalPreviewDialog: (action) => {
+  openLocalPreviewDialogForRoom: (roomId) => {
+    set({
+      localPreviewDialog: {
+        ...emptyLocalPreviewDialog,
+        open: true,
+        roomId
+      }
+    });
+  },
+  closeLocalPreviewDialog: () => {
     set((state) => ({
-      localPreviewDialog: resolveSetStateAction(state.localPreviewDialog, action)
+      localPreviewDialog: {
+        ...state.localPreviewDialog,
+        open: false
+      }
+    }));
+  },
+  setLocalPreviewDialogCandidates: (candidates, error) => {
+    set((state) => ({
+      localPreviewDialog: {
+        ...state.localPreviewDialog,
+        candidates,
+        selectedUrl: candidates[0]?.url ?? "",
+        error
+      }
+    }));
+  },
+  setLocalPreviewDialogSelectedUrl: (selectedUrl) => {
+    set((state) => ({
+      localPreviewDialog: {
+        ...state.localPreviewDialog,
+        selectedUrl
+      }
+    }));
+  },
+  setLocalPreviewDialogManualUrl: (manualUrl) => {
+    set((state) => ({
+      localPreviewDialog: {
+        ...state.localPreviewDialog,
+        manualUrl
+      }
+    }));
+  },
+  setLocalPreviewDialogPhase: (phase, error = null) => {
+    set((state) => ({
+      localPreviewDialog: {
+        ...state.localPreviewDialog,
+        phase,
+        error
+      }
+    }));
+  },
+  setLocalPreviewDialogConfirmation: (roomId, selectedUrl, cloudflaredVersion) => {
+    set((state) => ({
+      localPreviewDialog: {
+        ...state.localPreviewDialog,
+        phase: "confirm",
+        roomId,
+        selectedUrl,
+        cloudflaredVersion,
+        error: null
+      }
+    }));
+  },
+  setLocalPreviewDialogError: (error) => {
+    set((state) => ({
+      localPreviewDialog: {
+        ...state.localPreviewDialog,
+        error
+      }
     }));
   },
   setInviteRequestsForRoom: (roomId, requests) => {
