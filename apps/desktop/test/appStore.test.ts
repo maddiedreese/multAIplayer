@@ -572,6 +572,43 @@ test("desktop store keeps Codex room state room scoped", () => {
   assert.equal(state.codexThreadIdsByRoom["room-a"], "thread-room-a");
 });
 
+test("desktop store exposes room Codex approval actions", () => {
+  const store = useAppStore.getState();
+  const approval = {
+    roomId: "room-a",
+    messages: [
+      {
+        id: "message-1",
+        author: "Avery",
+        role: "human" as const,
+        body: "@Codex draft a plan",
+        time: "9:43"
+      }
+    ],
+    summary: {
+      messagesSinceLastCodex: 1,
+      attachments: [],
+      workspacePath: "/Users/maddiedreese/Documents/MultAIplayer",
+      git: null,
+      browserAccess: [],
+      terminals: []
+    }
+  };
+
+  store.setApprovalVisibleForRoom("room-a", true);
+  store.setPendingCodexApprovalForRoom("room-a", approval);
+  store.setCodexRunningForRoom("room-a", true);
+  store.setApprovalVisibleForRoom("room-b", true);
+  store.resetCodexApprovalForRoom("room-a");
+  store.setCodexRunningForRoom("room-a", false);
+
+  const state = useAppStore.getState();
+  assert.equal(state.approvalVisibleByRoom["room-a"], undefined);
+  assert.equal(state.pendingCodexApprovalsByRoom["room-a"], undefined);
+  assert.equal(state.codexRunningByRoom["room-a"], undefined);
+  assert.equal(state.approvalVisibleByRoom["room-b"], true);
+});
+
 test("desktop store keeps markdown message selection room scoped", () => {
   const store = useAppStore.getState();
 

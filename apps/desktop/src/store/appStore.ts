@@ -352,6 +352,10 @@ interface AppStoreState {
   updateTerminalRequestStatus: (roomId: string, requestId: string, status: TerminalCommandRequest["status"]) => void;
   appendBrowserRequest: (roomId: string, request: BrowserAccessRequest) => void;
   updateBrowserRequestStatus: (roomId: string, requestId: string, status: BrowserAccessRequest["status"]) => void;
+  setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
+  setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
+  resetCodexApprovalForRoom: (roomId: string) => void;
+  setCodexRunningForRoom: (roomId: string, running: boolean) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   setMarkdownCopyFallbackForRoom: (roomId: string, fallback: MarkdownCopyFallback | null) => void;
@@ -828,6 +832,33 @@ export const useAppStore = create<AppStoreState>((set) => ({
           request.id === requestId ? { ...request, status } : request
         )
       }
+    }));
+  },
+  setApprovalVisibleForRoom: (roomId, visible) => {
+    set((state) => ({
+      approvalVisibleByRoom: visible
+        ? { ...state.approvalVisibleByRoom, [roomId]: true }
+        : omitRecordKey(state.approvalVisibleByRoom, roomId)
+    }));
+  },
+  setPendingCodexApprovalForRoom: (roomId, approval) => {
+    set((state) => ({
+      pendingCodexApprovalsByRoom: approval
+        ? { ...state.pendingCodexApprovalsByRoom, [roomId]: approval }
+        : omitRecordKey(state.pendingCodexApprovalsByRoom, roomId)
+    }));
+  },
+  resetCodexApprovalForRoom: (roomId) => {
+    set((state) => ({
+      pendingCodexApprovalsByRoom: omitRecordKey(state.pendingCodexApprovalsByRoom, roomId),
+      approvalVisibleByRoom: omitRecordKey(state.approvalVisibleByRoom, roomId)
+    }));
+  },
+  setCodexRunningForRoom: (roomId, running) => {
+    set((state) => ({
+      codexRunningByRoom: running
+        ? { ...state.codexRunningByRoom, [roomId]: true }
+        : omitRecordKey(state.codexRunningByRoom, roomId)
     }));
   },
   setHostMessageForRoom: (roomId, message) => {

@@ -1,5 +1,4 @@
 import type { MutableRefObject } from "react";
-import { useRoomCodexApprovalSetters } from "./useRoomCodexApprovalSetters";
 import { useRoomEventAppenders } from "./useRoomEventAppenders";
 import { useRoomFileSetters } from "./useRoomFileSetters";
 import { useRoomTerminalSetters } from "./useRoomTerminalSetters";
@@ -30,7 +29,6 @@ export function useRoomScopedSetters({
   busy,
   files,
   terminals,
-  codexApprovals,
   browser,
   project,
   events
@@ -40,7 +38,6 @@ export function useRoomScopedSetters({
   busy: RoomBusySettersOptions;
   files: Parameters<typeof useRoomFileSetters>[0];
   terminals: Parameters<typeof useRoomTerminalSetters>[0];
-  codexApprovals: Parameters<typeof useRoomCodexApprovalSetters>[0];
   browser: {
     defaultBrowserUrl: string;
     defaultBrowserReason: string;
@@ -85,6 +82,10 @@ export function useRoomScopedSetters({
   const updateTerminalRequestStatus = useAppStore((state) => state.updateTerminalRequestStatus);
   const appendBrowserRequest = useAppStore((state) => state.appendBrowserRequest);
   const updateBrowserRequestStatus = useAppStore((state) => state.updateBrowserRequestStatus);
+  const setApprovalVisibleForRoom = useAppStore((state) => state.setApprovalVisibleForRoom);
+  const setPendingCodexApprovalForRoom = useAppStore((state) => state.setPendingCodexApprovalForRoom);
+  const resetCodexApprovalForRoom = useAppStore((state) => state.resetCodexApprovalForRoom);
+  const setCodexRunningForRoom = useAppStore((state) => state.setCodexRunningForRoom);
 
   const applyBusyForRoom = (
     ref: MutableRefObject<BusyMap>,
@@ -155,7 +156,10 @@ export function useRoomScopedSetters({
       applyBusyForRoom(busy.terminalBusyRef, setTerminalBusyForRoom, roomId, isBusy),
     ...useRoomFileSetters(files),
     ...useRoomTerminalSetters(terminals),
-    ...useRoomCodexApprovalSetters(codexApprovals),
+    setApprovalVisibleForRoom,
+    setPendingCodexApprovalForRoom,
+    resetCodexApprovalForRoom,
+    setCodexRunningForRoom,
     ...useRoomEventAppenders(events),
     updateInviteRequestStatus,
     appendTerminalRequest,
