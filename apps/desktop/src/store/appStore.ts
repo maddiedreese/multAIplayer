@@ -398,6 +398,7 @@ interface AppStoreState {
     updater: ChatAttachment[] | ((current: ChatAttachment[]) => ChatAttachment[])
   ) => void;
   setDraftForRoom: (roomId: string, value: string) => void;
+  clearRoomScopedStateForRoom: (roomId: string) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
 }
@@ -1225,6 +1226,63 @@ export const useAppStore = create<AppStoreState>((set) => ({
         ...state.draftsByRoom,
         [roomId]: value
       }
+    }));
+  },
+  clearRoomScopedStateForRoom: (roomId) => {
+    set((state) => ({
+      messagesByRoom: { ...state.messagesByRoom, [roomId]: [] },
+      terminalRequestsByRoom: { ...state.terminalRequestsByRoom, [roomId]: [] },
+      browserRequestsByRoom: { ...state.browserRequestsByRoom, [roomId]: [] },
+      inviteRequestsByRoom: { ...state.inviteRequestsByRoom, [roomId]: [] },
+      codexEventsByRoom: { ...state.codexEventsByRoom, [roomId]: [] },
+      gitWorkflowEventsByRoom: { ...state.gitWorkflowEventsByRoom, [roomId]: [] },
+      githubActionsEventsByRoom: { ...state.githubActionsEventsByRoom, [roomId]: [] },
+      hostHandoffsByRoom: { ...state.hostHandoffsByRoom, [roomId]: [] },
+      codexThreadIdsByRoom: omitRecordKey(state.codexThreadIdsByRoom, roomId),
+      actionRunsByRoom: omitRecordKey(state.actionRunsByRoom, roomId),
+      actionsLastCheckedByRoom: omitRecordKey(state.actionsLastCheckedByRoom, roomId),
+      actionsMessagesByRoom: omitRecordKey(state.actionsMessagesByRoom, roomId),
+      actionsBusyByRoom: omitRecordKey(state.actionsBusyByRoom, roomId),
+      gitWorkflowBusyByRoom: omitRecordKey(state.gitWorkflowBusyByRoom, roomId),
+      hostBusyByRoom: omitRecordKey(state.hostBusyByRoom, roomId),
+      hostMessagesByRoom: omitRecordKey(state.hostMessagesByRoom, roomId),
+      chatMessagesByRoom: omitRecordKey(state.chatMessagesByRoom, roomId),
+      markdownCopyFallbacksByRoom: omitRecordKey(state.markdownCopyFallbacksByRoom, roomId),
+      secretWarningsVisibleByRoom: omitRecordKey(state.secretWarningsVisibleByRoom, roomId),
+      historyMessagesByRoom: omitRecordKey(state.historyMessagesByRoom, roomId),
+      settingsBusyByRoom: omitRecordKey(state.settingsBusyByRoom, roomId),
+      settingsMessagesByRoom: omitRecordKey(state.settingsMessagesByRoom, roomId),
+      customCodexModelsByRoom: omitRecordKey(state.customCodexModelsByRoom, roomId),
+      projectPathDraftsByRoom: omitRecordKey(state.projectPathDraftsByRoom, roomId),
+      keyRotationBusyByRoom: omitRecordKey(state.keyRotationBusyByRoom, roomId),
+      approvalVisibleByRoom: omitRecordKey(state.approvalVisibleByRoom, roomId),
+      pendingCodexApprovalsByRoom: omitRecordKey(state.pendingCodexApprovalsByRoom, roomId),
+      codexRunningByRoom: omitRecordKey(state.codexRunningByRoom, roomId),
+      browserStatusByRoom: omitRecordKey(state.browserStatusByRoom, roomId),
+      activeBrowserUrlsByRoom: omitRecordKey(state.activeBrowserUrlsByRoom, roomId),
+      gitStatusByRoom: omitRecordKey(state.gitStatusByRoom, roomId),
+      fileQueriesByRoom: omitRecordKey(state.fileQueriesByRoom, roomId),
+      projectFilesByRoom: omitRecordKey(state.projectFilesByRoom, roomId),
+      selectedFilesByRoom: omitRecordKey(state.selectedFilesByRoom, roomId),
+      selectedDiffsByRoom: omitRecordKey(state.selectedDiffsByRoom, roomId),
+      fileBusyByRoom: omitRecordKey(state.fileBusyByRoom, roomId),
+      fileMessagesByRoom: omitRecordKey(state.fileMessagesByRoom, roomId),
+      pendingAttachmentsByRoom: omitRecordKey(state.pendingAttachmentsByRoom, roomId),
+      terminalLinesByRoom: omitRecordKey(state.terminalLinesByRoom, roomId),
+      terminalBusyByRoom: omitRecordKey(state.terminalBusyByRoom, roomId),
+      selectedTerminalIdsByRoom: omitRecordKey(state.selectedTerminalIdsByRoom, roomId),
+      terminalNamesByRoom: omitRecordKey(state.terminalNamesByRoom, roomId),
+      terminalCommandsByRoom: omitRecordKey(state.terminalCommandsByRoom, roomId),
+      terminalInputsByRoom: omitRecordKey(state.terminalInputsByRoom, roomId),
+      terminalErrorsByRoom: omitRecordKey(state.terminalErrorsByRoom, roomId),
+      terminals: state.terminals.filter((terminal) => terminal.roomId !== roomId),
+      browserUrlsByRoom: omitRecordKey(state.browserUrlsByRoom, roomId),
+      browserReasonsByRoom: omitRecordKey(state.browserReasonsByRoom, roomId),
+      browserMessagesByRoom: omitRecordKey(state.browserMessagesByRoom, roomId),
+      inviteLinksByRoom: omitRecordKey(state.inviteLinksByRoom, roomId),
+      inviteApprovalGatesByRoom: omitRecordKey(state.inviteApprovalGatesByRoom, roomId),
+      inviteMessagesByRoom: omitRecordKey(state.inviteMessagesByRoom, roomId),
+      draftsByRoom: omitRecordKey(state.draftsByRoom, roomId)
     }));
   },
   resetAppStore: () => set(emptyAppStoreState),

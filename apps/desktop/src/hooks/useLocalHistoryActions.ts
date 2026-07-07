@@ -18,10 +18,6 @@ import {
 } from "../lib/teamRoomDefaults";
 import { updateRoomSettings } from "../lib/workspaceClient";
 import {
-  type GitDiffResult,
-  type GitStatusSummary,
-  type ProjectFileContent,
-  type ProjectFileEntry,
   type TerminalSnapshot
 } from "../lib/localBackend";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
@@ -34,18 +30,15 @@ import {
 } from "../lib/terminalState";
 import { pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
 import { clearRoomVisibilityWarningAcknowledgement } from "../lib/roomVisibilityWarning";
-import type { GitHubActionRun } from "../lib/authClient";
+import { useAppStore } from "../store/appStore";
 import type {
   BrowserAccessRequest,
   BrowserStatus,
-  ChatAttachment,
   ChatMessage,
   CodexRoomEvent,
   HostHandoffRecord,
   InviteJoinRequest,
   LocalPreviewRecord,
-  MarkdownCopyFallback,
-  PendingCodexApproval,
   TerminalCommandRequest
 } from "../types";
 
@@ -94,48 +87,6 @@ interface UseLocalHistoryActionsOptions {
   setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
   setBrowserStatusByRoom: Dispatch<SetStateAction<Record<string, BrowserStatus>>>;
   setActiveBrowserUrlsByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setCodexThreadIdsByRoom: Dispatch<SetStateAction<Record<string, string>>>;
-  setActionRunsByRoom: Dispatch<SetStateAction<Record<string, GitHubActionRun[]>>>;
-  setActionsLastCheckedByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setActionsMessagesByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setActionsBusyByRoom: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setGitWorkflowBusyByRoom: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setHostBusyByRoom: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setHostMessagesByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setChatMessagesByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setMarkdownCopyFallbacksByRoom: Dispatch<SetStateAction<Record<string, MarkdownCopyFallback | null>>>;
-  setSecretWarningsVisibleByRoom: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setHistoryMessagesByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setSettingsBusyByRoom: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setSettingsMessagesByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setCustomCodexModelsByRoom: Dispatch<SetStateAction<Record<string, string>>>;
-  setProjectPathDraftsByRoom: Dispatch<SetStateAction<Record<string, string>>>;
-  setKeyRotationBusyByRoom: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setApprovalVisibleByRoom: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setPendingCodexApprovalsByRoom: Dispatch<SetStateAction<Record<string, PendingCodexApproval>>>;
-  setCodexRunningByRoom: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setGitStatusByRoom: Dispatch<SetStateAction<Record<string, GitStatusSummary | null>>>;
-  setFileQueriesByRoom: Dispatch<SetStateAction<Record<string, string>>>;
-  setProjectFilesByRoom: Dispatch<SetStateAction<Record<string, ProjectFileEntry[]>>>;
-  setSelectedFilesByRoom: Dispatch<SetStateAction<Record<string, ProjectFileContent | null>>>;
-  setSelectedDiffsByRoom: Dispatch<SetStateAction<Record<string, GitDiffResult | null>>>;
-  setFileBusyByRoom: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setFileMessagesByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setPendingAttachmentsByRoom: Dispatch<SetStateAction<Record<string, ChatAttachment[]>>>;
-  setTerminalLinesByRoom: Dispatch<SetStateAction<Record<string, string[]>>>;
-  setTerminalBusyByRoom: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setSelectedTerminalIdsByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setTerminalNamesByRoom: Dispatch<SetStateAction<Record<string, string>>>;
-  setTerminalCommandsByRoom: Dispatch<SetStateAction<Record<string, string>>>;
-  setTerminalInputsByRoom: Dispatch<SetStateAction<Record<string, string>>>;
-  setTerminalErrorsByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setBrowserUrlsByRoom: Dispatch<SetStateAction<Record<string, string>>>;
-  setBrowserReasonsByRoom: Dispatch<SetStateAction<Record<string, string>>>;
-  setBrowserMessagesByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setInviteLinksByRoom: Dispatch<SetStateAction<Record<string, string>>>;
-  setInviteApprovalGatesByRoom: Dispatch<SetStateAction<Record<string, boolean>>>;
-  setInviteMessagesByRoom: Dispatch<SetStateAction<Record<string, string | null>>>;
-  setDraftsByRoom: Dispatch<SetStateAction<Record<string, string>>>;
   setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
   historyLoadedRoomIds: MutableRefObject<Set<string>>;
 }
@@ -179,51 +130,11 @@ export function useLocalHistoryActions({
   setRooms,
   setBrowserStatusByRoom,
   setActiveBrowserUrlsByRoom,
-  setCodexThreadIdsByRoom,
-  setActionRunsByRoom,
-  setActionsLastCheckedByRoom,
-  setActionsMessagesByRoom,
-  setActionsBusyByRoom,
-  setGitWorkflowBusyByRoom,
-  setHostBusyByRoom,
-  setHostMessagesByRoom,
-  setChatMessagesByRoom,
-  setMarkdownCopyFallbacksByRoom,
-  setSecretWarningsVisibleByRoom,
-  setHistoryMessagesByRoom,
-  setSettingsBusyByRoom,
-  setSettingsMessagesByRoom,
-  setCustomCodexModelsByRoom,
-  setProjectPathDraftsByRoom,
-  setKeyRotationBusyByRoom,
-  setApprovalVisibleByRoom,
-  setPendingCodexApprovalsByRoom,
-  setCodexRunningByRoom,
-  setGitStatusByRoom,
-  setFileQueriesByRoom,
-  setProjectFilesByRoom,
-  setSelectedFilesByRoom,
-  setSelectedDiffsByRoom,
-  setFileBusyByRoom,
-  setFileMessagesByRoom,
-  setPendingAttachmentsByRoom,
-  setTerminalLinesByRoom,
-  setTerminalBusyByRoom,
-  setSelectedTerminalIdsByRoom,
-  setTerminalNamesByRoom,
-  setTerminalCommandsByRoom,
-  setTerminalInputsByRoom,
-  setTerminalErrorsByRoom,
-  setBrowserUrlsByRoom,
-  setBrowserReasonsByRoom,
-  setBrowserMessagesByRoom,
-  setInviteLinksByRoom,
-  setInviteApprovalGatesByRoom,
-  setInviteMessagesByRoom,
-  setDraftsByRoom,
   setForgottenRoomIds,
   historyLoadedRoomIds
 }: UseLocalHistoryActionsOptions) {
+  const clearRoomScopedStateForRoom = useAppStore((state) => state.clearRoomScopedStateForRoom);
+
   function updateLocalHistorySettings(next: LocalHistorySettings) {
     if (!hasSelectedRoom) {
       setSelectedHistoryMessage("Create or join a room before changing encrypted history settings.");
@@ -311,86 +222,6 @@ export function useLocalHistoryActions({
     }
   }
 
-  function clearRoomScopedState(roomId: string) {
-    setMessagesByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setTerminalRequestsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setBrowserRequestsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setInviteRequestsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setCodexEventsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setGitWorkflowEventsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setGitHubActionsEventsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setHostHandoffsByRoom((current) => ({
-      ...current,
-      [selectedRoom.id]: []
-    }));
-    setCodexThreadIdsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActionRunsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActionsLastCheckedByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActionsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActionsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setGitWorkflowBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setHostBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setHostMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setChatMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setMarkdownCopyFallbacksByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSecretWarningsVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setHistoryMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSettingsBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSettingsMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setCustomCodexModelsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setProjectPathDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setKeyRotationBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setApprovalVisibleByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setPendingCodexApprovalsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setCodexRunningByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setBrowserStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setActiveBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setGitStatusByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setFileQueriesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setProjectFilesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSelectedFilesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSelectedDiffsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setFileBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setFileMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setPendingAttachmentsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalLinesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalBusyByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setSelectedTerminalIdsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalNamesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalCommandsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalInputsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminalErrorsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setTerminals((current) => current.filter((terminal) => terminal.roomId !== selectedRoom.id));
-    setBrowserUrlsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setBrowserReasonsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setBrowserMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setInviteLinksByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setInviteApprovalGatesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setInviteMessagesByRoom((current) => omitRecordKey(current, selectedRoom.id));
-    setDraftsByRoom((current) => omitRecordKey(current, selectedRoom.id));
-  }
-
   async function clearRoomHistory() {
     if (!hasSelectedRoom) {
       setSelectedHistoryMessage("Create or join a room before clearing local history.");
@@ -398,7 +229,7 @@ export function useLocalHistoryActions({
     }
     const roomId = selectedRoom.id;
     await clearEncryptedHistory(selectedRoom.id);
-    clearRoomScopedState(roomId);
+    clearRoomScopedStateForRoom(roomId);
     setHistoryMessageForRoom(roomId, "Cleared encrypted local history for this room.");
   }
 
@@ -416,7 +247,7 @@ export function useLocalHistoryActions({
     clearRoomVisibilityWarningAcknowledgement(selectedRoom.id);
     historyLoadedRoomIds.current.delete(selectedRoom.id);
     setForgottenRoomIds((current) => new Set(current).add(selectedRoom.id));
-    clearRoomScopedState(roomId);
+    clearRoomScopedStateForRoom(roomId);
     setHistorySettings(loadHistorySettings(selectedRoom.id));
     setSecretWarningVisibleForRoom(selectedRoom.id, true);
     setHistoryMessageForRoom(roomId, "Forgot this room on this device. Rejoin from an invite to unlock it again.");
