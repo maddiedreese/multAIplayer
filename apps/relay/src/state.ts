@@ -86,6 +86,9 @@ export interface RelayStore {
   deleteAttachmentBlob(blobId: string): boolean;
   getDevice(userId: string, deviceId: string): DeviceRecord | undefined;
   setDevice(device: DeviceRecord): void;
+  getEncryptedBacklog(roomKey: RoomKey): RelayEnvelope[] | undefined;
+  setEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): void;
+  allEncryptedBacklogEntries(): Array<[RoomKey, RelayEnvelope[]]>;
 }
 
 export class InMemoryRelayStore implements RelayStore {
@@ -186,6 +189,18 @@ export class InMemoryRelayStore implements RelayStore {
 
   setDevice(device: DeviceRecord): void {
     this.devices.set(deviceKey(device.userId, device.deviceId), device);
+  }
+
+  getEncryptedBacklog(roomKey: RoomKey): RelayEnvelope[] | undefined {
+    return this.encryptedBacklog.get(roomKey);
+  }
+
+  setEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): void {
+    this.encryptedBacklog.set(roomKey, envelopes);
+  }
+
+  allEncryptedBacklogEntries(): Array<[RoomKey, RelayEnvelope[]]> {
+    return Array.from(this.encryptedBacklog.entries());
   }
 }
 

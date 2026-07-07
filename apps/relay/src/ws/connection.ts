@@ -5,14 +5,14 @@ import {
   type RelayEnvelope,
   type RelayServerMessage
 } from "@multaiplayer/protocol";
-import type { AuthSession, ClientSession, PresenceRecord, RoomKey } from "../state.js";
+import type { AuthSession, ClientSession, PresenceRecord, RelayStore, RoomKey } from "../state.js";
 
 type RateLimitResult = { allowed: boolean };
 
 interface RegisterRelayWebSocketConnectionOptions {
   wss: WebSocketServer;
+  store: Pick<RelayStore, "getEncryptedBacklog">;
   sessions: Map<ClientSession["socket"], ClientSession>;
-  encryptedBacklog: Map<RoomKey, RelayEnvelope[]>;
   roomPresence: Map<RoomKey, Map<string, PresenceRecord>>;
   encryptedEnvelopeMaxBytes: number;
   maxDisplayNameChars: number;
@@ -51,8 +51,8 @@ interface RegisterRelayWebSocketConnectionOptions {
 
 export function registerRelayWebSocketConnection({
   wss,
+  store,
   sessions,
-  encryptedBacklog,
   roomPresence,
   encryptedEnvelopeMaxBytes,
   maxDisplayNameChars,
@@ -232,7 +232,7 @@ export function registerRelayWebSocketConnection({
           }
           joinRoom(session, parsed.teamId, parsed.roomId, parsed.userId, parsed.deviceId);
           send(socket, { type: "joined", teamId: parsed.teamId, roomId: parsed.roomId });
-          for (const envelope of encryptedBacklog.get(roomKey(parsed.teamId, parsed.roomId)) ?? []) {
+          for (const envelope of store.getEncryptedBacklog(roomKey(parsed.teamId, parsed.roomId)) ?? []) {
             send(socket, { type: "envelope", envelope });
           }
           for (const presence of roomPresence.get(roomKey(parsed.teamId, parsed.roomId))?.values() ?? []) {

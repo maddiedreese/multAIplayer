@@ -14,7 +14,6 @@ interface CreateRelayFanoutOptions {
   teamSockets: Map<string, Set<WebSocket>>;
   workspaceSockets: Set<WebSocket>;
   sessions: Map<WebSocket, ClientSession>;
-  encryptedBacklog: Map<RoomKey, RelayEnvelope[]>;
   roomPresence: Map<RoomKey, Map<string, PresenceRecord>>;
   metrics: RelayMetrics;
   roomKey: (teamId: string, roomId: string) => RoomKey;
@@ -34,7 +33,6 @@ export function createRelayFanout({
   teamSockets,
   workspaceSockets,
   sessions,
-  encryptedBacklog,
   roomPresence,
   metrics,
   roomKey,
@@ -73,10 +71,10 @@ export function createRelayFanout({
 
   function publishEnvelope(envelope: RelayEnvelope) {
     const key = roomKey(envelope.teamId, envelope.roomId);
-    const backlog = encryptedBacklog.get(key) ?? [];
+    const backlog = store.getEncryptedBacklog(key) ?? [];
     if (backlog.some((existing) => existing.id === envelope.id)) return;
     backlog.push(envelope);
-    encryptedBacklog.set(key, pruneEncryptedBacklog(backlog));
+    store.setEncryptedBacklog(key, pruneEncryptedBacklog(backlog));
     metrics.recordEnvelopePublished();
     scheduleStoreSave();
     broadcast(key, { type: "envelope", envelope });
