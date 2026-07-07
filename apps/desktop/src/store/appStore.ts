@@ -233,7 +233,8 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, TerminalSli
   setRoomGoalsByRoom: (action: SetStateAction<RoomGoalsByRoom>) => void;
   setSecretWarningsVisibleByRoom: (action: SetStateAction<SecretWarningsVisibleByRoom>) => void;
   setCodexThreadIdsByRoom: (action: SetStateAction<CodexThreadIdsByRoom>) => void;
-  setSelectedMessageIdsByRoom: (action: SetStateAction<SelectedMessageIdsByRoom>) => void;
+  toggleSelectedMessageForRoom: (roomId: string, messageId: string) => void;
+  clearSelectedMessagesForRoom: (roomId: string) => void;
   setHistorySearchMessagesByRoom: (action: SetStateAction<HistorySearchMessagesByRoom>) => void;
   setHistoryMessagesByRoom: (action: SetStateAction<HistoryMessagesByRoom>) => void;
   setTeamHistoryMessagesByTeam: (action: SetStateAction<TeamHistoryMessagesByTeam>) => void;
@@ -487,9 +488,23 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
       codexThreadIdsByRoom: resolveSetStateAction(state.codexThreadIdsByRoom, action)
     }));
   },
-  setSelectedMessageIdsByRoom: (action) => {
+  toggleSelectedMessageForRoom: (roomId, messageId) => {
+    set((state) => {
+      const roomIds = state.selectedMessageIdsByRoom[roomId] ?? [];
+      const nextIds = roomIds.includes(messageId)
+        ? roomIds.filter((id) => id !== messageId)
+        : [...roomIds, messageId];
+      return {
+        selectedMessageIdsByRoom: {
+          ...state.selectedMessageIdsByRoom,
+          [roomId]: nextIds
+        }
+      };
+    });
+  },
+  clearSelectedMessagesForRoom: (roomId) => {
     set((state) => ({
-      selectedMessageIdsByRoom: resolveSetStateAction(state.selectedMessageIdsByRoom, action)
+      selectedMessageIdsByRoom: omitRecordKey(state.selectedMessageIdsByRoom, roomId)
     }));
   },
   setHistorySearchMessagesByRoom: (action) => {

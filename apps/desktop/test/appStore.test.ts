@@ -688,18 +688,17 @@ test("desktop store exposes room Codex thread actions", () => {
 test("desktop store keeps markdown message selection room scoped", () => {
   const store = useAppStore.getState();
 
-  store.setSelectedMessageIdsByRoom({
-    "room-a": ["message-1", "message-2"],
-    "room-b": ["message-9"]
-  });
-  store.setSelectedMessageIdsByRoom((current) => ({
-    ...current,
-    "room-a": current["room-a"]?.filter((id) => id !== "message-1") ?? []
-  }));
+  store.toggleSelectedMessageForRoom("room-a", "message-1");
+  store.toggleSelectedMessageForRoom("room-a", "message-2");
+  store.toggleSelectedMessageForRoom("room-b", "message-9");
+  store.toggleSelectedMessageForRoom("room-a", "message-1");
 
   const state = useAppStore.getState();
   assert.deepEqual(state.selectedMessageIdsByRoom["room-a"], ["message-2"]);
   assert.deepEqual(state.selectedMessageIdsByRoom["room-b"], ["message-9"]);
+
+  store.clearSelectedMessagesForRoom("room-a");
+  assert.equal(useAppStore.getState().selectedMessageIdsByRoom["room-a"], undefined);
 });
 
 test("desktop store keeps history search messages room scoped", () => {
