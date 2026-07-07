@@ -1231,6 +1231,8 @@ test("desktop store exposes room chat message actions", () => {
 
   store.appendRoomMessage("room-a", message);
   store.appendRoomMessage("room-a", message);
+  store.initializeMessagesForRoom("room-b");
+  store.initializeMessagesForRoom("room-a");
   store.applyMessageReaction("room-a", {
     eventType: "chat.reaction",
     messageId: message.id,
@@ -1242,6 +1244,7 @@ test("desktop store exposes room chat message actions", () => {
 
   let state = useAppStore.getState();
   assert.equal(state.messagesByRoom["room-a"]?.length, 1);
+  assert.deepEqual(state.messagesByRoom["room-b"], []);
   assert.equal(state.messagesByRoom["room-a"]?.[0]?.reactions?.[0]?.reactors[0]?.name, "Maddie");
 
   store.applyMessageReaction("room-a", {

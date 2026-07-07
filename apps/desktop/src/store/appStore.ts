@@ -351,6 +351,7 @@ interface AppStoreState {
   setTeamMembersBusyForTeam: (teamId: string, busy: boolean) => void;
   ensureLocalTeamMemberForTeam: (teamId: string, userId: string, role: TeamMemberRecord["role"]) => void;
   setMessagesByRoom: (action: SetStateAction<MessagesByRoom>) => void;
+  initializeMessagesForRoom: (roomId: string) => void;
   appendRoomMessage: (roomId: string, message: ChatMessage) => void;
   applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
   setGitWorkflowBusyForRoom: (roomId: string, busy: boolean) => void;
@@ -889,6 +890,17 @@ export const useAppStore = create<AppStoreState>((set) => ({
     set((state) => ({
       messagesByRoom: resolveSetStateAction(state.messagesByRoom, action)
     }));
+  },
+  initializeMessagesForRoom: (roomId) => {
+    set((state) => {
+      if (state.messagesByRoom[roomId]) return state;
+      return {
+        messagesByRoom: {
+          ...state.messagesByRoom,
+          [roomId]: []
+        }
+      };
+    });
   },
   appendRoomMessage: (roomId, message) => {
     set((state) => {
