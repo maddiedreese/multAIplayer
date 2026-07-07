@@ -414,3 +414,105 @@ test("desktop store keeps history status messages scoped", () => {
   assert.equal(state.teamHistoryMessagesByTeam["team-core"], "Team defaults saved");
   assert.equal(state.teamHistoryMessagesByTeam["__no-team"], null);
 });
+
+test("desktop store keeps room runtime state room scoped", () => {
+  const store = useAppStore.getState();
+
+  store.setInspectorTabsByRoom({ "room-a": "files", "room-b": "terminal" });
+  store.setPresenceByRoom({
+    "room-a": {
+      "device-a": {
+        userId: "github:avery",
+        deviceId: "device-a",
+        displayName: "Avery",
+        status: "online"
+      }
+    }
+  });
+  store.setHostHandoffsByRoom({
+    "room-a": [
+      {
+        id: "handoff-1",
+        fromHost: "Maddie",
+        fromUserId: "github:maddie",
+        reason: "usage_limit",
+        projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
+        codexModel: "GPT-5.4",
+        approvalPolicy: "Ask every Codex turn",
+        messagesSinceLastCodex: 3,
+        attachmentNames: ["docs/plan.md"],
+        terminals: ["shell"],
+        createdAt: "2026-07-06T00:10:00.000Z",
+        status: "available"
+      }
+    ]
+  });
+  store.setCodexContinuationByRoom((current) => ({
+    ...current,
+    "room-b": {
+      id: "handoff-2",
+      fromHost: "Avery",
+      fromUserId: "github:avery",
+      projectPath: "/Users/avery/project",
+      codexModel: "GPT-5.4",
+      approvalPolicy: "Ask every Codex turn",
+      messagesSinceLastCodex: 1,
+      attachmentNames: [],
+      terminals: [],
+      createdAt: "2026-07-06T00:11:00.000Z",
+      status: "accepted",
+      acceptedBy: "Jordan",
+      acceptedByUserId: "github:jordan",
+      acceptedAt: "2026-07-06T00:12:00.000Z"
+    }
+  }));
+  store.setGitWorkflowEventsByRoom({
+    "room-a": [
+      {
+        eventType: "git.workflow",
+        status: "completed",
+        branch: "codex/runtime-state",
+        push: true,
+        message: "Opened draft PR",
+        runner: "Maddie",
+        runnerUserId: "github:maddie",
+        createdAt: "2026-07-06T00:13:00.000Z"
+      }
+    ]
+  });
+  store.setGitHubActionsEventsByRoom({
+    "room-b": [
+      {
+        eventType: "github.actions",
+        owner: "maddiedreese",
+        repo: "multAIplayer",
+        branch: "main",
+        summary: { label: "CI", detail: "All checks passed", tone: "green" },
+        message: "Checked Actions",
+        checkedBy: "Maddie",
+        checkedByUserId: "github:maddie",
+        checkedAt: "2026-07-06T00:14:00.000Z",
+        runs: [
+          {
+            id: 18,
+            name: "Web, relay, and packages",
+            status: "completed",
+            conclusion: "success",
+            url: "https://github.com/maddiedreese/multAIplayer/actions/runs/18",
+            createdAt: "2026-07-06T00:13:00.000Z",
+            updatedAt: "2026-07-06T00:14:00.000Z"
+          }
+        ]
+      }
+    ]
+  });
+
+  const state = useAppStore.getState();
+  assert.equal(state.inspectorTabsByRoom["room-a"], "files");
+  assert.equal(state.inspectorTabsByRoom["room-b"], "terminal");
+  assert.equal(state.presenceByRoom["room-a"]?.["device-a"]?.displayName, "Avery");
+  assert.equal(state.hostHandoffsByRoom["room-a"]?.[0]?.reason, "usage_limit");
+  assert.equal(state.codexContinuationByRoom["room-b"]?.acceptedBy, "Jordan");
+  assert.equal(state.gitWorkflowEventsByRoom["room-a"]?.[0]?.branch, "codex/runtime-state");
+  assert.equal(state.githubActionsEventsByRoom["room-b"]?.[0]?.summary.tone, "green");
+});

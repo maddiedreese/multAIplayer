@@ -9,13 +9,20 @@ import type {
   ChatAttachment,
   ChatMessage,
   CodexRoomEvent,
+  HostHandoffRecord,
   InviteJoinRequest,
   LocalPreviewDialogState,
   LocalPreviewRecord,
-  PendingCodexApproval
+  PendingCodexApproval,
+  RoomPresence
 } from "../types";
 import type { FilePreviewTab } from "../lib/filePreview";
 import type { MarkdownCopyFallback } from "../types";
+import type { InspectorTab } from "../components/RoomInspectorPanel";
+import type {
+  GitHubActionsEventPlaintextPayload,
+  GitWorkflowEventPlaintextPayload
+} from "@multaiplayer/protocol";
 
 type GitStatusByRoom = Record<string, GitStatusSummary | null>;
 type GitWorkflowBusyByRoom = Record<string, boolean>;
@@ -66,6 +73,12 @@ type SelectedMessageIdsByRoom = Record<string, string[]>;
 type HistorySearchMessagesByRoom = Record<string, ChatMessage[]>;
 type HistoryMessagesByRoom = Record<string, string | null>;
 type TeamHistoryMessagesByTeam = Record<string, string | null>;
+type InspectorTabsByRoom = Record<string, InspectorTab>;
+type PresenceByRoom = Record<string, Record<string, RoomPresence>>;
+type HostHandoffsByRoom = Record<string, HostHandoffRecord[]>;
+type CodexContinuationByRoom = Record<string, HostHandoffRecord>;
+type GitWorkflowEventsByRoom = Record<string, GitWorkflowEventPlaintextPayload[]>;
+type GitHubActionsEventsByRoom = Record<string, GitHubActionsEventPlaintextPayload[]>;
 
 const emptyLocalPreviewDialog: LocalPreviewDialogState = {
   open: false,
@@ -130,7 +143,13 @@ const emptyAppStoreState = {
   selectedMessageIdsByRoom: {},
   historySearchMessagesByRoom: {},
   historyMessagesByRoom: {},
-  teamHistoryMessagesByTeam: {}
+  teamHistoryMessagesByTeam: {},
+  inspectorTabsByRoom: {},
+  presenceByRoom: {},
+  hostHandoffsByRoom: {},
+  codexContinuationByRoom: {},
+  gitWorkflowEventsByRoom: {},
+  githubActionsEventsByRoom: {}
 };
 
 function resolveSetStateAction<T>(current: T, action: SetStateAction<T>): T {
@@ -190,6 +209,12 @@ interface AppStoreState {
   historySearchMessagesByRoom: HistorySearchMessagesByRoom;
   historyMessagesByRoom: HistoryMessagesByRoom;
   teamHistoryMessagesByTeam: TeamHistoryMessagesByTeam;
+  inspectorTabsByRoom: InspectorTabsByRoom;
+  presenceByRoom: PresenceByRoom;
+  hostHandoffsByRoom: HostHandoffsByRoom;
+  codexContinuationByRoom: CodexContinuationByRoom;
+  gitWorkflowEventsByRoom: GitWorkflowEventsByRoom;
+  githubActionsEventsByRoom: GitHubActionsEventsByRoom;
   setGitStatusByRoom: (action: SetStateAction<GitStatusByRoom>) => void;
   setGitWorkflowBusyByRoom: (action: SetStateAction<GitWorkflowBusyByRoom>) => void;
   setGitWorkflowMessagesByRoom: (action: SetStateAction<GitWorkflowMessagesByRoom>) => void;
@@ -242,6 +267,12 @@ interface AppStoreState {
   setHistorySearchMessagesByRoom: (action: SetStateAction<HistorySearchMessagesByRoom>) => void;
   setHistoryMessagesByRoom: (action: SetStateAction<HistoryMessagesByRoom>) => void;
   setTeamHistoryMessagesByTeam: (action: SetStateAction<TeamHistoryMessagesByTeam>) => void;
+  setInspectorTabsByRoom: (action: SetStateAction<InspectorTabsByRoom>) => void;
+  setPresenceByRoom: (action: SetStateAction<PresenceByRoom>) => void;
+  setHostHandoffsByRoom: (action: SetStateAction<HostHandoffsByRoom>) => void;
+  setCodexContinuationByRoom: (action: SetStateAction<CodexContinuationByRoom>) => void;
+  setGitWorkflowEventsByRoom: (action: SetStateAction<GitWorkflowEventsByRoom>) => void;
+  setGitHubActionsEventsByRoom: (action: SetStateAction<GitHubActionsEventsByRoom>) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
 }
@@ -506,6 +537,36 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setTeamHistoryMessagesByTeam: (action) => {
     set((state) => ({
       teamHistoryMessagesByTeam: resolveSetStateAction(state.teamHistoryMessagesByTeam, action)
+    }));
+  },
+  setInspectorTabsByRoom: (action) => {
+    set((state) => ({
+      inspectorTabsByRoom: resolveSetStateAction(state.inspectorTabsByRoom, action)
+    }));
+  },
+  setPresenceByRoom: (action) => {
+    set((state) => ({
+      presenceByRoom: resolveSetStateAction(state.presenceByRoom, action)
+    }));
+  },
+  setHostHandoffsByRoom: (action) => {
+    set((state) => ({
+      hostHandoffsByRoom: resolveSetStateAction(state.hostHandoffsByRoom, action)
+    }));
+  },
+  setCodexContinuationByRoom: (action) => {
+    set((state) => ({
+      codexContinuationByRoom: resolveSetStateAction(state.codexContinuationByRoom, action)
+    }));
+  },
+  setGitWorkflowEventsByRoom: (action) => {
+    set((state) => ({
+      gitWorkflowEventsByRoom: resolveSetStateAction(state.gitWorkflowEventsByRoom, action)
+    }));
+  },
+  setGitHubActionsEventsByRoom: (action) => {
+    set((state) => ({
+      githubActionsEventsByRoom: resolveSetStateAction(state.githubActionsEventsByRoom, action)
     }));
   },
   resetAppStore: () => set(emptyAppStoreState),
