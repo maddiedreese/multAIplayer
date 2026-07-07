@@ -554,69 +554,60 @@ test("desktop store exposes room message actions", () => {
 test("desktop store keeps Codex room state room scoped", () => {
   const store = useAppStore.getState();
 
-  store.setCodexEventsByRoom({
-    "room-a": [
+  store.appendCodexEvent("room-a", {
+    eventType: "codex.turn",
+    turnId: "turn-1",
+    status: "started",
+    message: "Reading room context",
+    model: "gpt-5.4",
+    threadId: "thread-room-a",
+    host: "Maddie",
+    hostUserId: "github:maddie",
+    createdAt: "2026-07-06T00:07:00.000Z"
+  });
+  store.setApprovalVisibleForRoom("room-a", true);
+  store.setApprovalVisibleForRoom("room-b", false);
+  store.setPendingCodexApprovalForRoom("room-a", {
+    roomId: "room-a",
+    messages: [
       {
-        eventType: "codex.turn",
-        turnId: "turn-1",
-        status: "started",
-        message: "Reading room context",
-        model: "gpt-5.4",
-        threadId: "thread-room-a",
-        host: "Maddie",
-        hostUserId: "github:maddie",
-        createdAt: "2026-07-06T00:07:00.000Z"
+        id: "message-1",
+        author: "Avery",
+        role: "human",
+        body: "@Codex draft a plan",
+        time: "9:43"
       }
-    ]
-  });
-  store.setApprovalVisibleByRoom({ "room-a": true, "room-b": false });
-  store.setPendingCodexApprovalsByRoom({
-    "room-a": {
-      roomId: "room-a",
-      messages: [
-        {
-          id: "message-1",
-          author: "Avery",
-          role: "human",
-          body: "@Codex draft a plan",
-          time: "9:43"
-        }
-      ],
-      summary: {
-        messagesSinceLastCodex: 1,
-        attachments: [],
-        workspacePath: "/Users/maddiedreese/Documents/MultAIplayer",
-        git: null,
-        browserAccess: [],
-        terminals: []
-      }
+    ],
+    summary: {
+      messagesSinceLastCodex: 1,
+      attachments: [],
+      workspacePath: "/Users/maddiedreese/Documents/MultAIplayer",
+      git: null,
+      browserAccess: [],
+      terminals: []
     }
   });
-  store.setCodexRunningByRoom({ "room-a": true, "room-b": false });
-  store.setRoomGoalsByRoom({
-    "room-a": {
-      id: "goal-a",
-      text: "Finish the room",
-      status: "running",
-      startedAt: "2026-07-06T00:08:00.000Z",
-      updatedAt: "2026-07-06T00:08:00.000Z",
-      elapsedMs: 0
-    }
+  store.setCodexRunningForRoom("room-a", true);
+  store.setCodexRunningForRoom("room-b", false);
+  store.setRoomGoalForRoom("room-a", {
+    id: "goal-a",
+    text: "Finish the room",
+    status: "running",
+    startedAt: "2026-07-06T00:08:00.000Z",
+    updatedAt: "2026-07-06T00:08:00.000Z",
+    elapsedMs: 0
   });
-  store.setSecretWarningsVisibleByRoom({ "room-a": true });
-  store.setCodexThreadIdsByRoom((current) => ({
-    ...current,
-    "room-a": "thread-room-a"
-  }));
+  store.setSecretWarningVisibleForRoom("room-a", true);
+  store.setCodexThreadIdForRoom("room-a", "thread-room-a");
 
   const state = useAppStore.getState();
   assert.equal(state.codexEventsByRoom["room-a"]?.[0]?.turnId, "turn-1");
   assert.equal(state.approvalVisibleByRoom["room-a"], true);
-  assert.equal(state.approvalVisibleByRoom["room-b"], false);
+  assert.equal(state.approvalVisibleByRoom["room-b"], undefined);
   assert.equal(state.pendingCodexApprovalsByRoom["room-a"]?.messages[0]?.body, "@Codex draft a plan");
   assert.equal(state.pendingCodexApprovalsByRoom["room-a"]?.summary.workspacePath, "/Users/maddiedreese/Documents/MultAIplayer");
   assert.equal(state.codexRunningByRoom["room-a"], true);
-  assert.equal(state.codexRunningByRoom["room-b"], false);
+  assert.equal(state.codexRunningByRoom["room-b"], undefined);
   assert.equal(state.roomGoalsByRoom["room-a"]?.text, "Finish the room");
   assert.equal(state.secretWarningsVisibleByRoom["room-a"], true);
   assert.equal(state.codexThreadIdsByRoom["room-a"], "thread-room-a");
@@ -1149,11 +1140,23 @@ test("desktop store clears local room-scoped state", () => {
   });
   store.setInviteRequestsForRoom("room-a", []);
   store.setInviteRequestsForRoom("room-b", []);
-  store.setCodexEventsByRoom({ "room-a": [], "room-b": [] });
+  store.appendCodexEvent("room-a", {
+    eventType: "codex.turn",
+    turnId: "turn-a",
+    status: "started",
+    createdAt: "2026-07-06T00:23:00.000Z"
+  });
+  store.appendCodexEvent("room-b", {
+    eventType: "codex.turn",
+    turnId: "turn-b",
+    status: "started",
+    createdAt: "2026-07-06T00:24:00.000Z"
+  });
   store.setGitWorkflowEventsByRoom({ "room-a": [], "room-b": [] });
   store.setGitHubActionsEventsByRoom({ "room-a": [], "room-b": [] });
   store.setHostHandoffsByRoom({ "room-a": [], "room-b": [] });
-  store.setCodexThreadIdsByRoom({ "room-a": "thread-a", "room-b": "thread-b" });
+  store.setCodexThreadIdForRoom("room-a", "thread-a");
+  store.setCodexThreadIdForRoom("room-b", "thread-b");
   store.setActionRunsForRoom("room-a", []);
   store.setActionRunsForRoom("room-b", []);
   store.setActionsLastCheckedForRoom("room-a", "now");
@@ -1163,7 +1166,8 @@ test("desktop store clears local room-scoped state", () => {
   store.setGitWorkflowBusyForRoom("room-a", true);
   store.setGitWorkflowBusyForRoom("room-b", true);
   store.setHostMessagesByRoom({ "room-a": "Host busy", "room-b": "Keep" });
-  store.setSecretWarningsVisibleByRoom({ "room-a": true, "room-b": true });
+  store.setSecretWarningVisibleForRoom("room-a", true);
+  store.setSecretWarningVisibleForRoom("room-b", true);
   store.setProjectFilesForRoom("room-a", [{ path: "README.md", size: 1 }]);
   store.setProjectFilesForRoom("room-b", []);
   store.setSelectedTerminalIdForRoom("room-a", "terminal-a");
@@ -1218,6 +1222,7 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.browserUrlsByRoom["room-a"], undefined);
   assert.equal(state.draftsByRoom["room-a"], undefined);
   assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "keep");
+  assert.equal(state.codexEventsByRoom["room-b"]?.[0]?.turnId, "turn-b");
   assert.equal(state.codexThreadIdsByRoom["room-b"], "thread-b");
   assert.equal(state.terminals.some((terminal) => terminal.roomId === "room-b"), true);
 });

@@ -222,13 +222,6 @@ export interface AppStoreState extends BrowserSlice, FilePanelSlice, TerminalSli
   setDraftsByRoom: (action: SetStateAction<DraftsByRoom>) => void;
   setPendingAttachmentsByRoom: (action: SetStateAction<PendingAttachmentsByRoom>) => void;
   setSensitiveAttachmentReviewKey: (action: SetStateAction<string | null>) => void;
-  setCodexEventsByRoom: (action: SetStateAction<CodexEventsByRoom>) => void;
-  setApprovalVisibleByRoom: (action: SetStateAction<ApprovalVisibleByRoom>) => void;
-  setPendingCodexApprovalsByRoom: (action: SetStateAction<PendingCodexApprovalsByRoom>) => void;
-  setCodexRunningByRoom: (action: SetStateAction<CodexRunningByRoom>) => void;
-  setRoomGoalsByRoom: (action: SetStateAction<RoomGoalsByRoom>) => void;
-  setSecretWarningsVisibleByRoom: (action: SetStateAction<SecretWarningsVisibleByRoom>) => void;
-  setCodexThreadIdsByRoom: (action: SetStateAction<CodexThreadIdsByRoom>) => void;
   toggleSelectedMessageForRoom: (roomId: string, messageId: string) => void;
   clearSelectedMessagesForRoom: (roomId: string) => void;
   replaceHistorySearchMessagesByRoom: (messagesByRoom: HistorySearchMessagesByRoom) => void;
@@ -424,41 +417,6 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   setSensitiveAttachmentReviewKey: (action) => {
     set((state) => ({
       sensitiveAttachmentReviewKey: resolveSetStateAction(state.sensitiveAttachmentReviewKey, action)
-    }));
-  },
-  setCodexEventsByRoom: (action) => {
-    set((state) => ({
-      codexEventsByRoom: resolveSetStateAction(state.codexEventsByRoom, action)
-    }));
-  },
-  setApprovalVisibleByRoom: (action) => {
-    set((state) => ({
-      approvalVisibleByRoom: resolveSetStateAction(state.approvalVisibleByRoom, action)
-    }));
-  },
-  setPendingCodexApprovalsByRoom: (action) => {
-    set((state) => ({
-      pendingCodexApprovalsByRoom: resolveSetStateAction(state.pendingCodexApprovalsByRoom, action)
-    }));
-  },
-  setCodexRunningByRoom: (action) => {
-    set((state) => ({
-      codexRunningByRoom: resolveSetStateAction(state.codexRunningByRoom, action)
-    }));
-  },
-  setRoomGoalsByRoom: (action) => {
-    set((state) => ({
-      roomGoalsByRoom: resolveSetStateAction(state.roomGoalsByRoom, action)
-    }));
-  },
-  setSecretWarningsVisibleByRoom: (action) => {
-    set((state) => ({
-      secretWarningsVisibleByRoom: resolveSetStateAction(state.secretWarningsVisibleByRoom, action)
-    }));
-  },
-  setCodexThreadIdsByRoom: (action) => {
-    set((state) => ({
-      codexThreadIdsByRoom: resolveSetStateAction(state.codexThreadIdsByRoom, action)
     }));
   },
   toggleSelectedMessageForRoom: (roomId, messageId) => {
