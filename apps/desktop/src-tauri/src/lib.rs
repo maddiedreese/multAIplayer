@@ -1,7 +1,6 @@
-use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command};
+use std::process::Child;
 
 mod browser;
 mod codex;
@@ -10,6 +9,7 @@ mod keychain;
 mod local_preview;
 mod output;
 mod project;
+mod shell;
 mod terminal;
 mod validation;
 use browser::*;
@@ -17,52 +17,14 @@ use codex::*;
 use git::*;
 use keychain::*;
 use local_preview::*;
-use output::*;
 use project::*;
+use shell::*;
 use terminal::*;
 use validation::*;
 
 #[tauri::command]
 fn app_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct CommandResult {
-    pub(crate) command: String,
-    pub(crate) cwd: String,
-    pub(crate) status: Option<i32>,
-    pub(crate) stdout: String,
-    pub(crate) stderr: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ShellCommandRequest {
-    cwd: String,
-    command: String,
-}
-
-#[tauri::command]
-fn run_shell_command(request: ShellCommandRequest) -> Result<CommandResult, String> {
-    ensure_existing_dir(&request.cwd)?;
-    ensure_terminal_command(&request.command)?;
-
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
-    let output = Command::new(shell)
-        .current_dir(&request.cwd)
-        .args(["-lc", &request.command])
-        .output()
-        .map_err(|error| format!("Failed to run command: {error}"))?;
-
-    Ok(CommandResult {
-        command: request.command,
-        cwd: request.cwd,
-        status: output.status.code(),
-        stdout: bound_command_output(&output.stdout),
-        stderr: bound_command_output(&output.stderr),
-    })
 }
 
 fn ensure_existing_dir(cwd: &str) -> Result<(), String> {
@@ -140,7 +102,9 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::output::*;
     use std::fs::{create_dir_all, write};
+    use std::process::Command;
     use std::sync::{Arc, Mutex};
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
