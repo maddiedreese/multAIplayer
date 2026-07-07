@@ -4,9 +4,7 @@ import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "../
 import { ensureRoomDefaults } from "../lib/roomDefaults";
 import { shouldResetCodexApprovalForRoomUpdate } from "../lib/codexApproval";
 import { upsertRoomPreservingUnread } from "../lib/roomUnread";
-import { omitRecordKey } from "../lib/setUtils";
 import { useAppStore } from "../store/appStore";
-import type { RoomPresence } from "../types";
 
 interface LocalUser {
   id: string;
@@ -25,8 +23,6 @@ interface UseWorkspaceRecordActionsOptions {
   setRevokedRoomIds: Dispatch<SetStateAction<Set<string>>>;
   setRevokedTeamIds: Dispatch<SetStateAction<Set<string>>>;
   setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
-  setInviteAdmissionsByRoom: Dispatch<SetStateAction<Record<string, string>>>;
-  setPresenceByRoom: Dispatch<SetStateAction<Record<string, Record<string, RoomPresence>>>>;
   setInviteLinkForRoom: (roomId: string, link: string) => void;
   setInviteMessageForRoom: (roomId: string, message: string | null) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
@@ -45,8 +41,6 @@ export function useWorkspaceRecordActions({
   setRevokedRoomIds,
   setRevokedTeamIds,
   setForgottenRoomIds,
-  setInviteAdmissionsByRoom,
-  setPresenceByRoom,
   setInviteLinkForRoom,
   setInviteMessageForRoom,
   setChatMessageForRoom,
@@ -54,6 +48,8 @@ export function useWorkspaceRecordActions({
   setWorkspaceError
 }: UseWorkspaceRecordActionsOptions) {
   const ensureLocalTeamMemberForTeam = useAppStore((state) => state.ensureLocalTeamMemberForTeam);
+  const clearInviteAdmissionForRoom = useAppStore((state) => state.clearInviteAdmissionForRoom);
+  const clearPresenceForRoom = useAppStore((state) => state.clearPresenceForRoom);
 
   function upsertTeam(team: TeamRecord) {
     setTeams((current) => {
@@ -85,8 +81,8 @@ export function useWorkspaceRecordActions({
     setRevokedRoomIds((current) => new Set(current).add(room.id));
     setRevokedTeamIds((current) => new Set(current).add(room.teamId));
     setForgottenRoomIds((current) => new Set(current).add(room.id));
-    setInviteAdmissionsByRoom((current) => omitRecordKey(current, room.id));
-    setPresenceByRoom((current) => omitRecordKey(current, room.id));
+    clearInviteAdmissionForRoom(room.id);
+    clearPresenceForRoom(room.id);
     setInviteLinkForRoom(room.id, "");
     setInviteMessageForRoom(room.id, userMessage);
     setChatMessageForRoom(room.id, userMessage);

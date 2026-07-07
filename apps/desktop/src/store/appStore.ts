@@ -314,6 +314,7 @@ interface AppStoreState {
   setInviteMessagesByRoom: (action: SetStateAction<InviteMessagesByRoom>) => void;
   setKeyRotationBusyByRoom: (action: SetStateAction<KeyRotationBusyByRoom>) => void;
   setInviteAdmissionsByRoom: (action: SetStateAction<InviteAdmissionsByRoom>) => void;
+  clearInviteAdmissionForRoom: (roomId: string) => void;
   setChatMessagesByRoom: (action: SetStateAction<ChatMessagesByRoom>) => void;
   setDraftsByRoom: (action: SetStateAction<DraftsByRoom>) => void;
   setPendingAttachmentsByRoom: (action: SetStateAction<PendingAttachmentsByRoom>) => void;
@@ -330,6 +331,7 @@ interface AppStoreState {
   setTeamHistoryMessagesByTeam: (action: SetStateAction<TeamHistoryMessagesByTeam>) => void;
   setInspectorTabsByRoom: (action: SetStateAction<InspectorTabsByRoom>) => void;
   setPresenceByRoom: (action: SetStateAction<PresenceByRoom>) => void;
+  clearPresenceForRoom: (roomId: string) => void;
   setHostHandoffsByRoom: (action: SetStateAction<HostHandoffsByRoom>) => void;
   setCodexContinuationByRoom: (action: SetStateAction<CodexContinuationByRoom>) => void;
   setGitWorkflowEventsByRoom: (action: SetStateAction<GitWorkflowEventsByRoom>) => void;
@@ -687,6 +689,11 @@ export const useAppStore = create<AppStoreState>((set) => ({
       inviteAdmissionsByRoom: resolveSetStateAction(state.inviteAdmissionsByRoom, action)
     }));
   },
+  clearInviteAdmissionForRoom: (roomId) => {
+    set((state) => ({
+      inviteAdmissionsByRoom: omitRecordKey(state.inviteAdmissionsByRoom, roomId)
+    }));
+  },
   setChatMessagesByRoom: (action) => {
     set((state) => ({
       chatMessagesByRoom: resolveSetStateAction(state.chatMessagesByRoom, action)
@@ -765,6 +772,11 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setPresenceByRoom: (action) => {
     set((state) => ({
       presenceByRoom: resolveSetStateAction(state.presenceByRoom, action)
+    }));
+  },
+  clearPresenceForRoom: (roomId) => {
+    set((state) => ({
+      presenceByRoom: omitRecordKey(state.presenceByRoom, roomId)
     }));
   },
   setHostHandoffsByRoom: (action) => {
