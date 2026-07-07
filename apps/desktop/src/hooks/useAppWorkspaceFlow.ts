@@ -67,7 +67,6 @@ export function useAppWorkspaceFlow({
     appRuntimeState,
     terminalPanelState,
     browserPanelState,
-    githubWorkflowPanelState,
     filePanelState,
     invitePanelState
   } = appState;
@@ -106,7 +105,8 @@ export function useAppWorkspaceFlow({
     setSelectedFileForRoom,
     setSelectedDiffForRoom,
     setFilePreviewTabForRoom,
-    setPendingAttachmentsForRoom
+    setPendingAttachmentsForRoom,
+    hydrateLocalRoomHistoryForRoom
   } = roomActions;
 
   return useWorkspaceFlowContext({
@@ -284,22 +284,7 @@ export function useAppWorkspaceFlow({
         forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
         setHistorySettings: historyDefaultsState.setHistorySettings,
-        setMessagesByRoom: workspaceState.setMessagesByRoom,
-        setTerminalRequestsByRoom: terminalPanelState.setTerminalRequestsByRoom,
-        setBrowserRequestsByRoom: browserPanelState.setBrowserRequestsByRoom,
-        setInviteRequestsByRoom: invitePanelState.setInviteRequestsByRoom,
-        setCodexEventsByRoom: codexRoomState.setCodexEventsByRoom,
-        setGitWorkflowEventsByRoom: roomRuntimeState.setGitWorkflowEventsByRoom,
-        setGitHubActionsEventsByRoom: roomRuntimeState.setGitHubActionsEventsByRoom,
-        setLocalPreviewsByRoom: localPreviewState.setLocalPreviewsByRoom,
-        setGitWorkflowMessageForRoom,
-        setActionRunsByRoom: githubWorkflowPanelState.setActionRunsByRoom,
-        setActionsLastCheckedByRoom: githubWorkflowPanelState.setActionsLastCheckedByRoom,
-        setActionsMessagesByRoom: githubWorkflowPanelState.setActionsMessagesByRoom,
-        setTerminals: terminalPanelState.setTerminals,
-        setSelectedTerminalIdsByRoom: terminalPanelState.setSelectedTerminalIdsByRoom,
-        setHostHandoffsByRoom: roomRuntimeState.setHostHandoffsByRoom,
-        setCodexThreadIdsByRoom: codexRoomState.setCodexThreadIdsByRoom
+        hydrateLocalRoomHistoryForRoom
       },
       search: {
         searchActive: roomDisplay.searchActive,

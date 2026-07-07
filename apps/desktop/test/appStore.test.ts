@@ -1236,6 +1236,189 @@ test("desktop store keeps workspace maps scoped", () => {
   assert.deepEqual(state.messagesByRoom["room-b"], []);
 });
 
+test("desktop store hydrates local room history through one room-scoped action", () => {
+  const store = useAppStore.getState();
+
+  store.setMessagesByRoom({
+    "room-b": [
+      {
+        id: "message-b",
+        author: "Jordan",
+        role: "human",
+        body: "Keep this room alone.",
+        time: "10:16"
+      }
+    ]
+  });
+  store.setSelectedTerminalIdsByRoom({ "room-a": "terminal-a", "room-b": "terminal-b" });
+  store.setTerminals([
+    {
+      id: "terminal-b",
+      roomId: "room-b",
+      name: "shell",
+      cwd: "/tmp/b",
+      command: "zsh -l",
+      status: "running",
+      output: []
+    }
+  ]);
+
+  store.hydrateLocalRoomHistoryForRoom("room-a", {
+    version: 3,
+    messages: [
+      {
+        id: "message-a",
+        author: "Avery",
+        role: "human",
+        body: "Restore this room.",
+        time: "10:17"
+      }
+    ],
+    terminalRequests: [
+      {
+        id: "terminal-request-a",
+        requester: "Avery",
+        requesterUserId: "github:avery",
+        command: "npm test",
+        cwd: "/Users/maddiedreese/Documents/MultAIplayer",
+        requestedAt: "2026-07-06T00:03:00.000Z",
+        status: "pending"
+      }
+    ],
+    browserRequests: [
+      {
+        id: "browser-request-a",
+        requester: "Jordan",
+        requesterUserId: "github:jordan",
+        url: "http://localhost:5173",
+        reason: "Inspect local preview",
+        requestedAt: "2026-07-06T00:04:00.000Z",
+        status: "pending"
+      }
+    ],
+    inviteRequests: [
+      {
+        eventType: "invite.request",
+        id: "invite-request-a",
+        requester: "Jordan",
+        requesterUserId: "github:jordan",
+        requesterDeviceId: "device-jordan",
+        requestedAt: "2026-07-06T00:05:00.000Z",
+        status: "pending"
+      }
+    ],
+    codexEvents: [
+      {
+        eventType: "codex.turn",
+        turnId: "turn-a",
+        status: "event",
+        message: "Reading context",
+        model: "gpt-5.4",
+        host: "Maddie",
+        hostUserId: "github:maddie",
+        createdAt: "2026-07-06T00:06:00.000Z"
+      }
+    ],
+    gitWorkflowEvents: [
+      {
+        eventType: "git.workflow",
+        status: "completed",
+        branch: "codex/history-hydration",
+        push: true,
+        message: "Opened draft PR",
+        runner: "Maddie",
+        runnerUserId: "github:maddie",
+        createdAt: "2026-07-06T00:07:00.000Z"
+      }
+    ],
+    githubActionsEvents: [
+      {
+        eventType: "github.actions",
+        owner: "maddiedreese",
+        repo: "multAIplayer",
+        branch: "main",
+        summary: { label: "CI", detail: "All checks passed", tone: "green" },
+        message: "Checked Actions",
+        checkedBy: "Maddie",
+        checkedByUserId: "github:maddie",
+        checkedAt: "2026-07-06T00:08:00.000Z",
+        runs: [
+          {
+            id: 18,
+            name: "Web, relay, and packages",
+            status: "completed",
+            conclusion: "success",
+            url: "https://github.com/maddiedreese/multAIplayer/actions/runs/18",
+            createdAt: "2026-07-06T00:07:00.000Z",
+            updatedAt: "2026-07-06T00:08:00.000Z"
+          }
+        ]
+      }
+    ],
+    localPreviews: [
+      {
+        eventType: "local.preview",
+        id: "preview-a",
+        sharedBy: "Maddie",
+        sharedByUserId: "github:maddie",
+        sourceUrl: "http://127.0.0.1:5173",
+        status: "live",
+        createdAt: "2026-07-06T00:09:00.000Z",
+        updatedAt: "2026-07-06T00:10:00.000Z"
+      }
+    ],
+    terminalSnapshots: [
+      {
+        id: "terminal-a",
+        roomId: "room-a",
+        name: "shell",
+        cwd: "/tmp/a",
+        command: "zsh -l",
+        status: "running",
+        output: []
+      }
+    ],
+    hostHandoffs: [
+      {
+        id: "handoff-a",
+        fromHost: "Maddie",
+        fromUserId: "github:maddie",
+        reason: "usage_limit",
+        projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
+        codexModel: "gpt-5.4",
+        approvalPolicy: "ask",
+        messagesSinceLastCodex: 4,
+        attachmentNames: [],
+        terminals: [],
+        createdAt: "2026-07-06T00:11:00.000Z",
+        status: "available"
+      }
+    ],
+    codexThreadId: "thread-a"
+  });
+
+  const state = useAppStore.getState();
+  assert.equal(state.messagesByRoom["room-a"]?.[0]?.body, "Restore this room.");
+  assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "Keep this room alone.");
+  assert.equal(state.terminalRequestsByRoom["room-a"]?.[0]?.command, "npm test");
+  assert.equal(state.browserRequestsByRoom["room-a"]?.[0]?.url, "http://localhost:5173");
+  assert.equal(state.inviteRequestsByRoom["room-a"]?.[0]?.requester, "Jordan");
+  assert.equal(state.codexEventsByRoom["room-a"]?.[0]?.message, "Reading context");
+  assert.equal(state.gitWorkflowEventsByRoom["room-a"]?.[0]?.branch, "codex/history-hydration");
+  assert.equal(state.gitWorkflowMessagesByRoom["room-a"], "Opened draft PR");
+  assert.equal(state.githubActionsEventsByRoom["room-a"]?.[0]?.runs[0]?.name, "Web, relay, and packages");
+  assert.equal(state.actionRunsByRoom["room-a"]?.[0]?.id, 18);
+  assert.equal(state.actionsLastCheckedByRoom["room-a"], "2026-07-06T00:08:00.000Z");
+  assert.equal(state.actionsMessagesByRoom["room-a"], "CI: Checked Actions");
+  assert.equal(state.localPreviewsByRoom["room-a"]?.[0]?.status, "live");
+  assert.equal(state.terminals.some((terminal) => terminal.id === "terminal-a"), true);
+  assert.equal(state.terminals.some((terminal) => terminal.id === "terminal-b"), true);
+  assert.equal(state.selectedTerminalIdsByRoom["room-a"], "terminal-a");
+  assert.equal(state.selectedTerminalIdsByRoom["room-b"], "terminal-b");
+  assert.equal(state.hostHandoffsByRoom["room-a"]?.[0]?.reason, "usage_limit");
+  assert.equal(state.codexThreadIdsByRoom["room-a"], "thread-a");
+});
+
 test("desktop store exposes team member actions", () => {
   const store = useAppStore.getState();
   const members = [

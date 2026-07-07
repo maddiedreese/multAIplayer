@@ -51,6 +51,7 @@ export function useRoomActions({
   const setSettingsMessageForRoom = useAppStore((state) => state.setSettingsMessageForRoom);
   const setPendingAttachmentsForRoom = useAppStore((state) => state.setPendingAttachmentsForRoom);
   const setDraftForRoom = useAppStore((state) => state.setDraftForRoom);
+  const hydrateLocalRoomHistoryForRoom = useAppStore((state) => state.hydrateLocalRoomHistoryForRoom);
   const setGitWorkflowMessageForRoom = useAppStore((state) => state.setGitWorkflowMessageForRoom);
   const setGitStatusForRoom = useAppStore((state) => state.setGitStatusForRoom);
   const updateGitWorkflowDraftForRoom = useAppStore((state) => state.updateGitWorkflowDraftForRoom);
@@ -158,6 +159,7 @@ export function useRoomActions({
     },
     setPendingAttachmentsForRoom,
     setDraftForRoom,
+    hydrateLocalRoomHistoryForRoom,
     setGitWorkflowBusyForRoom: (roomId: string, isBusy: boolean) =>
       applyBusyForRoom(busy.gitWorkflowBusyRef, setGitWorkflowBusyForRoom, roomId, isBusy),
     setActionsBusyForRoom: (roomId: string, isBusy: boolean) =>
