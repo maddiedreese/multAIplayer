@@ -10,7 +10,6 @@ import type { AuthSession, RelayStore } from "../state.js";
 interface RegisterTeamRoutesOptions {
   app: Express;
   store: RelayStore;
-  teamMembers: Map<string, Map<string, TeamMemberRecord>>;
   getAuthSession: (sessionId: unknown) => AuthSession | null;
   allowRead: (session: AuthSession | null, res: Response) => boolean;
   allowMutation: (session: AuthSession | null, res: Response) => boolean;
@@ -32,7 +31,6 @@ interface RegisterTeamRoutesOptions {
 export function registerTeamRoutes({
   app,
   store,
-  teamMembers,
   getAuthSession,
   allowRead,
   allowMutation,
@@ -57,7 +55,7 @@ export function registerTeamRoutes({
     res.json({
       teams: store.allTeams()
         .filter((team) => visibleTeamIds.has(team.id))
-        .map((team) => teamRecordForUser(team, teamMembers, session?.user.id)),
+        .map((team) => teamRecordForUser(team, store, session?.user.id)),
       rooms: store.allRooms().filter((room) => visibleTeamIds.has(room.teamId))
     });
   });
@@ -75,7 +73,7 @@ export function registerTeamRoutes({
       res.status(403).json({ error: "Join this team before reading its member list." });
       return;
     }
-    res.json({ members: listTeamMembers(teamId, teamMembers, teamRoleRank) });
+    res.json({ members: listTeamMembers(teamId, store, teamRoleRank) });
   });
 
   app.patch("/teams/:teamId/members/:userId", (req, res) => {
@@ -93,13 +91,13 @@ export function registerTeamRoutes({
       res.status(400).json({ error: "role must be admin or member" });
       return;
     }
-    const members = teamMembers.get(teamId);
-    const target = members?.get(userId);
+    const members = store.getTeamMembers(teamId);
+    const target = store.getTeamMember(teamId, userId);
     if (!members || !target) {
       res.status(404).json({ error: "Team member not found" });
       return;
     }
-    const requesterRole = session ? members.get(session.user.id)?.role : "owner";
+    const requesterRole = session ? store.getTeamMember(teamId, session.user.id)?.role : "owner";
     if (!canSetTeamMemberRole(requesterRole, target.role, role)) {
       res.status(403).json({ error: "Only team owners can change admin roles." });
       return;
@@ -108,7 +106,7 @@ export function registerTeamRoutes({
     const updated: TeamMemberRecord = { ...target, role };
     members.set(userId, updated);
     scheduleStoreSave();
-    res.json({ member: updated, members: listTeamMembers(teamId, teamMembers, teamRoleRank) });
+    res.json({ member: updated, members: listTeamMembers(teamId, store, teamRoleRank) });
   });
 
   app.post("/teams/:teamId/members/:userId/transfer-owner", (req, res) => {
@@ -121,13 +119,13 @@ export function registerTeamRoutes({
       res.status(404).json({ error: "Team not found" });
       return;
     }
-    const members = teamMembers.get(teamId);
-    const target = members?.get(userId);
+    const members = store.getTeamMembers(teamId);
+    const target = store.getTeamMember(teamId, userId);
     if (!members || !target) {
       res.status(404).json({ error: "Team member not found" });
       return;
     }
-    const requesterRole = session ? members.get(session.user.id)?.role : "owner";
+    const requesterRole = session ? store.getTeamMember(teamId, session.user.id)?.role : "owner";
     if (requesterRole !== "owner") {
       res.status(403).json({ error: "Only the current team owner can transfer ownership." });
       return;
@@ -141,7 +139,7 @@ export function registerTeamRoutes({
     const team = store.getTeam(teamId);
     if (team) broadcastWorkspaceUpdated(team);
     scheduleStoreSave();
-    res.json({ member: updatedMembers.get(userId), members: listTeamMembers(teamId, teamMembers, teamRoleRank) });
+    res.json({ member: updatedMembers.get(userId), members: listTeamMembers(teamId, store, teamRoleRank) });
   });
 
   app.delete("/teams/:teamId/members/:userId", (req, res) => {
@@ -154,13 +152,13 @@ export function registerTeamRoutes({
       res.status(404).json({ error: "Team not found" });
       return;
     }
-    const members = teamMembers.get(teamId);
-    const target = members?.get(userId);
+    const members = store.getTeamMembers(teamId);
+    const target = store.getTeamMember(teamId, userId);
     if (!members || !target) {
       res.status(404).json({ error: "Team member not found" });
       return;
     }
-    const requesterRole = session ? members.get(session.user.id)?.role : "owner";
+    const requesterRole = session ? store.getTeamMember(teamId, session.user.id)?.role : "owner";
     if (!canRemoveTeamMember(requesterRole, target.role)) {
       res.status(403).json({ error: "Only team owners can remove admins, and owners cannot be removed." });
       return;
@@ -176,7 +174,7 @@ export function registerTeamRoutes({
       broadcastWorkspaceUpdated(updatedTeam);
     }
     scheduleStoreSave();
-    res.json({ members: listTeamMembers(teamId, teamMembers, teamRoleRank) });
+    res.json({ members: listTeamMembers(teamId, store, teamRoleRank) });
   });
 
   app.post("/teams", (req, res) => {
@@ -200,25 +198,25 @@ export function registerTeamRoutes({
       scheduleStoreSave();
       broadcastWorkspaceUpdated(team);
     }
-    res.status(201).json({ team: teamRecordForUser(store.getTeam(team.id) ?? team, teamMembers, session?.user.id) });
+    res.status(201).json({ team: teamRecordForUser(store.getTeam(team.id) ?? team, store, session?.user.id) });
   });
 }
 
 function listTeamMembers(
   teamId: string,
-  teamMembers: Map<string, Map<string, TeamMemberRecord>>,
+  store: RelayStore,
   teamRoleRank: (role: TeamRole) => number
 ): TeamMemberRecord[] {
-  return Array.from(teamMembers.get(teamId)?.values() ?? [])
+  return Array.from(store.getTeamMembers(teamId)?.values() ?? [])
     .sort((a, b) => teamRoleRank(a.role) - teamRoleRank(b.role) || a.userId.localeCompare(b.userId));
 }
 
 export function teamRecordForUser(
   team: TeamRecord,
-  teamMembers: Map<string, Map<string, TeamMemberRecord>>,
+  store: Pick<RelayStore, "getTeamMember">,
   userId?: string
 ): TeamRecord {
-  const role = userId ? teamMembers.get(team.id)?.get(userId)?.role : undefined;
+  const role = userId ? store.getTeamMember(team.id, userId)?.role : undefined;
   return role ? { ...team, role } : team;
 }
 
