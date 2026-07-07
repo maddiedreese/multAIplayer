@@ -13,7 +13,7 @@ const productionRelayEnv = {
   MULTAIPLAYER_RELAY_RATE_LIMITS: "true",
   MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS: "false",
   MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-  MULTAIPLAYER_RELAY_DATA_PATH: ".multaiplayer/relay-store.json"
+  MULTAIPLAYER_RELAY_DATA_PATH: ".multaiplayer/relay-store.sqlite"
 };
 
 test("production relay doctor accepts a hardened representative environment", () => {
@@ -36,7 +36,18 @@ test("production relay doctor rejects unsupported storage backends", () => {
 
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /MULTAIPLAYER_RELAY_STORAGE/);
-  assert.match(result.stdout, /must be json or sqlite/);
+  assert.match(result.stdout, /must be sqlite/);
+});
+
+test("production relay doctor requires sqlite storage", () => {
+  const result = runProductionDoctor({
+    ...productionRelayEnv,
+    MULTAIPLAYER_RELAY_STORAGE: "json"
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /MULTAIPLAYER_RELAY_STORAGE/);
+  assert.match(result.stdout, /must be sqlite for a hosted production relay/);
 });
 
 test("production relay doctor rejects wildcard and pathful origins", () => {

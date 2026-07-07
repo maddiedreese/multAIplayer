@@ -52,11 +52,11 @@ docker run --rm -p 4321:4321 \
   multaiplayer-relay:alpha
 ```
 
-The image sets `NODE_ENV=production`, `PORT=4321`, and `MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.json` by default. The container healthcheck reads `/healthz`; keep `/readyz` available for platform-level readiness checks, but do not treat either endpoint as a security audit.
+The image sets `NODE_ENV=production`, `PORT=4321`, `MULTAIPLAYER_RELAY_STORAGE=sqlite`, and `MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite` by default. The container healthcheck reads `/healthz`; keep `/readyz` available for platform-level readiness checks, but do not treat either endpoint as a security audit.
 
 ## Relay Storage
 
-The alpha relay persists its state to a JSON file. Set:
+Local development can persist relay state to a JSON file. Set:
 
 ```bash
 MULTAIPLAYER_RELAY_STORAGE=json
@@ -65,14 +65,14 @@ MULTAIPLAYER_RELAY_DATA_PATH=/var/lib/multaiplayer/relay-store.json
 
 If unset, local development uses `.multaiplayer/relay-store.json`.
 
-Hosted relays can use SQLite instead:
+Hosted or internet-facing relays must use SQLite to pass the production relay doctor:
 
 ```bash
 MULTAIPLAYER_RELAY_STORAGE=sqlite
 MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
 ```
 
-SQLite uses WAL mode and transactional snapshot writes. It is the recommended alpha storage backend for the official hosted relay because it is more crash-safe than replacing one JSON file. The current SQLite adapter still stores the normalized encrypted relay snapshot as JSON inside SQLite; route-level per-mutation tables are a later migration step now that the persistence backend is isolated.
+SQLite uses WAL mode and transactional snapshot writes. It is the required alpha storage backend for hosted relays because it is more crash-safe than replacing one JSON file. The current SQLite adapter still stores the normalized encrypted relay snapshot as JSON inside SQLite; route-level per-mutation tables are a later migration step now that the persistence backend is isolated.
 
 If the relay cannot parse the configured store, or the store version is unsupported, it moves the store aside next to the original path with a `.corrupt-...` suffix and starts from a clean in-memory state. Keep regular backups of `MULTAIPLAYER_RELAY_DATA_PATH` for production/self-hosted deployments; the quarantine file is a recovery aid, not a replacement for backups.
 

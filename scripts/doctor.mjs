@@ -152,13 +152,13 @@ function checkProductionRelayEnv() {
     detail: rateLimits ? "rate limits enabled" : "must not be false for a hosted production relay"
   });
   checks.push({
-    ok: ["json", "sqlite"].includes(storage),
+    ok: storage === "sqlite",
     label: "production MULTAIPLAYER_RELAY_STORAGE",
     detail: storage === "sqlite"
       ? "sqlite storage configured"
       : storage === "json"
-        ? "json storage configured; sqlite is recommended for the official hosted alpha relay"
-        : "must be json or sqlite"
+        ? "must be sqlite for a hosted production relay"
+        : "must be sqlite"
   });
   checks.push({
     ok: Boolean(dataPath) && !dataPath.startsWith("/tmp/"),
