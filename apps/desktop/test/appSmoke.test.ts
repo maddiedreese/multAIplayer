@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 import { JSDOM } from "jsdom";
 import { createElement } from "react";
+import { useAppStore } from "../src/store/appStore";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://127.0.0.1:5173/"
@@ -129,6 +130,7 @@ Object.defineProperty(globalThis, "fetch", {
 });
 
 beforeEach(() => {
+  useAppStore.getState().resetAppStore();
   localStorage.clear();
   document.body.innerHTML = "";
 });
