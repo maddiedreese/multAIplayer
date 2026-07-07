@@ -284,3 +284,63 @@ test("desktop store keeps room chat composition state room scoped", () => {
   assert.equal(state.pendingAttachmentsByRoom["room-a"]?.[0]?.name, "README.md");
   assert.equal(state.sensitiveAttachmentReviewKey, "room-a:.env");
 });
+
+test("desktop store keeps Codex room state room scoped", () => {
+  const store = useAppStore.getState();
+
+  store.setCodexEventsByRoom({
+    "room-a": [
+      {
+        eventType: "codex.turn",
+        turnId: "turn-1",
+        status: "started",
+        message: "Reading room context",
+        model: "gpt-5.4",
+        threadId: "thread-room-a",
+        host: "Maddie",
+        hostUserId: "github:maddie",
+        createdAt: "2026-07-06T00:07:00.000Z"
+      }
+    ]
+  });
+  store.setApprovalVisibleByRoom({ "room-a": true, "room-b": false });
+  store.setPendingCodexApprovalsByRoom({
+    "room-a": {
+      roomId: "room-a",
+      messages: [
+        {
+          id: "message-1",
+          author: "Avery",
+          role: "human",
+          body: "@Codex draft a plan",
+          time: "9:43"
+        }
+      ],
+      summary: {
+        messagesSinceLastCodex: 1,
+        attachments: [],
+        workspacePath: "/Users/maddiedreese/Documents/MultAIplayer",
+        git: null,
+        browserAccess: [],
+        terminals: []
+      }
+    }
+  });
+  store.setCodexRunningByRoom({ "room-a": true, "room-b": false });
+  store.setSecretWarningsVisibleByRoom({ "room-a": true });
+  store.setCodexThreadIdsByRoom((current) => ({
+    ...current,
+    "room-a": "thread-room-a"
+  }));
+
+  const state = useAppStore.getState();
+  assert.equal(state.codexEventsByRoom["room-a"]?.[0]?.turnId, "turn-1");
+  assert.equal(state.approvalVisibleByRoom["room-a"], true);
+  assert.equal(state.approvalVisibleByRoom["room-b"], false);
+  assert.equal(state.pendingCodexApprovalsByRoom["room-a"]?.messages[0]?.body, "@Codex draft a plan");
+  assert.equal(state.pendingCodexApprovalsByRoom["room-a"]?.summary.workspacePath, "/Users/maddiedreese/Documents/MultAIplayer");
+  assert.equal(state.codexRunningByRoom["room-a"], true);
+  assert.equal(state.codexRunningByRoom["room-b"], false);
+  assert.equal(state.secretWarningsVisibleByRoom["room-a"], true);
+  assert.equal(state.codexThreadIdsByRoom["room-a"], "thread-room-a");
+});

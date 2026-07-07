@@ -7,9 +7,11 @@ import type {
   BrowserAccessRequest,
   BrowserStatus,
   ChatAttachment,
+  CodexRoomEvent,
   InviteJoinRequest,
   LocalPreviewDialogState,
-  LocalPreviewRecord
+  LocalPreviewRecord,
+  PendingCodexApproval
 } from "../types";
 import type { FilePreviewTab } from "../lib/filePreview";
 import type { MarkdownCopyFallback } from "../types";
@@ -53,6 +55,12 @@ type InviteAdmissionsByRoom = Record<string, string>;
 type ChatMessagesByRoom = Record<string, string | null>;
 type DraftsByRoom = Record<string, string>;
 type PendingAttachmentsByRoom = Record<string, ChatAttachment[]>;
+type CodexEventsByRoom = Record<string, CodexRoomEvent[]>;
+type ApprovalVisibleByRoom = Record<string, boolean>;
+type PendingCodexApprovalsByRoom = Record<string, PendingCodexApproval>;
+type CodexRunningByRoom = Record<string, boolean>;
+type SecretWarningsVisibleByRoom = Record<string, boolean>;
+type CodexThreadIdsByRoom = Record<string, string>;
 
 const emptyLocalPreviewDialog: LocalPreviewDialogState = {
   open: false,
@@ -107,7 +115,13 @@ const emptyAppStoreState = {
   chatMessagesByRoom: {},
   draftsByRoom: {},
   pendingAttachmentsByRoom: {},
-  sensitiveAttachmentReviewKey: null
+  sensitiveAttachmentReviewKey: null,
+  codexEventsByRoom: {},
+  approvalVisibleByRoom: {},
+  pendingCodexApprovalsByRoom: {},
+  codexRunningByRoom: {},
+  secretWarningsVisibleByRoom: {},
+  codexThreadIdsByRoom: {}
 };
 
 function resolveSetStateAction<T>(current: T, action: SetStateAction<T>): T {
@@ -157,6 +171,12 @@ interface AppStoreState {
   draftsByRoom: DraftsByRoom;
   pendingAttachmentsByRoom: PendingAttachmentsByRoom;
   sensitiveAttachmentReviewKey: string | null;
+  codexEventsByRoom: CodexEventsByRoom;
+  approvalVisibleByRoom: ApprovalVisibleByRoom;
+  pendingCodexApprovalsByRoom: PendingCodexApprovalsByRoom;
+  codexRunningByRoom: CodexRunningByRoom;
+  secretWarningsVisibleByRoom: SecretWarningsVisibleByRoom;
+  codexThreadIdsByRoom: CodexThreadIdsByRoom;
   setGitStatusByRoom: (action: SetStateAction<GitStatusByRoom>) => void;
   setGitWorkflowBusyByRoom: (action: SetStateAction<GitWorkflowBusyByRoom>) => void;
   setGitWorkflowMessagesByRoom: (action: SetStateAction<GitWorkflowMessagesByRoom>) => void;
@@ -199,6 +219,12 @@ interface AppStoreState {
   setDraftsByRoom: (action: SetStateAction<DraftsByRoom>) => void;
   setPendingAttachmentsByRoom: (action: SetStateAction<PendingAttachmentsByRoom>) => void;
   setSensitiveAttachmentReviewKey: (action: SetStateAction<string | null>) => void;
+  setCodexEventsByRoom: (action: SetStateAction<CodexEventsByRoom>) => void;
+  setApprovalVisibleByRoom: (action: SetStateAction<ApprovalVisibleByRoom>) => void;
+  setPendingCodexApprovalsByRoom: (action: SetStateAction<PendingCodexApprovalsByRoom>) => void;
+  setCodexRunningByRoom: (action: SetStateAction<CodexRunningByRoom>) => void;
+  setSecretWarningsVisibleByRoom: (action: SetStateAction<SecretWarningsVisibleByRoom>) => void;
+  setCodexThreadIdsByRoom: (action: SetStateAction<CodexThreadIdsByRoom>) => void;
   resetAppStore: () => void;
   resetGitWorkflowState: () => void;
 }
@@ -413,6 +439,36 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setSensitiveAttachmentReviewKey: (action) => {
     set((state) => ({
       sensitiveAttachmentReviewKey: resolveSetStateAction(state.sensitiveAttachmentReviewKey, action)
+    }));
+  },
+  setCodexEventsByRoom: (action) => {
+    set((state) => ({
+      codexEventsByRoom: resolveSetStateAction(state.codexEventsByRoom, action)
+    }));
+  },
+  setApprovalVisibleByRoom: (action) => {
+    set((state) => ({
+      approvalVisibleByRoom: resolveSetStateAction(state.approvalVisibleByRoom, action)
+    }));
+  },
+  setPendingCodexApprovalsByRoom: (action) => {
+    set((state) => ({
+      pendingCodexApprovalsByRoom: resolveSetStateAction(state.pendingCodexApprovalsByRoom, action)
+    }));
+  },
+  setCodexRunningByRoom: (action) => {
+    set((state) => ({
+      codexRunningByRoom: resolveSetStateAction(state.codexRunningByRoom, action)
+    }));
+  },
+  setSecretWarningsVisibleByRoom: (action) => {
+    set((state) => ({
+      secretWarningsVisibleByRoom: resolveSetStateAction(state.secretWarningsVisibleByRoom, action)
+    }));
+  },
+  setCodexThreadIdsByRoom: (action) => {
+    set((state) => ({
+      codexThreadIdsByRoom: resolveSetStateAction(state.codexThreadIdsByRoom, action)
     }));
   },
   resetAppStore: () => set(emptyAppStoreState),
