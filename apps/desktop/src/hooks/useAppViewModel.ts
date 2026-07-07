@@ -12,7 +12,7 @@ import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRoomDisplayContext } from "./useAppRoomDisplayContext";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
 import type { useAppRoomPanelActions } from "./useAppRoomPanelActions";
-import type { useAppRoomScopedSetters } from "./useAppRoomScopedSetters";
+import type { useAppRoomActions } from "./useAppRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { useAppStateSlices } from "./useAppStateSlices";
@@ -30,7 +30,7 @@ type ThemeMode = ReturnType<typeof useThemeMode>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
-type RoomSetters = ReturnType<typeof useAppRoomScopedSetters>;
+type RoomActions = ReturnType<typeof useAppRoomActions>;
 type RoomDisplay = ReturnType<typeof useAppRoomDisplayContext>;
 type RoomPanels = ReturnType<typeof useAppRoomPanelActions>;
 type RoomRuntime = ReturnType<typeof useRoomRuntimeContext>;
@@ -46,7 +46,7 @@ export function useAppViewModel({
   selected,
   selectedRuntime,
   roomInteraction,
-  roomSetters,
+  roomActions,
   roomDisplay,
   roomPanels,
   roomRuntime,
@@ -61,7 +61,7 @@ export function useAppViewModel({
   selected: SelectedRoomContext;
   selectedRuntime: SelectedRoomRuntime;
   roomInteraction: RoomInteraction;
-  roomSetters: RoomSetters;
+  roomActions: RoomActions;
   roomDisplay: RoomDisplay;
   roomPanels: RoomPanels;
   roomRuntime: RoomRuntime;
@@ -136,7 +136,7 @@ export function useAppViewModel({
     setInviteApprovalGateForRoom,
     setCustomCodexModelForRoom,
     updateSelectedGitWorkflowDraft
-  } = roomSetters;
+  } = roomActions;
 
   return useAppViewProps({
     shell: {

@@ -7,7 +7,7 @@ import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRoomDisplayContext } from "./useAppRoomDisplayContext";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
-import type { useAppRoomScopedSetters } from "./useAppRoomScopedSetters";
+import type { useAppRoomActions } from "./useAppRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppStateSlices } from "./useAppStateSlices";
 import type { useAppWorkspaceRecords } from "./useAppWorkspaceRecords";
@@ -20,7 +20,7 @@ type AppRefs = ReturnType<typeof useAppRefs>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
-type RoomSetters = ReturnType<typeof useAppRoomScopedSetters>;
+type RoomActions = ReturnType<typeof useAppRoomActions>;
 type WorkspaceRecords = ReturnType<typeof useAppWorkspaceRecords>;
 type RoomDisplay = ReturnType<typeof useAppRoomDisplayContext>;
 type InviteActions = ReturnType<typeof useAppInviteActions>;
@@ -33,7 +33,7 @@ export function useAppRelaySync({
   localIdentity,
   selected,
   roomInteraction,
-  roomSetters,
+  roomActions,
   workspaceRecords,
   roomDisplay,
   inviteActions,
@@ -45,7 +45,7 @@ export function useAppRelaySync({
   localIdentity: LocalIdentity;
   selected: SelectedRoomContext;
   roomInteraction: RoomInteraction;
-  roomSetters: RoomSetters;
+  roomActions: RoomActions;
   workspaceRecords: WorkspaceRecords;
   roomDisplay: RoomDisplay;
   inviteActions: InviteActions;
@@ -82,7 +82,7 @@ export function useAppRelaySync({
     setHostMessageForRoom,
     appendHostHandoff,
     setInviteMessageForRoom
-  } = roomSetters;
+  } = roomActions;
 
   return useRelaySyncContext({
     browserOpenCommand: {

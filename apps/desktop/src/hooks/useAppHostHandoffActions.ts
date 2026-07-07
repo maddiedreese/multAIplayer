@@ -1,6 +1,6 @@
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
-import type { useAppRoomScopedSetters } from "./useAppRoomScopedSetters";
+import type { useAppRoomActions } from "./useAppRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { useAppStateSlices } from "./useAppStateSlices";
@@ -14,7 +14,7 @@ type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
-type RoomSetters = ReturnType<typeof useAppRoomScopedSetters>;
+type RoomActions = ReturnType<typeof useAppRoomActions>;
 type RoomSettingsActor = ReturnType<typeof useRoomSettingsActor>;
 
 export function useAppHostHandoffActions({
@@ -24,7 +24,7 @@ export function useAppHostHandoffActions({
   selected,
   selectedRuntime,
   roomInteraction,
-  roomSetters,
+  roomActions,
   roomSettingsActor
 }: {
   appState: AppStateSlices;
@@ -33,7 +33,7 @@ export function useAppHostHandoffActions({
   selected: SelectedRoomContext;
   selectedRuntime: SelectedRoomRuntime;
   roomInteraction: RoomInteraction;
-  roomSetters: RoomSetters;
+  roomActions: RoomActions;
   roomSettingsActor: RoomSettingsActor;
 }) {
   const {
@@ -61,7 +61,7 @@ export function useAppHostHandoffActions({
     resetFileContextForRoom,
     resetCodexApprovalForRoom,
     appendHostHandoff
-  } = roomSetters;
+  } = roomActions;
 
   return useHostHandoffActions({
     hasSelectedRoom,

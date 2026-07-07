@@ -6,7 +6,7 @@ import { omitRecordKey } from "../lib/setUtils";
 
 type BusyMap = Record<string, boolean>;
 
-interface RoomBusySettersOptions {
+interface RoomBusyActionsOptions {
   gitWorkflowBusyRef: MutableRefObject<BusyMap>;
   actionsBusyRef: MutableRefObject<BusyMap>;
   localPreviewBusyRef: MutableRefObject<BusyMap>;
@@ -21,7 +21,7 @@ function updateBusyRef(ref: MutableRefObject<BusyMap>, roomId: string, busy: boo
   ref.current = busy ? { ...ref.current, [roomId]: true } : omitRecordKey(ref.current, roomId);
 }
 
-export function useRoomScopedSetters({
+export function useRoomActions({
   selectedRoomId,
   selectedTeamId,
   busy,
@@ -32,7 +32,7 @@ export function useRoomScopedSetters({
 }: {
   selectedRoomId: string;
   selectedTeamId: string;
-  busy: RoomBusySettersOptions;
+  busy: RoomBusyActionsOptions;
   maxTerminalActivityLines: number;
   browser: {
     defaultBrowserUrl: string;

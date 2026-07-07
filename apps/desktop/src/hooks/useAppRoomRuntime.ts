@@ -7,7 +7,7 @@ import type { useAppHostHandoffActions } from "./useAppHostHandoffActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRelaySync } from "./useAppRelaySync";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
-import type { useAppRoomScopedSetters } from "./useAppRoomScopedSetters";
+import type { useAppRoomActions } from "./useAppRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { useAppStateSlices } from "./useAppStateSlices";
@@ -23,7 +23,7 @@ type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
-type RoomSetters = ReturnType<typeof useAppRoomScopedSetters>;
+type RoomActions = ReturnType<typeof useAppRoomActions>;
 type RelaySync = ReturnType<typeof useAppRelaySync>;
 type HostHandoffActions = ReturnType<typeof useAppHostHandoffActions>;
 type RoomSettingsActor = ReturnType<typeof useRoomSettingsActor>;
@@ -36,7 +36,7 @@ export function useAppRoomRuntime({
   selected,
   selectedRuntime,
   roomInteraction,
-  roomSetters,
+  roomActions,
   relaySync,
   hostHandoffActions,
   roomSettingsActor
@@ -48,7 +48,7 @@ export function useAppRoomRuntime({
   selected: SelectedRoomContext;
   selectedRuntime: SelectedRoomRuntime;
   roomInteraction: RoomInteraction;
-  roomSetters: RoomSetters;
+  roomActions: RoomActions;
   relaySync: RelaySync;
   hostHandoffActions: HostHandoffActions;
   roomSettingsActor: RoomSettingsActor;
@@ -127,7 +127,7 @@ export function useAppRoomRuntime({
     updateTerminalRequestStatus,
     appendBrowserRequest,
     updateBrowserRequestStatus
-  } = roomSetters;
+  } = roomActions;
 
   return useRoomRuntimeContext({
     codexActions: {
@@ -201,7 +201,7 @@ export function useAppRoomRuntime({
         roomSettingsGateMessage: roomInteraction.roomSettingsGateMessage,
         roomSettingsActor,
         reportRoomSettingsMutationInFlight: roomInteraction.reportRoomSettingsMutationInFlight,
-        setSettingsBusyForRoom: roomSetters.setSettingsBusyForRoom,
+        setSettingsBusyForRoom: roomActions.setSettingsBusyForRoom,
         setSelectedSettingsMessage,
         setSettingsMessageForRoom,
         setSelectedBrowserMessage,
@@ -236,7 +236,7 @@ export function useAppRoomRuntime({
         terminalInput,
         terminalRequests: selectedRuntime.terminalRequests,
         reportRoomTerminalActionInFlight: roomInteraction.reportRoomTerminalActionInFlight,
-        setTerminalBusyForRoom: roomSetters.setTerminalBusyForRoom,
+        setTerminalBusyForRoom: roomActions.setTerminalBusyForRoom,
         setSelectedTerminalError,
         setTerminalErrorForRoom,
         appendTerminalLinesForRoom,

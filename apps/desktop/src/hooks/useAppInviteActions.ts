@@ -1,6 +1,6 @@
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
-import type { useAppRoomScopedSetters } from "./useAppRoomScopedSetters";
+import type { useAppRoomActions } from "./useAppRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { useAppStateSlices } from "./useAppStateSlices";
@@ -15,7 +15,7 @@ type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
-type RoomSetters = ReturnType<typeof useAppRoomScopedSetters>;
+type RoomActions = ReturnType<typeof useAppRoomActions>;
 type RoomChatMutations = ReturnType<typeof useRoomChatMutations>;
 type WorkspaceRecords = ReturnType<typeof useAppWorkspaceRecords>;
 
@@ -26,7 +26,7 @@ export function useAppInviteActions({
   selected,
   selectedRuntime,
   roomInteraction,
-  roomSetters,
+  roomActions,
   roomChatMutations,
   workspaceRecords
 }: {
@@ -36,7 +36,7 @@ export function useAppInviteActions({
   selected: SelectedRoomContext;
   selectedRuntime: SelectedRoomRuntime;
   roomInteraction: RoomInteraction;
-  roomSetters: RoomSetters;
+  roomActions: RoomActions;
   roomChatMutations: RoomChatMutations;
   workspaceRecords: WorkspaceRecords;
 }) {
@@ -58,7 +58,7 @@ export function useAppInviteActions({
     setInviteMessageForRoom,
     setInviteLinkForRoom,
     setKeyRotationBusyForRoom
-  } = roomSetters;
+  } = roomActions;
 
   return useInviteActions({
     hasSelectedRoom,

@@ -1,13 +1,13 @@
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppSelectedContext } from "./useAppSelectedContext";
 import type { useAppStateSlices } from "./useAppStateSlices";
-import { useRoomScopedSetters } from "./useRoomScopedSetters";
+import { useRoomActions } from "./useRoomActions";
 
 type AppStateSlices = ReturnType<typeof useAppStateSlices>;
 type AppRefs = ReturnType<typeof useAppRefs>;
 type SelectedRoom = ReturnType<typeof useAppSelectedContext>["selectedRoom"];
 
-export function useAppRoomScopedSetters({
+export function useAppRoomActions({
   appState,
   appRefs,
   selectedRoom,
@@ -39,7 +39,7 @@ export function useAppRoomScopedSetters({
     invitePanelState
   } = appState;
 
-  return useRoomScopedSetters({
+  return useRoomActions({
     selectedRoomId: selectedRoom.id,
     selectedTeamId: workspaceState.selectedTeam,
     busy: {
