@@ -50,15 +50,7 @@ export function useAppRoomScopedSetters({
       settingsBusyRef: appRefs.settingsBusyRef,
       keyRotationBusyRef: appRefs.keyRotationBusyRef,
       fileBusyRef: appRefs.fileBusyRef,
-      terminalBusyRef: appRefs.terminalBusyRef,
-      setGitWorkflowBusyByRoom: githubWorkflowPanelState.setGitWorkflowBusyByRoom,
-      setActionsBusyByRoom: githubWorkflowPanelState.setActionsBusyByRoom,
-      setLocalPreviewBusyByRoom: localPreviewState.setLocalPreviewBusyByRoom,
-      setHostBusyByRoom: roomSettingsState.setHostBusyByRoom,
-      setSettingsBusyByRoom: roomSettingsState.setSettingsBusyByRoom,
-      setKeyRotationBusyByRoom: invitePanelState.setKeyRotationBusyByRoom,
-      setFileBusyByRoom: filePanelState.setFileBusyByRoom,
-      setTerminalBusyByRoom: terminalPanelState.setTerminalBusyByRoom
+      terminalBusyRef: appRefs.terminalBusyRef
     },
     files: {
       selectedRoomId: selectedRoom.id,

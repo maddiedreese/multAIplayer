@@ -101,6 +101,7 @@ type TeamMembersByTeam = Record<string, TeamMemberRecord[]>;
 type TeamMembersMessageByTeam = Record<string, string | null>;
 type TeamMembersBusyByTeam = Record<string, boolean>;
 type MessagesByRoom = Record<string, ChatMessage[]>;
+type RoomBusyByRoom = Record<string, boolean>;
 
 const emptyLocalPreviewDialog: LocalPreviewDialogState = {
   open: false,
@@ -189,6 +190,10 @@ const emptyAppStoreState = {
 
 function resolveSetStateAction<T>(current: T, action: SetStateAction<T>): T {
   return typeof action === "function" ? (action as (current: T) => T)(current) : action;
+}
+
+function updateRoomBusyMap(current: RoomBusyByRoom, roomId: string, busy: boolean): RoomBusyByRoom {
+  return busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId);
 }
 
 interface AppStoreState {
@@ -334,6 +339,14 @@ interface AppStoreState {
   setTeamMembersMessageByTeam: (action: SetStateAction<TeamMembersMessageByTeam>) => void;
   setTeamMembersBusyByTeam: (action: SetStateAction<TeamMembersBusyByTeam>) => void;
   setMessagesByRoom: (action: SetStateAction<MessagesByRoom>) => void;
+  setGitWorkflowBusyForRoom: (roomId: string, busy: boolean) => void;
+  setActionsBusyForRoom: (roomId: string, busy: boolean) => void;
+  setLocalPreviewBusyForRoom: (roomId: string, busy: boolean) => void;
+  setHostBusyForRoom: (roomId: string, busy: boolean) => void;
+  setSettingsBusyForRoom: (roomId: string, busy: boolean) => void;
+  setKeyRotationBusyForRoom: (roomId: string, busy: boolean) => void;
+  setFileBusyForRoom: (roomId: string, busy: boolean) => void;
+  setTerminalBusyForRoom: (roomId: string, busy: boolean) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   setMarkdownCopyFallbackForRoom: (roomId: string, fallback: MarkdownCopyFallback | null) => void;
@@ -716,6 +729,46 @@ export const useAppStore = create<AppStoreState>((set) => ({
   setMessagesByRoom: (action) => {
     set((state) => ({
       messagesByRoom: resolveSetStateAction(state.messagesByRoom, action)
+    }));
+  },
+  setGitWorkflowBusyForRoom: (roomId, busy) => {
+    set((state) => ({
+      gitWorkflowBusyByRoom: updateRoomBusyMap(state.gitWorkflowBusyByRoom, roomId, busy)
+    }));
+  },
+  setActionsBusyForRoom: (roomId, busy) => {
+    set((state) => ({
+      actionsBusyByRoom: updateRoomBusyMap(state.actionsBusyByRoom, roomId, busy)
+    }));
+  },
+  setLocalPreviewBusyForRoom: (roomId, busy) => {
+    set((state) => ({
+      localPreviewBusyByRoom: updateRoomBusyMap(state.localPreviewBusyByRoom, roomId, busy)
+    }));
+  },
+  setHostBusyForRoom: (roomId, busy) => {
+    set((state) => ({
+      hostBusyByRoom: updateRoomBusyMap(state.hostBusyByRoom, roomId, busy)
+    }));
+  },
+  setSettingsBusyForRoom: (roomId, busy) => {
+    set((state) => ({
+      settingsBusyByRoom: updateRoomBusyMap(state.settingsBusyByRoom, roomId, busy)
+    }));
+  },
+  setKeyRotationBusyForRoom: (roomId, busy) => {
+    set((state) => ({
+      keyRotationBusyByRoom: updateRoomBusyMap(state.keyRotationBusyByRoom, roomId, busy)
+    }));
+  },
+  setFileBusyForRoom: (roomId, busy) => {
+    set((state) => ({
+      fileBusyByRoom: updateRoomBusyMap(state.fileBusyByRoom, roomId, busy)
+    }));
+  },
+  setTerminalBusyForRoom: (roomId, busy) => {
+    set((state) => ({
+      terminalBusyByRoom: updateRoomBusyMap(state.terminalBusyByRoom, roomId, busy)
     }));
   },
   setHostMessageForRoom: (roomId, message) => {
