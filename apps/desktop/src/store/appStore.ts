@@ -68,7 +68,6 @@ export interface AppStoreState
     TerminalSlice,
     WorkspaceDataSlice {
   resetAppStore: () => void;
-  resetGitWorkflowState: () => void;
 }
 
 export const useAppStore = create<AppStoreState>((set, get, api) => ({
@@ -85,6 +84,5 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   ...createRoomLifecycleSlice(set, get, api),
   ...createTerminalSlice(set, get, api),
   ...createWorkspaceDataSlice(set, get, api),
-  resetAppStore: () => set(emptyAppStoreState),
-  resetGitWorkflowState: () => set(emptyAppStoreState)
+  resetAppStore: () => set(emptyAppStoreState)
 }));
