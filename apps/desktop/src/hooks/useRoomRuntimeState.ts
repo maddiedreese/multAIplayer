@@ -64,6 +64,11 @@ export function useRoomRuntimeState() {
     restoreRoomAccess(roomId);
     restoreTeamAccess(teamId);
   }, [restoreRoomAccess, restoreTeamAccess]);
+  const revokeWorkspaceAccess = useCallback((teamId: string, roomId: string) => {
+    revokeRoomAccess(roomId);
+    revokeTeamAccess(teamId);
+    rememberForgottenRoom(roomId);
+  }, [rememberForgottenRoom, revokeRoomAccess, revokeTeamAccess]);
   const clearPresenceByRoom = useAppStore((state) => state.clearPresenceByRoom);
   const setRoomPresenceForDevice = useAppStore((state) => state.setRoomPresenceForDevice);
   const codexRuntimeByRoom = useAppStore((state) => state.codexRuntimeByRoom);
@@ -96,6 +101,7 @@ export function useRoomRuntimeState() {
     setRevokedTeamIds,
     revokeTeamAccess,
     restoreTeamAccess,
+    revokeWorkspaceAccess,
     restoreWorkspaceAccess,
     presenceByRoom: historyPresenceMaps.presenceByRoom,
     clearPresenceByRoom,

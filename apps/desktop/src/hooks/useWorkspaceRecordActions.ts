@@ -24,9 +24,7 @@ interface UseWorkspaceRecordActionsOptions {
   setTeams: Dispatch<SetStateAction<TeamRecord[]>>;
   setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
   resetCodexApprovalForRoom: (roomId: string) => void;
-  setRevokedRoomIds: Dispatch<SetStateAction<Set<string>>>;
-  setRevokedTeamIds: Dispatch<SetStateAction<Set<string>>>;
-  setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
+  revokeWorkspaceAccess: (teamId: string, roomId: string) => void;
   setInviteLinkForRoom: (roomId: string, link: string) => void;
   setInviteMessageForRoom: (roomId: string, message: string | null) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
@@ -42,9 +40,7 @@ export function useWorkspaceRecordActions({
   setTeams,
   setRooms,
   resetCodexApprovalForRoom,
-  setRevokedRoomIds,
-  setRevokedTeamIds,
-  setForgottenRoomIds,
+  revokeWorkspaceAccess,
   setInviteLinkForRoom,
   setInviteMessageForRoom,
   setChatMessageForRoom,
@@ -95,9 +91,7 @@ export function useWorkspaceRecordActions({
 
     const room = selectedRoom;
     const userMessage = membershipRemovedRoomMessage(room.name);
-    setRevokedRoomIds((current) => new Set(current).add(room.id));
-    setRevokedTeamIds((current) => new Set(current).add(room.teamId));
-    setForgottenRoomIds((current) => new Set(current).add(room.id));
+    revokeWorkspaceAccess(room.teamId, room.id);
     clearInviteAdmissionForRoom(room.id);
     clearPresenceForRoom(room.id);
     setInviteLinkForRoom(room.id, "");
