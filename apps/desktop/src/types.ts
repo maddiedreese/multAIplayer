@@ -128,6 +128,7 @@ export interface NoSecretRoomInvite {
 export interface LocalRoomHistoryPayload {
   version: 3;
   messages: ChatMessage[];
+  readState?: LocalRoomReadState;
   terminalRequests: TerminalCommandRequest[];
   browserRequests: BrowserAccessRequest[];
   inviteRequests: InviteJoinRequest[];
@@ -138,6 +139,11 @@ export interface LocalRoomHistoryPayload {
   terminalSnapshots: TerminalSnapshot[];
   hostHandoffs: HostHandoffRecord[];
   codexThreadId?: string;
+}
+
+export interface LocalRoomReadState {
+  lastReadMessageId?: string;
+  unread: number;
 }
 
 export type RelayStatus = "connecting" | "open" | "closed" | "error";

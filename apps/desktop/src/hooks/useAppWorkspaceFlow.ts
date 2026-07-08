@@ -274,7 +274,8 @@ export function useAppWorkspaceFlow({
         forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
         replaceHistorySettings: historyDefaultsState.replaceHistorySettings,
-        hydrateLocalRoomHistoryForRoom
+        hydrateLocalRoomHistoryForRoom,
+        hydrateRoomReadState: workspaceState.hydrateRoomReadState
       },
       search: {
         searchActive: roomDisplay.searchActive,

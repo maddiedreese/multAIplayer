@@ -20,6 +20,7 @@ import {
 import type { GitHubActionRun } from "./authClient";
 import { normalizeChatMessage } from "./chatSanitizer";
 import { normalizeCodexThreadId } from "./codexThread";
+import { sanitizeLocalRoomReadState } from "./roomUnread";
 import type { GitWorkflowResult, TerminalSnapshot } from "./localBackend";
 import { terminalsForLocalHistory } from "./terminalState";
 import type {
@@ -37,6 +38,7 @@ export function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentio
   return {
     version: 3,
     messages: payload.messages.filter((message) => isWithinRetention(message.createdAt ?? message.time, cutoffMs)),
+    ...(payload.readState ? { readState: payload.readState } : {}),
     terminalRequests: payload.terminalRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     browserRequests: payload.browserRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     inviteRequests: payload.inviteRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
@@ -57,6 +59,7 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
     return {
       version: 3,
       messages: normalizeChatHistoryMessages(value),
+      readState: undefined,
       terminalRequests: [],
       browserRequests: [],
       inviteRequests: [],
@@ -73,6 +76,7 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
   return {
     version: 3,
     messages: Array.isArray(value.messages) ? normalizeChatHistoryMessages(value.messages) : [],
+    readState: sanitizeLocalRoomReadState(value.readState),
     terminalRequests: Array.isArray(value.terminalRequests) ? value.terminalRequests.filter(isTerminalCommandRequest) : [],
     browserRequests: Array.isArray(value.browserRequests) ? value.browserRequests.filter(isBrowserAccessRequest) : [],
     inviteRequests: Array.isArray(value.inviteRequests) ? value.inviteRequests.filter(isInviteJoinRequest) : [],

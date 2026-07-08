@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { saveEncryptedHistory, type LocalHistorySettings } from "../lib/localHistory";
 import { pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
+import { localRoomReadStateForHistory } from "../lib/roomUnread";
 import { terminalsForLocalHistory } from "../lib/terminalState";
 import type { TerminalSnapshot } from "../lib/localBackend";
+import type { RoomRecord } from "@multaiplayer/protocol";
 import type {
   BrowserAccessRequest,
   ChatMessage,
@@ -26,6 +28,7 @@ interface UseLocalHistoryPersistenceOptions {
   hasSelectedRoom: boolean;
   selectedRoomId: string;
   selectedRoomTeamId: string;
+  selectedRoom: RoomRecord;
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
   revokedTeamIds: Set<string>;
@@ -48,6 +51,7 @@ export function useLocalHistoryPersistence({
   hasSelectedRoom,
   selectedRoomId,
   selectedRoomTeamId,
+  selectedRoom,
   forgottenRoomIds,
   revokedRoomIds,
   revokedTeamIds,
@@ -72,6 +76,7 @@ export function useLocalHistoryPersistence({
     const payload = pruneLocalRoomHistory({
       version: 3,
       messages,
+      readState: localRoomReadStateForHistory(selectedRoom, messages),
       terminalRequests,
       browserRequests,
       inviteRequests,
@@ -105,6 +110,7 @@ export function useLocalHistoryPersistence({
     selectedCodexThreadId,
     selectedRoomId,
     selectedRoomTeamId,
+    selectedRoom,
     terminalRequests
   ]);
 }

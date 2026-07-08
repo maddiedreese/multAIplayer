@@ -369,6 +369,7 @@ export function useAppRoomRuntime({
         hasSelectedRoom,
         selectedRoomId: workspaceState.selectedRoomId,
         selectedRoomTeamId: selectedRoom.teamId,
+        selectedRoom,
         forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
         revokedRoomIds: roomRuntimeState.revokedRoomIds,
         revokedTeamIds: roomRuntimeState.revokedTeamIds,

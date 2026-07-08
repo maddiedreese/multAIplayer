@@ -4,6 +4,7 @@ import type { ChatMessage, SidebarPanel } from "../types";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
 import {
   markRoomRead as markRoomReadRecord,
+  applyLocalRoomReadState,
   markRoomUnreadForIncomingChat,
   replaceRoomPreservingUnread,
   upsertRoomPreservingUnread
@@ -98,6 +99,9 @@ export function useWorkspaceUiState({
   const markRoomReadById = useCallback((roomId: string) => {
     setRooms((current) => markRoomReadRecord(current, roomId));
   }, []);
+  const hydrateRoomReadState = useCallback((roomId: string, readState: Parameters<typeof applyLocalRoomReadState>[2]) => {
+    setRooms((current) => applyLocalRoomReadState(current, roomId, readState));
+  }, []);
   const markIncomingChatUnread = useCallback((
     roomId: string,
     activeRoomId: string,
@@ -133,6 +137,7 @@ export function useWorkspaceUiState({
     upsertRoomRecord,
     replaceRoomRecord,
     markRoomReadById,
+    hydrateRoomReadState,
     markIncomingChatUnread,
     teamMembersByTeam,
     teamMembersMessageByTeam,

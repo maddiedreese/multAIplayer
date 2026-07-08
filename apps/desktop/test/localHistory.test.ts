@@ -64,6 +64,8 @@ const {
   ...(await import("../src/lib/roomVisibilityWarning"))
 };
 
+const { normalizeLocalRoomHistory } = await import("../src/lib/localRoomHistoryPayload");
+
 test.beforeEach(() => {
   localStorage.clear();
 });
@@ -118,6 +120,59 @@ test("encrypted history keeps Codex thread continuity local and encrypted", asyn
   assert.ok(stored);
   assert.doesNotMatch(stored, /thr_room_123/);
   assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
+});
+
+test("encrypted history keeps local room read state encrypted", async () => {
+  const roomId = "room-read-state-history";
+  const payload = {
+    version: 3,
+    messages: [],
+    readState: {
+      lastReadMessageId: "message-last-read",
+      unread: 3
+    },
+    terminalRequests: [],
+    browserRequests: [],
+    inviteRequests: [],
+    codexEvents: [],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
+    localPreviews: [],
+    terminalSnapshots: [],
+    hostHandoffs: []
+  };
+
+  await saveEncryptedHistory(roomId, payload);
+
+  const stored = localStorage.getItem(`multaiplayer:history:${roomId}`);
+  assert.ok(stored);
+  assert.doesNotMatch(stored, /message-last-read/);
+  assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
+});
+
+test("local history normalization preserves sanitized room read state", () => {
+  const normalized = normalizeLocalRoomHistory({
+    version: 3,
+    messages: [],
+    readState: {
+      lastReadMessageId: " message-a ",
+      unread: 1000
+    },
+    terminalRequests: [],
+    browserRequests: [],
+    inviteRequests: [],
+    codexEvents: [],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
+    localPreviews: [],
+    terminalSnapshots: [],
+    hostHandoffs: []
+  });
+
+  assert.deepEqual(normalized.readState, {
+    lastReadMessageId: "message-a",
+    unread: 999
+  });
 });
 
 test("encrypted history keeps Git workflow and Actions events local and encrypted", async () => {
