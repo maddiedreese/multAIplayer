@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   CodexApprovalPlaintextPayload,
+  CodexEventPlaintextPayload,
   DevicePublicKeyJwk,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
@@ -232,6 +233,38 @@ test("Codex approval payloads carry delegated host execution authorization", () 
   assert.equal(CodexApprovalPlaintextPayload.safeParse({
     ...parsed,
     delegationPolicy: "host_only"
+  }).success, false);
+});
+
+test("Codex turn events can carry bounded risk flags for encrypted audit history", () => {
+  const parsed = CodexEventPlaintextPayload.parse({
+    eventType: "codex.turn",
+    turnId: "turn-1",
+    status: "started",
+    message: "Started Codex turn with GPT-5.5.",
+    model: "gpt-5.5",
+    riskFlags: [{
+      id: "message-1:agent-directed-phrasing",
+      label: "message from Maddie contains agent-directed phrasing",
+      source: "message from Maddie",
+      risk: "Agent-directed phrasing",
+      severity: "warning"
+    }],
+    host: "Maddie",
+    hostUserId: "github:maddie",
+    createdAt: "2026-07-04T12:00:00.000Z"
+  });
+
+  assert.equal(parsed.riskFlags?.[0]?.risk, "Agent-directed phrasing");
+  assert.equal(CodexEventPlaintextPayload.safeParse({
+    ...parsed,
+    riskFlags: Array.from({ length: 25 }, (_, index) => ({
+      id: `flag-${index}`,
+      label: "too many flags",
+      source: "message",
+      risk: "risk",
+      severity: "warning"
+    }))
   }).success, false);
 });
 

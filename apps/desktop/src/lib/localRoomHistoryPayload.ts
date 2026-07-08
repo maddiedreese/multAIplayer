@@ -219,9 +219,25 @@ export function isCodexEventPlaintextPayload(value: unknown): value is CodexEven
     typeof value.model === "string" &&
     (value.threadId === undefined || typeof value.threadId === "string") &&
     (value.eventName === undefined || typeof value.eventName === "string") &&
+    (value.riskFlags === undefined || isCodexTurnRiskFlags(value.riskFlags)) &&
     typeof value.host === "string" &&
     typeof value.hostUserId === "string" &&
     typeof value.createdAt === "string"
+  );
+}
+
+function isCodexTurnRiskFlags(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length <= 24 &&
+    value.every((flag) => (
+      isRecord(flag) &&
+      typeof flag.id === "string" &&
+      typeof flag.label === "string" &&
+      typeof flag.source === "string" &&
+      typeof flag.risk === "string" &&
+      flag.severity === "warning"
+    ))
   );
 }
 

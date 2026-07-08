@@ -200,6 +200,14 @@ export const RoomKeyRotationPlaintextPayload = z.object({
   note: z.string().max(maxMediumTextChars).optional()
 });
 
+export const CodexTurnRiskFlagPayload = z.object({
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  label: z.string().min(1).max(maxMediumTextChars),
+  source: z.string().min(1).max(maxShortTextChars),
+  risk: z.string().min(1).max(maxShortTextChars),
+  severity: z.literal("warning")
+});
+
 export const CodexEventPlaintextPayload = z.object({
   eventType: z.literal("codex.turn"),
   turnId: z.string().min(1).max(maxEnvelopeIdChars),
@@ -208,6 +216,7 @@ export const CodexEventPlaintextPayload = z.object({
   model: z.string().min(1).max(maxCodexModelChars),
   threadId: z.string().min(1).max(maxCodexThreadIdChars).optional(),
   eventName: z.string().min(1).max(maxShortTextChars).optional(),
+  riskFlags: z.array(CodexTurnRiskFlagPayload).max(24).optional(),
   host: z.string().min(1).max(maxDisplayNameChars),
   hostUserId: z.string().min(1).max(maxUserIdChars),
   createdAt: z.string().datetime()
@@ -608,6 +617,7 @@ export type InviteJoinRequestPlaintextPayload = z.infer<typeof InviteJoinRequest
 export type InviteJoinStatusPlaintextPayload = z.infer<typeof InviteJoinStatusPlaintextPayload>;
 export type WrappedRoomSecretPayload = z.infer<typeof WrappedRoomSecretPayload>;
 export type RoomKeyRotationPlaintextPayload = z.infer<typeof RoomKeyRotationPlaintextPayload>;
+export type CodexTurnRiskFlagPayload = z.infer<typeof CodexTurnRiskFlagPayload>;
 export type CodexEventPlaintextPayload = z.infer<typeof CodexEventPlaintextPayload>;
 export type CodexApprovalPlaintextPayload = z.infer<typeof CodexApprovalPlaintextPayload>;
 export type TerminalResultPlaintextPayload = z.infer<typeof TerminalResultPlaintextPayload>;

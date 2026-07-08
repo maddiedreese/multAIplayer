@@ -23,7 +23,8 @@ import {
 } from "../lib/codexApproval";
 import {
   buildCodexTurnInput,
-  buildCodexTurnSummary
+  buildCodexTurnSummary,
+  detectCodexTurnRiskFlags
 } from "../lib/codexTurn";
 import { normalizeCodexThreadId } from "../lib/codexThread";
 import {
@@ -202,6 +203,13 @@ export function useCodexTurnActions({
     const input = buildCodexTurnInput(turnMessages, projectPath, model, turnSummary, {
       fullRoomContext: Boolean(continuationHandoff)
     });
+    const riskFlags = detectCodexTurnRiskFlags(
+      turnMessages,
+      room,
+      browserRequestsByRoom[roomId] ?? [],
+      gitStatusByRoom[roomId] ?? null,
+      { includeWorkspaceContext: roomCanReadLocalWorkspace }
+    );
     const previousThreadId = codexThreadIdsByRoom[roomId] ?? null;
     try {
       await publishCodexEvent({
@@ -210,7 +218,8 @@ export function useCodexTurnActions({
         message: previousThreadId
           ? `Resuming Codex thread ${previousThreadId} with ${formatCodexModel(model)}.`
           : `Started Codex turn with ${formatCodexModel(model)}.`,
-        model
+        model,
+        ...(riskFlags.length ? { riskFlags } : {})
       }, room);
       const result = await runCodexTurn(roomId, projectPath, input, model, reasoningEffort, speed, sandboxLevel, previousThreadId);
       if (classifyCodexFailure([result.status, result.stderr, result.transcript, ...result.events]) === "usage_limit") {

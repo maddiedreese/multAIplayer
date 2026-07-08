@@ -122,6 +122,45 @@ test("encrypted history keeps Codex thread continuity local and encrypted", asyn
   assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
 });
 
+test("encrypted history keeps Codex turn risk flags local and encrypted", async () => {
+  const roomId = "room-codex-risk-history";
+  const payload = {
+    version: 3,
+    messages: [],
+    terminalRequests: [],
+    browserRequests: [],
+    inviteRequests: [],
+    codexEvents: [{
+      eventType: "codex.turn",
+      turnId: "turn-risk",
+      status: "started",
+      message: "Started Codex turn with GPT-5.5.",
+      model: "gpt-5.5",
+      riskFlags: [{
+        id: "message-risk",
+        label: "message from Maddie contains agent-directed phrasing",
+        source: "message from Maddie",
+        risk: "Agent-directed phrasing",
+        severity: "warning"
+      }],
+      host: "Maddie",
+      hostUserId: "github:maddie",
+      createdAt: "2026-07-06T00:06:00.000Z"
+    }],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
+    terminalSnapshots: [],
+    hostHandoffs: []
+  };
+
+  await saveEncryptedHistory(roomId, payload);
+
+  const stored = localStorage.getItem(`multaiplayer:history:${roomId}`);
+  assert.ok(stored);
+  assert.doesNotMatch(stored, /agent-directed phrasing/);
+  assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
+});
+
 test("encrypted history keeps local room read state encrypted", async () => {
   const roomId = "room-read-state-history";
   const payload = {
