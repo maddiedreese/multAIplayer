@@ -3,17 +3,35 @@ import { omitRecordKey } from "../../lib/setUtils";
 import type { ChatAttachment } from "../../types";
 import type { AppStoreState } from "../appStore";
 
-type ChatMessagesByRoom = Record<string, string | null>;
-type DraftsByRoom = Record<string, string>;
-type PendingAttachmentsByRoom = Record<string, ChatAttachment[]>;
-type SelectedMessageIdsByRoom = Record<string, string[]>;
+export interface RoomChatRoomState {
+  message?: string;
+  draft?: string;
+  pendingAttachments?: ChatAttachment[];
+  selectedMessageIds?: string[];
+}
+
+export type RoomChatByRoom = Record<string, RoomChatRoomState>;
+
+function compactRoomChat(record: RoomChatRoomState): RoomChatRoomState | undefined {
+  return Object.keys(record).length ? record : undefined;
+}
+
+function updateRoomChatForRoom(
+  current: RoomChatByRoom,
+  roomId: string,
+  update: (roomChat: RoomChatRoomState) => RoomChatRoomState
+): RoomChatByRoom {
+  const nextRoomChat = compactRoomChat(update(current[roomId] ?? {}));
+  if (!nextRoomChat) return omitRecordKey(current, roomId);
+  return {
+    ...current,
+    [roomId]: nextRoomChat
+  };
+}
 
 export interface RoomChatSlice {
-  chatMessagesByRoom: ChatMessagesByRoom;
-  draftsByRoom: DraftsByRoom;
-  pendingAttachmentsByRoom: PendingAttachmentsByRoom;
+  roomChatByRoom: RoomChatByRoom;
   sensitiveAttachmentReviewKey: string | null;
-  selectedMessageIdsByRoom: SelectedMessageIdsByRoom;
   setSensitiveAttachmentReviewKey: (key: string | null) => void;
   toggleSelectedMessageForRoom: (roomId: string, messageId: string) => void;
   clearSelectedMessagesForRoom: (roomId: string) => void;
@@ -27,17 +45,11 @@ export interface RoomChatSlice {
 
 export const emptyRoomChatState: Pick<
   RoomChatSlice,
-  | "chatMessagesByRoom"
-  | "draftsByRoom"
-  | "pendingAttachmentsByRoom"
+  | "roomChatByRoom"
   | "sensitiveAttachmentReviewKey"
-  | "selectedMessageIdsByRoom"
 > = {
-  chatMessagesByRoom: {},
-  draftsByRoom: {},
-  pendingAttachmentsByRoom: {},
-  sensitiveAttachmentReviewKey: null,
-  selectedMessageIdsByRoom: {}
+  roomChatByRoom: {},
+  sensitiveAttachmentReviewKey: null
 };
 
 export const createRoomChatSlice: StateCreator<AppStoreState, [], [], RoomChatSlice> = (set) => ({
@@ -47,69 +59,78 @@ export const createRoomChatSlice: StateCreator<AppStoreState, [], [], RoomChatSl
   },
   toggleSelectedMessageForRoom: (roomId, messageId) => {
     set((state) => {
-      const roomIds = state.selectedMessageIdsByRoom[roomId] ?? [];
+      const roomIds = state.roomChatByRoom[roomId]?.selectedMessageIds ?? [];
       const nextIds = roomIds.includes(messageId)
         ? roomIds.filter((id) => id !== messageId)
         : [...roomIds, messageId];
       return {
-        selectedMessageIdsByRoom: {
-          ...state.selectedMessageIdsByRoom,
-          [roomId]: nextIds
-        }
+        roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => ({
+          ...roomChat,
+          selectedMessageIds: nextIds
+        }))
       };
     });
   },
   clearSelectedMessagesForRoom: (roomId) => {
     set((state) => ({
-      selectedMessageIdsByRoom: omitRecordKey(state.selectedMessageIdsByRoom, roomId)
+      roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => {
+        const { selectedMessageIds, ...rest } = roomChat;
+        return rest;
+      })
     }));
   },
   setChatMessageForRoom: (roomId, message) => {
     set((state) => ({
-      chatMessagesByRoom: message
-        ? { ...state.chatMessagesByRoom, [roomId]: message }
-        : omitRecordKey(state.chatMessagesByRoom, roomId)
+      roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => {
+        const { message: _message, ...rest } = roomChat;
+        return message ? { ...roomChat, message } : rest;
+      })
     }));
   },
   setPendingAttachmentsForRoom: (roomId, attachments) => {
     set((state) => ({
-      pendingAttachmentsByRoom: {
-        ...state.pendingAttachmentsByRoom,
-        [roomId]: attachments
-      }
+      roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => ({
+        ...roomChat,
+        pendingAttachments: attachments
+      }))
     }));
   },
   appendPendingAttachmentForRoom: (roomId, attachment) => {
     set((state) => {
-      const currentAttachments = state.pendingAttachmentsByRoom[roomId] ?? [];
+      const currentAttachments = state.roomChatByRoom[roomId]?.pendingAttachments ?? [];
       if (currentAttachments.some((item) => item.id === attachment.id)) return state;
       return {
-        pendingAttachmentsByRoom: {
-          ...state.pendingAttachmentsByRoom,
-          [roomId]: [...currentAttachments, attachment]
-        }
+        roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => ({
+          ...roomChat,
+          pendingAttachments: [...currentAttachments, attachment]
+        }))
       };
     });
   },
   removePendingAttachmentForRoom: (roomId, attachmentId) => {
     set((state) => ({
-      pendingAttachmentsByRoom: {
-        ...state.pendingAttachmentsByRoom,
-        [roomId]: (state.pendingAttachmentsByRoom[roomId] ?? []).filter((attachment) => attachment.id !== attachmentId)
-      }
+      roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => {
+        const nextAttachments = (roomChat.pendingAttachments ?? []).filter((attachment) => attachment.id !== attachmentId);
+        if (nextAttachments.length) return { ...roomChat, pendingAttachments: nextAttachments };
+        const { pendingAttachments, ...rest } = roomChat;
+        return rest;
+      })
     }));
   },
   clearPendingAttachmentsForRoom: (roomId) => {
     set((state) => ({
-      pendingAttachmentsByRoom: omitRecordKey(state.pendingAttachmentsByRoom, roomId)
+      roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => {
+        const { pendingAttachments, ...rest } = roomChat;
+        return rest;
+      })
     }));
   },
   setDraftForRoom: (roomId, value) => {
     set((state) => ({
-      draftsByRoom: {
-        ...state.draftsByRoom,
-        [roomId]: value
-      }
+      roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => {
+        const { draft, ...rest } = roomChat;
+        return value ? { ...roomChat, draft: value } : rest;
+      })
     }));
   }
 });

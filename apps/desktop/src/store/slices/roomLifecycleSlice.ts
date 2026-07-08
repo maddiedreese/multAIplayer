@@ -119,7 +119,10 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       codexThreadIdsByRoom: omitRecordKey(state.codexThreadIdsByRoom, roomId),
       githubActionsByRoom: omitRecordKey(state.githubActionsByRoom, roomId),
       roomSettingsByRoom: omitRecordKey(state.roomSettingsByRoom, roomId),
-      chatMessagesByRoom: omitRecordKey(state.chatMessagesByRoom, roomId),
+      roomChatByRoom: omitRecordKey(state.roomChatByRoom, roomId),
+      sensitiveAttachmentReviewKey: state.sensitiveAttachmentReviewKey?.startsWith(`${roomId}:`)
+        ? null
+        : state.sensitiveAttachmentReviewKey,
       filePanelByRoom: omitRecordKey(state.filePanelByRoom, roomId),
       secretWarningsVisibleByRoom: omitRecordKey(state.secretWarningsVisibleByRoom, roomId),
       historySearchMessagesByRoom: omitRecordKey(state.historySearchMessagesByRoom, roomId),
@@ -132,14 +135,11 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       roomGoalsByRoom: omitRecordKey(state.roomGoalsByRoom, roomId),
       codexContinuationByRoom: omitRecordKey(state.codexContinuationByRoom, roomId),
       localPreviewByRoom: omitRecordKey(state.localPreviewByRoom, roomId),
-      pendingAttachmentsByRoom: omitRecordKey(state.pendingAttachmentsByRoom, roomId),
-      selectedMessageIdsByRoom: omitRecordKey(state.selectedMessageIdsByRoom, roomId),
       terminalLinesByRoom: omitRecordKey(state.terminalLinesByRoom, roomId),
       terminalBusyByRoom: omitRecordKey(state.terminalBusyByRoom, roomId),
       selectedTerminalIdsByRoom: omitRecordKey(state.selectedTerminalIdsByRoom, roomId),
       terminalUiByRoom: omitRecordKey(state.terminalUiByRoom, roomId),
-      terminals: state.terminals.filter((terminal) => terminal.roomId !== roomId),
-      draftsByRoom: omitRecordKey(state.draftsByRoom, roomId)
+      terminals: state.terminals.filter((terminal) => terminal.roomId !== roomId)
     }));
   }
 });

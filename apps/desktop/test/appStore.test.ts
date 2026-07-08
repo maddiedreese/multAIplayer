@@ -476,11 +476,11 @@ test("desktop store keeps room chat composition state room scoped", () => {
   store.setSensitiveAttachmentReviewKey("room-a:.env");
 
   const state = useAppStore.getState();
-  assert.equal(state.chatMessagesByRoom["room-a"], "Sending message");
-  assert.equal(state.chatMessagesByRoom["room-b"], undefined);
-  assert.equal(state.draftsByRoom["room-a"], "@Codex draft a test plan");
-  assert.equal(state.draftsByRoom["room-b"], "Looks good");
-  assert.equal(state.pendingAttachmentsByRoom["room-a"]?.[0]?.name, "README.md");
+  assert.equal(state.roomChatByRoom["room-a"]?.message, "Sending message");
+  assert.equal(state.roomChatByRoom["room-b"]?.message, undefined);
+  assert.equal(state.roomChatByRoom["room-a"]?.draft, "@Codex draft a test plan");
+  assert.equal(state.roomChatByRoom["room-b"]?.draft, "Looks good");
+  assert.equal(state.roomChatByRoom["room-a"]?.pendingAttachments?.[0]?.name, "README.md");
   assert.equal(state.sensitiveAttachmentReviewKey, "room-a:.env");
 });
 
@@ -508,16 +508,16 @@ test("desktop store exposes room draft actions", () => {
   store.appendPendingAttachmentForRoom("room-a", planAttachment);
 
   let state = useAppStore.getState();
-  assert.equal(state.draftsByRoom["room-a"], "@Codex summarize this");
-  assert.deepEqual(state.pendingAttachmentsByRoom["room-a"]?.map((attachment) => attachment.name), ["README.md", "plan.md"]);
+  assert.equal(state.roomChatByRoom["room-a"]?.draft, "@Codex summarize this");
+  assert.deepEqual(state.roomChatByRoom["room-a"]?.pendingAttachments?.map((attachment) => attachment.name), ["README.md", "plan.md"]);
 
   store.removePendingAttachmentForRoom("room-a", "attachment-1");
   state = useAppStore.getState();
-  assert.deepEqual(state.pendingAttachmentsByRoom["room-a"]?.map((attachment) => attachment.name), ["plan.md"]);
+  assert.deepEqual(state.roomChatByRoom["room-a"]?.pendingAttachments?.map((attachment) => attachment.name), ["plan.md"]);
 
   store.clearPendingAttachmentsForRoom("room-a");
   state = useAppStore.getState();
-  assert.equal(state.pendingAttachmentsByRoom["room-a"], undefined);
+  assert.equal(state.roomChatByRoom["room-a"]?.pendingAttachments, undefined);
 });
 
 test("desktop store exposes room message actions", () => {
@@ -536,7 +536,7 @@ test("desktop store exposes room message actions", () => {
 
   let state = useAppStore.getState();
   assert.equal(state.roomSettingsByRoom["room-a"]?.hostMessage, "Host saved");
-  assert.equal(state.chatMessagesByRoom["room-a"], "Message sent");
+  assert.equal(state.roomChatByRoom["room-a"]?.message, "Message sent");
   assert.equal(state.filePanelByRoom["room-a"]?.markdownCopyFallback?.title, "Selected messages");
   assert.equal(state.secretWarningsVisibleByRoom["room-a"], true);
   assert.equal(state.historyMessagesByRoom["room-a"], "History saved");
@@ -553,7 +553,7 @@ test("desktop store exposes room message actions", () => {
 
   state = useAppStore.getState();
   assert.equal("room-a" in state.roomSettingsByRoom, false);
-  assert.equal("room-a" in state.chatMessagesByRoom, false);
+  assert.equal("room-a" in state.roomChatByRoom, false);
   assert.equal("room-a" in state.filePanelByRoom, false);
   assert.equal("room-a" in state.secretWarningsVisibleByRoom, false);
   assert.equal("room-a" in state.historyMessagesByRoom, false);
@@ -688,11 +688,11 @@ test("desktop store keeps markdown message selection room scoped", () => {
   store.toggleSelectedMessageForRoom("room-a", "message-1");
 
   const state = useAppStore.getState();
-  assert.deepEqual(state.selectedMessageIdsByRoom["room-a"], ["message-2"]);
-  assert.deepEqual(state.selectedMessageIdsByRoom["room-b"], ["message-9"]);
+  assert.deepEqual(state.roomChatByRoom["room-a"]?.selectedMessageIds, ["message-2"]);
+  assert.deepEqual(state.roomChatByRoom["room-b"]?.selectedMessageIds, ["message-9"]);
 
   store.clearSelectedMessagesForRoom("room-a");
-  assert.equal(useAppStore.getState().selectedMessageIdsByRoom["room-a"], undefined);
+  assert.equal(useAppStore.getState().roomChatByRoom["room-a"]?.selectedMessageIds, undefined);
 });
 
 test("desktop store keeps history search messages room scoped", () => {
@@ -1295,6 +1295,7 @@ test("desktop store clears local room-scoped state", () => {
   store.setBrowserUrlForRoom("room-b", "https://example.com", "http://localhost:3000");
   store.setDraftForRoom("room-a", "clear me");
   store.setDraftForRoom("room-b", "keep me");
+  store.setSensitiveAttachmentReviewKey("room-a:.env");
 
   store.clearRoomScopedStateForRoom("room-a");
 
@@ -1316,13 +1317,13 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.inspectorTabsByRoom["room-a"], undefined);
   assert.equal(state.presenceByRoom["room-a"], undefined);
   assert.equal(state.codexContinuationByRoom["room-a"], undefined);
-  assert.equal(state.selectedMessageIdsByRoom["room-a"], undefined);
+  assert.equal(state.roomChatByRoom["room-a"], undefined);
+  assert.equal(state.sensitiveAttachmentReviewKey, null);
   assert.equal(state.filePanelByRoom["room-a"], undefined);
   assert.equal(state.localPreviewByRoom["room-a"], undefined);
   assert.equal(state.selectedTerminalIdsByRoom["room-a"], undefined);
   assert.equal(state.terminals.some((terminal) => terminal.roomId === "room-a"), false);
   assert.equal(state.browserByRoom["room-a"]?.url, undefined);
-  assert.equal(state.draftsByRoom["room-a"], undefined);
   assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "keep");
   assert.equal(state.codexEventsByRoom["room-b"]?.[0]?.turnId, "turn-b");
   assert.equal(state.codexThreadIdsByRoom["room-b"], "thread-b");
@@ -1330,7 +1331,7 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.inspectorTabsByRoom["room-b"], "terminal");
   assert.equal(state.presenceByRoom["room-b"]?.["device-b"]?.displayName, "Jordan");
   assert.equal(state.codexContinuationByRoom["room-b"]?.acceptedBy, "Jordan");
-  assert.deepEqual(state.selectedMessageIdsByRoom["room-b"], ["message-b"]);
+  assert.deepEqual(state.roomChatByRoom["room-b"]?.selectedMessageIds, ["message-b"]);
   assert.equal(state.terminals.some((terminal) => terminal.roomId === "room-b"), true);
   assert.equal(state.browserByRoom["room-b"]?.url, "https://example.com");
 });

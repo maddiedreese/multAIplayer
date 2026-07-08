@@ -9,7 +9,7 @@ interface UseMarkdownSelectionOptions {
 
 export function useMarkdownSelection({ activeRoomId, enabled, resetKey }: UseMarkdownSelectionOptions) {
   const [markdownSelectionMode, setMarkdownSelectionMode] = useState(false);
-  const selectedMessageIdsByRoom = useAppStore((state) => state.selectedMessageIdsByRoom);
+  const roomChatByRoom = useAppStore((state) => state.roomChatByRoom);
   const toggleSelectedMessageForRoom = useAppStore((state) => state.toggleSelectedMessageForRoom);
   const clearSelectedMessagesForRoom = useAppStore((state) => state.clearSelectedMessagesForRoom);
 
@@ -17,7 +17,7 @@ export function useMarkdownSelection({ activeRoomId, enabled, resetKey }: UseMar
     setMarkdownSelectionMode(false);
   }, [resetKey]);
 
-  const selectedMessageIds = selectedMessageIdsByRoom[activeRoomId] ?? [];
+  const selectedMessageIds = roomChatByRoom[activeRoomId]?.selectedMessageIds ?? [];
 
   function toggleMessageSelection(messageId: string) {
     if (!enabled) return;
