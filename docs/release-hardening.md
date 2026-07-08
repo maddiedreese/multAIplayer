@@ -74,6 +74,8 @@ node scripts/sqlite-backup-restore-drill.mjs --data-path=/path/to/relay-store.sq
 
 The release preflight runs the same drill in fixture mode so the backup path stays exercised in CI-friendly environments.
 
+The SQLite backup drill does not remove the alpha storage scaling caveat: encrypted room envelopes are incremental, but the normalized non-envelope relay tables are still cleared and reinserted as a full snapshot on each debounced state flush. Treat that as an alpha-scale ceiling to revisit before operating a larger hosted relay with many rooms, members, devices, invites, or sessions.
+
 ## Field Diagnostics
 
 When an alpha tester hits an ordinary crash or app bug, ask them to open Account settings and click `Copy diagnostics`. The bundle contains app version, runtime/platform metadata, relay origins, and recent redacted warning/error entries. It does not intentionally include room transcripts, room secrets, terminal output, browser contents, file contents, invite fragments, or GitHub tokens. Users should still review the copied JSON before attaching it to a GitHub issue.
