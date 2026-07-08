@@ -2,6 +2,8 @@
 
 The relay is intended to be self-hostable. In v1 it routes encrypted room events and manages presence; it does not call OpenAI or store plaintext chat transcripts.
 
+Teams moving from the hosted relay to their own relay should use the [hosted-to-self-hosted relay migration runbook](relay-migration-runbook.md). The short version is: deploy and verify a self-hosted relay, change each desktop app's Settings drawer to the new relay HTTP and WebSocket URLs, recreate team/room membership with fresh invites, and rely on each device's local room keys and encrypted local history for continuity.
+
 Planned self-hosting requirements:
 
 - Node.js runtime for the relay;
@@ -238,3 +240,18 @@ VITE_RELAY_URL=ws://127.0.0.1:4321/rooms
 These env vars define the packaged defaults. Desktop users can also open Settings and change the relay HTTP API URL and WebSocket rooms URL without rebuilding the app. The override is stored locally on that device.
 
 The current alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured. Production/self-hosted deployments should still prefer a real database-backed session store, token rotation, and regular key rotation once multi-instance hosting is needed.
+
+## Migrating From The Hosted Relay
+
+The relay does not hold plaintext room history or room keys. Migrating from the hosted relay to a self-hosted relay is therefore a membership and routing cutover, not a server-side transcript export.
+
+Use [relay-migration-runbook.md](relay-migration-runbook.md) for the full procedure and verification checklist. Plan to:
+
+- stand up the self-hosted relay and pass `NODE_ENV=production npm run doctor:production-relay`;
+- switch each desktop app's `HTTP API URL` and `WebSocket rooms URL` in Settings;
+- sign in to GitHub again for the new relay origin when auth is required;
+- recreate teams and rooms on the self-hosted relay;
+- issue fresh invites so each device joins the new relay-side rooms;
+- confirm new encrypted chat, attachments, Codex host approval, and local history readability before treating the migration as complete.
+
+Encrypted export/import is planned as a future belt-and-suspenders backup and exit path. Until it ships, keep the original devices and their local encrypted history intact during migration.
