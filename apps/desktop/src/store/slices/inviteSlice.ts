@@ -3,21 +3,37 @@ import { omitRecordKey } from "../../lib/setUtils";
 import type { InviteJoinRequest } from "../../types";
 import type { AppStoreState } from "../appStore";
 
-type InviteRequestsByRoom = Record<string, InviteJoinRequest[]>;
-type InviteLinksByRoom = Record<string, string>;
-type InviteApprovalGatesByRoom = Record<string, boolean>;
-type InviteMessagesByRoom = Record<string, string | null>;
-type KeyRotationBusyByRoom = Record<string, boolean>;
-type InviteAdmissionsByRoom = Record<string, string>;
+export interface InviteRoomState {
+  requests?: InviteJoinRequest[];
+  link?: string;
+  approvalGate?: boolean;
+  message?: string;
+  keyRotationBusy?: boolean;
+  admission?: string;
+}
+
+export type InviteByRoom = Record<string, InviteRoomState>;
+
+function compactInviteRoom(record: InviteRoomState): InviteRoomState | undefined {
+  return Object.keys(record).length ? record : undefined;
+}
+
+function updateInviteForRoom(
+  current: InviteByRoom,
+  roomId: string,
+  update: (invite: InviteRoomState) => InviteRoomState
+): InviteByRoom {
+  const nextInvite = compactInviteRoom(update(current[roomId] ?? {}));
+  if (!nextInvite) return omitRecordKey(current, roomId);
+  return {
+    ...current,
+    [roomId]: nextInvite
+  };
+}
 
 export interface InviteSlice {
-  inviteRequestsByRoom: InviteRequestsByRoom;
+  inviteByRoom: InviteByRoom;
   inviteSecretInput: string;
-  inviteLinksByRoom: InviteLinksByRoom;
-  inviteApprovalGatesByRoom: InviteApprovalGatesByRoom;
-  inviteMessagesByRoom: InviteMessagesByRoom;
-  keyRotationBusyByRoom: KeyRotationBusyByRoom;
-  inviteAdmissionsByRoom: InviteAdmissionsByRoom;
   setInviteRequestsForRoom: (roomId: string, requests: InviteJoinRequest[]) => void;
   setInviteSecretInputValue: (value: string) => void;
   clearInviteSecretInput: () => void;
@@ -33,31 +49,21 @@ export interface InviteSlice {
 
 export const emptyInviteState: Pick<
   InviteSlice,
-  | "inviteRequestsByRoom"
+  | "inviteByRoom"
   | "inviteSecretInput"
-  | "inviteLinksByRoom"
-  | "inviteApprovalGatesByRoom"
-  | "inviteMessagesByRoom"
-  | "keyRotationBusyByRoom"
-  | "inviteAdmissionsByRoom"
 > = {
-  inviteRequestsByRoom: {},
-  inviteSecretInput: "",
-  inviteLinksByRoom: {},
-  inviteApprovalGatesByRoom: {},
-  inviteMessagesByRoom: {},
-  keyRotationBusyByRoom: {},
-  inviteAdmissionsByRoom: {}
+  inviteByRoom: {},
+  inviteSecretInput: ""
 };
 
 export const createInviteSlice: StateCreator<AppStoreState, [], [], InviteSlice> = (set) => ({
   ...emptyInviteState,
   setInviteRequestsForRoom: (roomId, requests) => {
     set((state) => ({
-      inviteRequestsByRoom: {
-        ...state.inviteRequestsByRoom,
-        [roomId]: requests
-      }
+      inviteByRoom: updateInviteForRoom(state.inviteByRoom, roomId, (invite) => ({
+        ...invite,
+        requests
+      }))
     }));
   },
   setInviteSecretInputValue: (value) => {
@@ -68,64 +74,72 @@ export const createInviteSlice: StateCreator<AppStoreState, [], [], InviteSlice>
   },
   setInviteAdmissionForRoom: (roomId, inviteId) => {
     set((state) => ({
-      inviteAdmissionsByRoom: inviteId
-        ? { ...state.inviteAdmissionsByRoom, [roomId]: inviteId }
-        : omitRecordKey(state.inviteAdmissionsByRoom, roomId)
+      inviteByRoom: updateInviteForRoom(state.inviteByRoom, roomId, (invite) => {
+        const { admission, ...rest } = invite;
+        return inviteId ? { ...invite, admission: inviteId } : rest;
+      })
     }));
   },
   clearInviteAdmissionForRoom: (roomId) => {
     set((state) => ({
-      inviteAdmissionsByRoom: omitRecordKey(state.inviteAdmissionsByRoom, roomId)
+      inviteByRoom: updateInviteForRoom(state.inviteByRoom, roomId, (invite) => {
+        const { admission, ...rest } = invite;
+        return rest;
+      })
     }));
   },
   setKeyRotationBusyForRoom: (roomId, busy) => {
     set((state) => ({
-      keyRotationBusyByRoom: busy
-        ? { ...state.keyRotationBusyByRoom, [roomId]: true }
-        : omitRecordKey(state.keyRotationBusyByRoom, roomId)
+      inviteByRoom: updateInviteForRoom(state.inviteByRoom, roomId, (invite) => {
+        const { keyRotationBusy, ...rest } = invite;
+        return busy ? { ...invite, keyRotationBusy: true } : rest;
+      })
     }));
   },
   updateInviteRequestStatus: (roomId, requestId, status) => {
     set((state) => ({
-      inviteRequestsByRoom: {
-        ...state.inviteRequestsByRoom,
-        [roomId]: (state.inviteRequestsByRoom[roomId] ?? []).map((request) =>
+      inviteByRoom: updateInviteForRoom(state.inviteByRoom, roomId, (invite) => ({
+        ...invite,
+        requests: (invite.requests ?? []).map((request) =>
           request.id === requestId ? { ...request, status } : request
         )
-      }
+      }))
     }));
   },
   appendInviteRequest: (roomId, request) => {
     set((state) => {
-      const roomRequests = state.inviteRequestsByRoom[roomId] ?? [];
+      const roomRequests = state.inviteByRoom[roomId]?.requests ?? [];
       if (roomRequests.some((existing) => existing.id === request.id)) return state;
       return {
-        inviteRequestsByRoom: {
-          ...state.inviteRequestsByRoom,
-          [roomId]: [...roomRequests, request]
-        }
+        inviteByRoom: updateInviteForRoom(state.inviteByRoom, roomId, (invite) => ({
+          ...invite,
+          requests: [...roomRequests, request]
+        }))
       };
     });
   },
   setInviteLinkForRoom: (roomId, link) => {
     set((state) => ({
-      inviteLinksByRoom: link
-        ? { ...state.inviteLinksByRoom, [roomId]: link }
-        : omitRecordKey(state.inviteLinksByRoom, roomId)
+      inviteByRoom: updateInviteForRoom(state.inviteByRoom, roomId, (invite) => {
+        const { link: _link, ...rest } = invite;
+        return link ? { ...invite, link } : rest;
+      })
     }));
   },
   setInviteApprovalGateForRoom: (roomId, enabled) => {
     set((state) => ({
-      inviteApprovalGatesByRoom: enabled
-        ? { ...state.inviteApprovalGatesByRoom, [roomId]: true }
-        : omitRecordKey(state.inviteApprovalGatesByRoom, roomId)
+      inviteByRoom: updateInviteForRoom(state.inviteByRoom, roomId, (invite) => {
+        const { approvalGate, ...rest } = invite;
+        return enabled ? { ...invite, approvalGate: true } : rest;
+      })
     }));
   },
   setInviteMessageForRoom: (roomId, message) => {
     set((state) => ({
-      inviteMessagesByRoom: message
-        ? { ...state.inviteMessagesByRoom, [roomId]: message }
-        : omitRecordKey(state.inviteMessagesByRoom, roomId)
+      inviteByRoom: updateInviteForRoom(state.inviteByRoom, roomId, (invite) => {
+        const { message: _message, ...rest } = invite;
+        return message ? { ...invite, message } : rest;
+      })
     }));
   }
 });

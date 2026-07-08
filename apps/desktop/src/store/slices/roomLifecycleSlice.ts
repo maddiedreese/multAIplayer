@@ -37,9 +37,15 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
               }
             }
           : state.browserByRoom,
-        inviteRequestsByRoom: payload.inviteRequests.length
-          ? { ...state.inviteRequestsByRoom, [roomId]: payload.inviteRequests }
-          : state.inviteRequestsByRoom,
+        inviteByRoom: payload.inviteRequests.length
+          ? {
+              ...state.inviteByRoom,
+              [roomId]: {
+                ...state.inviteByRoom[roomId],
+                requests: payload.inviteRequests
+              }
+            }
+          : state.inviteByRoom,
         codexEventsByRoom: payload.codexEvents.length
           ? { ...state.codexEventsByRoom, [roomId]: payload.codexEvents }
           : state.codexEventsByRoom,
@@ -100,7 +106,7 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
           requests: []
         }
       },
-      inviteRequestsByRoom: { ...state.inviteRequestsByRoom, [roomId]: [] },
+      inviteByRoom: omitRecordKey(state.inviteByRoom, roomId),
       codexEventsByRoom: { ...state.codexEventsByRoom, [roomId]: [] },
       gitWorkflowByRoom: {
         ...state.gitWorkflowByRoom,
@@ -117,7 +123,6 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       filePanelByRoom: omitRecordKey(state.filePanelByRoom, roomId),
       secretWarningsVisibleByRoom: omitRecordKey(state.secretWarningsVisibleByRoom, roomId),
       historyMessagesByRoom: omitRecordKey(state.historyMessagesByRoom, roomId),
-      keyRotationBusyByRoom: omitRecordKey(state.keyRotationBusyByRoom, roomId),
       approvalVisibleByRoom: omitRecordKey(state.approvalVisibleByRoom, roomId),
       pendingCodexApprovalsByRoom: omitRecordKey(state.pendingCodexApprovalsByRoom, roomId),
       codexRunningByRoom: omitRecordKey(state.codexRunningByRoom, roomId),
@@ -129,9 +134,6 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       selectedTerminalIdsByRoom: omitRecordKey(state.selectedTerminalIdsByRoom, roomId),
       terminalUiByRoom: omitRecordKey(state.terminalUiByRoom, roomId),
       terminals: state.terminals.filter((terminal) => terminal.roomId !== roomId),
-      inviteLinksByRoom: omitRecordKey(state.inviteLinksByRoom, roomId),
-      inviteApprovalGatesByRoom: omitRecordKey(state.inviteApprovalGatesByRoom, roomId),
-      inviteMessagesByRoom: omitRecordKey(state.inviteMessagesByRoom, roomId),
       draftsByRoom: omitRecordKey(state.draftsByRoom, roomId)
     }));
   }

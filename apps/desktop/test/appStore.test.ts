@@ -71,7 +71,7 @@ test("desktop store exposes room busy actions", () => {
   assert.equal(state.localPreviewByRoom["room-a"]?.busy, true);
   assert.equal(state.roomSettingsByRoom["room-a"]?.hostBusy, true);
   assert.equal(state.roomSettingsByRoom["room-a"]?.settingsBusy, true);
-  assert.equal(state.keyRotationBusyByRoom["room-a"], true);
+  assert.equal(state.inviteByRoom["room-a"]?.keyRotationBusy, true);
   assert.equal(state.filePanelByRoom["room-a"]?.busy, true);
   assert.equal(state.terminalBusyByRoom["room-a"], true);
 });
@@ -120,7 +120,7 @@ test("desktop store exposes room request actions", () => {
   store.updateBrowserRequestStatus("room-a", "browser-request-a", "approved");
 
   const state = useAppStore.getState();
-  assert.equal(state.inviteRequestsByRoom["room-a"]?.[0]?.status, "approved");
+  assert.equal(state.inviteByRoom["room-a"]?.requests?.[0]?.status, "approved");
   assert.equal(state.terminalRequestsByRoom["room-a"]?.length, 1);
   assert.equal(state.terminalRequestsByRoom["room-a"]?.[0]?.status, "denied");
   assert.equal(state.browserByRoom["room-a"]?.requests?.[0]?.status, "approved");
@@ -427,16 +427,16 @@ test("desktop store keeps invite panel state room scoped", () => {
   store.setInviteAdmissionForRoom("room-a", null);
 
   const state = useAppStore.getState();
-  assert.equal(state.inviteRequestsByRoom["room-a"]?.[0]?.requester, "Jordan");
+  assert.equal(state.inviteByRoom["room-a"]?.requests?.[0]?.requester, "Jordan");
   assert.equal(state.inviteSecretInput, "multaiplayer://invite#secret");
-  assert.equal(state.inviteLinksByRoom["room-a"], "https://multaiplayer.com/invite/room-a");
-  assert.equal(state.inviteApprovalGatesByRoom["room-a"], true);
-  assert.equal(state.inviteApprovalGatesByRoom["room-b"], undefined);
-  assert.equal(state.inviteMessagesByRoom["room-a"], "Invite created");
-  assert.equal(state.inviteMessagesByRoom["room-b"], undefined);
-  assert.equal(state.keyRotationBusyByRoom["room-a"], true);
-  assert.equal(state.inviteAdmissionsByRoom["room-a"], undefined);
-  assert.equal(state.inviteAdmissionsByRoom["room-b"], "Admitted Avery");
+  assert.equal(state.inviteByRoom["room-a"]?.link, "https://multaiplayer.com/invite/room-a");
+  assert.equal(state.inviteByRoom["room-a"]?.approvalGate, true);
+  assert.equal(state.inviteByRoom["room-b"]?.approvalGate, undefined);
+  assert.equal(state.inviteByRoom["room-a"]?.message, "Invite created");
+  assert.equal(state.inviteByRoom["room-b"]?.message, undefined);
+  assert.equal(state.inviteByRoom["room-a"]?.keyRotationBusy, true);
+  assert.equal(state.inviteByRoom["room-a"]?.admission, undefined);
+  assert.equal(state.inviteByRoom["room-b"]?.admission, "Admitted Avery");
 });
 
 test("desktop store exposes room invite actions", () => {
@@ -450,11 +450,11 @@ test("desktop store exposes room invite actions", () => {
   store.setInviteMessageForRoom("room-a", null);
 
   const state = useAppStore.getState();
-  assert.equal(state.inviteLinksByRoom["room-a"], "https://multaiplayer.com/invite/room-a");
-  assert.equal(state.inviteApprovalGatesByRoom["room-a"], true);
-  assert.equal(state.inviteMessagesByRoom["room-a"], undefined);
-  assert.equal(state.inviteLinksByRoom["room-b"], undefined);
-  assert.equal(state.inviteApprovalGatesByRoom["room-b"], undefined);
+  assert.equal(state.inviteByRoom["room-a"]?.link, "https://multaiplayer.com/invite/room-a");
+  assert.equal(state.inviteByRoom["room-a"]?.approvalGate, true);
+  assert.equal(state.inviteByRoom["room-a"]?.message, undefined);
+  assert.equal(state.inviteByRoom["room-b"]?.link, undefined);
+  assert.equal(state.inviteByRoom["room-b"]?.approvalGate, undefined);
 });
 
 test("desktop store keeps room chat composition state room scoped", () => {
@@ -959,7 +959,7 @@ test("desktop store exposes room event append actions", () => {
   assert.equal(state.localPreviewByRoom["room-a"]?.previews?.length, 1);
   assert.equal(state.localPreviewByRoom["room-a"]?.previews?.[0]?.status, "live");
   assert.equal(state.hostHandoffsByRoom["room-a"]?.length, 1);
-  assert.equal(state.inviteRequestsByRoom["room-a"]?.length, 1);
+  assert.equal(state.inviteByRoom["room-a"]?.requests?.length, 1);
   assert.equal(state.codexEventsByRoom["room-a"]?.length, 1);
 });
 
@@ -1232,7 +1232,7 @@ test("desktop store clears local room-scoped state", () => {
   assert.deepEqual(state.messagesByRoom["room-a"], []);
   assert.deepEqual(state.terminalRequestsByRoom["room-a"], []);
   assert.deepEqual(state.browserByRoom["room-a"], { requests: [] });
-  assert.deepEqual(state.inviteRequestsByRoom["room-a"], []);
+  assert.equal(state.inviteByRoom["room-a"], undefined);
   assert.deepEqual(state.codexEventsByRoom["room-a"], []);
   assert.deepEqual(state.gitWorkflowByRoom["room-a"], { events: [] });
   assert.deepEqual(state.githubActionsEventsByRoom["room-a"], []);
@@ -1500,7 +1500,7 @@ test("desktop store hydrates local room history through one room-scoped action",
   assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "Keep this room alone.");
   assert.equal(state.terminalRequestsByRoom["room-a"]?.[0]?.command, "npm test");
   assert.equal(state.browserByRoom["room-a"]?.requests?.[0]?.url, "http://localhost:5173");
-  assert.equal(state.inviteRequestsByRoom["room-a"]?.[0]?.requester, "Jordan");
+  assert.equal(state.inviteByRoom["room-a"]?.requests?.[0]?.requester, "Jordan");
   assert.equal(state.codexEventsByRoom["room-a"]?.[0]?.message, "Reading context");
   assert.equal(state.gitWorkflowByRoom["room-a"]?.events?.[0]?.branch, "codex/history-hydration");
   assert.equal(state.gitWorkflowByRoom["room-a"]?.message, "Opened draft PR");
