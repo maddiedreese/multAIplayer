@@ -13,6 +13,7 @@ multAIplayer is an honest alpha. It is useful for local and trusted-team testing
 - GitHub sign-in requires a GitHub OAuth app configured on the relay.
 - A hosted production relay requires real domain, TLS, secrets, persistent storage, and operator monitoring.
 - The relay Dockerfile and SQLite storage are available, but multi-instance production hosting still needs external/shared rate limiting, backup/restore drills, and operational monitoring.
+- SQLite encrypted room envelopes use an incremental append/delete path, but the normalized non-envelope relay state still rewrites all teams, rooms, invites, devices, members, and sessions on each debounced flush. That is acceptable for alpha-scale trusted teams, but larger hosted relays should plan an incremental or shared-store rewrite before rooms and membership counts grow enough for whole-store rewrites to become a scaling ceiling.
 
 ## Privacy And Encryption
 

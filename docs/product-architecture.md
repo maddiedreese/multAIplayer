@@ -587,6 +587,7 @@ docs/
 - Alpha member removal is relay-enforced for future reads, live sockets, and stale invite metadata. Production-grade cryptographic removal with room key epochs and per-device delivery is post-alpha roadmap work.
 - Alpha multi-device support is device-oriented: each device has its own key identity and local trust note. Recovery and synchronized multi-device identity are post-alpha roadmap work.
 - Official relay federation is not part of the alpha scope.
+- Relay SQLite storage is alpha-scale. Encrypted room envelopes append and prune incrementally, but normalized non-envelope state is still saved by clearing and reinserting the full set of teams, rooms, invites, devices, members, and sessions on each debounced flush. Larger hosted relays should move those tables to incremental writes or a shared production store before whole-store rewrites become an operational limit.
 - GitHub OAuth is the alpha GitHub integration. GitHub App support remains a future option for tighter repo-level permissions and enterprise self-hosting.
 - The desktop discovers and runs the local `codex app-server`; multAIplayer does not proxy Codex credentials through the hosted relay.
 - Secret detection is a review aid for files, terminal commands, browser pages, and copied Markdown. The alpha warns and gates risky sharing without claiming automatic redaction.
