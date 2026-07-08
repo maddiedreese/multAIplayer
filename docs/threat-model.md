@@ -49,7 +49,13 @@ Draft message text and attachments are kept in memory per room. Large encrypted 
 
 ## Desktop App Shell CSP
 
-The packaged Tauri app sets a Content Security Policy for the main multAIplayer window. It allows the app bundle itself, Tauri IPC, local development relay endpoints, and the official hosted relay origin. It does not allow arbitrary HTTPS/WSS egress from the app shell; self-hosted packaged builds must include their relay origin in the build-time CSP. App-shell image loading is limited to bundled/data/blob images and GitHub-hosted avatars, and presence avatar URLs are filtered before render. This policy applies to the multAIplayer app shell; approved room browser pages open in separate room/project-scoped WebViews with their own profile and download blocking.
+The packaged Tauri app sets a Content Security Policy for the main multAIplayer window. It allows the app bundle itself, Tauri IPC, local development relay endpoints, the official hosted relay origin, and the public `multaiplayer.com` release-manifest endpoint used for update notices. It does not allow arbitrary HTTPS/WSS egress from the app shell; self-hosted packaged builds must include their relay origin in the build-time CSP. App-shell image loading is limited to bundled/data/blob images and GitHub-hosted avatars, and presence avatar URLs are filtered before render. This policy applies to the multAIplayer app shell; approved room browser pages open in separate room/project-scoped WebViews with their own profile and download blocking.
+
+## Diagnostics And Updates
+
+The alpha does not send telemetry automatically. The desktop keeps a small local diagnostics buffer of warning/error summaries and global crash events. Users can copy a diagnostics JSON bundle from Account settings when filing a bug. The bundle includes app version, runtime/platform metadata, relay origins, and redacted recent error entries; it is not intended to include transcripts, room secrets, terminal output, browser contents, file contents, invite fragments, or GitHub tokens.
+
+The alpha does not use automatic updates. The desktop checks the public release manifest and shows an in-app banner when a newer version is available, with a stronger label for security updates. Users still manually download and install signed builds.
 
 ## Room Browser Capability Guards
 

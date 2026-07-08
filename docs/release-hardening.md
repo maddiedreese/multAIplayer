@@ -8,6 +8,8 @@ Run these before tagging or publishing a release candidate:
 
 ```bash
 npm run doctor
+npm run license:check
+npm run sqlite:backup-restore-drill
 npm run verify
 ```
 
@@ -37,6 +39,23 @@ If any required Apple signing secret is missing, the release workflow fails befo
 
 Do not attach ad hoc local builds to public releases. Release artifacts should come from GitHub Actions so the source commit, workflow logs, and checksums are visible.
 
+## Update Notices
+
+The alpha does not use the Tauri auto-updater. Instead, the desktop app checks `https://multaiplayer.com/releases/latest.json` and shows an in-app banner when the manifest advertises a newer version. Security updates should set `security: true` so the banner is labelled as a security update.
+
+Manifest shape:
+
+```json
+{
+  "version": "0.1.1-alpha.0",
+  "url": "https://github.com/maddiedreese/multAIplayer/releases/tag/v0.1.1-alpha.0",
+  "notes": "Security update for room trust handling.",
+  "security": true
+}
+```
+
+The banner is only a nudge; alpha users still need to download and install the new signed build manually. Publish or update the manifest before announcing a security fix.
+
 ## Relay Deployment
 
 Before advertising an official relay, verify the exact environment that will run the relay:
@@ -46,6 +65,18 @@ NODE_ENV=production npm run doctor:production-relay
 ```
 
 For Docker deployments, build from the repository root with `apps/relay/Dockerfile`, mount persistent storage at `/data`, and set `MULTAIPLAYER_RELAY_ALLOWED_ORIGINS` to bare origins only, such as `https://multaiplayer.com`. The image defaults to SQLite at `/data/relay-store.sqlite`; do not use JSON storage, `*`, path-scoped origins, `/tmp` storage, or disabled rate limits for public relays.
+
+Before tagging a public alpha, run a backup/restore drill against a staged copy of the relay SQLite file:
+
+```bash
+node scripts/sqlite-backup-restore-drill.mjs --data-path=/path/to/relay-store.sqlite
+```
+
+The release preflight runs the same drill in fixture mode so the backup path stays exercised in CI-friendly environments.
+
+## Field Diagnostics
+
+When an alpha tester hits an ordinary crash or app bug, ask them to open Account settings and click `Copy diagnostics`. The bundle contains app version, runtime/platform metadata, relay origins, and recent redacted warning/error entries. It does not intentionally include room transcripts, room secrets, terminal output, browser contents, file contents, invite fragments, or GitHub tokens. Users should still review the copied JSON before attaching it to a GitHub issue.
 
 ## Secrets
 

@@ -10,7 +10,7 @@ interface AppWorkspaceShellProps {
   main: ReactNode;
   inspector: ReactNode;
   dialog: ReactNode;
-  webPreviewBanner?: ReactNode;
+  shellBanner?: ReactNode;
   onBeginSidebarResize: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onBeginInspectorResize: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onToggleSidebarCollapsed: () => void;
@@ -26,7 +26,7 @@ export function AppWorkspaceShell({
   main,
   inspector,
   dialog,
-  webPreviewBanner,
+  shellBanner,
   onBeginSidebarResize,
   onBeginInspectorResize,
   onToggleSidebarCollapsed,
@@ -34,10 +34,10 @@ export function AppWorkspaceShell({
 }: AppWorkspaceShellProps) {
   return (
     <div
-      className={`app-shell ${webPreviewBanner ? "has-web-preview-banner" : ""} ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${inspectorCollapsed ? "inspector-collapsed" : ""}`}
+      className={`app-shell ${shellBanner ? "has-shell-banner" : ""} ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${inspectorCollapsed ? "inspector-collapsed" : ""}`}
       style={shellStyle}
     >
-      {webPreviewBanner}
+      {shellBanner && <div className="shell-banner-stack">{shellBanner}</div>}
       {sidebar}
       <ShellResizer
         side="left"

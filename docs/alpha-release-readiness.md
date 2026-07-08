@@ -26,6 +26,8 @@ Expected automated coverage:
 - Rust formatting.
 - Production web build.
 - Local setup checks for Node, npm, Rust, Cargo, lockfiles, env templates, and macOS packaging tools.
+- Project package license consistency and dependency license scanning.
+- SQLite relay backup/restore drill in fixture mode.
 - Hosted relay sanity checks for GitHub OAuth, session secret strength, exact HTTP(S) allowed origins, auth-required mode, disabled debug endpoints, disabled demo seeding, enabled rate limits, persistent data path, and conservative proxy-header handling.
 - An alpha smoke test that covers room creation, encrypted local history, chat attachments, Codex approval context, file/diff preview selection, terminal approval, GitHub PR/Actions readiness, browser gating, usage-limit host handoff context, and locked-room blocking.
 
@@ -39,8 +41,11 @@ These require a maintainer account, secret, device, or product decision:
 - Create and store production relay secrets.
 - Set up Apple Developer ID signing and notarization secrets.
 - Decide release cadence, support expectations, and disclosure contact.
+- Publish or update the alpha update manifest at `https://multaiplayer.com/releases/latest.json`.
+- Run `node scripts/sqlite-backup-restore-drill.mjs --data-path=/path/to/relay-store.sqlite` against a staged copy of the real relay SQLite store.
 - Run a real multi-user test with at least two GitHub accounts and two machines.
 - Review final security/trust copy before public announcement.
+- Confirm ordinary bug reports ask users to copy diagnostics from Account settings and review the bundle before attaching it.
 
 ## Required Dogfood Scenarios
 
@@ -61,6 +66,7 @@ Before a wider alpha, manually run these in the native macOS app:
 ## Alpha-Only Limitations To Keep Visible
 
 - Public macOS alpha artifacts are expected to be Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
+- The alpha app checks a hosted release manifest and shows an in-app update banner, but users still manually download and install updated builds.
 - Production-grade cryptographic member removal still needs key epochs and per-device key delivery.
 - JSON relay storage is for local/dev self-hosting. Hosted or internet-facing alpha relays should use SQLite and still need backup/restore drills before production claims.
 - Rate limiting is process-local; multi-instance hosting needs an edge or shared-store limiter.

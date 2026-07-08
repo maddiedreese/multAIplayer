@@ -20,7 +20,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://avatars.githubusercontent.com https://*.githubusercontent.com; font-src 'self' data:; connect-src 'self' ipc: http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://relay.multaiplayer.com wss://relay.multaiplayer.com; frame-src 'none'; object-src 'none'; base-uri 'none'"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://avatars.githubusercontent.com https://*.githubusercontent.com; font-src 'self' data:; connect-src 'self' ipc: http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://relay.multaiplayer.com wss://relay.multaiplayer.com https://multaiplayer.com; frame-src 'none'; object-src 'none'; base-uri 'none'"
     }
   },
   "bundle": {

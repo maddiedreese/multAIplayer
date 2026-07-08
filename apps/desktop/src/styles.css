@@ -104,12 +104,16 @@ button:disabled {
   background: #eef1ed;
 }
 
-.app-shell.has-web-preview-banner {
+.app-shell.has-shell-banner {
   grid-template-rows: auto minmax(0, 1fr);
 }
 
-.web-preview-banner {
+.shell-banner-stack {
   grid-column: 1 / -1;
+  display: grid;
+}
+
+.web-preview-banner {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -125,11 +129,50 @@ button:disabled {
   white-space: nowrap;
 }
 
-.app-shell.has-web-preview-banner .sidebar,
-.app-shell.has-web-preview-banner .room,
-.app-shell.has-web-preview-banner .inspector,
-.app-shell.has-web-preview-banner .shell-resizer,
-.app-shell.has-web-preview-banner .sidebar-drawer {
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  padding: 9px 18px;
+  border-bottom: 1px solid #c7d4c3;
+  background: #edf8ea;
+  color: #1d3b23;
+  font-size: 0.82rem;
+}
+
+.update-banner.security {
+  border-bottom-color: #d2a15a;
+  background: #fff1d6;
+  color: #4a2e06;
+}
+
+.update-banner strong {
+  white-space: nowrap;
+}
+
+.update-banner span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.update-banner button {
+  margin-left: auto;
+  padding: 6px 10px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.app-shell.has-shell-banner .sidebar,
+.app-shell.has-shell-banner .room,
+.app-shell.has-shell-banner .inspector,
+.app-shell.has-shell-banner .shell-resizer,
+.app-shell.has-shell-banner .sidebar-drawer {
   grid-row: 2;
 }
 

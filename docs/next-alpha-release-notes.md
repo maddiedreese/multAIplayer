@@ -15,6 +15,8 @@ These notes are a draft for the next public alpha after `v0.1.0-alpha.0`. Keep t
 - Room goals can be started with `/goal`, paused/resumed, edited, deleted, and restored from encrypted local history as local room focus state.
 - Local preview sharing was added so a host can expose a local development server through room context during collaborative coding.
 - Release hardening now includes production relay checks, branch protection, stronger issue templates, signed/notarized macOS release enforcement, and clearer alpha launch documentation.
+- The desktop app now shows an in-app update banner from the public alpha release manifest, with a stronger label for security updates.
+- Account settings can copy a local diagnostics bundle for bug reports without including transcripts, room secrets, terminal output, browser contents, file contents, invite fragments, or GitHub tokens by design.
 
 ## Security And Privacy Notes
 
@@ -28,6 +30,7 @@ These notes are a draft for the next public alpha after `v0.1.0-alpha.0`. Keep t
 - Public macOS alpha artifacts are expected to be Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
 - Member removal does not yet provide production-grade cryptographic key epochs.
 - The official/self-host relay uses SQLite table storage in this alpha. It still needs backup/restore drills and external/shared rate limiting before production claims.
+- Release preflight now includes a fixture SQLite backup/restore drill and dependency license scan; maintainers should still run the SQLite drill against a staged copy of the real relay store before tagging.
 - Rate limiting is process-local.
 - Host handoff reconstructs context from room state; it still needs real two-person testing against actual Codex usage-limit failures.
 - Browser and terminal behavior is powerful and intentionally host-local, but it should continue to receive security review before private or regulated work.
