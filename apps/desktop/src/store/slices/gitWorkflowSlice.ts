@@ -36,6 +36,17 @@ export interface GitWorkflowRuntimeRoomState {
 
 export type GitWorkflowRuntimeByRoom = Record<string, GitWorkflowRuntimeRoomState>;
 
+export interface GitHubWorkflowPanelMaps {
+  gitStatusByRoom: Record<string, GitStatusSummary | null>;
+  gitWorkflowBusyByRoom: Record<string, boolean>;
+  gitWorkflowMessagesByRoom: Record<string, string | null>;
+  gitWorkflowDraftsByRoom: Record<string, Partial<GitWorkflowDraft>>;
+  actionsBusyByRoom: Record<string, boolean>;
+  actionsMessagesByRoom: Record<string, string | null>;
+  actionRunsByRoom: Record<string, GitHubActionRun[]>;
+  actionsLastCheckedByRoom: Record<string, string | null>;
+}
+
 function isEmptyRecord(record: object): boolean {
   return Object.keys(record).length === 0;
 }
@@ -73,6 +84,56 @@ export function projectGitHubActionsByRoom(gitWorkflowRuntimeByRoom: GitWorkflow
       .filter(([, runtime]) => runtime.actions)
       .map(([roomId, runtime]) => [roomId, runtime.actions ?? {}])
   );
+}
+
+export function projectGitHubWorkflowPanelMaps(
+  gitWorkflowRuntimeByRoom: GitWorkflowRuntimeByRoom
+): GitHubWorkflowPanelMaps {
+  const gitWorkflowByRoom = projectGitWorkflowByRoom(gitWorkflowRuntimeByRoom);
+  const githubActionsByRoom = projectGitHubActionsByRoom(gitWorkflowRuntimeByRoom);
+
+  return {
+    gitStatusByRoom: Object.fromEntries(
+      Object.entries(gitWorkflowByRoom)
+        .filter(([, workflow]) => "status" in workflow)
+        .map(([roomId, workflow]) => [roomId, workflow.status ?? null])
+    ),
+    gitWorkflowBusyByRoom: Object.fromEntries(
+      Object.entries(gitWorkflowByRoom)
+        .filter(([, workflow]) => workflow.busy)
+        .map(([roomId]) => [roomId, true])
+    ),
+    gitWorkflowMessagesByRoom: Object.fromEntries(
+      Object.entries(gitWorkflowByRoom)
+        .filter(([, workflow]) => "message" in workflow)
+        .map(([roomId, workflow]) => [roomId, workflow.message ?? null])
+    ),
+    gitWorkflowDraftsByRoom: Object.fromEntries(
+      Object.entries(gitWorkflowByRoom)
+        .filter(([, workflow]) => workflow.draft)
+        .map(([roomId, workflow]) => [roomId, workflow.draft ?? {}])
+    ),
+    actionsBusyByRoom: Object.fromEntries(
+      Object.entries(githubActionsByRoom)
+        .filter(([, actions]) => actions.busy)
+        .map(([roomId]) => [roomId, true])
+    ),
+    actionsMessagesByRoom: Object.fromEntries(
+      Object.entries(githubActionsByRoom)
+        .filter(([, actions]) => actions.message)
+        .map(([roomId, actions]) => [roomId, actions.message ?? null])
+    ),
+    actionRunsByRoom: Object.fromEntries(
+      Object.entries(githubActionsByRoom)
+        .filter(([, actions]) => actions.runs)
+        .map(([roomId, actions]) => [roomId, actions.runs ?? []])
+    ),
+    actionsLastCheckedByRoom: Object.fromEntries(
+      Object.entries(githubActionsByRoom)
+        .filter(([, actions]) => actions.lastChecked)
+        .map(([roomId, actions]) => [roomId, actions.lastChecked ?? null])
+    )
+  };
 }
 
 export function projectGitWorkflowEventsByRoom(
