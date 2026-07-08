@@ -110,11 +110,11 @@ export function useAppWorkspaceFlow({
     bootstrap: {
       workspace: {
         relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
-        setTeams: workspaceState.setTeams,
-        setRooms: workspaceState.setRooms,
-        setSelectedTeam: workspaceState.setSelectedTeam,
-        setSelectedRoomId: workspaceState.setSelectedRoomId,
-        setWorkspaceError: workspaceState.setWorkspaceError
+        replaceTeams: workspaceState.replaceTeams,
+        replaceRooms: workspaceState.replaceRooms,
+        selectExistingTeamOrFirst: workspaceState.selectExistingTeamOrFirst,
+        selectExistingRoomOrFirst: workspaceState.selectExistingRoomOrFirst,
+        setWorkspaceStatusError: workspaceState.setWorkspaceStatusError
       },
       selectedRoomReadReceipt: {
         selectedRoomId: workspaceState.selectedRoomId,

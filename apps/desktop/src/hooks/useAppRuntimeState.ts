@@ -13,7 +13,13 @@ import type { RelayStatus } from "../types";
 
 export function useAppRuntimeState() {
   const [codexProbe, setCodexProbe] = useState<CodexProbe | null>(null);
+  const replaceCodexProbe = useCallback((next: CodexProbe | null) => {
+    setCodexProbe(next);
+  }, []);
   const [relayStatus, setRelayStatus] = useState<RelayStatus>("closed");
+  const replaceRelayStatus = useCallback((next: RelayStatus) => {
+    setRelayStatus(next);
+  }, []);
   const [deviceIdentity, setDeviceIdentity] = useState<DeviceIdentity | null>(null);
   const [deviceIdentityMessage, setDeviceIdentityMessage] = useState<string | null>(null);
   const replaceDeviceIdentity = useCallback((next: DeviceIdentity | null) => {
@@ -44,9 +50,9 @@ export function useAppRuntimeState() {
 
   return {
     codexProbe,
-    setCodexProbe,
+    replaceCodexProbe,
     relayStatus,
-    setRelayStatus,
+    replaceRelayStatus,
     deviceIdentity,
     replaceDeviceIdentity,
     deviceIdentityMessage,

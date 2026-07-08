@@ -434,7 +434,7 @@ export function useAppRoomRuntime({
         selectedRoomId: selectedRoom.id,
         terminalAutoOpenedRoomsRef: terminalPanelState.terminalAutoOpenedRoomsRef
       },
-      codexProbe: { setCodexProbe: appRuntimeState.setCodexProbe },
+      codexProbe: { replaceCodexProbe: appRuntimeState.replaceCodexProbe },
       roomDraftCleanup: {
         hasSelectedRoom,
         selectedRoomId: selectedRoom.id,

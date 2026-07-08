@@ -51,6 +51,25 @@ export function useWorkspaceUiState({
   const [selectedRoomId, setSelectedRoomId] = useState(initialRoomId);
   const [sidebarQuery, setSidebarQuery] = useState("");
   const messagesByRoom = useAppStore((state) => state.messagesByRoom);
+  const replaceTeams = useCallback((nextTeams: TeamRecord[]) => {
+    setTeams(nextTeams);
+  }, []);
+  const replaceRooms = useCallback((nextRooms: RoomRecord[]) => {
+    setRooms(nextRooms);
+  }, []);
+  const selectExistingTeamOrFirst = useCallback((nextTeams: TeamRecord[]) => {
+    setSelectedTeam((current) =>
+      nextTeams.some((team) => team.id === current) ? current : nextTeams[0]?.id ?? ""
+    );
+  }, []);
+  const selectExistingRoomOrFirst = useCallback((nextRooms: RoomRecord[]) => {
+    setSelectedRoomId((current) =>
+      nextRooms.some((room) => room.id === current) ? current : nextRooms[0]?.id ?? ""
+    );
+  }, []);
+  const setWorkspaceStatusError = useCallback((message: string | null) => {
+    setWorkspaceError(message);
+  }, []);
   const updateTeamRoleForTeam = useCallback((teamId: string, role: TeamRecord["role"] | undefined) => {
     setTeams((current) => current.map((team) =>
       team.id === teamId ? { ...team, role: role ?? team.role } : team
@@ -97,11 +116,13 @@ export function useWorkspaceUiState({
   return {
     teams,
     setTeams,
+    replaceTeams,
     updateTeamRoleForTeam,
     updateTeamMemberCountForTeam,
     upsertTeamRecord,
     rooms,
     setRooms,
+    replaceRooms,
     upsertRoomRecord,
     replaceRoomRecord,
     markRoomReadById,
@@ -110,6 +131,7 @@ export function useWorkspaceUiState({
     teamMembersBusyByTeam,
     workspaceError,
     setWorkspaceError,
+    setWorkspaceStatusError,
     activeSidebarPanel,
     setActiveSidebarPanel,
     newTeamName,
@@ -120,8 +142,10 @@ export function useWorkspaceUiState({
     setNewRoomProjectPath,
     selectedTeam,
     setSelectedTeam,
+    selectExistingTeamOrFirst,
     selectedRoomId,
     setSelectedRoomId,
+    selectExistingRoomOrFirst,
     selectWorkspaceRoom,
     selectTeamRoom,
     sidebarQuery,
