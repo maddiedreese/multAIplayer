@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { InspectorTab } from "./InspectorTabs";
 
 export type { InspectorTab };
@@ -18,6 +18,7 @@ export function RoomInspectorPanel({
   terminalPanel,
   roomPanel
 }: RoomInspectorPanelProps) {
+  const inspectorRef = useRef<HTMLElement | null>(null);
   const activeLabel = activeTab === "room" ? "room" : activeTab;
   const panelByTab: Record<InspectorTab, ReactNode> = {
     files: filesPanel,
@@ -27,8 +28,12 @@ export function RoomInspectorPanel({
     room: roomPanel
   };
 
+  useEffect(() => {
+    inspectorRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [activeTab]);
+
   return (
-    <aside className="inspector">
+    <aside className="inspector" ref={inspectorRef}>
       <div className="inspector-context">
         <span>Context</span>
         <strong>{activeLabel}</strong>

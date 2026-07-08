@@ -135,7 +135,7 @@ export function registerRoomRoutes({
       return;
     }
     if (!codexReasoningEffort) {
-      res.status(400).json({ error: "codexReasoningEffort must be low, medium, high, or xhigh" });
+      res.status(400).json({ error: "codexReasoningEffort must be minimal, low, medium, high, or xhigh" });
       return;
     }
     if (!codexSpeed) {
@@ -314,7 +314,7 @@ export function registerRoomRoutes({
       return;
     }
     if (codexReasoningEffort !== undefined && !codexReasoningEffort) {
-      res.status(400).json({ error: "codexReasoningEffort must be low, medium, high, or xhigh" });
+      res.status(400).json({ error: "codexReasoningEffort must be minimal, low, medium, high, or xhigh" });
       return;
     }
     if (codexSpeed !== undefined && !codexSpeed) {

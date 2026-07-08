@@ -70,7 +70,7 @@ export function seedWorkspace(options: {
       approvalDelegationPolicy: "host_only",
       trustedApproverUserIds: [],
       mode: defaultRoomMode,
-      codexModel: "gpt-5.4-mini",
+      codexModel: "gpt-5.3-codex-spark",
       codexReasoningEffort: "medium",
       codexSpeed: "standard",
       browserAllowedOrigins: defaultBrowserAllowedOrigins,
