@@ -69,8 +69,8 @@ test("desktop store exposes room busy actions", () => {
   assert.equal(state.gitWorkflowByRoom["room-b"]?.busy, true);
   assert.equal(state.githubActionsByRoom["room-a"]?.busy, true);
   assert.equal(state.localPreviewByRoom["room-a"]?.busy, true);
-  assert.equal(state.hostBusyByRoom["room-a"], true);
-  assert.equal(state.settingsBusyByRoom["room-a"], true);
+  assert.equal(state.roomSettingsByRoom["room-a"]?.hostBusy, true);
+  assert.equal(state.roomSettingsByRoom["room-a"]?.settingsBusy, true);
   assert.equal(state.keyRotationBusyByRoom["room-a"], true);
   assert.equal(state.filePanelByRoom["room-a"]?.busy, true);
   assert.equal(state.terminalBusyByRoom["room-a"], true);
@@ -346,13 +346,13 @@ test("desktop store keeps room settings state room scoped", () => {
   store.setProjectPathDraftForRoom("room-b", "/tmp/example", "/tmp/current-project");
 
   const state = useAppStore.getState();
-  assert.equal(state.hostBusyByRoom["room-a"], true);
-  assert.equal(state.hostMessagesByRoom["room-a"], "Host updated");
-  assert.equal(state.hostMessagesByRoom["room-b"], undefined);
-  assert.equal(state.settingsBusyByRoom["room-b"], true);
-  assert.equal(state.settingsMessagesByRoom["room-a"], "Settings saved");
-  assert.equal(state.customCodexModelsByRoom["room-a"], "gpt-5.4");
-  assert.equal(state.projectPathDraftsByRoom["room-b"], "/tmp/example");
+  assert.equal(state.roomSettingsByRoom["room-a"]?.hostBusy, true);
+  assert.equal(state.roomSettingsByRoom["room-a"]?.hostMessage, "Host updated");
+  assert.equal(state.roomSettingsByRoom["room-b"]?.hostMessage, undefined);
+  assert.equal(state.roomSettingsByRoom["room-b"]?.settingsBusy, true);
+  assert.equal(state.roomSettingsByRoom["room-a"]?.settingsMessage, "Settings saved");
+  assert.equal(state.roomSettingsByRoom["room-a"]?.customCodexModel, "gpt-5.4");
+  assert.equal(state.roomSettingsByRoom["room-b"]?.projectPathDraft, "/tmp/example");
 });
 
 test("desktop store exposes room project override actions", () => {
@@ -365,10 +365,10 @@ test("desktop store exposes room project override actions", () => {
   store.setCustomCodexModelForRoom("room-a", "gpt-5.3", "gpt-5.3");
 
   const state = useAppStore.getState();
-  assert.equal(state.customCodexModelsByRoom["room-a"], undefined);
-  assert.equal(state.projectPathDraftsByRoom["room-a"], "/tmp/example");
-  assert.equal(state.customCodexModelsByRoom["room-b"], undefined);
-  assert.equal(state.projectPathDraftsByRoom["room-b"], undefined);
+  assert.equal(state.roomSettingsByRoom["room-a"]?.customCodexModel, undefined);
+  assert.equal(state.roomSettingsByRoom["room-a"]?.projectPathDraft, "/tmp/example");
+  assert.equal(state.roomSettingsByRoom["room-b"]?.customCodexModel, undefined);
+  assert.equal(state.roomSettingsByRoom["room-b"]?.projectPathDraft, undefined);
 });
 
 test("desktop store keeps local preview state room scoped", () => {
@@ -535,13 +535,13 @@ test("desktop store exposes room message actions", () => {
   store.setSettingsMessageForRoom("room-a", "Settings saved");
 
   let state = useAppStore.getState();
-  assert.equal(state.hostMessagesByRoom["room-a"], "Host saved");
+  assert.equal(state.roomSettingsByRoom["room-a"]?.hostMessage, "Host saved");
   assert.equal(state.chatMessagesByRoom["room-a"], "Message sent");
   assert.equal(state.filePanelByRoom["room-a"]?.markdownCopyFallback?.title, "Selected messages");
   assert.equal(state.secretWarningsVisibleByRoom["room-a"], true);
   assert.equal(state.historyMessagesByRoom["room-a"], "History saved");
   assert.equal(state.teamHistoryMessagesByTeam["team-a"], "Team defaults saved");
-  assert.equal(state.settingsMessagesByRoom["room-a"], "Settings saved");
+  assert.equal(state.roomSettingsByRoom["room-a"]?.settingsMessage, "Settings saved");
 
   store.setHostMessageForRoom("room-a", null);
   store.setChatMessageForRoom("room-a", null);
@@ -552,13 +552,12 @@ test("desktop store exposes room message actions", () => {
   store.setSettingsMessageForRoom("room-a", null);
 
   state = useAppStore.getState();
-  assert.equal("room-a" in state.hostMessagesByRoom, false);
+  assert.equal("room-a" in state.roomSettingsByRoom, false);
   assert.equal("room-a" in state.chatMessagesByRoom, false);
   assert.equal("room-a" in state.filePanelByRoom, false);
   assert.equal("room-a" in state.secretWarningsVisibleByRoom, false);
   assert.equal("room-a" in state.historyMessagesByRoom, false);
   assert.equal("team-a" in state.teamHistoryMessagesByTeam, false);
-  assert.equal("room-a" in state.settingsMessagesByRoom, false);
 });
 
 test("desktop store keeps Codex room state room scoped", () => {
@@ -1241,7 +1240,7 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.codexThreadIdsByRoom["room-a"], undefined);
   assert.equal(state.githubActionsByRoom["room-a"], undefined);
   assert.equal(state.gitWorkflowByRoom["room-a"]?.busy, undefined);
-  assert.equal(state.hostMessagesByRoom["room-a"], undefined);
+  assert.equal(state.roomSettingsByRoom["room-a"], undefined);
   assert.equal(state.secretWarningsVisibleByRoom["room-a"], undefined);
   assert.equal(state.filePanelByRoom["room-a"], undefined);
   assert.equal(state.localPreviewByRoom["room-a"], undefined);

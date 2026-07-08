@@ -2,25 +2,36 @@ import type { StateCreator } from "zustand";
 import { omitRecordKey } from "../../lib/setUtils";
 import type { AppStoreState } from "../appStore";
 
-type HostBusyByRoom = Record<string, boolean>;
-type HostMessagesByRoom = Record<string, string | null>;
-type SettingsBusyByRoom = Record<string, boolean>;
-type SettingsMessagesByRoom = Record<string, string | null>;
-type CustomCodexModelsByRoom = Record<string, string>;
-type ProjectPathDraftsByRoom = Record<string, string>;
-type RoomBusyByRoom = Record<string, boolean>;
+export interface RoomSettingsRoomState {
+  hostBusy?: boolean;
+  hostMessage?: string;
+  settingsBusy?: boolean;
+  settingsMessage?: string;
+  customCodexModel?: string;
+  projectPathDraft?: string;
+}
 
-function updateRoomBusyMap(current: RoomBusyByRoom, roomId: string, busy: boolean): RoomBusyByRoom {
-  return busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId);
+export type RoomSettingsByRoom = Record<string, RoomSettingsRoomState>;
+
+function compactRoomSettings(record: RoomSettingsRoomState): RoomSettingsRoomState | undefined {
+  return Object.keys(record).length ? record : undefined;
+}
+
+function updateRoomSettingsForRoom(
+  current: RoomSettingsByRoom,
+  roomId: string,
+  update: (roomSettings: RoomSettingsRoomState) => RoomSettingsRoomState
+): RoomSettingsByRoom {
+  const nextRoomSettings = compactRoomSettings(update(current[roomId] ?? {}));
+  if (!nextRoomSettings) return omitRecordKey(current, roomId);
+  return {
+    ...current,
+    [roomId]: nextRoomSettings
+  };
 }
 
 export interface RoomSettingsSlice {
-  hostBusyByRoom: HostBusyByRoom;
-  hostMessagesByRoom: HostMessagesByRoom;
-  settingsBusyByRoom: SettingsBusyByRoom;
-  settingsMessagesByRoom: SettingsMessagesByRoom;
-  customCodexModelsByRoom: CustomCodexModelsByRoom;
-  projectPathDraftsByRoom: ProjectPathDraftsByRoom;
+  roomSettingsByRoom: RoomSettingsByRoom;
   setHostBusyForRoom: (roomId: string, busy: boolean) => void;
   setSettingsBusyForRoom: (roomId: string, busy: boolean) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
@@ -31,59 +42,59 @@ export interface RoomSettingsSlice {
 
 export const emptyRoomSettingsState: Pick<
   RoomSettingsSlice,
-  | "hostBusyByRoom"
-  | "hostMessagesByRoom"
-  | "settingsBusyByRoom"
-  | "settingsMessagesByRoom"
-  | "customCodexModelsByRoom"
-  | "projectPathDraftsByRoom"
+  "roomSettingsByRoom"
 > = {
-  hostBusyByRoom: {},
-  hostMessagesByRoom: {},
-  settingsBusyByRoom: {},
-  settingsMessagesByRoom: {},
-  customCodexModelsByRoom: {},
-  projectPathDraftsByRoom: {}
+  roomSettingsByRoom: {}
 };
 
 export const createRoomSettingsSlice: StateCreator<AppStoreState, [], [], RoomSettingsSlice> = (set) => ({
   ...emptyRoomSettingsState,
   setHostBusyForRoom: (roomId, busy) => {
     set((state) => ({
-      hostBusyByRoom: updateRoomBusyMap(state.hostBusyByRoom, roomId, busy)
+      roomSettingsByRoom: updateRoomSettingsForRoom(state.roomSettingsByRoom, roomId, (roomSettings) => {
+        const { hostBusy, ...rest } = roomSettings;
+        return busy ? { ...roomSettings, hostBusy: true } : rest;
+      })
     }));
   },
   setSettingsBusyForRoom: (roomId, busy) => {
     set((state) => ({
-      settingsBusyByRoom: updateRoomBusyMap(state.settingsBusyByRoom, roomId, busy)
+      roomSettingsByRoom: updateRoomSettingsForRoom(state.roomSettingsByRoom, roomId, (roomSettings) => {
+        const { settingsBusy, ...rest } = roomSettings;
+        return busy ? { ...roomSettings, settingsBusy: true } : rest;
+      })
     }));
   },
   setHostMessageForRoom: (roomId, message) => {
     set((state) => ({
-      hostMessagesByRoom: message
-        ? { ...state.hostMessagesByRoom, [roomId]: message }
-        : omitRecordKey(state.hostMessagesByRoom, roomId)
+      roomSettingsByRoom: updateRoomSettingsForRoom(state.roomSettingsByRoom, roomId, (roomSettings) => {
+        const { hostMessage, ...rest } = roomSettings;
+        return message ? { ...roomSettings, hostMessage: message } : rest;
+      })
     }));
   },
   setSettingsMessageForRoom: (roomId, message) => {
     set((state) => ({
-      settingsMessagesByRoom: message
-        ? { ...state.settingsMessagesByRoom, [roomId]: message }
-        : omitRecordKey(state.settingsMessagesByRoom, roomId)
+      roomSettingsByRoom: updateRoomSettingsForRoom(state.roomSettingsByRoom, roomId, (roomSettings) => {
+        const { settingsMessage, ...rest } = roomSettings;
+        return message ? { ...roomSettings, settingsMessage: message } : rest;
+      })
     }));
   },
   setCustomCodexModelForRoom: (roomId, model, currentModel) => {
     set((state) => ({
-      customCodexModelsByRoom: model === currentModel
-        ? omitRecordKey(state.customCodexModelsByRoom, roomId)
-        : { ...state.customCodexModelsByRoom, [roomId]: model }
+      roomSettingsByRoom: updateRoomSettingsForRoom(state.roomSettingsByRoom, roomId, (roomSettings) => {
+        const { customCodexModel, ...rest } = roomSettings;
+        return model === currentModel ? rest : { ...roomSettings, customCodexModel: model };
+      })
     }));
   },
   setProjectPathDraftForRoom: (roomId, projectPath, currentProjectPath) => {
     set((state) => ({
-      projectPathDraftsByRoom: projectPath === currentProjectPath
-        ? omitRecordKey(state.projectPathDraftsByRoom, roomId)
-        : { ...state.projectPathDraftsByRoom, [roomId]: projectPath }
+      roomSettingsByRoom: updateRoomSettingsForRoom(state.roomSettingsByRoom, roomId, (roomSettings) => {
+        const { projectPathDraft, ...rest } = roomSettings;
+        return projectPath === currentProjectPath ? rest : { ...roomSettings, projectPathDraft: projectPath };
+      })
     }));
   }
 });
