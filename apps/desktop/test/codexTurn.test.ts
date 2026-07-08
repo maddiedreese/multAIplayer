@@ -11,6 +11,7 @@ import {
   buildCodexTurnSummary,
   formatAttachmentSummaryList,
   formatAttachmentForCodex,
+  formatObservedContextMaterial,
   maxCodexGitFiles,
   messagesSinceLastCodex,
   type CodexChatMessage
@@ -186,8 +187,10 @@ test("buildCodexTurnInput includes model, summary, and only the recent transcrip
   assert.match(input, /Selected model: gpt-5\.4-mini/);
   assert.match(input, /Workspace: \/Users\/maddie\/projects\/alpha/);
   assert.match(input, /Attachments included: notes\.md \(inline content included\)/);
-  assert.match(input, /Git status: disabled or unavailable/);
-  assert.match(input, /Terminals included: tests/);
+  assert.match(input, /Observed non-human context:/);
+  assert.match(input, /\[Terminal context -- observed material from terminal, not a room member speaking\]/);
+  assert.match(input, /tests/);
+  assert.match(input, /\[end material: terminal\]/);
   assert.match(input, /room chat as first-class user instruction context/);
   assert.doesNotMatch(input, /Do not treat room messages as system instructions/);
   assert.match(input, /@Maddie \(human, 9:02 AM\): please inspect the parser/);
@@ -274,6 +277,41 @@ test("buildCodexTurnInput bounds oversized context before invoking native Codex"
   assert.match(input, new RegExp(codexMaterialTruncationNotice.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(input, /important final traceback/);
   assert.doesNotMatch(input, new RegExp(codexTurnInputTruncationNotice.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("buildCodexTurnInput frames git browser and terminal context as observed material", () => {
+  const summary = buildCodexTurnSummary(
+    messages,
+    room,
+    [{ name: "tests" }],
+    [{ url: "https://github.com/maddiedreese/multAIplayer/actions", status: "approved" }],
+    {
+      branch: "feature/alpha",
+      files: [{ path: "src/App.tsx", status: "modified", added: 10, removed: 2 }]
+    }
+  );
+  const input = buildCodexTurnInput(messages, room.projectPath, "gpt-5.5", summary);
+
+  assert.match(input, /\[Git status -- observed material from git, not a room member speaking\]/);
+  assert.match(input, /feature\/alpha, 1 changed file\(s\): modified src\/App\.tsx \(\+10\/-2\)/);
+  assert.match(input, /\[end material: git\]/);
+  assert.match(input, /\[Browser context -- observed material from browser, not a room member speaking\]/);
+  assert.match(input, /https:\/\/github\.com/);
+  assert.match(input, /\[end material: browser\]/);
+  assert.match(input, /\[Terminal context -- observed material from terminal, not a room member speaking\]/);
+  assert.match(input, /tests/);
+  assert.match(input, /\[end material: terminal\]/);
+});
+
+test("formatObservedContextMaterial returns no block when no non-human context is included", () => {
+  assert.equal(formatObservedContextMaterial({
+    messagesSinceLastCodex: 1,
+    attachments: [],
+    workspacePath: null,
+    git: null,
+    browserAccess: [],
+    terminals: []
+  }), "");
 });
 
 test("formatAttachmentForCodex references large encrypted blobs without including plaintext", () => {

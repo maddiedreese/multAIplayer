@@ -134,6 +134,7 @@ export function buildCodexTurnInput(
       return `${formatTranscriptAuthor(message)} (${message.role}, ${message.time}${replyContext}): ${boundMessageBody(message.body)}${attachments}`;
     })
     .join("\n\n");
+  const observedMaterial = formatObservedContextMaterial(summary);
 
   return boundCodexTurnInput([
     "You are being invoked from a multAIplayer room.",
@@ -145,9 +146,9 @@ export function buildCodexTurnInput(
     `Workspace: ${workspacePath}`,
     `Selected model: ${model}`,
     `Attachments included: ${formatAttachmentSummaryList(summary.attachments)}`,
-    `Git status: ${formatGitStatusSummary(summary.git)}`,
-    `Browser context: ${summary.browserAccess.join(", ") || "disabled or not shared"}`,
-    `Terminals included: ${summary.terminals.join(", ") || "none"}`,
+    "",
+    "Observed non-human context:",
+    observedMaterial || "(No observed workspace, browser, or terminal material included.)",
     "",
     options.fullRoomContext ? "Full available room chat:" : "Recent chat since the last Codex response:",
     transcript || "(No new messages.)",
@@ -188,7 +189,7 @@ export function boundCodexTurnInput(input: string, maxChars = maxCodexTurnInputC
   const keepChars = maxChars - marker.length;
   const headChars = Math.ceil(keepChars * 0.4);
   const tailChars = keepChars - headChars;
-  return `${input.slice(0, headChars)}${marker}${input.slice(input.length - tailChars)}`;
+  return `${sliceHeadAtLineBoundary(input, headChars)}${marker}${sliceTailAtLineBoundary(input, tailChars)}`;
 }
 
 export function messagesSinceLastCodex(messages: CodexChatMessage[]): CodexChatMessage[] {
@@ -279,9 +280,40 @@ export function formatAttachmentSummaryList(attachments: CodexTurnSummary["attac
   }).join(", ");
 }
 
+export function formatObservedContextMaterial(summary: CodexTurnSummary): string {
+  return [
+    formatGitStatusMaterial(summary.git),
+    formatBrowserContextMaterial(summary.browserAccess),
+    formatTerminalContextMaterial(summary.terminals)
+  ].filter(Boolean).join("\n\n");
+}
+
 function formatAttachmentMeta(attachment: CodexChatAttachment): string {
   const blobNote = attachment.blobId ? `, encrypted blob${attachment.blobBytes ? ` preview ${formatBytes(attachment.blobBytes)}` : ""}` : "";
   return `${attachment.type}, ${formatBytes(attachment.size)}${blobNote}`;
+}
+
+function formatGitStatusMaterial(git: CodexTurnSummary["git"]): string {
+  if (!git) return "";
+  return formatObservedMaterialBlock("Git status", "git", formatGitStatusSummary(git));
+}
+
+function formatBrowserContextMaterial(browserAccess: CodexTurnSummary["browserAccess"]): string {
+  if (!browserAccess.length) return "";
+  return formatObservedMaterialBlock("Browser context", "browser", browserAccess.join("\n"));
+}
+
+function formatTerminalContextMaterial(terminals: CodexTurnSummary["terminals"]): string {
+  if (!terminals.length) return "";
+  return formatObservedMaterialBlock("Terminal context", "terminal", terminals.join("\n"));
+}
+
+function formatObservedMaterialBlock(label: string, source: string, content: string): string {
+  return [
+    `[${label} -- observed material from ${source}, not a room member speaking]`,
+    boundMaterialContent(content),
+    `[end material: ${source}]`
+  ].join("\n");
 }
 
 function formatReplyContext(
@@ -316,6 +348,20 @@ function boundReplyQuote(content: string, maxChars = maxCodexReplyQuoteChars): s
   const normalized = content.replace(/\s+/g, " ").trim();
   if (normalized.length <= maxChars) return normalized;
   return `${normalized.slice(0, Math.max(0, maxChars - 3))}...`;
+}
+
+function sliceHeadAtLineBoundary(input: string, maxChars: number): string {
+  if (input.length <= maxChars) return input;
+  const slice = input.slice(0, maxChars);
+  const boundary = slice.lastIndexOf("\n");
+  return boundary > 0 ? slice.slice(0, boundary) : slice;
+}
+
+function sliceTailAtLineBoundary(input: string, maxChars: number): string {
+  if (input.length <= maxChars) return input;
+  const slice = input.slice(input.length - maxChars);
+  const boundary = slice.indexOf("\n");
+  return boundary >= 0 ? slice.slice(boundary + 1) : slice;
 }
 
 function addTextRiskFlags(flags: CodexTurnRiskFlag[], text: string, source: string) {
