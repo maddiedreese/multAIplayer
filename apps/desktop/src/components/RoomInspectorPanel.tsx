@@ -29,7 +29,14 @@ export function RoomInspectorPanel({
   };
 
   useEffect(() => {
-    inspectorRef.current?.scrollTo({ top: 0, left: 0 });
+    const inspector = inspectorRef.current;
+    if (!inspector) return;
+    if (typeof inspector.scrollTo === "function") {
+      inspector.scrollTo({ top: 0, left: 0 });
+      return;
+    }
+    inspector.scrollTop = 0;
+    inspector.scrollLeft = 0;
   }, [activeTab]);
 
   return (

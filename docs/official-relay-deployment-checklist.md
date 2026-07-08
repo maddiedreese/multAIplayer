@@ -80,7 +80,8 @@ The check must pass. It verifies GitHub OAuth presence, strong durable session e
 ## Health Checks
 
 - Use `/healthz` for container health.
-- Use `/readyz` for platform readiness.
+- Use `/readyz` for platform readiness; it must turn not-ready during shutdown so traffic stops before the process exits.
+- Confirm deploy drains reject new HTTP requests and WebSocket upgrades, close existing room WebSockets with code `1012` (`Service Restart`), and flush the relay store before exit.
 - Use `/metrics` for content-free relay counters such as active sockets, published envelopes, rate-limit rejections, quota rejections by quota type, start time, and uptime.
 - Do not treat these endpoints as a privacy or security audit.
 
@@ -105,10 +106,11 @@ Before announcing the relay:
 - Invoke Codex, approve a turn, and verify host-local project/browser/terminal access stays on the host device.
 - Confirm rate-limited requests return `429` with `Retry-After`.
 - Restart the relay and confirm signed-in sessions survive only when the session secret is stable.
+- During a staged shutdown, confirm `/readyz` becomes not-ready, new HTTP/WS work is rejected, existing room WebSockets close with `1012`, and the relay store flushes before exit.
 
 ## Rollback Plan
 
 - Keep the previous deploy artifact available.
-- Keep the previous relay JSON store backup available.
+- Keep the previous relay SQLite store backup available.
 - If auth, storage, or WebSocket routing breaks, disable the official relay link in public copy and direct users to self-hosting until fixed.
 - If plaintext leakage is suspected, stop the relay, preserve logs/store for private investigation, and use the security disclosure path instead of a public issue.

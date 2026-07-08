@@ -60,11 +60,11 @@ test("normalizeCodexModel rejects blank, oversized, and non-model-like ids", () 
 });
 
 test("normalizeCodexReasoningEffort accepts current Codex reasoning choices", () => {
+  assert.equal(normalizeCodexReasoningEffort("minimal"), "minimal");
   assert.equal(normalizeCodexReasoningEffort("low"), "low");
   assert.equal(normalizeCodexReasoningEffort("medium"), "medium");
   assert.equal(normalizeCodexReasoningEffort("high"), "high");
   assert.equal(normalizeCodexReasoningEffort("xhigh"), "xhigh");
-  assert.equal(normalizeCodexReasoningEffort("minimal"), null);
   assert.equal(normalizeCodexReasoningEffort("extra"), null);
 });
 

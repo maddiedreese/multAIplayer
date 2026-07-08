@@ -54,7 +54,7 @@ docker run --rm -p 4321:4321 \
   multaiplayer-relay:alpha
 ```
 
-The image sets `NODE_ENV=production`, `PORT=4321`, `MULTAIPLAYER_RELAY_STORAGE=sqlite`, and `MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite` by default. The container healthcheck reads `/healthz`; keep `/readyz` available for platform-level readiness checks, but do not treat either endpoint as a security audit.
+The image sets `NODE_ENV=production`, `PORT=4321`, `MULTAIPLAYER_RELAY_STORAGE=sqlite`, and `MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite` by default. The container healthcheck reads `/healthz`; point platform readiness at `/readyz`. During shutdown, `/readyz` reports not-ready, new HTTP requests and WebSocket upgrades are rejected, existing room WebSockets close with code `1012` (`Service Restart`), and the relay store is flushed before exit. Give the process a termination grace period long enough for the flush to complete.
 
 ## Relay Storage
 
@@ -195,6 +195,15 @@ MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
 Each response includes an `x-request-id` header. The relay accepts a bounded incoming `x-request-id` or generates one. Logs include request method, path, status code, duration, and request id; they do not include room plaintext, encrypted payload bodies, attachment contents, GitHub tokens, Codex credentials, terminal output, browser pages, or repo files.
 
 The relay also exposes content-free operational counters at `/metrics`, including active sockets, published envelope count, rate-limit rejection count, quota rejection counts by quota type, start time, and uptime.
+
+Graceful shutdown timing is configurable:
+
+```bash
+MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS=0
+MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS=10000
+```
+
+When shutdown starts, `/readyz` flips to not-ready immediately. `MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS` keeps the process alive briefly for load balancers to stop routing before sockets close; `MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS` bounds how long existing room WebSockets can take to close before they are terminated.
 
 Workspace mutations can require GitHub sign-in:
 

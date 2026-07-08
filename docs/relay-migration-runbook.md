@@ -55,6 +55,8 @@ NODE_ENV=production npm run doctor:production-relay
 The check must pass before inviting the team to switch. Also confirm:
 
 - `https://relay.example.com/healthz` responds through the public HTTPS endpoint;
+- `https://relay.example.com/readyz` responds ready before cutover;
+- during a test restart, `/readyz` becomes not-ready, new HTTP/WS work is rejected, existing room WebSockets close with `1012`, and the relay store flushes before exit;
 - WebSocket upgrades reach `wss://relay.example.com/rooms`;
 - the relay data path is persistent and backed up;
 - the relay logs do not include plaintext room content, attachment content, terminal output, browser pages, Codex credentials, OpenAI credentials, or repo files.
@@ -122,6 +124,7 @@ If the hosted relay is in a sunset window, rollback is temporary. Use the remain
 For the official hosted relay, maintainers commit to at least 90 days' public notice before a planned shutdown. During that notice period:
 
 - sign-in and relay connectivity remain available for migration unless an emergency security or provider incident makes that impossible;
+- planned relay drains use `/readyz` not-ready, reject new work, close existing room WebSockets with `1012`, and flush the relay store before exit;
 - users can switch Settings to a self-hosted relay and re-establish teams/rooms there;
 - migration docs remain published in the repository;
 - encrypted export/import, once implemented, remains available as an additional backup and exit path.

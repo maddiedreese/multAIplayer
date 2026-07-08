@@ -45,6 +45,8 @@ npm run doctor:production-relay
 
 The relay also ships with a Dockerfile at `apps/relay/Dockerfile`; see [docs/self-hosting.md](docs/self-hosting.md) for the build/run command and production env checklist. Teams leaving the hosted relay can follow [docs/relay-migration-runbook.md](docs/relay-migration-runbook.md); the hosted relay policy is at least 90 days' notice before any planned shutdown, with migration kept available during that window whenever safely possible.
 
+Production deploys should wire `/readyz` to platform readiness: shutdown makes it not-ready, rejects new HTTP/WS work, closes existing room WebSockets with `1012`, and flushes the relay store before exit.
+
 ## CI
 
 The GitHub Actions workflow runs on pushes, pull requests, and manual dispatch:

@@ -37,6 +37,10 @@ export interface RelayConfig {
     perUser: number;
     perDevice: number;
   };
+  shutdown: {
+    drainMs: number;
+    graceMs: number;
+  };
   dailyCreationCaps: {
     teamsPerUser: number;
     roomsPerUser: number;
@@ -102,6 +106,10 @@ export function loadRelayConfig(): RelayConfig {
     websocketConnectionCaps: {
       perUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER, 20, 1, 1_000),
       perDevice: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE, 5, 1, 100)
+    },
+    shutdown: {
+      drainMs: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS, 0, 0, 60_000),
+      graceMs: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS, 10_000, 1_000, 120_000)
     },
     dailyCreationCaps: {
       teamsPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP, 25, 0, 10_000),

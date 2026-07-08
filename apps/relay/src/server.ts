@@ -2,7 +2,7 @@ import cors, { type CorsOptions } from "cors";
 import cookieParser from "cookie-parser";
 import express from "express";
 import { createServer } from "node:http";
-import { WebSocketServer, type WebSocket } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 import {
   createRelayAuthSessionManager,
   createRelayAuthSessionPersistence
@@ -86,7 +86,8 @@ const {
   structuredLogsEnabled,
   rateLimitWindowMs,
   rateLimitCaps,
-  websocketConnectionCaps
+  websocketConnectionCaps,
+  shutdown
 } = relayConfig;
 const relayMetrics = createRelayMetrics();
 const relayPersistence = createRelayPersistence({ backend: storageBackend, dataPath });
@@ -101,10 +102,22 @@ const corsOptions: CorsOptions = {
   }
 };
 const app = express();
+let relayShuttingDown = false;
+let relayShutdownPromise: Promise<void> | null = null;
 app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(requestLoggingMiddleware(structuredLogsEnabled));
 app.use(express.json({ limit: `${jsonBodyLimitBytes}b` }));
+app.use((req, res, next) => {
+  if (isRelayReady() || isShutdownExemptPath(req.path)) {
+    next();
+    return;
+  }
+  res.status(503).json({
+    error: "Relay is shutting down.",
+    code: "relay_shutting_down"
+  });
+});
 
 const server = createServer(app);
 const wss = new WebSocketServer({
@@ -402,7 +415,8 @@ registerOpsRoutes({
   app,
   dataPath,
   metrics: relayMetrics,
-  sessions
+  sessions,
+  isReady: isRelayReady
 });
 registerRoomRoutes({
   app,
@@ -453,6 +467,7 @@ registerRelayWebSocketConnection({
   consumeRateLimit,
   websocketConnectionCaps,
   recordQuotaRejection: relayMetrics.recordQuotaRejection,
+  isReady: isRelayReady,
   send,
   roomKey,
   isKnownRoom,
@@ -573,6 +588,14 @@ function isAllowedCorsOrigin(origin: string | undefined): boolean {
   return nodeEnv !== "production";
 }
 
+function isRelayReady(): boolean {
+  return !relayShuttingDown;
+}
+
+function isShutdownExemptPath(path: string): boolean {
+  return path === "/healthz" || path === "/readyz" || path === "/metrics";
+}
+
 function displayNameForUser(user: AuthSession["user"]): string {
   return user.name?.trim() || user.login;
 }
@@ -635,4 +658,69 @@ export function closeRelayServer() {
       resolve();
     });
   });
+}
+
+export async function shutdownRelay() {
+  if (!relayShutdownPromise) {
+    relayShuttingDown = true;
+    relayShutdownPromise = runRelayShutdown();
+  }
+  await relayShutdownPromise;
+}
+
+async function runRelayShutdown() {
+  if (shutdown.drainMs > 0) await delay(shutdown.drainMs);
+  const socketClose = closeRelayWebSockets();
+  await Promise.allSettled([
+    closeRelayServer(),
+    closeRelayWebSocketServer()
+  ]);
+  await socketClose;
+  await closeRelayStore();
+}
+
+async function closeRelayWebSocketServer() {
+  await new Promise<void>((resolve) => {
+    wss.close(() => resolve());
+  });
+}
+
+async function closeRelayWebSockets() {
+  const sockets = Array.from(wss.clients);
+  if (sockets.length === 0) return;
+  const closed = Promise.all(sockets.map((socket) => waitForSocketClose(socket)));
+  await Promise.race([
+    closed,
+    delay(shutdown.graceMs).then(() => {
+      for (const socket of sockets) {
+        if (socket.readyState !== WebSocket.CLOSED) socket.terminate();
+      }
+    })
+  ]);
+}
+
+function waitForSocketClose(socket: WebSocket): Promise<void> {
+  return new Promise((resolve) => {
+    if (socket.readyState === WebSocket.CLOSED) {
+      resolve();
+      return;
+    }
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      socket.off("close", done);
+      socket.off("error", done);
+      resolve();
+    };
+    socket.once("close", done);
+    socket.once("error", done);
+    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+      socket.close(1012, "Relay shutting down");
+    }
+  });
+}
+
+function delay(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }

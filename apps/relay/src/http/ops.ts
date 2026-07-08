@@ -7,14 +7,19 @@ interface RegisterOpsRoutesOptions {
   dataPath: string;
   metrics: RelayMetrics;
   sessions: Pick<ReadonlyMap<unknown, ClientSession>, "size">;
+  isReady?: () => boolean;
 }
 
-export function registerOpsRoutes({ app, dataPath, metrics, sessions }: RegisterOpsRoutesOptions) {
+export function registerOpsRoutes({ app, dataPath, metrics, sessions, isReady = () => true }: RegisterOpsRoutesOptions) {
   app.get("/healthz", (_req, res) => {
     res.json({ ok: true, service: "multaiplayer-relay" });
   });
 
   app.get("/readyz", (_req, res) => {
+    if (!isReady()) {
+      res.status(503).json({ ok: false, dataPath, code: "relay_shutting_down" });
+      return;
+    }
     res.json({ ok: true, dataPath });
   });
 

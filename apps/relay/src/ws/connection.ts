@@ -32,6 +32,7 @@ interface RegisterRelayWebSocketConnectionOptions {
     perDevice: number;
   };
   recordQuotaRejection?: (type: string) => void;
+  isReady?: () => boolean;
   send: (socket: ClientSession["socket"], message: RelayServerMessage) => void;
   roomKey: (teamId: string, roomId: string) => RoomKey;
   isKnownRoom: (teamId: string, roomId: string) => boolean;
@@ -74,6 +75,7 @@ export function registerRelayWebSocketConnection({
   consumeRateLimit,
   websocketConnectionCaps,
   recordQuotaRejection,
+  isReady = () => true,
   send,
   roomKey,
   isKnownRoom,
@@ -225,6 +227,11 @@ export function registerRelayWebSocketConnection({
   }
 
   wss.on("connection", (socket, request) => {
+    if (!isReady()) {
+      send(socket, { type: "error", message: "Relay is shutting down. Reconnect to another relay instance." });
+      socket.close(1012, "Relay shutting down");
+      return;
+    }
     const session: ClientSession = {
       socket,
       authSession: getAuthSessionFromRequest(request),

@@ -14,6 +14,7 @@ interface RelayHarness {
   wsUrl: string;
   dataPath: string;
   tempDir: string;
+  beginShutdown(): Promise<void>;
   close(options?: { preserveData?: boolean }): Promise<void>;
 }
 
@@ -269,6 +270,78 @@ test("relay broadcasts newly created teams to workspace subscribers", async () =
     const updatedTeam = await updatePromise;
     assert.equal(updatedTeam.name, "New live team");
     assert.equal(updatedTeam.members, 1);
+  } finally {
+    socket.close();
+    await relay.close();
+  }
+});
+
+test("relay drains readiness, sockets, and pending store writes on graceful shutdown", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS: "500",
+    MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS: "2000"
+  });
+  const socket = new WebSocket(relay.wsUrl);
+  try {
+    await onceOpen(socket);
+    socket.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:tester",
+      deviceId: "device-test-123"
+    }));
+    await waitForJoined(socket);
+
+    const createResponse = await fetch(`${relay.baseUrl}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Shutdown flush team" })
+    });
+    assert.equal(createResponse.status, 201);
+
+    const closePromise = waitForClose(socket);
+    const shutdownPromise = relay.beginShutdown();
+    const readyBody = await waitForNotReady(relay.baseUrl);
+    assert.equal(readyBody.code, "relay_shutting_down");
+
+    const rejectedResponse = await fetch(`${relay.baseUrl}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Rejected during shutdown" })
+    });
+    assert.equal(rejectedResponse.status, 503);
+    assert.deepEqual(await rejectedResponse.json(), {
+      error: "Relay is shutting down.",
+      code: "relay_shutting_down"
+    });
+
+    const lateSocket = new WebSocket(relay.wsUrl);
+    try {
+      const lateClosePromise = waitForClose(lateSocket);
+      await onceOpen(lateSocket).catch(() => undefined);
+      const lateClose = await lateClosePromise;
+      assert.equal(lateClose.code, 1012);
+      assert.equal(lateClose.reason, "Relay shutting down");
+    } finally {
+      lateSocket.close();
+    }
+
+    const close = await closePromise;
+    assert.equal(close.code, 1012);
+    assert.equal(close.reason, "Relay shutting down");
+    await shutdownPromise;
+
+    const stored = JSON.parse(await readFile(relay.dataPath, "utf8")) as StoredRelayStateFixture;
+    assert.ok(
+      Array.isArray(stored.teams) &&
+      stored.teams.some((team) => (
+        typeof team === "object" &&
+        team !== null &&
+        "name" in team &&
+        team.name === "Shutdown flush team"
+      ))
+    );
   } finally {
     socket.close();
     await relay.close();
@@ -3518,6 +3591,9 @@ async function startRelay(
         wsUrl: `ws://127.0.0.1:${port}/rooms`,
         dataPath,
         tempDir,
+        beginShutdown() {
+          return beginProcessShutdown(child);
+        },
         async close(options = {}) {
           await stopProcess(child);
           if (!options.preserveData) await rm(tempDir, { recursive: true, force: true });
@@ -3722,6 +3798,21 @@ async function waitForReady(
     await delay(100);
   }
   throw new Error(`Relay did not become ready: ${getOutput()}`);
+}
+
+async function waitForNotReady(baseUrl: string): Promise<{ code: string }> {
+  let lastStatus = 0;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    try {
+      const response = await fetch(`${baseUrl}/readyz`);
+      lastStatus = response.status;
+      if (response.status === 503) return await response.json() as { code: string };
+    } catch {
+      // Keep polling while the child is transitioning.
+    }
+    await delay(50);
+  }
+  assert.fail(`Timed out waiting for /readyz to become not-ready; last status ${lastStatus}`);
 }
 
 function onceOpen(socket: WebSocket): Promise<void> {
@@ -3947,6 +4038,11 @@ function deviceSealedPayload() {
 }
 
 async function stopProcess(child: ChildProcessWithoutNullStreams) {
+  if (child.exitCode !== null) return;
+  await beginProcessShutdown(child);
+}
+
+async function beginProcessShutdown(child: ChildProcessWithoutNullStreams) {
   if (child.exitCode !== null) return;
   child.kill("SIGTERM");
   await Promise.race([
