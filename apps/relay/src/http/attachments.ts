@@ -20,6 +20,7 @@ interface RegisterAttachmentRoutesOptions {
   allowMutation: (session: AuthSession | null, res: Response) => boolean;
   canAccessRoom: (teamId: string, roomId: string, userId: string) => boolean;
   scheduleStoreSave: () => void;
+  recordQuotaRejection?: (type: string) => void;
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
   maxCiphertextCharactersForBlob: (maxBytes: number) => number;
   isExpiredAttachmentBlob: (blob: AttachmentBlobRecordType) => boolean;
@@ -39,6 +40,7 @@ export function registerAttachmentRoutes({
   allowMutation,
   canAccessRoom,
   scheduleStoreSave,
+  recordQuotaRejection,
   normalizeMetadataText,
   maxCiphertextCharactersForBlob,
   isExpiredAttachmentBlob
@@ -98,6 +100,7 @@ export function registerAttachmentRoutes({
     if (session) {
       const usedBytes = liveAttachmentBlobBytesForUser(store, session.user.id, isExpiredAttachmentBlob);
       if (usedBytes + size > attachmentBlobLiveQuotaBytes) {
+        recordQuotaRejection?.("live_attachment_blob_bytes");
         res.status(413).json({
           error: "Live encrypted attachment blob storage quota exceeded.",
           code: "quota_exceeded",

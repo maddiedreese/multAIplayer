@@ -85,7 +85,8 @@ const {
   trustProxyHeaders,
   structuredLogsEnabled,
   rateLimitWindowMs,
-  rateLimitCaps
+  rateLimitCaps,
+  websocketConnectionCaps
 } = relayConfig;
 const relayMetrics = createRelayMetrics();
 const relayPersistence = createRelayPersistence({ backend: storageBackend, dataPath });
@@ -347,6 +348,7 @@ registerAttachmentRoutes({
   allowMutation,
   canAccessRoom,
   scheduleStoreSave,
+  recordQuotaRejection: relayMetrics.recordQuotaRejection,
   normalizeMetadataText,
   maxCiphertextCharactersForBlob,
   isExpiredAttachmentBlob
@@ -377,6 +379,7 @@ registerTeamRoutes({
   revokeTeamMemberSessions,
   broadcastWorkspaceUpdated,
   scheduleStoreSave,
+  recordQuotaRejection: relayMetrics.recordQuotaRejection,
   normalizeMetadataText,
   maxTeamNameChars
 });
@@ -410,6 +413,7 @@ registerRoomRoutes({
   canAccessRoom,
   scheduleStoreSave,
   broadcastRoomUpdated,
+  recordQuotaRejection: relayMetrics.recordQuotaRejection,
   requesterFromRequest,
   isRoomHost,
   isApprovalPolicy,
@@ -447,6 +451,8 @@ registerRelayWebSocketConnection({
   getAuthSessionFromRequest,
   clientIdentityFromIncomingMessage,
   consumeRateLimit,
+  websocketConnectionCaps,
+  recordQuotaRejection: relayMetrics.recordQuotaRejection,
   send,
   roomKey,
   isKnownRoom,

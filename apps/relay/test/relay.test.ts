@@ -83,6 +83,8 @@ test("relay exposes content-free operational metrics", async () => {
     const body = await response.json() as {
       activeSockets?: unknown;
       envelopesPublishedTotal?: unknown;
+      quotaRejectionsTotal?: unknown;
+      quotaRejectionsByType?: unknown;
       rateLimitRejectionsTotal?: unknown;
       startedAt?: unknown;
       uptimeSeconds?: unknown;
@@ -90,6 +92,8 @@ test("relay exposes content-free operational metrics", async () => {
 
     assert.equal(body.activeSockets, 0);
     assert.equal(body.envelopesPublishedTotal, 0);
+    assert.equal(body.quotaRejectionsTotal, 0);
+    assert.deepEqual(body.quotaRejectionsByType, {});
     assert.equal(body.rateLimitRejectionsTotal, 0);
     assert.equal(typeof body.startedAt, "string");
     assert.equal(typeof body.uptimeSeconds, "number");
@@ -352,6 +356,16 @@ test("relay enforces authenticated user daily team and room creation quotas", as
     });
     assert.equal(limitedRoomBody.retryAfterSeconds, Number(limitedRoom.headers.get("retry-after")));
     assert.ok(Number.isFinite(Date.parse(limitedRoomBody.quota.resetsAt)));
+
+    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const metricsBody = await metrics.json() as {
+      quotaRejectionsTotal?: unknown;
+      quotaRejectionsByType?: Record<string, unknown>;
+    };
+    assert.equal(metricsBody.quotaRejectionsTotal, 2);
+    assert.equal(metricsBody.quotaRejectionsByType?.daily_user_team_creations, 1);
+    assert.equal(metricsBody.quotaRejectionsByType?.daily_user_room_creations, 1);
   } finally {
     await relay.close();
   }
@@ -1423,6 +1437,83 @@ test("relay rate limits room WebSocket events per client", async () => {
   }
 });
 
+test("relay caps concurrent room WebSocket connections per device", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER: "10",
+    MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE: "1"
+  });
+  const first = new WebSocket(relay.wsUrl);
+  const second = new WebSocket(relay.wsUrl);
+  try {
+    await Promise.all([onceOpen(first), onceOpen(second)]);
+    first.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:tester",
+      deviceId: "device-test-123"
+    }));
+    await waitForJoined(first);
+
+    const errorPromise = waitForError(second);
+    const closePromise = waitForClose(second);
+    second.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:tester",
+      deviceId: "device-test-123"
+    }));
+    assert.match(await errorPromise, /Concurrent WebSocket connection quota exceeded for this device/);
+    const close = await closePromise;
+    assert.equal(close.code, 1008);
+
+    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const body = await metrics.json() as {
+      quotaRejectionsTotal?: unknown;
+      quotaRejectionsByType?: Record<string, unknown>;
+    };
+    assert.equal(body.quotaRejectionsTotal, 1);
+    assert.equal(body.quotaRejectionsByType?.websocket_connections_per_device, 1);
+  } finally {
+    first.close();
+    second.close();
+    await relay.close();
+  }
+});
+
+test("relay caps concurrent WebSocket connections per user identity", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER: "1",
+    MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE: "5"
+  });
+  const first = new WebSocket(relay.wsUrl);
+  let second: WebSocket | null = null;
+  try {
+    await onceOpen(first);
+    second = new WebSocket(relay.wsUrl);
+    const errorPromise = waitForError(second);
+    const closePromise = waitForClose(second);
+    assert.match(await errorPromise, /Concurrent WebSocket connection quota exceeded for this user/);
+    const close = await closePromise;
+    assert.equal(close.code, 1008);
+
+    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const body = await metrics.json() as {
+      quotaRejectionsTotal?: unknown;
+      quotaRejectionsByType?: Record<string, unknown>;
+    };
+    assert.equal(body.quotaRejectionsTotal, 1);
+    assert.equal(body.quotaRejectionsByType?.websocket_connections_per_user, 1);
+  } finally {
+    first.close();
+    second?.close();
+    await relay.close();
+  }
+});
+
 test("relay applies configured CORS origin allowlist", async () => {
   const relay = await startRelay({
     MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://multaiplayer.com/ http://127.0.0.1:1420"
@@ -2464,6 +2555,15 @@ test("relay enforces authenticated live encrypted attachment blob quotas", async
       body: JSON.stringify(uploadBody(5, "alex.txt"))
     });
     assert.equal(otherUser.status, 201);
+
+    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const metricsBody = await metrics.json() as {
+      quotaRejectionsTotal?: unknown;
+      quotaRejectionsByType?: Record<string, unknown>;
+    };
+    assert.equal(metricsBody.quotaRejectionsTotal, 1);
+    assert.equal(metricsBody.quotaRejectionsByType?.live_attachment_blob_bytes, 1);
   } finally {
     await relay.close();
   }

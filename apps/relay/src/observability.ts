@@ -4,6 +4,8 @@ import type { NextFunction, Request, Response } from "express";
 export interface RelayMetricsSnapshot {
   activeSockets: number;
   envelopesPublishedTotal: number;
+  quotaRejectionsTotal: number;
+  quotaRejectionsByType: Record<string, number>;
   rateLimitRejectionsTotal: number;
   startedAt: string;
   uptimeSeconds: number;
@@ -11,6 +13,7 @@ export interface RelayMetricsSnapshot {
 
 export interface RelayMetrics {
   recordEnvelopePublished(): void;
+  recordQuotaRejection(type: string): void;
   recordRateLimitRejection(): void;
   snapshot(activeSockets: number): RelayMetricsSnapshot;
 }
@@ -18,11 +21,18 @@ export interface RelayMetrics {
 export function createRelayMetrics(now = () => Date.now()): RelayMetrics {
   const startedAtMs = now();
   let envelopesPublishedTotal = 0;
+  let quotaRejectionsTotal = 0;
+  const quotaRejectionsByType = new Map<string, number>();
   let rateLimitRejectionsTotal = 0;
 
   return {
     recordEnvelopePublished() {
       envelopesPublishedTotal += 1;
+    },
+    recordQuotaRejection(type) {
+      const normalizedType = normalizeMetricType(type);
+      quotaRejectionsTotal += 1;
+      quotaRejectionsByType.set(normalizedType, (quotaRejectionsByType.get(normalizedType) ?? 0) + 1);
     },
     recordRateLimitRejection() {
       rateLimitRejectionsTotal += 1;
@@ -31,12 +41,19 @@ export function createRelayMetrics(now = () => Date.now()): RelayMetrics {
       return {
         activeSockets,
         envelopesPublishedTotal,
+        quotaRejectionsTotal,
+        quotaRejectionsByType: Object.fromEntries(quotaRejectionsByType),
         rateLimitRejectionsTotal,
         startedAt: new Date(startedAtMs).toISOString(),
         uptimeSeconds: Math.max(0, Math.floor((now() - startedAtMs) / 1000))
       };
     }
   };
+}
+
+function normalizeMetricType(type: string): string {
+  const normalized = type.trim().toLowerCase().replace(/[^a-z0-9_.:-]+/g, "_").slice(0, 80);
+  return normalized || "unknown";
 }
 
 export function requestLoggingMiddleware(enabled: boolean) {

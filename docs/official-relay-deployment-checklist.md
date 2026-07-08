@@ -29,6 +29,14 @@ MULTAIPLAYER_RELAY_DEBUG=false
 MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
 MULTAIPLAYER_RELAY_SEED_DEMO=false
 MULTAIPLAYER_RELAY_RATE_LIMITS=true
+MULTAIPLAYER_ATTACHMENT_BLOB_TTL_DAYS=30
+MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES=5000000
+MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES=250000000
+MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES=1000000
+MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER=20
+MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE=5
+MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP=25
+MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP=100
 MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
 ```
 
@@ -73,8 +81,15 @@ The check must pass. It verifies GitHub OAuth presence, strong durable session e
 
 - Use `/healthz` for container health.
 - Use `/readyz` for platform readiness.
-- Use `/metrics` for content-free relay counters such as active sockets, published envelopes, rate-limit rejections, start time, and uptime.
+- Use `/metrics` for content-free relay counters such as active sockets, published envelopes, rate-limit rejections, quota rejections by quota type, start time, and uptime.
 - Do not treat these endpoints as a privacy or security audit.
+
+## Cost Guardrails
+
+- Keep attachment blob max size, live blob quota, encrypted envelope max size, daily team/room creation caps, and WebSocket connection caps explicitly set in production.
+- Confirm quota failures return structured `quota_exceeded` JSON where applicable and increment `/metrics` without exposing plaintext payloads.
+- Keep limits intentionally above normal team use; these guardrails are for runaway clients and abuse, not ordinary collaboration.
+- For multi-instance hosting, put shared or edge rate limiting in front of the relay because the alpha in-process limiter and connection counters are per instance.
 
 ## Launch Smoke Test
 

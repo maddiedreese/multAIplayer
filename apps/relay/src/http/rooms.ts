@@ -25,6 +25,7 @@ interface RegisterRoomRoutesOptions {
   canAccessRoom: (teamId: string, roomId: string, userId: string) => boolean;
   scheduleStoreSave: () => void;
   broadcastRoomUpdated: (room: RoomRecord) => void;
+  recordQuotaRejection?: (type: string) => void;
   requesterFromRequest: (body: unknown, sessionId: unknown) => { id: string; name: string };
   isRoomHost: (room: RoomRecord, requester: { id: string; name: string }) => boolean;
   isApprovalPolicy: (value: string) => value is RoomRecord["approvalPolicy"];
@@ -56,6 +57,7 @@ export function registerRoomRoutes({
   canAccessRoom,
   scheduleStoreSave,
   broadcastRoomUpdated,
+  recordQuotaRejection,
   requesterFromRequest,
   isRoomHost,
   isApprovalPolicy,
@@ -162,7 +164,8 @@ export function registerRoomRoutes({
       counts: dailyRoomCreationCounts,
       quota: "daily_user_room_creations",
       userId: session.user.id,
-      res
+      res,
+      recordQuotaRejection
     })) {
       return;
     }
@@ -390,13 +393,15 @@ function consumeDailyCreationQuota({
   counts,
   quota,
   userId,
-  res
+  res,
+  recordQuotaRejection
 }: {
   cap: number;
   counts: Map<string, DailyCreationQuotaRecord>;
   quota: "daily_user_room_creations";
   userId: string;
   res: Response;
+  recordQuotaRejection?: (type: string) => void;
 }): boolean {
   const now = Date.now();
   const resetAt = nextUtcMidnight(now);
@@ -410,6 +415,7 @@ function consumeDailyCreationQuota({
       used: record.count,
       resetAt: record.resetAt
     });
+    recordQuotaRejection?.(quota);
     return false;
   }
   counts.set(key, { count: record.count + 1, resetAt: record.resetAt });

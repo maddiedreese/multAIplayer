@@ -137,9 +137,10 @@ Encrypted attachment blobs are also bounded and pruned:
 ```bash
 MULTAIPLAYER_ATTACHMENT_BLOB_TTL_DAYS=30
 MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES=5000000
+MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES=250000000
 ```
 
-The max-bytes setting limits both the declared plaintext attachment size and the ciphertext field size accepted by the relay. Blob payloads are still ciphertext; this limit is for relay storage and request-size control, not content inspection.
+The max-bytes setting limits both the declared plaintext attachment size and the ciphertext field size accepted by the relay. The live quota limits the total unexpired encrypted attachment blob volume per signed-in user. Blob payloads are still ciphertext; these limits are for relay storage and request-size control, not content inspection.
 
 Encrypted room events are also bounded before they enter WebSocket fanout or backlog:
 
@@ -161,10 +162,14 @@ MULTAIPLAYER_RELAY_RATE_LIMIT_READ=300
 MULTAIPLAYER_RELAY_RATE_LIMIT_MUTATION=120
 MULTAIPLAYER_RELAY_RATE_LIMIT_ATTACHMENT=60
 MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET=600
+MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER=20
+MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE=5
 MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
 ```
 
 These limits are keyed by signed-in session when available, otherwise by client IP. By default, the relay uses the direct socket address and ignores `X-Forwarded-For`, because direct internet clients can spoof that header. Set `MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=true` only when the relay sits behind a trusted reverse proxy that removes client-supplied forwarding headers and writes its own. HTTP requests over the limit receive `429` with `Retry-After`; room WebSocket clients receive an encrypted-room-safe error message and remain connected. The alpha limiter is process-local, so multi-instance deployments should add an edge or shared-store limiter in front of the relay.
+
+Concurrent WebSocket connection caps are also enforced per signed-in user when available, otherwise per client identity, and per room device id after join. These caps are intentionally above normal use; they exist to prevent a runaway client from holding unbounded sockets.
 
 Team and room creation also have authenticated per-user daily caps:
 
@@ -189,7 +194,7 @@ MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
 
 Each response includes an `x-request-id` header. The relay accepts a bounded incoming `x-request-id` or generates one. Logs include request method, path, status code, duration, and request id; they do not include room plaintext, encrypted payload bodies, attachment contents, GitHub tokens, Codex credentials, terminal output, browser pages, or repo files.
 
-The relay also exposes content-free operational counters at `/metrics`, including active sockets, published envelope count, rate-limit rejection count, start time, and uptime.
+The relay also exposes content-free operational counters at `/metrics`, including active sockets, published envelope count, rate-limit rejection count, quota rejection counts by quota type, start time, and uptime.
 
 Workspace mutations can require GitHub sign-in:
 

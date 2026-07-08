@@ -33,6 +33,10 @@ export interface RelayConfig {
     attachment: number;
     websocket: number;
   };
+  websocketConnectionCaps: {
+    perUser: number;
+    perDevice: number;
+  };
   dailyCreationCaps: {
     teamsPerUser: number;
     roomsPerUser: number;
@@ -94,6 +98,10 @@ export function loadRelayConfig(): RelayConfig {
       mutation: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_MUTATION, 120, 1, 100_000),
       attachment: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_ATTACHMENT, 60, 1, 10_000),
       websocket: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET, 600, 1, 100_000)
+    },
+    websocketConnectionCaps: {
+      perUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER, 20, 1, 1_000),
+      perDevice: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE, 5, 1, 100)
     },
     dailyCreationCaps: {
       teamsPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP, 25, 0, 10_000),

@@ -25,6 +25,7 @@ interface RegisterTeamRoutesOptions {
   revokeTeamMemberSessions: (teamId: string, userId: string) => void;
   broadcastWorkspaceUpdated: (team: TeamRecord) => void;
   scheduleStoreSave: () => void;
+  recordQuotaRejection?: (type: string) => void;
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
   maxTeamNameChars: number;
 }
@@ -48,6 +49,7 @@ export function registerTeamRoutes({
   revokeTeamMemberSessions,
   broadcastWorkspaceUpdated,
   scheduleStoreSave,
+  recordQuotaRejection,
   normalizeMetadataText,
   maxTeamNameChars
 }: RegisterTeamRoutesOptions) {
@@ -196,7 +198,8 @@ export function registerTeamRoutes({
       counts: dailyTeamCreationCounts,
       quota: "daily_user_team_creations",
       userId: session.user.id,
-      res
+      res,
+      recordQuotaRejection
     })) {
       return;
     }
@@ -248,13 +251,15 @@ function consumeDailyCreationQuota({
   counts,
   quota,
   userId,
-  res
+  res,
+  recordQuotaRejection
 }: {
   cap: number;
   counts: Map<string, DailyCreationQuotaRecord>;
   quota: "daily_user_team_creations";
   userId: string;
   res: Response;
+  recordQuotaRejection?: (type: string) => void;
 }): boolean {
   const now = Date.now();
   const resetAt = nextUtcMidnight(now);
@@ -268,6 +273,7 @@ function consumeDailyCreationQuota({
       used: record.count,
       resetAt: record.resetAt
     });
+    recordQuotaRejection?.(quota);
     return false;
   }
   counts.set(key, { count: record.count + 1, resetAt: record.resetAt });
