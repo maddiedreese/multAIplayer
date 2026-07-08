@@ -1,4 +1,4 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect } from "react";
 import {
   hasHistorySettings,
   loadEncryptedHistory,
@@ -23,7 +23,7 @@ interface UseLocalHistoryHydrationOptions {
   selectedRoomTeamId: string;
   forgottenRoomIds: Set<string>;
   historyLoadedRoomIds: LatestRef<Set<string>>;
-  setHistorySettings: Dispatch<SetStateAction<LocalHistorySettings>>;
+  replaceHistorySettings: (next: LocalHistorySettings) => void;
   hydrateLocalRoomHistoryForRoom: (roomId: string, payload: LocalRoomHistoryPayload) => void;
 }
 
@@ -33,13 +33,13 @@ export function useLocalHistoryHydration({
   selectedRoomTeamId,
   forgottenRoomIds,
   historyLoadedRoomIds,
-  setHistorySettings,
+  replaceHistorySettings,
   hydrateLocalRoomHistoryForRoom
 }: UseLocalHistoryHydrationOptions) {
   useEffect(() => {
     if (!hasSelectedRoom) return;
     if (forgottenRoomIds.has(selectedRoomId)) {
-      setHistorySettings(loadHistorySettings(selectedRoomId));
+      replaceHistorySettings(loadHistorySettings(selectedRoomId));
       return;
     }
     let cancelled = false;
@@ -49,7 +49,7 @@ export function useLocalHistoryHydration({
     if (!hasHistorySettings(selectedRoomId)) {
       saveHistorySettings(selectedRoomId, settings);
     }
-    setHistorySettings(settings);
+    replaceHistorySettings(settings);
     loadEncryptedHistory<ChatMessage[] | LocalRoomHistoryPayload>(selectedRoomId).then((storedHistory) => {
       if (cancelled || !storedHistory) return;
       const payload = pruneLocalRoomHistory(normalizeLocalRoomHistory(storedHistory), settings.retentionDays);
@@ -68,6 +68,6 @@ export function useLocalHistoryHydration({
     hydrateLocalRoomHistoryForRoom,
     selectedRoomTeamId,
     selectedRoomId,
-    setHistorySettings
+    replaceHistorySettings
   ]);
 }

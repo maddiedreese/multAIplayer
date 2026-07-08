@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { ApprovalPolicy } from "@multaiplayer/protocol";
 import type { LocalHistorySettings } from "../lib/localHistory";
 import { loadTeamRoomDefaults } from "../lib/teamRoomDefaults";
@@ -39,10 +39,13 @@ export function useHistoryDefaultsState({ initialTeamId }: { initialTeamId: stri
     () => projectTeamHistoryMessagesByTeam(teamHistoryByTeam),
     [teamHistoryByTeam]
   );
+  const replaceHistorySettings = useCallback((next: LocalHistorySettings) => {
+    setHistorySettings(next);
+  }, []);
 
   return {
     historySettings,
-    setHistorySettings,
+    replaceHistorySettings,
     teamHistorySettings,
     setTeamHistorySettings,
     teamDefaultApprovalPolicy,

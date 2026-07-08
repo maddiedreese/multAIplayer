@@ -236,7 +236,7 @@ export function useAppWorkspaceFlow({
         setInviteApprovalGateForRoom,
         setSettingsBusyForRoom,
         setSecretWarningVisibleForRoom,
-        setHistorySettings: historyDefaultsState.setHistorySettings,
+        replaceHistorySettings: historyDefaultsState.replaceHistorySettings,
         hydrateLocalRoomHistoryForRoom,
         replaceRoom: workspaceRecords.replaceRoom,
         clearBrowserStatusForRoom,
@@ -273,7 +273,7 @@ export function useAppWorkspaceFlow({
         selectedRoomTeamId: selectedRoom.teamId,
         forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
-        setHistorySettings: historyDefaultsState.setHistorySettings,
+        replaceHistorySettings: historyDefaultsState.replaceHistorySettings,
         hydrateLocalRoomHistoryForRoom
       },
       search: {
