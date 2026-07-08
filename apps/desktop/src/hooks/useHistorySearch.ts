@@ -22,11 +22,12 @@ export function useHistorySearch({
   revokedTeamIds,
   setHistorySearchBusy
 }: UseHistorySearchOptions) {
-  const replaceHistorySearchMessagesByRoom = useAppStore((state) => state.replaceHistorySearchMessagesByRoom);
+  const setHistorySearchResultsByRoom = useAppStore((state) => state.setHistorySearchResultsByRoom);
+  const clearHistorySearchResults = useAppStore((state) => state.clearHistorySearchResults);
 
   useEffect(() => {
     if (!searchActive) {
-      replaceHistorySearchMessagesByRoom({});
+      clearHistorySearchResults();
       setHistorySearchBusy(false);
       return;
     }
@@ -49,7 +50,7 @@ export function useHistorySearch({
     )
       .then((entries) => {
         if (cancelled) return;
-        replaceHistorySearchMessagesByRoom(
+        setHistorySearchResultsByRoom(
           Object.fromEntries(entries.filter(([, roomMessages]) => roomMessages.length > 0))
         );
       })
@@ -70,6 +71,7 @@ export function useHistorySearch({
     rooms,
     searchActive,
     setHistorySearchBusy,
-    replaceHistorySearchMessagesByRoom
+    clearHistorySearchResults,
+    setHistorySearchResultsByRoom
   ]);
 }

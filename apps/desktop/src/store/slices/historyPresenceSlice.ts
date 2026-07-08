@@ -16,7 +16,8 @@ export interface HistoryPresenceSlice {
   teamHistoryMessagesByTeam: TeamHistoryMessagesByTeam;
   inspectorTabsByRoom: InspectorTabsByRoom;
   presenceByRoom: PresenceByRoom;
-  replaceHistorySearchMessagesByRoom: (messagesByRoom: HistorySearchMessagesByRoom) => void;
+  setHistorySearchResultsByRoom: (messagesByRoom: HistorySearchMessagesByRoom) => void;
+  clearHistorySearchResults: () => void;
   setHistoryMessageForRoom: (roomId: string, message: string | null) => void;
   setTeamHistoryMessageForTeam: (teamId: string, message: string | null) => void;
   setInspectorTabForRoom: (roomId: string, tab: InspectorTab) => void;
@@ -42,8 +43,11 @@ export const emptyHistoryPresenceState: Pick<
 
 export const createHistoryPresenceSlice: StateCreator<AppStoreState, [], [], HistoryPresenceSlice> = (set) => ({
   ...emptyHistoryPresenceState,
-  replaceHistorySearchMessagesByRoom: (messagesByRoom) => {
+  setHistorySearchResultsByRoom: (messagesByRoom) => {
     set({ historySearchMessagesByRoom: messagesByRoom });
+  },
+  clearHistorySearchResults: () => {
+    set({ historySearchMessagesByRoom: {} });
   },
   setHistoryMessageForRoom: (roomId, message) => {
     set((state) => ({

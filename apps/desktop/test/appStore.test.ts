@@ -698,7 +698,7 @@ test("desktop store keeps markdown message selection room scoped", () => {
 test("desktop store keeps history search messages room scoped", () => {
   const store = useAppStore.getState();
 
-  store.replaceHistorySearchMessagesByRoom({
+  store.setHistorySearchResultsByRoom({
     "room-a": [
       {
         id: "history-message-1",
@@ -708,10 +708,6 @@ test("desktop store keeps history search messages room scoped", () => {
         time: "Yesterday"
       }
     ],
-    "room-b": []
-  });
-  store.replaceHistorySearchMessagesByRoom({
-    ...useAppStore.getState().historySearchMessagesByRoom,
     "room-b": [
       {
         id: "history-message-2",
@@ -726,6 +722,9 @@ test("desktop store keeps history search messages room scoped", () => {
   const state = useAppStore.getState();
   assert.equal(state.historySearchMessagesByRoom["room-a"]?.[0]?.body, "Find the old setup note");
   assert.equal(state.historySearchMessagesByRoom["room-b"]?.[0]?.author, "Codex");
+
+  store.clearHistorySearchResults();
+  assert.deepEqual(useAppStore.getState().historySearchMessagesByRoom, {});
 });
 
 test("desktop store keeps history status messages scoped", () => {
@@ -1195,7 +1194,7 @@ test("desktop store clears local room-scoped state", () => {
   store.setHostMessageForRoom("room-b", "Keep");
   store.setSecretWarningVisibleForRoom("room-a", true);
   store.setSecretWarningVisibleForRoom("room-b", true);
-  store.replaceHistorySearchMessagesByRoom({
+  store.setHistorySearchResultsByRoom({
     "room-a": [{
       id: "history-search-a",
       author: "Avery",
