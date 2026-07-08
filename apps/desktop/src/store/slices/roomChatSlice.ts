@@ -12,6 +12,13 @@ export interface RoomChatRoomState {
 
 export type RoomChatByRoom = Record<string, RoomChatRoomState>;
 
+export interface RoomChatPanelMaps {
+  chatMessagesByRoom: Record<string, string | null>;
+  draftsByRoom: Record<string, string>;
+  pendingAttachmentsByRoom: Record<string, ChatAttachment[]>;
+  selectedMessageIdsByRoom: Record<string, string[]>;
+}
+
 function compactRoomChat(record: RoomChatRoomState): RoomChatRoomState | undefined {
   return Object.keys(record).length ? record : undefined;
 }
@@ -26,6 +33,31 @@ function updateRoomChatForRoom(
   return {
     ...current,
     [roomId]: nextRoomChat
+  };
+}
+
+export function projectRoomChatPanelMaps(roomChatByRoom: RoomChatByRoom): RoomChatPanelMaps {
+  return {
+    chatMessagesByRoom: Object.fromEntries(
+      Object.entries(roomChatByRoom)
+        .filter(([, chat]) => chat.message)
+        .map(([roomId, chat]) => [roomId, chat.message ?? null])
+    ),
+    draftsByRoom: Object.fromEntries(
+      Object.entries(roomChatByRoom)
+        .filter(([, chat]) => chat.draft)
+        .map(([roomId, chat]) => [roomId, chat.draft ?? ""])
+    ),
+    pendingAttachmentsByRoom: Object.fromEntries(
+      Object.entries(roomChatByRoom)
+        .filter(([, chat]) => chat.pendingAttachments)
+        .map(([roomId, chat]) => [roomId, chat.pendingAttachments ?? []])
+    ),
+    selectedMessageIdsByRoom: Object.fromEntries(
+      Object.entries(roomChatByRoom)
+        .filter(([, chat]) => chat.selectedMessageIds)
+        .map(([roomId, chat]) => [roomId, chat.selectedMessageIds ?? []])
+    )
   };
 }
 
