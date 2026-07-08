@@ -13,13 +13,7 @@ function renderChat(messages: RoomChatMessageDisplay[]) {
     approvalSummary: {
       messages: "0 since last Codex response",
       attachments: "None",
-      workspace: "Disabled",
-      git: "Disabled",
-      browser: "Disabled",
-      terminals: "None",
-      model: "GPT-5.4",
-      thread: "New thread",
-      policy: "Ask every Codex turn"
+      riskFlags: []
     },
     isActiveHost: true,
     codexRunning: false,
@@ -65,6 +59,49 @@ test("RoomChatPanel hides zero-count reaction placeholders", () => {
 
   assert.equal(html.includes("👍"), false);
   assert.equal(html.includes("✅"), false);
+});
+
+test("RoomChatPanel renders Codex approval risk warnings", () => {
+  const html = renderToStaticMarkup(createElement(RoomChatPanel, {
+    messages: [],
+    approvalVisible: true,
+    approvalSummary: {
+      messages: "Maddie: inspect this output",
+      attachments: "output.log (1 KB)",
+      riskFlags: [{
+        id: "attachment-output.log:agent-directed",
+        label: "attachment output.log contains agent-directed phrasing",
+        source: "attachment output.log",
+        risk: "Agent-directed phrasing",
+        severity: "warning"
+      }]
+    },
+    isActiveHost: true,
+    codexRunning: false,
+    canApproveCodex: true,
+    canUseChat: true,
+    canSendMessage: false,
+    roomLocked: false,
+    lockedPlaceholder: "Room locked",
+    chatEnabled: true,
+    draft: "",
+    pendingAttachments: [],
+    pendingAttachmentSummary: "0/5 files",
+    onToggleMessageSelection: noop,
+    onCopyMessageMarkdown: noop,
+    onCopyCodexOutputMarkdown: noop,
+    onOpenAttachment: noop,
+    onToggleReaction: noop,
+    onDenyApproval: noop,
+    onApproveApproval: noop,
+    onInvokeCodex: noop,
+    onRemovePendingAttachment: noop,
+    onDraftChange: noop,
+    onSendMessage: noop
+  }));
+
+  assert.equal(html.includes("Review warnings"), true);
+  assert.equal(html.includes("attachment output.log contains agent-directed phrasing"), true);
 });
 
 test("RoomChatPanel keeps reactions that have activity", () => {

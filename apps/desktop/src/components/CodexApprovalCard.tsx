@@ -1,9 +1,11 @@
-import { Bot, Check, KeyRound, X } from "lucide-react";
+import { AlertTriangle, Bot, Check, KeyRound, X } from "lucide-react";
+import type { CodexTurnRiskFlag } from "../lib/codexTurn";
 import { ApprovalItem, StatusPill } from "./common";
 
 export type CodexApprovalSummaryDisplay = {
   messages: string;
   attachments: string;
+  riskFlags: CodexTurnRiskFlag[];
 };
 
 export function CodexApprovalCard({
@@ -38,6 +40,19 @@ export function CodexApprovalCard({
         <ApprovalItem label="Messages" value={summary.messages} />
         <ApprovalItem label="Attachments" value={summary.attachments} />
       </div>
+      {summary.riskFlags.length > 0 && (
+        <div className="approval-risk-list">
+          <div className="approval-risk-title">
+            <AlertTriangle size={16} />
+            <strong>Review warnings</strong>
+          </div>
+          {summary.riskFlags.map((flag) => (
+            <div className="approval-risk-item" key={flag.id}>
+              {flag.label}
+            </div>
+          ))}
+        </div>
+      )}
       <div className="approval-actions">
         <button className="secondary" onClick={onDeny}>
           <X size={16} /> Deny

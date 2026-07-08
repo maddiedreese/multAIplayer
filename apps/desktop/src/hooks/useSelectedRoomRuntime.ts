@@ -105,7 +105,8 @@ export function useSelectedRoomRuntime({
   const approvalTranscriptMessages = messagesSinceLastCodex(activeCodexApproval?.messages ?? messages) as ChatMessage[];
   const codexApprovalSummaryDisplay = {
     messages: formatApprovalMessages(approvalTranscriptMessages),
-    attachments: formatApprovalAttachments(approvalTranscriptMessages)
+    attachments: formatApprovalAttachments(approvalTranscriptMessages),
+    riskFlags: activeCodexApproval?.riskFlags ?? []
   };
   const chatMessageRows = buildRoomChatMessageRows({
     messages,

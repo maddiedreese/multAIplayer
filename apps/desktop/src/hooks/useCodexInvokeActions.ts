@@ -207,7 +207,7 @@ export function useCodexInvokeActions({
       includeWorkspaceContext: canReadLocalWorkspace
     });
     if (selectedRoom.approvalPolicy === "auto_chat_only") {
-      if (shouldAutoApproveChatOnlyTurn(approvalSnapshot.summary, isActiveHost)) {
+      if (shouldAutoApproveChatOnlyTurn(approvalSnapshot.summary, isActiveHost, approvalSnapshot.riskFlags)) {
         setPendingCodexApprovalForRoom(roomId, null);
         setApprovalVisibleForRoom(roomId, false);
         setHostMessageForRoom(roomId, "Auto-approved chat-only Codex turn.");
@@ -221,7 +221,9 @@ export function useCodexInvokeActions({
       setHostMessageForRoom(
         roomId,
         isActiveHost
-          ? "This turn includes workspace, browser, terminal, or attachment context, so host approval is required."
+          ? approvalSnapshot.riskFlags.length > 0
+            ? "This turn includes content warnings, so host approval is required."
+            : "This turn includes workspace, browser, terminal, or attachment context, so host approval is required."
           : hostGateMessage
       );
       return;

@@ -11,6 +11,7 @@ import type {
   TerminalRequestPlaintextPayload
 } from "@multaiplayer/protocol";
 import type { TerminalSnapshot } from "./lib/localBackend";
+import type { CodexTurnRiskFlag } from "./lib/codexTurn";
 import type { LocalPreviewCandidate } from "./lib/localPreview";
 import type { SidebarPanelName } from "./components/DesktopSidebar";
 
@@ -54,6 +55,7 @@ export interface PendingCodexApproval {
   roomId: string;
   messages: ChatMessage[];
   summary: CodexTurnSummary;
+  riskFlags?: CodexTurnRiskFlag[];
 }
 
 export interface RoomPresence {
