@@ -50,7 +50,7 @@ export function useTerminalLifecycle({
           snapshots
         );
         syncTerminalSnapshotsForRoom(roomId, mergedSnapshots);
-        const currentTerminalId = useAppStore.getState().selectedTerminalIdsByRoom[roomId] ?? null;
+        const currentTerminalId = useAppStore.getState().terminalRuntimeByRoom[roomId]?.selectedTerminalId ?? null;
         const nextTerminalId = currentTerminalId && mergedSnapshots.some((terminal) => terminal.id === currentTerminalId)
           ? currentTerminalId
           : mergedSnapshots[0]?.id ?? null;

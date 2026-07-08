@@ -15,10 +15,11 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
     set((state) => {
       const latestGitWorkflowEvent = payload.gitWorkflowEvents.at(-1);
       const latestGitHubActionsEvent = payload.githubActionsEvents.at(-1);
-      const currentTerminalId = state.selectedTerminalIdsByRoom[roomId] ?? null;
+      const currentTerminalId = state.terminalRuntimeByRoom[roomId]?.selectedTerminalId ?? null;
       const nextTerminalId = currentTerminalId && payload.terminalSnapshots.some((terminal) => terminal.id === currentTerminalId)
         ? currentTerminalId
         : payload.terminalSnapshots[0]?.id ?? null;
+      const shouldHydrateTerminalRuntime = payload.terminalRequests.length > 0 || Boolean(payload.terminalSnapshots.length && nextTerminalId);
       const codexThreadId = normalizeCodexThreadId(payload.codexThreadId);
       const {
         threadId: _threadId,
@@ -29,9 +30,16 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         messagesByRoom: payload.messages.length
           ? { ...state.messagesByRoom, [roomId]: payload.messages }
           : state.messagesByRoom,
-        terminalRequestsByRoom: payload.terminalRequests.length
-          ? { ...state.terminalRequestsByRoom, [roomId]: payload.terminalRequests }
-          : state.terminalRequestsByRoom,
+        terminalRuntimeByRoom: shouldHydrateTerminalRuntime
+          ? {
+              ...state.terminalRuntimeByRoom,
+              [roomId]: {
+                ...state.terminalRuntimeByRoom[roomId],
+                ...(payload.terminalRequests.length ? { requests: payload.terminalRequests } : {}),
+                ...(payload.terminalSnapshots.length && nextTerminalId ? { selectedTerminalId: nextTerminalId } : {})
+              }
+            }
+          : state.terminalRuntimeByRoom,
         browserByRoom: payload.browserRequests.length
           ? {
               ...state.browserByRoom,
@@ -95,16 +103,16 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         terminals: payload.terminalSnapshots.length
           ? replaceRoomTerminalSnapshots(state.terminals, roomId, payload.terminalSnapshots)
           : state.terminals,
-        selectedTerminalIdsByRoom: payload.terminalSnapshots.length && nextTerminalId
-          ? { ...state.selectedTerminalIdsByRoom, [roomId]: nextTerminalId }
-          : state.selectedTerminalIdsByRoom,
       };
     });
   },
   clearRoomScopedStateForRoom: (roomId) => {
     set((state) => ({
       messagesByRoom: { ...state.messagesByRoom, [roomId]: [] },
-      terminalRequestsByRoom: { ...state.terminalRequestsByRoom, [roomId]: [] },
+      terminalRuntimeByRoom: {
+        ...state.terminalRuntimeByRoom,
+        [roomId]: { requests: [] }
+      },
       browserByRoom: {
         ...state.browserByRoom,
         [roomId]: {
@@ -137,10 +145,6 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       filePanelByRoom: omitRecordKey(state.filePanelByRoom, roomId),
       historyPresenceByRoom: omitRecordKey(state.historyPresenceByRoom, roomId),
       localPreviewByRoom: omitRecordKey(state.localPreviewByRoom, roomId),
-      terminalLinesByRoom: omitRecordKey(state.terminalLinesByRoom, roomId),
-      terminalBusyByRoom: omitRecordKey(state.terminalBusyByRoom, roomId),
-      selectedTerminalIdsByRoom: omitRecordKey(state.selectedTerminalIdsByRoom, roomId),
-      terminalUiByRoom: omitRecordKey(state.terminalUiByRoom, roomId),
       terminals: state.terminals.filter((terminal) => terminal.roomId !== roomId)
     }));
   }

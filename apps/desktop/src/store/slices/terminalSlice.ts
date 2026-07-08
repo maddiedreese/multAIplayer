@@ -20,23 +20,78 @@ export interface TerminalRoomUiState {
 
 export type TerminalUiByRoom = Record<string, TerminalRoomUiState>;
 
-function updateTerminalUiForRoom(
-  current: TerminalUiByRoom,
+export interface TerminalRoomState {
+  lines?: string[];
+  busy?: boolean;
+  requests?: TerminalCommandRequest[];
+  selectedTerminalId?: string;
+  ui?: TerminalRoomUiState;
+}
+
+export type TerminalRuntimeByRoom = Record<string, TerminalRoomState>;
+
+function updateTerminalRuntimeForRoom(
+  current: TerminalRuntimeByRoom,
   roomId: string,
+  update: (roomTerminal: TerminalRoomState) => TerminalRoomState
+): TerminalRuntimeByRoom {
+  const nextRoomTerminal = update(current[roomId] ?? {});
+  if (Object.keys(nextRoomTerminal).length === 0) return omitRecordKey(current, roomId);
+  return { ...current, [roomId]: nextRoomTerminal };
+}
+
+function updateTerminalUiForRoomState(
+  roomTerminal: TerminalRoomState,
   update: (roomUi: TerminalRoomUiState) => TerminalRoomUiState
-): TerminalUiByRoom {
-  const nextRoomUi = update(current[roomId] ?? {});
-  if (Object.keys(nextRoomUi).length === 0) return omitRecordKey(current, roomId);
-  return { ...current, [roomId]: nextRoomUi };
+): TerminalRoomState {
+  const nextUi = update(roomTerminal.ui ?? {});
+  const { ui: _ui, ...rest } = roomTerminal;
+  return Object.keys(nextUi).length > 0 ? { ...rest, ui: nextUi } : rest;
+}
+
+export function projectTerminalRuntimeLinesByRoom(terminalRuntimeByRoom: TerminalRuntimeByRoom): TerminalLinesByRoom {
+  return Object.fromEntries(
+    Object.entries(terminalRuntimeByRoom)
+      .filter(([, terminal]) => terminal.lines)
+      .map(([roomId, terminal]) => [roomId, terminal.lines ?? []])
+  );
+}
+
+export function projectTerminalRuntimeBusyByRoom(terminalRuntimeByRoom: TerminalRuntimeByRoom): TerminalBusyByRoom {
+  return Object.fromEntries(
+    Object.entries(terminalRuntimeByRoom)
+      .filter(([, terminal]) => terminal.busy)
+      .map(([roomId]) => [roomId, true])
+  );
+}
+
+export function projectTerminalRuntimeRequestsByRoom(terminalRuntimeByRoom: TerminalRuntimeByRoom): TerminalRequestsByRoom {
+  return Object.fromEntries(
+    Object.entries(terminalRuntimeByRoom)
+      .filter(([, terminal]) => terminal.requests)
+      .map(([roomId, terminal]) => [roomId, terminal.requests ?? []])
+  );
+}
+
+export function projectSelectedTerminalRuntimeIdsByRoom(terminalRuntimeByRoom: TerminalRuntimeByRoom): SelectedTerminalIdsByRoom {
+  return Object.fromEntries(
+    Object.entries(terminalRuntimeByRoom)
+      .filter(([, terminal]) => terminal.selectedTerminalId)
+      .map(([roomId, terminal]) => [roomId, terminal.selectedTerminalId ?? null])
+  );
+}
+
+export function projectTerminalRuntimeUiByRoom(terminalRuntimeByRoom: TerminalRuntimeByRoom): TerminalUiByRoom {
+  return Object.fromEntries(
+    Object.entries(terminalRuntimeByRoom)
+      .filter(([, terminal]) => terminal.ui)
+      .map(([roomId, terminal]) => [roomId, terminal.ui ?? {}])
+  );
 }
 
 export interface TerminalSlice {
-  terminalLinesByRoom: TerminalLinesByRoom;
-  terminalBusyByRoom: TerminalBusyByRoom;
+  terminalRuntimeByRoom: TerminalRuntimeByRoom;
   terminals: Terminals;
-  terminalRequestsByRoom: TerminalRequestsByRoom;
-  selectedTerminalIdsByRoom: SelectedTerminalIdsByRoom;
-  terminalUiByRoom: TerminalUiByRoom;
   clearTerminalSnapshots: () => void;
   clearTerminalSnapshotsForRoom: (roomId: string) => void;
   syncTerminalSnapshotsForRoom: (roomId: string, snapshots: Terminals) => void;
@@ -55,19 +110,11 @@ export interface TerminalSlice {
 
 export const emptyTerminalState: Pick<
   TerminalSlice,
-  | "terminalLinesByRoom"
-  | "terminalBusyByRoom"
+  | "terminalRuntimeByRoom"
   | "terminals"
-  | "terminalRequestsByRoom"
-  | "selectedTerminalIdsByRoom"
-  | "terminalUiByRoom"
 > = {
-  terminalLinesByRoom: {},
-  terminalBusyByRoom: {},
-  terminals: [],
-  terminalRequestsByRoom: {},
-  selectedTerminalIdsByRoom: {},
-  terminalUiByRoom: {}
+  terminalRuntimeByRoom: {},
+  terminals: []
 };
 
 export const createTerminalSlice: StateCreator<AppStoreState, [], [], TerminalSlice> = (set) => ({
@@ -93,86 +140,98 @@ export const createTerminalSlice: StateCreator<AppStoreState, [], [], TerminalSl
   seedInitialTerminalLines: (linesByRoom) => {
     if (Object.keys(linesByRoom).length === 0) return;
     set((state) => (
-      Object.keys(state.terminalLinesByRoom).length === 0
-        ? { terminalLinesByRoom: linesByRoom }
+      Object.values(state.terminalRuntimeByRoom).every((terminal) => !terminal.lines)
+        ? {
+            terminalRuntimeByRoom: Object.fromEntries(
+              Object.entries(linesByRoom).map(([roomId, lines]) => [
+                roomId,
+                {
+                  ...state.terminalRuntimeByRoom[roomId],
+                  lines
+                }
+              ])
+            )
+          }
         : state
     ));
   },
   setTerminalBusyForRoom: (roomId, busy) => {
     set((state) => ({
-      terminalBusyByRoom: busy
-        ? { ...state.terminalBusyByRoom, [roomId]: true }
-        : omitRecordKey(state.terminalBusyByRoom, roomId)
+      terminalRuntimeByRoom: updateTerminalRuntimeForRoom(state.terminalRuntimeByRoom, roomId, (roomTerminal) => {
+        const { busy: _busy, ...rest } = roomTerminal;
+        return busy ? { ...rest, busy: true } : rest;
+      })
     }));
   },
   appendTerminalRequest: (roomId, request) => {
     set((state) => {
-      const roomRequests = state.terminalRequestsByRoom[roomId] ?? [];
+      const roomRequests = state.terminalRuntimeByRoom[roomId]?.requests ?? [];
       if (roomRequests.some((existing) => existing.id === request.id)) return state;
       return {
-        terminalRequestsByRoom: {
-          ...state.terminalRequestsByRoom,
-          [roomId]: [...roomRequests, request]
-        }
+        terminalRuntimeByRoom: updateTerminalRuntimeForRoom(state.terminalRuntimeByRoom, roomId, (roomTerminal) => ({
+          ...roomTerminal,
+          requests: [...roomRequests, request]
+        }))
       };
     });
   },
   updateTerminalRequestStatus: (roomId, requestId, status) => {
     set((state) => ({
-      terminalRequestsByRoom: {
-        ...state.terminalRequestsByRoom,
-        [roomId]: (state.terminalRequestsByRoom[roomId] ?? []).map((request) =>
+      terminalRuntimeByRoom: updateTerminalRuntimeForRoom(state.terminalRuntimeByRoom, roomId, (roomTerminal) => ({
+        ...roomTerminal,
+        requests: (roomTerminal.requests ?? []).map((request) =>
           request.id === requestId ? { ...request, status } : request
         )
-      }
+      }))
     }));
   },
   setSelectedTerminalIdForRoom: (roomId, terminalId) => {
     set((state) => ({
-      selectedTerminalIdsByRoom: terminalId
-        ? { ...state.selectedTerminalIdsByRoom, [roomId]: terminalId }
-        : omitRecordKey(state.selectedTerminalIdsByRoom, roomId)
+      terminalRuntimeByRoom: updateTerminalRuntimeForRoom(state.terminalRuntimeByRoom, roomId, (roomTerminal) => {
+        const { selectedTerminalId: _selectedTerminalId, ...rest } = roomTerminal;
+        return terminalId ? { ...rest, selectedTerminalId: terminalId } : rest;
+      })
     }));
   },
   setTerminalNameForRoom: (roomId, name) => {
     set((state) => ({
-      terminalUiByRoom: updateTerminalUiForRoom(state.terminalUiByRoom, roomId, (roomUi) => {
+      terminalRuntimeByRoom: updateTerminalRuntimeForRoom(state.terminalRuntimeByRoom, roomId, (roomTerminal) => updateTerminalUiForRoomState(roomTerminal, (roomUi) => {
         const { name: _name, ...rest } = roomUi;
         return name === "dev-server" ? rest : { ...rest, name };
-      })
+      }))
     }));
   },
   setTerminalCommandForRoom: (roomId, command) => {
     set((state) => ({
-      terminalUiByRoom: updateTerminalUiForRoom(state.terminalUiByRoom, roomId, (roomUi) => {
+      terminalRuntimeByRoom: updateTerminalRuntimeForRoom(state.terminalRuntimeByRoom, roomId, (roomTerminal) => updateTerminalUiForRoomState(roomTerminal, (roomUi) => {
         const { command: _command, ...rest } = roomUi;
         return command === "npm run dev:desktop" ? rest : { ...rest, command };
-      })
+      }))
     }));
   },
   setTerminalInputForRoom: (roomId, input) => {
     set((state) => ({
-      terminalUiByRoom: updateTerminalUiForRoom(state.terminalUiByRoom, roomId, (roomUi) => {
+      terminalRuntimeByRoom: updateTerminalRuntimeForRoom(state.terminalRuntimeByRoom, roomId, (roomTerminal) => updateTerminalUiForRoomState(roomTerminal, (roomUi) => {
         const { input: _input, ...rest } = roomUi;
         return input ? { ...rest, input } : rest;
-      })
+      }))
     }));
   },
   setTerminalErrorForRoom: (roomId, error) => {
     set((state) => ({
-      terminalUiByRoom: updateTerminalUiForRoom(state.terminalUiByRoom, roomId, (roomUi) => {
+      terminalRuntimeByRoom: updateTerminalRuntimeForRoom(state.terminalRuntimeByRoom, roomId, (roomTerminal) => updateTerminalUiForRoomState(roomTerminal, (roomUi) => {
         const { error: _error, ...rest } = roomUi;
         return error ? { ...rest, error } : rest;
-      })
+      }))
     }));
   },
   appendTerminalLinesForRoom: (roomId, lines, maxTerminalActivityLines) => {
     if (lines.length === 0) return;
     set((state) => ({
-      terminalLinesByRoom: {
-        ...state.terminalLinesByRoom,
-        [roomId]: [...(state.terminalLinesByRoom[roomId] ?? []), ...lines].slice(-maxTerminalActivityLines)
-      }
+      terminalRuntimeByRoom: updateTerminalRuntimeForRoom(state.terminalRuntimeByRoom, roomId, (roomTerminal) => ({
+        ...roomTerminal,
+        lines: [...(roomTerminal.lines ?? []), ...lines].slice(-maxTerminalActivityLines)
+      }))
     }));
   }
 });

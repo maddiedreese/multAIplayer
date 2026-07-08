@@ -93,7 +93,7 @@ test("desktop store exposes room busy actions", () => {
   assert.equal(state.roomSettingsByRoom["room-a"]?.settingsBusy, true);
   assert.equal(state.inviteByRoom["room-a"]?.keyRotationBusy, true);
   assert.equal(state.filePanelByRoom["room-a"]?.busy, true);
-  assert.equal(state.terminalBusyByRoom["room-a"], true);
+  assert.equal(state.terminalRuntimeByRoom["room-a"]?.busy, true);
 });
 
 test("desktop store exposes room request actions", () => {
@@ -141,8 +141,8 @@ test("desktop store exposes room request actions", () => {
 
   const state = useAppStore.getState();
   assert.equal(state.inviteByRoom["room-a"]?.requests?.[0]?.status, "approved");
-  assert.equal(state.terminalRequestsByRoom["room-a"]?.length, 1);
-  assert.equal(state.terminalRequestsByRoom["room-a"]?.[0]?.status, "denied");
+  assert.equal(state.terminalRuntimeByRoom["room-a"]?.requests?.length, 1);
+  assert.equal(state.terminalRuntimeByRoom["room-a"]?.requests?.[0]?.status, "denied");
   assert.equal(state.browserByRoom["room-a"]?.requests?.[0]?.status, "approved");
 });
 
@@ -1140,19 +1140,19 @@ test("desktop store keeps terminal panel state room scoped", () => {
   store.setTerminalErrorForRoom("room-b", "Host approval required");
 
   const state = useAppStore.getState();
-  assert.equal(state.terminalLinesByRoom["room-a"]?.[1], "stdout Ready");
-  assert.equal(state.terminalBusyByRoom["room-a"], true);
-  assert.equal(state.terminalBusyByRoom["room-b"], undefined);
+  assert.equal(state.terminalRuntimeByRoom["room-a"]?.lines?.[1], "stdout Ready");
+  assert.equal(state.terminalRuntimeByRoom["room-a"]?.busy, true);
+  assert.equal(state.terminalRuntimeByRoom["room-b"]?.busy, undefined);
   assert.equal(state.terminals[0]?.name, "shell");
-  assert.equal(state.terminalRequestsByRoom["room-b"]?.[0]?.command, "npm test");
-  assert.equal(state.selectedTerminalIdsByRoom["room-a"], "terminal-a");
-  assert.equal(state.selectedTerminalIdsByRoom["room-b"], undefined);
-  assert.deepEqual(state.terminalUiByRoom["room-a"], {
+  assert.equal(state.terminalRuntimeByRoom["room-b"]?.requests?.[0]?.command, "npm test");
+  assert.equal(state.terminalRuntimeByRoom["room-a"]?.selectedTerminalId, "terminal-a");
+  assert.equal(state.terminalRuntimeByRoom["room-b"]?.selectedTerminalId, undefined);
+  assert.deepEqual(state.terminalRuntimeByRoom["room-a"]?.ui, {
     name: "shell",
     command: "zsh -l",
     input: "git status"
   });
-  assert.deepEqual(state.terminalUiByRoom["room-b"], {
+  assert.deepEqual(state.terminalRuntimeByRoom["room-b"]?.ui, {
     error: "Host approval required"
   });
 });
@@ -1174,14 +1174,14 @@ test("desktop store exposes room terminal actions", () => {
   store.setTerminalErrorForRoom("room-a", null);
 
   const state = useAppStore.getState();
-  assert.equal(state.selectedTerminalIdsByRoom["room-a"], "terminal-a");
-  assert.equal(state.selectedTerminalIdsByRoom["room-b"], undefined);
-  assert.deepEqual(state.terminalUiByRoom["room-a"], {
+  assert.equal(state.terminalRuntimeByRoom["room-a"]?.selectedTerminalId, "terminal-a");
+  assert.equal(state.terminalRuntimeByRoom["room-b"]?.selectedTerminalId, undefined);
+  assert.deepEqual(state.terminalRuntimeByRoom["room-a"]?.ui, {
     name: "shell",
     command: "zsh -l"
   });
-  assert.equal(state.terminalUiByRoom["room-b"], undefined);
-  assert.deepEqual(state.terminalLinesByRoom["room-a"], ["two", "three", "four"]);
+  assert.equal(state.terminalRuntimeByRoom["room-b"]?.ui, undefined);
+  assert.deepEqual(state.terminalRuntimeByRoom["room-a"]?.lines, ["two", "three", "four"]);
 });
 
 test("desktop store clears local room-scoped state", () => {
@@ -1404,7 +1404,7 @@ test("desktop store clears local room-scoped state", () => {
 
   const state = useAppStore.getState();
   assert.deepEqual(state.messagesByRoom["room-a"], []);
-  assert.deepEqual(state.terminalRequestsByRoom["room-a"], []);
+  assert.deepEqual(state.terminalRuntimeByRoom["room-a"]?.requests, []);
   assert.deepEqual(state.browserByRoom["room-a"], { requests: [] });
   assert.equal(state.inviteByRoom["room-a"], undefined);
   assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.events, []);
@@ -1424,7 +1424,7 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.sensitiveAttachmentReviewKey, null);
   assert.equal(state.filePanelByRoom["room-a"], undefined);
   assert.equal(state.localPreviewByRoom["room-a"], undefined);
-  assert.equal(state.selectedTerminalIdsByRoom["room-a"], undefined);
+  assert.equal(state.terminalRuntimeByRoom["room-a"]?.selectedTerminalId, undefined);
   assert.equal(state.terminals.some((terminal) => terminal.roomId === "room-a"), false);
   assert.equal(state.browserByRoom["room-a"]?.url, undefined);
   assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "keep");
@@ -1682,7 +1682,7 @@ test("desktop store hydrates local room history through one room-scoped action",
   const state = useAppStore.getState();
   assert.equal(state.messagesByRoom["room-a"]?.[0]?.body, "Restore this room.");
   assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "Keep this room alone.");
-  assert.equal(state.terminalRequestsByRoom["room-a"]?.[0]?.command, "npm test");
+  assert.equal(state.terminalRuntimeByRoom["room-a"]?.requests?.[0]?.command, "npm test");
   assert.equal(state.browserByRoom["room-a"]?.requests?.[0]?.url, "http://localhost:5173");
   assert.equal(state.inviteByRoom["room-a"]?.requests?.[0]?.requester, "Jordan");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.events?.[0]?.message, "Reading context");
@@ -1695,8 +1695,8 @@ test("desktop store hydrates local room history through one room-scoped action",
   assert.equal(state.localPreviewByRoom["room-a"]?.previews?.[0]?.status, "live");
   assert.equal(state.terminals.some((terminal) => terminal.id === "terminal-a"), true);
   assert.equal(state.terminals.some((terminal) => terminal.id === "terminal-b"), true);
-  assert.equal(state.selectedTerminalIdsByRoom["room-a"], "terminal-a");
-  assert.equal(state.selectedTerminalIdsByRoom["room-b"], "terminal-b");
+  assert.equal(state.terminalRuntimeByRoom["room-a"]?.selectedTerminalId, "terminal-a");
+  assert.equal(state.terminalRuntimeByRoom["room-b"]?.selectedTerminalId, "terminal-b");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.hostHandoffs?.[0]?.reason, "usage_limit");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.threadId, "thread-a");
 });
