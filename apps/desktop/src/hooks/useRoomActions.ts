@@ -107,6 +107,7 @@ export function useRoomActions({
   const appendGitHubActionsEvent = useAppStore((state) => state.appendGitHubActionsEvent);
   const appendLocalPreviewEvent = useAppStore((state) => state.appendLocalPreviewEvent);
   const appendHostHandoff = useAppStore((state) => state.appendHostHandoff);
+  const applyAcceptedHostHandoffForRoom = useAppStore((state) => state.applyAcceptedHostHandoffForRoom);
   const appendInviteRequest = useAppStore((state) => state.appendInviteRequest);
   const appendCodexEvent = useAppStore((state) => state.appendCodexEvent);
 
@@ -212,6 +213,7 @@ export function useRoomActions({
     appendGitHubActionsEvent,
     appendLocalPreviewEvent,
     appendHostHandoff,
+    applyAcceptedHostHandoffForRoom,
     appendInviteRequest,
     appendCodexEvent,
     updateInviteRequestStatus,

@@ -1069,6 +1069,38 @@ test("desktop store exposes host handoff actions", () => {
   assert.equal(state.codexContinuationByRoom["room-a"], undefined);
 });
 
+test("desktop store preserves accepted host handoffs that arrive before available handoffs", () => {
+  const store = useAppStore.getState();
+  const acceptedHandoff = {
+    id: "handoff-accepted-first",
+    fromHost: "Maddie",
+    fromUserId: "github:maddie",
+    reason: "usage_limit" as const,
+    projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
+    codexModel: "gpt-5.4",
+    approvalPolicy: "ask",
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
+    messagesSinceLastCodex: 4,
+    attachmentNames: [],
+    terminals: [],
+    createdAt: "2026-07-06T00:16:00.000Z",
+    status: "accepted" as const,
+    acceptedBy: "Jordan",
+    acceptedByUserId: "github:jordan",
+    acceptedAt: "2026-07-06T00:17:00.000Z"
+  };
+
+  store.applyAcceptedHostHandoffForRoom("room-a", acceptedHandoff);
+  store.appendHostHandoff("room-a", { ...acceptedHandoff, status: "available" });
+
+  const state = useAppStore.getState();
+  assert.equal(state.hostHandoffsByRoom["room-a"]?.length, 1);
+  assert.equal(state.hostHandoffsByRoom["room-a"]?.[0]?.status, "accepted");
+  assert.equal(state.hostHandoffsByRoom["room-a"]?.[0]?.acceptedBy, "Jordan");
+  assert.equal(state.hostHandoffsByRoom["room-a"]?.[0]?.acceptedAt, "2026-07-06T00:17:00.000Z");
+});
+
 test("desktop store keeps terminal panel state room scoped", () => {
   const store = useAppStore.getState();
 
@@ -1666,6 +1698,57 @@ test("desktop store hydrates local room history through one room-scoped action",
   assert.equal(state.selectedTerminalIdsByRoom["room-b"], "terminal-b");
   assert.equal(state.hostHandoffsByRoom["room-a"]?.[0]?.reason, "usage_limit");
   assert.equal(state.codexThreadIdsByRoom["room-a"], "thread-a");
+});
+
+test("desktop store clears stale Codex handoff history when hydrating an empty room payload", () => {
+  const store = useAppStore.getState();
+
+  store.appendCodexEvent("room-a", {
+    eventType: "codex.turn",
+    turnId: "turn-stale",
+    status: "event",
+    message: "Stale Codex event",
+    model: "gpt-5.4",
+    host: "Maddie",
+    hostUserId: "github:maddie",
+    createdAt: "2026-07-06T00:20:00.000Z"
+  });
+  store.appendHostHandoff("room-a", {
+    id: "handoff-stale",
+    fromHost: "Maddie",
+    fromUserId: "github:maddie",
+    reason: "usage_limit",
+    projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
+    codexModel: "gpt-5.4",
+    approvalPolicy: "ask",
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
+    messagesSinceLastCodex: 3,
+    attachmentNames: [],
+    terminals: [],
+    createdAt: "2026-07-06T00:21:00.000Z",
+    status: "available"
+  });
+  store.setCodexThreadIdForRoom("room-a", "thread-stale");
+
+  store.hydrateLocalRoomHistoryForRoom("room-a", {
+    version: 3,
+    messages: [],
+    terminalRequests: [],
+    browserRequests: [],
+    inviteRequests: [],
+    codexEvents: [],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
+    localPreviews: [],
+    terminalSnapshots: [],
+    hostHandoffs: []
+  });
+
+  const state = useAppStore.getState();
+  assert.deepEqual(state.codexEventsByRoom["room-a"], []);
+  assert.deepEqual(state.hostHandoffsByRoom["room-a"], []);
+  assert.equal(state.codexThreadIdsByRoom["room-a"], undefined);
 });
 
 test("desktop store exposes team member actions", () => {

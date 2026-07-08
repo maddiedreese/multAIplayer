@@ -83,6 +83,7 @@ export function useAppRelaySync({
     setChatMessageForRoom,
     setHostMessageForRoom,
     appendHostHandoff,
+    applyAcceptedHostHandoffForRoom,
     setInviteMessageForRoom
   } = roomActions;
   const handleCodexApprovalEvent = useCallback((event: CodexApprovalPlaintextPayload, roomId: string) => {
@@ -150,9 +151,9 @@ export function useAppRelaySync({
         updateBrowserRequestStatus,
         appendLocalPreviewEvent,
         setChatMessageForRoom,
-        markHostHandoffAccepted: hostHandoffActions.markHostHandoffAccepted,
         setHostMessageForRoom,
         appendHostHandoff,
+        applyAcceptedHostHandoffForRoom,
         appendRoomMessage: roomChatMutations.appendRoomMessage,
         setInviteMessageForRoom
       },

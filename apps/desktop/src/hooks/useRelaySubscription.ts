@@ -105,9 +105,9 @@ interface UseRelaySubscriptionOptions {
   updateBrowserRequestStatus: (roomId: string, requestId: string, status: BrowserAccessRequest["status"]) => void;
   appendLocalPreviewEvent: (roomId: string, event: LocalPreviewRecord) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
-  markHostHandoffAccepted: (roomId: string, handoffId: string) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   appendHostHandoff: (roomId: string, handoff: HostHandoffRecord) => void;
+  applyAcceptedHostHandoffForRoom: (roomId: string, handoff: HostHandoffRecord) => void;
   appendRoomMessage: (roomId: string, message: ChatMessage) => void;
   setInviteMessageForRoom: (roomId: string, message: string | null) => void;
 }
@@ -157,9 +157,9 @@ export function useRelaySubscription({
   updateBrowserRequestStatus,
   appendLocalPreviewEvent,
   setChatMessageForRoom,
-  markHostHandoffAccepted,
   setHostMessageForRoom,
   appendHostHandoff,
+  applyAcceptedHostHandoffForRoom,
   appendRoomMessage,
   setInviteMessageForRoom
 }: UseRelaySubscriptionOptions) {
@@ -323,7 +323,7 @@ export function useRelaySubscription({
           if (message.envelope.kind === "room.host") {
             const plaintext = await decryptJson<HostHandoffPlaintextPayload>(roomPayload, secret);
             if (plaintext.status === "accepted") {
-              markHostHandoffAccepted(message.envelope.roomId, plaintext.id);
+              applyAcceptedHostHandoffForRoom(message.envelope.roomId, { ...plaintext, status: "accepted" });
               setHostMessageForRoom(
                 message.envelope.roomId,
                 `${plaintext.acceptedBy ?? "A room member"} accepted host handoff from ${plaintext.fromHost}.`

@@ -29,6 +29,7 @@ export interface CodexHostHandoffSlice {
   hostHandoffsByRoom: HostHandoffsByRoom;
   codexContinuationByRoom: CodexContinuationByRoom;
   appendHostHandoff: (roomId: string, handoff: HostHandoffRecord) => void;
+  applyAcceptedHostHandoffForRoom: (roomId: string, handoff: HostHandoffRecord) => void;
   markHostHandoffAcceptedForRoom: (roomId: string, handoffId: string) => void;
   markLatestHostHandoffAcceptedForRoom: (roomId: string) => void;
   setCodexContinuationForRoom: (roomId: string, handoff: HostHandoffRecord | null) => void;
@@ -75,6 +76,29 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
         hostHandoffsByRoom: {
           ...state.hostHandoffsByRoom,
           [roomId]: [...roomHandoffs, handoff]
+        }
+      };
+    });
+  },
+  applyAcceptedHostHandoffForRoom: (roomId, handoff) => {
+    set((state) => {
+      const acceptedHandoff: HostHandoffRecord = { ...handoff, status: "accepted" };
+      const roomHandoffs = state.hostHandoffsByRoom[roomId] ?? [];
+      const existingIndex = roomHandoffs.findIndex((existing) => existing.id === handoff.id);
+      const nextHandoffs = existingIndex >= 0
+        ? roomHandoffs.map((existing) =>
+            existing.id === handoff.id
+              ? {
+                  ...existing,
+                  ...acceptedHandoff
+                }
+              : existing
+          )
+        : [...roomHandoffs, acceptedHandoff];
+      return {
+        hostHandoffsByRoom: {
+          ...state.hostHandoffsByRoom,
+          [roomId]: nextHandoffs
         }
       };
     });

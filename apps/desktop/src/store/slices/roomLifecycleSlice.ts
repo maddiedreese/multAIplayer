@@ -48,7 +48,7 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
           : state.inviteByRoom,
         codexEventsByRoom: payload.codexEvents.length
           ? { ...state.codexEventsByRoom, [roomId]: payload.codexEvents }
-          : state.codexEventsByRoom,
+          : { ...state.codexEventsByRoom, [roomId]: [] },
         gitWorkflowByRoom: payload.gitWorkflowEvents.length
           ? {
               ...state.gitWorkflowByRoom,
@@ -89,10 +89,10 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
           : state.selectedTerminalIdsByRoom,
         hostHandoffsByRoom: payload.hostHandoffs.length
           ? { ...state.hostHandoffsByRoom, [roomId]: payload.hostHandoffs }
-          : state.hostHandoffsByRoom,
+          : { ...state.hostHandoffsByRoom, [roomId]: [] },
         codexThreadIdsByRoom: codexThreadId
           ? { ...state.codexThreadIdsByRoom, [roomId]: codexThreadId }
-          : state.codexThreadIdsByRoom
+          : omitRecordKey(state.codexThreadIdsByRoom, roomId)
       };
     });
   },
