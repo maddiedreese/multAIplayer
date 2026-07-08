@@ -5,7 +5,7 @@ import type {
   RoomSettingsPlaintextPayload
 } from "@multaiplayer/protocol";
 import type { ChatMessage } from "../types";
-import { formatCodexModel, formatMessageTime } from "./appFormatters";
+import { formatCodexModel, formatCodexReasoningEffort, formatCodexSpeed, formatMessageTime } from "./appFormatters";
 import { formatBrowserAccessLabel } from "./browserUi";
 
 interface RoomSettingsMessageLabels {
@@ -45,6 +45,10 @@ export function buildRoomSettingsMessageBody(
       return `${event.changedBy} ${formatRoomModeChange(event.nextValue, labels)}.`;
     case "codexModel":
       return `${event.changedBy} changed the Codex model from ${formatCodexModel(event.previousValue)} to ${formatCodexModel(event.nextValue)}.`;
+    case "codexReasoningEffort":
+      return `${event.changedBy} changed Codex reasoning from ${formatCodexReasoningEffort(event.previousValue)} to ${formatCodexReasoningEffort(event.nextValue)}.`;
+    case "codexSpeed":
+      return `${event.changedBy} changed Codex speed from ${formatCodexSpeed(event.previousValue)} to ${formatCodexSpeed(event.nextValue)}.`;
     case "projectPath":
       return `${event.changedBy} changed the project folder from ${event.previousValue} to ${event.nextValue}.`;
     case "browserAllowedOrigins":

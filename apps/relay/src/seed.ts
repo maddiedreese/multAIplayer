@@ -2,6 +2,8 @@ import {
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultCodexModel,
+  defaultCodexReasoningEffort,
+  defaultCodexSpeed,
   defaultRoomMode,
   type RoomRecord,
   type TeamMemberRecord,
@@ -50,6 +52,8 @@ export function seedWorkspace(options: {
       trustedApproverUserIds: [],
       mode: { ...defaultRoomMode, browser: true },
       codexModel: defaultCodexModel,
+      codexReasoningEffort: defaultCodexReasoningEffort,
+      codexSpeed: defaultCodexSpeed,
       browserAllowedOrigins: defaultBrowserAllowedOrigins,
       browserProfilePersistent: defaultBrowserProfilePersistent,
       unread: 0
@@ -67,6 +71,8 @@ export function seedWorkspace(options: {
       trustedApproverUserIds: [],
       mode: defaultRoomMode,
       codexModel: "gpt-5.4-mini",
+      codexReasoningEffort: "medium",
+      codexSpeed: "standard",
       browserAllowedOrigins: defaultBrowserAllowedOrigins,
       browserProfilePersistent: defaultBrowserProfilePersistent,
       unread: 2
@@ -83,7 +89,9 @@ export function seedWorkspace(options: {
       approvalDelegationPolicy: "host_only",
       trustedApproverUserIds: [],
       mode: defaultRoomMode,
-      codexModel: "gpt-5.4-thinking",
+      codexModel: "gpt-5.3-codex-spark",
+      codexReasoningEffort: "high",
+      codexSpeed: "standard",
       browserAllowedOrigins: defaultBrowserAllowedOrigins,
       browserProfilePersistent: defaultBrowserProfilePersistent,
       unread: 0

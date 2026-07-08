@@ -9,21 +9,33 @@ export type ModelOptionDisplay = {
 export function ModelPanel({
   selectedModel,
   selectedModelLabel,
+  selectedReasoningEffort,
+  selectedSpeed,
   customModel,
   modelOptions,
+  reasoningOptions,
+  speedOptions,
   disabled,
   canApplyCustomModel,
   onSelectModel,
+  onSelectReasoningEffort,
+  onSelectSpeed,
   onCustomModelChange,
   onApplyCustomModel
 }: {
   selectedModel: string;
   selectedModelLabel: string;
+  selectedReasoningEffort: string;
+  selectedSpeed: string;
   customModel: string;
   modelOptions: readonly ModelOptionDisplay[];
+  reasoningOptions: readonly ModelOptionDisplay[];
+  speedOptions: readonly ModelOptionDisplay[];
   disabled: boolean;
   canApplyCustomModel: boolean;
   onSelectModel: (model: string) => void;
+  onSelectReasoningEffort: (effort: string) => void;
+  onSelectSpeed: (speed: string) => void;
   onCustomModelChange: (model: string) => void;
   onApplyCustomModel: () => void;
 }) {
@@ -52,6 +64,34 @@ export function ModelPanel({
             </option>
           ))}
           <option value="custom">Custom</option>
+        </select>
+      </label>
+      <label>
+        <span>Reasoning</span>
+        <select
+          value={selectedReasoningEffort}
+          disabled={disabled}
+          onChange={(event) => onSelectReasoningEffort(event.target.value)}
+        >
+          {reasoningOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span>Speed</span>
+        <select
+          value={selectedSpeed}
+          disabled={disabled}
+          onChange={(event) => onSelectSpeed(event.target.value)}
+        >
+          {speedOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </label>
       <label>
@@ -86,6 +126,32 @@ export function ModelPanel({
             className={selectedModel === option.id ? "active" : ""}
             disabled={disabled}
             onClick={() => onSelectModel(option.id)}
+          >
+            <strong>{option.label}</strong>
+            <span>{option.description}</span>
+          </button>
+        ))}
+      </div>
+      <div className="model-options compact">
+        {reasoningOptions.map((option) => (
+          <button
+            key={option.id}
+            className={selectedReasoningEffort === option.id ? "active" : ""}
+            disabled={disabled}
+            onClick={() => onSelectReasoningEffort(option.id)}
+          >
+            <strong>{option.label}</strong>
+            <span>{option.description}</span>
+          </button>
+        ))}
+      </div>
+      <div className="model-options compact">
+        {speedOptions.map((option) => (
+          <button
+            key={option.id}
+            className={selectedSpeed === option.id ? "active" : ""}
+            disabled={disabled}
+            onClick={() => onSelectSpeed(option.id)}
           >
             <strong>{option.label}</strong>
             <span>{option.description}</span>

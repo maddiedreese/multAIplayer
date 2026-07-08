@@ -11,9 +11,11 @@ import { RoomModePanel } from "./RoomModePanel";
 import { RoomMembersPanel, TeamRosterPanel } from "./RosterPanels";
 import { TerminalPanel } from "./TerminalPanel";
 import { WorkspaceFilesPanel } from "./WorkspaceFilesPanel";
+import type { InspectorTab } from "./InspectorTabs";
 import type { HostHandoffRecord, InviteJoinRequest } from "../types";
 
 export function RoomInspectorWorkPanel({
+  activeTab,
   project,
   teamRoster,
   roomMembers,
@@ -28,6 +30,7 @@ export function RoomInspectorWorkPanel({
   githubActions,
   terminal
 }: {
+  activeTab: InspectorTab;
   project: ComponentProps<typeof ProjectPanel>;
   teamRoster: ComponentProps<typeof TeamRosterPanel>;
   roomMembers: ComponentProps<typeof RoomMembersPanel>;
@@ -42,6 +45,25 @@ export function RoomInspectorWorkPanel({
   githubActions: ComponentProps<typeof GitHubActionsPanel>;
   terminal: ComponentProps<typeof TerminalPanel>;
 }) {
+  if (activeTab === "files" || activeTab === "diff") {
+    return (
+      <>
+        <ProjectPanel {...project} />
+        <WorkspaceFilesPanel {...workspaceFiles} />
+        <GitHandoffPanel {...gitHandoff} />
+        <GitHubActionsPanel {...githubActions} />
+      </>
+    );
+  }
+
+  if (activeTab === "terminal") {
+    return <TerminalPanel {...terminal} />;
+  }
+
+  if (activeTab === "browser") {
+    return null;
+  }
+
   return (
     <>
       <ProjectPanel {...project} />
@@ -53,10 +75,6 @@ export function RoomInspectorWorkPanel({
       <RoomModePanel {...roomMode} />
       <ModelPanel {...model} />
       <LocalHistoryPanel {...localHistory} />
-      <WorkspaceFilesPanel {...workspaceFiles} />
-      <GitHandoffPanel {...gitHandoff} />
-      <GitHubActionsPanel {...githubActions} />
-      <TerminalPanel {...terminal} />
     </>
   );
 }

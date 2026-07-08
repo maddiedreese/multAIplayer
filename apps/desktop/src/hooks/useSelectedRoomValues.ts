@@ -1,5 +1,5 @@
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { defaultCodexModel } from "@multaiplayer/protocol";
+import { defaultCodexModel, defaultCodexReasoningEffort, defaultCodexSpeed } from "@multaiplayer/protocol";
 import { resolveFilePreviewTab } from "../lib/filePreview";
 import { resolveGitWorkflowDraft } from "../lib/gitWorkflowDraft";
 import { embeddedAttachmentBytes } from "../lib/appFormatters";
@@ -60,6 +60,8 @@ export function useSelectedRoomValues({
 }: UseSelectedRoomValuesOptions) {
   const roomId = selectedRoom.id ?? selectedRoomId;
   const selectedCodexModel = selectedRoom.codexModel ?? defaultCodexModel;
+  const selectedCodexReasoningEffort = selectedRoom.codexReasoningEffort ?? defaultCodexReasoningEffort;
+  const selectedCodexSpeed = selectedRoom.codexSpeed ?? defaultCodexSpeed;
   const messages = messagesByRoom[roomId] ?? [];
   const roomSettings = roomSettingsByRoom[roomId] ?? {};
   const roomChat = roomChatByRoom[roomId] ?? {};
@@ -80,6 +82,8 @@ export function useSelectedRoomValues({
 
   return {
     selectedCodexModel,
+    selectedCodexReasoningEffort,
+    selectedCodexSpeed,
     customCodexModel: roomSettings.customCodexModel ?? selectedCodexModel,
     projectPathDraft: roomSettings.projectPathDraft ?? selectedRoom.projectPath,
     messages,

@@ -1,5 +1,7 @@
 import {
   codexModelOptions,
+  codexReasoningEffortOptions,
+  codexSpeedOptions,
   defaultCodexModel
 } from "@multaiplayer/protocol";
 import { defaultProjectPath } from "../lib/localBackend";
@@ -84,6 +86,8 @@ export function useAppViewModel({
     selectedRoom,
     hasSelectedRoom,
     selectedCodexModel,
+    selectedCodexReasoningEffort,
+    selectedCodexSpeed,
     selectedMessages,
     markdownSelectionMode,
     inspectorTab,
@@ -161,7 +165,11 @@ export function useAppViewModel({
       isSelectedRoomRevoked: roomInteraction.isSelectedRoomRevoked,
       hasSelectedRoom,
       selectedCodexModel,
+      selectedCodexReasoningEffort,
+      selectedCodexSpeed,
       modelOptions: codexModelOptions,
+      reasoningOptions: codexReasoningEffortOptions,
+      speedOptions: codexSpeedOptions,
       settingsBusy: selectedRuntime.settingsBusy,
       selectedMessages,
       markdownSelectionMode,
@@ -170,6 +178,8 @@ export function useAppViewModel({
       onSetHost: hostHandoffActions.setRoomHost,
       onRenameRoom: roomRuntime.renameRoom,
       onSelectModel: roomRuntime.setCodexModel,
+      onSelectReasoningEffort: roomRuntime.setCodexReasoningEffort,
+      onSelectSpeed: roomRuntime.setCodexSpeed,
       onCopyRoomMarkdown: workspaceFlow.copyRoomMarkdown,
       onCopySelectedMarkdown: workspaceFlow.copySelectedMessagesMarkdown,
       onToggleMarkdownSelection: toggleMarkdownSelectionMode,
@@ -274,11 +284,17 @@ export function useAppViewModel({
         onToggleMode: roomRuntime.toggleRoomMode
       },
       selectedCodexModel,
+      selectedCodexReasoningEffort,
+      selectedCodexSpeed,
       customCodexModel,
       model: {
         customModel: customCodexModel,
         modelOptions: codexModelOptions,
+        reasoningOptions: codexReasoningEffortOptions,
+        speedOptions: codexSpeedOptions,
         onSelectModel: roomRuntime.setCodexModel,
+        onSelectReasoningEffort: roomRuntime.setCodexReasoningEffort,
+        onSelectSpeed: roomRuntime.setCodexSpeed,
         onCustomModelChange: (model) => setCustomCodexModelForRoom(selectedRoom.id, model),
         onApplyCustomModel: () => roomRuntime.setCodexModel(customCodexModel)
       },

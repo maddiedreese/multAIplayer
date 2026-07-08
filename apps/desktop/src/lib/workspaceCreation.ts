@@ -1,4 +1,4 @@
-import { codexModelOptions } from "@multaiplayer/protocol";
+import { codexModelOptions, codexReasoningEffortOptions, codexSpeedOptions } from "@multaiplayer/protocol";
 
 export interface WorkspaceCreatePlan {
   name: string;
@@ -42,6 +42,16 @@ export function normalizeCodexModel(model: string): string | null {
   if (codexModelOptions.some((option) => option.id === trimmed)) return trimmed;
   if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/.test(trimmed)) return null;
   return trimmed;
+}
+
+export function normalizeCodexReasoningEffort(effort: string): string | null {
+  const trimmed = effort.trim();
+  return codexReasoningEffortOptions.some((option) => option.id === trimmed) ? trimmed : null;
+}
+
+export function normalizeCodexSpeed(speed: string): string | null {
+  const trimmed = speed.trim();
+  return codexSpeedOptions.some((option) => option.id === trimmed) ? trimmed : null;
 }
 
 export function planTeamCreation(name: string): WorkspaceCreatePlan {

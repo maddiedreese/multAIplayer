@@ -4,7 +4,7 @@ import type {
   CodexEventPlaintextPayload,
   RoomRecord
 } from "@multaiplayer/protocol";
-import { defaultCodexModel } from "@multaiplayer/protocol";
+import { defaultCodexModel, defaultCodexReasoningEffort, defaultCodexSpeed } from "@multaiplayer/protocol";
 import {
   runCodexTurn,
   shutdownCodexRoom,
@@ -178,6 +178,8 @@ export function useCodexTurnActions({
       { includeWorkspaceContext: roomCanReadLocalWorkspace }
     );
     const model = room.codexModel ?? defaultCodexModel;
+    const reasoningEffort = room.codexReasoningEffort ?? defaultCodexReasoningEffort;
+    const speed = room.codexSpeed ?? defaultCodexSpeed;
     const projectPath = room.projectPath;
     setPendingCodexApprovalForRoom(roomId, null);
     setApprovalVisibleForRoom(roomId, false);
@@ -202,7 +204,7 @@ export function useCodexTurnActions({
           : `Started Codex turn with ${formatCodexModel(model)}.`,
         model
       }, room);
-      const result = await runCodexTurn(roomId, projectPath, input, model, previousThreadId);
+      const result = await runCodexTurn(roomId, projectPath, input, model, reasoningEffort, speed, previousThreadId);
       if (classifyCodexFailure([result.status, result.stderr, result.transcript, ...result.events]) === "usage_limit") {
         await handleCodexUsageLimit(room, turnId, model, turnMessages, result.events, result.stderr);
         return;

@@ -2,6 +2,8 @@ import {
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultCodexModel,
+  defaultCodexReasoningEffort,
+  defaultCodexSpeed,
   defaultRoomMode,
   type ApprovalDelegationPolicy,
   type ApprovalPolicy,
@@ -50,6 +52,8 @@ export const seededRooms: RoomRecord[] = [
     trustedApproverUserIds: [],
     mode: { ...defaultRoomMode, browser: true },
     codexModel: defaultCodexModel,
+    codexReasoningEffort: defaultCodexReasoningEffort,
+    codexSpeed: defaultCodexSpeed,
     browserAllowedOrigins: defaultBrowserAllowedOrigins,
     browserProfilePersistent: defaultBrowserProfilePersistent,
     unread: 0
@@ -67,6 +71,8 @@ export const seededRooms: RoomRecord[] = [
     trustedApproverUserIds: [],
     mode: defaultRoomMode,
     codexModel: "gpt-5.4-mini",
+    codexReasoningEffort: "medium",
+    codexSpeed: "standard",
     browserAllowedOrigins: defaultBrowserAllowedOrigins,
     browserProfilePersistent: defaultBrowserProfilePersistent,
     unread: 2
@@ -83,7 +89,9 @@ export const seededRooms: RoomRecord[] = [
     approvalDelegationPolicy: "host_only",
     trustedApproverUserIds: [],
     mode: defaultRoomMode,
-    codexModel: "gpt-5.4-thinking",
+    codexModel: "gpt-5.3-codex-spark",
+    codexReasoningEffort: "high",
+    codexSpeed: "standard",
     browserAllowedOrigins: defaultBrowserAllowedOrigins,
     browserProfilePersistent: defaultBrowserProfilePersistent,
     unread: 0
@@ -103,6 +111,8 @@ export const emptyRoom: RoomRecord = {
   trustedApproverUserIds: [],
   mode: defaultRoomMode,
   codexModel: defaultCodexModel,
+  codexReasoningEffort: defaultCodexReasoningEffort,
+  codexSpeed: defaultCodexSpeed,
   browserAllowedOrigins: defaultBrowserAllowedOrigins,
   browserProfilePersistent: defaultBrowserProfilePersistent,
   unread: 0

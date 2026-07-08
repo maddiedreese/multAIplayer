@@ -74,6 +74,8 @@ export function useAppRoomRuntime({
   } = appState;
   const {
     selectedCodexModel,
+    selectedCodexReasoningEffort,
+    selectedCodexSpeed,
     hasSelectedRoom,
     selectedRoom,
     inspectorTab,
@@ -205,6 +207,8 @@ export function useAppRoomRuntime({
         selectedRoom,
         selectedRoomIdRef: appRefs.selectedRoomIdRef,
         selectedCodexModel,
+        selectedCodexReasoningEffort,
+        selectedCodexSpeed,
         projectPathDraft,
         approvalPolicyLabels,
         roomModeLabels,

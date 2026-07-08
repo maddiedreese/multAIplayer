@@ -23,12 +23,10 @@ export function RoomInspectorPanel({
         <strong>{activeLabel}</strong>
       </div>
 
-      <div className="inspector-panel-group" hidden={activeTab !== "browser"}>{browserPanel}</div>
       <div
         className={`inspector-panel-group inspector-panel-${activeTab}`}
-        hidden={activeTab === "browser"}
       >
-        {workPanel}
+        {activeTab === "browser" ? browserPanel : workPanel}
       </div>
     </aside>
   );

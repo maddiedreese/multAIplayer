@@ -403,6 +403,8 @@ function isRoomSettingsName(value: unknown): value is RoomSettingsPlaintextPaylo
     value === "roomName" ||
     value === "roomMode" ||
     value === "codexModel" ||
+    value === "codexReasoningEffort" ||
+    value === "codexSpeed" ||
     value === "projectPath" ||
     value === "browserAllowedOrigins" ||
     value === "browserProfilePersistent"

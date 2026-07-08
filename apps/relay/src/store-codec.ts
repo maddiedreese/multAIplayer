@@ -6,6 +6,8 @@ import {
   defaultBrowserProfilePersistent,
   defaultApprovalDelegationPolicy,
   defaultCodexModel,
+  defaultCodexReasoningEffort,
+  defaultCodexSpeed,
   defaultRoomMode,
   type AttachmentBlobRecord as AttachmentBlobRecordType,
   type DeviceRecord,
@@ -23,6 +25,8 @@ import {
   maxCiphertextCharactersForBlob,
   normalizeBrowserAllowedOrigins,
   normalizeCodexModel,
+  normalizeCodexReasoningEffortOrDefault,
+  normalizeCodexSpeedOrDefault,
   normalizeDevicePublicKeyJwk,
   normalizeMetadataText,
   normalizeOptionalMetadataText,
@@ -247,6 +251,8 @@ export function createRelayStoreCodec(options: {
       trustedApproverUserIds,
       mode,
       codexModel: normalizeModel(room.codexModel) ?? defaultCodexModel,
+      codexReasoningEffort: normalizeCodexReasoningEffortOrDefault((room as { codexReasoningEffort?: unknown }).codexReasoningEffort ?? defaultCodexReasoningEffort),
+      codexSpeed: normalizeCodexSpeedOrDefault((room as { codexSpeed?: unknown }).codexSpeed ?? defaultCodexSpeed),
       browserAllowedOrigins: normalizeBrowserAllowedOrigins((room as { browserAllowedOrigins?: unknown }).browserAllowedOrigins)
         ?? defaultBrowserAllowedOrigins,
       browserProfilePersistent: typeof (room as { browserProfilePersistent?: unknown }).browserProfilePersistent === "boolean"

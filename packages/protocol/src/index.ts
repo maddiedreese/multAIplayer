@@ -330,6 +330,8 @@ export const RoomSettingsPlaintextPayload = z.object({
     "trustedApprovers",
     "roomMode",
     "codexModel",
+    "codexReasoningEffort",
+    "codexSpeed",
     "projectPath",
     "browserAllowedOrigins",
     "browserProfilePersistent"
@@ -365,15 +367,33 @@ export type ApprovalDelegationPolicy =
   | "trusted_members_only";
 
 export const defaultApprovalDelegationPolicy: ApprovalDelegationPolicy = "host_only";
-export const defaultCodexModel = "gpt-5.4";
+export const defaultCodexModel = "gpt-5.5";
+export const defaultCodexReasoningEffort = "medium";
+export const defaultCodexSpeed = "standard";
 export const defaultBrowserAllowedOrigins = ["https://github.com"];
 export const defaultBrowserProfilePersistent = true;
 
 export const codexModelOptions = [
-  { id: "gpt-5.4", label: "GPT-5.4", description: "Default high-capability Codex host model" },
-  { id: "gpt-5.4-mini", label: "GPT-5.4 mini", description: "Faster Codex turns for lighter room tasks" },
-  { id: "gpt-5.4-thinking", label: "GPT-5.4 thinking", description: "Deeper reasoning for larger coding turns" }
+  { id: "gpt-5.5", label: "GPT-5.5", description: "Frontier model for complex coding, research, and real-world work." },
+  { id: "gpt-5.4", label: "GPT-5.4", description: "High-capability Codex host model" },
+  { id: "gpt-5.4-mini", label: "GPT-5.4-Mini", description: "Faster Codex turns for lighter room tasks" },
+  { id: "gpt-5.3-codex-spark", label: "GPT-5.3-Codex-Spark", description: "Older Codex model for compatibility testing" }
 ] as const;
+
+export const codexReasoningEffortOptions = [
+  { id: "low", label: "Low", description: "Fast responses with lighter reasoning" },
+  { id: "medium", label: "Medium", description: "Balances speed and reasoning depth for everyday tasks" },
+  { id: "high", label: "High", description: "Greater reasoning depth for complex problems" },
+  { id: "xhigh", label: "Extra high", description: "Extra high reasoning depth for complex problems" }
+] as const;
+
+export const codexSpeedOptions = [
+  { id: "standard", label: "Standard", serviceTier: "default", description: "Default Codex speed and usage behavior" },
+  { id: "fast", label: "Fast", serviceTier: "priority", description: "Priority tier for faster Codex turns when available" }
+] as const;
+
+export type CodexReasoningEffort = typeof codexReasoningEffortOptions[number]["id"];
+export type CodexSpeed = typeof codexSpeedOptions[number]["id"];
 
 export const TeamRole = z.enum(["owner", "admin", "member"]);
 
@@ -431,6 +451,8 @@ export const RoomRecord = z.object({
   trustedApproverUserIds: z.array(UserId).max(50),
   mode: RoomModeSchema,
   codexModel: z.string().min(1).max(maxCodexModelChars),
+  codexReasoningEffort: z.enum(["low", "medium", "high", "xhigh"]).optional(),
+  codexSpeed: z.enum(["standard", "fast"]).optional(),
   browserAllowedOrigins: z.array(z.string().min(1).max(maxUrlChars)).max(20),
   browserProfilePersistent: z.boolean(),
   unread: z.number().int().nonnegative()

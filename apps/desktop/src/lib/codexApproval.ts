@@ -60,6 +60,8 @@ export function shouldResetCodexApprovalForRoomUpdate(previous: RoomRecord, next
   return (
     previous.projectPath !== next.projectPath ||
     previous.codexModel !== next.codexModel ||
+    previous.codexReasoningEffort !== next.codexReasoningEffort ||
+    previous.codexSpeed !== next.codexSpeed ||
     previous.approvalPolicy !== next.approvalPolicy ||
     previous.approvalDelegationPolicy !== next.approvalDelegationPolicy ||
     !sameStrings(previous.trustedApproverUserIds ?? [], next.trustedApproverUserIds ?? []) ||

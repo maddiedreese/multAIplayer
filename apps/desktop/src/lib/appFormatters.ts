@@ -1,5 +1,7 @@
 import {
   codexModelOptions,
+  codexReasoningEffortOptions,
+  codexSpeedOptions,
   maxEmbeddedAttachmentBytes,
   maxEmbeddedAttachmentBytesPerMessage,
   maxMessageAttachments,
@@ -11,6 +13,14 @@ import type { ChatAttachment, RoomPresence } from "../types";
 
 export function formatCodexModel(model: string): string {
   return codexModelOptions.find((option) => option.id === model)?.label ?? model;
+}
+
+export function formatCodexReasoningEffort(effort: string): string {
+  return codexReasoningEffortOptions.find((option) => option.id === effort)?.label ?? effort;
+}
+
+export function formatCodexSpeed(speed: string): string {
+  return codexSpeedOptions.find((option) => option.id === speed)?.label ?? speed;
 }
 
 export function clamp(value: number, min: number, max: number): number {

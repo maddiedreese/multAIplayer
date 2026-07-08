@@ -63,7 +63,7 @@ export function createInitializeRequest(id: number): JsonRpcRequest {
   };
 }
 
-export function createThreadStartRequest(id: number, model = "gpt-5.4"): JsonRpcRequest {
+export function createThreadStartRequest(id: number, model = "gpt-5.5"): JsonRpcRequest {
   return {
     method: "thread/start",
     id,
@@ -137,7 +137,7 @@ export class CodexAppServerClient extends EventEmitter<CodexAppServerEvents> {
     return response;
   }
 
-  async startThread(model = this.config.model ?? "gpt-5.4"): Promise<CodexThreadStartResult> {
+  async startThread(model = this.config.model ?? "gpt-5.5"): Promise<CodexThreadStartResult> {
     const response = await this.request<CodexThreadStartResult>(
       createThreadStartRequest(this.allocateId(), model)
     );

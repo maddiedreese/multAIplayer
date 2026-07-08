@@ -38,6 +38,8 @@ pub(crate) struct CodexTurnRequest {
     cwd: String,
     input: String,
     model: Option<String>,
+    reasoning_effort: Option<String>,
+    speed: Option<String>,
     previous_thread_id: Option<String>,
     timeout_seconds: Option<u64>,
 }
@@ -53,6 +55,8 @@ pub(crate) struct CodexServerKey {
     room_id: String,
     cwd: String,
     model: String,
+    reasoning_effort: String,
+    service_tier: String,
 }
 
 struct CodexServerSession {
@@ -96,13 +100,23 @@ pub(crate) fn run_codex_turn(request: CodexTurnRequest) -> Result<CodexTurnResul
     ensure_codex_input(&request.input)?;
     let previous_thread_id = normalize_codex_thread_id(request.previous_thread_id.as_deref())?;
     let timeout = codex_timeout(request.timeout_seconds)?;
-    let model = request.model.unwrap_or_else(|| "gpt-5.4".to_string());
-    let key = codex_server_key(request.room_id.as_deref(), &request.cwd, &model)?;
+    let model = request.model.unwrap_or_else(|| "gpt-5.5".to_string());
+    let reasoning_effort = normalize_reasoning_effort(request.reasoning_effort.as_deref())?;
+    let service_tier = service_tier_for_speed(request.speed.as_deref())?;
+    let key = codex_server_key(
+        request.room_id.as_deref(),
+        &request.cwd,
+        &model,
+        &reasoning_effort,
+        &service_tier,
+    )?;
     let mut session = checkout_codex_session(&key, timeout)?;
     let result = session.run_turn(
         &request.cwd,
         &request.input,
         &model,
+        &reasoning_effort,
+        &service_tier,
         previous_thread_id.as_deref(),
         timeout,
     );
@@ -118,10 +132,36 @@ pub(crate) fn shutdown_codex_room(request: CodexRoomShutdownRequest) -> Result<u
     Ok(shutdown_codex_room_sessions(&request.room_id))
 }
 
+fn normalize_reasoning_effort(value: Option<&str>) -> Result<String, String> {
+    let effort = value.unwrap_or("medium").trim();
+    match effort {
+        "low" | "medium" | "high" | "xhigh" => Ok(effort.to_string()),
+        _ => Err("Codex reasoning effort must be low, medium, high, or xhigh.".to_string()),
+    }
+}
+
+fn service_tier_for_speed(value: Option<&str>) -> Result<String, String> {
+    let speed = value.unwrap_or("standard").trim();
+    match speed {
+        "standard" => Ok("default".to_string()),
+        "fast" => Ok("priority".to_string()),
+        _ => Err("Codex speed must be standard or fast.".to_string()),
+    }
+}
+
 impl CodexServerSession {
-    fn start(cwd: &str, timeout: Duration) -> Result<Self, String> {
+    fn start(
+        cwd: &str,
+        reasoning_effort: &str,
+        service_tier: &str,
+        timeout: Duration,
+    ) -> Result<Self, String> {
         let started_at = Instant::now();
         let mut child = Command::new("codex")
+            .arg("-c")
+            .arg(format!("model_reasoning_effort=\"{reasoning_effort}\""))
+            .arg("-c")
+            .arg(format!("service_tier=\"{service_tier}\""))
             .arg("app-server")
             .current_dir(cwd)
             .stdin(Stdio::piped())
@@ -220,6 +260,8 @@ impl CodexServerSession {
         cwd: &str,
         input: &str,
         model: &str,
+        reasoning_effort: &str,
+        service_tier: &str,
         previous_thread_id: Option<&str>,
         timeout: Duration,
     ) -> Result<CodexTurnResult, String> {
@@ -304,7 +346,9 @@ impl CodexServerSession {
                         "threadId": thread_id,
                         "input": [{ "type": "text", "text": input }],
                         "cwd": cwd,
-                        "model": model
+                        "model": model,
+                        "modelReasoningEffort": reasoning_effort,
+                        "serviceTier": service_tier
                     }
                 }),
             ),
@@ -399,6 +443,8 @@ pub(crate) fn codex_server_key(
     room_id: Option<&str>,
     cwd: &str,
     model: &str,
+    reasoning_effort: &str,
+    service_tier: &str,
 ) -> Result<CodexServerKey, String> {
     let room_id = room_id.unwrap_or("__legacy_room");
     ensure_room_id(room_id)?;
@@ -406,6 +452,8 @@ pub(crate) fn codex_server_key(
         room_id: room_id.to_string(),
         cwd: cwd.to_string(),
         model: model.to_string(),
+        reasoning_effort: reasoning_effort.to_string(),
+        service_tier: service_tier.to_string(),
     })
 }
 
@@ -427,7 +475,7 @@ fn checkout_codex_session(
             return Ok(session);
         }
     }
-    CodexServerSession::start(&key.cwd, timeout)
+    CodexServerSession::start(&key.cwd, &key.reasoning_effort, &key.service_tier, timeout)
 }
 
 fn checkin_codex_session(key: CodexServerKey, session: CodexServerSession) {

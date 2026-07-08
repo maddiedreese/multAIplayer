@@ -588,7 +588,9 @@ export async function runCodexTurn(
   roomId: string,
   cwd: string,
   input: string,
-  model = "gpt-5.4",
+  model = "gpt-5.5",
+  reasoningEffort = "medium",
+  speed = "standard",
   previousThreadId: string | null = null,
   timeoutSeconds = 180
 ): Promise<CodexTurnResult> {
@@ -599,6 +601,8 @@ export async function runCodexTurn(
         cwd,
         input,
         model,
+        reasoningEffort,
+        speed,
         previousThreadId,
         timeoutSeconds
       }

@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { canApproveCodexTurn, canDelegateApproveCodexTurn } from "../lib/codexApproval";
 import { roomLockMessage } from "../lib/appRuntime";
-import { formatCodexModel } from "../lib/appFormatters";
+import { formatCodexModel, formatCodexReasoningEffort, formatCodexSpeed } from "../lib/appFormatters";
 import type { LocalHostUser } from "../lib/roomHost";
 import type { InspectorTab } from "../components/RoomInspectorPanel";
 import { RoomMainColumn } from "../components/RoomMainColumn";
@@ -29,7 +29,11 @@ interface UseRoomMainColumnPropsOptions {
   isSelectedRoomRevoked: boolean;
   hasSelectedRoom: boolean;
   selectedCodexModel: string;
+  selectedCodexReasoningEffort: string;
+  selectedCodexSpeed: string;
   modelOptions: HeaderProps["modelOptions"];
+  reasoningOptions: HeaderProps["reasoningOptions"];
+  speedOptions: HeaderProps["speedOptions"];
   settingsBusy: boolean;
   selectedMessageCount: number;
   markdownSelectionMode: boolean;
@@ -38,6 +42,8 @@ interface UseRoomMainColumnPropsOptions {
   onSetHost: HeaderProps["onSetHost"];
   onRenameRoom: HeaderProps["onRenameRoom"];
   onSelectModel: HeaderProps["onSelectModel"];
+  onSelectReasoningEffort: HeaderProps["onSelectReasoningEffort"];
+  onSelectSpeed: HeaderProps["onSelectSpeed"];
   onCopyRoomMarkdown: HeaderProps["onCopyRoomMarkdown"];
   onCopySelectedMarkdown: HeaderProps["onCopySelectedMarkdown"];
   onToggleMarkdownSelection: HeaderProps["onToggleMarkdownSelection"];
@@ -99,7 +105,11 @@ export function useRoomMainColumnProps({
   isSelectedRoomRevoked,
   hasSelectedRoom,
   selectedCodexModel,
+  selectedCodexReasoningEffort,
+  selectedCodexSpeed,
   modelOptions,
+  reasoningOptions,
+  speedOptions,
   settingsBusy,
   selectedMessageCount,
   markdownSelectionMode,
@@ -108,6 +118,8 @@ export function useRoomMainColumnProps({
   onSetHost,
   onRenameRoom,
   onSelectModel,
+  onSelectReasoningEffort,
+  onSelectSpeed,
   onCopyRoomMarkdown,
   onCopySelectedMarkdown,
   onToggleMarkdownSelection,
@@ -148,6 +160,12 @@ export function useRoomMainColumnProps({
       selectedModel: selectedCodexModel,
       modelLabel: formatCodexModel(selectedCodexModel),
       modelOptions,
+      selectedReasoningEffort: selectedCodexReasoningEffort,
+      reasoningLabel: formatCodexReasoningEffort(selectedCodexReasoningEffort),
+      reasoningOptions,
+      selectedSpeed: selectedCodexSpeed,
+      speedLabel: formatCodexSpeed(selectedCodexSpeed),
+      speedOptions,
       settingsBusy,
       selectedCount: selectedMessageCount,
       markdownSelectionMode,
@@ -155,6 +173,8 @@ export function useRoomMainColumnProps({
       onSetHost,
       onRenameRoom,
       onSelectModel,
+      onSelectReasoningEffort,
+      onSelectSpeed,
       onCopyRoomMarkdown,
       onCopySelectedMarkdown,
       onToggleMarkdownSelection,

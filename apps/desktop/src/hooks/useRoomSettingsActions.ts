@@ -12,13 +12,15 @@ import {
   maxCodexModelChars,
   maxRoomProjectPathChars,
   normalizeCodexModel,
+  normalizeCodexReasoningEffort,
+  normalizeCodexSpeed,
   normalizeProjectPath,
   normalizeRoomName
 } from "../lib/workspaceCreation";
 import { shouldResetCodexApprovalForRoomModeChange } from "../lib/codexApproval";
 import { roomLockMessage } from "../lib/appRuntime";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
-import { formatCodexModel } from "../lib/appFormatters";
+import { formatCodexModel, formatCodexReasoningEffort, formatCodexSpeed } from "../lib/appFormatters";
 
 interface UseRoomSettingsActionsOptions {
   hasSelectedRoom: boolean;
@@ -28,6 +30,8 @@ interface UseRoomSettingsActionsOptions {
   selectedRoom: RoomRecord;
   selectedRoomIdRef: MutableRefObject<string>;
   selectedCodexModel: string;
+  selectedCodexReasoningEffort: string;
+  selectedCodexSpeed: string;
   projectPathDraft: string;
   approvalPolicyLabels: Record<string, string>;
   roomModeLabels: Record<keyof RoomMode, string>;
@@ -61,6 +65,8 @@ export function useRoomSettingsActions({
   selectedRoom,
   selectedRoomIdRef,
   selectedCodexModel,
+  selectedCodexReasoningEffort,
+  selectedCodexSpeed,
   projectPathDraft,
   approvalPolicyLabels,
   roomModeLabels,
@@ -249,6 +255,104 @@ export function useRoomSettingsActions({
     }
   }
 
+  async function setCodexReasoningEffort(reasoningEffort: string) {
+    const nextReasoningEffort = normalizeCodexReasoningEffort(reasoningEffort);
+    if (!nextReasoningEffort) {
+      setSelectedSettingsMessage("Choose a supported Codex reasoning level.");
+      return;
+    }
+    if (nextReasoningEffort === selectedCodexReasoningEffort) return;
+    if (!hasSelectedRoom) {
+      setSelectedSettingsMessage("Create or join a room before changing Codex reasoning.");
+      return;
+    }
+    if (isSelectedRoomLocked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
+    if (!isActiveHost) {
+      setSelectedSettingsMessage(roomSettingsGateMessage);
+      return;
+    }
+    const roomId = selectedRoom.id;
+    if (reportRoomSettingsMutationInFlight(roomId)) return;
+    setSettingsBusyForRoom(roomId, true);
+    setSettingsMessageForRoom(roomId, null);
+    try {
+      const previousValue = selectedCodexReasoningEffort;
+      const room = await updateRoomSettings(roomId, {
+        ...roomSettingsActor(),
+        codexReasoningEffort: nextReasoningEffort as RoomRecord["codexReasoningEffort"]
+      });
+      void shutdownCodexRoom(roomId);
+      replaceRoom(room);
+      await publishRoomSettingsEvent(room, {
+        id: crypto.randomUUID(),
+        setting: "codexReasoningEffort",
+        previousValue,
+        nextValue: nextReasoningEffort,
+        changedAt: new Date().toISOString()
+      });
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setSettingsMessageForRoom(roomId, `Codex reasoning set to ${formatCodexReasoningEffort(nextReasoningEffort)}.`);
+      }
+      resetCodexApprovalForRoom(roomId);
+    } catch (error) {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
+    } finally {
+      setSettingsBusyForRoom(roomId, false);
+    }
+  }
+
+  async function setCodexSpeed(speed: string) {
+    const nextSpeed = normalizeCodexSpeed(speed);
+    if (!nextSpeed) {
+      setSelectedSettingsMessage("Choose a supported Codex speed.");
+      return;
+    }
+    if (nextSpeed === selectedCodexSpeed) return;
+    if (!hasSelectedRoom) {
+      setSelectedSettingsMessage("Create or join a room before changing Codex speed.");
+      return;
+    }
+    if (isSelectedRoomLocked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
+    if (!isActiveHost) {
+      setSelectedSettingsMessage(roomSettingsGateMessage);
+      return;
+    }
+    const roomId = selectedRoom.id;
+    if (reportRoomSettingsMutationInFlight(roomId)) return;
+    setSettingsBusyForRoom(roomId, true);
+    setSettingsMessageForRoom(roomId, null);
+    try {
+      const previousValue = selectedCodexSpeed;
+      const room = await updateRoomSettings(roomId, {
+        ...roomSettingsActor(),
+        codexSpeed: nextSpeed as RoomRecord["codexSpeed"]
+      });
+      void shutdownCodexRoom(roomId);
+      replaceRoom(room);
+      await publishRoomSettingsEvent(room, {
+        id: crypto.randomUUID(),
+        setting: "codexSpeed",
+        previousValue,
+        nextValue: nextSpeed,
+        changedAt: new Date().toISOString()
+      });
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setSettingsMessageForRoom(roomId, `Codex speed set to ${formatCodexSpeed(nextSpeed)}.`);
+      }
+      resetCodexApprovalForRoom(roomId);
+    } catch (error) {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
+    } finally {
+      setSettingsBusyForRoom(roomId, false);
+    }
+  }
+
   async function renameRoom(name: string) {
     const nextName = normalizeRoomName(name);
     if (!nextName) {
@@ -420,6 +524,8 @@ export function useRoomSettingsActions({
     setApprovalDelegationPolicy,
     toggleRoomMode,
     setCodexModel,
+    setCodexReasoningEffort,
+    setCodexSpeed,
     renameRoom,
     setBrowserProfilePersistence,
     updateProjectPath,

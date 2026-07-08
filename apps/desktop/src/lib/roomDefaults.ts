@@ -3,6 +3,8 @@ import {
   defaultBrowserProfilePersistent,
   defaultApprovalDelegationPolicy,
   defaultCodexModel,
+  defaultCodexReasoningEffort,
+  defaultCodexSpeed,
   type RoomRecord
 } from "@multaiplayer/protocol";
 import { normalizeBrowserAllowedOrigins } from "./browserPolicy";
@@ -12,6 +14,8 @@ export function ensureRoomDefaults(room: RoomRecord): RoomRecord {
     ...room,
     name: normalizeRoomDisplayName(room.name),
     codexModel: room.codexModel || defaultCodexModel,
+    codexReasoningEffort: room.codexReasoningEffort ?? defaultCodexReasoningEffort,
+    codexSpeed: room.codexSpeed ?? defaultCodexSpeed,
     approvalDelegationPolicy: room.approvalDelegationPolicy ?? defaultApprovalDelegationPolicy,
     trustedApproverUserIds: Array.isArray(room.trustedApproverUserIds) ? room.trustedApproverUserIds : [],
     browserAllowedOrigins: normalizeBrowserAllowedOrigins(room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins) ?? defaultBrowserAllowedOrigins,

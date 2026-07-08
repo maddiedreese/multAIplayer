@@ -38,7 +38,12 @@ interface UseRoomInspectorPanelPropsOptions {
   approvalPolicy: Omit<WorkProps["approvalPolicy"], "selectedPolicy" | "selectedDelegationPolicy" | "disabled">;
   roomMode: Omit<WorkProps["roomMode"], "mode" | "disabled">;
   selectedCodexModel: string;
-  model: Omit<WorkProps["model"], "selectedModel" | "selectedModelLabel" | "disabled" | "canApplyCustomModel">;
+  selectedCodexReasoningEffort: string;
+  selectedCodexSpeed: string;
+  model: Omit<
+    WorkProps["model"],
+    "selectedModel" | "selectedModelLabel" | "selectedReasoningEffort" | "selectedSpeed" | "disabled" | "canApplyCustomModel"
+  >;
   customCodexModel: string;
   localHistory: WorkProps["localHistory"];
   workspaceFiles: Omit<
@@ -94,6 +99,8 @@ export function useRoomInspectorPanelProps({
   approvalPolicy,
   roomMode,
   selectedCodexModel,
+  selectedCodexReasoningEffort,
+  selectedCodexSpeed,
   model,
   customCodexModel,
   localHistory,
@@ -116,6 +123,7 @@ export function useRoomInspectorPanelProps({
     ),
     workPanel: (
       <RoomInspectorWorkPanel
+        activeTab={activeTab}
         project={{
           projectPath: selectedRoom.projectPath,
           projectPathDraft,
@@ -151,6 +159,8 @@ export function useRoomInspectorPanelProps({
           ...model,
           selectedModel: selectedCodexModel,
           selectedModelLabel: formatCodexModel(selectedCodexModel),
+          selectedReasoningEffort: selectedCodexReasoningEffort,
+          selectedSpeed: selectedCodexSpeed,
           disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
           canApplyCustomModel: Boolean(customCodexModel.trim()) && customCodexModel.trim() !== selectedCodexModel
         }}

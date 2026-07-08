@@ -1,6 +1,10 @@
 import {
   DevicePublicKeyJwk,
   defaultApprovalDelegationPolicy,
+  defaultCodexReasoningEffort,
+  defaultCodexSpeed,
+  codexReasoningEffortOptions,
+  codexSpeedOptions,
   type RelayEnvelope,
   codexModelOptions,
   type DevicePublicKeyJwk as DevicePublicKeyJwkType,
@@ -109,6 +113,28 @@ export function normalizeCodexModel(value: unknown, maxCodexModelChars: number):
   if (codexModelOptions.some((option) => option.id === model)) return model;
   if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/.test(model)) return null;
   return model;
+}
+
+export function normalizeCodexReasoningEffort(value: unknown): RoomRecord["codexReasoningEffort"] | null {
+  const effort = String(value ?? "").trim();
+  return codexReasoningEffortOptions.some((option) => option.id === effort)
+    ? effort as RoomRecord["codexReasoningEffort"]
+    : null;
+}
+
+export function normalizeCodexSpeed(value: unknown): RoomRecord["codexSpeed"] | null {
+  const speed = String(value ?? "").trim();
+  return codexSpeedOptions.some((option) => option.id === speed)
+    ? speed as RoomRecord["codexSpeed"]
+    : null;
+}
+
+export function normalizeCodexReasoningEffortOrDefault(value: unknown): RoomRecord["codexReasoningEffort"] {
+  return normalizeCodexReasoningEffort(value) ?? defaultCodexReasoningEffort;
+}
+
+export function normalizeCodexSpeedOrDefault(value: unknown): RoomRecord["codexSpeed"] {
+  return normalizeCodexSpeed(value) ?? defaultCodexSpeed;
 }
 
 export function normalizeTeamRole(value: unknown): TeamRole {

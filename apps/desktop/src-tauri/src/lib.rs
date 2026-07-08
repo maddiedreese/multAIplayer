@@ -564,32 +564,105 @@ mod tests {
 
     #[test]
     fn codex_server_key_is_scoped_to_room_project_and_model() {
-        let base = codex_server_key(Some("room-alpha"), "/tmp/project", "gpt-5.4")
-            .expect("valid codex session key");
-        let same = codex_server_key(Some("room-alpha"), "/tmp/project", "gpt-5.4")
-            .expect("same codex session key");
-        let different_room = codex_server_key(Some("room-beta"), "/tmp/project", "gpt-5.4")
-            .expect("different room key");
-        let different_project = codex_server_key(Some("room-alpha"), "/tmp/other", "gpt-5.4")
-            .expect("different project key");
-        let different_model = codex_server_key(Some("room-alpha"), "/tmp/project", "gpt-5.4-mini")
-            .expect("different model key");
+        let base = codex_server_key(
+            Some("room-alpha"),
+            "/tmp/project",
+            "gpt-5.4",
+            "medium",
+            "default",
+        )
+        .expect("valid codex session key");
+        let same = codex_server_key(
+            Some("room-alpha"),
+            "/tmp/project",
+            "gpt-5.4",
+            "medium",
+            "default",
+        )
+        .expect("same codex session key");
+        let different_room = codex_server_key(
+            Some("room-beta"),
+            "/tmp/project",
+            "gpt-5.4",
+            "medium",
+            "default",
+        )
+        .expect("different room key");
+        let different_project = codex_server_key(
+            Some("room-alpha"),
+            "/tmp/other",
+            "gpt-5.4",
+            "medium",
+            "default",
+        )
+        .expect("different project key");
+        let different_model = codex_server_key(
+            Some("room-alpha"),
+            "/tmp/project",
+            "gpt-5.4-mini",
+            "medium",
+            "default",
+        )
+        .expect("different model key");
+        let different_reasoning = codex_server_key(
+            Some("room-alpha"),
+            "/tmp/project",
+            "gpt-5.4",
+            "high",
+            "default",
+        )
+        .expect("different reasoning key");
+        let different_speed = codex_server_key(
+            Some("room-alpha"),
+            "/tmp/project",
+            "gpt-5.4",
+            "medium",
+            "priority",
+        )
+        .expect("different speed key");
 
         assert_eq!(base, same);
         assert_ne!(base, different_room);
         assert_ne!(base, different_project);
         assert_ne!(base, different_model);
-        assert!(codex_server_key(Some("room/alpha"), "/tmp/project", "gpt-5.4").is_err());
+        assert_ne!(base, different_reasoning);
+        assert_ne!(base, different_speed);
+        assert!(codex_server_key(
+            Some("room/alpha"),
+            "/tmp/project",
+            "gpt-5.4",
+            "medium",
+            "default"
+        )
+        .is_err());
     }
 
     #[test]
     fn codex_room_shutdown_matches_all_sessions_for_room_only() {
-        let room_a_main = codex_server_key(Some("room-alpha"), "/tmp/project", "gpt-5.4")
-            .expect("room alpha key");
-        let room_a_model = codex_server_key(Some("room-alpha"), "/tmp/project", "gpt-5.4-mini")
-            .expect("room alpha model key");
-        let room_b =
-            codex_server_key(Some("room-beta"), "/tmp/project", "gpt-5.4").expect("room beta key");
+        let room_a_main = codex_server_key(
+            Some("room-alpha"),
+            "/tmp/project",
+            "gpt-5.4",
+            "medium",
+            "default",
+        )
+        .expect("room alpha key");
+        let room_a_model = codex_server_key(
+            Some("room-alpha"),
+            "/tmp/project",
+            "gpt-5.4-mini",
+            "medium",
+            "default",
+        )
+        .expect("room alpha model key");
+        let room_b = codex_server_key(
+            Some("room-beta"),
+            "/tmp/project",
+            "gpt-5.4",
+            "medium",
+            "default",
+        )
+        .expect("room beta key");
 
         assert!(should_shutdown_codex_session_for_room(
             &room_a_main,

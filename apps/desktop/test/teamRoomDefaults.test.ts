@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { defaultCodexModel } from "@multaiplayer/protocol";
 import {
   isRoomSettingsMutationInFlight,
   loadTeamRoomDefaults,
@@ -73,7 +74,7 @@ test("team room defaults persist approval policy per team", () => {
   });
   assert.deepEqual(loadTeamRoomDefaults("team-labs"), {
     approvalPolicy: "ask_every_turn",
-    codexModel: "gpt-5.4",
+    codexModel: defaultCodexModel,
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
     inviteApprovalGate: false
@@ -83,7 +84,7 @@ test("team room defaults persist approval policy per team", () => {
 test("team room defaults sanitize unsupported approval policies", () => {
   assert.deepEqual(sanitizeTeamRoomDefaults({ approvalPolicy: "surprise" as never }), {
     approvalPolicy: "ask_every_turn",
-    codexModel: "gpt-5.4",
+    codexModel: defaultCodexModel,
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
     inviteApprovalGate: false
@@ -92,7 +93,7 @@ test("team room defaults sanitize unsupported approval policies", () => {
   localStorage.setItem(teamRoomDefaultsKey("team-core"), JSON.stringify({ approvalPolicy: "nope" }));
   assert.deepEqual(loadTeamRoomDefaults("team-core"), {
     approvalPolicy: "ask_every_turn",
-    codexModel: "gpt-5.4",
+    codexModel: defaultCodexModel,
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
     inviteApprovalGate: false
@@ -116,7 +117,7 @@ test("team room defaults sanitize Codex model", () => {
 
   assert.deepEqual(sanitizeTeamRoomDefaults({ codexModel: "not a model id" }), {
     approvalPolicy: "ask_every_turn",
-    codexModel: "gpt-5.4",
+    codexModel: defaultCodexModel,
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
     inviteApprovalGate: false
@@ -200,7 +201,7 @@ test("team room defaults drop corrupted storage", () => {
 
   assert.deepEqual(loadTeamRoomDefaults("team-core"), {
     approvalPolicy: "ask_every_turn",
-    codexModel: "gpt-5.4",
+    codexModel: defaultCodexModel,
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
     inviteApprovalGate: false

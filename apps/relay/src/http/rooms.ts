@@ -5,6 +5,8 @@ import {
   defaultBrowserProfilePersistent,
   defaultApprovalDelegationPolicy,
   defaultCodexModel,
+  defaultCodexReasoningEffort,
+  defaultCodexSpeed,
   defaultRoomMode,
   type ApprovalDelegationPolicy,
   type RoomRecord
@@ -29,6 +31,8 @@ interface RegisterRoomRoutesOptions {
   normalizeOptionalMetadataText: (value: unknown, maxChars: number) => string | null;
   normalizeRoomProjectPath: (value: unknown) => string | null;
   normalizeCodexModel: (value: unknown) => string | null;
+  normalizeCodexReasoningEffort: (value: unknown) => RoomRecord["codexReasoningEffort"] | null;
+  normalizeCodexSpeed: (value: unknown) => RoomRecord["codexSpeed"] | null;
   normalizeBrowserAllowedOrigins: (value: unknown) => string[] | null;
   displayNameForUser: (user: AuthSession["user"]) => string;
   maxCodexModelChars: number;
@@ -56,6 +60,8 @@ export function registerRoomRoutes({
   normalizeOptionalMetadataText,
   normalizeRoomProjectPath,
   normalizeCodexModel,
+  normalizeCodexReasoningEffort,
+  normalizeCodexSpeed,
   normalizeBrowserAllowedOrigins,
   displayNameForUser,
   maxCodexModelChars,
@@ -78,6 +84,10 @@ export function registerRoomRoutes({
         : String(req.body.approvalDelegationPolicy);
     const trustedApproverUserIds = normalizeTrustedApproverUserIds(req.body?.trustedApproverUserIds, maxUserIdChars);
     const codexModel = req.body?.codexModel === undefined ? defaultCodexModel : normalizeCodexModel(req.body.codexModel);
+    const codexReasoningEffort = req.body?.codexReasoningEffort === undefined
+      ? defaultCodexReasoningEffort
+      : normalizeCodexReasoningEffort(req.body.codexReasoningEffort);
+    const codexSpeed = req.body?.codexSpeed === undefined ? defaultCodexSpeed : normalizeCodexSpeed(req.body.codexSpeed);
     const browserAllowedOrigins = req.body?.browserAllowedOrigins;
     const browserProfilePersistent = req.body?.browserProfilePersistent;
     if (!store.hasTeam(teamId)) {
@@ -112,6 +122,14 @@ export function registerRoomRoutes({
       res.status(400).json({ error: `codexModel must be a known model id or a model-like id up to ${maxCodexModelChars} characters` });
       return;
     }
+    if (!codexReasoningEffort) {
+      res.status(400).json({ error: "codexReasoningEffort must be low, medium, high, or xhigh" });
+      return;
+    }
+    if (!codexSpeed) {
+      res.status(400).json({ error: "codexSpeed must be standard or fast" });
+      return;
+    }
     let normalizedBrowserAllowedOrigins = defaultBrowserAllowedOrigins;
     if (browserAllowedOrigins !== undefined) {
       const parsedBrowserAllowedOrigins = normalizeBrowserAllowedOrigins(browserAllowedOrigins);
@@ -137,6 +155,8 @@ export function registerRoomRoutes({
       trustedApproverUserIds,
       mode: defaultRoomMode,
       codexModel,
+      codexReasoningEffort,
+      codexSpeed,
       browserAllowedOrigins: normalizedBrowserAllowedOrigins,
       browserProfilePersistent: browserProfilePersistent ?? defaultBrowserProfilePersistent,
       unread: 0
@@ -218,6 +238,10 @@ export function registerRoomRoutes({
         : normalizeTrustedApproverUserIds(req.body.trustedApproverUserIds, maxUserIdChars);
     const mode = req.body?.mode;
     const codexModel = req.body?.codexModel === undefined ? undefined : normalizeCodexModel(req.body.codexModel);
+    const codexReasoningEffort = req.body?.codexReasoningEffort === undefined
+      ? undefined
+      : normalizeCodexReasoningEffort(req.body.codexReasoningEffort);
+    const codexSpeed = req.body?.codexSpeed === undefined ? undefined : normalizeCodexSpeed(req.body.codexSpeed);
     const projectPath = req.body?.projectPath === undefined ? undefined : normalizeRoomProjectPath(req.body.projectPath);
     const browserAllowedOrigins = req.body?.browserAllowedOrigins;
     const browserProfilePersistent = req.body?.browserProfilePersistent;
@@ -259,6 +283,14 @@ export function registerRoomRoutes({
       res.status(400).json({ error: `codexModel must be a known model id or a model-like id up to ${maxCodexModelChars} characters` });
       return;
     }
+    if (codexReasoningEffort !== undefined && !codexReasoningEffort) {
+      res.status(400).json({ error: "codexReasoningEffort must be low, medium, high, or xhigh" });
+      return;
+    }
+    if (codexSpeed !== undefined && !codexSpeed) {
+      res.status(400).json({ error: "codexSpeed must be standard or fast" });
+      return;
+    }
     if (projectPath !== undefined && !projectPath) {
       res.status(400).json({ error: `projectPath must be a non-empty string up to ${maxRoomProjectPathChars} characters` });
       return;
@@ -284,6 +316,8 @@ export function registerRoomRoutes({
       trustedApproverUserIds: trustedApproverUserIds ?? room.trustedApproverUserIds,
       mode: mode ?? room.mode,
       codexModel: codexModel ?? room.codexModel,
+      codexReasoningEffort: codexReasoningEffort ?? room.codexReasoningEffort,
+      codexSpeed: codexSpeed ?? room.codexSpeed,
       browserAllowedOrigins: normalizedBrowserAllowedOrigins ?? room.browserAllowedOrigins,
       browserProfilePersistent: browserProfilePersistent ?? room.browserProfilePersistent
     };

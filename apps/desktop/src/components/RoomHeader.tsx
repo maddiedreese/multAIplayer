@@ -30,6 +30,12 @@ export function RoomHeader({
   selectedModel,
   modelLabel,
   modelOptions,
+  selectedReasoningEffort,
+  reasoningLabel,
+  reasoningOptions,
+  selectedSpeed,
+  speedLabel,
+  speedOptions,
   settingsBusy,
   selectedCount,
   markdownSelectionMode,
@@ -38,6 +44,8 @@ export function RoomHeader({
   onSelectTeam,
   onRenameRoom,
   onSelectModel,
+  onSelectReasoningEffort,
+  onSelectSpeed,
   onSelectInspectorTab,
   onCopyRoomMarkdown,
   onCopySelectedMarkdown,
@@ -56,6 +64,12 @@ export function RoomHeader({
   selectedModel: string;
   modelLabel: string;
   modelOptions: readonly HeaderModelOption[];
+  selectedReasoningEffort: string;
+  reasoningLabel: string;
+  reasoningOptions: readonly HeaderModelOption[];
+  selectedSpeed: string;
+  speedLabel: string;
+  speedOptions: readonly HeaderModelOption[];
   settingsBusy: boolean;
   selectedCount: number;
   markdownSelectionMode: boolean;
@@ -64,6 +78,8 @@ export function RoomHeader({
   onSelectTeam: (teamId: string) => void;
   onRenameRoom: (name: string) => void;
   onSelectModel: (model: string) => void;
+  onSelectReasoningEffort: (effort: string) => void;
+  onSelectSpeed: (speed: string) => void;
   onSelectInspectorTab: (tab: InspectorTab) => void;
   onCopyRoomMarkdown: () => void;
   onCopySelectedMarkdown: () => void;
@@ -72,6 +88,8 @@ export function RoomHeader({
   onShareLocalPreview: () => void;
 }) {
   const knownModel = modelOptions.some((option) => option.id === selectedModel);
+  const knownReasoningEffort = reasoningOptions.some((option) => option.id === selectedReasoningEffort);
+  const knownSpeed = speedOptions.some((option) => option.id === selectedSpeed);
   const [roomNameDraft, setRoomNameDraft] = useState(roomName);
   useEffect(() => setRoomNameDraft(roomName), [roomName]);
   const commitRoomName = () => {
@@ -171,6 +189,36 @@ export function RoomHeader({
               </option>
             ))}
             {!knownModel && <option value="custom">{modelLabel}</option>}
+          </select>
+        </label>
+        <label className="header-model-switcher" title={isActiveHost ? "Switch Codex reasoning for this room" : "Only the active host can switch reasoning"}>
+          <select
+            aria-label="Codex reasoning"
+            value={knownReasoningEffort ? selectedReasoningEffort : "medium"}
+            disabled={!hasRoom || roomLocked || settingsBusy || !isActiveHost}
+            onChange={(event) => onSelectReasoningEffort(event.target.value)}
+          >
+            {reasoningOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+            {!knownReasoningEffort && <option value={selectedReasoningEffort}>{reasoningLabel}</option>}
+          </select>
+        </label>
+        <label className="header-model-switcher" title={isActiveHost ? "Switch Codex speed for this room" : "Only the active host can switch speed"}>
+          <select
+            aria-label="Codex speed"
+            value={knownSpeed ? selectedSpeed : "standard"}
+            disabled={!hasRoom || roomLocked || settingsBusy || !isActiveHost}
+            onChange={(event) => onSelectSpeed(event.target.value)}
+          >
+            {speedOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+            {!knownSpeed && <option value={selectedSpeed}>{speedLabel}</option>}
           </select>
         </label>
         <button className="header-copy" onClick={onCopyRoomMarkdown} disabled={!hasRoom}>
