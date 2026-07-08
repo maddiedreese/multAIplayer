@@ -1195,6 +1195,76 @@ test("desktop store clears local room-scoped state", () => {
   store.setHostMessageForRoom("room-b", "Keep");
   store.setSecretWarningVisibleForRoom("room-a", true);
   store.setSecretWarningVisibleForRoom("room-b", true);
+  store.replaceHistorySearchMessagesByRoom({
+    "room-a": [{
+      id: "history-search-a",
+      author: "Avery",
+      role: "human",
+      body: "Clear search result",
+      time: "10:01"
+    }],
+    "room-b": [{
+      id: "history-search-b",
+      author: "Jordan",
+      role: "human",
+      body: "Keep search result",
+      time: "10:02"
+    }]
+  });
+  store.setInspectorTabForRoom("room-a", "browser");
+  store.setInspectorTabForRoom("room-b", "terminal");
+  store.setRoomPresenceForDevice("room-a", "device-a", {
+    roomId: "room-a",
+    deviceId: "device-a",
+    displayName: "Avery",
+    userId: "github:avery",
+    lastSeenAt: "2026-07-06T00:28:00.000Z"
+  });
+  store.setRoomPresenceForDevice("room-b", "device-b", {
+    roomId: "room-b",
+    deviceId: "device-b",
+    displayName: "Jordan",
+    userId: "github:jordan",
+    lastSeenAt: "2026-07-06T00:29:00.000Z"
+  });
+  store.setCodexContinuationForRoom("room-a", {
+    id: "handoff-clear",
+    fromHost: "Avery",
+    fromUserId: "github:avery",
+    projectPath: "/tmp/a",
+    codexModel: "GPT-5.4",
+    approvalPolicy: "Ask every Codex turn",
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
+    messagesSinceLastCodex: 2,
+    attachmentNames: [],
+    terminals: [],
+    createdAt: "2026-07-06T00:30:00.000Z",
+    status: "accepted",
+    acceptedBy: "Avery",
+    acceptedByUserId: "github:avery",
+    acceptedAt: "2026-07-06T00:31:00.000Z"
+  });
+  store.setCodexContinuationForRoom("room-b", {
+    id: "handoff-continue",
+    fromHost: "Maddie",
+    fromUserId: "github:maddie",
+    projectPath: "/tmp/b",
+    codexModel: "GPT-5.4",
+    approvalPolicy: "Ask every Codex turn",
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
+    messagesSinceLastCodex: 3,
+    attachmentNames: [],
+    terminals: [],
+    createdAt: "2026-07-06T00:32:00.000Z",
+    status: "accepted",
+    acceptedBy: "Jordan",
+    acceptedByUserId: "github:jordan",
+    acceptedAt: "2026-07-06T00:33:00.000Z"
+  });
+  store.toggleSelectedMessageForRoom("room-a", "message-a");
+  store.toggleSelectedMessageForRoom("room-b", "message-b");
   store.setProjectFilesForRoom("room-a", [{ path: "README.md", size: 1 }]);
   store.setProjectFilesForRoom("room-b", []);
   store.setSelectedTerminalIdForRoom("room-a", "terminal-a");
@@ -1242,6 +1312,11 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.gitWorkflowByRoom["room-a"]?.busy, undefined);
   assert.equal(state.roomSettingsByRoom["room-a"], undefined);
   assert.equal(state.secretWarningsVisibleByRoom["room-a"], undefined);
+  assert.equal(state.historySearchMessagesByRoom["room-a"], undefined);
+  assert.equal(state.inspectorTabsByRoom["room-a"], undefined);
+  assert.equal(state.presenceByRoom["room-a"], undefined);
+  assert.equal(state.codexContinuationByRoom["room-a"], undefined);
+  assert.equal(state.selectedMessageIdsByRoom["room-a"], undefined);
   assert.equal(state.filePanelByRoom["room-a"], undefined);
   assert.equal(state.localPreviewByRoom["room-a"], undefined);
   assert.equal(state.selectedTerminalIdsByRoom["room-a"], undefined);
@@ -1251,6 +1326,11 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "keep");
   assert.equal(state.codexEventsByRoom["room-b"]?.[0]?.turnId, "turn-b");
   assert.equal(state.codexThreadIdsByRoom["room-b"], "thread-b");
+  assert.equal(state.historySearchMessagesByRoom["room-b"]?.[0]?.body, "Keep search result");
+  assert.equal(state.inspectorTabsByRoom["room-b"], "terminal");
+  assert.equal(state.presenceByRoom["room-b"]?.["device-b"]?.displayName, "Jordan");
+  assert.equal(state.codexContinuationByRoom["room-b"]?.acceptedBy, "Jordan");
+  assert.deepEqual(state.selectedMessageIdsByRoom["room-b"], ["message-b"]);
   assert.equal(state.terminals.some((terminal) => terminal.roomId === "room-b"), true);
   assert.equal(state.browserByRoom["room-b"]?.url, "https://example.com");
 });
