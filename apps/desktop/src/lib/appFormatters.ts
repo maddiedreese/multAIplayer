@@ -1,6 +1,7 @@
 import {
   codexModelOptions,
   codexReasoningEffortOptions,
+  codexSandboxLevelOptions,
   codexSpeedOptions,
   maxEmbeddedAttachmentBytes,
   maxEmbeddedAttachmentBytesPerMessage,
@@ -21,6 +22,10 @@ export function formatCodexReasoningEffort(effort: string): string {
 
 export function formatCodexSpeed(speed: string): string {
   return codexSpeedOptions.find((option) => option.id === speed)?.label ?? speed;
+}
+
+export function formatCodexSandboxLevel(sandboxLevel: string): string {
+  return codexSandboxLevelOptions.find((option) => option.id === sandboxLevel)?.label ?? sandboxLevel;
 }
 
 export function clamp(value: number, min: number, max: number): number {
@@ -142,7 +147,7 @@ export function formatHostStatus(room: RoomRecord): string {
 export function formatMemberDeviceLabel(member: RoomPresence, localDeviceId: string, trusted = false): string {
   const localLabel = member.deviceId === localDeviceId ? "This device" : "Online";
   const fingerprint = member.publicKeyFingerprint ? shortFingerprint(member.publicKeyFingerprint) : "identity pending";
-  return `${localLabel} · ${fingerprint}${trusted ? " · locally trusted" : ""}`;
+  return `${localLabel} · ${fingerprint}${trusted ? " · local trust" : ""}`;
 }
 
 export function shortFingerprint(fingerprint: string): string {

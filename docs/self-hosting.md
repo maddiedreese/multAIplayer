@@ -2,13 +2,15 @@
 
 The relay is intended to be self-hostable. In v1 it routes encrypted room events and manages presence; it does not call OpenAI or store plaintext chat transcripts.
 
-Planned self-hosting requirements:
+Teams moving from the hosted relay to their own relay should use the [hosted-to-self-hosted relay migration runbook](relay-migration-runbook.md). The short version is: deploy and verify a self-hosted relay, change each desktop app's Settings drawer to the new relay HTTP and WebSocket URLs, recreate team/room membership with fresh invites, and rely on each device's local room keys and encrypted local history for continuity.
+
+Supported alpha self-hosting requirements:
 
 - Node.js runtime for the relay;
 - GitHub OAuth app configured by the self-hoster;
 - HTTPS and WebSocket support;
-- object storage for encrypted attachment blobs;
-- database for accounts, devices, teams, rooms, and encrypted metadata.
+- persistent SQLite storage for hosted or internet-facing relays;
+- relay-managed encrypted attachment blob storage in SQLite for hosted or internet-facing relays, or JSON storage for local/dev self-hosting.
 
 ## Relay Configuration
 
@@ -52,7 +54,7 @@ docker run --rm -p 4321:4321 \
   multaiplayer-relay:alpha
 ```
 
-The image sets `NODE_ENV=production`, `PORT=4321`, `MULTAIPLAYER_RELAY_STORAGE=sqlite`, and `MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite` by default. The container healthcheck reads `/healthz`; keep `/readyz` available for platform-level readiness checks, but do not treat either endpoint as a security audit.
+The image sets `NODE_ENV=production`, `PORT=4321`, `MULTAIPLAYER_RELAY_STORAGE=sqlite`, and `MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite` by default. The container healthcheck reads `/healthz`; point platform readiness at `/readyz`. During shutdown, `/readyz` reports not-ready, new HTTP requests and WebSocket upgrades are rejected, existing room WebSockets close with code `1012` (`Service Restart`), and the relay store is flushed before exit. Give the process a termination grace period long enough for the flush to complete.
 
 ## Relay Storage
 
@@ -135,9 +137,12 @@ Encrypted attachment blobs are also bounded and pruned:
 ```bash
 MULTAIPLAYER_ATTACHMENT_BLOB_TTL_DAYS=30
 MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES=5000000
+MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES=250000000
+MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW=100000000
+MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_WINDOW_MS=3600000
 ```
 
-The max-bytes setting limits both the declared plaintext attachment size and the ciphertext field size accepted by the relay. Blob payloads are still ciphertext; this limit is for relay storage and request-size control, not content inspection.
+The max-bytes setting limits both the declared plaintext attachment size and the ciphertext field size accepted by the relay. The live quota limits the total unexpired encrypted attachment blob volume per signed-in user. The upload bytes quota limits burst upload volume in the configured window. Blob payloads are still ciphertext; these limits are for relay storage and request-size control, not content inspection.
 
 Encrypted room events are also bounded before they enter WebSocket fanout or backlog:
 
@@ -159,10 +164,27 @@ MULTAIPLAYER_RELAY_RATE_LIMIT_READ=300
 MULTAIPLAYER_RELAY_RATE_LIMIT_MUTATION=120
 MULTAIPLAYER_RELAY_RATE_LIMIT_ATTACHMENT=60
 MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET=600
+MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT=120
+MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER=20
+MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE=5
 MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
 ```
 
 These limits are keyed by signed-in session when available, otherwise by client IP. By default, the relay uses the direct socket address and ignores `X-Forwarded-For`, because direct internet clients can spoof that header. Set `MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=true` only when the relay sits behind a trusted reverse proxy that removes client-supplied forwarding headers and writes its own. HTTP requests over the limit receive `429` with `Retry-After`; room WebSocket clients receive an encrypted-room-safe error message and remain connected. The alpha limiter is process-local, so multi-instance deployments should add an edge or shared-store limiter in front of the relay.
+
+Concurrent WebSocket connection caps are also enforced per signed-in user when available, otherwise per client identity, and per room device id after join. These caps are intentionally above normal use; they exist to prevent a runaway client from holding unbounded sockets.
+
+Team and room creation also have authenticated per-user daily caps:
+
+```bash
+MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP=25
+MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP=100
+MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER=500
+```
+
+Daily creation quota rejections return `429` with `Retry-After` and a structured `quota_exceeded` JSON body that clients can render directly. The total-room cap is checked against the signed-in user's current visible rooms and returns the same structured `quota_exceeded` shape.
+
+Authenticated quotas use the GitHub session identity. If a self-hosted relay deliberately disables auth, rate limits still fall back to client IP, but authenticated per-user creation and blob-volume quotas cannot identify a durable account and are correspondingly weaker.
 
 Debug endpoints are available in non-production relay runs. In production (`NODE_ENV=production`), they are disabled unless explicitly enabled:
 
@@ -178,7 +200,16 @@ MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
 
 Each response includes an `x-request-id` header. The relay accepts a bounded incoming `x-request-id` or generates one. Logs include request method, path, status code, duration, and request id; they do not include room plaintext, encrypted payload bodies, attachment contents, GitHub tokens, Codex credentials, terminal output, browser pages, or repo files.
 
-The relay also exposes content-free operational counters at `/metrics`, including active sockets, published envelope count, rate-limit rejection count, start time, and uptime.
+The relay also exposes content-free operational counters at `/metrics`, including active sockets, live encrypted blob count and bytes, published envelope count, accepted attachment upload count and bytes, upload rejection counts by reason, rate-limit rejection counts by bucket, quota rejection counts by quota type, WebSocket connection attempt/accept/rejection counts, start time, and uptime.
+
+Graceful shutdown timing is configurable:
+
+```bash
+MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS=0
+MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS=10000
+```
+
+When shutdown starts, `/readyz` flips to not-ready immediately. `MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS` keeps the process alive briefly for load balancers to stop routing before sockets close; `MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS` bounds how long existing room WebSockets can take to close before they are terminated.
 
 Workspace mutations can require GitHub sign-in:
 
@@ -237,4 +268,19 @@ VITE_RELAY_URL=ws://127.0.0.1:4321/rooms
 
 These env vars define the packaged defaults. Desktop users can also open Settings and change the relay HTTP API URL and WebSocket rooms URL without rebuilding the app. The override is stored locally on that device.
 
-The current alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured. Production/self-hosted deployments should still prefer a real database-backed session store, token rotation, and regular key rotation once multi-instance hosting is needed.
+The current alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured. Hosted and internet-facing deployments should use SQLite and should add backup/restore drills, token-rotation operations, and shared/external rate limiting before making production or multi-instance claims.
+
+## Migrating From The Hosted Relay
+
+The relay does not hold plaintext room history or room keys. Migrating from the hosted relay to a self-hosted relay is therefore a membership and routing cutover, not a server-side transcript export.
+
+Use [relay-migration-runbook.md](relay-migration-runbook.md) for the full procedure and verification checklist. Plan to:
+
+- stand up the self-hosted relay and pass `NODE_ENV=production npm run doctor:production-relay`;
+- switch each desktop app's `HTTP API URL` and `WebSocket rooms URL` in Settings;
+- sign in to GitHub again for the new relay origin when auth is required;
+- recreate teams and rooms on the self-hosted relay;
+- issue fresh invites so each device joins the new relay-side rooms;
+- confirm new encrypted chat, attachments, Codex host approval, and local history readability before treating the migration as complete.
+
+Encrypted export/import is planned as a future belt-and-suspenders backup and exit path. Until it ships, keep the original devices and their local encrypted history intact during migration.

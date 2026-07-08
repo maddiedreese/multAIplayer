@@ -8,6 +8,7 @@ import {
 import type { AuthSession, ClientSession, PresenceRecord, RelayStore, RoomKey } from "../state.js";
 
 type RateLimitResult = { allowed: boolean };
+type WebSocketRateLimitBucket = "websocket" | "websocketConnect";
 
 interface RegisterRelayWebSocketConnectionOptions {
   wss: WebSocketServer;
@@ -26,7 +27,17 @@ interface RegisterRelayWebSocketConnectionOptions {
   maxUserIdChars: number;
   getAuthSessionFromRequest: (request: IncomingMessage) => AuthSession | undefined;
   clientIdentityFromIncomingMessage: (request: IncomingMessage) => string;
-  consumeRateLimit: (bucket: "websocket", clientId: string) => RateLimitResult;
+  consumeRateLimit: (bucket: WebSocketRateLimitBucket, clientId: string) => RateLimitResult;
+  websocketConnectionCaps: {
+    perUser: number;
+    perDevice: number;
+  };
+  recordQuotaRejection?: (type: string) => void;
+  recordRateLimitRejection?: (bucket: string) => void;
+  recordConnectionAttempt?: () => void;
+  recordConnectionAccepted?: () => void;
+  recordConnectionRejection?: (reason: string) => void;
+  isReady?: () => boolean;
   send: (socket: ClientSession["socket"], message: RelayServerMessage) => void;
   roomKey: (teamId: string, roomId: string) => RoomKey;
   isKnownRoom: (teamId: string, roomId: string) => boolean;
@@ -67,6 +78,13 @@ export function registerRelayWebSocketConnection({
   getAuthSessionFromRequest,
   clientIdentityFromIncomingMessage,
   consumeRateLimit,
+  websocketConnectionCaps,
+  recordQuotaRejection,
+  recordRateLimitRejection,
+  recordConnectionAttempt,
+  recordConnectionAccepted,
+  recordConnectionRejection,
+  isReady = () => true,
   send,
   roomKey,
   isKnownRoom,
@@ -88,6 +106,33 @@ export function registerRelayWebSocketConnection({
   isJsonStringifiableWithin,
   isRecord
 }: RegisterRelayWebSocketConnectionOptions) {
+  function socketConnectionQuotaError(session: ClientSession): string | null {
+    const userConnectionId = session.authSession?.user.id ?? session.rateClientId;
+    const deviceConnectionId = session.deviceId ? `${userConnectionId}:${session.deviceId}` : null;
+    let userConnections = 0;
+    let deviceConnections = 0;
+
+    for (const existing of sessions.values()) {
+      if (existing.socket === session.socket) continue;
+      const existingUserConnectionId = existing.authSession?.user.id ?? existing.rateClientId;
+      if (existingUserConnectionId !== userConnectionId) continue;
+      userConnections += 1;
+      if (deviceConnectionId && existing.deviceId && `${existingUserConnectionId}:${existing.deviceId}` === deviceConnectionId) {
+        deviceConnections += 1;
+      }
+    }
+
+    if (userConnections >= websocketConnectionCaps.perUser) {
+      recordQuotaRejection?.("websocket_connections_per_user");
+      return `Concurrent WebSocket connection quota exceeded for this user (${websocketConnectionCaps.perUser} max).`;
+    }
+    if (deviceConnectionId && deviceConnections >= websocketConnectionCaps.perDevice) {
+      recordQuotaRejection?.("websocket_connections_per_device");
+      return `Concurrent WebSocket connection quota exceeded for this device (${websocketConnectionCaps.perDevice} max).`;
+    }
+    return null;
+  }
+
   function isRelayEnvelopeWithinLimits(envelope: RelayEnvelope): boolean {
     if (!normalizeMetadataText(envelope.id, maxEnvelopeIdChars)) return false;
     if (!normalizeMetadataText(envelope.senderUserId, maxUserIdChars)) return false;
@@ -191,18 +236,42 @@ export function registerRelayWebSocketConnection({
   }
 
   wss.on("connection", (socket, request) => {
+    recordConnectionAttempt?.();
+    if (!isReady()) {
+      recordConnectionRejection?.("not_ready");
+      send(socket, { type: "error", message: "Relay is shutting down. Reconnect to another relay instance." });
+      socket.close(1012, "Relay shutting down");
+      return;
+    }
+    const rateClientId = clientIdentityFromIncomingMessage(request);
+    if (!consumeRateLimit("websocketConnect", rateClientId).allowed) {
+      recordRateLimitRejection?.("websocketConnect");
+      recordConnectionRejection?.("rate_limit");
+      send(socket, { type: "error", message: "WebSocket connection rate limit exceeded. Slow down before reconnecting." });
+      socket.close(1008, "WebSocket connection rate limit exceeded");
+      return;
+    }
     const session: ClientSession = {
       socket,
       authSession: getAuthSessionFromRequest(request),
-      rateClientId: clientIdentityFromIncomingMessage(request),
+      rateClientId,
       subscribedTeamIds: new Set<string>(),
       workspaceSubscribed: false
     };
+    const initialQuotaError = socketConnectionQuotaError(session);
+    if (initialQuotaError) {
+      recordConnectionRejection?.("quota_initial");
+      send(socket, { type: "error", message: initialQuotaError });
+      socket.close(1008, "WebSocket connection quota exceeded");
+      return;
+    }
     sessions.set(socket, session);
+    recordConnectionAccepted?.();
 
     socket.on("message", (raw) => {
       try {
         if (!consumeRateLimit("websocket", session.rateClientId).allowed) {
+          recordRateLimitRejection?.("websocket");
           send(socket, { type: "error", message: "Rate limit exceeded. Slow down before sending more room events." });
           return;
         }
@@ -228,6 +297,15 @@ export function registerRelayWebSocketConnection({
           }
           if (!canJoinRoom(session, parsed.teamId, parsed.roomId, parsed.userId, parsed.inviteId)) {
             send(socket, { type: "error", message: "Sign in and use a valid invite before joining this room." });
+            return;
+          }
+          session.userId = parsed.userId;
+          session.deviceId = parsed.deviceId;
+          const quotaError = socketConnectionQuotaError(session);
+          if (quotaError) {
+            recordConnectionRejection?.("quota_after_join");
+            send(socket, { type: "error", message: quotaError });
+            socket.close(1008, "WebSocket connection quota exceeded");
             return;
           }
           joinRoom(session, parsed.teamId, parsed.roomId, parsed.userId, parsed.deviceId);

@@ -11,7 +11,8 @@ export function useRoomChatState() {
     chatMessagesByRoom,
     draftsByRoom,
     pendingAttachmentsByRoom,
-    selectedMessageIdsByRoom
+    selectedMessageIdsByRoom,
+    replyToMessageIdsByRoom
   } = useMemo(() => projectRoomChatPanelMaps(roomChatByRoom), [roomChatByRoom]);
 
   return {
@@ -20,6 +21,7 @@ export function useRoomChatState() {
     draftsByRoom,
     pendingAttachmentsByRoom,
     selectedMessageIdsByRoom,
+    replyToMessageIdsByRoom,
     sensitiveAttachmentReviewKey,
     setSensitiveAttachmentReviewKey
   };

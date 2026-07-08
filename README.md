@@ -7,7 +7,7 @@ People chat normally, like iMessage or Slack. When the group needs help, someone
 Short version: group chat for coding with Codex. Private by default. Open source.
 
 See [docs/product-architecture.md](docs/product-architecture.md) for the initial product and architecture spec.
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidance, [SECURITY.md](SECURITY.md) for the alpha security policy, [docs/threat-model.md](docs/threat-model.md) for privacy boundaries, [docs/codex-hosting.md](docs/codex-hosting.md) for how host-side Codex works, [docs/self-hosting.md](docs/self-hosting.md) for relay deployment, [docs/official-relay-deployment-checklist.md](docs/official-relay-deployment-checklist.md) for the hosted relay launch checklist, [docs/release-hardening.md](docs/release-hardening.md) for release checks, [docs/public-alpha-maintainer-guide.md](docs/public-alpha-maintainer-guide.md) for maintainer launch tasks, [docs/next-alpha-release-notes.md](docs/next-alpha-release-notes.md) for draft release notes, and [docs/alpha-limitations.md](docs/alpha-limitations.md) for current alpha limits.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidance, [SECURITY.md](SECURITY.md) for the alpha security policy, [docs/threat-model.md](docs/threat-model.md) for privacy boundaries, [docs/codex-hosting.md](docs/codex-hosting.md) for how host-side Codex works, [docs/self-hosting.md](docs/self-hosting.md) for relay deployment, [docs/relay-migration-runbook.md](docs/relay-migration-runbook.md) for hosted-to-self-hosted relay migration and hosted relay sunset policy, [docs/official-relay-deployment-checklist.md](docs/official-relay-deployment-checklist.md) for the hosted relay launch checklist, [docs/release-hardening.md](docs/release-hardening.md) for release checks, [docs/public-alpha-maintainer-guide.md](docs/public-alpha-maintainer-guide.md) for maintainer launch tasks, [docs/next-alpha-release-notes.md](docs/next-alpha-release-notes.md) for draft release notes, and [docs/alpha-limitations.md](docs/alpha-limitations.md) for current alpha limits.
 
 ## Download
 
@@ -43,7 +43,9 @@ For an internet-facing relay, configure exact allowed origins, durable encrypted
 npm run doctor:production-relay
 ```
 
-The relay also ships with a Dockerfile at `apps/relay/Dockerfile`; see [docs/self-hosting.md](docs/self-hosting.md) for the build/run command and production env checklist.
+The relay also ships with a Dockerfile at `apps/relay/Dockerfile`; see [docs/self-hosting.md](docs/self-hosting.md) for the build/run command and production env checklist. Teams leaving the hosted relay can follow [docs/relay-migration-runbook.md](docs/relay-migration-runbook.md); the hosted relay policy is at least 90 days' notice before any planned shutdown, with migration kept available during that window whenever safely possible.
+
+Production deploys should wire `/readyz` to platform readiness: shutdown makes it not-ready, rejects new HTTP/WS work, closes existing room WebSockets with `1012`, and flushes the relay store before exit.
 
 ## CI
 

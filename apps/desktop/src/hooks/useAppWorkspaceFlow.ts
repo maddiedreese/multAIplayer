@@ -228,6 +228,7 @@ export function useAppWorkspaceFlow({
         localPreviews: selectedRuntime.localPreviews,
         terminals: terminalPanelState.terminals,
         hostHandoffs: selectedRuntime.hostHandoffs,
+        roomGoal: selected.roomGoal,
         selectedCodexThreadId: selectedRuntime.selectedCodexThreadId,
         reportRoomSettingsMutationInFlight: roomInteraction.reportRoomSettingsMutationInFlight,
         roomSettingsActor,
@@ -274,7 +275,8 @@ export function useAppWorkspaceFlow({
         forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
         replaceHistorySettings: historyDefaultsState.replaceHistorySettings,
-        hydrateLocalRoomHistoryForRoom
+        hydrateLocalRoomHistoryForRoom,
+        hydrateRoomReadState: workspaceState.hydrateRoomReadState
       },
       search: {
         searchActive: roomDisplay.searchActive,

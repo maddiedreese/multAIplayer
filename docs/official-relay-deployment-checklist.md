@@ -29,6 +29,26 @@ MULTAIPLAYER_RELAY_DEBUG=false
 MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
 MULTAIPLAYER_RELAY_SEED_DEMO=false
 MULTAIPLAYER_RELAY_RATE_LIMITS=true
+MULTAIPLAYER_ATTACHMENT_BLOB_TTL_DAYS=30
+MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES=5000000
+MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES=250000000
+MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW=100000000
+MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_WINDOW_MS=3600000
+MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES=1000000
+MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS=60000
+MULTAIPLAYER_RELAY_RATE_LIMIT_AUTH=30
+MULTAIPLAYER_RELAY_RATE_LIMIT_READ=300
+MULTAIPLAYER_RELAY_RATE_LIMIT_MUTATION=120
+MULTAIPLAYER_RELAY_RATE_LIMIT_ATTACHMENT=60
+MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET=600
+MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT=120
+MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER=20
+MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE=5
+MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP=25
+MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP=100
+MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER=500
+MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS=0
+MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS=10000
 MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
 ```
 
@@ -50,7 +70,7 @@ Run this in the deployed environment before pointing users at the relay:
 NODE_ENV=production npm run doctor:production-relay
 ```
 
-The check must pass. It verifies GitHub OAuth presence, strong durable session encryption, exact HTTP(S) allowed origins, auth-required mode, disabled debug endpoints, disabled demo seeding, enabled rate limits, persistent relay storage, and conservative proxy-header handling.
+The check must pass. It verifies GitHub OAuth presence, strong durable session encryption, exact HTTP(S) allowed origins, auth-required mode, disabled debug endpoints, disabled demo seeding, enabled rate limits, attachment/upload quotas, WebSocket connection caps, total room caps, persistent relay storage, and conservative proxy-header handling.
 
 ## Storage And Backups
 
@@ -72,9 +92,18 @@ The check must pass. It verifies GitHub OAuth presence, strong durable session e
 ## Health Checks
 
 - Use `/healthz` for container health.
-- Use `/readyz` for platform readiness.
-- Use `/metrics` for content-free relay counters such as active sockets, published envelopes, rate-limit rejections, start time, and uptime.
+- Use `/readyz` for platform readiness; it must turn not-ready during shutdown so traffic stops before the process exits.
+- Confirm deploy drains reject new HTTP requests and WebSocket upgrades, close existing room WebSockets with code `1012` (`Service Restart`), and flush the relay store before exit.
+- Use `/metrics` for content-free relay counters such as active sockets, live encrypted blob count/bytes, accepted attachment upload bytes, upload rejection reasons, published envelopes, rate-limit rejections by bucket, quota rejections by quota type, WebSocket connection attempts/accepts/rejections, start time, and uptime.
 - Do not treat these endpoints as a privacy or security audit.
+
+## Cost Guardrails
+
+- Keep attachment blob max size, live blob quota, attachment upload byte quota, encrypted envelope max size, daily team/room creation caps, total room cap, WebSocket connection-attempt limit, and WebSocket connection caps explicitly set in production.
+- Confirm quota failures return structured `quota_exceeded` JSON where applicable and increment `/metrics` without exposing plaintext payloads.
+- Confirm upload-byte quota failures, WebSocket connection-attempt rate limits, and total-room quota failures have visible `/metrics` counters.
+- Keep limits intentionally above normal team use; these guardrails are for runaway clients and abuse, not ordinary collaboration.
+- For multi-instance hosting, put shared or edge rate limiting in front of the relay because the alpha in-process limiter and connection counters are per instance.
 
 ## Launch Smoke Test
 
@@ -90,10 +119,11 @@ Before announcing the relay:
 - Invoke Codex, approve a turn, and verify host-local project/browser/terminal access stays on the host device.
 - Confirm rate-limited requests return `429` with `Retry-After`.
 - Restart the relay and confirm signed-in sessions survive only when the session secret is stable.
+- During a staged shutdown, confirm `/readyz` becomes not-ready, new HTTP/WS work is rejected, existing room WebSockets close with `1012`, and the relay store flushes before exit.
 
 ## Rollback Plan
 
 - Keep the previous deploy artifact available.
-- Keep the previous relay JSON store backup available.
+- Keep the previous relay SQLite store backup available.
 - If auth, storage, or WebSocket routing breaks, disable the official relay link in public copy and direct users to self-hosting until fixed.
 - If plaintext leakage is suspected, stop the relay, preserve logs/store for private investigation, and use the security disclosure path instead of a public issue.

@@ -1,6 +1,7 @@
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { useAppStateSlices } from "./useAppStateSlices";
+import { hideUnreadForLockedRooms } from "../lib/roomUnread";
 import { useRoomDisplayContext } from "./useRoomDisplayContext";
 
 type AppStateSlices = ReturnType<typeof useAppStateSlices>;
@@ -33,6 +34,12 @@ export function useAppRoomDisplayContext({
     terminalLines,
     terminalCommand
   } = selected;
+  const visibleSidebarRooms = hideUnreadForLockedRooms(
+    workspaceState.rooms,
+    appState.roomRuntimeState.forgottenRoomIds,
+    appState.roomRuntimeState.revokedRoomIds,
+    appState.roomRuntimeState.revokedTeamIds
+  );
 
   return useRoomDisplayContext({
     fileTerminal: {
@@ -48,7 +55,7 @@ export function useAppRoomDisplayContext({
     },
     sidebar: {
       sidebarQuery: workspaceState.sidebarQuery,
-      rooms: workspaceState.rooms,
+      rooms: visibleSidebarRooms,
       teams: workspaceState.teams,
       selectedTeam: workspaceState.selectedTeam,
       selectedRoomId: workspaceState.selectedRoomId,

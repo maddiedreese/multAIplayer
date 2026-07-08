@@ -11,7 +11,8 @@ export function useRoomSettingsState() {
     settingsBusyByRoom,
     settingsMessagesByRoom,
     customCodexModelsByRoom,
-    projectPathDraftsByRoom
+    projectPathDraftsByRoom,
+    notificationMutedRoomIds
   } = useMemo(() => projectRoomSettingsPanelMaps(roomSettingsByRoom), [roomSettingsByRoom]);
 
   return {
@@ -21,6 +22,7 @@ export function useRoomSettingsState() {
     settingsBusyByRoom,
     settingsMessagesByRoom,
     customCodexModelsByRoom,
-    projectPathDraftsByRoom
+    projectPathDraftsByRoom,
+    notificationMutedRoomIds
   };
 }

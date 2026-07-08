@@ -25,6 +25,14 @@ export interface RoomChatMessageDisplay {
   role: "human" | "codex" | "system";
   body: string;
   time: string;
+  edited?: boolean;
+  deleted?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  replyPreview?: {
+    author: string;
+    body: string;
+  } | null;
   selected: boolean;
   attachments: RoomChatAttachmentDisplay[];
   reactions: RoomChatReactionDisplay[];
@@ -47,6 +55,15 @@ export interface PendingAttachmentDisplay {
   encryptedBlob: boolean;
 }
 
+export interface QueuedCodexTurnDisplay {
+  turnId: string;
+  requestedBy: string;
+  requestedByUserId?: string;
+  queuedAt: string;
+  messagesSinceLastCodex: number;
+  canCancel?: boolean;
+}
+
 export function RoomChatPanel({
   messages,
   approvalVisible,
@@ -61,6 +78,8 @@ export function RoomChatPanel({
   chatEnabled,
   draft,
   pendingAttachments,
+  replyTarget,
+  queuedCodexTurns = [],
   roomGoal,
   localPreviewCards = [],
   pendingAttachmentSummary,
@@ -70,6 +89,8 @@ export function RoomChatPanel({
   onCopyCodexOutputMarkdown,
   onOpenAttachment,
   onToggleReaction,
+  onEditMessage,
+  onDeleteMessage,
   onDenyApproval,
   onApproveApproval,
   onInvokeCodex,
@@ -83,6 +104,9 @@ export function RoomChatPanel({
   onCopyLocalPreviewLink,
   onStopLocalPreview,
   onOpenFileSelector,
+  onReplyToMessage,
+  onCancelReply,
+  onCancelQueuedCodexTurn,
   onDraftChange,
   onSendMessage
 }: {
@@ -99,6 +123,11 @@ export function RoomChatPanel({
   chatEnabled: boolean;
   draft: string;
   pendingAttachments: PendingAttachmentDisplay[];
+  replyTarget?: {
+    author: string;
+    body: string;
+  } | null;
+  queuedCodexTurns?: QueuedCodexTurnDisplay[];
   roomGoal: RoomGoal | null;
   localPreviewCards: LocalPreviewCardDisplay[];
   pendingAttachmentSummary: string;
@@ -108,6 +137,8 @@ export function RoomChatPanel({
   onCopyCodexOutputMarkdown: (messageId: string) => void;
   onOpenAttachment: (messageId: string, attachmentId: string) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
+  onEditMessage: (messageId: string, nextBody: string) => void;
+  onDeleteMessage: (messageId: string) => void;
   onDenyApproval: () => void;
   onApproveApproval: () => void;
   onInvokeCodex: () => void;
@@ -121,6 +152,9 @@ export function RoomChatPanel({
   onCopyLocalPreviewLink: (previewId: string) => void;
   onStopLocalPreview: (previewId: string) => void;
   onOpenFileSelector: () => void;
+  onReplyToMessage: (messageId: string) => void;
+  onCancelReply: () => void;
+  onCancelQueuedCodexTurn: (turnId: string) => void;
   onDraftChange: (draft: string) => void;
   onSendMessage: () => void;
 }) {
@@ -169,7 +203,49 @@ export function RoomChatPanel({
                       <Bot size={13} />
                     </button>
                   )}
+                  {message.edited && <span>(edited)</span>}
+                  {message.canEdit && (
+                    <button
+                      onClick={() => {
+                        const nextBody = window.prompt("Edit message", message.body);
+                        if (nextBody !== null && nextBody.trim() && nextBody !== message.body) {
+                          onEditMessage(message.id, nextBody.trim());
+                        }
+                      }}
+                      title="Edit message"
+                      aria-label={`Edit message from ${message.author}`}
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  )}
+                  {message.canDelete && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm("Delete this message before Codex uses it?")) {
+                          onDeleteMessage(message.id);
+                        }
+                      }}
+                      title="Delete message"
+                      aria-label={`Delete message from ${message.author}`}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onReplyToMessage(message.id)}
+                    title="Reply to message"
+                    aria-label={`Reply to message from ${message.author}`}
+                    disabled={!canUseChat || roomLocked}
+                  >
+                    Reply
+                  </button>
                 </div>
+                {message.replyPreview && (
+                  <div className="reply-preview">
+                    <strong>{message.replyPreview.author}</strong>
+                    <span>{message.replyPreview.body}</span>
+                  </div>
+                )}
                 <p>{message.body}</p>
                 {message.attachments.map((attachment) => (
                   <button
@@ -267,6 +343,28 @@ export function RoomChatPanel({
             onApprove={onApproveApproval}
           />
         )}
+        {queuedCodexTurns.length > 0 && (
+          <section className="codex-queue" aria-label="Queued Codex turns">
+            <div className="codex-queue-title">
+              <Bot size={15} />
+              <strong>Codex queue</strong>
+              <span>{queuedCodexTurns.length} waiting</span>
+            </div>
+            {queuedCodexTurns.map((turn, index) => (
+              <div className="codex-queue-row" key={turn.turnId}>
+                <span>{index + 1}</span>
+                <div>
+                  <strong>{turn.requestedBy}</strong>
+                  <small>{turn.messagesSinceLastCodex} message{turn.messagesSinceLastCodex === 1 ? "" : "s"} ready at turn start</small>
+                </div>
+                <button onClick={() => onCancelQueuedCodexTurn(turn.turnId)} disabled={roomLocked || !turn.canCancel}>
+                  <X size={13} />
+                  Cancel
+                </button>
+              </div>
+            ))}
+          </section>
+        )}
       </div>
 
       <footer className="composer">
@@ -303,6 +401,17 @@ export function RoomChatPanel({
                 </span>
               ))}
               <small>{pendingAttachmentSummary}</small>
+            </div>
+          )}
+          {replyTarget && (
+            <div className="composer-reply-target">
+              <div>
+                <strong>Replying to {replyTarget.author}</strong>
+                <span>{replyTarget.body}</span>
+              </div>
+              <button onClick={onCancelReply} aria-label="Cancel reply">
+                <X size={12} />
+              </button>
             </div>
           )}
           <textarea

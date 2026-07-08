@@ -40,6 +40,7 @@ interface UseRoomInspectorPanelPropsOptions {
   selectedCodexModel: string;
   selectedCodexReasoningEffort: string;
   selectedCodexSpeed: string;
+  selectedCodexSandboxLevel: NonNullable<RoomRecord["codexSandboxLevel"]>;
   model: Omit<
     WorkProps["model"],
     "selectedModel" | "selectedModelLabel" | "selectedReasoningEffort" | "selectedSpeed" | "disabled" | "canApplyCustomModel"
@@ -101,6 +102,7 @@ export function useRoomInspectorPanelProps({
   selectedCodexModel,
   selectedCodexReasoningEffort,
   selectedCodexSpeed,
+  selectedCodexSandboxLevel,
   model,
   customCodexModel,
   localHistory,
@@ -109,11 +111,71 @@ export function useRoomInspectorPanelProps({
   githubActions,
   terminal
 }: UseRoomInspectorPanelPropsOptions): InspectorProps {
+  const workPanelProps: Omit<WorkProps, "activeTab"> = {
+    project: {
+      projectPath: selectedRoom.projectPath,
+      projectPathDraft,
+      branchLabel: gitStatus?.branch ?? "loading",
+      disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
+      attachDisabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost || !projectPathDraft.trim() || projectPathDraft.trim() === selectedRoom.projectPath,
+      onProjectPathDraftChange,
+      onChooseProjectPath,
+      onUseDefaultProjectPath: () => onProjectPathDraftChange(defaultProjectPath),
+      onUpdateProjectPath
+    },
+    teamRoster,
+    roomMembers,
+    hostHandoff: {
+      handoffs: hostHandoffs,
+      acceptDisabled: !hasSelectedRoom || isSelectedRoomLocked || hostBusy,
+      onAcceptHandoff,
+      formatModel: formatCodexModel
+    },
+    encryptedInvite,
+    approvalPolicy: {
+      ...approvalPolicy,
+      selectedPolicy: selectedRoom.approvalPolicy,
+      selectedDelegationPolicy: selectedRoom.approvalDelegationPolicy,
+      selectedSandboxLevel: selectedCodexSandboxLevel,
+      disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost
+    },
+    roomMode: {
+      ...roomMode,
+      mode: selectedRoom.mode,
+      disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost
+    },
+    model: {
+      ...model,
+      selectedModel: selectedCodexModel,
+      selectedModelLabel: formatCodexModel(selectedCodexModel),
+      selectedReasoningEffort: selectedCodexReasoningEffort,
+      selectedSpeed: selectedCodexSpeed,
+      disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
+      canApplyCustomModel: Boolean(customCodexModel.trim()) && customCodexModel.trim() !== selectedCodexModel
+    },
+    localHistory,
+    workspaceFiles: {
+      ...workspaceFiles,
+      gitStatus,
+      canAttachSelectedFile: canStageRoomChatAttachment(selectedRoom, isSelectedRoomLocked),
+      formatBytes
+    },
+    gitHandoff,
+    githubActions: {
+      ...githubActions,
+      formatTimestamp
+    },
+    terminal: {
+      ...terminal,
+      canApproveTerminal: terminal.canReadLocalWorkspace && isActiveHost
+    }
+  };
+
   return {
     activeTab,
     browserPanel: (
       <BrowserAccessPanel
-        hidden={activeTab !== "browser"}
+        hidden={false}
         activeBrowserUrl={activeBrowserUrl}
         browserUrl={browserUrl}
         canHostBrowser={canHostBrowser}
@@ -121,65 +183,22 @@ export function useRoomInspectorPanelProps({
         onOpenBrowserNow={onOpenBrowserNow}
       />
     ),
-    workPanel: (
+    filesPanel: (
       <RoomInspectorWorkPanel
-        activeTab={activeTab}
-        project={{
-          projectPath: selectedRoom.projectPath,
-          projectPathDraft,
-          branchLabel: gitStatus?.branch ?? "loading",
-          disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
-          attachDisabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost || !projectPathDraft.trim() || projectPathDraft.trim() === selectedRoom.projectPath,
-          onProjectPathDraftChange,
-          onChooseProjectPath,
-          onUseDefaultProjectPath: () => onProjectPathDraftChange(defaultProjectPath),
-          onUpdateProjectPath
-        }}
-        teamRoster={teamRoster}
-        roomMembers={roomMembers}
-        hostHandoff={{
-          handoffs: hostHandoffs,
-          acceptDisabled: !hasSelectedRoom || isSelectedRoomLocked || hostBusy,
-          onAcceptHandoff,
-          formatModel: formatCodexModel
-        }}
-        encryptedInvite={encryptedInvite}
-        approvalPolicy={{
-          ...approvalPolicy,
-          selectedPolicy: selectedRoom.approvalPolicy,
-          selectedDelegationPolicy: selectedRoom.approvalDelegationPolicy,
-          disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost
-        }}
-        roomMode={{
-          ...roomMode,
-          mode: selectedRoom.mode,
-          disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost
-        }}
-        model={{
-          ...model,
-          selectedModel: selectedCodexModel,
-          selectedModelLabel: formatCodexModel(selectedCodexModel),
-          selectedReasoningEffort: selectedCodexReasoningEffort,
-          selectedSpeed: selectedCodexSpeed,
-          disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
-          canApplyCustomModel: Boolean(customCodexModel.trim()) && customCodexModel.trim() !== selectedCodexModel
-        }}
-        localHistory={localHistory}
-        workspaceFiles={{
-          ...workspaceFiles,
-          gitStatus,
-          canAttachSelectedFile: canStageRoomChatAttachment(selectedRoom, isSelectedRoomLocked),
-          formatBytes
-        }}
-        gitHandoff={gitHandoff}
-        githubActions={{
-          ...githubActions,
-          formatTimestamp
-        }}
-        terminal={{
-          ...terminal,
-          canApproveTerminal: terminal.canReadLocalWorkspace && isActiveHost
-        }}
+        activeTab="files"
+        {...workPanelProps}
+      />
+    ),
+    terminalPanel: (
+      <RoomInspectorWorkPanel
+        activeTab="terminal"
+        {...workPanelProps}
+      />
+    ),
+    roomPanel: (
+      <RoomInspectorWorkPanel
+        activeTab="room"
+        {...workPanelProps}
       />
     )
   };

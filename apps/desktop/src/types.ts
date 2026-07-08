@@ -1,5 +1,7 @@
 import type {
   BrowserRequestPlaintextPayload,
+  ChatDeletePlaintextPayload,
+  ChatEditPlaintextPayload,
   CodexEventPlaintextPayload,
   CodexTurnSummary,
   DevicePublicKeyJwk as DevicePublicKeyJwkType,
@@ -11,16 +13,24 @@ import type {
   TerminalRequestPlaintextPayload
 } from "@multaiplayer/protocol";
 import type { TerminalSnapshot } from "./lib/localBackend";
+import type { CodexTurnRiskFlag } from "./lib/codexTurn";
 import type { LocalPreviewCandidate } from "./lib/localPreview";
 import type { SidebarPanelName } from "./components/DesktopSidebar";
 
 export interface ChatMessage {
   id: string;
   author: string;
+  authorUserId?: string;
   role: "human" | "codex" | "system";
   body: string;
   time: string;
   createdAt?: string;
+  editedAt?: string;
+  editedByUserId?: string;
+  deletedAt?: string;
+  deletedBy?: string;
+  deletedByUserId?: string;
+  replyTo?: string;
   attachments?: ChatAttachment[];
   reactions?: ChatReaction[];
 }
@@ -51,9 +61,23 @@ export interface RoomGoal {
 }
 
 export interface PendingCodexApproval {
+  turnId: string;
   roomId: string;
+  requestedBy: string;
+  requestedByUserId: string;
+  queuedAt: string;
   messages: ChatMessage[];
   summary: CodexTurnSummary;
+  riskFlags?: CodexTurnRiskFlag[];
+}
+
+export interface QueuedCodexTurn {
+  turnId: string;
+  roomId: string;
+  requestedBy: string;
+  requestedByUserId: string;
+  queuedAt: string;
+  triggerMessageId?: string;
 }
 
 export interface RoomPresence {
@@ -121,6 +145,9 @@ export interface NoSecretRoomInvite {
 export interface LocalRoomHistoryPayload {
   version: 3;
   messages: ChatMessage[];
+  chatEdits?: ChatEditPlaintextPayload[];
+  chatDeletes?: ChatDeletePlaintextPayload[];
+  readState?: LocalRoomReadState;
   terminalRequests: TerminalCommandRequest[];
   browserRequests: BrowserAccessRequest[];
   inviteRequests: InviteJoinRequest[];
@@ -130,7 +157,14 @@ export interface LocalRoomHistoryPayload {
   localPreviews: LocalPreviewRecord[];
   terminalSnapshots: TerminalSnapshot[];
   hostHandoffs: HostHandoffRecord[];
+  queuedCodexTurns?: QueuedCodexTurn[];
+  roomGoal?: RoomGoal;
   codexThreadId?: string;
+}
+
+export interface LocalRoomReadState {
+  lastReadMessageId?: string;
+  unread: number;
 }
 
 export type RelayStatus = "connecting" | "open" | "closed" | "error";

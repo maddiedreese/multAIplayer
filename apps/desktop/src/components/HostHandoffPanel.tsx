@@ -7,6 +7,10 @@ export interface HostHandoffDisplay {
   fromHost: string;
   reason?: "manual" | "usage_limit";
   messagesSinceLastCodex: number;
+  queuedCodexTurns?: Array<{
+    turnId: string;
+    requestedBy: string;
+  }>;
   attachmentNames: string[];
   terminals: string[];
   projectPath: string;
@@ -50,7 +54,7 @@ export function HostHandoffPanel<T extends HostHandoffDisplay>({
               </strong>
               <span>{hostHandoffDetail(handoff)}</span>
               <small>
-                {handoff.messagesSinceLastCodex} messages · {handoff.attachmentNames.length} attachments · {handoff.terminals.length} terminals · {formatModel(handoff.codexModel)}
+                {handoff.messagesSinceLastCodex} messages · {handoff.queuedCodexTurns?.length ?? 0} queued · {handoff.attachmentNames.length} attachments · {handoff.terminals.length} terminals · {formatModel(handoff.codexModel)}
               </small>
               {handoff.gitRepoOwner && handoff.gitRepoName ? (
                 <small>

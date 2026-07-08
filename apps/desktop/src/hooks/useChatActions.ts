@@ -1,5 +1,7 @@
 import type { MutableRefObject } from "react";
 import type {
+  ChatDeletePlaintextPayload,
+  ChatEditPlaintextPayload,
   ChatPlaintextPayload,
   ChatReactionPlaintextPayload,
   RelayEnvelope,
@@ -9,8 +11,9 @@ import { encryptJson } from "@multaiplayer/crypto";
 import { loadOrCreateRoomSecret } from "../lib/localHistory";
 import { canUseRoomChat, roomChatGateMessage } from "../lib/chatPolicy";
 import { roomLockMessage } from "../lib/appRuntime";
+import { messageIsBeforeCodexWatermark } from "../lib/codexMessageWatermark";
 import type { RelayClient } from "../lib/relayClient";
-import type { ChatMessage, RelayStatus } from "../types";
+import type { ChatMessage, CodexRoomEvent, RelayStatus } from "../types";
 
 interface LocalUser {
   id: string;
@@ -30,7 +33,10 @@ interface UseChatActionsOptions {
   relayStatus: RelayStatus;
   relayRef: MutableRefObject<RelayClient | null>;
   seenEnvelopeIds: MutableRefObject<Set<string>>;
+  codexEventsByRoom: Record<string, CodexRoomEvent[]>;
   appendRoomMessage: (roomId: string, message: ChatMessage) => void;
+  editRoomMessage: (roomId: string, edit: ChatEditPlaintextPayload) => void;
+  deleteRoomMessage: (roomId: string, deletion: ChatDeletePlaintextPayload) => void;
   applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   setSelectedChatMessage: (message: string | null) => void;
@@ -49,7 +55,10 @@ export function useChatActions({
   relayStatus,
   relayRef,
   seenEnvelopeIds,
+  codexEventsByRoom,
   appendRoomMessage,
+  editRoomMessage,
+  deleteRoomMessage,
   applyMessageReaction,
   setChatMessageForRoom,
   setSelectedChatMessage
@@ -130,8 +139,86 @@ export function useChatActions({
     client.publish({ type: "publish", envelope });
   }
 
+  async function publishChatMessageEdit(message: ChatMessage, body: string) {
+    if (!canMutateSelectedMessage(message)) return;
+    const payload: ChatEditPlaintextPayload = {
+      id: crypto.randomUUID(),
+      messageId: message.id,
+      body,
+      editedBy: localUser.name,
+      editedByUserId: localUser.id,
+      editedAt: new Date().toISOString()
+    };
+    editRoomMessage(selectedRoom.id, payload);
+    await publishChatMutation("chat.edit", payload, payload.editedAt);
+  }
+
+  async function publishChatMessageDelete(message: ChatMessage) {
+    if (!canMutateSelectedMessage(message)) return;
+    const payload: ChatDeletePlaintextPayload = {
+      id: crypto.randomUUID(),
+      messageId: message.id,
+      deletedBy: localUser.name,
+      deletedByUserId: localUser.id,
+      deletedAt: new Date().toISOString()
+    };
+    deleteRoomMessage(selectedRoom.id, payload);
+    await publishChatMutation("chat.delete", payload, payload.deletedAt);
+  }
+
+  async function publishChatMutation(
+    kind: "chat.edit" | "chat.delete",
+    payload: ChatEditPlaintextPayload | ChatDeletePlaintextPayload,
+    createdAt: string
+  ) {
+    const client = relayRef.current;
+    if (!client || relayStatus === "closed" || relayStatus === "error") {
+      setChatMessageForRoom(selectedRoom.id, "Saved message change locally because the relay is not connected.");
+      return;
+    }
+    const secret = await loadOrCreateRoomSecret(selectedRoom.id);
+    const envelope: RelayEnvelope = {
+      id: crypto.randomUUID(),
+      teamId: selectedRoom.teamId,
+      roomId: selectedRoom.id,
+      senderDeviceId: deviceId,
+      senderUserId: localUser.id,
+      createdAt,
+      kind,
+      payload: await encryptJson(payload, secret)
+    };
+    seenEnvelopeIds.current.add(envelope.id);
+    client.publish({ type: "publish", envelope });
+  }
+
+  function canMutateSelectedMessage(message: ChatMessage) {
+    if (!hasSelectedRoom) {
+      setSelectedChatMessage("Create or join a room before editing messages.");
+      return false;
+    }
+    if (isSelectedRoomLocked) {
+      setChatMessageForRoom(selectedRoom.id, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return false;
+    }
+    if (!canUseRoomChat(selectedRoom)) {
+      setChatMessageForRoom(selectedRoom.id, roomChatGateMessage(selectedRoom));
+      return false;
+    }
+    if (message.authorUserId !== localUser.id || message.deletedAt || message.role === "codex") {
+      setChatMessageForRoom(selectedRoom.id, "Only your own messages can be changed before Codex uses them.");
+      return false;
+    }
+    if (!messageIsBeforeCodexWatermark(message, codexEventsByRoom[selectedRoom.id] ?? [])) {
+      setChatMessageForRoom(selectedRoom.id, "That message was already sent to Codex. Post a follow-up correction instead.");
+      return false;
+    }
+    return true;
+  }
+
   return {
     publishChatMessage,
+    publishChatMessageEdit,
+    publishChatMessageDelete,
     toggleMessageReaction
   };
 }

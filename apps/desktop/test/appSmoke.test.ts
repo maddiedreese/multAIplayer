@@ -3,7 +3,7 @@ import { afterEach, test } from "node:test";
 import { JSDOM } from "jsdom";
 import { createElement } from "react";
 import { useAppStore } from "../src/store/appStore";
-import { initialMessagesByRoom } from "../src/seedData";
+import { initialMessagesByRoom, seededRooms } from "../src/seedData";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://127.0.0.1:5173/"
@@ -111,7 +111,7 @@ Object.defineProperty(dom.window, "WebSocket", {
 
 Object.defineProperty(globalThis, "fetch", {
   configurable: true,
-  value: async (input: string | URL | Request) => {
+  value: async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input);
     if (url.endsWith("/auth/config")) {
       return jsonResponse({
@@ -125,6 +125,14 @@ Object.defineProperty(globalThis, "fetch", {
     }
     if (url.endsWith("/auth/me")) {
       return jsonResponse({ error: "Not signed in" }, { status: 401 });
+    }
+    const settingsMatch = url.match(/\/rooms\/([^/]+)\/settings$/);
+    if (settingsMatch && init?.method === "PATCH") {
+      const roomId = decodeURIComponent(settingsMatch[1]);
+      const room = seededRooms.find((item) => item.id === roomId);
+      if (!room) return jsonResponse({ error: "Room not found" }, { status: 404 });
+      const patch = JSON.parse(String(init.body ?? "{}"));
+      return jsonResponse({ room: { ...room, ...patch } });
     }
     throw new Error(`Network disabled in App smoke test: ${url}`);
   }
@@ -207,5 +215,90 @@ test("App smoke", async (t) => {
     });
     assert.equal(screen.getByText("finish the editor").textContent, "finish the editor");
     assert.equal(screen.queryByText("/goal finish the editor"), null);
+  });
+
+  await t.test("wires header model, reasoning, and speed selectors to room settings", async () => {
+    resetAppSmokeDom();
+    render(createElement(App));
+
+    const modelSelect = await screen.findByLabelText("Codex host model") as HTMLSelectElement;
+    const reasoningSelect = screen.getByLabelText("Codex reasoning") as HTMLSelectElement;
+    const speedSelect = screen.getByLabelText("Codex speed") as HTMLSelectElement;
+    const modelOptions = Array.from(modelSelect.options).map((option) => option.value);
+    const reasoningOptions = Array.from(reasoningSelect.options).map((option) => option.value);
+    const speedOptions = Array.from(speedSelect.options).map((option) => option.value);
+
+    assert.deepEqual(modelOptions, ["gpt-5.5", "gpt-5.5-cyber", "gpt-5.3-codex", "gpt-5.3-codex-spark"]);
+    assert.deepEqual(reasoningOptions, ["none", "minimal", "low", "medium", "high", "xhigh"]);
+    assert.deepEqual(speedOptions, ["standard", "fast"]);
+
+    fireEvent.change(modelSelect, { target: { value: "gpt-5.3-codex-spark" } });
+    await waitFor(() => {
+      assert.equal(modelSelect.value, "gpt-5.3-codex-spark");
+    });
+    await waitFor(() => {
+      assert.equal(reasoningSelect.disabled, false);
+    });
+
+    fireEvent.change(reasoningSelect, { target: { value: "xhigh" } });
+    await waitFor(() => {
+      assert.equal(reasoningSelect.value, "xhigh");
+    });
+    await waitFor(() => {
+      assert.equal(speedSelect.disabled, false);
+    });
+
+    fireEvent.change(speedSelect, { target: { value: "fast" } });
+    await waitFor(() => {
+      assert.equal(speedSelect.value, "fast");
+    });
+  });
+
+  await t.test("switches inspector tabs after browser and files without blanking the rail", async () => {
+    resetAppSmokeDom();
+    render(createElement(App));
+    const roomTools = await screen.findByRole("navigation", { name: "Room tools" });
+
+    fireEvent.click(within(roomTools).getByRole("button", { name: /browser/i }));
+    await waitFor(() => {
+      assert.ok(screen.getByLabelText("Browser URL"));
+    });
+
+    fireEvent.click(within(roomTools).getByRole("button", { name: /terminal/i }));
+    await waitFor(() => {
+      assert.ok(screen.getByRole("button", { name: /New terminal/i }));
+    });
+    assert.equal(document.querySelector(".browser-panel"), null);
+    assert.equal(document.querySelector(".inspector-panel-terminal"), document.querySelector("[data-active-tab='terminal']"));
+
+    fireEvent.click(within(roomTools).getByRole("button", { name: /browser/i }));
+    await waitFor(() => {
+      assert.ok(screen.getByLabelText("Browser URL"));
+    });
+
+    fireEvent.click(within(roomTools).getByRole("button", { name: /room/i }));
+    await waitFor(() => {
+      assert.ok(screen.getByText("Team roster"));
+    });
+    assert.equal(document.querySelector(".browser-panel"), null);
+    assert.equal(document.querySelector("[data-active-tab='room']")?.textContent?.includes("Team roster"), true);
+
+    fireEvent.click(within(roomTools).getByRole("button", { name: /files/i }));
+    await waitFor(() => {
+      assert.ok(screen.getByPlaceholderText("Search project files"));
+      assert.ok(screen.getByText("Changed files"));
+    });
+
+    fireEvent.click(within(roomTools).getByRole("button", { name: /room/i }));
+    await waitFor(() => {
+      assert.ok(screen.getByText("Team roster"));
+    });
+    assert.equal(document.querySelector(".browser-panel"), null);
+
+    fireEvent.click(within(roomTools).getByRole("button", { name: /terminal/i }));
+    await waitFor(() => {
+      assert.ok(screen.getByRole("button", { name: /New terminal/i }));
+    });
+    assert.equal(document.querySelector("[data-active-tab='terminal']")?.textContent?.includes("New terminal"), true);
   });
 });

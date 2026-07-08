@@ -3,6 +3,9 @@ import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import { Webview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
+import { closeRoomBrowserSurfaceEvent } from "../lib/browserSurfaceEvents";
+
+const browserWebviewLabel = "room_browser";
 
 export function BrowserAccessPanel({
   hidden,
@@ -25,23 +28,36 @@ export function BrowserAccessPanel({
   const [browserExpanded, setBrowserExpanded] = useState(false);
   const tauriRuntime = "__TAURI_INTERNALS__" in window;
   const canOpenUrl = canHostBrowser && browserUrl.trim().length > 0;
+  const panelClassName = `panel browser-panel ${hidden ? "" : "browser-open"} ${browserExpanded ? "expanded" : ""}`;
 
   function openBrowserUrl() {
     if (!canOpenUrl) return;
     onOpenBrowserNow();
   }
 
+  async function closeBrowserWebview() {
+    const webview = browserWebviewRef.current;
+    browserWebviewRef.current = null;
+    if (webview) {
+      await webview.close().catch(() => undefined);
+    }
+    if (tauriRuntime) {
+      const labeledWebview = await Webview.getByLabel(browserWebviewLabel).catch(() => null);
+      await labeledWebview?.close().catch(() => undefined);
+    }
+  }
+
+  useEffect(() => {
+    const close = () => {
+      void closeBrowserWebview();
+    };
+    window.addEventListener(closeRoomBrowserSurfaceEvent, close);
+    return () => window.removeEventListener(closeRoomBrowserSurfaceEvent, close);
+  }, [tauriRuntime]);
+
   useEffect(() => {
     let cancelled = false;
     let cleanupPositioning: (() => void) | null = null;
-
-    async function closeBrowserWebview() {
-      const webview = browserWebviewRef.current;
-      browserWebviewRef.current = null;
-      if (webview) {
-        await webview.close().catch(() => undefined);
-      }
-    }
 
     async function positionBrowserWebview(webview: Webview) {
       const slot = browserViewportRef.current;
@@ -68,7 +84,7 @@ export function BrowserAccessPanel({
       const toolbar = browserViewportRef.current.parentElement?.querySelector<HTMLElement>(".browser-toolbar");
       const toolbarRect = toolbar?.getBoundingClientRect();
       const top = toolbarRect ? Math.max(rect.top, toolbarRect.bottom + 18) : rect.top;
-      const webview = new Webview(getCurrentWindow(), "room_browser", {
+      const webview = new Webview(getCurrentWindow(), browserWebviewLabel, {
         url: activeBrowserUrl,
         x: Math.round(rect.left),
         y: Math.round(top),
@@ -118,7 +134,7 @@ export function BrowserAccessPanel({
 
   if (activeBrowserUrl) {
     return (
-      <section className={`panel browser-panel browser-open ${browserExpanded ? "expanded" : ""}`} hidden={hidden}>
+      <section className={panelClassName} hidden={hidden}>
         <form
           className="browser-toolbar"
           onSubmit={(event) => {
@@ -169,7 +185,7 @@ export function BrowserAccessPanel({
   }
 
   return (
-    <section className={`panel browser-panel browser-open ${browserExpanded ? "expanded" : ""}`} hidden={hidden}>
+    <section className={panelClassName} hidden={hidden}>
       <form
         className="browser-toolbar"
         onSubmit={(event) => {

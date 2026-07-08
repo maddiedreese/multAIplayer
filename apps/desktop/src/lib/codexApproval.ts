@@ -1,5 +1,6 @@
 import type { ApprovalDelegationPolicy, CodexTurnSummary, RoomMode, RoomRecord } from "@multaiplayer/protocol";
 import { isLocalUserActiveHostForRoom, type LocalHostUser } from "./roomHost";
+import type { CodexTurnRiskFlag } from "./codexTurn";
 
 export function isChatOnlyCodexTurn(summary: CodexTurnSummary): boolean {
   return (
@@ -10,8 +11,12 @@ export function isChatOnlyCodexTurn(summary: CodexTurnSummary): boolean {
   );
 }
 
-export function shouldAutoApproveChatOnlyTurn(summary: CodexTurnSummary, activeHost: boolean): boolean {
-  return activeHost && isChatOnlyCodexTurn(summary);
+export function shouldAutoApproveChatOnlyTurn(
+  summary: CodexTurnSummary,
+  activeHost: boolean,
+  riskFlags: readonly CodexTurnRiskFlag[] = []
+): boolean {
+  return activeHost && riskFlags.length === 0 && isChatOnlyCodexTurn(summary);
 }
 
 export function canApproveCodexTurn(room: RoomRecord, user: LocalHostUser, locked = false): boolean {

@@ -1,6 +1,6 @@
 import type { MutableRefObject } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { buildCodexApprovalSnapshot } from "../lib/codexTurn";
+import { buildCodexApprovalSnapshot, hasActionableCodexTurnContext } from "../lib/codexTurn";
 import { shouldAutoApproveChatOnlyTurn } from "../lib/codexApproval";
 import { canUseRoomChat, roomChatGateMessage } from "../lib/chatPolicy";
 import { messageInvokesCodex } from "../lib/codexInvoke";
@@ -23,6 +23,7 @@ import type {
   ChatAttachment,
   ChatMessage,
   PendingCodexApproval,
+  QueuedCodexTurn,
   RoomGoal
 } from "../types";
 import type {
@@ -42,16 +43,20 @@ interface UseCodexInvokeActionsOptions {
   isSelectedRoomLocked: boolean;
   isSelectedRoomRevoked: boolean;
   isActiveHost: boolean;
+  codexRunning: boolean;
   canReadLocalWorkspace: boolean;
   hostGateMessage: string;
   localUser: LocalUser;
   draft: string;
+  replyToMessageId: string | null;
   roomGoal: RoomGoal | null;
   pendingAttachments: ChatAttachment[];
   messages: ChatMessage[];
   roomTerminals: TerminalSnapshot[];
   browserRequests: BrowserAccessRequest[];
   gitStatus: GitStatusSummary | null;
+  activeCodexApproval: PendingCodexApproval | null;
+  queuedCodexApprovals: QueuedCodexTurn[];
   publishChatMessage: (message: ChatMessage, room?: RoomRecord) => Promise<void>;
   handleCodexBrowserOpenCommand: (message: ChatMessage, room: RoomRecord) => boolean;
   approveCodexTurn: (approval?: PendingCodexApproval | null) => Promise<void>;
@@ -60,8 +65,10 @@ interface UseCodexInvokeActionsOptions {
   setSelectedHostMessage: (message: string | null) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
+  enqueueCodexApprovalForRoom: (roomId: string, turn: QueuedCodexTurn) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   setDraftForRoom: (roomId: string, draft: string) => void;
+  setReplyToMessageForRoom: (roomId: string, messageId: string | null) => void;
   setRoomGoalForRoom: (roomId: string, goal: RoomGoal | null) => void;
   clearPendingAttachmentsForRoom: (roomId: string) => void;
 }
@@ -73,16 +80,20 @@ export function useCodexInvokeActions({
   isSelectedRoomLocked,
   isSelectedRoomRevoked,
   isActiveHost,
+  codexRunning,
   canReadLocalWorkspace,
   hostGateMessage,
   localUser,
   draft,
+  replyToMessageId,
   roomGoal,
   pendingAttachments,
   messages,
   roomTerminals,
   browserRequests,
   gitStatus,
+  activeCodexApproval,
+  queuedCodexApprovals,
   publishChatMessage,
   handleCodexBrowserOpenCommand,
   approveCodexTurn,
@@ -91,8 +102,10 @@ export function useCodexInvokeActions({
   setSelectedHostMessage,
   setHostMessageForRoom,
   setPendingCodexApprovalForRoom,
+  enqueueCodexApprovalForRoom,
   setApprovalVisibleForRoom,
   setDraftForRoom,
+  setReplyToMessageForRoom,
   setRoomGoalForRoom,
   clearPendingAttachmentsForRoom
 }: UseCodexInvokeActionsOptions) {
@@ -100,6 +113,7 @@ export function useCodexInvokeActions({
     const roomId = selectedRoom.id;
     setRoomGoalForRoom(roomId, createRoomGoal(text));
     setDraftForRoom(roomId, "");
+    setReplyToMessageForRoom(roomId, null);
     clearPendingAttachmentsForRoom(roomId);
     setChatMessageForRoom(roomId, "Goal started.");
   }
@@ -162,10 +176,12 @@ export function useCodexInvokeActions({
     const message: ChatMessage = {
       id: crypto.randomUUID(),
       author: localUser.name,
+      authorUserId: localUser.id,
       role: invokesCodex ? "system" : "human",
       body: body || "Attached files.",
       time: formatMessageTime(createdAt),
       createdAt,
+      replyTo: replyToMessageId ?? undefined,
       attachments: attachments.length ? attachments : undefined
     };
     await publishChatMessage(message);
@@ -173,6 +189,7 @@ export function useCodexInvokeActions({
       if (!handleCodexBrowserOpenCommand(message, selectedRoom)) handleCodexInvoke(message);
     }
     setDraftForRoom(roomId, "");
+    setReplyToMessageForRoom(roomId, null);
     clearPendingAttachmentsForRoom(roomId);
   }
 
@@ -203,11 +220,36 @@ export function useCodexInvokeActions({
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
-    const approvalSnapshot = buildCodexApprovalSnapshot(selectedRoom, messages, pendingMessage, roomTerminals, browserRequests, gitStatus, {
-      includeWorkspaceContext: canReadLocalWorkspace
-    });
+    const turnIntent: QueuedCodexTurn = {
+      roomId,
+      turnId: crypto.randomUUID(),
+      requestedBy: localUser.name,
+      requestedByUserId: localUser.id,
+      queuedAt: new Date().toISOString(),
+      ...(pendingMessage?.id ? { triggerMessageId: pendingMessage.id } : {})
+    };
+    if (activeCodexApproval || codexRunning) {
+      if (queuedCodexApprovals.length >= 5) {
+        setHostMessageForRoom(roomId, "Codex queue is full. Wait for one turn to finish or cancel a queued turn.");
+        return;
+      }
+      enqueueCodexApprovalForRoom(roomId, turnIntent);
+      setHostMessageForRoom(roomId, `Queued Codex turn ${queuedCodexApprovals.length + 1} of 5.`);
+      return;
+    }
+    const approvalSnapshot: PendingCodexApproval = {
+      ...buildCodexApprovalSnapshot(selectedRoom, messages, pendingMessage, roomTerminals, browserRequests, gitStatus, {
+        includeWorkspaceContext: canReadLocalWorkspace
+      }),
+      ...turnIntent
+    };
+    if (!hasActionableCodexTurnContext(approvalSnapshot.summary)) {
+      setHostMessageForRoom(roomId, "Codex needs a new message, attachment, or room context before starting another turn.");
+      setApprovalVisibleForRoom(roomId, false);
+      return;
+    }
     if (selectedRoom.approvalPolicy === "auto_chat_only") {
-      if (shouldAutoApproveChatOnlyTurn(approvalSnapshot.summary, isActiveHost)) {
+      if (shouldAutoApproveChatOnlyTurn(approvalSnapshot.summary, isActiveHost, approvalSnapshot.riskFlags ?? [])) {
         setPendingCodexApprovalForRoom(roomId, null);
         setApprovalVisibleForRoom(roomId, false);
         setHostMessageForRoom(roomId, "Auto-approved chat-only Codex turn.");
@@ -221,7 +263,9 @@ export function useCodexInvokeActions({
       setHostMessageForRoom(
         roomId,
         isActiveHost
-          ? "This turn includes workspace, browser, terminal, or attachment context, so host approval is required."
+          ? (approvalSnapshot.riskFlags ?? []).length > 0
+            ? "This turn includes content warnings, so host approval is required."
+            : "This turn includes workspace, browser, terminal, or attachment context, so host approval is required."
           : hostGateMessage
       );
       return;

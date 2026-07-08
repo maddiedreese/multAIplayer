@@ -2,9 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   CodexApprovalPlaintextPayload,
+  CodexEventPlaintextPayload,
+  CodexQueuePlaintextPayload,
   DevicePublicKeyJwk,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
+  ChatDeletePlaintextPayload,
+  ChatEditPlaintextPayload,
+  ChatPlaintextPayload,
   InviteJoinRequestPlaintextPayload,
   InviteJoinStatusPlaintextPayload,
   DeviceRecord,
@@ -37,6 +42,65 @@ test("team and room ids use relay-safe bounded identifiers", () => {
   for (const value of ["room:desktop", "room/desktop", " room-desktop", "room-desktop ", "ro", "x".repeat(161)]) {
     assert.equal(RoomId.safeParse(value).success, false, `${value} should not be a valid room id`);
   }
+});
+
+test("chat payloads can carry encrypted reply references", () => {
+  const parsed = ChatPlaintextPayload.parse({
+    id: "message-2",
+    author: "Maddie",
+    role: "human",
+    body: "agreed, do that",
+    time: "9:43 AM",
+    replyTo: "message-1"
+  });
+
+  assert.equal(parsed.replyTo, "message-1");
+  assert.equal(ChatPlaintextPayload.safeParse({
+    id: "message-3",
+    author: "Maddie",
+    role: "human",
+    body: "bad reply",
+    time: "9:44 AM",
+    replyTo: ""
+  }).success, false);
+});
+
+test("chat payloads can carry author ids and encrypted edit/delete events", () => {
+  const message = ChatPlaintextPayload.parse({
+    id: "message-2",
+    author: "Maddie",
+    authorUserId: "github:maddie",
+    role: "human",
+    body: "agreed, do that",
+    time: "9:43 AM"
+  });
+  const edit = ChatEditPlaintextPayload.parse({
+    id: "edit-1",
+    messageId: "message-2",
+    body: "agreed, please do that",
+    editedBy: "Maddie",
+    editedByUserId: "github:maddie",
+    editedAt: "2026-07-08T12:00:00.000Z"
+  });
+  const deletion = ChatDeletePlaintextPayload.parse({
+    id: "delete-1",
+    messageId: "message-2",
+    deletedBy: "Maddie",
+    deletedByUserId: "github:maddie",
+    deletedAt: "2026-07-08T12:01:00.000Z"
+  });
+
+  assert.equal(message.authorUserId, "github:maddie");
+  assert.equal(edit.body, "agreed, please do that");
+  assert.equal(deletion.deletedByUserId, "github:maddie");
+  assert.equal(ChatEditPlaintextPayload.safeParse({
+    id: "bad-edit",
+    messageId: "message-2",
+    body: "",
+    editedBy: "Maddie",
+    editedByUserId: "github:maddie",
+    editedAt: "2026-07-08T12:00:00.000Z"
+  }).success, false);
 });
 
 test("team records can carry the current user's role", () => {
@@ -135,6 +199,13 @@ test("host handoff payloads can report room-visible acceptance", () => {
     codexModel: "gpt-5.4",
     approvalPolicy: "ask_every_turn",
     messagesSinceLastCodex: 2,
+    queuedCodexTurns: [{
+      turnId: "turn-queued-1",
+      requestedBy: "Jordan",
+      requestedByUserId: "github:jordan",
+      queuedAt: "2026-07-04T12:03:00.000Z",
+      triggerMessageId: "message-2"
+    }],
     attachmentNames: [],
     terminals: ["tests"],
     continuationSummary: "Maddie is out of Codex usage.",
@@ -147,6 +218,25 @@ test("host handoff payloads can report room-visible acceptance", () => {
 
   assert.equal(parsed.status, "accepted");
   assert.equal(parsed.acceptedBy, "Alex");
+  assert.equal(parsed.queuedCodexTurns?.[0]?.turnId, "turn-queued-1");
+  assert.equal(HostHandoffPlaintextPayload.safeParse({
+    id: "handoff-bad-queue",
+    fromHost: "Maddie",
+    fromUserId: "github:maddie",
+    projectPath: "/tmp/multaiplayer",
+    codexModel: "gpt-5.4",
+    approvalPolicy: "ask_every_turn",
+    messagesSinceLastCodex: 2,
+    queuedCodexTurns: Array.from({ length: 6 }, (_, index) => ({
+      turnId: `turn-${index}`,
+      requestedBy: "Jordan",
+      requestedByUserId: "github:jordan",
+      queuedAt: "2026-07-04T12:03:00.000Z"
+    })),
+    attachmentNames: [],
+    terminals: [],
+    createdAt: "2026-07-04T12:00:00.000Z"
+  }).success, false);
 });
 
 test("room settings payloads can report model changes", () => {
@@ -210,6 +300,77 @@ test("Codex approval payloads carry delegated host execution authorization", () 
   assert.equal(CodexApprovalPlaintextPayload.safeParse({
     ...parsed,
     delegationPolicy: "host_only"
+  }).success, false);
+});
+
+test("Codex queue payloads bound room-visible turn queue events", () => {
+  const queued = CodexQueuePlaintextPayload.parse({
+    eventType: "codex.queue",
+    queueEventId: "queue-event-1",
+    turnId: "turn-queued-1",
+    action: "queued",
+    requestedBy: "Jordan",
+    requestedByUserId: "github:jordan",
+    triggerMessageId: "message-2",
+    queuePosition: 2,
+    queueSize: 2,
+    createdAt: "2026-07-04T12:00:00.000Z"
+  });
+  const cancelled = CodexQueuePlaintextPayload.parse({
+    eventType: "codex.queue",
+    queueEventId: "queue-event-2",
+    turnId: "turn-queued-1",
+    action: "cancelled",
+    requestedBy: "Jordan",
+    requestedByUserId: "github:jordan",
+    reason: "Requester cancelled before host approval.",
+    queueSize: 1,
+    createdAt: "2026-07-04T12:01:00.000Z"
+  });
+
+  assert.equal(queued.queuePosition, 2);
+  assert.equal(cancelled.action, "cancelled");
+  assert.equal(CodexQueuePlaintextPayload.safeParse({
+    ...queued,
+    queuePosition: undefined
+  }).success, false);
+  assert.equal(CodexQueuePlaintextPayload.safeParse({
+    ...queued,
+    queueSize: 6
+  }).success, false);
+});
+
+test("Codex turn events can carry bounded risk flags for encrypted audit history", () => {
+  const parsed = CodexEventPlaintextPayload.parse({
+    eventType: "codex.turn",
+    turnId: "turn-1",
+    status: "started",
+    message: "Started Codex turn with GPT-5.5.",
+    model: "gpt-5.5",
+    consumedMessageIds: ["message-1", "message-2"],
+    riskFlags: [{
+      id: "message-1:agent-directed-phrasing",
+      label: "message from Maddie contains agent-directed phrasing",
+      source: "message from Maddie",
+      risk: "Agent-directed phrasing",
+      severity: "warning"
+    }],
+    host: "Maddie",
+    hostUserId: "github:maddie",
+    createdAt: "2026-07-04T12:00:00.000Z"
+  });
+
+  assert.deepEqual(parsed.consumedMessageIds, ["message-1", "message-2"]);
+  assert.equal(parsed.riskFlags?.[0]?.risk, "Agent-directed phrasing");
+  assert.equal(CodexEventPlaintextPayload.safeParse({
+    ...parsed,
+    riskFlags: Array.from({ length: 25 }, (_, index) => ({
+      id: `flag-${index}`,
+      label: "too many flags",
+      source: "message",
+      risk: "risk",
+      severity: "warning"
+    }))
   }).success, false);
 });
 

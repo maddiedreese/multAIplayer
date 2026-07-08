@@ -74,6 +74,21 @@ export interface CodexProbe {
   available: boolean;
   version: string | null;
   error: string | null;
+  models: CodexModelOption[];
+  modelError: string | null;
+}
+
+export interface CodexModelOption {
+  id: string;
+  label: string;
+  description: string;
+  model: string;
+  hidden: boolean;
+  isDefault: boolean;
+  defaultReasoningEffort: string;
+  supportedReasoningEfforts: string[];
+  serviceTiers: string[];
+  defaultServiceTier: string | null;
 }
 
 export interface CodexTurnResult {
@@ -527,7 +542,9 @@ export async function probeCodex(): Promise<CodexProbe> {
   return {
     available: false,
     version: null,
-    error: "Preview mode"
+    error: "Preview mode",
+    models: [],
+    modelError: null
   };
 }
 
@@ -591,6 +608,7 @@ export async function runCodexTurn(
   model = "gpt-5.5",
   reasoningEffort = "medium",
   speed = "standard",
+  sandboxLevel = "workspace_write",
   previousThreadId: string | null = null,
   timeoutSeconds = 180
 ): Promise<CodexTurnResult> {
@@ -603,6 +621,7 @@ export async function runCodexTurn(
         model,
         reasoningEffort,
         speed,
+        sandboxLevel,
         previousThreadId,
         timeoutSeconds
       }

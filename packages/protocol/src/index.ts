@@ -17,6 +17,7 @@ export const maxProjectPathChars = 2_048;
 export const maxUrlChars = 2_048;
 export const maxCodexModelChars = 80;
 export const maxCodexThreadIdChars = 512;
+export const maxCodexQueueSize = 5;
 export const maxTerminalSnapshots = 20;
 export const maxGitWorkflowResults = 20;
 export const maxGitHubActionRuns = 20;
@@ -65,6 +66,8 @@ export const RelayEnvelope = z.object({
     "chat.message",
     "chat.attachment",
     "chat.reaction",
+    "chat.edit",
+    "chat.delete",
     "codex.invoke",
     "codex.event",
     "codex.approval",
@@ -86,10 +89,12 @@ export const RelayEnvelope = z.object({
 export const ChatPlaintextPayload = z.object({
   id: z.string().min(1).max(maxEnvelopeIdChars),
   author: z.string().min(1).max(maxDisplayNameChars),
+  authorUserId: z.string().min(1).max(maxUserIdChars).optional(),
   role: z.enum(["human", "codex", "system"]),
   body: z.string().max(maxLongTextChars),
   time: z.string().min(1).max(maxShortTextChars),
   createdAt: z.string().datetime().optional(),
+  replyTo: z.string().min(1).max(maxEnvelopeIdChars).optional(),
   attachments: z.array(z.object({
     id: z.string().min(1).max(maxEnvelopeIdChars),
     name: z.string().min(1).max(maxShortTextChars),
@@ -100,6 +105,23 @@ export const ChatPlaintextPayload = z.object({
     blobBytes: z.number().int().nonnegative().optional(),
     truncated: z.boolean().optional()
   })).max(maxMessageAttachments).optional()
+});
+
+export const ChatEditPlaintextPayload = z.object({
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  messageId: z.string().min(1).max(maxEnvelopeIdChars),
+  body: z.string().min(1).max(maxLongTextChars),
+  editedBy: z.string().min(1).max(maxDisplayNameChars),
+  editedByUserId: z.string().min(1).max(maxUserIdChars),
+  editedAt: z.string().datetime()
+});
+
+export const ChatDeletePlaintextPayload = z.object({
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  messageId: z.string().min(1).max(maxEnvelopeIdChars),
+  deletedBy: z.string().min(1).max(maxDisplayNameChars),
+  deletedByUserId: z.string().min(1).max(maxUserIdChars),
+  deletedAt: z.string().datetime()
 });
 
 export const ChatReactionPlaintextPayload = z.object({
@@ -199,6 +221,14 @@ export const RoomKeyRotationPlaintextPayload = z.object({
   note: z.string().max(maxMediumTextChars).optional()
 });
 
+export const CodexTurnRiskFlagPayload = z.object({
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  label: z.string().min(1).max(maxMediumTextChars),
+  source: z.string().min(1).max(maxShortTextChars),
+  risk: z.string().min(1).max(maxShortTextChars),
+  severity: z.literal("warning")
+});
+
 export const CodexEventPlaintextPayload = z.object({
   eventType: z.literal("codex.turn"),
   turnId: z.string().min(1).max(maxEnvelopeIdChars),
@@ -207,6 +237,8 @@ export const CodexEventPlaintextPayload = z.object({
   model: z.string().min(1).max(maxCodexModelChars),
   threadId: z.string().min(1).max(maxCodexThreadIdChars).optional(),
   eventName: z.string().min(1).max(maxShortTextChars).optional(),
+  consumedMessageIds: z.array(z.string().min(1).max(maxEnvelopeIdChars)).max(256).optional(),
+  riskFlags: z.array(CodexTurnRiskFlagPayload).max(24).optional(),
   host: z.string().min(1).max(maxDisplayNameChars),
   hostUserId: z.string().min(1).max(maxUserIdChars),
   createdAt: z.string().datetime()
@@ -224,6 +256,28 @@ export const CodexApprovalPlaintextPayload = z.object({
     "trusted_members_only"
   ]),
   message: z.string().max(maxMediumTextChars).optional()
+});
+
+export const CodexQueuePlaintextPayload = z.object({
+  eventType: z.literal("codex.queue"),
+  queueEventId: z.string().min(1).max(maxEnvelopeIdChars),
+  turnId: z.string().min(1).max(maxEnvelopeIdChars),
+  action: z.enum(["queued", "cancelled", "coalesced", "promoted", "dropped"]),
+  requestedBy: z.string().min(1).max(maxDisplayNameChars),
+  requestedByUserId: z.string().min(1).max(maxUserIdChars),
+  triggerMessageId: z.string().min(1).max(maxEnvelopeIdChars).optional(),
+  reason: z.string().max(maxMediumTextChars).optional(),
+  queuePosition: z.number().int().min(1).max(maxCodexQueueSize).optional(),
+  queueSize: z.number().int().nonnegative().max(maxCodexQueueSize),
+  createdAt: z.string().datetime()
+}).refine((payload) => {
+  if (payload.action === "queued" || payload.action === "promoted") {
+    return typeof payload.queuePosition === "number";
+  }
+  return true;
+}, {
+  message: "Queued and promoted Codex queue events must include a queue position",
+  path: ["queuePosition"]
 });
 
 export const TerminalResultPlaintextPayload = z.object({
@@ -308,8 +362,21 @@ export const HostHandoffPlaintextPayload = z.object({
   gitPatch: z.string().max(maxLongTextChars).optional(),
   gitPatchTruncated: z.boolean().optional(),
   codexModel: z.string().min(1).max(maxCodexModelChars),
+  codexSandboxLevel: z.enum([
+    "read_only",
+    "workspace_write",
+    "workspace_write_network",
+    "danger_full_access"
+  ]).optional(),
   approvalPolicy: z.string().min(1).max(maxShortTextChars),
   messagesSinceLastCodex: z.number().int().nonnegative(),
+  queuedCodexTurns: z.array(z.object({
+    turnId: z.string().min(1).max(maxEnvelopeIdChars),
+    requestedBy: z.string().min(1).max(maxDisplayNameChars),
+    requestedByUserId: z.string().min(1).max(maxUserIdChars),
+    queuedAt: z.string().datetime(),
+    triggerMessageId: z.string().min(1).max(maxEnvelopeIdChars).optional()
+  })).max(5).optional(),
   attachmentNames: z.array(z.string().min(1).max(maxShortTextChars)).max(maxMessageAttachments),
   terminals: z.array(z.string().min(1).max(maxShortTextChars)).max(maxTerminalSnapshots),
   continuationSummary: z.string().max(maxMediumTextChars).optional(),
@@ -332,6 +399,7 @@ export const RoomSettingsPlaintextPayload = z.object({
     "codexModel",
     "codexReasoningEffort",
     "codexSpeed",
+    "codexSandboxLevel",
     "projectPath",
     "browserAllowedOrigins",
     "browserProfilePersistent"
@@ -370,17 +438,20 @@ export const defaultApprovalDelegationPolicy: ApprovalDelegationPolicy = "host_o
 export const defaultCodexModel = "gpt-5.5";
 export const defaultCodexReasoningEffort = "medium";
 export const defaultCodexSpeed = "standard";
+export const defaultCodexSandboxLevel = "workspace_write";
 export const defaultBrowserAllowedOrigins = ["https://github.com"];
 export const defaultBrowserProfilePersistent = true;
 
 export const codexModelOptions = [
-  { id: "gpt-5.5", label: "GPT-5.5", description: "Frontier model for complex coding, research, and real-world work." },
-  { id: "gpt-5.4", label: "GPT-5.4", description: "High-capability Codex host model" },
-  { id: "gpt-5.4-mini", label: "GPT-5.4-Mini", description: "Faster Codex turns for lighter room tasks" },
-  { id: "gpt-5.3-codex-spark", label: "GPT-5.3-Codex-Spark", description: "Older Codex model for compatibility testing" }
+  { id: "gpt-5.5", label: "GPT-5.5", description: "Current frontier Codex model for complex coding, research, and real-world work." },
+  { id: "gpt-5.5-cyber", label: "GPT-5.5 Cyber", description: "Specialized Codex model for eligible cyber and security workflows." },
+  { id: "gpt-5.3-codex", label: "GPT-5.3 Codex", description: "Codex model used for review-oriented software work." },
+  { id: "gpt-5.3-codex-spark", label: "GPT-5.3 Codex Spark", description: "Research-preview Codex model for smaller coding turns." }
 ] as const;
 
 export const codexReasoningEffortOptions = [
+  { id: "none", label: "None", description: "No extra reasoning budget for direct, mechanical turns" },
+  { id: "minimal", label: "Minimal", description: "Smallest supported reasoning budget for simple edits and quick checks" },
   { id: "low", label: "Low", description: "Fast responses with lighter reasoning" },
   { id: "medium", label: "Medium", description: "Balances speed and reasoning depth for everyday tasks" },
   { id: "high", label: "High", description: "Greater reasoning depth for complex problems" },
@@ -389,11 +460,47 @@ export const codexReasoningEffortOptions = [
 
 export const codexSpeedOptions = [
   { id: "standard", label: "Standard", serviceTier: "default", description: "Default Codex speed and usage behavior" },
-  { id: "fast", label: "Fast", serviceTier: "priority", description: "Priority tier for faster Codex turns when available" }
+  { id: "fast", label: "Fast", serviceTier: "fast", description: "Fast mode for supported Codex models when available" }
+] as const;
+
+export const codexSandboxLevelOptions = [
+  {
+    id: "read_only",
+    label: "Read-only",
+    sandboxMode: "read-only",
+    approvalPolicy: "on-request",
+    networkAccess: false,
+    description: "Codex can inspect the workspace; file changes and boundary crossings need approval."
+  },
+  {
+    id: "workspace_write",
+    label: "Workspace write",
+    sandboxMode: "workspace-write",
+    approvalPolicy: "on-request",
+    networkAccess: false,
+    description: "Codex can edit the room project; network and out-of-workspace actions need approval."
+  },
+  {
+    id: "workspace_write_network",
+    label: "Workspace + network",
+    sandboxMode: "workspace-write",
+    approvalPolicy: "on-request",
+    networkAccess: true,
+    description: "Codex can edit the room project and use network access inside the sandbox."
+  },
+  {
+    id: "danger_full_access",
+    label: "Full access",
+    sandboxMode: "danger-full-access",
+    approvalPolicy: "on-request",
+    networkAccess: true,
+    description: "Codex can run with broad local access. Use only in fully trusted rooms."
+  }
 ] as const;
 
 export type CodexReasoningEffort = typeof codexReasoningEffortOptions[number]["id"];
 export type CodexSpeed = typeof codexSpeedOptions[number]["id"];
+export type CodexSandboxLevel = typeof codexSandboxLevelOptions[number]["id"];
 
 export const TeamRole = z.enum(["owner", "admin", "member"]);
 
@@ -451,8 +558,9 @@ export const RoomRecord = z.object({
   trustedApproverUserIds: z.array(UserId).max(50),
   mode: RoomModeSchema,
   codexModel: z.string().min(1).max(maxCodexModelChars),
-  codexReasoningEffort: z.enum(["low", "medium", "high", "xhigh"]).optional(),
+  codexReasoningEffort: z.enum(["minimal", "low", "medium", "high", "xhigh"]).optional(),
   codexSpeed: z.enum(["standard", "fast"]).optional(),
+  codexSandboxLevel: z.enum(["read_only", "workspace_write", "workspace_write_network", "danger_full_access"]).optional(),
   browserAllowedOrigins: z.array(z.string().min(1).max(maxUrlChars)).max(20),
   browserProfilePersistent: z.boolean(),
   unread: z.number().int().nonnegative()
@@ -473,6 +581,7 @@ export const AttachmentBlobRecord = z.object({
   name: z.string().min(1).max(maxShortTextChars),
   type: z.string().min(1).max(maxShortTextChars),
   size: z.number().int().nonnegative(),
+  uploadedByUserId: UserId.optional(),
   payload: CiphertextPayload,
   createdAt: z.string().datetime(),
   expiresAt: z.string().datetime().optional()
@@ -550,6 +659,8 @@ export const RelayServerMessage = z.discriminatedUnion("type", [
 export type CiphertextPayload = z.infer<typeof CiphertextPayload>;
 export type RelayEnvelope = z.infer<typeof RelayEnvelope>;
 export type ChatPlaintextPayload = z.infer<typeof ChatPlaintextPayload>;
+export type ChatEditPlaintextPayload = z.infer<typeof ChatEditPlaintextPayload>;
+export type ChatDeletePlaintextPayload = z.infer<typeof ChatDeletePlaintextPayload>;
 export type ChatReactionPlaintextPayload = z.infer<typeof ChatReactionPlaintextPayload>;
 export type LocalPreviewPlaintextPayload = z.infer<typeof LocalPreviewPlaintextPayload>;
 export type BrowserRequestPlaintextPayload = z.infer<typeof BrowserRequestPlaintextPayload>;
@@ -559,8 +670,10 @@ export type InviteJoinRequestPlaintextPayload = z.infer<typeof InviteJoinRequest
 export type InviteJoinStatusPlaintextPayload = z.infer<typeof InviteJoinStatusPlaintextPayload>;
 export type WrappedRoomSecretPayload = z.infer<typeof WrappedRoomSecretPayload>;
 export type RoomKeyRotationPlaintextPayload = z.infer<typeof RoomKeyRotationPlaintextPayload>;
+export type CodexTurnRiskFlagPayload = z.infer<typeof CodexTurnRiskFlagPayload>;
 export type CodexEventPlaintextPayload = z.infer<typeof CodexEventPlaintextPayload>;
 export type CodexApprovalPlaintextPayload = z.infer<typeof CodexApprovalPlaintextPayload>;
+export type CodexQueuePlaintextPayload = z.infer<typeof CodexQueuePlaintextPayload>;
 export type TerminalResultPlaintextPayload = z.infer<typeof TerminalResultPlaintextPayload>;
 export type GitWorkflowEventPlaintextPayload = z.infer<typeof GitWorkflowEventPlaintextPayload>;
 export type GitHubActionsEventPlaintextPayload = z.infer<typeof GitHubActionsEventPlaintextPayload>;

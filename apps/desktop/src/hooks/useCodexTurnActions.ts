@@ -4,7 +4,12 @@ import type {
   CodexEventPlaintextPayload,
   RoomRecord
 } from "@multaiplayer/protocol";
-import { defaultCodexModel, defaultCodexReasoningEffort, defaultCodexSpeed } from "@multaiplayer/protocol";
+import {
+  defaultCodexModel,
+  defaultCodexReasoningEffort,
+  defaultCodexSandboxLevel,
+  defaultCodexSpeed
+} from "@multaiplayer/protocol";
 import {
   runCodexTurn,
   shutdownCodexRoom,
@@ -17,8 +22,12 @@ import {
   isDelegatedApprovalExecutionPolicy
 } from "../lib/codexApproval";
 import {
+  buildCodexApprovalSnapshot,
   buildCodexTurnInput,
-  buildCodexTurnSummary
+  buildCodexTurnSummary,
+  detectCodexTurnRiskFlags,
+  hasActionableCodexTurnContext,
+  messagesSinceLastCodex
 } from "../lib/codexTurn";
 import { normalizeCodexThreadId } from "../lib/codexThread";
 import {
@@ -38,7 +47,8 @@ import type {
   BrowserAccessRequest,
   ChatMessage,
   HostHandoffRecord,
-  PendingCodexApproval
+  PendingCodexApproval,
+  QueuedCodexTurn
 } from "../types";
 
 interface LocalUser {
@@ -61,9 +71,11 @@ interface UseCodexTurnActionsOptions {
   gitStatusByRoom: Record<string, GitStatusSummary | null>;
   codexContinuationByRoom: Record<string, HostHandoffRecord>;
   codexThreadIdsByRoom: Record<string, string>;
+  queuedCodexApprovalsByRoom: Record<string, QueuedCodexTurn[]>;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
+  removeQueuedCodexApprovalForRoom: (roomId: string, turnId: string) => void;
   setCodexRunningForRoom: (roomId: string, running: boolean) => void;
   appendTerminalLinesForRoom: (roomId: string, lines: string[]) => void;
   replaceRoom: (room: RoomRecord) => void;
@@ -98,9 +110,11 @@ export function useCodexTurnActions({
   gitStatusByRoom,
   codexContinuationByRoom,
   codexThreadIdsByRoom,
+  queuedCodexApprovalsByRoom,
   setHostMessageForRoom,
   setPendingCodexApprovalForRoom,
   setApprovalVisibleForRoom,
+  removeQueuedCodexApprovalForRoom,
   setCodexRunningForRoom,
   appendTerminalLinesForRoom,
   replaceRoom,
@@ -111,6 +125,69 @@ export function useCodexTurnActions({
 }: UseCodexTurnActionsOptions) {
   const setCodexThreadIdForRoom = useAppStore((state) => state.setCodexThreadIdForRoom);
   const setCodexContinuationForRoom = useAppStore((state) => state.setCodexContinuationForRoom);
+
+  function promoteNextCodexApprovalForRoom(roomId: string) {
+    const nextTurn = queuedCodexApprovalsByRoom[roomId]?.[0];
+    if (!nextTurn) return;
+    const room = roomsRef.current.find((item) => item.id === roomId);
+    if (!room) {
+      removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
+      return;
+    }
+    const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
+    const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
+    if (roomLocked || !room.mode.code || room.approvalPolicy === "never_host") {
+      removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
+      const cancellationMessage = roomLocked
+        ? roomLockMessage(room, roomRevoked)
+        : "Queued Codex turn was cancelled because Codex is unavailable in this room.";
+      void publishChatMessage({
+        id: crypto.randomUUID(),
+        author: "multAIplayer",
+        role: "system",
+        body: cancellationMessage,
+        time: formatMessageTime(),
+        createdAt: new Date().toISOString()
+      }, room);
+      setHostMessageForRoom(roomId, cancellationMessage);
+      return;
+    }
+    const roomCanReadLocalWorkspace = canUseLocalWorkspace(room, localUser, roomLocked);
+    const approvalSnapshot = buildCodexApprovalSnapshot(
+      room,
+      messagesByRoom[roomId] ?? [],
+      undefined,
+      terminals.filter((terminal) => terminal.roomId === roomId),
+      browserRequestsByRoom[roomId] ?? [],
+      gitStatusByRoom[roomId] ?? null,
+      { includeWorkspaceContext: roomCanReadLocalWorkspace }
+    );
+    if (!hasActionableCodexTurnContext(approvalSnapshot.summary)) {
+      removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
+      void publishChatMessage({
+        id: crypto.randomUUID(),
+        author: "multAIplayer",
+        role: "system",
+        body: `Dropped ${nextTurn.requestedBy}'s queued Codex turn because there is no new room context to send.`,
+        time: formatMessageTime(),
+        createdAt: new Date().toISOString()
+      }, room);
+      setHostMessageForRoom(roomId, "Dropped an empty queued Codex turn.");
+      promoteNextCodexApprovalForRoom(roomId);
+      return;
+    }
+    const approval = {
+      ...approvalSnapshot,
+      turnId: nextTurn.turnId,
+      requestedBy: nextTurn.requestedBy,
+      requestedByUserId: nextTurn.requestedByUserId,
+      queuedAt: nextTurn.queuedAt
+    };
+    removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
+    setPendingCodexApprovalForRoom(roomId, approval);
+    setApprovalVisibleForRoom(roomId, true);
+    setHostMessageForRoom(roomId, "Queued Codex turn is ready for host approval with current room context.");
+  }
 
   async function approveCodexTurn(approval: PendingCodexApproval | null = activeCodexApproval) {
     const roomId = approval?.roomId ?? selectedRoom.id;
@@ -168,7 +245,10 @@ export function useCodexTurnActions({
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
-    const turnMessages = approval?.messages ?? messagesByRoom[roomId] ?? [];
+    const currentRoomMessages = messagesByRoom[roomId] ?? [];
+    const turnMessages = approval?.messages
+      ? refreshApprovalMessagesFromRoom(approval.messages, currentRoomMessages)
+      : currentRoomMessages;
     const turnSummary = buildCodexTurnSummary(
       turnMessages,
       room,
@@ -180,7 +260,15 @@ export function useCodexTurnActions({
     const model = room.codexModel ?? defaultCodexModel;
     const reasoningEffort = room.codexReasoningEffort ?? defaultCodexReasoningEffort;
     const speed = room.codexSpeed ?? defaultCodexSpeed;
+    const sandboxLevel = room.codexSandboxLevel ?? defaultCodexSandboxLevel;
     const projectPath = room.projectPath;
+    if (!hasActionableCodexTurnContext(turnSummary)) {
+      setPendingCodexApprovalForRoom(roomId, null);
+      setApprovalVisibleForRoom(roomId, false);
+      setHostMessageForRoom(roomId, "The pending Codex turn became empty after room edits or deletes.");
+      promoteNextCodexApprovalForRoom(roomId);
+      return;
+    }
     setPendingCodexApprovalForRoom(roomId, null);
     setApprovalVisibleForRoom(roomId, false);
     setCodexRunningForRoom(roomId, true);
@@ -189,11 +277,21 @@ export function useCodexTurnActions({
       `Starting approved Codex turn with ${formatCodexModel(model)} from encrypted room context...`
     ]);
 
-    const turnId = crypto.randomUUID();
+    const turnId = approval?.turnId ?? crypto.randomUUID();
     const continuationHandoff = codexContinuationByRoom[roomId] ?? null;
     const input = buildCodexTurnInput(turnMessages, projectPath, model, turnSummary, {
       fullRoomContext: Boolean(continuationHandoff)
     });
+    const riskFlags = detectCodexTurnRiskFlags(
+      turnMessages,
+      room,
+      browserRequestsByRoom[roomId] ?? [],
+      gitStatusByRoom[roomId] ?? null,
+      { includeWorkspaceContext: roomCanReadLocalWorkspace }
+    );
+    const consumedMessageIds = messagesSinceLastCodex(turnMessages)
+      .map((message) => message.id)
+      .filter((id): id is string => Boolean(id));
     const previousThreadId = codexThreadIdsByRoom[roomId] ?? null;
     try {
       await publishCodexEvent({
@@ -202,9 +300,11 @@ export function useCodexTurnActions({
         message: previousThreadId
           ? `Resuming Codex thread ${previousThreadId} with ${formatCodexModel(model)}.`
           : `Started Codex turn with ${formatCodexModel(model)}.`,
-        model
+        model,
+        ...(consumedMessageIds.length ? { consumedMessageIds } : {}),
+        ...(riskFlags.length ? { riskFlags } : {})
       }, room);
-      const result = await runCodexTurn(roomId, projectPath, input, model, reasoningEffort, speed, previousThreadId);
+      const result = await runCodexTurn(roomId, projectPath, input, model, reasoningEffort, speed, sandboxLevel, previousThreadId);
       if (classifyCodexFailure([result.status, result.stderr, result.transcript, ...result.events]) === "usage_limit") {
         await handleCodexUsageLimit(room, turnId, model, turnMessages, result.events, result.stderr);
         return;
@@ -272,6 +372,7 @@ export function useCodexTurnActions({
         setCodexContinuationForRoom(roomId, null);
       }
       setCodexRunningForRoom(roomId, false);
+      promoteNextCodexApprovalForRoom(roomId);
     }
   }
 
@@ -319,6 +420,13 @@ export function useCodexTurnActions({
   }
 
   return {
-    approveCodexTurn
+    approveCodexTurn,
+    promoteNextCodexApprovalForRoom
   };
+}
+
+function refreshApprovalMessagesFromRoom(approvalMessages: ChatMessage[], roomMessages: ChatMessage[]): ChatMessage[] {
+  const approvalMessageIds = new Set(approvalMessages.map((message) => message.id).filter(Boolean));
+  const refreshed = roomMessages.filter((message) => approvalMessageIds.has(message.id) && !message.deletedAt);
+  return refreshed.length ? refreshed : approvalMessages.filter((message) => !message.deletedAt);
 }

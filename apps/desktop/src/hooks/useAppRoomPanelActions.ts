@@ -44,6 +44,7 @@ export function useAppRoomPanelActions({
   } = selected;
   const {
     setPendingCodexApprovalForRoom,
+    removeQueuedCodexApprovalForRoom,
     setApprovalVisibleForRoom,
     setChatMessageForRoom,
     setDraftForRoom,
@@ -67,8 +68,13 @@ export function useAppRoomPanelActions({
       copyCodexOutputMarkdown: workspaceFlow.copyCodexOutputMarkdown,
       openEncryptedAttachmentBlob: workspaceFlow.openEncryptedAttachmentBlob,
       toggleMessageReaction: roomInteraction.toggleMessageReaction,
+      publishChatMessageEdit: roomInteraction.publishChatMessageEdit,
+      publishChatMessageDelete: roomInteraction.publishChatMessageDelete,
+      publishChatMessage: roomInteraction.publishChatMessage,
       setPendingCodexApprovalForRoom,
       setApprovalVisibleForRoom,
+      removeQueuedCodexApprovalForRoom,
+      promoteNextCodexApprovalForRoom: roomRuntime.promoteNextCodexApprovalForRoom,
       approveCodexTurn: roomRuntime.approveCodexTurn,
       handleCodexInvoke: roomRuntime.handleCodexInvoke,
       pauseGoal: roomRuntime.pauseGoal,
@@ -80,6 +86,7 @@ export function useAppRoomPanelActions({
       setChatMessageForRoom,
       stopLocalPreview: roomRuntime.stopLocalPreview,
       setInspectorTabForRoom,
+      setReplyToMessageForRoom: roomActions.setReplyToMessageForRoom,
       setDraftForRoom
     },
     header: {

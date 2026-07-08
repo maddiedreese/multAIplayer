@@ -55,6 +55,7 @@ export function useAppSidebarProps({
   relayWsDraft,
   selectedRoomMode,
   roomSettingsGateMessage,
+  notificationsMuted,
   historySettings,
   teamHistorySettings,
   teamDefaultApprovalPolicy,
@@ -82,6 +83,7 @@ export function useAppSidebarProps({
   onResetRelay,
   onSaveRelay,
   onToggleRoomMode,
+  onNotificationsMutedChange,
   onHistorySettingsChange,
   onClearRoomHistory,
   onForgetRoomLocalData,
@@ -136,6 +138,7 @@ export function useAppSidebarProps({
   relayWsDraft: string;
   selectedRoomMode: AppSidebarDrawerProps["settings"]["roomMode"];
   roomSettingsGateMessage: string;
+  notificationsMuted: boolean;
   historySettings: AppSidebarDrawerProps["settings"]["historySettings"];
   teamHistorySettings: AppSidebarDrawerProps["settings"]["teamHistorySettings"];
   teamDefaultApprovalPolicy: AppSidebarDrawerProps["settings"]["teamDefaultApprovalPolicy"];
@@ -163,6 +166,7 @@ export function useAppSidebarProps({
   onResetRelay: AppSidebarDrawerProps["settings"]["onResetRelay"];
   onSaveRelay: AppSidebarDrawerProps["settings"]["onSaveRelay"];
   onToggleRoomMode: AppSidebarDrawerProps["settings"]["onToggleRoomMode"];
+  onNotificationsMutedChange: AppSidebarDrawerProps["settings"]["onNotificationsMutedChange"];
   onHistorySettingsChange: (settings: AppSidebarDrawerProps["settings"]["historySettings"]) => void;
   onClearRoomHistory: AppSidebarDrawerProps["settings"]["onClearRoomHistory"];
   onForgetRoomLocalData: AppSidebarDrawerProps["settings"]["onForgetRoomLocalData"];
@@ -254,6 +258,7 @@ export function useAppSidebarProps({
       roomModesDisabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
       showRoomSettingsGate: !isActiveHost && hasSelectedRoom,
       roomSettingsGateMessage,
+      notificationsMuted,
       historySettings,
       teamHistorySettings,
       hasSelectedRoom,
@@ -273,6 +278,7 @@ export function useAppSidebarProps({
       onResetRelay,
       onSaveRelay,
       onToggleRoomMode,
+      onNotificationsMutedChange,
       onHistoryEnabledChange: (enabled) =>
         onHistorySettingsChange({
           ...historySettings,

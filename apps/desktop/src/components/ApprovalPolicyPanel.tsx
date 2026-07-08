@@ -1,4 +1,4 @@
-import type { ApprovalDelegationPolicy, ApprovalPolicy } from "@multaiplayer/protocol";
+import type { ApprovalDelegationPolicy, ApprovalPolicy, CodexSandboxLevel, codexSandboxLevelOptions } from "@multaiplayer/protocol";
 
 const selectableApprovalPolicies: ApprovalPolicy[] = [
   "ask_every_turn",
@@ -16,21 +16,27 @@ const selectableDelegationPolicies: ApprovalDelegationPolicy[] = [
 export function ApprovalPolicyPanel({
   selectedPolicy,
   selectedDelegationPolicy,
+  selectedSandboxLevel,
   labels,
   delegationLabels,
+  sandboxOptions,
   disabled,
   message,
   onSelectPolicy,
-  onSelectDelegationPolicy
+  onSelectDelegationPolicy,
+  onSelectSandboxLevel
 }: {
   selectedPolicy: ApprovalPolicy;
   selectedDelegationPolicy: ApprovalDelegationPolicy;
+  selectedSandboxLevel: CodexSandboxLevel;
   labels: Record<ApprovalPolicy, string>;
   delegationLabels: Record<ApprovalDelegationPolicy, string>;
+  sandboxOptions: typeof codexSandboxLevelOptions;
   disabled: boolean;
   message: string | null;
   onSelectPolicy: (policy: ApprovalPolicy) => void;
   onSelectDelegationPolicy: (policy: ApprovalDelegationPolicy) => void;
+  onSelectSandboxLevel: (sandboxLevel: CodexSandboxLevel) => void;
 }) {
   const delegatedExecution =
     selectedDelegationPolicy === "members_can_approve" || selectedDelegationPolicy === "trusted_members_only";
@@ -71,6 +77,20 @@ export function ApprovalPolicyPanel({
           Room members can approve Codex turns that may use this host's project folder, terminal, browser context, Git, and Codex usage.
         </div>
       )}
+      <div className="panel-subtitle">Codex sandbox</div>
+      <div className="model-options compact">
+        {sandboxOptions.map((option) => (
+          <button
+            key={option.id}
+            className={selectedSandboxLevel === option.id ? "active" : ""}
+            onClick={() => onSelectSandboxLevel(option.id)}
+            disabled={disabled}
+          >
+            <strong>{option.label}</strong>
+            <span>{option.description}</span>
+          </button>
+        ))}
+      </div>
       {message && <div className="workflow-message">{message}</div>}
     </section>
   );

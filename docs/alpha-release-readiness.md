@@ -62,7 +62,7 @@ Before a wider alpha, manually run these in the native macOS app:
 
 - Public macOS alpha artifacts are expected to be Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
 - Production-grade cryptographic member removal still needs key epochs and per-device key delivery.
-- The JSON relay store is acceptable for alpha/self-hosting but should become database-backed before production claims.
+- JSON relay storage is for local/dev self-hosting. Hosted or internet-facing alpha relays should use SQLite and still need backup/restore drills before production claims.
 - Rate limiting is process-local; multi-instance hosting needs an edge or shared-store limiter.
 - The browser and terminal expose host-local capabilities after approval and need continued security review.
 - Codex continuity uses local app-server behavior and reconstructed room context; it should be tested against real Codex failures before relying on it during important work.

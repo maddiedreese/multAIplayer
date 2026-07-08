@@ -17,6 +17,7 @@ import type { GitHubActionRun } from "./lib/authClient";
 import {
   normalizeRoomName
 } from "./lib/workspaceCreation";
+import { registerRoomNotificationClickFocus } from "./lib/roomNotifications";
 import { attachmentReviewScopeKey } from "./lib/attachmentPolicy";
 import { roomChatGateMessage } from "./lib/chatPolicy";
 import type { GitHubActionsTarget } from "./lib/githubWorkflowReadiness";
@@ -119,6 +120,10 @@ export function App() {
     terminalBusyByRoom: terminalPanelState.terminalBusyByRoom,
     browserRequestsByRoom: browserPanelState.browserRequestsByRoom
   });
+  React.useEffect(() => registerRoomNotificationClickFocus({
+    roomsRef: appRefs.roomsRef,
+    selectWorkspaceRoom: workspaceState.selectWorkspaceRoom
+  }), [appRefs.roomsRef, workspaceState.selectWorkspaceRoom]);
   const githubAuth = useGitHubAuth(appConfigState.appConfig.relayHttpUrl);
   const localIdentity = useLocalIdentity(githubAuth.currentUser);
   const roomSettingsActor = useRoomSettingsActor(localIdentity.localUser);

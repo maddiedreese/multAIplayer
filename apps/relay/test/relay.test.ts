@@ -14,6 +14,7 @@ interface RelayHarness {
   wsUrl: string;
   dataPath: string;
   tempDir: string;
+  beginShutdown(): Promise<void>;
   close(options?: { preserveData?: boolean }): Promise<void>;
 }
 
@@ -28,6 +29,19 @@ interface StoredRelayStateFixture {
   authSessions?: unknown[];
   attachmentBlobs?: unknown[];
   encryptedBacklog: unknown;
+}
+
+interface DailyCreationQuotaErrorBody {
+  error: string;
+  code: string;
+  retryAfterSeconds: number;
+  quota: {
+    type: string;
+    limit: number;
+    used: number;
+    remaining: number;
+    resetsAt: string;
+  };
 }
 
 test("relay rejects non-host takeover and allows explicit handoff", async () => {
@@ -69,15 +83,37 @@ test("relay exposes content-free operational metrics", async () => {
     assert.equal(response.status, 200);
     const body = await response.json() as {
       activeSockets?: unknown;
+      liveAttachmentBlobCount?: unknown;
+      liveAttachmentBlobBytes?: unknown;
       envelopesPublishedTotal?: unknown;
+      attachmentBlobUploadsTotal?: unknown;
+      attachmentBlobUploadBytesTotal?: unknown;
+      attachmentBlobUploadRejectionsByReason?: unknown;
+      quotaRejectionsTotal?: unknown;
+      quotaRejectionsByType?: unknown;
       rateLimitRejectionsTotal?: unknown;
+      rateLimitRejectionsByBucket?: unknown;
+      webSocketConnectionAttemptsTotal?: unknown;
+      webSocketConnectionsAcceptedTotal?: unknown;
+      webSocketConnectionRejectionsByReason?: unknown;
       startedAt?: unknown;
       uptimeSeconds?: unknown;
     };
 
     assert.equal(body.activeSockets, 0);
+    assert.equal(body.liveAttachmentBlobCount, 0);
+    assert.equal(body.liveAttachmentBlobBytes, 0);
     assert.equal(body.envelopesPublishedTotal, 0);
+    assert.equal(body.attachmentBlobUploadsTotal, 0);
+    assert.equal(body.attachmentBlobUploadBytesTotal, 0);
+    assert.deepEqual(body.attachmentBlobUploadRejectionsByReason, {});
+    assert.equal(body.quotaRejectionsTotal, 0);
+    assert.deepEqual(body.quotaRejectionsByType, {});
     assert.equal(body.rateLimitRejectionsTotal, 0);
+    assert.deepEqual(body.rateLimitRejectionsByBucket, {});
+    assert.equal(body.webSocketConnectionAttemptsTotal, 0);
+    assert.equal(body.webSocketConnectionsAcceptedTotal, 0);
+    assert.deepEqual(body.webSocketConnectionRejectionsByReason, {});
     assert.equal(typeof body.startedAt, "string");
     assert.equal(typeof body.uptimeSeconds, "number");
   } finally {
@@ -254,6 +290,219 @@ test("relay broadcasts newly created teams to workspace subscribers", async () =
     assert.equal(updatedTeam.members, 1);
   } finally {
     socket.close();
+    await relay.close();
+  }
+});
+
+test("relay drains readiness, sockets, and pending store writes on graceful shutdown", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS: "500",
+    MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS: "2000"
+  });
+  const socket = new WebSocket(relay.wsUrl);
+  try {
+    await onceOpen(socket);
+    socket.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:tester",
+      deviceId: "device-test-123"
+    }));
+    await waitForJoined(socket);
+
+    const createResponse = await fetch(`${relay.baseUrl}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Shutdown flush team" })
+    });
+    assert.equal(createResponse.status, 201);
+
+    const closePromise = waitForClose(socket);
+    const shutdownPromise = relay.beginShutdown();
+    const readyBody = await waitForNotReady(relay.baseUrl);
+    assert.equal(readyBody.code, "relay_shutting_down");
+
+    const rejectedResponse = await fetch(`${relay.baseUrl}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Rejected during shutdown" })
+    });
+    assert.equal(rejectedResponse.status, 503);
+    assert.deepEqual(await rejectedResponse.json(), {
+      error: "Relay is shutting down.",
+      code: "relay_shutting_down"
+    });
+
+    const lateSocket = new WebSocket(relay.wsUrl);
+    try {
+      const lateClosePromise = waitForClose(lateSocket);
+      await onceOpen(lateSocket).catch(() => undefined);
+      const lateClose = await lateClosePromise;
+      assert.equal(lateClose.code, 1012);
+      assert.equal(lateClose.reason, "Relay shutting down");
+    } finally {
+      lateSocket.close();
+    }
+
+    const close = await closePromise;
+    assert.equal(close.code, 1012);
+    assert.equal(close.reason, "Relay shutting down");
+    await shutdownPromise;
+
+    const stored = JSON.parse(await readFile(relay.dataPath, "utf8")) as StoredRelayStateFixture;
+    assert.ok(
+      Array.isArray(stored.teams) &&
+      stored.teams.some((team) => (
+        typeof team === "object" &&
+        team !== null &&
+        "name" in team &&
+        team.name === "Shutdown flush team"
+      ))
+    );
+  } finally {
+    socket.close();
+    await relay.close();
+  }
+});
+
+test("relay enforces authenticated user daily team and room creation quotas", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP: "1",
+    MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP: "1"
+  });
+  try {
+    const firstUserCookie = await createDebugSession(relay.baseUrl, "github:quota-user", "quota-user");
+    const secondUserCookie = await createDebugSession(relay.baseUrl, "github:quota-peer", "quota-peer");
+    const maddieCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+
+    const firstTeam = await fetch(`${relay.baseUrl}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: firstUserCookie },
+      body: JSON.stringify({ name: "Quota team one" })
+    });
+    assert.equal(firstTeam.status, 201);
+
+    const limitedTeam = await fetch(`${relay.baseUrl}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: firstUserCookie },
+      body: JSON.stringify({ name: "Quota team two" })
+    });
+    assert.equal(limitedTeam.status, 429);
+    assert.ok(limitedTeam.headers.get("retry-after"));
+    const limitedTeamBody = await limitedTeam.json() as DailyCreationQuotaErrorBody;
+    assert.equal(limitedTeamBody.error, "Daily team creation quota exceeded.");
+    assert.equal(limitedTeamBody.code, "quota_exceeded");
+    assert.equal(limitedTeamBody.retryAfterSeconds, Number(limitedTeam.headers.get("retry-after")));
+    assert.deepEqual(limitedTeamBody.quota, {
+      type: "daily_user_team_creations",
+      limit: 1,
+      used: 1,
+      remaining: 0,
+      resetsAt: limitedTeamBody.quota.resetsAt
+    });
+    assert.ok(Number.isFinite(Date.parse(limitedTeamBody.quota.resetsAt)));
+
+    const peerTeam = await fetch(`${relay.baseUrl}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: secondUserCookie },
+      body: JSON.stringify({ name: "Quota peer team" })
+    });
+    assert.equal(peerTeam.status, 201);
+
+    const firstRoom = await fetch(`${relay.baseUrl}/rooms`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: maddieCookie },
+      body: JSON.stringify({
+        teamId: "team-core",
+        name: "Quota room one",
+        projectPath: "/tmp/multaiplayer"
+      })
+    });
+    assert.equal(firstRoom.status, 201);
+
+    const limitedRoom = await fetch(`${relay.baseUrl}/rooms`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: maddieCookie },
+      body: JSON.stringify({
+        teamId: "team-core",
+        name: "Quota room two",
+        projectPath: "/tmp/multaiplayer"
+      })
+    });
+    assert.equal(limitedRoom.status, 429);
+    assert.ok(limitedRoom.headers.get("retry-after"));
+    const limitedRoomBody = await limitedRoom.json() as DailyCreationQuotaErrorBody;
+    assert.deepEqual(limitedRoomBody, {
+      error: "Daily room creation quota exceeded.",
+      code: "quota_exceeded",
+      retryAfterSeconds: limitedRoomBody.retryAfterSeconds,
+      quota: {
+        type: "daily_user_room_creations",
+        limit: 1,
+        used: 1,
+        remaining: 0,
+        resetsAt: limitedRoomBody.quota.resetsAt
+      }
+    });
+    assert.equal(limitedRoomBody.retryAfterSeconds, Number(limitedRoom.headers.get("retry-after")));
+    assert.ok(Number.isFinite(Date.parse(limitedRoomBody.quota.resetsAt)));
+
+    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const metricsBody = await metrics.json() as {
+      quotaRejectionsTotal?: unknown;
+      quotaRejectionsByType?: Record<string, unknown>;
+    };
+    assert.equal(metricsBody.quotaRejectionsTotal, 2);
+    assert.equal(metricsBody.quotaRejectionsByType?.daily_user_team_creations, 1);
+    assert.equal(metricsBody.quotaRejectionsByType?.daily_user_room_creations, 1);
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay enforces authenticated total room ceiling", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER: "2"
+  });
+  try {
+    const maddieCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    const limited = await fetch(`${relay.baseUrl}/rooms`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: maddieCookie },
+      body: JSON.stringify({
+        teamId: "team-core",
+        name: "Too many rooms",
+        projectPath: "/tmp/multaiplayer"
+      })
+    });
+    assert.equal(limited.status, 429);
+    const body = await limited.json() as {
+      error: string;
+      code: string;
+      quota: { type: string; limit: number; used: number; remaining: number };
+    };
+    assert.deepEqual(body, {
+      error: "Total room quota exceeded.",
+      code: "quota_exceeded",
+      quota: {
+        type: "total_user_rooms",
+        limit: 2,
+        used: 2,
+        remaining: 0
+      }
+    });
+
+    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const metricsBody = await metrics.json() as {
+      quotaRejectionsTotal?: unknown;
+      quotaRejectionsByType?: Record<string, unknown>;
+    };
+    assert.equal(metricsBody.quotaRejectionsTotal, 1);
+    assert.equal(metricsBody.quotaRejectionsByType?.total_user_rooms, 1);
+  } finally {
     await relay.close();
   }
 });
@@ -1324,6 +1573,120 @@ test("relay rate limits room WebSocket events per client", async () => {
   }
 });
 
+test("relay rate limits WebSocket connection attempts per client", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT: "1",
+    MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS: "60000"
+  });
+  const first = new WebSocket(relay.wsUrl);
+  let second: WebSocket | null = null;
+  try {
+    await onceOpen(first);
+    second = new WebSocket(relay.wsUrl);
+    const errorPromise = waitForError(second);
+    const closePromise = waitForClose(second);
+    assert.match(await errorPromise, /WebSocket connection rate limit exceeded/);
+    const close = await closePromise;
+    assert.equal(close.code, 1008);
+
+    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const body = await metrics.json() as {
+      rateLimitRejectionsTotal?: unknown;
+      rateLimitRejectionsByBucket?: Record<string, unknown>;
+      webSocketConnectionAttemptsTotal?: unknown;
+      webSocketConnectionsAcceptedTotal?: unknown;
+      webSocketConnectionRejectionsByReason?: Record<string, unknown>;
+    };
+    assert.equal(body.rateLimitRejectionsTotal, 1);
+    assert.equal(body.rateLimitRejectionsByBucket?.websocketconnect, 1);
+    assert.equal(body.webSocketConnectionAttemptsTotal, 2);
+    assert.equal(body.webSocketConnectionsAcceptedTotal, 1);
+    assert.equal(body.webSocketConnectionRejectionsByReason?.rate_limit, 1);
+  } finally {
+    first.close();
+    second?.close();
+    await relay.close();
+  }
+});
+
+test("relay caps concurrent room WebSocket connections per device", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER: "10",
+    MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE: "1"
+  });
+  const first = new WebSocket(relay.wsUrl);
+  const second = new WebSocket(relay.wsUrl);
+  try {
+    await Promise.all([onceOpen(first), onceOpen(second)]);
+    first.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:tester",
+      deviceId: "device-test-123"
+    }));
+    await waitForJoined(first);
+
+    const errorPromise = waitForError(second);
+    const closePromise = waitForClose(second);
+    second.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:tester",
+      deviceId: "device-test-123"
+    }));
+    assert.match(await errorPromise, /Concurrent WebSocket connection quota exceeded for this device/);
+    const close = await closePromise;
+    assert.equal(close.code, 1008);
+
+    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const body = await metrics.json() as {
+      quotaRejectionsTotal?: unknown;
+      quotaRejectionsByType?: Record<string, unknown>;
+    };
+    assert.equal(body.quotaRejectionsTotal, 1);
+    assert.equal(body.quotaRejectionsByType?.websocket_connections_per_device, 1);
+  } finally {
+    first.close();
+    second.close();
+    await relay.close();
+  }
+});
+
+test("relay caps concurrent WebSocket connections per user identity", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER: "1",
+    MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE: "5"
+  });
+  const first = new WebSocket(relay.wsUrl);
+  let second: WebSocket | null = null;
+  try {
+    await onceOpen(first);
+    second = new WebSocket(relay.wsUrl);
+    const errorPromise = waitForError(second);
+    const closePromise = waitForClose(second);
+    assert.match(await errorPromise, /Concurrent WebSocket connection quota exceeded for this user/);
+    const close = await closePromise;
+    assert.equal(close.code, 1008);
+
+    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const body = await metrics.json() as {
+      quotaRejectionsTotal?: unknown;
+      quotaRejectionsByType?: Record<string, unknown>;
+    };
+    assert.equal(body.quotaRejectionsTotal, 1);
+    assert.equal(body.quotaRejectionsByType?.websocket_connections_per_user, 1);
+  } finally {
+    first.close();
+    second?.close();
+    await relay.close();
+  }
+});
+
 test("relay applies configured CORS origin allowlist", async () => {
   const relay = await startRelay({
     MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://multaiplayer.com/ http://127.0.0.1:1420"
@@ -2309,6 +2672,153 @@ test("relay stores encrypted attachment blobs as ciphertext", async () => {
   }
 });
 
+test("relay enforces authenticated live encrypted attachment blob quotas", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "10",
+    MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES: "10"
+  });
+  try {
+    const maddieCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    const alexCookie = await createDebugSession(relay.baseUrl, "github:alex", "alex");
+    const uploadBody = (size: number, name: string) => ({
+      teamId: "team-core",
+      roomId: "room-desktop",
+      name,
+      type: "text/plain",
+      size,
+      payload: {
+        algorithm: "AES-GCM-256",
+        nonce: "nonce-for-test",
+        ciphertext: "tiny"
+      }
+    });
+
+    const first = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: maddieCookie },
+      body: JSON.stringify(uploadBody(6, "one.txt"))
+    });
+    assert.equal(first.status, 201);
+    const firstBody = await first.json() as { blob: { uploadedByUserId?: string } };
+    assert.equal(firstBody.blob.uploadedByUserId, "github:maddiedreese");
+
+    const limited = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: maddieCookie },
+      body: JSON.stringify(uploadBody(5, "two.txt"))
+    });
+    assert.equal(limited.status, 413);
+    const limitedBody = await limited.json() as {
+      error: string;
+      code: string;
+      quota: { type: string; limit: number; used: number; remaining: number };
+    };
+    assert.equal(limitedBody.error, "Live encrypted attachment blob storage quota exceeded.");
+    assert.equal(limitedBody.code, "quota_exceeded");
+    assert.deepEqual(limitedBody.quota, {
+      type: "live_attachment_blob_bytes",
+      limit: 10,
+      used: 6,
+      remaining: 4
+    });
+
+    const otherUser = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: alexCookie },
+      body: JSON.stringify(uploadBody(5, "alex.txt"))
+    });
+    assert.equal(otherUser.status, 201);
+
+    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const metricsBody = await metrics.json() as {
+      quotaRejectionsTotal?: unknown;
+      quotaRejectionsByType?: Record<string, unknown>;
+    };
+    assert.equal(metricsBody.quotaRejectionsTotal, 1);
+    assert.equal(metricsBody.quotaRejectionsByType?.live_attachment_blob_bytes, 1);
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay enforces authenticated encrypted attachment upload byte quotas", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "10",
+    MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES: "100",
+    MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW: "10",
+    MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_WINDOW_MS: "60000"
+  });
+  try {
+    const maddieCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    const uploadBody = (size: number, name: string) => ({
+      teamId: "team-core",
+      roomId: "room-desktop",
+      name,
+      type: "text/plain",
+      size,
+      payload: {
+        algorithm: "AES-GCM-256",
+        nonce: "nonce-for-test",
+        ciphertext: "tiny"
+      }
+    });
+
+    const first = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: maddieCookie },
+      body: JSON.stringify(uploadBody(6, "one.txt"))
+    });
+    assert.equal(first.status, 201);
+
+    const limited = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: maddieCookie },
+      body: JSON.stringify(uploadBody(5, "two.txt"))
+    });
+    assert.equal(limited.status, 429);
+    assert.equal(limited.headers.get("retry-after"), "60");
+    const limitedBody = await limited.json() as {
+      error: string;
+      code: string;
+      retryAfterSeconds: number;
+      quota: { type: string; limit: number; used: number; remaining: number; resetsAt: string };
+    };
+    assert.equal(limitedBody.error, "Encrypted attachment blob upload byte quota exceeded.");
+    assert.equal(limitedBody.code, "quota_exceeded");
+    assert.equal(limitedBody.retryAfterSeconds, 60);
+    assert.deepEqual(limitedBody.quota, {
+      type: "attachment_blob_upload_bytes",
+      limit: 10,
+      used: 6,
+      remaining: 4,
+      resetsAt: limitedBody.quota.resetsAt
+    });
+    assert.ok(Number.isFinite(Date.parse(limitedBody.quota.resetsAt)));
+
+    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const metricsBody = await metrics.json() as {
+      liveAttachmentBlobCount?: unknown;
+      liveAttachmentBlobBytes?: unknown;
+      attachmentBlobUploadsTotal?: unknown;
+      attachmentBlobUploadBytesTotal?: unknown;
+      attachmentBlobUploadRejectionsByReason?: Record<string, unknown>;
+      quotaRejectionsTotal?: unknown;
+      quotaRejectionsByType?: Record<string, unknown>;
+    };
+    assert.equal(metricsBody.liveAttachmentBlobCount, 1);
+    assert.equal(metricsBody.liveAttachmentBlobBytes, 6);
+    assert.equal(metricsBody.attachmentBlobUploadsTotal, 1);
+    assert.equal(metricsBody.attachmentBlobUploadBytesTotal, 6);
+    assert.equal(metricsBody.attachmentBlobUploadRejectionsByReason?.upload_byte_quota, 1);
+    assert.equal(metricsBody.quotaRejectionsTotal, 1);
+    assert.equal(metricsBody.quotaRejectionsByType?.attachment_blob_upload_bytes, 1);
+  } finally {
+    await relay.close();
+  }
+});
+
 test("relay enforces encrypted attachment blob size limits", async () => {
   const relay = await startRelay({ MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "16" });
   try {
@@ -3258,6 +3768,9 @@ async function startRelay(
         wsUrl: `ws://127.0.0.1:${port}/rooms`,
         dataPath,
         tempDir,
+        beginShutdown() {
+          return beginProcessShutdown(child);
+        },
         async close(options = {}) {
           await stopProcess(child);
           if (!options.preserveData) await rm(tempDir, { recursive: true, force: true });
@@ -3462,6 +3975,21 @@ async function waitForReady(
     await delay(100);
   }
   throw new Error(`Relay did not become ready: ${getOutput()}`);
+}
+
+async function waitForNotReady(baseUrl: string): Promise<{ code: string }> {
+  let lastStatus = 0;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    try {
+      const response = await fetch(`${baseUrl}/readyz`);
+      lastStatus = response.status;
+      if (response.status === 503) return await response.json() as { code: string };
+    } catch {
+      // Keep polling while the child is transitioning.
+    }
+    await delay(50);
+  }
+  assert.fail(`Timed out waiting for /readyz to become not-ready; last status ${lastStatus}`);
 }
 
 function onceOpen(socket: WebSocket): Promise<void> {
@@ -3687,6 +4215,11 @@ function deviceSealedPayload() {
 }
 
 async function stopProcess(child: ChildProcessWithoutNullStreams) {
+  if (child.exitCode !== null) return;
+  await beginProcessShutdown(child);
+}
+
+async function beginProcessShutdown(child: ChildProcessWithoutNullStreams) {
   if (child.exitCode !== null) return;
   child.kill("SIGTERM");
   await Promise.race([

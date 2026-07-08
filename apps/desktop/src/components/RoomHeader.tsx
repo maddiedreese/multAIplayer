@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { InspectorTab } from "./InspectorTabs";
+import { closeRoomBrowserSurface } from "../lib/browserSurfaceEvents";
 
 type HostStatus = "active" | "handoff" | "offline";
 
@@ -147,7 +148,10 @@ export function RoomHeader({
           <button
             className={activeInspectorTab === tab.id ? "active" : ""}
             key={tab.id}
-            onClick={() => onSelectInspectorTab(tab.id)}
+            onClick={() => {
+              if (tab.id !== "browser") closeRoomBrowserSurface();
+              onSelectInspectorTab(tab.id);
+            }}
             aria-pressed={activeInspectorTab === tab.id}
           >
             {tab.icon}

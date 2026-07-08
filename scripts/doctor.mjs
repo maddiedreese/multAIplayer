@@ -108,6 +108,12 @@ function checkProductionRelayEnv() {
   const trustProxyHeaders = envBoolean("MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS", false);
   const storage = envValue("MULTAIPLAYER_RELAY_STORAGE") || "json";
   const dataPath = envValue("MULTAIPLAYER_RELAY_DATA_PATH");
+  const attachmentBlobMaxBytes = envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES", 5_000_000);
+  const attachmentBlobLiveQuotaBytes = envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES", 250_000_000);
+  const attachmentBlobUploadBytes = envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW", 100_000_000);
+  const websocketConnectionCap = envInteger("MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER", 20);
+  const websocketConnectRateLimit = envInteger("MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT", 120);
+  const totalRoomCap = envInteger("MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER", 500);
   const allowedOriginErrors = validateAllowedOrigins(allowedOrigins);
 
   checks.push({
@@ -176,6 +182,48 @@ function checkProductionRelayEnv() {
       ? "only enable after configuring a trusted reverse proxy; leave false by default"
       : "proxy headers not trusted by default"
   });
+  checks.push({
+    ok: attachmentBlobMaxBytes > 0 && attachmentBlobMaxBytes <= 50_000_000,
+    label: "production MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES",
+    detail: attachmentBlobMaxBytes > 0 && attachmentBlobMaxBytes <= 50_000_000
+      ? `configured at ${attachmentBlobMaxBytes} bytes`
+      : "must be between 1 and 50000000 bytes"
+  });
+  checks.push({
+    ok: attachmentBlobLiveQuotaBytes >= attachmentBlobMaxBytes && attachmentBlobLiveQuotaBytes <= 10_000_000_000,
+    label: "production MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES",
+    detail: attachmentBlobLiveQuotaBytes >= attachmentBlobMaxBytes && attachmentBlobLiveQuotaBytes <= 10_000_000_000
+      ? `configured at ${attachmentBlobLiveQuotaBytes} bytes`
+      : "must be at least the blob max and no more than 10000000000 bytes"
+  });
+  checks.push({
+    ok: attachmentBlobUploadBytes >= attachmentBlobMaxBytes && attachmentBlobUploadBytes <= 10_000_000_000,
+    label: "production MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW",
+    detail: attachmentBlobUploadBytes >= attachmentBlobMaxBytes && attachmentBlobUploadBytes <= 10_000_000_000
+      ? `configured at ${attachmentBlobUploadBytes} bytes`
+      : "must be at least the blob max and no more than 10000000000 bytes"
+  });
+  checks.push({
+    ok: websocketConnectionCap > 0 && websocketConnectionCap <= 1_000,
+    label: "production MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER",
+    detail: websocketConnectionCap > 0 && websocketConnectionCap <= 1_000
+      ? `configured at ${websocketConnectionCap}`
+      : "must be between 1 and 1000"
+  });
+  checks.push({
+    ok: websocketConnectRateLimit > 0 && websocketConnectRateLimit <= 100_000,
+    label: "production MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT",
+    detail: websocketConnectRateLimit > 0 && websocketConnectRateLimit <= 100_000
+      ? `configured at ${websocketConnectRateLimit}`
+      : "must be between 1 and 100000"
+  });
+  checks.push({
+    ok: totalRoomCap > 0 && totalRoomCap <= 100_000,
+    label: "production MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER",
+    detail: totalRoomCap > 0 && totalRoomCap <= 100_000
+      ? `configured at ${totalRoomCap}`
+      : "must be between 1 and 100000"
+  });
 }
 
 function envValue(name) {
@@ -188,6 +236,13 @@ function envBoolean(name, fallback) {
   if (["1", "true", "yes", "on"].includes(value)) return true;
   if (["0", "false", "no", "off"].includes(value)) return false;
   return fallback;
+}
+
+function envInteger(name, fallback) {
+  const raw = envValue(name);
+  if (!raw) return fallback;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) ? value : NaN;
 }
 
 function validateAllowedOrigins(value) {

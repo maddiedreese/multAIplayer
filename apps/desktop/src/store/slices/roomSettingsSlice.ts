@@ -9,6 +9,7 @@ export interface RoomSettingsRoomState {
   settingsMessage?: string;
   customCodexModel?: string;
   projectPathDraft?: string;
+  notificationsMuted?: boolean;
 }
 
 export type RoomSettingsByRoom = Record<string, RoomSettingsRoomState>;
@@ -20,6 +21,7 @@ export interface RoomSettingsPanelMaps {
   settingsMessagesByRoom: Record<string, string | null>;
   customCodexModelsByRoom: Record<string, string>;
   projectPathDraftsByRoom: Record<string, string>;
+  notificationMutedRoomIds: Set<string>;
 }
 
 function compactRoomSettings(record: RoomSettingsRoomState): RoomSettingsRoomState | undefined {
@@ -70,6 +72,11 @@ export function projectRoomSettingsPanelMaps(roomSettingsByRoom: RoomSettingsByR
       Object.entries(roomSettingsByRoom)
         .filter(([, settings]) => settings.projectPathDraft)
         .map(([roomId, settings]) => [roomId, settings.projectPathDraft ?? ""])
+    ),
+    notificationMutedRoomIds: new Set(
+      Object.entries(roomSettingsByRoom)
+        .filter(([, settings]) => settings.notificationsMuted)
+        .map(([roomId]) => roomId)
     )
   };
 }
@@ -82,6 +89,7 @@ export interface RoomSettingsSlice {
   setSettingsMessageForRoom: (roomId: string, message: string | null) => void;
   setCustomCodexModelForRoom: (roomId: string, model: string, currentModel: string) => void;
   setProjectPathDraftForRoom: (roomId: string, projectPath: string, currentProjectPath: string) => void;
+  setRoomNotificationsMuted: (roomId: string, muted: boolean) => void;
 }
 
 export const emptyRoomSettingsState: Pick<
@@ -138,6 +146,14 @@ export const createRoomSettingsSlice: StateCreator<AppStoreState, [], [], RoomSe
       roomSettingsByRoom: updateRoomSettingsForRoom(state.roomSettingsByRoom, roomId, (roomSettings) => {
         const { projectPathDraft, ...rest } = roomSettings;
         return projectPath === currentProjectPath ? rest : { ...roomSettings, projectPathDraft: projectPath };
+      })
+    }));
+  },
+  setRoomNotificationsMuted: (roomId, muted) => {
+    set((state) => ({
+      roomSettingsByRoom: updateRoomSettingsForRoom(state.roomSettingsByRoom, roomId, (roomSettings) => {
+        const { notificationsMuted, ...rest } = roomSettings;
+        return muted ? { ...roomSettings, notificationsMuted: true } : rest;
       })
     }));
   }

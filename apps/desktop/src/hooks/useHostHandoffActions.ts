@@ -1,9 +1,11 @@
 import type { MutableRefObject } from "react";
 import type {
+  CodexSandboxLevel,
   HostHandoffPlaintextPayload,
   RelayEnvelope,
   RoomRecord
 } from "@multaiplayer/protocol";
+import { defaultCodexSandboxLevel } from "@multaiplayer/protocol";
 import { encryptJson } from "@multaiplayer/crypto";
 import { loadOrCreateRoomSecret } from "../lib/localHistory";
 import {
@@ -41,6 +43,7 @@ import type {
   BrowserAccessRequest,
   ChatMessage,
   HostHandoffRecord,
+  QueuedCodexTurn,
   RelayStatus
 } from "../types";
 
@@ -65,6 +68,7 @@ interface UseHostHandoffActionsOptions {
   isActiveHost: boolean;
   hostGateMessage: string;
   hostHandoffs: HostHandoffRecord[];
+  queuedCodexTurns: QueuedCodexTurn[];
   localUser: LocalUser;
   deviceId: string;
   relayStatus: RelayStatus;
@@ -101,6 +105,7 @@ export function useHostHandoffActions({
   isActiveHost,
   hostGateMessage,
   hostHandoffs,
+  queuedCodexTurns,
   localUser,
   deviceId,
   relayStatus,
@@ -329,8 +334,10 @@ export function useHostHandoffActions({
       ...(patchResult?.patch && !patchResult.truncated ? { gitPatch: patchResult.patch } : {}),
       ...(patchResult?.truncated ? { gitPatchTruncated: true } : {}),
       codexModel: room.codexModel,
+      codexSandboxLevel: (room.codexSandboxLevel ?? defaultCodexSandboxLevel) as CodexSandboxLevel,
       approvalPolicy: room.approvalPolicy,
       messagesSinceLastCodex: summary.messagesSinceLastCodex,
+      queuedCodexTurns: queueForHandoff(room.id, queuedCodexTurns),
       attachmentNames: summary.attachments.map((attachment) => attachment.name),
       terminals: summary.terminals,
       continuationSummary: reason === "usage_limit"
@@ -361,8 +368,10 @@ export function useHostHandoffActions({
       gitPatch: handoff.gitPatch,
       gitPatchTruncated: handoff.gitPatchTruncated,
       codexModel: handoff.codexModel,
+      codexSandboxLevel: handoff.codexSandboxLevel,
       approvalPolicy: handoff.approvalPolicy,
       messagesSinceLastCodex: handoff.messagesSinceLastCodex,
+      queuedCodexTurns: handoff.queuedCodexTurns,
       attachmentNames: handoff.attachmentNames,
       terminals: handoff.terminals,
       continuationSummary: handoff.continuationSummary,
@@ -401,8 +410,10 @@ export function useHostHandoffActions({
       gitPatch: handoff.gitPatch,
       gitPatchTruncated: handoff.gitPatchTruncated,
       codexModel: handoff.codexModel,
+      codexSandboxLevel: handoff.codexSandboxLevel,
       approvalPolicy: handoff.approvalPolicy,
       messagesSinceLastCodex: handoff.messagesSinceLastCodex,
+      queuedCodexTurns: handoff.queuedCodexTurns,
       attachmentNames: handoff.attachmentNames,
       terminals: handoff.terminals,
       continuationSummary: handoff.continuationSummary,
@@ -433,6 +444,19 @@ export function useHostHandoffActions({
 
   function markHostHandoffAccepted(roomId: string, handoffId: string) {
     markHostHandoffAcceptedForRoom(roomId, handoffId);
+  }
+
+  function queueForHandoff(roomId: string, turns: QueuedCodexTurn[]): HostHandoffPlaintextPayload["queuedCodexTurns"] {
+    return turns
+      .filter((turn) => turn.roomId === roomId)
+      .slice(0, 5)
+      .map((turn) => ({
+        turnId: turn.turnId,
+        requestedBy: turn.requestedBy,
+        requestedByUserId: turn.requestedByUserId,
+        queuedAt: turn.queuedAt,
+        ...(turn.triggerMessageId ? { triggerMessageId: turn.triggerMessageId } : {})
+      }));
   }
 
   return {

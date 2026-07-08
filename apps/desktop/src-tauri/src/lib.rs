@@ -30,6 +30,7 @@ pub fn run() {
         .manage(TerminalState::default())
         .manage(LocalPreviewState::default())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             app_version,
@@ -547,79 +548,96 @@ mod tests {
 
     #[test]
     fn codex_thread_request_starts_or_resumes_room_thread() {
-        let start = codex_thread_request(2, None, "/tmp/project", "gpt-5.4-mini");
+        let start = codex_thread_request(2, None, "/tmp/project", "gpt-5.3-codex-spark");
         assert_eq!(start["method"], "thread/start");
         assert_eq!(start["id"], 2);
         assert_eq!(start["params"]["cwd"], "/tmp/project");
-        assert_eq!(start["params"]["model"], "gpt-5.4-mini");
+        assert_eq!(start["params"]["model"], "gpt-5.3-codex-spark");
 
-        let resume = codex_thread_request(3, Some("thr_room_123"), "/tmp/project", "gpt-5.4");
+        let resume = codex_thread_request(3, Some("thr_room_123"), "/tmp/project", "gpt-5.3-codex");
         assert_eq!(resume["method"], "thread/resume");
         assert_eq!(resume["id"], 3);
         assert_eq!(resume["params"]["threadId"], "thr_room_123");
         assert_eq!(resume["params"]["cwd"], "/tmp/project");
-        assert_eq!(resume["params"]["model"], "gpt-5.4");
+        assert_eq!(resume["params"]["model"], "gpt-5.3-codex");
         assert_eq!(resume["params"]["excludeTurns"], true);
     }
 
     #[test]
     fn codex_server_key_is_scoped_to_room_project_and_model() {
+        let sandbox = codex_sandbox_config(Some("workspace_write")).expect("workspace sandbox");
         let base = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("valid codex session key");
         let same = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("same codex session key");
         let different_room = codex_server_key(
             Some("room-beta"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("different room key");
         let different_project = codex_server_key(
             Some("room-alpha"),
             "/tmp/other",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("different project key");
         let different_model = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
-            "gpt-5.4-mini",
+            "gpt-5.3-codex-spark",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("different model key");
         let different_reasoning = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "high",
             "default",
+            &sandbox,
         )
         .expect("different reasoning key");
         let different_speed = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
-            "priority",
+            "fast",
+            &sandbox,
         )
         .expect("different speed key");
+        let different_sandbox = codex_server_key(
+            Some("room-alpha"),
+            "/tmp/project",
+            "gpt-5.3-codex",
+            "medium",
+            "default",
+            &codex_sandbox_config(Some("read_only")).expect("read-only sandbox"),
+        )
+        .expect("different sandbox key");
 
         assert_eq!(base, same);
         assert_ne!(base, different_room);
@@ -627,40 +645,46 @@ mod tests {
         assert_ne!(base, different_model);
         assert_ne!(base, different_reasoning);
         assert_ne!(base, different_speed);
+        assert_ne!(base, different_sandbox);
         assert!(codex_server_key(
             Some("room/alpha"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
-            "default"
+            "default",
+            &sandbox
         )
         .is_err());
     }
 
     #[test]
     fn codex_room_shutdown_matches_all_sessions_for_room_only() {
+        let sandbox = codex_sandbox_config(Some("workspace_write")).expect("workspace sandbox");
         let room_a_main = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("room alpha key");
         let room_a_model = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
-            "gpt-5.4-mini",
+            "gpt-5.3-codex-spark",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("room alpha model key");
         let room_b = codex_server_key(
             Some("room-beta"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("room beta key");
 

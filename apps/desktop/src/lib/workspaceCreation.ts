@@ -1,4 +1,4 @@
-import { codexModelOptions, codexReasoningEffortOptions, codexSpeedOptions } from "@multaiplayer/protocol";
+import { codexModelOptions, codexReasoningEffortOptions, codexSandboxLevelOptions, codexSpeedOptions } from "@multaiplayer/protocol";
 
 export interface WorkspaceCreatePlan {
   name: string;
@@ -52,6 +52,11 @@ export function normalizeCodexReasoningEffort(effort: string): string | null {
 export function normalizeCodexSpeed(speed: string): string | null {
   const trimmed = speed.trim();
   return codexSpeedOptions.some((option) => option.id === trimmed) ? trimmed : null;
+}
+
+export function normalizeCodexSandboxLevel(sandboxLevel: string): string | null {
+  const trimmed = sandboxLevel.trim();
+  return codexSandboxLevelOptions.some((option) => option.id === trimmed) ? trimmed : null;
 }
 
 export function planTeamCreation(name: string): WorkspaceCreatePlan {

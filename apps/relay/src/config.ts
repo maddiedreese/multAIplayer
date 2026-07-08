@@ -14,6 +14,9 @@ export interface RelayConfig {
   inviteTtlDays: number;
   attachmentBlobTtlDays: number;
   attachmentBlobMaxBytes: number;
+  attachmentBlobLiveQuotaBytes: number;
+  attachmentBlobUploadBytesPerWindow: number;
+  attachmentBlobUploadWindowMs: number;
   jsonBodyLimitBytes: number;
   encryptedEnvelopeMaxBytes: number;
   sessionPersistenceSecret: string | null;
@@ -31,7 +34,21 @@ export interface RelayConfig {
     mutation: number;
     attachment: number;
     websocket: number;
+    websocketConnect: number;
   };
+  websocketConnectionCaps: {
+    perUser: number;
+    perDevice: number;
+  };
+  shutdown: {
+    drainMs: number;
+    graceMs: number;
+  };
+  dailyCreationCaps: {
+    teamsPerUser: number;
+    roomsPerUser: number;
+  };
+  totalRoomCapPerUser: number;
 }
 
 export function loadRelayConfig(): RelayConfig {
@@ -58,6 +75,24 @@ export function loadRelayConfig(): RelayConfig {
     inviteTtlDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_INVITE_TTL_DAYS, 7, 1, 365),
     attachmentBlobTtlDays: parseIntegerEnv(process.env.MULTAIPLAYER_ATTACHMENT_BLOB_TTL_DAYS, 30, 1, 365),
     attachmentBlobMaxBytes,
+    attachmentBlobLiveQuotaBytes: parseIntegerEnv(
+      process.env.MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES,
+      250_000_000,
+      attachmentBlobMaxBytes,
+      10_000_000_000
+    ),
+    attachmentBlobUploadBytesPerWindow: parseIntegerEnv(
+      process.env.MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW,
+      100_000_000,
+      attachmentBlobMaxBytes,
+      10_000_000_000
+    ),
+    attachmentBlobUploadWindowMs: parseIntegerEnv(
+      process.env.MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_WINDOW_MS,
+      3_600_000,
+      60_000,
+      86_400_000
+    ),
     jsonBodyLimitBytes,
     encryptedEnvelopeMaxBytes: parseIntegerEnv(
       process.env.MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES,
@@ -82,8 +117,22 @@ export function loadRelayConfig(): RelayConfig {
       read: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_READ, 300, 1, 100_000),
       mutation: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_MUTATION, 120, 1, 100_000),
       attachment: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_ATTACHMENT, 60, 1, 10_000),
-      websocket: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET, 600, 1, 100_000)
-    }
+      websocket: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET, 600, 1, 100_000),
+      websocketConnect: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT, 120, 1, 100_000)
+    },
+    websocketConnectionCaps: {
+      perUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER, 20, 1, 1_000),
+      perDevice: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE, 5, 1, 100)
+    },
+    shutdown: {
+      drainMs: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS, 0, 0, 60_000),
+      graceMs: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS, 10_000, 1_000, 120_000)
+    },
+    dailyCreationCaps: {
+      teamsPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP, 25, 0, 10_000),
+      roomsPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP, 100, 0, 100_000)
+    },
+    totalRoomCapPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER, 500, 1, 100_000)
   };
 }
 

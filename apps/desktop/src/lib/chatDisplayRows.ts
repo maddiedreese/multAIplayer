@@ -5,8 +5,10 @@ import type {
 } from "../components/RoomChatPanel";
 import type { ChatAttachment, ChatMessage, LocalPreviewRecord } from "../types";
 import { canOpenChatAttachment, formatAttachmentMeta } from "./appFormatters";
+import { messageIsBeforeCodexWatermark } from "./codexMessageWatermark";
 import { localPreviewStatusLabel } from "./localPreview";
 import { isBrowserDecisionSystemMessage } from "./localRoomHistoryPayload";
+import type { CodexRoomEvent } from "../types";
 
 const roomReactionEmoji = ["👍", "✅", "👀"];
 
@@ -14,28 +16,40 @@ export function buildRoomChatMessageRows({
   messages,
   markdownSelectionMode,
   selectedMessageIds,
-  localUserId
+  localUserId,
+  codexEvents = []
 }: {
   messages: ChatMessage[];
   markdownSelectionMode: boolean;
   selectedMessageIds: string[];
   localUserId: string;
+  codexEvents?: readonly CodexRoomEvent[];
 }): RoomChatMessageDisplay[] {
-  return messages.filter((message) => !isBrowserDecisionSystemMessage(message)).map((message) => ({
+  const visibleMessages = messages.filter((message) => !isBrowserDecisionSystemMessage(message));
+  const messagesById = new Map(visibleMessages.map((message) => [message.id, message]));
+  const lastCodexIndex = visibleMessages.reduce((lastIndex, message, index) => (
+    message.role === "codex" ? index : lastIndex
+  ), -1);
+  return visibleMessages.map((message) => ({
     id: message.id,
     author: message.author,
     role: message.role,
-    body: message.body,
+    body: message.deletedAt ? formatDeletedMessageBody(message) : message.body,
     time: message.time,
+    edited: Boolean(message.editedAt && !message.deletedAt),
+    deleted: Boolean(message.deletedAt),
+    canEdit: canMutateMessage(message, localUserId) && visibleMessages.indexOf(message) > lastCodexIndex && messageIsBeforeCodexWatermark(message, codexEvents),
+    canDelete: canMutateMessage(message, localUserId) && visibleMessages.indexOf(message) > lastCodexIndex && messageIsBeforeCodexWatermark(message, codexEvents),
+    replyPreview: message.replyTo ? buildReplyPreview(messagesById.get(message.replyTo)) : null,
     selected: markdownSelectionMode && selectedMessageIds.includes(message.id),
-    attachments: (message.attachments ?? []).map((attachment) => ({
+    attachments: message.deletedAt ? [] : (message.attachments ?? []).map((attachment) => ({
       id: attachment.id,
       name: attachment.name,
       meta: formatAttachmentMeta(attachment),
       encryptedBlob: Boolean(attachment.blobId),
       canPreview: canOpenChatAttachment(attachment)
     })),
-    reactions: roomReactionEmoji.map((emoji) => {
+    reactions: message.deletedAt ? [] : roomReactionEmoji.map((emoji) => {
       const reaction = message.reactions?.find((item) => item.emoji === emoji);
       return {
         emoji,
@@ -45,6 +59,29 @@ export function buildRoomChatMessageRows({
       };
     })
   }));
+}
+
+function canMutateMessage(message: ChatMessage, localUserId: string): boolean {
+  return message.role !== "codex" && !message.deletedAt && message.authorUserId === localUserId;
+}
+
+function formatDeletedMessageBody(message: ChatMessage): string {
+  if (message.deletedBy) return `Message deleted by ${message.deletedBy}`;
+  if (message.deletedByUserId) return `Message deleted by ${message.deletedByUserId.replace(/^github:/, "@")}`;
+  return "Message deleted";
+}
+
+function buildReplyPreview(message: ChatMessage | undefined): RoomChatMessageDisplay["replyPreview"] {
+  if (!message) {
+    return {
+      author: "Original message",
+      body: "Original message unavailable or deleted"
+    };
+  }
+  return {
+    author: message.author,
+    body: message.deletedAt ? "Original message deleted" : message.body || "Original message unavailable or deleted"
+  };
 }
 
 export function buildPendingAttachmentRows(attachments: ChatAttachment[]): PendingAttachmentDisplay[] {

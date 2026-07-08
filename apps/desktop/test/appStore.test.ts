@@ -645,7 +645,11 @@ test("desktop store keeps Codex room state room scoped", () => {
   store.setApprovalVisibleForRoom("room-a", true);
   store.setApprovalVisibleForRoom("room-b", false);
   store.setPendingCodexApprovalForRoom("room-a", {
+    turnId: "turn-pending-a",
     roomId: "room-a",
+    requestedBy: "Avery",
+    requestedByUserId: "github:avery",
+    queuedAt: "2026-07-06T00:07:00.000Z",
     messages: [
       {
         id: "message-1",
@@ -693,7 +697,11 @@ test("desktop store keeps Codex room state room scoped", () => {
 test("desktop store exposes room Codex approval actions", () => {
   const store = useAppStore.getState();
   const approval = {
+    turnId: "turn-pending-a",
     roomId: "room-a",
+    requestedBy: "Avery",
+    requestedByUserId: "github:avery",
+    queuedAt: "2026-07-06T00:07:00.000Z",
     messages: [
       {
         id: "message-1",
@@ -712,9 +720,15 @@ test("desktop store exposes room Codex approval actions", () => {
       terminals: []
     }
   };
+  const queuedApproval = {
+    ...approval,
+    turnId: "turn-queued-a",
+    queuedAt: "2026-07-06T00:08:00.000Z"
+  };
 
   store.setApprovalVisibleForRoom("room-a", true);
   store.setPendingCodexApprovalForRoom("room-a", approval);
+  store.enqueueCodexApprovalForRoom("room-a", queuedApproval);
   store.setCodexRunningForRoom("room-a", true);
   store.setRoomGoalForRoom("room-a", {
     id: "goal-a",
@@ -732,9 +746,201 @@ test("desktop store exposes room Codex approval actions", () => {
   const state = useAppStore.getState();
   assert.equal(state.codexRuntimeByRoom["room-a"]?.approvalVisible, undefined);
   assert.equal(state.codexRuntimeByRoom["room-a"]?.pendingApproval, undefined);
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.queuedApprovals, undefined);
   assert.equal(state.codexRuntimeByRoom["room-a"]?.running, undefined);
   assert.equal(state.codexRuntimeByRoom["room-a"]?.goal, undefined);
   assert.equal(state.codexRuntimeByRoom["room-b"]?.approvalVisible, true);
+});
+
+test("desktop store edits and deletes messages while refreshing pending Codex approvals", () => {
+  const store = useAppStore.getState();
+  store.appendRoomMessage("room-a", {
+    id: "message-1",
+    author: "Maddie",
+    authorUserId: "github:maddie",
+    role: "human",
+    body: "@Codex draft a plan",
+    time: "9:43"
+  });
+  store.appendRoomMessage("room-a", {
+    id: "message-2",
+    author: "Jordan",
+    authorUserId: "github:jordan",
+    role: "human",
+    body: "remote message",
+    time: "9:44"
+  });
+  store.setPendingCodexApprovalForRoom("room-a", {
+    turnId: "turn-pending-a",
+    roomId: "room-a",
+    requestedBy: "Maddie",
+    requestedByUserId: "github:maddie",
+    queuedAt: "2026-07-08T12:00:00.000Z",
+    messages: [
+      {
+        id: "message-1",
+        author: "Maddie",
+        authorUserId: "github:maddie",
+        role: "human",
+        body: "@Codex draft a plan",
+        time: "9:43"
+      },
+      {
+        id: "message-2",
+        author: "Jordan",
+        authorUserId: "github:jordan",
+        role: "human",
+        body: "remote message",
+        time: "9:44"
+      }
+    ],
+    summary: {
+      messagesSinceLastCodex: 2,
+      attachments: [],
+      workspacePath: null,
+      git: null,
+      browserAccess: [],
+      terminals: []
+    }
+  });
+  store.setApprovalVisibleForRoom("room-a", true);
+
+  store.editRoomMessage("room-a", {
+    id: "edit-1",
+    messageId: "message-1",
+    body: "@Codex draft a safer plan",
+    editedBy: "Maddie",
+    editedByUserId: "github:maddie",
+    editedAt: "2026-07-08T12:01:00.000Z"
+  });
+
+  let state = useAppStore.getState();
+  assert.equal(state.messagesByRoom["room-a"]?.[0]?.body, "@Codex draft a safer plan");
+  assert.equal(state.messagesByRoom["room-a"]?.[0]?.editedAt, "2026-07-08T12:01:00.000Z");
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.pendingApproval?.messages[0]?.body, "@Codex draft a safer plan");
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.pendingApproval?.summary.messagesSinceLastCodex, 2);
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.approvalVisible, true);
+  assert.deepEqual(state.chatEditsByRoom["room-a"], [{
+    id: "edit-1",
+    messageId: "message-1",
+    body: "@Codex draft a safer plan",
+    editedBy: "Maddie",
+    editedByUserId: "github:maddie",
+    editedAt: "2026-07-08T12:01:00.000Z"
+  }]);
+
+  store.deleteRoomMessage("room-a", {
+    id: "delete-1",
+    messageId: "message-2",
+    deletedBy: "Maddie",
+    deletedByUserId: "github:maddie",
+    deletedAt: "2026-07-08T12:02:00.000Z"
+  });
+  state = useAppStore.getState();
+  assert.equal(state.messagesByRoom["room-a"]?.[1]?.deletedAt, undefined);
+
+  store.deleteRoomMessage("room-a", {
+    id: "delete-2",
+    messageId: "message-2",
+    deletedBy: "Jordan",
+    deletedByUserId: "github:jordan",
+    deletedAt: "2026-07-08T12:03:00.000Z"
+  });
+  state = useAppStore.getState();
+  assert.equal(state.messagesByRoom["room-a"]?.[1]?.body, "");
+  assert.equal(state.messagesByRoom["room-a"]?.[1]?.deletedAt, "2026-07-08T12:03:00.000Z");
+  assert.equal(state.messagesByRoom["room-a"]?.[1]?.deletedBy, "Jordan");
+  assert.deepEqual(state.chatDeletesByRoom["room-a"], [{
+    id: "delete-2",
+    messageId: "message-2",
+    deletedBy: "Jordan",
+    deletedByUserId: "github:jordan",
+    deletedAt: "2026-07-08T12:03:00.000Z"
+  }]);
+  assert.deepEqual(
+    state.codexRuntimeByRoom["room-a"]?.pendingApproval?.messages.map((message) => message.id),
+    ["message-1"]
+  );
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.pendingApproval?.summary.messagesSinceLastCodex, 1);
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.approvalVisible, true);
+});
+
+test("desktop store keeps queued Codex turn intents in order", () => {
+  const store = useAppStore.getState();
+  const queuedTurn = {
+    turnId: "turn-queued-1",
+    roomId: "room-a",
+    requestedBy: "Avery",
+    requestedByUserId: "github:avery",
+    queuedAt: "2026-07-06T00:07:00.000Z"
+  };
+  const secondQueuedTurn = {
+    ...queuedTurn,
+    turnId: "turn-queued-2",
+    requestedBy: "Jordan",
+    requestedByUserId: "github:jordan",
+    queuedAt: "2026-07-06T00:08:00.000Z"
+  };
+
+  store.enqueueCodexApprovalForRoom("room-a", queuedTurn);
+  store.enqueueCodexApprovalForRoom("room-a", secondQueuedTurn);
+  store.enqueueCodexApprovalForRoom("room-a", secondQueuedTurn);
+
+  let state = useAppStore.getState();
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.queuedApprovals?.length, 2);
+  assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.queuedApprovals?.map((turn) => turn.turnId), ["turn-queued-1", "turn-queued-2"]);
+
+  store.removeQueuedCodexApprovalForRoom("room-a", "turn-queued-2");
+
+  state = useAppStore.getState();
+  assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.queuedApprovals?.map((turn) => turn.turnId), ["turn-queued-1"]);
+});
+
+test("desktop store rejects edit and delete mutations after a Codex started event consumes the message", () => {
+  const store = useAppStore.getState();
+  store.appendRoomMessage("room-a", {
+    id: "message-consumed",
+    author: "Maddie",
+    authorUserId: "github:maddie",
+    role: "human",
+    body: "@Codex use this",
+    time: "9:43",
+    createdAt: "2026-07-08T12:00:00.000Z"
+  });
+  store.appendCodexEvent("room-a", {
+    eventType: "codex.turn",
+    turnId: "turn-consumed",
+    status: "started",
+    message: "Started Codex turn.",
+    model: "gpt-5.5",
+    consumedMessageIds: ["message-consumed"],
+    host: "Maddie",
+    hostUserId: "github:maddie",
+    createdAt: "2026-07-08T12:01:00.000Z"
+  });
+
+  store.editRoomMessage("room-a", {
+    id: "edit-consumed",
+    messageId: "message-consumed",
+    body: "late edit",
+    editedBy: "Maddie",
+    editedByUserId: "github:maddie",
+    editedAt: "2026-07-08T12:02:00.000Z"
+  });
+  store.deleteRoomMessage("room-a", {
+    id: "delete-consumed",
+    messageId: "message-consumed",
+    deletedBy: "Maddie",
+    deletedByUserId: "github:maddie",
+    deletedAt: "2026-07-08T12:03:00.000Z"
+  });
+
+  const message = useAppStore.getState().messagesByRoom["room-a"]?.find((item) => item.id === "message-consumed");
+  assert.equal(message?.body, "@Codex use this");
+  assert.equal(message?.editedAt, undefined);
+  assert.equal(message?.deletedAt, undefined);
+  assert.equal(useAppStore.getState().chatEditsByRoom["room-a"], undefined);
+  assert.equal(useAppStore.getState().chatDeletesByRoom["room-a"], undefined);
 });
 
 test("desktop store exposes room Codex thread actions", () => {
@@ -1193,6 +1399,21 @@ test("desktop store clears local room-scoped state", () => {
 
   store.appendRoomMessage("room-a", { id: "message-a", author: "Avery", role: "human", body: "hello", time: "9:41" });
   store.appendRoomMessage("room-b", { id: "message-b", author: "Jordan", role: "human", body: "keep", time: "9:42" });
+  store.editRoomMessage("room-a", {
+    id: "edit-clear",
+    messageId: "message-a",
+    body: "hello edited",
+    editedBy: "Avery",
+    editedByUserId: "github:avery",
+    editedAt: "2026-07-06T00:19:00.000Z"
+  });
+  store.deleteRoomMessage("room-a", {
+    id: "delete-clear",
+    messageId: "message-a",
+    deletedBy: "Avery",
+    deletedByUserId: "github:avery",
+    deletedAt: "2026-07-06T00:19:30.000Z"
+  });
   store.appendTerminalRequest("room-a", {
     id: "terminal-request-room-a",
     requester: "Avery",
@@ -1408,6 +1629,8 @@ test("desktop store clears local room-scoped state", () => {
 
   const state = useAppStore.getState();
   assert.deepEqual(state.messagesByRoom["room-a"], []);
+  assert.deepEqual(state.chatEditsByRoom["room-a"], []);
+  assert.deepEqual(state.chatDeletesByRoom["room-a"], []);
   assert.deepEqual(state.terminalRuntimeByRoom["room-a"]?.requests, []);
   assert.deepEqual(state.browserByRoom["room-a"], { requests: [] });
   assert.equal(state.inviteByRoom["room-a"], undefined);
@@ -1558,6 +1781,25 @@ test("desktop store hydrates local room history through one room-scoped action",
         time: "10:17"
       }
     ],
+    chatEdits: [
+      {
+        id: "edit-a",
+        messageId: "message-a",
+        body: "Restore this edited room.",
+        editedBy: "Avery",
+        editedByUserId: "github:avery",
+        editedAt: "2026-07-06T00:02:00.000Z"
+      }
+    ],
+    chatDeletes: [
+      {
+        id: "delete-a",
+        messageId: "message-old",
+        deletedBy: "Avery",
+        deletedByUserId: "github:avery",
+        deletedAt: "2026-07-06T00:02:30.000Z"
+      }
+    ],
     terminalRequests: [
       {
         id: "terminal-request-a",
@@ -1680,11 +1922,31 @@ test("desktop store hydrates local room history through one room-scoped action",
         status: "available"
       }
     ],
+    queuedCodexTurns: [
+      {
+        turnId: "turn-queued-1",
+        roomId: "room-a",
+        requestedBy: "Jordan",
+        requestedByUserId: "github:jordan",
+        queuedAt: "2026-07-06T00:12:00.000Z",
+        triggerMessageId: "message-a"
+      }
+    ],
+    roomGoal: {
+      id: "goal-a",
+      text: "Finish encrypted history polish",
+      status: "paused",
+      startedAt: "2026-07-06T00:12:00.000Z",
+      updatedAt: "2026-07-06T00:13:00.000Z",
+      elapsedMs: 60000
+    },
     codexThreadId: "thread-a"
   });
 
   const state = useAppStore.getState();
   assert.equal(state.messagesByRoom["room-a"]?.[0]?.body, "Restore this room.");
+  assert.equal(state.chatEditsByRoom["room-a"]?.[0]?.body, "Restore this edited room.");
+  assert.equal(state.chatDeletesByRoom["room-a"]?.[0]?.messageId, "message-old");
   assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "Keep this room alone.");
   assert.equal(state.terminalRuntimeByRoom["room-a"]?.requests?.[0]?.command, "npm test");
   assert.equal(state.browserByRoom["room-a"]?.requests?.[0]?.url, "http://localhost:5173");
@@ -1702,6 +1964,8 @@ test("desktop store hydrates local room history through one room-scoped action",
   assert.equal(state.terminalRuntimeByRoom["room-a"]?.selectedTerminalId, "terminal-a");
   assert.equal(state.terminalRuntimeByRoom["room-b"]?.selectedTerminalId, "terminal-b");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.hostHandoffs?.[0]?.reason, "usage_limit");
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.queuedApprovals?.[0]?.turnId, "turn-queued-1");
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.goal?.text, "Finish encrypted history polish");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.threadId, "thread-a");
 });
 

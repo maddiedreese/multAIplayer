@@ -10,7 +10,8 @@ import {
 import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
 import type {
   ChatMessage,
-  LocalRoomHistoryPayload
+  LocalRoomHistoryPayload,
+  LocalRoomReadState
 } from "../types";
 
 interface LatestRef<T> {
@@ -25,6 +26,7 @@ interface UseLocalHistoryHydrationOptions {
   historyLoadedRoomIds: LatestRef<Set<string>>;
   replaceHistorySettings: (next: LocalHistorySettings) => void;
   hydrateLocalRoomHistoryForRoom: (roomId: string, payload: LocalRoomHistoryPayload) => void;
+  hydrateRoomReadState: (roomId: string, readState?: LocalRoomReadState) => void;
 }
 
 export function useLocalHistoryHydration({
@@ -34,7 +36,8 @@ export function useLocalHistoryHydration({
   forgottenRoomIds,
   historyLoadedRoomIds,
   replaceHistorySettings,
-  hydrateLocalRoomHistoryForRoom
+  hydrateLocalRoomHistoryForRoom,
+  hydrateRoomReadState
 }: UseLocalHistoryHydrationOptions) {
   useEffect(() => {
     if (!hasSelectedRoom) return;
@@ -54,6 +57,7 @@ export function useLocalHistoryHydration({
       if (cancelled || !storedHistory) return;
       const payload = pruneLocalRoomHistory(normalizeLocalRoomHistory(storedHistory), settings.retentionDays);
       hydrateLocalRoomHistoryForRoom(selectedRoomId, payload);
+      hydrateRoomReadState(selectedRoomId, payload.readState);
     }).catch((error) => {
       if (!cancelled) console.warn("Failed to load encrypted local history", error);
     }).finally(() => {
@@ -66,6 +70,7 @@ export function useLocalHistoryHydration({
     forgottenRoomIds,
     hasSelectedRoom,
     hydrateLocalRoomHistoryForRoom,
+    hydrateRoomReadState,
     selectedRoomTeamId,
     selectedRoomId,
     replaceHistorySettings

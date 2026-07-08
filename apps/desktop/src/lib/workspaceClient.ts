@@ -119,6 +119,7 @@ export async function createRoom(
     codexModel?: string;
     codexReasoningEffort?: RoomRecord["codexReasoningEffort"];
     codexSpeed?: RoomRecord["codexSpeed"];
+    codexSandboxLevel?: RoomRecord["codexSandboxLevel"];
     browserAllowedOrigins?: string[];
     browserProfilePersistent?: boolean;
   } = {}
@@ -160,6 +161,7 @@ export async function updateRoomSettings(
     codexModel?: string;
     codexReasoningEffort?: RoomRecord["codexReasoningEffort"];
     codexSpeed?: RoomRecord["codexSpeed"];
+    codexSandboxLevel?: RoomRecord["codexSandboxLevel"];
     projectPath?: string;
     browserAllowedOrigins?: string[];
     browserProfilePersistent?: boolean;

@@ -87,7 +87,7 @@ test("loadTrustedDeviceKeys drops corrupted trust storage", () => {
   assert.equal(localStorage.getItem(trustStorageKey), null);
 });
 
-test("buildDeviceFingerprintMarkdown produces verification text", () => {
+test("buildDeviceFingerprintMarkdown produces local device-note text", () => {
   const markdown = buildDeviceFingerprintMarkdown({
     roomName: "Core Desktop",
     displayName: "Maddie",
@@ -101,5 +101,6 @@ test("buildDeviceFingerprintMarkdown produces verification text", () => {
   assert.match(markdown, /Device: device-123/);
   assert.match(markdown, /Trust status: locally trusted/);
   assert.match(markdown, /```text\nabcdef1234567890abcdef\n```/);
-  assert.match(markdown, /Verify this fingerprint out of band/);
+  assert.match(markdown, /local device note/);
+  assert.match(markdown, /Compare the fingerprint out of band/);
 });

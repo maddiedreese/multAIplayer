@@ -6,11 +6,14 @@ import {
   defaultApprovalDelegationPolicy,
   defaultCodexModel,
   defaultCodexReasoningEffort,
+  defaultCodexSandboxLevel,
   defaultCodexSpeed,
   defaultRoomMode,
+  codexSandboxLevelOptions,
   type ApprovalDelegationPolicy,
   type RoomRecord
 } from "@multaiplayer/protocol";
+import { loadRelayConfig } from "../config.js";
 import type { AuthSession, RelayStore } from "../state.js";
 
 interface RegisterRoomRoutesOptions {
@@ -18,10 +21,12 @@ interface RegisterRoomRoutesOptions {
   store: RelayStore;
   getAuthSession: (sessionId: unknown) => AuthSession | null;
   allowMutation: (session: AuthSession | null, res: Response) => boolean;
+  teamIdsForUser: (userId: string) => Set<string>;
   isTeamMember: (teamId: string, userId: string) => boolean;
   canAccessRoom: (teamId: string, roomId: string, userId: string) => boolean;
   scheduleStoreSave: () => void;
   broadcastRoomUpdated: (room: RoomRecord) => void;
+  recordQuotaRejection?: (type: string) => void;
   requesterFromRequest: (body: unknown, sessionId: unknown) => { id: string; name: string };
   isRoomHost: (room: RoomRecord, requester: { id: string; name: string }) => boolean;
   isApprovalPolicy: (value: string) => value is RoomRecord["approvalPolicy"];
@@ -42,15 +47,19 @@ interface RegisterRoomRoutesOptions {
   maxUserIdChars: number;
 }
 
+const dailyRoomCreationCounts = new Map<string, DailyCreationQuotaRecord>();
+
 export function registerRoomRoutes({
   app,
   store,
   getAuthSession,
   allowMutation,
+  teamIdsForUser,
   isTeamMember,
   canAccessRoom,
   scheduleStoreSave,
   broadcastRoomUpdated,
+  recordQuotaRejection,
   requesterFromRequest,
   isRoomHost,
   isApprovalPolicy,
@@ -70,6 +79,8 @@ export function registerRoomRoutes({
   maxRoomProjectPathChars,
   maxUserIdChars
 }: RegisterRoomRoutesOptions) {
+  const { dailyCreationCaps, totalRoomCapPerUser } = loadRelayConfig();
+
   app.post("/rooms", (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
@@ -88,6 +99,9 @@ export function registerRoomRoutes({
       ? defaultCodexReasoningEffort
       : normalizeCodexReasoningEffort(req.body.codexReasoningEffort);
     const codexSpeed = req.body?.codexSpeed === undefined ? defaultCodexSpeed : normalizeCodexSpeed(req.body.codexSpeed);
+    const codexSandboxLevel = req.body?.codexSandboxLevel === undefined
+      ? defaultCodexSandboxLevel
+      : normalizeCodexSandboxLevel(req.body.codexSandboxLevel);
     const browserAllowedOrigins = req.body?.browserAllowedOrigins;
     const browserProfilePersistent = req.body?.browserProfilePersistent;
     if (!store.hasTeam(teamId)) {
@@ -123,11 +137,15 @@ export function registerRoomRoutes({
       return;
     }
     if (!codexReasoningEffort) {
-      res.status(400).json({ error: "codexReasoningEffort must be low, medium, high, or xhigh" });
+      res.status(400).json({ error: "codexReasoningEffort must be minimal, low, medium, high, or xhigh" });
       return;
     }
     if (!codexSpeed) {
       res.status(400).json({ error: "codexSpeed must be standard or fast" });
+      return;
+    }
+    if (!codexSandboxLevel) {
+      res.status(400).json({ error: "codexSandboxLevel must be read_only, workspace_write, workspace_write_network, or danger_full_access" });
       return;
     }
     let normalizedBrowserAllowedOrigins = defaultBrowserAllowedOrigins;
@@ -141,6 +159,25 @@ export function registerRoomRoutes({
     }
     if (browserProfilePersistent !== undefined && typeof browserProfilePersistent !== "boolean") {
       res.status(400).json({ error: "browserProfilePersistent must be a boolean" });
+      return;
+    }
+    if (session && !allowTotalRoomQuota({
+      store,
+      teamIds: teamIdsForUser(session.user.id),
+      cap: totalRoomCapPerUser,
+      res,
+      recordQuotaRejection
+    })) {
+      return;
+    }
+    if (session && !consumeDailyCreationQuota({
+      cap: dailyCreationCaps.roomsPerUser,
+      counts: dailyRoomCreationCounts,
+      quota: "daily_user_room_creations",
+      userId: session.user.id,
+      res,
+      recordQuotaRejection
+    })) {
       return;
     }
     const room: RoomRecord = {
@@ -157,6 +194,7 @@ export function registerRoomRoutes({
       codexModel,
       codexReasoningEffort,
       codexSpeed,
+      codexSandboxLevel,
       browserAllowedOrigins: normalizedBrowserAllowedOrigins,
       browserProfilePersistent: browserProfilePersistent ?? defaultBrowserProfilePersistent,
       unread: 0
@@ -242,6 +280,9 @@ export function registerRoomRoutes({
       ? undefined
       : normalizeCodexReasoningEffort(req.body.codexReasoningEffort);
     const codexSpeed = req.body?.codexSpeed === undefined ? undefined : normalizeCodexSpeed(req.body.codexSpeed);
+    const codexSandboxLevel = req.body?.codexSandboxLevel === undefined
+      ? undefined
+      : normalizeCodexSandboxLevel(req.body.codexSandboxLevel);
     const projectPath = req.body?.projectPath === undefined ? undefined : normalizeRoomProjectPath(req.body.projectPath);
     const browserAllowedOrigins = req.body?.browserAllowedOrigins;
     const browserProfilePersistent = req.body?.browserProfilePersistent;
@@ -284,11 +325,15 @@ export function registerRoomRoutes({
       return;
     }
     if (codexReasoningEffort !== undefined && !codexReasoningEffort) {
-      res.status(400).json({ error: "codexReasoningEffort must be low, medium, high, or xhigh" });
+      res.status(400).json({ error: "codexReasoningEffort must be minimal, low, medium, high, or xhigh" });
       return;
     }
     if (codexSpeed !== undefined && !codexSpeed) {
       res.status(400).json({ error: "codexSpeed must be standard or fast" });
+      return;
+    }
+    if (codexSandboxLevel !== undefined && !codexSandboxLevel) {
+      res.status(400).json({ error: "codexSandboxLevel must be read_only, workspace_write, workspace_write_network, or danger_full_access" });
       return;
     }
     if (projectPath !== undefined && !projectPath) {
@@ -318,6 +363,7 @@ export function registerRoomRoutes({
       codexModel: codexModel ?? room.codexModel,
       codexReasoningEffort: codexReasoningEffort ?? room.codexReasoningEffort,
       codexSpeed: codexSpeed ?? room.codexSpeed,
+      codexSandboxLevel: codexSandboxLevel ?? room.codexSandboxLevel,
       browserAllowedOrigins: normalizedBrowserAllowedOrigins ?? room.browserAllowedOrigins,
       browserProfilePersistent: browserProfilePersistent ?? room.browserProfilePersistent
     };
@@ -326,6 +372,44 @@ export function registerRoomRoutes({
     broadcastRoomUpdated(updated);
     res.json({ room: updated });
   });
+}
+
+function allowTotalRoomQuota({
+  store,
+  teamIds,
+  cap,
+  res,
+  recordQuotaRejection
+}: {
+  store: RelayStore;
+  teamIds: Set<string>;
+  cap: number;
+  res: Response;
+  recordQuotaRejection?: (type: string) => void;
+}): boolean {
+  const quota = "total_user_rooms";
+  const used = store.allRooms().filter((room) => teamIds.has(room.teamId)).length;
+  if (used < cap) return true;
+  recordQuotaRejection?.(quota);
+  res.status(429).json({
+    error: "Total room quota exceeded.",
+    code: "quota_exceeded",
+    quota: {
+      type: quota,
+      limit: cap,
+      used,
+      remaining: 0
+    }
+  });
+  return false;
+}
+
+function normalizeCodexSandboxLevel(value: unknown): RoomRecord["codexSandboxLevel"] | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return codexSandboxLevelOptions.some((option) => option.id === trimmed)
+    ? trimmed as RoomRecord["codexSandboxLevel"]
+    : null;
 }
 
 function normalizeTrustedApproverUserIds(value: unknown, maxUserIdChars: number): string[] | null {
@@ -338,4 +422,73 @@ function normalizeTrustedApproverUserIds(value: unknown, maxUserIdChars: number)
     ids.add(normalized);
   }
   return [...ids];
+}
+
+interface DailyCreationQuotaRecord {
+  count: number;
+  resetAt: number;
+}
+
+function consumeDailyCreationQuota({
+  cap,
+  counts,
+  quota,
+  userId,
+  res,
+  recordQuotaRejection
+}: {
+  cap: number;
+  counts: Map<string, DailyCreationQuotaRecord>;
+  quota: "daily_user_room_creations";
+  userId: string;
+  res: Response;
+  recordQuotaRejection?: (type: string) => void;
+}): boolean {
+  const now = Date.now();
+  const resetAt = nextUtcMidnight(now);
+  const key = `${quota}:${userId}`;
+  const current = counts.get(key);
+  const record = current && current.resetAt > now ? current : { count: 0, resetAt };
+  if (record.count >= cap) {
+    sendDailyCreationQuotaExceeded(res, {
+      quota,
+      limit: cap,
+      used: record.count,
+      resetAt: record.resetAt
+    });
+    recordQuotaRejection?.(quota);
+    return false;
+  }
+  counts.set(key, { count: record.count + 1, resetAt: record.resetAt });
+  return true;
+}
+
+function sendDailyCreationQuotaExceeded(
+  res: Response,
+  { quota, limit, used, resetAt }: {
+    quota: "daily_user_room_creations";
+    limit: number;
+    used: number;
+    resetAt: number;
+  }
+) {
+  const retryAfterSeconds = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
+  res.setHeader("Retry-After", retryAfterSeconds);
+  res.status(429).json({
+    error: "Daily room creation quota exceeded.",
+    code: "quota_exceeded",
+    retryAfterSeconds,
+    quota: {
+      type: quota,
+      limit,
+      used,
+      remaining: 0,
+      resetsAt: new Date(resetAt).toISOString()
+    }
+  });
+}
+
+function nextUtcMidnight(now: number): number {
+  const date = new Date(now);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1);
 }

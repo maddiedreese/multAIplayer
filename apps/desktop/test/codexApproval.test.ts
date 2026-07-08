@@ -43,6 +43,16 @@ test("chat-only Codex turns are auto-approved for the active host", () => {
   assert.equal(shouldAutoApproveChatOnlyTurn(baseSummary, true), true);
 });
 
+test("chat-only Codex turns with risk flags fall back to host approval", () => {
+  assert.equal(shouldAutoApproveChatOnlyTurn(baseSummary, true, [{
+    id: "message-1:agent-directed",
+    label: "message 1 (@Maddie) contains agent-directed phrasing",
+    source: "message 1 (@Maddie)",
+    risk: "Agent-directed phrasing",
+    severity: "warning"
+  }]), false);
+});
+
 test("chat-only Codex turns are not auto-approved for non-host members", () => {
   assert.equal(shouldAutoApproveChatOnlyTurn(baseSummary, false), false);
 });

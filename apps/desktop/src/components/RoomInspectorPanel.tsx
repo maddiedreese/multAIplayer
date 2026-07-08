@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { InspectorTab } from "./InspectorTabs";
 
 export type { InspectorTab };
@@ -6,27 +6,52 @@ export type { InspectorTab };
 interface RoomInspectorPanelProps {
   activeTab: InspectorTab;
   browserPanel: ReactNode;
-  workPanel: ReactNode;
+  filesPanel: ReactNode;
+  terminalPanel: ReactNode;
+  roomPanel: ReactNode;
 }
 
 export function RoomInspectorPanel({
   activeTab,
   browserPanel,
-  workPanel
+  filesPanel,
+  terminalPanel,
+  roomPanel
 }: RoomInspectorPanelProps) {
+  const inspectorRef = useRef<HTMLElement | null>(null);
   const activeLabel = activeTab === "room" ? "room" : activeTab;
+  const panelByTab: Record<InspectorTab, ReactNode> = {
+    files: filesPanel,
+    diff: filesPanel,
+    terminal: terminalPanel,
+    browser: browserPanel,
+    room: roomPanel
+  };
+
+  useEffect(() => {
+    const inspector = inspectorRef.current;
+    if (!inspector) return;
+    if (typeof inspector.scrollTo === "function") {
+      inspector.scrollTo({ top: 0, left: 0 });
+      return;
+    }
+    inspector.scrollTop = 0;
+    inspector.scrollLeft = 0;
+  }, [activeTab]);
 
   return (
-    <aside className="inspector">
+    <aside className="inspector" ref={inspectorRef}>
       <div className="inspector-context">
         <span>Context</span>
         <strong>{activeLabel}</strong>
       </div>
 
       <div
+        key={activeTab}
         className={`inspector-panel-group inspector-panel-${activeTab}`}
+        data-active-tab={activeTab}
       >
-        {activeTab === "browser" ? browserPanel : workPanel}
+        {panelByTab[activeTab]}
       </div>
     </aside>
   );

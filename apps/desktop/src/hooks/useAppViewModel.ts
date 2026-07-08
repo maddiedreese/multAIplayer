@@ -1,6 +1,7 @@
 import {
   codexModelOptions,
   codexReasoningEffortOptions,
+  codexSandboxLevelOptions,
   codexSpeedOptions,
   defaultCodexModel
 } from "@multaiplayer/protocol";
@@ -88,6 +89,7 @@ export function useAppViewModel({
     selectedCodexModel,
     selectedCodexReasoningEffort,
     selectedCodexSpeed,
+    selectedCodexSandboxLevel,
     selectedMessages,
     markdownSelectionMode,
     inspectorTab,
@@ -141,6 +143,7 @@ export function useAppViewModel({
     setProjectPathDraftForRoom,
     setInviteApprovalGateForRoom,
     setCustomCodexModelForRoom,
+    setRoomNotificationsMuted,
     updateSelectedGitWorkflowDraft
   } = roomActions;
 
@@ -198,9 +201,11 @@ export function useAppViewModel({
       codexRunning: selectedRuntime.codexRunning,
       roomCanUseChat: selectedRuntime.roomCanUseChat,
       draft,
+      replyTarget: selectedRuntime.replyTarget,
       roomGoal,
       pendingAttachmentsForCount: pendingAttachments,
       pendingAttachments: selectedRuntime.pendingAttachmentRows,
+      queuedCodexTurns: selectedRuntime.queuedCodexTurnRows,
       localPreviewCards: selectedRuntime.localPreviewCards,
       pendingAttachmentSummary: selectedRuntime.pendingAttachmentSummary,
       onToggleMessageSelection: toggleMessageSelection,
@@ -247,6 +252,7 @@ export function useAppViewModel({
       hostHandoffs: selectedRuntime.hostHandoffs,
       hostBusy: selectedRuntime.hostBusy,
       onAcceptHandoff: hostHandoffActions.acceptHostHandoff,
+      selectedCodexSandboxLevel,
       encryptedInvite: {
         inviteApprovalGate,
         copyDisabled: !roomInteraction.canCopyRoomInvite,
@@ -275,9 +281,12 @@ export function useAppViewModel({
       approvalPolicy: {
         labels: approvalPolicyLabels,
         delegationLabels: approvalDelegationPolicyLabels,
+        sandboxOptions: codexSandboxLevelOptions,
         message: settingsMessage,
+        selectedSandboxLevel: selectedCodexSandboxLevel,
         onSelectPolicy: roomRuntime.setApprovalPolicy,
-        onSelectDelegationPolicy: roomRuntime.setApprovalDelegationPolicy
+        onSelectDelegationPolicy: roomRuntime.setApprovalDelegationPolicy,
+        onSelectSandboxLevel: roomRuntime.setCodexSandboxLevel
       },
       roomMode: {
         labels: roomModeLabels,
@@ -448,6 +457,7 @@ export function useAppViewModel({
       relayWsDraft: appConfigState.relayWsDraft,
       selectedRoomMode: selectedRoom.mode,
       roomSettingsGateMessage: roomInteraction.roomSettingsGateMessage,
+      notificationsMuted: roomSettingsState.notificationMutedRoomIds.has(selectedRoom.id),
       historySettings: historyDefaultsState.historySettings,
       teamHistorySettings: historyDefaultsState.teamHistorySettings,
       teamDefaultApprovalPolicy: historyDefaultsState.teamDefaultApprovalPolicy,
@@ -477,6 +487,7 @@ export function useAppViewModel({
       onResetRelay: appConfigState.resetRelayConfiguration,
       onSaveRelay: appConfigState.saveRelayConfiguration,
       onToggleRoomMode: roomRuntime.toggleRoomMode,
+      onNotificationsMutedChange: (muted) => setRoomNotificationsMuted(selectedRoom.id, muted),
       onHistorySettingsChange: workspaceFlow.updateLocalHistorySettings,
       onClearRoomHistory: workspaceFlow.clearRoomHistory,
       onForgetRoomLocalData: workspaceFlow.forgetSelectedRoomLocalData,

@@ -1,12 +1,21 @@
 import type { StateCreator } from "zustand";
-import type { ChatReactionPlaintextPayload, TeamMemberRecord } from "@multaiplayer/protocol";
-import type { ChatMessage } from "../../types";
+import type {
+  ChatDeletePlaintextPayload,
+  ChatEditPlaintextPayload,
+  ChatReactionPlaintextPayload,
+  TeamMemberRecord
+} from "@multaiplayer/protocol";
+import { messageIsBeforeCodexWatermark } from "../../lib/codexMessageWatermark";
+import { messagesSinceLastCodex } from "../../lib/codexTurn";
+import type { ChatAttachment, ChatMessage, PendingCodexApproval } from "../../types";
 import type { AppStoreState } from "../appStore";
 
 type TeamMembersByTeam = Record<string, TeamMemberRecord[]>;
 type TeamMembersMessageByTeam = Record<string, string | null>;
 type TeamMembersBusyByTeam = Record<string, boolean>;
 type MessagesByRoom = Record<string, ChatMessage[]>;
+type ChatEditsByRoom = Record<string, ChatEditPlaintextPayload[]>;
+type ChatDeletesByRoom = Record<string, ChatDeletePlaintextPayload[]>;
 
 export interface TeamRosterState {
   members?: TeamMemberRecord[];
@@ -24,6 +33,8 @@ interface WorkspaceInitialData {
 export interface WorkspaceDataSlice {
   teamRosterByTeam: TeamRosterByTeam;
   messagesByRoom: MessagesByRoom;
+  chatEditsByRoom: ChatEditsByRoom;
+  chatDeletesByRoom: ChatDeletesByRoom;
   seedWorkspaceInitialDataIfEmpty: (initialData: WorkspaceInitialData) => void;
   setTeamMembersForTeam: (teamId: string, members: TeamMemberRecord[]) => void;
   setTeamMembersMessageForTeam: (teamId: string, message: string | null) => void;
@@ -31,15 +42,19 @@ export interface WorkspaceDataSlice {
   ensureLocalTeamMemberForTeam: (teamId: string, userId: string, role: TeamMemberRecord["role"]) => void;
   initializeMessagesForRoom: (roomId: string) => void;
   appendRoomMessage: (roomId: string, message: ChatMessage) => void;
+  editRoomMessage: (roomId: string, edit: ChatEditPlaintextPayload) => void;
+  deleteRoomMessage: (roomId: string, deletion: ChatDeletePlaintextPayload) => void;
   applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
 }
 
 export const emptyWorkspaceDataState: Pick<
   WorkspaceDataSlice,
-  "teamRosterByTeam" | "messagesByRoom"
+  "teamRosterByTeam" | "messagesByRoom" | "chatEditsByRoom" | "chatDeletesByRoom"
 > = {
   teamRosterByTeam: {},
-  messagesByRoom: {}
+  messagesByRoom: {},
+  chatEditsByRoom: {},
+  chatDeletesByRoom: {}
 };
 
 function updateTeamRosterForTeam(
@@ -158,6 +173,108 @@ export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], Works
       };
     });
   },
+  editRoomMessage: (roomId, edit) => {
+    set((state) => {
+      const roomMessages = state.messagesByRoom[roomId] ?? [];
+      const target = roomMessages.find((message) => message.id === edit.messageId);
+      if (!target || target.deletedAt) return state;
+      if (target.authorUserId && target.authorUserId !== edit.editedByUserId) return state;
+      const roomRuntime = state.codexRuntimeByRoom[roomId];
+      if (!messageIsBeforeCodexWatermark(target, roomRuntime?.events ?? [])) return state;
+      const nextMessages = roomMessages.map((message) => {
+        if (message.id !== edit.messageId) return message;
+        return {
+          ...message,
+          body: edit.body,
+          editedAt: edit.editedAt,
+          editedByUserId: edit.editedByUserId
+        };
+      });
+      const approvalIncludesMessage = roomRuntime?.pendingApproval?.messages.some((message) => message.id === edit.messageId) ?? false;
+      const refreshedApproval = approvalIncludesMessage && roomRuntime?.pendingApproval
+        ? refreshPendingApprovalMessages(roomRuntime.pendingApproval, nextMessages)
+        : null;
+      return {
+        messagesByRoom: {
+          ...state.messagesByRoom,
+          [roomId]: nextMessages
+        },
+        chatEditsByRoom: {
+          ...state.chatEditsByRoom,
+          [roomId]: appendUniqueAuditEvent(
+            state.chatEditsByRoom[roomId],
+            edit,
+            (item) => item.id
+          )
+        },
+        ...(approvalIncludesMessage
+          ? {
+            codexRuntimeByRoom: {
+              ...state.codexRuntimeByRoom,
+              [roomId]: {
+                ...roomRuntime,
+                ...(refreshedApproval ? { pendingApproval: refreshedApproval } : {})
+              }
+            }
+          }
+          : {})
+      };
+    });
+  },
+  deleteRoomMessage: (roomId, deletion) => {
+    set((state) => {
+      const roomMessages = state.messagesByRoom[roomId] ?? [];
+      const target = roomMessages.find((message) => message.id === deletion.messageId);
+      if (!target || target.deletedAt) return state;
+      if (target.authorUserId && target.authorUserId !== deletion.deletedByUserId) return state;
+      const roomRuntime = state.codexRuntimeByRoom[roomId];
+      if (!messageIsBeforeCodexWatermark(target, roomRuntime?.events ?? [])) return state;
+      const nextMessages = roomMessages.map((message) => {
+        if (message.id !== deletion.messageId) return message;
+        return {
+          ...message,
+          body: "",
+          deletedAt: deletion.deletedAt,
+          deletedBy: deletion.deletedBy,
+          deletedByUserId: deletion.deletedByUserId,
+          attachments: undefined,
+          reactions: undefined
+        };
+      });
+      const approvalIncludesMessage = roomRuntime?.pendingApproval?.messages.some((message) => message.id === deletion.messageId) ?? false;
+      const queuedApprovals = roomRuntime?.queuedApprovals?.filter((turn) => turn.triggerMessageId !== deletion.messageId);
+      const queueChanged = queuedApprovals && queuedApprovals.length !== (roomRuntime?.queuedApprovals ?? []).length;
+      const refreshedApproval = approvalIncludesMessage && roomRuntime?.pendingApproval
+        ? refreshPendingApprovalMessages(roomRuntime.pendingApproval, nextMessages)
+        : null;
+      return {
+        messagesByRoom: {
+          ...state.messagesByRoom,
+          [roomId]: nextMessages
+        },
+        chatDeletesByRoom: {
+          ...state.chatDeletesByRoom,
+          [roomId]: appendUniqueAuditEvent(
+            state.chatDeletesByRoom[roomId],
+            deletion,
+            (item) => item.id
+          )
+        },
+        ...(approvalIncludesMessage || queueChanged
+          ? {
+            codexRuntimeByRoom: {
+              ...state.codexRuntimeByRoom,
+              [roomId]: updateCodexRuntimeAfterMessageDelete(
+                roomRuntime,
+                approvalIncludesMessage ? refreshedApproval : roomRuntime?.pendingApproval,
+                queueChanged ? queuedApprovals : roomRuntime?.queuedApprovals
+              )
+            }
+          }
+          : {})
+      };
+    });
+  },
   applyMessageReaction: (roomId, reaction) => {
     set((state) => {
       const roomMessages = state.messagesByRoom[roomId] ?? [];
@@ -185,3 +302,62 @@ export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], Works
     });
   }
 });
+
+function updateCodexRuntimeAfterMessageDelete(
+  roomRuntime: AppStoreState["codexRuntimeByRoom"][string] | undefined,
+  pendingApproval: PendingCodexApproval | null | undefined,
+  queuedApprovals = roomRuntime?.queuedApprovals
+): AppStoreState["codexRuntimeByRoom"][string] {
+  const {
+    pendingApproval: _pendingApproval,
+    queuedApprovals: _queuedApprovals,
+    ...rest
+  } = roomRuntime ?? {};
+  return {
+    ...rest,
+    ...(pendingApproval ? { pendingApproval } : {}),
+    ...(queuedApprovals?.length ? { queuedApprovals } : {})
+  };
+}
+
+function refreshPendingApprovalMessages(
+  approval: PendingCodexApproval,
+  roomMessages: ChatMessage[]
+): PendingCodexApproval | null {
+  const approvalMessageIds = new Set(approval.messages.map((message) => message.id).filter(Boolean));
+  const refreshedMessages = roomMessages.filter((message) => approvalMessageIds.has(message.id) && !message.deletedAt);
+  if (!refreshedMessages.length) return null;
+  const delta = messagesSinceLastCodex(refreshedMessages) as ChatMessage[];
+  const attachments = delta.flatMap((message) => message.attachments ?? []);
+  return {
+    ...approval,
+    messages: refreshedMessages,
+    summary: {
+      ...approval.summary,
+      messagesSinceLastCodex: delta.length,
+      attachments: attachments.map(formatApprovalAttachmentSummary)
+    }
+  };
+}
+
+function formatApprovalAttachmentSummary(attachment: ChatAttachment): PendingCodexApproval["summary"]["attachments"][number] {
+  return {
+    id: attachment.id,
+    name: attachment.name,
+    type: attachment.type,
+    size: attachment.size,
+    storage: attachment.blobId ? "encrypted_blob" : "inline",
+    contentIncluded: Boolean(attachment.content)
+  };
+}
+
+function appendUniqueAuditEvent<T>(
+  current: T[] | undefined,
+  event: T,
+  keyFor: (event: T) => string
+): T[] {
+  const events = current ?? [];
+  const key = keyFor(event);
+  if (events.some((item) => keyFor(item) === key)) return events;
+  return [...events, event];
+}

@@ -5,6 +5,7 @@ import type {
   TeamRecord,
   TeamRole
 } from "@multaiplayer/protocol";
+import { loadRelayConfig } from "../config.js";
 import type { AuthSession, RelayStore } from "../state.js";
 
 interface RegisterTeamRoutesOptions {
@@ -24,9 +25,12 @@ interface RegisterTeamRoutesOptions {
   revokeTeamMemberSessions: (teamId: string, userId: string) => void;
   broadcastWorkspaceUpdated: (team: TeamRecord) => void;
   scheduleStoreSave: () => void;
+  recordQuotaRejection?: (type: string) => void;
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
   maxTeamNameChars: number;
 }
+
+const dailyTeamCreationCounts = new Map<string, DailyCreationQuotaRecord>();
 
 export function registerTeamRoutes({
   app,
@@ -45,9 +49,12 @@ export function registerTeamRoutes({
   revokeTeamMemberSessions,
   broadcastWorkspaceUpdated,
   scheduleStoreSave,
+  recordQuotaRejection,
   normalizeMetadataText,
   maxTeamNameChars
 }: RegisterTeamRoutesOptions) {
+  const { dailyCreationCaps } = loadRelayConfig();
+
   app.get("/teams", (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowRead(session, res)) return;
@@ -186,6 +193,16 @@ export function registerTeamRoutes({
       res.status(400).json({ error: `Team name is required and must be up to ${maxTeamNameChars} characters` });
       return;
     }
+    if (session && !consumeDailyCreationQuota({
+      cap: dailyCreationCaps.teamsPerUser,
+      counts: dailyTeamCreationCounts,
+      quota: "daily_user_team_creations",
+      userId: session.user.id,
+      res,
+      recordQuotaRejection
+    })) {
+      return;
+    }
     const team: TeamRecord = {
       id: `team_${nanoid(10)}`,
       name,
@@ -222,4 +239,73 @@ export function teamRecordForUser(
 
 function parseRequestedTeamRole(value: unknown): TeamRole | null {
   return value === "owner" || value === "admin" || value === "member" ? value : null;
+}
+
+interface DailyCreationQuotaRecord {
+  count: number;
+  resetAt: number;
+}
+
+function consumeDailyCreationQuota({
+  cap,
+  counts,
+  quota,
+  userId,
+  res,
+  recordQuotaRejection
+}: {
+  cap: number;
+  counts: Map<string, DailyCreationQuotaRecord>;
+  quota: "daily_user_team_creations";
+  userId: string;
+  res: Response;
+  recordQuotaRejection?: (type: string) => void;
+}): boolean {
+  const now = Date.now();
+  const resetAt = nextUtcMidnight(now);
+  const key = `${quota}:${userId}`;
+  const current = counts.get(key);
+  const record = current && current.resetAt > now ? current : { count: 0, resetAt };
+  if (record.count >= cap) {
+    sendDailyCreationQuotaExceeded(res, {
+      quota,
+      limit: cap,
+      used: record.count,
+      resetAt: record.resetAt
+    });
+    recordQuotaRejection?.(quota);
+    return false;
+  }
+  counts.set(key, { count: record.count + 1, resetAt: record.resetAt });
+  return true;
+}
+
+function sendDailyCreationQuotaExceeded(
+  res: Response,
+  { quota, limit, used, resetAt }: {
+    quota: "daily_user_team_creations";
+    limit: number;
+    used: number;
+    resetAt: number;
+  }
+) {
+  const retryAfterSeconds = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
+  res.setHeader("Retry-After", retryAfterSeconds);
+  res.status(429).json({
+    error: "Daily team creation quota exceeded.",
+    code: "quota_exceeded",
+    retryAfterSeconds,
+    quota: {
+      type: quota,
+      limit,
+      used,
+      remaining: 0,
+      resetsAt: new Date(resetAt).toISOString()
+    }
+  });
+}
+
+function nextUtcMidnight(now: number): number {
+  const date = new Date(now);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1);
 }

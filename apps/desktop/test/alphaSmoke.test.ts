@@ -191,6 +191,7 @@ test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, brow
     fromHostUserId: host.id,
     projectPath: room.projectPath,
     codexModel: room.codexModel,
+    codexSandboxLevel: "workspace_write" as const,
     approvalPolicy: room.approvalPolicy,
     gitRepoOwner: "maddiedreese",
     gitRepoName: "multAIplayer",
@@ -200,6 +201,7 @@ test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, brow
   assert.deepEqual(createHandoffSettingsPatch(handoff), {
     projectPath: room.projectPath,
     codexModel: room.codexModel,
+    codexSandboxLevel: "workspace_write",
     approvalPolicy: room.approvalPolicy
   });
   assert.match(hostHandoffDetail(handoff), /out of Codex usage/);
