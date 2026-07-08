@@ -159,7 +159,7 @@ fn service_tier_for_speed(value: Option<&str>) -> Result<String, String> {
     let speed = value.unwrap_or("standard").trim();
     match speed {
         "standard" => Ok("default".to_string()),
-        "fast" => Ok("priority".to_string()),
+        "fast" => Ok("fast".to_string()),
         "flex" => Ok("flex".to_string()),
         _ => Err("Codex speed must be standard, fast, or flex.".to_string()),
     }

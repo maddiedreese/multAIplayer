@@ -408,7 +408,7 @@ export const codexReasoningEffortOptions = [
 
 export const codexSpeedOptions = [
   { id: "standard", label: "Standard", serviceTier: "default", description: "Default Codex speed and usage behavior" },
-  { id: "fast", label: "Fast", serviceTier: "priority", description: "Priority tier for faster Codex turns when available" },
+  { id: "fast", label: "Fast", serviceTier: "fast", description: "Fast mode for supported Codex models when available" },
   { id: "flex", label: "Flex", serviceTier: "flex", description: "Flex tier for lower-priority Codex turns when available" }
 ] as const;
 

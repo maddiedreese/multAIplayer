@@ -625,7 +625,7 @@ mod tests {
             "/tmp/project",
             "gpt-5.3-codex",
             "medium",
-            "priority",
+            "fast",
             &sandbox,
         )
         .expect("different speed key");

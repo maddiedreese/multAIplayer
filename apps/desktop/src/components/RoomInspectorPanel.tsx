@@ -6,16 +6,26 @@ export type { InspectorTab };
 interface RoomInspectorPanelProps {
   activeTab: InspectorTab;
   browserPanel: ReactNode;
-  workPanel: ReactNode;
+  filesPanel: ReactNode;
+  terminalPanel: ReactNode;
+  roomPanel: ReactNode;
 }
 
 export function RoomInspectorPanel({
   activeTab,
   browserPanel,
-  workPanel
+  filesPanel,
+  terminalPanel,
+  roomPanel
 }: RoomInspectorPanelProps) {
   const activeLabel = activeTab === "room" ? "room" : activeTab;
-  const panel = activeTab === "browser" ? browserPanel : workPanel;
+  const panelByTab: Record<InspectorTab, ReactNode> = {
+    files: filesPanel,
+    diff: filesPanel,
+    terminal: terminalPanel,
+    browser: browserPanel,
+    room: roomPanel
+  };
 
   return (
     <aside className="inspector">
@@ -29,7 +39,7 @@ export function RoomInspectorPanel({
         className={`inspector-panel-group inspector-panel-${activeTab}`}
         data-active-tab={activeTab}
       >
-        {panel}
+        {panelByTab[activeTab]}
       </div>
     </aside>
   );
