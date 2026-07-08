@@ -73,7 +73,7 @@ interface UseLocalHistoryActionsOptions {
   hydrateLocalRoomHistoryForRoom: (roomId: string, payload: ReturnType<typeof pruneLocalRoomHistory>) => void;
   replaceRoom: (room: RoomRecord) => void;
   clearBrowserStatusForRoom: (roomId: string) => void;
-  setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
+  rememberForgottenRoom: (roomId: string) => void;
   historyLoadedRoomIds: MutableRefObject<Set<string>>;
 }
 
@@ -106,7 +106,7 @@ export function useLocalHistoryActions({
   hydrateLocalRoomHistoryForRoom,
   replaceRoom,
   clearBrowserStatusForRoom,
-  setForgottenRoomIds,
+  rememberForgottenRoom,
   historyLoadedRoomIds
 }: UseLocalHistoryActionsOptions) {
   const clearRoomScopedStateForRoom = useAppStore((state) => state.clearRoomScopedStateForRoom);
@@ -212,7 +212,7 @@ export function useLocalHistoryActions({
     await forgetRoomLocalData(selectedRoom.id);
     clearRoomVisibilityWarningAcknowledgement(selectedRoom.id);
     historyLoadedRoomIds.current.delete(selectedRoom.id);
-    setForgottenRoomIds((current) => new Set(current).add(selectedRoom.id));
+    rememberForgottenRoom(selectedRoom.id);
     clearRoomScopedStateForRoom(roomId);
     setHistorySettings(loadHistorySettings(selectedRoom.id));
     setSecretWarningVisibleForRoom(selectedRoom.id, true);

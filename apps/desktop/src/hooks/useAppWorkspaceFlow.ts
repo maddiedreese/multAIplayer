@@ -191,9 +191,9 @@ export function useAppWorkspaceFlow({
         setNewTeamName: workspaceState.setNewTeamName,
         setNewRoomName: workspaceState.setNewRoomName,
         setNewRoomProjectPath: workspaceState.setNewRoomProjectPath,
-        setRevokedRoomIds: roomRuntimeState.setRevokedRoomIds,
-        setRevokedTeamIds: roomRuntimeState.setRevokedTeamIds,
-        setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
+        restoreRoomAccess: roomRuntimeState.restoreRoomAccess,
+        restoreTeamAccess: roomRuntimeState.restoreTeamAccess,
+        restoreForgottenRoom: roomRuntimeState.restoreForgottenRoom,
         setInviteApprovalGateForRoom,
         upsertTeam: workspaceRecords.upsertTeam,
         upsertRoom: workspaceRecords.upsertRoom
@@ -238,7 +238,7 @@ export function useAppWorkspaceFlow({
         hydrateLocalRoomHistoryForRoom,
         replaceRoom: workspaceRecords.replaceRoom,
         clearBrowserStatusForRoom,
-        setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
+        rememberForgottenRoom: roomRuntimeState.rememberForgottenRoom,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds
       },
       files: {

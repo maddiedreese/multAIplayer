@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useAppStore } from "../store/appStore";
 import {
   projectInspectorTabsByRoom,
@@ -30,6 +30,36 @@ export function useRoomRuntimeState() {
   const [forgottenRoomIds, setForgottenRoomIds] = useState<Set<string>>(() => new Set());
   const [revokedRoomIds, setRevokedRoomIds] = useState<Set<string>>(() => new Set());
   const [revokedTeamIds, setRevokedTeamIds] = useState<Set<string>>(() => new Set());
+  const rememberForgottenRoom = useCallback((roomId: string) => {
+    setForgottenRoomIds((current) => new Set(current).add(roomId));
+  }, []);
+  const restoreForgottenRoom = useCallback((roomId: string) => {
+    setForgottenRoomIds((current) => {
+      const next = new Set(current);
+      next.delete(roomId);
+      return next;
+    });
+  }, []);
+  const revokeRoomAccess = useCallback((roomId: string) => {
+    setRevokedRoomIds((current) => new Set(current).add(roomId));
+  }, []);
+  const restoreRoomAccess = useCallback((roomId: string) => {
+    setRevokedRoomIds((current) => {
+      const next = new Set(current);
+      next.delete(roomId);
+      return next;
+    });
+  }, []);
+  const revokeTeamAccess = useCallback((teamId: string) => {
+    setRevokedTeamIds((current) => new Set(current).add(teamId));
+  }, []);
+  const restoreTeamAccess = useCallback((teamId: string) => {
+    setRevokedTeamIds((current) => {
+      const next = new Set(current);
+      next.delete(teamId);
+      return next;
+    });
+  }, []);
   const clearPresenceByRoom = useAppStore((state) => state.clearPresenceByRoom);
   const setRoomPresenceForDevice = useAppStore((state) => state.setRoomPresenceForDevice);
   const codexRuntimeByRoom = useAppStore((state) => state.codexRuntimeByRoom);
@@ -52,10 +82,16 @@ export function useRoomRuntimeState() {
     inspectorTabsByRoom: historyPresenceMaps.inspectorTabsByRoom,
     forgottenRoomIds,
     setForgottenRoomIds,
+    rememberForgottenRoom,
+    restoreForgottenRoom,
     revokedRoomIds,
     setRevokedRoomIds,
+    revokeRoomAccess,
+    restoreRoomAccess,
     revokedTeamIds,
     setRevokedTeamIds,
+    revokeTeamAccess,
+    restoreTeamAccess,
     presenceByRoom: historyPresenceMaps.presenceByRoom,
     clearPresenceByRoom,
     setRoomPresenceForDevice,
