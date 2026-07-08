@@ -133,7 +133,10 @@ Object.defineProperty(globalThis, "fetch", {
 function resetAppSmokeDom() {
   cleanup();
   useAppStore.getState().resetAppStore();
-  useAppStore.getState().setMessagesByRoom(structuredClone(initialMessagesByRoom));
+  useAppStore.getState().seedWorkspaceInitialDataIfEmpty({
+    teamMembersByTeam: {},
+    messagesByRoom: structuredClone(initialMessagesByRoom)
+  });
   localStorage.clear();
   document.body.innerHTML = "";
 }

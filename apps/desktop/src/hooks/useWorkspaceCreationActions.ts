@@ -1,4 +1,3 @@
-import type { Dispatch, SetStateAction } from "react";
 import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { createRoom, createTeam } from "../lib/workspaceClient";
 import { chooseProjectFolder, defaultProjectPath } from "../lib/localBackend";
@@ -6,7 +5,6 @@ import { loadTeamRoomDefaults } from "../lib/teamRoomDefaults";
 import { loadTeamHistorySettings, saveHistorySettings } from "../lib/localHistory";
 import { planRoomCreation, planTeamCreation } from "../lib/workspaceCreation";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
-import { withoutSetValue } from "../lib/setUtils";
 import { useAppStore } from "../store/appStore";
 
 interface UseWorkspaceCreationActionsOptions {
@@ -14,15 +12,15 @@ interface UseWorkspaceCreationActionsOptions {
   newTeamName: string;
   newRoomName: string;
   newRoomProjectPath: string;
-  setWorkspaceError: (message: string | null) => void;
+  setWorkspaceStatusError: (message: string | null) => void;
   setSelectedTeam: (teamId: string) => void;
   setSelectedRoomId: (roomId: string) => void;
   setNewTeamName: (name: string) => void;
   setNewRoomName: (name: string) => void;
   setNewRoomProjectPath: (path: string) => void;
-  setRevokedRoomIds: Dispatch<SetStateAction<Set<string>>>;
-  setRevokedTeamIds: Dispatch<SetStateAction<Set<string>>>;
-  setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
+  restoreRoomAccess: (roomId: string) => void;
+  restoreTeamAccess: (teamId: string) => void;
+  restoreForgottenRoom: (roomId: string) => void;
   setInviteApprovalGateForRoom: (roomId: string, inviteApprovalGate: boolean) => void;
   upsertTeam: (team: TeamRecord) => void;
   upsertRoom: (room: RoomRecord) => void;
@@ -33,15 +31,15 @@ export function useWorkspaceCreationActions({
   newTeamName,
   newRoomName,
   newRoomProjectPath,
-  setWorkspaceError,
+  setWorkspaceStatusError,
   setSelectedTeam,
   setSelectedRoomId,
   setNewTeamName,
   setNewRoomName,
   setNewRoomProjectPath,
-  setRevokedRoomIds,
-  setRevokedTeamIds,
-  setForgottenRoomIds,
+  restoreRoomAccess,
+  restoreTeamAccess,
+  restoreForgottenRoom,
   setInviteApprovalGateForRoom,
   upsertTeam,
   upsertRoom
@@ -53,7 +51,7 @@ export function useWorkspaceCreationActions({
     try {
       plan = planTeamCreation(newTeamName);
     } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : String(error));
+      setWorkspaceStatusError(error instanceof Error ? error.message : String(error));
       return;
     }
     try {
@@ -61,9 +59,9 @@ export function useWorkspaceCreationActions({
       upsertTeam(team);
       setSelectedTeam(team.id);
       setNewTeamName("");
-      setWorkspaceError(null);
+      setWorkspaceStatusError(null);
     } catch (error) {
-      setWorkspaceError(String(error));
+      setWorkspaceStatusError(String(error));
     }
   }
 
@@ -72,7 +70,7 @@ export function useWorkspaceCreationActions({
     try {
       plan = planRoomCreation(selectedTeam, newRoomName, newRoomProjectPath);
     } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : String(error));
+      setWorkspaceStatusError(error instanceof Error ? error.message : String(error));
       return;
     }
     try {
@@ -89,18 +87,18 @@ export function useWorkspaceCreationActions({
         }
       );
       upsertRoom(ensureRoomDefaults(room));
-      setRevokedRoomIds((current) => withoutSetValue(current, room.id));
-      setRevokedTeamIds((current) => withoutSetValue(current, room.teamId));
-      setForgottenRoomIds((current) => withoutSetValue(current, room.id));
+      restoreRoomAccess(room.id);
+      restoreTeamAccess(room.teamId);
+      restoreForgottenRoom(room.id);
       setInviteApprovalGateForRoom(room.id, teamDefaults.inviteApprovalGate);
       saveHistorySettings(room.id, loadTeamHistorySettings(plan.teamId));
       initializeMessagesForRoom(room.id);
       setSelectedRoomId(room.id);
       setNewRoomName("");
       setNewRoomProjectPath(plan.projectPath);
-      setWorkspaceError(null);
+      setWorkspaceStatusError(null);
     } catch (error) {
-      setWorkspaceError(String(error));
+      setWorkspaceStatusError(String(error));
     }
   }
 
@@ -109,9 +107,9 @@ export function useWorkspaceCreationActions({
       const path = await chooseProjectFolder(newRoomProjectPath || defaultProjectPath);
       if (!path) return;
       setNewRoomProjectPath(path);
-      setWorkspaceError(null);
+      setWorkspaceStatusError(null);
     } catch (error) {
-      setWorkspaceError(String(error));
+      setWorkspaceStatusError(String(error));
     }
   }
 

@@ -1,22 +1,25 @@
+import { useMemo } from "react";
 import { useAppStore } from "../store/appStore";
+import { projectRoomChatPanelMaps } from "../store/slices/roomChatSlice";
 
 export function useRoomChatState() {
-  const chatMessagesByRoom = useAppStore((state) => state.chatMessagesByRoom);
-  const setChatMessagesByRoom = useAppStore((state) => state.setChatMessagesByRoom);
-  const draftsByRoom = useAppStore((state) => state.draftsByRoom);
-  const setDraftsByRoom = useAppStore((state) => state.setDraftsByRoom);
-  const pendingAttachmentsByRoom = useAppStore((state) => state.pendingAttachmentsByRoom);
-  const setPendingAttachmentsByRoom = useAppStore((state) => state.setPendingAttachmentsByRoom);
+  const roomChatByRoom = useAppStore((state) => state.roomChatByRoom);
   const sensitiveAttachmentReviewKey = useAppStore((state) => state.sensitiveAttachmentReviewKey);
   const setSensitiveAttachmentReviewKey = useAppStore((state) => state.setSensitiveAttachmentReviewKey);
 
-  return {
+  const {
     chatMessagesByRoom,
-    setChatMessagesByRoom,
     draftsByRoom,
-    setDraftsByRoom,
     pendingAttachmentsByRoom,
-    setPendingAttachmentsByRoom,
+    selectedMessageIdsByRoom
+  } = useMemo(() => projectRoomChatPanelMaps(roomChatByRoom), [roomChatByRoom]);
+
+  return {
+    roomChatByRoom,
+    chatMessagesByRoom,
+    draftsByRoom,
+    pendingAttachmentsByRoom,
+    selectedMessageIdsByRoom,
     sensitiveAttachmentReviewKey,
     setSensitiveAttachmentReviewKey
   };

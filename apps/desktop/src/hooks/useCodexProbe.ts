@@ -1,14 +1,14 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect } from "react";
 import { probeCodex, type CodexProbe } from "../lib/localBackend";
 
 interface UseCodexProbeOptions {
-  setCodexProbe: Dispatch<SetStateAction<CodexProbe | null>>;
+  replaceCodexProbe: (next: CodexProbe | null) => void;
 }
 
-export function useCodexProbe({ setCodexProbe }: UseCodexProbeOptions) {
+export function useCodexProbe({ replaceCodexProbe }: UseCodexProbeOptions) {
   useEffect(() => {
-    probeCodex().then(setCodexProbe).catch((error) => {
-      setCodexProbe({ available: false, version: null, error: String(error) });
+    probeCodex().then(replaceCodexProbe).catch((error) => {
+      replaceCodexProbe({ available: false, version: null, error: String(error) });
     });
-  }, [setCodexProbe]);
+  }, [replaceCodexProbe]);
 }

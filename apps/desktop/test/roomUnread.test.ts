@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { markRoomRead, markRoomUnreadForIncomingChat, upsertRoomPreservingUnread } from "../src/lib/roomUnread";
+import {
+  markRoomRead,
+  markRoomUnreadForIncomingChat,
+  replaceRoomPreservingUnread,
+  upsertRoomPreservingUnread
+} from "../src/lib/roomUnread";
 
 const room: RoomRecord = {
   id: "room-a",
@@ -44,4 +49,17 @@ test("upsertRoomPreservingUnread keeps local unread on room updates", () => {
 
   assert.equal(updated[0].name, "Renamed");
   assert.equal(updated[0].unread, 2);
+});
+
+test("replaceRoomPreservingUnread keeps local unread on existing room replacement", () => {
+  const updated = replaceRoomPreservingUnread([room], { ...room, name: "Renamed", unread: 0 });
+
+  assert.equal(updated[0].name, "Renamed");
+  assert.equal(updated[0].unread, 2);
+});
+
+test("replaceRoomPreservingUnread does not append missing rooms", () => {
+  const updated = replaceRoomPreservingUnread([room], { ...room, id: "room-b", name: "Beta", unread: 0 });
+
+  assert.deepEqual(updated, [room]);
 });

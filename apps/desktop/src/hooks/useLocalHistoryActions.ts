@@ -1,4 +1,4 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type { MutableRefObject } from "react";
 import type {
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
@@ -20,7 +20,6 @@ import { updateRoomSettings } from "../lib/workspaceClient";
 import {
   type TerminalSnapshot
 } from "../lib/localBackend";
-import { ensureRoomDefaults } from "../lib/roomDefaults";
 import { roomLockMessage } from "../lib/appRuntime";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
 import {
@@ -70,11 +69,11 @@ interface UseLocalHistoryActionsOptions {
   setInviteApprovalGateForRoom: (roomId: string, enabled: boolean) => void;
   setSettingsBusyForRoom: (roomId: string, busy: boolean) => void;
   setSecretWarningVisibleForRoom: (roomId: string, visible: boolean) => void;
-  setHistorySettings: Dispatch<SetStateAction<LocalHistorySettings>>;
+  replaceHistorySettings: (next: LocalHistorySettings) => void;
   hydrateLocalRoomHistoryForRoom: (roomId: string, payload: ReturnType<typeof pruneLocalRoomHistory>) => void;
-  setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
+  replaceRoom: (room: RoomRecord) => void;
   clearBrowserStatusForRoom: (roomId: string) => void;
-  setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
+  rememberForgottenRoom: (roomId: string) => void;
   historyLoadedRoomIds: MutableRefObject<Set<string>>;
 }
 
@@ -103,11 +102,11 @@ export function useLocalHistoryActions({
   setInviteApprovalGateForRoom,
   setSettingsBusyForRoom,
   setSecretWarningVisibleForRoom,
-  setHistorySettings,
+  replaceHistorySettings,
   hydrateLocalRoomHistoryForRoom,
-  setRooms,
+  replaceRoom,
   clearBrowserStatusForRoom,
-  setForgottenRoomIds,
+  rememberForgottenRoom,
   historyLoadedRoomIds
 }: UseLocalHistoryActionsOptions) {
   const clearRoomScopedStateForRoom = useAppStore((state) => state.clearRoomScopedStateForRoom);
@@ -119,7 +118,7 @@ export function useLocalHistoryActions({
     }
     const roomId = selectedRoom.id;
     const saved = saveHistorySettings(roomId, next);
-    setHistorySettings(saved);
+    replaceHistorySettings(saved);
     if (saved.enabled) {
       const payload = pruneLocalRoomHistory({
         version: 3,
@@ -175,7 +174,7 @@ export function useLocalHistoryActions({
         ...roomSettingsActor(),
         ...roomSettings
       });
-      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      replaceRoom(room);
       if (!roomSettings.browserProfilePersistent) {
         clearBrowserStatusForRoom(roomId);
       }
@@ -213,9 +212,9 @@ export function useLocalHistoryActions({
     await forgetRoomLocalData(selectedRoom.id);
     clearRoomVisibilityWarningAcknowledgement(selectedRoom.id);
     historyLoadedRoomIds.current.delete(selectedRoom.id);
-    setForgottenRoomIds((current) => new Set(current).add(selectedRoom.id));
+    rememberForgottenRoom(selectedRoom.id);
     clearRoomScopedStateForRoom(roomId);
-    setHistorySettings(loadHistorySettings(selectedRoom.id));
+    replaceHistorySettings(loadHistorySettings(selectedRoom.id));
     setSecretWarningVisibleForRoom(selectedRoom.id, true);
     setHistoryMessageForRoom(roomId, "Forgot this room on this device. Rejoin from an invite to unlock it again.");
   }

@@ -45,16 +45,16 @@ export function useAppWorkspaceRecords({
     selectedRoom,
     localUser: localIdentity.localUser,
     roomsRef: appRefs.roomsRef,
-    setTeams: workspaceState.setTeams,
-    setRooms: workspaceState.setRooms,
+    upsertTeamRecord: workspaceState.upsertTeamRecord,
+    upsertRoomRecord: workspaceState.upsertRoomRecord,
+    replaceRoomRecord: workspaceState.replaceRoomRecord,
+    markRoomReadById: workspaceState.markRoomReadById,
     resetCodexApprovalForRoom,
-    setRevokedRoomIds: roomRuntimeState.setRevokedRoomIds,
-    setRevokedTeamIds: roomRuntimeState.setRevokedTeamIds,
-    setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
+    revokeWorkspaceAccess: roomRuntimeState.revokeWorkspaceAccess,
     setInviteLinkForRoom,
     setInviteMessageForRoom,
     setChatMessageForRoom,
     setHostMessageForRoom,
-    setWorkspaceError: workspaceState.setWorkspaceError
+    setWorkspaceStatusError: workspaceState.setWorkspaceStatusError
   });
 }

@@ -1,30 +1,23 @@
-import type { Dispatch, SetStateAction } from "react";
-import type { RoomRecord } from "@multaiplayer/protocol";
 import type { InspectorTab } from "../components/RoomInspectorPanel";
 import { useAppStore } from "../store/appStore";
 
 export function useRoomHeaderActions({
-  rooms,
   selectedRoomId,
   selectedRoomIdForTabs,
   activeBrowserUrl,
-  setSelectedTeam,
-  setSelectedRoomId,
+  selectTeamRoom,
   openRoomBrowserNow
 }: {
-  rooms: RoomRecord[];
   selectedRoomId: string;
   selectedRoomIdForTabs: string;
   activeBrowserUrl: string | null;
-  setSelectedTeam: Dispatch<SetStateAction<string>>;
-  setSelectedRoomId: Dispatch<SetStateAction<string>>;
+  selectTeamRoom: (teamId: string, fallbackRoomId: string) => void;
   openRoomBrowserNow: () => void;
 }) {
   const setInspectorTabForRoom = useAppStore((state) => state.setInspectorTabForRoom);
 
   function onSelectTeam(teamId: string) {
-    setSelectedTeam(teamId);
-    setSelectedRoomId(rooms.find((room) => room.teamId === teamId)?.id ?? selectedRoomId);
+    selectTeamRoom(teamId, selectedRoomId);
   }
 
   function onSelectInspectorTab(tab: InspectorTab) {

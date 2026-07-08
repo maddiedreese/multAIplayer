@@ -1,4 +1,3 @@
-import type { Dispatch, SetStateAction } from "react";
 import type { TeamMemberRecord, TeamRecord, RoomRecord } from "@multaiplayer/protocol";
 import type { SignedInUser } from "../lib/authClient";
 import {
@@ -6,7 +5,7 @@ import {
   transferTeamOwnership,
   updateTeamMemberRole
 } from "../lib/workspaceClient";
-import { buildDeviceFingerprintMarkdown, trustDeviceKey, untrustDeviceKey, type TrustedDeviceKey } from "../lib/deviceTrust";
+import { buildDeviceFingerprintMarkdown } from "../lib/deviceTrust";
 import { formatTeamMemberName, formatTeamRole } from "../lib/appFormatters";
 import { useAppStore } from "../store/appStore";
 import type { RoomPresence } from "../types";
@@ -24,8 +23,10 @@ interface UseMemberActionsOptions {
   localUser: LocalUser;
   currentUser: SignedInUser | null;
   setDeviceIdentityMessage: (message: string | null) => void;
-  setTrustedDeviceKeys: Dispatch<SetStateAction<TrustedDeviceKey[]>>;
-  setTeams: Dispatch<SetStateAction<TeamRecord[]>>;
+  trustDeviceForRoom: (roomId: string, deviceId: string, fingerprint: string) => void;
+  untrustDeviceForRoom: (roomId: string, deviceId: string) => void;
+  updateTeamRoleForTeam: (teamId: string, role: TeamRecord["role"] | undefined) => void;
+  updateTeamMemberCountForTeam: (teamId: string, members: number) => void;
   copyMarkdownWithFallback: (
     title: string,
     markdown: string,
@@ -42,8 +43,10 @@ export function useMemberActions({
   localUser,
   currentUser,
   setDeviceIdentityMessage,
-  setTrustedDeviceKeys,
-  setTeams,
+  trustDeviceForRoom,
+  untrustDeviceForRoom,
+  updateTeamRoleForTeam,
+  updateTeamMemberCountForTeam,
   copyMarkdownWithFallback
 }: UseMemberActionsOptions) {
   const setTeamMembersForTeam = useAppStore((state) => state.setTeamMembersForTeam);
@@ -56,14 +59,12 @@ export function useMemberActions({
       setDeviceIdentityMessage(`${member.displayName} has no registered device identity to trust.`);
       return;
     }
-    setTrustedDeviceKeys((current) =>
-      trustDeviceKey(current, selectedRoom.id, member.deviceId, fingerprint)
-    );
+    trustDeviceForRoom(selectedRoom.id, member.deviceId, fingerprint);
     setDeviceIdentityMessage(`Trusted ${member.displayName}'s device identity for ${selectedRoom.name}.`);
   }
 
   function untrustRoomMemberDevice(member: RoomPresence) {
-    setTrustedDeviceKeys((current) => untrustDeviceKey(current, selectedRoom.id, member.deviceId));
+    untrustDeviceForRoom(selectedRoom.id, member.deviceId);
     setDeviceIdentityMessage(`Removed local trust for ${member.displayName}'s device identity in ${selectedRoom.name}.`);
   }
 
@@ -111,9 +112,7 @@ export function useMemberActions({
       const members = await transferTeamOwnership(selectedTeam, member.userId);
       setTeamMembersForTeam(selectedTeam, members);
       const localMember = members.find((item) => item.userId === localUser.id);
-      setTeams((current) => current.map((team) =>
-        team.id === selectedTeam ? { ...team, role: localMember?.role ?? team.role } : team
-      ));
+      updateTeamRoleForTeam(selectedTeam, localMember?.role);
       setTeamMembersMessageForTeam(selectedTeam, `${formatTeamMemberName(member.userId, currentUser)} is now the team owner.`);
     } catch (error) {
       setTeamMembersMessageForTeam(selectedTeam, String(error));
@@ -129,7 +128,7 @@ export function useMemberActions({
     try {
       const members = await removeTeamMember(selectedTeam, member.userId);
       setTeamMembersForTeam(selectedTeam, members);
-      setTeams((current) => current.map((team) => team.id === selectedTeam ? { ...team, members: members.length } : team));
+      updateTeamMemberCountForTeam(selectedTeam, members.length);
       setTeamMembersMessageForTeam(selectedTeam, `Removed ${formatTeamMemberName(member.userId, currentUser)} from ${selectedTeamName}.`);
     } catch (error) {
       setTeamMembersMessageForTeam(selectedTeam, String(error));

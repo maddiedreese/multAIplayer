@@ -87,12 +87,11 @@ export function useAppInviteActions({
     setSelectedInviteMessage,
     setInviteMessageForRoom,
     setInviteLinkForRoom,
-    setInviteSecretInput: invitePanelState.setInviteSecretInput,
-    setSelectedTeam: workspaceState.setSelectedTeam,
-    setSelectedRoomId: workspaceState.setSelectedRoomId,
-    setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
-    setRevokedRoomIds: roomRuntimeState.setRevokedRoomIds,
-    setRevokedTeamIds: roomRuntimeState.setRevokedTeamIds,
+    clearInviteSecretInput: invitePanelState.clearInviteSecretInput,
+    selectWorkspaceRoom: workspaceState.selectWorkspaceRoom,
+    rememberForgottenRoom: roomRuntimeState.rememberForgottenRoom,
+    restoreForgottenRoom: roomRuntimeState.restoreForgottenRoom,
+    restoreWorkspaceAccess: roomRuntimeState.restoreWorkspaceAccess,
     setKeyRotationBusyForRoom
   });
 }

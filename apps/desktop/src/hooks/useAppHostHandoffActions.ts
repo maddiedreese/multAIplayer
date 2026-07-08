@@ -4,6 +4,7 @@ import type { useAppRoomActions } from "./useAppRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { useAppStateSlices } from "./useAppStateSlices";
+import type { useAppWorkspaceRecords } from "./useAppWorkspaceRecords";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import type { useRoomSettingsActor } from "./useRoomSettingsActor";
 import { useHostHandoffActions } from "./useHostHandoffActions";
@@ -15,6 +16,7 @@ type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
 type RoomActions = ReturnType<typeof useAppRoomActions>;
+type WorkspaceRecords = ReturnType<typeof useAppWorkspaceRecords>;
 type RoomSettingsActor = ReturnType<typeof useRoomSettingsActor>;
 
 export function useAppHostHandoffActions({
@@ -25,6 +27,7 @@ export function useAppHostHandoffActions({
   selectedRuntime,
   roomInteraction,
   roomActions,
+  workspaceRecords,
   roomSettingsActor
 }: {
   appState: AppStateSlices;
@@ -34,6 +37,7 @@ export function useAppHostHandoffActions({
   selectedRuntime: SelectedRoomRuntime;
   roomInteraction: RoomInteraction;
   roomActions: RoomActions;
+  workspaceRecords: WorkspaceRecords;
   roomSettingsActor: RoomSettingsActor;
 }) {
   const {
@@ -84,7 +88,7 @@ export function useAppHostHandoffActions({
     gitStatusByRoom: githubWorkflowPanelState.gitStatusByRoom,
     reportRoomHostMutationInFlight: roomInteraction.reportRoomHostMutationInFlight,
     roomSettingsActor,
-    setRooms: workspaceState.setRooms,
+    replaceRoom: workspaceRecords.replaceRoom,
     setHostBusyForRoom,
     setHostMessageForRoom,
     setSelectedHostMessage,

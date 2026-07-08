@@ -1,4 +1,4 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type { MutableRefObject } from "react";
 import type {
   HostHandoffPlaintextPayload,
   RelayEnvelope,
@@ -32,7 +32,6 @@ import {
   sameHandoffRepo
 } from "../lib/hostHandoff";
 import { parseGitHubRemoteUrl } from "../lib/gitWorkflowDraft";
-import { ensureRoomDefaults } from "../lib/roomDefaults";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
 import { roomLockMessage } from "../lib/appRuntime";
 import { formatCodexModel } from "../lib/appFormatters";
@@ -81,7 +80,7 @@ interface UseHostHandoffActionsOptions {
     requesterName: string;
     requesterUserId: string;
   };
-  setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
+  replaceRoom: (room: RoomRecord) => void;
   setHostBusyForRoom: (roomId: string, busy: boolean) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setSelectedHostMessage: (message: string | null) => void;
@@ -114,7 +113,7 @@ export function useHostHandoffActions({
   gitStatusByRoom,
   reportRoomHostMutationInFlight,
   roomSettingsActor,
-  setRooms,
+  replaceRoom,
   setHostBusyForRoom,
   setHostMessageForRoom,
   setSelectedHostMessage,
@@ -151,7 +150,7 @@ export function useHostHandoffActions({
       const hostUserId = hostStatus === "active" ? localUser.id : selectedRoom.hostUserId ?? localUser.id;
       const room = await updateRoomHost(roomId, host, hostUserId, hostStatus);
       if (hostStatus !== "active") void shutdownCodexRoom(roomId);
-      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      replaceRoom(room);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setHostMessageForRoom(
           roomId,
@@ -216,7 +215,7 @@ export function useHostHandoffActions({
       });
       const claimed = await updateRoomHost(updatedSettings.id, localUser.name, localUser.id, "active");
       void shutdownCodexRoom(roomId);
-      setRooms((current) => current.map((item) => (item.id === claimed.id ? ensureRoomDefaults(claimed) : item)));
+      replaceRoom(claimed);
       markHostHandoffAccepted(roomId, roomHandoff.id);
       await publishHostHandoffAccepted(selectedRoom, roomHandoff);
       setCodexContinuationForRoom(roomId, roomHandoff.reason === "usage_limit" ? roomHandoff : null);

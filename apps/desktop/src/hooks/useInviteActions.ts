@@ -1,4 +1,4 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type { MutableRefObject } from "react";
 import type {
   InviteJoinRequestPlaintextPayload,
   InviteJoinStatusPlaintextPayload,
@@ -43,7 +43,6 @@ import {
 import { displayableInviteLink } from "../lib/invitePrivacy";
 import { canCreateRoomInvite } from "../lib/invitePolicy";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
-import { withoutSetValue } from "../lib/setUtils";
 import {
   isDeviceSealedPayload,
   isInviteJoinRequestPlaintextPayload,
@@ -97,12 +96,11 @@ interface UseInviteActionsOptions {
   setSelectedInviteMessage: (message: string | null) => void;
   setInviteMessageForRoom: (roomId: string, message: string | null) => void;
   setInviteLinkForRoom: (roomId: string, link: string) => void;
-  setInviteSecretInput: Dispatch<SetStateAction<string>>;
-  setSelectedTeam: Dispatch<SetStateAction<string>>;
-  setSelectedRoomId: Dispatch<SetStateAction<string>>;
-  setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
-  setRevokedRoomIds: Dispatch<SetStateAction<Set<string>>>;
-  setRevokedTeamIds: Dispatch<SetStateAction<Set<string>>>;
+  clearInviteSecretInput: () => void;
+  selectWorkspaceRoom: (teamId: string, roomId: string) => void;
+  rememberForgottenRoom: (roomId: string) => void;
+  restoreForgottenRoom: (roomId: string) => void;
+  restoreWorkspaceAccess: (teamId: string, roomId: string) => void;
   setKeyRotationBusyForRoom: (roomId: string, busy: boolean) => void;
 }
 
@@ -133,12 +131,11 @@ export function useInviteActions({
   setSelectedInviteMessage,
   setInviteMessageForRoom,
   setInviteLinkForRoom,
-  setInviteSecretInput,
-  setSelectedTeam,
-  setSelectedRoomId,
-  setForgottenRoomIds,
-  setRevokedRoomIds,
-  setRevokedTeamIds,
+  clearInviteSecretInput,
+  selectWorkspaceRoom,
+  rememberForgottenRoom,
+  restoreForgottenRoom,
+  restoreWorkspaceAccess,
   setKeyRotationBusyForRoom
 }: UseInviteActionsOptions) {
   const setInviteAdmissionForRoom = useAppStore((state) => state.setInviteAdmissionForRoom);
@@ -181,7 +178,7 @@ export function useInviteActions({
     if (envelope.payload.algorithm === "AES-GCM-256") {
       const secret = await loadRoomSecret(envelope.roomId);
       if (!secret) {
-        setForgottenRoomIds((current) => new Set(current).add(envelope.roomId));
+        rememberForgottenRoom(envelope.roomId);
         return null;
       }
       return decryptJson<unknown>(envelope.payload, secret);
@@ -205,7 +202,7 @@ export function useInviteActions({
     ) {
       const unwrappedSecret = await unwrapRoomSecretForDevice(plaintext.wrappedRoomSecret, deviceIdentity.privateKeyJwk);
       await importRoomSecret(roomId, unwrappedSecret);
-      setForgottenRoomIds((current) => withoutSetValue(current, roomId));
+      restoreForgottenRoom(roomId);
     }
     if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
       setInviteMessageForRoom(
@@ -419,7 +416,7 @@ export function useInviteActions({
         time: formatMessageTime(rotatedAt),
         createdAt: rotatedAt
       });
-      setForgottenRoomIds((current) => withoutSetValue(current, room.id));
+      restoreForgottenRoom(room.id);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
         setInviteLinkForRoom(room.id, "");
         setInviteMessageForRoom(
@@ -447,8 +444,7 @@ export function useInviteActions({
       upsertTeam(metadata.team);
       upsertRoom(ensureRoomDefaults(metadata.room));
       acceptedRoomName = metadata.room.name;
-      setRevokedRoomIds((current) => withoutSetValue(current, inviteSecret.roomId));
-      setRevokedTeamIds((current) => withoutSetValue(current, inviteSecret.teamId));
+      restoreWorkspaceAccess(inviteSecret.teamId, inviteSecret.roomId);
       setInviteAdmissionForRoom(inviteSecret.roomId, inviteId);
     } else {
       upsertTeam({
@@ -475,9 +471,8 @@ export function useInviteActions({
     }
 
     initializeMessagesForRoom(inviteSecret.roomId);
-    setSelectedTeam(inviteSecret.teamId);
-    setSelectedRoomId(inviteSecret.roomId);
-    setInviteSecretInput("");
+    selectWorkspaceRoom(inviteSecret.teamId, inviteSecret.roomId);
+    clearInviteSecretInput();
     const requestedAt = new Date().toISOString();
     const request: InviteJoinRequest = {
       eventType: "invite.request",
@@ -522,8 +517,7 @@ export function useInviteActions({
       upsertTeam(metadata.team);
       upsertRoom(ensureRoomDefaults(metadata.room));
       acceptedRoomName = metadata.room.name;
-      setRevokedRoomIds((current) => withoutSetValue(current, inviteSecret.roomId));
-      setRevokedTeamIds((current) => withoutSetValue(current, inviteSecret.teamId));
+      restoreWorkspaceAccess(inviteSecret.teamId, inviteSecret.roomId);
     } else {
       upsertTeam({
         id: inviteSecret.teamId,
@@ -549,14 +543,13 @@ export function useInviteActions({
     }
 
     await importRoomSecret(inviteSecret.roomId, inviteSecret.secret);
-    setForgottenRoomIds((current) => withoutSetValue(current, inviteSecret.roomId));
+    restoreForgottenRoom(inviteSecret.roomId);
     if (inviteId) {
       setInviteAdmissionForRoom(inviteSecret.roomId, inviteId);
     }
     initializeMessagesForRoom(inviteSecret.roomId);
-    setSelectedTeam(inviteSecret.teamId);
-    setSelectedRoomId(inviteSecret.roomId);
-    setInviteSecretInput("");
+    selectWorkspaceRoom(inviteSecret.teamId, inviteSecret.roomId);
+    clearInviteSecretInput();
     if (approvalRequested) {
       const requestedAt = new Date().toISOString();
       const request: InviteJoinRequest = {
@@ -597,7 +590,7 @@ export function useInviteActions({
     const raw = inviteSecretInput.trim();
     if (!raw) return;
     setSelectedInviteMessage(null);
-    setInviteSecretInput("");
+    clearInviteSecretInput();
     try {
       const [beforeHash, afterHash] = raw.includes("#") ? raw.split("#") : ["", raw];
       const inviteId = beforeHash.includes("?")

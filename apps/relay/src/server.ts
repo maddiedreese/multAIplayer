@@ -258,7 +258,8 @@ const {
   roomKey,
   pruneEncryptedBacklog,
   addTeamMember,
-  scheduleStoreSave,
+  saveEncryptedEnvelope: (roomKey, envelope, prunedEnvelopeIds) =>
+    relayStorePersistence.saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds),
   teamRecordForUser
 });
 const {
@@ -606,6 +607,10 @@ export function listenRelayServer() {
 
 export async function flushRelayStore() {
   await relayStorePersistence.flushRelayStore();
+}
+
+export async function closeRelayStore() {
+  await relayStorePersistence.closeRelayStore();
 }
 
 export function closeRelayServer() {

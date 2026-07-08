@@ -100,7 +100,8 @@ export function useAppWorkspaceFlow({
     setSelectedFileForRoom,
     setSelectedDiffForRoom,
     setFilePreviewTabForRoom,
-    setPendingAttachmentsForRoom,
+    appendPendingAttachmentForRoom,
+    removePendingAttachmentForRoom,
     hydrateLocalRoomHistoryForRoom,
     clearBrowserStatusForRoom
   } = roomActions;
@@ -109,15 +110,15 @@ export function useAppWorkspaceFlow({
     bootstrap: {
       workspace: {
         relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
-        setTeams: workspaceState.setTeams,
-        setRooms: workspaceState.setRooms,
-        setSelectedTeam: workspaceState.setSelectedTeam,
-        setSelectedRoomId: workspaceState.setSelectedRoomId,
-        setWorkspaceError: workspaceState.setWorkspaceError
+        replaceTeams: workspaceState.replaceTeams,
+        replaceRooms: workspaceState.replaceRooms,
+        selectExistingTeamOrFirst: workspaceState.selectExistingTeamOrFirst,
+        selectExistingRoomOrFirst: workspaceState.selectExistingRoomOrFirst,
+        setWorkspaceStatusError: workspaceState.setWorkspaceStatusError
       },
       selectedRoomReadReceipt: {
         selectedRoomId: workspaceState.selectedRoomId,
-        setRooms: workspaceState.setRooms
+        markRoomRead: workspaceRecords.markRoomRead
       },
       deviceIdentity: {
         relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
@@ -125,16 +126,16 @@ export function useAppWorkspaceFlow({
         userId: localIdentity.localUser.id,
         displayName: localIdentity.localUser.name,
         deviceIdentity: appRuntimeState.deviceIdentity,
-        setDeviceIdentity: appRuntimeState.setDeviceIdentity,
-        setDeviceIdentityMessage: appRuntimeState.setDeviceIdentityMessage
+        replaceDeviceIdentity: appRuntimeState.replaceDeviceIdentity,
+        setDeviceIdentityStatusMessage: appRuntimeState.setDeviceIdentityStatusMessage
       },
       selectedTeamDefaults: {
         selectedTeam: workspaceState.selectedTeam,
-        setTeamHistorySettings: historyDefaultsState.setTeamHistorySettings,
-        setTeamDefaultApprovalPolicy: historyDefaultsState.setTeamDefaultApprovalPolicy,
-        setTeamDefaultCodexModel: historyDefaultsState.setTeamDefaultCodexModel,
-        setTeamDefaultBrowserProfilePersistent: historyDefaultsState.setTeamDefaultBrowserProfilePersistent,
-        setTeamDefaultInviteApprovalGate: historyDefaultsState.setTeamDefaultInviteApprovalGate
+        replaceTeamHistorySettings: historyDefaultsState.replaceTeamHistorySettings,
+        replaceTeamDefaultApprovalPolicy: historyDefaultsState.replaceTeamDefaultApprovalPolicy,
+        replaceTeamDefaultCodexModel: historyDefaultsState.replaceTeamDefaultCodexModel,
+        replaceTeamDefaultBrowserProfilePersistent: historyDefaultsState.replaceTeamDefaultBrowserProfilePersistent,
+        replaceTeamDefaultInviteApprovalGate: historyDefaultsState.replaceTeamDefaultInviteApprovalGate
       },
       inviteUrl: {
         requestNoSecretInviteAccess: inviteActions.requestNoSecretInviteAccess,
@@ -175,24 +176,26 @@ export function useAppWorkspaceFlow({
         selectedRoom,
         localUser: localIdentity.localUser,
         currentUser: githubAuth.currentUser,
-        setDeviceIdentityMessage: appRuntimeState.setDeviceIdentityMessage,
-        setTrustedDeviceKeys: appRuntimeState.setTrustedDeviceKeys,
-        setTeams: workspaceState.setTeams
+        setDeviceIdentityMessage: appRuntimeState.setDeviceIdentityStatusMessage,
+        trustDeviceForRoom: appRuntimeState.trustDeviceForRoom,
+        untrustDeviceForRoom: appRuntimeState.untrustDeviceForRoom,
+        updateTeamRoleForTeam: workspaceState.updateTeamRoleForTeam,
+        updateTeamMemberCountForTeam: workspaceState.updateTeamMemberCountForTeam
       },
       workspaceCreation: {
         selectedTeam: workspaceState.selectedTeam,
         newTeamName: workspaceState.newTeamName,
         newRoomName: workspaceState.newRoomName,
         newRoomProjectPath: workspaceState.newRoomProjectPath,
-        setWorkspaceError: workspaceState.setWorkspaceError,
+        setWorkspaceStatusError: workspaceState.setWorkspaceStatusError,
         setSelectedTeam: workspaceState.setSelectedTeam,
         setSelectedRoomId: workspaceState.setSelectedRoomId,
         setNewTeamName: workspaceState.setNewTeamName,
         setNewRoomName: workspaceState.setNewRoomName,
         setNewRoomProjectPath: workspaceState.setNewRoomProjectPath,
-        setRevokedRoomIds: roomRuntimeState.setRevokedRoomIds,
-        setRevokedTeamIds: roomRuntimeState.setRevokedTeamIds,
-        setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
+        restoreRoomAccess: roomRuntimeState.restoreRoomAccess,
+        restoreTeamAccess: roomRuntimeState.restoreTeamAccess,
+        restoreForgottenRoom: roomRuntimeState.restoreForgottenRoom,
         setInviteApprovalGateForRoom,
         upsertTeam: workspaceRecords.upsertTeam,
         upsertRoom: workspaceRecords.upsertRoom
@@ -233,11 +236,11 @@ export function useAppWorkspaceFlow({
         setInviteApprovalGateForRoom,
         setSettingsBusyForRoom,
         setSecretWarningVisibleForRoom,
-        setHistorySettings: historyDefaultsState.setHistorySettings,
+        replaceHistorySettings: historyDefaultsState.replaceHistorySettings,
         hydrateLocalRoomHistoryForRoom,
-        setRooms: workspaceState.setRooms,
+        replaceRoom: workspaceRecords.replaceRoom,
         clearBrowserStatusForRoom,
-        setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
+        rememberForgottenRoom: roomRuntimeState.rememberForgottenRoom,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds
       },
       files: {
@@ -259,7 +262,8 @@ export function useAppWorkspaceFlow({
         setFilePreviewTabForRoom,
         setSelectedFileMessage,
         setFileMessageForRoom,
-        setPendingAttachmentsForRoom
+        appendPendingAttachmentForRoom,
+        removePendingAttachmentForRoom
       }
     },
     historyEffects: {
@@ -269,7 +273,7 @@ export function useAppWorkspaceFlow({
         selectedRoomTeamId: selectedRoom.teamId,
         forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
-        setHistorySettings: historyDefaultsState.setHistorySettings,
+        replaceHistorySettings: historyDefaultsState.replaceHistorySettings,
         hydrateLocalRoomHistoryForRoom
       },
       search: {
@@ -278,7 +282,8 @@ export function useAppWorkspaceFlow({
         forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
         revokedRoomIds: roomRuntimeState.revokedRoomIds,
         revokedTeamIds: roomRuntimeState.revokedTeamIds,
-        setHistorySearchBusy: appRuntimeState.setHistorySearchBusy
+        startHistorySearch: appRuntimeState.startHistorySearch,
+        finishHistorySearch: appRuntimeState.finishHistorySearch
       }
     }
   });

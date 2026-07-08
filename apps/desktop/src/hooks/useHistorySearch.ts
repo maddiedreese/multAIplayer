@@ -1,8 +1,9 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { loadEncryptedHistory, loadHistorySettings } from "../lib/localHistory";
 import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
 import { useAppStore } from "../store/appStore";
+import { historySearchEntriesToMessagesByRoom } from "../store/slices/historyPresenceSlice";
 import type { ChatMessage, LocalRoomHistoryPayload } from "../types";
 
 interface UseHistorySearchOptions {
@@ -11,7 +12,8 @@ interface UseHistorySearchOptions {
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
   revokedTeamIds: Set<string>;
-  setHistorySearchBusy: Dispatch<SetStateAction<boolean>>;
+  startHistorySearch: () => void;
+  finishHistorySearch: () => void;
 }
 
 export function useHistorySearch({
@@ -20,14 +22,16 @@ export function useHistorySearch({
   forgottenRoomIds,
   revokedRoomIds,
   revokedTeamIds,
-  setHistorySearchBusy
+  startHistorySearch,
+  finishHistorySearch
 }: UseHistorySearchOptions) {
-  const setHistorySearchMessagesByRoom = useAppStore((state) => state.setHistorySearchMessagesByRoom);
+  const setHistorySearchResultsByRoom = useAppStore((state) => state.setHistorySearchResultsByRoom);
+  const clearHistorySearchResults = useAppStore((state) => state.clearHistorySearchResults);
 
   useEffect(() => {
     if (!searchActive) {
-      setHistorySearchMessagesByRoom({});
-      setHistorySearchBusy(false);
+      clearHistorySearchResults();
+      finishHistorySearch();
       return;
     }
 
@@ -37,7 +41,11 @@ export function useHistorySearch({
       !revokedRoomIds.has(room.id) &&
       !revokedTeamIds.has(room.teamId)
     );
-    setHistorySearchBusy(searchableRooms.length > 0);
+    if (searchableRooms.length > 0) {
+      startHistorySearch();
+    } else {
+      finishHistorySearch();
+    }
     Promise.all(
       searchableRooms.map(async (room) => {
         const storedHistory = await loadEncryptedHistory<ChatMessage[] | LocalRoomHistoryPayload>(room.id);
@@ -49,15 +57,13 @@ export function useHistorySearch({
     )
       .then((entries) => {
         if (cancelled) return;
-        setHistorySearchMessagesByRoom(
-          Object.fromEntries(entries.filter(([, roomMessages]) => roomMessages.length > 0))
-        );
+        setHistorySearchResultsByRoom(historySearchEntriesToMessagesByRoom(entries));
       })
       .catch((error) => {
         if (!cancelled) console.warn("Failed to search encrypted local history", error);
       })
       .finally(() => {
-        if (!cancelled) setHistorySearchBusy(false);
+        if (!cancelled) finishHistorySearch();
       });
 
     return () => {
@@ -69,7 +75,9 @@ export function useHistorySearch({
     revokedTeamIds,
     rooms,
     searchActive,
-    setHistorySearchBusy,
-    setHistorySearchMessagesByRoom
+    startHistorySearch,
+    finishHistorySearch,
+    clearHistorySearchResults,
+    setHistorySearchResultsByRoom
   ]);
 }

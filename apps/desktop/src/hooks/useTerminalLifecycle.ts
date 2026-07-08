@@ -1,6 +1,6 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect } from "react";
 import { listTerminals, readTerminal, type TerminalSnapshot } from "../lib/localBackend";
-import { mergeTerminalSnapshots, replaceRoomTerminalSnapshots, upsertTerminal } from "../lib/terminalState";
+import { mergeTerminalSnapshots } from "../lib/terminalState";
 import { useAppStore } from "../store/appStore";
 
 interface UseTerminalLifecycleOptions {
@@ -9,7 +9,10 @@ interface UseTerminalLifecycleOptions {
   selectedRoomId: string;
   selectedTerminalId: string | null;
   selectedTerminalRunning: boolean | undefined;
-  setTerminals: Dispatch<SetStateAction<TerminalSnapshot[]>>;
+  clearTerminalSnapshots: () => void;
+  clearTerminalSnapshotsForRoom: (roomId: string) => void;
+  syncTerminalSnapshotsForRoom: (roomId: string, snapshots: TerminalSnapshot[]) => void;
+  upsertTerminalSnapshot: (snapshot: TerminalSnapshot) => void;
   setTerminalErrorForRoom: (roomId: string, message: string | null) => void;
 }
 
@@ -19,19 +22,22 @@ export function useTerminalLifecycle({
   selectedRoomId,
   selectedTerminalId,
   selectedTerminalRunning,
-  setTerminals,
+  clearTerminalSnapshots,
+  clearTerminalSnapshotsForRoom,
+  syncTerminalSnapshotsForRoom,
+  upsertTerminalSnapshot,
   setTerminalErrorForRoom
 }: UseTerminalLifecycleOptions) {
   const setSelectedTerminalIdForRoom = useAppStore((state) => state.setSelectedTerminalIdForRoom);
 
   useEffect(() => {
     if (!hasSelectedRoom) {
-      setTerminals([]);
+      clearTerminalSnapshots();
       return;
     }
     const roomId = selectedRoomId;
     if (!canReadLocalWorkspace) {
-      setTerminals((current) => replaceRoomTerminalSnapshots(current, roomId, []));
+      clearTerminalSnapshotsForRoom(roomId);
       setSelectedTerminalIdForRoom(roomId, null);
       return;
     }
@@ -39,15 +45,12 @@ export function useTerminalLifecycle({
     listTerminals(roomId)
       .then((snapshots) => {
         if (cancelled) return;
-        let mergedSnapshots: TerminalSnapshot[] = [];
-        setTerminals((current) => {
-          mergedSnapshots = mergeTerminalSnapshots(
-            current.filter((terminal) => terminal.roomId === roomId),
-            snapshots
-          );
-          return replaceRoomTerminalSnapshots(current, roomId, mergedSnapshots);
-        });
-        const currentTerminalId = useAppStore.getState().selectedTerminalIdsByRoom[roomId] ?? null;
+        const mergedSnapshots = mergeTerminalSnapshots(
+          useAppStore.getState().terminals.filter((terminal) => terminal.roomId === roomId),
+          snapshots
+        );
+        syncTerminalSnapshotsForRoom(roomId, mergedSnapshots);
+        const currentTerminalId = useAppStore.getState().terminalRuntimeByRoom[roomId]?.selectedTerminalId ?? null;
         const nextTerminalId = currentTerminalId && mergedSnapshots.some((terminal) => terminal.id === currentTerminalId)
           ? currentTerminalId
           : mergedSnapshots[0]?.id ?? null;
@@ -59,7 +62,7 @@ export function useTerminalLifecycle({
     return () => {
       cancelled = true;
     };
-  }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoomId, setSelectedTerminalIdForRoom]);
+  }, [canReadLocalWorkspace, clearTerminalSnapshots, clearTerminalSnapshotsForRoom, hasSelectedRoom, selectedRoomId, setSelectedTerminalIdForRoom, syncTerminalSnapshotsForRoom]);
 
   useEffect(() => {
     if (!canReadLocalWorkspace || !selectedTerminalId || !selectedTerminalRunning) return;
@@ -68,7 +71,7 @@ export function useTerminalLifecycle({
       readTerminal(selectedTerminalId)
         .then((snapshot) => {
           if (cancelled) return;
-          setTerminals((current) => upsertTerminal(current, snapshot));
+          upsertTerminalSnapshot(snapshot);
         })
         .catch((error) => {
           if (!cancelled && hasSelectedRoom) setTerminalErrorForRoom(selectedRoomId, String(error));
@@ -78,5 +81,5 @@ export function useTerminalLifecycle({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [hasSelectedRoom, selectedRoomId, selectedTerminalRunning, selectedTerminalId]);
+  }, [hasSelectedRoom, selectedRoomId, selectedTerminalRunning, selectedTerminalId, upsertTerminalSnapshot]);
 }

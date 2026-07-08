@@ -1,3 +1,4 @@
+import React from "react";
 import type {
   LocalPreviewPlaintextPayload
 } from "@multaiplayer/protocol";
@@ -247,6 +248,9 @@ export function App() {
     setInviteMessageForRoom,
     setSelectedInviteMessage,
     setPendingAttachmentsForRoom,
+    appendPendingAttachmentForRoom,
+    removePendingAttachmentForRoom,
+    clearPendingAttachmentsForRoom,
     setDraftForRoom,
     setCustomCodexModelForRoom,
     setProjectPathDraftForRoom,
@@ -297,6 +301,7 @@ export function App() {
     selectedRuntime,
     roomInteraction,
     roomActions,
+    workspaceRecords,
     roomSettingsActor
   });
   const inviteActions = useAppInviteActions({
@@ -356,6 +361,7 @@ export function App() {
     roomActions,
     relaySync,
     hostHandoffActions,
+    workspaceRecords,
     roomSettingsActor
   });
 

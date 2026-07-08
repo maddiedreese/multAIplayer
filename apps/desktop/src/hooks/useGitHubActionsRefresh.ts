@@ -60,8 +60,7 @@ export function useGitHubActionsRefresh({
   publishGitHubActionsEvent
 }: UseGitHubActionsRefreshOptions) {
   const setActionsMessageForRoom = useAppStore((state) => state.setActionsMessageForRoom);
-  const setActionRunsForRoom = useAppStore((state) => state.setActionRunsForRoom);
-  const setActionsLastCheckedForRoom = useAppStore((state) => state.setActionsLastCheckedForRoom);
+  const recordGitHubActionsRefreshForRoom = useAppStore((state) => state.recordGitHubActionsRefreshForRoom);
 
   async function refreshGitHubActions(roomArg?: RoomRecord, targetArg?: GitHubActionsTarget) {
     const room = roomArg ?? (hasSelectedRoom ? selectedRoom : null);
@@ -115,13 +114,15 @@ export function useGitHubActionsRefresh({
     try {
       const result = await listGitHubActionRuns(actionsTarget.owner, actionsTarget.repo, actionsTarget.branch);
       const checkedAt = new Date().toISOString();
-      setActionRunsForRoom(roomId, result.runs);
-      setActionsLastCheckedForRoom(roomId, checkedAt);
       const summary = summarizeActionRuns(result.runs);
       const message = result.runs.length
         ? `Loaded ${result.runs.length} workflow runs for ${actionsTarget.branch}.`
         : `No workflow runs found for ${actionsTarget.branch}. GitHub may still be scheduling the branch.`;
-      setActionsMessageForRoom(roomId, `${summary.label}: ${message}`);
+      recordGitHubActionsRefreshForRoom(roomId, {
+        runs: result.runs,
+        checkedAt,
+        message: `${summary.label}: ${message}`
+      });
       publishGitHubActionsEvent({
         owner: actionsTarget.owner,
         repo: actionsTarget.repo,

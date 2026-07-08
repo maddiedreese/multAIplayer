@@ -1,4 +1,4 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type { MutableRefObject } from "react";
 import type {
   CodexApprovalPlaintextPayload,
   CodexEventPlaintextPayload,
@@ -32,7 +32,6 @@ import {
 import { roomLockMessage } from "../lib/appRuntime";
 import { canUseLocalWorkspace } from "../lib/workspaceAccess";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
-import { ensureRoomDefaults } from "../lib/roomDefaults";
 import { updateRoomHost } from "../lib/workspaceClient";
 import { useAppStore } from "../store/appStore";
 import type {
@@ -67,7 +66,7 @@ interface UseCodexTurnActionsOptions {
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   setCodexRunningForRoom: (roomId: string, running: boolean) => void;
   appendTerminalLinesForRoom: (roomId: string, lines: string[]) => void;
-  setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
+  replaceRoom: (room: RoomRecord) => void;
   publishCodexEvent: (
     event: Omit<CodexEventPlaintextPayload, "eventType" | "host" | "hostUserId" | "createdAt">,
     room?: RoomRecord
@@ -104,7 +103,7 @@ export function useCodexTurnActions({
   setApprovalVisibleForRoom,
   setCodexRunningForRoom,
   appendTerminalLinesForRoom,
-  setRooms,
+  replaceRoom,
   publishCodexEvent,
   publishCodexApproval,
   publishChatMessage,
@@ -305,7 +304,7 @@ export function useCodexTurnActions({
     try {
       const handedOff = await updateRoomHost(roomId, room.host, room.hostUserId ?? localUser.id, "handoff");
       void shutdownCodexRoom(roomId);
-      setRooms((current) => current.map((item) => (item.id === handedOff.id ? ensureRoomDefaults(handedOff) : item)));
+      replaceRoom(handedOff);
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setHostMessageForRoom(roomId, `Codex usage is unavailable, but host handoff could not update room host status: ${String(error)}`);
