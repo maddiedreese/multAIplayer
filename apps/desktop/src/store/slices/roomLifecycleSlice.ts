@@ -20,6 +20,10 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         ? currentTerminalId
         : payload.terminalSnapshots[0]?.id ?? null;
       const codexThreadId = normalizeCodexThreadId(payload.codexThreadId);
+      const {
+        threadId: _threadId,
+        ...codexRuntimeWithoutThread
+      } = state.codexRuntimeByRoom[roomId] ?? {};
 
       return {
         messagesByRoom: payload.messages.length
@@ -46,9 +50,15 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
               }
             }
           : state.inviteByRoom,
-        codexEventsByRoom: payload.codexEvents.length
-          ? { ...state.codexEventsByRoom, [roomId]: payload.codexEvents }
-          : { ...state.codexEventsByRoom, [roomId]: [] },
+        codexRuntimeByRoom: {
+          ...state.codexRuntimeByRoom,
+          [roomId]: {
+            ...codexRuntimeWithoutThread,
+            events: payload.codexEvents,
+            hostHandoffs: payload.hostHandoffs,
+            ...(codexThreadId ? { threadId: codexThreadId } : {})
+          }
+        },
         gitWorkflowByRoom: payload.gitWorkflowEvents.length
           ? {
               ...state.gitWorkflowByRoom,
@@ -87,12 +97,6 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         selectedTerminalIdsByRoom: payload.terminalSnapshots.length && nextTerminalId
           ? { ...state.selectedTerminalIdsByRoom, [roomId]: nextTerminalId }
           : state.selectedTerminalIdsByRoom,
-        hostHandoffsByRoom: payload.hostHandoffs.length
-          ? { ...state.hostHandoffsByRoom, [roomId]: payload.hostHandoffs }
-          : { ...state.hostHandoffsByRoom, [roomId]: [] },
-        codexThreadIdsByRoom: codexThreadId
-          ? { ...state.codexThreadIdsByRoom, [roomId]: codexThreadId }
-          : omitRecordKey(state.codexThreadIdsByRoom, roomId)
       };
     });
   },
@@ -107,7 +111,13 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         }
       },
       inviteByRoom: omitRecordKey(state.inviteByRoom, roomId),
-      codexEventsByRoom: { ...state.codexEventsByRoom, [roomId]: [] },
+      codexRuntimeByRoom: {
+        ...state.codexRuntimeByRoom,
+        [roomId]: {
+          events: [],
+          hostHandoffs: []
+        }
+      },
       gitWorkflowByRoom: {
         ...state.gitWorkflowByRoom,
         [roomId]: {
@@ -115,8 +125,6 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         }
       },
       githubActionsEventsByRoom: { ...state.githubActionsEventsByRoom, [roomId]: [] },
-      hostHandoffsByRoom: { ...state.hostHandoffsByRoom, [roomId]: [] },
-      codexThreadIdsByRoom: omitRecordKey(state.codexThreadIdsByRoom, roomId),
       githubActionsByRoom: omitRecordKey(state.githubActionsByRoom, roomId),
       roomSettingsByRoom: omitRecordKey(state.roomSettingsByRoom, roomId),
       roomChatByRoom: omitRecordKey(state.roomChatByRoom, roomId),
@@ -124,16 +132,10 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         ? null
         : state.sensitiveAttachmentReviewKey,
       filePanelByRoom: omitRecordKey(state.filePanelByRoom, roomId),
-      secretWarningsVisibleByRoom: omitRecordKey(state.secretWarningsVisibleByRoom, roomId),
       historySearchMessagesByRoom: omitRecordKey(state.historySearchMessagesByRoom, roomId),
       historyMessagesByRoom: omitRecordKey(state.historyMessagesByRoom, roomId),
       inspectorTabsByRoom: omitRecordKey(state.inspectorTabsByRoom, roomId),
       presenceByRoom: omitRecordKey(state.presenceByRoom, roomId),
-      approvalVisibleByRoom: omitRecordKey(state.approvalVisibleByRoom, roomId),
-      pendingCodexApprovalsByRoom: omitRecordKey(state.pendingCodexApprovalsByRoom, roomId),
-      codexRunningByRoom: omitRecordKey(state.codexRunningByRoom, roomId),
-      roomGoalsByRoom: omitRecordKey(state.roomGoalsByRoom, roomId),
-      codexContinuationByRoom: omitRecordKey(state.codexContinuationByRoom, roomId),
       localPreviewByRoom: omitRecordKey(state.localPreviewByRoom, roomId),
       terminalLinesByRoom: omitRecordKey(state.terminalLinesByRoom, roomId),
       terminalBusyByRoom: omitRecordKey(state.terminalBusyByRoom, roomId),

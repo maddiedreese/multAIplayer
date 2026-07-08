@@ -8,26 +8,34 @@ import type {
 } from "../../types";
 import type { AppStoreState } from "../appStore";
 
-type CodexEventsByRoom = Record<string, CodexRoomEvent[]>;
-type ApprovalVisibleByRoom = Record<string, boolean>;
-type PendingCodexApprovalsByRoom = Record<string, PendingCodexApproval>;
-type CodexRunningByRoom = Record<string, boolean>;
-type RoomGoalsByRoom = Record<string, RoomGoal>;
-type SecretWarningsVisibleByRoom = Record<string, boolean>;
-type CodexThreadIdsByRoom = Record<string, string>;
-type HostHandoffsByRoom = Record<string, HostHandoffRecord[]>;
-type CodexContinuationByRoom = Record<string, HostHandoffRecord>;
+export interface CodexRuntimeRoomState {
+  events?: CodexRoomEvent[];
+  approvalVisible?: boolean;
+  pendingApproval?: PendingCodexApproval;
+  running?: boolean;
+  goal?: RoomGoal;
+  secretWarningVisible?: boolean;
+  threadId?: string;
+  hostHandoffs?: HostHandoffRecord[];
+  continuation?: HostHandoffRecord;
+}
+
+export type CodexRuntimeByRoom = Record<string, CodexRuntimeRoomState>;
+
+function updateCodexRuntimeForRoom(
+  current: CodexRuntimeByRoom,
+  roomId: string,
+  update: (roomRuntime: CodexRuntimeRoomState) => CodexRuntimeRoomState
+): CodexRuntimeByRoom {
+  const nextRoomRuntime = update(current[roomId] ?? {});
+  if (Object.keys(nextRoomRuntime).length === 0) {
+    return roomId in current ? omitRecordKey(current, roomId) : current;
+  }
+  return { ...current, [roomId]: nextRoomRuntime };
+}
 
 export interface CodexHostHandoffSlice {
-  codexEventsByRoom: CodexEventsByRoom;
-  approvalVisibleByRoom: ApprovalVisibleByRoom;
-  pendingCodexApprovalsByRoom: PendingCodexApprovalsByRoom;
-  codexRunningByRoom: CodexRunningByRoom;
-  roomGoalsByRoom: RoomGoalsByRoom;
-  secretWarningsVisibleByRoom: SecretWarningsVisibleByRoom;
-  codexThreadIdsByRoom: CodexThreadIdsByRoom;
-  hostHandoffsByRoom: HostHandoffsByRoom;
-  codexContinuationByRoom: CodexContinuationByRoom;
+  codexRuntimeByRoom: CodexRuntimeByRoom;
   appendHostHandoff: (roomId: string, handoff: HostHandoffRecord) => void;
   applyAcceptedHostHandoffForRoom: (roomId: string, handoff: HostHandoffRecord) => void;
   markHostHandoffAcceptedForRoom: (roomId: string, handoffId: string) => void;
@@ -43,47 +51,28 @@ export interface CodexHostHandoffSlice {
   setSecretWarningVisibleForRoom: (roomId: string, visible: boolean) => void;
 }
 
-export const emptyCodexHostHandoffState: Pick<
-  CodexHostHandoffSlice,
-  | "codexEventsByRoom"
-  | "approvalVisibleByRoom"
-  | "pendingCodexApprovalsByRoom"
-  | "codexRunningByRoom"
-  | "roomGoalsByRoom"
-  | "secretWarningsVisibleByRoom"
-  | "codexThreadIdsByRoom"
-  | "hostHandoffsByRoom"
-  | "codexContinuationByRoom"
-> = {
-  codexEventsByRoom: {},
-  approvalVisibleByRoom: {},
-  pendingCodexApprovalsByRoom: {},
-  codexRunningByRoom: {},
-  roomGoalsByRoom: {},
-  secretWarningsVisibleByRoom: {},
-  codexThreadIdsByRoom: {},
-  hostHandoffsByRoom: {},
-  codexContinuationByRoom: {}
+export const emptyCodexHostHandoffState: Pick<CodexHostHandoffSlice, "codexRuntimeByRoom"> = {
+  codexRuntimeByRoom: {}
 };
 
 export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], CodexHostHandoffSlice> = (set) => ({
   ...emptyCodexHostHandoffState,
   appendHostHandoff: (roomId, handoff) => {
     set((state) => {
-      const roomHandoffs = state.hostHandoffsByRoom[roomId] ?? [];
+      const roomHandoffs = state.codexRuntimeByRoom[roomId]?.hostHandoffs ?? [];
       if (roomHandoffs.some((existing) => existing.id === handoff.id)) return state;
       return {
-        hostHandoffsByRoom: {
-          ...state.hostHandoffsByRoom,
-          [roomId]: [...roomHandoffs, handoff]
-        }
+        codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => ({
+          ...roomRuntime,
+          hostHandoffs: [...roomHandoffs, handoff]
+        }))
       };
     });
   },
   applyAcceptedHostHandoffForRoom: (roomId, handoff) => {
     set((state) => {
       const acceptedHandoff: HostHandoffRecord = { ...handoff, status: "accepted" };
-      const roomHandoffs = state.hostHandoffsByRoom[roomId] ?? [];
+      const roomHandoffs = state.codexRuntimeByRoom[roomId]?.hostHandoffs ?? [];
       const existingIndex = roomHandoffs.findIndex((existing) => existing.id === handoff.id);
       const nextHandoffs = existingIndex >= 0
         ? roomHandoffs.map((existing) =>
@@ -96,52 +85,53 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
           )
         : [...roomHandoffs, acceptedHandoff];
       return {
-        hostHandoffsByRoom: {
-          ...state.hostHandoffsByRoom,
-          [roomId]: nextHandoffs
-        }
+        codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => ({
+          ...roomRuntime,
+          hostHandoffs: nextHandoffs
+        }))
       };
     });
   },
   markHostHandoffAcceptedForRoom: (roomId, handoffId) => {
     set((state) => {
-      const roomHandoffs = state.hostHandoffsByRoom[roomId] ?? [];
+      const roomHandoffs = state.codexRuntimeByRoom[roomId]?.hostHandoffs ?? [];
       if (!roomHandoffs.some((handoff) => handoff.id === handoffId)) return state;
       return {
-        hostHandoffsByRoom: {
-          ...state.hostHandoffsByRoom,
-          [roomId]: roomHandoffs.map((handoff) =>
+        codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => ({
+          ...roomRuntime,
+          hostHandoffs: roomHandoffs.map((handoff) =>
             handoff.id === handoffId ? { ...handoff, status: "accepted" } : handoff
           )
-        }
+        }))
       };
     });
   },
   markLatestHostHandoffAcceptedForRoom: (roomId) => {
     set((state) => {
-      const roomHandoffs = state.hostHandoffsByRoom[roomId] ?? [];
+      const roomHandoffs = state.codexRuntimeByRoom[roomId]?.hostHandoffs ?? [];
       const latestAvailable = [...roomHandoffs].reverse().find((handoff) => handoff.status === "available");
       if (!latestAvailable) return state;
       return {
-        hostHandoffsByRoom: {
-          ...state.hostHandoffsByRoom,
-          [roomId]: roomHandoffs.map((handoff) =>
+        codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => ({
+          ...roomRuntime,
+          hostHandoffs: roomHandoffs.map((handoff) =>
             handoff.id === latestAvailable.id ? { ...handoff, status: "accepted" } : handoff
           )
-        }
+        }))
       };
     });
   },
   setCodexContinuationForRoom: (roomId, handoff) => {
     set((state) => ({
-      codexContinuationByRoom: handoff
-        ? { ...state.codexContinuationByRoom, [roomId]: handoff }
-        : omitRecordKey(state.codexContinuationByRoom, roomId)
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
+        const { continuation: _continuation, ...rest } = roomRuntime;
+        return handoff ? { ...rest, continuation: handoff } : rest;
+      })
     }));
   },
   appendCodexEvent: (roomId, event) => {
     set((state) => {
-      const roomEvents = state.codexEventsByRoom[roomId] ?? [];
+      const roomEvents = state.codexRuntimeByRoom[roomId]?.events ?? [];
       if (
         roomEvents.some((existing) =>
           existing.turnId === event.turnId &&
@@ -153,59 +143,71 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
         return state;
       }
       return {
-        codexEventsByRoom: {
-          ...state.codexEventsByRoom,
-          [roomId]: [...roomEvents, event].slice(-80)
-        }
+        codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => ({
+          ...roomRuntime,
+          events: [...roomEvents, event].slice(-80)
+        }))
       };
     });
   },
   setApprovalVisibleForRoom: (roomId, visible) => {
     set((state) => ({
-      approvalVisibleByRoom: visible
-        ? { ...state.approvalVisibleByRoom, [roomId]: true }
-        : omitRecordKey(state.approvalVisibleByRoom, roomId)
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
+        const { approvalVisible: _approvalVisible, ...rest } = roomRuntime;
+        return visible ? { ...rest, approvalVisible: true } : rest;
+      })
     }));
   },
   setPendingCodexApprovalForRoom: (roomId, approval) => {
     set((state) => ({
-      pendingCodexApprovalsByRoom: approval
-        ? { ...state.pendingCodexApprovalsByRoom, [roomId]: approval }
-        : omitRecordKey(state.pendingCodexApprovalsByRoom, roomId)
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
+        const { pendingApproval: _pendingApproval, ...rest } = roomRuntime;
+        return approval ? { ...rest, pendingApproval: approval } : rest;
+      })
     }));
   },
   resetCodexApprovalForRoom: (roomId) => {
     set((state) => ({
-      pendingCodexApprovalsByRoom: omitRecordKey(state.pendingCodexApprovalsByRoom, roomId),
-      approvalVisibleByRoom: omitRecordKey(state.approvalVisibleByRoom, roomId)
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
+        const {
+          pendingApproval: _pendingApproval,
+          approvalVisible: _approvalVisible,
+          ...rest
+        } = roomRuntime;
+        return rest;
+      })
     }));
   },
   setCodexRunningForRoom: (roomId, running) => {
     set((state) => ({
-      codexRunningByRoom: running
-        ? { ...state.codexRunningByRoom, [roomId]: true }
-        : omitRecordKey(state.codexRunningByRoom, roomId)
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
+        const { running: _running, ...rest } = roomRuntime;
+        return running ? { ...rest, running: true } : rest;
+      })
     }));
   },
   setRoomGoalForRoom: (roomId, goal) => {
     set((state) => ({
-      roomGoalsByRoom: goal
-        ? { ...state.roomGoalsByRoom, [roomId]: goal }
-        : omitRecordKey(state.roomGoalsByRoom, roomId)
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
+        const { goal: _goal, ...rest } = roomRuntime;
+        return goal ? { ...rest, goal } : rest;
+      })
     }));
   },
   setCodexThreadIdForRoom: (roomId, threadId) => {
     set((state) => ({
-      codexThreadIdsByRoom: threadId
-        ? { ...state.codexThreadIdsByRoom, [roomId]: threadId }
-        : omitRecordKey(state.codexThreadIdsByRoom, roomId)
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
+        const { threadId: _threadId, ...rest } = roomRuntime;
+        return threadId ? { ...rest, threadId } : rest;
+      })
     }));
   },
   setSecretWarningVisibleForRoom: (roomId, visible) => {
     set((state) => ({
-      secretWarningsVisibleByRoom: visible
-        ? { ...state.secretWarningsVisibleByRoom, [roomId]: true }
-        : omitRecordKey(state.secretWarningsVisibleByRoom, roomId)
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
+        const { secretWarningVisible: _secretWarningVisible, ...rest } = roomRuntime;
+        return visible ? { ...rest, secretWarningVisible: true } : rest;
+      })
     }));
   }
 });

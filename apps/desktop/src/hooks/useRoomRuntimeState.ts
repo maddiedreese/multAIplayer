@@ -1,5 +1,21 @@
 import { useMemo, useState } from "react";
 import { useAppStore } from "../store/appStore";
+import type { HostHandoffRecord } from "../types";
+
+function projectCodexRuntimeMaps(codexRuntimeByRoom: ReturnType<typeof useAppStore.getState>["codexRuntimeByRoom"]) {
+  const hostHandoffsByRoom: Record<string, HostHandoffRecord[]> = {};
+  const codexContinuationByRoom: Record<string, HostHandoffRecord> = {};
+
+  Object.entries(codexRuntimeByRoom).forEach(([roomId, runtime]) => {
+    if (runtime.hostHandoffs) hostHandoffsByRoom[roomId] = runtime.hostHandoffs;
+    if (runtime.continuation) codexContinuationByRoom[roomId] = runtime.continuation;
+  });
+
+  return {
+    hostHandoffsByRoom,
+    codexContinuationByRoom
+  };
+}
 
 export function useRoomRuntimeState() {
   const inspectorTabsByRoom = useAppStore((state) => state.inspectorTabsByRoom);
@@ -9,10 +25,10 @@ export function useRoomRuntimeState() {
   const presenceByRoom = useAppStore((state) => state.presenceByRoom);
   const clearPresenceByRoom = useAppStore((state) => state.clearPresenceByRoom);
   const setRoomPresenceForDevice = useAppStore((state) => state.setRoomPresenceForDevice);
-  const hostHandoffsByRoom = useAppStore((state) => state.hostHandoffsByRoom);
-  const codexContinuationByRoom = useAppStore((state) => state.codexContinuationByRoom);
+  const codexRuntimeByRoom = useAppStore((state) => state.codexRuntimeByRoom);
   const gitWorkflowByRoom = useAppStore((state) => state.gitWorkflowByRoom);
   const githubActionsEventsByRoom = useAppStore((state) => state.githubActionsEventsByRoom);
+  const codexRuntimeMaps = useMemo(() => projectCodexRuntimeMaps(codexRuntimeByRoom), [codexRuntimeByRoom]);
   const gitWorkflowEventsByRoom = useMemo(() => Object.fromEntries(
     Object.entries(gitWorkflowByRoom)
       .filter(([, workflow]) => workflow.events)
@@ -30,8 +46,8 @@ export function useRoomRuntimeState() {
     presenceByRoom,
     clearPresenceByRoom,
     setRoomPresenceForDevice,
-    hostHandoffsByRoom,
-    codexContinuationByRoom,
+    hostHandoffsByRoom: codexRuntimeMaps.hostHandoffsByRoom,
+    codexContinuationByRoom: codexRuntimeMaps.codexContinuationByRoom,
     gitWorkflowEventsByRoom,
     githubActionsEventsByRoom
   };
