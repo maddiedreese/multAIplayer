@@ -1,6 +1,7 @@
 import {
   codexModelOptions,
   codexReasoningEffortOptions,
+  codexSandboxLevelOptions,
   codexSpeedOptions,
   maxEmbeddedAttachmentBytes,
   maxEmbeddedAttachmentBytesPerMessage,
@@ -21,6 +22,10 @@ export function formatCodexReasoningEffort(effort: string): string {
 
 export function formatCodexSpeed(speed: string): string {
   return codexSpeedOptions.find((option) => option.id === speed)?.label ?? speed;
+}
+
+export function formatCodexSandboxLevel(sandboxLevel: string): string {
+  return codexSandboxLevelOptions.find((option) => option.id === sandboxLevel)?.label ?? sandboxLevel;
 }
 
 export function clamp(value: number, min: number, max: number): number {

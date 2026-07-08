@@ -1,9 +1,15 @@
-import type { ApprovalPolicy, HostHandoffPlaintextPayload } from "@multaiplayer/protocol";
-import { normalizeCodexModel, normalizeProjectPath } from "./workspaceCreation";
+import {
+  defaultCodexSandboxLevel,
+  type ApprovalPolicy,
+  type HostHandoffPlaintextPayload,
+  type RoomRecord
+} from "@multaiplayer/protocol";
+import { normalizeCodexModel, normalizeCodexSandboxLevel, normalizeProjectPath } from "./workspaceCreation";
 
 export interface HandoffSettingsPatch {
   projectPath: string;
   codexModel: string;
+  codexSandboxLevel: RoomRecord["codexSandboxLevel"];
   approvalPolicy: ApprovalPolicy;
 }
 
@@ -40,12 +46,15 @@ export function createHandoffSettingsPatch(handoff: HostHandoffPlaintextPayload)
   if (!projectPath) throw new Error("Host handoff is missing a supported project path.");
   const codexModel = normalizeCodexModel(handoff.codexModel);
   if (!codexModel) throw new Error("Host handoff is missing a supported Codex model.");
+  const codexSandboxLevel = normalizeCodexSandboxLevel(handoff.codexSandboxLevel ?? defaultCodexSandboxLevel);
+  if (!codexSandboxLevel) throw new Error("Host handoff is missing a supported Codex sandbox level.");
   if (!approvalPolicies.includes(handoff.approvalPolicy as ApprovalPolicy)) {
     throw new Error(`Host handoff approval policy is not supported: ${handoff.approvalPolicy}`);
   }
   return {
     projectPath,
     codexModel,
+    codexSandboxLevel: codexSandboxLevel as RoomRecord["codexSandboxLevel"],
     approvalPolicy: handoff.approvalPolicy as ApprovalPolicy
   };
 }

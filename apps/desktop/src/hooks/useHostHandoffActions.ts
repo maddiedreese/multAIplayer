@@ -1,9 +1,11 @@
 import type { MutableRefObject } from "react";
 import type {
+  CodexSandboxLevel,
   HostHandoffPlaintextPayload,
   RelayEnvelope,
   RoomRecord
 } from "@multaiplayer/protocol";
+import { defaultCodexSandboxLevel } from "@multaiplayer/protocol";
 import { encryptJson } from "@multaiplayer/crypto";
 import { loadOrCreateRoomSecret } from "../lib/localHistory";
 import {
@@ -329,6 +331,7 @@ export function useHostHandoffActions({
       ...(patchResult?.patch && !patchResult.truncated ? { gitPatch: patchResult.patch } : {}),
       ...(patchResult?.truncated ? { gitPatchTruncated: true } : {}),
       codexModel: room.codexModel,
+      codexSandboxLevel: (room.codexSandboxLevel ?? defaultCodexSandboxLevel) as CodexSandboxLevel,
       approvalPolicy: room.approvalPolicy,
       messagesSinceLastCodex: summary.messagesSinceLastCodex,
       attachmentNames: summary.attachments.map((attachment) => attachment.name),
@@ -361,6 +364,7 @@ export function useHostHandoffActions({
       gitPatch: handoff.gitPatch,
       gitPatchTruncated: handoff.gitPatchTruncated,
       codexModel: handoff.codexModel,
+      codexSandboxLevel: handoff.codexSandboxLevel,
       approvalPolicy: handoff.approvalPolicy,
       messagesSinceLastCodex: handoff.messagesSinceLastCodex,
       attachmentNames: handoff.attachmentNames,
@@ -401,6 +405,7 @@ export function useHostHandoffActions({
       gitPatch: handoff.gitPatch,
       gitPatchTruncated: handoff.gitPatchTruncated,
       codexModel: handoff.codexModel,
+      codexSandboxLevel: handoff.codexSandboxLevel,
       approvalPolicy: handoff.approvalPolicy,
       messagesSinceLastCodex: handoff.messagesSinceLastCodex,
       attachmentNames: handoff.attachmentNames,

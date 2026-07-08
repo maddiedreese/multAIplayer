@@ -308,6 +308,12 @@ export const HostHandoffPlaintextPayload = z.object({
   gitPatch: z.string().max(maxLongTextChars).optional(),
   gitPatchTruncated: z.boolean().optional(),
   codexModel: z.string().min(1).max(maxCodexModelChars),
+  codexSandboxLevel: z.enum([
+    "read_only",
+    "workspace_write",
+    "workspace_write_network",
+    "danger_full_access"
+  ]).optional(),
   approvalPolicy: z.string().min(1).max(maxShortTextChars),
   messagesSinceLastCodex: z.number().int().nonnegative(),
   attachmentNames: z.array(z.string().min(1).max(maxShortTextChars)).max(maxMessageAttachments),
@@ -332,6 +338,7 @@ export const RoomSettingsPlaintextPayload = z.object({
     "codexModel",
     "codexReasoningEffort",
     "codexSpeed",
+    "codexSandboxLevel",
     "projectPath",
     "browserAllowedOrigins",
     "browserProfilePersistent"
@@ -370,6 +377,7 @@ export const defaultApprovalDelegationPolicy: ApprovalDelegationPolicy = "host_o
 export const defaultCodexModel = "gpt-5.3-codex";
 export const defaultCodexReasoningEffort = "medium";
 export const defaultCodexSpeed = "standard";
+export const defaultCodexSandboxLevel = "workspace_write";
 export const defaultBrowserAllowedOrigins = ["https://github.com"];
 export const defaultBrowserProfilePersistent = true;
 
@@ -398,8 +406,44 @@ export const codexSpeedOptions = [
   { id: "flex", label: "Flex", serviceTier: "flex", description: "Flexible tier for non-urgent Codex turns when available" }
 ] as const;
 
+export const codexSandboxLevelOptions = [
+  {
+    id: "read_only",
+    label: "Read-only",
+    sandboxMode: "read-only",
+    approvalPolicy: "on-request",
+    networkAccess: false,
+    description: "Codex can inspect the workspace; file changes and boundary crossings need approval."
+  },
+  {
+    id: "workspace_write",
+    label: "Workspace write",
+    sandboxMode: "workspace-write",
+    approvalPolicy: "on-request",
+    networkAccess: false,
+    description: "Codex can edit the room project; network and out-of-workspace actions need approval."
+  },
+  {
+    id: "workspace_write_network",
+    label: "Workspace + network",
+    sandboxMode: "workspace-write",
+    approvalPolicy: "on-request",
+    networkAccess: true,
+    description: "Codex can edit the room project and use network access inside the sandbox."
+  },
+  {
+    id: "danger_full_access",
+    label: "Full access",
+    sandboxMode: "danger-full-access",
+    approvalPolicy: "on-request",
+    networkAccess: true,
+    description: "Codex can run with broad local access. Use only in fully trusted rooms."
+  }
+] as const;
+
 export type CodexReasoningEffort = typeof codexReasoningEffortOptions[number]["id"];
 export type CodexSpeed = typeof codexSpeedOptions[number]["id"];
+export type CodexSandboxLevel = typeof codexSandboxLevelOptions[number]["id"];
 
 export const TeamRole = z.enum(["owner", "admin", "member"]);
 
@@ -459,6 +503,7 @@ export const RoomRecord = z.object({
   codexModel: z.string().min(1).max(maxCodexModelChars),
   codexReasoningEffort: z.enum(["minimal", "low", "medium", "high", "xhigh"]).optional(),
   codexSpeed: z.enum(["standard", "fast", "flex"]).optional(),
+  codexSandboxLevel: z.enum(["read_only", "workspace_write", "workspace_write_network", "danger_full_access"]).optional(),
   browserAllowedOrigins: z.array(z.string().min(1).max(maxUrlChars)).max(20),
   browserProfilePersistent: z.boolean(),
   unread: z.number().int().nonnegative()

@@ -564,12 +564,14 @@ mod tests {
 
     #[test]
     fn codex_server_key_is_scoped_to_room_project_and_model() {
+        let sandbox = codex_sandbox_config(Some("workspace_write")).expect("workspace sandbox");
         let base = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
             "gpt-5.3-codex",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("valid codex session key");
         let same = codex_server_key(
@@ -578,6 +580,7 @@ mod tests {
             "gpt-5.3-codex",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("same codex session key");
         let different_room = codex_server_key(
@@ -586,6 +589,7 @@ mod tests {
             "gpt-5.3-codex",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("different room key");
         let different_project = codex_server_key(
@@ -594,6 +598,7 @@ mod tests {
             "gpt-5.3-codex",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("different project key");
         let different_model = codex_server_key(
@@ -602,6 +607,7 @@ mod tests {
             "gpt-5.3-codex-spark",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("different model key");
         let different_reasoning = codex_server_key(
@@ -610,6 +616,7 @@ mod tests {
             "gpt-5.3-codex",
             "high",
             "default",
+            &sandbox,
         )
         .expect("different reasoning key");
         let different_speed = codex_server_key(
@@ -618,8 +625,18 @@ mod tests {
             "gpt-5.3-codex",
             "medium",
             "priority",
+            &sandbox,
         )
         .expect("different speed key");
+        let different_sandbox = codex_server_key(
+            Some("room-alpha"),
+            "/tmp/project",
+            "gpt-5.3-codex",
+            "medium",
+            "default",
+            &codex_sandbox_config(Some("read_only")).expect("read-only sandbox"),
+        )
+        .expect("different sandbox key");
 
         assert_eq!(base, same);
         assert_ne!(base, different_room);
@@ -627,24 +644,28 @@ mod tests {
         assert_ne!(base, different_model);
         assert_ne!(base, different_reasoning);
         assert_ne!(base, different_speed);
+        assert_ne!(base, different_sandbox);
         assert!(codex_server_key(
             Some("room/alpha"),
             "/tmp/project",
             "gpt-5.3-codex",
             "medium",
-            "default"
+            "default",
+            &sandbox
         )
         .is_err());
     }
 
     #[test]
     fn codex_room_shutdown_matches_all_sessions_for_room_only() {
+        let sandbox = codex_sandbox_config(Some("workspace_write")).expect("workspace sandbox");
         let room_a_main = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
             "gpt-5.3-codex",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("room alpha key");
         let room_a_model = codex_server_key(
@@ -653,6 +674,7 @@ mod tests {
             "gpt-5.3-codex-spark",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("room alpha model key");
         let room_b = codex_server_key(
@@ -661,6 +683,7 @@ mod tests {
             "gpt-5.3-codex",
             "medium",
             "default",
+            &sandbox,
         )
         .expect("room beta key");
 

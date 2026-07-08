@@ -591,6 +591,7 @@ export async function runCodexTurn(
   model = "gpt-5.3-codex",
   reasoningEffort = "medium",
   speed = "standard",
+  sandboxLevel = "workspace_write",
   previousThreadId: string | null = null,
   timeoutSeconds = 180
 ): Promise<CodexTurnResult> {
@@ -603,6 +604,7 @@ export async function runCodexTurn(
         model,
         reasoningEffort,
         speed,
+        sandboxLevel,
         previousThreadId,
         timeoutSeconds
       }

@@ -4,6 +4,7 @@ import {
   defaultApprovalDelegationPolicy,
   defaultCodexModel,
   defaultCodexReasoningEffort,
+  defaultCodexSandboxLevel,
   defaultCodexSpeed,
   type RoomRecord
 } from "@multaiplayer/protocol";
@@ -16,6 +17,7 @@ export function ensureRoomDefaults(room: RoomRecord): RoomRecord {
     codexModel: room.codexModel || defaultCodexModel,
     codexReasoningEffort: room.codexReasoningEffort ?? defaultCodexReasoningEffort,
     codexSpeed: room.codexSpeed ?? defaultCodexSpeed,
+    codexSandboxLevel: room.codexSandboxLevel ?? defaultCodexSandboxLevel,
     approvalDelegationPolicy: room.approvalDelegationPolicy ?? defaultApprovalDelegationPolicy,
     trustedApproverUserIds: Array.isArray(room.trustedApproverUserIds) ? room.trustedApproverUserIds : [],
     browserAllowedOrigins: normalizeBrowserAllowedOrigins(room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins) ?? defaultBrowserAllowedOrigins,

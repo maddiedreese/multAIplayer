@@ -13,6 +13,7 @@ import {
   maxRoomProjectPathChars,
   normalizeCodexModel,
   normalizeCodexReasoningEffort,
+  normalizeCodexSandboxLevel,
   normalizeCodexSpeed,
   normalizeProjectPath,
   normalizeRoomName
@@ -20,7 +21,7 @@ import {
 import { shouldResetCodexApprovalForRoomModeChange } from "../lib/codexApproval";
 import { roomLockMessage } from "../lib/appRuntime";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
-import { formatCodexModel, formatCodexReasoningEffort, formatCodexSpeed } from "../lib/appFormatters";
+import { formatCodexModel, formatCodexReasoningEffort, formatCodexSandboxLevel, formatCodexSpeed } from "../lib/appFormatters";
 
 interface UseRoomSettingsActionsOptions {
   hasSelectedRoom: boolean;
@@ -32,6 +33,7 @@ interface UseRoomSettingsActionsOptions {
   selectedCodexModel: string;
   selectedCodexReasoningEffort: string;
   selectedCodexSpeed: string;
+  selectedCodexSandboxLevel: string;
   projectPathDraft: string;
   approvalPolicyLabels: Record<string, string>;
   roomModeLabels: Record<keyof RoomMode, string>;
@@ -67,6 +69,7 @@ export function useRoomSettingsActions({
   selectedCodexModel,
   selectedCodexReasoningEffort,
   selectedCodexSpeed,
+  selectedCodexSandboxLevel,
   projectPathDraft,
   approvalPolicyLabels,
   roomModeLabels,
@@ -353,6 +356,55 @@ export function useRoomSettingsActions({
     }
   }
 
+  async function setCodexSandboxLevel(sandboxLevel: string) {
+    const nextSandboxLevel = normalizeCodexSandboxLevel(sandboxLevel);
+    if (!nextSandboxLevel) {
+      setSelectedSettingsMessage("Choose a supported Codex sandbox level.");
+      return;
+    }
+    if (nextSandboxLevel === selectedCodexSandboxLevel) return;
+    if (!hasSelectedRoom) {
+      setSelectedSettingsMessage("Create or join a room before changing the Codex sandbox.");
+      return;
+    }
+    if (isSelectedRoomLocked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
+    if (!isActiveHost) {
+      setSelectedSettingsMessage(roomSettingsGateMessage);
+      return;
+    }
+    const roomId = selectedRoom.id;
+    if (reportRoomSettingsMutationInFlight(roomId)) return;
+    setSettingsBusyForRoom(roomId, true);
+    setSettingsMessageForRoom(roomId, null);
+    try {
+      const previousValue = selectedCodexSandboxLevel;
+      const room = await updateRoomSettings(roomId, {
+        ...roomSettingsActor(),
+        codexSandboxLevel: nextSandboxLevel as RoomRecord["codexSandboxLevel"]
+      });
+      void shutdownCodexRoom(roomId);
+      replaceRoom(room);
+      await publishRoomSettingsEvent(room, {
+        id: crypto.randomUUID(),
+        setting: "codexSandboxLevel",
+        previousValue,
+        nextValue: nextSandboxLevel,
+        changedAt: new Date().toISOString()
+      });
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setSettingsMessageForRoom(roomId, `Codex sandbox set to ${formatCodexSandboxLevel(nextSandboxLevel)}.`);
+      }
+      resetCodexApprovalForRoom(roomId);
+    } catch (error) {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
+    } finally {
+      setSettingsBusyForRoom(roomId, false);
+    }
+  }
+
   async function renameRoom(name: string) {
     const nextName = normalizeRoomName(name);
     if (!nextName) {
@@ -526,6 +578,7 @@ export function useRoomSettingsActions({
     setCodexModel,
     setCodexReasoningEffort,
     setCodexSpeed,
+    setCodexSandboxLevel,
     renameRoom,
     setBrowserProfilePersistence,
     updateProjectPath,

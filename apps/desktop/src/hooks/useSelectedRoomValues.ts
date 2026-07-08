@@ -1,5 +1,5 @@
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { defaultCodexModel, defaultCodexReasoningEffort, defaultCodexSpeed } from "@multaiplayer/protocol";
+import { defaultCodexModel, defaultCodexReasoningEffort, defaultCodexSandboxLevel, defaultCodexSpeed } from "@multaiplayer/protocol";
 import { resolveFilePreviewTab } from "../lib/filePreview";
 import { resolveGitWorkflowDraft } from "../lib/gitWorkflowDraft";
 import { embeddedAttachmentBytes } from "../lib/appFormatters";
@@ -62,6 +62,7 @@ export function useSelectedRoomValues({
   const selectedCodexModel = selectedRoom.codexModel ?? defaultCodexModel;
   const selectedCodexReasoningEffort = selectedRoom.codexReasoningEffort ?? defaultCodexReasoningEffort;
   const selectedCodexSpeed = selectedRoom.codexSpeed ?? defaultCodexSpeed;
+  const selectedCodexSandboxLevel = selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel;
   const messages = messagesByRoom[roomId] ?? [];
   const roomSettings = roomSettingsByRoom[roomId] ?? {};
   const roomChat = roomChatByRoom[roomId] ?? {};
@@ -84,6 +85,7 @@ export function useSelectedRoomValues({
     selectedCodexModel,
     selectedCodexReasoningEffort,
     selectedCodexSpeed,
+    selectedCodexSandboxLevel,
     customCodexModel: roomSettings.customCodexModel ?? selectedCodexModel,
     projectPathDraft: roomSettings.projectPathDraft ?? selectedRoom.projectPath,
     messages,

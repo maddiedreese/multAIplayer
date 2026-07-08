@@ -7,6 +7,7 @@ import {
   maxTeamNameChars,
   normalizeCodexModel,
   normalizeCodexReasoningEffort,
+  normalizeCodexSandboxLevel,
   normalizeCodexSpeed,
   planRoomCreation,
   planTeamCreation
@@ -72,4 +73,12 @@ test("normalizeCodexSpeed accepts current Codex speed choices", () => {
   assert.equal(normalizeCodexSpeed("fast"), "fast");
   assert.equal(normalizeCodexSpeed("flex"), "flex");
   assert.equal(normalizeCodexSpeed("urgent"), null);
+});
+
+test("normalizeCodexSandboxLevel accepts supported room sandbox choices", () => {
+  assert.equal(normalizeCodexSandboxLevel("read_only"), "read_only");
+  assert.equal(normalizeCodexSandboxLevel("workspace_write"), "workspace_write");
+  assert.equal(normalizeCodexSandboxLevel("workspace_write_network"), "workspace_write_network");
+  assert.equal(normalizeCodexSandboxLevel("danger_full_access"), "danger_full_access");
+  assert.equal(normalizeCodexSandboxLevel("full-send"), null);
 });

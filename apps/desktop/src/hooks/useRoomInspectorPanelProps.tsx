@@ -40,6 +40,7 @@ interface UseRoomInspectorPanelPropsOptions {
   selectedCodexModel: string;
   selectedCodexReasoningEffort: string;
   selectedCodexSpeed: string;
+  selectedCodexSandboxLevel: NonNullable<RoomRecord["codexSandboxLevel"]>;
   model: Omit<
     WorkProps["model"],
     "selectedModel" | "selectedModelLabel" | "selectedReasoningEffort" | "selectedSpeed" | "disabled" | "canApplyCustomModel"
@@ -101,6 +102,7 @@ export function useRoomInspectorPanelProps({
   selectedCodexModel,
   selectedCodexReasoningEffort,
   selectedCodexSpeed,
+  selectedCodexSandboxLevel,
   model,
   customCodexModel,
   localHistory,
@@ -148,6 +150,7 @@ export function useRoomInspectorPanelProps({
           ...approvalPolicy,
           selectedPolicy: selectedRoom.approvalPolicy,
           selectedDelegationPolicy: selectedRoom.approvalDelegationPolicy,
+          selectedSandboxLevel: selectedCodexSandboxLevel,
           disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost
         }}
         roomMode={{

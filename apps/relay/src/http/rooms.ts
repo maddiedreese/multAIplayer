@@ -6,8 +6,10 @@ import {
   defaultApprovalDelegationPolicy,
   defaultCodexModel,
   defaultCodexReasoningEffort,
+  defaultCodexSandboxLevel,
   defaultCodexSpeed,
   defaultRoomMode,
+  codexSandboxLevelOptions,
   type ApprovalDelegationPolicy,
   type RoomRecord
 } from "@multaiplayer/protocol";
@@ -93,6 +95,9 @@ export function registerRoomRoutes({
       ? defaultCodexReasoningEffort
       : normalizeCodexReasoningEffort(req.body.codexReasoningEffort);
     const codexSpeed = req.body?.codexSpeed === undefined ? defaultCodexSpeed : normalizeCodexSpeed(req.body.codexSpeed);
+    const codexSandboxLevel = req.body?.codexSandboxLevel === undefined
+      ? defaultCodexSandboxLevel
+      : normalizeCodexSandboxLevel(req.body.codexSandboxLevel);
     const browserAllowedOrigins = req.body?.browserAllowedOrigins;
     const browserProfilePersistent = req.body?.browserProfilePersistent;
     if (!store.hasTeam(teamId)) {
@@ -135,6 +140,10 @@ export function registerRoomRoutes({
       res.status(400).json({ error: "codexSpeed must be standard or fast" });
       return;
     }
+    if (!codexSandboxLevel) {
+      res.status(400).json({ error: "codexSandboxLevel must be read_only, workspace_write, workspace_write_network, or danger_full_access" });
+      return;
+    }
     let normalizedBrowserAllowedOrigins = defaultBrowserAllowedOrigins;
     if (browserAllowedOrigins !== undefined) {
       const parsedBrowserAllowedOrigins = normalizeBrowserAllowedOrigins(browserAllowedOrigins);
@@ -171,6 +180,7 @@ export function registerRoomRoutes({
       codexModel,
       codexReasoningEffort,
       codexSpeed,
+      codexSandboxLevel,
       browserAllowedOrigins: normalizedBrowserAllowedOrigins,
       browserProfilePersistent: browserProfilePersistent ?? defaultBrowserProfilePersistent,
       unread: 0
@@ -256,6 +266,9 @@ export function registerRoomRoutes({
       ? undefined
       : normalizeCodexReasoningEffort(req.body.codexReasoningEffort);
     const codexSpeed = req.body?.codexSpeed === undefined ? undefined : normalizeCodexSpeed(req.body.codexSpeed);
+    const codexSandboxLevel = req.body?.codexSandboxLevel === undefined
+      ? undefined
+      : normalizeCodexSandboxLevel(req.body.codexSandboxLevel);
     const projectPath = req.body?.projectPath === undefined ? undefined : normalizeRoomProjectPath(req.body.projectPath);
     const browserAllowedOrigins = req.body?.browserAllowedOrigins;
     const browserProfilePersistent = req.body?.browserProfilePersistent;
@@ -305,6 +318,10 @@ export function registerRoomRoutes({
       res.status(400).json({ error: "codexSpeed must be standard or fast" });
       return;
     }
+    if (codexSandboxLevel !== undefined && !codexSandboxLevel) {
+      res.status(400).json({ error: "codexSandboxLevel must be read_only, workspace_write, workspace_write_network, or danger_full_access" });
+      return;
+    }
     if (projectPath !== undefined && !projectPath) {
       res.status(400).json({ error: `projectPath must be a non-empty string up to ${maxRoomProjectPathChars} characters` });
       return;
@@ -332,6 +349,7 @@ export function registerRoomRoutes({
       codexModel: codexModel ?? room.codexModel,
       codexReasoningEffort: codexReasoningEffort ?? room.codexReasoningEffort,
       codexSpeed: codexSpeed ?? room.codexSpeed,
+      codexSandboxLevel: codexSandboxLevel ?? room.codexSandboxLevel,
       browserAllowedOrigins: normalizedBrowserAllowedOrigins ?? room.browserAllowedOrigins,
       browserProfilePersistent: browserProfilePersistent ?? room.browserProfilePersistent
     };
@@ -340,6 +358,14 @@ export function registerRoomRoutes({
     broadcastRoomUpdated(updated);
     res.json({ room: updated });
   });
+}
+
+function normalizeCodexSandboxLevel(value: unknown): RoomRecord["codexSandboxLevel"] | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return codexSandboxLevelOptions.some((option) => option.id === trimmed)
+    ? trimmed as RoomRecord["codexSandboxLevel"]
+    : null;
 }
 
 function normalizeTrustedApproverUserIds(value: unknown, maxUserIdChars: number): string[] | null {

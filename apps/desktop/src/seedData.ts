@@ -3,6 +3,7 @@ import {
   defaultBrowserProfilePersistent,
   defaultCodexModel,
   defaultCodexReasoningEffort,
+  defaultCodexSandboxLevel,
   defaultCodexSpeed,
   defaultRoomMode,
   type ApprovalDelegationPolicy,
@@ -54,6 +55,7 @@ export const seededRooms: RoomRecord[] = [
     codexModel: defaultCodexModel,
     codexReasoningEffort: defaultCodexReasoningEffort,
     codexSpeed: defaultCodexSpeed,
+    codexSandboxLevel: "workspace_write",
     browserAllowedOrigins: defaultBrowserAllowedOrigins,
     browserProfilePersistent: defaultBrowserProfilePersistent,
     unread: 0
@@ -73,6 +75,7 @@ export const seededRooms: RoomRecord[] = [
     codexModel: "gpt-5.3-codex-spark",
     codexReasoningEffort: "medium",
     codexSpeed: "standard",
+    codexSandboxLevel: "workspace_write",
     browserAllowedOrigins: defaultBrowserAllowedOrigins,
     browserProfilePersistent: defaultBrowserProfilePersistent,
     unread: 2
@@ -92,6 +95,7 @@ export const seededRooms: RoomRecord[] = [
     codexModel: "gpt-5.3-codex-spark",
     codexReasoningEffort: "high",
     codexSpeed: "standard",
+    codexSandboxLevel: "read_only",
     browserAllowedOrigins: defaultBrowserAllowedOrigins,
     browserProfilePersistent: defaultBrowserProfilePersistent,
     unread: 0
@@ -113,6 +117,7 @@ export const emptyRoom: RoomRecord = {
   codexModel: defaultCodexModel,
   codexReasoningEffort: defaultCodexReasoningEffort,
   codexSpeed: defaultCodexSpeed,
+  codexSandboxLevel: defaultCodexSandboxLevel,
   browserAllowedOrigins: defaultBrowserAllowedOrigins,
   browserProfilePersistent: defaultBrowserProfilePersistent,
   unread: 0

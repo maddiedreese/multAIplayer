@@ -40,6 +40,7 @@ pub(crate) struct CodexTurnRequest {
     model: Option<String>,
     reasoning_effort: Option<String>,
     speed: Option<String>,
+    sandbox_level: Option<String>,
     previous_thread_id: Option<String>,
     timeout_seconds: Option<u64>,
 }
@@ -57,6 +58,16 @@ pub(crate) struct CodexServerKey {
     model: String,
     reasoning_effort: String,
     service_tier: String,
+    sandbox_mode: String,
+    approval_policy: String,
+    network_access: bool,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) struct CodexSandboxConfig {
+    sandbox_mode: String,
+    approval_policy: String,
+    network_access: bool,
 }
 
 struct CodexServerSession {
@@ -103,12 +114,14 @@ pub(crate) fn run_codex_turn(request: CodexTurnRequest) -> Result<CodexTurnResul
     let model = request.model.unwrap_or_else(|| "gpt-5.3-codex".to_string());
     let reasoning_effort = normalize_reasoning_effort(request.reasoning_effort.as_deref())?;
     let service_tier = service_tier_for_speed(request.speed.as_deref())?;
+    let sandbox_config = codex_sandbox_config(request.sandbox_level.as_deref())?;
     let key = codex_server_key(
         request.room_id.as_deref(),
         &request.cwd,
         &model,
         &reasoning_effort,
         &service_tier,
+        &sandbox_config,
     )?;
     let mut session = checkout_codex_session(&key, timeout)?;
     let result = session.run_turn(
@@ -136,7 +149,9 @@ fn normalize_reasoning_effort(value: Option<&str>) -> Result<String, String> {
     let effort = value.unwrap_or("medium").trim();
     match effort {
         "minimal" | "low" | "medium" | "high" | "xhigh" => Ok(effort.to_string()),
-        _ => Err("Codex reasoning effort must be minimal, low, medium, high, or xhigh.".to_string()),
+        _ => {
+            Err("Codex reasoning effort must be minimal, low, medium, high, or xhigh.".to_string())
+        }
     }
 }
 
@@ -150,11 +165,39 @@ fn service_tier_for_speed(value: Option<&str>) -> Result<String, String> {
     }
 }
 
+pub(crate) fn codex_sandbox_config(value: Option<&str>) -> Result<CodexSandboxConfig, String> {
+    let level = value.unwrap_or("workspace_write").trim();
+    match level {
+        "read_only" => Ok(CodexSandboxConfig {
+            sandbox_mode: "read-only".to_string(),
+            approval_policy: "on-request".to_string(),
+            network_access: false,
+        }),
+        "workspace_write" => Ok(CodexSandboxConfig {
+            sandbox_mode: "workspace-write".to_string(),
+            approval_policy: "on-request".to_string(),
+            network_access: false,
+        }),
+        "workspace_write_network" => Ok(CodexSandboxConfig {
+            sandbox_mode: "workspace-write".to_string(),
+            approval_policy: "on-request".to_string(),
+            network_access: true,
+        }),
+        "danger_full_access" => Ok(CodexSandboxConfig {
+            sandbox_mode: "danger-full-access".to_string(),
+            approval_policy: "on-request".to_string(),
+            network_access: true,
+        }),
+        _ => Err("Codex sandbox level must be read_only, workspace_write, workspace_write_network, or danger_full_access.".to_string()),
+    }
+}
+
 impl CodexServerSession {
     fn start(
         cwd: &str,
         reasoning_effort: &str,
         service_tier: &str,
+        sandbox_config: &CodexSandboxConfig,
         timeout: Duration,
     ) -> Result<Self, String> {
         let started_at = Instant::now();
@@ -163,6 +206,18 @@ impl CodexServerSession {
             .arg(format!("model_reasoning_effort=\"{reasoning_effort}\""))
             .arg("-c")
             .arg(format!("service_tier=\"{service_tier}\""))
+            .arg("-c")
+            .arg(format!("sandbox_mode=\"{}\"", sandbox_config.sandbox_mode))
+            .arg("-c")
+            .arg(format!(
+                "approval_policy=\"{}\"",
+                sandbox_config.approval_policy
+            ))
+            .arg("-c")
+            .arg(format!(
+                "sandbox_workspace_write.network_access={}",
+                sandbox_config.network_access
+            ))
             .arg("app-server")
             .current_dir(cwd)
             .stdin(Stdio::piped())
@@ -446,6 +501,7 @@ pub(crate) fn codex_server_key(
     model: &str,
     reasoning_effort: &str,
     service_tier: &str,
+    sandbox_config: &CodexSandboxConfig,
 ) -> Result<CodexServerKey, String> {
     let room_id = room_id.unwrap_or("__legacy_room");
     ensure_room_id(room_id)?;
@@ -455,6 +511,9 @@ pub(crate) fn codex_server_key(
         model: model.to_string(),
         reasoning_effort: reasoning_effort.to_string(),
         service_tier: service_tier.to_string(),
+        sandbox_mode: sandbox_config.sandbox_mode.clone(),
+        approval_policy: sandbox_config.approval_policy.clone(),
+        network_access: sandbox_config.network_access,
     })
 }
 
@@ -476,7 +535,17 @@ fn checkout_codex_session(
             return Ok(session);
         }
     }
-    CodexServerSession::start(&key.cwd, &key.reasoning_effort, &key.service_tier, timeout)
+    CodexServerSession::start(
+        &key.cwd,
+        &key.reasoning_effort,
+        &key.service_tier,
+        &CodexSandboxConfig {
+            sandbox_mode: key.sandbox_mode.clone(),
+            approval_policy: key.approval_policy.clone(),
+            network_access: key.network_access,
+        },
+        timeout,
+    )
 }
 
 fn checkin_codex_session(key: CodexServerKey, session: CodexServerSession) {

@@ -1,6 +1,7 @@
 import {
   codexModelOptions,
   codexReasoningEffortOptions,
+  codexSandboxLevelOptions,
   codexSpeedOptions,
   defaultCodexModel
 } from "@multaiplayer/protocol";
@@ -88,6 +89,7 @@ export function useAppViewModel({
     selectedCodexModel,
     selectedCodexReasoningEffort,
     selectedCodexSpeed,
+    selectedCodexSandboxLevel,
     selectedMessages,
     markdownSelectionMode,
     inspectorTab,
@@ -247,6 +249,7 @@ export function useAppViewModel({
       hostHandoffs: selectedRuntime.hostHandoffs,
       hostBusy: selectedRuntime.hostBusy,
       onAcceptHandoff: hostHandoffActions.acceptHostHandoff,
+      selectedCodexSandboxLevel,
       encryptedInvite: {
         inviteApprovalGate,
         copyDisabled: !roomInteraction.canCopyRoomInvite,
@@ -275,9 +278,12 @@ export function useAppViewModel({
       approvalPolicy: {
         labels: approvalPolicyLabels,
         delegationLabels: approvalDelegationPolicyLabels,
+        sandboxOptions: codexSandboxLevelOptions,
         message: settingsMessage,
+        selectedSandboxLevel: selectedCodexSandboxLevel,
         onSelectPolicy: roomRuntime.setApprovalPolicy,
-        onSelectDelegationPolicy: roomRuntime.setApprovalDelegationPolicy
+        onSelectDelegationPolicy: roomRuntime.setApprovalDelegationPolicy,
+        onSelectSandboxLevel: roomRuntime.setCodexSandboxLevel
       },
       roomMode: {
         labels: roomModeLabels,
