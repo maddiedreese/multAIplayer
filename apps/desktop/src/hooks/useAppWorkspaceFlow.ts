@@ -187,7 +187,7 @@ export function useAppWorkspaceFlow({
         newTeamName: workspaceState.newTeamName,
         newRoomName: workspaceState.newRoomName,
         newRoomProjectPath: workspaceState.newRoomProjectPath,
-        setWorkspaceError: workspaceState.setWorkspaceError,
+        setWorkspaceStatusError: workspaceState.setWorkspaceStatusError,
         setSelectedTeam: workspaceState.setSelectedTeam,
         setSelectedRoomId: workspaceState.setSelectedRoomId,
         setNewTeamName: workspaceState.setNewTeamName,

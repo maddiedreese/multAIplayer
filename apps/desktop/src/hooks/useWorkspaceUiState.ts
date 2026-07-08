@@ -124,13 +124,11 @@ export function useWorkspaceUiState({
 
   return {
     teams,
-    setTeams,
     replaceTeams,
     updateTeamRoleForTeam,
     updateTeamMemberCountForTeam,
     upsertTeamRecord,
     rooms,
-    setRooms,
     replaceRooms,
     upsertRoomRecord,
     replaceRoomRecord,
@@ -140,7 +138,6 @@ export function useWorkspaceUiState({
     teamMembersMessageByTeam,
     teamMembersBusyByTeam,
     workspaceError,
-    setWorkspaceError,
     setWorkspaceStatusError,
     activeSidebarPanel,
     setActiveSidebarPanel,

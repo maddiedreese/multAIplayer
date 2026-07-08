@@ -12,7 +12,7 @@ interface UseWorkspaceCreationActionsOptions {
   newTeamName: string;
   newRoomName: string;
   newRoomProjectPath: string;
-  setWorkspaceError: (message: string | null) => void;
+  setWorkspaceStatusError: (message: string | null) => void;
   setSelectedTeam: (teamId: string) => void;
   setSelectedRoomId: (roomId: string) => void;
   setNewTeamName: (name: string) => void;
@@ -31,7 +31,7 @@ export function useWorkspaceCreationActions({
   newTeamName,
   newRoomName,
   newRoomProjectPath,
-  setWorkspaceError,
+  setWorkspaceStatusError,
   setSelectedTeam,
   setSelectedRoomId,
   setNewTeamName,
@@ -51,7 +51,7 @@ export function useWorkspaceCreationActions({
     try {
       plan = planTeamCreation(newTeamName);
     } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : String(error));
+      setWorkspaceStatusError(error instanceof Error ? error.message : String(error));
       return;
     }
     try {
@@ -59,9 +59,9 @@ export function useWorkspaceCreationActions({
       upsertTeam(team);
       setSelectedTeam(team.id);
       setNewTeamName("");
-      setWorkspaceError(null);
+      setWorkspaceStatusError(null);
     } catch (error) {
-      setWorkspaceError(String(error));
+      setWorkspaceStatusError(String(error));
     }
   }
 
@@ -70,7 +70,7 @@ export function useWorkspaceCreationActions({
     try {
       plan = planRoomCreation(selectedTeam, newRoomName, newRoomProjectPath);
     } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : String(error));
+      setWorkspaceStatusError(error instanceof Error ? error.message : String(error));
       return;
     }
     try {
@@ -96,9 +96,9 @@ export function useWorkspaceCreationActions({
       setSelectedRoomId(room.id);
       setNewRoomName("");
       setNewRoomProjectPath(plan.projectPath);
-      setWorkspaceError(null);
+      setWorkspaceStatusError(null);
     } catch (error) {
-      setWorkspaceError(String(error));
+      setWorkspaceStatusError(String(error));
     }
   }
 
@@ -107,9 +107,9 @@ export function useWorkspaceCreationActions({
       const path = await chooseProjectFolder(newRoomProjectPath || defaultProjectPath);
       if (!path) return;
       setNewRoomProjectPath(path);
-      setWorkspaceError(null);
+      setWorkspaceStatusError(null);
     } catch (error) {
-      setWorkspaceError(String(error));
+      setWorkspaceStatusError(String(error));
     }
   }
 

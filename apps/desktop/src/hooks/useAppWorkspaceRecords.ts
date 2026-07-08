@@ -55,6 +55,6 @@ export function useAppWorkspaceRecords({
     setInviteMessageForRoom,
     setChatMessageForRoom,
     setHostMessageForRoom,
-    setWorkspaceError: workspaceState.setWorkspaceError
+    setWorkspaceStatusError: workspaceState.setWorkspaceStatusError
   });
 }

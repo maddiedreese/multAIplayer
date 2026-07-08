@@ -26,7 +26,7 @@ interface UseWorkspaceRecordActionsOptions {
   setInviteMessageForRoom: (roomId: string, message: string | null) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
-  setWorkspaceError: (message: string | null) => void;
+  setWorkspaceStatusError: (message: string | null) => void;
 }
 
 export function useWorkspaceRecordActions({
@@ -44,7 +44,7 @@ export function useWorkspaceRecordActions({
   setInviteMessageForRoom,
   setChatMessageForRoom,
   setHostMessageForRoom,
-  setWorkspaceError
+  setWorkspaceStatusError
 }: UseWorkspaceRecordActionsOptions) {
   const ensureLocalTeamMemberForTeam = useAppStore((state) => state.ensureLocalTeamMemberForTeam);
   const clearInviteAdmissionForRoom = useAppStore((state) => state.clearInviteAdmissionForRoom);
@@ -92,7 +92,7 @@ export function useWorkspaceRecordActions({
     setInviteMessageForRoom(room.id, userMessage);
     setChatMessageForRoom(room.id, userMessage);
     setHostMessageForRoom(room.id, userMessage);
-    setWorkspaceError(userMessage);
+    setWorkspaceStatusError(userMessage);
   }
 
   return {
