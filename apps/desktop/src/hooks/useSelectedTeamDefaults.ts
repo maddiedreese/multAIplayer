@@ -1,39 +1,39 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect } from "react";
 import type { ApprovalPolicy } from "@multaiplayer/protocol";
 import { loadTeamHistorySettings, type LocalHistorySettings } from "../lib/localHistory";
 import { loadTeamRoomDefaults } from "../lib/teamRoomDefaults";
 
 interface UseSelectedTeamDefaultsOptions {
   selectedTeam: string;
-  setTeamHistorySettings: Dispatch<SetStateAction<LocalHistorySettings>>;
-  setTeamDefaultApprovalPolicy: Dispatch<SetStateAction<ApprovalPolicy>>;
-  setTeamDefaultCodexModel: Dispatch<SetStateAction<string>>;
-  setTeamDefaultBrowserProfilePersistent: Dispatch<SetStateAction<boolean>>;
-  setTeamDefaultInviteApprovalGate: Dispatch<SetStateAction<boolean>>;
+  replaceTeamHistorySettings: (next: LocalHistorySettings) => void;
+  replaceTeamDefaultApprovalPolicy: (next: ApprovalPolicy) => void;
+  replaceTeamDefaultCodexModel: (next: string) => void;
+  replaceTeamDefaultBrowserProfilePersistent: (next: boolean) => void;
+  replaceTeamDefaultInviteApprovalGate: (next: boolean) => void;
 }
 
 export function useSelectedTeamDefaults({
   selectedTeam,
-  setTeamHistorySettings,
-  setTeamDefaultApprovalPolicy,
-  setTeamDefaultCodexModel,
-  setTeamDefaultBrowserProfilePersistent,
-  setTeamDefaultInviteApprovalGate
+  replaceTeamHistorySettings,
+  replaceTeamDefaultApprovalPolicy,
+  replaceTeamDefaultCodexModel,
+  replaceTeamDefaultBrowserProfilePersistent,
+  replaceTeamDefaultInviteApprovalGate
 }: UseSelectedTeamDefaultsOptions) {
   useEffect(() => {
     if (!selectedTeam) return;
     const teamRoomDefaults = loadTeamRoomDefaults(selectedTeam);
-    setTeamHistorySettings(loadTeamHistorySettings(selectedTeam));
-    setTeamDefaultApprovalPolicy(teamRoomDefaults.approvalPolicy);
-    setTeamDefaultCodexModel(teamRoomDefaults.codexModel);
-    setTeamDefaultBrowserProfilePersistent(teamRoomDefaults.browserProfilePersistent);
-    setTeamDefaultInviteApprovalGate(teamRoomDefaults.inviteApprovalGate);
+    replaceTeamHistorySettings(loadTeamHistorySettings(selectedTeam));
+    replaceTeamDefaultApprovalPolicy(teamRoomDefaults.approvalPolicy);
+    replaceTeamDefaultCodexModel(teamRoomDefaults.codexModel);
+    replaceTeamDefaultBrowserProfilePersistent(teamRoomDefaults.browserProfilePersistent);
+    replaceTeamDefaultInviteApprovalGate(teamRoomDefaults.inviteApprovalGate);
   }, [
+    replaceTeamDefaultApprovalPolicy,
+    replaceTeamDefaultBrowserProfilePersistent,
+    replaceTeamDefaultCodexModel,
+    replaceTeamDefaultInviteApprovalGate,
+    replaceTeamHistorySettings,
     selectedTeam,
-    setTeamDefaultApprovalPolicy,
-    setTeamDefaultBrowserProfilePersistent,
-    setTeamDefaultCodexModel,
-    setTeamDefaultInviteApprovalGate,
-    setTeamHistorySettings
   ]);
 }

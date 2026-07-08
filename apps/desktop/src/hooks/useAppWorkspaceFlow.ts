@@ -126,16 +126,16 @@ export function useAppWorkspaceFlow({
         userId: localIdentity.localUser.id,
         displayName: localIdentity.localUser.name,
         deviceIdentity: appRuntimeState.deviceIdentity,
-        setDeviceIdentity: appRuntimeState.setDeviceIdentity,
-        setDeviceIdentityMessage: appRuntimeState.setDeviceIdentityMessage
+        replaceDeviceIdentity: appRuntimeState.replaceDeviceIdentity,
+        setDeviceIdentityStatusMessage: appRuntimeState.setDeviceIdentityStatusMessage
       },
       selectedTeamDefaults: {
         selectedTeam: workspaceState.selectedTeam,
-        setTeamHistorySettings: historyDefaultsState.setTeamHistorySettings,
-        setTeamDefaultApprovalPolicy: historyDefaultsState.setTeamDefaultApprovalPolicy,
-        setTeamDefaultCodexModel: historyDefaultsState.setTeamDefaultCodexModel,
-        setTeamDefaultBrowserProfilePersistent: historyDefaultsState.setTeamDefaultBrowserProfilePersistent,
-        setTeamDefaultInviteApprovalGate: historyDefaultsState.setTeamDefaultInviteApprovalGate
+        replaceTeamHistorySettings: historyDefaultsState.replaceTeamHistorySettings,
+        replaceTeamDefaultApprovalPolicy: historyDefaultsState.replaceTeamDefaultApprovalPolicy,
+        replaceTeamDefaultCodexModel: historyDefaultsState.replaceTeamDefaultCodexModel,
+        replaceTeamDefaultBrowserProfilePersistent: historyDefaultsState.replaceTeamDefaultBrowserProfilePersistent,
+        replaceTeamDefaultInviteApprovalGate: historyDefaultsState.replaceTeamDefaultInviteApprovalGate
       },
       inviteUrl: {
         requestNoSecretInviteAccess: inviteActions.requestNoSecretInviteAccess,
@@ -176,7 +176,7 @@ export function useAppWorkspaceFlow({
         selectedRoom,
         localUser: localIdentity.localUser,
         currentUser: githubAuth.currentUser,
-        setDeviceIdentityMessage: appRuntimeState.setDeviceIdentityMessage,
+        setDeviceIdentityMessage: appRuntimeState.setDeviceIdentityStatusMessage,
         trustDeviceForRoom: appRuntimeState.trustDeviceForRoom,
         untrustDeviceForRoom: appRuntimeState.untrustDeviceForRoom,
         updateTeamRoleForTeam: workspaceState.updateTeamRoleForTeam,

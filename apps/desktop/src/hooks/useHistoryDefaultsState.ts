@@ -42,19 +42,39 @@ export function useHistoryDefaultsState({ initialTeamId }: { initialTeamId: stri
   const replaceHistorySettings = useCallback((next: LocalHistorySettings) => {
     setHistorySettings(next);
   }, []);
+  const replaceTeamHistorySettings = useCallback((next: LocalHistorySettings) => {
+    setTeamHistorySettings(next);
+  }, []);
+  const replaceTeamDefaultApprovalPolicy = useCallback((next: ApprovalPolicy) => {
+    setTeamDefaultApprovalPolicy(next);
+  }, []);
+  const replaceTeamDefaultCodexModel = useCallback((next: string) => {
+    setTeamDefaultCodexModel(next);
+  }, []);
+  const replaceTeamDefaultBrowserProfilePersistent = useCallback((next: boolean) => {
+    setTeamDefaultBrowserProfilePersistent(next);
+  }, []);
+  const replaceTeamDefaultInviteApprovalGate = useCallback((next: boolean) => {
+    setTeamDefaultInviteApprovalGate(next);
+  }, []);
 
   return {
     historySettings,
     replaceHistorySettings,
     teamHistorySettings,
+    replaceTeamHistorySettings,
     setTeamHistorySettings,
     teamDefaultApprovalPolicy,
+    replaceTeamDefaultApprovalPolicy,
     setTeamDefaultApprovalPolicy,
     teamDefaultCodexModel,
+    replaceTeamDefaultCodexModel,
     setTeamDefaultCodexModel,
     teamDefaultBrowserProfilePersistent,
+    replaceTeamDefaultBrowserProfilePersistent,
     setTeamDefaultBrowserProfilePersistent,
     teamDefaultInviteApprovalGate,
+    replaceTeamDefaultInviteApprovalGate,
     setTeamDefaultInviteApprovalGate,
     historyMessagesByRoom,
     teamHistoryMessagesByTeam
