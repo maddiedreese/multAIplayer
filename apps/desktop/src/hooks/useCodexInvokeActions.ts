@@ -42,6 +42,7 @@ interface UseCodexInvokeActionsOptions {
   isSelectedRoomLocked: boolean;
   isSelectedRoomRevoked: boolean;
   isActiveHost: boolean;
+  codexRunning: boolean;
   canReadLocalWorkspace: boolean;
   hostGateMessage: string;
   localUser: LocalUser;
@@ -53,6 +54,8 @@ interface UseCodexInvokeActionsOptions {
   roomTerminals: TerminalSnapshot[];
   browserRequests: BrowserAccessRequest[];
   gitStatus: GitStatusSummary | null;
+  activeCodexApproval: PendingCodexApproval | null;
+  queuedCodexApprovals: PendingCodexApproval[];
   publishChatMessage: (message: ChatMessage, room?: RoomRecord) => Promise<void>;
   handleCodexBrowserOpenCommand: (message: ChatMessage, room: RoomRecord) => boolean;
   approveCodexTurn: (approval?: PendingCodexApproval | null) => Promise<void>;
@@ -61,6 +64,7 @@ interface UseCodexInvokeActionsOptions {
   setSelectedHostMessage: (message: string | null) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
+  enqueueCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   setDraftForRoom: (roomId: string, draft: string) => void;
   setReplyToMessageForRoom: (roomId: string, messageId: string | null) => void;
@@ -75,6 +79,7 @@ export function useCodexInvokeActions({
   isSelectedRoomLocked,
   isSelectedRoomRevoked,
   isActiveHost,
+  codexRunning,
   canReadLocalWorkspace,
   hostGateMessage,
   localUser,
@@ -86,6 +91,8 @@ export function useCodexInvokeActions({
   roomTerminals,
   browserRequests,
   gitStatus,
+  activeCodexApproval,
+  queuedCodexApprovals,
   publishChatMessage,
   handleCodexBrowserOpenCommand,
   approveCodexTurn,
@@ -94,6 +101,7 @@ export function useCodexInvokeActions({
   setSelectedHostMessage,
   setHostMessageForRoom,
   setPendingCodexApprovalForRoom,
+  enqueueCodexApprovalForRoom,
   setApprovalVisibleForRoom,
   setDraftForRoom,
   setReplyToMessageForRoom,
@@ -210,11 +218,26 @@ export function useCodexInvokeActions({
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
-    const approvalSnapshot = buildCodexApprovalSnapshot(selectedRoom, messages, pendingMessage, roomTerminals, browserRequests, gitStatus, {
-      includeWorkspaceContext: canReadLocalWorkspace
-    });
+    const approvalSnapshot: PendingCodexApproval = {
+      ...buildCodexApprovalSnapshot(selectedRoom, messages, pendingMessage, roomTerminals, browserRequests, gitStatus, {
+        includeWorkspaceContext: canReadLocalWorkspace
+      }),
+      turnId: crypto.randomUUID(),
+      requestedBy: localUser.name,
+      requestedByUserId: localUser.id,
+      queuedAt: new Date().toISOString()
+    };
+    if (activeCodexApproval || codexRunning) {
+      if (queuedCodexApprovals.length >= 5) {
+        setHostMessageForRoom(roomId, "Codex queue is full. Wait for one turn to finish or cancel a queued turn.");
+        return;
+      }
+      enqueueCodexApprovalForRoom(roomId, approvalSnapshot);
+      setHostMessageForRoom(roomId, `Queued Codex turn ${queuedCodexApprovals.length + 1} of 5.`);
+      return;
+    }
     if (selectedRoom.approvalPolicy === "auto_chat_only") {
-      if (shouldAutoApproveChatOnlyTurn(approvalSnapshot.summary, isActiveHost, approvalSnapshot.riskFlags)) {
+      if (shouldAutoApproveChatOnlyTurn(approvalSnapshot.summary, isActiveHost, approvalSnapshot.riskFlags ?? [])) {
         setPendingCodexApprovalForRoom(roomId, null);
         setApprovalVisibleForRoom(roomId, false);
         setHostMessageForRoom(roomId, "Auto-approved chat-only Codex turn.");
@@ -228,7 +251,7 @@ export function useCodexInvokeActions({
       setHostMessageForRoom(
         roomId,
         isActiveHost
-          ? approvalSnapshot.riskFlags.length > 0
+          ? (approvalSnapshot.riskFlags ?? []).length > 0
             ? "This turn includes content warnings, so host approval is required."
             : "This turn includes workspace, browser, terminal, or attachment context, so host approval is required."
           : hostGateMessage

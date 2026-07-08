@@ -69,6 +69,7 @@ interface UseCodexTurnActionsOptions {
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
+  promoteNextCodexApprovalForRoom: (roomId: string) => void;
   setCodexRunningForRoom: (roomId: string, running: boolean) => void;
   appendTerminalLinesForRoom: (roomId: string, lines: string[]) => void;
   replaceRoom: (room: RoomRecord) => void;
@@ -106,6 +107,7 @@ export function useCodexTurnActions({
   setHostMessageForRoom,
   setPendingCodexApprovalForRoom,
   setApprovalVisibleForRoom,
+  promoteNextCodexApprovalForRoom,
   setCodexRunningForRoom,
   appendTerminalLinesForRoom,
   replaceRoom,
@@ -195,7 +197,7 @@ export function useCodexTurnActions({
       `Starting approved Codex turn with ${formatCodexModel(model)} from encrypted room context...`
     ]);
 
-    const turnId = crypto.randomUUID();
+    const turnId = approval?.turnId ?? crypto.randomUUID();
     const continuationHandoff = codexContinuationByRoom[roomId] ?? null;
     const input = buildCodexTurnInput(turnMessages, projectPath, model, turnSummary, {
       fullRoomContext: Boolean(continuationHandoff)
@@ -278,6 +280,7 @@ export function useCodexTurnActions({
         setCodexContinuationForRoom(roomId, null);
       }
       setCodexRunningForRoom(roomId, false);
+      promoteNextCodexApprovalForRoom(roomId);
     }
   }
 

@@ -53,7 +53,11 @@ export interface RoomGoal {
 }
 
 export interface PendingCodexApproval {
+  turnId: string;
   roomId: string;
+  requestedBy: string;
+  requestedByUserId: string;
+  queuedAt: string;
   messages: ChatMessage[];
   summary: CodexTurnSummary;
   riskFlags?: CodexTurnRiskFlag[];

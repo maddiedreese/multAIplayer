@@ -88,6 +88,9 @@ export function useRoomActions({
   const updateBrowserRequestStatus = useAppStore((state) => state.updateBrowserRequestStatus);
   const setApprovalVisibleForRoom = useAppStore((state) => state.setApprovalVisibleForRoom);
   const setPendingCodexApprovalForRoom = useAppStore((state) => state.setPendingCodexApprovalForRoom);
+  const enqueueCodexApprovalForRoom = useAppStore((state) => state.enqueueCodexApprovalForRoom);
+  const removeQueuedCodexApprovalForRoom = useAppStore((state) => state.removeQueuedCodexApprovalForRoom);
+  const promoteNextCodexApprovalForRoom = useAppStore((state) => state.promoteNextCodexApprovalForRoom);
   const resetCodexApprovalForRoom = useAppStore((state) => state.resetCodexApprovalForRoom);
   const setCodexRunningForRoom = useAppStore((state) => state.setCodexRunningForRoom);
   const setRoomGoalForRoom = useAppStore((state) => state.setRoomGoalForRoom);
@@ -208,6 +211,9 @@ export function useRoomActions({
       appendTerminalLinesForRoom(roomId, lines, maxTerminalActivityLines),
     setApprovalVisibleForRoom,
     setPendingCodexApprovalForRoom,
+    enqueueCodexApprovalForRoom,
+    removeQueuedCodexApprovalForRoom,
+    promoteNextCodexApprovalForRoom,
     resetCodexApprovalForRoom,
     setCodexRunningForRoom,
     setRoomGoalForRoom,

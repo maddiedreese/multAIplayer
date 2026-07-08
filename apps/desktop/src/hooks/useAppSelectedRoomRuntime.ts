@@ -57,6 +57,7 @@ export function useAppSelectedRoomRuntime({
     roomTerminals,
     selectedTerminalId,
     pendingCodexApprovalsByRoom: codexRoomState.pendingCodexApprovalsByRoom,
+    queuedCodexApprovalsByRoom: codexRoomState.queuedCodexApprovalsByRoom,
     approvalVisibleByRoom: codexRoomState.approvalVisibleByRoom,
     hostHandoffsByRoom: roomRuntimeState.hostHandoffsByRoom,
     terminalRequestsByRoom: terminalPanelState.terminalRequestsByRoom,

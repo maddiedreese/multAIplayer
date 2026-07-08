@@ -51,6 +51,13 @@ export interface PendingAttachmentDisplay {
   encryptedBlob: boolean;
 }
 
+export interface QueuedCodexTurnDisplay {
+  turnId: string;
+  requestedBy: string;
+  queuedAt: string;
+  messagesSinceLastCodex: number;
+}
+
 export function RoomChatPanel({
   messages,
   approvalVisible,
@@ -66,6 +73,7 @@ export function RoomChatPanel({
   draft,
   pendingAttachments,
   replyTarget,
+  queuedCodexTurns = [],
   roomGoal,
   localPreviewCards = [],
   pendingAttachmentSummary,
@@ -90,6 +98,7 @@ export function RoomChatPanel({
   onOpenFileSelector,
   onReplyToMessage,
   onCancelReply,
+  onCancelQueuedCodexTurn,
   onDraftChange,
   onSendMessage
 }: {
@@ -110,6 +119,7 @@ export function RoomChatPanel({
     author: string;
     body: string;
   } | null;
+  queuedCodexTurns?: QueuedCodexTurnDisplay[];
   roomGoal: RoomGoal | null;
   localPreviewCards: LocalPreviewCardDisplay[];
   pendingAttachmentSummary: string;
@@ -134,6 +144,7 @@ export function RoomChatPanel({
   onOpenFileSelector: () => void;
   onReplyToMessage: (messageId: string) => void;
   onCancelReply: () => void;
+  onCancelQueuedCodexTurn: (turnId: string) => void;
   onDraftChange: (draft: string) => void;
   onSendMessage: () => void;
 }) {
@@ -293,6 +304,28 @@ export function RoomChatPanel({
             onDeny={onDenyApproval}
             onApprove={onApproveApproval}
           />
+        )}
+        {queuedCodexTurns.length > 0 && (
+          <section className="codex-queue" aria-label="Queued Codex turns">
+            <div className="codex-queue-title">
+              <Bot size={15} />
+              <strong>Codex queue</strong>
+              <span>{queuedCodexTurns.length} waiting</span>
+            </div>
+            {queuedCodexTurns.map((turn, index) => (
+              <div className="codex-queue-row" key={turn.turnId}>
+                <span>{index + 1}</span>
+                <div>
+                  <strong>{turn.requestedBy}</strong>
+                  <small>{turn.messagesSinceLastCodex} message{turn.messagesSinceLastCodex === 1 ? "" : "s"} ready at turn start</small>
+                </div>
+                <button onClick={() => onCancelQueuedCodexTurn(turn.turnId)} disabled={roomLocked}>
+                  <X size={13} />
+                  Cancel
+                </button>
+              </div>
+            ))}
+          </section>
         )}
       </div>
 

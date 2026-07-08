@@ -65,6 +65,7 @@ interface UseRoomMainColumnPropsOptions {
   roomGoal: ChatProps["roomGoal"];
   pendingAttachmentCount: number;
   pendingAttachments: ChatProps["pendingAttachments"];
+  queuedCodexTurns: ChatProps["queuedCodexTurns"];
   localPreviewCards: ChatProps["localPreviewCards"];
   pendingAttachmentSummary: string;
   onToggleMessageSelection: ChatProps["onToggleMessageSelection"];
@@ -142,6 +143,7 @@ export function useRoomMainColumnProps({
   roomGoal,
   pendingAttachmentCount,
   pendingAttachments,
+  queuedCodexTurns,
   localPreviewCards,
   pendingAttachmentSummary,
   onToggleMessageSelection,
@@ -217,6 +219,7 @@ export function useRoomMainColumnProps({
       replyTarget,
       roomGoal,
       pendingAttachments,
+      queuedCodexTurns,
       localPreviewCards,
       pendingAttachmentSummary,
       markdownSelectionMode,

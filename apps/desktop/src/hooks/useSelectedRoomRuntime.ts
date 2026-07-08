@@ -41,6 +41,7 @@ interface UseSelectedRoomRuntimeOptions {
   roomTerminals: TerminalSnapshot[];
   selectedTerminalId: string | null;
   pendingCodexApprovalsByRoom: Record<string, PendingCodexApproval | null>;
+  queuedCodexApprovalsByRoom: Record<string, PendingCodexApproval[]>;
   approvalVisibleByRoom: Record<string, boolean>;
   hostHandoffsByRoom: Record<string, HostHandoffRecord[]>;
   terminalRequestsByRoom: Record<string, TerminalCommandRequest[]>;
@@ -72,6 +73,7 @@ export function useSelectedRoomRuntime({
   roomTerminals,
   selectedTerminalId,
   pendingCodexApprovalsByRoom,
+  queuedCodexApprovalsByRoom,
   approvalVisibleByRoom,
   hostHandoffsByRoom,
   terminalRequestsByRoom,
@@ -89,6 +91,7 @@ export function useSelectedRoomRuntime({
 }: UseSelectedRoomRuntimeOptions) {
   const roomId = selectedRoom.id ?? selectedRoomId;
   const activeCodexApproval = pendingCodexApprovalsByRoom[roomId] ?? null;
+  const queuedCodexApprovals = queuedCodexApprovalsByRoom[roomId] ?? [];
   const approvalVisible = approvalVisibleByRoom[roomId] ?? false;
   const selectedTerminal = roomTerminals.find((terminal) => terminal.id === selectedTerminalId) ?? null;
   const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
@@ -114,6 +117,12 @@ export function useSelectedRoomRuntime({
     attachments: formatApprovalAttachments(approvalTranscriptMessages),
     riskFlags: activeCodexApproval?.riskFlags ?? []
   };
+  const queuedCodexTurnRows = queuedCodexApprovals.map((approval) => ({
+    turnId: approval.turnId,
+    requestedBy: approval.requestedBy,
+    queuedAt: approval.queuedAt,
+    messagesSinceLastCodex: approval.summary.messagesSinceLastCodex
+  }));
   const chatMessageRows = buildRoomChatMessageRows({
     messages,
     markdownSelectionMode,
@@ -133,6 +142,7 @@ export function useSelectedRoomRuntime({
 
   return {
     activeCodexApproval,
+    queuedCodexApprovals,
     approvalVisible,
     selectedTerminal,
     selectedTerminalCanRestart,
@@ -150,6 +160,7 @@ export function useSelectedRoomRuntime({
     codexRunning,
     approvalTranscriptMessages,
     codexApprovalSummaryDisplay,
+    queuedCodexTurnRows,
     chatMessageRows,
     replyTarget,
     pendingAttachmentRows,

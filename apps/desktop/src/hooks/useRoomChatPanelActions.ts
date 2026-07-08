@@ -10,6 +10,8 @@ export function useRoomChatPanelActions({
   toggleMessageReaction,
   setPendingCodexApprovalForRoom,
   setApprovalVisibleForRoom,
+  removeQueuedCodexApprovalForRoom,
+  promoteNextCodexApprovalForRoom,
   approveCodexTurn,
   handleCodexInvoke,
   pauseGoal,
@@ -33,6 +35,8 @@ export function useRoomChatPanelActions({
   toggleMessageReaction: (message: ChatMessage, emoji: string) => void;
   setPendingCodexApprovalForRoom: (roomId: string, approval: null) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
+  removeQueuedCodexApprovalForRoom: (roomId: string, turnId: string) => void;
+  promoteNextCodexApprovalForRoom: (roomId: string) => void;
   approveCodexTurn: () => void;
   handleCodexInvoke: () => void;
   pauseGoal: () => void;
@@ -76,6 +80,7 @@ export function useRoomChatPanelActions({
   function onDenyApproval() {
     setPendingCodexApprovalForRoom(selectedRoomId, null);
     setApprovalVisibleForRoom(selectedRoomId, false);
+    promoteNextCodexApprovalForRoom(selectedRoomId);
   }
 
   function onOpenLocalPreview(previewId: string) {
@@ -114,6 +119,7 @@ export function useRoomChatPanelActions({
     onOpenFileSelector: () => setInspectorTabForRoom(selectedRoomId, "files"),
     onReplyToMessage: (messageId: string) => setReplyToMessageForRoom(selectedRoomId, messageId),
     onCancelReply: () => setReplyToMessageForRoom(selectedRoomId, null),
+    onCancelQueuedCodexTurn: (turnId: string) => removeQueuedCodexApprovalForRoom(selectedRoomId, turnId),
     onDraftChange: (nextDraft: string) => setDraftForRoom(selectedRoomId, nextDraft)
   };
 }

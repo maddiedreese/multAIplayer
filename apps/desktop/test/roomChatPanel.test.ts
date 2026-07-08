@@ -49,6 +49,7 @@ function renderChat(messages: RoomChatMessageDisplay[]) {
     onOpenFileSelector: noop,
     onReplyToMessage: noop,
     onCancelReply: noop,
+    onCancelQueuedCodexTurn: noop,
     onDraftChange: noop,
     onSendMessage: noop
   }));
@@ -124,6 +125,7 @@ test("RoomChatPanel renders Codex approval risk warnings", () => {
     onOpenFileSelector: noop,
     onReplyToMessage: noop,
     onCancelReply: noop,
+    onCancelQueuedCodexTurn: noop,
     onDraftChange: noop,
     onSendMessage: noop
   }));
@@ -213,6 +215,7 @@ test("RoomChatPanel renders reply previews and composer reply target", () => {
     onOpenFileSelector: noop,
     onReplyToMessage: noop,
     onCancelReply: noop,
+    onCancelQueuedCodexTurn: noop,
     onDraftChange: noop,
     onSendMessage: noop
   }));
@@ -220,4 +223,65 @@ test("RoomChatPanel renders reply previews and composer reply target", () => {
   assert.equal(html.includes("Replying to Avery"), true);
   assert.equal(html.includes("Use approach B."), true);
   assert.equal(html.includes("Agreed, do that."), true);
+});
+
+test("RoomChatPanel renders queued Codex turns", () => {
+  const html = renderToStaticMarkup(createElement(RoomChatPanel, {
+    messages: [],
+    approvalVisible: false,
+    approvalSummary: {
+      messages: "0 since last Codex response",
+      attachments: "None",
+      riskFlags: []
+    },
+    isActiveHost: true,
+    codexRunning: true,
+    canApproveCodex: true,
+    canUseChat: true,
+    canSendMessage: false,
+    roomLocked: false,
+    lockedPlaceholder: "Room locked",
+    chatEnabled: true,
+    draft: "",
+    replyTarget: null,
+    queuedCodexTurns: [{
+      turnId: "turn-queued-1",
+      requestedBy: "Maddie",
+      queuedAt: "2026-07-07T12:00:00.000Z",
+      messagesSinceLastCodex: 3
+    }],
+    roomGoal: null,
+    pendingAttachments: [],
+    localPreviewCards: [],
+    pendingAttachmentSummary: "0/5 files",
+    markdownSelectionMode: false,
+    onToggleMessageSelection: noop,
+    onCopyMessageMarkdown: noop,
+    onCopyCodexOutputMarkdown: noop,
+    onOpenAttachment: noop,
+    onToggleReaction: noop,
+    onDenyApproval: noop,
+    onApproveApproval: noop,
+    onInvokeCodex: noop,
+    onRemovePendingAttachment: noop,
+    onPauseGoal: noop,
+    onResumeGoal: noop,
+    onEditGoal: noop,
+    onDeleteGoal: noop,
+    onTickGoalElapsed: noop,
+    onOpenLocalPreview: noop,
+    onCopyLocalPreviewLink: noop,
+    onStopLocalPreview: noop,
+    onOpenFileSelector: noop,
+    onReplyToMessage: noop,
+    onCancelReply: noop,
+    onCancelQueuedCodexTurn: noop,
+    onDraftChange: noop,
+    onSendMessage: noop
+  }));
+
+  assert.equal(html.includes("Codex queue"), true);
+  assert.equal(html.includes("1 waiting"), true);
+  assert.equal(html.includes("Maddie"), true);
+  assert.equal(html.includes("3 messages ready at turn start"), true);
 });

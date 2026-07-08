@@ -12,6 +12,7 @@ export interface CodexRuntimeRoomState {
   events?: CodexRoomEvent[];
   approvalVisible?: boolean;
   pendingApproval?: PendingCodexApproval;
+  queuedApprovals?: PendingCodexApproval[];
   running?: boolean;
   goal?: RoomGoal;
   secretWarningVisible?: boolean;
@@ -26,6 +27,7 @@ export interface CodexRuntimeMaps {
   codexEventsByRoom: Record<string, CodexRoomEvent[]>;
   approvalVisibleByRoom: Record<string, boolean>;
   pendingCodexApprovalsByRoom: Record<string, PendingCodexApproval>;
+  queuedCodexApprovalsByRoom: Record<string, PendingCodexApproval[]>;
   codexRunningByRoom: Record<string, boolean>;
   roomGoalsByRoom: Record<string, RoomGoal>;
   secretWarningsVisibleByRoom: Record<string, boolean>;
@@ -41,6 +43,7 @@ export function projectCodexRuntimeMaps(codexRuntimeByRoom: CodexRuntimeByRoom):
   const codexEventsByRoom: Record<string, CodexRoomEvent[]> = {};
   const approvalVisibleByRoom: Record<string, boolean> = {};
   const pendingCodexApprovalsByRoom: Record<string, PendingCodexApproval> = {};
+  const queuedCodexApprovalsByRoom: Record<string, PendingCodexApproval[]> = {};
   const codexRunningByRoom: Record<string, boolean> = {};
   const roomGoalsByRoom: Record<string, RoomGoal> = {};
   const secretWarningsVisibleByRoom: Record<string, boolean> = {};
@@ -50,6 +53,7 @@ export function projectCodexRuntimeMaps(codexRuntimeByRoom: CodexRuntimeByRoom):
     if (runtime.events) codexEventsByRoom[roomId] = runtime.events;
     if (runtime.approvalVisible) approvalVisibleByRoom[roomId] = true;
     if (runtime.pendingApproval) pendingCodexApprovalsByRoom[roomId] = runtime.pendingApproval;
+    if (runtime.queuedApprovals?.length) queuedCodexApprovalsByRoom[roomId] = runtime.queuedApprovals;
     if (runtime.running) codexRunningByRoom[roomId] = true;
     if (runtime.goal) roomGoalsByRoom[roomId] = runtime.goal;
     if (runtime.secretWarningVisible) secretWarningsVisibleByRoom[roomId] = true;
@@ -60,6 +64,7 @@ export function projectCodexRuntimeMaps(codexRuntimeByRoom: CodexRuntimeByRoom):
     codexEventsByRoom,
     approvalVisibleByRoom,
     pendingCodexApprovalsByRoom,
+    queuedCodexApprovalsByRoom,
     codexRunningByRoom,
     roomGoalsByRoom,
     secretWarningsVisibleByRoom,
@@ -104,6 +109,9 @@ export interface CodexHostHandoffSlice {
   appendCodexEvent: (roomId: string, event: CodexRoomEvent) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
+  enqueueCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval) => void;
+  removeQueuedCodexApprovalForRoom: (roomId: string, turnId: string) => void;
+  promoteNextCodexApprovalForRoom: (roomId: string) => void;
   resetCodexApprovalForRoom: (roomId: string) => void;
   setCodexRunningForRoom: (roomId: string, running: boolean) => void;
   setRoomGoalForRoom: (roomId: string, goal: RoomGoal | null) => void;
@@ -221,8 +229,55 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
   setPendingCodexApprovalForRoom: (roomId, approval) => {
     set((state) => ({
       codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
-        const { pendingApproval: _pendingApproval, ...rest } = roomRuntime;
-        return approval ? { ...rest, pendingApproval: approval } : rest;
+        const { pendingApproval: _pendingApproval, queuedApprovals, ...rest } = roomRuntime;
+        const nextQueue = approval && queuedApprovals?.length
+          ? queuedApprovals.filter((queued) => queued.turnId !== approval.turnId)
+          : queuedApprovals;
+        return {
+          ...rest,
+          ...(nextQueue?.length ? { queuedApprovals: nextQueue } : {}),
+          ...(approval ? { pendingApproval: approval } : {})
+        };
+      })
+    }));
+  },
+  enqueueCodexApprovalForRoom: (roomId, approval) => {
+    set((state) => ({
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
+        const queuedApprovals = roomRuntime.queuedApprovals ?? [];
+        if (roomRuntime.pendingApproval?.turnId === approval.turnId || queuedApprovals.some((queued) => queued.turnId === approval.turnId)) {
+          return roomRuntime;
+        }
+        return {
+          ...roomRuntime,
+          queuedApprovals: [...queuedApprovals, approval].slice(0, 5)
+        };
+      })
+    }));
+  },
+  removeQueuedCodexApprovalForRoom: (roomId, turnId) => {
+    set((state) => ({
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
+        const queuedApprovals = (roomRuntime.queuedApprovals ?? []).filter((approval) => approval.turnId !== turnId);
+        const { queuedApprovals: _queuedApprovals, ...rest } = roomRuntime;
+        return queuedApprovals.length ? { ...rest, queuedApprovals } : rest;
+      })
+    }));
+  },
+  promoteNextCodexApprovalForRoom: (roomId) => {
+    set((state) => ({
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
+        if (roomRuntime.pendingApproval) return roomRuntime;
+        const [nextApproval, ...remainingApprovals] = roomRuntime.queuedApprovals ?? [];
+        const { queuedApprovals: _queuedApprovals, ...rest } = roomRuntime;
+        return nextApproval
+          ? {
+              ...rest,
+              pendingApproval: nextApproval,
+              approvalVisible: true,
+              ...(remainingApprovals.length ? { queuedApprovals: remainingApprovals } : {})
+            }
+          : rest;
       })
     }));
   },
@@ -232,6 +287,7 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
         const {
           pendingApproval: _pendingApproval,
           approvalVisible: _approvalVisible,
+          queuedApprovals: _queuedApprovals,
           ...rest
         } = roomRuntime;
         return rest;

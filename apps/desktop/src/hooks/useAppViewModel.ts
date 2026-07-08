@@ -204,6 +204,7 @@ export function useAppViewModel({
       roomGoal,
       pendingAttachmentsForCount: pendingAttachments,
       pendingAttachments: selectedRuntime.pendingAttachmentRows,
+      queuedCodexTurns: selectedRuntime.queuedCodexTurnRows,
       localPreviewCards: selectedRuntime.localPreviewCards,
       pendingAttachmentSummary: selectedRuntime.pendingAttachmentSummary,
       onToggleMessageSelection: toggleMessageSelection,
