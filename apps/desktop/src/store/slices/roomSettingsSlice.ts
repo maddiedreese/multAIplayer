@@ -13,6 +13,15 @@ export interface RoomSettingsRoomState {
 
 export type RoomSettingsByRoom = Record<string, RoomSettingsRoomState>;
 
+export interface RoomSettingsPanelMaps {
+  hostBusyByRoom: Record<string, boolean>;
+  hostMessagesByRoom: Record<string, string | null>;
+  settingsBusyByRoom: Record<string, boolean>;
+  settingsMessagesByRoom: Record<string, string | null>;
+  customCodexModelsByRoom: Record<string, string>;
+  projectPathDraftsByRoom: Record<string, string>;
+}
+
 function compactRoomSettings(record: RoomSettingsRoomState): RoomSettingsRoomState | undefined {
   return Object.keys(record).length ? record : undefined;
 }
@@ -27,6 +36,41 @@ function updateRoomSettingsForRoom(
   return {
     ...current,
     [roomId]: nextRoomSettings
+  };
+}
+
+export function projectRoomSettingsPanelMaps(roomSettingsByRoom: RoomSettingsByRoom): RoomSettingsPanelMaps {
+  return {
+    hostBusyByRoom: Object.fromEntries(
+      Object.entries(roomSettingsByRoom)
+        .filter(([, settings]) => settings.hostBusy)
+        .map(([roomId]) => [roomId, true])
+    ),
+    hostMessagesByRoom: Object.fromEntries(
+      Object.entries(roomSettingsByRoom)
+        .filter(([, settings]) => settings.hostMessage)
+        .map(([roomId, settings]) => [roomId, settings.hostMessage ?? null])
+    ),
+    settingsBusyByRoom: Object.fromEntries(
+      Object.entries(roomSettingsByRoom)
+        .filter(([, settings]) => settings.settingsBusy)
+        .map(([roomId]) => [roomId, true])
+    ),
+    settingsMessagesByRoom: Object.fromEntries(
+      Object.entries(roomSettingsByRoom)
+        .filter(([, settings]) => settings.settingsMessage)
+        .map(([roomId, settings]) => [roomId, settings.settingsMessage ?? null])
+    ),
+    customCodexModelsByRoom: Object.fromEntries(
+      Object.entries(roomSettingsByRoom)
+        .filter(([, settings]) => settings.customCodexModel)
+        .map(([roomId, settings]) => [roomId, settings.customCodexModel ?? ""])
+    ),
+    projectPathDraftsByRoom: Object.fromEntries(
+      Object.entries(roomSettingsByRoom)
+        .filter(([, settings]) => settings.projectPathDraft)
+        .map(([roomId, settings]) => [roomId, settings.projectPathDraft ?? ""])
+    )
   };
 }
 
