@@ -1,5 +1,5 @@
 :root {
-  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro", "SF Pro Text", ui-sans-serif, "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-sans);
   font-family: var(--font-sans);
   color: #111111;
@@ -59,6 +59,12 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  font-family: var(--font-sans);
+}
+
 body {
   margin: 0;
   min-width: 1120px;
@@ -67,8 +73,15 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select,
+option,
+code,
+pre,
+kbd,
+samp {
   font: inherit;
+  font-family: var(--font-sans);
 }
 
 button {

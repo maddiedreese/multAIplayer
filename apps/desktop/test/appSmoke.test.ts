@@ -268,6 +268,8 @@ test("App smoke", async (t) => {
     await waitFor(() => {
       assert.ok(screen.getByRole("button", { name: /New terminal/i }));
     });
+    assert.equal(document.querySelector(".browser-panel"), null);
+    assert.equal(document.querySelector(".inspector-panel-terminal"), document.querySelector("[data-active-tab='terminal']"));
 
     fireEvent.click(within(roomTools).getByRole("button", { name: /browser/i }));
     await waitFor(() => {
@@ -278,6 +280,8 @@ test("App smoke", async (t) => {
     await waitFor(() => {
       assert.ok(screen.getByText("Team roster"));
     });
+    assert.equal(document.querySelector(".browser-panel"), null);
+    assert.equal(document.querySelector("[data-active-tab='room']")?.textContent?.includes("Team roster"), true);
 
     fireEvent.click(within(roomTools).getByRole("button", { name: /files/i }));
     await waitFor(() => {
@@ -289,10 +293,12 @@ test("App smoke", async (t) => {
     await waitFor(() => {
       assert.ok(screen.getByText("Team roster"));
     });
+    assert.equal(document.querySelector(".browser-panel"), null);
 
     fireEvent.click(within(roomTools).getByRole("button", { name: /terminal/i }));
     await waitFor(() => {
       assert.ok(screen.getByRole("button", { name: /New terminal/i }));
     });
+    assert.equal(document.querySelector("[data-active-tab='terminal']")?.textContent?.includes("New terminal"), true);
   });
 });
