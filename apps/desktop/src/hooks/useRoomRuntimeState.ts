@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
 import { useAppStore } from "../store/appStore";
+import {
+  projectInspectorTabsByRoom,
+  projectPresenceByRoom
+} from "../store/slices/historyPresenceSlice";
 import type { HostHandoffRecord } from "../types";
 
 function projectCodexRuntimeMaps(codexRuntimeByRoom: ReturnType<typeof useAppStore.getState>["codexRuntimeByRoom"]) {
@@ -18,16 +22,19 @@ function projectCodexRuntimeMaps(codexRuntimeByRoom: ReturnType<typeof useAppSto
 }
 
 export function useRoomRuntimeState() {
-  const inspectorTabsByRoom = useAppStore((state) => state.inspectorTabsByRoom);
+  const historyPresenceByRoom = useAppStore((state) => state.historyPresenceByRoom);
   const [forgottenRoomIds, setForgottenRoomIds] = useState<Set<string>>(() => new Set());
   const [revokedRoomIds, setRevokedRoomIds] = useState<Set<string>>(() => new Set());
   const [revokedTeamIds, setRevokedTeamIds] = useState<Set<string>>(() => new Set());
-  const presenceByRoom = useAppStore((state) => state.presenceByRoom);
   const clearPresenceByRoom = useAppStore((state) => state.clearPresenceByRoom);
   const setRoomPresenceForDevice = useAppStore((state) => state.setRoomPresenceForDevice);
   const codexRuntimeByRoom = useAppStore((state) => state.codexRuntimeByRoom);
   const gitWorkflowByRoom = useAppStore((state) => state.gitWorkflowByRoom);
   const githubActionsEventsByRoom = useAppStore((state) => state.githubActionsEventsByRoom);
+  const historyPresenceMaps = useMemo(() => ({
+    inspectorTabsByRoom: projectInspectorTabsByRoom(historyPresenceByRoom),
+    presenceByRoom: projectPresenceByRoom(historyPresenceByRoom)
+  }), [historyPresenceByRoom]);
   const codexRuntimeMaps = useMemo(() => projectCodexRuntimeMaps(codexRuntimeByRoom), [codexRuntimeByRoom]);
   const gitWorkflowEventsByRoom = useMemo(() => Object.fromEntries(
     Object.entries(gitWorkflowByRoom)
@@ -36,14 +43,14 @@ export function useRoomRuntimeState() {
   ), [gitWorkflowByRoom]);
 
   return {
-    inspectorTabsByRoom,
+    inspectorTabsByRoom: historyPresenceMaps.inspectorTabsByRoom,
     forgottenRoomIds,
     setForgottenRoomIds,
     revokedRoomIds,
     setRevokedRoomIds,
     revokedTeamIds,
     setRevokedTeamIds,
-    presenceByRoom,
+    presenceByRoom: historyPresenceMaps.presenceByRoom,
     clearPresenceByRoom,
     setRoomPresenceForDevice,
     hostHandoffsByRoom: codexRuntimeMaps.hostHandoffsByRoom,

@@ -316,7 +316,7 @@ test("desktop store exposes room browser actions", () => {
   assert.equal(state.browserByRoom["room-b"]?.reason, undefined);
   assert.equal(state.browserByRoom["room-a"]?.activeUrl, undefined);
   assert.equal(state.browserByRoom["room-a"]?.status, undefined);
-  assert.equal(state.inspectorTabsByRoom["room-a"], "browser");
+  assert.equal(state.historyPresenceByRoom["room-a"]?.inspectorTab, "browser");
   assert.equal(state.browserByRoom["room-b"]?.activeUrl, undefined);
   assert.equal(state.browserByRoom["room-b"]?.status?.profilePath, "/tmp/browser-profile");
 });
@@ -602,8 +602,8 @@ test("desktop store exposes room message actions", () => {
   assert.equal(state.roomChatByRoom["room-a"]?.message, "Message sent");
   assert.equal(state.filePanelByRoom["room-a"]?.markdownCopyFallback?.title, "Selected messages");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.secretWarningVisible, true);
-  assert.equal(state.historyMessagesByRoom["room-a"], "History saved");
-  assert.equal(state.teamHistoryMessagesByTeam["team-a"], "Team defaults saved");
+  assert.equal(state.historyPresenceByRoom["room-a"]?.historyMessage, "History saved");
+  assert.equal(state.teamHistoryByTeam["team-a"]?.message, "Team defaults saved");
   assert.equal(state.roomSettingsByRoom["room-a"]?.settingsMessage, "Settings saved");
 
   store.setHostMessageForRoom("room-a", null);
@@ -619,8 +619,8 @@ test("desktop store exposes room message actions", () => {
   assert.equal("room-a" in state.roomChatByRoom, false);
   assert.equal("room-a" in state.filePanelByRoom, false);
   assert.equal(state.codexRuntimeByRoom["room-a"]?.secretWarningVisible, undefined);
-  assert.equal("room-a" in state.historyMessagesByRoom, false);
-  assert.equal("team-a" in state.teamHistoryMessagesByTeam, false);
+  assert.equal("room-a" in state.historyPresenceByRoom, false);
+  assert.equal("team-a" in state.teamHistoryByTeam, false);
 });
 
 test("desktop store keeps Codex room state room scoped", () => {
@@ -783,11 +783,11 @@ test("desktop store keeps history search messages room scoped", () => {
   });
 
   const state = useAppStore.getState();
-  assert.equal(state.historySearchMessagesByRoom["room-a"]?.[0]?.body, "Find the old setup note");
-  assert.equal(state.historySearchMessagesByRoom["room-b"]?.[0]?.author, "Codex");
+  assert.equal(state.historyPresenceByRoom["room-a"]?.searchMessages?.[0]?.body, "Find the old setup note");
+  assert.equal(state.historyPresenceByRoom["room-b"]?.searchMessages?.[0]?.author, "Codex");
 
   store.clearHistorySearchResults();
-  assert.deepEqual(useAppStore.getState().historySearchMessagesByRoom, {});
+  assert.deepEqual(useAppStore.getState().historyPresenceByRoom, {});
 });
 
 test("desktop store keeps history status messages scoped", () => {
@@ -799,10 +799,10 @@ test("desktop store keeps history status messages scoped", () => {
   store.setTeamHistoryMessageForTeam("__no-team", null);
 
   const state = useAppStore.getState();
-  assert.equal(state.historyMessagesByRoom["room-a"], "Local history saved");
-  assert.equal(state.historyMessagesByRoom["room-b"], undefined);
-  assert.equal(state.teamHistoryMessagesByTeam["team-core"], "Team defaults saved");
-  assert.equal(state.teamHistoryMessagesByTeam["__no-team"], undefined);
+  assert.equal(state.historyPresenceByRoom["room-a"]?.historyMessage, "Local history saved");
+  assert.equal(state.historyPresenceByRoom["room-b"]?.historyMessage, undefined);
+  assert.equal(state.teamHistoryByTeam["team-core"]?.message, "Team defaults saved");
+  assert.equal(state.teamHistoryByTeam["__no-team"]?.message, undefined);
 });
 
 test("desktop store keeps room runtime state room scoped", () => {
@@ -894,10 +894,10 @@ test("desktop store keeps room runtime state room scoped", () => {
   );
 
   const state = useAppStore.getState();
-  assert.equal(state.inspectorTabsByRoom["room-a"], "files");
-  assert.equal(state.inspectorTabsByRoom["room-b"], "terminal");
-  assert.equal(state.presenceByRoom["room-a"], undefined);
-  assert.equal(state.presenceByRoom["room-b"]?.["device-b"]?.displayName, "Jordan");
+  assert.equal(state.historyPresenceByRoom["room-a"]?.inspectorTab, "files");
+  assert.equal(state.historyPresenceByRoom["room-b"]?.inspectorTab, "terminal");
+  assert.equal(state.historyPresenceByRoom["room-a"]?.presence, undefined);
+  assert.equal(state.historyPresenceByRoom["room-b"]?.presence?.["device-b"]?.displayName, "Jordan");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.hostHandoffs?.[0]?.reason, "usage_limit");
   assert.equal(state.codexRuntimeByRoom["room-b"]?.continuation?.acceptedBy, "Jordan");
   assert.equal(state.gitWorkflowByRoom["room-a"]?.events?.[0]?.branch, "codex/runtime-state");
@@ -923,13 +923,13 @@ test("desktop store exposes room presence actions", () => {
   store.setRoomPresenceForDevice("room-a", "device-a", null);
 
   let state = useAppStore.getState();
-  assert.deepEqual(state.presenceByRoom["room-a"], {});
-  assert.equal(state.presenceByRoom["room-b"]?.["device-b"]?.displayName, "Jordan");
+  assert.deepEqual(state.historyPresenceByRoom["room-a"]?.presence, {});
+  assert.equal(state.historyPresenceByRoom["room-b"]?.presence?.["device-b"]?.displayName, "Jordan");
 
   store.clearPresenceByRoom();
 
   state = useAppStore.getState();
-  assert.deepEqual(state.presenceByRoom, {});
+  assert.deepEqual(state.historyPresenceByRoom, {});
 });
 
 test("desktop store exposes room event append actions", () => {
@@ -1415,9 +1415,9 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.gitWorkflowByRoom["room-a"]?.busy, undefined);
   assert.equal(state.roomSettingsByRoom["room-a"], undefined);
   assert.equal(state.codexRuntimeByRoom["room-a"]?.secretWarningVisible, undefined);
-  assert.equal(state.historySearchMessagesByRoom["room-a"], undefined);
-  assert.equal(state.inspectorTabsByRoom["room-a"], undefined);
-  assert.equal(state.presenceByRoom["room-a"], undefined);
+  assert.equal(state.historyPresenceByRoom["room-a"]?.searchMessages, undefined);
+  assert.equal(state.historyPresenceByRoom["room-a"]?.inspectorTab, undefined);
+  assert.equal(state.historyPresenceByRoom["room-a"]?.presence, undefined);
   assert.equal(state.codexRuntimeByRoom["room-a"]?.continuation, undefined);
   assert.equal(state.roomChatByRoom["room-a"], undefined);
   assert.equal(state.sensitiveAttachmentReviewKey, null);
@@ -1429,9 +1429,9 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "keep");
   assert.equal(state.codexRuntimeByRoom["room-b"]?.events?.[0]?.turnId, "turn-b");
   assert.equal(state.codexRuntimeByRoom["room-b"]?.threadId, "thread-b");
-  assert.equal(state.historySearchMessagesByRoom["room-b"]?.[0]?.body, "Keep search result");
-  assert.equal(state.inspectorTabsByRoom["room-b"], "terminal");
-  assert.equal(state.presenceByRoom["room-b"]?.["device-b"]?.displayName, "Jordan");
+  assert.equal(state.historyPresenceByRoom["room-b"]?.searchMessages?.[0]?.body, "Keep search result");
+  assert.equal(state.historyPresenceByRoom["room-b"]?.inspectorTab, "terminal");
+  assert.equal(state.historyPresenceByRoom["room-b"]?.presence?.["device-b"]?.displayName, "Jordan");
   assert.equal(state.codexRuntimeByRoom["room-b"]?.continuation?.acceptedBy, "Jordan");
   assert.deepEqual(state.roomChatByRoom["room-b"]?.selectedMessageIds, ["message-b"]);
   assert.equal(state.terminals.some((terminal) => terminal.roomId === "room-b"), true);

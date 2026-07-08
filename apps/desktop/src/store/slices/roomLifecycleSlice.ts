@@ -132,10 +132,7 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         ? null
         : state.sensitiveAttachmentReviewKey,
       filePanelByRoom: omitRecordKey(state.filePanelByRoom, roomId),
-      historySearchMessagesByRoom: omitRecordKey(state.historySearchMessagesByRoom, roomId),
-      historyMessagesByRoom: omitRecordKey(state.historyMessagesByRoom, roomId),
-      inspectorTabsByRoom: omitRecordKey(state.inspectorTabsByRoom, roomId),
-      presenceByRoom: omitRecordKey(state.presenceByRoom, roomId),
+      historyPresenceByRoom: omitRecordKey(state.historyPresenceByRoom, roomId),
       localPreviewByRoom: omitRecordKey(state.localPreviewByRoom, roomId),
       terminalLinesByRoom: omitRecordKey(state.terminalLinesByRoom, roomId),
       terminalBusyByRoom: omitRecordKey(state.terminalBusyByRoom, roomId),

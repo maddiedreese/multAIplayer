@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { DeviceIdentity } from "../lib/deviceIdentity";
 import { loadTrustedDeviceKeys, type TrustedDeviceKey } from "../lib/deviceTrust";
 import type { CodexProbe } from "../lib/localBackend";
 import { useAppStore } from "../store/appStore";
+import { projectHistorySearchMessagesByRoom } from "../store/slices/historyPresenceSlice";
 import type { RelayStatus } from "../types";
 
 export function useAppRuntimeState() {
@@ -12,7 +13,11 @@ export function useAppRuntimeState() {
   const [deviceIdentityMessage, setDeviceIdentityMessage] = useState<string | null>(null);
   const [trustedDeviceKeys, setTrustedDeviceKeys] = useState<TrustedDeviceKey[]>(() => loadTrustedDeviceKeys());
   const [historySearchBusy, setHistorySearchBusy] = useState(false);
-  const historySearchMessagesByRoom = useAppStore((state) => state.historySearchMessagesByRoom);
+  const historyPresenceByRoom = useAppStore((state) => state.historyPresenceByRoom);
+  const historySearchMessagesByRoom = useMemo(
+    () => projectHistorySearchMessagesByRoom(historyPresenceByRoom),
+    [historyPresenceByRoom]
+  );
 
   return {
     codexProbe,
