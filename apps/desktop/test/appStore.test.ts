@@ -68,7 +68,7 @@ test("desktop store exposes room busy actions", () => {
   assert.equal(state.gitWorkflowByRoom["room-a"]?.busy, undefined);
   assert.equal(state.gitWorkflowByRoom["room-b"]?.busy, true);
   assert.equal(state.githubActionsByRoom["room-a"]?.busy, true);
-  assert.equal(state.localPreviewBusyByRoom["room-a"], true);
+  assert.equal(state.localPreviewByRoom["room-a"]?.busy, true);
   assert.equal(state.hostBusyByRoom["room-a"], true);
   assert.equal(state.settingsBusyByRoom["room-a"], true);
   assert.equal(state.keyRotationBusyByRoom["room-a"], true);
@@ -393,9 +393,9 @@ test("desktop store keeps local preview state room scoped", () => {
   store.setLocalPreviewDialogConfirmation("room-a", "http://localhost:5173/", "2026.7.0");
 
   const state = useAppStore.getState();
-  assert.equal(state.localPreviewsByRoom["room-a"]?.[0]?.status, "live");
-  assert.equal(state.localPreviewBusyByRoom["room-a"], true);
-  assert.equal(state.localPreviewBusyByRoom["room-b"], undefined);
+  assert.equal(state.localPreviewByRoom["room-a"]?.previews?.[0]?.status, "live");
+  assert.equal(state.localPreviewByRoom["room-a"]?.busy, true);
+  assert.equal(state.localPreviewByRoom["room-b"]?.busy, undefined);
   assert.equal(state.localPreviewDialog.open, true);
   assert.equal(state.localPreviewDialog.candidates[0]?.label, "localhost:5173");
 });
@@ -957,8 +957,8 @@ test("desktop store exposes room event append actions", () => {
   const state = useAppStore.getState();
   assert.equal(state.gitWorkflowByRoom["room-a"]?.events?.length, 1);
   assert.equal(state.githubActionsEventsByRoom["room-a"]?.length, 1);
-  assert.equal(state.localPreviewsByRoom["room-a"]?.length, 1);
-  assert.equal(state.localPreviewsByRoom["room-a"]?.[0]?.status, "live");
+  assert.equal(state.localPreviewByRoom["room-a"]?.previews?.length, 1);
+  assert.equal(state.localPreviewByRoom["room-a"]?.previews?.[0]?.status, "live");
   assert.equal(state.hostHandoffsByRoom["room-a"]?.length, 1);
   assert.equal(state.inviteRequestsByRoom["room-a"]?.length, 1);
   assert.equal(state.codexEventsByRoom["room-a"]?.length, 1);
@@ -1244,6 +1244,7 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.hostMessagesByRoom["room-a"], undefined);
   assert.equal(state.secretWarningsVisibleByRoom["room-a"], undefined);
   assert.equal(state.filePanelByRoom["room-a"], undefined);
+  assert.equal(state.localPreviewByRoom["room-a"], undefined);
   assert.equal(state.selectedTerminalIdsByRoom["room-a"], undefined);
   assert.equal(state.terminals.some((terminal) => terminal.roomId === "room-a"), false);
   assert.equal(state.browserByRoom["room-a"]?.url, undefined);
@@ -1508,7 +1509,7 @@ test("desktop store hydrates local room history through one room-scoped action",
   assert.equal(state.githubActionsByRoom["room-a"]?.runs?.[0]?.id, 18);
   assert.equal(state.githubActionsByRoom["room-a"]?.lastChecked, "2026-07-06T00:08:00.000Z");
   assert.equal(state.githubActionsByRoom["room-a"]?.message, "CI: Checked Actions");
-  assert.equal(state.localPreviewsByRoom["room-a"]?.[0]?.status, "live");
+  assert.equal(state.localPreviewByRoom["room-a"]?.previews?.[0]?.status, "live");
   assert.equal(state.terminals.some((terminal) => terminal.id === "terminal-a"), true);
   assert.equal(state.terminals.some((terminal) => terminal.id === "terminal-b"), true);
   assert.equal(state.selectedTerminalIdsByRoom["room-a"], "terminal-a");

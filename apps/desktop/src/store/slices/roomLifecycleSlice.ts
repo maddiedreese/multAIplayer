@@ -66,9 +66,15 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
               }
             }
           : state.githubActionsByRoom,
-        localPreviewsByRoom: payload.localPreviews.length
-          ? { ...state.localPreviewsByRoom, [roomId]: payload.localPreviews }
-          : state.localPreviewsByRoom,
+        localPreviewByRoom: payload.localPreviews.length
+          ? {
+              ...state.localPreviewByRoom,
+              [roomId]: {
+                ...state.localPreviewByRoom[roomId],
+                previews: payload.localPreviews
+              }
+            }
+          : state.localPreviewByRoom,
         terminals: payload.terminalSnapshots.length
           ? replaceRoomTerminalSnapshots(state.terminals, roomId, payload.terminalSnapshots)
           : state.terminals,
@@ -121,6 +127,7 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       pendingCodexApprovalsByRoom: omitRecordKey(state.pendingCodexApprovalsByRoom, roomId),
       codexRunningByRoom: omitRecordKey(state.codexRunningByRoom, roomId),
       roomGoalsByRoom: omitRecordKey(state.roomGoalsByRoom, roomId),
+      localPreviewByRoom: omitRecordKey(state.localPreviewByRoom, roomId),
       pendingAttachmentsByRoom: omitRecordKey(state.pendingAttachmentsByRoom, roomId),
       terminalLinesByRoom: omitRecordKey(state.terminalLinesByRoom, roomId),
       terminalBusyByRoom: omitRecordKey(state.terminalBusyByRoom, roomId),

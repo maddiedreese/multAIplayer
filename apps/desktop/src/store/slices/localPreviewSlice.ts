@@ -3,9 +3,26 @@ import { omitRecordKey } from "../../lib/setUtils";
 import type { LocalPreviewDialogState, LocalPreviewRecord } from "../../types";
 import type { AppStoreState } from "../appStore";
 
-type LocalPreviewsByRoom = Record<string, LocalPreviewRecord[]>;
-type LocalPreviewBusyByRoom = Record<string, boolean>;
 type LocalPreviewCandidate = LocalPreviewDialogState["candidates"][number];
+
+export interface LocalPreviewRoomState {
+  previews?: LocalPreviewRecord[];
+  busy?: boolean;
+}
+
+export type LocalPreviewByRoom = Record<string, LocalPreviewRoomState>;
+
+function updateLocalPreviewForRoom(
+  current: LocalPreviewByRoom,
+  roomId: string,
+  update: (roomPreview: LocalPreviewRoomState) => LocalPreviewRoomState
+): LocalPreviewByRoom {
+  const nextRoomPreview = update(current[roomId] ?? {});
+  if (Object.keys(nextRoomPreview).length === 0) {
+    return roomId in current ? omitRecordKey(current, roomId) : current;
+  }
+  return { ...current, [roomId]: nextRoomPreview };
+}
 
 const emptyLocalPreviewDialog: LocalPreviewDialogState = {
   open: false,
@@ -19,9 +36,8 @@ const emptyLocalPreviewDialog: LocalPreviewDialogState = {
 };
 
 export interface LocalPreviewSlice {
-  localPreviewsByRoom: LocalPreviewsByRoom;
+  localPreviewByRoom: LocalPreviewByRoom;
   localPreviewDialog: LocalPreviewDialogState;
-  localPreviewBusyByRoom: LocalPreviewBusyByRoom;
   openLocalPreviewDialogForRoom: (roomId: string) => void;
   closeLocalPreviewDialog: () => void;
   setLocalPreviewDialogCandidates: (candidates: LocalPreviewCandidate[], error: string | null) => void;
@@ -36,11 +52,10 @@ export interface LocalPreviewSlice {
 
 export const emptyLocalPreviewState: Pick<
   LocalPreviewSlice,
-  "localPreviewsByRoom" | "localPreviewDialog" | "localPreviewBusyByRoom"
+  "localPreviewByRoom" | "localPreviewDialog"
 > = {
-  localPreviewsByRoom: {},
-  localPreviewDialog: emptyLocalPreviewDialog,
-  localPreviewBusyByRoom: {}
+  localPreviewByRoom: {},
+  localPreviewDialog: emptyLocalPreviewDialog
 };
 
 export const createLocalPreviewSlice: StateCreator<AppStoreState, [], [], LocalPreviewSlice> = (set) => ({
@@ -119,22 +134,28 @@ export const createLocalPreviewSlice: StateCreator<AppStoreState, [], [], LocalP
   },
   setLocalPreviewBusyForRoom: (roomId, busy) => {
     set((state) => ({
-      localPreviewBusyByRoom: busy
-        ? { ...state.localPreviewBusyByRoom, [roomId]: true }
-        : omitRecordKey(state.localPreviewBusyByRoom, roomId)
+      localPreviewByRoom: updateLocalPreviewForRoom(state.localPreviewByRoom, roomId, (roomPreview) => {
+        const nextRoomPreview = { ...roomPreview };
+        if (busy) {
+          nextRoomPreview.busy = true;
+        } else {
+          delete nextRoomPreview.busy;
+        }
+        return nextRoomPreview;
+      })
     }));
   },
   appendLocalPreviewEvent: (roomId, event) => {
     set((state) => {
-      const roomEvents = state.localPreviewsByRoom[roomId] ?? [];
+      const roomEvents = state.localPreviewByRoom[roomId]?.previews ?? [];
       const nextEvents = roomEvents.some((existing) => existing.id === event.id)
         ? roomEvents.map((existing) => existing.id === event.id ? event : existing)
         : [...roomEvents, event];
       return {
-        localPreviewsByRoom: {
-          ...state.localPreviewsByRoom,
-          [roomId]: nextEvents.slice(-50)
-        }
+        localPreviewByRoom: updateLocalPreviewForRoom(state.localPreviewByRoom, roomId, (roomPreview) => ({
+          ...roomPreview,
+          previews: nextEvents.slice(-50)
+        }))
       };
     });
   }
