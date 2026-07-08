@@ -3088,6 +3088,55 @@ test("relay appends SQLite encrypted backlog rows without rewriting retained row
   }
 });
 
+test("relay prunes stale SQLite encrypted envelope rows on generic save", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-sqlite-backlog-prune-"));
+  const dataPath = join(tempDir, "relay-store.sqlite");
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+    MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS: "365"
+  }, undefined, dataPath);
+  const sender = new WebSocket(relay.wsUrl);
+  let restarted: RelayHarness | null = null;
+  try {
+    await onceOpen(sender);
+    sender.send(JSON.stringify({
+      type: "join",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      userId: "github:tester",
+      deviceId: "device-test-123"
+    }));
+    await waitForJoined(sender);
+
+    sender.send(JSON.stringify({
+      type: "publish",
+      envelope: testEnvelope({ id: "sqlite-stale-envelope", createdAt: "2026-07-05T00:00:00.000Z" })
+    }));
+    await waitForSqliteBacklogRows(dataPath, (rows) => rows.length === 1 && rows[0]?.envelope_id === "sqlite-stale-envelope");
+    sender.close();
+    await relay.close({ preserveData: true });
+
+    restarted = await startRelay({
+      MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+      MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS: "1"
+    }, undefined, dataPath);
+    await restarted.close({ preserveData: true });
+
+    const db = new Database(dataPath, { readonly: true });
+    try {
+      const rows = db.prepare("select envelope_id from relay_encrypted_envelopes where room_key = ?").all("team-core:room-desktop");
+      assert.deepEqual(rows, []);
+    } finally {
+      db.close();
+    }
+  } finally {
+    sender.close();
+    if (restarted) await restarted.close();
+    else await relay.close();
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("relay disables debug endpoints in production unless explicitly enabled", async () => {
   const productionRelay = await startRelay({ NODE_ENV: "production" });
   try {

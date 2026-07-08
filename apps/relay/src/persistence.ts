@@ -216,6 +216,7 @@ function saveNormalizedRelayState(db: Database.Database, state: unknown) {
     saveJsonRows(db, "relay_team_members", "team_id", state.teamMembers, (item) => relayId(item, "teamId"));
     saveJsonRows(db, "relay_auth_sessions", "session_id", state.authSessions, (item) => relayId(item, "sessionId"));
     saveJsonRows(db, "relay_attachment_blobs", "id", state.attachmentBlobs, (item) => relayId(item, "id"));
+    pruneEncryptedEnvelopeRows(db, state.encryptedBacklog);
   })();
 }
 
@@ -306,6 +307,32 @@ function saveEncryptedBacklogRows(db: Database.Database, roomKey: RoomKey, envel
       upsert.run(roomKey, envelope.id, index, envelope.createdAt, JSON.stringify(envelope));
     }
   })();
+}
+
+function pruneEncryptedEnvelopeRows(db: Database.Database, encryptedBacklog: unknown) {
+  if (!Array.isArray(encryptedBacklog)) return;
+  const retainedByRoom = new Map<string, Set<string>>();
+  for (const item of encryptedBacklog) {
+    if (!isRecord(item) || typeof item.key !== "string" || !Array.isArray(item.envelopes)) continue;
+    retainedByRoom.set(
+      item.key,
+      new Set(item.envelopes
+        .filter((envelope): envelope is Record<string, unknown> => isRecord(envelope))
+        .map((envelope) => envelope.id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0))
+    );
+  }
+
+  const rows = db
+    .prepare("select room_key, envelope_id from relay_encrypted_envelopes")
+    .all() as Array<{ room_key?: unknown; envelope_id?: unknown }>;
+  const deleteEnvelope = db.prepare("delete from relay_encrypted_envelopes where room_key = ? and envelope_id = ?");
+  for (const row of rows) {
+    if (typeof row.room_key !== "string" || typeof row.envelope_id !== "string") continue;
+    if (!retainedByRoom.get(row.room_key)?.has(row.envelope_id)) {
+      deleteEnvelope.run(row.room_key, row.envelope_id);
+    }
+  }
 }
 
 function appendEncryptedBacklogRow(
