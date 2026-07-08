@@ -1,13 +1,8 @@
-import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { useCallback, type MutableRefObject } from "react";
 import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "../lib/relayAccess";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
 import { shouldResetCodexApprovalForRoomUpdate } from "../lib/codexApproval";
-import {
-  markRoomRead as markRoomReadRecord,
-  replaceRoomPreservingUnread,
-  upsertRoomPreservingUnread
-} from "../lib/roomUnread";
 import { useAppStore } from "../store/appStore";
 
 interface LocalUser {
@@ -21,8 +16,10 @@ interface UseWorkspaceRecordActionsOptions {
   selectedRoom: RoomRecord;
   localUser: LocalUser;
   roomsRef: MutableRefObject<RoomRecord[]>;
-  setTeams: Dispatch<SetStateAction<TeamRecord[]>>;
-  setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
+  upsertTeamRecord: (team: TeamRecord) => void;
+  upsertRoomRecord: (room: RoomRecord) => void;
+  replaceRoomRecord: (room: RoomRecord) => void;
+  markRoomReadById: (roomId: string) => void;
   resetCodexApprovalForRoom: (roomId: string) => void;
   revokeWorkspaceAccess: (teamId: string, roomId: string) => void;
   setInviteLinkForRoom: (roomId: string, link: string) => void;
@@ -37,8 +34,10 @@ export function useWorkspaceRecordActions({
   selectedRoom,
   localUser,
   roomsRef,
-  setTeams,
-  setRooms,
+  upsertTeamRecord,
+  upsertRoomRecord,
+  replaceRoomRecord,
+  markRoomReadById,
   resetCodexApprovalForRoom,
   revokeWorkspaceAccess,
   setInviteLinkForRoom,
@@ -52,12 +51,7 @@ export function useWorkspaceRecordActions({
   const clearPresenceForRoom = useAppStore((state) => state.clearPresenceForRoom);
 
   function upsertTeam(team: TeamRecord) {
-    setTeams((current) => {
-      if (current.some((item) => item.id === team.id)) {
-        return current.map((item) => (item.id === team.id ? team : item));
-      }
-      return [...current, team];
-    });
+    upsertTeamRecord(team);
     if (team.role) {
       ensureLocalTeamMemberForTeam(team.id, localUser.id, team.role);
     }
@@ -69,7 +63,7 @@ export function useWorkspaceRecordActions({
     if (previousRoom && shouldResetCodexApprovalForRoomUpdate(ensureRoomDefaults(previousRoom), nextRoom)) {
       resetCodexApprovalForRoom(nextRoom.id);
     }
-    setRooms((current) => upsertRoomPreservingUnread(current, nextRoom));
+    upsertRoomRecord(nextRoom);
   }
 
   function replaceRoom(room: RoomRecord) {
@@ -78,12 +72,12 @@ export function useWorkspaceRecordActions({
     if (previousRoom && shouldResetCodexApprovalForRoomUpdate(ensureRoomDefaults(previousRoom), nextRoom)) {
       resetCodexApprovalForRoom(nextRoom.id);
     }
-    setRooms((current) => replaceRoomPreservingUnread(current, nextRoom));
+    replaceRoomRecord(nextRoom);
   }
 
   const markRoomRead = useCallback((roomId: string) => {
-    setRooms((current) => markRoomReadRecord(current, roomId));
-  }, [setRooms]);
+    markRoomReadById(roomId);
+  }, [markRoomReadById]);
 
   function handleRelayError(message: string) {
     console.warn("Relay error", message);

@@ -1,6 +1,12 @@
 import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import type { RoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
 import type { ChatMessage, SidebarPanel } from "../types";
+import { ensureRoomDefaults } from "../lib/roomDefaults";
+import {
+  markRoomRead as markRoomReadRecord,
+  replaceRoomPreservingUnread,
+  upsertRoomPreservingUnread
+} from "../lib/roomUnread";
 import { useAppStore } from "../store/appStore";
 import {
   projectTeamMembersBusyByTeam,
@@ -55,6 +61,23 @@ export function useWorkspaceUiState({
       team.id === teamId ? { ...team, members } : team
     ));
   }, []);
+  const upsertTeamRecord = useCallback((team: TeamRecord) => {
+    setTeams((current) => {
+      if (current.some((item) => item.id === team.id)) {
+        return current.map((item) => (item.id === team.id ? team : item));
+      }
+      return [...current, team];
+    });
+  }, []);
+  const upsertRoomRecord = useCallback((room: RoomRecord) => {
+    setRooms((current) => upsertRoomPreservingUnread(current, ensureRoomDefaults(room)));
+  }, []);
+  const replaceRoomRecord = useCallback((room: RoomRecord) => {
+    setRooms((current) => replaceRoomPreservingUnread(current, ensureRoomDefaults(room)));
+  }, []);
+  const markRoomReadById = useCallback((roomId: string) => {
+    setRooms((current) => markRoomReadRecord(current, roomId));
+  }, []);
   const selectWorkspaceRoom = useCallback((teamId: string, roomId: string) => {
     setSelectedTeam(teamId);
     setSelectedRoomId(roomId);
@@ -76,8 +99,12 @@ export function useWorkspaceUiState({
     setTeams,
     updateTeamRoleForTeam,
     updateTeamMemberCountForTeam,
+    upsertTeamRecord,
     rooms,
     setRooms,
+    upsertRoomRecord,
+    replaceRoomRecord,
+    markRoomReadById,
     teamMembersByTeam,
     teamMembersMessageByTeam,
     teamMembersBusyByTeam,
