@@ -16,6 +16,12 @@ export function useAppRuntimeState() {
   const [relayStatus, setRelayStatus] = useState<RelayStatus>("closed");
   const [deviceIdentity, setDeviceIdentity] = useState<DeviceIdentity | null>(null);
   const [deviceIdentityMessage, setDeviceIdentityMessage] = useState<string | null>(null);
+  const replaceDeviceIdentity = useCallback((next: DeviceIdentity | null) => {
+    setDeviceIdentity(next);
+  }, []);
+  const setDeviceIdentityStatusMessage = useCallback((message: string | null) => {
+    setDeviceIdentityMessage(message);
+  }, []);
   const [trustedDeviceKeys, setTrustedDeviceKeys] = useState<TrustedDeviceKey[]>(() => loadTrustedDeviceKeys());
   const trustDeviceForRoom = useCallback((roomId: string, deviceId: string, fingerprint: string) => {
     setTrustedDeviceKeys((current) => trustDeviceKey(current, roomId, deviceId, fingerprint));
@@ -42,9 +48,9 @@ export function useAppRuntimeState() {
     relayStatus,
     setRelayStatus,
     deviceIdentity,
-    setDeviceIdentity,
+    replaceDeviceIdentity,
     deviceIdentityMessage,
-    setDeviceIdentityMessage,
+    setDeviceIdentityStatusMessage,
     trustedDeviceKeys,
     setTrustedDeviceKeys,
     trustDeviceForRoom,

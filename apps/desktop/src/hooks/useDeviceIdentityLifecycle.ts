@@ -1,4 +1,4 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect } from "react";
 import { loadOrCreateDeviceIdentity, type DeviceIdentity } from "../lib/deviceIdentity";
 import { registerDevice } from "../lib/workspaceClient";
 
@@ -8,8 +8,8 @@ interface UseDeviceIdentityLifecycleOptions {
   userId: string;
   displayName: string;
   deviceIdentity: DeviceIdentity | null;
-  setDeviceIdentity: Dispatch<SetStateAction<DeviceIdentity | null>>;
-  setDeviceIdentityMessage: Dispatch<SetStateAction<string | null>>;
+  replaceDeviceIdentity: (next: DeviceIdentity | null) => void;
+  setDeviceIdentityStatusMessage: (message: string | null) => void;
 }
 
 export function useDeviceIdentityLifecycle({
@@ -18,19 +18,19 @@ export function useDeviceIdentityLifecycle({
   userId,
   displayName,
   deviceIdentity,
-  setDeviceIdentity,
-  setDeviceIdentityMessage
+  replaceDeviceIdentity,
+  setDeviceIdentityStatusMessage
 }: UseDeviceIdentityLifecycleOptions) {
   useEffect(() => {
     loadOrCreateDeviceIdentity()
       .then((identity) => {
-        setDeviceIdentity(identity);
-        setDeviceIdentityMessage(null);
+        replaceDeviceIdentity(identity);
+        setDeviceIdentityStatusMessage(null);
       })
       .catch((error) => {
-        setDeviceIdentityMessage(`Device identity unavailable: ${String(error)}`);
+        setDeviceIdentityStatusMessage(`Device identity unavailable: ${String(error)}`);
       });
-  }, [setDeviceIdentity, setDeviceIdentityMessage]);
+  }, [replaceDeviceIdentity, setDeviceIdentityStatusMessage]);
 
   useEffect(() => {
     if (!deviceIdentity) return;
@@ -41,7 +41,7 @@ export function useDeviceIdentityLifecycle({
       publicKeyJwk: deviceIdentity.publicKeyJwk,
       publicKeyFingerprint: deviceIdentity.publicKeyFingerprint
     })
-      .then(() => setDeviceIdentityMessage("Device identity registered with relay."))
-      .catch((error) => setDeviceIdentityMessage(`Device identity registration pending: ${String(error)}`));
-  }, [relayHttpUrl, deviceId, deviceIdentity, displayName, setDeviceIdentityMessage, userId]);
+      .then(() => setDeviceIdentityStatusMessage("Device identity registered with relay."))
+      .catch((error) => setDeviceIdentityStatusMessage(`Device identity registration pending: ${String(error)}`));
+  }, [relayHttpUrl, deviceId, deviceIdentity, displayName, setDeviceIdentityStatusMessage, userId]);
 }
