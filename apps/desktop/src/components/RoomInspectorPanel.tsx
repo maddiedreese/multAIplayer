@@ -15,6 +15,7 @@ export function RoomInspectorPanel({
   workPanel
 }: RoomInspectorPanelProps) {
   const activeLabel = activeTab === "room" ? "room" : activeTab;
+  const panel = activeTab === "browser" ? browserPanel : workPanel;
 
   return (
     <aside className="inspector">
@@ -25,8 +26,9 @@ export function RoomInspectorPanel({
 
       <div
         className={`inspector-panel-group inspector-panel-${activeTab}`}
+        data-active-tab={activeTab}
       >
-        {activeTab === "browser" ? browserPanel : workPanel}
+        {panel}
       </div>
     </aside>
   );

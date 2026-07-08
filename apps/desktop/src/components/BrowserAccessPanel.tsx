@@ -4,6 +4,8 @@ import { Webview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
 
+const browserWebviewLabel = "room_browser";
+
 export function BrowserAccessPanel({
   hidden,
   activeBrowserUrl,
@@ -31,17 +33,21 @@ export function BrowserAccessPanel({
     onOpenBrowserNow();
   }
 
+  async function closeBrowserWebview() {
+    const webview = browserWebviewRef.current;
+    browserWebviewRef.current = null;
+    if (webview) {
+      await webview.close().catch(() => undefined);
+    }
+    if (tauriRuntime) {
+      const labeledWebview = await Webview.getByLabel(browserWebviewLabel).catch(() => null);
+      await labeledWebview?.close().catch(() => undefined);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
     let cleanupPositioning: (() => void) | null = null;
-
-    async function closeBrowserWebview() {
-      const webview = browserWebviewRef.current;
-      browserWebviewRef.current = null;
-      if (webview) {
-        await webview.close().catch(() => undefined);
-      }
-    }
 
     async function positionBrowserWebview(webview: Webview) {
       const slot = browserViewportRef.current;
@@ -68,7 +74,7 @@ export function BrowserAccessPanel({
       const toolbar = browserViewportRef.current.parentElement?.querySelector<HTMLElement>(".browser-toolbar");
       const toolbarRect = toolbar?.getBoundingClientRect();
       const top = toolbarRect ? Math.max(rect.top, toolbarRect.bottom + 18) : rect.top;
-      const webview = new Webview(getCurrentWindow(), "room_browser", {
+      const webview = new Webview(getCurrentWindow(), browserWebviewLabel, {
         url: activeBrowserUrl,
         x: Math.round(rect.left),
         y: Math.round(top),

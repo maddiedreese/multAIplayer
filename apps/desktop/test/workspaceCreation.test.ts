@@ -6,6 +6,8 @@ import {
   maxRoomProjectPathChars,
   maxTeamNameChars,
   normalizeCodexModel,
+  normalizeCodexReasoningEffort,
+  normalizeCodexSpeed,
   planRoomCreation,
   planTeamCreation
 } from "../src/lib/workspaceCreation";
@@ -45,7 +47,8 @@ test("planRoomCreation rejects oversized and control-character room metadata", (
 });
 
 test("normalizeCodexModel accepts known and model-like ids", () => {
-  assert.equal(normalizeCodexModel(" gpt-5.4-thinking "), "gpt-5.4-thinking");
+  assert.equal(normalizeCodexModel(" gpt-5.3-codex "), "gpt-5.3-codex");
+  assert.equal(normalizeCodexModel(" gpt-5.1-codex-max "), "gpt-5.1-codex-max");
   assert.equal(normalizeCodexModel("provider/custom-model:v1"), "provider/custom-model:v1");
 });
 
@@ -53,4 +56,20 @@ test("normalizeCodexModel rejects blank, oversized, and non-model-like ids", () 
   assert.equal(normalizeCodexModel(" "), null);
   assert.equal(normalizeCodexModel("x".repeat(maxCodexModelChars + 1)), null);
   assert.equal(normalizeCodexModel("bad model with spaces"), null);
+});
+
+test("normalizeCodexReasoningEffort accepts current Codex reasoning choices", () => {
+  assert.equal(normalizeCodexReasoningEffort("minimal"), "minimal");
+  assert.equal(normalizeCodexReasoningEffort("low"), "low");
+  assert.equal(normalizeCodexReasoningEffort("medium"), "medium");
+  assert.equal(normalizeCodexReasoningEffort("high"), "high");
+  assert.equal(normalizeCodexReasoningEffort("xhigh"), "xhigh");
+  assert.equal(normalizeCodexReasoningEffort("extra"), null);
+});
+
+test("normalizeCodexSpeed accepts current Codex speed choices", () => {
+  assert.equal(normalizeCodexSpeed("standard"), "standard");
+  assert.equal(normalizeCodexSpeed("fast"), "fast");
+  assert.equal(normalizeCodexSpeed("flex"), "flex");
+  assert.equal(normalizeCodexSpeed("urgent"), null);
 });

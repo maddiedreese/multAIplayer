@@ -367,20 +367,25 @@ export type ApprovalDelegationPolicy =
   | "trusted_members_only";
 
 export const defaultApprovalDelegationPolicy: ApprovalDelegationPolicy = "host_only";
-export const defaultCodexModel = "gpt-5.5";
+export const defaultCodexModel = "gpt-5.3-codex";
 export const defaultCodexReasoningEffort = "medium";
 export const defaultCodexSpeed = "standard";
 export const defaultBrowserAllowedOrigins = ["https://github.com"];
 export const defaultBrowserProfilePersistent = true;
 
 export const codexModelOptions = [
-  { id: "gpt-5.5", label: "GPT-5.5", description: "Frontier model for complex coding, research, and real-world work." },
-  { id: "gpt-5.4", label: "GPT-5.4", description: "High-capability Codex host model" },
-  { id: "gpt-5.4-mini", label: "GPT-5.4-Mini", description: "Faster Codex turns for lighter room tasks" },
-  { id: "gpt-5.3-codex-spark", label: "GPT-5.3-Codex-Spark", description: "Older Codex model for compatibility testing" }
+  { id: "gpt-5.3-codex", label: "GPT-5.3-Codex", description: "Current Codex coding model for agentic software work." },
+  { id: "gpt-5.3-codex-spark", label: "GPT-5.3-Codex-Spark", description: "Fast Codex model for smaller coding turns." },
+  { id: "gpt-5.2-codex", label: "GPT-5.2-Codex", description: "Previous Codex model optimized for long-horizon coding." },
+  { id: "gpt-5.1-codex-max", label: "GPT-5.1-Codex-Max", description: "Frontier GPT-5.1 Codex model for deeper work." },
+  { id: "gpt-5.1-codex", label: "GPT-5.1-Codex", description: "GPT-5.1 coding model for Codex harnesses." },
+  { id: "gpt-5.1-codex-mini", label: "GPT-5.1-Codex-Mini", description: "Smaller GPT-5.1 Codex model for lighter turns." },
+  { id: "gpt-5-codex", label: "GPT-5-Codex", description: "Original GPT-5 Codex model." },
+  { id: "gpt-5-codex-mini", label: "GPT-5-Codex-Mini", description: "Smaller GPT-5 Codex model with lower usage cost." }
 ] as const;
 
 export const codexReasoningEffortOptions = [
+  { id: "minimal", label: "Minimal", description: "Smallest reasoning budget for very direct turns" },
   { id: "low", label: "Low", description: "Fast responses with lighter reasoning" },
   { id: "medium", label: "Medium", description: "Balances speed and reasoning depth for everyday tasks" },
   { id: "high", label: "High", description: "Greater reasoning depth for complex problems" },
@@ -389,7 +394,8 @@ export const codexReasoningEffortOptions = [
 
 export const codexSpeedOptions = [
   { id: "standard", label: "Standard", serviceTier: "default", description: "Default Codex speed and usage behavior" },
-  { id: "fast", label: "Fast", serviceTier: "priority", description: "Priority tier for faster Codex turns when available" }
+  { id: "fast", label: "Fast", serviceTier: "priority", description: "Priority tier for faster Codex turns when available" },
+  { id: "flex", label: "Flex", serviceTier: "flex", description: "Flexible tier for non-urgent Codex turns when available" }
 ] as const;
 
 export type CodexReasoningEffort = typeof codexReasoningEffortOptions[number]["id"];
@@ -451,8 +457,8 @@ export const RoomRecord = z.object({
   trustedApproverUserIds: z.array(UserId).max(50),
   mode: RoomModeSchema,
   codexModel: z.string().min(1).max(maxCodexModelChars),
-  codexReasoningEffort: z.enum(["low", "medium", "high", "xhigh"]).optional(),
-  codexSpeed: z.enum(["standard", "fast"]).optional(),
+  codexReasoningEffort: z.enum(["minimal", "low", "medium", "high", "xhigh"]).optional(),
+  codexSpeed: z.enum(["standard", "fast", "flex"]).optional(),
   browserAllowedOrigins: z.array(z.string().min(1).max(maxUrlChars)).max(20),
   browserProfilePersistent: z.boolean(),
   unread: z.number().int().nonnegative()

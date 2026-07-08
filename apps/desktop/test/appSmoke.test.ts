@@ -208,4 +208,31 @@ test("App smoke", async (t) => {
     assert.equal(screen.getByText("finish the editor").textContent, "finish the editor");
     assert.equal(screen.queryByText("/goal finish the editor"), null);
   });
+
+  await t.test("switches inspector tabs after browser and files without blanking the rail", async () => {
+    resetAppSmokeDom();
+    render(createElement(App));
+    const roomTools = await screen.findByRole("navigation", { name: "Room tools" });
+
+    fireEvent.click(within(roomTools).getByRole("button", { name: /browser/i }));
+    await waitFor(() => {
+      assert.ok(screen.getByLabelText("Browser URL"));
+    });
+
+    fireEvent.click(within(roomTools).getByRole("button", { name: /room/i }));
+    await waitFor(() => {
+      assert.ok(screen.getByText("Team roster"));
+    });
+
+    fireEvent.click(within(roomTools).getByRole("button", { name: /files/i }));
+    await waitFor(() => {
+      assert.ok(screen.getByPlaceholderText("Search project files"));
+      assert.ok(screen.getByText("Changed files"));
+    });
+
+    fireEvent.click(within(roomTools).getByRole("button", { name: /terminal/i }));
+    await waitFor(() => {
+      assert.ok(screen.getByRole("button", { name: /New terminal/i }));
+    });
+  });
 });

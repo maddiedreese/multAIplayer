@@ -547,18 +547,18 @@ mod tests {
 
     #[test]
     fn codex_thread_request_starts_or_resumes_room_thread() {
-        let start = codex_thread_request(2, None, "/tmp/project", "gpt-5.4-mini");
+        let start = codex_thread_request(2, None, "/tmp/project", "gpt-5.3-codex-spark");
         assert_eq!(start["method"], "thread/start");
         assert_eq!(start["id"], 2);
         assert_eq!(start["params"]["cwd"], "/tmp/project");
-        assert_eq!(start["params"]["model"], "gpt-5.4-mini");
+        assert_eq!(start["params"]["model"], "gpt-5.3-codex-spark");
 
-        let resume = codex_thread_request(3, Some("thr_room_123"), "/tmp/project", "gpt-5.4");
+        let resume = codex_thread_request(3, Some("thr_room_123"), "/tmp/project", "gpt-5.3-codex");
         assert_eq!(resume["method"], "thread/resume");
         assert_eq!(resume["id"], 3);
         assert_eq!(resume["params"]["threadId"], "thr_room_123");
         assert_eq!(resume["params"]["cwd"], "/tmp/project");
-        assert_eq!(resume["params"]["model"], "gpt-5.4");
+        assert_eq!(resume["params"]["model"], "gpt-5.3-codex");
         assert_eq!(resume["params"]["excludeTurns"], true);
     }
 
@@ -567,7 +567,7 @@ mod tests {
         let base = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
             "default",
         )
@@ -575,7 +575,7 @@ mod tests {
         let same = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
             "default",
         )
@@ -583,7 +583,7 @@ mod tests {
         let different_room = codex_server_key(
             Some("room-beta"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
             "default",
         )
@@ -591,7 +591,7 @@ mod tests {
         let different_project = codex_server_key(
             Some("room-alpha"),
             "/tmp/other",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
             "default",
         )
@@ -599,7 +599,7 @@ mod tests {
         let different_model = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
-            "gpt-5.4-mini",
+            "gpt-5.3-codex-spark",
             "medium",
             "default",
         )
@@ -607,7 +607,7 @@ mod tests {
         let different_reasoning = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "high",
             "default",
         )
@@ -615,7 +615,7 @@ mod tests {
         let different_speed = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
             "priority",
         )
@@ -630,7 +630,7 @@ mod tests {
         assert!(codex_server_key(
             Some("room/alpha"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
             "default"
         )
@@ -642,7 +642,7 @@ mod tests {
         let room_a_main = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
             "default",
         )
@@ -650,7 +650,7 @@ mod tests {
         let room_a_model = codex_server_key(
             Some("room-alpha"),
             "/tmp/project",
-            "gpt-5.4-mini",
+            "gpt-5.3-codex-spark",
             "medium",
             "default",
         )
@@ -658,7 +658,7 @@ mod tests {
         let room_b = codex_server_key(
             Some("room-beta"),
             "/tmp/project",
-            "gpt-5.4",
+            "gpt-5.3-codex",
             "medium",
             "default",
         )

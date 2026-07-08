@@ -100,7 +100,7 @@ pub(crate) fn run_codex_turn(request: CodexTurnRequest) -> Result<CodexTurnResul
     ensure_codex_input(&request.input)?;
     let previous_thread_id = normalize_codex_thread_id(request.previous_thread_id.as_deref())?;
     let timeout = codex_timeout(request.timeout_seconds)?;
-    let model = request.model.unwrap_or_else(|| "gpt-5.5".to_string());
+    let model = request.model.unwrap_or_else(|| "gpt-5.3-codex".to_string());
     let reasoning_effort = normalize_reasoning_effort(request.reasoning_effort.as_deref())?;
     let service_tier = service_tier_for_speed(request.speed.as_deref())?;
     let key = codex_server_key(
@@ -135,8 +135,8 @@ pub(crate) fn shutdown_codex_room(request: CodexRoomShutdownRequest) -> Result<u
 fn normalize_reasoning_effort(value: Option<&str>) -> Result<String, String> {
     let effort = value.unwrap_or("medium").trim();
     match effort {
-        "low" | "medium" | "high" | "xhigh" => Ok(effort.to_string()),
-        _ => Err("Codex reasoning effort must be low, medium, high, or xhigh.".to_string()),
+        "minimal" | "low" | "medium" | "high" | "xhigh" => Ok(effort.to_string()),
+        _ => Err("Codex reasoning effort must be minimal, low, medium, high, or xhigh.".to_string()),
     }
 }
 
@@ -145,7 +145,8 @@ fn service_tier_for_speed(value: Option<&str>) -> Result<String, String> {
     match speed {
         "standard" => Ok("default".to_string()),
         "fast" => Ok("priority".to_string()),
-        _ => Err("Codex speed must be standard or fast.".to_string()),
+        "flex" => Ok("flex".to_string()),
+        _ => Err("Codex speed must be standard, fast, or flex.".to_string()),
     }
 }
 
