@@ -2,13 +2,14 @@
 
 The relay is intended to be self-hostable. In v1 it routes encrypted room events and manages presence; it does not call OpenAI or store plaintext chat transcripts.
 
-Teams moving from the hosted relay to their own relay should use the [hosted-to-self-hosted relay migration runbook](relay-migration-runbook.md). The short version is: deploy and verify a self-hosted relay, change each desktop app's Settings drawer to the new relay HTTP and WebSocket URLs, recreate team/room membership with fresh invites, and rely on each device's local room keys and encrypted local history for continuity.
+Teams moving from the hosted relay to their own relay should use the [hosted-to-self-hosted relay migration runbook](relay-migration-runbook.md). The short version is: deploy and verify a self-hosted relay, use a desktop build whose app-shell CSP allows the self-hosted HTTP and WebSocket origins, change each desktop app's Settings drawer to those relay URLs, recreate team/room membership with fresh invites, and rely on each device's local room keys and encrypted local history for continuity.
 
 Supported alpha self-hosting requirements:
 
 - Node.js runtime for the relay;
 - GitHub OAuth app configured by the self-hoster;
 - HTTPS and WebSocket support;
+- a desktop build whose app-shell CSP includes the self-hosted relay HTTP and WebSocket origins;
 - persistent SQLite storage for hosted or internet-facing relays;
 - relay-managed encrypted attachment blob storage in SQLite for hosted or internet-facing relays, or JSON storage for local/dev self-hosting.
 
@@ -266,7 +267,7 @@ VITE_RELAY_HTTP_URL=http://127.0.0.1:4321
 VITE_RELAY_URL=ws://127.0.0.1:4321/rooms
 ```
 
-These env vars define the packaged defaults. Desktop users can also open Settings and change the relay HTTP API URL and WebSocket rooms URL without rebuilding the app. The override is stored locally on that device.
+These env vars define the packaged defaults. The official packaged alpha app-shell CSP allows localhost development relays and the hosted multAIplayer relay origin; it does not allow arbitrary HTTPS/WSS relay origins. A custom self-hosted relay origin therefore requires a self-built desktop app with `apps/desktop/src-tauri/tauri.conf.json` updated so `connect-src` includes both the relay HTTP origin and the matching WebSocket origin. After the build permits those origins, desktop users can open Settings and change the relay HTTP API URL and WebSocket rooms URL. The override is stored locally on that device.
 
 The current alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured. Hosted and internet-facing deployments should use SQLite and should add backup/restore drills, token-rotation operations, and shared/external rate limiting before making production or multi-instance claims.
 
@@ -277,6 +278,7 @@ The relay does not hold plaintext room history or room keys. Migrating from the 
 Use [relay-migration-runbook.md](relay-migration-runbook.md) for the full procedure and verification checklist. Plan to:
 
 - stand up the self-hosted relay and pass `NODE_ENV=production npm run doctor:production-relay`;
+- use a desktop build whose app-shell CSP allows the self-hosted HTTP and WebSocket relay origins;
 - switch each desktop app's `HTTP API URL` and `WebSocket rooms URL` in Settings;
 - sign in to GitHub again for the new relay origin when auth is required;
 - recreate teams and rooms on the self-hosted relay;

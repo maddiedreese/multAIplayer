@@ -34,6 +34,8 @@ Relay HTTP API URL: https://relay.example.com
 Relay rooms WebSocket URL: wss://relay.example.com/rooms
 ```
 
+The official packaged alpha desktop app-shell CSP allows localhost development relays and the hosted multAIplayer relay origin. Before using a custom relay origin in the packaged app, build a desktop app with `apps/desktop/src-tauri/tauri.conf.json` updated so `connect-src` includes both the self-hosted HTTPS relay origin and its WSS rooms origin. Otherwise the Settings change will be saved locally but browser CSP will block the app-shell requests.
+
 Back up every device's local state by leaving the app installed and the rooms visible before changing relay settings. Encrypted room export/import is planned as the belt-and-suspenders backup path; until that exists, the practical backup is each member's retained local encrypted history plus normal project/Git backups.
 
 ## 1. Stand Up The Self-Hosted Relay
@@ -63,7 +65,7 @@ The check must pass before inviting the team to switch. Also confirm:
 
 ## 2. Create The Workspace On The New Relay
 
-On the device that will coordinate the migration:
+On the device that will coordinate the migration, using a desktop build whose CSP allows the self-hosted relay origins:
 
 1. Open multAIplayer.
 2. Open `Settings`.
