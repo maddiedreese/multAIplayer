@@ -29,41 +29,74 @@ export interface GitHubActionsRoomState {
 
 export type GitHubActionsByRoom = Record<string, GitHubActionsRoomState>;
 
-export function projectGitHubActionsEventsByRoom(
-  githubActionsByRoom: GitHubActionsByRoom
-): Record<string, GitHubActionsEventPlaintextPayload[]> {
+export interface GitWorkflowRuntimeRoomState {
+  workflow?: GitWorkflowRoomState;
+  actions?: GitHubActionsRoomState;
+}
+
+export type GitWorkflowRuntimeByRoom = Record<string, GitWorkflowRuntimeRoomState>;
+
+function isEmptyRecord(record: object): boolean {
+  return Object.keys(record).length === 0;
+}
+
+function maybeWithoutEmptyWorkflowRuntime(roomRuntime: GitWorkflowRuntimeRoomState): GitWorkflowRuntimeRoomState {
+  const nextRoomRuntime = { ...roomRuntime };
+  if (nextRoomRuntime.workflow && isEmptyRecord(nextRoomRuntime.workflow)) delete nextRoomRuntime.workflow;
+  if (nextRoomRuntime.actions && isEmptyRecord(nextRoomRuntime.actions)) delete nextRoomRuntime.actions;
+  return nextRoomRuntime;
+}
+
+function updateGitWorkflowRuntimeForRoom(
+  current: GitWorkflowRuntimeByRoom,
+  roomId: string,
+  update: (roomRuntime: GitWorkflowRuntimeRoomState) => GitWorkflowRuntimeRoomState
+): GitWorkflowRuntimeByRoom {
+  const nextRoomRuntime = maybeWithoutEmptyWorkflowRuntime(update(current[roomId] ?? {}));
+  if (isEmptyRecord(nextRoomRuntime)) {
+    return roomId in current ? omitRecordKey(current, roomId) : current;
+  }
+  return { ...current, [roomId]: nextRoomRuntime };
+}
+
+export function projectGitWorkflowByRoom(gitWorkflowRuntimeByRoom: GitWorkflowRuntimeByRoom): GitWorkflowByRoom {
   return Object.fromEntries(
-    Object.entries(githubActionsByRoom)
-      .filter(([, actions]) => actions.events)
-      .map(([roomId, actions]) => [roomId, actions.events ?? []])
+    Object.entries(gitWorkflowRuntimeByRoom)
+      .filter(([, runtime]) => runtime.workflow)
+      .map(([roomId, runtime]) => [roomId, runtime.workflow ?? {}])
   );
 }
 
-function updateGitWorkflowForRoom(
-  current: GitWorkflowByRoom,
-  roomId: string,
-  update: (roomWorkflow: GitWorkflowRoomState) => GitWorkflowRoomState
-): GitWorkflowByRoom {
-  const nextRoomWorkflow = update(current[roomId] ?? {});
-  if (Object.keys(nextRoomWorkflow).length === 0) {
-    return roomId in current ? omitRecordKey(current, roomId) : current;
-  }
-  return { ...current, [roomId]: nextRoomWorkflow };
+export function projectGitHubActionsByRoom(gitWorkflowRuntimeByRoom: GitWorkflowRuntimeByRoom): GitHubActionsByRoom {
+  return Object.fromEntries(
+    Object.entries(gitWorkflowRuntimeByRoom)
+      .filter(([, runtime]) => runtime.actions)
+      .map(([roomId, runtime]) => [roomId, runtime.actions ?? {}])
+  );
 }
 
-function updateGitHubActionsForRoom(
-  current: GitHubActionsByRoom,
-  roomId: string,
-  update: (roomActions: GitHubActionsRoomState) => GitHubActionsRoomState
-): GitHubActionsByRoom {
-  const nextRoomActions = update(current[roomId] ?? {});
-  if (Object.keys(nextRoomActions).length === 0) return omitRecordKey(current, roomId);
-  return { ...current, [roomId]: nextRoomActions };
+export function projectGitWorkflowEventsByRoom(
+  gitWorkflowRuntimeByRoom: GitWorkflowRuntimeByRoom
+): Record<string, GitWorkflowEventPlaintextPayload[]> {
+  return Object.fromEntries(
+    Object.entries(gitWorkflowRuntimeByRoom)
+      .filter(([, runtime]) => runtime.workflow?.events)
+      .map(([roomId, runtime]) => [roomId, runtime.workflow?.events ?? []])
+  );
+}
+
+export function projectGitHubActionsEventsByRoom(
+  gitWorkflowRuntimeByRoom: GitWorkflowRuntimeByRoom
+): Record<string, GitHubActionsEventPlaintextPayload[]> {
+  return Object.fromEntries(
+    Object.entries(gitWorkflowRuntimeByRoom)
+      .filter(([, runtime]) => runtime.actions?.events)
+      .map(([roomId, runtime]) => [roomId, runtime.actions?.events ?? []])
+  );
 }
 
 export interface GitWorkflowSlice {
-  gitWorkflowByRoom: GitWorkflowByRoom;
-  githubActionsByRoom: GitHubActionsByRoom;
+  gitWorkflowRuntimeByRoom: GitWorkflowRuntimeByRoom;
   setActionsMessageForRoom: (roomId: string, message: string | null) => void;
   recordGitHubActionsRefreshForRoom: (roomId: string, refresh: {
     runs: GitHubActionRun[];
@@ -85,36 +118,37 @@ export interface GitWorkflowSlice {
 
 export const emptyGitWorkflowState: Pick<
   GitWorkflowSlice,
-  | "gitWorkflowByRoom"
-  | "githubActionsByRoom"
+  "gitWorkflowRuntimeByRoom"
 > = {
-  gitWorkflowByRoom: {},
-  githubActionsByRoom: {}
+  gitWorkflowRuntimeByRoom: {}
 };
 
 export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWorkflowSlice> = (set) => ({
   ...emptyGitWorkflowState,
   setActionsMessageForRoom: (roomId, message) => {
     set((state) => ({
-      githubActionsByRoom: updateGitHubActionsForRoom(state.githubActionsByRoom, roomId, (roomActions) => {
-        const { message: _message, ...rest } = roomActions;
-        return message ? { ...rest, message } : rest;
+      gitWorkflowRuntimeByRoom: updateGitWorkflowRuntimeForRoom(state.gitWorkflowRuntimeByRoom, roomId, (runtime) => {
+        const { message: _message, ...rest } = runtime.actions ?? {};
+        return { ...runtime, actions: message ? { ...rest, message } : rest };
       })
     }));
   },
   recordGitHubActionsRefreshForRoom: (roomId, refresh) => {
     set((state) => ({
-      githubActionsByRoom: updateGitHubActionsForRoom(state.githubActionsByRoom, roomId, (roomActions) => ({
-        ...roomActions,
-        runs: refresh.runs,
-        lastChecked: refresh.checkedAt,
-        message: refresh.message
+      gitWorkflowRuntimeByRoom: updateGitWorkflowRuntimeForRoom(state.gitWorkflowRuntimeByRoom, roomId, (runtime) => ({
+        ...runtime,
+        actions: {
+          ...runtime.actions,
+          runs: refresh.runs,
+          lastChecked: refresh.checkedAt,
+          message: refresh.message
+        }
       }))
     }));
   },
   applyGitHubActionsEventForRoom: (roomId, event) => {
     set((state) => {
-      const roomEvents = state.githubActionsByRoom[roomId]?.events ?? [];
+      const roomEvents = state.gitWorkflowRuntimeByRoom[roomId]?.actions?.events ?? [];
       const alreadyRecorded = roomEvents.some((existing) =>
         existing.checkedAt === event.checkedAt &&
         existing.owner === event.owner &&
@@ -122,56 +156,59 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
         existing.branch === event.branch
       );
       return {
-        githubActionsByRoom: updateGitHubActionsForRoom(state.githubActionsByRoom, roomId, (roomActions) => ({
-          ...roomActions,
-          events: alreadyRecorded ? roomEvents : [...roomEvents, event].slice(-50),
-          runs: event.runs,
-          lastChecked: event.checkedAt,
-          message: `${event.summary.label}: ${event.message}`
+        gitWorkflowRuntimeByRoom: updateGitWorkflowRuntimeForRoom(state.gitWorkflowRuntimeByRoom, roomId, (runtime) => ({
+          ...runtime,
+          actions: {
+            ...runtime.actions,
+            events: alreadyRecorded ? roomEvents : [...roomEvents, event].slice(-50),
+            runs: event.runs,
+            lastChecked: event.checkedAt,
+            message: `${event.summary.label}: ${event.message}`
+          }
         }))
       };
     });
   },
   setActionsLastCheckedForRoom: (roomId, checkedAt) => {
     set((state) => ({
-      githubActionsByRoom: updateGitHubActionsForRoom(state.githubActionsByRoom, roomId, (roomActions) => {
-        const { lastChecked: _lastChecked, ...rest } = roomActions;
-        return checkedAt ? { ...rest, lastChecked: checkedAt } : rest;
+      gitWorkflowRuntimeByRoom: updateGitWorkflowRuntimeForRoom(state.gitWorkflowRuntimeByRoom, roomId, (runtime) => {
+        const { lastChecked: _lastChecked, ...rest } = runtime.actions ?? {};
+        return { ...runtime, actions: checkedAt ? { ...rest, lastChecked: checkedAt } : rest };
       })
     }));
   },
   resetGitHubActionsStateForRoom: (roomId) => {
     set((state) => ({
-      githubActionsByRoom: {
-        ...omitRecordKey(state.githubActionsByRoom, roomId),
-        [roomId]: { runs: [] }
-      }
+      gitWorkflowRuntimeByRoom: updateGitWorkflowRuntimeForRoom(state.gitWorkflowRuntimeByRoom, roomId, (runtime) => ({
+        ...runtime,
+        actions: { runs: [] }
+      }))
     }));
   },
   setGitWorkflowBusyForRoom: (roomId, busy) => {
     set((state) => ({
-      gitWorkflowByRoom: updateGitWorkflowForRoom(state.gitWorkflowByRoom, roomId, (roomWorkflow) => {
-        const nextRoomWorkflow = { ...roomWorkflow };
+      gitWorkflowRuntimeByRoom: updateGitWorkflowRuntimeForRoom(state.gitWorkflowRuntimeByRoom, roomId, (runtime) => {
+        const nextRoomWorkflow = { ...runtime.workflow };
         if (busy) {
           nextRoomWorkflow.busy = true;
         } else {
           delete nextRoomWorkflow.busy;
         }
-        return nextRoomWorkflow;
+        return { ...runtime, workflow: nextRoomWorkflow };
       })
     }));
   },
   setActionsBusyForRoom: (roomId, busy) => {
     set((state) => ({
-      githubActionsByRoom: updateGitHubActionsForRoom(state.githubActionsByRoom, roomId, (roomActions) => {
-        const { busy: _busy, ...rest } = roomActions;
-        return busy ? { ...rest, busy: true } : rest;
+      gitWorkflowRuntimeByRoom: updateGitWorkflowRuntimeForRoom(state.gitWorkflowRuntimeByRoom, roomId, (runtime) => {
+        const { busy: _busy, ...rest } = runtime.actions ?? {};
+        return { ...runtime, actions: busy ? { ...rest, busy: true } : rest };
       })
     }));
   },
   appendGitWorkflowEvent: (roomId, event) => {
     set((state) => {
-      const roomEvents = state.gitWorkflowByRoom[roomId]?.events ?? [];
+      const roomEvents = state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.events ?? [];
       if (
         roomEvents.some((existing) =>
           existing.createdAt === event.createdAt &&
@@ -182,16 +219,19 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
         return state;
       }
       return {
-        gitWorkflowByRoom: updateGitWorkflowForRoom(state.gitWorkflowByRoom, roomId, (roomWorkflow) => ({
-          ...roomWorkflow,
-          events: [...roomEvents, event].slice(-100)
+        gitWorkflowRuntimeByRoom: updateGitWorkflowRuntimeForRoom(state.gitWorkflowRuntimeByRoom, roomId, (runtime) => ({
+          ...runtime,
+          workflow: {
+            ...runtime.workflow,
+            events: [...roomEvents, event].slice(-100)
+          }
         }))
       };
     });
   },
   appendGitHubActionsEvent: (roomId, event) => {
     set((state) => {
-      const roomEvents = state.githubActionsByRoom[roomId]?.events ?? [];
+      const roomEvents = state.gitWorkflowRuntimeByRoom[roomId]?.actions?.events ?? [];
       if (
         roomEvents.some((existing) =>
           existing.checkedAt === event.checkedAt &&
@@ -203,39 +243,51 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
         return state;
       }
       return {
-        githubActionsByRoom: updateGitHubActionsForRoom(state.githubActionsByRoom, roomId, (roomActions) => ({
-          ...roomActions,
-          events: [...roomEvents, event].slice(-50)
+        gitWorkflowRuntimeByRoom: updateGitWorkflowRuntimeForRoom(state.gitWorkflowRuntimeByRoom, roomId, (runtime) => ({
+          ...runtime,
+          actions: {
+            ...runtime.actions,
+            events: [...roomEvents, event].slice(-50)
+          }
         }))
       };
     });
   },
   setGitWorkflowMessageForRoom: (roomId, message) => {
     set((state) => ({
-      gitWorkflowByRoom: updateGitWorkflowForRoom(state.gitWorkflowByRoom, roomId, (roomWorkflow) => ({
-        ...roomWorkflow,
-        message
+      gitWorkflowRuntimeByRoom: updateGitWorkflowRuntimeForRoom(state.gitWorkflowRuntimeByRoom, roomId, (runtime) => ({
+        ...runtime,
+        workflow: {
+          ...runtime.workflow,
+          message
+        }
       }))
     }));
   },
   setGitStatusForRoom: (roomId, status) => {
     set((state) => ({
-      gitWorkflowByRoom: updateGitWorkflowForRoom(state.gitWorkflowByRoom, roomId, (roomWorkflow) => ({
-        ...roomWorkflow,
-        status
+      gitWorkflowRuntimeByRoom: updateGitWorkflowRuntimeForRoom(state.gitWorkflowRuntimeByRoom, roomId, (runtime) => ({
+        ...runtime,
+        workflow: {
+          ...runtime.workflow,
+          status
+        }
       }))
     }));
   },
   editGitWorkflowDraftForRoom: (roomId, patch) => {
     set((state) => {
-      const draftByRoom = state.gitWorkflowByRoom[roomId]?.draft
-        ? { [roomId]: state.gitWorkflowByRoom[roomId].draft }
+      const draftByRoom = state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.draft
+        ? { [roomId]: state.gitWorkflowRuntimeByRoom[roomId].workflow.draft }
         : {};
       const nextDraft = updateGitWorkflowDraftRecord(draftByRoom, roomId, patch)[roomId];
       return {
-        gitWorkflowByRoom: updateGitWorkflowForRoom(state.gitWorkflowByRoom, roomId, (roomWorkflow) => ({
-          ...roomWorkflow,
-          draft: nextDraft
+        gitWorkflowRuntimeByRoom: updateGitWorkflowRuntimeForRoom(state.gitWorkflowRuntimeByRoom, roomId, (runtime) => ({
+          ...runtime,
+          workflow: {
+            ...runtime.workflow,
+            draft: nextDraft
+          }
         }))
       };
     });
@@ -243,8 +295,8 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
   applyInferredGitHubRemoteForRoom: (roomId, remote) => {
     let applied = false;
     set((state) => {
-      const draftByRoom = state.gitWorkflowByRoom[roomId]?.draft
-        ? { [roomId]: state.gitWorkflowByRoom[roomId].draft }
+      const draftByRoom = state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.draft
+        ? { [roomId]: state.gitWorkflowRuntimeByRoom[roomId].workflow.draft }
         : {};
       const currentDraft = updateGitWorkflowDraftRecord(draftByRoom, roomId, {})[roomId];
       const isDefaultTarget =
@@ -260,9 +312,12 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
         prRepo: remote.repo
       })[roomId];
       return {
-        gitWorkflowByRoom: updateGitWorkflowForRoom(state.gitWorkflowByRoom, roomId, (roomWorkflow) => ({
-          ...roomWorkflow,
-          draft: nextDraft
+        gitWorkflowRuntimeByRoom: updateGitWorkflowRuntimeForRoom(state.gitWorkflowRuntimeByRoom, roomId, (runtime) => ({
+          ...runtime,
+          workflow: {
+            ...runtime.workflow,
+            draft: nextDraft
+          }
         }))
       };
     });

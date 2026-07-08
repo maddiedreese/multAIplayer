@@ -1,9 +1,20 @@
 import { useMemo } from "react";
 import { useAppStore } from "../store/appStore";
+import {
+  projectGitHubActionsByRoom,
+  projectGitWorkflowByRoom
+} from "../store/slices/gitWorkflowSlice";
 
 export function useGitHubWorkflowPanelState() {
-  const gitWorkflowByRoom = useAppStore((state) => state.gitWorkflowByRoom);
-  const githubActionsByRoom = useAppStore((state) => state.githubActionsByRoom);
+  const gitWorkflowRuntimeByRoom = useAppStore((state) => state.gitWorkflowRuntimeByRoom);
+  const gitWorkflowByRoom = useMemo(
+    () => projectGitWorkflowByRoom(gitWorkflowRuntimeByRoom),
+    [gitWorkflowRuntimeByRoom]
+  );
+  const githubActionsByRoom = useMemo(
+    () => projectGitHubActionsByRoom(gitWorkflowRuntimeByRoom),
+    [gitWorkflowRuntimeByRoom]
+  );
 
   const {
     gitStatusByRoom,

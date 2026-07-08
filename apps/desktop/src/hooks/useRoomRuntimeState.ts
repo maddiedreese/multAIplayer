@@ -4,7 +4,10 @@ import {
   projectInspectorTabsByRoom,
   projectPresenceByRoom
 } from "../store/slices/historyPresenceSlice";
-import { projectGitHubActionsEventsByRoom } from "../store/slices/gitWorkflowSlice";
+import {
+  projectGitHubActionsEventsByRoom,
+  projectGitWorkflowEventsByRoom
+} from "../store/slices/gitWorkflowSlice";
 import type { HostHandoffRecord } from "../types";
 
 function projectCodexRuntimeMaps(codexRuntimeByRoom: ReturnType<typeof useAppStore.getState>["codexRuntimeByRoom"]) {
@@ -30,21 +33,19 @@ export function useRoomRuntimeState() {
   const clearPresenceByRoom = useAppStore((state) => state.clearPresenceByRoom);
   const setRoomPresenceForDevice = useAppStore((state) => state.setRoomPresenceForDevice);
   const codexRuntimeByRoom = useAppStore((state) => state.codexRuntimeByRoom);
-  const gitWorkflowByRoom = useAppStore((state) => state.gitWorkflowByRoom);
-  const githubActionsByRoom = useAppStore((state) => state.githubActionsByRoom);
+  const gitWorkflowRuntimeByRoom = useAppStore((state) => state.gitWorkflowRuntimeByRoom);
   const historyPresenceMaps = useMemo(() => ({
     inspectorTabsByRoom: projectInspectorTabsByRoom(historyPresenceByRoom),
     presenceByRoom: projectPresenceByRoom(historyPresenceByRoom)
   }), [historyPresenceByRoom]);
   const codexRuntimeMaps = useMemo(() => projectCodexRuntimeMaps(codexRuntimeByRoom), [codexRuntimeByRoom]);
-  const gitWorkflowEventsByRoom = useMemo(() => Object.fromEntries(
-    Object.entries(gitWorkflowByRoom)
-      .filter(([, workflow]) => workflow.events)
-      .map(([roomId, workflow]) => [roomId, workflow.events ?? []])
-  ), [gitWorkflowByRoom]);
+  const gitWorkflowEventsByRoom = useMemo(
+    () => projectGitWorkflowEventsByRoom(gitWorkflowRuntimeByRoom),
+    [gitWorkflowRuntimeByRoom]
+  );
   const githubActionsEventsByRoom = useMemo(
-    () => projectGitHubActionsEventsByRoom(githubActionsByRoom),
-    [githubActionsByRoom]
+    () => projectGitHubActionsEventsByRoom(gitWorkflowRuntimeByRoom),
+    [gitWorkflowRuntimeByRoom]
   );
 
   return {
