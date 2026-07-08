@@ -415,7 +415,8 @@ export function useAppRoomRuntime({
         selectedTerminalId,
         selectedTerminalRunning: selectedRuntime.selectedTerminal?.running,
         clearTerminalSnapshots: terminalPanelState.clearTerminalSnapshots,
-        replaceTerminalSnapshotsForRoom: terminalPanelState.replaceTerminalSnapshotsForRoom,
+        clearTerminalSnapshotsForRoom: terminalPanelState.clearTerminalSnapshotsForRoom,
+        syncTerminalSnapshotsForRoom: terminalPanelState.syncTerminalSnapshotsForRoom,
         upsertTerminalSnapshot: terminalPanelState.upsertTerminalSnapshot,
         setTerminalErrorForRoom
       },

@@ -1009,7 +1009,7 @@ test("desktop store exposes host handoff actions", () => {
 test("desktop store keeps terminal panel state room scoped", () => {
   const store = useAppStore.getState();
 
-  store.initializeTerminalLinesByRoom({
+  store.seedInitialTerminalLines({
     "room-a": ["system $ npm run dev", "stdout Ready"],
     "room-b": ["system $ git status"]
   });
@@ -1268,7 +1268,7 @@ test("desktop store clears local room-scoped state", () => {
   store.setProjectFilesForRoom("room-b", []);
   store.setSelectedTerminalIdForRoom("room-a", "terminal-a");
   store.setSelectedTerminalIdForRoom("room-b", "terminal-b");
-  store.replaceTerminalSnapshotsForRoom("room-a", [
+  store.syncTerminalSnapshotsForRoom("room-a", [
     {
       id: "terminal-a",
       roomId: "room-a",
@@ -1279,7 +1279,7 @@ test("desktop store clears local room-scoped state", () => {
       output: []
     }
   ]);
-  store.replaceTerminalSnapshotsForRoom("room-b", [
+  store.syncTerminalSnapshotsForRoom("room-b", [
     {
       id: "terminal-b",
       roomId: "room-b",
@@ -1427,7 +1427,7 @@ test("desktop store hydrates local room history through one room-scoped action",
   });
   store.setSelectedTerminalIdForRoom("room-a", "terminal-a");
   store.setSelectedTerminalIdForRoom("room-b", "terminal-b");
-  store.replaceTerminalSnapshotsForRoom("room-b", [
+  store.syncTerminalSnapshotsForRoom("room-b", [
     {
       id: "terminal-b",
       roomId: "room-b",

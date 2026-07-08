@@ -10,7 +10,8 @@ interface UseTerminalLifecycleOptions {
   selectedTerminalId: string | null;
   selectedTerminalRunning: boolean | undefined;
   clearTerminalSnapshots: () => void;
-  replaceTerminalSnapshotsForRoom: (roomId: string, snapshots: TerminalSnapshot[]) => void;
+  clearTerminalSnapshotsForRoom: (roomId: string) => void;
+  syncTerminalSnapshotsForRoom: (roomId: string, snapshots: TerminalSnapshot[]) => void;
   upsertTerminalSnapshot: (snapshot: TerminalSnapshot) => void;
   setTerminalErrorForRoom: (roomId: string, message: string | null) => void;
 }
@@ -22,7 +23,8 @@ export function useTerminalLifecycle({
   selectedTerminalId,
   selectedTerminalRunning,
   clearTerminalSnapshots,
-  replaceTerminalSnapshotsForRoom,
+  clearTerminalSnapshotsForRoom,
+  syncTerminalSnapshotsForRoom,
   upsertTerminalSnapshot,
   setTerminalErrorForRoom
 }: UseTerminalLifecycleOptions) {
@@ -35,7 +37,7 @@ export function useTerminalLifecycle({
     }
     const roomId = selectedRoomId;
     if (!canReadLocalWorkspace) {
-      replaceTerminalSnapshotsForRoom(roomId, []);
+      clearTerminalSnapshotsForRoom(roomId);
       setSelectedTerminalIdForRoom(roomId, null);
       return;
     }
@@ -47,7 +49,7 @@ export function useTerminalLifecycle({
           useAppStore.getState().terminals.filter((terminal) => terminal.roomId === roomId),
           snapshots
         );
-        replaceTerminalSnapshotsForRoom(roomId, mergedSnapshots);
+        syncTerminalSnapshotsForRoom(roomId, mergedSnapshots);
         const currentTerminalId = useAppStore.getState().selectedTerminalIdsByRoom[roomId] ?? null;
         const nextTerminalId = currentTerminalId && mergedSnapshots.some((terminal) => terminal.id === currentTerminalId)
           ? currentTerminalId
@@ -60,7 +62,7 @@ export function useTerminalLifecycle({
     return () => {
       cancelled = true;
     };
-  }, [canReadLocalWorkspace, clearTerminalSnapshots, hasSelectedRoom, replaceTerminalSnapshotsForRoom, selectedRoomId, setSelectedTerminalIdForRoom]);
+  }, [canReadLocalWorkspace, clearTerminalSnapshots, clearTerminalSnapshotsForRoom, hasSelectedRoom, selectedRoomId, setSelectedTerminalIdForRoom, syncTerminalSnapshotsForRoom]);
 
   useEffect(() => {
     if (!canReadLocalWorkspace || !selectedTerminalId || !selectedTerminalRunning) return;

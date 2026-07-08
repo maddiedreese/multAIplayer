@@ -7,11 +7,12 @@ export function useTerminalPanelState({
   initialTerminalLinesByRoom: Record<string, string[]>;
 }) {
   const terminalLinesByRoom = useAppStore((state) => state.terminalLinesByRoom);
-  const initializeTerminalLinesByRoom = useAppStore((state) => state.initializeTerminalLinesByRoom);
+  const seedInitialTerminalLines = useAppStore((state) => state.seedInitialTerminalLines);
   const terminalBusyByRoom = useAppStore((state) => state.terminalBusyByRoom);
   const terminals = useAppStore((state) => state.terminals);
   const clearTerminalSnapshots = useAppStore((state) => state.clearTerminalSnapshots);
-  const replaceTerminalSnapshotsForRoom = useAppStore((state) => state.replaceTerminalSnapshotsForRoom);
+  const clearTerminalSnapshotsForRoom = useAppStore((state) => state.clearTerminalSnapshotsForRoom);
+  const syncTerminalSnapshotsForRoom = useAppStore((state) => state.syncTerminalSnapshotsForRoom);
   const upsertTerminalSnapshot = useAppStore((state) => state.upsertTerminalSnapshot);
   const terminalRequestsByRoom = useAppStore((state) => state.terminalRequestsByRoom);
   const selectedTerminalIdsByRoom = useAppStore((state) => state.selectedTerminalIdsByRoom);
@@ -19,15 +20,16 @@ export function useTerminalPanelState({
   const terminalAutoOpenedRoomsRef = useRef<Set<string>>(new Set());
 
   useLayoutEffect(() => {
-    initializeTerminalLinesByRoom(initialTerminalLinesByRoom);
-  }, [initialTerminalLinesByRoom, initializeTerminalLinesByRoom]);
+    seedInitialTerminalLines(initialTerminalLinesByRoom);
+  }, [initialTerminalLinesByRoom, seedInitialTerminalLines]);
 
   return {
     terminalLinesByRoom,
     terminalBusyByRoom,
     terminals,
     clearTerminalSnapshots,
-    replaceTerminalSnapshotsForRoom,
+    clearTerminalSnapshotsForRoom,
+    syncTerminalSnapshotsForRoom,
     upsertTerminalSnapshot,
     terminalRequestsByRoom,
     selectedTerminalIdsByRoom,

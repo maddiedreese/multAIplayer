@@ -38,9 +38,10 @@ export interface TerminalSlice {
   selectedTerminalIdsByRoom: SelectedTerminalIdsByRoom;
   terminalUiByRoom: TerminalUiByRoom;
   clearTerminalSnapshots: () => void;
-  replaceTerminalSnapshotsForRoom: (roomId: string, snapshots: Terminals) => void;
+  clearTerminalSnapshotsForRoom: (roomId: string) => void;
+  syncTerminalSnapshotsForRoom: (roomId: string, snapshots: Terminals) => void;
   upsertTerminalSnapshot: (snapshot: TerminalSnapshot) => void;
-  initializeTerminalLinesByRoom: (linesByRoom: TerminalLinesByRoom) => void;
+  seedInitialTerminalLines: (linesByRoom: TerminalLinesByRoom) => void;
   setTerminalBusyForRoom: (roomId: string, busy: boolean) => void;
   appendTerminalRequest: (roomId: string, request: TerminalCommandRequest) => void;
   updateTerminalRequestStatus: (roomId: string, requestId: string, status: TerminalCommandRequest["status"]) => void;
@@ -74,7 +75,12 @@ export const createTerminalSlice: StateCreator<AppStoreState, [], [], TerminalSl
   clearTerminalSnapshots: () => {
     set({ terminals: [] });
   },
-  replaceTerminalSnapshotsForRoom: (roomId, snapshots) => {
+  clearTerminalSnapshotsForRoom: (roomId) => {
+    set((state) => ({
+      terminals: replaceRoomTerminalSnapshots(state.terminals, roomId, [])
+    }));
+  },
+  syncTerminalSnapshotsForRoom: (roomId, snapshots) => {
     set((state) => ({
       terminals: replaceRoomTerminalSnapshots(state.terminals, roomId, snapshots)
     }));
@@ -84,7 +90,7 @@ export const createTerminalSlice: StateCreator<AppStoreState, [], [], TerminalSl
       terminals: upsertTerminal(state.terminals, snapshot)
     }));
   },
-  initializeTerminalLinesByRoom: (linesByRoom) => {
+  seedInitialTerminalLines: (linesByRoom) => {
     if (Object.keys(linesByRoom).length === 0) return;
     set((state) => (
       Object.keys(state.terminalLinesByRoom).length === 0
