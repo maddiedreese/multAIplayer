@@ -8,6 +8,7 @@ export function useCodexRoomState() {
   const roomState = useMemo(() => projectCodexRuntimeMaps(codexRuntimeByRoom), [codexRuntimeByRoom]);
 
   return {
+    codexRuntimeByRoom,
     ...roomState
   };
 }

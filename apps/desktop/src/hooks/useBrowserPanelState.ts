@@ -8,6 +8,7 @@ export function useBrowserPanelState() {
   const browserMaps = useMemo(() => projectBrowserPanelMaps(browserByRoom), [browserByRoom]);
 
   return {
+    browserByRoom,
     ...browserMaps
   };
 }

@@ -17,6 +17,7 @@ export function useFilePanelState() {
   } = useMemo(() => projectFilePanelMaps(filePanelByRoom), [filePanelByRoom]);
 
   return {
+    filePanelByRoom,
     fileQueriesByRoom,
     projectFilesByRoom,
     selectedFilesByRoom,

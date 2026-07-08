@@ -19,6 +19,7 @@ export function useGitHubWorkflowPanelState() {
   );
 
   return {
+    gitWorkflowRuntimeByRoom,
     gitStatusByRoom,
     gitWorkflowBusyByRoom,
     gitWorkflowMessagesByRoom,

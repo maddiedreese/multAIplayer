@@ -40,6 +40,7 @@ export function useTerminalPanelState({
   }, [initialTerminalLinesByRoom, seedInitialTerminalLines]);
 
   return {
+    terminalRuntimeByRoom,
     terminalLinesByRoom,
     terminalBusyByRoom,
     terminals,

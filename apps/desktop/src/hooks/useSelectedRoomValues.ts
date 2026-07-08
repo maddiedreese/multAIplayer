@@ -1,27 +1,20 @@
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { defaultCodexModel } from "@multaiplayer/protocol";
-import type { GitHubActionRun } from "../lib/authClient";
-import type {
-  GitDiffResult,
-  GitStatusSummary,
-  ProjectFileContent,
-  ProjectFileEntry
-} from "../lib/localBackend";
-import { resolveFilePreviewTab, type FilePreviewTab } from "../lib/filePreview";
-import { resolveGitWorkflowDraft, type GitWorkflowDraft } from "../lib/gitWorkflowDraft";
+import { resolveFilePreviewTab } from "../lib/filePreview";
+import { resolveGitWorkflowDraft } from "../lib/gitWorkflowDraft";
 import { embeddedAttachmentBytes } from "../lib/appFormatters";
+import type { BrowserByRoom } from "../store/slices/browserSlice";
+import type { CodexRuntimeByRoom } from "../store/slices/codexHostHandoffSlice";
+import type { FilePanelByRoom } from "../store/slices/filePanelSlice";
+import type { GitWorkflowRuntimeByRoom } from "../store/slices/gitWorkflowSlice";
+import type { InviteByRoom } from "../store/slices/inviteSlice";
+import type { RoomChatByRoom } from "../store/slices/roomChatSlice";
+import type { RoomSettingsByRoom } from "../store/slices/roomSettingsSlice";
+import type { TerminalRuntimeByRoom, TerminalRoomUiState } from "../store/slices/terminalSlice";
 import type {
-  TerminalUiByRoom,
-  TerminalRoomUiState
-} from "../store/slices/terminalSlice";
-import type {
-  BrowserAccessRequest,
   ChatAttachment,
   ChatMessage,
-  InviteJoinRequest,
-  MarkdownCopyFallback,
-  RoomGoal,
-  TerminalCommandRequest
+  MarkdownCopyFallback
 } from "../types";
 
 interface UseSelectedRoomValuesOptions {
@@ -30,44 +23,17 @@ interface UseSelectedRoomValuesOptions {
   selectedTeam: string;
   selectedMessageIds: string[];
   markdownSelectionMode: boolean;
-  customCodexModelsByRoom: Record<string, string>;
-  projectPathDraftsByRoom: Record<string, string>;
+  roomSettingsByRoom: RoomSettingsByRoom;
   messagesByRoom: Record<string, ChatMessage[]>;
-  draftsByRoom: Record<string, string>;
-  pendingAttachmentsByRoom: Record<string, ChatAttachment[]>;
-  roomGoalsByRoom: Record<string, RoomGoal>;
-  browserRequestsByRoom: Record<string, BrowserAccessRequest[]>;
-  browserUrlsByRoom: Record<string, string>;
-  browserReasonsByRoom: Record<string, string>;
-  activeBrowserUrlsByRoom: Record<string, string | null>;
-  gitStatusByRoom: Record<string, GitStatusSummary | null>;
-  gitWorkflowDraftsByRoom: Record<string, Partial<GitWorkflowDraft>>;
-  gitWorkflowBusyByRoom: Record<string, boolean>;
-  gitWorkflowMessagesByRoom: Record<string, string | null>;
-  actionRunsByRoom: Record<string, GitHubActionRun[]>;
-  actionsBusyByRoom: Record<string, boolean>;
-  actionsLastCheckedByRoom: Record<string, string | null>;
-  actionsMessagesByRoom: Record<string, string | null>;
-  terminalLinesByRoom: Record<string, string[]>;
-  terminalBusyByRoom: Record<string, boolean>;
-  selectedTerminalIdsByRoom: Record<string, string | null>;
-  terminalUiByRoom: TerminalUiByRoom;
-  fileQueriesByRoom: Record<string, string>;
-  projectFilesByRoom: Record<string, ProjectFileEntry[]>;
-  selectedFilesByRoom: Record<string, ProjectFileContent | null>;
-  selectedDiffsByRoom: Record<string, GitDiffResult | null>;
-  filePreviewTabsByRoom: Record<string, FilePreviewTab>;
-  fileBusyByRoom: Record<string, boolean>;
-  fileMessagesByRoom: Record<string, string | null>;
-  inviteLinksByRoom: Record<string, string>;
-  inviteApprovalGatesByRoom: Record<string, boolean>;
-  inviteMessagesByRoom: Record<string, string | null>;
-  hostMessagesByRoom: Record<string, string | null>;
-  chatMessagesByRoom: Record<string, string | null>;
-  settingsMessagesByRoom: Record<string, string | null>;
+  roomChatByRoom: RoomChatByRoom;
+  codexRuntimeByRoom: CodexRuntimeByRoom;
+  browserByRoom: BrowserByRoom;
+  gitWorkflowRuntimeByRoom: GitWorkflowRuntimeByRoom;
+  terminalRuntimeByRoom: TerminalRuntimeByRoom;
+  filePanelByRoom: FilePanelByRoom;
+  inviteByRoom: InviteByRoom;
   historyMessagesByRoom: Record<string, string | null>;
   teamHistoryMessagesByTeam: Record<string, string | null>;
-  markdownCopyFallbacksByRoom: Record<string, MarkdownCopyFallback | null>;
   defaultBrowserUrl: string;
   defaultBrowserReason: string;
 }
@@ -78,105 +44,90 @@ export function useSelectedRoomValues({
   selectedTeam,
   selectedMessageIds,
   markdownSelectionMode,
-  customCodexModelsByRoom,
-  projectPathDraftsByRoom,
+  roomSettingsByRoom,
   messagesByRoom,
-  draftsByRoom,
-  pendingAttachmentsByRoom,
-  roomGoalsByRoom,
-  browserRequestsByRoom,
-  browserUrlsByRoom,
-  browserReasonsByRoom,
-  activeBrowserUrlsByRoom,
-  gitStatusByRoom,
-  gitWorkflowDraftsByRoom,
-  gitWorkflowBusyByRoom,
-  gitWorkflowMessagesByRoom,
-  actionRunsByRoom,
-  actionsBusyByRoom,
-  actionsLastCheckedByRoom,
-  actionsMessagesByRoom,
-  terminalLinesByRoom,
-  terminalBusyByRoom,
-  selectedTerminalIdsByRoom,
-  terminalUiByRoom,
-  fileQueriesByRoom,
-  projectFilesByRoom,
-  selectedFilesByRoom,
-  selectedDiffsByRoom,
-  filePreviewTabsByRoom,
-  fileBusyByRoom,
-  fileMessagesByRoom,
-  inviteLinksByRoom,
-  inviteApprovalGatesByRoom,
-  inviteMessagesByRoom,
-  hostMessagesByRoom,
-  chatMessagesByRoom,
-  settingsMessagesByRoom,
+  roomChatByRoom,
+  codexRuntimeByRoom,
+  browserByRoom,
+  gitWorkflowRuntimeByRoom,
+  terminalRuntimeByRoom,
+  filePanelByRoom,
+  inviteByRoom,
   historyMessagesByRoom,
   teamHistoryMessagesByTeam,
-  markdownCopyFallbacksByRoom,
   defaultBrowserUrl,
   defaultBrowserReason
 }: UseSelectedRoomValuesOptions) {
   const roomId = selectedRoom.id ?? selectedRoomId;
   const selectedCodexModel = selectedRoom.codexModel ?? defaultCodexModel;
   const messages = messagesByRoom[roomId] ?? [];
-  const selectedDiff = selectedDiffsByRoom[roomId] ?? null;
+  const roomSettings = roomSettingsByRoom[roomId] ?? {};
+  const roomChat = roomChatByRoom[roomId] ?? {};
+  const codexRuntime = codexRuntimeByRoom[roomId] ?? {};
+  const browser = browserByRoom[roomId] ?? {};
+  const gitRuntime = gitWorkflowRuntimeByRoom[roomId] ?? {};
+  const gitWorkflow = gitRuntime.workflow ?? {};
+  const githubActions = gitRuntime.actions ?? {};
+  const terminalRuntime = terminalRuntimeByRoom[roomId] ?? {};
+  const filePanel = filePanelByRoom[roomId] ?? {};
+  const invite = inviteByRoom[roomId] ?? {};
+  const selectedDiff = filePanel.selectedDiff ?? null;
   const historyMessage = historyMessagesByRoom[roomId] ?? null;
   const teamHistoryMessage = teamHistoryMessagesByTeam[selectedTeam || "__no-team"] ?? null;
-  const terminalUi: TerminalRoomUiState = terminalUiByRoom[roomId] ?? {};
+  const terminalUi: TerminalRoomUiState = terminalRuntime.ui ?? {};
+  const pendingAttachments: ChatAttachment[] = roomChat.pendingAttachments ?? [];
+  const markdownCopyFallback: MarkdownCopyFallback | null = filePanel.markdownCopyFallback ?? null;
 
   return {
     selectedCodexModel,
-    customCodexModel: customCodexModelsByRoom[roomId] ?? selectedCodexModel,
-    projectPathDraft: projectPathDraftsByRoom[roomId] ?? selectedRoom.projectPath,
+    customCodexModel: roomSettings.customCodexModel ?? selectedCodexModel,
+    projectPathDraft: roomSettings.projectPathDraft ?? selectedRoom.projectPath,
     messages,
-    draft: draftsByRoom[roomId] ?? "",
+    draft: roomChat.draft ?? "",
     selectedMessages: markdownSelectionMode
       ? messages.filter((message) => selectedMessageIds.includes(message.id))
       : [],
-    pendingAttachments: pendingAttachmentsByRoom[roomId] ?? [],
-    roomGoal: roomGoalsByRoom[roomId] ?? null,
-    pendingAttachmentBytes: embeddedAttachmentBytes(pendingAttachmentsByRoom[roomId] ?? []),
-    browserRequests: browserRequestsByRoom[roomId] ?? [],
-    browserUrl: browserUrlsByRoom[roomId] ?? defaultBrowserUrl,
-    browserReason: browserReasonsByRoom[roomId] ?? defaultBrowserReason,
-    activeBrowserUrl: activeBrowserUrlsByRoom[roomId] ?? null,
-    gitStatus: gitStatusByRoom[roomId] ?? null,
-    gitWorkflowDraft: resolveGitWorkflowDraft(gitWorkflowDraftsByRoom, roomId),
-    gitWorkflowBusy: gitWorkflowBusyByRoom[roomId] ?? false,
-    gitWorkflowMessage: gitWorkflowMessagesByRoom[roomId] ?? null,
-    actionRuns: actionRunsByRoom[roomId] ?? [],
-    actionsBusy: actionsBusyByRoom[roomId] ?? false,
-    actionsLastChecked: actionsLastCheckedByRoom[roomId] ?? null,
-    actionsMessage: actionsMessagesByRoom[roomId] ?? null,
-    terminalLines: terminalLinesByRoom[roomId] ?? [],
-    terminalBusy: terminalBusyByRoom[roomId] ?? false,
-    selectedTerminalId: selectedTerminalIdsByRoom[roomId] ?? null,
+    pendingAttachments,
+    roomGoal: codexRuntime.goal ?? null,
+    pendingAttachmentBytes: embeddedAttachmentBytes(pendingAttachments),
+    browserRequests: browser.requests ?? [],
+    browserUrl: browser.url ?? defaultBrowserUrl,
+    browserReason: browser.reason ?? defaultBrowserReason,
+    activeBrowserUrl: browser.activeUrl ?? null,
+    gitStatus: gitWorkflow.status ?? null,
+    gitWorkflowDraft: resolveGitWorkflowDraft({ [roomId]: gitWorkflow.draft ?? {} }, roomId),
+    gitWorkflowBusy: gitWorkflow.busy ?? false,
+    gitWorkflowMessage: gitWorkflow.message ?? null,
+    actionRuns: githubActions.runs ?? [],
+    actionsBusy: githubActions.busy ?? false,
+    actionsLastChecked: githubActions.lastChecked ?? null,
+    actionsMessage: githubActions.message ?? null,
+    terminalLines: terminalRuntime.lines ?? [],
+    terminalBusy: terminalRuntime.busy ?? false,
+    selectedTerminalId: terminalRuntime.selectedTerminalId ?? null,
     terminalName: terminalUi.name ?? "dev-server",
     terminalCommand: terminalUi.command ?? "npm run dev:desktop",
     terminalInput: terminalUi.input ?? "",
     terminalError: terminalUi.error ?? null,
-    fileQuery: fileQueriesByRoom[roomId] ?? "",
-    projectFiles: projectFilesByRoom[roomId] ?? [],
-    selectedFile: selectedFilesByRoom[roomId] ?? null,
+    fileQuery: filePanel.query ?? "",
+    projectFiles: filePanel.projectFiles ?? [],
+    selectedFile: filePanel.selectedFile ?? null,
     selectedDiff,
     filePreviewTab: resolveFilePreviewTab(
-      filePreviewTabsByRoom[roomId] ?? "file",
+      filePanel.previewTab ?? "file",
       Boolean(selectedDiff?.diff.trim())
     ),
-    fileBusy: fileBusyByRoom[roomId] ?? false,
-    fileMessage: fileMessagesByRoom[roomId] ?? null,
-    inviteLink: inviteLinksByRoom[roomId] ?? "",
-    inviteApprovalGate: inviteApprovalGatesByRoom[roomId] ?? false,
-    inviteMessage: inviteMessagesByRoom[roomId] ?? null,
-    hostMessage: hostMessagesByRoom[roomId] ?? null,
-    chatMessage: chatMessagesByRoom[roomId] ?? null,
-    settingsMessage: settingsMessagesByRoom[roomId] ?? null,
+    fileBusy: filePanel.busy ?? false,
+    fileMessage: filePanel.message ?? null,
+    inviteLink: invite.link ?? "",
+    inviteApprovalGate: invite.approvalGate ?? false,
+    inviteMessage: invite.message ?? null,
+    hostMessage: roomSettings.hostMessage ?? null,
+    chatMessage: roomChat.message ?? null,
+    settingsMessage: roomSettings.settingsMessage ?? null,
     historyMessage,
     teamHistoryMessage,
     visibleHistoryMessage: historyMessage ?? teamHistoryMessage,
-    markdownCopyFallback: markdownCopyFallbacksByRoom[roomId] ?? null
+    markdownCopyFallback
   };
 }
