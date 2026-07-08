@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import type { RoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
 import type { ChatMessage, SidebarPanel } from "../types";
 import { useAppStore } from "../store/appStore";
@@ -45,6 +45,16 @@ export function useWorkspaceUiState({
   const [selectedRoomId, setSelectedRoomId] = useState(initialRoomId);
   const [sidebarQuery, setSidebarQuery] = useState("");
   const messagesByRoom = useAppStore((state) => state.messagesByRoom);
+  const updateTeamRoleForTeam = useCallback((teamId: string, role: TeamRecord["role"] | undefined) => {
+    setTeams((current) => current.map((team) =>
+      team.id === teamId ? { ...team, role: role ?? team.role } : team
+    ));
+  }, []);
+  const updateTeamMemberCountForTeam = useCallback((teamId: string, members: number) => {
+    setTeams((current) => current.map((team) =>
+      team.id === teamId ? { ...team, members } : team
+    ));
+  }, []);
 
   useLayoutEffect(() => {
     seedWorkspaceInitialDataIfEmpty({
@@ -56,6 +66,8 @@ export function useWorkspaceUiState({
   return {
     teams,
     setTeams,
+    updateTeamRoleForTeam,
+    updateTeamMemberCountForTeam,
     rooms,
     setRooms,
     teamMembersByTeam,

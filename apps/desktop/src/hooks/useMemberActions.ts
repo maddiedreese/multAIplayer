@@ -25,7 +25,8 @@ interface UseMemberActionsOptions {
   currentUser: SignedInUser | null;
   setDeviceIdentityMessage: (message: string | null) => void;
   setTrustedDeviceKeys: Dispatch<SetStateAction<TrustedDeviceKey[]>>;
-  setTeams: Dispatch<SetStateAction<TeamRecord[]>>;
+  updateTeamRoleForTeam: (teamId: string, role: TeamRecord["role"] | undefined) => void;
+  updateTeamMemberCountForTeam: (teamId: string, members: number) => void;
   copyMarkdownWithFallback: (
     title: string,
     markdown: string,
@@ -43,7 +44,8 @@ export function useMemberActions({
   currentUser,
   setDeviceIdentityMessage,
   setTrustedDeviceKeys,
-  setTeams,
+  updateTeamRoleForTeam,
+  updateTeamMemberCountForTeam,
   copyMarkdownWithFallback
 }: UseMemberActionsOptions) {
   const setTeamMembersForTeam = useAppStore((state) => state.setTeamMembersForTeam);
@@ -111,9 +113,7 @@ export function useMemberActions({
       const members = await transferTeamOwnership(selectedTeam, member.userId);
       setTeamMembersForTeam(selectedTeam, members);
       const localMember = members.find((item) => item.userId === localUser.id);
-      setTeams((current) => current.map((team) =>
-        team.id === selectedTeam ? { ...team, role: localMember?.role ?? team.role } : team
-      ));
+      updateTeamRoleForTeam(selectedTeam, localMember?.role);
       setTeamMembersMessageForTeam(selectedTeam, `${formatTeamMemberName(member.userId, currentUser)} is now the team owner.`);
     } catch (error) {
       setTeamMembersMessageForTeam(selectedTeam, String(error));
@@ -129,7 +129,7 @@ export function useMemberActions({
     try {
       const members = await removeTeamMember(selectedTeam, member.userId);
       setTeamMembersForTeam(selectedTeam, members);
-      setTeams((current) => current.map((team) => team.id === selectedTeam ? { ...team, members: members.length } : team));
+      updateTeamMemberCountForTeam(selectedTeam, members.length);
       setTeamMembersMessageForTeam(selectedTeam, `Removed ${formatTeamMemberName(member.userId, currentUser)} from ${selectedTeamName}.`);
     } catch (error) {
       setTeamMembersMessageForTeam(selectedTeam, String(error));
