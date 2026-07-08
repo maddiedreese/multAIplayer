@@ -72,7 +72,7 @@ test("desktop store exposes room busy actions", () => {
   assert.equal(state.hostBusyByRoom["room-a"], true);
   assert.equal(state.settingsBusyByRoom["room-a"], true);
   assert.equal(state.keyRotationBusyByRoom["room-a"], true);
-  assert.equal(state.fileBusyByRoom["room-a"], true);
+  assert.equal(state.filePanelByRoom["room-a"]?.busy, true);
   assert.equal(state.terminalBusyByRoom["room-a"], true);
 });
 
@@ -286,16 +286,16 @@ test("desktop store keeps file panel state room scoped", () => {
   });
 
   const state = useAppStore.getState();
-  assert.equal(state.fileQueriesByRoom["room-b"], ".env");
-  assert.equal(state.projectFilesByRoom["room-a"]?.[1]?.path, "apps/desktop/src/App.tsx");
-  assert.equal(state.selectedFilesByRoom["room-a"]?.content, "# multAIplayer");
-  assert.equal(state.selectedFilesByRoom["room-b"], undefined);
-  assert.equal(state.selectedDiffsByRoom["room-a"]?.path, "README.md");
-  assert.equal(state.filePreviewTabsByRoom["room-a"], "diff");
-  assert.equal(state.fileBusyByRoom["room-a"], true);
-  assert.equal(state.fileMessagesByRoom["room-a"], "Loaded README.md");
-  assert.equal(state.fileMessagesByRoom["room-b"], undefined);
-  assert.equal(state.markdownCopyFallbacksByRoom["room-a"]?.title, "README.md");
+  assert.equal(state.filePanelByRoom["room-b"]?.query, ".env");
+  assert.equal(state.filePanelByRoom["room-a"]?.projectFiles?.[1]?.path, "apps/desktop/src/App.tsx");
+  assert.equal(state.filePanelByRoom["room-a"]?.selectedFile?.content, "# multAIplayer");
+  assert.equal(state.filePanelByRoom["room-b"]?.selectedFile, undefined);
+  assert.equal(state.filePanelByRoom["room-a"]?.selectedDiff?.path, "README.md");
+  assert.equal(state.filePanelByRoom["room-a"]?.previewTab, "diff");
+  assert.equal(state.filePanelByRoom["room-a"]?.busy, true);
+  assert.equal(state.filePanelByRoom["room-a"]?.message, "Loaded README.md");
+  assert.equal(state.filePanelByRoom["room-b"]?.message, undefined);
+  assert.equal(state.filePanelByRoom["room-a"]?.markdownCopyFallback?.title, "README.md");
 });
 
 test("desktop store exposes room file panel actions", () => {
@@ -321,14 +321,11 @@ test("desktop store exposes room file panel actions", () => {
   store.resetFileContextForRoom("room-a");
 
   const state = useAppStore.getState();
-  assert.equal(state.fileQueriesByRoom["room-a"], undefined);
-  assert.equal(state.projectFilesByRoom["room-a"], undefined);
-  assert.equal(state.selectedFilesByRoom["room-a"], undefined);
-  assert.equal(state.selectedDiffsByRoom["room-a"], undefined);
-  assert.equal(state.fileBusyByRoom["room-a"], undefined);
-  assert.equal(state.fileMessagesByRoom["room-a"], undefined);
-  assert.equal(state.fileQueriesByRoom["room-b"], "LICENSE");
-  assert.equal(state.filePreviewTabsByRoom["room-b"], undefined);
+  assert.deepEqual(state.filePanelByRoom["room-a"], {
+    previewTab: "diff"
+  });
+  assert.equal(state.filePanelByRoom["room-b"]?.query, "LICENSE");
+  assert.equal(state.filePanelByRoom["room-b"]?.previewTab, undefined);
 });
 
 test("desktop store keeps room settings state room scoped", () => {
@@ -540,7 +537,7 @@ test("desktop store exposes room message actions", () => {
   let state = useAppStore.getState();
   assert.equal(state.hostMessagesByRoom["room-a"], "Host saved");
   assert.equal(state.chatMessagesByRoom["room-a"], "Message sent");
-  assert.equal(state.markdownCopyFallbacksByRoom["room-a"]?.title, "Selected messages");
+  assert.equal(state.filePanelByRoom["room-a"]?.markdownCopyFallback?.title, "Selected messages");
   assert.equal(state.secretWarningsVisibleByRoom["room-a"], true);
   assert.equal(state.historyMessagesByRoom["room-a"], "History saved");
   assert.equal(state.teamHistoryMessagesByTeam["team-a"], "Team defaults saved");
@@ -557,7 +554,7 @@ test("desktop store exposes room message actions", () => {
   state = useAppStore.getState();
   assert.equal("room-a" in state.hostMessagesByRoom, false);
   assert.equal("room-a" in state.chatMessagesByRoom, false);
-  assert.equal("room-a" in state.markdownCopyFallbacksByRoom, false);
+  assert.equal("room-a" in state.filePanelByRoom, false);
   assert.equal("room-a" in state.secretWarningsVisibleByRoom, false);
   assert.equal("room-a" in state.historyMessagesByRoom, false);
   assert.equal("team-a" in state.teamHistoryMessagesByTeam, false);
@@ -1246,7 +1243,7 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.gitWorkflowBusyByRoom["room-a"], undefined);
   assert.equal(state.hostMessagesByRoom["room-a"], undefined);
   assert.equal(state.secretWarningsVisibleByRoom["room-a"], undefined);
-  assert.equal(state.projectFilesByRoom["room-a"], undefined);
+  assert.equal(state.filePanelByRoom["room-a"], undefined);
   assert.equal(state.selectedTerminalIdsByRoom["room-a"], undefined);
   assert.equal(state.terminals.some((terminal) => terminal.roomId === "room-a"), false);
   assert.equal(state.browserUrlsByRoom["room-a"], undefined);

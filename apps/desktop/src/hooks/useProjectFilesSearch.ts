@@ -11,7 +11,7 @@ interface UseProjectFilesSearchOptions {
   canReadLocalWorkspace: boolean;
   selectedRoomId: string;
   selectedRoomProjectPath: string;
-  fileQueriesByRoom: Record<string, string>;
+  fileQuery: string;
   localWorkspaceMessage: string;
   setProjectFilesForRoom: (roomId: string, files: ProjectFileEntry[]) => void;
   setSelectedFileForRoom: (roomId: string, file: ProjectFileContent | null) => void;
@@ -25,7 +25,7 @@ export function useProjectFilesSearch({
   canReadLocalWorkspace,
   selectedRoomId,
   selectedRoomProjectPath,
-  fileQueriesByRoom,
+  fileQuery,
   localWorkspaceMessage,
   setProjectFilesForRoom,
   setSelectedFileForRoom,
@@ -48,7 +48,7 @@ export function useProjectFilesSearch({
     }
     let cancelled = false;
     setFileBusyForRoom(roomId, true);
-    searchProjectFiles(selectedRoomProjectPath, fileQueriesByRoom[roomId] ?? "", 80)
+    searchProjectFiles(selectedRoomProjectPath, fileQuery, 80)
       .then((files) => {
         if (cancelled) return;
         setProjectFilesForRoom(roomId, files);
@@ -63,5 +63,5 @@ export function useProjectFilesSearch({
     return () => {
       cancelled = true;
     };
-  }, [canReadLocalWorkspace, fileQueriesByRoom, hasSelectedRoom, localWorkspaceMessage, selectedRoomId, selectedRoomProjectPath]);
+  }, [canReadLocalWorkspace, fileQuery, hasSelectedRoom, localWorkspaceMessage, selectedRoomId, selectedRoomProjectPath]);
 }

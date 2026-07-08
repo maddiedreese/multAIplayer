@@ -5,24 +5,39 @@ import type { FilePreviewTab } from "../../lib/filePreview";
 import type { MarkdownCopyFallback } from "../../types";
 import type { AppStoreState } from "../appStore";
 
-type FileQueriesByRoom = Record<string, string>;
-type ProjectFilesByRoom = Record<string, ProjectFileEntry[]>;
-type SelectedFilesByRoom = Record<string, ProjectFileContent | null>;
-type SelectedDiffsByRoom = Record<string, GitDiffResult | null>;
-type FilePreviewTabsByRoom = Record<string, FilePreviewTab>;
-type FileBusyByRoom = Record<string, boolean>;
-type FileMessagesByRoom = Record<string, string | null>;
-type MarkdownCopyFallbacksByRoom = Record<string, MarkdownCopyFallback | null>;
+export interface FilePanelRoomState {
+  query?: string;
+  projectFiles?: ProjectFileEntry[];
+  selectedFile?: ProjectFileContent;
+  selectedDiff?: GitDiffResult;
+  previewTab?: FilePreviewTab;
+  busy?: boolean;
+  message?: string;
+  markdownCopyFallback?: MarkdownCopyFallback;
+}
+
+export type FilePanelByRoom = Record<string, FilePanelRoomState>;
+
+function shallowEqualFilePanelRoomState(left: FilePanelRoomState, right: FilePanelRoomState): boolean {
+  const leftKeys = Object.keys(left) as Array<keyof FilePanelRoomState>;
+  const rightKeys = Object.keys(right) as Array<keyof FilePanelRoomState>;
+  return leftKeys.length === rightKeys.length && leftKeys.every((key) => left[key] === right[key]);
+}
+
+function updateFilePanelForRoom(
+  current: FilePanelByRoom,
+  roomId: string,
+  update: (roomPanel: FilePanelRoomState) => FilePanelRoomState
+): FilePanelByRoom {
+  const currentRoomPanel = current[roomId] ?? {};
+  const nextRoomPanel = update(currentRoomPanel);
+  if (shallowEqualFilePanelRoomState(currentRoomPanel, nextRoomPanel)) return current;
+  if (Object.keys(nextRoomPanel).length === 0) return roomId in current ? omitRecordKey(current, roomId) : current;
+  return { ...current, [roomId]: nextRoomPanel };
+}
 
 export interface FilePanelSlice {
-  fileQueriesByRoom: FileQueriesByRoom;
-  projectFilesByRoom: ProjectFilesByRoom;
-  selectedFilesByRoom: SelectedFilesByRoom;
-  selectedDiffsByRoom: SelectedDiffsByRoom;
-  filePreviewTabsByRoom: FilePreviewTabsByRoom;
-  fileBusyByRoom: FileBusyByRoom;
-  fileMessagesByRoom: FileMessagesByRoom;
-  markdownCopyFallbacksByRoom: MarkdownCopyFallbacksByRoom;
+  filePanelByRoom: FilePanelByRoom;
   setFileBusyForRoom: (roomId: string, busy: boolean) => void;
   setFileQueryForRoom: (roomId: string, query: string) => void;
   setProjectFilesForRoom: (roomId: string, files: ProjectFileEntry[]) => void;
@@ -36,92 +51,91 @@ export interface FilePanelSlice {
 
 export const emptyFilePanelState: Pick<
   FilePanelSlice,
-  | "fileQueriesByRoom"
-  | "projectFilesByRoom"
-  | "selectedFilesByRoom"
-  | "selectedDiffsByRoom"
-  | "filePreviewTabsByRoom"
-  | "fileBusyByRoom"
-  | "fileMessagesByRoom"
-  | "markdownCopyFallbacksByRoom"
+  | "filePanelByRoom"
 > = {
-  fileQueriesByRoom: {},
-  projectFilesByRoom: {},
-  selectedFilesByRoom: {},
-  selectedDiffsByRoom: {},
-  filePreviewTabsByRoom: {},
-  fileBusyByRoom: {},
-  fileMessagesByRoom: {},
-  markdownCopyFallbacksByRoom: {}
+  filePanelByRoom: {}
 };
 
 export const createFilePanelSlice: StateCreator<AppStoreState, [], [], FilePanelSlice> = (set) => ({
   ...emptyFilePanelState,
   setFileBusyForRoom: (roomId, busy) => {
     set((state) => ({
-      fileBusyByRoom: busy
-        ? { ...state.fileBusyByRoom, [roomId]: true }
-        : omitRecordKey(state.fileBusyByRoom, roomId)
+      filePanelByRoom: updateFilePanelForRoom(state.filePanelByRoom, roomId, (roomPanel) => {
+        const { busy: _busy, ...rest } = roomPanel;
+        return busy ? { ...rest, busy: true } : rest;
+      })
     }));
   },
   setFileQueryForRoom: (roomId, query) => {
     set((state) => ({
-      fileQueriesByRoom: query
-        ? { ...state.fileQueriesByRoom, [roomId]: query }
-        : omitRecordKey(state.fileQueriesByRoom, roomId)
+      filePanelByRoom: updateFilePanelForRoom(state.filePanelByRoom, roomId, (roomPanel) => {
+        const { query: _query, ...rest } = roomPanel;
+        return query ? { ...rest, query } : rest;
+      })
     }));
   },
   setProjectFilesForRoom: (roomId, files) => {
     set((state) => ({
-      projectFilesByRoom: {
-        ...state.projectFilesByRoom,
-        [roomId]: files
-      }
+      filePanelByRoom: updateFilePanelForRoom(state.filePanelByRoom, roomId, (roomPanel) => ({
+        ...roomPanel,
+        projectFiles: files
+      }))
     }));
   },
   setSelectedFileForRoom: (roomId, file) => {
     set((state) => ({
-      selectedFilesByRoom: file
-        ? { ...state.selectedFilesByRoom, [roomId]: file }
-        : omitRecordKey(state.selectedFilesByRoom, roomId)
+      filePanelByRoom: updateFilePanelForRoom(state.filePanelByRoom, roomId, (roomPanel) => {
+        const { selectedFile: _selectedFile, ...rest } = roomPanel;
+        return file ? { ...rest, selectedFile: file } : rest;
+      })
     }));
   },
   setSelectedDiffForRoom: (roomId, diff) => {
     set((state) => ({
-      selectedDiffsByRoom: diff
-        ? { ...state.selectedDiffsByRoom, [roomId]: diff }
-        : omitRecordKey(state.selectedDiffsByRoom, roomId)
+      filePanelByRoom: updateFilePanelForRoom(state.filePanelByRoom, roomId, (roomPanel) => {
+        const { selectedDiff: _selectedDiff, ...rest } = roomPanel;
+        return diff ? { ...rest, selectedDiff: diff } : rest;
+      })
     }));
   },
   setFilePreviewTabForRoom: (roomId, tab) => {
     set((state) => ({
-      filePreviewTabsByRoom: tab === "file"
-        ? omitRecordKey(state.filePreviewTabsByRoom, roomId)
-        : { ...state.filePreviewTabsByRoom, [roomId]: tab }
+      filePanelByRoom: updateFilePanelForRoom(state.filePanelByRoom, roomId, (roomPanel) => {
+        const { previewTab: _previewTab, ...rest } = roomPanel;
+        return tab === "file" ? rest : { ...rest, previewTab: tab };
+      })
     }));
   },
   setFileMessageForRoom: (roomId, message) => {
     set((state) => ({
-      fileMessagesByRoom: message
-        ? { ...state.fileMessagesByRoom, [roomId]: message }
-        : omitRecordKey(state.fileMessagesByRoom, roomId)
+      filePanelByRoom: updateFilePanelForRoom(state.filePanelByRoom, roomId, (roomPanel) => {
+        const { message: _message, ...rest } = roomPanel;
+        return message ? { ...rest, message } : rest;
+      })
     }));
   },
   setMarkdownCopyFallbackForRoom: (roomId, fallback) => {
     set((state) => ({
-      markdownCopyFallbacksByRoom: fallback
-        ? { ...state.markdownCopyFallbacksByRoom, [roomId]: fallback }
-        : omitRecordKey(state.markdownCopyFallbacksByRoom, roomId)
+      filePanelByRoom: updateFilePanelForRoom(state.filePanelByRoom, roomId, (roomPanel) => {
+        const { markdownCopyFallback: _markdownCopyFallback, ...rest } = roomPanel;
+        return fallback ? { ...rest, markdownCopyFallback: fallback } : rest;
+      })
     }));
   },
   resetFileContextForRoom: (roomId) => {
     set((state) => ({
-      selectedFilesByRoom: omitRecordKey(state.selectedFilesByRoom, roomId),
-      selectedDiffsByRoom: omitRecordKey(state.selectedDiffsByRoom, roomId),
-      fileQueriesByRoom: omitRecordKey(state.fileQueriesByRoom, roomId),
-      projectFilesByRoom: omitRecordKey(state.projectFilesByRoom, roomId),
-      fileBusyByRoom: omitRecordKey(state.fileBusyByRoom, roomId),
-      fileMessagesByRoom: omitRecordKey(state.fileMessagesByRoom, roomId)
+      filePanelByRoom: updateFilePanelForRoom(state.filePanelByRoom, roomId, (roomPanel) => {
+        const {
+          query: _query,
+          projectFiles: _projectFiles,
+          selectedFile: _selectedFile,
+          selectedDiff: _selectedDiff,
+          busy: _busy,
+          message: _message,
+          ...rest
+        } = roomPanel;
+        return rest;
+      })
     }));
   }
 });
