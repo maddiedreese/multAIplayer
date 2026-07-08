@@ -24,6 +24,12 @@ export function useAppRuntimeState() {
     setTrustedDeviceKeys((current) => untrustDeviceKey(current, roomId, deviceId));
   }, []);
   const [historySearchBusy, setHistorySearchBusy] = useState(false);
+  const startHistorySearch = useCallback(() => {
+    setHistorySearchBusy(true);
+  }, []);
+  const finishHistorySearch = useCallback(() => {
+    setHistorySearchBusy(false);
+  }, []);
   const historyPresenceByRoom = useAppStore((state) => state.historyPresenceByRoom);
   const historySearchMessagesByRoom = useMemo(
     () => projectHistorySearchMessagesByRoom(historyPresenceByRoom),
@@ -45,6 +51,7 @@ export function useAppRuntimeState() {
     untrustDeviceForRoom,
     historySearchMessagesByRoom,
     historySearchBusy,
-    setHistorySearchBusy
+    startHistorySearch,
+    finishHistorySearch
   };
 }

@@ -282,7 +282,8 @@ export function useAppWorkspaceFlow({
         forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
         revokedRoomIds: roomRuntimeState.revokedRoomIds,
         revokedTeamIds: roomRuntimeState.revokedTeamIds,
-        setHistorySearchBusy: appRuntimeState.setHistorySearchBusy
+        startHistorySearch: appRuntimeState.startHistorySearch,
+        finishHistorySearch: appRuntimeState.finishHistorySearch
       }
     }
   });

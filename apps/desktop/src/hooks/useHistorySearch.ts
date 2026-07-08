@@ -1,4 +1,4 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { loadEncryptedHistory, loadHistorySettings } from "../lib/localHistory";
 import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
@@ -11,7 +11,8 @@ interface UseHistorySearchOptions {
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
   revokedTeamIds: Set<string>;
-  setHistorySearchBusy: Dispatch<SetStateAction<boolean>>;
+  startHistorySearch: () => void;
+  finishHistorySearch: () => void;
 }
 
 export function useHistorySearch({
@@ -20,7 +21,8 @@ export function useHistorySearch({
   forgottenRoomIds,
   revokedRoomIds,
   revokedTeamIds,
-  setHistorySearchBusy
+  startHistorySearch,
+  finishHistorySearch
 }: UseHistorySearchOptions) {
   const setHistorySearchResultsByRoom = useAppStore((state) => state.setHistorySearchResultsByRoom);
   const clearHistorySearchResults = useAppStore((state) => state.clearHistorySearchResults);
@@ -28,7 +30,7 @@ export function useHistorySearch({
   useEffect(() => {
     if (!searchActive) {
       clearHistorySearchResults();
-      setHistorySearchBusy(false);
+      finishHistorySearch();
       return;
     }
 
@@ -38,7 +40,11 @@ export function useHistorySearch({
       !revokedRoomIds.has(room.id) &&
       !revokedTeamIds.has(room.teamId)
     );
-    setHistorySearchBusy(searchableRooms.length > 0);
+    if (searchableRooms.length > 0) {
+      startHistorySearch();
+    } else {
+      finishHistorySearch();
+    }
     Promise.all(
       searchableRooms.map(async (room) => {
         const storedHistory = await loadEncryptedHistory<ChatMessage[] | LocalRoomHistoryPayload>(room.id);
@@ -58,7 +64,7 @@ export function useHistorySearch({
         if (!cancelled) console.warn("Failed to search encrypted local history", error);
       })
       .finally(() => {
-        if (!cancelled) setHistorySearchBusy(false);
+        if (!cancelled) finishHistorySearch();
       });
 
     return () => {
@@ -70,7 +76,8 @@ export function useHistorySearch({
     revokedTeamIds,
     rooms,
     searchActive,
-    setHistorySearchBusy,
+    startHistorySearch,
+    finishHistorySearch,
     clearHistorySearchResults,
     setHistorySearchResultsByRoom
   ]);
