@@ -23,7 +23,7 @@ export function RoomInspectorPanel({
     files: filesPanel,
     diff: filesPanel,
     terminal: terminalPanel,
-    browser: browserPanel,
+    browser: null,
     room: roomPanel
   };
 
@@ -39,7 +39,8 @@ export function RoomInspectorPanel({
         className={`inspector-panel-group inspector-panel-${activeTab}`}
         data-active-tab={activeTab}
       >
-        {panelByTab[activeTab]}
+        {activeTab === "browser" ? browserPanel : panelByTab[activeTab]}
+        {activeTab !== "browser" && browserPanel}
       </div>
     </aside>
   );

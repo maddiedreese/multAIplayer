@@ -34,6 +34,7 @@ import type {
   HostHandoffRecord,
   InviteJoinRequest,
   LocalRoomHistoryPayload,
+  QueuedCodexTurn,
   TerminalCommandRequest
 } from "../types";
 
@@ -54,6 +55,7 @@ export function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentio
       payload.terminalSnapshots.filter((terminal) => isWithinRetention(terminal.startedAt, cutoffMs))
     ),
     hostHandoffs: payload.hostHandoffs.filter((handoff) => isWithinRetention(handoff.createdAt, cutoffMs)),
+    queuedCodexTurns: (payload.queuedCodexTurns ?? []).filter((turn) => isWithinRetention(turn.queuedAt, cutoffMs)),
     ...(payload.codexThreadId ? { codexThreadId: payload.codexThreadId } : {})
   };
 }
@@ -72,7 +74,8 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
       githubActionsEvents: [],
       localPreviews: [],
       terminalSnapshots: [],
-      hostHandoffs: []
+      hostHandoffs: [],
+      queuedCodexTurns: []
     };
   }
 
@@ -96,6 +99,7 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
       ? terminalsForLocalHistory(value.terminalSnapshots.filter(isTerminalSnapshot))
       : [],
     hostHandoffs: Array.isArray(value.hostHandoffs) ? value.hostHandoffs.filter(isHostHandoffRecord) : [],
+    queuedCodexTurns: Array.isArray(value.queuedCodexTurns) ? value.queuedCodexTurns.filter(isQueuedCodexTurn) : [],
     ...(codexThreadId ? { codexThreadId } : {})
   };
 }
@@ -471,10 +475,24 @@ function isHostHandoffRecord(value: unknown): value is HostHandoffRecord {
     typeof value.codexModel === "string" &&
     typeof value.approvalPolicy === "string" &&
     typeof value.messagesSinceLastCodex === "number" &&
+    (value.queuedCodexTurns === undefined ||
+      (Array.isArray(value.queuedCodexTurns) && value.queuedCodexTurns.every(isQueuedCodexTurn))) &&
     Array.isArray(value.attachmentNames) &&
     Array.isArray(value.terminals) &&
     typeof value.createdAt === "string" &&
     (value.status === "available" || value.status === "accepted")
+  );
+}
+
+function isQueuedCodexTurn(value: unknown): value is QueuedCodexTurn {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.turnId === "string" &&
+    typeof value.roomId === "string" &&
+    typeof value.requestedBy === "string" &&
+    typeof value.requestedByUserId === "string" &&
+    typeof value.queuedAt === "string" &&
+    (value.triggerMessageId === undefined || typeof value.triggerMessageId === "string")
   );
 }
 

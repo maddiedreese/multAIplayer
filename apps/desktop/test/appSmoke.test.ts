@@ -224,6 +224,13 @@ test("App smoke", async (t) => {
     const modelSelect = await screen.findByLabelText("Codex host model") as HTMLSelectElement;
     const reasoningSelect = screen.getByLabelText("Codex reasoning") as HTMLSelectElement;
     const speedSelect = screen.getByLabelText("Codex speed") as HTMLSelectElement;
+    const modelOptions = Array.from(modelSelect.options).map((option) => option.value);
+    const reasoningOptions = Array.from(reasoningSelect.options).map((option) => option.value);
+    const speedOptions = Array.from(speedSelect.options).map((option) => option.value);
+
+    assert.deepEqual(modelOptions, ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex-spark"]);
+    assert.deepEqual(reasoningOptions, ["low", "medium", "high", "xhigh"]);
+    assert.deepEqual(speedOptions, ["standard", "fast"]);
 
     fireEvent.change(modelSelect, { target: { value: "gpt-5.4-mini" } });
     await waitFor(() => {
@@ -257,6 +264,16 @@ test("App smoke", async (t) => {
       assert.ok(screen.getByLabelText("Browser URL"));
     });
 
+    fireEvent.click(within(roomTools).getByRole("button", { name: /terminal/i }));
+    await waitFor(() => {
+      assert.ok(screen.getByRole("button", { name: /New terminal/i }));
+    });
+
+    fireEvent.click(within(roomTools).getByRole("button", { name: /browser/i }));
+    await waitFor(() => {
+      assert.ok(screen.getByLabelText("Browser URL"));
+    });
+
     fireEvent.click(within(roomTools).getByRole("button", { name: /room/i }));
     await waitFor(() => {
       assert.ok(screen.getByText("Team roster"));
@@ -266,6 +283,11 @@ test("App smoke", async (t) => {
     await waitFor(() => {
       assert.ok(screen.getByPlaceholderText("Search project files"));
       assert.ok(screen.getByText("Changed files"));
+    });
+
+    fireEvent.click(within(roomTools).getByRole("button", { name: /room/i }));
+    await waitFor(() => {
+      assert.ok(screen.getByText("Team roster"));
     });
 
     fireEvent.click(within(roomTools).getByRole("button", { name: /terminal/i }));

@@ -20,6 +20,7 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         ? currentTerminalId
         : payload.terminalSnapshots[0]?.id ?? null;
       const shouldHydrateTerminalRuntime = payload.terminalRequests.length > 0 || Boolean(payload.terminalSnapshots.length && nextTerminalId);
+      const queuedCodexTurns = payload.queuedCodexTurns ?? [];
       const codexThreadId = normalizeCodexThreadId(payload.codexThreadId);
       const {
         threadId: _threadId,
@@ -64,6 +65,7 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
             ...codexRuntimeWithoutThread,
             events: payload.codexEvents,
             hostHandoffs: payload.hostHandoffs,
+            ...(queuedCodexTurns.length ? { queuedApprovals: queuedCodexTurns } : {}),
             ...(codexThreadId ? { threadId: codexThreadId } : {})
           }
         },
@@ -126,7 +128,8 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         ...state.codexRuntimeByRoom,
         [roomId]: {
           events: [],
-          hostHandoffs: []
+          hostHandoffs: [],
+          queuedApprovals: []
         }
       },
       gitWorkflowRuntimeByRoom: {

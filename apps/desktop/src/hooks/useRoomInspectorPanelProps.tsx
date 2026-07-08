@@ -175,7 +175,7 @@ export function useRoomInspectorPanelProps({
     activeTab,
     browserPanel: (
       <BrowserAccessPanel
-        hidden={false}
+        hidden={activeTab !== "browser"}
         activeBrowserUrl={activeBrowserUrl}
         browserUrl={browserUrl}
         canHostBrowser={canHostBrowser}

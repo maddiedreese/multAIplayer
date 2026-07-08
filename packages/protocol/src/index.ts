@@ -346,6 +346,13 @@ export const HostHandoffPlaintextPayload = z.object({
   ]).optional(),
   approvalPolicy: z.string().min(1).max(maxShortTextChars),
   messagesSinceLastCodex: z.number().int().nonnegative(),
+  queuedCodexTurns: z.array(z.object({
+    turnId: z.string().min(1).max(maxEnvelopeIdChars),
+    requestedBy: z.string().min(1).max(maxDisplayNameChars),
+    requestedByUserId: z.string().min(1).max(maxUserIdChars),
+    queuedAt: z.string().datetime(),
+    triggerMessageId: z.string().min(1).max(maxEnvelopeIdChars).optional()
+  })).max(5).optional(),
   attachmentNames: z.array(z.string().min(1).max(maxShortTextChars)).max(maxMessageAttachments),
   terminals: z.array(z.string().min(1).max(maxShortTextChars)).max(maxTerminalSnapshots),
   continuationSummary: z.string().max(maxMediumTextChars).optional(),
@@ -419,7 +426,6 @@ export const codexModelOptions = [
 ] as const;
 
 export const codexReasoningEffortOptions = [
-  { id: "minimal", label: "Minimal", description: "Lowest reasoning depth for the fastest lightweight Codex turns" },
   { id: "low", label: "Low", description: "Fast responses with lighter reasoning" },
   { id: "medium", label: "Medium", description: "Balances speed and reasoning depth for everyday tasks" },
   { id: "high", label: "High", description: "Greater reasoning depth for complex problems" },
@@ -428,8 +434,7 @@ export const codexReasoningEffortOptions = [
 
 export const codexSpeedOptions = [
   { id: "standard", label: "Standard", serviceTier: "default", description: "Default Codex speed and usage behavior" },
-  { id: "fast", label: "Fast", serviceTier: "fast", description: "Fast mode for supported Codex models when available" },
-  { id: "flex", label: "Flex", serviceTier: "flex", description: "Flex tier for lower-priority Codex turns when available" }
+  { id: "fast", label: "Fast", serviceTier: "fast", description: "Fast mode for supported Codex models when available" }
 ] as const;
 
 export const codexSandboxLevelOptions = [
@@ -527,8 +532,8 @@ export const RoomRecord = z.object({
   trustedApproverUserIds: z.array(UserId).max(50),
   mode: RoomModeSchema,
   codexModel: z.string().min(1).max(maxCodexModelChars),
-  codexReasoningEffort: z.enum(["minimal", "low", "medium", "high", "xhigh"]).optional(),
-  codexSpeed: z.enum(["standard", "fast", "flex"]).optional(),
+  codexReasoningEffort: z.enum(["low", "medium", "high", "xhigh"]).optional(),
+  codexSpeed: z.enum(["standard", "fast"]).optional(),
   codexSandboxLevel: z.enum(["read_only", "workspace_write", "workspace_write_network", "danger_full_access"]).optional(),
   browserAllowedOrigins: z.array(z.string().min(1).max(maxUrlChars)).max(20),
   browserProfilePersistent: z.boolean(),

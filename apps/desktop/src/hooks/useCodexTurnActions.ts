@@ -25,7 +25,8 @@ import {
   buildCodexApprovalSnapshot,
   buildCodexTurnInput,
   buildCodexTurnSummary,
-  detectCodexTurnRiskFlags
+  detectCodexTurnRiskFlags,
+  hasActionableCodexTurnContext
 } from "../lib/codexTurn";
 import { normalizeCodexThreadId } from "../lib/codexThread";
 import {
@@ -136,20 +137,46 @@ export function useCodexTurnActions({
     const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
     if (roomLocked || !room.mode.code || room.approvalPolicy === "never_host") {
       removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
-      setHostMessageForRoom(roomId, roomLocked ? roomLockMessage(room, roomRevoked) : "Queued Codex turn was cancelled because Codex is unavailable in this room.");
+      const cancellationMessage = roomLocked
+        ? roomLockMessage(room, roomRevoked)
+        : "Queued Codex turn was cancelled because Codex is unavailable in this room.";
+      void publishChatMessage({
+        id: crypto.randomUUID(),
+        author: "multAIplayer",
+        role: "system",
+        body: cancellationMessage,
+        time: formatMessageTime(),
+        createdAt: new Date().toISOString()
+      }, room);
+      setHostMessageForRoom(roomId, cancellationMessage);
       return;
     }
     const roomCanReadLocalWorkspace = canUseLocalWorkspace(room, localUser, roomLocked);
+    const approvalSnapshot = buildCodexApprovalSnapshot(
+      room,
+      messagesByRoom[roomId] ?? [],
+      undefined,
+      terminals.filter((terminal) => terminal.roomId === roomId),
+      browserRequestsByRoom[roomId] ?? [],
+      gitStatusByRoom[roomId] ?? null,
+      { includeWorkspaceContext: roomCanReadLocalWorkspace }
+    );
+    if (!hasActionableCodexTurnContext(approvalSnapshot.summary)) {
+      removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
+      void publishChatMessage({
+        id: crypto.randomUUID(),
+        author: "multAIplayer",
+        role: "system",
+        body: `Dropped ${nextTurn.requestedBy}'s queued Codex turn because there is no new room context to send.`,
+        time: formatMessageTime(),
+        createdAt: new Date().toISOString()
+      }, room);
+      setHostMessageForRoom(roomId, "Dropped an empty queued Codex turn.");
+      promoteNextCodexApprovalForRoom(roomId);
+      return;
+    }
     const approval = {
-      ...buildCodexApprovalSnapshot(
-        room,
-        messagesByRoom[roomId] ?? [],
-        undefined,
-        terminals.filter((terminal) => terminal.roomId === roomId),
-        browserRequestsByRoom[roomId] ?? [],
-        gitStatusByRoom[roomId] ?? null,
-        { includeWorkspaceContext: roomCanReadLocalWorkspace }
-      ),
+      ...approvalSnapshot,
       turnId: nextTurn.turnId,
       requestedBy: nextTurn.requestedBy,
       requestedByUserId: nextTurn.requestedByUserId,

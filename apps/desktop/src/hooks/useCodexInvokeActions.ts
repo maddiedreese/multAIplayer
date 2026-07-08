@@ -1,6 +1,6 @@
 import type { MutableRefObject } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { buildCodexApprovalSnapshot } from "../lib/codexTurn";
+import { buildCodexApprovalSnapshot, hasActionableCodexTurnContext } from "../lib/codexTurn";
 import { shouldAutoApproveChatOnlyTurn } from "../lib/codexApproval";
 import { canUseRoomChat, roomChatGateMessage } from "../lib/chatPolicy";
 import { messageInvokesCodex } from "../lib/codexInvoke";
@@ -243,6 +243,11 @@ export function useCodexInvokeActions({
       }),
       ...turnIntent
     };
+    if (!hasActionableCodexTurnContext(approvalSnapshot.summary)) {
+      setHostMessageForRoom(roomId, "Codex needs a new message, attachment, or room context before starting another turn.");
+      setApprovalVisibleForRoom(roomId, false);
+      return;
+    }
     if (selectedRoom.approvalPolicy === "auto_chat_only") {
       if (shouldAutoApproveChatOnlyTurn(approvalSnapshot.summary, isActiveHost, approvalSnapshot.riskFlags ?? [])) {
         setPendingCodexApprovalForRoom(roomId, null);

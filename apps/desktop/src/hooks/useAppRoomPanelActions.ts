@@ -70,6 +70,7 @@ export function useAppRoomPanelActions({
       toggleMessageReaction: roomInteraction.toggleMessageReaction,
       publishChatMessageEdit: roomInteraction.publishChatMessageEdit,
       publishChatMessageDelete: roomInteraction.publishChatMessageDelete,
+      publishChatMessage: roomInteraction.publishChatMessage,
       setPendingCodexApprovalForRoom,
       setApprovalVisibleForRoom,
       removeQueuedCodexApprovalForRoom,

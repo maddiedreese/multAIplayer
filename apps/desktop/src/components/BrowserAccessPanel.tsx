@@ -27,6 +27,7 @@ export function BrowserAccessPanel({
   const [browserExpanded, setBrowserExpanded] = useState(false);
   const tauriRuntime = "__TAURI_INTERNALS__" in window;
   const canOpenUrl = canHostBrowser && browserUrl.trim().length > 0;
+  const panelClassName = `panel browser-panel ${hidden ? "" : "browser-open"} ${browserExpanded ? "expanded" : ""}`;
 
   function openBrowserUrl() {
     if (!canOpenUrl) return;
@@ -124,7 +125,7 @@ export function BrowserAccessPanel({
 
   if (activeBrowserUrl) {
     return (
-      <section className={`panel browser-panel browser-open ${browserExpanded ? "expanded" : ""}`} hidden={hidden}>
+      <section className={panelClassName} hidden={hidden}>
         <form
           className="browser-toolbar"
           onSubmit={(event) => {
@@ -175,7 +176,7 @@ export function BrowserAccessPanel({
   }
 
   return (
-    <section className={`panel browser-panel browser-open ${browserExpanded ? "expanded" : ""}`} hidden={hidden}>
+    <section className={panelClassName} hidden={hidden}>
       <form
         className="browser-toolbar"
         onSubmit={(event) => {

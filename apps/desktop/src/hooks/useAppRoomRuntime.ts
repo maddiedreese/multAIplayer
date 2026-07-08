@@ -386,6 +386,7 @@ export function useAppRoomRuntime({
         localPreviews: selectedRuntime.localPreviews,
         terminals: terminalPanelState.terminals,
         hostHandoffs: selectedRuntime.hostHandoffs,
+        queuedCodexTurns: selectedRuntime.queuedCodexApprovals,
         selectedCodexThreadId: selectedRuntime.selectedCodexThreadId
       },
       localPreviewPolling: {

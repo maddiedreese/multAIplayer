@@ -76,6 +76,7 @@ export function useAppHostHandoffActions({
     isActiveHost: roomInteraction.isActiveHost,
     hostGateMessage: roomInteraction.hostGateMessage,
     hostHandoffs: selectedRuntime.hostHandoffs,
+    queuedCodexTurns: selectedRuntime.queuedCodexApprovals,
     localUser: localIdentity.localUser,
     deviceId: localIdentity.deviceId,
     relayStatus: appRuntimeState.relayStatus,

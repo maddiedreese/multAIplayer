@@ -1,4 +1,5 @@
 import type { ChatAttachment, ChatMessage, LocalPreviewRecord } from "../types";
+import { formatMessageTime } from "../lib/appFormatters";
 
 export function useRoomChatPanelActions({
   selectedRoomId,
@@ -10,6 +11,7 @@ export function useRoomChatPanelActions({
   toggleMessageReaction,
   publishChatMessageEdit,
   publishChatMessageDelete,
+  publishChatMessage,
   setPendingCodexApprovalForRoom,
   setApprovalVisibleForRoom,
   removeQueuedCodexApprovalForRoom,
@@ -37,6 +39,7 @@ export function useRoomChatPanelActions({
   toggleMessageReaction: (message: ChatMessage, emoji: string) => void;
   publishChatMessageEdit: (message: ChatMessage, body: string) => Promise<void>;
   publishChatMessageDelete: (message: ChatMessage) => Promise<void>;
+  publishChatMessage: (message: ChatMessage) => Promise<void>;
   setPendingCodexApprovalForRoom: (roomId: string, approval: null) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   removeQueuedCodexApprovalForRoom: (roomId: string, turnId: string) => void;
@@ -135,7 +138,17 @@ export function useRoomChatPanelActions({
     onOpenFileSelector: () => setInspectorTabForRoom(selectedRoomId, "files"),
     onReplyToMessage: (messageId: string) => setReplyToMessageForRoom(selectedRoomId, messageId),
     onCancelReply: () => setReplyToMessageForRoom(selectedRoomId, null),
-    onCancelQueuedCodexTurn: (turnId: string) => removeQueuedCodexApprovalForRoom(selectedRoomId, turnId),
+    onCancelQueuedCodexTurn: (turnId: string) => {
+      removeQueuedCodexApprovalForRoom(selectedRoomId, turnId);
+      void publishChatMessage({
+        id: crypto.randomUUID(),
+        author: "multAIplayer",
+        role: "system",
+        body: "Queued Codex turn cancelled.",
+        time: formatMessageTime(),
+        createdAt: new Date().toISOString()
+      });
+    },
     onDraftChange: (nextDraft: string) => setDraftForRoom(selectedRoomId, nextDraft)
   };
 }

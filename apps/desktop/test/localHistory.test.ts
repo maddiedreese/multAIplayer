@@ -178,7 +178,14 @@ test("encrypted history keeps local room read state encrypted", async () => {
     githubActionsEvents: [],
     localPreviews: [],
     terminalSnapshots: [],
-    hostHandoffs: []
+    hostHandoffs: [],
+    queuedCodexTurns: [{
+      turnId: "turn-queued-1",
+      roomId,
+      requestedBy: "Maddie",
+      requestedByUserId: "github:maddie",
+      queuedAt: "2026-07-06T00:05:00.000Z"
+    }]
   };
 
   await saveEncryptedHistory(roomId, payload);
@@ -186,6 +193,7 @@ test("encrypted history keeps local room read state encrypted", async () => {
   const stored = localStorage.getItem(`multaiplayer:history:${roomId}`);
   assert.ok(stored);
   assert.doesNotMatch(stored, /message-last-read/);
+  assert.doesNotMatch(stored, /turn-queued-1/);
   assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
 });
 
@@ -205,13 +213,22 @@ test("local history normalization preserves sanitized room read state", () => {
     githubActionsEvents: [],
     localPreviews: [],
     terminalSnapshots: [],
-    hostHandoffs: []
+    hostHandoffs: [],
+    queuedCodexTurns: [{
+      turnId: "turn-queued-1",
+      roomId: "room-a",
+      requestedBy: "Maddie",
+      requestedByUserId: "github:maddie",
+      queuedAt: "2026-07-06T00:05:00.000Z",
+      triggerMessageId: "message-a"
+    }]
   });
 
   assert.deepEqual(normalized.readState, {
     lastReadMessageId: "message-a",
     unread: 999
   });
+  assert.equal(normalized.queuedCodexTurns?.[0]?.turnId, "turn-queued-1");
 });
 
 test("encrypted history keeps Git workflow and Actions events local and encrypted", async () => {

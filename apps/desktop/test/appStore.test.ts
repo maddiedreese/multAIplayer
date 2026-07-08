@@ -1806,6 +1806,16 @@ test("desktop store hydrates local room history through one room-scoped action",
         status: "available"
       }
     ],
+    queuedCodexTurns: [
+      {
+        turnId: "turn-queued-1",
+        roomId: "room-a",
+        requestedBy: "Jordan",
+        requestedByUserId: "github:jordan",
+        queuedAt: "2026-07-06T00:12:00.000Z",
+        triggerMessageId: "message-a"
+      }
+    ],
     codexThreadId: "thread-a"
   });
 
@@ -1828,6 +1838,7 @@ test("desktop store hydrates local room history through one room-scoped action",
   assert.equal(state.terminalRuntimeByRoom["room-a"]?.selectedTerminalId, "terminal-a");
   assert.equal(state.terminalRuntimeByRoom["room-b"]?.selectedTerminalId, "terminal-b");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.hostHandoffs?.[0]?.reason, "usage_limit");
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.queuedApprovals?.[0]?.turnId, "turn-queued-1");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.threadId, "thread-a");
 });
 

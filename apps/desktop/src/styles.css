@@ -1,5 +1,7 @@
 :root {
-  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-sans);
+  font-family: var(--font-sans);
   color: #111111;
   background: #ffffff;
   --bg: #ffffff;
@@ -4039,8 +4041,6 @@ button:not(:disabled):active {
 
 /* Intentional product polish: one type system, calmer spacing, one clear room tool switcher. */
 :root {
-  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
-  --font-mono: var(--font-sans);
   --control-height: 36px;
   --rail-width: 372px;
   --sidebar-width: 280px;

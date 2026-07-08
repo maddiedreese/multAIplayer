@@ -12,6 +12,7 @@ import {
   formatAttachmentSummaryList,
   formatAttachmentForCodex,
   formatObservedContextMaterial,
+  hasActionableCodexTurnContext,
   maxCodexGitFiles,
   messagesSinceLastCodex,
   type CodexChatMessage
@@ -437,4 +438,28 @@ test("buildCodexTurnInput excludes deleted messages and treats deleted replies a
 
   assert.doesNotMatch(input, /@Maddie \(human, 9:02 AM/);
   assert.match(input, /@Jordan \(human, 9:03 AM, replying to original message unavailable or deleted\)/);
+});
+
+test("hasActionableCodexTurnContext rejects empty turns and accepts real context", () => {
+  assert.equal(hasActionableCodexTurnContext({
+    messagesSinceLastCodex: 0,
+    attachments: [],
+    workspacePath: null,
+    git: null,
+    browserAccess: [],
+    terminals: []
+  }), false);
+  assert.equal(hasActionableCodexTurnContext({
+    messagesSinceLastCodex: 0,
+    attachments: [],
+    workspacePath: null,
+    git: {
+      branch: "main",
+      files: [{ path: "README.md", status: "modified", added: 1, removed: 0 }],
+      totalFiles: 1,
+      truncated: false
+    },
+    browserAccess: [],
+    terminals: []
+  }), true);
 });

@@ -152,6 +152,7 @@ export interface LocalRoomHistoryPayload {
   localPreviews: LocalPreviewRecord[];
   terminalSnapshots: TerminalSnapshot[];
   hostHandoffs: HostHandoffRecord[];
+  queuedCodexTurns?: QueuedCodexTurn[];
   codexThreadId?: string;
 }
 

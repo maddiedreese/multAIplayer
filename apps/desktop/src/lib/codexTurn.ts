@@ -118,6 +118,16 @@ export function buildCodexTurnSummary(
   };
 }
 
+export function hasActionableCodexTurnContext(summary: CodexTurnSummary): boolean {
+  return (
+    summary.messagesSinceLastCodex > 0 ||
+    summary.attachments.length > 0 ||
+    summary.browserAccess.length > 0 ||
+    summary.terminals.length > 0 ||
+    Boolean(summary.git && summary.git.totalFiles > 0)
+  );
+}
+
 export function buildCodexTurnInput(
   messages: CodexChatMessage[],
   workspacePath: string,

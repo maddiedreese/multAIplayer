@@ -198,6 +198,13 @@ test("host handoff payloads can report room-visible acceptance", () => {
     codexModel: "gpt-5.4",
     approvalPolicy: "ask_every_turn",
     messagesSinceLastCodex: 2,
+    queuedCodexTurns: [{
+      turnId: "turn-queued-1",
+      requestedBy: "Jordan",
+      requestedByUserId: "github:jordan",
+      queuedAt: "2026-07-04T12:03:00.000Z",
+      triggerMessageId: "message-2"
+    }],
     attachmentNames: [],
     terminals: ["tests"],
     continuationSummary: "Maddie is out of Codex usage.",
@@ -210,6 +217,25 @@ test("host handoff payloads can report room-visible acceptance", () => {
 
   assert.equal(parsed.status, "accepted");
   assert.equal(parsed.acceptedBy, "Alex");
+  assert.equal(parsed.queuedCodexTurns?.[0]?.turnId, "turn-queued-1");
+  assert.equal(HostHandoffPlaintextPayload.safeParse({
+    id: "handoff-bad-queue",
+    fromHost: "Maddie",
+    fromUserId: "github:maddie",
+    projectPath: "/tmp/multaiplayer",
+    codexModel: "gpt-5.4",
+    approvalPolicy: "ask_every_turn",
+    messagesSinceLastCodex: 2,
+    queuedCodexTurns: Array.from({ length: 6 }, (_, index) => ({
+      turnId: `turn-${index}`,
+      requestedBy: "Jordan",
+      requestedByUserId: "github:jordan",
+      queuedAt: "2026-07-04T12:03:00.000Z"
+    })),
+    attachmentNames: [],
+    terminals: [],
+    createdAt: "2026-07-04T12:00:00.000Z"
+  }).success, false);
 });
 
 test("room settings payloads can report model changes", () => {

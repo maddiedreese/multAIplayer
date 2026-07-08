@@ -13,6 +13,7 @@ import type {
   InviteJoinRequest,
   LocalPreviewRecord,
   LocalRoomHistoryPayload,
+  QueuedCodexTurn,
   TerminalCommandRequest
 } from "../types";
 import type {
@@ -44,6 +45,7 @@ interface UseLocalHistoryPersistenceOptions {
   localPreviews: LocalPreviewRecord[];
   terminals: TerminalSnapshot[];
   hostHandoffs: HostHandoffRecord[];
+  queuedCodexTurns: QueuedCodexTurn[];
   selectedCodexThreadId: string | null;
 }
 
@@ -67,6 +69,7 @@ export function useLocalHistoryPersistence({
   localPreviews,
   terminals,
   hostHandoffs,
+  queuedCodexTurns,
   selectedCodexThreadId
 }: UseLocalHistoryPersistenceOptions) {
   useEffect(() => {
@@ -86,6 +89,7 @@ export function useLocalHistoryPersistence({
       localPreviews,
       terminalSnapshots: terminalsForLocalHistory(terminals.filter((terminal) => terminal.roomId === selectedRoomId)),
       hostHandoffs,
+      queuedCodexTurns,
       ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
     }, historySettings.retentionDays);
     saveEncryptedHistory(selectedRoomId, payload satisfies LocalRoomHistoryPayload).catch((error) => {
@@ -96,6 +100,7 @@ export function useLocalHistoryPersistence({
     historySettings.enabled,
     historySettings.retentionDays,
     hostHandoffs,
+    queuedCodexTurns,
     inviteRequests,
     codexEvents,
     gitWorkflowEvents,
