@@ -118,7 +118,7 @@ export function useAppWorkspaceFlow({
       },
       selectedRoomReadReceipt: {
         selectedRoomId: workspaceState.selectedRoomId,
-        setRooms: workspaceState.setRooms
+        markRoomRead: workspaceRecords.markRoomRead
       },
       deviceIdentity: {
         relayHttpUrl: appConfigState.appConfig.relayHttpUrl,

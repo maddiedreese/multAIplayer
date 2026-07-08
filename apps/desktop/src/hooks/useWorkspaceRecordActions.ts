@@ -1,9 +1,13 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "../lib/relayAccess";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
 import { shouldResetCodexApprovalForRoomUpdate } from "../lib/codexApproval";
-import { replaceRoomPreservingUnread, upsertRoomPreservingUnread } from "../lib/roomUnread";
+import {
+  markRoomRead as markRoomReadRecord,
+  replaceRoomPreservingUnread,
+  upsertRoomPreservingUnread
+} from "../lib/roomUnread";
 import { useAppStore } from "../store/appStore";
 
 interface LocalUser {
@@ -81,6 +85,10 @@ export function useWorkspaceRecordActions({
     setRooms((current) => replaceRoomPreservingUnread(current, nextRoom));
   }
 
+  const markRoomRead = useCallback((roomId: string) => {
+    setRooms((current) => markRoomReadRecord(current, roomId));
+  }, [setRooms]);
+
   function handleRelayError(message: string) {
     console.warn("Relay error", message);
     if (!isMembershipRemovedRelayError(message) || !hasSelectedRoom) return;
@@ -103,6 +111,7 @@ export function useWorkspaceRecordActions({
     upsertTeam,
     upsertRoom,
     replaceRoom,
+    markRoomRead,
     handleRelayError
   };
 }

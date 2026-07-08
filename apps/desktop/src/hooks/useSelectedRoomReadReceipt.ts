@@ -1,18 +1,16 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
-import type { RoomRecord } from "@multaiplayer/protocol";
-import { markRoomRead } from "../lib/roomUnread";
+import { useEffect } from "react";
 
 interface UseSelectedRoomReadReceiptOptions {
   selectedRoomId: string;
-  setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
+  markRoomRead: (roomId: string) => void;
 }
 
 export function useSelectedRoomReadReceipt({
   selectedRoomId,
-  setRooms
+  markRoomRead
 }: UseSelectedRoomReadReceiptOptions) {
   useEffect(() => {
     if (!selectedRoomId) return;
-    setRooms((current) => markRoomRead(current, selectedRoomId));
-  }, [selectedRoomId, setRooms]);
+    markRoomRead(selectedRoomId);
+  }, [selectedRoomId, markRoomRead]);
 }
