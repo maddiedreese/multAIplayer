@@ -519,6 +519,7 @@ export const AttachmentBlobRecord = z.object({
   name: z.string().min(1).max(maxShortTextChars),
   type: z.string().min(1).max(maxShortTextChars),
   size: z.number().int().nonnegative(),
+  uploadedByUserId: UserId.optional(),
   payload: CiphertextPayload,
   createdAt: z.string().datetime(),
   expiresAt: z.string().datetime().optional()

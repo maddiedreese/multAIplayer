@@ -2408,6 +2408,67 @@ test("relay stores encrypted attachment blobs as ciphertext", async () => {
   }
 });
 
+test("relay enforces authenticated live encrypted attachment blob quotas", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "10",
+    MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES: "10"
+  });
+  try {
+    const maddieCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    const alexCookie = await createDebugSession(relay.baseUrl, "github:alex", "alex");
+    const uploadBody = (size: number, name: string) => ({
+      teamId: "team-core",
+      roomId: "room-desktop",
+      name,
+      type: "text/plain",
+      size,
+      payload: {
+        algorithm: "AES-GCM-256",
+        nonce: "nonce-for-test",
+        ciphertext: "tiny"
+      }
+    });
+
+    const first = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: maddieCookie },
+      body: JSON.stringify(uploadBody(6, "one.txt"))
+    });
+    assert.equal(first.status, 201);
+    const firstBody = await first.json() as { blob: { uploadedByUserId?: string } };
+    assert.equal(firstBody.blob.uploadedByUserId, "github:maddiedreese");
+
+    const limited = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: maddieCookie },
+      body: JSON.stringify(uploadBody(5, "two.txt"))
+    });
+    assert.equal(limited.status, 413);
+    const limitedBody = await limited.json() as {
+      error: string;
+      code: string;
+      quota: { type: string; limit: number; used: number; remaining: number };
+    };
+    assert.equal(limitedBody.error, "Live encrypted attachment blob storage quota exceeded.");
+    assert.equal(limitedBody.code, "quota_exceeded");
+    assert.deepEqual(limitedBody.quota, {
+      type: "live_attachment_blob_bytes",
+      limit: 10,
+      used: 6,
+      remaining: 4
+    });
+
+    const otherUser = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: alexCookie },
+      body: JSON.stringify(uploadBody(5, "alex.txt"))
+    });
+    assert.equal(otherUser.status, 201);
+  } finally {
+    await relay.close();
+  }
+});
+
 test("relay enforces encrypted attachment blob size limits", async () => {
   const relay = await startRelay({ MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "16" });
   try {

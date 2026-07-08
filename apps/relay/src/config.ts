@@ -14,6 +14,7 @@ export interface RelayConfig {
   inviteTtlDays: number;
   attachmentBlobTtlDays: number;
   attachmentBlobMaxBytes: number;
+  attachmentBlobLiveQuotaBytes: number;
   jsonBodyLimitBytes: number;
   encryptedEnvelopeMaxBytes: number;
   sessionPersistenceSecret: string | null;
@@ -62,6 +63,12 @@ export function loadRelayConfig(): RelayConfig {
     inviteTtlDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_INVITE_TTL_DAYS, 7, 1, 365),
     attachmentBlobTtlDays: parseIntegerEnv(process.env.MULTAIPLAYER_ATTACHMENT_BLOB_TTL_DAYS, 30, 1, 365),
     attachmentBlobMaxBytes,
+    attachmentBlobLiveQuotaBytes: parseIntegerEnv(
+      process.env.MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES,
+      250_000_000,
+      attachmentBlobMaxBytes,
+      10_000_000_000
+    ),
     jsonBodyLimitBytes,
     encryptedEnvelopeMaxBytes: parseIntegerEnv(
       process.env.MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES,

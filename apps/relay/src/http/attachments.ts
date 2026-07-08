@@ -10,6 +10,7 @@ interface RegisterAttachmentRoutesOptions {
   app: Express;
   store: RelayStore;
   attachmentBlobMaxBytes: number;
+  attachmentBlobLiveQuotaBytes: number;
   attachmentBlobTtlDays: number;
   maxAttachmentBlobNameChars: number;
   maxAttachmentBlobTypeChars: number;
@@ -28,6 +29,7 @@ export function registerAttachmentRoutes({
   app,
   store,
   attachmentBlobMaxBytes,
+  attachmentBlobLiveQuotaBytes,
   attachmentBlobTtlDays,
   maxAttachmentBlobNameChars,
   maxAttachmentBlobTypeChars,
@@ -93,6 +95,22 @@ export function registerAttachmentRoutes({
       res.status(413).json({ error: `Attachment blob ciphertext exceeds ${attachmentBlobMaxBytes} bytes` });
       return;
     }
+    if (session) {
+      const usedBytes = liveAttachmentBlobBytesForUser(store, session.user.id, isExpiredAttachmentBlob);
+      if (usedBytes + size > attachmentBlobLiveQuotaBytes) {
+        res.status(413).json({
+          error: "Live encrypted attachment blob storage quota exceeded.",
+          code: "quota_exceeded",
+          quota: {
+            type: "live_attachment_blob_bytes",
+            limit: attachmentBlobLiveQuotaBytes,
+            used: usedBytes,
+            remaining: Math.max(0, attachmentBlobLiveQuotaBytes - usedBytes)
+          }
+        });
+        return;
+      }
+    }
 
     const blob: AttachmentBlobRecordType = {
       id: `blob_${nanoid(16)}`,
@@ -101,6 +119,7 @@ export function registerAttachmentRoutes({
       name,
       type,
       size,
+      ...(session ? { uploadedByUserId: session.user.id } : {}),
       payload: payload.data,
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + attachmentBlobTtlDays * 24 * 60 * 60 * 1000).toISOString()
@@ -140,4 +159,17 @@ export function registerAttachmentRoutes({
     }
     res.json({ blob });
   });
+}
+
+function liveAttachmentBlobBytesForUser(
+  store: RelayStore,
+  userId: string,
+  isExpiredAttachmentBlob: (blob: AttachmentBlobRecordType) => boolean
+): number {
+  let total = 0;
+  for (const blob of store.attachmentBlobs.values()) {
+    if (blob.uploadedByUserId !== userId || isExpiredAttachmentBlob(blob)) continue;
+    total += blob.size;
+  }
+  return total;
 }
