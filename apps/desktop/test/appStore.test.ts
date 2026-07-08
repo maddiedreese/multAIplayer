@@ -1465,12 +1465,12 @@ test("desktop store keeps workspace maps scoped", () => {
   store.initializeMessagesForRoom("room-b");
 
   const state = useAppStore.getState();
-  assert.equal(state.teamMembersByTeam["team-core"]?.[0]?.role, "owner");
-  assert.deepEqual(state.teamMembersByTeam["team-labs"], []);
-  assert.equal(state.teamMembersMessageByTeam["team-core"], null);
-  assert.equal(state.teamMembersMessageByTeam["team-labs"], "Could not refresh members");
-  assert.equal(state.teamMembersBusyByTeam["team-core"], true);
-  assert.equal(state.teamMembersBusyByTeam["team-labs"], false);
+  assert.equal(state.teamRosterByTeam["team-core"]?.members?.[0]?.role, "owner");
+  assert.deepEqual(state.teamRosterByTeam["team-labs"]?.members, []);
+  assert.equal(state.teamRosterByTeam["team-core"]?.message, null);
+  assert.equal(state.teamRosterByTeam["team-labs"]?.message, "Could not refresh members");
+  assert.equal(state.teamRosterByTeam["team-core"]?.busy, true);
+  assert.equal(state.teamRosterByTeam["team-labs"]?.busy, false);
   assert.equal(state.messagesByRoom["room-a"]?.[0]?.body, "Ship the store slice.");
   assert.deepEqual(state.messagesByRoom["room-b"], []);
 });
@@ -1495,7 +1495,7 @@ test("desktop store seeds initial workspace data only when maps are empty", () =
   });
 
   let state = useAppStore.getState();
-  assert.equal(state.teamMembersByTeam["team-core"]?.[0]?.userId, "github:maddie");
+  assert.equal(state.teamRosterByTeam["team-core"]?.members?.[0]?.userId, "github:maddie");
   assert.equal(state.messagesByRoom["room-a"]?.[0]?.body, "Seeded");
 
   store.seedWorkspaceInitialDataIfEmpty({
@@ -1515,7 +1515,7 @@ test("desktop store seeds initial workspace data only when maps are empty", () =
   });
 
   state = useAppStore.getState();
-  assert.equal(state.teamMembersByTeam["team-labs"], undefined);
+  assert.equal(state.teamRosterByTeam["team-labs"]?.members, undefined);
   assert.equal(state.messagesByRoom["room-b"], undefined);
 });
 
@@ -1770,11 +1770,11 @@ test("desktop store exposes team member actions", () => {
   store.ensureLocalTeamMemberForTeam("team-labs", "github:maddie", "member");
 
   const state = useAppStore.getState();
-  assert.equal(state.teamMembersByTeam["team-core"]?.[0]?.role, "owner");
-  assert.equal(state.teamMembersMessageByTeam["team-core"], "Members refreshed");
-  assert.equal(state.teamMembersBusyByTeam["team-core"], true);
-  assert.equal(state.teamMembersByTeam["team-labs"]?.length, 1);
-  assert.equal(state.teamMembersByTeam["team-labs"]?.[0]?.role, "admin");
+  assert.equal(state.teamRosterByTeam["team-core"]?.members?.[0]?.role, "owner");
+  assert.equal(state.teamRosterByTeam["team-core"]?.message, "Members refreshed");
+  assert.equal(state.teamRosterByTeam["team-core"]?.busy, true);
+  assert.equal(state.teamRosterByTeam["team-labs"]?.members?.length, 1);
+  assert.equal(state.teamRosterByTeam["team-labs"]?.members?.[0]?.role, "admin");
 });
 
 test("desktop store exposes room chat message actions", () => {

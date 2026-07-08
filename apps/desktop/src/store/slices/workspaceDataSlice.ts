@@ -8,15 +8,21 @@ type TeamMembersMessageByTeam = Record<string, string | null>;
 type TeamMembersBusyByTeam = Record<string, boolean>;
 type MessagesByRoom = Record<string, ChatMessage[]>;
 
+export interface TeamRosterState {
+  members?: TeamMemberRecord[];
+  message?: string | null;
+  busy?: boolean;
+}
+
+export type TeamRosterByTeam = Record<string, TeamRosterState>;
+
 interface WorkspaceInitialData {
   teamMembersByTeam: TeamMembersByTeam;
   messagesByRoom: MessagesByRoom;
 }
 
 export interface WorkspaceDataSlice {
-  teamMembersByTeam: TeamMembersByTeam;
-  teamMembersMessageByTeam: TeamMembersMessageByTeam;
-  teamMembersBusyByTeam: TeamMembersBusyByTeam;
+  teamRosterByTeam: TeamRosterByTeam;
   messagesByRoom: MessagesByRoom;
   seedWorkspaceInitialDataIfEmpty: (initialData: WorkspaceInitialData) => void;
   setTeamMembersForTeam: (teamId: string, members: TeamMemberRecord[]) => void;
@@ -30,65 +36,102 @@ export interface WorkspaceDataSlice {
 
 export const emptyWorkspaceDataState: Pick<
   WorkspaceDataSlice,
-  "teamMembersByTeam" | "teamMembersMessageByTeam" | "teamMembersBusyByTeam" | "messagesByRoom"
+  "teamRosterByTeam" | "messagesByRoom"
 > = {
-  teamMembersByTeam: {},
-  teamMembersMessageByTeam: {},
-  teamMembersBusyByTeam: {},
+  teamRosterByTeam: {},
   messagesByRoom: {}
 };
+
+function updateTeamRosterForTeam(
+  current: TeamRosterByTeam,
+  teamId: string,
+  update: (teamRoster: TeamRosterState) => TeamRosterState
+): TeamRosterByTeam {
+  return {
+    ...current,
+    [teamId]: update(current[teamId] ?? {})
+  };
+}
+
+export function projectTeamMembersByTeam(teamRosterByTeam: TeamRosterByTeam): TeamMembersByTeam {
+  return Object.fromEntries(
+    Object.entries(teamRosterByTeam)
+      .filter(([, roster]) => roster.members)
+      .map(([teamId, roster]) => [teamId, roster.members ?? []])
+  );
+}
+
+export function projectTeamMembersMessageByTeam(teamRosterByTeam: TeamRosterByTeam): TeamMembersMessageByTeam {
+  return Object.fromEntries(
+    Object.entries(teamRosterByTeam)
+      .filter(([, roster]) => "message" in roster)
+      .map(([teamId, roster]) => [teamId, roster.message ?? null])
+  );
+}
+
+export function projectTeamMembersBusyByTeam(teamRosterByTeam: TeamRosterByTeam): TeamMembersBusyByTeam {
+  return Object.fromEntries(
+    Object.entries(teamRosterByTeam)
+      .filter(([, roster]) => "busy" in roster)
+      .map(([teamId, roster]) => [teamId, roster.busy ?? false])
+  );
+}
 
 export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], WorkspaceDataSlice> = (set) => ({
   ...emptyWorkspaceDataState,
   seedWorkspaceInitialDataIfEmpty: ({ teamMembersByTeam, messagesByRoom }) => {
     set((state) => {
       const shouldSeedTeamMembers =
-        Object.keys(teamMembersByTeam).length > 0 && Object.keys(state.teamMembersByTeam).length === 0;
+        Object.keys(teamMembersByTeam).length > 0 && Object.keys(state.teamRosterByTeam).length === 0;
       const shouldSeedMessages = Object.keys(messagesByRoom).length > 0 && Object.keys(state.messagesByRoom).length === 0;
       if (!shouldSeedTeamMembers && !shouldSeedMessages) return state;
       return {
-        ...(shouldSeedTeamMembers ? { teamMembersByTeam } : {}),
+        ...(shouldSeedTeamMembers ? {
+          teamRosterByTeam: Object.fromEntries(
+            Object.entries(teamMembersByTeam).map(([teamId, members]) => [teamId, { members }])
+          )
+        } : {}),
         ...(shouldSeedMessages ? { messagesByRoom } : {})
       };
     });
   },
   setTeamMembersForTeam: (teamId, members) => {
     set((state) => ({
-      teamMembersByTeam: {
-        ...state.teamMembersByTeam,
-        [teamId]: members
-      }
+      teamRosterByTeam: updateTeamRosterForTeam(state.teamRosterByTeam, teamId, (roster) => ({
+        ...roster,
+        members
+      }))
     }));
   },
   setTeamMembersMessageForTeam: (teamId, message) => {
     set((state) => ({
-      teamMembersMessageByTeam: {
-        ...state.teamMembersMessageByTeam,
-        [teamId]: message
-      }
+      teamRosterByTeam: updateTeamRosterForTeam(state.teamRosterByTeam, teamId, (roster) => ({
+        ...roster,
+        message
+      }))
     }));
   },
   setTeamMembersBusyForTeam: (teamId, busy) => {
     set((state) => ({
-      teamMembersBusyByTeam: {
-        ...state.teamMembersBusyByTeam,
-        [teamId]: busy
-      }
+      teamRosterByTeam: updateTeamRosterForTeam(state.teamRosterByTeam, teamId, (roster) => ({
+        ...roster,
+        busy
+      }))
     }));
   },
   ensureLocalTeamMemberForTeam: (teamId, userId, role) => {
     set((state) => {
-      if (state.teamMembersByTeam[teamId]?.some((member) => member.userId === userId)) return state;
+      if (state.teamRosterByTeam[teamId]?.members?.some((member) => member.userId === userId)) return state;
       return {
-        teamMembersByTeam: {
-          ...state.teamMembersByTeam,
-          [teamId]: [{
+        teamRosterByTeam: updateTeamRosterForTeam(state.teamRosterByTeam, teamId, (roster) => ({
+          ...roster,
+          members: [{
             teamId,
             userId,
             role,
             joinedAt: new Date().toISOString()
           }]
-        }
+        }))
       };
     });
   },

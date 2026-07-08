@@ -1,7 +1,12 @@
-import { useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import type { RoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
 import type { ChatMessage, SidebarPanel } from "../types";
 import { useAppStore } from "../store/appStore";
+import {
+  projectTeamMembersBusyByTeam,
+  projectTeamMembersByTeam,
+  projectTeamMembersMessageByTeam
+} from "../store/slices/workspaceDataSlice";
 
 export function useWorkspaceUiState({
   initialTeams,
@@ -20,9 +25,16 @@ export function useWorkspaceUiState({
 }) {
   const [teams, setTeams] = useState<TeamRecord[]>(initialTeams);
   const [rooms, setRooms] = useState<RoomRecord[]>(initialRooms);
-  const teamMembersByTeam = useAppStore((state) => state.teamMembersByTeam);
-  const teamMembersMessageByTeam = useAppStore((state) => state.teamMembersMessageByTeam);
-  const teamMembersBusyByTeam = useAppStore((state) => state.teamMembersBusyByTeam);
+  const teamRosterByTeam = useAppStore((state) => state.teamRosterByTeam);
+  const {
+    teamMembersByTeam,
+    teamMembersMessageByTeam,
+    teamMembersBusyByTeam
+  } = useMemo(() => ({
+    teamMembersByTeam: projectTeamMembersByTeam(teamRosterByTeam),
+    teamMembersMessageByTeam: projectTeamMembersMessageByTeam(teamRosterByTeam),
+    teamMembersBusyByTeam: projectTeamMembersBusyByTeam(teamRosterByTeam)
+  }), [teamRosterByTeam]);
   const seedWorkspaceInitialDataIfEmpty = useAppStore((state) => state.seedWorkspaceInitialDataIfEmpty);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>(null);
