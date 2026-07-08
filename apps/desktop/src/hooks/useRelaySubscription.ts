@@ -1,4 +1,4 @@
-import { useEffect, type MutableRefObject } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 import type {
   BrowserRequestPlaintextPayload,
   CodexApprovalPlaintextPayload,
@@ -39,6 +39,7 @@ import {
   isTerminalResultPlaintextPayload
 } from "../lib/localRoomHistoryPayload";
 import { formatMessageTime } from "../lib/appFormatters";
+import { sendRoomMessageNotification } from "../lib/roomNotifications";
 import type {
   BrowserAccessRequest,
   ChatMessage,
@@ -66,6 +67,8 @@ interface UseRelaySubscriptionOptions {
   hasSelectedRoom: boolean;
   isActiveHost: boolean;
   inviteAdmissionsByRoom: Record<string, string | undefined>;
+  mutedRoomIds: Set<string>;
+  forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
   revokedTeamIds: Set<string>;
   approvalPolicyLabels: Record<string, string>;
@@ -119,6 +122,8 @@ export function useRelaySubscription({
   hasSelectedRoom,
   isActiveHost,
   inviteAdmissionsByRoom,
+  mutedRoomIds,
+  forgottenRoomIds,
   revokedRoomIds,
   revokedTeamIds,
   approvalPolicyLabels,
@@ -161,6 +166,13 @@ export function useRelaySubscription({
   appendRoomMessage,
   setInviteMessageForRoom
 }: UseRelaySubscriptionOptions) {
+  const mutedRoomIdsRef = useRef(mutedRoomIds);
+  const forgottenRoomIdsRef = useRef(forgottenRoomIds);
+  useEffect(() => {
+    mutedRoomIdsRef.current = mutedRoomIds;
+    forgottenRoomIdsRef.current = forgottenRoomIds;
+  }, [forgottenRoomIds, mutedRoomIds]);
+
   useEffect(() => {
     void isActiveHost;
     let cancelled = false;
@@ -247,6 +259,22 @@ export function useRelaySubscription({
             );
             appendRoomMessage(message.envelope.roomId, chatMessage);
             const envelopeRoom = roomsRef.current.find((room) => room.id === message.envelope.roomId);
+            void sendRoomMessageNotification({
+              relayOpen: true,
+              room: envelopeRoom,
+              message: chatMessage,
+              selectedRoomId: selectedRoomIdRef.current,
+              localDeviceId: deviceId,
+              senderDeviceId: message.envelope.senderDeviceId,
+              localUserId: localUser.id,
+              senderUserId: message.envelope.senderUserId,
+              mutedRoomIds: mutedRoomIdsRef.current,
+              forgottenRoomIds: forgottenRoomIdsRef.current,
+              revokedRoomIds,
+              revokedTeamIds
+            }).catch((error) => {
+              console.warn("Failed to send room notification", error);
+            });
             if (envelopeRoom) handleCodexBrowserOpenCommand(chatMessage, envelopeRoom);
           }
           if (message.envelope.kind === "chat.reaction") {

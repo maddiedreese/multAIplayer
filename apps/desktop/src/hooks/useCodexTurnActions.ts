@@ -22,6 +22,7 @@ import {
   isDelegatedApprovalExecutionPolicy
 } from "../lib/codexApproval";
 import {
+  buildCodexApprovalSnapshot,
   buildCodexTurnInput,
   buildCodexTurnSummary,
   detectCodexTurnRiskFlags
@@ -44,7 +45,8 @@ import type {
   BrowserAccessRequest,
   ChatMessage,
   HostHandoffRecord,
-  PendingCodexApproval
+  PendingCodexApproval,
+  QueuedCodexTurn
 } from "../types";
 
 interface LocalUser {
@@ -67,10 +69,11 @@ interface UseCodexTurnActionsOptions {
   gitStatusByRoom: Record<string, GitStatusSummary | null>;
   codexContinuationByRoom: Record<string, HostHandoffRecord>;
   codexThreadIdsByRoom: Record<string, string>;
+  queuedCodexApprovalsByRoom: Record<string, QueuedCodexTurn[]>;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
-  promoteNextCodexApprovalForRoom: (roomId: string) => void;
+  removeQueuedCodexApprovalForRoom: (roomId: string, turnId: string) => void;
   setCodexRunningForRoom: (roomId: string, running: boolean) => void;
   appendTerminalLinesForRoom: (roomId: string, lines: string[]) => void;
   replaceRoom: (room: RoomRecord) => void;
@@ -105,10 +108,11 @@ export function useCodexTurnActions({
   gitStatusByRoom,
   codexContinuationByRoom,
   codexThreadIdsByRoom,
+  queuedCodexApprovalsByRoom,
   setHostMessageForRoom,
   setPendingCodexApprovalForRoom,
   setApprovalVisibleForRoom,
-  promoteNextCodexApprovalForRoom,
+  removeQueuedCodexApprovalForRoom,
   setCodexRunningForRoom,
   appendTerminalLinesForRoom,
   replaceRoom,
@@ -119,6 +123,43 @@ export function useCodexTurnActions({
 }: UseCodexTurnActionsOptions) {
   const setCodexThreadIdForRoom = useAppStore((state) => state.setCodexThreadIdForRoom);
   const setCodexContinuationForRoom = useAppStore((state) => state.setCodexContinuationForRoom);
+
+  function promoteNextCodexApprovalForRoom(roomId: string) {
+    const nextTurn = queuedCodexApprovalsByRoom[roomId]?.[0];
+    if (!nextTurn) return;
+    const room = roomsRef.current.find((item) => item.id === roomId);
+    if (!room) {
+      removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
+      return;
+    }
+    const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
+    const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
+    if (roomLocked || !room.mode.code || room.approvalPolicy === "never_host") {
+      removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
+      setHostMessageForRoom(roomId, roomLocked ? roomLockMessage(room, roomRevoked) : "Queued Codex turn was cancelled because Codex is unavailable in this room.");
+      return;
+    }
+    const roomCanReadLocalWorkspace = canUseLocalWorkspace(room, localUser, roomLocked);
+    const approval = {
+      ...buildCodexApprovalSnapshot(
+        room,
+        messagesByRoom[roomId] ?? [],
+        undefined,
+        terminals.filter((terminal) => terminal.roomId === roomId),
+        browserRequestsByRoom[roomId] ?? [],
+        gitStatusByRoom[roomId] ?? null,
+        { includeWorkspaceContext: roomCanReadLocalWorkspace }
+      ),
+      turnId: nextTurn.turnId,
+      requestedBy: nextTurn.requestedBy,
+      requestedByUserId: nextTurn.requestedByUserId,
+      queuedAt: nextTurn.queuedAt
+    };
+    removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
+    setPendingCodexApprovalForRoom(roomId, approval);
+    setApprovalVisibleForRoom(roomId, true);
+    setHostMessageForRoom(roomId, "Queued Codex turn is ready for host approval with current room context.");
+  }
 
   async function approveCodexTurn(approval: PendingCodexApproval | null = activeCodexApproval) {
     const roomId = approval?.roomId ?? selectedRoom.id;
@@ -337,6 +378,7 @@ export function useCodexTurnActions({
   }
 
   return {
-    approveCodexTurn
+    approveCodexTurn,
+    promoteNextCodexApprovalForRoom
   };
 }

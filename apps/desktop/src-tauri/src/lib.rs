@@ -30,6 +30,7 @@ pub fn run() {
         .manage(TerminalState::default())
         .manage(LocalPreviewState::default())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             app_version,

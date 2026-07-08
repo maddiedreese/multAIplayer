@@ -11,7 +11,7 @@ export function useCodexRoomActions({
   turn: CodexTurnActionsOptions;
   invoke: CodexInvokeActionsOptions;
 }) {
-  const { approveCodexTurn } = useCodexTurnActions(turn);
+  const { approveCodexTurn, promoteNextCodexApprovalForRoom } = useCodexTurnActions(turn);
   const {
     handleCodexInvoke,
     sendMessage,
@@ -27,6 +27,7 @@ export function useCodexRoomActions({
 
   return {
     approveCodexTurn,
+    promoteNextCodexApprovalForRoom,
     handleCodexInvoke,
     sendMessage,
     pauseGoal,

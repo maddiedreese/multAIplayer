@@ -23,6 +23,7 @@ import type {
   ChatAttachment,
   ChatMessage,
   PendingCodexApproval,
+  QueuedCodexTurn,
   RoomGoal
 } from "../types";
 import type {
@@ -55,7 +56,7 @@ interface UseCodexInvokeActionsOptions {
   browserRequests: BrowserAccessRequest[];
   gitStatus: GitStatusSummary | null;
   activeCodexApproval: PendingCodexApproval | null;
-  queuedCodexApprovals: PendingCodexApproval[];
+  queuedCodexApprovals: QueuedCodexTurn[];
   publishChatMessage: (message: ChatMessage, room?: RoomRecord) => Promise<void>;
   handleCodexBrowserOpenCommand: (message: ChatMessage, room: RoomRecord) => boolean;
   approveCodexTurn: (approval?: PendingCodexApproval | null) => Promise<void>;
@@ -64,7 +65,7 @@ interface UseCodexInvokeActionsOptions {
   setSelectedHostMessage: (message: string | null) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
-  enqueueCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval) => void;
+  enqueueCodexApprovalForRoom: (roomId: string, turn: QueuedCodexTurn) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   setDraftForRoom: (roomId: string, draft: string) => void;
   setReplyToMessageForRoom: (roomId: string, messageId: string | null) => void;
@@ -218,10 +219,8 @@ export function useCodexInvokeActions({
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
-    const approvalSnapshot: PendingCodexApproval = {
-      ...buildCodexApprovalSnapshot(selectedRoom, messages, pendingMessage, roomTerminals, browserRequests, gitStatus, {
-        includeWorkspaceContext: canReadLocalWorkspace
-      }),
+    const turnIntent: QueuedCodexTurn = {
+      roomId,
       turnId: crypto.randomUUID(),
       requestedBy: localUser.name,
       requestedByUserId: localUser.id,
@@ -232,10 +231,16 @@ export function useCodexInvokeActions({
         setHostMessageForRoom(roomId, "Codex queue is full. Wait for one turn to finish or cancel a queued turn.");
         return;
       }
-      enqueueCodexApprovalForRoom(roomId, approvalSnapshot);
+      enqueueCodexApprovalForRoom(roomId, turnIntent);
       setHostMessageForRoom(roomId, `Queued Codex turn ${queuedCodexApprovals.length + 1} of 5.`);
       return;
     }
+    const approvalSnapshot: PendingCodexApproval = {
+      ...buildCodexApprovalSnapshot(selectedRoom, messages, pendingMessage, roomTerminals, browserRequests, gitStatus, {
+        includeWorkspaceContext: canReadLocalWorkspace
+      }),
+      ...turnIntent
+    };
     if (selectedRoom.approvalPolicy === "auto_chat_only") {
       if (shouldAutoApproveChatOnlyTurn(approvalSnapshot.summary, isActiveHost, approvalSnapshot.riskFlags ?? [])) {
         setPendingCodexApprovalForRoom(roomId, null);

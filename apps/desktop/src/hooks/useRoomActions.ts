@@ -73,6 +73,7 @@ export function useRoomActions({
   const setInviteMessageForRoom = useAppStore((state) => state.setInviteMessageForRoom);
   const setCustomCodexModelForRoom = useAppStore((state) => state.setCustomCodexModelForRoom);
   const setProjectPathDraftForRoom = useAppStore((state) => state.setProjectPathDraftForRoom);
+  const setRoomNotificationsMuted = useAppStore((state) => state.setRoomNotificationsMuted);
   const setGitWorkflowBusyForRoom = useAppStore((state) => state.setGitWorkflowBusyForRoom);
   const setActionsBusyForRoom = useAppStore((state) => state.setActionsBusyForRoom);
   const setLocalPreviewBusyForRoom = useAppStore((state) => state.setLocalPreviewBusyForRoom);
@@ -90,7 +91,6 @@ export function useRoomActions({
   const setPendingCodexApprovalForRoom = useAppStore((state) => state.setPendingCodexApprovalForRoom);
   const enqueueCodexApprovalForRoom = useAppStore((state) => state.enqueueCodexApprovalForRoom);
   const removeQueuedCodexApprovalForRoom = useAppStore((state) => state.removeQueuedCodexApprovalForRoom);
-  const promoteNextCodexApprovalForRoom = useAppStore((state) => state.promoteNextCodexApprovalForRoom);
   const resetCodexApprovalForRoom = useAppStore((state) => state.resetCodexApprovalForRoom);
   const setCodexRunningForRoom = useAppStore((state) => state.setCodexRunningForRoom);
   const setRoomGoalForRoom = useAppStore((state) => state.setRoomGoalForRoom);
@@ -170,6 +170,7 @@ export function useRoomActions({
       const room = project.roomsRef.current.find((item) => item.id === roomId);
       setProjectPathDraftForRoom(roomId, projectPath, room?.projectPath ?? project.defaultProjectPath);
     },
+    setRoomNotificationsMuted,
     setPendingAttachmentsForRoom,
     appendPendingAttachmentForRoom,
     removePendingAttachmentForRoom,
@@ -213,7 +214,6 @@ export function useRoomActions({
     setPendingCodexApprovalForRoom,
     enqueueCodexApprovalForRoom,
     removeQueuedCodexApprovalForRoom,
-    promoteNextCodexApprovalForRoom,
     resetCodexApprovalForRoom,
     setCodexRunningForRoom,
     setRoomGoalForRoom,

@@ -248,7 +248,8 @@ test("RoomChatPanel renders queued Codex turns", () => {
       turnId: "turn-queued-1",
       requestedBy: "Maddie",
       queuedAt: "2026-07-07T12:00:00.000Z",
-      messagesSinceLastCodex: 3
+      messagesSinceLastCodex: 3,
+      canCancel: true
     }],
     roomGoal: null,
     pendingAttachments: [],

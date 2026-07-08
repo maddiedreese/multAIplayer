@@ -14,6 +14,7 @@ import type {
   InviteJoinRequest,
   LocalPreviewRecord,
   PendingCodexApproval,
+  QueuedCodexTurn,
   TerminalCommandRequest
 } from "../types";
 import { formatBytes, formatHostStatus } from "../lib/appFormatters";
@@ -41,7 +42,7 @@ interface UseSelectedRoomRuntimeOptions {
   roomTerminals: TerminalSnapshot[];
   selectedTerminalId: string | null;
   pendingCodexApprovalsByRoom: Record<string, PendingCodexApproval | null>;
-  queuedCodexApprovalsByRoom: Record<string, PendingCodexApproval[]>;
+  queuedCodexApprovalsByRoom: Record<string, QueuedCodexTurn[]>;
   approvalVisibleByRoom: Record<string, boolean>;
   hostHandoffsByRoom: Record<string, HostHandoffRecord[]>;
   terminalRequestsByRoom: Record<string, TerminalCommandRequest[]>;
@@ -117,11 +118,14 @@ export function useSelectedRoomRuntime({
     attachments: formatApprovalAttachments(approvalTranscriptMessages),
     riskFlags: activeCodexApproval?.riskFlags ?? []
   };
-  const queuedCodexTurnRows = queuedCodexApprovals.map((approval) => ({
-    turnId: approval.turnId,
-    requestedBy: approval.requestedBy,
-    queuedAt: approval.queuedAt,
-    messagesSinceLastCodex: approval.summary.messagesSinceLastCodex
+  const currentMessagesSinceLastCodex = messagesSinceLastCodex(messages).length;
+  const queuedCodexTurnRows = queuedCodexApprovals.map((turn) => ({
+    turnId: turn.turnId,
+    requestedBy: turn.requestedBy,
+    requestedByUserId: turn.requestedByUserId,
+    queuedAt: turn.queuedAt,
+    messagesSinceLastCodex: currentMessagesSinceLastCodex,
+    canCancel: !isSelectedRoomLocked && (turn.requestedByUserId === localUser.id || selectedRoom.hostUserId === localUser.id)
   }));
   const chatMessageRows = buildRoomChatMessageRows({
     messages,

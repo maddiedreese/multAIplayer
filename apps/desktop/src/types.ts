@@ -63,6 +63,14 @@ export interface PendingCodexApproval {
   riskFlags?: CodexTurnRiskFlag[];
 }
 
+export interface QueuedCodexTurn {
+  turnId: string;
+  roomId: string;
+  requestedBy: string;
+  requestedByUserId: string;
+  queuedAt: string;
+}
+
 export interface RoomPresence {
   userId: string;
   deviceId: string;

@@ -143,6 +143,7 @@ export function useAppViewModel({
     setProjectPathDraftForRoom,
     setInviteApprovalGateForRoom,
     setCustomCodexModelForRoom,
+    setRoomNotificationsMuted,
     updateSelectedGitWorkflowDraft
   } = roomActions;
 
@@ -456,6 +457,7 @@ export function useAppViewModel({
       relayWsDraft: appConfigState.relayWsDraft,
       selectedRoomMode: selectedRoom.mode,
       roomSettingsGateMessage: roomInteraction.roomSettingsGateMessage,
+      notificationsMuted: roomSettingsState.notificationMutedRoomIds.has(selectedRoom.id),
       historySettings: historyDefaultsState.historySettings,
       teamHistorySettings: historyDefaultsState.teamHistorySettings,
       teamDefaultApprovalPolicy: historyDefaultsState.teamDefaultApprovalPolicy,
@@ -485,6 +487,7 @@ export function useAppViewModel({
       onResetRelay: appConfigState.resetRelayConfiguration,
       onSaveRelay: appConfigState.saveRelayConfiguration,
       onToggleRoomMode: roomRuntime.toggleRoomMode,
+      onNotificationsMutedChange: (muted) => setRoomNotificationsMuted(selectedRoom.id, muted),
       onHistorySettingsChange: workspaceFlow.updateLocalHistorySettings,
       onClearRoomHistory: workspaceFlow.clearRoomHistory,
       onForgetRoomLocalData: workspaceFlow.forgetSelectedRoomLocalData,

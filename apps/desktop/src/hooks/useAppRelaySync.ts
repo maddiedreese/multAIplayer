@@ -58,6 +58,7 @@ export function useAppRelaySync({
   const {
     workspaceState,
     appConfigState,
+    roomSettingsState,
     roomRuntimeState,
     appRuntimeState,
     invitePanelState
@@ -117,6 +118,8 @@ export function useAppRelaySync({
         hasSelectedRoom,
         isActiveHost: roomInteraction.isActiveHost,
         inviteAdmissionsByRoom: invitePanelState.inviteAdmissionsByRoom,
+        mutedRoomIds: roomSettingsState.notificationMutedRoomIds,
+        forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
         revokedRoomIds: roomRuntimeState.revokedRoomIds,
         revokedTeamIds: roomRuntimeState.revokedTeamIds,
         approvalPolicyLabels,

@@ -54,8 +54,10 @@ export interface PendingAttachmentDisplay {
 export interface QueuedCodexTurnDisplay {
   turnId: string;
   requestedBy: string;
+  requestedByUserId?: string;
   queuedAt: string;
   messagesSinceLastCodex: number;
+  canCancel?: boolean;
 }
 
 export function RoomChatPanel({
@@ -319,7 +321,7 @@ export function RoomChatPanel({
                   <strong>{turn.requestedBy}</strong>
                   <small>{turn.messagesSinceLastCodex} message{turn.messagesSinceLastCodex === 1 ? "" : "s"} ready at turn start</small>
                 </div>
-                <button onClick={() => onCancelQueuedCodexTurn(turn.turnId)} disabled={roomLocked}>
+                <button onClick={() => onCancelQueuedCodexTurn(turn.turnId)} disabled={roomLocked || !turn.canCancel}>
                   <X size={13} />
                   Cancel
                 </button>

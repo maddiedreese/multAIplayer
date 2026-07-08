@@ -45,7 +45,6 @@ export function useAppRoomPanelActions({
   const {
     setPendingCodexApprovalForRoom,
     removeQueuedCodexApprovalForRoom,
-    promoteNextCodexApprovalForRoom,
     setApprovalVisibleForRoom,
     setChatMessageForRoom,
     setDraftForRoom,
@@ -72,7 +71,7 @@ export function useAppRoomPanelActions({
       setPendingCodexApprovalForRoom,
       setApprovalVisibleForRoom,
       removeQueuedCodexApprovalForRoom,
-      promoteNextCodexApprovalForRoom,
+      promoteNextCodexApprovalForRoom: roomRuntime.promoteNextCodexApprovalForRoom,
       approveCodexTurn: roomRuntime.approveCodexTurn,
       handleCodexInvoke: roomRuntime.handleCodexInvoke,
       pauseGoal: roomRuntime.pauseGoal,

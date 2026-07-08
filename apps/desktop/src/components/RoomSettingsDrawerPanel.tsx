@@ -34,6 +34,7 @@ export function RoomSettingsDrawerPanel({
   roomModesDisabled,
   showRoomSettingsGate,
   roomSettingsGateMessage,
+  notificationsMuted,
   historySettings,
   teamHistorySettings,
   hasSelectedRoom,
@@ -53,6 +54,7 @@ export function RoomSettingsDrawerPanel({
   onResetRelay,
   onSaveRelay,
   onToggleRoomMode,
+  onNotificationsMutedChange,
   onHistoryEnabledChange,
   onHistoryRetentionDaysChange,
   onClearRoomHistory,
@@ -84,6 +86,7 @@ export function RoomSettingsDrawerPanel({
   roomModesDisabled: boolean;
   showRoomSettingsGate: boolean;
   roomSettingsGateMessage: string;
+  notificationsMuted: boolean;
   historySettings: LocalHistorySettings;
   teamHistorySettings: LocalHistorySettings;
   hasSelectedRoom: boolean;
@@ -103,6 +106,7 @@ export function RoomSettingsDrawerPanel({
   onResetRelay: () => void;
   onSaveRelay: () => void;
   onToggleRoomMode: (mode: keyof RoomMode) => void;
+  onNotificationsMutedChange: (muted: boolean) => void;
   onHistoryEnabledChange: (enabled: boolean) => void;
   onHistoryRetentionDaysChange: (days: number) => void;
   onClearRoomHistory: () => void;
@@ -193,6 +197,15 @@ export function RoomSettingsDrawerPanel({
 
       <section className="drawer-section">
         <div className="drawer-section-title">Local history</div>
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={notificationsMuted}
+            disabled={!hasSelectedRoom}
+            onChange={(event) => onNotificationsMutedChange(event.target.checked)}
+          />
+          <span>Mute notifications for this room</span>
+        </label>
         <label className="checkbox-row">
           <input
             type="checkbox"

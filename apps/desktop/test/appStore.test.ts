@@ -752,46 +752,35 @@ test("desktop store exposes room Codex approval actions", () => {
   assert.equal(state.codexRuntimeByRoom["room-b"]?.approvalVisible, true);
 });
 
-test("desktop store promotes queued Codex approvals in order", () => {
+test("desktop store keeps queued Codex turn intents in order", () => {
   const store = useAppStore.getState();
-  const approval = {
+  const queuedTurn = {
     turnId: "turn-queued-1",
     roomId: "room-a",
     requestedBy: "Avery",
     requestedByUserId: "github:avery",
-    queuedAt: "2026-07-06T00:07:00.000Z",
-    messages: [],
-    summary: {
-      messagesSinceLastCodex: 1,
-      attachments: [],
-      workspacePath: null,
-      git: null,
-      browserAccess: [],
-      terminals: []
-    }
+    queuedAt: "2026-07-06T00:07:00.000Z"
   };
-  const secondApproval = {
-    ...approval,
+  const secondQueuedTurn = {
+    ...queuedTurn,
     turnId: "turn-queued-2",
     requestedBy: "Jordan",
     requestedByUserId: "github:jordan",
     queuedAt: "2026-07-06T00:08:00.000Z"
   };
 
-  store.enqueueCodexApprovalForRoom("room-a", approval);
-  store.enqueueCodexApprovalForRoom("room-a", secondApproval);
-  store.enqueueCodexApprovalForRoom("room-a", secondApproval);
+  store.enqueueCodexApprovalForRoom("room-a", queuedTurn);
+  store.enqueueCodexApprovalForRoom("room-a", secondQueuedTurn);
+  store.enqueueCodexApprovalForRoom("room-a", secondQueuedTurn);
 
   let state = useAppStore.getState();
   assert.equal(state.codexRuntimeByRoom["room-a"]?.queuedApprovals?.length, 2);
+  assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.queuedApprovals?.map((turn) => turn.turnId), ["turn-queued-1", "turn-queued-2"]);
 
   store.removeQueuedCodexApprovalForRoom("room-a", "turn-queued-2");
-  store.promoteNextCodexApprovalForRoom("room-a");
 
   state = useAppStore.getState();
-  assert.equal(state.codexRuntimeByRoom["room-a"]?.pendingApproval?.turnId, "turn-queued-1");
-  assert.equal(state.codexRuntimeByRoom["room-a"]?.approvalVisible, true);
-  assert.equal(state.codexRuntimeByRoom["room-a"]?.queuedApprovals, undefined);
+  assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.queuedApprovals?.map((turn) => turn.turnId), ["turn-queued-1"]);
 });
 
 test("desktop store exposes room Codex thread actions", () => {
