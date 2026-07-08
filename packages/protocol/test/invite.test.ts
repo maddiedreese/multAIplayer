@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   CodexApprovalPlaintextPayload,
   CodexEventPlaintextPayload,
+  CodexQueuePlaintextPayload,
   DevicePublicKeyJwk,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
@@ -302,6 +303,43 @@ test("Codex approval payloads carry delegated host execution authorization", () 
   }).success, false);
 });
 
+test("Codex queue payloads bound room-visible turn queue events", () => {
+  const queued = CodexQueuePlaintextPayload.parse({
+    eventType: "codex.queue",
+    queueEventId: "queue-event-1",
+    turnId: "turn-queued-1",
+    action: "queued",
+    requestedBy: "Jordan",
+    requestedByUserId: "github:jordan",
+    triggerMessageId: "message-2",
+    queuePosition: 2,
+    queueSize: 2,
+    createdAt: "2026-07-04T12:00:00.000Z"
+  });
+  const cancelled = CodexQueuePlaintextPayload.parse({
+    eventType: "codex.queue",
+    queueEventId: "queue-event-2",
+    turnId: "turn-queued-1",
+    action: "cancelled",
+    requestedBy: "Jordan",
+    requestedByUserId: "github:jordan",
+    reason: "Requester cancelled before host approval.",
+    queueSize: 1,
+    createdAt: "2026-07-04T12:01:00.000Z"
+  });
+
+  assert.equal(queued.queuePosition, 2);
+  assert.equal(cancelled.action, "cancelled");
+  assert.equal(CodexQueuePlaintextPayload.safeParse({
+    ...queued,
+    queuePosition: undefined
+  }).success, false);
+  assert.equal(CodexQueuePlaintextPayload.safeParse({
+    ...queued,
+    queueSize: 6
+  }).success, false);
+});
+
 test("Codex turn events can carry bounded risk flags for encrypted audit history", () => {
   const parsed = CodexEventPlaintextPayload.parse({
     eventType: "codex.turn",
@@ -309,6 +347,7 @@ test("Codex turn events can carry bounded risk flags for encrypted audit history
     status: "started",
     message: "Started Codex turn with GPT-5.5.",
     model: "gpt-5.5",
+    consumedMessageIds: ["message-1", "message-2"],
     riskFlags: [{
       id: "message-1:agent-directed-phrasing",
       label: "message from Maddie contains agent-directed phrasing",
@@ -321,6 +360,7 @@ test("Codex turn events can carry bounded risk flags for encrypted audit history
     createdAt: "2026-07-04T12:00:00.000Z"
   });
 
+  assert.deepEqual(parsed.consumedMessageIds, ["message-1", "message-2"]);
   assert.equal(parsed.riskFlags?.[0]?.risk, "Agent-directed phrasing");
   assert.equal(CodexEventPlaintextPayload.safeParse({
     ...parsed,

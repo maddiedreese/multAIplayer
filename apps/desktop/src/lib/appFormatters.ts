@@ -147,7 +147,7 @@ export function formatHostStatus(room: RoomRecord): string {
 export function formatMemberDeviceLabel(member: RoomPresence, localDeviceId: string, trusted = false): string {
   const localLabel = member.deviceId === localDeviceId ? "This device" : "Online";
   const fingerprint = member.publicKeyFingerprint ? shortFingerprint(member.publicKeyFingerprint) : "identity pending";
-  return `${localLabel} · ${fingerprint}${trusted ? " · locally trusted" : ""}`;
+  return `${localLabel} · ${fingerprint}${trusted ? " · local trust" : ""}`;
 }
 
 export function shortFingerprint(fingerprint: string): string {

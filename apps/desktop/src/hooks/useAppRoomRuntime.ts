@@ -377,6 +377,8 @@ export function useAppRoomRuntime({
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
         historySettings: historyDefaultsState.historySettings,
         messages,
+        chatEdits: workspaceState.chatEditsByRoom[selectedRoom.id] ?? [],
+        chatDeletes: workspaceState.chatDeletesByRoom[selectedRoom.id] ?? [],
         terminalRequests: selectedRuntime.terminalRequests,
         browserRequests,
         inviteRequests: selectedRuntime.inviteRequests,
@@ -387,6 +389,7 @@ export function useAppRoomRuntime({
         terminals: terminalPanelState.terminals,
         hostHandoffs: selectedRuntime.hostHandoffs,
         queuedCodexTurns: selectedRuntime.queuedCodexApprovals,
+        roomGoal,
         selectedCodexThreadId: selectedRuntime.selectedCodexThreadId
       },
       localPreviewPolling: {

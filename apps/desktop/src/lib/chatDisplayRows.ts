@@ -5,8 +5,10 @@ import type {
 } from "../components/RoomChatPanel";
 import type { ChatAttachment, ChatMessage, LocalPreviewRecord } from "../types";
 import { canOpenChatAttachment, formatAttachmentMeta } from "./appFormatters";
+import { messageIsBeforeCodexWatermark } from "./codexMessageWatermark";
 import { localPreviewStatusLabel } from "./localPreview";
 import { isBrowserDecisionSystemMessage } from "./localRoomHistoryPayload";
+import type { CodexRoomEvent } from "../types";
 
 const roomReactionEmoji = ["👍", "✅", "👀"];
 
@@ -14,12 +16,14 @@ export function buildRoomChatMessageRows({
   messages,
   markdownSelectionMode,
   selectedMessageIds,
-  localUserId
+  localUserId,
+  codexEvents = []
 }: {
   messages: ChatMessage[];
   markdownSelectionMode: boolean;
   selectedMessageIds: string[];
   localUserId: string;
+  codexEvents?: readonly CodexRoomEvent[];
 }): RoomChatMessageDisplay[] {
   const visibleMessages = messages.filter((message) => !isBrowserDecisionSystemMessage(message));
   const messagesById = new Map(visibleMessages.map((message) => [message.id, message]));
@@ -30,12 +34,12 @@ export function buildRoomChatMessageRows({
     id: message.id,
     author: message.author,
     role: message.role,
-    body: message.deletedAt ? "Message deleted" : message.body,
+    body: message.deletedAt ? formatDeletedMessageBody(message) : message.body,
     time: message.time,
     edited: Boolean(message.editedAt && !message.deletedAt),
     deleted: Boolean(message.deletedAt),
-    canEdit: canMutateMessage(message, localUserId) && visibleMessages.indexOf(message) > lastCodexIndex,
-    canDelete: canMutateMessage(message, localUserId) && visibleMessages.indexOf(message) > lastCodexIndex,
+    canEdit: canMutateMessage(message, localUserId) && visibleMessages.indexOf(message) > lastCodexIndex && messageIsBeforeCodexWatermark(message, codexEvents),
+    canDelete: canMutateMessage(message, localUserId) && visibleMessages.indexOf(message) > lastCodexIndex && messageIsBeforeCodexWatermark(message, codexEvents),
     replyPreview: message.replyTo ? buildReplyPreview(messagesById.get(message.replyTo)) : null,
     selected: markdownSelectionMode && selectedMessageIds.includes(message.id),
     attachments: message.deletedAt ? [] : (message.attachments ?? []).map((attachment) => ({
@@ -59,6 +63,12 @@ export function buildRoomChatMessageRows({
 
 function canMutateMessage(message: ChatMessage, localUserId: string): boolean {
   return message.role !== "codex" && !message.deletedAt && message.authorUserId === localUserId;
+}
+
+function formatDeletedMessageBody(message: ChatMessage): string {
+  if (message.deletedBy) return `Message deleted by ${message.deletedBy}`;
+  if (message.deletedByUserId) return `Message deleted by ${message.deletedByUserId.replace(/^github:/, "@")}`;
+  return "Message deleted";
 }
 
 function buildReplyPreview(message: ChatMessage | undefined): RoomChatMessageDisplay["replyPreview"] {

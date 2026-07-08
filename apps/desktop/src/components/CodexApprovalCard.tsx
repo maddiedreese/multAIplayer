@@ -5,6 +5,7 @@ import { ApprovalItem, StatusPill } from "./common";
 export type CodexApprovalSummaryDisplay = {
   messages: string;
   attachments: string;
+  sandbox: string;
   riskFlags: CodexTurnRiskFlag[];
 };
 
@@ -39,6 +40,7 @@ export function CodexApprovalCard({
       <div className="approval-grid">
         <ApprovalItem label="Messages" value={summary.messages} />
         <ApprovalItem label="Attachments" value={summary.attachments} />
+        <ApprovalItem label="Sandbox" value={summary.sandbox} />
       </div>
       {summary.riskFlags.length > 0 && (
         <div className="approval-risk-list">

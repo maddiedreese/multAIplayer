@@ -228,6 +228,7 @@ export function useAppWorkspaceFlow({
         localPreviews: selectedRuntime.localPreviews,
         terminals: terminalPanelState.terminals,
         hostHandoffs: selectedRuntime.hostHandoffs,
+        roomGoal: selected.roomGoal,
         selectedCodexThreadId: selectedRuntime.selectedCodexThreadId,
         reportRoomSettingsMutationInFlight: roomInteraction.reportRoomSettingsMutationInFlight,
         roomSettingsActor,

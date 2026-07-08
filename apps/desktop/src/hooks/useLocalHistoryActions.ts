@@ -35,6 +35,7 @@ import type {
   HostHandoffRecord,
   InviteJoinRequest,
   LocalPreviewRecord,
+  RoomGoal,
   TerminalCommandRequest
 } from "../types";
 
@@ -55,6 +56,7 @@ interface UseLocalHistoryActionsOptions {
   localPreviews: LocalPreviewRecord[];
   terminals: TerminalSnapshot[];
   hostHandoffs: HostHandoffRecord[];
+  roomGoal: RoomGoal | null;
   selectedCodexThreadId: string | null;
   reportRoomSettingsMutationInFlight: (
     roomId: string,
@@ -94,6 +96,7 @@ export function useLocalHistoryActions({
   localPreviews,
   terminals,
   hostHandoffs,
+  roomGoal,
   selectedCodexThreadId,
   reportRoomSettingsMutationInFlight,
   roomSettingsActor,
@@ -132,6 +135,7 @@ export function useLocalHistoryActions({
         localPreviews,
         terminalSnapshots: terminalsForLocalHistory(terminals.filter((terminal) => terminal.roomId === roomId)),
         hostHandoffs,
+        ...(roomGoal ? { roomGoal } : {}),
         ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
       }, saved.retentionDays);
       hydrateLocalRoomHistoryForRoom(roomId, payload);

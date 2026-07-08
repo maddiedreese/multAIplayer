@@ -26,11 +26,19 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         threadId: _threadId,
         ...codexRuntimeWithoutThread
       } = state.codexRuntimeByRoom[roomId] ?? {};
+      const chatEdits = payload.chatEdits ?? [];
+      const chatDeletes = payload.chatDeletes ?? [];
 
       return {
         messagesByRoom: payload.messages.length
           ? { ...state.messagesByRoom, [roomId]: payload.messages }
           : state.messagesByRoom,
+        chatEditsByRoom: chatEdits.length
+          ? { ...state.chatEditsByRoom, [roomId]: chatEdits }
+          : state.chatEditsByRoom,
+        chatDeletesByRoom: chatDeletes.length
+          ? { ...state.chatDeletesByRoom, [roomId]: chatDeletes }
+          : state.chatDeletesByRoom,
         terminalRuntimeByRoom: shouldHydrateTerminalRuntime
           ? {
               ...state.terminalRuntimeByRoom,
@@ -66,6 +74,7 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
             events: payload.codexEvents,
             hostHandoffs: payload.hostHandoffs,
             ...(queuedCodexTurns.length ? { queuedApprovals: queuedCodexTurns } : {}),
+            ...(payload.roomGoal ? { goal: payload.roomGoal } : {}),
             ...(codexThreadId ? { threadId: codexThreadId } : {})
           }
         },
@@ -113,6 +122,8 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
   clearRoomScopedStateForRoom: (roomId) => {
     set((state) => ({
       messagesByRoom: { ...state.messagesByRoom, [roomId]: [] },
+      chatEditsByRoom: { ...state.chatEditsByRoom, [roomId]: [] },
+      chatDeletesByRoom: { ...state.chatDeletesByRoom, [roomId]: [] },
       terminalRuntimeByRoom: {
         ...state.terminalRuntimeByRoom,
         [roomId]: { requests: [] }

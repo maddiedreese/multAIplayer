@@ -73,9 +73,9 @@ Gated invite links do not carry the room key. They carry room metadata and the h
 
 Room key rotation is available as an alpha hygiene control. The active host publishes a new room key inside an encrypted `room.key` event using the current room key, then clients that can decrypt that event replace their local room key for future messages and invites. Local encrypted history ciphertext is cleared when the key is replaced so stale ciphertext is not left behind under the old key. This does not provide cryptographic member removal by itself: any device that still has the old key and receives the rotation event can learn the new key.
 
-## Stronger Member Removal Design
+## Post-Alpha Stronger Member Removal Design
 
-Production-grade member removal should use explicit room key epochs and per-device key delivery instead of broadcasting the next room key under the current room key.
+Production-grade member removal is post-alpha roadmap work. It should use explicit room key epochs and per-device key delivery instead of broadcasting the next room key under the current room key.
 
 The intended stronger design is:
 

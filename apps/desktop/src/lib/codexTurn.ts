@@ -254,17 +254,17 @@ export function detectCodexTurnRiskFlags(
   const flags: CodexTurnRiskFlag[] = [];
   const includeWorkspaceContext = options.includeWorkspaceContext ?? true;
   const contextMessages = messagesSinceLastCodex(messages);
+  const approvedOrigins = new Set((room.browserAllowedOrigins ?? []).map((origin) => origin.toLowerCase()));
   contextMessages.forEach((message, index) => {
     const messageSource = `message ${index + 1} (@${message.author})`;
-    addTextRiskFlags(flags, message.body, messageSource);
+    addTextRiskFlags(flags, message.body, messageSource, approvedOrigins);
     for (const attachment of message.attachments ?? []) {
       const attachmentSource = `attachment ${attachment.name}`;
       addNamedRisks(flags, attachmentSource, detectSecretRisks(attachment.content ?? "", attachment.name));
-      addTextRiskFlags(flags, attachment.content ?? "", attachmentSource);
+      addTextRiskFlags(flags, attachment.content ?? "", attachmentSource, approvedOrigins);
     }
   });
   if (room.mode.browser) {
-    const approvedOrigins = new Set((room.browserAllowedOrigins ?? []).map((origin) => origin.toLowerCase()));
     for (const request of browserRequests.filter((item) => item.status === "approved")) {
       const origin = formatBrowserAccessLabel(request.url).toLowerCase();
       if (origin && approvedOrigins.size > 0 && !approvedOrigins.has(origin)) {
@@ -376,7 +376,7 @@ function sliceTailAtLineBoundary(input: string, maxChars: number): string {
   return boundary >= 0 ? slice.slice(boundary + 1) : slice;
 }
 
-function addTextRiskFlags(flags: CodexTurnRiskFlag[], text: string, source: string) {
+function addTextRiskFlags(flags: CodexTurnRiskFlag[], text: string, source: string, approvedOrigins = new Set<string>()) {
   if (!text) return;
   addNamedRisks(flags, source, detectSecretRisks(text));
   if (/(ignore (all )?(previous|prior|above) instructions|disregard (all )?(previous|prior|above) instructions|you must now|as the assistant|as an ai|system prompt|developer message|run the following|execute the following)/i.test(text)) {
@@ -391,6 +391,12 @@ function addTextRiskFlags(flags: CodexTurnRiskFlag[], text: string, source: stri
   const nonAscii = Array.from(text).filter((char) => char.charCodeAt(0) > 127).length;
   if (text.length >= 80 && nonAscii / text.length > 0.35) {
     flags.push(createRiskFlag(source, "Homoglyph-heavy text"));
+  }
+  for (const url of extractWebUrls(text)) {
+    const origin = formatBrowserAccessLabel(url).toLowerCase();
+    if (origin && approvedOrigins.size > 0 && !approvedOrigins.has(origin)) {
+      flags.push(createRiskFlag(source, "URL outside approved browser domains"));
+    }
   }
 }
 
@@ -423,6 +429,16 @@ function formatBrowserAccessLabel(url: string): string {
   } catch {
     return url;
   }
+}
+
+function extractWebUrls(text: string): string[] {
+  const urls: string[] = [];
+  const pattern = /\bhttps?:\/\/[^\s<>"'`)\]]+/gi;
+  for (const match of text.matchAll(pattern)) {
+    const candidate = match[0].replace(/[.,;:!?]+$/g, "");
+    if (candidate) urls.push(candidate);
+  }
+  return urls;
 }
 
 function formatBytes(bytes: number): string {

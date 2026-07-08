@@ -83,7 +83,7 @@ export function buildDeviceFingerprintMarkdown(input: DeviceFingerprintMarkdownI
     input.fingerprint,
     "```",
     "",
-    "Verify this fingerprint out of band before trusting the device."
+    "This is a local device note. Compare the fingerprint out of band before marking it trusted."
   ].join("\n");
 }
 

@@ -1,5 +1,6 @@
 import type { GitHubActionsEventPlaintextPayload, GitWorkflowEventPlaintextPayload } from "@multaiplayer/protocol";
 import {
+  defaultCodexSandboxLevel,
   maxEmbeddedAttachmentBytesPerMessage,
   maxMessageAttachments
 } from "@multaiplayer/protocol";
@@ -17,10 +18,10 @@ import type {
   QueuedCodexTurn,
   TerminalCommandRequest
 } from "../types";
-import { formatBytes, formatHostStatus } from "../lib/appFormatters";
+import { formatBytes, formatCodexSandboxLevel, formatHostStatus } from "../lib/appFormatters";
 import { formatApprovalAttachments, formatApprovalMessages } from "../lib/codexApprovalSummary";
 import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessageRows } from "../lib/chatDisplayRows";
-import { messagesSinceLastCodex } from "../lib/codexTurn";
+import { detectCodexTurnRiskFlags, messagesSinceLastCodex } from "../lib/codexTurn";
 import { inspectorAttentionCounts } from "../lib/inspectorAttention";
 import { canUseRoomChat } from "../lib/chatPolicy";
 import { canControlRoomTerminal } from "../lib/terminalAccess";
@@ -111,12 +112,20 @@ export function useSelectedRoomRuntime({
   const approvalTranscriptMessages = messagesSinceLastCodex(activeCodexApproval?.messages ?? messages) as ChatMessage[];
   const replyTargetMessage = replyToMessageId ? messages.find((message) => message.id === replyToMessageId) ?? null : null;
   const replyTarget = replyTargetMessage
-    ? { author: replyTargetMessage.author, body: replyTargetMessage.body }
+    ? {
+        author: replyTargetMessage.deletedAt ? "Original message" : replyTargetMessage.author,
+        body: replyTargetMessage.deletedAt
+          ? "Original message deleted"
+          : replyTargetMessage.body || "Original message unavailable or deleted"
+      }
     : null;
   const codexApprovalSummaryDisplay = {
     messages: formatApprovalMessages(approvalTranscriptMessages),
     attachments: formatApprovalAttachments(approvalTranscriptMessages),
-    riskFlags: activeCodexApproval?.riskFlags ?? []
+    sandbox: formatCodexSandboxLevel(selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel),
+    riskFlags: activeCodexApproval
+      ? detectCodexTurnRiskFlags(approvalTranscriptMessages, selectedRoom, browserRequests, null)
+      : []
   };
   const currentMessagesSinceLastCodex = messagesSinceLastCodex(messages).length;
   const queuedCodexTurnRows = queuedCodexApprovals.map((turn) => ({
@@ -131,7 +140,8 @@ export function useSelectedRoomRuntime({
     messages,
     markdownSelectionMode,
     selectedMessageIds,
-    localUserId: localUser.id
+    localUserId: localUser.id,
+    codexEvents
   });
   const pendingAttachmentRows = buildPendingAttachmentRows(pendingAttachments);
   const localPreviewCards = buildLocalPreviewCards(localPreviews, localUser.id);

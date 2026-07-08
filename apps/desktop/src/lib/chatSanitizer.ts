@@ -35,6 +35,7 @@ export function normalizeChatMessage(value: unknown): SanitizedChatMessage | nul
     (value.editedAt !== undefined && typeof value.editedAt !== "string") ||
     (value.editedByUserId !== undefined && typeof value.editedByUserId !== "string") ||
     (value.deletedAt !== undefined && typeof value.deletedAt !== "string") ||
+    (value.deletedBy !== undefined && typeof value.deletedBy !== "string") ||
     (value.deletedByUserId !== undefined && typeof value.deletedByUserId !== "string") ||
     (value.replyTo !== undefined && (typeof value.replyTo !== "string" || value.replyTo.trim() === ""))
   ) {
@@ -57,6 +58,7 @@ export function normalizeChatMessage(value: unknown): SanitizedChatMessage | nul
     ...(value.editedAt ? { editedAt: value.editedAt } : {}),
     ...(value.editedByUserId ? { editedByUserId: value.editedByUserId } : {}),
     ...(value.deletedAt ? { deletedAt: value.deletedAt } : {}),
+    ...(value.deletedBy ? { deletedBy: value.deletedBy } : {}),
     ...(value.deletedByUserId ? { deletedByUserId: value.deletedByUserId } : {}),
     ...(typeof value.replyTo === "string" ? { replyTo: value.replyTo } : {}),
     ...(attachments?.length ? { attachments } : { attachments: undefined })

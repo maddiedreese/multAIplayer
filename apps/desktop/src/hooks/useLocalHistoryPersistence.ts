@@ -14,9 +14,12 @@ import type {
   LocalPreviewRecord,
   LocalRoomHistoryPayload,
   QueuedCodexTurn,
+  RoomGoal,
   TerminalCommandRequest
 } from "../types";
 import type {
+  ChatDeletePlaintextPayload,
+  ChatEditPlaintextPayload,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload
 } from "@multaiplayer/protocol";
@@ -36,6 +39,8 @@ interface UseLocalHistoryPersistenceOptions {
   historyLoadedRoomIds: LatestRef<Set<string>>;
   historySettings: LocalHistorySettings;
   messages: ChatMessage[];
+  chatEdits: ChatEditPlaintextPayload[];
+  chatDeletes: ChatDeletePlaintextPayload[];
   terminalRequests: TerminalCommandRequest[];
   browserRequests: BrowserAccessRequest[];
   inviteRequests: InviteJoinRequest[];
@@ -46,6 +51,7 @@ interface UseLocalHistoryPersistenceOptions {
   terminals: TerminalSnapshot[];
   hostHandoffs: HostHandoffRecord[];
   queuedCodexTurns: QueuedCodexTurn[];
+  roomGoal: RoomGoal | null;
   selectedCodexThreadId: string | null;
 }
 
@@ -60,6 +66,8 @@ export function useLocalHistoryPersistence({
   historyLoadedRoomIds,
   historySettings,
   messages,
+  chatEdits,
+  chatDeletes,
   terminalRequests,
   browserRequests,
   inviteRequests,
@@ -70,6 +78,7 @@ export function useLocalHistoryPersistence({
   terminals,
   hostHandoffs,
   queuedCodexTurns,
+  roomGoal,
   selectedCodexThreadId
 }: UseLocalHistoryPersistenceOptions) {
   useEffect(() => {
@@ -79,6 +88,8 @@ export function useLocalHistoryPersistence({
     const payload = pruneLocalRoomHistory({
       version: 3,
       messages,
+      chatEdits,
+      chatDeletes,
       readState: localRoomReadStateForHistory(selectedRoom, messages),
       terminalRequests,
       browserRequests,
@@ -90,6 +101,7 @@ export function useLocalHistoryPersistence({
       terminalSnapshots: terminalsForLocalHistory(terminals.filter((terminal) => terminal.roomId === selectedRoomId)),
       hostHandoffs,
       queuedCodexTurns,
+      ...(roomGoal ? { roomGoal } : {}),
       ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
     }, historySettings.retentionDays);
     saveEncryptedHistory(selectedRoomId, payload satisfies LocalRoomHistoryPayload).catch((error) => {
@@ -101,6 +113,7 @@ export function useLocalHistoryPersistence({
     historySettings.retentionDays,
     hostHandoffs,
     queuedCodexTurns,
+    roomGoal,
     inviteRequests,
     codexEvents,
     gitWorkflowEvents,
@@ -110,6 +123,8 @@ export function useLocalHistoryPersistence({
     revokedRoomIds,
     revokedTeamIds,
     terminals,
+    chatEdits,
+    chatDeletes,
     messages,
     hasSelectedRoom,
     selectedCodexThreadId,

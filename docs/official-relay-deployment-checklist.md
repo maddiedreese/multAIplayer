@@ -32,11 +32,23 @@ MULTAIPLAYER_RELAY_RATE_LIMITS=true
 MULTAIPLAYER_ATTACHMENT_BLOB_TTL_DAYS=30
 MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES=5000000
 MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES=250000000
+MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW=100000000
+MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_WINDOW_MS=3600000
 MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES=1000000
+MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS=60000
+MULTAIPLAYER_RELAY_RATE_LIMIT_AUTH=30
+MULTAIPLAYER_RELAY_RATE_LIMIT_READ=300
+MULTAIPLAYER_RELAY_RATE_LIMIT_MUTATION=120
+MULTAIPLAYER_RELAY_RATE_LIMIT_ATTACHMENT=60
+MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET=600
+MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT=120
 MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER=20
 MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE=5
 MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP=25
 MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP=100
+MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER=500
+MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS=0
+MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS=10000
 MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
 ```
 
@@ -58,7 +70,7 @@ Run this in the deployed environment before pointing users at the relay:
 NODE_ENV=production npm run doctor:production-relay
 ```
 
-The check must pass. It verifies GitHub OAuth presence, strong durable session encryption, exact HTTP(S) allowed origins, auth-required mode, disabled debug endpoints, disabled demo seeding, enabled rate limits, persistent relay storage, and conservative proxy-header handling.
+The check must pass. It verifies GitHub OAuth presence, strong durable session encryption, exact HTTP(S) allowed origins, auth-required mode, disabled debug endpoints, disabled demo seeding, enabled rate limits, attachment/upload quotas, WebSocket connection caps, total room caps, persistent relay storage, and conservative proxy-header handling.
 
 ## Storage And Backups
 

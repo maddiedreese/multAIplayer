@@ -26,7 +26,8 @@ import {
   buildCodexTurnInput,
   buildCodexTurnSummary,
   detectCodexTurnRiskFlags,
-  hasActionableCodexTurnContext
+  hasActionableCodexTurnContext,
+  messagesSinceLastCodex
 } from "../lib/codexTurn";
 import { normalizeCodexThreadId } from "../lib/codexThread";
 import {
@@ -244,7 +245,10 @@ export function useCodexTurnActions({
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
-    const turnMessages = approval?.messages ?? messagesByRoom[roomId] ?? [];
+    const currentRoomMessages = messagesByRoom[roomId] ?? [];
+    const turnMessages = approval?.messages
+      ? refreshApprovalMessagesFromRoom(approval.messages, currentRoomMessages)
+      : currentRoomMessages;
     const turnSummary = buildCodexTurnSummary(
       turnMessages,
       room,
@@ -258,6 +262,13 @@ export function useCodexTurnActions({
     const speed = room.codexSpeed ?? defaultCodexSpeed;
     const sandboxLevel = room.codexSandboxLevel ?? defaultCodexSandboxLevel;
     const projectPath = room.projectPath;
+    if (!hasActionableCodexTurnContext(turnSummary)) {
+      setPendingCodexApprovalForRoom(roomId, null);
+      setApprovalVisibleForRoom(roomId, false);
+      setHostMessageForRoom(roomId, "The pending Codex turn became empty after room edits or deletes.");
+      promoteNextCodexApprovalForRoom(roomId);
+      return;
+    }
     setPendingCodexApprovalForRoom(roomId, null);
     setApprovalVisibleForRoom(roomId, false);
     setCodexRunningForRoom(roomId, true);
@@ -278,6 +289,9 @@ export function useCodexTurnActions({
       gitStatusByRoom[roomId] ?? null,
       { includeWorkspaceContext: roomCanReadLocalWorkspace }
     );
+    const consumedMessageIds = messagesSinceLastCodex(turnMessages)
+      .map((message) => message.id)
+      .filter((id): id is string => Boolean(id));
     const previousThreadId = codexThreadIdsByRoom[roomId] ?? null;
     try {
       await publishCodexEvent({
@@ -287,6 +301,7 @@ export function useCodexTurnActions({
           ? `Resuming Codex thread ${previousThreadId} with ${formatCodexModel(model)}.`
           : `Started Codex turn with ${formatCodexModel(model)}.`,
         model,
+        ...(consumedMessageIds.length ? { consumedMessageIds } : {}),
         ...(riskFlags.length ? { riskFlags } : {})
       }, room);
       const result = await runCodexTurn(roomId, projectPath, input, model, reasoningEffort, speed, sandboxLevel, previousThreadId);
@@ -408,4 +423,10 @@ export function useCodexTurnActions({
     approveCodexTurn,
     promoteNextCodexApprovalForRoom
   };
+}
+
+function refreshApprovalMessagesFromRoom(approvalMessages: ChatMessage[], roomMessages: ChatMessage[]): ChatMessage[] {
+  const approvalMessageIds = new Set(approvalMessages.map((message) => message.id).filter(Boolean));
+  const refreshed = roomMessages.filter((message) => approvalMessageIds.has(message.id) && !message.deletedAt);
+  return refreshed.length ? refreshed : approvalMessages.filter((message) => !message.deletedAt);
 }

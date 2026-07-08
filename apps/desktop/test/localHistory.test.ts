@@ -65,6 +65,7 @@ const {
 };
 
 const { normalizeLocalRoomHistory } = await import("../src/lib/localRoomHistoryPayload");
+const { createRoomSecret } = await import("@multaiplayer/crypto");
 
 test.beforeEach(() => {
   localStorage.clear();
@@ -136,6 +137,7 @@ test("encrypted history keeps Codex turn risk flags local and encrypted", async 
       status: "started",
       message: "Started Codex turn with GPT-5.5.",
       model: "gpt-5.5",
+      consumedMessageIds: ["message-risk"],
       riskFlags: [{
         id: "message-risk",
         label: "message from Maddie contains agent-directed phrasing",
@@ -157,6 +159,7 @@ test("encrypted history keeps Codex turn risk flags local and encrypted", async 
 
   const stored = localStorage.getItem(`multaiplayer:history:${roomId}`);
   assert.ok(stored);
+  assert.doesNotMatch(stored, /message-risk/);
   assert.doesNotMatch(stored, /agent-directed phrasing/);
   assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
 });
@@ -195,6 +198,80 @@ test("encrypted history keeps local room read state encrypted", async () => {
   assert.doesNotMatch(stored, /message-last-read/);
   assert.doesNotMatch(stored, /turn-queued-1/);
   assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
+});
+
+test("encrypted history keeps pre-Codex edit and delete audit records encrypted", async () => {
+  const roomId = "room-edit-delete-audit-history";
+  const payload = {
+    version: 3,
+    messages: [
+      {
+        id: "message-edited",
+        author: "Maddie",
+        authorUserId: "github:maddie",
+        role: "human",
+        body: "final visible message",
+        time: "10:00 AM",
+        createdAt: "2026-07-08T17:00:00.000Z",
+        editedAt: "2026-07-08T17:01:00.000Z",
+        editedByUserId: "github:maddie"
+      },
+      {
+        id: "message-deleted",
+        author: "Jordan",
+        authorUserId: "github:jordan",
+        role: "human",
+        body: "",
+        time: "10:01 AM",
+        createdAt: "2026-07-08T17:01:00.000Z",
+        deletedAt: "2026-07-08T17:02:00.000Z",
+        deletedBy: "Jordan",
+        deletedByUserId: "github:jordan"
+      }
+    ],
+    chatEdits: [
+      {
+        id: "edit-secret",
+        messageId: "message-edited",
+        body: "private edited audit body",
+        editedBy: "Maddie",
+        editedByUserId: "github:maddie",
+        editedAt: "2026-07-08T17:01:00.000Z"
+      }
+    ],
+    chatDeletes: [
+      {
+        id: "delete-secret",
+        messageId: "message-deleted",
+        deletedBy: "Jordan",
+        deletedByUserId: "github:jordan",
+        deletedAt: "2026-07-08T17:02:00.000Z"
+      }
+    ],
+    terminalRequests: [],
+    browserRequests: [],
+    inviteRequests: [],
+    codexEvents: [],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
+    localPreviews: [],
+    terminalSnapshots: [],
+    hostHandoffs: [],
+    queuedCodexTurns: []
+  };
+
+  await saveEncryptedHistory(roomId, payload);
+
+  const stored = localStorage.getItem(`multaiplayer:history:${roomId}`);
+  assert.ok(stored);
+  assert.doesNotMatch(stored, /private edited audit body/);
+  assert.doesNotMatch(stored, /edit-secret/);
+  assert.doesNotMatch(stored, /delete-secret/);
+  assert.doesNotMatch(localStorage.dump(), /message-deleted/);
+  assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
+  const normalized = normalizeLocalRoomHistory(await loadEncryptedHistory<typeof payload>(roomId) ?? []);
+  assert.equal(normalized.chatEdits?.[0]?.body, "private edited audit body");
+  assert.equal(normalized.chatDeletes?.[0]?.deletedBy, "Jordan");
 });
 
 test("local history normalization preserves sanitized room read state", () => {
@@ -446,6 +523,44 @@ test("history retention settings are sanitized to the supported range", () => {
     enabled: true,
     retentionDays: 30
   });
+});
+
+test("encrypted history keeps local room goals encrypted", async () => {
+  const roomId = "room-goal-history";
+  const payload = {
+    version: 3,
+    messages: [],
+    terminalRequests: [],
+    browserRequests: [],
+    inviteRequests: [],
+    codexEvents: [],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
+    localPreviews: [],
+    terminalSnapshots: [],
+    hostHandoffs: [],
+    queuedCodexTurns: [],
+    roomGoal: {
+      id: "goal-secret",
+      text: "Coordinate private launch checklist",
+      status: "running",
+      startedAt: "2026-07-08T18:00:00.000Z",
+      updatedAt: "2026-07-08T18:01:00.000Z",
+      elapsedMs: 60000
+    }
+  };
+
+  await saveEncryptedHistory(roomId, payload);
+
+  const stored = localStorage.getItem(`multaiplayer:history:${roomId}`);
+  assert.ok(stored);
+  assert.doesNotMatch(stored, /Coordinate private launch checklist/);
+  assert.doesNotMatch(localStorage.dump(), /goal-secret/);
+
+  const restored = await loadEncryptedHistory<typeof payload>(roomId);
+  const normalized = normalizeLocalRoomHistory(restored!);
+  assert.equal(normalized.roomGoal?.text, "Coordinate private launch checklist");
+  assert.equal(normalized.roomGoal?.status, "running");
 });
 
 test("clearEncryptedHistory removes only the selected room payload", async () => {

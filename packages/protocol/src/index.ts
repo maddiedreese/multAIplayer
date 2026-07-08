@@ -17,6 +17,7 @@ export const maxProjectPathChars = 2_048;
 export const maxUrlChars = 2_048;
 export const maxCodexModelChars = 80;
 export const maxCodexThreadIdChars = 512;
+export const maxCodexQueueSize = 5;
 export const maxTerminalSnapshots = 20;
 export const maxGitWorkflowResults = 20;
 export const maxGitHubActionRuns = 20;
@@ -236,6 +237,7 @@ export const CodexEventPlaintextPayload = z.object({
   model: z.string().min(1).max(maxCodexModelChars),
   threadId: z.string().min(1).max(maxCodexThreadIdChars).optional(),
   eventName: z.string().min(1).max(maxShortTextChars).optional(),
+  consumedMessageIds: z.array(z.string().min(1).max(maxEnvelopeIdChars)).max(256).optional(),
   riskFlags: z.array(CodexTurnRiskFlagPayload).max(24).optional(),
   host: z.string().min(1).max(maxDisplayNameChars),
   hostUserId: z.string().min(1).max(maxUserIdChars),
@@ -254,6 +256,28 @@ export const CodexApprovalPlaintextPayload = z.object({
     "trusted_members_only"
   ]),
   message: z.string().max(maxMediumTextChars).optional()
+});
+
+export const CodexQueuePlaintextPayload = z.object({
+  eventType: z.literal("codex.queue"),
+  queueEventId: z.string().min(1).max(maxEnvelopeIdChars),
+  turnId: z.string().min(1).max(maxEnvelopeIdChars),
+  action: z.enum(["queued", "cancelled", "coalesced", "promoted", "dropped"]),
+  requestedBy: z.string().min(1).max(maxDisplayNameChars),
+  requestedByUserId: z.string().min(1).max(maxUserIdChars),
+  triggerMessageId: z.string().min(1).max(maxEnvelopeIdChars).optional(),
+  reason: z.string().max(maxMediumTextChars).optional(),
+  queuePosition: z.number().int().min(1).max(maxCodexQueueSize).optional(),
+  queueSize: z.number().int().nonnegative().max(maxCodexQueueSize),
+  createdAt: z.string().datetime()
+}).refine((payload) => {
+  if (payload.action === "queued" || payload.action === "promoted") {
+    return typeof payload.queuePosition === "number";
+  }
+  return true;
+}, {
+  message: "Queued and promoted Codex queue events must include a queue position",
+  path: ["queuePosition"]
 });
 
 export const TerminalResultPlaintextPayload = z.object({
@@ -426,6 +450,7 @@ export const codexModelOptions = [
 ] as const;
 
 export const codexReasoningEffortOptions = [
+  { id: "none", label: "None", description: "No extra reasoning budget for direct, mechanical turns" },
   { id: "minimal", label: "Minimal", description: "Smallest supported reasoning budget for simple edits and quick checks" },
   { id: "low", label: "Low", description: "Fast responses with lighter reasoning" },
   { id: "medium", label: "Medium", description: "Balances speed and reasoning depth for everyday tasks" },
@@ -648,6 +673,7 @@ export type RoomKeyRotationPlaintextPayload = z.infer<typeof RoomKeyRotationPlai
 export type CodexTurnRiskFlagPayload = z.infer<typeof CodexTurnRiskFlagPayload>;
 export type CodexEventPlaintextPayload = z.infer<typeof CodexEventPlaintextPayload>;
 export type CodexApprovalPlaintextPayload = z.infer<typeof CodexApprovalPlaintextPayload>;
+export type CodexQueuePlaintextPayload = z.infer<typeof CodexQueuePlaintextPayload>;
 export type TerminalResultPlaintextPayload = z.infer<typeof TerminalResultPlaintextPayload>;
 export type GitWorkflowEventPlaintextPayload = z.infer<typeof GitWorkflowEventPlaintextPayload>;
 export type GitHubActionsEventPlaintextPayload = z.infer<typeof GitHubActionsEventPlaintextPayload>;

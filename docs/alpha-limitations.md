@@ -12,7 +12,7 @@ multAIplayer is an honest alpha. It is useful for local and trusted-team testing
 
 - GitHub sign-in requires a GitHub OAuth app configured on the relay.
 - A hosted production relay requires real domain, TLS, secrets, persistent storage, and operator monitoring.
-- The relay Dockerfile is available, but multi-instance production hosting still needs external/shared rate limiting and a database-backed store.
+- The relay Dockerfile and SQLite storage are available, but multi-instance production hosting still needs external/shared rate limiting, backup/restore drills, and operational monitoring.
 
 ## Privacy And Encryption
 
@@ -20,6 +20,7 @@ multAIplayer is an honest alpha. It is useful for local and trusted-team testing
 - The relay still sees routing metadata such as team names, room names, host labels, project path labels, invite ids, encrypted envelope sizes, and encrypted blob metadata.
 - Direct invite links can include the room key in the URL fragment for convenience. Gated invite links avoid this by using host approval and device-wrapped room keys.
 - Member removal is relay-enforced for future reads and live sockets, but not yet full cryptographic forward secrecy. A removed member may keep content and keys they already received.
+- Post-alpha security roadmap items include MLS-style group keying, history epochs/backfill, stronger member-removal key epochs, identity verification, and multi-device recovery.
 
 ## Codex Hosting
 

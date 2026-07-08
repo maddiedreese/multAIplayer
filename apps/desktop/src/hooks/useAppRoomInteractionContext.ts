@@ -104,6 +104,7 @@ export function useAppRoomInteractionContext({
       relayStatus: appRuntimeState.relayStatus,
       relayRef: appRefs.relayRef,
       seenEnvelopeIds: appRefs.seenEnvelopeIds,
+      codexEventsByRoom: appState.codexRoomState.codexEventsByRoom,
       appendRoomMessage: roomChatMutations.appendRoomMessage,
       editRoomMessage: roomChatMutations.editRoomMessage,
       deleteRoomMessage: roomChatMutations.deleteRoomMessage,

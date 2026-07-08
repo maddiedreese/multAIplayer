@@ -53,6 +53,8 @@ export function useWorkspaceUiState({
   const [selectedRoomId, setSelectedRoomId] = useState(initialRoomId);
   const [sidebarQuery, setSidebarQuery] = useState("");
   const messagesByRoom = useAppStore((state) => state.messagesByRoom);
+  const chatEditsByRoom = useAppStore((state) => state.chatEditsByRoom);
+  const chatDeletesByRoom = useAppStore((state) => state.chatDeletesByRoom);
   const replaceTeams = useCallback((nextTeams: TeamRecord[]) => {
     setTeams(nextTeams);
   }, []);
@@ -162,6 +164,8 @@ export function useWorkspaceUiState({
     selectTeamRoom,
     sidebarQuery,
     setSidebarQuery,
-    messagesByRoom
+    messagesByRoom,
+    chatEditsByRoom,
+    chatDeletesByRoom
   };
 }

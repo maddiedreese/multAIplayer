@@ -88,12 +88,14 @@ test("normalizeChatMessage preserves valid edit and delete metadata", () => {
     editedAt: "2026-07-08T12:00:00.000Z",
     editedByUserId: "github:maddie",
     deletedAt: "2026-07-08T12:01:00.000Z",
+    deletedBy: "Maddie",
     deletedByUserId: "github:maddie"
   });
 
   assert.ok(message);
   assert.equal(message.authorUserId, "github:maddie");
   assert.equal(message.editedAt, "2026-07-08T12:00:00.000Z");
+  assert.equal(message.deletedBy, "Maddie");
   assert.equal(message.deletedByUserId, "github:maddie");
   assert.equal(normalizeChatMessage({
     id: "m5",

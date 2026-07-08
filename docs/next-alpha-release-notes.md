@@ -10,6 +10,9 @@ These notes are a draft for the next public alpha after `v0.1.0-alpha.0`. Keep t
 - The in-app browser behaves like a room tool instead of a browser-approval workflow. It has a URL bar and can be opened by Codex-triggered room events such as asking Codex to open a localhost preview.
 - Terminal UX has been tightened toward an actual room shell: foreground terminal state, copy-as-Markdown support, and clearer empty/error states.
 - Host handoff now has an alpha path for Codex usage exhaustion: the room can mark the current host as limited, another eligible member can accept hosting, and the replacement host receives reconstructed room context.
+- Codex turns now have a bounded room-visible queue, encrypted queue persistence, and consumed-message tracking so queued turns refresh against current chat while started turns freeze the messages that entered Codex context.
+- Chat now includes encrypted replies, local pre-Codex edits/deletes with tombstones, and encrypted local-history audit records for those mutations.
+- Room goals can be started with `/goal`, paused/resumed, edited, deleted, and restored from encrypted local history as local room focus state.
 - Local preview sharing was added so a host can expose a local development server through room context during collaborative coding.
 - Release hardening now includes production relay checks, branch protection, stronger issue templates, signed/notarized macOS release enforcement, and clearer alpha launch documentation.
 

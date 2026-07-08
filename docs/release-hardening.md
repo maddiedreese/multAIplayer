@@ -68,11 +68,11 @@ Manual release dispatches must point at an existing tag that starts with `v` and
 
 ## Before A Non-Alpha Release
 
-Before presenting multAIplayer as production-ready, the project should add:
+Before presenting multAIplayer as production-ready, the post-alpha roadmap should add:
 
 - documented maintainer release key custody;
 - stronger member-removal key epochs;
-- database-backed relay storage and backup/restore drills;
+- backup/restore drills and operational runbooks for SQLite relay storage;
 - external or shared-store rate limiting for multi-instance relays;
 - private security contact and disclosure process;
 - end-to-end multi-device invite, removal, and recovery tests.

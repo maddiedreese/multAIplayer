@@ -1,5 +1,7 @@
 import type {
   BrowserRequestPlaintextPayload,
+  ChatDeletePlaintextPayload,
+  ChatEditPlaintextPayload,
   CodexEventPlaintextPayload,
   CodexTurnSummary,
   DevicePublicKeyJwk as DevicePublicKeyJwkType,
@@ -26,6 +28,7 @@ export interface ChatMessage {
   editedAt?: string;
   editedByUserId?: string;
   deletedAt?: string;
+  deletedBy?: string;
   deletedByUserId?: string;
   replyTo?: string;
   attachments?: ChatAttachment[];
@@ -142,6 +145,8 @@ export interface NoSecretRoomInvite {
 export interface LocalRoomHistoryPayload {
   version: 3;
   messages: ChatMessage[];
+  chatEdits?: ChatEditPlaintextPayload[];
+  chatDeletes?: ChatDeletePlaintextPayload[];
   readState?: LocalRoomReadState;
   terminalRequests: TerminalCommandRequest[];
   browserRequests: BrowserAccessRequest[];
@@ -153,6 +158,7 @@ export interface LocalRoomHistoryPayload {
   terminalSnapshots: TerminalSnapshot[];
   hostHandoffs: HostHandoffRecord[];
   queuedCodexTurns?: QueuedCodexTurn[];
+  roomGoal?: RoomGoal;
   codexThreadId?: string;
 }
 

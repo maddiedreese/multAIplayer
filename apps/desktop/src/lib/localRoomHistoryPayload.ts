@@ -35,6 +35,7 @@ import type {
   InviteJoinRequest,
   LocalRoomHistoryPayload,
   QueuedCodexTurn,
+  RoomGoal,
   TerminalCommandRequest
 } from "../types";
 
@@ -43,6 +44,8 @@ export function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentio
   return {
     version: 3,
     messages: payload.messages.filter((message) => isWithinRetention(message.createdAt ?? message.time, cutoffMs)),
+    chatEdits: (payload.chatEdits ?? []).filter((edit) => isWithinRetention(edit.editedAt, cutoffMs)),
+    chatDeletes: (payload.chatDeletes ?? []).filter((deletion) => isWithinRetention(deletion.deletedAt, cutoffMs)),
     ...(payload.readState ? { readState: payload.readState } : {}),
     terminalRequests: payload.terminalRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     browserRequests: payload.browserRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
@@ -56,26 +59,36 @@ export function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentio
     ),
     hostHandoffs: payload.hostHandoffs.filter((handoff) => isWithinRetention(handoff.createdAt, cutoffMs)),
     queuedCodexTurns: (payload.queuedCodexTurns ?? []).filter((turn) => isWithinRetention(turn.queuedAt, cutoffMs)),
+    ...(payload.roomGoal && isWithinRetention(payload.roomGoal.updatedAt, cutoffMs) ? { roomGoal: payload.roomGoal } : {}),
     ...(payload.codexThreadId ? { codexThreadId: payload.codexThreadId } : {})
+  };
+}
+
+export function emptyLocalRoomHistoryPayload(): LocalRoomHistoryPayload {
+  return {
+    version: 3,
+    messages: [],
+    chatEdits: [],
+    chatDeletes: [],
+    readState: undefined,
+    terminalRequests: [],
+    browserRequests: [],
+    inviteRequests: [],
+    codexEvents: [],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
+    localPreviews: [],
+    terminalSnapshots: [],
+    hostHandoffs: [],
+    queuedCodexTurns: []
   };
 }
 
 export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistoryPayload): LocalRoomHistoryPayload {
   if (Array.isArray(value)) {
     return {
-      version: 3,
+      ...emptyLocalRoomHistoryPayload(),
       messages: normalizeChatHistoryMessages(value),
-      readState: undefined,
-      terminalRequests: [],
-      browserRequests: [],
-      inviteRequests: [],
-      codexEvents: [],
-      gitWorkflowEvents: [],
-      githubActionsEvents: [],
-      localPreviews: [],
-      terminalSnapshots: [],
-      hostHandoffs: [],
-      queuedCodexTurns: []
     };
   }
 
@@ -83,6 +96,8 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
   return {
     version: 3,
     messages: Array.isArray(value.messages) ? normalizeChatHistoryMessages(value.messages) : [],
+    chatEdits: Array.isArray(value.chatEdits) ? value.chatEdits.filter(isChatEditPlaintextPayload) : [],
+    chatDeletes: Array.isArray(value.chatDeletes) ? value.chatDeletes.filter(isChatDeletePlaintextPayload) : [],
     readState: sanitizeLocalRoomReadState(value.readState),
     terminalRequests: Array.isArray(value.terminalRequests) ? value.terminalRequests.filter(isTerminalCommandRequest) : [],
     browserRequests: Array.isArray(value.browserRequests) ? value.browserRequests.filter(isBrowserAccessRequest) : [],
@@ -100,6 +115,7 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
       : [],
     hostHandoffs: Array.isArray(value.hostHandoffs) ? value.hostHandoffs.filter(isHostHandoffRecord) : [],
     queuedCodexTurns: Array.isArray(value.queuedCodexTurns) ? value.queuedCodexTurns.filter(isQueuedCodexTurn) : [],
+    ...(isRoomGoal(value.roomGoal) ? { roomGoal: value.roomGoal } : {}),
     ...(codexThreadId ? { codexThreadId } : {})
   };
 }
@@ -235,10 +251,19 @@ export function isCodexEventPlaintextPayload(value: unknown): value is CodexEven
     typeof value.model === "string" &&
     (value.threadId === undefined || typeof value.threadId === "string") &&
     (value.eventName === undefined || typeof value.eventName === "string") &&
+    (value.consumedMessageIds === undefined || isBoundedStringList(value.consumedMessageIds, 256)) &&
     (value.riskFlags === undefined || isCodexTurnRiskFlags(value.riskFlags)) &&
     typeof value.host === "string" &&
     typeof value.hostUserId === "string" &&
     typeof value.createdAt === "string"
+  );
+}
+
+function isBoundedStringList(value: unknown, maxItems: number): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length <= maxItems &&
+    value.every((item) => typeof item === "string" && item.length > 0 && item.length <= 160)
   );
 }
 
@@ -493,6 +518,22 @@ function isQueuedCodexTurn(value: unknown): value is QueuedCodexTurn {
     typeof value.requestedByUserId === "string" &&
     typeof value.queuedAt === "string" &&
     (value.triggerMessageId === undefined || typeof value.triggerMessageId === "string")
+  );
+}
+
+function isRoomGoal(value: unknown): value is RoomGoal {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.text === "string" &&
+    value.text.length > 0 &&
+    value.text.length <= 2000 &&
+    (value.status === "running" || value.status === "paused") &&
+    typeof value.startedAt === "string" &&
+    typeof value.updatedAt === "string" &&
+    typeof value.elapsedMs === "number" &&
+    Number.isFinite(value.elapsedMs) &&
+    value.elapsedMs >= 0
   );
 }
 

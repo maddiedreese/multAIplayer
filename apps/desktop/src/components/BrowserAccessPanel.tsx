@@ -3,6 +3,7 @@ import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import { Webview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
+import { closeRoomBrowserSurfaceEvent } from "../lib/browserSurfaceEvents";
 
 const browserWebviewLabel = "room_browser";
 
@@ -45,6 +46,14 @@ export function BrowserAccessPanel({
       await labeledWebview?.close().catch(() => undefined);
     }
   }
+
+  useEffect(() => {
+    const close = () => {
+      void closeBrowserWebview();
+    };
+    window.addEventListener(closeRoomBrowserSurfaceEvent, close);
+    return () => window.removeEventListener(closeRoomBrowserSurfaceEvent, close);
+  }, [tauriRuntime]);
 
   useEffect(() => {
     let cancelled = false;

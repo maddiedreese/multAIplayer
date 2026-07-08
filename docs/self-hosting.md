@@ -4,13 +4,13 @@ The relay is intended to be self-hostable. In v1 it routes encrypted room events
 
 Teams moving from the hosted relay to their own relay should use the [hosted-to-self-hosted relay migration runbook](relay-migration-runbook.md). The short version is: deploy and verify a self-hosted relay, change each desktop app's Settings drawer to the new relay HTTP and WebSocket URLs, recreate team/room membership with fresh invites, and rely on each device's local room keys and encrypted local history for continuity.
 
-Planned self-hosting requirements:
+Supported alpha self-hosting requirements:
 
 - Node.js runtime for the relay;
 - GitHub OAuth app configured by the self-hoster;
 - HTTPS and WebSocket support;
-- object storage for encrypted attachment blobs;
-- database for accounts, devices, teams, rooms, and encrypted metadata.
+- persistent SQLite storage for hosted or internet-facing relays;
+- relay-managed encrypted attachment blob storage in SQLite for hosted or internet-facing relays, or JSON storage for local/dev self-hosting.
 
 ## Relay Configuration
 
@@ -268,7 +268,7 @@ VITE_RELAY_URL=ws://127.0.0.1:4321/rooms
 
 These env vars define the packaged defaults. Desktop users can also open Settings and change the relay HTTP API URL and WebSocket rooms URL without rebuilding the app. The override is stored locally on that device.
 
-The current alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured. Production/self-hosted deployments should still prefer a real database-backed session store, token rotation, and regular key rotation once multi-instance hosting is needed.
+The current alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured. Hosted and internet-facing deployments should use SQLite and should add backup/restore drills, token-rotation operations, and shared/external rate limiting before making production or multi-instance claims.
 
 ## Migrating From The Hosted Relay
 

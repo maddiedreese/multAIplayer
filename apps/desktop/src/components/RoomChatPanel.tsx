@@ -235,7 +235,7 @@ export function RoomChatPanel({
                     onClick={() => onReplyToMessage(message.id)}
                     title="Reply to message"
                     aria-label={`Reply to message from ${message.author}`}
-                    disabled={!canUseChat || roomLocked || message.deleted}
+                    disabled={!canUseChat || roomLocked}
                   >
                     Reply
                   </button>

@@ -11,8 +11,9 @@ import { encryptJson } from "@multaiplayer/crypto";
 import { loadOrCreateRoomSecret } from "../lib/localHistory";
 import { canUseRoomChat, roomChatGateMessage } from "../lib/chatPolicy";
 import { roomLockMessage } from "../lib/appRuntime";
+import { messageIsBeforeCodexWatermark } from "../lib/codexMessageWatermark";
 import type { RelayClient } from "../lib/relayClient";
-import type { ChatMessage, RelayStatus } from "../types";
+import type { ChatMessage, CodexRoomEvent, RelayStatus } from "../types";
 
 interface LocalUser {
   id: string;
@@ -32,6 +33,7 @@ interface UseChatActionsOptions {
   relayStatus: RelayStatus;
   relayRef: MutableRefObject<RelayClient | null>;
   seenEnvelopeIds: MutableRefObject<Set<string>>;
+  codexEventsByRoom: Record<string, CodexRoomEvent[]>;
   appendRoomMessage: (roomId: string, message: ChatMessage) => void;
   editRoomMessage: (roomId: string, edit: ChatEditPlaintextPayload) => void;
   deleteRoomMessage: (roomId: string, deletion: ChatDeletePlaintextPayload) => void;
@@ -53,6 +55,7 @@ export function useChatActions({
   relayStatus,
   relayRef,
   seenEnvelopeIds,
+  codexEventsByRoom,
   appendRoomMessage,
   editRoomMessage,
   deleteRoomMessage,
@@ -203,6 +206,10 @@ export function useChatActions({
     }
     if (message.authorUserId !== localUser.id || message.deletedAt || message.role === "codex") {
       setChatMessageForRoom(selectedRoom.id, "Only your own messages can be changed before Codex uses them.");
+      return false;
+    }
+    if (!messageIsBeforeCodexWatermark(message, codexEventsByRoom[selectedRoom.id] ?? [])) {
+      setChatMessageForRoom(selectedRoom.id, "That message was already sent to Codex. Post a follow-up correction instead.");
       return false;
     }
     return true;
