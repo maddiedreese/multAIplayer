@@ -177,7 +177,8 @@ export function useAppWorkspaceFlow({
         localUser: localIdentity.localUser,
         currentUser: githubAuth.currentUser,
         setDeviceIdentityMessage: appRuntimeState.setDeviceIdentityMessage,
-        setTrustedDeviceKeys: appRuntimeState.setTrustedDeviceKeys,
+        trustDeviceForRoom: appRuntimeState.trustDeviceForRoom,
+        untrustDeviceForRoom: appRuntimeState.untrustDeviceForRoom,
         updateTeamRoleForTeam: workspaceState.updateTeamRoleForTeam,
         updateTeamMemberCountForTeam: workspaceState.updateTeamMemberCountForTeam
       },

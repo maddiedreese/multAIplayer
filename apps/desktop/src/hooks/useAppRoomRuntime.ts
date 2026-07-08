@@ -288,7 +288,7 @@ export function useAppRoomRuntime({
         signOutGitHub: githubAuth.signOutGitHub,
         setDeviceIdentity: appRuntimeState.setDeviceIdentity,
         setDeviceIdentityMessage: appRuntimeState.setDeviceIdentityMessage,
-        setTrustedDeviceKeys: appRuntimeState.setTrustedDeviceKeys
+        untrustDeviceForRoom: appRuntimeState.untrustDeviceForRoom
       },
       githubActions: {
         hasSelectedRoom,

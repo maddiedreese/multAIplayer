@@ -1,6 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
 import { loadOrCreateDeviceIdentity, resetDeviceIdentity, type DeviceIdentity } from "../lib/deviceIdentity";
-import { untrustDeviceKey, type TrustedDeviceKey } from "../lib/deviceTrust";
 
 interface UseAccountActionsOptions {
   selectedRoomId: string;
@@ -9,7 +8,7 @@ interface UseAccountActionsOptions {
   signOutGitHub: () => Promise<void>;
   setDeviceIdentity: Dispatch<SetStateAction<DeviceIdentity | null>>;
   setDeviceIdentityMessage: (message: string | null) => void;
-  setTrustedDeviceKeys: Dispatch<SetStateAction<TrustedDeviceKey[]>>;
+  untrustDeviceForRoom: (roomId: string, deviceId: string) => void;
 }
 
 export function useAccountActions({
@@ -19,7 +18,7 @@ export function useAccountActions({
   signOutGitHub,
   setDeviceIdentity,
   setDeviceIdentityMessage,
-  setTrustedDeviceKeys
+  untrustDeviceForRoom
 }: UseAccountActionsOptions) {
   async function signOut() {
     await stopOwnedLocalPreviews("Stopped because the sharing user signed out.");
@@ -33,7 +32,7 @@ export function useAccountActions({
       await resetDeviceIdentity();
       const identity = await loadOrCreateDeviceIdentity();
       setDeviceIdentity(identity);
-      setTrustedDeviceKeys((current) => untrustDeviceKey(current, selectedRoomId, deviceId));
+      untrustDeviceForRoom(selectedRoomId, deviceId);
       setDeviceIdentityMessage("Created new local device identity. Public key registration will refresh automatically.");
     } catch (error) {
       setDeviceIdentityMessage(`Device identity rotation failed: ${String(error)}`);

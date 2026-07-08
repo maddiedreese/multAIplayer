@@ -1,4 +1,3 @@
-import type { Dispatch, SetStateAction } from "react";
 import type { TeamMemberRecord, TeamRecord, RoomRecord } from "@multaiplayer/protocol";
 import type { SignedInUser } from "../lib/authClient";
 import {
@@ -6,7 +5,7 @@ import {
   transferTeamOwnership,
   updateTeamMemberRole
 } from "../lib/workspaceClient";
-import { buildDeviceFingerprintMarkdown, trustDeviceKey, untrustDeviceKey, type TrustedDeviceKey } from "../lib/deviceTrust";
+import { buildDeviceFingerprintMarkdown } from "../lib/deviceTrust";
 import { formatTeamMemberName, formatTeamRole } from "../lib/appFormatters";
 import { useAppStore } from "../store/appStore";
 import type { RoomPresence } from "../types";
@@ -24,7 +23,8 @@ interface UseMemberActionsOptions {
   localUser: LocalUser;
   currentUser: SignedInUser | null;
   setDeviceIdentityMessage: (message: string | null) => void;
-  setTrustedDeviceKeys: Dispatch<SetStateAction<TrustedDeviceKey[]>>;
+  trustDeviceForRoom: (roomId: string, deviceId: string, fingerprint: string) => void;
+  untrustDeviceForRoom: (roomId: string, deviceId: string) => void;
   updateTeamRoleForTeam: (teamId: string, role: TeamRecord["role"] | undefined) => void;
   updateTeamMemberCountForTeam: (teamId: string, members: number) => void;
   copyMarkdownWithFallback: (
@@ -43,7 +43,8 @@ export function useMemberActions({
   localUser,
   currentUser,
   setDeviceIdentityMessage,
-  setTrustedDeviceKeys,
+  trustDeviceForRoom,
+  untrustDeviceForRoom,
   updateTeamRoleForTeam,
   updateTeamMemberCountForTeam,
   copyMarkdownWithFallback
@@ -58,14 +59,12 @@ export function useMemberActions({
       setDeviceIdentityMessage(`${member.displayName} has no registered device identity to trust.`);
       return;
     }
-    setTrustedDeviceKeys((current) =>
-      trustDeviceKey(current, selectedRoom.id, member.deviceId, fingerprint)
-    );
+    trustDeviceForRoom(selectedRoom.id, member.deviceId, fingerprint);
     setDeviceIdentityMessage(`Trusted ${member.displayName}'s device identity for ${selectedRoom.name}.`);
   }
 
   function untrustRoomMemberDevice(member: RoomPresence) {
-    setTrustedDeviceKeys((current) => untrustDeviceKey(current, selectedRoom.id, member.deviceId));
+    untrustDeviceForRoom(selectedRoom.id, member.deviceId);
     setDeviceIdentityMessage(`Removed local trust for ${member.displayName}'s device identity in ${selectedRoom.name}.`);
   }
 
