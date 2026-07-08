@@ -6,6 +6,7 @@ import { LocalPreviewDialog } from "./LocalPreviewDialog";
 import { RoomInspectorPanel } from "./RoomInspectorPanel";
 import { RoomMainColumn } from "./RoomMainColumn";
 import { isWebPreviewRuntime } from "../lib/appRuntime";
+import { useUpdateNotice } from "../hooks/useUpdateNotice";
 
 type AppWorkspaceShellProps = ComponentProps<typeof AppWorkspaceShell>;
 
@@ -41,12 +42,31 @@ export function AppShellView({
   localPreviewDialogProps
 }: AppShellViewProps) {
   const dialog: ReactNode = localPreviewDialogOpen ? <LocalPreviewDialog {...localPreviewDialogProps} /> : null;
+  const updateNotice = useUpdateNotice();
   const webPreviewBanner: ReactNode = isWebPreviewRuntime() ? (
     <div className="web-preview-banner" role="status">
       <strong>Development web preview</strong>
       <span>Do not use this fallback for private projects; room secrets use browser localStorage instead of the native Keychain.</span>
     </div>
   ) : null;
+  const updateBanner: ReactNode = updateNotice ? (
+    <div className={`update-banner ${updateNotice.security ? "security" : ""}`} role="status">
+      <strong>{updateNotice.security ? "Security update available" : "Update available"}</strong>
+      <span>
+        {updateNotice.currentVersion} &rarr; {updateNotice.latestVersion}
+        {updateNotice.notes ? `: ${updateNotice.notes}` : ""}
+      </span>
+      <button onClick={() => window.open(updateNotice.url, "_blank", "noopener,noreferrer")}>
+        Download
+      </button>
+    </div>
+  ) : null;
+  const shellBanner: ReactNode = (
+    <>
+      {updateBanner}
+      {webPreviewBanner}
+    </>
+  );
 
   return (
     <AppWorkspaceShell
@@ -62,7 +82,7 @@ export function AppShellView({
       main={<RoomMainColumn {...roomMainColumnProps} />}
       inspector={<RoomInspectorPanel {...roomInspectorPanelProps} />}
       dialog={dialog}
-      webPreviewBanner={webPreviewBanner}
+      shellBanner={updateBanner || webPreviewBanner ? shellBanner : null}
     />
   );
 }

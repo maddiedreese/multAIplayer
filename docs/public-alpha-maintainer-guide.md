@@ -111,6 +111,12 @@ Use an app-specific password for `APPLE_PASSWORD`. Use a generated random value 
 
 After the first signed release succeeds, verify the GitHub Release says the artifact is Developer ID signed and notarized.
 
+## Update And Support Loop
+
+Publish `https://multaiplayer.com/releases/latest.json` for every public alpha build. The desktop app reads this manifest and shows an update banner when `version` is newer than the installed app. Set `security: true` for security fixes so stale clients get a stronger in-app nudge. The alpha still uses manual downloads, not Tauri auto-update, so release announcements should tell users to install the new signed build.
+
+For ordinary bug reports, ask testers to open Account settings, click `Copy diagnostics`, review the JSON, and attach it to the GitHub issue. Diagnostics are local and redacted by default; do not ask users to paste terminal output, room transcripts, direct invite fragments, private repo files, or browser contents unless they explicitly choose to share that material.
+
 ## Two-Person Dogfood
 
 Run at least one full test with two GitHub accounts on two macOS devices:
