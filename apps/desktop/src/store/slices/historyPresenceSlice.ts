@@ -52,6 +52,16 @@ export function projectHistorySearchMessagesByRoom(
   );
 }
 
+export function historySearchEntriesToMessagesByRoom(
+  entries: ReadonlyArray<readonly [string, readonly ChatMessage[]]>
+): HistorySearchMessagesByRoom {
+  return Object.fromEntries(
+    entries
+      .filter(([, roomMessages]) => roomMessages.length > 0)
+      .map(([roomId, roomMessages]) => [roomId, [...roomMessages]])
+  );
+}
+
 export function projectHistoryMessagesByRoom(historyPresenceByRoom: HistoryPresenceByRoom): HistoryMessagesByRoom {
   return Object.fromEntries(
     Object.entries(historyPresenceByRoom)

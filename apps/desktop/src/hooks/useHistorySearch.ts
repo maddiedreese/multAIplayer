@@ -3,6 +3,7 @@ import type { RoomRecord } from "@multaiplayer/protocol";
 import { loadEncryptedHistory, loadHistorySettings } from "../lib/localHistory";
 import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
 import { useAppStore } from "../store/appStore";
+import { historySearchEntriesToMessagesByRoom } from "../store/slices/historyPresenceSlice";
 import type { ChatMessage, LocalRoomHistoryPayload } from "../types";
 
 interface UseHistorySearchOptions {
@@ -56,9 +57,7 @@ export function useHistorySearch({
     )
       .then((entries) => {
         if (cancelled) return;
-        setHistorySearchResultsByRoom(
-          Object.fromEntries(entries.filter(([, roomMessages]) => roomMessages.length > 0))
-        );
+        setHistorySearchResultsByRoom(historySearchEntriesToMessagesByRoom(entries));
       })
       .catch((error) => {
         if (!cancelled) console.warn("Failed to search encrypted local history", error);
