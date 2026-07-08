@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAppStore } from "../store/appStore";
 
 export function useRoomRuntimeState() {
@@ -11,8 +11,13 @@ export function useRoomRuntimeState() {
   const setRoomPresenceForDevice = useAppStore((state) => state.setRoomPresenceForDevice);
   const hostHandoffsByRoom = useAppStore((state) => state.hostHandoffsByRoom);
   const codexContinuationByRoom = useAppStore((state) => state.codexContinuationByRoom);
-  const gitWorkflowEventsByRoom = useAppStore((state) => state.gitWorkflowEventsByRoom);
+  const gitWorkflowByRoom = useAppStore((state) => state.gitWorkflowByRoom);
   const githubActionsEventsByRoom = useAppStore((state) => state.githubActionsEventsByRoom);
+  const gitWorkflowEventsByRoom = useMemo(() => Object.fromEntries(
+    Object.entries(gitWorkflowByRoom)
+      .filter(([, workflow]) => workflow.events)
+      .map(([roomId, workflow]) => [roomId, workflow.events ?? []])
+  ), [gitWorkflowByRoom]);
 
   return {
     inspectorTabsByRoom,

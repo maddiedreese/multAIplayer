@@ -43,12 +43,16 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         codexEventsByRoom: payload.codexEvents.length
           ? { ...state.codexEventsByRoom, [roomId]: payload.codexEvents }
           : state.codexEventsByRoom,
-        gitWorkflowEventsByRoom: payload.gitWorkflowEvents.length
-          ? { ...state.gitWorkflowEventsByRoom, [roomId]: payload.gitWorkflowEvents }
-          : state.gitWorkflowEventsByRoom,
-        gitWorkflowMessagesByRoom: latestGitWorkflowEvent
-          ? { ...state.gitWorkflowMessagesByRoom, [roomId]: latestGitWorkflowEvent.message }
-          : state.gitWorkflowMessagesByRoom,
+        gitWorkflowByRoom: payload.gitWorkflowEvents.length
+          ? {
+              ...state.gitWorkflowByRoom,
+              [roomId]: {
+                ...state.gitWorkflowByRoom[roomId],
+                events: payload.gitWorkflowEvents,
+                message: latestGitWorkflowEvent?.message ?? null
+              }
+            }
+          : state.gitWorkflowByRoom,
         githubActionsEventsByRoom: payload.githubActionsEvents.length
           ? { ...state.githubActionsEventsByRoom, [roomId]: payload.githubActionsEvents }
           : state.githubActionsEventsByRoom,
@@ -92,12 +96,16 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       },
       inviteRequestsByRoom: { ...state.inviteRequestsByRoom, [roomId]: [] },
       codexEventsByRoom: { ...state.codexEventsByRoom, [roomId]: [] },
-      gitWorkflowEventsByRoom: { ...state.gitWorkflowEventsByRoom, [roomId]: [] },
+      gitWorkflowByRoom: {
+        ...state.gitWorkflowByRoom,
+        [roomId]: {
+          events: []
+        }
+      },
       githubActionsEventsByRoom: { ...state.githubActionsEventsByRoom, [roomId]: [] },
       hostHandoffsByRoom: { ...state.hostHandoffsByRoom, [roomId]: [] },
       codexThreadIdsByRoom: omitRecordKey(state.codexThreadIdsByRoom, roomId),
       githubActionsByRoom: omitRecordKey(state.githubActionsByRoom, roomId),
-      gitWorkflowBusyByRoom: omitRecordKey(state.gitWorkflowBusyByRoom, roomId),
       hostBusyByRoom: omitRecordKey(state.hostBusyByRoom, roomId),
       hostMessagesByRoom: omitRecordKey(state.hostMessagesByRoom, roomId),
       chatMessagesByRoom: omitRecordKey(state.chatMessagesByRoom, roomId),
@@ -113,7 +121,6 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       pendingCodexApprovalsByRoom: omitRecordKey(state.pendingCodexApprovalsByRoom, roomId),
       codexRunningByRoom: omitRecordKey(state.codexRunningByRoom, roomId),
       roomGoalsByRoom: omitRecordKey(state.roomGoalsByRoom, roomId),
-      gitStatusByRoom: omitRecordKey(state.gitStatusByRoom, roomId),
       pendingAttachmentsByRoom: omitRecordKey(state.pendingAttachmentsByRoom, roomId),
       terminalLinesByRoom: omitRecordKey(state.terminalLinesByRoom, roomId),
       terminalBusyByRoom: omitRecordKey(state.terminalBusyByRoom, roomId),

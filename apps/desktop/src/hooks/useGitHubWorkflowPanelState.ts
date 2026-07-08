@@ -2,11 +2,36 @@ import { useMemo } from "react";
 import { useAppStore } from "../store/appStore";
 
 export function useGitHubWorkflowPanelState() {
-  const gitStatusByRoom = useAppStore((state) => state.gitStatusByRoom);
-  const gitWorkflowBusyByRoom = useAppStore((state) => state.gitWorkflowBusyByRoom);
-  const gitWorkflowMessagesByRoom = useAppStore((state) => state.gitWorkflowMessagesByRoom);
-  const gitWorkflowDraftsByRoom = useAppStore((state) => state.gitWorkflowDraftsByRoom);
+  const gitWorkflowByRoom = useAppStore((state) => state.gitWorkflowByRoom);
   const githubActionsByRoom = useAppStore((state) => state.githubActionsByRoom);
+
+  const {
+    gitStatusByRoom,
+    gitWorkflowBusyByRoom,
+    gitWorkflowMessagesByRoom,
+    gitWorkflowDraftsByRoom
+  } = useMemo(() => ({
+    gitStatusByRoom: Object.fromEntries(
+      Object.entries(gitWorkflowByRoom)
+        .filter(([, workflow]) => "status" in workflow)
+        .map(([roomId, workflow]) => [roomId, workflow.status ?? null])
+    ),
+    gitWorkflowBusyByRoom: Object.fromEntries(
+      Object.entries(gitWorkflowByRoom)
+        .filter(([, workflow]) => workflow.busy)
+        .map(([roomId]) => [roomId, true])
+    ),
+    gitWorkflowMessagesByRoom: Object.fromEntries(
+      Object.entries(gitWorkflowByRoom)
+        .filter(([, workflow]) => "message" in workflow)
+        .map(([roomId, workflow]) => [roomId, workflow.message ?? null])
+    ),
+    gitWorkflowDraftsByRoom: Object.fromEntries(
+      Object.entries(gitWorkflowByRoom)
+        .filter(([, workflow]) => workflow.draft)
+        .map(([roomId, workflow]) => [roomId, workflow.draft ?? {}])
+    )
+  }), [gitWorkflowByRoom]);
 
   const {
     actionsBusyByRoom,

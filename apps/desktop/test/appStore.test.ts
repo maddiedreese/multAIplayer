@@ -19,12 +19,12 @@ test("desktop store keeps git workflow state room scoped", () => {
   store.updateGitWorkflowDraftForRoom("room-b", { branchName: "multaiplayer/alpha" });
 
   const state = useAppStore.getState();
-  assert.equal(state.gitWorkflowBusyByRoom["room-a"], true);
-  assert.equal(state.gitWorkflowMessagesByRoom["room-a"], "Creating PR");
-  assert.equal(state.gitWorkflowMessagesByRoom["room-b"], null);
-  assert.equal(state.gitStatusByRoom["room-a"]?.files[0]?.path, "apps/desktop/src/App.tsx");
-  assert.equal(state.gitWorkflowDraftsByRoom["room-b"]?.branchName, "multaiplayer/alpha");
-  assert.equal(state.gitWorkflowDraftsByRoom["room-b"]?.prBase, "main");
+  assert.equal(state.gitWorkflowByRoom["room-a"]?.busy, true);
+  assert.equal(state.gitWorkflowByRoom["room-a"]?.message, "Creating PR");
+  assert.equal(state.gitWorkflowByRoom["room-b"]?.message, null);
+  assert.equal(state.gitWorkflowByRoom["room-a"]?.status?.files[0]?.path, "apps/desktop/src/App.tsx");
+  assert.equal(state.gitWorkflowByRoom["room-b"]?.draft?.branchName, "multaiplayer/alpha");
+  assert.equal(state.gitWorkflowByRoom["room-b"]?.draft?.prBase, "main");
 });
 
 test("desktop store exposes room git workflow actions", () => {
@@ -41,13 +41,13 @@ test("desktop store exposes room git workflow actions", () => {
   store.updateGitWorkflowDraftForRoom("room-a", { commitMessage: "Build alpha" });
 
   const state = useAppStore.getState();
-  assert.equal(state.gitWorkflowMessagesByRoom["room-a"], "Creating PR");
-  assert.equal(state.gitWorkflowMessagesByRoom["room-b"], null);
-  assert.equal(state.gitStatusByRoom["room-a"]?.files[0]?.path, "apps/desktop/src/App.tsx");
-  assert.equal(state.gitStatusByRoom["room-b"], null);
-  assert.equal(state.gitWorkflowDraftsByRoom["room-a"]?.branchName, "multaiplayer/alpha");
-  assert.equal(state.gitWorkflowDraftsByRoom["room-a"]?.commitMessage, "Build alpha");
-  assert.equal(state.gitWorkflowDraftsByRoom["room-a"]?.prBase, "main");
+  assert.equal(state.gitWorkflowByRoom["room-a"]?.message, "Creating PR");
+  assert.equal(state.gitWorkflowByRoom["room-b"]?.message, null);
+  assert.equal(state.gitWorkflowByRoom["room-a"]?.status?.files[0]?.path, "apps/desktop/src/App.tsx");
+  assert.equal(state.gitWorkflowByRoom["room-b"]?.status, null);
+  assert.equal(state.gitWorkflowByRoom["room-a"]?.draft?.branchName, "multaiplayer/alpha");
+  assert.equal(state.gitWorkflowByRoom["room-a"]?.draft?.commitMessage, "Build alpha");
+  assert.equal(state.gitWorkflowByRoom["room-a"]?.draft?.prBase, "main");
 });
 
 test("desktop store exposes room busy actions", () => {
@@ -65,8 +65,8 @@ test("desktop store exposes room busy actions", () => {
   store.setGitWorkflowBusyForRoom("room-a", false);
 
   const state = useAppStore.getState();
-  assert.equal(state.gitWorkflowBusyByRoom["room-a"], undefined);
-  assert.equal(state.gitWorkflowBusyByRoom["room-b"], true);
+  assert.equal(state.gitWorkflowByRoom["room-a"]?.busy, undefined);
+  assert.equal(state.gitWorkflowByRoom["room-b"]?.busy, true);
   assert.equal(state.githubActionsByRoom["room-a"]?.busy, true);
   assert.equal(state.localPreviewBusyByRoom["room-a"], true);
   assert.equal(state.hostBusyByRoom["room-a"], true);
@@ -839,7 +839,7 @@ test("desktop store keeps room runtime state room scoped", () => {
   assert.equal(state.presenceByRoom["room-b"]?.["device-b"]?.displayName, "Jordan");
   assert.equal(state.hostHandoffsByRoom["room-a"]?.[0]?.reason, "usage_limit");
   assert.equal(state.codexContinuationByRoom["room-b"]?.acceptedBy, "Jordan");
-  assert.equal(state.gitWorkflowEventsByRoom["room-a"]?.[0]?.branch, "codex/runtime-state");
+  assert.equal(state.gitWorkflowByRoom["room-a"]?.events?.[0]?.branch, "codex/runtime-state");
   assert.equal(state.githubActionsEventsByRoom["room-b"]?.[0]?.summary.tone, "green");
 });
 
@@ -955,7 +955,7 @@ test("desktop store exposes room event append actions", () => {
   store.appendCodexEvent("room-a", codexEvent);
 
   const state = useAppStore.getState();
-  assert.equal(state.gitWorkflowEventsByRoom["room-a"]?.length, 1);
+  assert.equal(state.gitWorkflowByRoom["room-a"]?.events?.length, 1);
   assert.equal(state.githubActionsEventsByRoom["room-a"]?.length, 1);
   assert.equal(state.localPreviewsByRoom["room-a"]?.length, 1);
   assert.equal(state.localPreviewsByRoom["room-a"]?.[0]?.status, "live");
@@ -1235,12 +1235,12 @@ test("desktop store clears local room-scoped state", () => {
   assert.deepEqual(state.browserByRoom["room-a"], { requests: [] });
   assert.deepEqual(state.inviteRequestsByRoom["room-a"], []);
   assert.deepEqual(state.codexEventsByRoom["room-a"], []);
-  assert.deepEqual(state.gitWorkflowEventsByRoom["room-a"], []);
+  assert.deepEqual(state.gitWorkflowByRoom["room-a"], { events: [] });
   assert.deepEqual(state.githubActionsEventsByRoom["room-a"], []);
   assert.deepEqual(state.hostHandoffsByRoom["room-a"], []);
   assert.equal(state.codexThreadIdsByRoom["room-a"], undefined);
   assert.equal(state.githubActionsByRoom["room-a"], undefined);
-  assert.equal(state.gitWorkflowBusyByRoom["room-a"], undefined);
+  assert.equal(state.gitWorkflowByRoom["room-a"]?.busy, undefined);
   assert.equal(state.hostMessagesByRoom["room-a"], undefined);
   assert.equal(state.secretWarningsVisibleByRoom["room-a"], undefined);
   assert.equal(state.filePanelByRoom["room-a"], undefined);
@@ -1502,8 +1502,8 @@ test("desktop store hydrates local room history through one room-scoped action",
   assert.equal(state.browserByRoom["room-a"]?.requests?.[0]?.url, "http://localhost:5173");
   assert.equal(state.inviteRequestsByRoom["room-a"]?.[0]?.requester, "Jordan");
   assert.equal(state.codexEventsByRoom["room-a"]?.[0]?.message, "Reading context");
-  assert.equal(state.gitWorkflowEventsByRoom["room-a"]?.[0]?.branch, "codex/history-hydration");
-  assert.equal(state.gitWorkflowMessagesByRoom["room-a"], "Opened draft PR");
+  assert.equal(state.gitWorkflowByRoom["room-a"]?.events?.[0]?.branch, "codex/history-hydration");
+  assert.equal(state.gitWorkflowByRoom["room-a"]?.message, "Opened draft PR");
   assert.equal(state.githubActionsEventsByRoom["room-a"]?.[0]?.runs[0]?.name, "Web, relay, and packages");
   assert.equal(state.githubActionsByRoom["room-a"]?.runs?.[0]?.id, 18);
   assert.equal(state.githubActionsByRoom["room-a"]?.lastChecked, "2026-07-06T00:08:00.000Z");

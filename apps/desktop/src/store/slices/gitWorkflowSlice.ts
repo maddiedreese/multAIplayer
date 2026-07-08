@@ -9,13 +9,17 @@ import type { GitStatusSummary } from "../../lib/localBackend";
 import { omitRecordKey } from "../../lib/setUtils";
 import type { AppStoreState } from "../appStore";
 
-type GitStatusByRoom = Record<string, GitStatusSummary | null>;
-type GitWorkflowBusyByRoom = Record<string, boolean>;
-type GitWorkflowMessagesByRoom = Record<string, string | null>;
-type GitWorkflowDraftsByRoom = Record<string, Partial<GitWorkflowDraft>>;
-type GitWorkflowEventsByRoom = Record<string, GitWorkflowEventPlaintextPayload[]>;
 type GitHubActionsEventsByRoom = Record<string, GitHubActionsEventPlaintextPayload[]>;
-type RoomBusyByRoom = Record<string, boolean>;
+
+export interface GitWorkflowRoomState {
+  status?: GitStatusSummary | null;
+  busy?: boolean;
+  message?: string | null;
+  draft?: Partial<GitWorkflowDraft>;
+  events?: GitWorkflowEventPlaintextPayload[];
+}
+
+export type GitWorkflowByRoom = Record<string, GitWorkflowRoomState>;
 
 export interface GitHubActionsRoomState {
   busy?: boolean;
@@ -26,8 +30,16 @@ export interface GitHubActionsRoomState {
 
 export type GitHubActionsByRoom = Record<string, GitHubActionsRoomState>;
 
-function updateRoomBusyMap(current: RoomBusyByRoom, roomId: string, busy: boolean): RoomBusyByRoom {
-  return busy ? { ...current, [roomId]: true } : omitRecordKey(current, roomId);
+function updateGitWorkflowForRoom(
+  current: GitWorkflowByRoom,
+  roomId: string,
+  update: (roomWorkflow: GitWorkflowRoomState) => GitWorkflowRoomState
+): GitWorkflowByRoom {
+  const nextRoomWorkflow = update(current[roomId] ?? {});
+  if (Object.keys(nextRoomWorkflow).length === 0) {
+    return roomId in current ? omitRecordKey(current, roomId) : current;
+  }
+  return { ...current, [roomId]: nextRoomWorkflow };
 }
 
 function updateGitHubActionsForRoom(
@@ -41,12 +53,8 @@ function updateGitHubActionsForRoom(
 }
 
 export interface GitWorkflowSlice {
-  gitStatusByRoom: GitStatusByRoom;
-  gitWorkflowBusyByRoom: GitWorkflowBusyByRoom;
-  gitWorkflowMessagesByRoom: GitWorkflowMessagesByRoom;
-  gitWorkflowDraftsByRoom: GitWorkflowDraftsByRoom;
+  gitWorkflowByRoom: GitWorkflowByRoom;
   githubActionsByRoom: GitHubActionsByRoom;
-  gitWorkflowEventsByRoom: GitWorkflowEventsByRoom;
   githubActionsEventsByRoom: GitHubActionsEventsByRoom;
   setActionsMessageForRoom: (roomId: string, message: string | null) => void;
   setActionRunsForRoom: (roomId: string, runs: GitHubActionRun[]) => void;
@@ -63,20 +71,12 @@ export interface GitWorkflowSlice {
 
 export const emptyGitWorkflowState: Pick<
   GitWorkflowSlice,
-  | "gitStatusByRoom"
-  | "gitWorkflowBusyByRoom"
-  | "gitWorkflowMessagesByRoom"
-  | "gitWorkflowDraftsByRoom"
+  | "gitWorkflowByRoom"
   | "githubActionsByRoom"
-  | "gitWorkflowEventsByRoom"
   | "githubActionsEventsByRoom"
 > = {
-  gitStatusByRoom: {},
-  gitWorkflowBusyByRoom: {},
-  gitWorkflowMessagesByRoom: {},
-  gitWorkflowDraftsByRoom: {},
+  gitWorkflowByRoom: {},
   githubActionsByRoom: {},
-  gitWorkflowEventsByRoom: {},
   githubActionsEventsByRoom: {}
 };
 
@@ -116,7 +116,15 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
   },
   setGitWorkflowBusyForRoom: (roomId, busy) => {
     set((state) => ({
-      gitWorkflowBusyByRoom: updateRoomBusyMap(state.gitWorkflowBusyByRoom, roomId, busy)
+      gitWorkflowByRoom: updateGitWorkflowForRoom(state.gitWorkflowByRoom, roomId, (roomWorkflow) => {
+        const nextRoomWorkflow = { ...roomWorkflow };
+        if (busy) {
+          nextRoomWorkflow.busy = true;
+        } else {
+          delete nextRoomWorkflow.busy;
+        }
+        return nextRoomWorkflow;
+      })
     }));
   },
   setActionsBusyForRoom: (roomId, busy) => {
@@ -129,7 +137,7 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
   },
   appendGitWorkflowEvent: (roomId, event) => {
     set((state) => {
-      const roomEvents = state.gitWorkflowEventsByRoom[roomId] ?? [];
+      const roomEvents = state.gitWorkflowByRoom[roomId]?.events ?? [];
       if (
         roomEvents.some((existing) =>
           existing.createdAt === event.createdAt &&
@@ -140,10 +148,10 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
         return state;
       }
       return {
-        gitWorkflowEventsByRoom: {
-          ...state.gitWorkflowEventsByRoom,
-          [roomId]: [...roomEvents, event].slice(-100)
-        }
+        gitWorkflowByRoom: updateGitWorkflowForRoom(state.gitWorkflowByRoom, roomId, (roomWorkflow) => ({
+          ...roomWorkflow,
+          events: [...roomEvents, event].slice(-100)
+        }))
       };
     });
   },
@@ -170,23 +178,32 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
   },
   setGitWorkflowMessageForRoom: (roomId, message) => {
     set((state) => ({
-      gitWorkflowMessagesByRoom: {
-        ...state.gitWorkflowMessagesByRoom,
-        [roomId]: message
-      }
+      gitWorkflowByRoom: updateGitWorkflowForRoom(state.gitWorkflowByRoom, roomId, (roomWorkflow) => ({
+        ...roomWorkflow,
+        message
+      }))
     }));
   },
   setGitStatusForRoom: (roomId, status) => {
     set((state) => ({
-      gitStatusByRoom: {
-        ...state.gitStatusByRoom,
-        [roomId]: status
-      }
+      gitWorkflowByRoom: updateGitWorkflowForRoom(state.gitWorkflowByRoom, roomId, (roomWorkflow) => ({
+        ...roomWorkflow,
+        status
+      }))
     }));
   },
   updateGitWorkflowDraftForRoom: (roomId, patch) => {
-    set((state) => ({
-      gitWorkflowDraftsByRoom: updateGitWorkflowDraftRecord(state.gitWorkflowDraftsByRoom, roomId, patch)
-    }));
+    set((state) => {
+      const draftByRoom = state.gitWorkflowByRoom[roomId]?.draft
+        ? { [roomId]: state.gitWorkflowByRoom[roomId].draft }
+        : {};
+      const nextDraft = updateGitWorkflowDraftRecord(draftByRoom, roomId, patch)[roomId];
+      return {
+        gitWorkflowByRoom: updateGitWorkflowForRoom(state.gitWorkflowByRoom, roomId, (roomWorkflow) => ({
+          ...roomWorkflow,
+          draft: nextDraft
+        }))
+      };
+    });
   }
 });
