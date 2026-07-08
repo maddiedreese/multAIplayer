@@ -46,6 +46,7 @@ interface UseCodexInvokeActionsOptions {
   hostGateMessage: string;
   localUser: LocalUser;
   draft: string;
+  replyToMessageId: string | null;
   roomGoal: RoomGoal | null;
   pendingAttachments: ChatAttachment[];
   messages: ChatMessage[];
@@ -62,6 +63,7 @@ interface UseCodexInvokeActionsOptions {
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   setDraftForRoom: (roomId: string, draft: string) => void;
+  setReplyToMessageForRoom: (roomId: string, messageId: string | null) => void;
   setRoomGoalForRoom: (roomId: string, goal: RoomGoal | null) => void;
   clearPendingAttachmentsForRoom: (roomId: string) => void;
 }
@@ -77,6 +79,7 @@ export function useCodexInvokeActions({
   hostGateMessage,
   localUser,
   draft,
+  replyToMessageId,
   roomGoal,
   pendingAttachments,
   messages,
@@ -93,6 +96,7 @@ export function useCodexInvokeActions({
   setPendingCodexApprovalForRoom,
   setApprovalVisibleForRoom,
   setDraftForRoom,
+  setReplyToMessageForRoom,
   setRoomGoalForRoom,
   clearPendingAttachmentsForRoom
 }: UseCodexInvokeActionsOptions) {
@@ -100,6 +104,7 @@ export function useCodexInvokeActions({
     const roomId = selectedRoom.id;
     setRoomGoalForRoom(roomId, createRoomGoal(text));
     setDraftForRoom(roomId, "");
+    setReplyToMessageForRoom(roomId, null);
     clearPendingAttachmentsForRoom(roomId);
     setChatMessageForRoom(roomId, "Goal started.");
   }
@@ -166,6 +171,7 @@ export function useCodexInvokeActions({
       body: body || "Attached files.",
       time: formatMessageTime(createdAt),
       createdAt,
+      replyTo: replyToMessageId ?? undefined,
       attachments: attachments.length ? attachments : undefined
     };
     await publishChatMessage(message);
@@ -173,6 +179,7 @@ export function useCodexInvokeActions({
       if (!handleCodexBrowserOpenCommand(message, selectedRoom)) handleCodexInvoke(message);
     }
     setDraftForRoom(roomId, "");
+    setReplyToMessageForRoom(roomId, null);
     clearPendingAttachmentsForRoom(roomId);
   }
 

@@ -588,7 +588,7 @@ export async function runCodexTurn(
   roomId: string,
   cwd: string,
   input: string,
-  model = "gpt-5.3-codex",
+  model = "gpt-5.5",
   reasoningEffort = "medium",
   speed = "standard",
   sandboxLevel = "workspace_write",

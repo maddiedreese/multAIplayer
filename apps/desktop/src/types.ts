@@ -22,6 +22,7 @@ export interface ChatMessage {
   body: string;
   time: string;
   createdAt?: string;
+  replyTo?: string;
   attachments?: ChatAttachment[];
   reactions?: ChatReaction[];
 }

@@ -21,12 +21,15 @@ export function buildRoomChatMessageRows({
   selectedMessageIds: string[];
   localUserId: string;
 }): RoomChatMessageDisplay[] {
-  return messages.filter((message) => !isBrowserDecisionSystemMessage(message)).map((message) => ({
+  const visibleMessages = messages.filter((message) => !isBrowserDecisionSystemMessage(message));
+  const messagesById = new Map(visibleMessages.map((message) => [message.id, message]));
+  return visibleMessages.map((message) => ({
     id: message.id,
     author: message.author,
     role: message.role,
     body: message.body,
     time: message.time,
+    replyPreview: message.replyTo ? buildReplyPreview(messagesById.get(message.replyTo)) : null,
     selected: markdownSelectionMode && selectedMessageIds.includes(message.id),
     attachments: (message.attachments ?? []).map((attachment) => ({
       id: attachment.id,
@@ -45,6 +48,19 @@ export function buildRoomChatMessageRows({
       };
     })
   }));
+}
+
+function buildReplyPreview(message: ChatMessage | undefined): RoomChatMessageDisplay["replyPreview"] {
+  if (!message) {
+    return {
+      author: "Original message",
+      body: "Original message unavailable or deleted"
+    };
+  }
+  return {
+    author: message.author,
+    body: message.body || "Original message unavailable or deleted"
+  };
 }
 
 export function buildPendingAttachmentRows(attachments: ChatAttachment[]): PendingAttachmentDisplay[] {

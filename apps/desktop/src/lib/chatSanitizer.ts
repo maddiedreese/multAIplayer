@@ -30,7 +30,8 @@ export function normalizeChatMessage(value: unknown): SanitizedChatMessage | nul
     !isChatRole(value.role) ||
     typeof value.body !== "string" ||
     typeof value.time !== "string" ||
-    (value.createdAt !== undefined && typeof value.createdAt !== "string")
+    (value.createdAt !== undefined && typeof value.createdAt !== "string") ||
+    (value.replyTo !== undefined && (typeof value.replyTo !== "string" || value.replyTo.trim() === ""))
   ) {
     return null;
   }
@@ -47,6 +48,7 @@ export function normalizeChatMessage(value: unknown): SanitizedChatMessage | nul
     body: value.body,
     time: value.time,
     ...(value.createdAt ? { createdAt: value.createdAt } : {}),
+    ...(typeof value.replyTo === "string" ? { replyTo: value.replyTo } : {}),
     ...(attachments?.length ? { attachments } : { attachments: undefined })
   };
 }

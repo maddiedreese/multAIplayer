@@ -199,6 +199,33 @@ test("buildCodexTurnInput includes model, summary, and only the recent transcrip
   assert.doesNotMatch(input, /old answer/);
 });
 
+test("buildCodexTurnInput resolves reply references in the transcript", () => {
+  const messages: CodexChatMessage[] = [
+    { id: "m1", author: "Avery", role: "human", body: "Use approach B for onboarding.", time: "9:41 AM" },
+    {
+      id: "m2",
+      author: "Jordan",
+      role: "human",
+      body: "Agreed, do that.",
+      time: "9:42 AM",
+      replyTo: "m1"
+    },
+    {
+      id: "m3",
+      author: "Maddie",
+      role: "human",
+      body: "I remember the missing context.",
+      time: "9:43 AM",
+      replyTo: "missing-message"
+    }
+  ];
+  const summary = buildCodexTurnSummary(messages, room, [], []);
+  const input = buildCodexTurnInput(messages, room.projectPath, "gpt-5.5", summary);
+
+  assert.match(input, /@Jordan \(human, 9:42 AM, replying to @Avery: "Use approach B for onboarding\."\): Agreed, do that\./);
+  assert.match(input, /@Maddie \(human, 9:43 AM, replying to original message unavailable or deleted\): I remember the missing context\./);
+});
+
 test("buildCodexTurnInput can include full room context for host continuation", () => {
   const messages = [
     { author: "Avery", role: "human" as const, body: "Initial task", time: "9:00 AM" },

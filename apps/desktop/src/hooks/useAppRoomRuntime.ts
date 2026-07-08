@@ -83,6 +83,7 @@ export function useAppRoomRuntime({
     roomTerminals,
     projectPathDraft,
     messages,
+    replyToMessageId,
     draft,
     roomGoal,
     pendingAttachments,
@@ -180,6 +181,7 @@ export function useAppRoomRuntime({
         hostGateMessage: roomInteraction.hostGateMessage,
         localUser: localIdentity.localUser,
         draft,
+        replyToMessageId,
         roomGoal,
         pendingAttachments,
         messages,
@@ -195,6 +197,7 @@ export function useAppRoomRuntime({
         setPendingCodexApprovalForRoom,
         setApprovalVisibleForRoom,
         setDraftForRoom,
+        setReplyToMessageForRoom: roomActions.setReplyToMessageForRoom,
         setRoomGoalForRoom,
         clearPendingAttachmentsForRoom
       }

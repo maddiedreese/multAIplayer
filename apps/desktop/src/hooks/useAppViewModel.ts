@@ -200,6 +200,7 @@ export function useAppViewModel({
       codexRunning: selectedRuntime.codexRunning,
       roomCanUseChat: selectedRuntime.roomCanUseChat,
       draft,
+      replyTarget: selectedRuntime.replyTarget,
       roomGoal,
       pendingAttachmentsForCount: pendingAttachments,
       pendingAttachments: selectedRuntime.pendingAttachmentRows,

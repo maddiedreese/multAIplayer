@@ -8,6 +8,7 @@ export interface RoomChatRoomState {
   draft?: string;
   pendingAttachments?: ChatAttachment[];
   selectedMessageIds?: string[];
+  replyToMessageId?: string;
 }
 
 export type RoomChatByRoom = Record<string, RoomChatRoomState>;
@@ -17,6 +18,7 @@ export interface RoomChatPanelMaps {
   draftsByRoom: Record<string, string>;
   pendingAttachmentsByRoom: Record<string, ChatAttachment[]>;
   selectedMessageIdsByRoom: Record<string, string[]>;
+  replyToMessageIdsByRoom: Record<string, string>;
 }
 
 function compactRoomChat(record: RoomChatRoomState): RoomChatRoomState | undefined {
@@ -57,6 +59,11 @@ export function projectRoomChatPanelMaps(roomChatByRoom: RoomChatByRoom): RoomCh
       Object.entries(roomChatByRoom)
         .filter(([, chat]) => chat.selectedMessageIds)
         .map(([roomId, chat]) => [roomId, chat.selectedMessageIds ?? []])
+    ),
+    replyToMessageIdsByRoom: Object.fromEntries(
+      Object.entries(roomChatByRoom)
+        .filter(([, chat]) => chat.replyToMessageId)
+        .map(([roomId, chat]) => [roomId, chat.replyToMessageId ?? ""])
     )
   };
 }
@@ -67,6 +74,7 @@ export interface RoomChatSlice {
   setSensitiveAttachmentReviewKey: (key: string | null) => void;
   toggleSelectedMessageForRoom: (roomId: string, messageId: string) => void;
   clearSelectedMessagesForRoom: (roomId: string) => void;
+  setReplyToMessageForRoom: (roomId: string, messageId: string | null) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   setPendingAttachmentsForRoom: (roomId: string, attachments: ChatAttachment[]) => void;
   appendPendingAttachmentForRoom: (roomId: string, attachment: ChatAttachment) => void;
@@ -108,6 +116,14 @@ export const createRoomChatSlice: StateCreator<AppStoreState, [], [], RoomChatSl
       roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => {
         const { selectedMessageIds, ...rest } = roomChat;
         return rest;
+      })
+    }));
+  },
+  setReplyToMessageForRoom: (roomId, messageId) => {
+    set((state) => ({
+      roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => {
+        const { replyToMessageId, ...rest } = roomChat;
+        return messageId ? { ...roomChat, replyToMessageId: messageId } : rest;
       })
     }));
   },

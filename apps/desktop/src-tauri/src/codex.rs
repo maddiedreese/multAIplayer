@@ -111,7 +111,7 @@ pub(crate) fn run_codex_turn(request: CodexTurnRequest) -> Result<CodexTurnResul
     ensure_codex_input(&request.input)?;
     let previous_thread_id = normalize_codex_thread_id(request.previous_thread_id.as_deref())?;
     let timeout = codex_timeout(request.timeout_seconds)?;
-    let model = request.model.unwrap_or_else(|| "gpt-5.3-codex".to_string());
+    let model = request.model.unwrap_or_else(|| "gpt-5.5".to_string());
     let reasoning_effort = normalize_reasoning_effort(request.reasoning_effort.as_deref())?;
     let service_tier = service_tier_for_speed(request.speed.as_deref())?;
     let sandbox_config = codex_sandbox_config(request.sandbox_level.as_deref())?;

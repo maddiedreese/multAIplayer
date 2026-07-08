@@ -66,6 +66,7 @@ export function useSelectedRoomValues({
   const messages = messagesByRoom[roomId] ?? [];
   const roomSettings = roomSettingsByRoom[roomId] ?? {};
   const roomChat = roomChatByRoom[roomId] ?? {};
+  const replyToMessageId = roomChat.replyToMessageId ?? null;
   const codexRuntime = codexRuntimeByRoom[roomId] ?? {};
   const browser = browserByRoom[roomId] ?? {};
   const gitRuntime = gitWorkflowRuntimeByRoom[roomId] ?? {};
@@ -86,6 +87,7 @@ export function useSelectedRoomValues({
     selectedCodexReasoningEffort,
     selectedCodexSpeed,
     selectedCodexSandboxLevel,
+    replyToMessageId,
     customCodexModel: roomSettings.customCodexModel ?? selectedCodexModel,
     projectPathDraft: roomSettings.projectPathDraft ?? selectedRoom.projectPath,
     messages,

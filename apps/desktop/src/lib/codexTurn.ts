@@ -13,10 +13,12 @@ export interface CodexChatAttachment {
 }
 
 export interface CodexChatMessage {
+  id?: string;
   author: string;
   role: "human" | "codex" | "system";
   body: string;
   time: string;
+  replyTo?: string;
   attachments?: CodexChatAttachment[];
 }
 
@@ -57,6 +59,7 @@ export const maxCodexTurnInputChars = 220_000;
 export const maxCodexGitFiles = 12;
 export const maxCodexMessageBodyChars = 24_000;
 export const maxCodexMaterialChars = 24_000;
+export const maxCodexReplyQuoteChars = 280;
 export const codexTurnInputTruncationNotice =
   "[multAIplayer truncated older room context to fit the local Codex app-server input limit.]";
 export const codexMessageTruncationNotice =
@@ -121,12 +124,14 @@ export function buildCodexTurnInput(
   options: { fullRoomContext?: boolean } = {}
 ): string {
   const contextMessages = options.fullRoomContext ? messages : messagesSinceLastCodex(messages);
+  const messagesById = new Map(messages.flatMap((message) => message.id ? [[message.id, message]] : []));
   const transcript = contextMessages
     .map((message) => {
       const attachments = message.attachments?.length
         ? `\nAttachments:\n${message.attachments.map(formatAttachmentForCodex).join("\n\n")}`
         : "";
-      return `${formatTranscriptAuthor(message)} (${message.role}, ${message.time}): ${boundMessageBody(message.body)}${attachments}`;
+      const replyContext = formatReplyContext(message, messagesById);
+      return `${formatTranscriptAuthor(message)} (${message.role}, ${message.time}${replyContext}): ${boundMessageBody(message.body)}${attachments}`;
     })
     .join("\n\n");
 
@@ -279,6 +284,16 @@ function formatAttachmentMeta(attachment: CodexChatAttachment): string {
   return `${attachment.type}, ${formatBytes(attachment.size)}${blobNote}`;
 }
 
+function formatReplyContext(
+  message: CodexChatMessage,
+  messagesById: Map<string, CodexChatMessage>
+): string {
+  if (!message.replyTo) return "";
+  const target = messagesById.get(message.replyTo);
+  if (!target) return ", replying to original message unavailable or deleted";
+  return `, replying to ${formatTranscriptAuthor(target)}: "${boundReplyQuote(target.body)}"`;
+}
+
 function formatTranscriptAuthor(message: CodexChatMessage): string {
   return message.author.startsWith("@") ? message.author : `@${message.author}`;
 }
@@ -295,6 +310,12 @@ function boundMessageBody(content: string, maxChars = maxCodexMessageBodyChars):
   if (content.length <= maxChars) return content;
   const keepChars = Math.max(0, maxChars - codexMessageTruncationNotice.length - 2);
   return `${content.slice(0, keepChars)}\n${codexMessageTruncationNotice}`;
+}
+
+function boundReplyQuote(content: string, maxChars = maxCodexReplyQuoteChars): string {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxChars) return normalized;
+  return `${normalized.slice(0, Math.max(0, maxChars - 3))}...`;
 }
 
 function addTextRiskFlags(flags: CodexTurnRiskFlag[], text: string, source: string) {

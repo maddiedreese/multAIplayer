@@ -25,6 +25,7 @@ export function RoomInspectorPanel({
       </div>
 
       <div
+        key={activeTab}
         className={`inspector-panel-group inspector-panel-${activeTab}`}
         data-active-tab={activeTab}
       >

@@ -90,6 +90,7 @@ export const ChatPlaintextPayload = z.object({
   body: z.string().max(maxLongTextChars),
   time: z.string().min(1).max(maxShortTextChars),
   createdAt: z.string().datetime().optional(),
+  replyTo: z.string().min(1).max(maxEnvelopeIdChars).optional(),
   attachments: z.array(z.object({
     id: z.string().min(1).max(maxEnvelopeIdChars),
     name: z.string().min(1).max(maxShortTextChars),
@@ -374,7 +375,7 @@ export type ApprovalDelegationPolicy =
   | "trusted_members_only";
 
 export const defaultApprovalDelegationPolicy: ApprovalDelegationPolicy = "host_only";
-export const defaultCodexModel = "gpt-5.3-codex";
+export const defaultCodexModel = "gpt-5.5";
 export const defaultCodexReasoningEffort = "medium";
 export const defaultCodexSpeed = "standard";
 export const defaultCodexSandboxLevel = "workspace_write";
@@ -382,18 +383,13 @@ export const defaultBrowserAllowedOrigins = ["https://github.com"];
 export const defaultBrowserProfilePersistent = true;
 
 export const codexModelOptions = [
-  { id: "gpt-5.3-codex", label: "GPT-5.3-Codex", description: "Current Codex coding model for agentic software work." },
-  { id: "gpt-5.3-codex-spark", label: "GPT-5.3-Codex-Spark", description: "Fast Codex model for smaller coding turns." },
-  { id: "gpt-5.2-codex", label: "GPT-5.2-Codex", description: "Previous Codex model optimized for long-horizon coding." },
-  { id: "gpt-5.1-codex-max", label: "GPT-5.1-Codex-Max", description: "Frontier GPT-5.1 Codex model for deeper work." },
-  { id: "gpt-5.1-codex", label: "GPT-5.1-Codex", description: "GPT-5.1 coding model for Codex harnesses." },
-  { id: "gpt-5.1-codex-mini", label: "GPT-5.1-Codex-Mini", description: "Smaller GPT-5.1 Codex model for lighter turns." },
-  { id: "gpt-5-codex", label: "GPT-5-Codex", description: "Original GPT-5 Codex model." },
-  { id: "gpt-5-codex-mini", label: "GPT-5-Codex-Mini", description: "Smaller GPT-5 Codex model with lower usage cost." }
+  { id: "gpt-5.5", label: "GPT-5.5", description: "Current frontier Codex model for complex coding, research, and real-world work." },
+  { id: "gpt-5.4", label: "GPT-5.4", description: "Strong Codex model for agentic software work." },
+  { id: "gpt-5.4-mini", label: "GPT-5.4-Mini", description: "Smaller GPT-5.4 Codex model for lighter turns." },
+  { id: "gpt-5.3-codex-spark", label: "GPT-5.3-Codex-Spark", description: "Fast Codex model for smaller coding turns." }
 ] as const;
 
 export const codexReasoningEffortOptions = [
-  { id: "minimal", label: "Minimal", description: "Smallest reasoning budget for very direct turns" },
   { id: "low", label: "Low", description: "Fast responses with lighter reasoning" },
   { id: "medium", label: "Medium", description: "Balances speed and reasoning depth for everyday tasks" },
   { id: "high", label: "High", description: "Greater reasoning depth for complex problems" },
@@ -402,8 +398,7 @@ export const codexReasoningEffortOptions = [
 
 export const codexSpeedOptions = [
   { id: "standard", label: "Standard", serviceTier: "default", description: "Default Codex speed and usage behavior" },
-  { id: "fast", label: "Fast", serviceTier: "priority", description: "Priority tier for faster Codex turns when available" },
-  { id: "flex", label: "Flex", serviceTier: "flex", description: "Flexible tier for non-urgent Codex turns when available" }
+  { id: "fast", label: "Fast", serviceTier: "priority", description: "Priority tier for faster Codex turns when available" }
 ] as const;
 
 export const codexSandboxLevelOptions = [

@@ -80,6 +80,7 @@ export function useAppRoomPanelActions({
       setChatMessageForRoom,
       stopLocalPreview: roomRuntime.stopLocalPreview,
       setInspectorTabForRoom,
+      setReplyToMessageForRoom: roomActions.setReplyToMessageForRoom,
       setDraftForRoom
     },
     header: {

@@ -55,6 +55,7 @@ export function useRoomActions({
   const removePendingAttachmentForRoom = useAppStore((state) => state.removePendingAttachmentForRoom);
   const clearPendingAttachmentsForRoom = useAppStore((state) => state.clearPendingAttachmentsForRoom);
   const setDraftForRoom = useAppStore((state) => state.setDraftForRoom);
+  const setReplyToMessageForRoom = useAppStore((state) => state.setReplyToMessageForRoom);
   const hydrateLocalRoomHistoryForRoom = useAppStore((state) => state.hydrateLocalRoomHistoryForRoom);
   const setGitWorkflowMessageForRoom = useAppStore((state) => state.setGitWorkflowMessageForRoom);
   const setGitStatusForRoom = useAppStore((state) => state.setGitStatusForRoom);
@@ -171,6 +172,7 @@ export function useRoomActions({
     removePendingAttachmentForRoom,
     clearPendingAttachmentsForRoom,
     setDraftForRoom,
+    setReplyToMessageForRoom,
     hydrateLocalRoomHistoryForRoom,
     setGitWorkflowBusyForRoom: (roomId: string, isBusy: boolean) =>
       applyBusyForRoom(busy.gitWorkflowBusyRef, setGitWorkflowBusyForRoom, roomId, isBusy),

@@ -34,6 +34,7 @@ interface UseSelectedRoomRuntimeOptions {
   localUser: LocalHostUser;
   isSelectedRoomLocked: boolean;
   messages: ChatMessage[];
+  replyToMessageId: string | null;
   pendingAttachments: ChatAttachment[];
   pendingAttachmentBytes: number;
   browserRequests: BrowserAccessRequest[];
@@ -64,6 +65,7 @@ export function useSelectedRoomRuntime({
   localUser,
   isSelectedRoomLocked,
   messages,
+  replyToMessageId,
   pendingAttachments,
   pendingAttachmentBytes,
   browserRequests,
@@ -103,6 +105,10 @@ export function useSelectedRoomRuntime({
   const selectedCodexThreadId = codexThreadIdsByRoom[roomId] ?? null;
   const codexRunning = codexRunningByRoom[roomId] ?? false;
   const approvalTranscriptMessages = messagesSinceLastCodex(activeCodexApproval?.messages ?? messages) as ChatMessage[];
+  const replyTargetMessage = replyToMessageId ? messages.find((message) => message.id === replyToMessageId) ?? null : null;
+  const replyTarget = replyTargetMessage
+    ? { author: replyTargetMessage.author, body: replyTargetMessage.body }
+    : null;
   const codexApprovalSummaryDisplay = {
     messages: formatApprovalMessages(approvalTranscriptMessages),
     attachments: formatApprovalAttachments(approvalTranscriptMessages),
@@ -145,6 +151,7 @@ export function useSelectedRoomRuntime({
     approvalTranscriptMessages,
     codexApprovalSummaryDisplay,
     chatMessageRows,
+    replyTarget,
     pendingAttachmentRows,
     localPreviewCards,
     pendingAttachmentSummary,

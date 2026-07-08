@@ -923,7 +923,7 @@ button:disabled {
   border-radius: 8px;
   background: #fff;
   color: #25312a;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: inherit;
   font-size: 12px;
   line-height: 1.45;
 }
@@ -1920,7 +1920,7 @@ button:disabled {
   border-radius: 8px;
   background: #141b17;
   color: #d8f4df;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: inherit;
   font-size: 12px;
   line-height: 1.45;
 }
@@ -2290,7 +2290,7 @@ button:disabled {
   border-radius: 8px;
   background: #effaf1;
   color: #14542c;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: inherit;
   font-size: 11px;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -2603,7 +2603,7 @@ button:disabled {
   border-radius: 8px;
   background: #111815;
   color: #cbe8d2;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: inherit;
   font-size: 12px;
   line-height: 1.55;
 }
@@ -3842,7 +3842,7 @@ button:not(:disabled):active {
   border-radius: 2px;
   background: var(--code-bg);
   color: var(--code-text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: inherit;
   white-space: pre-wrap;
 }
 
@@ -3975,28 +3975,6 @@ button:not(:disabled):active {
 
 .inspector-panel-group {
   padding: 12px 16px 24px;
-}
-
-.inspector-panel-files > :not(.panel:has(.project-card)):not(.panel:has(.file-search)):not(.diff-preview) {
-  display: none !important;
-}
-
-.inspector-panel-diff > :not(.panel:has(.diff-list)):not(.diff-preview):not(.git-approval-panel):not(.actions-panel) {
-  display: none !important;
-}
-
-.inspector-panel-terminal > :not(.terminal-panel) {
-  display: none !important;
-}
-
-.inspector-panel-room > .panel:has(.project-card),
-.inspector-panel-room > .panel:has(.file-search),
-.inspector-panel-room > .panel:has(.diff-list),
-.inspector-panel-room > .diff-preview,
-.inspector-panel-room > .git-approval-panel,
-.inspector-panel-room > .actions-panel,
-.inspector-panel-room > .terminal-panel {
-  display: none !important;
 }
 
 .panel {
@@ -5812,7 +5790,7 @@ select {
   outline: none;
   background: #101010;
   color: #f4f4f4;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-family: inherit;
   font-size: 12px;
   line-height: 1.55;
   tab-size: 2;
@@ -6031,7 +6009,7 @@ select {
   gap: 8px;
   margin-top: 8px;
   color: #99c2ff;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: inherit;
   font-size: 12px;
 }
 
@@ -6173,6 +6151,51 @@ select {
 /* Overnight hardening: final UI guardrails for cramped alpha surfaces. */
 .app-shell {
   grid-template-columns: var(--sidebar-width) 8px minmax(620px, 1fr) 8px var(--rail-width);
+}
+
+.reply-preview,
+.composer-reply-target {
+  display: grid;
+  gap: 3px;
+  max-width: min(100%, 560px);
+  margin: 4px 0 8px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--border-strong);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.reply-preview strong,
+.composer-reply-target strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.reply-preview span,
+.composer-reply-target span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-reply-target {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  max-width: none;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--border-strong);
+  border-radius: 8px;
+}
+
+.composer-reply-target button {
+  width: 28px;
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
 }
 
 .sidebar {

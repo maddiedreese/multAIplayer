@@ -24,7 +24,10 @@ function renderChat(messages: RoomChatMessageDisplay[]) {
     lockedPlaceholder: "Room locked",
     chatEnabled: true,
     draft: "",
+    replyTarget: null,
+    roomGoal: null,
     pendingAttachments: [],
+    localPreviewCards: [],
     pendingAttachmentSummary: "0/5 files",
     onToggleMessageSelection: noop,
     onCopyMessageMarkdown: noop,
@@ -35,6 +38,17 @@ function renderChat(messages: RoomChatMessageDisplay[]) {
     onApproveApproval: noop,
     onInvokeCodex: noop,
     onRemovePendingAttachment: noop,
+    onPauseGoal: noop,
+    onResumeGoal: noop,
+    onEditGoal: noop,
+    onDeleteGoal: noop,
+    onTickGoalElapsed: noop,
+    onOpenLocalPreview: noop,
+    onCopyLocalPreviewLink: noop,
+    onStopLocalPreview: noop,
+    onOpenFileSelector: noop,
+    onReplyToMessage: noop,
+    onCancelReply: noop,
     onDraftChange: noop,
     onSendMessage: noop
   }));
@@ -85,7 +99,10 @@ test("RoomChatPanel renders Codex approval risk warnings", () => {
     lockedPlaceholder: "Room locked",
     chatEnabled: true,
     draft: "",
+    replyTarget: null,
+    roomGoal: null,
     pendingAttachments: [],
+    localPreviewCards: [],
     pendingAttachmentSummary: "0/5 files",
     onToggleMessageSelection: noop,
     onCopyMessageMarkdown: noop,
@@ -96,6 +113,17 @@ test("RoomChatPanel renders Codex approval risk warnings", () => {
     onApproveApproval: noop,
     onInvokeCodex: noop,
     onRemovePendingAttachment: noop,
+    onPauseGoal: noop,
+    onResumeGoal: noop,
+    onEditGoal: noop,
+    onDeleteGoal: noop,
+    onTickGoalElapsed: noop,
+    onOpenLocalPreview: noop,
+    onCopyLocalPreviewLink: noop,
+    onStopLocalPreview: noop,
+    onOpenFileSelector: noop,
+    onReplyToMessage: noop,
+    onCancelReply: noop,
     onDraftChange: noop,
     onSendMessage: noop
   }));
@@ -123,4 +151,73 @@ test("RoomChatPanel keeps reactions that have activity", () => {
 
   assert.equal(html.includes("👍"), true);
   assert.equal(html.includes("✅"), false);
+});
+
+test("RoomChatPanel renders reply previews and composer reply target", () => {
+  const html = renderToStaticMarkup(createElement(RoomChatPanel, {
+    messages: [{
+      id: "m2",
+      author: "Jordan",
+      role: "human",
+      body: "Agreed, do that.",
+      time: "9:43",
+      replyPreview: {
+        author: "Avery",
+        body: "Use approach B."
+      },
+      selected: false,
+      attachments: [],
+      reactions: []
+    }],
+    approvalVisible: false,
+    approvalSummary: {
+      messages: "0 since last Codex response",
+      attachments: "None",
+      riskFlags: []
+    },
+    isActiveHost: true,
+    codexRunning: false,
+    canApproveCodex: true,
+    canUseChat: true,
+    canSendMessage: true,
+    roomLocked: false,
+    lockedPlaceholder: "Room locked",
+    chatEnabled: true,
+    draft: "yes",
+    replyTarget: {
+      author: "Avery",
+      body: "Use approach B."
+    },
+    roomGoal: null,
+    pendingAttachments: [],
+    localPreviewCards: [],
+    pendingAttachmentSummary: "0/5 files",
+    markdownSelectionMode: false,
+    onToggleMessageSelection: noop,
+    onCopyMessageMarkdown: noop,
+    onCopyCodexOutputMarkdown: noop,
+    onOpenAttachment: noop,
+    onToggleReaction: noop,
+    onDenyApproval: noop,
+    onApproveApproval: noop,
+    onInvokeCodex: noop,
+    onRemovePendingAttachment: noop,
+    onPauseGoal: noop,
+    onResumeGoal: noop,
+    onEditGoal: noop,
+    onDeleteGoal: noop,
+    onTickGoalElapsed: noop,
+    onOpenLocalPreview: noop,
+    onCopyLocalPreviewLink: noop,
+    onStopLocalPreview: noop,
+    onOpenFileSelector: noop,
+    onReplyToMessage: noop,
+    onCancelReply: noop,
+    onDraftChange: noop,
+    onSendMessage: noop
+  }));
+
+  assert.equal(html.includes("Replying to Avery"), true);
+  assert.equal(html.includes("Use approach B."), true);
+  assert.equal(html.includes("Agreed, do that."), true);
 });

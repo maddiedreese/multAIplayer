@@ -61,6 +61,7 @@ interface UseRoomMainColumnPropsOptions {
   codexRunning: boolean;
   roomCanUseChat: boolean;
   draft: string;
+  replyTarget: ChatProps["replyTarget"];
   roomGoal: ChatProps["roomGoal"];
   pendingAttachmentCount: number;
   pendingAttachments: ChatProps["pendingAttachments"];
@@ -137,6 +138,7 @@ export function useRoomMainColumnProps({
   codexRunning,
   roomCanUseChat,
   draft,
+  replyTarget,
   roomGoal,
   pendingAttachmentCount,
   pendingAttachments,
@@ -212,6 +214,7 @@ export function useRoomMainColumnProps({
       lockedPlaceholder: roomLockMessage(selectedRoom, isSelectedRoomRevoked),
       chatEnabled: selectedRoom.mode.chat,
       draft,
+      replyTarget,
       roomGoal,
       pendingAttachments,
       localPreviewCards,

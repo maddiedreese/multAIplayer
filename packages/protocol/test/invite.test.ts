@@ -5,6 +5,7 @@ import {
   DevicePublicKeyJwk,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
+  ChatPlaintextPayload,
   InviteJoinRequestPlaintextPayload,
   InviteJoinStatusPlaintextPayload,
   DeviceRecord,
@@ -37,6 +38,27 @@ test("team and room ids use relay-safe bounded identifiers", () => {
   for (const value of ["room:desktop", "room/desktop", " room-desktop", "room-desktop ", "ro", "x".repeat(161)]) {
     assert.equal(RoomId.safeParse(value).success, false, `${value} should not be a valid room id`);
   }
+});
+
+test("chat payloads can carry encrypted reply references", () => {
+  const parsed = ChatPlaintextPayload.parse({
+    id: "message-2",
+    author: "Maddie",
+    role: "human",
+    body: "agreed, do that",
+    time: "9:43 AM",
+    replyTo: "message-1"
+  });
+
+  assert.equal(parsed.replyTo, "message-1");
+  assert.equal(ChatPlaintextPayload.safeParse({
+    id: "message-3",
+    author: "Maddie",
+    role: "human",
+    body: "bad reply",
+    time: "9:44 AM",
+    replyTo: ""
+  }).success, false);
 });
 
 test("team records can carry the current user's role", () => {

@@ -54,3 +54,25 @@ test("normalizeChatMessage rejects invalid message envelopes", () => {
   assert.equal(normalizeChatMessage({ id: "m1", author: "Maddie", role: "human", body: "missing time" }), null);
   assert.equal(normalizeChatMessage({ id: "m1", author: "Maddie", role: "assistant", body: "bad role", time: "10:00" }), null);
 });
+
+test("normalizeChatMessage preserves valid reply references", () => {
+  const message = normalizeChatMessage({
+    id: "m2",
+    author: "Jordan",
+    role: "human",
+    body: "agreed, do that",
+    time: "10:01",
+    replyTo: "m1"
+  });
+
+  assert.ok(message);
+  assert.equal(message.replyTo, "m1");
+  assert.equal(normalizeChatMessage({
+    id: "m3",
+    author: "Jordan",
+    role: "human",
+    body: "bad reply",
+    time: "10:02",
+    replyTo: " "
+  }), null);
+});

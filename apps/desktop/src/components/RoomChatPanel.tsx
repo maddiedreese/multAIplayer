@@ -25,6 +25,10 @@ export interface RoomChatMessageDisplay {
   role: "human" | "codex" | "system";
   body: string;
   time: string;
+  replyPreview?: {
+    author: string;
+    body: string;
+  } | null;
   selected: boolean;
   attachments: RoomChatAttachmentDisplay[];
   reactions: RoomChatReactionDisplay[];
@@ -61,6 +65,7 @@ export function RoomChatPanel({
   chatEnabled,
   draft,
   pendingAttachments,
+  replyTarget,
   roomGoal,
   localPreviewCards = [],
   pendingAttachmentSummary,
@@ -83,6 +88,8 @@ export function RoomChatPanel({
   onCopyLocalPreviewLink,
   onStopLocalPreview,
   onOpenFileSelector,
+  onReplyToMessage,
+  onCancelReply,
   onDraftChange,
   onSendMessage
 }: {
@@ -99,6 +106,10 @@ export function RoomChatPanel({
   chatEnabled: boolean;
   draft: string;
   pendingAttachments: PendingAttachmentDisplay[];
+  replyTarget?: {
+    author: string;
+    body: string;
+  } | null;
   roomGoal: RoomGoal | null;
   localPreviewCards: LocalPreviewCardDisplay[];
   pendingAttachmentSummary: string;
@@ -121,6 +132,8 @@ export function RoomChatPanel({
   onCopyLocalPreviewLink: (previewId: string) => void;
   onStopLocalPreview: (previewId: string) => void;
   onOpenFileSelector: () => void;
+  onReplyToMessage: (messageId: string) => void;
+  onCancelReply: () => void;
   onDraftChange: (draft: string) => void;
   onSendMessage: () => void;
 }) {
@@ -169,7 +182,21 @@ export function RoomChatPanel({
                       <Bot size={13} />
                     </button>
                   )}
+                  <button
+                    onClick={() => onReplyToMessage(message.id)}
+                    title="Reply to message"
+                    aria-label={`Reply to message from ${message.author}`}
+                    disabled={!canUseChat || roomLocked}
+                  >
+                    Reply
+                  </button>
                 </div>
+                {message.replyPreview && (
+                  <div className="reply-preview">
+                    <strong>{message.replyPreview.author}</strong>
+                    <span>{message.replyPreview.body}</span>
+                  </div>
+                )}
                 <p>{message.body}</p>
                 {message.attachments.map((attachment) => (
                   <button
@@ -303,6 +330,17 @@ export function RoomChatPanel({
                 </span>
               ))}
               <small>{pendingAttachmentSummary}</small>
+            </div>
+          )}
+          {replyTarget && (
+            <div className="composer-reply-target">
+              <div>
+                <strong>Replying to {replyTarget.author}</strong>
+                <span>{replyTarget.body}</span>
+              </div>
+              <button onClick={onCancelReply} aria-label="Cancel reply">
+                <X size={12} />
+              </button>
             </div>
           )}
           <textarea
