@@ -185,7 +185,7 @@ Non-host members can request terminal commands. These are separate from Codex co
 - Human command request: a member proposes an exact command for the host to approve.
 - Codex command proposal: Codex proposes or runs commands according to the active sandbox and approval policy.
 
-Human command requests are encrypted room events. The relay can route the request but cannot read the command. The active host sees the requester and command before approving or denying it locally. Approved non-host terminal requests always execute from the active room's selected project folder on the host machine; the host app does not trust a requester-provided working directory.
+Human command requests are encrypted room events. The relay can route the request but cannot read the command. The active host sees the requester and command before approving or denying it locally. Approved non-host terminal requests always execute from the active room's selected project folder on the host machine; the host app does not trust a requester-provided working directory. Approval grants shell access on the host account, not a project sandbox.
 
 Codex can spin up background or foreground terminals. A background terminal can be brought to the foreground by request or by host action.
 

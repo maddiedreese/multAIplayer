@@ -104,6 +104,35 @@ button:disabled {
   background: #eef1ed;
 }
 
+.app-shell.has-web-preview-banner {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.web-preview-banner {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 9px 18px;
+  border-bottom: 1px solid #d1b65d;
+  background: #fff5cb;
+  color: #40330b;
+  font-size: 0.82rem;
+}
+
+.web-preview-banner strong {
+  white-space: nowrap;
+}
+
+.app-shell.has-web-preview-banner .sidebar,
+.app-shell.has-web-preview-banner .room,
+.app-shell.has-web-preview-banner .inspector,
+.app-shell.has-web-preview-banner .shell-resizer,
+.app-shell.has-web-preview-banner .sidebar-drawer {
+  grid-row: 2;
+}
+
 .sidebar {
   display: flex;
   flex-direction: column;

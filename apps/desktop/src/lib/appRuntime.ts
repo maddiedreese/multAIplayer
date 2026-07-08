@@ -23,5 +23,13 @@ export function roomLockMessage(room: RoomRecord, revoked: boolean): string {
 }
 
 export function roomSecretStorageLabel(): string {
-  return "__TAURI_INTERNALS__" in window ? "macOS Keychain" : "web preview localStorage";
+  return isTauriRuntime() ? "macOS Keychain" : "web preview localStorage";
+}
+
+export function isWebPreviewRuntime(): boolean {
+  return !isTauriRuntime();
+}
+
+function isTauriRuntime(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }

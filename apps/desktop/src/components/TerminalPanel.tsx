@@ -125,6 +125,14 @@ export function TerminalPanel({
               </div>
               <small>{request.status}</small>
               {request.status === "pending" && (
+                <div className="terminal-request-warning">
+                  <InlineSecretWarning
+                    risks={["Approving runs this shell command on the host account, not inside a project sandbox."]}
+                    compact
+                  />
+                </div>
+              )}
+              {request.status === "pending" && (
                 <div>
                   <button
                     onClick={() => onApproveTerminalRequest(request.id)}

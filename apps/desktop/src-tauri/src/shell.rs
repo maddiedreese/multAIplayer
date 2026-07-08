@@ -30,7 +30,7 @@ pub(crate) fn run_shell_command(request: ShellCommandRequest) -> Result<CommandR
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
     let output = Command::new(shell)
         .current_dir(&request.cwd)
-        .args(["-lc", &request.command])
+        .args(["-c", &request.command])
         .output()
         .map_err(|error| format!("Failed to run command: {error}"))?;
 

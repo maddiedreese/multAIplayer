@@ -102,7 +102,7 @@ pub(crate) fn terminal_start(
         .map_err(|error| format!("Failed to open terminal pty: {error}"))?;
     let mut command = CommandBuilder::new(shell);
     command.cwd(&request.cwd);
-    command.arg("-lc");
+    command.arg("-c");
     command.arg(&request.command);
     let child = pair
         .slave

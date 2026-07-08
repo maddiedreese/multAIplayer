@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { isLocalUserActiveHostForRoom } from "../src/lib/roomHost";
+import {
+  findEnvelopeRoom,
+  isEnvelopeFromActiveRoomHost,
+  isLocalUserActiveHostForRoom,
+  roomHostEnvelopeRejectionMessage
+} from "../src/lib/roomHost";
 
 const activeRoom: RoomRecord = {
   id: "room-alpha",
@@ -46,5 +51,27 @@ test("isLocalUserActiveHostForRoom rejects inactive host states", () => {
   assert.equal(
     isLocalUserActiveHostForRoom({ ...activeRoom, hostStatus: "offline" }, { id: "github:maddiedreese", name: "Maddie" }),
     false
+  );
+});
+
+test("room host envelopes must come from stable active host identity", () => {
+  assert.equal(isEnvelopeFromActiveRoomHost(activeRoom, { senderUserId: "github:maddiedreese" }), true);
+  assert.equal(isEnvelopeFromActiveRoomHost(activeRoom, { senderUserId: "github:member" }), false);
+  assert.equal(
+    isEnvelopeFromActiveRoomHost({ ...activeRoom, hostStatus: "handoff" }, { senderUserId: "github:maddiedreese" }),
+    false
+  );
+  assert.equal(
+    isEnvelopeFromActiveRoomHost({ ...activeRoom, hostUserId: undefined }, { senderUserId: "github:maddiedreese" }),
+    false
+  );
+});
+
+test("room host envelope helpers find known rooms and explain rejections", () => {
+  assert.equal(findEnvelopeRoom([activeRoom], "room-alpha")?.name, "Alpha");
+  assert.equal(findEnvelopeRoom([activeRoom], "missing"), null);
+  assert.equal(
+    roomHostEnvelopeRejectionMessage(activeRoom, "host handoff"),
+    "Rejected host handoff because it was not sent by Maddie."
   );
 });
