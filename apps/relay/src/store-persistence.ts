@@ -20,6 +20,20 @@ export function createRelayStorePersistenceCoordinator(options: {
   storeCodec: RelayStoreCodec;
 }): RelayStorePersistenceCoordinator {
   let saveTimer: NodeJS.Timeout | null = null;
+  const pendingEncryptedSaves = new Set<Promise<void>>();
+
+  function trackEncryptedSave(save: Promise<void>) {
+    const tracked = save.finally(() => {
+      pendingEncryptedSaves.delete(tracked);
+    });
+    pendingEncryptedSaves.add(tracked);
+  }
+
+  async function waitForPendingEncryptedSaves() {
+    while (pendingEncryptedSaves.size > 0) {
+      await Promise.allSettled([...pendingEncryptedSaves]);
+    }
+  }
 
   async function loadRelayStore() {
     try {
@@ -55,25 +69,25 @@ export function createRelayStorePersistenceCoordinator(options: {
   }
 
   function saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]) {
-    options.persistence.saveEncryptedBacklog(roomKey, envelopes)
+    trackEncryptedSave(options.persistence.saveEncryptedBacklog(roomKey, envelopes)
       .then((handled) => {
         if (!handled) scheduleStoreSave();
       })
       .catch((error) => {
         console.error("Failed to save encrypted relay backlog:", error);
         scheduleStoreSave();
-      });
+      }));
   }
 
   function saveEncryptedEnvelope(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]) {
-    options.persistence.saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds)
+    trackEncryptedSave(options.persistence.saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds)
       .then((handled) => {
         if (!handled) scheduleStoreSave();
       })
       .catch((error) => {
         console.error("Failed to append encrypted relay envelope:", error);
         scheduleStoreSave();
-      });
+      }));
   }
 
   async function saveRelayStore() {
@@ -82,6 +96,11 @@ export function createRelayStorePersistenceCoordinator(options: {
   }
 
   async function flushRelayStore() {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    await waitForPendingEncryptedSaves();
     if (saveTimer) {
       clearTimeout(saveTimer);
       saveTimer = null;

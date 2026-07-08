@@ -117,6 +117,74 @@ test("relay store persistence close flushes pending work and closes backend", as
   assert.equal(closed, true);
 });
 
+test("relay store persistence close waits for pending encrypted envelope saves", async () => {
+  let fullSaves = 0;
+  let encryptedSaveResolved = false;
+  let closed = false;
+  const persistence: RelayPersistence = {
+    flushMode: "debounced",
+    async load() {
+      return null;
+    },
+    async save() {
+      fullSaves += 1;
+      assert.equal(encryptedSaveResolved, true);
+    },
+    async saveEncryptedBacklog() {
+      return false;
+    },
+    async saveEncryptedEnvelope() {
+      await delay(75);
+      encryptedSaveResolved = true;
+      return true;
+    },
+    async quarantine() {},
+    close() {
+      closed = true;
+      assert.equal(encryptedSaveResolved, true);
+    }
+  };
+  const storeCodec: RelayStoreCodec = {
+    isExpiredInvite() {
+      return false;
+    },
+    isExpiredAttachmentBlob() {
+      return false;
+    },
+    applyStoredRelayState() {},
+    pruneExpiredRelayState() {},
+    toStoredRelayState() {
+      return storedState(1);
+    }
+  };
+  const coordinator = createRelayStorePersistenceCoordinator({
+    dataPath: "memory",
+    persistence,
+    storeCodec
+  });
+
+  coordinator.saveEncryptedEnvelope("team:room", {
+    id: "envelope-close",
+    teamId: "team",
+    roomId: "room",
+    senderUserId: "user",
+    senderDeviceId: "device",
+    kind: "chat.message",
+    createdAt: "2026-07-07T00:00:01.000Z",
+    payload: {
+      algorithm: "AES-GCM-256",
+      nonce: "nonce",
+      ciphertext: "ciphertext"
+    }
+  }, []);
+
+  await coordinator.closeRelayStore();
+
+  assert.equal(encryptedSaveResolved, true);
+  assert.equal(fullSaves, 1);
+  assert.equal(closed, true);
+});
+
 test("relay store persistence uses incremental encrypted backlog saves when available", async () => {
   let fullSaves = 0;
   const backlogSaves: Array<{ roomKey: RoomKey; envelopes: RelayEnvelope[] }> = [];
