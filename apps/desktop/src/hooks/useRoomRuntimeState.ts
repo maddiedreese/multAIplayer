@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useAppStore } from "../store/appStore";
+import { projectCodexHostHandoffMaps } from "../store/slices/codexHostHandoffSlice";
 import {
   projectInspectorTabsByRoom,
   projectPresenceByRoom
@@ -8,22 +9,6 @@ import {
   projectGitHubActionsEventsByRoom,
   projectGitWorkflowEventsByRoom
 } from "../store/slices/gitWorkflowSlice";
-import type { HostHandoffRecord } from "../types";
-
-function projectCodexRuntimeMaps(codexRuntimeByRoom: ReturnType<typeof useAppStore.getState>["codexRuntimeByRoom"]) {
-  const hostHandoffsByRoom: Record<string, HostHandoffRecord[]> = {};
-  const codexContinuationByRoom: Record<string, HostHandoffRecord> = {};
-
-  Object.entries(codexRuntimeByRoom).forEach(([roomId, runtime]) => {
-    if (runtime.hostHandoffs) hostHandoffsByRoom[roomId] = runtime.hostHandoffs;
-    if (runtime.continuation) codexContinuationByRoom[roomId] = runtime.continuation;
-  });
-
-  return {
-    hostHandoffsByRoom,
-    codexContinuationByRoom
-  };
-}
 
 export function useRoomRuntimeState() {
   const historyPresenceByRoom = useAppStore((state) => state.historyPresenceByRoom);
@@ -77,7 +62,7 @@ export function useRoomRuntimeState() {
     inspectorTabsByRoom: projectInspectorTabsByRoom(historyPresenceByRoom),
     presenceByRoom: projectPresenceByRoom(historyPresenceByRoom)
   }), [historyPresenceByRoom]);
-  const codexRuntimeMaps = useMemo(() => projectCodexRuntimeMaps(codexRuntimeByRoom), [codexRuntimeByRoom]);
+  const codexRuntimeMaps = useMemo(() => projectCodexHostHandoffMaps(codexRuntimeByRoom), [codexRuntimeByRoom]);
   const gitWorkflowEventsByRoom = useMemo(
     () => projectGitWorkflowEventsByRoom(gitWorkflowRuntimeByRoom),
     [gitWorkflowRuntimeByRoom]

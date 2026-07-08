@@ -32,6 +32,11 @@ export interface CodexRuntimeMaps {
   codexThreadIdsByRoom: Record<string, string>;
 }
 
+export interface CodexHostHandoffMaps {
+  hostHandoffsByRoom: Record<string, HostHandoffRecord[]>;
+  codexContinuationByRoom: Record<string, HostHandoffRecord>;
+}
+
 export function projectCodexRuntimeMaps(codexRuntimeByRoom: CodexRuntimeByRoom): CodexRuntimeMaps {
   const codexEventsByRoom: Record<string, CodexRoomEvent[]> = {};
   const approvalVisibleByRoom: Record<string, boolean> = {};
@@ -59,6 +64,21 @@ export function projectCodexRuntimeMaps(codexRuntimeByRoom: CodexRuntimeByRoom):
     roomGoalsByRoom,
     secretWarningsVisibleByRoom,
     codexThreadIdsByRoom
+  };
+}
+
+export function projectCodexHostHandoffMaps(codexRuntimeByRoom: CodexRuntimeByRoom): CodexHostHandoffMaps {
+  const hostHandoffsByRoom: Record<string, HostHandoffRecord[]> = {};
+  const codexContinuationByRoom: Record<string, HostHandoffRecord> = {};
+
+  Object.entries(codexRuntimeByRoom).forEach(([roomId, runtime]) => {
+    if (runtime.hostHandoffs) hostHandoffsByRoom[roomId] = runtime.hostHandoffs;
+    if (runtime.continuation) codexContinuationByRoom[roomId] = runtime.continuation;
+  });
+
+  return {
+    hostHandoffsByRoom,
+    codexContinuationByRoom
   };
 }
 
