@@ -83,19 +83,37 @@ test("relay exposes content-free operational metrics", async () => {
     assert.equal(response.status, 200);
     const body = await response.json() as {
       activeSockets?: unknown;
+      liveAttachmentBlobCount?: unknown;
+      liveAttachmentBlobBytes?: unknown;
       envelopesPublishedTotal?: unknown;
+      attachmentBlobUploadsTotal?: unknown;
+      attachmentBlobUploadBytesTotal?: unknown;
+      attachmentBlobUploadRejectionsByReason?: unknown;
       quotaRejectionsTotal?: unknown;
       quotaRejectionsByType?: unknown;
       rateLimitRejectionsTotal?: unknown;
+      rateLimitRejectionsByBucket?: unknown;
+      webSocketConnectionAttemptsTotal?: unknown;
+      webSocketConnectionsAcceptedTotal?: unknown;
+      webSocketConnectionRejectionsByReason?: unknown;
       startedAt?: unknown;
       uptimeSeconds?: unknown;
     };
 
     assert.equal(body.activeSockets, 0);
+    assert.equal(body.liveAttachmentBlobCount, 0);
+    assert.equal(body.liveAttachmentBlobBytes, 0);
     assert.equal(body.envelopesPublishedTotal, 0);
+    assert.equal(body.attachmentBlobUploadsTotal, 0);
+    assert.equal(body.attachmentBlobUploadBytesTotal, 0);
+    assert.deepEqual(body.attachmentBlobUploadRejectionsByReason, {});
     assert.equal(body.quotaRejectionsTotal, 0);
     assert.deepEqual(body.quotaRejectionsByType, {});
     assert.equal(body.rateLimitRejectionsTotal, 0);
+    assert.deepEqual(body.rateLimitRejectionsByBucket, {});
+    assert.equal(body.webSocketConnectionAttemptsTotal, 0);
+    assert.equal(body.webSocketConnectionsAcceptedTotal, 0);
+    assert.deepEqual(body.webSocketConnectionRejectionsByReason, {});
     assert.equal(typeof body.startedAt, "string");
     assert.equal(typeof body.uptimeSeconds, "number");
   } finally {
@@ -439,6 +457,51 @@ test("relay enforces authenticated user daily team and room creation quotas", as
     assert.equal(metricsBody.quotaRejectionsTotal, 2);
     assert.equal(metricsBody.quotaRejectionsByType?.daily_user_team_creations, 1);
     assert.equal(metricsBody.quotaRejectionsByType?.daily_user_room_creations, 1);
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay enforces authenticated total room ceiling", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER: "2"
+  });
+  try {
+    const maddieCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    const limited = await fetch(`${relay.baseUrl}/rooms`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: maddieCookie },
+      body: JSON.stringify({
+        teamId: "team-core",
+        name: "Too many rooms",
+        projectPath: "/tmp/multaiplayer"
+      })
+    });
+    assert.equal(limited.status, 429);
+    const body = await limited.json() as {
+      error: string;
+      code: string;
+      quota: { type: string; limit: number; used: number; remaining: number };
+    };
+    assert.deepEqual(body, {
+      error: "Total room quota exceeded.",
+      code: "quota_exceeded",
+      quota: {
+        type: "total_user_rooms",
+        limit: 2,
+        used: 2,
+        remaining: 0
+      }
+    });
+
+    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const metricsBody = await metrics.json() as {
+      quotaRejectionsTotal?: unknown;
+      quotaRejectionsByType?: Record<string, unknown>;
+    };
+    assert.equal(metricsBody.quotaRejectionsTotal, 1);
+    assert.equal(metricsBody.quotaRejectionsByType?.total_user_rooms, 1);
   } finally {
     await relay.close();
   }
@@ -1506,6 +1569,43 @@ test("relay rate limits room WebSocket events per client", async () => {
     assert.match(await errorPromise, /Rate limit exceeded/);
   } finally {
     socket.close();
+    await relay.close();
+  }
+});
+
+test("relay rate limits WebSocket connection attempts per client", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT: "1",
+    MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS: "60000"
+  });
+  const first = new WebSocket(relay.wsUrl);
+  let second: WebSocket | null = null;
+  try {
+    await onceOpen(first);
+    second = new WebSocket(relay.wsUrl);
+    const errorPromise = waitForError(second);
+    const closePromise = waitForClose(second);
+    assert.match(await errorPromise, /WebSocket connection rate limit exceeded/);
+    const close = await closePromise;
+    assert.equal(close.code, 1008);
+
+    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const body = await metrics.json() as {
+      rateLimitRejectionsTotal?: unknown;
+      rateLimitRejectionsByBucket?: Record<string, unknown>;
+      webSocketConnectionAttemptsTotal?: unknown;
+      webSocketConnectionsAcceptedTotal?: unknown;
+      webSocketConnectionRejectionsByReason?: Record<string, unknown>;
+    };
+    assert.equal(body.rateLimitRejectionsTotal, 1);
+    assert.equal(body.rateLimitRejectionsByBucket?.websocketconnect, 1);
+    assert.equal(body.webSocketConnectionAttemptsTotal, 2);
+    assert.equal(body.webSocketConnectionsAcceptedTotal, 1);
+    assert.equal(body.webSocketConnectionRejectionsByReason?.rate_limit, 1);
+  } finally {
+    first.close();
+    second?.close();
     await relay.close();
   }
 });
@@ -2637,6 +2737,83 @@ test("relay enforces authenticated live encrypted attachment blob quotas", async
     };
     assert.equal(metricsBody.quotaRejectionsTotal, 1);
     assert.equal(metricsBody.quotaRejectionsByType?.live_attachment_blob_bytes, 1);
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay enforces authenticated encrypted attachment upload byte quotas", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "10",
+    MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES: "100",
+    MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW: "10",
+    MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_WINDOW_MS: "60000"
+  });
+  try {
+    const maddieCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    const uploadBody = (size: number, name: string) => ({
+      teamId: "team-core",
+      roomId: "room-desktop",
+      name,
+      type: "text/plain",
+      size,
+      payload: {
+        algorithm: "AES-GCM-256",
+        nonce: "nonce-for-test",
+        ciphertext: "tiny"
+      }
+    });
+
+    const first = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: maddieCookie },
+      body: JSON.stringify(uploadBody(6, "one.txt"))
+    });
+    assert.equal(first.status, 201);
+
+    const limited = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: maddieCookie },
+      body: JSON.stringify(uploadBody(5, "two.txt"))
+    });
+    assert.equal(limited.status, 429);
+    assert.equal(limited.headers.get("retry-after"), "60");
+    const limitedBody = await limited.json() as {
+      error: string;
+      code: string;
+      retryAfterSeconds: number;
+      quota: { type: string; limit: number; used: number; remaining: number; resetsAt: string };
+    };
+    assert.equal(limitedBody.error, "Encrypted attachment blob upload byte quota exceeded.");
+    assert.equal(limitedBody.code, "quota_exceeded");
+    assert.equal(limitedBody.retryAfterSeconds, 60);
+    assert.deepEqual(limitedBody.quota, {
+      type: "attachment_blob_upload_bytes",
+      limit: 10,
+      used: 6,
+      remaining: 4,
+      resetsAt: limitedBody.quota.resetsAt
+    });
+    assert.ok(Number.isFinite(Date.parse(limitedBody.quota.resetsAt)));
+
+    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const metricsBody = await metrics.json() as {
+      liveAttachmentBlobCount?: unknown;
+      liveAttachmentBlobBytes?: unknown;
+      attachmentBlobUploadsTotal?: unknown;
+      attachmentBlobUploadBytesTotal?: unknown;
+      attachmentBlobUploadRejectionsByReason?: Record<string, unknown>;
+      quotaRejectionsTotal?: unknown;
+      quotaRejectionsByType?: Record<string, unknown>;
+    };
+    assert.equal(metricsBody.liveAttachmentBlobCount, 1);
+    assert.equal(metricsBody.liveAttachmentBlobBytes, 6);
+    assert.equal(metricsBody.attachmentBlobUploadsTotal, 1);
+    assert.equal(metricsBody.attachmentBlobUploadBytesTotal, 6);
+    assert.equal(metricsBody.attachmentBlobUploadRejectionsByReason?.upload_byte_quota, 1);
+    assert.equal(metricsBody.quotaRejectionsTotal, 1);
+    assert.equal(metricsBody.quotaRejectionsByType?.attachment_blob_upload_bytes, 1);
   } finally {
     await relay.close();
   }

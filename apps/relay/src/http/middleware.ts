@@ -13,6 +13,7 @@ interface RelayRequestGuardsOptions {
     mutation: number;
     attachment: number;
     websocket: number;
+    websocketConnect: number;
   };
   rateLimitStore: Map<string, RateLimitRecord>;
   trustProxyHeaders: boolean;
@@ -42,7 +43,7 @@ export function createRelayRequestGuards({
       next();
       return;
     }
-    metrics.recordRateLimitRejection();
+    metrics.recordRateLimitRejection(bucket);
     res.setHeader("Retry-After", String(Math.ceil(Math.max(0, result.resetAt - Date.now()) / 1000)));
     res.status(429).json({
       error: "Rate limit exceeded. Slow down before retrying.",

@@ -13,7 +13,13 @@ const productionRelayEnv = {
   MULTAIPLAYER_RELAY_RATE_LIMITS: "true",
   MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS: "false",
   MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-  MULTAIPLAYER_RELAY_DATA_PATH: ".multaiplayer/relay-store.sqlite"
+  MULTAIPLAYER_RELAY_DATA_PATH: ".multaiplayer/relay-store.sqlite",
+  MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "5000000",
+  MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES: "250000000",
+  MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW: "100000000",
+  MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER: "20",
+  MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT: "120",
+  MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER: "500"
 };
 
 test("production relay doctor accepts a hardened representative environment", () => {
@@ -24,6 +30,9 @@ test("production relay doctor accepts a hardened representative environment", ()
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_RATE_LIMITS: rate limits enabled/);
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_STORAGE: sqlite storage configured/);
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_DATA_PATH: configured/);
+  assert.match(result.stdout, /production MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW: configured/);
+  assert.match(result.stdout, /production MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT: configured/);
+  assert.match(result.stdout, /production MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER: configured/);
   assert.doesNotMatch(result.stdout, /\bcargo:/);
   assert.doesNotMatch(result.stdout, /\brustc:/);
 });
@@ -76,6 +85,20 @@ test("production relay doctor rejects disabled rate limits and temporary storage
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /RATE_LIMITS|rate limits/i);
   assert.match(result.stdout, /must not point at \/tmp/);
+});
+
+test("production relay doctor rejects missing cost guardrail bounds", () => {
+  const result = runProductionDoctor({
+    ...productionRelayEnv,
+    MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW: "1",
+    MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER: "0",
+    MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER: "0"
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW/);
+  assert.match(result.stdout, /WEBSOCKET_CONNECTION_CAP_USER/);
+  assert.match(result.stdout, /TOTAL_ROOM_CAP_USER/);
 });
 
 function runProductionDoctor(env) {

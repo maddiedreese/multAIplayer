@@ -82,13 +82,14 @@ The check must pass. It verifies GitHub OAuth presence, strong durable session e
 - Use `/healthz` for container health.
 - Use `/readyz` for platform readiness; it must turn not-ready during shutdown so traffic stops before the process exits.
 - Confirm deploy drains reject new HTTP requests and WebSocket upgrades, close existing room WebSockets with code `1012` (`Service Restart`), and flush the relay store before exit.
-- Use `/metrics` for content-free relay counters such as active sockets, published envelopes, rate-limit rejections, quota rejections by quota type, start time, and uptime.
+- Use `/metrics` for content-free relay counters such as active sockets, live encrypted blob count/bytes, accepted attachment upload bytes, upload rejection reasons, published envelopes, rate-limit rejections by bucket, quota rejections by quota type, WebSocket connection attempts/accepts/rejections, start time, and uptime.
 - Do not treat these endpoints as a privacy or security audit.
 
 ## Cost Guardrails
 
-- Keep attachment blob max size, live blob quota, encrypted envelope max size, daily team/room creation caps, and WebSocket connection caps explicitly set in production.
+- Keep attachment blob max size, live blob quota, attachment upload byte quota, encrypted envelope max size, daily team/room creation caps, total room cap, WebSocket connection-attempt limit, and WebSocket connection caps explicitly set in production.
 - Confirm quota failures return structured `quota_exceeded` JSON where applicable and increment `/metrics` without exposing plaintext payloads.
+- Confirm upload-byte quota failures, WebSocket connection-attempt rate limits, and total-room quota failures have visible `/metrics` counters.
 - Keep limits intentionally above normal team use; these guardrails are for runaway clients and abuse, not ordinary collaboration.
 - For multi-instance hosting, put shared or edge rate limiting in front of the relay because the alpha in-process limiter and connection counters are per instance.
 

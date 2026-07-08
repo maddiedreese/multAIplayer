@@ -8,6 +8,7 @@ import {
 import type { AuthSession, ClientSession, PresenceRecord, RelayStore, RoomKey } from "../state.js";
 
 type RateLimitResult = { allowed: boolean };
+type WebSocketRateLimitBucket = "websocket" | "websocketConnect";
 
 interface RegisterRelayWebSocketConnectionOptions {
   wss: WebSocketServer;
@@ -26,12 +27,16 @@ interface RegisterRelayWebSocketConnectionOptions {
   maxUserIdChars: number;
   getAuthSessionFromRequest: (request: IncomingMessage) => AuthSession | undefined;
   clientIdentityFromIncomingMessage: (request: IncomingMessage) => string;
-  consumeRateLimit: (bucket: "websocket", clientId: string) => RateLimitResult;
+  consumeRateLimit: (bucket: WebSocketRateLimitBucket, clientId: string) => RateLimitResult;
   websocketConnectionCaps: {
     perUser: number;
     perDevice: number;
   };
   recordQuotaRejection?: (type: string) => void;
+  recordRateLimitRejection?: (bucket: string) => void;
+  recordConnectionAttempt?: () => void;
+  recordConnectionAccepted?: () => void;
+  recordConnectionRejection?: (reason: string) => void;
   isReady?: () => boolean;
   send: (socket: ClientSession["socket"], message: RelayServerMessage) => void;
   roomKey: (teamId: string, roomId: string) => RoomKey;
@@ -75,6 +80,10 @@ export function registerRelayWebSocketConnection({
   consumeRateLimit,
   websocketConnectionCaps,
   recordQuotaRejection,
+  recordRateLimitRejection,
+  recordConnectionAttempt,
+  recordConnectionAccepted,
+  recordConnectionRejection,
   isReady = () => true,
   send,
   roomKey,
@@ -227,29 +236,42 @@ export function registerRelayWebSocketConnection({
   }
 
   wss.on("connection", (socket, request) => {
+    recordConnectionAttempt?.();
     if (!isReady()) {
+      recordConnectionRejection?.("not_ready");
       send(socket, { type: "error", message: "Relay is shutting down. Reconnect to another relay instance." });
       socket.close(1012, "Relay shutting down");
+      return;
+    }
+    const rateClientId = clientIdentityFromIncomingMessage(request);
+    if (!consumeRateLimit("websocketConnect", rateClientId).allowed) {
+      recordRateLimitRejection?.("websocketConnect");
+      recordConnectionRejection?.("rate_limit");
+      send(socket, { type: "error", message: "WebSocket connection rate limit exceeded. Slow down before reconnecting." });
+      socket.close(1008, "WebSocket connection rate limit exceeded");
       return;
     }
     const session: ClientSession = {
       socket,
       authSession: getAuthSessionFromRequest(request),
-      rateClientId: clientIdentityFromIncomingMessage(request),
+      rateClientId,
       subscribedTeamIds: new Set<string>(),
       workspaceSubscribed: false
     };
     const initialQuotaError = socketConnectionQuotaError(session);
     if (initialQuotaError) {
+      recordConnectionRejection?.("quota_initial");
       send(socket, { type: "error", message: initialQuotaError });
       socket.close(1008, "WebSocket connection quota exceeded");
       return;
     }
     sessions.set(socket, session);
+    recordConnectionAccepted?.();
 
     socket.on("message", (raw) => {
       try {
         if (!consumeRateLimit("websocket", session.rateClientId).allowed) {
+          recordRateLimitRejection?.("websocket");
           send(socket, { type: "error", message: "Rate limit exceeded. Slow down before sending more room events." });
           return;
         }
@@ -281,6 +303,7 @@ export function registerRelayWebSocketConnection({
           session.deviceId = parsed.deviceId;
           const quotaError = socketConnectionQuotaError(session);
           if (quotaError) {
+            recordConnectionRejection?.("quota_after_join");
             send(socket, { type: "error", message: quotaError });
             socket.close(1008, "WebSocket connection quota exceeded");
             return;

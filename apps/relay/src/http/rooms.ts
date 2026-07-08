@@ -21,6 +21,7 @@ interface RegisterRoomRoutesOptions {
   store: RelayStore;
   getAuthSession: (sessionId: unknown) => AuthSession | null;
   allowMutation: (session: AuthSession | null, res: Response) => boolean;
+  teamIdsForUser: (userId: string) => Set<string>;
   isTeamMember: (teamId: string, userId: string) => boolean;
   canAccessRoom: (teamId: string, roomId: string, userId: string) => boolean;
   scheduleStoreSave: () => void;
@@ -53,6 +54,7 @@ export function registerRoomRoutes({
   store,
   getAuthSession,
   allowMutation,
+  teamIdsForUser,
   isTeamMember,
   canAccessRoom,
   scheduleStoreSave,
@@ -77,7 +79,7 @@ export function registerRoomRoutes({
   maxRoomProjectPathChars,
   maxUserIdChars
 }: RegisterRoomRoutesOptions) {
-  const { dailyCreationCaps } = loadRelayConfig();
+  const { dailyCreationCaps, totalRoomCapPerUser } = loadRelayConfig();
 
   app.post("/rooms", (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
@@ -157,6 +159,15 @@ export function registerRoomRoutes({
     }
     if (browserProfilePersistent !== undefined && typeof browserProfilePersistent !== "boolean") {
       res.status(400).json({ error: "browserProfilePersistent must be a boolean" });
+      return;
+    }
+    if (session && !allowTotalRoomQuota({
+      store,
+      teamIds: teamIdsForUser(session.user.id),
+      cap: totalRoomCapPerUser,
+      res,
+      recordQuotaRejection
+    })) {
       return;
     }
     if (session && !consumeDailyCreationQuota({
@@ -361,6 +372,36 @@ export function registerRoomRoutes({
     broadcastRoomUpdated(updated);
     res.json({ room: updated });
   });
+}
+
+function allowTotalRoomQuota({
+  store,
+  teamIds,
+  cap,
+  res,
+  recordQuotaRejection
+}: {
+  store: RelayStore;
+  teamIds: Set<string>;
+  cap: number;
+  res: Response;
+  recordQuotaRejection?: (type: string) => void;
+}): boolean {
+  const quota = "total_user_rooms";
+  const used = store.allRooms().filter((room) => teamIds.has(room.teamId)).length;
+  if (used < cap) return true;
+  recordQuotaRejection?.(quota);
+  res.status(429).json({
+    error: "Total room quota exceeded.",
+    code: "quota_exceeded",
+    quota: {
+      type: quota,
+      limit: cap,
+      used,
+      remaining: 0
+    }
+  });
+  return false;
 }
 
 function normalizeCodexSandboxLevel(value: unknown): RoomRecord["codexSandboxLevel"] | null {

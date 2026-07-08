@@ -138,9 +138,11 @@ Encrypted attachment blobs are also bounded and pruned:
 MULTAIPLAYER_ATTACHMENT_BLOB_TTL_DAYS=30
 MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES=5000000
 MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES=250000000
+MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW=100000000
+MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_WINDOW_MS=3600000
 ```
 
-The max-bytes setting limits both the declared plaintext attachment size and the ciphertext field size accepted by the relay. The live quota limits the total unexpired encrypted attachment blob volume per signed-in user. Blob payloads are still ciphertext; these limits are for relay storage and request-size control, not content inspection.
+The max-bytes setting limits both the declared plaintext attachment size and the ciphertext field size accepted by the relay. The live quota limits the total unexpired encrypted attachment blob volume per signed-in user. The upload bytes quota limits burst upload volume in the configured window. Blob payloads are still ciphertext; these limits are for relay storage and request-size control, not content inspection.
 
 Encrypted room events are also bounded before they enter WebSocket fanout or backlog:
 
@@ -162,6 +164,7 @@ MULTAIPLAYER_RELAY_RATE_LIMIT_READ=300
 MULTAIPLAYER_RELAY_RATE_LIMIT_MUTATION=120
 MULTAIPLAYER_RELAY_RATE_LIMIT_ATTACHMENT=60
 MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET=600
+MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT=120
 MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER=20
 MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE=5
 MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
@@ -176,9 +179,12 @@ Team and room creation also have authenticated per-user daily caps:
 ```bash
 MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP=25
 MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP=100
+MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER=500
 ```
 
-Daily creation quota rejections return `429` with `Retry-After` and a structured `quota_exceeded` JSON body that clients can render directly.
+Daily creation quota rejections return `429` with `Retry-After` and a structured `quota_exceeded` JSON body that clients can render directly. The total-room cap is checked against the signed-in user's current visible rooms and returns the same structured `quota_exceeded` shape.
+
+Authenticated quotas use the GitHub session identity. If a self-hosted relay deliberately disables auth, rate limits still fall back to client IP, but authenticated per-user creation and blob-volume quotas cannot identify a durable account and are correspondingly weaker.
 
 Debug endpoints are available in non-production relay runs. In production (`NODE_ENV=production`), they are disabled unless explicitly enabled:
 
@@ -194,7 +200,7 @@ MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
 
 Each response includes an `x-request-id` header. The relay accepts a bounded incoming `x-request-id` or generates one. Logs include request method, path, status code, duration, and request id; they do not include room plaintext, encrypted payload bodies, attachment contents, GitHub tokens, Codex credentials, terminal output, browser pages, or repo files.
 
-The relay also exposes content-free operational counters at `/metrics`, including active sockets, published envelope count, rate-limit rejection count, quota rejection counts by quota type, start time, and uptime.
+The relay also exposes content-free operational counters at `/metrics`, including active sockets, live encrypted blob count and bytes, published envelope count, accepted attachment upload count and bytes, upload rejection counts by reason, rate-limit rejection counts by bucket, quota rejection counts by quota type, WebSocket connection attempt/accept/rejection counts, start time, and uptime.
 
 Graceful shutdown timing is configurable:
 
