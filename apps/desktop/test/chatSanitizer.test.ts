@@ -76,3 +76,31 @@ test("normalizeChatMessage preserves valid reply references", () => {
     replyTo: " "
   }), null);
 });
+
+test("normalizeChatMessage preserves valid edit and delete metadata", () => {
+  const message = normalizeChatMessage({
+    id: "m4",
+    author: "Maddie",
+    authorUserId: "github:maddie",
+    role: "human",
+    body: "updated text",
+    time: "10:04",
+    editedAt: "2026-07-08T12:00:00.000Z",
+    editedByUserId: "github:maddie",
+    deletedAt: "2026-07-08T12:01:00.000Z",
+    deletedByUserId: "github:maddie"
+  });
+
+  assert.ok(message);
+  assert.equal(message.authorUserId, "github:maddie");
+  assert.equal(message.editedAt, "2026-07-08T12:00:00.000Z");
+  assert.equal(message.deletedByUserId, "github:maddie");
+  assert.equal(normalizeChatMessage({
+    id: "m5",
+    author: "Maddie",
+    authorUserId: 123,
+    role: "human",
+    body: "bad author",
+    time: "10:05"
+  }), null);
+});

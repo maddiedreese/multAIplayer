@@ -25,6 +25,10 @@ export interface RoomChatMessageDisplay {
   role: "human" | "codex" | "system";
   body: string;
   time: string;
+  edited?: boolean;
+  deleted?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
   replyPreview?: {
     author: string;
     body: string;
@@ -85,6 +89,8 @@ export function RoomChatPanel({
   onCopyCodexOutputMarkdown,
   onOpenAttachment,
   onToggleReaction,
+  onEditMessage,
+  onDeleteMessage,
   onDenyApproval,
   onApproveApproval,
   onInvokeCodex,
@@ -131,6 +137,8 @@ export function RoomChatPanel({
   onCopyCodexOutputMarkdown: (messageId: string) => void;
   onOpenAttachment: (messageId: string, attachmentId: string) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
+  onEditMessage: (messageId: string, nextBody: string) => void;
+  onDeleteMessage: (messageId: string) => void;
   onDenyApproval: () => void;
   onApproveApproval: () => void;
   onInvokeCodex: () => void;
@@ -195,11 +203,39 @@ export function RoomChatPanel({
                       <Bot size={13} />
                     </button>
                   )}
+                  {message.edited && <span>(edited)</span>}
+                  {message.canEdit && (
+                    <button
+                      onClick={() => {
+                        const nextBody = window.prompt("Edit message", message.body);
+                        if (nextBody !== null && nextBody.trim() && nextBody !== message.body) {
+                          onEditMessage(message.id, nextBody.trim());
+                        }
+                      }}
+                      title="Edit message"
+                      aria-label={`Edit message from ${message.author}`}
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  )}
+                  {message.canDelete && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm("Delete this message before Codex uses it?")) {
+                          onDeleteMessage(message.id);
+                        }
+                      }}
+                      title="Delete message"
+                      aria-label={`Delete message from ${message.author}`}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                   <button
                     onClick={() => onReplyToMessage(message.id)}
                     title="Reply to message"
                     aria-label={`Reply to message from ${message.author}`}
-                    disabled={!canUseChat || roomLocked}
+                    disabled={!canUseChat || roomLocked || message.deleted}
                   >
                     Reply
                   </button>

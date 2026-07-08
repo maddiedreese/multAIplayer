@@ -19,6 +19,8 @@ export interface CodexChatMessage {
   body: string;
   time: string;
   replyTo?: string;
+  editedAt?: string;
+  deletedAt?: string;
   attachments?: CodexChatAttachment[];
 }
 
@@ -200,7 +202,7 @@ export function messagesSinceLastCodex(messages: CodexChatMessage[]): CodexChatM
       break;
     }
   }
-  return messages.slice(lastCodexIndex + 1);
+  return messages.slice(lastCodexIndex + 1).filter((message) => !message.deletedAt);
 }
 
 export function formatAttachmentForCodex(attachment: CodexChatAttachment): string {
@@ -322,7 +324,7 @@ function formatReplyContext(
 ): string {
   if (!message.replyTo) return "";
   const target = messagesById.get(message.replyTo);
-  if (!target) return ", replying to original message unavailable or deleted";
+  if (!target || target.deletedAt) return ", replying to original message unavailable or deleted";
   return `, replying to ${formatTranscriptAuthor(target)}: "${boundReplyQuote(target.body)}"`;
 }
 

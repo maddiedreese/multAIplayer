@@ -8,6 +8,8 @@ export function useRoomChatPanelActions({
   copyCodexOutputMarkdown,
   openEncryptedAttachmentBlob,
   toggleMessageReaction,
+  publishChatMessageEdit,
+  publishChatMessageDelete,
   setPendingCodexApprovalForRoom,
   setApprovalVisibleForRoom,
   removeQueuedCodexApprovalForRoom,
@@ -33,6 +35,8 @@ export function useRoomChatPanelActions({
   copyCodexOutputMarkdown: (message: ChatMessage) => void;
   openEncryptedAttachmentBlob: (attachment: ChatAttachment) => void;
   toggleMessageReaction: (message: ChatMessage, emoji: string) => void;
+  publishChatMessageEdit: (message: ChatMessage, body: string) => Promise<void>;
+  publishChatMessageDelete: (message: ChatMessage) => Promise<void>;
   setPendingCodexApprovalForRoom: (roomId: string, approval: null) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   removeQueuedCodexApprovalForRoom: (roomId: string, turnId: string) => void;
@@ -77,6 +81,16 @@ export function useRoomChatPanelActions({
     if (message) toggleMessageReaction(message, emoji);
   }
 
+  function onEditMessage(messageId: string, nextBody: string) {
+    const message = messages.find((item) => item.id === messageId);
+    if (message) void publishChatMessageEdit(message, nextBody);
+  }
+
+  function onDeleteMessage(messageId: string) {
+    const message = messages.find((item) => item.id === messageId);
+    if (message) void publishChatMessageDelete(message);
+  }
+
   function onDenyApproval() {
     setPendingCodexApprovalForRoom(selectedRoomId, null);
     setApprovalVisibleForRoom(selectedRoomId, false);
@@ -105,6 +119,8 @@ export function useRoomChatPanelActions({
     onCopyCodexOutputMarkdown,
     onOpenAttachment,
     onToggleReaction,
+    onEditMessage,
+    onDeleteMessage,
     onDenyApproval,
     onApproveApproval: () => approveCodexTurn(),
     onInvokeCodex: () => handleCodexInvoke(),

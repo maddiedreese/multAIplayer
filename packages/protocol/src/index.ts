@@ -65,6 +65,8 @@ export const RelayEnvelope = z.object({
     "chat.message",
     "chat.attachment",
     "chat.reaction",
+    "chat.edit",
+    "chat.delete",
     "codex.invoke",
     "codex.event",
     "codex.approval",
@@ -86,6 +88,7 @@ export const RelayEnvelope = z.object({
 export const ChatPlaintextPayload = z.object({
   id: z.string().min(1).max(maxEnvelopeIdChars),
   author: z.string().min(1).max(maxDisplayNameChars),
+  authorUserId: z.string().min(1).max(maxUserIdChars).optional(),
   role: z.enum(["human", "codex", "system"]),
   body: z.string().max(maxLongTextChars),
   time: z.string().min(1).max(maxShortTextChars),
@@ -101,6 +104,23 @@ export const ChatPlaintextPayload = z.object({
     blobBytes: z.number().int().nonnegative().optional(),
     truncated: z.boolean().optional()
   })).max(maxMessageAttachments).optional()
+});
+
+export const ChatEditPlaintextPayload = z.object({
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  messageId: z.string().min(1).max(maxEnvelopeIdChars),
+  body: z.string().min(1).max(maxLongTextChars),
+  editedBy: z.string().min(1).max(maxDisplayNameChars),
+  editedByUserId: z.string().min(1).max(maxUserIdChars),
+  editedAt: z.string().datetime()
+});
+
+export const ChatDeletePlaintextPayload = z.object({
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  messageId: z.string().min(1).max(maxEnvelopeIdChars),
+  deletedBy: z.string().min(1).max(maxDisplayNameChars),
+  deletedByUserId: z.string().min(1).max(maxUserIdChars),
+  deletedAt: z.string().datetime()
 });
 
 export const ChatReactionPlaintextPayload = z.object({
@@ -608,6 +628,8 @@ export const RelayServerMessage = z.discriminatedUnion("type", [
 export type CiphertextPayload = z.infer<typeof CiphertextPayload>;
 export type RelayEnvelope = z.infer<typeof RelayEnvelope>;
 export type ChatPlaintextPayload = z.infer<typeof ChatPlaintextPayload>;
+export type ChatEditPlaintextPayload = z.infer<typeof ChatEditPlaintextPayload>;
+export type ChatDeletePlaintextPayload = z.infer<typeof ChatDeletePlaintextPayload>;
 export type ChatReactionPlaintextPayload = z.infer<typeof ChatReactionPlaintextPayload>;
 export type LocalPreviewPlaintextPayload = z.infer<typeof LocalPreviewPlaintextPayload>;
 export type BrowserRequestPlaintextPayload = z.infer<typeof BrowserRequestPlaintextPayload>;

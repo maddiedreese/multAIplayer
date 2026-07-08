@@ -18,10 +18,15 @@ import type { SidebarPanelName } from "./components/DesktopSidebar";
 export interface ChatMessage {
   id: string;
   author: string;
+  authorUserId?: string;
   role: "human" | "codex" | "system";
   body: string;
   time: string;
   createdAt?: string;
+  editedAt?: string;
+  editedByUserId?: string;
+  deletedAt?: string;
+  deletedByUserId?: string;
   replyTo?: string;
   attachments?: ChatAttachment[];
   reactions?: ChatReaction[];
@@ -69,6 +74,7 @@ export interface QueuedCodexTurn {
   requestedBy: string;
   requestedByUserId: string;
   queuedAt: string;
+  triggerMessageId?: string;
 }
 
 export interface RoomPresence {

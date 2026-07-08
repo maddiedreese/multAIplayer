@@ -105,6 +105,8 @@ export function useAppRoomInteractionContext({
       relayRef: appRefs.relayRef,
       seenEnvelopeIds: appRefs.seenEnvelopeIds,
       appendRoomMessage: roomChatMutations.appendRoomMessage,
+      editRoomMessage: roomChatMutations.editRoomMessage,
+      deleteRoomMessage: roomChatMutations.deleteRoomMessage,
       applyMessageReaction: roomChatMutations.applyMessageReaction,
       setChatMessageForRoom,
       setSelectedChatMessage

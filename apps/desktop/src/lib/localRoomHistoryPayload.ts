@@ -3,6 +3,10 @@ import {
   CodexApprovalPlaintextPayload as CodexApprovalPlaintextPayloadSchema,
   LocalPreviewPlaintextPayload as LocalPreviewPlaintextPayloadSchema,
   RoomKeyRotationPlaintextPayload as RoomKeyRotationPlaintextPayloadSchema,
+  ChatDeletePlaintextPayload as ChatDeletePlaintextPayloadSchema,
+  ChatEditPlaintextPayload as ChatEditPlaintextPayloadSchema,
+  type ChatDeletePlaintextPayload,
+  type ChatEditPlaintextPayload,
   type ChatReactionPlaintextPayload,
   type CodexApprovalPlaintextPayload,
   type CodexEventPlaintextPayload,
@@ -115,6 +119,14 @@ export function isChatReactionPlaintextPayload(value: unknown): value is ChatRea
     typeof value.reactorUserId === "string" &&
     typeof value.createdAt === "string"
   );
+}
+
+export function isChatEditPlaintextPayload(value: unknown): value is ChatEditPlaintextPayload {
+  return ChatEditPlaintextPayloadSchema.safeParse(value).success;
+}
+
+export function isChatDeletePlaintextPayload(value: unknown): value is ChatDeletePlaintextPayload {
+  return ChatDeletePlaintextPayloadSchema.safeParse(value).success;
 }
 
 export function isCodexApprovalPlaintextPayload(value: unknown): value is CodexApprovalPlaintextPayload {

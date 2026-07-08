@@ -1,5 +1,10 @@
 import type { StateCreator } from "zustand";
-import type { ChatReactionPlaintextPayload, TeamMemberRecord } from "@multaiplayer/protocol";
+import type {
+  ChatDeletePlaintextPayload,
+  ChatEditPlaintextPayload,
+  ChatReactionPlaintextPayload,
+  TeamMemberRecord
+} from "@multaiplayer/protocol";
 import type { ChatMessage } from "../../types";
 import type { AppStoreState } from "../appStore";
 
@@ -31,6 +36,8 @@ export interface WorkspaceDataSlice {
   ensureLocalTeamMemberForTeam: (teamId: string, userId: string, role: TeamMemberRecord["role"]) => void;
   initializeMessagesForRoom: (roomId: string) => void;
   appendRoomMessage: (roomId: string, message: ChatMessage) => void;
+  editRoomMessage: (roomId: string, edit: ChatEditPlaintextPayload) => void;
+  deleteRoomMessage: (roomId: string, deletion: ChatDeletePlaintextPayload) => void;
   applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
 }
 
@@ -158,6 +165,76 @@ export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], Works
       };
     });
   },
+  editRoomMessage: (roomId, edit) => {
+    set((state) => {
+      const roomMessages = state.messagesByRoom[roomId] ?? [];
+      const target = roomMessages.find((message) => message.id === edit.messageId);
+      if (!target || target.deletedAt) return state;
+      if (target.authorUserId && target.authorUserId !== edit.editedByUserId) return state;
+      const nextMessages = roomMessages.map((message) => {
+        if (message.id !== edit.messageId) return message;
+        return {
+          ...message,
+          body: edit.body,
+          editedAt: edit.editedAt,
+          editedByUserId: edit.editedByUserId
+        };
+      });
+      const roomRuntime = state.codexRuntimeByRoom[roomId];
+      const approvalIncludesMessage = roomRuntime?.pendingApproval?.messages.some((message) => message.id === edit.messageId) ?? false;
+      return {
+        messagesByRoom: {
+          ...state.messagesByRoom,
+          [roomId]: nextMessages
+        },
+        ...(approvalIncludesMessage
+          ? {
+            codexRuntimeByRoom: {
+              ...state.codexRuntimeByRoom,
+              [roomId]: clearPendingCodexApproval(roomRuntime)
+            }
+          }
+          : {})
+      };
+    });
+  },
+  deleteRoomMessage: (roomId, deletion) => {
+    set((state) => {
+      const roomMessages = state.messagesByRoom[roomId] ?? [];
+      const target = roomMessages.find((message) => message.id === deletion.messageId);
+      if (!target || target.deletedAt) return state;
+      if (target.authorUserId && target.authorUserId !== deletion.deletedByUserId) return state;
+      const nextMessages = roomMessages.map((message) => {
+        if (message.id !== deletion.messageId) return message;
+        return {
+          ...message,
+          body: "",
+          deletedAt: deletion.deletedAt,
+          deletedByUserId: deletion.deletedByUserId,
+          attachments: undefined,
+          reactions: undefined
+        };
+      });
+      const roomRuntime = state.codexRuntimeByRoom[roomId];
+      const approvalIncludesMessage = roomRuntime?.pendingApproval?.messages.some((message) => message.id === deletion.messageId) ?? false;
+      const queuedApprovals = roomRuntime?.queuedApprovals?.filter((turn) => turn.triggerMessageId !== deletion.messageId);
+      const queueChanged = queuedApprovals && queuedApprovals.length !== (roomRuntime?.queuedApprovals ?? []).length;
+      return {
+        messagesByRoom: {
+          ...state.messagesByRoom,
+          [roomId]: nextMessages
+        },
+        ...(approvalIncludesMessage || queueChanged
+          ? {
+            codexRuntimeByRoom: {
+              ...state.codexRuntimeByRoom,
+              [roomId]: clearPendingCodexApproval(roomRuntime, queuedApprovals)
+            }
+          }
+          : {})
+      };
+    });
+  },
   applyMessageReaction: (roomId, reaction) => {
     set((state) => {
       const roomMessages = state.messagesByRoom[roomId] ?? [];
@@ -185,3 +262,16 @@ export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], Works
     });
   }
 });
+
+function clearPendingCodexApproval(
+  roomRuntime: AppStoreState["codexRuntimeByRoom"][string] | undefined,
+  queuedApprovals = roomRuntime?.queuedApprovals
+): AppStoreState["codexRuntimeByRoom"][string] {
+  const {
+    pendingApproval: _pendingApproval,
+    approvalVisible: _approvalVisible,
+    queuedApprovals: _queuedApprovals,
+    ...rest
+  } = roomRuntime ?? {};
+  return queuedApprovals?.length ? { ...rest, queuedApprovals } : rest;
+}

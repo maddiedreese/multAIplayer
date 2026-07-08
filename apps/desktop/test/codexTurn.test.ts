@@ -401,3 +401,40 @@ test("attachment summary distinguishes inline content from encrypted blob refere
 
   assert.equal(summary, "notes.md (inline content included), large.log (encrypted blob reference only)");
 });
+
+test("buildCodexTurnInput excludes deleted messages and treats deleted replies as unavailable", () => {
+  const input = buildCodexTurnInput(
+    [
+      { id: "codex-1", author: "Codex", role: "codex", body: "previous turn", time: "9:01 AM" },
+      {
+        id: "deleted-1",
+        author: "Maddie",
+        role: "human",
+        body: "",
+        time: "9:02 AM",
+        deletedAt: "2026-07-08T12:00:00.000Z"
+      },
+      {
+        id: "message-2",
+        author: "Jordan",
+        role: "human",
+        body: "continue from the current plan",
+        time: "9:03 AM",
+        replyTo: "deleted-1"
+      }
+    ],
+    "/Users/maddiedreese/Documents/MultAIplayer",
+    "GPT-5.4",
+    {
+      messagesSinceLastCodex: 1,
+      attachments: [],
+      workspacePath: null,
+      git: null,
+      browserAccess: [],
+      terminals: []
+    }
+  );
+
+  assert.doesNotMatch(input, /@Maddie \(human, 9:02 AM/);
+  assert.match(input, /@Jordan \(human, 9:03 AM, replying to original message unavailable or deleted\)/);
+});

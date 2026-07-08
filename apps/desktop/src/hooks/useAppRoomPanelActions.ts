@@ -68,6 +68,8 @@ export function useAppRoomPanelActions({
       copyCodexOutputMarkdown: workspaceFlow.copyCodexOutputMarkdown,
       openEncryptedAttachmentBlob: workspaceFlow.openEncryptedAttachmentBlob,
       toggleMessageReaction: roomInteraction.toggleMessageReaction,
+      publishChatMessageEdit: roomInteraction.publishChatMessageEdit,
+      publishChatMessageDelete: roomInteraction.publishChatMessageDelete,
       setPendingCodexApprovalForRoom,
       setApprovalVisibleForRoom,
       removeQueuedCodexApprovalForRoom,

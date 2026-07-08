@@ -27,10 +27,15 @@ export function normalizeChatMessage(value: unknown): SanitizedChatMessage | nul
   if (
     typeof value.id !== "string" ||
     typeof value.author !== "string" ||
+    (value.authorUserId !== undefined && typeof value.authorUserId !== "string") ||
     !isChatRole(value.role) ||
     typeof value.body !== "string" ||
     typeof value.time !== "string" ||
     (value.createdAt !== undefined && typeof value.createdAt !== "string") ||
+    (value.editedAt !== undefined && typeof value.editedAt !== "string") ||
+    (value.editedByUserId !== undefined && typeof value.editedByUserId !== "string") ||
+    (value.deletedAt !== undefined && typeof value.deletedAt !== "string") ||
+    (value.deletedByUserId !== undefined && typeof value.deletedByUserId !== "string") ||
     (value.replyTo !== undefined && (typeof value.replyTo !== "string" || value.replyTo.trim() === ""))
   ) {
     return null;
@@ -44,10 +49,15 @@ export function normalizeChatMessage(value: unknown): SanitizedChatMessage | nul
     ...value,
     id: value.id,
     author: value.author,
+    ...(value.authorUserId ? { authorUserId: value.authorUserId } : {}),
     role: value.role,
     body: value.body,
     time: value.time,
     ...(value.createdAt ? { createdAt: value.createdAt } : {}),
+    ...(value.editedAt ? { editedAt: value.editedAt } : {}),
+    ...(value.editedByUserId ? { editedByUserId: value.editedByUserId } : {}),
+    ...(value.deletedAt ? { deletedAt: value.deletedAt } : {}),
+    ...(value.deletedByUserId ? { deletedByUserId: value.deletedByUserId } : {}),
     ...(typeof value.replyTo === "string" ? { replyTo: value.replyTo } : {}),
     ...(attachments?.length ? { attachments } : { attachments: undefined })
   };

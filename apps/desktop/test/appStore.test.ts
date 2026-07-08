@@ -752,6 +752,86 @@ test("desktop store exposes room Codex approval actions", () => {
   assert.equal(state.codexRuntimeByRoom["room-b"]?.approvalVisible, true);
 });
 
+test("desktop store edits and deletes messages while invalidating stale Codex approvals", () => {
+  const store = useAppStore.getState();
+  store.appendRoomMessage("room-a", {
+    id: "message-1",
+    author: "Maddie",
+    authorUserId: "github:maddie",
+    role: "human",
+    body: "@Codex draft a plan",
+    time: "9:43"
+  });
+  store.appendRoomMessage("room-a", {
+    id: "message-2",
+    author: "Jordan",
+    authorUserId: "github:jordan",
+    role: "human",
+    body: "remote message",
+    time: "9:44"
+  });
+  store.setPendingCodexApprovalForRoom("room-a", {
+    turnId: "turn-pending-a",
+    roomId: "room-a",
+    requestedBy: "Maddie",
+    requestedByUserId: "github:maddie",
+    queuedAt: "2026-07-08T12:00:00.000Z",
+    messages: [{
+      id: "message-1",
+      author: "Maddie",
+      authorUserId: "github:maddie",
+      role: "human",
+      body: "@Codex draft a plan",
+      time: "9:43"
+    }],
+    summary: {
+      messagesSinceLastCodex: 1,
+      attachments: [],
+      workspacePath: null,
+      git: null,
+      browserAccess: [],
+      terminals: []
+    }
+  });
+  store.setApprovalVisibleForRoom("room-a", true);
+
+  store.editRoomMessage("room-a", {
+    id: "edit-1",
+    messageId: "message-1",
+    body: "@Codex draft a safer plan",
+    editedBy: "Maddie",
+    editedByUserId: "github:maddie",
+    editedAt: "2026-07-08T12:01:00.000Z"
+  });
+
+  let state = useAppStore.getState();
+  assert.equal(state.messagesByRoom["room-a"]?.[0]?.body, "@Codex draft a safer plan");
+  assert.equal(state.messagesByRoom["room-a"]?.[0]?.editedAt, "2026-07-08T12:01:00.000Z");
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.pendingApproval, undefined);
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.approvalVisible, undefined);
+
+  store.deleteRoomMessage("room-a", {
+    id: "delete-1",
+    messageId: "message-2",
+    deletedBy: "Maddie",
+    deletedByUserId: "github:maddie",
+    deletedAt: "2026-07-08T12:02:00.000Z"
+  });
+  state = useAppStore.getState();
+  assert.equal(state.messagesByRoom["room-a"]?.[1]?.deletedAt, undefined);
+
+  store.deleteRoomMessage("room-a", {
+    id: "delete-2",
+    messageId: "message-2",
+    deletedBy: "Jordan",
+    deletedByUserId: "github:jordan",
+    deletedAt: "2026-07-08T12:03:00.000Z"
+  });
+  state = useAppStore.getState();
+  assert.equal(state.messagesByRoom["room-a"]?.[1]?.body, "");
+  assert.equal(state.messagesByRoom["room-a"]?.[1]?.deletedAt, "2026-07-08T12:03:00.000Z");
+});
+
 test("desktop store keeps queued Codex turn intents in order", () => {
   const store = useAppStore.getState();
   const queuedTurn = {

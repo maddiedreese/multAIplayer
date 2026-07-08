@@ -6,6 +6,8 @@ import {
   DevicePublicKeyJwk,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
+  ChatDeletePlaintextPayload,
+  ChatEditPlaintextPayload,
   ChatPlaintextPayload,
   InviteJoinRequestPlaintextPayload,
   InviteJoinStatusPlaintextPayload,
@@ -59,6 +61,44 @@ test("chat payloads can carry encrypted reply references", () => {
     body: "bad reply",
     time: "9:44 AM",
     replyTo: ""
+  }).success, false);
+});
+
+test("chat payloads can carry author ids and encrypted edit/delete events", () => {
+  const message = ChatPlaintextPayload.parse({
+    id: "message-2",
+    author: "Maddie",
+    authorUserId: "github:maddie",
+    role: "human",
+    body: "agreed, do that",
+    time: "9:43 AM"
+  });
+  const edit = ChatEditPlaintextPayload.parse({
+    id: "edit-1",
+    messageId: "message-2",
+    body: "agreed, please do that",
+    editedBy: "Maddie",
+    editedByUserId: "github:maddie",
+    editedAt: "2026-07-08T12:00:00.000Z"
+  });
+  const deletion = ChatDeletePlaintextPayload.parse({
+    id: "delete-1",
+    messageId: "message-2",
+    deletedBy: "Maddie",
+    deletedByUserId: "github:maddie",
+    deletedAt: "2026-07-08T12:01:00.000Z"
+  });
+
+  assert.equal(message.authorUserId, "github:maddie");
+  assert.equal(edit.body, "agreed, please do that");
+  assert.equal(deletion.deletedByUserId, "github:maddie");
+  assert.equal(ChatEditPlaintextPayload.safeParse({
+    id: "bad-edit",
+    messageId: "message-2",
+    body: "",
+    editedBy: "Maddie",
+    editedByUserId: "github:maddie",
+    editedAt: "2026-07-08T12:00:00.000Z"
   }).success, false);
 });
 

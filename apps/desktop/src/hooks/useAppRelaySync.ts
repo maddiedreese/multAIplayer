@@ -143,6 +143,8 @@ export function useAppRelaySync({
         decryptInviteEnvelope: inviteActions.decryptInviteEnvelope,
         handleInviteEnvelopePlaintext: inviteActions.handleInviteEnvelopePlaintext,
         handleCodexApprovalEvent,
+        editRoomMessage: roomChatMutations.editRoomMessage,
+        deleteRoomMessage: roomChatMutations.deleteRoomMessage,
         applyMessageReaction: roomChatMutations.applyMessageReaction,
         appendTerminalRequest,
         updateTerminalRequestStatus,

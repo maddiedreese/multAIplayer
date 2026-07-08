@@ -176,6 +176,7 @@ export function useCodexInvokeActions({
     const message: ChatMessage = {
       id: crypto.randomUUID(),
       author: localUser.name,
+      authorUserId: localUser.id,
       role: invokesCodex ? "system" : "human",
       body: body || "Attached files.",
       time: formatMessageTime(createdAt),
@@ -224,7 +225,8 @@ export function useCodexInvokeActions({
       turnId: crypto.randomUUID(),
       requestedBy: localUser.name,
       requestedByUserId: localUser.id,
-      queuedAt: new Date().toISOString()
+      queuedAt: new Date().toISOString(),
+      ...(pendingMessage?.id ? { triggerMessageId: pendingMessage.id } : {})
     };
     if (activeCodexApproval || codexRunning) {
       if (queuedCodexApprovals.length >= 5) {

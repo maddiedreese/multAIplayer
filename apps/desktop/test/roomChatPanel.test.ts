@@ -34,6 +34,8 @@ function renderChat(messages: RoomChatMessageDisplay[]) {
     onCopyCodexOutputMarkdown: noop,
     onOpenAttachment: noop,
     onToggleReaction: noop,
+    onEditMessage: noop,
+    onDeleteMessage: noop,
     onDenyApproval: noop,
     onApproveApproval: noop,
     onInvokeCodex: noop,
@@ -110,6 +112,8 @@ test("RoomChatPanel renders Codex approval risk warnings", () => {
     onCopyCodexOutputMarkdown: noop,
     onOpenAttachment: noop,
     onToggleReaction: noop,
+    onEditMessage: noop,
+    onDeleteMessage: noop,
     onDenyApproval: noop,
     onApproveApproval: noop,
     onInvokeCodex: noop,
@@ -200,6 +204,8 @@ test("RoomChatPanel renders reply previews and composer reply target", () => {
     onCopyCodexOutputMarkdown: noop,
     onOpenAttachment: noop,
     onToggleReaction: noop,
+    onEditMessage: noop,
+    onDeleteMessage: noop,
     onDenyApproval: noop,
     onApproveApproval: noop,
     onInvokeCodex: noop,
@@ -261,6 +267,8 @@ test("RoomChatPanel renders queued Codex turns", () => {
     onCopyCodexOutputMarkdown: noop,
     onOpenAttachment: noop,
     onToggleReaction: noop,
+    onEditMessage: noop,
+    onDeleteMessage: noop,
     onDenyApproval: noop,
     onApproveApproval: noop,
     onInvokeCodex: noop,
@@ -285,4 +293,38 @@ test("RoomChatPanel renders queued Codex turns", () => {
   assert.equal(html.includes("1 waiting"), true);
   assert.equal(html.includes("Maddie"), true);
   assert.equal(html.includes("3 messages ready at turn start"), true);
+});
+
+test("RoomChatPanel renders editable markers and deleted tombstones", () => {
+  const html = renderChat([
+    {
+      id: "m1",
+      author: "Maddie",
+      role: "human",
+      body: "Updated plan",
+      time: "9:44",
+      edited: true,
+      canEdit: true,
+      canDelete: true,
+      selected: false,
+      attachments: [],
+      reactions: []
+    },
+    {
+      id: "m2",
+      author: "Jordan",
+      role: "human",
+      body: "Message deleted",
+      time: "9:45",
+      deleted: true,
+      selected: false,
+      attachments: [],
+      reactions: []
+    }
+  ]);
+
+  assert.equal(html.includes("(edited)"), true);
+  assert.equal(html.includes("Edit message"), true);
+  assert.equal(html.includes("Delete message"), true);
+  assert.equal(html.includes("Message deleted"), true);
 });

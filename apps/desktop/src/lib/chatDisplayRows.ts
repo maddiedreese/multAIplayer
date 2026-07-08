@@ -23,22 +23,29 @@ export function buildRoomChatMessageRows({
 }): RoomChatMessageDisplay[] {
   const visibleMessages = messages.filter((message) => !isBrowserDecisionSystemMessage(message));
   const messagesById = new Map(visibleMessages.map((message) => [message.id, message]));
+  const lastCodexIndex = visibleMessages.reduce((lastIndex, message, index) => (
+    message.role === "codex" ? index : lastIndex
+  ), -1);
   return visibleMessages.map((message) => ({
     id: message.id,
     author: message.author,
     role: message.role,
-    body: message.body,
+    body: message.deletedAt ? "Message deleted" : message.body,
     time: message.time,
+    edited: Boolean(message.editedAt && !message.deletedAt),
+    deleted: Boolean(message.deletedAt),
+    canEdit: canMutateMessage(message, localUserId) && visibleMessages.indexOf(message) > lastCodexIndex,
+    canDelete: canMutateMessage(message, localUserId) && visibleMessages.indexOf(message) > lastCodexIndex,
     replyPreview: message.replyTo ? buildReplyPreview(messagesById.get(message.replyTo)) : null,
     selected: markdownSelectionMode && selectedMessageIds.includes(message.id),
-    attachments: (message.attachments ?? []).map((attachment) => ({
+    attachments: message.deletedAt ? [] : (message.attachments ?? []).map((attachment) => ({
       id: attachment.id,
       name: attachment.name,
       meta: formatAttachmentMeta(attachment),
       encryptedBlob: Boolean(attachment.blobId),
       canPreview: canOpenChatAttachment(attachment)
     })),
-    reactions: roomReactionEmoji.map((emoji) => {
+    reactions: message.deletedAt ? [] : roomReactionEmoji.map((emoji) => {
       const reaction = message.reactions?.find((item) => item.emoji === emoji);
       return {
         emoji,
@@ -50,6 +57,10 @@ export function buildRoomChatMessageRows({
   }));
 }
 
+function canMutateMessage(message: ChatMessage, localUserId: string): boolean {
+  return message.role !== "codex" && !message.deletedAt && message.authorUserId === localUserId;
+}
+
 function buildReplyPreview(message: ChatMessage | undefined): RoomChatMessageDisplay["replyPreview"] {
   if (!message) {
     return {
@@ -59,7 +70,7 @@ function buildReplyPreview(message: ChatMessage | undefined): RoomChatMessageDis
   }
   return {
     author: message.author,
-    body: message.body || "Original message unavailable or deleted"
+    body: message.deletedAt ? "Original message deleted" : message.body || "Original message unavailable or deleted"
   };
 }
 

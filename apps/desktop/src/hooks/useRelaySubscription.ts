@@ -1,6 +1,8 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
 import type {
   BrowserRequestPlaintextPayload,
+  ChatDeletePlaintextPayload,
+  ChatEditPlaintextPayload,
   CodexApprovalPlaintextPayload,
   ChatPlaintextPayload,
   ChatReactionPlaintextPayload,
@@ -27,6 +29,8 @@ import {
 } from "../lib/activityLines";
 import {
   isChatReactionPlaintextPayload,
+  isChatDeletePlaintextPayload,
+  isChatEditPlaintextPayload,
   isCodexApprovalPlaintextPayload,
   isCodexEventPlaintextPayload,
   isGitHubActionsEventPlaintextPayload,
@@ -93,6 +97,8 @@ interface UseRelaySubscriptionOptions {
   handleInviteEnvelopePlaintext: (roomId: string, plaintext: unknown) => Promise<void>;
   handleCodexBrowserOpenCommand: (message: ChatMessage, room: RoomRecord) => boolean;
   handleCodexApprovalEvent: (event: CodexApprovalPlaintextPayload, roomId: string) => void;
+  editRoomMessage: (roomId: string, edit: ChatEditPlaintextPayload) => void;
+  deleteRoomMessage: (roomId: string, deletion: ChatDeletePlaintextPayload) => void;
   applyMessageReaction: (roomId: string, reaction: ChatReactionPlaintextPayload) => void;
   appendTerminalRequest: (roomId: string, request: TerminalCommandRequest) => void;
   updateTerminalRequestStatus: (roomId: string, requestId: string, status: TerminalCommandRequest["status"]) => void;
@@ -148,6 +154,8 @@ export function useRelaySubscription({
   handleInviteEnvelopePlaintext,
   handleCodexBrowserOpenCommand,
   handleCodexApprovalEvent,
+  editRoomMessage,
+  deleteRoomMessage,
   applyMessageReaction,
   appendTerminalRequest,
   updateTerminalRequestStatus,
@@ -281,6 +289,18 @@ export function useRelaySubscription({
             const plaintext = await decryptJson<unknown>(roomPayload, secret);
             if (isChatReactionPlaintextPayload(plaintext)) {
               applyMessageReaction(message.envelope.roomId, plaintext);
+            }
+          }
+          if (message.envelope.kind === "chat.edit") {
+            const plaintext = await decryptJson<unknown>(roomPayload, secret);
+            if (isChatEditPlaintextPayload(plaintext)) {
+              editRoomMessage(message.envelope.roomId, plaintext);
+            }
+          }
+          if (message.envelope.kind === "chat.delete") {
+            const plaintext = await decryptJson<unknown>(roomPayload, secret);
+            if (isChatDeletePlaintextPayload(plaintext)) {
+              deleteRoomMessage(message.envelope.roomId, plaintext);
             }
           }
           if (message.envelope.kind === "terminal.request") {
