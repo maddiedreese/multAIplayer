@@ -69,16 +69,17 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
               }
             }
           : state.gitWorkflowByRoom,
-        githubActionsEventsByRoom: payload.githubActionsEvents.length
-          ? { ...state.githubActionsEventsByRoom, [roomId]: payload.githubActionsEvents }
-          : state.githubActionsEventsByRoom,
-        githubActionsByRoom: latestGitHubActionsEvent
+        githubActionsByRoom: payload.githubActionsEvents.length
           ? {
               ...state.githubActionsByRoom,
               [roomId]: {
-                runs: latestGitHubActionsEvent.runs,
-                lastChecked: latestGitHubActionsEvent.checkedAt,
-                message: `${latestGitHubActionsEvent.summary.label}: ${latestGitHubActionsEvent.message}`
+                ...state.githubActionsByRoom[roomId],
+                events: payload.githubActionsEvents,
+                ...(latestGitHubActionsEvent ? {
+                  runs: latestGitHubActionsEvent.runs,
+                  lastChecked: latestGitHubActionsEvent.checkedAt,
+                  message: `${latestGitHubActionsEvent.summary.label}: ${latestGitHubActionsEvent.message}`
+                } : {})
               }
             }
           : state.githubActionsByRoom,
@@ -124,8 +125,10 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
           events: []
         }
       },
-      githubActionsEventsByRoom: { ...state.githubActionsEventsByRoom, [roomId]: [] },
-      githubActionsByRoom: omitRecordKey(state.githubActionsByRoom, roomId),
+      githubActionsByRoom: {
+        ...state.githubActionsByRoom,
+        [roomId]: { events: [] }
+      },
       roomSettingsByRoom: omitRecordKey(state.roomSettingsByRoom, roomId),
       roomChatByRoom: omitRecordKey(state.roomChatByRoom, roomId),
       sensitiveAttachmentReviewKey: state.sensitiveAttachmentReviewKey?.startsWith(`${roomId}:`)

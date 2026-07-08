@@ -256,11 +256,12 @@ test("desktop store applies GitHub Actions events as one room-scoped state updat
 
   const state = useAppStore.getState();
   assert.deepEqual(state.githubActionsByRoom["room-a"], {
+    events: [event],
     runs: event.runs,
     lastChecked: event.checkedAt,
     message: "Passing: Loaded 1 workflow run for main."
   });
-  assert.equal(state.githubActionsEventsByRoom["room-a"]?.length, 1);
+  assert.equal(state.githubActionsByRoom["room-a"]?.events?.length, 1);
 });
 
 test("desktop store keeps browser panel state room scoped", () => {
@@ -901,7 +902,7 @@ test("desktop store keeps room runtime state room scoped", () => {
   assert.equal(state.codexRuntimeByRoom["room-a"]?.hostHandoffs?.[0]?.reason, "usage_limit");
   assert.equal(state.codexRuntimeByRoom["room-b"]?.continuation?.acceptedBy, "Jordan");
   assert.equal(state.gitWorkflowByRoom["room-a"]?.events?.[0]?.branch, "codex/runtime-state");
-  assert.equal(state.githubActionsEventsByRoom["room-b"]?.[0]?.summary.tone, "green");
+  assert.equal(state.githubActionsByRoom["room-b"]?.events?.[0]?.summary.tone, "green");
 });
 
 test("desktop store exposes room presence actions", () => {
@@ -1017,7 +1018,7 @@ test("desktop store exposes room event append actions", () => {
 
   const state = useAppStore.getState();
   assert.equal(state.gitWorkflowByRoom["room-a"]?.events?.length, 1);
-  assert.equal(state.githubActionsEventsByRoom["room-a"]?.length, 1);
+  assert.equal(state.githubActionsByRoom["room-a"]?.events?.length, 1);
   assert.equal(state.localPreviewByRoom["room-a"]?.previews?.length, 1);
   assert.equal(state.localPreviewByRoom["room-a"]?.previews?.[0]?.status, "live");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.hostHandoffs?.length, 1);
@@ -1408,10 +1409,10 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.inviteByRoom["room-a"], undefined);
   assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.events, []);
   assert.deepEqual(state.gitWorkflowByRoom["room-a"], { events: [] });
-  assert.deepEqual(state.githubActionsEventsByRoom["room-a"], []);
+  assert.deepEqual(state.githubActionsByRoom["room-a"]?.events, []);
   assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.hostHandoffs, []);
   assert.equal(state.codexRuntimeByRoom["room-a"]?.threadId, undefined);
-  assert.equal(state.githubActionsByRoom["room-a"], undefined);
+  assert.equal(state.githubActionsByRoom["room-a"]?.runs, undefined);
   assert.equal(state.gitWorkflowByRoom["room-a"]?.busy, undefined);
   assert.equal(state.roomSettingsByRoom["room-a"], undefined);
   assert.equal(state.codexRuntimeByRoom["room-a"]?.secretWarningVisible, undefined);
@@ -1687,7 +1688,7 @@ test("desktop store hydrates local room history through one room-scoped action",
   assert.equal(state.codexRuntimeByRoom["room-a"]?.events?.[0]?.message, "Reading context");
   assert.equal(state.gitWorkflowByRoom["room-a"]?.events?.[0]?.branch, "codex/history-hydration");
   assert.equal(state.gitWorkflowByRoom["room-a"]?.message, "Opened draft PR");
-  assert.equal(state.githubActionsEventsByRoom["room-a"]?.[0]?.runs[0]?.name, "Web, relay, and packages");
+  assert.equal(state.githubActionsByRoom["room-a"]?.events?.[0]?.runs[0]?.name, "Web, relay, and packages");
   assert.equal(state.githubActionsByRoom["room-a"]?.runs?.[0]?.id, 18);
   assert.equal(state.githubActionsByRoom["room-a"]?.lastChecked, "2026-07-06T00:08:00.000Z");
   assert.equal(state.githubActionsByRoom["room-a"]?.message, "CI: Checked Actions");

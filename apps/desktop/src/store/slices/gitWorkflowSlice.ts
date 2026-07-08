@@ -9,8 +9,6 @@ import type { GitStatusSummary } from "../../lib/localBackend";
 import { omitRecordKey } from "../../lib/setUtils";
 import type { AppStoreState } from "../appStore";
 
-type GitHubActionsEventsByRoom = Record<string, GitHubActionsEventPlaintextPayload[]>;
-
 export interface GitWorkflowRoomState {
   status?: GitStatusSummary | null;
   busy?: boolean;
@@ -26,9 +24,20 @@ export interface GitHubActionsRoomState {
   message?: string;
   runs?: GitHubActionRun[];
   lastChecked?: string;
+  events?: GitHubActionsEventPlaintextPayload[];
 }
 
 export type GitHubActionsByRoom = Record<string, GitHubActionsRoomState>;
+
+export function projectGitHubActionsEventsByRoom(
+  githubActionsByRoom: GitHubActionsByRoom
+): Record<string, GitHubActionsEventPlaintextPayload[]> {
+  return Object.fromEntries(
+    Object.entries(githubActionsByRoom)
+      .filter(([, actions]) => actions.events)
+      .map(([roomId, actions]) => [roomId, actions.events ?? []])
+  );
+}
 
 function updateGitWorkflowForRoom(
   current: GitWorkflowByRoom,
@@ -55,7 +64,6 @@ function updateGitHubActionsForRoom(
 export interface GitWorkflowSlice {
   gitWorkflowByRoom: GitWorkflowByRoom;
   githubActionsByRoom: GitHubActionsByRoom;
-  githubActionsEventsByRoom: GitHubActionsEventsByRoom;
   setActionsMessageForRoom: (roomId: string, message: string | null) => void;
   recordGitHubActionsRefreshForRoom: (roomId: string, refresh: {
     runs: GitHubActionRun[];
@@ -79,11 +87,9 @@ export const emptyGitWorkflowState: Pick<
   GitWorkflowSlice,
   | "gitWorkflowByRoom"
   | "githubActionsByRoom"
-  | "githubActionsEventsByRoom"
 > = {
   gitWorkflowByRoom: {},
-  githubActionsByRoom: {},
-  githubActionsEventsByRoom: {}
+  githubActionsByRoom: {}
 };
 
 export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWorkflowSlice> = (set) => ({
@@ -108,7 +114,7 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
   },
   applyGitHubActionsEventForRoom: (roomId, event) => {
     set((state) => {
-      const roomEvents = state.githubActionsEventsByRoom[roomId] ?? [];
+      const roomEvents = state.githubActionsByRoom[roomId]?.events ?? [];
       const alreadyRecorded = roomEvents.some((existing) =>
         existing.checkedAt === event.checkedAt &&
         existing.owner === event.owner &&
@@ -116,14 +122,9 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
         existing.branch === event.branch
       );
       return {
-        githubActionsEventsByRoom: alreadyRecorded
-          ? state.githubActionsEventsByRoom
-          : {
-              ...state.githubActionsEventsByRoom,
-              [roomId]: [...roomEvents, event].slice(-50)
-            },
         githubActionsByRoom: updateGitHubActionsForRoom(state.githubActionsByRoom, roomId, (roomActions) => ({
           ...roomActions,
+          events: alreadyRecorded ? roomEvents : [...roomEvents, event].slice(-50),
           runs: event.runs,
           lastChecked: event.checkedAt,
           message: `${event.summary.label}: ${event.message}`
@@ -190,7 +191,7 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
   },
   appendGitHubActionsEvent: (roomId, event) => {
     set((state) => {
-      const roomEvents = state.githubActionsEventsByRoom[roomId] ?? [];
+      const roomEvents = state.githubActionsByRoom[roomId]?.events ?? [];
       if (
         roomEvents.some((existing) =>
           existing.checkedAt === event.checkedAt &&
@@ -202,10 +203,10 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
         return state;
       }
       return {
-        githubActionsEventsByRoom: {
-          ...state.githubActionsEventsByRoom,
-          [roomId]: [...roomEvents, event].slice(-50)
-        }
+        githubActionsByRoom: updateGitHubActionsForRoom(state.githubActionsByRoom, roomId, (roomActions) => ({
+          ...roomActions,
+          events: [...roomEvents, event].slice(-50)
+        }))
       };
     });
   },

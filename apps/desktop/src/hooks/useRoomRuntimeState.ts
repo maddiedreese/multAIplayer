@@ -4,6 +4,7 @@ import {
   projectInspectorTabsByRoom,
   projectPresenceByRoom
 } from "../store/slices/historyPresenceSlice";
+import { projectGitHubActionsEventsByRoom } from "../store/slices/gitWorkflowSlice";
 import type { HostHandoffRecord } from "../types";
 
 function projectCodexRuntimeMaps(codexRuntimeByRoom: ReturnType<typeof useAppStore.getState>["codexRuntimeByRoom"]) {
@@ -30,7 +31,7 @@ export function useRoomRuntimeState() {
   const setRoomPresenceForDevice = useAppStore((state) => state.setRoomPresenceForDevice);
   const codexRuntimeByRoom = useAppStore((state) => state.codexRuntimeByRoom);
   const gitWorkflowByRoom = useAppStore((state) => state.gitWorkflowByRoom);
-  const githubActionsEventsByRoom = useAppStore((state) => state.githubActionsEventsByRoom);
+  const githubActionsByRoom = useAppStore((state) => state.githubActionsByRoom);
   const historyPresenceMaps = useMemo(() => ({
     inspectorTabsByRoom: projectInspectorTabsByRoom(historyPresenceByRoom),
     presenceByRoom: projectPresenceByRoom(historyPresenceByRoom)
@@ -41,6 +42,10 @@ export function useRoomRuntimeState() {
       .filter(([, workflow]) => workflow.events)
       .map(([roomId, workflow]) => [roomId, workflow.events ?? []])
   ), [gitWorkflowByRoom]);
+  const githubActionsEventsByRoom = useMemo(
+    () => projectGitHubActionsEventsByRoom(githubActionsByRoom),
+    [githubActionsByRoom]
+  );
 
   return {
     inspectorTabsByRoom: historyPresenceMaps.inspectorTabsByRoom,
