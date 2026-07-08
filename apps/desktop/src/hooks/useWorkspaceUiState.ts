@@ -55,6 +55,14 @@ export function useWorkspaceUiState({
       team.id === teamId ? { ...team, members } : team
     ));
   }, []);
+  const selectWorkspaceRoom = useCallback((teamId: string, roomId: string) => {
+    setSelectedTeam(teamId);
+    setSelectedRoomId(roomId);
+  }, []);
+  const selectTeamRoom = useCallback((teamId: string, fallbackRoomId: string) => {
+    setSelectedTeam(teamId);
+    setSelectedRoomId(rooms.find((room) => room.teamId === teamId)?.id ?? fallbackRoomId);
+  }, [rooms]);
 
   useLayoutEffect(() => {
     seedWorkspaceInitialDataIfEmpty({
@@ -87,6 +95,8 @@ export function useWorkspaceUiState({
     setSelectedTeam,
     selectedRoomId,
     setSelectedRoomId,
+    selectWorkspaceRoom,
+    selectTeamRoom,
     sidebarQuery,
     setSidebarQuery,
     messagesByRoom

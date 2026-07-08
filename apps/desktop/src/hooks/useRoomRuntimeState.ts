@@ -60,6 +60,10 @@ export function useRoomRuntimeState() {
       return next;
     });
   }, []);
+  const restoreWorkspaceAccess = useCallback((teamId: string, roomId: string) => {
+    restoreRoomAccess(roomId);
+    restoreTeamAccess(teamId);
+  }, [restoreRoomAccess, restoreTeamAccess]);
   const clearPresenceByRoom = useAppStore((state) => state.clearPresenceByRoom);
   const setRoomPresenceForDevice = useAppStore((state) => state.setRoomPresenceForDevice);
   const codexRuntimeByRoom = useAppStore((state) => state.codexRuntimeByRoom);
@@ -92,6 +96,7 @@ export function useRoomRuntimeState() {
     setRevokedTeamIds,
     revokeTeamAccess,
     restoreTeamAccess,
+    restoreWorkspaceAccess,
     presenceByRoom: historyPresenceMaps.presenceByRoom,
     clearPresenceByRoom,
     setRoomPresenceForDevice,

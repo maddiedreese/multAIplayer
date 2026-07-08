@@ -83,12 +83,10 @@ export function useAppRoomPanelActions({
       setDraftForRoom
     },
     header: {
-      rooms: workspaceState.rooms,
       selectedRoomId: workspaceState.selectedRoomId,
       selectedRoomIdForTabs: selectedRoom.id,
       activeBrowserUrl,
-      setSelectedTeam: workspaceState.setSelectedTeam,
-      setSelectedRoomId: workspaceState.setSelectedRoomId,
+      selectTeamRoom: workspaceState.selectTeamRoom,
       openRoomBrowserNow: roomRuntime.openRoomBrowserNow
     },
     terminal: {
