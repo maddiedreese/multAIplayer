@@ -3066,7 +3066,9 @@ test("relay appends SQLite encrypted backlog rows without rewriting retained row
         envelope: testEnvelope({ id, createdAt: `2026-07-07T00:00:0${id.endsWith("first") ? "1" : "2"}.000Z` })
       }));
     }
-    await waitForSqliteBacklogRows(dataPath, (rows) => rows.length === 2);
+    const initialRows = await waitForSqliteBacklogRows(dataPath, (rows) => rows.length === 2);
+    const retainedBeforeAppend = initialRows.find((row) => row.envelope_id === "sqlite-delta-second");
+    assert.ok(retainedBeforeAppend);
 
     sender.send(JSON.stringify({
       type: "publish",
@@ -3081,6 +3083,10 @@ test("relay appends SQLite encrypted backlog rows without rewriting retained row
         ids.includes("sqlite-delta-third");
     });
     assert.deepEqual(rows.map((row) => JSON.parse(row.data_json).id), ["sqlite-delta-second", "sqlite-delta-third"]);
+    assert.equal(
+      rows.find((row) => row.envelope_id === "sqlite-delta-second")?.rowid,
+      retainedBeforeAppend.rowid
+    );
   } finally {
     sender.close();
     await relay.close();
@@ -3405,19 +3411,19 @@ async function waitForSqliteRows(
 
 async function waitForSqliteBacklogRows(
   dataPath: string,
-  predicate: (rows: Array<{ envelope_id: string; sort_order: number; data_json: string }>) => boolean
-): Promise<Array<{ envelope_id: string; sort_order: number; data_json: string }>> {
+  predicate: (rows: Array<{ rowid: number; envelope_id: string; sort_order: number; data_json: string }>) => boolean
+): Promise<Array<{ rowid: number; envelope_id: string; sort_order: number; data_json: string }>> {
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 30; attempt += 1) {
     let db: Database.Database | null = null;
     try {
       db = new Database(dataPath, { readonly: true });
       const rows = db.prepare(`
-        select envelope_id, sort_order, data_json
+        select rowid, envelope_id, sort_order, data_json
         from relay_encrypted_envelopes
         where room_key = ?
         order by sort_order, envelope_id
-      `).all("team-core:room-desktop") as Array<{ envelope_id: string; sort_order: number; data_json: string }>;
+      `).all("team-core:room-desktop") as Array<{ rowid: number; envelope_id: string; sort_order: number; data_json: string }>;
       if (predicate(rows)) return rows;
     } catch (error) {
       lastError = error;
