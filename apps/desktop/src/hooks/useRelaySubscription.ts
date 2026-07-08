@@ -1,4 +1,4 @@
-import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { useEffect, type MutableRefObject } from "react";
 import type {
   BrowserRequestPlaintextPayload,
   CodexApprovalPlaintextPayload,
@@ -18,8 +18,6 @@ import { connectRelay, type RelayClient } from "../lib/relayClient";
 import { buildRoomSettingsSystemMessage } from "../lib/roomSettingsMessages";
 import { loadRoomSecret, replaceRoomSecret } from "../lib/localHistory";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
-import { markRoomUnreadForIncomingChat } from "../lib/roomUnread";
-import { withoutSetValue } from "../lib/setUtils";
 import { normalizeChatMessage } from "../lib/chatSanitizer";
 import {
   buildCodexEventLine,
@@ -52,8 +50,6 @@ import type {
   TerminalCommandRequest
 } from "../types";
 
-type StatusSetter = Dispatch<SetStateAction<RelayStatus>>;
-
 interface LocalUser {
   id: string;
   name: string;
@@ -80,11 +76,12 @@ interface UseRelaySubscriptionOptions {
   roomsRef: MutableRefObject<RoomRecord[]>;
   selectedRoomIdRef: MutableRefObject<string>;
   historyLoadedRoomIds: MutableRefObject<Set<string>>;
-  setRelayStatus: StatusSetter;
+  replaceRelayStatus: (status: RelayStatus) => void;
   clearPresenceByRoom: () => void;
   setRoomPresenceForDevice: (roomId: string, deviceId: string, presence: RoomPresence | null) => void;
-  setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
-  setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
+  markIncomingChatUnread: (roomId: string, selectedRoomId: string, senderDeviceId: string, localDeviceId: string) => void;
+  rememberForgottenRoom: (roomId: string) => void;
+  restoreForgottenRoom: (roomId: string) => void;
   handleRelayError: (message: string) => void;
   upsertRoom: (room: RoomRecord) => void;
   upsertTeam: (team: TeamRecord) => void;
@@ -132,11 +129,12 @@ export function useRelaySubscription({
   roomsRef,
   selectedRoomIdRef,
   historyLoadedRoomIds,
-  setRelayStatus,
+  replaceRelayStatus,
   clearPresenceByRoom,
   setRoomPresenceForDevice,
-  setRooms,
-  setForgottenRoomIds,
+  markIncomingChatUnread,
+  rememberForgottenRoom,
+  restoreForgottenRoom,
   handleRelayError,
   upsertRoom,
   upsertTeam,
@@ -172,14 +170,14 @@ export function useRelaySubscription({
       async (message) => {
         if (cancelled) return;
         if (message.type === "joined") {
-          setRelayStatus("open");
+          replaceRelayStatus("open");
           return;
         }
         if (message.type === "team.subscribed") {
           return;
         }
         if (message.type === "workspace.subscribed") {
-          setRelayStatus("open");
+          replaceRelayStatus("open");
           return;
         }
         if (message.type === "error") {
@@ -233,7 +231,7 @@ export function useRelaySubscription({
           const roomPayload = message.envelope.payload;
           const secret = await loadRoomSecret(message.envelope.roomId);
           if (!secret) {
-            setForgottenRoomIds((current) => new Set(current).add(message.envelope.roomId));
+            rememberForgottenRoom(message.envelope.roomId);
             return;
           }
           if (message.envelope.kind === "chat.message") {
@@ -241,14 +239,11 @@ export function useRelaySubscription({
             const chatMessage = normalizeChatMessage(plaintext) as ChatMessage | null;
             if (!chatMessage) return;
             if (isLegacyDebugChatMessage(chatMessage)) return;
-            setRooms((current) =>
-              markRoomUnreadForIncomingChat(
-                current,
-                message.envelope.roomId,
-                selectedRoomIdRef.current,
-                message.envelope.senderDeviceId,
-                deviceId
-              )
+            markIncomingChatUnread(
+              message.envelope.roomId,
+              selectedRoomIdRef.current,
+              message.envelope.senderDeviceId,
+              deviceId
             );
             appendRoomMessage(message.envelope.roomId, chatMessage);
             const envelopeRoom = roomsRef.current.find((room) => room.id === message.envelope.roomId);
@@ -350,7 +345,7 @@ export function useRelaySubscription({
             if (isRoomKeyRotationPlaintextPayload(plaintext)) {
               await replaceRoomSecret(message.envelope.roomId, plaintext.newSecret);
               historyLoadedRoomIds.current.add(message.envelope.roomId);
-              setForgottenRoomIds((current) => withoutSetValue(current, message.envelope.roomId));
+              restoreForgottenRoom(message.envelope.roomId);
               appendRoomMessage(message.envelope.roomId, {
                 id: plaintext.id,
                 author: "multAIplayer",
@@ -366,7 +361,7 @@ export function useRelaySubscription({
           console.warn("Failed to decrypt relay envelope", error);
         }
       },
-      setRelayStatus,
+      replaceRelayStatus,
       (openClient) => {
         openClient.publish({
           type: "subscribe.workspace",
@@ -424,6 +419,9 @@ export function useRelaySubscription({
     roomModeLabels,
     devicePublicKeyFingerprint,
     inviteAdmissionsByRoom,
+    markIncomingChatUnread,
+    rememberForgottenRoom,
+    restoreForgottenRoom,
     refreshTeamMembers,
     revokedRoomIds,
     revokedTeamIds,
@@ -433,6 +431,7 @@ export function useRelaySubscription({
     selectedRoom.id,
     selectedRoom.name,
     selectedRoom.teamId,
-    selectedTeam
+    selectedTeam,
+    replaceRelayStatus
   ]);
 }
