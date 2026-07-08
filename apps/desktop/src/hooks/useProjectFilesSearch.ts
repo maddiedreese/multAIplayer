@@ -30,7 +30,6 @@ export function useProjectFilesSearch({
   setProjectFilesForRoom,
   setSelectedFileForRoom,
   setSelectedDiffForRoom,
-  setFileBusyForRoom,
   setFileMessageForRoom
 }: UseProjectFilesSearchOptions) {
   useEffect(() => {
@@ -42,12 +41,10 @@ export function useProjectFilesSearch({
       setProjectFilesForRoom(roomId, []);
       setSelectedFileForRoom(roomId, null);
       setSelectedDiffForRoom(roomId, null);
-      setFileBusyForRoom(roomId, false);
       setFileMessageForRoom(roomId, localWorkspaceMessage);
       return;
     }
     let cancelled = false;
-    setFileBusyForRoom(roomId, true);
     searchProjectFiles(selectedRoomProjectPath, fileQuery, 80)
       .then((files) => {
         if (cancelled) return;
@@ -57,9 +54,6 @@ export function useProjectFilesSearch({
       .catch((error) => {
         if (!cancelled) setFileMessageForRoom(roomId, String(error));
       })
-      .finally(() => {
-        if (!cancelled) setFileBusyForRoom(roomId, false);
-      });
     return () => {
       cancelled = true;
     };

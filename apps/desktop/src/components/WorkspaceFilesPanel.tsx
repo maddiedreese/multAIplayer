@@ -192,7 +192,7 @@ export function WorkspaceFilesPanel({
                 value={editorContent}
                 onChange={(event) => setEditorContent(event.target.value)}
                 spellCheck={false}
-                disabled={!canReadLocalWorkspace || selectedFile.truncated || fileBusy}
+                disabled={!canReadLocalWorkspace || selectedFile.truncated}
                 aria-label={`Edit ${selectedFile.path}`}
               />
             ) : (
@@ -240,7 +240,7 @@ export function WorkspaceFilesPanel({
             <div className="empty-state">No files match this search.</div>
           )}
         </div>
-        {fileBusy && <div className="empty-state">Loading project files...</div>}
+        {fileBusy && projectFiles.length === 0 && <div className="empty-state">Loading project files...</div>}
         {fileMessage && <div className="workflow-message">{fileMessage}</div>}
       </section>
 

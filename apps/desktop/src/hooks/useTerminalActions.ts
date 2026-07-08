@@ -23,6 +23,8 @@ import { canControlRoomTerminal, roomTerminalControlMessage } from "../lib/termi
 import { nextShellTerminalName, terminalInputForShellSubmit } from "../lib/terminalUi";
 import type { RelayStatus, TerminalCommandRequest } from "../types";
 
+const defaultInteractiveShellCommand = "exec zsh -f";
+
 interface LocalUser {
   id: string;
   name: string;
@@ -224,13 +226,13 @@ export function useTerminalActions({
         roomId,
         name,
         room.projectPath,
-        "zsh -l"
+        defaultInteractiveShellCommand
       );
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         upsertTerminalSnapshot(snapshot);
         setSelectedTerminalIdForRoom(roomId, snapshot.id);
         setTerminalNameForRoom(roomId, name);
-        setTerminalCommandForRoom(roomId, "zsh -l");
+        setTerminalCommandForRoom(roomId, defaultInteractiveShellCommand);
         if (!options.quiet) setTerminalErrorForRoom(roomId, null);
       }
     } catch (error) {

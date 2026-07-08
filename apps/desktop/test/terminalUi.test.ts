@@ -8,8 +8,8 @@ test("nextShellTerminalName uses shell for the first terminal", () => {
 
 test("nextShellTerminalName increments from existing shell sessions", () => {
   assert.equal(
-    nextShellTerminalName([{ name: "shell" }, { name: "shell 2" }, { name: "tests" }]),
-    "shell 3"
+    nextShellTerminalName([{ name: "shell" }, { name: "shell-2" }, { name: "tests" }]),
+    "shell-3"
   );
 });
 
