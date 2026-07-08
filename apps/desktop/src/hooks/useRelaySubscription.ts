@@ -99,10 +99,7 @@ interface UseRelaySubscriptionOptions {
   appendTerminalLinesForRoom: (roomId: string, lines: string[]) => void;
   appendGitWorkflowEvent: (roomId: string, event: GitWorkflowEventPlaintextPayload) => void;
   setGitWorkflowMessageForRoom: (roomId: string, message: string | null) => void;
-  appendGitHubActionsEvent: (roomId: string, event: GitHubActionsEventPlaintextPayload) => void;
-  setActionRunsForRoom: (roomId: string, runs: GitHubActionsEventPlaintextPayload["runs"]) => void;
-  setActionsLastCheckedForRoom: (roomId: string, checkedAt: string | null) => void;
-  setActionsMessageForRoom: (roomId: string, message: string | null) => void;
+  applyGitHubActionsEventForRoom: (roomId: string, event: GitHubActionsEventPlaintextPayload) => void;
   appendCodexEvent: (roomId: string, event: CodexRoomEvent) => void;
   appendBrowserRequest: (roomId: string, request: BrowserAccessRequest) => void;
   updateBrowserRequestStatus: (roomId: string, requestId: string, status: BrowserAccessRequest["status"]) => void;
@@ -154,10 +151,7 @@ export function useRelaySubscription({
   appendTerminalLinesForRoom,
   appendGitWorkflowEvent,
   setGitWorkflowMessageForRoom,
-  appendGitHubActionsEvent,
-  setActionRunsForRoom,
-  setActionsLastCheckedForRoom,
-  setActionsMessageForRoom,
+  applyGitHubActionsEventForRoom,
   appendCodexEvent,
   appendBrowserRequest,
   updateBrowserRequestStatus,
@@ -287,10 +281,7 @@ export function useRelaySubscription({
               setGitWorkflowMessageForRoom(message.envelope.roomId, plaintext.message);
             }
             if (isGitHubActionsEventPlaintextPayload(plaintext)) {
-              appendGitHubActionsEvent(message.envelope.roomId, plaintext);
-              setActionRunsForRoom(message.envelope.roomId, plaintext.runs);
-              setActionsLastCheckedForRoom(message.envelope.roomId, plaintext.checkedAt);
-              setActionsMessageForRoom(message.envelope.roomId, `${plaintext.summary.label}: ${plaintext.message}`);
+              applyGitHubActionsEventForRoom(message.envelope.roomId, plaintext);
               appendTerminalLinesForRoom(message.envelope.roomId, buildGitHubActionsEventLines(plaintext));
             }
           }

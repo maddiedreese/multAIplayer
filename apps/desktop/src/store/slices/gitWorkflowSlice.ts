@@ -4,7 +4,7 @@ import type {
   GitWorkflowEventPlaintextPayload
 } from "@multaiplayer/protocol";
 import type { GitHubActionRun } from "../../lib/authClient";
-import { updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "../../lib/gitWorkflowDraft";
+import { defaultGitWorkflowDraft, updateGitWorkflowDraftRecord, type GitWorkflowDraft } from "../../lib/gitWorkflowDraft";
 import type { GitStatusSummary } from "../../lib/localBackend";
 import { omitRecordKey } from "../../lib/setUtils";
 import type { AppStoreState } from "../appStore";
@@ -57,7 +57,12 @@ export interface GitWorkflowSlice {
   githubActionsByRoom: GitHubActionsByRoom;
   githubActionsEventsByRoom: GitHubActionsEventsByRoom;
   setActionsMessageForRoom: (roomId: string, message: string | null) => void;
-  setActionRunsForRoom: (roomId: string, runs: GitHubActionRun[]) => void;
+  recordGitHubActionsRefreshForRoom: (roomId: string, refresh: {
+    runs: GitHubActionRun[];
+    checkedAt: string;
+    message: string;
+  }) => void;
+  applyGitHubActionsEventForRoom: (roomId: string, event: GitHubActionsEventPlaintextPayload) => void;
   setActionsLastCheckedForRoom: (roomId: string, checkedAt: string | null) => void;
   resetGitHubActionsStateForRoom: (roomId: string) => void;
   setGitWorkflowBusyForRoom: (roomId: string, busy: boolean) => void;
@@ -66,7 +71,8 @@ export interface GitWorkflowSlice {
   appendGitHubActionsEvent: (roomId: string, event: GitHubActionsEventPlaintextPayload) => void;
   setGitWorkflowMessageForRoom: (roomId: string, message: string | null) => void;
   setGitStatusForRoom: (roomId: string, status: GitStatusSummary | null) => void;
-  updateGitWorkflowDraftForRoom: (roomId: string, patch: Partial<GitWorkflowDraft>) => void;
+  editGitWorkflowDraftForRoom: (roomId: string, patch: Partial<GitWorkflowDraft>) => void;
+  applyInferredGitHubRemoteForRoom: (roomId: string, remote: { owner: string; repo: string }) => boolean;
 }
 
 export const emptyGitWorkflowState: Pick<
@@ -90,13 +96,40 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
       })
     }));
   },
-  setActionRunsForRoom: (roomId, runs) => {
+  recordGitHubActionsRefreshForRoom: (roomId, refresh) => {
     set((state) => ({
       githubActionsByRoom: updateGitHubActionsForRoom(state.githubActionsByRoom, roomId, (roomActions) => ({
         ...roomActions,
-        runs
+        runs: refresh.runs,
+        lastChecked: refresh.checkedAt,
+        message: refresh.message
       }))
     }));
+  },
+  applyGitHubActionsEventForRoom: (roomId, event) => {
+    set((state) => {
+      const roomEvents = state.githubActionsEventsByRoom[roomId] ?? [];
+      const alreadyRecorded = roomEvents.some((existing) =>
+        existing.checkedAt === event.checkedAt &&
+        existing.owner === event.owner &&
+        existing.repo === event.repo &&
+        existing.branch === event.branch
+      );
+      return {
+        githubActionsEventsByRoom: alreadyRecorded
+          ? state.githubActionsEventsByRoom
+          : {
+              ...state.githubActionsEventsByRoom,
+              [roomId]: [...roomEvents, event].slice(-50)
+            },
+        githubActionsByRoom: updateGitHubActionsForRoom(state.githubActionsByRoom, roomId, (roomActions) => ({
+          ...roomActions,
+          runs: event.runs,
+          lastChecked: event.checkedAt,
+          message: `${event.summary.label}: ${event.message}`
+        }))
+      };
+    });
   },
   setActionsLastCheckedForRoom: (roomId, checkedAt) => {
     set((state) => ({
@@ -192,7 +225,7 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
       }))
     }));
   },
-  updateGitWorkflowDraftForRoom: (roomId, patch) => {
+  editGitWorkflowDraftForRoom: (roomId, patch) => {
     set((state) => {
       const draftByRoom = state.gitWorkflowByRoom[roomId]?.draft
         ? { [roomId]: state.gitWorkflowByRoom[roomId].draft }
@@ -205,5 +238,33 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
         }))
       };
     });
+  },
+  applyInferredGitHubRemoteForRoom: (roomId, remote) => {
+    let applied = false;
+    set((state) => {
+      const draftByRoom = state.gitWorkflowByRoom[roomId]?.draft
+        ? { [roomId]: state.gitWorkflowByRoom[roomId].draft }
+        : {};
+      const currentDraft = updateGitWorkflowDraftRecord(draftByRoom, roomId, {})[roomId];
+      const isDefaultTarget =
+        currentDraft.prOwner === defaultGitWorkflowDraft.prOwner &&
+        currentDraft.prRepo === defaultGitWorkflowDraft.prRepo;
+      const alreadyMatches = currentDraft.prOwner === remote.owner && currentDraft.prRepo === remote.repo;
+      if (!isDefaultTarget || alreadyMatches) {
+        return state;
+      }
+      applied = true;
+      const nextDraft = updateGitWorkflowDraftRecord(draftByRoom, roomId, {
+        prOwner: remote.owner,
+        prRepo: remote.repo
+      })[roomId];
+      return {
+        gitWorkflowByRoom: updateGitWorkflowForRoom(state.gitWorkflowByRoom, roomId, (roomWorkflow) => ({
+          ...roomWorkflow,
+          draft: nextDraft
+        }))
+      };
+    });
+    return applied;
   }
 });

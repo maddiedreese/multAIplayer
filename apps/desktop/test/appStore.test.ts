@@ -16,7 +16,7 @@ test("desktop store keeps git workflow state room scoped", () => {
     branch: "main",
     files: [{ path: "apps/desktop/src/App.tsx", status: "modified", added: 2, removed: 1 }]
   });
-  store.updateGitWorkflowDraftForRoom("room-b", { branchName: "multaiplayer/alpha" });
+  store.editGitWorkflowDraftForRoom("room-b", { branchName: "multaiplayer/alpha" });
 
   const state = useAppStore.getState();
   assert.equal(state.gitWorkflowByRoom["room-a"]?.busy, true);
@@ -37,8 +37,8 @@ test("desktop store exposes room git workflow actions", () => {
     files: [{ path: "apps/desktop/src/App.tsx", status: "modified", added: 2, removed: 1 }]
   });
   store.setGitStatusForRoom("room-b", null);
-  store.updateGitWorkflowDraftForRoom("room-a", { branchName: "multaiplayer/alpha" });
-  store.updateGitWorkflowDraftForRoom("room-a", { commitMessage: "Build alpha" });
+  store.editGitWorkflowDraftForRoom("room-a", { branchName: "multaiplayer/alpha" });
+  store.editGitWorkflowDraftForRoom("room-a", { commitMessage: "Build alpha" });
 
   const state = useAppStore.getState();
   assert.equal(state.gitWorkflowByRoom["room-a"]?.message, "Creating PR");
@@ -48,6 +48,26 @@ test("desktop store exposes room git workflow actions", () => {
   assert.equal(state.gitWorkflowByRoom["room-a"]?.draft?.branchName, "multaiplayer/alpha");
   assert.equal(state.gitWorkflowByRoom["room-a"]?.draft?.commitMessage, "Build alpha");
   assert.equal(state.gitWorkflowByRoom["room-a"]?.draft?.prBase, "main");
+});
+
+test("desktop store applies inferred GitHub remotes only to default draft targets", () => {
+  const store = useAppStore.getState();
+
+  assert.equal(
+    store.applyInferredGitHubRemoteForRoom("room-a", { owner: "openai", repo: "codex" }),
+    true
+  );
+  assert.equal(useAppStore.getState().gitWorkflowByRoom["room-a"]?.draft?.prOwner, "openai");
+  assert.equal(useAppStore.getState().gitWorkflowByRoom["room-a"]?.draft?.prRepo, "codex");
+
+  store.editGitWorkflowDraftForRoom("room-b", { prOwner: "maddiedreese", prRepo: "custom" });
+
+  assert.equal(
+    store.applyInferredGitHubRemoteForRoom("room-b", { owner: "openai", repo: "codex" }),
+    false
+  );
+  assert.equal(useAppStore.getState().gitWorkflowByRoom["room-b"]?.draft?.prOwner, "maddiedreese");
+  assert.equal(useAppStore.getState().gitWorkflowByRoom["room-b"]?.draft?.prRepo, "custom");
 });
 
 test("desktop store exposes room busy actions", () => {
@@ -132,20 +152,23 @@ test("desktop store keeps GitHub Actions state room scoped", () => {
   store.setActionsBusyForRoom("room-a", true);
   store.setActionsMessageForRoom("room-a", "Refreshing Actions");
   store.setActionsMessageForRoom("room-b", null);
-  store.setActionRunsForRoom("room-a", [
-    {
-      id: 18,
-      name: "CI",
-      status: "completed",
-      conclusion: "success",
-      url: "https://github.com/maddiedreese/multAIplayer/actions/runs/18",
-      branch: "main",
-      event: "push",
-      createdAt: "2026-07-06T00:00:00.000Z",
-      updatedAt: "2026-07-06T00:01:00.000Z"
-    }
-  ]);
-  store.setActionsLastCheckedForRoom("room-a", "2026-07-06T00:02:00.000Z");
+  store.recordGitHubActionsRefreshForRoom("room-a", {
+    message: "Refreshing Actions",
+    checkedAt: "2026-07-06T00:02:00.000Z",
+    runs: [
+      {
+        id: 18,
+        name: "CI",
+        status: "completed",
+        conclusion: "success",
+        url: "https://github.com/maddiedreese/multAIplayer/actions/runs/18",
+        branch: "main",
+        event: "push",
+        createdAt: "2026-07-06T00:00:00.000Z",
+        updatedAt: "2026-07-06T00:01:00.000Z"
+      }
+    ]
+  });
 
   const state = useAppStore.getState();
   assert.deepEqual(state.githubActionsByRoom["room-a"], {
@@ -183,8 +206,11 @@ test("desktop store exposes GitHub Actions room actions", () => {
 
   store.setActionsBusyForRoom("room-a", true);
   store.setActionsMessageForRoom("room-a", "Checking Actions");
-  store.setActionRunsForRoom("room-a", [run]);
-  store.setActionsLastCheckedForRoom("room-a", "2026-07-06T00:01:00.000Z");
+  store.recordGitHubActionsRefreshForRoom("room-a", {
+    runs: [run],
+    checkedAt: "2026-07-06T00:01:00.000Z",
+    message: "Checking Actions"
+  });
 
   let state = useAppStore.getState();
   assert.deepEqual(state.githubActionsByRoom["room-a"], {
@@ -198,6 +224,43 @@ test("desktop store exposes GitHub Actions room actions", () => {
 
   state = useAppStore.getState();
   assert.deepEqual(state.githubActionsByRoom["room-a"], { runs: [] });
+});
+
+test("desktop store applies GitHub Actions events as one room-scoped state update", () => {
+  const store = useAppStore.getState();
+  const event = {
+    eventType: "github.actions" as const,
+    checkedBy: "Maddie",
+    checkedByUserId: "github:maddie",
+    owner: "maddiedreese",
+    repo: "multAIplayer",
+    branch: "main",
+    checkedAt: "2026-07-06T00:03:00.000Z",
+    summary: { label: "Passing", detail: "Latest loaded workflow runs are passing.", tone: "green" as const },
+    message: "Loaded 1 workflow run for main.",
+    runs: [{
+      id: 7,
+      name: "CI",
+      status: "completed",
+      conclusion: "success",
+      url: "https://github.com/maddiedreese/multAIplayer/actions/runs/7",
+      branch: "main",
+      event: "push",
+      createdAt: "2026-07-06T00:00:00.000Z",
+      updatedAt: "2026-07-06T00:01:00.000Z"
+    }]
+  };
+
+  store.applyGitHubActionsEventForRoom("room-a", event);
+  store.applyGitHubActionsEventForRoom("room-a", event);
+
+  const state = useAppStore.getState();
+  assert.deepEqual(state.githubActionsByRoom["room-a"], {
+    runs: event.runs,
+    lastChecked: event.checkedAt,
+    message: "Passing: Loaded 1 workflow run for main."
+  });
+  assert.equal(state.githubActionsEventsByRoom["room-a"]?.length, 1);
 });
 
 test("desktop store keeps browser panel state room scoped", () => {
@@ -1182,8 +1245,16 @@ test("desktop store clears local room-scoped state", () => {
   });
   store.setCodexThreadIdForRoom("room-a", "thread-a");
   store.setCodexThreadIdForRoom("room-b", "thread-b");
-  store.setActionRunsForRoom("room-a", []);
-  store.setActionRunsForRoom("room-b", []);
+  store.recordGitHubActionsRefreshForRoom("room-a", {
+    runs: [],
+    checkedAt: "now",
+    message: "Checking"
+  });
+  store.recordGitHubActionsRefreshForRoom("room-b", {
+    runs: [],
+    checkedAt: "later",
+    message: "Keep"
+  });
   store.setActionsLastCheckedForRoom("room-a", "now");
   store.setActionsLastCheckedForRoom("room-b", "later");
   store.setActionsMessageForRoom("room-a", "Checking");

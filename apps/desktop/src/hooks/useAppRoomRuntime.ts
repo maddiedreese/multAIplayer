@@ -387,7 +387,6 @@ export function useAppRoomRuntime({
         selectedRoomId: selectedRoom.id,
         selectedRoomProjectPath: selectedRoom.projectPath,
         selectedRoomIdRef: appRefs.selectedRoomIdRef,
-        gitWorkflowDraftsRef: appRefs.gitWorkflowDraftsRef,
         setGitWorkflowMessageForRoom
       },
       gitHubActionsDraftReset: {

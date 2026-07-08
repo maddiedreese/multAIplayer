@@ -58,8 +58,9 @@ export function useRoomActions({
   const hydrateLocalRoomHistoryForRoom = useAppStore((state) => state.hydrateLocalRoomHistoryForRoom);
   const setGitWorkflowMessageForRoom = useAppStore((state) => state.setGitWorkflowMessageForRoom);
   const setGitStatusForRoom = useAppStore((state) => state.setGitStatusForRoom);
-  const updateGitWorkflowDraftForRoom = useAppStore((state) => state.updateGitWorkflowDraftForRoom);
-  const setActionRunsForRoom = useAppStore((state) => state.setActionRunsForRoom);
+  const editGitWorkflowDraftForRoom = useAppStore((state) => state.editGitWorkflowDraftForRoom);
+  const recordGitHubActionsRefreshForRoom = useAppStore((state) => state.recordGitHubActionsRefreshForRoom);
+  const applyGitHubActionsEventForRoom = useAppStore((state) => state.applyGitHubActionsEventForRoom);
   const setActionsLastCheckedForRoom = useAppStore((state) => state.setActionsLastCheckedForRoom);
   const setActionsMessageForRoom = useAppStore((state) => state.setActionsMessageForRoom);
   const setBrowserUrlForRoom = useAppStore((state) => state.setBrowserUrlForRoom);
@@ -137,12 +138,13 @@ export function useRoomActions({
     setGitWorkflowMessageForRoom,
     setSelectedGitWorkflowMessage: (message: string | null) => setGitWorkflowMessageForRoom(selectedRoomId, message),
     setGitStatusForRoom,
-    setActionRunsForRoom,
+    recordGitHubActionsRefreshForRoom,
+    applyGitHubActionsEventForRoom,
     setActionsLastCheckedForRoom,
     setActionsMessageForRoom,
-    updateSelectedGitWorkflowDraft: (patch: Parameters<typeof updateGitWorkflowDraftForRoom>[1]) => {
+    updateSelectedGitWorkflowDraft: (patch: Parameters<typeof editGitWorkflowDraftForRoom>[1]) => {
       if (!selectedRoomId) return;
-      updateGitWorkflowDraftForRoom(selectedRoomId, patch);
+      editGitWorkflowDraftForRoom(selectedRoomId, patch);
     },
     setBrowserUrlForRoom: (roomId: string, url: string) =>
       setBrowserUrlForRoom(roomId, url, browser.defaultBrowserUrl),
