@@ -5,6 +5,7 @@ import {
   type RoomRecord
 } from "@multaiplayer/protocol";
 import type { GitDiffResult, ProjectFileContent, TerminalSnapshot } from "./localBackend";
+import { stripTerminalControlSequences } from "./terminalText";
 
 export interface MarkdownChatAttachment {
   name: string;
@@ -228,8 +229,12 @@ export function buildTerminalMarkdown(
   sensitiveRisks: string[] = []
 ): string {
   const title = terminal ? terminal.name : "Room terminal log";
-  const output = lines.length
-    ? lines.map((line) => line.stream === "stdout" ? line.text : `[${line.stream}] ${line.text}`).join("\n")
+  const visibleLines = lines.filter((line) => !(line.stream === "system" && line.text.trim() === "$ exec zsh -f"));
+  const output = visibleLines.length
+    ? visibleLines.map((line) => {
+        const text = stripTerminalControlSequences(line.text);
+        return line.stream === "stdout" ? text : `[${line.stream}] ${text}`;
+      }).join("\n")
     : "(No terminal output.)";
   return compactMarkdown([
     `# ${escapeMarkdown(room.name)} Terminal Output`,

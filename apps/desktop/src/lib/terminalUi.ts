@@ -8,7 +8,7 @@ export function nextShellTerminalName(terminals: TerminalNameCandidate[], baseNa
   if (!usedNames.has(normalizedBase)) return normalizedBase;
 
   for (let index = 2; index < 1000; index += 1) {
-    const candidate = `${normalizedBase} ${index}`;
+    const candidate = `${normalizedBase}-${index}`;
     if (!usedNames.has(candidate)) return candidate;
   }
 

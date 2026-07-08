@@ -1,5 +1,8 @@
-import { X } from "lucide-react";
+import { Check, Copy, X } from "lucide-react";
+import { useState } from "react";
 import type { LocalPreviewDialogState } from "../types";
+
+const cloudflaredInstallCommand = "brew install cloudflare/cloudflare/cloudflared";
 
 export function LocalPreviewDialog({
   dialog,
@@ -24,6 +27,14 @@ export function LocalPreviewDialog({
   onContinue: () => void;
   onStartSharing: () => void;
 }) {
+  const [installCommandCopied, setInstallCommandCopied] = useState(false);
+
+  async function copyInstallCommand() {
+    await navigator.clipboard?.writeText(cloudflaredInstallCommand);
+    setInstallCommandCopied(true);
+    window.setTimeout(() => setInstallCommandCopied(false), 1800);
+  }
+
   return (
     <div className="modal-backdrop" role="presentation">
       <section className="modal local-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="local-preview-title">
@@ -82,11 +93,16 @@ export function LocalPreviewDialog({
 
         {dialog.phase === "install" && (
           <>
-            <p className="modal-copy">cloudflared is required to start a Cloudflare Quick Tunnel.</p>
-            <pre className="install-snippet">brew install cloudflare/cloudflare/cloudflared</pre>
-            <a href="https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/" target="_blank" rel="noreferrer">
-              Windows and Linux downloads
-            </a>
+            <p className="modal-copy">
+              cloudflared is required to start a Cloudflare Quick Tunnel on macOS. Install it with Homebrew, then come back here and check again.
+            </p>
+            <div className="install-helper">
+              <pre className="install-snippet">{cloudflaredInstallCommand}</pre>
+              <button type="button" className="ghost" onClick={() => void copyInstallCommand()}>
+                {installCommandCopied ? <Check size={14} /> : <Copy size={14} />}
+                {installCommandCopied ? "Copied" : "Copy command"}
+              </button>
+            </div>
             {dialog.error && <div className="workflow-message">{dialog.error}</div>}
             <div className="modal-actions">
               <button type="button" onClick={onBackToSelect}>

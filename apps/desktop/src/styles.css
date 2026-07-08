@@ -5933,10 +5933,6 @@ select {
   width: 100%;
 }
 
-.terminal-panel .panel-title-actions .primary-tool {
-  grid-column: 1 / -1;
-}
-
 .terminal-command-line {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr);
@@ -5992,6 +5988,59 @@ select {
 
 .terminal-session-actions button:disabled {
   opacity: 0.5;
+}
+
+.terminal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 3px 5px 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.terminal-tab.active {
+  border-color: #0f0f0f;
+  background: #f4f4f4;
+}
+
+.terminal-tab-select,
+.terminal-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.terminal-tabs .terminal-tab-select {
+  gap: 6px;
+  min-height: 24px;
+  width: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 13px;
+}
+
+.terminal-tabs .terminal-tab-close {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.terminal-tabs .terminal-tab-close:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.08);
 }
 
 .sidebar .nested-team-list .team-button {
@@ -6350,12 +6399,25 @@ select {
 }
 
 .install-snippet {
-  margin: 12px 0;
+  min-width: 0;
+  margin: 0;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 7px;
   background: var(--code-bg);
   overflow-x: auto;
+}
+
+.install-helper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: stretch;
+  margin: 12px 0;
+}
+
+.install-helper button {
+  white-space: nowrap;
 }
 
 .modal-actions {

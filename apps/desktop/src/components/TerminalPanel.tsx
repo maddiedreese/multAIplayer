@@ -1,6 +1,7 @@
-import { Check, Copy, MessageSquare, Plus, Play, Square, Terminal, X } from "lucide-react";
+import { Check, Copy, Plus, Play, Square, Terminal, X } from "lucide-react";
 import { useRef } from "react";
 import type { TerminalLine, TerminalSnapshot } from "../lib/localBackend";
+import { stripTerminalControlSequences } from "../lib/terminalText";
 import { InlineSecretWarning } from "./common";
 
 export interface TerminalCommandRequestDisplay {
@@ -26,12 +27,9 @@ export interface TerminalOutputLineDisplay extends TerminalLine {
 }
 
 export function TerminalPanel({
-  terminalName,
-  terminalCommand,
   terminalInput,
   terminalBusy,
   terminalError,
-  terminalCommandRisks,
   terminalRisks,
   codexEvents,
   commandRequests,
@@ -43,15 +41,9 @@ export function TerminalPanel({
   terminalOutputLines,
   codexRunning,
   canReadLocalWorkspace,
-  canRequestWorkspace,
   canApproveTerminal,
   onCopyMarkdown,
-  onRunGitStatus,
   onOpenInteractiveTerminal,
-  onTerminalNameChange,
-  onTerminalCommandChange,
-  onStartTerminal,
-  onRequestTerminalCommand,
   onApproveTerminalRequest,
   onDenyTerminalRequest,
   onSelectTerminal,
@@ -95,6 +87,9 @@ export function TerminalPanel({
   onStopTerminal: () => void;
 }) {
   const terminalInputRef = useRef<HTMLInputElement | null>(null);
+  const visibleTerminalLines = terminalOutputLines.filter(
+    (line) => !(line.stream === "system" && line.text.trim() === "$ exec zsh -f")
+  );
 
   return (
     <section className="panel terminal-panel">
@@ -107,46 +102,7 @@ export function TerminalPanel({
           <button className="ghost" onClick={onCopyMarkdown} disabled={!canReadLocalWorkspace}>
             <Copy size={14} /> Markdown
           </button>
-          <button className="ghost" onClick={onRunGitStatus} disabled={!canReadLocalWorkspace || terminalBusy || !canApproveTerminal}>
-            <Play size={14} /> {terminalBusy ? "running" : "git status"}
-          </button>
         </div>
-      </div>
-
-      <div className="terminal-launcher compact">
-        <input
-          value={terminalName}
-          onChange={(event) => onTerminalNameChange(event.target.value)}
-          placeholder="terminal name"
-        />
-        <input
-          value={terminalCommand}
-          onChange={(event) => onTerminalCommandChange(event.target.value)}
-          placeholder="command to run or request"
-        />
-        <button
-          onClick={onStartTerminal}
-          disabled={!canReadLocalWorkspace || terminalBusy || !canApproveTerminal || !terminalName.trim() || !terminalCommand.trim()}
-          title="Start terminal"
-          aria-label="Start terminal"
-        >
-          <Play size={14} />
-        </button>
-        <button
-          onClick={onRequestTerminalCommand}
-          disabled={!canRequestWorkspace || !terminalCommand.trim()}
-          title="Request terminal command"
-          aria-label="Request terminal command"
-        >
-          <MessageSquare size={14} />
-        </button>
-        {terminalCommandRisks.length > 0 && (
-          <InlineSecretWarning
-            risks={terminalCommandRisks}
-            detail="Review before requesting or running it on the host machine."
-            compact
-          />
-        )}
       </div>
 
       {(codexEvents.length > 0 || commandRequests.length > 0) && (
@@ -205,25 +161,42 @@ export function TerminalPanel({
       {roomTerminals.length > 0 && (
         <div className="terminal-tabs">
           {roomTerminals.map((terminal) => (
-            <button
+            <div
               key={terminal.id}
-              className={terminal.id === selectedTerminalId ? "active" : ""}
-              onClick={() => onSelectTerminal(terminal.id)}
+              className={`terminal-tab ${terminal.id === selectedTerminalId ? "active" : ""}`}
             >
-              <Terminal size={13} />
-              {terminal.name}
+              <button
+                type="button"
+                className="terminal-tab-select"
+                onClick={() => onSelectTerminal(terminal.id)}
+              >
+                <Terminal size={13} />
+                {terminal.name}
+              </button>
               <span>{terminal.running ? "live" : terminal.exitStatus ?? "done"}</span>
-            </button>
+              {terminal.id === selectedTerminalId && (
+                <button
+                  type="button"
+                  className="terminal-tab-close"
+                  onClick={onStopTerminal}
+                  disabled={!selectedTerminalCanControl || !terminal.running || terminalBusy}
+                  title={`Close ${terminal.name}`}
+                  aria-label={`Close ${terminal.name}`}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}
 
       <div className="terminal-output" onClick={() => terminalInputRef.current?.focus()}>
         {terminalRisks.length > 0 && <InlineSecretWarning risks={terminalRisks} compact />}
-        {terminalOutputLines.map((line, index) => (
+        {visibleTerminalLines.map((line, index) => (
           <div className={`terminal-line ${line.stream} ${line.risks.length ? "sensitive" : ""}`} key={`${line.stream}-${index}-${line.text}`}>
             {line.stream !== "stdout" && <span>{line.stream}</span>}
-            {line.text}
+            {stripTerminalControlSequences(line.text)}
           </div>
         ))}
         {codexRunning && <div className="terminal-active">Codex is preparing a foreground terminal...</div>}
@@ -268,11 +241,11 @@ export function TerminalPanel({
           <button
             onClick={onStopTerminal}
             disabled={!selectedTerminalCanControl || !selectedTerminal.running || terminalBusy}
-            title={`Stop ${selectedTerminal.name}`}
-            aria-label={`Stop ${selectedTerminal.name}`}
+            title={`Close ${selectedTerminal.name}`}
+            aria-label={`Close ${selectedTerminal.name}`}
           >
             <Square size={14} />
-            Stop
+            Close
           </button>
         </div>
       )}
