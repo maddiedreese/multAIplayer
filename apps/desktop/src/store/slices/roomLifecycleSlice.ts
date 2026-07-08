@@ -28,9 +28,15 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         terminalRequestsByRoom: payload.terminalRequests.length
           ? { ...state.terminalRequestsByRoom, [roomId]: payload.terminalRequests }
           : state.terminalRequestsByRoom,
-        browserRequestsByRoom: payload.browserRequests.length
-          ? { ...state.browserRequestsByRoom, [roomId]: payload.browserRequests }
-          : state.browserRequestsByRoom,
+        browserByRoom: payload.browserRequests.length
+          ? {
+              ...state.browserByRoom,
+              [roomId]: {
+                ...state.browserByRoom[roomId],
+                requests: payload.browserRequests
+              }
+            }
+          : state.browserByRoom,
         inviteRequestsByRoom: payload.inviteRequests.length
           ? { ...state.inviteRequestsByRoom, [roomId]: payload.inviteRequests }
           : state.inviteRequestsByRoom,
@@ -78,7 +84,12 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
     set((state) => ({
       messagesByRoom: { ...state.messagesByRoom, [roomId]: [] },
       terminalRequestsByRoom: { ...state.terminalRequestsByRoom, [roomId]: [] },
-      browserRequestsByRoom: { ...state.browserRequestsByRoom, [roomId]: [] },
+      browserByRoom: {
+        ...state.browserByRoom,
+        [roomId]: {
+          requests: []
+        }
+      },
       inviteRequestsByRoom: { ...state.inviteRequestsByRoom, [roomId]: [] },
       codexEventsByRoom: { ...state.codexEventsByRoom, [roomId]: [] },
       gitWorkflowEventsByRoom: { ...state.gitWorkflowEventsByRoom, [roomId]: [] },
@@ -102,8 +113,6 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       pendingCodexApprovalsByRoom: omitRecordKey(state.pendingCodexApprovalsByRoom, roomId),
       codexRunningByRoom: omitRecordKey(state.codexRunningByRoom, roomId),
       roomGoalsByRoom: omitRecordKey(state.roomGoalsByRoom, roomId),
-      browserStatusByRoom: omitRecordKey(state.browserStatusByRoom, roomId),
-      activeBrowserUrlsByRoom: omitRecordKey(state.activeBrowserUrlsByRoom, roomId),
       gitStatusByRoom: omitRecordKey(state.gitStatusByRoom, roomId),
       pendingAttachmentsByRoom: omitRecordKey(state.pendingAttachmentsByRoom, roomId),
       terminalLinesByRoom: omitRecordKey(state.terminalLinesByRoom, roomId),
@@ -111,9 +120,6 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       selectedTerminalIdsByRoom: omitRecordKey(state.selectedTerminalIdsByRoom, roomId),
       terminalUiByRoom: omitRecordKey(state.terminalUiByRoom, roomId),
       terminals: state.terminals.filter((terminal) => terminal.roomId !== roomId),
-      browserUrlsByRoom: omitRecordKey(state.browserUrlsByRoom, roomId),
-      browserReasonsByRoom: omitRecordKey(state.browserReasonsByRoom, roomId),
-      browserMessagesByRoom: omitRecordKey(state.browserMessagesByRoom, roomId),
       inviteLinksByRoom: omitRecordKey(state.inviteLinksByRoom, roomId),
       inviteApprovalGatesByRoom: omitRecordKey(state.inviteApprovalGatesByRoom, roomId),
       inviteMessagesByRoom: omitRecordKey(state.inviteMessagesByRoom, roomId),

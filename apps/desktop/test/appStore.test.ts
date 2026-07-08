@@ -123,7 +123,7 @@ test("desktop store exposes room request actions", () => {
   assert.equal(state.inviteRequestsByRoom["room-a"]?.[0]?.status, "approved");
   assert.equal(state.terminalRequestsByRoom["room-a"]?.length, 1);
   assert.equal(state.terminalRequestsByRoom["room-a"]?.[0]?.status, "denied");
-  assert.equal(state.browserRequestsByRoom["room-a"]?.[0]?.status, "approved");
+  assert.equal(state.browserByRoom["room-a"]?.requests?.[0]?.status, "approved");
 });
 
 test("desktop store keeps GitHub Actions state room scoped", () => {
@@ -219,14 +219,14 @@ test("desktop store keeps browser panel state room scoped", () => {
   store.openEmbeddedBrowserForRoom("room-a", "https://github.com");
 
   const state = useAppStore.getState();
-  assert.equal(state.browserRequestsByRoom["room-a"]?.[0]?.url, "http://localhost:3000");
-  assert.equal(state.browserUrlsByRoom["room-b"], "http://localhost:5173");
-  assert.equal(state.browserReasonsByRoom["room-b"], "Open app preview");
-  assert.equal(state.browserMessagesByRoom["room-a"], "Opened browser");
-  assert.equal(state.browserMessagesByRoom["room-b"], undefined);
-  assert.equal(state.browserStatusByRoom["room-a"]?.profilePath, "Embedded in this room");
-  assert.equal(state.activeBrowserUrlsByRoom["room-a"], "https://github.com");
-  assert.equal(state.activeBrowserUrlsByRoom["room-b"], undefined);
+  assert.equal(state.browserByRoom["room-a"]?.requests?.[0]?.url, "http://localhost:3000");
+  assert.equal(state.browserByRoom["room-b"]?.url, "http://localhost:5173");
+  assert.equal(state.browserByRoom["room-b"]?.reason, "Open app preview");
+  assert.equal(state.browserByRoom["room-a"]?.message, "Opened browser");
+  assert.equal(state.browserByRoom["room-b"]?.message, undefined);
+  assert.equal(state.browserByRoom["room-a"]?.status?.profilePath, "Embedded in this room");
+  assert.equal(state.browserByRoom["room-a"]?.activeUrl, "https://github.com");
+  assert.equal(state.browserByRoom["room-b"]?.activeUrl, undefined);
 });
 
 test("desktop store exposes room browser actions", () => {
@@ -246,16 +246,16 @@ test("desktop store exposes room browser actions", () => {
   store.clearBrowserStatusForRoom("room-a");
 
   const state = useAppStore.getState();
-  assert.equal(state.browserUrlsByRoom["room-a"], "http://localhost:5173");
-  assert.equal(state.browserReasonsByRoom["room-a"], "Inspect local preview");
-  assert.equal(state.browserMessagesByRoom["room-a"], undefined);
-  assert.equal(state.browserUrlsByRoom["room-b"], undefined);
-  assert.equal(state.browserReasonsByRoom["room-b"], undefined);
-  assert.equal(state.activeBrowserUrlsByRoom["room-a"], undefined);
-  assert.equal(state.browserStatusByRoom["room-a"], undefined);
+  assert.equal(state.browserByRoom["room-a"]?.url, "http://localhost:5173");
+  assert.equal(state.browserByRoom["room-a"]?.reason, "Inspect local preview");
+  assert.equal(state.browserByRoom["room-a"]?.message, undefined);
+  assert.equal(state.browserByRoom["room-b"]?.url, undefined);
+  assert.equal(state.browserByRoom["room-b"]?.reason, undefined);
+  assert.equal(state.browserByRoom["room-a"]?.activeUrl, undefined);
+  assert.equal(state.browserByRoom["room-a"]?.status, undefined);
   assert.equal(state.inspectorTabsByRoom["room-a"], "browser");
-  assert.equal(state.activeBrowserUrlsByRoom["room-b"], undefined);
-  assert.equal(state.browserStatusByRoom["room-b"]?.profilePath, "/tmp/browser-profile");
+  assert.equal(state.browserByRoom["room-b"]?.activeUrl, undefined);
+  assert.equal(state.browserByRoom["room-b"]?.status?.profilePath, "/tmp/browser-profile");
 });
 
 test("desktop store keeps file panel state room scoped", () => {
@@ -1232,7 +1232,7 @@ test("desktop store clears local room-scoped state", () => {
   const state = useAppStore.getState();
   assert.deepEqual(state.messagesByRoom["room-a"], []);
   assert.deepEqual(state.terminalRequestsByRoom["room-a"], []);
-  assert.deepEqual(state.browserRequestsByRoom["room-a"], []);
+  assert.deepEqual(state.browserByRoom["room-a"], { requests: [] });
   assert.deepEqual(state.inviteRequestsByRoom["room-a"], []);
   assert.deepEqual(state.codexEventsByRoom["room-a"], []);
   assert.deepEqual(state.gitWorkflowEventsByRoom["room-a"], []);
@@ -1246,12 +1246,13 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.filePanelByRoom["room-a"], undefined);
   assert.equal(state.selectedTerminalIdsByRoom["room-a"], undefined);
   assert.equal(state.terminals.some((terminal) => terminal.roomId === "room-a"), false);
-  assert.equal(state.browserUrlsByRoom["room-a"], undefined);
+  assert.equal(state.browserByRoom["room-a"]?.url, undefined);
   assert.equal(state.draftsByRoom["room-a"], undefined);
   assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "keep");
   assert.equal(state.codexEventsByRoom["room-b"]?.[0]?.turnId, "turn-b");
   assert.equal(state.codexThreadIdsByRoom["room-b"], "thread-b");
   assert.equal(state.terminals.some((terminal) => terminal.roomId === "room-b"), true);
+  assert.equal(state.browserByRoom["room-b"]?.url, "https://example.com");
 });
 
 test("desktop store keeps workspace maps scoped", () => {
@@ -1498,7 +1499,7 @@ test("desktop store hydrates local room history through one room-scoped action",
   assert.equal(state.messagesByRoom["room-a"]?.[0]?.body, "Restore this room.");
   assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "Keep this room alone.");
   assert.equal(state.terminalRequestsByRoom["room-a"]?.[0]?.command, "npm test");
-  assert.equal(state.browserRequestsByRoom["room-a"]?.[0]?.url, "http://localhost:5173");
+  assert.equal(state.browserByRoom["room-a"]?.requests?.[0]?.url, "http://localhost:5173");
   assert.equal(state.inviteRequestsByRoom["room-a"]?.[0]?.requester, "Jordan");
   assert.equal(state.codexEventsByRoom["room-a"]?.[0]?.message, "Reading context");
   assert.equal(state.gitWorkflowEventsByRoom["room-a"]?.[0]?.branch, "codex/history-hydration");
