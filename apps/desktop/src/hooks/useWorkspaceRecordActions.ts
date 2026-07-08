@@ -3,7 +3,7 @@ import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "../lib/relayAccess";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
 import { shouldResetCodexApprovalForRoomUpdate } from "../lib/codexApproval";
-import { upsertRoomPreservingUnread } from "../lib/roomUnread";
+import { replaceRoomPreservingUnread, upsertRoomPreservingUnread } from "../lib/roomUnread";
 import { useAppStore } from "../store/appStore";
 
 interface LocalUser {
@@ -72,6 +72,15 @@ export function useWorkspaceRecordActions({
     setRooms((current) => upsertRoomPreservingUnread(current, nextRoom));
   }
 
+  function replaceRoom(room: RoomRecord) {
+    const nextRoom = ensureRoomDefaults(room);
+    const previousRoom = roomsRef.current.find((existing) => existing.id === nextRoom.id);
+    if (previousRoom && shouldResetCodexApprovalForRoomUpdate(ensureRoomDefaults(previousRoom), nextRoom)) {
+      resetCodexApprovalForRoom(nextRoom.id);
+    }
+    setRooms((current) => replaceRoomPreservingUnread(current, nextRoom));
+  }
+
   function handleRelayError(message: string) {
     console.warn("Relay error", message);
     if (!isMembershipRemovedRelayError(message) || !hasSelectedRoom) return;
@@ -93,6 +102,7 @@ export function useWorkspaceRecordActions({
   return {
     upsertTeam,
     upsertRoom,
+    replaceRoom,
     handleRelayError
   };
 }

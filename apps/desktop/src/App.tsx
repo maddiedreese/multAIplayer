@@ -301,6 +301,7 @@ export function App() {
     selectedRuntime,
     roomInteraction,
     roomActions,
+    workspaceRecords,
     roomSettingsActor
   });
   const inviteActions = useAppInviteActions({
@@ -360,6 +361,7 @@ export function App() {
     roomActions,
     relaySync,
     hostHandoffActions,
+    workspaceRecords,
     roomSettingsActor
   });
 

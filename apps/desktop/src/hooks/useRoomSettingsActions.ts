@@ -1,4 +1,4 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type { MutableRefObject } from "react";
 import type {
   ApprovalDelegationPolicy,
   ApprovalPolicy,
@@ -8,7 +8,6 @@ import type {
 } from "@multaiplayer/protocol";
 import { chooseProjectFolder, shutdownCodexRoom } from "../lib/localBackend";
 import { updateRoomSettings } from "../lib/workspaceClient";
-import { ensureRoomDefaults } from "../lib/roomDefaults";
 import {
   maxCodexModelChars,
   maxRoomProjectPathChars,
@@ -43,7 +42,7 @@ interface UseRoomSettingsActionsOptions {
   setSettingsMessageForRoom: (roomId: string, message: string | null) => void;
   setSelectedBrowserMessage: (message: string | null) => void;
   setBrowserMessageForRoom: (roomId: string, message: string | null) => void;
-  setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
+  replaceRoom: (room: RoomRecord) => void;
   clearBrowserStatusForRoom: (roomId: string) => void;
   setProjectPathDraftForRoom: (roomId: string, path: string) => void;
   resetCodexApprovalForRoom: (roomId: string) => void;
@@ -73,7 +72,7 @@ export function useRoomSettingsActions({
   setSettingsMessageForRoom,
   setSelectedBrowserMessage,
   setBrowserMessageForRoom,
-  setRooms,
+  replaceRoom,
   clearBrowserStatusForRoom,
   setProjectPathDraftForRoom,
   resetCodexApprovalForRoom,
@@ -100,7 +99,7 @@ export function useRoomSettingsActions({
     try {
       const previousPolicy = selectedRoom.approvalPolicy;
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), approvalPolicy });
-      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      replaceRoom(room);
       await publishRoomSettingsEvent(room, {
         id: crypto.randomUUID(),
         setting: "approvalPolicy",
@@ -139,7 +138,7 @@ export function useRoomSettingsActions({
     try {
       const previousPolicy = selectedRoom.approvalDelegationPolicy;
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), approvalDelegationPolicy });
-      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      replaceRoom(room);
       await publishRoomSettingsEvent(room, {
         id: crypto.randomUUID(),
         setting: "approvalDelegationPolicy",
@@ -183,7 +182,7 @@ export function useRoomSettingsActions({
       const previousValue = `${key}:${selectedRoom.mode[key] ? "enabled" : "disabled"}`;
       const nextValue = `${key}:${nextMode[key] ? "enabled" : "disabled"}`;
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), mode: nextMode });
-      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      replaceRoom(room);
       await publishRoomSettingsEvent(room, {
         id: crypto.randomUUID(),
         setting: "roomMode",
@@ -231,7 +230,7 @@ export function useRoomSettingsActions({
       const previousModel = selectedCodexModel;
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), codexModel: nextModel });
       void shutdownCodexRoom(roomId);
-      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      replaceRoom(room);
       await publishRoomSettingsEvent(room, {
         id: crypto.randomUUID(),
         setting: "codexModel",
@@ -268,7 +267,7 @@ export function useRoomSettingsActions({
     try {
       const previousName = selectedRoom.name;
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), name: nextName });
-      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      replaceRoom(room);
       await publishRoomSettingsEvent(room, {
         id: crypto.randomUUID(),
         setting: "roomName",
@@ -310,7 +309,7 @@ export function useRoomSettingsActions({
         ...roomSettingsActor(),
         browserProfilePersistent
       });
-      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      replaceRoom(room);
       await publishRoomSettingsEvent(room, {
         id: crypto.randomUUID(),
         setting: "browserProfilePersistent",
@@ -364,7 +363,7 @@ export function useRoomSettingsActions({
       const previousProjectPath = selectedRoom.projectPath;
       const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), projectPath: nextProjectPath });
       void shutdownCodexRoom(roomId);
-      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      replaceRoom(room);
       await publishRoomSettingsEvent(room, {
         id: crypto.randomUUID(),
         setting: "projectPath",

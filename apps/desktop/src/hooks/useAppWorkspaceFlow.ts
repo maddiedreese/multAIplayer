@@ -236,7 +236,7 @@ export function useAppWorkspaceFlow({
         setSecretWarningVisibleForRoom,
         setHistorySettings: historyDefaultsState.setHistorySettings,
         hydrateLocalRoomHistoryForRoom,
-        setRooms: workspaceState.setRooms,
+        replaceRoom: workspaceRecords.replaceRoom,
         clearBrowserStatusForRoom,
         setForgottenRoomIds: roomRuntimeState.setForgottenRoomIds,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds

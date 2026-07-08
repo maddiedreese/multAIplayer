@@ -22,3 +22,9 @@ export function upsertRoomPreservingUnread(rooms: RoomRecord[], room: RoomRecord
   }
   return [...rooms, room];
 }
+
+export function replaceRoomPreservingUnread(rooms: RoomRecord[], room: RoomRecord): RoomRecord[] {
+  const existing = rooms.find((item) => item.id === room.id);
+  if (!existing) return rooms;
+  return rooms.map((item) => (item.id === room.id ? { ...room, unread: existing.unread } : item));
+}

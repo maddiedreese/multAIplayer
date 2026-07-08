@@ -13,6 +13,7 @@ import type { useAppRoomActions } from "./useAppRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { useAppStateSlices } from "./useAppStateSlices";
+import type { useAppWorkspaceRecords } from "./useAppWorkspaceRecords";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import { useRoomRuntimeContext } from "./useRoomRuntimeContext";
@@ -28,6 +29,7 @@ type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
 type RoomActions = ReturnType<typeof useAppRoomActions>;
 type RelaySync = ReturnType<typeof useAppRelaySync>;
 type HostHandoffActions = ReturnType<typeof useAppHostHandoffActions>;
+type WorkspaceRecords = ReturnType<typeof useAppWorkspaceRecords>;
 type RoomSettingsActor = ReturnType<typeof useRoomSettingsActor>;
 
 export function useAppRoomRuntime({
@@ -41,6 +43,7 @@ export function useAppRoomRuntime({
   roomActions,
   relaySync,
   hostHandoffActions,
+  workspaceRecords,
   roomSettingsActor
 }: {
   appState: AppStateSlices;
@@ -53,6 +56,7 @@ export function useAppRoomRuntime({
   roomActions: RoomActions;
   relaySync: RelaySync;
   hostHandoffActions: HostHandoffActions;
+  workspaceRecords: WorkspaceRecords;
   roomSettingsActor: RoomSettingsActor;
 }) {
   const {
@@ -156,7 +160,7 @@ export function useAppRoomRuntime({
         setApprovalVisibleForRoom,
         setCodexRunningForRoom,
         appendTerminalLinesForRoom,
-        setRooms: workspaceState.setRooms,
+        replaceRoom: workspaceRecords.replaceRoom,
         publishCodexEvent: relaySync.publishCodexEvent,
         publishCodexApproval: relaySync.publishCodexApproval,
         publishChatMessage: roomInteraction.publishChatMessage,
@@ -212,7 +216,7 @@ export function useAppRoomRuntime({
         setSettingsMessageForRoom,
         setSelectedBrowserMessage,
         setBrowserMessageForRoom,
-        setRooms: workspaceState.setRooms,
+        replaceRoom: workspaceRecords.replaceRoom,
         clearBrowserStatusForRoom: roomActions.clearBrowserStatusForRoom,
         setProjectPathDraftForRoom,
         resetCodexApprovalForRoom,

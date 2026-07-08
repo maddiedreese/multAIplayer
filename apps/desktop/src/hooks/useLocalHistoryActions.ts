@@ -20,7 +20,6 @@ import { updateRoomSettings } from "../lib/workspaceClient";
 import {
   type TerminalSnapshot
 } from "../lib/localBackend";
-import { ensureRoomDefaults } from "../lib/roomDefaults";
 import { roomLockMessage } from "../lib/appRuntime";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
 import {
@@ -72,7 +71,7 @@ interface UseLocalHistoryActionsOptions {
   setSecretWarningVisibleForRoom: (roomId: string, visible: boolean) => void;
   setHistorySettings: Dispatch<SetStateAction<LocalHistorySettings>>;
   hydrateLocalRoomHistoryForRoom: (roomId: string, payload: ReturnType<typeof pruneLocalRoomHistory>) => void;
-  setRooms: Dispatch<SetStateAction<RoomRecord[]>>;
+  replaceRoom: (room: RoomRecord) => void;
   clearBrowserStatusForRoom: (roomId: string) => void;
   setForgottenRoomIds: Dispatch<SetStateAction<Set<string>>>;
   historyLoadedRoomIds: MutableRefObject<Set<string>>;
@@ -105,7 +104,7 @@ export function useLocalHistoryActions({
   setSecretWarningVisibleForRoom,
   setHistorySettings,
   hydrateLocalRoomHistoryForRoom,
-  setRooms,
+  replaceRoom,
   clearBrowserStatusForRoom,
   setForgottenRoomIds,
   historyLoadedRoomIds
@@ -175,7 +174,7 @@ export function useLocalHistoryActions({
         ...roomSettingsActor(),
         ...roomSettings
       });
-      setRooms((current) => current.map((item) => (item.id === room.id ? ensureRoomDefaults(room) : item)));
+      replaceRoom(room);
       if (!roomSettings.browserProfilePersistent) {
         clearBrowserStatusForRoom(roomId);
       }
