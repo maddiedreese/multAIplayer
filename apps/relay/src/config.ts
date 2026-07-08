@@ -32,6 +32,10 @@ export interface RelayConfig {
     attachment: number;
     websocket: number;
   };
+  dailyCreationCaps: {
+    teamsPerUser: number;
+    roomsPerUser: number;
+  };
 }
 
 export function loadRelayConfig(): RelayConfig {
@@ -83,6 +87,10 @@ export function loadRelayConfig(): RelayConfig {
       mutation: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_MUTATION, 120, 1, 100_000),
       attachment: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_ATTACHMENT, 60, 1, 10_000),
       websocket: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET, 600, 1, 100_000)
+    },
+    dailyCreationCaps: {
+      teamsPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP, 25, 0, 10_000),
+      roomsPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP, 100, 0, 100_000)
     }
   };
 }

@@ -166,6 +166,15 @@ MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
 
 These limits are keyed by signed-in session when available, otherwise by client IP. By default, the relay uses the direct socket address and ignores `X-Forwarded-For`, because direct internet clients can spoof that header. Set `MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=true` only when the relay sits behind a trusted reverse proxy that removes client-supplied forwarding headers and writes its own. HTTP requests over the limit receive `429` with `Retry-After`; room WebSocket clients receive an encrypted-room-safe error message and remain connected. The alpha limiter is process-local, so multi-instance deployments should add an edge or shared-store limiter in front of the relay.
 
+Team and room creation also have authenticated per-user daily caps:
+
+```bash
+MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP=25
+MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP=100
+```
+
+Daily creation quota rejections return `429` with `Retry-After` and a structured `quota_exceeded` JSON body that clients can render directly.
+
 Debug endpoints are available in non-production relay runs. In production (`NODE_ENV=production`), they are disabled unless explicitly enabled:
 
 ```bash

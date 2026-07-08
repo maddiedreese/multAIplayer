@@ -30,6 +30,19 @@ interface StoredRelayStateFixture {
   encryptedBacklog: unknown;
 }
 
+interface DailyCreationQuotaErrorBody {
+  error: string;
+  code: string;
+  retryAfterSeconds: number;
+  quota: {
+    type: string;
+    limit: number;
+    used: number;
+    remaining: number;
+    resetsAt: string;
+  };
+}
+
 test("relay rejects non-host takeover and allows explicit handoff", async () => {
   const relay = await startRelay();
   try {
@@ -254,6 +267,92 @@ test("relay broadcasts newly created teams to workspace subscribers", async () =
     assert.equal(updatedTeam.members, 1);
   } finally {
     socket.close();
+    await relay.close();
+  }
+});
+
+test("relay enforces authenticated user daily team and room creation quotas", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP: "1",
+    MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP: "1"
+  });
+  try {
+    const firstUserCookie = await createDebugSession(relay.baseUrl, "github:quota-user", "quota-user");
+    const secondUserCookie = await createDebugSession(relay.baseUrl, "github:quota-peer", "quota-peer");
+    const maddieCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+
+    const firstTeam = await fetch(`${relay.baseUrl}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: firstUserCookie },
+      body: JSON.stringify({ name: "Quota team one" })
+    });
+    assert.equal(firstTeam.status, 201);
+
+    const limitedTeam = await fetch(`${relay.baseUrl}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: firstUserCookie },
+      body: JSON.stringify({ name: "Quota team two" })
+    });
+    assert.equal(limitedTeam.status, 429);
+    assert.ok(limitedTeam.headers.get("retry-after"));
+    const limitedTeamBody = await limitedTeam.json() as DailyCreationQuotaErrorBody;
+    assert.equal(limitedTeamBody.error, "Daily team creation quota exceeded.");
+    assert.equal(limitedTeamBody.code, "quota_exceeded");
+    assert.equal(limitedTeamBody.retryAfterSeconds, Number(limitedTeam.headers.get("retry-after")));
+    assert.deepEqual(limitedTeamBody.quota, {
+      type: "daily_user_team_creations",
+      limit: 1,
+      used: 1,
+      remaining: 0,
+      resetsAt: limitedTeamBody.quota.resetsAt
+    });
+    assert.ok(Number.isFinite(Date.parse(limitedTeamBody.quota.resetsAt)));
+
+    const peerTeam = await fetch(`${relay.baseUrl}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: secondUserCookie },
+      body: JSON.stringify({ name: "Quota peer team" })
+    });
+    assert.equal(peerTeam.status, 201);
+
+    const firstRoom = await fetch(`${relay.baseUrl}/rooms`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: maddieCookie },
+      body: JSON.stringify({
+        teamId: "team-core",
+        name: "Quota room one",
+        projectPath: "/tmp/multaiplayer"
+      })
+    });
+    assert.equal(firstRoom.status, 201);
+
+    const limitedRoom = await fetch(`${relay.baseUrl}/rooms`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: maddieCookie },
+      body: JSON.stringify({
+        teamId: "team-core",
+        name: "Quota room two",
+        projectPath: "/tmp/multaiplayer"
+      })
+    });
+    assert.equal(limitedRoom.status, 429);
+    assert.ok(limitedRoom.headers.get("retry-after"));
+    const limitedRoomBody = await limitedRoom.json() as DailyCreationQuotaErrorBody;
+    assert.deepEqual(limitedRoomBody, {
+      error: "Daily room creation quota exceeded.",
+      code: "quota_exceeded",
+      retryAfterSeconds: limitedRoomBody.retryAfterSeconds,
+      quota: {
+        type: "daily_user_room_creations",
+        limit: 1,
+        used: 1,
+        remaining: 0,
+        resetsAt: limitedRoomBody.quota.resetsAt
+      }
+    });
+    assert.equal(limitedRoomBody.retryAfterSeconds, Number(limitedRoom.headers.get("retry-after")));
+    assert.ok(Number.isFinite(Date.parse(limitedRoomBody.quota.resetsAt)));
+  } finally {
     await relay.close();
   }
 });

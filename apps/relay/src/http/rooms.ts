@@ -11,6 +11,7 @@ import {
   type ApprovalDelegationPolicy,
   type RoomRecord
 } from "@multaiplayer/protocol";
+import { loadRelayConfig } from "../config.js";
 import type { AuthSession, RelayStore } from "../state.js";
 
 interface RegisterRoomRoutesOptions {
@@ -42,6 +43,8 @@ interface RegisterRoomRoutesOptions {
   maxUserIdChars: number;
 }
 
+const dailyRoomCreationCounts = new Map<string, DailyCreationQuotaRecord>();
+
 export function registerRoomRoutes({
   app,
   store,
@@ -70,6 +73,8 @@ export function registerRoomRoutes({
   maxRoomProjectPathChars,
   maxUserIdChars
 }: RegisterRoomRoutesOptions) {
+  const { dailyCreationCaps } = loadRelayConfig();
+
   app.post("/rooms", (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
@@ -141,6 +146,15 @@ export function registerRoomRoutes({
     }
     if (browserProfilePersistent !== undefined && typeof browserProfilePersistent !== "boolean") {
       res.status(400).json({ error: "browserProfilePersistent must be a boolean" });
+      return;
+    }
+    if (session && !consumeDailyCreationQuota({
+      cap: dailyCreationCaps.roomsPerUser,
+      counts: dailyRoomCreationCounts,
+      quota: "daily_user_room_creations",
+      userId: session.user.id,
+      res
+    })) {
       return;
     }
     const room: RoomRecord = {
@@ -338,4 +352,70 @@ function normalizeTrustedApproverUserIds(value: unknown, maxUserIdChars: number)
     ids.add(normalized);
   }
   return [...ids];
+}
+
+interface DailyCreationQuotaRecord {
+  count: number;
+  resetAt: number;
+}
+
+function consumeDailyCreationQuota({
+  cap,
+  counts,
+  quota,
+  userId,
+  res
+}: {
+  cap: number;
+  counts: Map<string, DailyCreationQuotaRecord>;
+  quota: "daily_user_room_creations";
+  userId: string;
+  res: Response;
+}): boolean {
+  const now = Date.now();
+  const resetAt = nextUtcMidnight(now);
+  const key = `${quota}:${userId}`;
+  const current = counts.get(key);
+  const record = current && current.resetAt > now ? current : { count: 0, resetAt };
+  if (record.count >= cap) {
+    sendDailyCreationQuotaExceeded(res, {
+      quota,
+      limit: cap,
+      used: record.count,
+      resetAt: record.resetAt
+    });
+    return false;
+  }
+  counts.set(key, { count: record.count + 1, resetAt: record.resetAt });
+  return true;
+}
+
+function sendDailyCreationQuotaExceeded(
+  res: Response,
+  { quota, limit, used, resetAt }: {
+    quota: "daily_user_room_creations";
+    limit: number;
+    used: number;
+    resetAt: number;
+  }
+) {
+  const retryAfterSeconds = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
+  res.setHeader("Retry-After", retryAfterSeconds);
+  res.status(429).json({
+    error: "Daily room creation quota exceeded.",
+    code: "quota_exceeded",
+    retryAfterSeconds,
+    quota: {
+      type: quota,
+      limit,
+      used,
+      remaining: 0,
+      resetsAt: new Date(resetAt).toISOString()
+    }
+  });
+}
+
+function nextUtcMidnight(now: number): number {
+  const date = new Date(now);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1);
 }
