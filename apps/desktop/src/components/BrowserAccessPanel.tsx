@@ -1,4 +1,4 @@
-import { ExternalLink, Globe2, Maximize2, Minimize2 } from "lucide-react";
+import { ArrowRight, Globe2, Maximize2, Minimize2 } from "lucide-react";
 import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import { Webview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -24,6 +24,12 @@ export function BrowserAccessPanel({
   const [browserSurfaceError, setBrowserSurfaceError] = useState<string | null>(null);
   const [browserExpanded, setBrowserExpanded] = useState(false);
   const tauriRuntime = "__TAURI_INTERNALS__" in window;
+  const canOpenUrl = canHostBrowser && browserUrl.trim().length > 0;
+
+  function openBrowserUrl() {
+    if (!canOpenUrl) return;
+    onOpenBrowserNow();
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -117,7 +123,7 @@ export function BrowserAccessPanel({
           className="browser-toolbar"
           onSubmit={(event) => {
             event.preventDefault();
-            onOpenBrowserNow();
+            openBrowserUrl();
           }}
         >
           <Globe2 size={15} />
@@ -128,17 +134,19 @@ export function BrowserAccessPanel({
             placeholder="Search or enter URL"
             aria-label="Browser URL"
           />
-          <button type="submit" disabled={!canHostBrowser || !browserUrl.trim()} aria-label="Open URL">
-            <ExternalLink size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setBrowserExpanded((current) => !current)}
-            aria-label={browserExpanded ? "Return browser to column" : "Expand browser"}
-            title={browserExpanded ? "Return to column" : "Expand"}
-          >
-            {browserExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          </button>
+          <div className="browser-toolbar-actions">
+            <button type="button" disabled={!canOpenUrl} onClick={openBrowserUrl} aria-label="Open URL" title="Open URL">
+              <ArrowRight size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setBrowserExpanded((current) => !current)}
+              aria-label={browserExpanded ? "Return browser to column" : "Expand browser"}
+              title={browserExpanded ? "Return to column" : "Expand browser"}
+            >
+              {browserExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+          </div>
         </form>
         <div className="browser-viewport active" ref={browserViewportRef}>
           {!tauriRuntime ? (
@@ -166,7 +174,7 @@ export function BrowserAccessPanel({
         className="browser-toolbar"
         onSubmit={(event) => {
           event.preventDefault();
-          onOpenBrowserNow();
+          openBrowserUrl();
         }}
       >
         <Globe2 size={15} />
@@ -177,17 +185,19 @@ export function BrowserAccessPanel({
           placeholder="Search or enter URL"
           aria-label="Browser URL"
         />
-        <button type="submit" disabled={!canHostBrowser || !browserUrl.trim()} aria-label="Open URL">
-          <ExternalLink size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => setBrowserExpanded((current) => !current)}
-          aria-label={browserExpanded ? "Return browser to column" : "Expand browser"}
-          title={browserExpanded ? "Return to column" : "Expand"}
-        >
-          {browserExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-        </button>
+        <div className="browser-toolbar-actions">
+          <button type="button" disabled={!canOpenUrl} onClick={openBrowserUrl} aria-label="Open URL" title="Open URL">
+            <ArrowRight size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setBrowserExpanded((current) => !current)}
+            aria-label={browserExpanded ? "Return browser to column" : "Expand browser"}
+            title={browserExpanded ? "Return to column" : "Expand browser"}
+          >
+            {browserExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
+        </div>
       </form>
       <div className={`browser-viewport ${activeBrowserUrl ? "active" : ""}`} ref={browserViewportRef}>
         {activeBrowserUrl && !tauriRuntime ? (

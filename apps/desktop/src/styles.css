@@ -5483,7 +5483,7 @@ select {
 .browser-toolbar {
   display: grid;
   flex: 0 0 48px;
-  grid-template-columns: 18px minmax(0, 1fr) 34px;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   min-height: 56px;
@@ -5492,6 +5492,13 @@ select {
   background: var(--surface-strong);
   position: relative;
   z-index: 1;
+}
+
+.browser-toolbar-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
 }
 
 .browser-toolbar input {
@@ -5507,11 +5514,14 @@ select {
   font-weight: 650;
 }
 
-.browser-toolbar button {
+.browser-toolbar-actions button {
   display: grid;
   place-items: center;
+  flex: 0 0 34px;
   width: 34px;
   height: 32px;
+  min-width: 34px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
