@@ -3629,8 +3629,8 @@ button:not(:disabled):active {
 }
 
 .brand-mark {
-  border: 1px solid var(--border);
-  background: var(--surface-strong);
+  border: 0;
+  background: transparent;
 }
 
 .github-button,
@@ -5558,6 +5558,19 @@ select {
   background: var(--surface-strong);
 }
 
+.file-viewer-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.file-viewer-toolbar-actions .ghost:not(.icon-only) {
+  min-width: 0;
+  max-width: 180px;
+}
+
 .file-viewer-toolbar > div {
   min-width: 0;
 }
@@ -5669,6 +5682,7 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
   flex: 0 0 auto;
   padding: 10px;
   border-bottom: 1px solid var(--border);
@@ -5680,6 +5694,8 @@ select {
   justify-content: flex-end;
   gap: 8px;
   min-width: 0;
+  flex: 1 1 220px;
+  flex-wrap: wrap;
 }
 
 .file-editor-actions button {
@@ -5691,6 +5707,7 @@ select {
   border-radius: 8px;
   font-size: 12px;
   font-weight: 720;
+  white-space: nowrap;
 }
 
 .file-editor-actions .primary {
@@ -5703,6 +5720,15 @@ select {
   border-color: var(--border);
   background: var(--surface-muted);
   color: var(--text-muted);
+}
+
+.file-preview-tabs {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.file-preview-tabs button {
+  min-width: 0;
 }
 
 .file-viewer-body {
@@ -5810,6 +5836,25 @@ select {
   padding: 0;
   border: 0;
   border-radius: 0;
+  background: var(--surface);
+}
+
+.file-viewer-open.expanded,
+.browser-panel.browser-open.expanded {
+  position: fixed;
+  inset: 36px 0 0;
+  z-index: 80;
+  width: auto;
+  height: calc(100vh - 36px);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.file-viewer-open.expanded {
+  background: var(--surface);
+}
+
+.browser-panel.browser-open.expanded {
   background: var(--surface);
 }
 

@@ -1,4 +1,4 @@
-import { ExternalLink, Globe2 } from "lucide-react";
+import { ExternalLink, Globe2, Maximize2, Minimize2 } from "lucide-react";
 import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import { Webview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -22,6 +22,7 @@ export function BrowserAccessPanel({
   const browserViewportRef = useRef<HTMLDivElement | null>(null);
   const browserWebviewRef = useRef<Webview | null>(null);
   const [browserSurfaceError, setBrowserSurfaceError] = useState<string | null>(null);
+  const [browserExpanded, setBrowserExpanded] = useState(false);
   const tauriRuntime = "__TAURI_INTERNALS__" in window;
 
   useEffect(() => {
@@ -107,11 +108,11 @@ export function BrowserAccessPanel({
       cleanupPositioning?.();
       void closeBrowserWebview();
     };
-  }, [activeBrowserUrl, hidden, tauriRuntime]);
+  }, [activeBrowserUrl, browserExpanded, hidden, tauriRuntime]);
 
   if (activeBrowserUrl) {
     return (
-      <section className="panel browser-panel browser-open" hidden={hidden}>
+      <section className={`panel browser-panel browser-open ${browserExpanded ? "expanded" : ""}`} hidden={hidden}>
         <form
           className="browser-toolbar"
           onSubmit={(event) => {
@@ -129,6 +130,14 @@ export function BrowserAccessPanel({
           />
           <button type="submit" disabled={!canHostBrowser || !browserUrl.trim()} aria-label="Open URL">
             <ExternalLink size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setBrowserExpanded((current) => !current)}
+            aria-label={browserExpanded ? "Return browser to column" : "Expand browser"}
+            title={browserExpanded ? "Return to column" : "Expand"}
+          >
+            {browserExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
         </form>
         <div className="browser-viewport active" ref={browserViewportRef}>
@@ -152,7 +161,7 @@ export function BrowserAccessPanel({
   }
 
   return (
-    <section className="panel browser-panel browser-open" hidden={hidden}>
+    <section className={`panel browser-panel browser-open ${browserExpanded ? "expanded" : ""}`} hidden={hidden}>
       <form
         className="browser-toolbar"
         onSubmit={(event) => {
@@ -170,6 +179,14 @@ export function BrowserAccessPanel({
         />
         <button type="submit" disabled={!canHostBrowser || !browserUrl.trim()} aria-label="Open URL">
           <ExternalLink size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setBrowserExpanded((current) => !current)}
+          aria-label={browserExpanded ? "Return browser to column" : "Expand browser"}
+          title={browserExpanded ? "Return to column" : "Expand"}
+        >
+          {browserExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
       </form>
       <div className={`browser-viewport ${activeBrowserUrl ? "active" : ""}`} ref={browserViewportRef}>

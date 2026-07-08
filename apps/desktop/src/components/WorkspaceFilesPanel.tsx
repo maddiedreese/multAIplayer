@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Copy, FileCode2, Plus, RotateCcw, Save, Search, ShieldAlert, X } from "lucide-react";
+import { Copy, FileCode2, Maximize2, Minimize2, Plus, RotateCcw, Save, Search, ShieldAlert, X } from "lucide-react";
 import type {
   GitDiffResult,
   GitStatusSummary,
@@ -62,6 +62,7 @@ export function WorkspaceFilesPanel({
   onCloseFileViewer: () => void;
 }) {
   const [editorContent, setEditorContent] = useState(selectedFile?.content ?? "");
+  const [viewerExpanded, setViewerExpanded] = useState(false);
   const selectedFileKey = selectedFile ? `${selectedFile.path}:${selectedFile.size}:${selectedFile.content}` : "";
   useEffect(() => {
     setEditorContent(selectedFile?.content ?? "");
@@ -71,7 +72,7 @@ export function WorkspaceFilesPanel({
   if (viewerPath) {
     const selectedFileName = viewerPath.split("/").at(-1) ?? viewerPath;
     return (
-      <section className="panel file-viewer-open">
+      <section className={`panel file-viewer-open ${viewerExpanded ? "expanded" : ""}`}>
         <div className="file-viewer-toolbar">
           <button className="ghost icon-only" onClick={onCloseFileViewer} aria-label="Close file viewer">
             <X size={15} />
@@ -80,14 +81,24 @@ export function WorkspaceFilesPanel({
             <strong>{selectedFileName}</strong>
             <span>{viewerPath}</span>
           </div>
-          <button
-            className={selectedFileNeedsAttachmentReview && selectedSensitiveFileReviewed ? "ghost danger" : "ghost"}
-            onClick={onAttachSelectedFileToMessage}
-            disabled={!selectedFile || !canReadLocalWorkspace || !canAttachSelectedFile}
-          >
-            {selectedFileNeedsAttachmentReview && !selectedSensitiveFileReviewed ? <ShieldAlert size={14} /> : <Plus size={14} />}
-            {selectedAttachmentActionLabel}
-          </button>
+          <div className="file-viewer-toolbar-actions">
+            <button
+              className={selectedFileNeedsAttachmentReview && selectedSensitiveFileReviewed ? "ghost danger" : "ghost"}
+              onClick={onAttachSelectedFileToMessage}
+              disabled={!selectedFile || !canReadLocalWorkspace || !canAttachSelectedFile}
+            >
+              {selectedFileNeedsAttachmentReview && !selectedSensitiveFileReviewed ? <ShieldAlert size={14} /> : <Plus size={14} />}
+              {selectedAttachmentActionLabel}
+            </button>
+            <button
+              className="ghost icon-only"
+              onClick={() => setViewerExpanded((current) => !current)}
+              aria-label={viewerExpanded ? "Return file viewer to column" : "Expand file viewer"}
+              title={viewerExpanded ? "Return to column" : "Expand"}
+            >
+              {viewerExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+          </div>
         </div>
 
         <label className="file-search viewer-search">
