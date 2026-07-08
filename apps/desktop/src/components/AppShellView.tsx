@@ -5,6 +5,7 @@ import { DesktopSidebar } from "./DesktopSidebar";
 import { LocalPreviewDialog } from "./LocalPreviewDialog";
 import { RoomInspectorPanel } from "./RoomInspectorPanel";
 import { RoomMainColumn } from "./RoomMainColumn";
+import { isWebPreviewRuntime } from "../lib/appRuntime";
 
 type AppWorkspaceShellProps = ComponentProps<typeof AppWorkspaceShell>;
 
@@ -40,6 +41,12 @@ export function AppShellView({
   localPreviewDialogProps
 }: AppShellViewProps) {
   const dialog: ReactNode = localPreviewDialogOpen ? <LocalPreviewDialog {...localPreviewDialogProps} /> : null;
+  const webPreviewBanner: ReactNode = isWebPreviewRuntime() ? (
+    <div className="web-preview-banner" role="status">
+      <strong>Development web preview</strong>
+      <span>Do not use this fallback for private projects; room secrets use browser localStorage instead of the native Keychain.</span>
+    </div>
+  ) : null;
 
   return (
     <AppWorkspaceShell
@@ -55,6 +62,7 @@ export function AppShellView({
       main={<RoomMainColumn {...roomMainColumnProps} />}
       inspector={<RoomInspectorPanel {...roomInspectorPanelProps} />}
       dialog={dialog}
+      webPreviewBanner={webPreviewBanner}
     />
   );
 }

@@ -39,6 +39,8 @@ VITE_RELAY_HTTP_URL=https://relay.multaiplayer.com
 VITE_RELAY_URL=wss://relay.multaiplayer.com/rooms
 ```
 
+Keep the packaged desktop CSP aligned with these origins. The alpha app shell intentionally allows localhost development relays and `https://relay.multaiplayer.com` / `wss://relay.multaiplayer.com`, not arbitrary HTTPS/WSS egress.
+
 For the relay:
 
 ```bash

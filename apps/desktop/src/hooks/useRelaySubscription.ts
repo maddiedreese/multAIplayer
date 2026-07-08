@@ -19,6 +19,7 @@ import { decryptJson } from "@multaiplayer/crypto";
 import { connectRelay, type RelayClient } from "../lib/relayClient";
 import { buildRoomSettingsSystemMessage } from "../lib/roomSettingsMessages";
 import { loadRoomSecret, replaceRoomSecret } from "../lib/localHistory";
+import { trustedAvatarUrl } from "../lib/avatarUrl";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
 import { normalizeChatMessage } from "../lib/chatSanitizer";
 import {
@@ -43,6 +44,12 @@ import {
   isTerminalResultPlaintextPayload
 } from "../lib/localRoomHistoryPayload";
 import { formatMessageTime } from "../lib/appFormatters";
+import { isRoomKeyRotationEnvelopeAuthorized } from "../lib/roomKeyRotation";
+import {
+  findEnvelopeRoom,
+  isEnvelopeFromActiveRoomHost,
+  roomHostEnvelopeRejectionMessage
+} from "../lib/roomHost";
 import { sendRoomMessageNotification } from "../lib/roomNotifications";
 import type {
   BrowserAccessRequest,
@@ -214,7 +221,7 @@ export function useRelaySubscription({
                   userId: message.userId,
                   deviceId: message.deviceId,
                   displayName: message.displayName,
-                  avatarUrl: message.avatarUrl,
+                  avatarUrl: trustedAvatarUrl(message.avatarUrl),
                   publicKeyFingerprint: message.publicKeyFingerprint,
                   status: message.status
                 }
@@ -366,12 +373,30 @@ export function useRelaySubscription({
           if (message.envelope.kind === "room.host") {
             const plaintext = await decryptJson<HostHandoffPlaintextPayload>(roomPayload, secret);
             if (plaintext.status === "accepted") {
+              if (plaintext.acceptedByUserId !== message.envelope.senderUserId) {
+                setHostMessageForRoom(
+                  message.envelope.roomId,
+                  "Rejected host handoff acceptance because the sender did not match the accepting user."
+                );
+                return;
+              }
               applyAcceptedHostHandoffForRoom(message.envelope.roomId, { ...plaintext, status: "accepted" });
               setHostMessageForRoom(
                 message.envelope.roomId,
                 `${plaintext.acceptedBy ?? "A room member"} accepted host handoff from ${plaintext.fromHost}.`
               );
             } else {
+              const envelopeRoom = findEnvelopeRoom(roomsRef.current, message.envelope.roomId);
+              if (
+                !isEnvelopeFromActiveRoomHost(envelopeRoom, message.envelope) ||
+                plaintext.fromUserId !== message.envelope.senderUserId
+              ) {
+                setHostMessageForRoom(
+                  message.envelope.roomId,
+                  roomHostEnvelopeRejectionMessage(envelopeRoom, "host handoff")
+                );
+                return;
+              }
               appendHostHandoff(message.envelope.roomId, { ...plaintext, status: "available" });
             }
           }
@@ -391,6 +416,14 @@ export function useRelaySubscription({
           if (message.envelope.kind === "room.key") {
             const plaintext = await decryptJson<unknown>(roomPayload, secret);
             if (isRoomKeyRotationPlaintextPayload(plaintext)) {
+              const envelopeRoom = findEnvelopeRoom(roomsRef.current, message.envelope.roomId);
+              if (!isRoomKeyRotationEnvelopeAuthorized(envelopeRoom, message.envelope, plaintext)) {
+                setInviteMessageForRoom(
+                  message.envelope.roomId,
+                  roomHostEnvelopeRejectionMessage(envelopeRoom, "room access refresh")
+                );
+                return;
+              }
               await replaceRoomSecret(message.envelope.roomId, plaintext.newSecret);
               historyLoadedRoomIds.current.add(message.envelope.roomId);
               restoreForgottenRoom(message.envelope.roomId);

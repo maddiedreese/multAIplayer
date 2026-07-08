@@ -49,7 +49,7 @@ Draft message text and attachments are kept in memory per room. Large encrypted 
 
 ## Desktop App Shell CSP
 
-The packaged Tauri app sets a Content Security Policy for the main multAIplayer window. It allows the app bundle itself, Tauri IPC, local development relay endpoints, and HTTPS/WSS self-hosted relays. It blocks frames, plugins, and arbitrary base URI changes. This policy applies to the multAIplayer app shell; approved room browser pages open in separate room/project-scoped WebViews with their own profile and download blocking.
+The packaged Tauri app sets a Content Security Policy for the main multAIplayer window. It allows the app bundle itself, Tauri IPC, local development relay endpoints, and the official hosted relay origin. It does not allow arbitrary HTTPS/WSS egress from the app shell; self-hosted packaged builds must include their relay origin in the build-time CSP. App-shell image loading is limited to bundled/data/blob images and GitHub-hosted avatars, and presence avatar URLs are filtered before render. This policy applies to the multAIplayer app shell; approved room browser pages open in separate room/project-scoped WebViews with their own profile and download blocking.
 
 ## Room Browser Capability Guards
 
@@ -59,7 +59,7 @@ Approved room browser pages run in a room/project-scoped native WebView profile.
 
 Project file previews that look like `.env` files, credential files, environment dumps, tokens, or private keys require an explicit review click before they can be attached to the next encrypted room message. The second click is labelled as an intentional override so the host can still share a needed file while seeing that it will be visible to the room and may enter Codex context.
 
-Terminal commands are also scanned before request or host approval. Commands that appear to dump environment variables, read `.env` or credential files, or include token-like text show an inline warning. This is a review aid, not a complete secret detector, and it does not replace host judgment or project-directory confinement.
+Terminal commands are also scanned before request or host approval. Commands that appear to dump environment variables, read `.env` or credential files, or include token-like text show an inline warning. This is a review aid, not a complete secret detector, and it does not replace host judgment. Approving a terminal command grants shell access on the host account, with the selected project folder only used as the working directory.
 
 ## Device Key Agreement
 
