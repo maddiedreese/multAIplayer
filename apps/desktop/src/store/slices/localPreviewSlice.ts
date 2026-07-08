@@ -12,6 +12,11 @@ export interface LocalPreviewRoomState {
 
 export type LocalPreviewByRoom = Record<string, LocalPreviewRoomState>;
 
+export interface LocalPreviewPanelMaps {
+  localPreviewsByRoom: Record<string, LocalPreviewRecord[]>;
+  localPreviewBusyByRoom: Record<string, boolean>;
+}
+
 function updateLocalPreviewForRoom(
   current: LocalPreviewByRoom,
   roomId: string,
@@ -22,6 +27,21 @@ function updateLocalPreviewForRoom(
     return roomId in current ? omitRecordKey(current, roomId) : current;
   }
   return { ...current, [roomId]: nextRoomPreview };
+}
+
+export function projectLocalPreviewPanelMaps(localPreviewByRoom: LocalPreviewByRoom): LocalPreviewPanelMaps {
+  return {
+    localPreviewsByRoom: Object.fromEntries(
+      Object.entries(localPreviewByRoom)
+        .filter(([, preview]) => preview.previews)
+        .map(([roomId, preview]) => [roomId, preview.previews ?? []])
+    ),
+    localPreviewBusyByRoom: Object.fromEntries(
+      Object.entries(localPreviewByRoom)
+        .filter(([, preview]) => preview.busy)
+        .map(([roomId]) => [roomId, true])
+    )
+  };
 }
 
 const emptyLocalPreviewDialog: LocalPreviewDialogState = {

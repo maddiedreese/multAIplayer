@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useAppStore } from "../store/appStore";
+import { projectLocalPreviewPanelMaps } from "../store/slices/localPreviewSlice";
 
 export function useLocalPreviewState() {
   const localPreviewByRoom = useAppStore((state) => state.localPreviewByRoom);
@@ -12,18 +13,10 @@ export function useLocalPreviewState() {
   const setLocalPreviewDialogPhase = useAppStore((state) => state.setLocalPreviewDialogPhase);
   const setLocalPreviewDialogConfirmation = useAppStore((state) => state.setLocalPreviewDialogConfirmation);
   const setLocalPreviewDialogError = useAppStore((state) => state.setLocalPreviewDialogError);
-  const { localPreviewsByRoom, localPreviewBusyByRoom } = useMemo(() => ({
-    localPreviewsByRoom: Object.fromEntries(
-      Object.entries(localPreviewByRoom)
-        .filter(([, preview]) => preview.previews)
-        .map(([roomId, preview]) => [roomId, preview.previews ?? []])
-    ),
-    localPreviewBusyByRoom: Object.fromEntries(
-      Object.entries(localPreviewByRoom)
-        .filter(([, preview]) => preview.busy)
-        .map(([roomId]) => [roomId, true])
-    )
-  }), [localPreviewByRoom]);
+  const { localPreviewsByRoom, localPreviewBusyByRoom } = useMemo(
+    () => projectLocalPreviewPanelMaps(localPreviewByRoom),
+    [localPreviewByRoom]
+  );
 
   return {
     localPreviewsByRoom,
