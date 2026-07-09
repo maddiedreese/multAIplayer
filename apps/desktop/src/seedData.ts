@@ -68,7 +68,7 @@ export const seededRooms: RoomRecord[] = [
     host: "Alex",
     hostUserId: "github:alex",
     hostStatus: "handoff",
-    approvalPolicy: "auto_chat_only",
+    approvalPolicy: "ask_every_turn",
     approvalDelegationPolicy: "host_only",
     trustedApproverUserIds: [],
     mode: defaultRoomMode,
@@ -172,7 +172,7 @@ const initialMessages: ChatMessage[] = [
     role: "codex",
     body: "Plan updated. Ready for review.",
     time: "9:48",
-    attachments: [{ id: "att-seed-plan", name: "docs/plan/run-18-plan.md", type: "code", size: 1800 }]
+    attachments: [{ id: "att-seed-checklist", name: "docs/checklists/run-18.md", type: "code", size: 1800 }]
   }
 ];
 
@@ -207,8 +207,8 @@ export const initialMessagesByRoom: Record<string, ChatMessage[]> = {
 
 export const approvalPolicyLabels: Record<ApprovalPolicy, string> = {
   ask_every_turn: "Ask every Codex turn",
-  auto_chat_only: "Host approves chat-only turns",
-  auto_browser_allowed_sites: "Legacy browser auto-approval",
+  auto_chat_only: "Ask every Codex turn",
+  auto_browser_allowed_sites: "Ask every Codex turn",
   never_host: "Never host this room"
 };
 

@@ -91,7 +91,7 @@ Release workflows and logs must not expose:
 - decrypted room payloads;
 - private repo files, diffs, or terminal output.
 
-The current release workflow does not need OpenAI credentials because Codex runs through the user's local Codex app-server, not through the OpenAI API.
+The release workflow does not need OpenAI credentials because Codex runs through the user's local Codex app-server, not through the OpenAI API.
 
 ## CI And Release Workflow Bounds
 

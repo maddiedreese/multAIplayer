@@ -104,7 +104,7 @@ GitHub sign-in sessions are memory-only unless the relay has a session secret. T
 MULTAIPLAYER_RELAY_SESSION_SECRET=$(openssl rand -base64 32)
 ```
 
-With this set, the relay encrypts GitHub session access tokens with AES-GCM before writing them to the JSON store and prunes expired sessions on load and save. The secret must be at least 32 characters; shorter values are ignored and durable sessions stay disabled. If the secret is missing, sessions are not persisted and restarting the relay signs users out. If the secret changes, previously stored sessions cannot be decrypted and users must sign in again. Plaintext access tokens in the relay store are ignored.
+With this set, the relay encrypts GitHub session access tokens with AES-GCM before writing them to the JSON store and prunes expired sessions on load and save. The secret must be at least 32 characters; shorter values are ignored and durable sessions stay disabled. If the secret is missing, sessions are not persisted and restarting the relay signs users out. Rotating the secret makes existing encrypted sessions unreadable, so users must sign in again. Plaintext access tokens in the relay store are ignored.
 
 The desktop Account drawer reads `/auth/config` and shows whether the connected relay is using encrypted-at-rest sessions or memory-only sessions.
 
@@ -269,7 +269,7 @@ VITE_RELAY_URL=ws://127.0.0.1:4321/rooms
 
 These env vars define the packaged defaults. The official packaged alpha app-shell CSP allows localhost development relays and the hosted multAIplayer relay origin; it does not allow arbitrary HTTPS/WSS relay origins. A custom self-hosted relay origin therefore requires a self-built desktop app with `apps/desktop/src-tauri/tauri.conf.json` updated so `connect-src` includes both the relay HTTP origin and the matching WebSocket origin. After the build permits those origins, desktop users can open Settings and change the relay HTTP API URL and WebSocket rooms URL. The override is stored locally on that device.
 
-The current alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured. Hosted and internet-facing deployments should use SQLite and should add backup/restore drills, token-rotation operations, and shared/external rate limiting before making production or multi-instance claims.
+The alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured. Hosted and internet-facing deployments should use SQLite and should add backup/restore drills, token-rotation operations, and shared/external rate limiting before making production or multi-instance claims.
 
 ## Migrating From The Hosted Relay
 

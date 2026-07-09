@@ -10,7 +10,6 @@ export function canControlRoomTerminal(
 ): boolean {
   return (
     !locked &&
-    room.mode.workspace &&
     isLocalUserActiveHostForRoom(room, user) &&
     terminal?.roomId === room.id
   );
@@ -22,7 +21,6 @@ export function roomTerminalControlMessage(
   locked = false
 ): string {
   if (locked) return "Unlock this room before controlling terminals.";
-  if (!room.mode.workspace) return "Workspace mode is disabled for this room.";
   if (!terminal) return "Select a terminal in this room before controlling it.";
   if (terminal.roomId !== room.id) return "Selected terminal belongs to a different room.";
   return "Terminal control is available.";

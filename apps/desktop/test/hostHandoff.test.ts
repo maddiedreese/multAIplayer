@@ -34,7 +34,7 @@ test("createHandoffSettingsPatch trims and returns inherited room settings", () 
     projectPath: "/tmp/multaiplayer",
     codexModel: "gpt-5.4-thinking",
     codexSandboxLevel: "workspace_write",
-    approvalPolicy: "auto_chat_only"
+    approvalPolicy: "ask_every_turn"
   });
 });
 

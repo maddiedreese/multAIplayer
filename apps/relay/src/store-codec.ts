@@ -127,7 +127,13 @@ export function createRelayStoreCodec(options: {
     const members = typeof team.members === "number" && Number.isSafeInteger(team.members) && team.members >= 0
       ? team.members
       : 0;
-    return { id, name, members };
+    const archivedAt = typeof team.archivedAt === "string" && !Number.isNaN(Date.parse(team.archivedAt))
+      ? team.archivedAt
+      : undefined;
+    const deletedAt = typeof team.deletedAt === "string" && !Number.isNaN(Date.parse(team.deletedAt))
+      ? team.deletedAt
+      : undefined;
+    return { id, name, members, archivedAt, deletedAt };
   }
 
   function normalizeDevice(device: unknown): DeviceRecord | null {
@@ -238,6 +244,12 @@ export function createRelayStoreCodec(options: {
     const unread = typeof room.unread === "number" && Number.isSafeInteger(room.unread) && room.unread >= 0
       ? room.unread
       : 0;
+    const archivedAt = typeof room.archivedAt === "string" && !Number.isNaN(Date.parse(room.archivedAt))
+      ? room.archivedAt
+      : undefined;
+    const deletedAt = typeof room.deletedAt === "string" && !Number.isNaN(Date.parse(room.deletedAt))
+      ? room.deletedAt
+      : undefined;
     return {
       id,
       teamId,
@@ -258,7 +270,9 @@ export function createRelayStoreCodec(options: {
       browserProfilePersistent: typeof (room as { browserProfilePersistent?: unknown }).browserProfilePersistent === "boolean"
         ? (room as { browserProfilePersistent: boolean }).browserProfilePersistent
         : defaultBrowserProfilePersistent,
-      unread
+      unread,
+      archivedAt,
+      deletedAt
     };
   }
 

@@ -48,6 +48,19 @@ pub(crate) struct CodexTurnResult {
     stderr: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CodexGoal {
+    objective: String,
+    status: String,
+    thread_id: String,
+    created_at: i64,
+    updated_at: i64,
+    time_used_seconds: i64,
+    tokens_used: i64,
+    token_budget: Option<i64>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CodexTurnRequest {
@@ -60,6 +73,23 @@ pub(crate) struct CodexTurnRequest {
     sandbox_level: Option<String>,
     previous_thread_id: Option<String>,
     timeout_seconds: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CodexGoalSetRequest {
+    room_id: String,
+    thread_id: String,
+    objective: Option<String>,
+    status: Option<String>,
+    token_budget: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CodexGoalThreadRequest {
+    room_id: String,
+    thread_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -166,9 +196,163 @@ pub(crate) fn run_codex_turn(request: CodexTurnRequest) -> Result<CodexTurnResul
 }
 
 #[tauri::command]
+pub(crate) fn set_codex_goal(request: CodexGoalSetRequest) -> Result<CodexGoal, String> {
+    ensure_room_id(&request.room_id)?;
+    let thread_id = normalize_codex_thread_id(Some(&request.thread_id))?
+        .ok_or_else(|| "Codex thread id is required before setting a goal.".to_string())?;
+    let status = match request.status.as_deref() {
+        None
+        | Some("active")
+        | Some("paused")
+        | Some("blocked")
+        | Some("usageLimited")
+        | Some("budgetLimited")
+        | Some("complete") => request.status,
+        Some(_) => return Err("Codex goal status is invalid.".to_string()),
+    };
+    let response = run_codex_goal_request(json!({
+        "method": "thread/goal/set",
+        "params": {
+            "threadId": thread_id,
+            "objective": request.objective,
+            "status": status,
+            "tokenBudget": request.token_budget
+        }
+    }))?;
+    parse_codex_goal_response(&response)
+}
+
+#[tauri::command]
+pub(crate) fn get_codex_goal(request: CodexGoalThreadRequest) -> Result<Option<CodexGoal>, String> {
+    ensure_room_id(&request.room_id)?;
+    let thread_id = normalize_codex_thread_id(Some(&request.thread_id))?
+        .ok_or_else(|| "Codex thread id is required before reading a goal.".to_string())?;
+    let response = run_codex_goal_request(json!({
+        "method": "thread/goal/get",
+        "params": {
+            "threadId": thread_id
+        }
+    }))?;
+    let Some(goal) = response
+        .get("result")
+        .and_then(|result| result.get("goal"))
+        .filter(|goal| !goal.is_null())
+    else {
+        return Ok(None);
+    };
+    Ok(Some(parse_codex_goal(goal)?))
+}
+
+#[tauri::command]
+pub(crate) fn clear_codex_goal(request: CodexGoalThreadRequest) -> Result<(), String> {
+    ensure_room_id(&request.room_id)?;
+    let thread_id = normalize_codex_thread_id(Some(&request.thread_id))?
+        .ok_or_else(|| "Codex thread id is required before clearing a goal.".to_string())?;
+    let _response = run_codex_goal_request(json!({
+        "method": "thread/goal/clear",
+        "params": {
+            "threadId": thread_id
+        }
+    }))?;
+    Ok(())
+}
+
+#[tauri::command]
 pub(crate) fn shutdown_codex_room(request: CodexRoomShutdownRequest) -> Result<usize, String> {
     ensure_room_id(&request.room_id)?;
     Ok(shutdown_codex_room_sessions(&request.room_id))
+}
+
+fn run_codex_goal_request(mut request: Value) -> Result<Value, String> {
+    let timeout = Duration::from_secs(20);
+    let started_at = Instant::now();
+    let mut child = Command::new("codex")
+        .arg("app-server")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("Failed to start codex app-server for goal: {error}"))?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| "Could not open codex app-server stdin for goal".to_string())?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "Could not open codex app-server stdout for goal".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "Could not open codex app-server stderr for goal".to_string())?;
+
+    let (line_tx, line_rx) = mpsc::channel::<String>();
+    thread::spawn(move || {
+        let reader = BufReader::new(stdout);
+        for line in reader.lines().map_while(Result::ok) {
+            if line_tx.send(line).is_err() {
+                break;
+            }
+        }
+    });
+
+    let (stderr_tx, stderr_rx) = mpsc::channel::<String>();
+    thread::spawn(move || {
+        let reader = BufReader::new(stderr);
+        for line in reader.lines().map_while(Result::ok) {
+            if stderr_tx.send(line).is_err() {
+                break;
+            }
+        }
+    });
+
+    let result = (|| {
+        send_json(
+            &mut stdin,
+            json!({
+                "method": "initialize",
+                "id": 1,
+                "params": {
+                    "clientInfo": {
+                        "name": "multaiplayer",
+                        "title": "multAIplayer",
+                        "version": env!("CARGO_PKG_VERSION")
+                    },
+                    "capabilities": {
+                        "experimentalApi": true
+                    }
+                }
+            }),
+        )?;
+        wait_for_response(&line_rx, 1, started_at, timeout)?;
+        send_json(&mut stdin, json!({ "method": "initialized", "params": {} }))?;
+        request["id"] = json!(2);
+        send_json(&mut stdin, request)?;
+        wait_for_response(&line_rx, 2, started_at, timeout)
+    })();
+
+    terminate_child(&mut child);
+    result.map_err(|error| {
+        let stderr = stderr_rx.try_iter().collect::<Vec<_>>().join("\n");
+        if stderr.trim().is_empty() {
+            error
+        } else {
+            format!("{error}: {stderr}")
+        }
+    })
+}
+
+fn parse_codex_goal_response(value: &Value) -> Result<CodexGoal, String> {
+    let goal = value
+        .get("result")
+        .and_then(|result| result.get("goal"))
+        .ok_or_else(|| format!("Codex goal response did not include a goal: {value}"))?;
+    parse_codex_goal(goal)
+}
+
+fn parse_codex_goal(value: &Value) -> Result<CodexGoal, String> {
+    serde_json::from_value(value.clone())
+        .map_err(|error| format!("Codex goal response was invalid: {error}; {value}"))
 }
 
 fn normalize_reasoning_effort(value: Option<&str>) -> Result<String, String> {

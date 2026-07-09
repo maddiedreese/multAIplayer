@@ -1,5 +1,5 @@
 import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
-import { createRoom, createTeam } from "../lib/workspaceClient";
+import { createRoom, createTeam, updateRoomLifecycle, updateTeamLifecycle } from "../lib/workspaceClient";
 import { chooseProjectFolder, defaultProjectPath } from "../lib/localBackend";
 import { loadTeamRoomDefaults } from "../lib/teamRoomDefaults";
 import { loadTeamHistorySettings, saveHistorySettings } from "../lib/localHistory";
@@ -24,6 +24,7 @@ interface UseWorkspaceCreationActionsOptions {
   setInviteApprovalGateForRoom: (roomId: string, inviteApprovalGate: boolean) => void;
   upsertTeam: (team: TeamRecord) => void;
   upsertRoom: (room: RoomRecord) => void;
+  roomSettingsActor: () => { requesterName: string; requesterUserId: string };
 }
 
 export function useWorkspaceCreationActions({
@@ -42,7 +43,8 @@ export function useWorkspaceCreationActions({
   restoreForgottenRoom,
   setInviteApprovalGateForRoom,
   upsertTeam,
-  upsertRoom
+  upsertRoom,
+  roomSettingsActor
 }: UseWorkspaceCreationActionsOptions) {
   const initializeMessagesForRoom = useAppStore((state) => state.initializeMessagesForRoom);
 
@@ -113,9 +115,32 @@ export function useWorkspaceCreationActions({
     }
   }
 
+  async function setTeamLifecycle(teamId: string, action: "archive" | "restore" | "delete") {
+    try {
+      const result = await updateTeamLifecycle(teamId, action);
+      upsertTeam(result.team);
+      for (const room of result.rooms) upsertRoom(ensureRoomDefaults(room));
+      setWorkspaceStatusError(null);
+    } catch (error) {
+      setWorkspaceStatusError(String(error));
+    }
+  }
+
+  async function setRoomLifecycle(roomId: string, action: "archive" | "restore" | "delete") {
+    try {
+      const room = await updateRoomLifecycle(roomId, action, roomSettingsActor());
+      upsertRoom(ensureRoomDefaults(room));
+      setWorkspaceStatusError(null);
+    } catch (error) {
+      setWorkspaceStatusError(String(error));
+    }
+  }
+
   return {
     addTeam,
     addRoom,
-    chooseNewRoomProjectPath
+    chooseNewRoomProjectPath,
+    setTeamLifecycle,
+    setRoomLifecycle
   };
 }

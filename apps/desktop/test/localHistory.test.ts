@@ -308,6 +308,88 @@ test("local history normalization preserves sanitized room read state", () => {
   assert.equal(normalized.queuedCodexTurns?.[0]?.turnId, "turn-queued-1");
 });
 
+test("local history normalization preserves file save requests", () => {
+  const payload = normalizeLocalRoomHistory({
+    version: 3,
+    messages: [],
+    terminalRequests: [],
+    fileSaveRequests: [
+      {
+        eventType: "workspace.file.save",
+        id: "file-save-1",
+        requester: "Maddie",
+        requesterUserId: "github:maddie",
+        path: "README.md",
+        previousContent: "# Old\n",
+        nextContent: "# New\n",
+        requestedAt: "2026-07-08T12:00:00.000Z",
+        status: "pending"
+      },
+      {
+        eventType: "workspace.file.save",
+        id: "file-save-invalid",
+        requester: "Maddie",
+        requesterUserId: "github:maddie",
+        path: "README.md",
+        previousContent: "# Old\n",
+        nextContent: "# New\n",
+        requestedAt: "2026-07-08T12:00:00.000Z",
+        status: "maybe"
+      }
+    ],
+    browserRequests: [],
+    inviteRequests: [],
+    codexEvents: [],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
+    localPreviews: [],
+    terminalSnapshots: [],
+    hostHandoffs: [],
+    queuedCodexTurns: []
+  });
+
+  assert.deepEqual(payload.fileSaveRequests.map((request) => request.id), ["file-save-1"]);
+  assert.equal(payload.fileSaveRequests[0]?.status, "pending");
+});
+
+test("encrypted history keeps file save requests local and encrypted", async () => {
+  const roomId = "room-file-save-history";
+  const payload = {
+    version: 3,
+    messages: [],
+    terminalRequests: [],
+    fileSaveRequests: [
+      {
+        eventType: "workspace.file.save",
+        id: "file-save-1",
+        requester: "Maddie",
+        requesterUserId: "github:maddie",
+        path: "README.md",
+        previousContent: "old private content",
+        nextContent: "new private content",
+        requestedAt: "2026-07-08T12:00:00.000Z",
+        status: "pending"
+      }
+    ],
+    browserRequests: [],
+    inviteRequests: [],
+    codexEvents: [],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
+    localPreviews: [],
+    terminalSnapshots: [],
+    hostHandoffs: [],
+    queuedCodexTurns: []
+  };
+
+  await saveEncryptedHistory(roomId, payload);
+
+  const stored = localStorage.getItem(`multaiplayer:history:${roomId}`);
+  assert.ok(stored);
+  assert.doesNotMatch(stored, /new private content/);
+  assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
+});
+
 test("encrypted history keeps Git workflow and Actions events local and encrypted", async () => {
   const roomId = "room-git-events-history";
   const payload = {
@@ -543,7 +625,7 @@ test("encrypted history keeps local room goals encrypted", async () => {
     roomGoal: {
       id: "goal-secret",
       text: "Coordinate private launch checklist",
-      status: "running",
+      status: "active",
       startedAt: "2026-07-08T18:00:00.000Z",
       updatedAt: "2026-07-08T18:01:00.000Z",
       elapsedMs: 60000
@@ -560,7 +642,7 @@ test("encrypted history keeps local room goals encrypted", async () => {
   const restored = await loadEncryptedHistory<typeof payload>(roomId);
   const normalized = normalizeLocalRoomHistory(restored!);
   assert.equal(normalized.roomGoal?.text, "Coordinate private launch checklist");
-  assert.equal(normalized.roomGoal?.status, "running");
+  assert.equal(normalized.roomGoal?.status, "active");
 });
 
 test("clearEncryptedHistory removes only the selected room payload", async () => {

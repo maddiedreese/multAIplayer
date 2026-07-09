@@ -2,7 +2,10 @@ import type { MutableRefObject } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import {
   maxEmbeddedAttachmentBytes,
-  maxEmbeddedAttachmentBytesPerMessage
+  maxEmbeddedAttachmentBytesPerMessage,
+  type RelayEnvelope,
+  type RequestStatusPlaintextPayload,
+  type WorkspaceFileSaveRequestPlaintextPayload
 } from "@multaiplayer/protocol";
 import { decryptJson, encryptJson } from "@multaiplayer/crypto";
 import { createAttachmentBlob, loadAttachmentBlob } from "../lib/workspaceClient";
@@ -27,17 +30,27 @@ import {
   validatePendingAttachments
 } from "../lib/appFormatters";
 import type { ChatAttachment } from "../types";
+import type { RelayClient } from "../lib/relayClient";
+import type { WorkspaceFileSaveRequest } from "../types";
 import { useAppStore } from "../store/appStore";
 
 interface UseFileActionsOptions {
   hasSelectedRoom: boolean;
   canReadLocalWorkspace: boolean;
   localWorkspaceMessage: string;
+  isActiveHost: boolean;
+  hostGateMessage: string;
   selectedRoom: RoomRecord;
   selectedRoomIdRef: MutableRefObject<string>;
   isSelectedRoomLocked: boolean;
   isSelectedRoomRevoked: boolean;
   selectedFile: ProjectFileContent | null;
+  fileSaveRequests: WorkspaceFileSaveRequest[];
+  localUser: { id: string; name: string };
+  deviceId: string;
+  relayStatus: "connecting" | "open" | "closed" | "error";
+  relayRef: MutableRefObject<RelayClient | null>;
+  seenEnvelopeIds: MutableRefObject<Set<string>>;
   pendingAttachmentsByRoom: Record<string, ChatAttachment[]>;
   sensitiveAttachmentReviewKey: string | null;
   setSensitiveAttachmentReviewKey: (key: string | null) => void;
@@ -46,6 +59,8 @@ interface UseFileActionsOptions {
   setSelectedFileForRoom: (roomId: string, file: ProjectFileContent | null) => void;
   setSelectedDiffForRoom: (roomId: string, diff: GitDiffResult | null) => void;
   setFilePreviewTabForRoom: (roomId: string, tab: FilePreviewTab) => void;
+  appendFileSaveRequest: (roomId: string, request: WorkspaceFileSaveRequest) => void;
+  updateFileSaveRequestStatus: (roomId: string, requestId: string, status: WorkspaceFileSaveRequest["status"]) => void;
   setSelectedFileMessage: (message: string | null) => void;
   setFileMessageForRoom: (roomId: string, message: string | null) => void;
   appendPendingAttachmentForRoom: (roomId: string, attachment: ChatAttachment) => void;
@@ -56,11 +71,19 @@ export function useFileActions({
   hasSelectedRoom,
   canReadLocalWorkspace,
   localWorkspaceMessage,
+  isActiveHost,
+  hostGateMessage,
   selectedRoom,
   selectedRoomIdRef,
   isSelectedRoomLocked,
   isSelectedRoomRevoked,
   selectedFile,
+  fileSaveRequests,
+  localUser,
+  deviceId,
+  relayStatus,
+  relayRef,
+  seenEnvelopeIds,
   pendingAttachmentsByRoom,
   sensitiveAttachmentReviewKey,
   setSensitiveAttachmentReviewKey,
@@ -69,6 +92,8 @@ export function useFileActions({
   setSelectedFileForRoom,
   setSelectedDiffForRoom,
   setFilePreviewTabForRoom,
+  appendFileSaveRequest,
+  updateFileSaveRequestStatus,
   setSelectedFileMessage,
   setFileMessageForRoom,
   appendPendingAttachmentForRoom,
@@ -221,7 +246,64 @@ export function useFileActions({
     }
     const room = selectedRoom;
     const path = selectedFile.path;
-    if (reportRoomFileActionInFlight(room.id)) return;
+    if (!isActiveHost) {
+      await requestFileSaveApproval(room, selectedFile, content);
+      return;
+    }
+    await writeSelectedFileContent(room, path, content);
+  }
+
+  async function requestFileSaveApproval(room: RoomRecord, file: ProjectFileContent, content: string) {
+    const request: WorkspaceFileSaveRequest = {
+      eventType: "workspace.file.save",
+      id: crypto.randomUUID(),
+      requester: localUser.name,
+      requesterUserId: localUser.id,
+      path: file.path,
+      previousContent: file.content,
+      nextContent: content,
+      requestedAt: new Date().toISOString(),
+      status: "pending"
+    };
+    const client = relayRef.current;
+    if (!client || relayStatus === "closed" || relayStatus === "error") {
+      appendFileSaveRequest(room.id, request);
+      setFileMessageForRoom(room.id, "Saved file edit request locally because the relay is not connected.");
+      return;
+    }
+    try {
+      const secret = await loadOrCreateRoomSecret(room.id);
+      const payload: WorkspaceFileSaveRequestPlaintextPayload = {
+        eventType: request.eventType,
+        id: request.id,
+        requester: request.requester,
+        requesterUserId: request.requesterUserId,
+        path: request.path,
+        previousContent: request.previousContent,
+        nextContent: request.nextContent,
+        requestedAt: request.requestedAt
+      };
+      const envelope: RelayEnvelope = {
+        id: crypto.randomUUID(),
+        teamId: room.teamId,
+        roomId: room.id,
+        senderDeviceId: deviceId,
+        senderUserId: localUser.id,
+        createdAt: request.requestedAt,
+        kind: "workspace.request",
+        payload: await encryptJson(payload, secret)
+      };
+      seenEnvelopeIds.current.add(envelope.id);
+      client.publish({ type: "publish", envelope });
+      appendFileSaveRequest(room.id, request);
+      setFileMessageForRoom(room.id, `Requested host approval to save ${file.path}.`);
+    } catch (error) {
+      setFileMessageForRoom(room.id, String(error));
+    }
+  }
+
+  async function writeSelectedFileContent(room: RoomRecord, path: string, content: string): Promise<boolean> {
+    if (reportRoomFileActionInFlight(room.id)) return false;
     setFileBusyForRoom(room.id, true);
     setFileMessageForRoom(room.id, null);
     try {
@@ -230,20 +312,95 @@ export function useFileActions({
         readProjectFile(room.projectPath, path),
         getGitDiff(room.projectPath, path).catch(() => null)
       ]);
-      if (selectedRoomIdRef.current !== room.id) return;
-      setSelectedFileForRoom(room.id, {
-        ...file,
-        path: saved.path,
-        size: saved.size
-      });
-      setSelectedDiffForRoom(room.id, diff);
-      setFilePreviewTabForRoom(room.id, "file");
-      setFileMessageForRoom(room.id, `Saved ${path}.`);
+      if (selectedRoomIdRef.current === room.id) {
+        setSelectedFileForRoom(room.id, {
+          ...file,
+          path: saved.path,
+          size: saved.size
+        });
+        setSelectedDiffForRoom(room.id, diff);
+        setFilePreviewTabForRoom(room.id, "file");
+        setFileMessageForRoom(room.id, `Saved ${path}.`);
+      }
+      return true;
     } catch (error) {
       if (selectedRoomIdRef.current === room.id) setFileMessageForRoom(room.id, String(error));
+      return false;
     } finally {
       setFileBusyForRoom(room.id, false);
     }
+  }
+
+  async function publishFileSaveStatus(room: RoomRecord, requestId: string, status: RequestStatusPlaintextPayload["status"]) {
+    const client = relayRef.current;
+    if (!client || relayStatus === "closed" || relayStatus === "error") return;
+    const payload: RequestStatusPlaintextPayload = {
+      requestId,
+      status,
+      decidedBy: localUser.name,
+      decidedByUserId: localUser.id,
+      decidedAt: new Date().toISOString()
+    };
+    const secret = await loadOrCreateRoomSecret(room.id);
+    const envelope: RelayEnvelope = {
+      id: crypto.randomUUID(),
+      teamId: room.teamId,
+      roomId: room.id,
+      senderDeviceId: deviceId,
+      senderUserId: localUser.id,
+      createdAt: payload.decidedAt,
+      kind: "workspace.event",
+      payload: await encryptJson(payload, secret)
+    };
+    seenEnvelopeIds.current.add(envelope.id);
+    client.publish({ type: "publish", envelope });
+  }
+
+  async function approveFileSaveRequest(request: WorkspaceFileSaveRequest) {
+    if (!hasSelectedRoom) {
+      setSelectedFileMessage("Create or join a room before approving file edits.");
+      return;
+    }
+    if (!isActiveHost) {
+      setSelectedFileMessage(hostGateMessage);
+      return;
+    }
+    if (!canReadLocalWorkspace) {
+      setSelectedFileMessage(localWorkspaceMessage);
+      return;
+    }
+    if (isSelectedRoomLocked) {
+      setSelectedFileMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+      return;
+    }
+    if (!fileSaveRequests.some((item) => item.id === request.id && item.status === "pending")) {
+      setFileMessageForRoom(selectedRoom.id, "That file edit request is no longer pending.");
+      return;
+    }
+    const room = selectedRoom;
+    const saved = await writeSelectedFileContent(room, request.path, request.nextContent);
+    if (!saved) return;
+    updateFileSaveRequestStatus(room.id, request.id, "approved");
+    publishFileSaveStatus(room, request.id, "approved").catch((error) => setFileMessageForRoom(room.id, String(error)));
+  }
+
+  function denyFileSaveRequest(requestId: string) {
+    if (!hasSelectedRoom) {
+      setSelectedFileMessage("Create or join a room before denying file edits.");
+      return;
+    }
+    if (!isActiveHost) {
+      setSelectedFileMessage(hostGateMessage);
+      return;
+    }
+    if (!fileSaveRequests.some((item) => item.id === requestId && item.status === "pending")) {
+      setFileMessageForRoom(selectedRoom.id, "That file edit request is no longer pending.");
+      return;
+    }
+    const room = selectedRoom;
+    updateFileSaveRequestStatus(room.id, requestId, "denied");
+    publishFileSaveStatus(room, requestId, "denied").catch((error) => setFileMessageForRoom(room.id, String(error)));
+    setFileMessageForRoom(room.id, "Denied file edit request.");
   }
 
   function removePendingAttachment(attachmentId: string) {
@@ -314,6 +471,8 @@ export function useFileActions({
   return {
     openProjectFile,
     saveSelectedFileContent,
+    approveFileSaveRequest,
+    denyFileSaveRequest,
     attachSelectedFileToMessage,
     removePendingAttachment,
     openEncryptedAttachmentBlob

@@ -211,7 +211,7 @@ export function useRoomMainColumnProps({
       canSendMessage: roomCanUseChat && (Boolean(draft.trim()) || pendingAttachmentCount > 0),
       roomLocked: isSelectedRoomLocked,
       lockedPlaceholder: roomLockMessage(selectedRoom, isSelectedRoomRevoked),
-      chatEnabled: selectedRoom.mode.chat,
+      chatEnabled: !isSelectedRoomLocked,
       draft,
       replyTarget,
       roomGoal,

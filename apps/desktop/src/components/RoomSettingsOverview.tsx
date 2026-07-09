@@ -6,7 +6,6 @@ export type RoomPostureDisplay = {
   workspaceAccess: string;
   history: string;
   browserProfile: string;
-  modes: string;
 };
 
 export function RoomSettingsOverview({
@@ -45,7 +44,6 @@ export function RoomSettingsOverview({
       <InfoRow label="Workspace" value={posture.workspaceAccess} />
       <InfoRow label="History" value={posture.history} />
       <InfoRow label="Browser" value={posture.browserProfile} />
-      <InfoRow label="Modes" value={posture.modes} />
       <button className="ghost-wide" onClick={onChooseProject} disabled={chooseProjectDisabled}>
         <FolderGit2 size={15} />
         Choose project folder

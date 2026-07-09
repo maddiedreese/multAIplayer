@@ -25,7 +25,6 @@ export function shouldAutoApproveChatOnlyTurn(
 export function canApproveCodexTurn(room: RoomRecord, user: LocalHostUser, locked = false): boolean {
   return (
     !locked &&
-    room.mode.code &&
     room.approvalPolicy !== "never_host" &&
     isLocalUserActiveHostForRoom(room, user)
   );
@@ -49,7 +48,8 @@ export function isDelegatedApprovalExecutionPolicy(policy: ApprovalDelegationPol
 }
 
 export function shouldResetCodexApprovalForRoomModeChange(mode: keyof RoomMode): boolean {
-  return mode === "code" || mode === "workspace" || mode === "browser";
+  void mode;
+  return false;
 }
 
 export function shouldResetCodexApprovalForRoomUpdate(previous: RoomRecord, next: RoomRecord): boolean {
@@ -61,9 +61,6 @@ export function shouldResetCodexApprovalForRoomUpdate(previous: RoomRecord, next
     previous.approvalPolicy !== next.approvalPolicy ||
     previous.approvalDelegationPolicy !== next.approvalDelegationPolicy ||
     !sameStrings(previous.trustedApproverUserIds ?? [], next.trustedApproverUserIds ?? []) ||
-    previous.mode.code !== next.mode.code ||
-    previous.mode.workspace !== next.mode.workspace ||
-    previous.mode.browser !== next.mode.browser ||
     previous.browserProfilePersistent !== next.browserProfilePersistent ||
     !sameStrings(previous.browserAllowedOrigins ?? [], next.browserAllowedOrigins ?? [])
   );

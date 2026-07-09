@@ -12,9 +12,11 @@ import {
 import {
   runCodexTurn,
   shutdownCodexRoom,
+  getCodexGoal,
   type GitStatusSummary,
   type TerminalSnapshot
 } from "../lib/localBackend";
+import { codexGoalToRoomGoal } from "../lib/roomGoals";
 import {
   canApproveCodexTurn
 } from "../lib/codexApproval";
@@ -119,6 +121,7 @@ export function useCodexTurnActions({
 }: UseCodexTurnActionsOptions) {
   const setCodexThreadIdForRoom = useAppStore((state) => state.setCodexThreadIdForRoom);
   const setCodexContinuationForRoom = useAppStore((state) => state.setCodexContinuationForRoom);
+  const setRoomGoalForRoom = useAppStore((state) => state.setRoomGoalForRoom);
 
   function promoteNextCodexApprovalForRoom(roomId: string) {
     const nextTurn = queuedCodexApprovalsByRoom[roomId]?.[0];
@@ -136,7 +139,7 @@ export function useCodexTurnActions({
     }
     const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
     const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
-    if (roomLocked || !room.mode.code || room.approvalPolicy === "never_host") {
+    if (roomLocked || room.approvalPolicy === "never_host") {
       removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
       const cancellationMessage = roomLocked
         ? roomLockMessage(room, roomRevoked)
@@ -211,12 +214,6 @@ export function useCodexTurnActions({
       room.hostStatus === "active"
         ? `Only ${room.host} can approve host-side actions in this room.`
         : "Claim host before approving host-side actions in this room.";
-    if (!room.mode.code) {
-      setHostMessageForRoom(roomId, "Code mode is disabled for this room.");
-      setPendingCodexApprovalForRoom(roomId, null);
-      setApprovalVisibleForRoom(roomId, false);
-      return;
-    }
     if (room.approvalPolicy === "never_host") {
       setHostMessageForRoom(roomId, "This room is set to never host Codex turns.");
       setPendingCodexApprovalForRoom(roomId, null);
@@ -298,6 +295,11 @@ export function useCodexTurnActions({
       const threadId = normalizeCodexThreadId(result.threadId);
       if (threadId) {
         setCodexThreadIdForRoom(roomId, threadId);
+        void getCodexGoal(roomId, threadId)
+          .then((goal) => {
+            setRoomGoalForRoom(roomId, goal ? codexGoalToRoomGoal(goal) : null);
+          })
+          .catch(() => undefined);
       }
       for (const eventName of result.events.slice(-16)) {
         await publishCodexEvent({

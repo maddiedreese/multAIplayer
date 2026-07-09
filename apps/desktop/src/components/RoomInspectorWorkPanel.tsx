@@ -7,7 +7,6 @@ import { HostHandoffPanel } from "./HostHandoffPanel";
 import { LocalHistoryPanel } from "./LocalHistoryPanel";
 import { ModelPanel } from "./ModelPanel";
 import { ProjectPanel } from "./ProjectPanel";
-import { RoomModePanel } from "./RoomModePanel";
 import { RoomMembersPanel, TeamRosterPanel } from "./RosterPanels";
 import { TerminalPanel } from "./TerminalPanel";
 import { WorkspaceFilesPanel } from "./WorkspaceFilesPanel";
@@ -22,7 +21,6 @@ export function RoomInspectorWorkPanel({
   hostHandoff,
   encryptedInvite,
   approvalPolicy,
-  roomMode,
   model,
   localHistory,
   workspaceFiles,
@@ -37,7 +35,6 @@ export function RoomInspectorWorkPanel({
   hostHandoff: ComponentProps<typeof HostHandoffPanel<HostHandoffRecord>>;
   encryptedInvite: ComponentProps<typeof EncryptedInvitePanel<InviteJoinRequest>>;
   approvalPolicy: ComponentProps<typeof ApprovalPolicyPanel>;
-  roomMode: ComponentProps<typeof RoomModePanel>;
   model: ComponentProps<typeof ModelPanel>;
   localHistory: ComponentProps<typeof LocalHistoryPanel>;
   workspaceFiles: ComponentProps<typeof WorkspaceFilesPanel>;
@@ -72,7 +69,6 @@ export function RoomInspectorWorkPanel({
       <HostHandoffPanel {...hostHandoff} />
       <EncryptedInvitePanel {...encryptedInvite} />
       <ApprovalPolicyPanel {...approvalPolicy} />
-      <RoomModePanel {...roomMode} />
       <ModelPanel {...model} />
       <LocalHistoryPanel {...localHistory} />
     </>

@@ -4,6 +4,7 @@ import {
   CodexQueuePlaintextPayload as CodexQueuePlaintextPayloadSchema,
   LocalPreviewPlaintextPayload as LocalPreviewPlaintextPayloadSchema,
   RoomKeyRotationPlaintextPayload as RoomKeyRotationPlaintextPayloadSchema,
+  WorkspaceFileSaveRequestPlaintextPayload as WorkspaceFileSaveRequestPlaintextPayloadSchema,
   ChatDeletePlaintextPayload as ChatDeletePlaintextPayloadSchema,
   ChatEditPlaintextPayload as ChatEditPlaintextPayloadSchema,
   type ChatDeletePlaintextPayload,
@@ -21,7 +22,8 @@ import {
   type RequestStatusPlaintextPayload,
   type RoomKeyRotationPlaintextPayload,
   type RoomSettingsPlaintextPayload,
-  type TerminalResultPlaintextPayload
+  type TerminalResultPlaintextPayload,
+  type WorkspaceFileSaveRequestPlaintextPayload
 } from "@multaiplayer/protocol";
 import type { GitHubActionRun } from "./authClient";
 import { normalizeChatMessage } from "./chatSanitizer";
@@ -38,7 +40,8 @@ import type {
   LocalRoomHistoryPayload,
   QueuedCodexTurn,
   RoomGoal,
-  TerminalCommandRequest
+  TerminalCommandRequest,
+  WorkspaceFileSaveRequest
 } from "../types";
 
 export function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentionDays: number): LocalRoomHistoryPayload {
@@ -50,6 +53,7 @@ export function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentio
     chatDeletes: (payload.chatDeletes ?? []).filter((deletion) => isWithinRetention(deletion.deletedAt, cutoffMs)),
     ...(payload.readState ? { readState: payload.readState } : {}),
     terminalRequests: payload.terminalRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
+    fileSaveRequests: (payload.fileSaveRequests ?? []).filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     browserRequests: payload.browserRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     inviteRequests: payload.inviteRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     codexEvents: payload.codexEvents.filter((event) => isWithinRetention(event.createdAt, cutoffMs)),
@@ -74,6 +78,7 @@ export function emptyLocalRoomHistoryPayload(): LocalRoomHistoryPayload {
     chatDeletes: [],
     readState: undefined,
     terminalRequests: [],
+    fileSaveRequests: [],
     browserRequests: [],
     inviteRequests: [],
     codexEvents: [],
@@ -102,6 +107,7 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
     chatDeletes: Array.isArray(value.chatDeletes) ? value.chatDeletes.filter(isChatDeletePlaintextPayload) : [],
     readState: sanitizeLocalRoomReadState(value.readState),
     terminalRequests: Array.isArray(value.terminalRequests) ? value.terminalRequests.filter(isTerminalCommandRequest) : [],
+    fileSaveRequests: Array.isArray(value.fileSaveRequests) ? value.fileSaveRequests.filter(isWorkspaceFileSaveRequest) : [],
     browserRequests: Array.isArray(value.browserRequests) ? value.browserRequests.filter(isBrowserAccessRequest) : [],
     inviteRequests: Array.isArray(value.inviteRequests) ? value.inviteRequests.filter(isInviteJoinRequest) : [],
     codexEvents: Array.isArray(value.codexEvents) ? value.codexEvents.filter(isCodexEventPlaintextPayload) : [],
@@ -190,6 +196,19 @@ export function isRequestStatusPlaintextPayload(value: unknown): value is Reques
     typeof value.decidedBy === "string" &&
     typeof value.decidedByUserId === "string" &&
     typeof value.decidedAt === "string"
+  );
+}
+
+export function isWorkspaceFileSaveRequestPlaintextPayload(value: unknown): value is WorkspaceFileSaveRequestPlaintextPayload {
+  return WorkspaceFileSaveRequestPlaintextPayloadSchema.safeParse(value).success;
+}
+
+export function isWorkspaceFileSaveRequest(value: unknown): value is WorkspaceFileSaveRequest {
+  if (!isRecord(value)) return false;
+  const status = value.status;
+  return (
+    isWorkspaceFileSaveRequestPlaintextPayload(value) &&
+    (status === "pending" || status === "approved" || status === "denied")
   );
 }
 
@@ -534,12 +553,23 @@ function isRoomGoal(value: unknown): value is RoomGoal {
     typeof value.text === "string" &&
     value.text.length > 0 &&
     value.text.length <= 2000 &&
-    (value.status === "running" || value.status === "paused") &&
+    isRoomGoalStatus(value.status) &&
     typeof value.startedAt === "string" &&
     typeof value.updatedAt === "string" &&
     typeof value.elapsedMs === "number" &&
     Number.isFinite(value.elapsedMs) &&
     value.elapsedMs >= 0
+  );
+}
+
+function isRoomGoalStatus(value: unknown): value is RoomGoal["status"] {
+  return (
+    value === "active" ||
+    value === "paused" ||
+    value === "blocked" ||
+    value === "usageLimited" ||
+    value === "budgetLimited" ||
+    value === "complete"
   );
 }
 

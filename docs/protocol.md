@@ -13,9 +13,9 @@ The relay sees:
 - timestamps;
 - ciphertext payload.
 
-The relay does not see plaintext message bodies, reactions, attachments, Codex turn input, terminal output, or file diffs.
+The relay does not see plaintext message bodies, reactions, attachments, Codex turn input, terminal output, file-save contents, or file diffs.
 
-In the alpha desktop app, small text/code attachments can be embedded inside the encrypted chat payload. A message can include up to 5 embedded attachments, each with up to 80 KB of plaintext preview content and up to 200 KB of embedded preview content total. Larger previews are encrypted locally and uploaded to relay blob storage as ciphertext, then referenced from the encrypted chat payload by blob id. Desktop clients fetch ciphertext blobs with the blob id plus matching team and room ids, decrypt them with the room key, and preview them locally without exposing plaintext to the relay. A locally locked room does not preview inline attachments or decrypt attachment blobs until it is unlocked with a fresh invite or key.
+Small text/code attachments can be embedded inside the encrypted chat payload. A message can include up to 5 embedded attachments, each with up to 80 KB of plaintext preview content and up to 200 KB of embedded preview content total. Larger previews are encrypted locally and uploaded to relay blob storage as ciphertext, then referenced from the encrypted chat payload by blob id. Desktop clients fetch ciphertext blobs with the blob id plus matching team and room ids, decrypt them with the room key, and preview them locally without exposing plaintext to the relay. A locally locked room does not preview inline attachments or decrypt attachment blobs until it is unlocked with a fresh invite or key.
 
 Codex turn summaries mark each attachment as inline content, metadata-only, or encrypted-blob-reference-only. This keeps the host approval sheet aligned with the actual Codex turn input: inline content can be sent to the local Codex app-server after approval, while large encrypted blob attachments are referenced but not decrypted into Codex context by default.
 
@@ -23,9 +23,11 @@ Chat messages can carry encrypted reply references. Message reactions are routed
 
 Host handoff packages are routed as encrypted `room.host` envelopes. The relay sees the envelope metadata but not the handoff summary contents.
 
-Room setting activity that should be visible in the transcript is routed as encrypted `room.settings` envelopes. The alpha uses this for host-controlled approval policy, approval delegation, room mode, Codex model, Codex reasoning/speed/sandbox settings, project path, browser allowlist, and browser profile persistence changes. The relay can store current room metadata, but it cannot read the human-readable before/after activity message.
+Room setting activity that should be visible in the transcript is routed as encrypted `room.settings` envelopes. This covers host-controlled approval policy, approval delegation, Codex model, Codex reasoning/speed/sandbox settings, project path, browser allowlist, and browser profile persistence changes. The relay can store current room metadata, but it cannot read the human-readable activity message.
 
 Browser access requests are routed as encrypted `browser.request` envelopes. Host decisions are routed as encrypted `browser.event` envelopes and can render as local room transcript activity after decryption. The relay sees the envelope kind, room id, sender id, and timestamp, but not the URL, reason, requester display name, decider, or host decision state.
+
+Non-host file-save requests are routed as encrypted `workspace.request` envelopes. Host decisions are routed as encrypted `workspace.event` envelopes. The relay sees that a workspace approval workflow happened in a room, but not the file path, previous content, proposed content, requester display name, decider, or decision state.
 
 Gated invite requests are routed as encrypted `room.invite` envelopes. The relay sees that an invite workflow event happened in a room, but not the requester name, device id, note, host decision, requester device public key, or wrapped room-key payload.
 
@@ -33,7 +35,7 @@ Codex turn progress is routed as encrypted `codex.event` envelopes. Started-turn
 
 Git workflow progress and GitHub Actions refreshes are routed as encrypted `git.event` envelopes. The relay sees that a Git event happened in a room, but not the branch, command output, PR URL, workflow run URLs, or result details. This lets non-host room members see the approved branch, commit, push, PR, and CI flow without exposing plaintext Git output to the hosted relay.
 
-Desktop clients also keep Git workflow events and GitHub Actions refreshes in the versioned encrypted local room-history payload. This lets a restarted client restore the latest workflow status and Actions panel from local ciphertext without storing plaintext branch names, PR URLs, command output, or run URLs on the relay.
+Desktop clients also keep file-save requests, Git workflow events, and GitHub Actions refreshes in the versioned encrypted local room-history payload. This lets a restarted client restore the latest workflow status and Actions panel from local ciphertext without storing plaintext file contents, branch names, PR URLs, command output, or run URLs on the relay.
 
 Persistent terminal snapshots are local-only and stored in that same encrypted room-history payload. Restored terminal snapshots are marked stopped/restartable; live terminal processes are not represented as durable relay state.
 
@@ -44,6 +46,8 @@ Room metadata is bounded before storage and broadcast. Project paths are trimmed
 Encrypted room envelopes are idempotent by envelope id within a room. If the same joined device publishes the same envelope id again, the relay keeps the first copy and does not append or rebroadcast the duplicate.
 
 When relay auth is required, workspace metadata is scoped to the signed-in GitHub user's team memberships. Non-members cannot list a team's rooms, create rooms, create invites, upload or fetch attachment blobs, change room settings, or join the room WebSocket unless they present a valid invite id for that room. The invite id does not carry the room key; it only lets the relay add the authenticated user to the team membership list so encrypted room traffic can be routed.
+
+Team and room records include optional `archivedAt` and `deletedAt` lifecycle timestamps. Archived records remain visible so clients can restore them, while deleted records are omitted from normal workspace listings. These flags are relay metadata only; they do not erase encrypted backlog, local history, exported Markdown, project files, or room keys already present on devices.
 
 When a team member is removed, the relay closes that user's live room/team/workspace sockets for the team and deletes outstanding invite metadata for that team. Removed users must receive a fresh invite before the relay will admit them again. This does not erase room keys or ciphertext already present on their device.
 
@@ -59,7 +63,7 @@ Room key rotations use encrypted `room.key` envelopes. The payload is encrypted 
 
 Host handoff packages are encrypted `room.host` envelopes. An available handoff summarizes the outgoing host's project path, selected model, approval policy, recent-message count, attachment names, and terminal names. When another member accepts the handoff and claims host, the desktop sends a second encrypted `room.host` envelope with `status: "accepted"` so peers stop showing the stale handoff as available.
 
-Host-controlled room setting changes are encrypted `room.settings` envelopes with `eventType: "room.settings"` and a setting name such as `codexModel`, `approvalPolicy`, `approvalDelegationPolicy`, `trustedApprovers`, `roomMode`, `codexReasoningEffort`, `codexSpeed`, `codexSandboxLevel`, `projectPath`, `browserAllowedOrigins`, or `browserProfilePersistent`. Clients render them as system transcript messages after decrypting locally, which gives the room an audit trail without exposing the before/after transcript text to the relay.
+Host-controlled room setting changes are encrypted `room.settings` envelopes with `eventType: "room.settings"` and a setting name such as `codexModel`, `approvalPolicy`, `approvalDelegationPolicy`, `trustedApprovers`, `codexReasoningEffort`, `codexSpeed`, `codexSandboxLevel`, `projectPath`, `browserAllowedOrigins`, or `browserProfilePersistent`. Clients render them as system transcript messages after decrypting locally, which gives the room an audit trail without exposing the before/after transcript text to the relay.
 
 The relay accepts device-sealed envelope payloads only for `room.invite`. All other room events must use normal room-key AES-GCM payloads, which keeps the envelope formats predictable and prevents device-sealed chat, terminal, Git, or Codex events from being routed as if peers could read them.
 
@@ -85,15 +89,15 @@ The desktop also avoids retaining direct room-key invite links in visible app st
 
 On accept, the desktop verifies that the relay invite metadata points to the same team and room named in the encrypted fragment before importing the room key. If the relay requires auth, the desktop also includes the invite id in its first room WebSocket join so the relay can admit the signed-in GitHub user as a team member.
 
-The current alpha invite payload is versioned and contains:
+The direct invite payload is versioned and contains:
 
 - team id;
 - room id;
 - room name;
 - AES-GCM-256 room secret.
 
-This is intentionally simple for the alpha. Post-alpha security roadmap work includes production-grade member removal, history epochs/backfill, identity verification, and multi-device recovery.
+This alpha design prioritizes a simple join path. Production-grade member removal, history epochs/backfill, identity verification, and multi-device recovery are outside the alpha security contract.
 
-For stronger member removal, future room events should move from a single room-key broadcast model to key epochs. A removal would create a new room key epoch, wrap that key independently to each remaining trusted device public key, and mark removed devices ineligible for future relay reads and key delivery. Old epochs may remain readable by devices that legitimately received them before removal, subject to local retention. That provides forward protection after removal without pretending previously delivered content can be erased.
+For stronger member removal, future room events should move from a single room-key broadcast model to key epochs. A removal would create a new room key epoch, wrap that key independently to each remaining trusted device public key, and mark removed devices ineligible for future relay reads and key delivery. Earlier epochs may remain readable by devices that legitimately received them before removal, subject to local retention. That provides forward protection after removal without pretending delivered content can be erased.
 
 Shared TypeScript schemas live in `packages/protocol`.

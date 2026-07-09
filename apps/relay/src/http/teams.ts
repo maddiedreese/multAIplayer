@@ -1,6 +1,7 @@
 import type { Express, Response } from "express";
 import { nanoid } from "nanoid";
 import type {
+  RoomRecord,
   TeamMemberRecord,
   TeamRecord,
   TeamRole
@@ -24,6 +25,7 @@ interface RegisterTeamRoutesOptions {
   revokeTeamInvites: (teamId: string) => void;
   revokeTeamMemberSessions: (teamId: string, userId: string) => void;
   broadcastWorkspaceUpdated: (team: TeamRecord) => void;
+  broadcastRoomUpdated: (room: RoomRecord) => void;
   scheduleStoreSave: () => void;
   recordQuotaRejection?: (type: string) => void;
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
@@ -48,6 +50,7 @@ export function registerTeamRoutes({
   revokeTeamInvites,
   revokeTeamMemberSessions,
   broadcastWorkspaceUpdated,
+  broadcastRoomUpdated,
   scheduleStoreSave,
   recordQuotaRejection,
   normalizeMetadataText,
@@ -59,11 +62,11 @@ export function registerTeamRoutes({
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowRead(session, res)) return;
     const visibleTeamIds = session ? teamIdsForUser(session.user.id) : new Set(store.allTeams().map((team) => team.id));
+    const visibleTeams = store.allTeams()
+      .filter((team) => visibleTeamIds.has(team.id) && !team.deletedAt);
     res.json({
-      teams: store.allTeams()
-        .filter((team) => visibleTeamIds.has(team.id))
-        .map((team) => teamRecordForUser(team, store, session?.user.id)),
-      rooms: store.allRooms().filter((room) => visibleTeamIds.has(room.teamId))
+      teams: visibleTeams.map((team) => teamRecordForUser(team, store, session?.user.id)),
+      rooms: store.allRooms().filter((room) => visibleTeamIds.has(room.teamId) && !room.deletedAt && !store.getTeam(room.teamId)?.deletedAt)
     });
   });
 
@@ -182,6 +185,61 @@ export function registerTeamRoutes({
     }
     scheduleStoreSave();
     res.json({ members: listTeamMembers(teamId, store, teamRoleRank) });
+  });
+
+  app.patch("/teams/:teamId/lifecycle", (req, res) => {
+    const session = getAuthSession(req.cookies?.multaiplayer_session);
+    if (!allowMutation(session, res)) return;
+
+    const teamId = String(req.params.teamId ?? "");
+    const action = String(req.body?.action ?? "");
+    const team = store.getTeam(teamId);
+    if (!team || team.deletedAt) {
+      res.status(404).json({ error: "Team not found" });
+      return;
+    }
+    const requesterRole = session ? store.getTeamMember(teamId, session.user.id)?.role : "owner";
+    if (session && !requesterRole) {
+      res.status(403).json({ error: "Join this team before changing its archive state." });
+      return;
+    }
+    if (!["archive", "restore", "delete"].includes(action)) {
+      res.status(400).json({ error: "action must be archive, restore, or delete" });
+      return;
+    }
+    if ((action === "archive" || action === "restore") && requesterRole !== "owner" && requesterRole !== "admin") {
+      res.status(403).json({ error: "Only team owners and admins can archive or restore teams." });
+      return;
+    }
+    if (action === "delete" && requesterRole !== "owner") {
+      res.status(403).json({ error: "Only the team owner can delete a team." });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const updatedTeam: TeamRecord = action === "restore"
+      ? { ...team, archivedAt: undefined }
+      : action === "archive"
+        ? { ...team, archivedAt: team.archivedAt ?? now }
+        : { ...team, archivedAt: undefined, deletedAt: now };
+    store.setTeam(updatedTeam);
+
+    const updatedRooms: RoomRecord[] = [];
+    for (const room of store.allRooms().filter((item) => item.teamId === teamId && !item.deletedAt)) {
+      const updatedRoom = action === "restore"
+        ? { ...room, archivedAt: undefined }
+        : action === "archive"
+          ? { ...room, archivedAt: room.archivedAt ?? now }
+          : { ...room, archivedAt: undefined, deletedAt: now };
+      store.setRoom(updatedRoom);
+      updatedRooms.push(updatedRoom);
+    }
+
+    if (action === "delete") revokeTeamInvites(teamId);
+    broadcastWorkspaceUpdated(updatedTeam);
+    for (const room of updatedRooms) broadcastRoomUpdated(room);
+    scheduleStoreSave();
+    res.json({ team: teamRecordForUser(updatedTeam, store, session?.user.id), rooms: updatedRooms });
   });
 
   app.post("/teams", (req, res) => {

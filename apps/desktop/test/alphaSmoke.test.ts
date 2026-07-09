@@ -109,7 +109,7 @@ test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, brow
       time: "9:45 AM",
       attachments: [{
         id: "att-plan",
-        name: "docs/plan/run-18-plan.md",
+        name: "docs/checklists/run-18.md",
         type: "code",
         size: 2048,
         content: "# Updated plan\n\n- Add tests"
@@ -126,14 +126,14 @@ test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, brow
     { branch: "main", files: [{ path: "apps/desktop/src/App.tsx", status: "modified", added: 12, removed: 4 }] }
   );
   assert.equal(approval.summary.messagesSinceLastCodex, 1);
-  assert.deepEqual(approval.summary.attachments.map((attachment) => attachment.name), ["docs/plan/run-18-plan.md"]);
+  assert.deepEqual(approval.summary.attachments.map((attachment) => attachment.name), ["docs/checklists/run-18.md"]);
   assert.equal(approval.summary.git?.totalFiles, 1);
   assert.deepEqual(approval.summary.browserAccess, ["http://localhost:5173"]);
   assert.deepEqual(approval.summary.terminals, ["shell"]);
 
   const codexInput = buildCodexTurnInput(messages, room.projectPath, room.codexModel, approval.summary);
   assert.match(codexInput, /Recent chat since the last Codex response/);
-  assert.match(codexInput, /docs\/plan\/run-18-plan\.md/);
+  assert.match(codexInput, /docs\/checklists\/run-18\.md/);
 
   assert.equal(resolveFilePreviewTab("file", false), "file");
   assert.equal(resolveFilePreviewTab("diff", true), "diff");
@@ -208,7 +208,7 @@ test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, brow
 
   saveHistorySettings(room.id, { enabled: true, retentionDays: 30 });
   await saveEncryptedHistory(room.id, { messages, handoffs: [handoff] });
-  assert.doesNotMatch(localStorage.dump(), /onboarding progress|run-18-plan|Codex usage/);
+  assert.doesNotMatch(localStorage.dump(), /onboarding progress|docs\/checklists\/run-18\.md|Codex usage/);
   const restored = await loadEncryptedHistory<{ messages: CodexChatMessage[]; handoffs: unknown[] }>(room.id);
   assert.equal(restored?.messages.length, messages.length);
   assert.equal(restored?.handoffs.length, 1);

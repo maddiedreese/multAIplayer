@@ -10,13 +10,11 @@ import {
 } from "../lib/appFormatters";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
 import {
-  createRoomGoal,
-  editRoomGoal,
+  codexGoalToRoomGoal,
   parseRoomGoalCommand,
-  pauseRoomGoal,
-  resumeRoomGoal,
   updateRoomGoalElapsed
 } from "../lib/roomGoals";
+import { clearCodexGoal, setCodexGoal } from "../lib/localBackend";
 import type {
   BrowserAccessRequest,
   ChatAttachment,
@@ -56,6 +54,7 @@ interface UseCodexInvokeActionsOptions {
   gitStatus: GitStatusSummary | null;
   activeCodexApproval: PendingCodexApproval | null;
   queuedCodexApprovals: QueuedCodexTurn[];
+  codexThreadId: string | null;
   publishChatMessage: (message: ChatMessage, room?: RoomRecord) => Promise<void>;
   handleCodexBrowserOpenCommand: (message: ChatMessage, room: RoomRecord) => boolean;
   publishCodexQueueEvent: (
@@ -103,6 +102,7 @@ export function useCodexInvokeActions({
   gitStatus,
   activeCodexApproval,
   queuedCodexApprovals,
+  codexThreadId,
   publishChatMessage,
   handleCodexBrowserOpenCommand,
   publishCodexQueueEvent,
@@ -118,39 +118,82 @@ export function useCodexInvokeActions({
   setRoomGoalForRoom,
   clearPendingAttachmentsForRoom
 }: UseCodexInvokeActionsOptions) {
-  function startRoomGoal(text: string) {
+  async function startRoomGoal(text: string) {
     const roomId = selectedRoom.id;
-    setRoomGoalForRoom(roomId, createRoomGoal(text));
+    if (!codexThreadId) {
+      setChatMessageForRoom(roomId, "Start an approved Codex turn before setting a Codex goal.");
+      return;
+    }
+    try {
+      const goal = await setCodexGoal(roomId, codexThreadId, text, "active");
+      setRoomGoalForRoom(roomId, codexGoalToRoomGoal(goal));
+      setChatMessageForRoom(roomId, "Codex goal started.");
+    } catch (error) {
+      setChatMessageForRoom(roomId, `Codex goal could not be started: ${String(error)}`);
+      return;
+    }
     setDraftForRoom(roomId, "");
     setReplyToMessageForRoom(roomId, null);
     clearPendingAttachmentsForRoom(roomId);
-    setChatMessageForRoom(roomId, "Goal started.");
   }
 
-  function pauseGoal() {
-    if (!roomGoal) return;
-    setRoomGoalForRoom(selectedRoom.id, pauseRoomGoal(roomGoal));
+  async function pauseGoal() {
+    await updateCodexGoalStatus("paused", "Codex goal paused.");
   }
 
-  function resumeGoal() {
-    if (!roomGoal) return;
-    setRoomGoalForRoom(selectedRoom.id, resumeRoomGoal(roomGoal));
+  async function resumeGoal() {
+    await updateCodexGoalStatus("active", "Codex goal resumed.");
   }
 
-  function editGoal(text: string) {
+  async function editGoal(text: string) {
     if (!roomGoal) return;
     const nextText = text.trim();
     if (!nextText) return;
-    setRoomGoalForRoom(selectedRoom.id, editRoomGoal(roomGoal, nextText));
+    if (!codexThreadId) {
+      setChatMessageForRoom(selectedRoom.id, "Start an approved Codex turn before editing a Codex goal.");
+      return;
+    }
+    try {
+      const goal = await setCodexGoal(selectedRoom.id, codexThreadId, nextText, roomGoal.status);
+      setRoomGoalForRoom(selectedRoom.id, codexGoalToRoomGoal(goal));
+      setChatMessageForRoom(selectedRoom.id, "Codex goal updated.");
+    } catch (error) {
+      setChatMessageForRoom(selectedRoom.id, `Codex goal could not be updated: ${String(error)}`);
+    }
   }
 
-  function deleteGoal() {
-    setRoomGoalForRoom(selectedRoom.id, null);
+  async function deleteGoal() {
+    if (!codexThreadId) {
+      setRoomGoalForRoom(selectedRoom.id, null);
+      return;
+    }
+    try {
+      await clearCodexGoal(selectedRoom.id, codexThreadId);
+      setRoomGoalForRoom(selectedRoom.id, null);
+      setChatMessageForRoom(selectedRoom.id, "Codex goal cleared.");
+    } catch (error) {
+      setChatMessageForRoom(selectedRoom.id, `Codex goal could not be cleared: ${String(error)}`);
+    }
   }
 
   function tickGoalElapsed() {
-    if (!roomGoal || roomGoal.status !== "running") return;
+    if (!roomGoal || roomGoal.status !== "active") return;
     setRoomGoalForRoom(selectedRoom.id, updateRoomGoalElapsed(roomGoal));
+  }
+
+  async function updateCodexGoalStatus(status: RoomGoal["status"], successMessage: string) {
+    if (!roomGoal) return;
+    if (!codexThreadId) {
+      setChatMessageForRoom(selectedRoom.id, "Start an approved Codex turn before updating a Codex goal.");
+      return;
+    }
+    try {
+      const goal = await setCodexGoal(selectedRoom.id, codexThreadId, roomGoal.text, status);
+      setRoomGoalForRoom(selectedRoom.id, codexGoalToRoomGoal(goal));
+      setChatMessageForRoom(selectedRoom.id, successMessage);
+    } catch (error) {
+      setChatMessageForRoom(selectedRoom.id, `Codex goal could not be updated: ${String(error)}`);
+    }
   }
 
   async function sendMessage() {
@@ -172,7 +215,7 @@ export function useCodexInvokeActions({
     if (!body && attachments.length === 0) return;
     const goalText = parseRoomGoalCommand(body);
     if (goalText) {
-      startRoomGoal(goalText);
+      await startRoomGoal(goalText);
       return;
     }
     const attachmentError = validatePendingAttachments(attachments);
@@ -215,11 +258,6 @@ export function useCodexInvokeActions({
     }
     if (!canUseRoomChat(selectedRoom)) {
       setHostMessageForRoom(roomId, roomChatGateMessage(selectedRoom));
-      setApprovalVisibleForRoom(roomId, false);
-      return;
-    }
-    if (!selectedRoom.mode.code) {
-      setHostMessageForRoom(roomId, "Code mode is disabled for this room.");
       setApprovalVisibleForRoom(roomId, false);
       return;
     }

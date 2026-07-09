@@ -10,7 +10,8 @@ import type {
   HostHandoffPlaintextPayload,
   InviteJoinRequestPlaintextPayload,
   LocalPreviewPlaintextPayload,
-  TerminalRequestPlaintextPayload
+  TerminalRequestPlaintextPayload,
+  WorkspaceFileSaveRequestPlaintextPayload
 } from "@multaiplayer/protocol";
 import type { TerminalSnapshot } from "./lib/localBackend";
 import type { CodexTurnRiskFlag } from "./lib/codexTurn";
@@ -54,10 +55,12 @@ export interface ChatAttachment {
 export interface RoomGoal {
   id: string;
   text: string;
-  status: "running" | "paused";
+  status: "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
   startedAt: string;
   updatedAt: string;
   elapsedMs: number;
+  tokensUsed?: number;
+  tokenBudget?: number | null;
 }
 
 export interface PendingCodexApproval {
@@ -94,6 +97,10 @@ export interface TerminalCommandRequest extends TerminalRequestPlaintextPayload 
 }
 
 export interface BrowserAccessRequest extends BrowserRequestPlaintextPayload {
+  status: "pending" | "approved" | "denied";
+}
+
+export interface WorkspaceFileSaveRequest extends WorkspaceFileSaveRequestPlaintextPayload {
   status: "pending" | "approved" | "denied";
 }
 
@@ -149,6 +156,7 @@ export interface LocalRoomHistoryPayload {
   chatDeletes?: ChatDeletePlaintextPayload[];
   readState?: LocalRoomReadState;
   terminalRequests: TerminalCommandRequest[];
+  fileSaveRequests: WorkspaceFileSaveRequest[];
   browserRequests: BrowserAccessRequest[];
   inviteRequests: InviteJoinRequest[];
   codexEvents: CodexRoomEvent[];

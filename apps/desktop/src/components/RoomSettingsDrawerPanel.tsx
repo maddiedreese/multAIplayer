@@ -1,5 +1,5 @@
 import { Check, KeyRound, RefreshCw, X } from "lucide-react";
-import type { ApprovalPolicy, RoomMode } from "@multaiplayer/protocol";
+import type { ApprovalPolicy } from "@multaiplayer/protocol";
 import type { LocalHistorySettings } from "../lib/localHistory";
 import { RoomSettingsOverview, type RoomPostureDisplay } from "./RoomSettingsOverview";
 
@@ -10,7 +10,6 @@ export interface CodexModelOptionDisplay {
 
 const selectableApprovalPolicies: ApprovalPolicy[] = [
   "ask_every_turn",
-  "auto_chat_only",
   "never_host"
 ];
 
@@ -29,9 +28,6 @@ export function RoomSettingsDrawerPanel({
   defaultRelayHttpUrl,
   defaultRelayWsUrl,
   saveRelayDisabled,
-  roomMode,
-  roomModeLabels,
-  roomModesDisabled,
   showRoomSettingsGate,
   roomSettingsGateMessage,
   notificationsMuted,
@@ -53,7 +49,6 @@ export function RoomSettingsDrawerPanel({
   onRelayWsDraftChange,
   onResetRelay,
   onSaveRelay,
-  onToggleRoomMode,
   onNotificationsMutedChange,
   onHistoryEnabledChange,
   onHistoryRetentionDaysChange,
@@ -81,9 +76,6 @@ export function RoomSettingsDrawerPanel({
   defaultRelayHttpUrl: string;
   defaultRelayWsUrl: string;
   saveRelayDisabled: boolean;
-  roomMode: RoomMode;
-  roomModeLabels: Record<keyof RoomMode, string>;
-  roomModesDisabled: boolean;
   showRoomSettingsGate: boolean;
   roomSettingsGateMessage: string;
   notificationsMuted: boolean;
@@ -105,7 +97,6 @@ export function RoomSettingsDrawerPanel({
   onRelayWsDraftChange: (value: string) => void;
   onResetRelay: () => void;
   onSaveRelay: () => void;
-  onToggleRoomMode: (mode: keyof RoomMode) => void;
   onNotificationsMutedChange: (muted: boolean) => void;
   onHistoryEnabledChange: (enabled: boolean) => void;
   onHistoryRetentionDaysChange: (days: number) => void;
@@ -175,25 +166,9 @@ export function RoomSettingsDrawerPanel({
         </div>
       </section>
 
-      <section className="drawer-section">
-        <div className="drawer-section-title">Room modes</div>
-        <div className="mode-options drawer-modes">
-          {(Object.keys(roomModeLabels) as Array<keyof RoomMode>).map((key) => (
-            <label key={key}>
-              <input
-                type="checkbox"
-                checked={roomMode[key]}
-                disabled={roomModesDisabled}
-                onChange={() => onToggleRoomMode(key)}
-              />
-              <span>{roomModeLabels[key]}</span>
-            </label>
-          ))}
-        </div>
-        {showRoomSettingsGate && (
-          <div className="workflow-message">{roomSettingsGateMessage}</div>
-        )}
-      </section>
+      {showRoomSettingsGate && (
+        <div className="workflow-message">{roomSettingsGateMessage}</div>
+      )}
 
       <section className="drawer-section">
         <div className="drawer-section-title">Local history</div>

@@ -36,13 +36,13 @@ The relay does see operational metadata needed to route the room:
 - encrypted attachment blob metadata such as filename, MIME type, declared size, room id, and expiry;
 - GitHub OAuth session identity metadata when sign-in is enabled.
 
-GitHub access tokens are used server-side only for identity, draft PR creation, and Actions reads. With `MULTAIPLAYER_RELAY_SESSION_SECRET` configured, stored tokens are encrypted at rest in the alpha JSON store. Without that secret, sessions are memory-only.
+GitHub access tokens are used server-side only for identity, draft PR creation, and Actions reads. With `MULTAIPLAYER_RELAY_SESSION_SECRET` configured, stored tokens are encrypted at rest in relay storage. Without that secret, sessions are memory-only.
 
 ## Host Handoff
 
 If a host runs out of Codex usage or needs to step away, they can create a handoff. The new host gets the room context and inherited room settings, then attaches their own local project folder. If they have access to the same GitHub repository, they can continue from the same branch or recreate the work locally.
 
-The current alpha sends full available room context to the new host's Codex invocation when accepting a usage-limit handoff. A future implementation should use Codex-native compaction if the local app-server exposes a stable public primitive for it.
+The alpha sends the available room context to the new host's Codex invocation when accepting a usage-limit handoff. Codex-native compaction is not part of the public alpha contract.
 
 ## Browser And Terminal
 

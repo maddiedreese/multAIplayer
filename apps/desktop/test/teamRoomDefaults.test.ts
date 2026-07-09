@@ -51,7 +51,7 @@ test.beforeEach(() => {
 
 test("team room defaults persist approval policy per team", () => {
   const saved = saveTeamRoomDefaults("team-core", {
-    approvalPolicy: "auto_chat_only",
+    approvalPolicy: "ask_every_turn",
     codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: ["https://github.com", "https://example.com"],
     browserProfilePersistent: false,
@@ -59,14 +59,14 @@ test("team room defaults persist approval policy per team", () => {
   });
 
   assert.deepEqual(saved, {
-    approvalPolicy: "auto_chat_only",
+    approvalPolicy: "ask_every_turn",
     codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: ["https://github.com", "https://example.com"],
     browserProfilePersistent: false,
     inviteApprovalGate: true
   });
   assert.deepEqual(loadTeamRoomDefaults("team-core"), {
-    approvalPolicy: "auto_chat_only",
+    approvalPolicy: "ask_every_turn",
     codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: ["https://github.com", "https://example.com"],
     browserProfilePersistent: false,
