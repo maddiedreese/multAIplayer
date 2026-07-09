@@ -18,6 +18,7 @@ interface RelayLifecycleOptions {
   drainMs: number;
   graceMs: number;
   closeStore: () => Promise<void>;
+  wait?: (ms: number) => Promise<void>;
 }
 
 export function createRelayLifecycle({
@@ -25,7 +26,8 @@ export function createRelayLifecycle({
   wss,
   drainMs,
   graceMs,
-  closeStore
+  closeStore,
+  wait = delay
 }: RelayLifecycleOptions): RelayLifecycle {
   let shuttingDown = false;
   let shutdownPromise: Promise<void> | null = null;
@@ -63,8 +65,8 @@ export function createRelayLifecycle({
   }
 
   async function runShutdown() {
-    if (drainMs > 0) await delay(drainMs);
-    const socketClose = closeWebSockets(wss, graceMs);
+    if (drainMs > 0) await wait(drainMs);
+    const socketClose = closeWebSockets(wss, graceMs, wait);
     await Promise.allSettled([
       closeServer(),
       closeWebSocketServer(wss)
@@ -91,13 +93,17 @@ async function closeWebSocketServer(wss: WebSocketServer) {
   });
 }
 
-async function closeWebSockets(wss: WebSocketServer, graceMs: number) {
+async function closeWebSockets(
+  wss: WebSocketServer,
+  graceMs: number,
+  wait: (ms: number) => Promise<void>
+) {
   const sockets = Array.from(wss.clients);
   if (sockets.length === 0) return;
   const closed = Promise.all(sockets.map((socket) => waitForSocketClose(socket)));
   await Promise.race([
     closed,
-    delay(graceMs).then(() => {
+    wait(graceMs).then(() => {
       for (const socket of sockets) {
         if (socket.readyState !== WebSocket.CLOSED) socket.terminate();
       }
