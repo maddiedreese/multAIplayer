@@ -1,8 +1,8 @@
-import cors, { type CorsOptions } from "cors";
+import cors from "cors";
 import cookieParser from "cookie-parser";
 import express from "express";
 import { createServer } from "node:http";
-import { WebSocket, WebSocketServer } from "ws";
+import { WebSocketServer } from "ws";
 import {
   createRelayAuthSessionManager,
   createRelayAuthSessionPersistence
@@ -28,8 +28,10 @@ import { registerGitHubRoutes } from "./http/github.js";
 import { registerInviteRoutes } from "./http/invites.js";
 import { createRelayRequestGuards } from "./http/middleware.js";
 import { registerOpsRoutes } from "./http/ops.js";
+import { createRelayOriginPolicy } from "./http/origin-policy.js";
 import { registerRoomRoutes } from "./http/rooms.js";
 import { registerTeamRoutes, teamRecordForUser } from "./http/teams.js";
+import { createRelayLifecycle } from "./lifecycle.js";
 import {
   isAllowedEnvelopePayload as isAllowedEnvelopePayloadWithLimits,
   isApprovalDelegationPolicy,
@@ -93,33 +95,12 @@ const {
 } = relayConfig;
 const relayMetrics = createRelayMetrics();
 const relayPersistence = createRelayPersistence({ backend: storageBackend, dataPath });
-const corsOptions: CorsOptions = {
-  credentials: true,
-  origin(origin, callback) {
-    if (isAllowedCorsOrigin(origin)) {
-      callback(null, true);
-      return;
-    }
-    callback(null, false);
-  }
-};
+const originPolicy = createRelayOriginPolicy({ nodeEnv, allowedCorsOrigins });
 const app = express();
-let relayShuttingDown = false;
-let relayShutdownPromise: Promise<void> | null = null;
-app.use(cors(corsOptions));
+app.use(cors(originPolicy.corsOptions));
 app.use(cookieParser());
 app.use(requestLoggingMiddleware(structuredLogsEnabled));
 app.use(express.json({ limit: `${jsonBodyLimitBytes}b` }));
-app.use((req, res, next) => {
-  if (isRelayReady() || isShutdownExemptPath(req.path)) {
-    next();
-    return;
-  }
-  res.status(503).json({
-    error: "Relay is shutting down.",
-    code: "relay_shutting_down"
-  });
-});
 
 const server = createServer(app);
 const wss = new WebSocketServer({
@@ -127,7 +108,7 @@ const wss = new WebSocketServer({
   path: "/rooms",
   maxPayload: encryptedEnvelopeMaxBytes * 2,
   verifyClient(info, done) {
-    if (isAllowedCorsOrigin(info.origin)) {
+    if (originPolicy.isAllowedOrigin(info.origin)) {
       done(true);
       return;
     }
@@ -184,6 +165,24 @@ const maxAttachmentBlobIdChars = 160;
 const maxAttachmentBlobNameChars = 512;
 const maxAttachmentBlobTypeChars = 160;
 let relayStorePersistence: RelayStorePersistenceCoordinator;
+const relayLifecycle = createRelayLifecycle({
+  server,
+  wss,
+  drainMs: shutdown.drainMs,
+  graceMs: shutdown.graceMs,
+  closeStore: () => closeRelayStore()
+});
+
+app.use((req, res, next) => {
+  relayLifecycle.shutdownMiddleware(
+    req.path,
+    next,
+    () => res.status(503).json({
+      error: "Relay is shutting down.",
+      code: "relay_shutting_down"
+    })
+  );
+});
 
 const authSessionManager = createRelayAuthSessionManager({
   authSessions,
@@ -425,7 +424,7 @@ registerOpsRoutes({
   sessions,
   attachmentBlobs: relayStore.attachmentBlobs.values(),
   isExpiredAttachmentBlob,
-  isReady: isRelayReady
+  isReady: relayLifecycle.isReady
 });
 registerRoomRoutes({
   app,
@@ -481,7 +480,7 @@ registerRelayWebSocketConnection({
   recordConnectionAttempt: relayMetrics.recordWebSocketConnectionAttempt,
   recordConnectionAccepted: relayMetrics.recordWebSocketConnectionAccepted,
   recordConnectionRejection: relayMetrics.recordWebSocketConnectionRejection,
-  isReady: isRelayReady,
+  isReady: relayLifecycle.isReady,
   send,
   roomKey,
   isKnownRoom,
@@ -596,20 +595,6 @@ function requesterFromRequest(body: unknown, sessionId: unknown): { id: string; 
   };
 }
 
-function isAllowedCorsOrigin(origin: string | undefined): boolean {
-  if (!origin) return true;
-  if (allowedCorsOrigins.length > 0) return allowedCorsOrigins.includes(origin);
-  return nodeEnv !== "production";
-}
-
-function isRelayReady(): boolean {
-  return !relayShuttingDown;
-}
-
-function isShutdownExemptPath(path: string): boolean {
-  return path === "/healthz" || path === "/readyz" || path === "/metrics";
-}
-
 function displayNameForUser(user: AuthSession["user"]): string {
   return user.name?.trim() || user.login;
 }
@@ -663,78 +648,9 @@ export async function closeRelayStore() {
 }
 
 export function closeRelayServer() {
-  return new Promise<void>((resolve, reject) => {
-    server.close((error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve();
-    });
-  });
+  return relayLifecycle.closeServer();
 }
 
 export async function shutdownRelay() {
-  if (!relayShutdownPromise) {
-    relayShuttingDown = true;
-    relayShutdownPromise = runRelayShutdown();
-  }
-  await relayShutdownPromise;
-}
-
-async function runRelayShutdown() {
-  if (shutdown.drainMs > 0) await delay(shutdown.drainMs);
-  const socketClose = closeRelayWebSockets();
-  await Promise.allSettled([
-    closeRelayServer(),
-    closeRelayWebSocketServer()
-  ]);
-  await socketClose;
-  await closeRelayStore();
-}
-
-async function closeRelayWebSocketServer() {
-  await new Promise<void>((resolve) => {
-    wss.close(() => resolve());
-  });
-}
-
-async function closeRelayWebSockets() {
-  const sockets = Array.from(wss.clients);
-  if (sockets.length === 0) return;
-  const closed = Promise.all(sockets.map((socket) => waitForSocketClose(socket)));
-  await Promise.race([
-    closed,
-    delay(shutdown.graceMs).then(() => {
-      for (const socket of sockets) {
-        if (socket.readyState !== WebSocket.CLOSED) socket.terminate();
-      }
-    })
-  ]);
-}
-
-function waitForSocketClose(socket: WebSocket): Promise<void> {
-  return new Promise((resolve) => {
-    if (socket.readyState === WebSocket.CLOSED) {
-      resolve();
-      return;
-    }
-    let settled = false;
-    const done = () => {
-      if (settled) return;
-      settled = true;
-      socket.off("close", done);
-      socket.off("error", done);
-      resolve();
-    };
-    socket.once("close", done);
-    socket.once("error", done);
-    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
-      socket.close(1012, "Relay shutting down");
-    }
-  });
-}
-
-function delay(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+  await relayLifecycle.shutdown();
 }

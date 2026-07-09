@@ -1,0 +1,28 @@
+import { z } from "zod";
+
+export const maxRelayIdChars = 160;
+export const relayIdPattern = /^[A-Za-z0-9_-]+$/;
+export const TeamId = z.string().min(3).max(maxRelayIdChars).regex(relayIdPattern);
+export const RoomId = z.string().min(3).max(maxRelayIdChars).regex(relayIdPattern);
+export const maxEnvelopeIdChars = 160;
+export const maxDeviceIdChars = 160;
+export const maxUserIdChars = 160;
+export const maxDisplayNameChars = 120;
+export const maxShortTextChars = 512;
+export const maxMediumTextChars = 4_096;
+export const maxLongTextChars = 120_000;
+export const maxCiphertextNonceChars = 4_096;
+export const maxCiphertextPayloadChars = 70_000_000;
+export const maxProjectPathChars = 2_048;
+export const maxUrlChars = 2_048;
+export const maxCodexModelChars = 80;
+export const maxCodexThreadIdChars = 512;
+export const maxCodexQueueSize = 5;
+export const maxTerminalSnapshots = 20;
+export const maxGitWorkflowResults = 20;
+export const maxGitHubActionRuns = 20;
+export const maxWrappedCiphertextChars = 4_096;
+export const maxRoomSecretRawKeyChars = 128;
+export const publicKeyCoordinatePattern = /^[A-Za-z0-9_-]+$/;
+export const DeviceId = z.string().min(8).max(maxDeviceIdChars);
+export const UserId = z.string().min(1).max(maxUserIdChars);

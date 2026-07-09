@@ -8,13 +8,6 @@ import type {
   TeamRecord
 } from "@multaiplayer/protocol";
 import {
-  codexModelOptions,
-  defaultBrowserAllowedOrigins,
-  defaultBrowserProfilePersistent,
-  defaultCodexModel,
-  defaultRoomMode
-} from "@multaiplayer/protocol";
-import {
   createRoomSecret,
   decodeRoomInviteSecret,
   decryptJson,
@@ -33,7 +26,6 @@ import {
   loadRoomSecret,
   replaceRoomSecret
 } from "../lib/localHistory";
-import { defaultProjectPath } from "../lib/localBackend";
 import { createInvite, lookupInvite } from "../lib/workspaceClient";
 import {
   canActOnRoomInviteRequest,
@@ -56,6 +48,12 @@ import {
 } from "../lib/noSecretRoomInvite";
 import { formatMessageTime } from "../lib/appFormatters";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
+import {
+  buildFallbackInvitedRoom,
+  buildPendingInviteJoinRequest,
+  inviteJoinRequestPlaintext,
+  parseInviteInput
+} from "../lib/inviteActionsHelpers";
 import { useAppStore } from "../store/appStore";
 import type { RelayClient } from "../lib/relayClient";
 import type {
@@ -452,54 +450,30 @@ export function useInviteActions({
         name: "Invited team",
         members: 1
       });
-      upsertRoom(ensureRoomDefaults({
-        id: inviteSecret.roomId,
+      upsertRoom(buildFallbackInvitedRoom({
         teamId: inviteSecret.teamId,
-        name: inviteSecret.roomName,
-        projectPath: defaultProjectPath,
-        host: "No host",
-        hostStatus: "offline",
-        approvalPolicy: "ask_every_turn",
-        approvalDelegationPolicy: "host_only",
-        trustedApproverUserIds: [],
-        mode: defaultRoomMode,
-        codexModel: defaultCodexModel,
-        browserAllowedOrigins: defaultBrowserAllowedOrigins,
-        browserProfilePersistent: defaultBrowserProfilePersistent,
-        unread: 0
+        roomId: inviteSecret.roomId,
+        roomName: inviteSecret.roomName
       }));
     }
 
     initializeMessagesForRoom(inviteSecret.roomId);
     selectWorkspaceRoom(inviteSecret.teamId, inviteSecret.roomId);
     clearInviteSecretInput();
-    const requestedAt = new Date().toISOString();
-    const request: InviteJoinRequest = {
-      eventType: "invite.request",
-      id: `${deviceId}:${crypto.randomUUID()}`,
-      inviteId: inviteId ?? undefined,
-      requester: localUser.name,
-      requesterUserId: localUser.id,
-      requesterDeviceId: deviceId,
-      requesterPublicKeyJwk: deviceIdentity ? jsonWebKeyToDevicePublicKeyJwk(deviceIdentity.publicKeyJwk) : undefined,
-      requesterPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
-      requestedAt,
-      note: `Requesting access to ${acceptedRoomName}.`,
-      status: "pending"
-    };
+    const request = buildPendingInviteJoinRequest({
+      deviceId,
+      deviceIdentity,
+      inviteId,
+      localUser,
+      roomName: acceptedRoomName
+    });
     appendInviteRequest(inviteSecret.roomId, request);
-    const published = await publishInviteJoinRequest(inviteSecret.teamId, inviteSecret.roomId, {
-      eventType: request.eventType,
-      id: request.id,
-      inviteId: request.inviteId,
-      requester: request.requester,
-      requesterUserId: request.requesterUserId,
-      requesterDeviceId: request.requesterDeviceId,
-      requesterPublicKeyJwk: request.requesterPublicKeyJwk,
-      requesterPublicKeyFingerprint: request.requesterPublicKeyFingerprint,
-      requestedAt: request.requestedAt,
-      note: request.note
-    }, inviteSecret.hostPublicKeyJwk);
+    const published = await publishInviteJoinRequest(
+      inviteSecret.teamId,
+      inviteSecret.roomId,
+      inviteJoinRequestPlaintext(request),
+      inviteSecret.hostPublicKeyJwk
+    );
     setInviteMessageForRoom(inviteSecret.roomId, published
       ? `Requested access to ${acceptedRoomName}. The host needs to approve this device before the room unlocks.`
       : `Imported ${acceptedRoomName} metadata. Send again after the relay reconnects so the host can approve access.`);
@@ -524,21 +498,10 @@ export function useInviteActions({
         name: "Invited team",
         members: 1
       });
-      upsertRoom(ensureRoomDefaults({
-        id: inviteSecret.roomId,
+      upsertRoom(buildFallbackInvitedRoom({
         teamId: inviteSecret.teamId,
-        name: inviteSecret.roomName,
-        projectPath: defaultProjectPath,
-        host: "No host",
-        hostStatus: "offline",
-        approvalPolicy: "ask_every_turn",
-        approvalDelegationPolicy: "host_only",
-        trustedApproverUserIds: [],
-        mode: defaultRoomMode,
-        codexModel: defaultCodexModel,
-        browserAllowedOrigins: defaultBrowserAllowedOrigins,
-        browserProfilePersistent: defaultBrowserProfilePersistent,
-        unread: 0
+        roomId: inviteSecret.roomId,
+        roomName: inviteSecret.roomName
       }));
     }
 
@@ -551,33 +514,19 @@ export function useInviteActions({
     selectWorkspaceRoom(inviteSecret.teamId, inviteSecret.roomId);
     clearInviteSecretInput();
     if (approvalRequested) {
-      const requestedAt = new Date().toISOString();
-      const request: InviteJoinRequest = {
-        eventType: "invite.request",
-        id: `${deviceId}:${crypto.randomUUID()}`,
-        inviteId: inviteId ?? undefined,
-        requester: localUser.name,
-        requesterUserId: localUser.id,
-        requesterDeviceId: deviceId,
-        requesterPublicKeyJwk: deviceIdentity ? jsonWebKeyToDevicePublicKeyJwk(deviceIdentity.publicKeyJwk) : undefined,
-        requesterPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
-        requestedAt,
-        note: `Requesting access to ${acceptedRoomName}.`,
-        status: "pending"
-      };
-      appendInviteRequest(inviteSecret.roomId, request);
-      const published = await publishInviteJoinRequest(inviteSecret.teamId, inviteSecret.roomId, {
-        eventType: request.eventType,
-        id: request.id,
-        inviteId: request.inviteId,
-        requester: request.requester,
-        requesterUserId: request.requesterUserId,
-        requesterDeviceId: request.requesterDeviceId,
-        requesterPublicKeyJwk: request.requesterPublicKeyJwk,
-        requesterPublicKeyFingerprint: request.requesterPublicKeyFingerprint,
-        requestedAt: request.requestedAt,
-        note: request.note
+      const request = buildPendingInviteJoinRequest({
+        deviceId,
+        deviceIdentity,
+        inviteId,
+        localUser,
+        roomName: acceptedRoomName
       });
+      appendInviteRequest(inviteSecret.roomId, request);
+      const published = await publishInviteJoinRequest(
+        inviteSecret.teamId,
+        inviteSecret.roomId,
+        inviteJoinRequestPlaintext(request)
+      );
       setInviteMessageForRoom(inviteSecret.roomId, published
         ? `Imported ${acceptedRoomName} and sent a join request to the active host.`
         : `Imported ${acceptedRoomName}. Send again after the relay reconnects so the host can approve access.`);
@@ -592,19 +541,12 @@ export function useInviteActions({
     setSelectedInviteMessage(null);
     clearInviteSecretInput();
     try {
-      const [beforeHash, afterHash] = raw.includes("#") ? raw.split("#") : ["", raw];
-      const inviteId = beforeHash.includes("?")
-        ? new URLSearchParams(beforeHash.split("?").at(-1) ?? "").get("invite")
-        : null;
-      const fragment = afterHash ?? raw;
-      const params = new URLSearchParams(fragment.replace(/^#/, ""));
-      const joinInvite = params.get("multaiplayerJoin");
+      const { approvalRequested, encodedInvite, inviteId, joinInvite } = parseInviteInput(raw);
       if (joinInvite) {
         await requestNoSecretInviteAccess(joinInvite, inviteId);
         return;
       }
-      const encoded = params.get("multaiplayerInvite") ?? raw;
-      await acceptInvite(encoded, inviteId, params.get("approval") === "request");
+      await acceptInvite(encodedInvite, inviteId, approvalRequested);
     } catch (error) {
       setSelectedInviteMessage(`Invite could not be imported: ${String(error)}`);
     }
