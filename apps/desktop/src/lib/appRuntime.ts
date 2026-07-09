@@ -18,6 +18,7 @@ export function loadThemeMode(): ThemeMode {
 }
 
 export function roomLockMessage(room: RoomRecord, revoked: boolean): string {
+  if (room.archivedAt) return "This room is archived. Restore it before sending messages or running host-side actions.";
   if (revoked) return membershipRemovedRoomMessage(room.name);
   return "This room was forgotten on this device. Rejoin from an invite or get host approval to unlock messages again.";
 }

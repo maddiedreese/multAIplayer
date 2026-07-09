@@ -43,7 +43,8 @@ import {
   isRequestStatusPlaintextPayload,
   isRoomKeyRotationPlaintextPayload,
   isRoomSettingsPlaintextPayload,
-  isTerminalResultPlaintextPayload
+  isTerminalResultPlaintextPayload,
+  isWorkspaceFileSaveRequestPlaintextPayload
 } from "../lib/localRoomHistoryPayload";
 import { formatMessageTime } from "../lib/appFormatters";
 import { isRoomKeyRotationEnvelopeAuthorized } from "../lib/roomKeyRotation";
@@ -62,7 +63,8 @@ import type {
   QueuedCodexTurn,
   RelayStatus,
   RoomPresence,
-  TerminalCommandRequest
+  TerminalCommandRequest,
+  WorkspaceFileSaveRequest
 } from "../types";
 
 interface LocalUser {
@@ -123,6 +125,8 @@ interface UseRelaySubscriptionOptions {
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   appendBrowserRequest: (roomId: string, request: BrowserAccessRequest) => void;
   updateBrowserRequestStatus: (roomId: string, requestId: string, status: BrowserAccessRequest["status"]) => void;
+  appendFileSaveRequest: (roomId: string, request: WorkspaceFileSaveRequest) => void;
+  updateFileSaveRequestStatus: (roomId: string, requestId: string, status: WorkspaceFileSaveRequest["status"]) => void;
   appendLocalPreviewEvent: (roomId: string, event: LocalPreviewRecord) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
@@ -184,6 +188,8 @@ export function useRelaySubscription({
   setApprovalVisibleForRoom,
   appendBrowserRequest,
   updateBrowserRequestStatus,
+  appendFileSaveRequest,
+  updateFileSaveRequestStatus,
   appendLocalPreviewEvent,
   setChatMessageForRoom,
   setHostMessageForRoom,
@@ -380,6 +386,19 @@ export function useRelaySubscription({
           if (message.envelope.kind === "browser.event") {
             const plaintext = await decryptJson<RequestStatusPlaintextPayload>(roomPayload, secret);
             updateBrowserRequestStatus(message.envelope.roomId, plaintext.requestId, plaintext.status);
+          }
+          if (message.envelope.kind === "workspace.request") {
+            const plaintext = await decryptJson<unknown>(roomPayload, secret);
+            if (isWorkspaceFileSaveRequestPlaintextPayload(plaintext)) {
+              appendFileSaveRequest(message.envelope.roomId, { ...plaintext, status: "pending" });
+              setChatMessageForRoom(message.envelope.roomId, `${plaintext.requester} requested a file save.`);
+            }
+          }
+          if (message.envelope.kind === "workspace.event") {
+            const plaintext = await decryptJson<unknown>(roomPayload, secret);
+            if (isRequestStatusPlaintextPayload(plaintext)) {
+              updateFileSaveRequestStatus(message.envelope.roomId, plaintext.requestId, plaintext.status);
+            }
           }
           if (message.envelope.kind === "preview.event") {
             const plaintext = await decryptJson<unknown>(roomPayload, secret);

@@ -56,10 +56,10 @@ export function useWorkspaceUiState({
   const chatEditsByRoom = useAppStore((state) => state.chatEditsByRoom);
   const chatDeletesByRoom = useAppStore((state) => state.chatDeletesByRoom);
   const replaceTeams = useCallback((nextTeams: TeamRecord[]) => {
-    setTeams(nextTeams);
+    setTeams(nextTeams.filter((team) => !team.deletedAt));
   }, []);
   const replaceRooms = useCallback((nextRooms: RoomRecord[]) => {
-    setRooms(nextRooms);
+    setRooms(nextRooms.filter((room) => !room.deletedAt));
   }, []);
   const selectExistingTeamOrFirst = useCallback((nextTeams: TeamRecord[]) => {
     setSelectedTeam((current) =>
@@ -86,6 +86,7 @@ export function useWorkspaceUiState({
   }, []);
   const upsertTeamRecord = useCallback((team: TeamRecord) => {
     setTeams((current) => {
+      if (team.deletedAt) return current.filter((item) => item.id !== team.id);
       if (current.some((item) => item.id === team.id)) {
         return current.map((item) => (item.id === team.id ? team : item));
       }
@@ -93,10 +94,16 @@ export function useWorkspaceUiState({
     });
   }, []);
   const upsertRoomRecord = useCallback((room: RoomRecord) => {
-    setRooms((current) => upsertRoomPreservingUnread(current, ensureRoomDefaults(room)));
+    setRooms((current) => {
+      if (room.deletedAt) return current.filter((item) => item.id !== room.id);
+      return upsertRoomPreservingUnread(current, ensureRoomDefaults(room));
+    });
   }, []);
   const replaceRoomRecord = useCallback((room: RoomRecord) => {
-    setRooms((current) => replaceRoomPreservingUnread(current, ensureRoomDefaults(room)));
+    setRooms((current) => {
+      if (room.deletedAt) return current.filter((item) => item.id !== room.id);
+      return replaceRoomPreservingUnread(current, ensureRoomDefaults(room));
+    });
   }, []);
   const markRoomReadById = useCallback((roomId: string) => {
     setRooms((current) => markRoomReadRecord(current, roomId));
@@ -119,6 +126,14 @@ export function useWorkspaceUiState({
   const selectTeamRoom = useCallback((teamId: string, fallbackRoomId: string) => {
     setSelectedTeam(teamId);
     setSelectedRoomId(rooms.find((room) => room.teamId === teamId)?.id ?? fallbackRoomId);
+  }, [rooms]);
+
+  useLayoutEffect(() => {
+    setSelectedTeam((current) => (teams.some((team) => team.id === current) ? current : teams[0]?.id ?? ""));
+  }, [teams]);
+
+  useLayoutEffect(() => {
+    setSelectedRoomId((current) => (rooms.some((room) => room.id === current) ? current : rooms[0]?.id ?? ""));
   }, [rooms]);
 
   useLayoutEffect(() => {

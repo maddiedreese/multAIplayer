@@ -15,7 +15,8 @@ import type {
   LocalRoomHistoryPayload,
   QueuedCodexTurn,
   RoomGoal,
-  TerminalCommandRequest
+  TerminalCommandRequest,
+  WorkspaceFileSaveRequest
 } from "../types";
 import type {
   ChatDeletePlaintextPayload,
@@ -42,6 +43,7 @@ interface UseLocalHistoryPersistenceOptions {
   chatEdits: ChatEditPlaintextPayload[];
   chatDeletes: ChatDeletePlaintextPayload[];
   terminalRequests: TerminalCommandRequest[];
+  fileSaveRequests: WorkspaceFileSaveRequest[];
   browserRequests: BrowserAccessRequest[];
   inviteRequests: InviteJoinRequest[];
   codexEvents: CodexRoomEvent[];
@@ -69,6 +71,7 @@ export function useLocalHistoryPersistence({
   chatEdits,
   chatDeletes,
   terminalRequests,
+  fileSaveRequests,
   browserRequests,
   inviteRequests,
   codexEvents,
@@ -92,6 +95,7 @@ export function useLocalHistoryPersistence({
       chatDeletes,
       readState: localRoomReadStateForHistory(selectedRoom, messages),
       terminalRequests,
+      fileSaveRequests,
       browserRequests,
       inviteRequests,
       codexEvents,
@@ -109,6 +113,7 @@ export function useLocalHistoryPersistence({
     });
   }, [
     browserRequests,
+    fileSaveRequests,
     historySettings.enabled,
     historySettings.retentionDays,
     hostHandoffs,

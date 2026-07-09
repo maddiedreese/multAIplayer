@@ -28,6 +28,7 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       } = state.codexRuntimeByRoom[roomId] ?? {};
       const chatEdits = payload.chatEdits ?? [];
       const chatDeletes = payload.chatDeletes ?? [];
+      const fileSaveRequests = payload.fileSaveRequests ?? [];
 
       return {
         messagesByRoom: payload.messages.length
@@ -58,6 +59,15 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
               }
             }
           : state.browserByRoom,
+        filePanelByRoom: fileSaveRequests.length
+          ? {
+              ...state.filePanelByRoom,
+              [roomId]: {
+                ...state.filePanelByRoom[roomId],
+                saveRequests: fileSaveRequests
+              }
+            }
+          : state.filePanelByRoom,
         inviteByRoom: payload.inviteRequests.length
           ? {
               ...state.inviteByRoom,

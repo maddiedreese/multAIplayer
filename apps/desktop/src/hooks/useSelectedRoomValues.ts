@@ -125,6 +125,7 @@ export function useSelectedRoomValues({
     ),
     fileBusy: filePanel.busy ?? false,
     fileMessage: filePanel.message ?? null,
+    fileSaveRequests: filePanel.saveRequests ?? [],
     inviteLink: invite.link ?? "",
     inviteApprovalGate: invite.approvalGate ?? true,
     inviteMessage: invite.message ?? null,

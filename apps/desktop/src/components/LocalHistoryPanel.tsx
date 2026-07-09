@@ -3,7 +3,6 @@ import type { ApprovalPolicy } from "@multaiplayer/protocol";
 
 const selectableApprovalPolicies: ApprovalPolicy[] = [
   "ask_every_turn",
-  "auto_chat_only",
   "never_host"
 ];
 

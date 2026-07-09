@@ -8,8 +8,7 @@ import {
 import { defaultProjectPath } from "../lib/localBackend";
 import {
   approvalDelegationPolicyLabels,
-  approvalPolicyLabels,
-  roomModeLabels
+  approvalPolicyLabels
 } from "../seedData";
 import type { useAppHostHandoffActions } from "./useAppHostHandoffActions";
 import type { useAppInviteActions } from "./useAppInviteActions";
@@ -293,10 +292,6 @@ export function useAppViewModel({
         onSelectDelegationPolicy: roomRuntime.setApprovalDelegationPolicy,
         onSelectSandboxLevel: roomRuntime.setCodexSandboxLevel
       },
-      roomMode: {
-        labels: roomModeLabels,
-        onToggleMode: roomRuntime.toggleRoomMode
-      },
       selectedCodexModel,
       selectedCodexReasoningEffort,
       selectedCodexSpeed,
@@ -361,7 +356,9 @@ export function useAppViewModel({
         selectedDiff,
         fileBusy,
         fileMessage,
+        fileSaveRequests: selected.fileSaveRequests,
         canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
+        isActiveHost: roomInteraction.isActiveHost,
         selectedFileRisks: roomDisplay.selectedFileRisks,
         selectedFileNeedsAttachmentReview: roomDisplay.selectedFileNeedsAttachmentReview,
         selectedSensitiveFileReviewed: roomDisplay.selectedSensitiveFileReviewed,
@@ -455,7 +452,6 @@ export function useAppViewModel({
       isActiveHost: roomInteraction.isActiveHost,
       relayHttpDraft: appConfigState.relayHttpDraft,
       relayWsDraft: appConfigState.relayWsDraft,
-      selectedRoomMode: selectedRoom.mode,
       roomSettingsGateMessage: roomInteraction.roomSettingsGateMessage,
       notificationsMuted: roomSettingsState.notificationMutedRoomIds.has(selectedRoom.id),
       historySettings: historyDefaultsState.historySettings,
@@ -478,6 +474,8 @@ export function useAppViewModel({
       onChooseNewRoomProjectPath: workspaceFlow.chooseNewRoomProjectPath,
       onCreateRoom: workspaceFlow.addRoom,
       onSelectRoom: workspaceState.setSelectedRoomId,
+      onSetTeamLifecycle: workspaceFlow.setTeamLifecycle,
+      onSetRoomLifecycle: workspaceFlow.setRoomLifecycle,
       onSelectSidebarPanel: workspaceState.setActiveSidebarPanel,
       onToggleTheme: theme.toggleThemeMode,
       onRotateDeviceIdentity: roomRuntime.rotateDeviceIdentity,
@@ -486,7 +484,6 @@ export function useAppViewModel({
       onRelayWsDraftChange: appConfigState.setRelayWsDraft,
       onResetRelay: appConfigState.resetRelayConfiguration,
       onSaveRelay: appConfigState.saveRelayConfiguration,
-      onToggleRoomMode: roomRuntime.toggleRoomMode,
       onNotificationsMutedChange: (muted) => setRoomNotificationsMuted(selectedRoom.id, muted),
       onHistorySettingsChange: workspaceFlow.updateLocalHistorySettings,
       onClearRoomHistory: workspaceFlow.clearRoomHistory,

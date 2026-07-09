@@ -111,12 +111,12 @@ test("terminal context requires host approval", () => {
   assert.equal(shouldAutoApproveChatOnlyTurn(summary, true), false);
 });
 
-test("Codex approval requires an unlocked active host but not workspace mode", () => {
+test("Codex approval requires an unlocked active host", () => {
   const host = { id: "github:maddie", name: "Maddie" };
   assert.equal(canApproveCodexTurn(room, host), true);
   assert.equal(canApproveCodexTurn(room, host, true), false);
   assert.equal(canApproveCodexTurn(room, { id: "github:peer", name: "Peer" }), false);
-  assert.equal(canApproveCodexTurn({ ...room, mode: { ...room.mode, code: false } }, host), false);
+  assert.equal(canApproveCodexTurn({ ...room, mode: { ...room.mode, code: false } }, host), true);
   assert.equal(canApproveCodexTurn({ ...room, approvalPolicy: "never_host" }, host), false);
 });
 
@@ -149,10 +149,10 @@ test("trusted-only delegated approvals still cannot authorize host execution", (
   assert.equal(canUserApprovalAuthorizeHostExecution(untrustedRoom, member.id), false);
 });
 
-test("Codex approvals reset when room modes change turn context", () => {
-  assert.equal(shouldResetCodexApprovalForRoomModeChange("code"), true);
-  assert.equal(shouldResetCodexApprovalForRoomModeChange("workspace"), true);
-  assert.equal(shouldResetCodexApprovalForRoomModeChange("browser"), true);
+test("Codex approvals do not reset for compatibility room mode changes", () => {
+  assert.equal(shouldResetCodexApprovalForRoomModeChange("code"), false);
+  assert.equal(shouldResetCodexApprovalForRoomModeChange("workspace"), false);
+  assert.equal(shouldResetCodexApprovalForRoomModeChange("browser"), false);
   assert.equal(shouldResetCodexApprovalForRoomModeChange("chat"), false);
 });
 
@@ -164,7 +164,7 @@ test("Codex approvals reset when room execution context changes", () => {
   assert.equal(shouldResetCodexApprovalForRoomUpdate(room, { ...room, trustedApproverUserIds: ["github:peer"] }), true);
   assert.equal(
     shouldResetCodexApprovalForRoomUpdate(room, { ...room, mode: { ...room.mode, workspace: true } }),
-    true
+    false
   );
   assert.equal(
     shouldResetCodexApprovalForRoomUpdate(room, { ...room, browserAllowedOrigins: ["https://github.com", "https://docs.github.com"] }),

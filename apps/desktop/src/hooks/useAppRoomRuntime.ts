@@ -1,8 +1,5 @@
 import { useEffect } from "react";
-import {
-  approvalPolicyLabels,
-  roomModeLabels
-} from "../seedData";
+import { approvalPolicyLabels } from "../seedData";
 import type { useAppHostHandoffActions } from "./useAppHostHandoffActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRelaySync } from "./useAppRelaySync";
@@ -86,6 +83,7 @@ export function useAppRoomRuntime({
     roomGoal,
     pendingAttachments,
     browserRequests,
+    fileSaveRequests,
     browserUrl,
     browserReason,
     gitStatus,
@@ -184,6 +182,7 @@ export function useAppRoomRuntime({
         gitStatus,
         activeCodexApproval: selectedRuntime.activeCodexApproval,
         queuedCodexApprovals: selectedRuntime.queuedCodexApprovals,
+        codexThreadId: selectedRuntime.selectedCodexThreadId,
         publishChatMessage: roomInteraction.publishChatMessage,
         handleCodexBrowserOpenCommand: relaySync.handleCodexBrowserOpenCommand,
         publishCodexQueueEvent: relaySync.publishCodexQueueEvent,
@@ -214,7 +213,6 @@ export function useAppRoomRuntime({
         selectedCodexSandboxLevel,
         projectPathDraft,
         approvalPolicyLabels,
-        roomModeLabels,
         roomSettingsGateMessage: roomInteraction.roomSettingsGateMessage,
         roomSettingsActor,
         reportRoomSettingsMutationInFlight: roomInteraction.reportRoomSettingsMutationInFlight,
@@ -359,6 +357,7 @@ export function useAppRoomRuntime({
         chatEdits: workspaceState.chatEditsByRoom[selectedRoom.id] ?? [],
         chatDeletes: workspaceState.chatDeletesByRoom[selectedRoom.id] ?? [],
         terminalRequests: selectedRuntime.terminalRequests,
+        fileSaveRequests,
         browserRequests,
         inviteRequests: selectedRuntime.inviteRequests,
         codexEvents: selectedRuntime.codexEvents,

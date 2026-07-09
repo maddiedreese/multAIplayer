@@ -1,6 +1,6 @@
 # Threat Model
 
-This document will track the security model for multAIplayer. The product goal is that the relay never stores plaintext transcripts, plaintext attachments, Codex credentials, OpenAI credentials, repo contents, or plaintext GitHub access tokens.
+This document describes the security model for multAIplayer. The product goal is that the relay never stores plaintext transcripts, plaintext attachments, Codex credentials, OpenAI credentials, repo contents, or plaintext GitHub access tokens.
 
 Initial trust boundaries:
 
@@ -53,7 +53,7 @@ The packaged Tauri app sets a Content Security Policy for the main multAIplayer 
 
 ## Diagnostics And Updates
 
-The alpha does not send telemetry automatically. The desktop keeps a small local diagnostics buffer of warning/error summaries and global crash events. Users can copy a diagnostics JSON bundle from Account settings when filing a bug. The bundle includes app version, runtime/platform metadata, relay origins, and redacted recent error entries; it is not intended to include transcripts, room secrets, terminal output, browser contents, file contents, invite fragments, or GitHub tokens.
+The alpha does not send telemetry automatically. The desktop keeps a small local diagnostics buffer of warning/error summaries and global crash events. Users can copy a diagnostics JSON bundle from Account settings when filing a bug. The bundle includes app version, runtime/platform metadata, relay origins, and redacted recent error entries; it is designed to exclude transcripts, room secrets, terminal output, browser contents, file contents, invite fragments, and GitHub tokens.
 
 The alpha does not use automatic updates. The desktop checks the public release manifest and shows an in-app banner when a newer version is available, with a stronger label for security updates. Users still manually download and install signed builds.
 

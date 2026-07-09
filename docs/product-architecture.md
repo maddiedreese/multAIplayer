@@ -1,15 +1,15 @@
 # multAIplayer Product And Architecture Spec
 
-Status: initial planning doc  
+Status: alpha product and architecture reference  
 License: Apache-2.0  
 Primary platform: macOS first  
 Desktop stack: Tauri  
 Repository: monorepo at `github.com/maddiedreese/multAIplayer`  
-Public posture: honest alpha
+Public posture: Public Alpha
 
 ## 1. Product Thesis
 
-multAIplayer is a private group chat app where your team can bring Codex into the conversation.
+multAIplayer helps teams build with Codex together.
 
 People chat normally in rooms. When the group needs help, someone invokes Codex with a button or `@Codex`. The active Codex host approves the turn, and their local Codex works from the chat since the last Codex response, included attachments, the selected local project folder, browser state, and terminal context. Codex can make code changes, run commands, commit, push, and open a PR while the room watches together.
 
@@ -19,15 +19,15 @@ The core promise:
 
 The short public pitch:
 
-> Group chat for coding with Codex. Private by default. Open source.
+> Build with Codex together. Private by default. Open source.
 
 ## 2. Non-Goals
 
 - Do not use OpenAI Platform API billing for the main Codex experience.
 - Do not collect, proxy, or store Codex access tokens.
-- Do not provide a browser-only version that spends ChatGPT or Codex subscription limits.
+- multAIplayer does not offer Codex Browser Use while the app-server surface does not support it.
 - Do not override Codex with a custom system prompt.
-- Do not support general whole-desktop computer use in v1.
+- multAIplayer does not offer Codex Computer Use while the app-server surface does not support it.
 - Do not persist plaintext chat transcripts on the relay.
 - Do not support multiple active projects in one room in v1.
 
@@ -59,25 +59,29 @@ A room is a chat space associated with one active project at a time.
 
 Rooms are spawned from teams and usually correspond to a project/local folder. A room has many human members and at most one active Codex host at a time.
 
+Rooms and teams support relay-backed archive, restore, and soft-delete lifecycle actions. Archived rooms move out of the normal sidebar into an archived view and can be restored, but clients treat them as locked for chat, file, terminal, browser, Git, and Codex actions. Deleting a room or team removes it from workspace listings and prevents future normal use. Delete is not retroactive erasure: devices may already hold room keys, local history, copied exports, screenshots, or project data.
+
 Room-level settings include:
 
 - active project folder;
 - active Codex host;
 - selected Codex model;
+- Codex reasoning, speed, and sandbox level;
 - host approval policy;
 - history retention;
 - browser profile persistence;
 - terminal list;
 - invite links;
+- local notification mute state;
 - visibility/secrets warning acknowledgement.
 
-The active project folder is a host-local path. The macOS app can attach it with a native folder picker or a pasted path. The relay stores the path as room metadata so members understand what project a room is about, but it never receives file contents. File reads, diffs, terminal commands, Git operations, and Codex turns execute from the active host's local desktop app after host approval.
+The active project folder is a host-local path. The macOS app can attach it with a native folder picker or a pasted path. The relay stores the path as room metadata so members understand what project a room is about, but it never receives plaintext file contents. Project tree, file preview, diff, and Git status visibility is shared to room members through encrypted room-scoped app state. Terminal commands, Git mutations, file saves, browser opens, and Codex turns execute from the active host's local desktop app after host approval.
 
 Native project file access is confined to the selected project root and rejects parent-directory or symlink escapes. File previews are read with a byte cap, and native diff output is bounded to 200,000 characters with an explicit truncation marker so generated files or large diffs do not overwhelm the desktop UI or copied context.
 
 The workspace file editor uses Monaco Editor for the primary code editing surface. Monaco is embedded as an MIT-licensed dependency with attribution in `THIRD_PARTY_NOTICES.md`; multAIplayer owns the surrounding room/file selection, save, attachment-review, diff, and approval workflows.
 
-Project file search, file preview, Git status, diff reads, Git remote inference, and approved Git workflows are local workspace actions. They are available only when workspace mode is enabled and the current device is the active host for the room. Other members can still see room-shared encrypted chat, attachments, browser decisions, Codex/Git events, and copied/shared outputs, but their clients do not independently read the host's local project path.
+Project file search, file editing, Git status, diff reads, and Git remote inference are room-visible project features while the room is unlocked. Active hosts can save file edits directly. Non-host file saves become encrypted file-save requests and require active-host approval before touching disk. Other mutating terminal, Git, browser, and Codex actions remain host-machine actions and require active-host approval before they run.
 
 Desktop git-status summaries are scoped per room/project. Switching rooms clears the visible status for the incoming room until its own local `git status` read completes, so changed-file counts, PR drafts, and diff summaries do not reuse another room's project state.
 
@@ -85,7 +89,7 @@ The relay bounds metadata before storage and broadcast: team names, room names, 
 
 The desktop client mirrors those bounds before creating teams/rooms, changing project paths or model ids, and accepting host handoff settings, so most invalid metadata is caught locally before it reaches the relay.
 
-When the active host changes approval policy, room mode, Codex model, project path, or browser profile persistence, the relay metadata updates for routing/sidebar freshness and the desktop also sends an encrypted `room.settings` activity event. Room members see a system transcript message after local decryption, while the relay cannot read the human-readable before/after activity text.
+When the active host changes approval policy, Codex model, project path, or browser profile persistence, the relay metadata updates for routing/sidebar freshness and the desktop also sends an encrypted `room.settings` activity event. Room members see a system transcript message after local decryption, while the relay cannot read the human-readable before/after activity text.
 
 ### Active Codex Host
 
@@ -93,7 +97,7 @@ The active host is the user whose local desktop app talks to Codex app-server fo
 
 Only one Codex host is active per room. Hosting can be handed off. When hosting is handed off, the new host receives the room context needed to continue: encrypted local chat history, attachments, room metadata, and project association. After decrypting locally, the new host can approve Codex turns against the full available room context.
 
-The alpha sends host handoff packages as encrypted `room.host` events. They summarize the project path, selected model, approval policy, recent-message count, attachment names, and terminal names so a new host can understand what they are inheriting before claiming the room. Accepting a handoff sends a second encrypted `room.host` acceptance event so the room roster stops presenting that handoff as available.
+The desktop sends host handoff packages as encrypted `room.host` events. They summarize the project path, selected model, approval policy, recent-message count, attachment names, and terminal names so a new host can understand what they are inheriting before claiming the room. Accepting a handoff sends a second encrypted `room.host` acceptance event so the room roster stops presenting that handoff as available.
 
 If the active host disconnects, the room remains available for human chat but becomes Codex-inactive until another member hosts.
 
@@ -105,23 +109,23 @@ Users chat normally in a room. Messages, replies, reactions, edits, deletes, att
 
 People can edit or delete their own pre-Codex messages while those messages are still mutable. When a Codex turn starts, the desktop records the consumed room message ids in the encrypted turn event; those messages stop showing edit/delete actions because they may already be part of Codex context. Queued Codex turns that have not started yet continue to refresh against the current room text.
 
-Invite approval requests are encrypted room events. A gated invite must be generated by the active host because it carries that host device public key. It imports room metadata but not the room key, then sends a device-sealed join request encrypted to the active host device public key. If the host approves, the approval event is device-sealed to the requester and includes the room key wrapped to the requester device public key. The alpha treats this as an approval workflow and visibility boundary, not as full cryptographic member removal; production-grade gated membership still needs key rotation after removal.
+Invite approval requests are encrypted room events. A gated invite must be generated by the active host because it carries that host device public key. It imports room metadata but not the room key, then sends a device-sealed join request encrypted to the active host device public key. If the host approves, the approval event is device-sealed to the requester and includes the room key wrapped to the requester device public key. This is an approval workflow and visibility boundary, not full cryptographic member removal; production-grade gated membership needs stronger key epochs after removal.
 
-Active hosts can rotate a room key for future messages and invite links. The rotation is published as an encrypted room event using the current room key, then clients that can decrypt that event replace their local room key and clear stale encrypted local-history ciphertext before future saves use the new key. This is useful after accidental direct-invite sharing or routine hygiene, but it is not full member removal in the alpha: any device that still has the old room key and can receive the rotation event can learn the new key. Strong removal still requires relay membership enforcement, key rotation that excludes removed devices, and recovery semantics; the alpha enforces relay membership removal and stale-invite revocation, but key exclusion remains future work.
+Active hosts can rotate a room key for future messages and invite links. The rotation is published as an encrypted room event using the current room key, then clients that can decrypt that event replace their local room key and clear stale encrypted local-history ciphertext before future saves use the new key. This is useful after accidental direct-invite sharing or routine hygiene, but it is not full member removal in the alpha: any device that still has the old room key and can receive the rotation event can learn the new key. Strong removal requires relay membership enforcement, key rotation that excludes removed devices, and recovery semantics. The alpha enforces relay membership removal and stale-invite revocation; key exclusion is outside the alpha security contract.
 
-If a room is forgotten on the device or relay membership is revoked, the desktop treats it as locally locked. While locked, the app blocks chat sends and reactions, host claiming, host handoff acceptance, invite generation, invite approval decisions, terminal request decisions, room-key rotation, and host-controlled room settings such as model, approval policy, room modes, project folder, and browser policy until the room is unlocked with a fresh invite or key.
+If a room is forgotten on the device or relay membership is revoked, the desktop treats it as locally locked. While locked, the app blocks chat sends and reactions, host claiming, host handoff acceptance, invite generation, invite approval decisions, terminal request decisions, room-key rotation, project inspection, and host-controlled room settings such as model, approval policy, project folder, and browser policy until the room is unlocked with a fresh invite or key.
 
-The alpha embeds small text/code attachment previews directly in encrypted chat payloads: up to 5 files per message, 80 KB per file, and 200 KB total preview content per message. Larger previews are encrypted locally, uploaded to relay blob storage as ciphertext, referenced from the encrypted chat message by blob id, and decrypted locally into the file preview pane when a room member opens them. Serialized encrypted room envelopes are also bounded by the relay before WebSocket fanout and backlog storage, so large file previews must use encrypted blob storage rather than oversized room events.
+Small text/code attachment previews can be embedded directly in encrypted chat payloads: up to 5 files per message, 80 KB per file, and 200 KB total preview content per message. Larger previews are encrypted locally, uploaded to relay blob storage as ciphertext, referenced from the encrypted chat message by blob id, and decrypted locally into the file preview pane when a room member opens them. Serialized encrypted room envelopes are also bounded by the relay before WebSocket fanout and backlog storage, so large file previews must use encrypted blob storage rather than oversized room events.
 
 Codex approval distinguishes inline attachment content from encrypted blob references. Inline text previews are included in the Codex turn package after host approval. Encrypted blob attachments are listed by name and blob reference only in the alpha Codex turn package, so approving a turn does not silently decrypt and inject large files into Codex context.
 
 Composer text and attachment drafts are scoped per room. If a user switches rooms, unfinished message text stays with its original room. If a large encrypted attachment blob finishes uploading after a switch, the finished attachment remains queued only for the room where the upload began.
 
-Room goals are local focus state for the selected room. A user can start one with `/goal` or `/goals`, pause/resume it, edit it, or delete it. Goals are not relay-shared room events; when encrypted local history is enabled, the current goal is saved inside that room's encrypted local-history payload.
+Room goals use Codex thread Goal mode. After a room has an approved Codex thread, `/goal <objective>` calls Codex app-server's thread goal API. Pause, resume, edit, and clear controls update the Codex thread goal, and local history can cache the latest displayed goal state with the room's Codex thread id.
 
 Project file previews and encrypted attachment blob opens are also tied to the originating room. If a room switch happens while a file read or blob decrypt is in flight, the completed read is ignored rather than rendered into the newly selected room's inspector. Attachment previews are blocked while a room is locally locked after forget or relay membership revocation.
 
-The app keeps encrypted local history with a default retention window of 30 days. Retention is configurable per room, and each team can define the default retention policy inherited by newly created rooms. The local encrypted room payload includes chat messages plus host-side workflow records such as terminal requests, terminal snapshots, browser approvals, Codex events, Git workflow events, GitHub Actions refreshes, and host handoff packages.
+The app keeps encrypted local history with a default retention window of 30 days. Retention is configurable per room, and each team can define the default retention policy inherited by newly created rooms. The local encrypted room payload includes chat messages plus workflow records such as terminal requests, terminal snapshots, non-host file-save requests, browser approvals, Codex events, Git workflow events, GitHub Actions refreshes, and host handoff packages.
 
 ### Invoke Codex
 
@@ -141,11 +145,11 @@ On invocation, multAIplayer builds a turn package containing:
 
 Attachments are included by default. Before the turn starts, the active host sees an approval sheet showing exactly what Codex will receive.
 
-Codex turn execution is an active-host local workspace action in the macOS alpha. The approval summary includes project path, Git status, and terminal names only when workspace mode is enabled, the room is unlocked, and the current device is the active host for that room. Stale approval sheets are rechecked at approval time before the app calls the local Codex app-server.
+Codex turn execution is an active-host local workspace action in the macOS app. The approval summary includes project path, Git status, terminal names, attachments, and approved browser context that Codex will receive. Stale approval sheets are rechecked at approval time before the app calls the local Codex app-server.
 
 Codex invocations are proposed before they run. Any member can tag Codex or press invoke, but that creates a pending room-visible proposal. Only the active host, checked by stable host user id at approval time, can authorize the proposal to spend that host's Codex subscription or touch that host's machine. If host role transfers while a proposal is waiting, the proposal remains queued and the new active host can approve or decline it.
 
-Codex proposals are queued when another proposal is pending or a turn is running. The alpha queue is bounded to five waiting turns, renders in the room, can be cancelled by the requester or host, times out if host approval does not arrive, and is saved in encrypted local history so handoff/reload context stays coherent.
+Codex proposals are queued when another proposal is pending or a turn is running. The queue is bounded to five waiting turns, renders in the room, can be cancelled by the requester or host, times out if host approval does not arrive, and is saved in encrypted local history so handoff/reload context stays coherent.
 
 Example approval summary:
 
@@ -168,12 +172,9 @@ The host can approve, deny, or adjust included context where supported.
 Initial room approval presets:
 
 - Ask every Codex turn.
-- Host approves chat-only turns.
 - Never host this room.
 
-Approval policies are host-side. They do not grant other users access to the host's Codex credentials, project files, browser state, or shell.
-
-In the alpha, Codex turns are not auto-approved. The chat-only preset is retained as a compatibility label for room defaults, but every invocation still becomes a proposal that requires the active host to approve before the local Codex app-server is called. High-privilege turns, such as full-access Codex or terminal/workspace/browser context, are called out distinctly in the approval sheet.
+Approval policies are host-side. They do not grant other users access to the host's Codex credentials, browser state, or shell. Every invocation becomes a proposal that requires the active host to approve before the local Codex app-server is called. High-privilege turns, such as full-access Codex or terminal/workspace/browser context, are called out distinctly in the approval sheet.
 
 ### Terminals
 
@@ -193,17 +194,19 @@ The macOS alpha bounds approved one-shot terminal commands and interactive termi
 
 Browser mode is room-scoped. The active host can open a normal in-app browser column for the room, and Codex can ask to open a URL such as localhost in that same column. The browser surface is a Tauri/Wry WebView with room-scoped tabs, address entry, refresh, expansion, and URL-stack navigation. The room keeps multiple browser tabs in local UI state, and the selected tab is mounted into the active WebView surface. Browser URLs and signed-in pages are treated as host-visible room context, so Codex browser use stays behind the host approval boundary.
 
-Browser access requests require an unlocked browser-enabled room. Browser approvals, denials, isolated browser opens, and browser profile resets require the current device to be the active host for that unlocked browser-enabled room.
+Browser access requests require an unlocked room. Browser approvals, denials, isolated browser opens, and browser profile resets require the current device to be the active host for that unlocked room.
 
 The relay can see that a `browser.request` or `browser.event` envelope exists, but not the requested URL, reason, or decision details. Browser approval and denial decisions render as local system transcript messages after decryption, so room members can see the host-side browser audit trail without exposing it to the relay. Approved URLs can be opened as tabs in a room/project-scoped Tauri/Wry WebView surface on the host machine. Browser profile persistence is a host-controlled room setting: profiles persist by default, hosts can reset them manually, and refresh mode closes and clears the room/project browser profile before each approved open. The alpha keeps this as an explicit host action; deeper browser automation can be added behind the same approval boundary.
 
-When a host shares a local build through a Cloudflare Quick Tunnel, the resulting `trycloudflare.com` URL is opened from the local preview card as a room browser tab inside multAIplayer, not as an external system browser tab. Copying the link remains an explicit separate action.
+Codex Browser Use is not offered in multAIplayer because the Codex app-server API surface this app uses does not support it.
+
+Local preview sharing uses `cloudflared` on the active host's machine to create a temporary Cloudflare Quick Tunnel for an explicit localhost or `127.0.0.1` URL. The relay does not proxy preview traffic; it only routes the encrypted room event that announces the generated `trycloudflare.com` URL. When a host shares a local build, the resulting URL is opened from the local preview card as a room browser tab inside multAIplayer, not as an external system browser tab. The host can stop the tunnel from the room, and copying the link remains an explicit separate action. See [local-preview-sharing.md](local-preview-sharing.md) for install and risk details.
 
 ### GitHub And Git
 
 GitHub is used for identity in v1.
 
-GitHub OAuth should trend toward incremental permissions. In the alpha, the relay exposes a configurable `GITHUB_OAUTH_SCOPES` value and the app displays the active scopes in Account settings. The default is `read:user public_repo` for open-source PR creation; self-hosters can use `read:user repo` when private repository PRs are required.
+GitHub OAuth is configurable through `GITHUB_OAUTH_SCOPES`, and the app displays the active scopes in Account settings. The default is `read:user public_repo` for open-source PR creation; self-hosters can use `read:user repo` when private repository PRs are required.
 
 Git operations in v1:
 
@@ -215,11 +218,11 @@ Git operations in v1:
 - every commit, push, and PR action requires explicit host approval;
 - Git workflow progress, results, and GitHub Actions refreshes are shared to the room as encrypted `git.event` envelopes, so peers can see branch, commit, push, PR, and CI outcomes without the relay seeing plaintext output.
 
-GitHub Actions in v1 are a room-visible branch status surface. After GitHub sign-in, the active host can refresh workflow runs for the selected owner, repo, and branch when workspace mode is enabled and the room is unlocked. The desktop validates the owner, repo, and branch target before calling the relay-side GitHub proxy or publishing a room-visible Actions event. The loaded runs, last-checked timestamp, and status message are scoped to the current room so switching projects does not show another room's CI state. The UI summarizes whether the loaded runs are passing, failing, running, or unknown, and links directly to each run on GitHub.
+GitHub Actions are a room-visible branch status surface. After GitHub sign-in, workflow runs can be refreshed for the selected owner, repo, and branch while the room is unlocked. The desktop validates the owner, repo, and branch target before calling the relay-side GitHub proxy or publishing a room-visible Actions event. The loaded runs, last-checked timestamp, and status message are scoped to the current room so switching projects does not show another room's CI state. The UI summarizes whether the loaded runs are passing, failing, running, or unknown, and links directly to each run on GitHub.
 
 When a room has an attached local project with a GitHub `origin` remote, the desktop infers the draft PR and Actions owner/repo target from that read-only git remote lookup. Manual owner/repo fields remain available and are not overwritten after the host edits them.
 
-Before a host can approve a workflow that pushes and opens a draft PR, the desktop performs a GitHub readiness check. Local-only branch and commit workflows do not require GitHub sign-in. Push/PR workflows require a signed-in GitHub session, a relay with GitHub OAuth configured, PR-capable OAuth scopes (`public_repo` for public repos or `repo` for private repos), and normalized owner/repo/base/head values. The app shows any blocker before approval so a host does not run local git steps and only then discover that the PR cannot be created.
+Before a host can approve a workflow that pushes and opens a draft PR, the desktop performs a GitHub readiness check. On the official hosted relay, GitHub sign-in is required for identity and GitHub workflows. Local-only branch and commit workflows without GitHub sign-in may exist only for local/LAN or self-hosted relays configured without GitHub auth. Push/PR workflows require a signed-in GitHub session, a relay with GitHub OAuth configured, PR-capable OAuth scopes (`public_repo` for public repos or `repo` for private repos), and normalized owner/repo/base/head values. The app shows any blocker before approval so a host does not run local git steps and only then discover that the PR cannot be created.
 
 The open-source repo includes a GitHub Actions CI workflow. It checks, tests, and builds all TypeScript workspaces on Ubuntu; on the pinned `macos-15` runner it runs the shared `npm run verify` gate, including Rust formatting and native Tauri/Rust tests, then builds the unsigned desktop app and uploads the `.app` and `.dmg` artifacts for inspection. The repo also provides `npm run doctor` as a read-only local setup check for Node/npm/Rust/Cargo and macOS packaging prerequisites.
 
@@ -310,8 +313,9 @@ Defaults:
 - 30-day retention window;
 - configurable per room and team;
 - team defaults apply to newly created rooms and can be explicitly applied to the current room;
-- chat messages, terminal requests, terminal snapshots, browser approvals, Codex events, Git workflow events, GitHub Actions refreshes, host handoff packages, and saved Codex thread continuity in one versioned encrypted room payload;
+- chat messages, terminal requests, terminal snapshots, non-host file-save requests, browser approvals, Codex events, Git workflow events, GitHub Actions refreshes, host handoff packages, and saved Codex thread continuity in one versioned encrypted room payload;
 - sidebar chat search includes decrypted-on-device local history for rooms whose keys are still available, without creating a relay-readable search index;
+- archived teams and rooms stay restorable; deleted teams and rooms are removed from workspace listings without claiming to erase content already received by devices;
 - attachment cache encrypted;
 - room keys in macOS Keychain in the native app;
 - user can clear local room history, including local room messages, workflow records, and the saved Codex thread id;
@@ -332,7 +336,7 @@ The app must warn that secrets may be exposed. The first-time room warning cover
 
 ### Browser Use
 
-v1 includes an isolated native WebView browser surface that Codex can use after host approval. On macOS, this is Tauri's platform WebView rather than the user's normal Chrome profile or a bundled Chrome session.
+v1 includes an isolated native WebView browser surface for approved room browser opens. On macOS, this is Tauri's platform WebView rather than the user's normal Chrome profile or a bundled Chrome session.
 
 Security model:
 
@@ -342,7 +346,7 @@ Security model:
 - state persists by default, with a room setting for refreshing the profile before each approved open and a host reset action;
 - no access to the user's normal Chrome profile, cookies, passwords, extensions, or tabs;
 - browser engine behavior follows the host platform WebView; the security boundary is room/project profile isolation plus host approvals and native guards, not a separate consumer-browser account container;
-- explicit host approval before Codex can use a site;
+- explicit host approval before a room browser request opens a site;
 - downloads are blocked by the native room browser download handler;
 - page Clipboard API calls are blocked by the native room browser guard script;
 - file inputs and file drag/drop are blocked by the native room browser guard script until a later host-approved upload flow is designed;
@@ -353,9 +357,9 @@ This is a contained tool surface, not the user's real browser.
 
 ### Computer Use
 
-General computer use is not part of v1.
+Codex Computer Use is not offered in multAIplayer because the Codex app-server API surface this app uses does not support it.
 
-Future computer use must be:
+Any future computer-control integration must be:
 
 - host-only;
 - off by default;
@@ -447,7 +451,7 @@ Bottom panel:
 - `@Codex` mention and invoke button;
 - host approval policies;
 - local project folder attachment;
-- file explorer and file viewer;
+- file explorer and file editor;
 - red/green diff viewer;
 - persistent named terminals;
 - xterm.js interactive terminal surface;
@@ -455,7 +459,7 @@ Bottom panel:
 - GitHub PR creation;
 - local git branch/commit/push;
 - profile drawer for GitHub identity, session, and local device id;
-- settings drawer for relay/Codex status, room modes, project, model, approval policy, and encrypted history;
+- settings drawer for relay/Codex status, project, model, approval policy, and encrypted history;
 - copy as Markdown for messages, threads, Codex output, diffs, and summaries;
 - profile/settings.
 
@@ -472,7 +476,7 @@ The app should support copying:
 
 Markdown export should make it easy to paste into GitHub, issues, PRs, docs, or another chat app.
 
-Project, diff, terminal, and PR draft exports are local workspace actions when they include local project metadata. They are available only to the active host while the room is unlocked and workspace mode is enabled.
+Project, diff, terminal, and PR draft exports are room collaboration features when they include shared project metadata. Host-machine mutations still require active-host approval.
 
 When the app detects sensitive material in project previews, diffs, or terminal output, the copied Markdown includes an explicit warning block. The alpha does not redact copied content automatically; it preserves the warning context so users can review before sharing outside the room.
 
@@ -506,9 +510,9 @@ Non-responsibilities:
 - running terminals;
 - executing AI tools.
 
-## 9. Monorepo Plan
+## 9. Repository Layout
 
-Initial repository structure:
+The repository is a monorepo:
 
 ```text
 apps/
@@ -529,64 +533,15 @@ docs/
   protocol.md
 ```
 
-## 10. Suggested V1 Milestones
+## 10. Alpha Scope And Limits
 
-### Milestone 1: Local Skeleton
-
-- Tauri app boots on macOS.
-- GitHub OAuth login.
-- Local encrypted storage.
-- Basic team/room/project model.
-- Local-only chat prototype.
-
-### Milestone 2: Relay And E2EE
-
-- Self-hostable relay.
-- WebSocket room transport.
-- Device keys.
-- Room keys.
-- Encrypted messages and attachments.
-- Invite links.
-
-### Milestone 3: Codex Hosting
-
-- Connect to local `codex app-server`.
-- Host a room.
-- Invoke Codex from chat delta.
-- Stream Codex events to room.
-- Approval sheet.
-- Host handoff.
-
-### Milestone 4: Coding Cockpit
-
-- Attach local project.
-- File explorer/viewer.
-- Diff viewer.
-- Persistent named terminals.
-- xterm.js interactive terminal surface.
-- Git status.
-
-### Milestone 5: GitHub Workflow
-
-- Branch/commit/push approvals.
-- GitHub PR creation.
-- Copy as Markdown.
-- PR description drafting.
-
-### Milestone 6: Isolated Browser
-
-- Per-room native WebView profile.
-- Browser approval flow.
-- Browser state persistence setting plus refresh/reset.
-
-## 11. Alpha Decisions And Roadmap
-
-- Alpha E2EE uses symmetric room keys for encrypted room traffic, AES-GCM local history, P-256 device key agreement for gated invites, and device-wrapped room secret delivery.
+- E2EE uses symmetric room keys for encrypted room traffic, AES-GCM local history, P-256 device key agreement for gated invites, and device-wrapped room secret delivery.
+- Desktop coding surfaces use Monaco Editor for file editing, xterm.js with a Rust PTY layer for terminals, and Tauri/Wry WebViews for room browser tabs.
 - Direct invite links carry the room key in the URL fragment for convenience. Gated no-secret invite links carry room metadata and a host device public key, then deliver the room key only after host approval.
-- Alpha member removal is relay-enforced for future reads, live sockets, and stale invite metadata. Production-grade cryptographic removal with room key epochs and per-device delivery is post-alpha roadmap work.
-- Alpha multi-device support is device-oriented: each device has its own key identity and local trust note. Recovery and synchronized multi-device identity are post-alpha roadmap work.
+- Member removal is relay-enforced for future reads, live sockets, and stale invite metadata. Production-grade cryptographic removal with room key epochs and per-device delivery is outside the alpha security contract.
+- Multi-device support is device-oriented: each device has its own key identity and local trust note. Recovery and synchronized multi-device identity are outside the alpha scope.
 - Official relay federation is not part of the alpha scope.
-- Relay SQLite storage is alpha-scale. Encrypted room envelopes append and prune incrementally, but normalized non-envelope state is still saved by clearing and reinserting the full set of teams, rooms, invites, devices, members, and sessions on each debounced flush. Larger hosted relays should move those tables to incremental writes or a shared production store before whole-store rewrites become an operational limit.
-- GitHub OAuth is the alpha GitHub integration. GitHub App support remains a future option for tighter repo-level permissions and enterprise self-hosting.
+- Relay SQLite storage is alpha-scale. Encrypted room envelopes append and prune incrementally, but normalized non-envelope state is saved by clearing and reinserting the full set of teams, rooms, invites, devices, members, and sessions on each debounced flush. Larger hosted relays should move those tables to incremental writes or a shared production store before whole-store rewrites become an operational limit.
+- GitHub OAuth is the public alpha GitHub integration. GitHub App support is a future option for tighter repo-level permissions and enterprise setups.
 - The desktop discovers and runs the local `codex app-server`; multAIplayer does not proxy Codex credentials through the hosted relay.
 - Secret detection is a review aid for files, terminal output, received terminal command requests, browser pages, and copied Markdown. The alpha warns and gates risky sharing without claiming automatic redaction.

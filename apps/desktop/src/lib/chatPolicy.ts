@@ -1,7 +1,8 @@
 import type { RoomRecord } from "@multaiplayer/protocol";
 
 export function canUseRoomChat(room: RoomRecord, locked = false): boolean {
-  return !locked && room.mode.chat;
+  void room;
+  return !locked;
 }
 
 export function canStageRoomChatAttachment(room: RoomRecord, locked = false): boolean {
@@ -10,6 +11,6 @@ export function canStageRoomChatAttachment(room: RoomRecord, locked = false): bo
 
 export function roomChatGateMessage(room: RoomRecord, locked = false): string {
   if (locked) return "Unlock this room before using chat.";
-  if (!room.mode.chat) return "Chat mode is disabled for this room.";
+  void room;
   return "Chat is available.";
 }

@@ -17,8 +17,9 @@ export function buildSidebarTeamRows(teams: TeamRecord[], selectedTeamId: string
   return teams.map((team) => ({
     id: team.id,
     name: team.name,
-    meta: formatTeamMeta(team),
-    active: team.id === selectedTeamId
+    meta: team.archivedAt ? `${formatTeamMeta(team)} · Archived` : formatTeamMeta(team),
+    active: team.id === selectedTeamId,
+    archived: Boolean(team.archivedAt)
   }));
 }
 
@@ -58,7 +59,8 @@ export function buildSidebarRoomRows({
       detail: searchActive ? team?.name ?? "Team" : room.projectPath.split("/").slice(-1)[0],
       active: room.id === selectedRoomId,
       attention: roomAttentionTotal,
-      unread: roomRecord.unread
+      unread: roomRecord.unread,
+      archived: Boolean(room.archivedAt || team?.archivedAt)
     };
   });
 }

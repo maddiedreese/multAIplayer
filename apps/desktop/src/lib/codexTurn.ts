@@ -111,10 +111,10 @@ export function buildCodexTurnSummary(
       storage: attachment.blobId ? "encrypted_blob" : "inline",
       contentIncluded: Boolean(attachment.content)
     })),
-    workspacePath: room.mode.workspace && includeWorkspaceContext ? room.projectPath : null,
-    git: room.mode.workspace && includeWorkspaceContext && gitStatus ? summarizeGitStatus(gitStatus) : null,
-    browserAccess: room.mode.browser ? approvedBrowserUrls : [],
-    terminals: room.mode.workspace && includeWorkspaceContext ? terminals.map((terminal) => terminal.name) : []
+    workspacePath: includeWorkspaceContext ? room.projectPath : null,
+    git: includeWorkspaceContext && gitStatus ? summarizeGitStatus(gitStatus) : null,
+    browserAccess: approvedBrowserUrls,
+    terminals: includeWorkspaceContext ? terminals.map((terminal) => terminal.name) : []
   };
 }
 
@@ -264,15 +264,13 @@ export function detectCodexTurnRiskFlags(
       addTextRiskFlags(flags, attachment.content ?? "", attachmentSource, approvedOrigins);
     }
   });
-  if (room.mode.browser) {
-    for (const request of browserRequests.filter((item) => item.status === "approved")) {
-      const origin = formatBrowserAccessLabel(request.url).toLowerCase();
-      if (origin && approvedOrigins.size > 0 && !approvedOrigins.has(origin)) {
-        flags.push(createRiskFlag(`browser ${request.url}`, "URL outside approved browser domains"));
-      }
+  for (const request of browserRequests.filter((item) => item.status === "approved")) {
+    const origin = formatBrowserAccessLabel(request.url).toLowerCase();
+    if (origin && approvedOrigins.size > 0 && !approvedOrigins.has(origin)) {
+      flags.push(createRiskFlag(`browser ${request.url}`, "URL outside approved browser domains"));
     }
   }
-  if (room.mode.workspace && includeWorkspaceContext && gitStatus) {
+  if (includeWorkspaceContext && gitStatus) {
     for (const file of gitStatus.files.slice(0, maxCodexGitFiles)) {
       addNamedRisks(flags, `git status ${file.path}`, detectSecretRisks("", file.path));
     }

@@ -40,7 +40,8 @@ export function useRoomAccess({
   const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser);
   const isSelectedRoomForgotten = forgottenRoomIds.has(selectedRoom.id);
   const isSelectedRoomRevoked = revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId);
-  const isSelectedRoomLocked = isSelectedRoomForgotten || isSelectedRoomRevoked;
+  const isSelectedRoomArchived = Boolean(selectedRoom.archivedAt);
+  const isSelectedRoomLocked = isSelectedRoomForgotten || isSelectedRoomRevoked || isSelectedRoomArchived;
   const canReadLocalWorkspace = hasSelectedRoom && canUseLocalWorkspace(selectedRoom, localUser, isSelectedRoomLocked);
   const canRequestWorkspace = hasSelectedRoom && canRequestWorkspaceAction(selectedRoom, isSelectedRoomLocked);
   const canRequestBrowser = hasSelectedRoom && canRequestBrowserAccess(selectedRoom, isSelectedRoomLocked);
@@ -53,13 +54,12 @@ export function useRoomAccess({
     isActiveHost,
     canReadLocalWorkspace,
     historySettings,
-    browserProfilePersistent: selectedRoom.browserProfilePersistent,
-    mode: selectedRoom.mode
+    browserProfilePersistent: selectedRoom.browserProfilePersistent
   });
   const browserAccessMessage = browserAccessGateMessage(selectedRoom, isSelectedRoomLocked);
   const workspaceRequestMessage = isSelectedRoomLocked
     ? roomLockMessage(selectedRoom, isSelectedRoomRevoked)
-    : "Workspace mode is disabled for this room.";
+    : "Workspace actions are available for room members to request.";
   const hostGateMessage =
     selectedRoom.hostStatus === "active"
       ? `Only ${selectedRoom.host} can approve host-side actions in this room.`
@@ -73,6 +73,7 @@ export function useRoomAccess({
     isActiveHost,
     isSelectedRoomForgotten,
     isSelectedRoomRevoked,
+    isSelectedRoomArchived,
     isSelectedRoomLocked,
     canReadLocalWorkspace,
     canRequestWorkspace,

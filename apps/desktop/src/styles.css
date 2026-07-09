@@ -5437,7 +5437,7 @@ select {
 
 .section-title {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 32px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -5457,6 +5457,13 @@ select {
   min-width: 32px;
   justify-self: end;
   border-radius: 9px;
+}
+
+.section-title-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .team-button,
@@ -5838,6 +5845,79 @@ select {
 
 .file-preview-tabs button {
   min-width: 0;
+}
+
+.file-save-requests {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.file-save-request {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.file-save-request strong,
+.file-save-request span,
+.file-save-request small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-save-request span,
+.file-save-request small {
+  color: var(--text-muted);
+}
+
+.file-save-request-preview {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.file-save-request-preview summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.file-save-request-preview pre {
+  max-height: 220px;
+  margin: 8px 0 0;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #101010;
+  color: #f4f4f4;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+}
+
+.file-save-request > div:last-child {
+  grid-column: 3;
+  grid-row: 1;
+  display: flex;
+  gap: 6px;
+}
+
+.file-save-request button {
+  min-height: 28px;
+  padding: 0 9px;
+  border-radius: 7px;
+  font-size: 12px;
 }
 
 .file-viewer-body {
@@ -6234,7 +6314,7 @@ select {
 
 .sidebar .nested-team-list .team-button {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-columns: 28px minmax(0, 1fr) auto;
   gap: 2px;
 }
 
@@ -6490,8 +6570,35 @@ select {
   color: var(--text-muted);
 }
 
+.sidebar-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  align-self: center;
+  padding-right: 2px;
+}
+
+.sidebar-row-actions .icon-only {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.sidebar-row-actions .icon-only:hover {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
 .room-button.nested {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   margin-right: 2px;
 }
 

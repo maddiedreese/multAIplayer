@@ -7,6 +7,7 @@ import type {
   ProjectFileEntry
 } from "../lib/localBackend";
 import type { FilePreviewTab } from "../lib/filePreview";
+import type { WorkspaceFileSaveRequest } from "../types";
 import { FilePreviewTabs } from "./FilePreviewTabs";
 import { InlineSecretWarning } from "./common";
 import { MonacoFileEditor } from "./MonacoFileEditor";
@@ -19,7 +20,9 @@ export function WorkspaceFilesPanel({
   selectedDiff,
   fileBusy,
   fileMessage,
+  fileSaveRequests,
   canReadLocalWorkspace,
+  isActiveHost,
   canAttachSelectedFile,
   selectedFileRisks,
   selectedFileNeedsAttachmentReview,
@@ -34,6 +37,8 @@ export function WorkspaceFilesPanel({
   onCopyDiffSummaryMarkdown,
   onAttachSelectedFileToMessage,
   onSaveSelectedFileContent,
+  onApproveFileSaveRequest,
+  onDenyFileSaveRequest,
   onFilePreviewTabChange,
   onCloseFileViewer
 }: {
@@ -44,7 +49,9 @@ export function WorkspaceFilesPanel({
   selectedDiff: GitDiffResult | null;
   fileBusy: boolean;
   fileMessage: string | null;
+  fileSaveRequests: WorkspaceFileSaveRequest[];
   canReadLocalWorkspace: boolean;
+  isActiveHost: boolean;
   canAttachSelectedFile: boolean;
   selectedFileRisks: string[];
   selectedFileNeedsAttachmentReview: boolean;
@@ -59,6 +66,8 @@ export function WorkspaceFilesPanel({
   onCopyDiffSummaryMarkdown: () => void;
   onAttachSelectedFileToMessage: () => void;
   onSaveSelectedFileContent: (content: string) => void;
+  onApproveFileSaveRequest: (request: WorkspaceFileSaveRequest) => void;
+  onDenyFileSaveRequest: (requestId: string) => void;
   onFilePreviewTabChange: (tab: FilePreviewTab) => void;
   onCloseFileViewer: () => void;
 }) {
@@ -69,13 +78,15 @@ export function WorkspaceFilesPanel({
     setEditorContent(selectedFile?.content ?? "");
   }, [selectedFileKey, selectedFile]);
   const editorDirty = Boolean(selectedFile && editorContent !== selectedFile.content);
+  const pendingFileSaveRequests = fileSaveRequests.filter((request) => request.status === "pending");
+  const saveButtonLabel = isActiveHost ? "Save" : "Request save";
   const viewerPath = selectedFile?.path ?? selectedDiff?.path ?? null;
   if (viewerPath) {
     const selectedFileName = viewerPath.split("/").at(-1) ?? viewerPath;
     return (
       <section className={`panel file-viewer-open ${viewerExpanded ? "expanded" : ""}`}>
         <div className="file-viewer-toolbar">
-          <button className="ghost icon-only" onClick={onCloseFileViewer} aria-label="Close file viewer">
+          <button className="ghost icon-only" onClick={onCloseFileViewer} aria-label="Close file editor">
             <X size={15} />
           </button>
           <div>
@@ -94,7 +105,7 @@ export function WorkspaceFilesPanel({
             <button
               className="ghost icon-only"
               onClick={() => setViewerExpanded((current) => !current)}
-              aria-label={viewerExpanded ? "Return file viewer to column" : "Expand file viewer"}
+              aria-label={viewerExpanded ? "Return file editor to column" : "Expand file editor"}
               title={viewerExpanded ? "Return to column" : "Expand"}
             >
               {viewerExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
@@ -181,9 +192,10 @@ export function WorkspaceFilesPanel({
               className="primary"
               onClick={() => onSaveSelectedFileContent(editorContent)}
               disabled={!selectedFile || !editorDirty || fileBusy || selectedFile.truncated || !canReadLocalWorkspace}
+              title={isActiveHost ? "Save file" : "Request active host approval to save this file"}
             >
               <Save size={14} />
-              Save
+              {saveButtonLabel}
             </button>
           </div>
         </div>
@@ -210,6 +222,33 @@ export function WorkspaceFilesPanel({
             )
           )}
         </div>
+        {pendingFileSaveRequests.length > 0 && (
+          <div className="file-save-requests">
+            {pendingFileSaveRequests.map((request) => (
+              <div className="file-save-request" key={request.id}>
+                <div>
+                  <strong>{request.path}</strong>
+                  <span>{request.requester} requested a save</span>
+                </div>
+                <small>{formatLineDelta(request.previousContent, request.nextContent)}</small>
+                <details className="file-save-request-preview">
+                  <summary>Review content</summary>
+                  <pre>{formatRequestedContentPreview(request.nextContent)}</pre>
+                </details>
+                {isActiveHost && (
+                  <div>
+                    <button className="primary" onClick={() => onApproveFileSaveRequest(request)}>
+                      Approve
+                    </button>
+                    <button className="ghost" onClick={() => onDenyFileSaveRequest(request.id)}>
+                      Deny
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         {fileMessage && <div className="workflow-message">{fileMessage}</div>}
       </section>
     );
@@ -279,6 +318,21 @@ export function WorkspaceFilesPanel({
       </section>
     </>
   );
+}
+
+function formatLineDelta(previousContent: string, nextContent: string): string {
+  const previousLines = previousContent.split("\n");
+  const nextLines = nextContent.split("\n");
+  const added = Math.max(0, nextLines.length - previousLines.length);
+  const removed = Math.max(0, previousLines.length - nextLines.length);
+  if (added === 0 && removed === 0) return `${nextLines.length} line(s) edited`;
+  return `+${added} -${removed} line(s)`;
+}
+
+function formatRequestedContentPreview(content: string): string {
+  const maxPreviewChars = 6000;
+  if (content.length <= maxPreviewChars) return content || "(empty file)";
+  return `${content.slice(0, maxPreviewChars)}\n\n... ${content.length - maxPreviewChars} more character(s)`;
 }
 
 function parseDiffLines(diff: string): Array<{ kind: "added" | "removed" | "hunk" | "meta" | "context"; prefix: string; text: string }> {

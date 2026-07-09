@@ -3,6 +3,7 @@ import type { GitDiffResult, ProjectFileContent, ProjectFileEntry } from "../../
 import { omitRecordKey } from "../../lib/setUtils";
 import type { FilePreviewTab } from "../../lib/filePreview";
 import type { MarkdownCopyFallback } from "../../types";
+import type { WorkspaceFileSaveRequest } from "../../types";
 import type { AppStoreState } from "../appStore";
 
 export interface FilePanelRoomState {
@@ -14,6 +15,7 @@ export interface FilePanelRoomState {
   busy?: boolean;
   message?: string;
   markdownCopyFallback?: MarkdownCopyFallback;
+  saveRequests?: WorkspaceFileSaveRequest[];
 }
 
 export type FilePanelByRoom = Record<string, FilePanelRoomState>;
@@ -27,6 +29,7 @@ export interface FilePanelMaps {
   fileBusyByRoom: Record<string, boolean>;
   fileMessagesByRoom: Record<string, string | null>;
   markdownCopyFallbacksByRoom: Record<string, MarkdownCopyFallback | null>;
+  fileSaveRequestsByRoom: Record<string, WorkspaceFileSaveRequest[]>;
 }
 
 function shallowEqualFilePanelRoomState(left: FilePanelRoomState, right: FilePanelRoomState): boolean {
@@ -88,6 +91,11 @@ export function projectFilePanelMaps(filePanelByRoom: FilePanelByRoom): FilePane
       Object.entries(filePanelByRoom)
         .filter(([, panel]) => panel.markdownCopyFallback)
         .map(([roomId, panel]) => [roomId, panel.markdownCopyFallback ?? null])
+    ),
+    fileSaveRequestsByRoom: Object.fromEntries(
+      Object.entries(filePanelByRoom)
+        .filter(([, panel]) => panel.saveRequests)
+        .map(([roomId, panel]) => [roomId, panel.saveRequests ?? []])
     )
   };
 }
@@ -102,6 +110,8 @@ export interface FilePanelSlice {
   setFilePreviewTabForRoom: (roomId: string, tab: FilePreviewTab) => void;
   setFileMessageForRoom: (roomId: string, message: string | null) => void;
   setMarkdownCopyFallbackForRoom: (roomId: string, fallback: MarkdownCopyFallback | null) => void;
+  appendFileSaveRequest: (roomId: string, request: WorkspaceFileSaveRequest) => void;
+  updateFileSaveRequestStatus: (roomId: string, requestId: string, status: WorkspaceFileSaveRequest["status"]) => void;
   resetFileContextForRoom: (roomId: string) => void;
 }
 
@@ -175,6 +185,24 @@ export const createFilePanelSlice: StateCreator<AppStoreState, [], [], FilePanel
       filePanelByRoom: updateFilePanelForRoom(state.filePanelByRoom, roomId, (roomPanel) => {
         const { markdownCopyFallback: _markdownCopyFallback, ...rest } = roomPanel;
         return fallback ? { ...rest, markdownCopyFallback: fallback } : rest;
+      })
+    }));
+  },
+  appendFileSaveRequest: (roomId, request) => {
+    set((state) => ({
+      filePanelByRoom: updateFilePanelForRoom(state.filePanelByRoom, roomId, (roomPanel) => {
+        const requests = roomPanel.saveRequests ?? [];
+        if (requests.some((item) => item.id === request.id)) return roomPanel;
+        return { ...roomPanel, saveRequests: [...requests, request] };
+      })
+    }));
+  },
+  updateFileSaveRequestStatus: (roomId, requestId, status) => {
+    set((state) => ({
+      filePanelByRoom: updateFilePanelForRoom(state.filePanelByRoom, roomId, (roomPanel) => {
+        const requests = roomPanel.saveRequests ?? [];
+        const nextRequests = requests.map((request) => request.id === requestId ? { ...request, status } : request);
+        return { ...roomPanel, saveRequests: nextRequests };
       })
     }));
   },

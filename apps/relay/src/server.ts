@@ -397,6 +397,7 @@ registerTeamRoutes({
   revokeTeamInvites,
   revokeTeamMemberSessions,
   broadcastWorkspaceUpdated,
+  broadcastRoomUpdated,
   scheduleStoreSave,
   recordQuotaRejection: relayMetrics.recordQuotaRejection,
   normalizeMetadataText,

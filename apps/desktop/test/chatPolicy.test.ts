@@ -21,22 +21,19 @@ const room: RoomRecord = {
   unread: 0
 };
 
-test("room chat requires chat mode and an unlocked room", () => {
+test("room chat requires an unlocked room", () => {
   assert.equal(canUseRoomChat(room), true);
-  assert.equal(canUseRoomChat({ ...room, mode: { ...room.mode, chat: false } }), false);
+  assert.equal(canUseRoomChat({ ...room, mode: { ...room.mode, chat: false } }), true);
   assert.equal(canUseRoomChat(room, true), false);
 });
 
-test("room chat attachments require chat mode and an unlocked room", () => {
+test("room chat attachments require an unlocked room", () => {
   assert.equal(canStageRoomChatAttachment(room), true);
-  assert.equal(canStageRoomChatAttachment({ ...room, mode: { ...room.mode, chat: false } }), false);
+  assert.equal(canStageRoomChatAttachment({ ...room, mode: { ...room.mode, chat: false } }), true);
   assert.equal(canStageRoomChatAttachment(room, true), false);
 });
 
 test("room chat gate messages explain why chat is unavailable", () => {
   assert.equal(roomChatGateMessage(room, true), "Unlock this room before using chat.");
-  assert.equal(
-    roomChatGateMessage({ ...room, mode: { ...room.mode, chat: false } }),
-    "Chat mode is disabled for this room."
-  );
+  assert.equal(roomChatGateMessage({ ...room, mode: { ...room.mode, chat: false } }), "Chat is available.");
 });

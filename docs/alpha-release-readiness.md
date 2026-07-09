@@ -66,7 +66,7 @@ Before a wider alpha, manually run these in the native macOS app:
 
 ## Alpha-Only Limitations To Keep Visible
 
-- Public macOS alpha artifacts are expected to be Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
+- Public macOS alpha artifacts are Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
 - The alpha app checks a hosted release manifest and shows an in-app update banner, but users still manually download and install updated builds.
 - Production-grade cryptographic member removal still needs key epochs and per-device key delivery.
 - JSON relay storage is for local/dev self-hosting. Hosted or internet-facing alpha relays should use SQLite and still need backup/restore drills before production claims.

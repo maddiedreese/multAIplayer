@@ -69,6 +69,8 @@ export function useAppRelaySync({
   const {
     appendBrowserRequest,
     updateBrowserRequestStatus,
+    appendFileSaveRequest,
+    updateFileSaveRequestStatus,
     setBrowserMessageForRoom,
     setBrowserUrlForRoom,
     appendTerminalRequest,
@@ -157,6 +159,8 @@ export function useAppRelaySync({
         setApprovalVisibleForRoom,
         appendBrowserRequest,
         updateBrowserRequestStatus,
+        appendFileSaveRequest,
+        updateFileSaveRequestStatus,
         appendLocalPreviewEvent,
         setChatMessageForRoom,
         setHostMessageForRoom,

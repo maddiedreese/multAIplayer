@@ -47,7 +47,8 @@ export function shouldAutoApproveBrowserRequestLegacy(url: string, room: RoomRec
 }
 
 export function canRequestBrowserAccess(room: RoomRecord, locked = false): boolean {
-  return !locked && room.mode.browser;
+  void room;
+  return !locked;
 }
 
 export function canHostBrowserAction(room: RoomRecord, user: LocalHostUser, locked = false): boolean {
@@ -91,6 +92,6 @@ export function roomBrowserRequestMessage<T extends BrowserRequestCandidate>(
 
 export function browserAccessGateMessage(room: RoomRecord, locked = false): string {
   if (locked) return "Unlock this room before using browser access.";
-  if (!room.mode.browser) return "Browser mode is disabled for this room.";
+  void room;
   return "Browser access is available for this room.";
 }

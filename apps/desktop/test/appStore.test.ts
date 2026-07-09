@@ -384,6 +384,18 @@ test("desktop store keeps file panel state room scoped", () => {
   store.setFilePreviewTabForRoom("room-a", "diff");
   store.setFileBusyForRoom("room-a", true);
   store.setFileMessageForRoom("room-a", "Loaded README.md");
+  store.appendFileSaveRequest("room-a", {
+    eventType: "workspace.file.save",
+    id: "file-save-1",
+    requester: "Maddie",
+    requesterUserId: "github:maddie",
+    path: "README.md",
+    previousContent: "# multAIplayer\n",
+    nextContent: "# multAIplayer\n\nAlpha notes\n",
+    requestedAt: "2026-07-08T12:00:00.000Z",
+    status: "pending"
+  });
+  store.updateFileSaveRequestStatus("room-a", "file-save-1", "approved");
   store.setMarkdownCopyFallbackForRoom("room-a", {
     title: "README.md",
     markdown: "# multAIplayer"
@@ -399,6 +411,8 @@ test("desktop store keeps file panel state room scoped", () => {
   assert.equal(state.filePanelByRoom["room-a"]?.busy, true);
   assert.equal(state.filePanelByRoom["room-a"]?.message, "Loaded README.md");
   assert.equal(state.filePanelByRoom["room-b"]?.message, undefined);
+  assert.equal(state.filePanelByRoom["room-a"]?.saveRequests?.[0]?.status, "approved");
+  assert.equal(state.filePanelByRoom["room-b"]?.saveRequests, undefined);
   assert.equal(state.filePanelByRoom["room-a"]?.markdownCopyFallback?.title, "README.md");
 });
 
@@ -420,13 +434,37 @@ test("desktop store exposes room file panel actions", () => {
   store.setFilePreviewTabForRoom("room-a", "diff");
   store.setFileBusyForRoom("room-a", true);
   store.setFileMessageForRoom("room-a", "Loaded README.md");
+  store.appendFileSaveRequest("room-a", {
+    eventType: "workspace.file.save",
+    id: "file-save-1",
+    requester: "Maddie",
+    requesterUserId: "github:maddie",
+    path: "README.md",
+    previousContent: "# multAIplayer\n",
+    nextContent: "# multAIplayer\n\nAlpha notes\n",
+    requestedAt: "2026-07-08T12:00:00.000Z",
+    status: "pending"
+  });
   store.setFileQueryForRoom("room-b", "LICENSE");
   store.setFilePreviewTabForRoom("room-b", "file");
   store.resetFileContextForRoom("room-a");
 
   const state = useAppStore.getState();
   assert.deepEqual(state.filePanelByRoom["room-a"], {
-    previewTab: "diff"
+    previewTab: "diff",
+    saveRequests: [
+      {
+        eventType: "workspace.file.save",
+        id: "file-save-1",
+        requester: "Maddie",
+        requesterUserId: "github:maddie",
+        path: "README.md",
+        previousContent: "# multAIplayer\n",
+        nextContent: "# multAIplayer\n\nAlpha notes\n",
+        requestedAt: "2026-07-08T12:00:00.000Z",
+        status: "pending"
+      }
+    ]
   });
   assert.equal(state.filePanelByRoom["room-b"]?.query, "LICENSE");
   assert.equal(state.filePanelByRoom["room-b"]?.previewTab, undefined);
@@ -1082,7 +1120,7 @@ test("desktop store keeps room runtime state room scoped", () => {
     approvalDelegationPolicy: "host_only",
     trustedApproverUserIds: [],
     messagesSinceLastCodex: 3,
-    attachmentNames: ["docs/plan.md"],
+    attachmentNames: ["docs/checklist.md"],
     terminals: ["shell"],
     createdAt: "2026-07-06T00:10:00.000Z",
     status: "available"
