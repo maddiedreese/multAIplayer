@@ -36,8 +36,6 @@ export function roomHostMutationInFlightMessage(): string {
 
 const approvalPolicies: ApprovalPolicy[] = [
   "ask_every_turn",
-  "auto_chat_only",
-  "auto_browser_allowed_sites",
   "never_host"
 ];
 
@@ -48,6 +46,14 @@ export function createHandoffSettingsPatch(handoff: HostHandoffPlaintextPayload)
   if (!codexModel) throw new Error("Host handoff is missing a supported Codex model.");
   const codexSandboxLevel = normalizeCodexSandboxLevel(handoff.codexSandboxLevel ?? defaultCodexSandboxLevel);
   if (!codexSandboxLevel) throw new Error("Host handoff is missing a supported Codex sandbox level.");
+  if (handoff.approvalPolicy === "auto_chat_only" || handoff.approvalPolicy === "auto_browser_allowed_sites") {
+    return {
+      projectPath,
+      codexModel,
+      codexSandboxLevel: codexSandboxLevel as RoomRecord["codexSandboxLevel"],
+      approvalPolicy: "ask_every_turn"
+    };
+  }
   if (!approvalPolicies.includes(handoff.approvalPolicy as ApprovalPolicy)) {
     throw new Error(`Host handoff approval policy is not supported: ${handoff.approvalPolicy}`);
   }

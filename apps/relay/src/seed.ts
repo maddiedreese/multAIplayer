@@ -66,7 +66,7 @@ export function seedWorkspace(options: {
       host: "Alex",
       hostUserId: "github:alex",
       hostStatus: "handoff",
-      approvalPolicy: "auto_chat_only",
+      approvalPolicy: "ask_every_turn",
       approvalDelegationPolicy: "host_only",
       trustedApproverUserIds: [],
       mode: defaultRoomMode,

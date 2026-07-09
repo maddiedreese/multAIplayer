@@ -65,6 +65,9 @@ pub fn run() {
             run_git_workflow,
             probe_codex,
             run_codex_turn,
+            set_codex_goal,
+            get_codex_goal,
+            clear_codex_goal,
             shutdown_codex_room
         ])
         .run(tauri::generate_context!())

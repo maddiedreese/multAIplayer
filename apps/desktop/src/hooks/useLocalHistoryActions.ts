@@ -36,7 +36,8 @@ import type {
   InviteJoinRequest,
   LocalPreviewRecord,
   RoomGoal,
-  TerminalCommandRequest
+  TerminalCommandRequest,
+  WorkspaceFileSaveRequest
 } from "../types";
 
 interface UseLocalHistoryActionsOptions {
@@ -48,6 +49,7 @@ interface UseLocalHistoryActionsOptions {
   isActiveHost: boolean;
   messages: ChatMessage[];
   terminalRequests: TerminalCommandRequest[];
+  fileSaveRequests: WorkspaceFileSaveRequest[];
   browserRequests: BrowserAccessRequest[];
   inviteRequests: InviteJoinRequest[];
   codexEvents: CodexRoomEvent[];
@@ -88,6 +90,7 @@ export function useLocalHistoryActions({
   isActiveHost,
   messages,
   terminalRequests,
+  fileSaveRequests,
   browserRequests,
   inviteRequests,
   codexEvents,
@@ -127,6 +130,7 @@ export function useLocalHistoryActions({
         version: 3,
         messages,
         terminalRequests,
+        fileSaveRequests,
         browserRequests,
         inviteRequests,
         codexEvents,

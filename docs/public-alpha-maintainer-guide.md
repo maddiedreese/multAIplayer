@@ -69,12 +69,12 @@ For the alpha, a single instance is acceptable if the public copy says it is alp
 
 Publish the hosted relay exit guarantee before the public alpha announcement:
 
-- Maintainers will give at least 90 days' public notice before a planned official hosted relay shutdown.
+- Maintainers will give at least 30 days' public notice before a planned official hosted relay shutdown.
 - During that window, sign-in, relay connectivity, and migration instructions should remain functional unless an emergency security, legal, provider, or private-data exposure incident prevents it.
 - The official migration path is the [hosted-to-self-hosted relay migration runbook](relay-migration-runbook.md): users stand up a self-hosted relay, switch the desktop Settings relay URLs, recreate team/room membership there, and keep local room keys/history on each device.
 - Encrypted export/import is planned as a future belt-and-suspenders exit path. Do not imply it exists until it ships; describe current continuity as device-local history plus relay migration.
 
-If an emergency shutdown cannot honor the full 90 days, publish the reason, keep the minimum safe relay functionality online for migration when possible, and direct users to the runbook.
+If an emergency shutdown cannot honor the full 30 days, publish the reason, keep the minimum safe relay functionality online for migration when possible, and direct users to the runbook.
 
 ## Production Secrets
 
@@ -83,7 +83,7 @@ Create and store:
 - `GITHUB_CLIENT_ID`;
 - `MULTAIPLAYER_RELAY_SESSION_SECRET`;
 - deploy/provider credentials;
-- Apple signing credentials, if signing now.
+- Apple signing credentials, when signing locally.
 
 Do not store OpenAI or Codex credentials in the relay. multAIplayer uses each host's local Codex app-server, not a project-owned OpenAI API key.
 

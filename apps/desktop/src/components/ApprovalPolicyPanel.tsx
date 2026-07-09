@@ -2,7 +2,6 @@ import type { ApprovalDelegationPolicy, ApprovalPolicy, CodexSandboxLevel, codex
 
 const selectableApprovalPolicies: ApprovalPolicy[] = [
   "ask_every_turn",
-  "auto_chat_only",
   "never_host"
 ];
 

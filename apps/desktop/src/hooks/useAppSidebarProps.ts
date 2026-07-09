@@ -4,7 +4,7 @@ import { defaultRelayHttpUrl, defaultRelayWsUrl } from "../lib/appConfig";
 import { formatCodexModel, formatSessionPersistence } from "../lib/appFormatters";
 import { roomSecretStorageLabel } from "../lib/appRuntime";
 import { defaultProjectPath } from "../lib/localBackend";
-import { approvalPolicyLabels, roomModeLabels } from "../seedData";
+import { approvalPolicyLabels } from "../seedData";
 import { AppSidebarDrawer } from "../components/AppSidebarDrawer";
 import { DesktopSidebar } from "../components/DesktopSidebar";
 
@@ -53,7 +53,6 @@ export function useAppSidebarProps({
   isActiveHost,
   relayHttpDraft,
   relayWsDraft,
-  selectedRoomMode,
   roomSettingsGateMessage,
   notificationsMuted,
   historySettings,
@@ -74,6 +73,8 @@ export function useAppSidebarProps({
   onChooseNewRoomProjectPath,
   onCreateRoom,
   onSelectRoom,
+  onSetTeamLifecycle,
+  onSetRoomLifecycle,
   onSelectSidebarPanel,
   onToggleTheme,
   onRotateDeviceIdentity,
@@ -82,7 +83,6 @@ export function useAppSidebarProps({
   onRelayWsDraftChange,
   onResetRelay,
   onSaveRelay,
-  onToggleRoomMode,
   onNotificationsMutedChange,
   onHistorySettingsChange,
   onClearRoomHistory,
@@ -136,7 +136,6 @@ export function useAppSidebarProps({
   isActiveHost: boolean;
   relayHttpDraft: string;
   relayWsDraft: string;
-  selectedRoomMode: AppSidebarDrawerProps["settings"]["roomMode"];
   roomSettingsGateMessage: string;
   notificationsMuted: boolean;
   historySettings: AppSidebarDrawerProps["settings"]["historySettings"];
@@ -157,6 +156,8 @@ export function useAppSidebarProps({
   onChooseNewRoomProjectPath: DesktopSidebarProps["onChooseNewRoomProjectPath"];
   onCreateRoom: DesktopSidebarProps["onCreateRoom"];
   onSelectRoom: (roomId: string, teamId?: string) => void;
+  onSetTeamLifecycle: DesktopSidebarProps["onSetTeamLifecycle"];
+  onSetRoomLifecycle: DesktopSidebarProps["onSetRoomLifecycle"];
   onSelectSidebarPanel: DesktopSidebarProps["onSelectSidebarPanel"];
   onToggleTheme: DesktopSidebarProps["onToggleTheme"];
   onRotateDeviceIdentity: AppSidebarDrawerProps["profile"]["onRotateDeviceIdentity"];
@@ -165,7 +166,6 @@ export function useAppSidebarProps({
   onRelayWsDraftChange: AppSidebarDrawerProps["settings"]["onRelayWsDraftChange"];
   onResetRelay: AppSidebarDrawerProps["settings"]["onResetRelay"];
   onSaveRelay: AppSidebarDrawerProps["settings"]["onSaveRelay"];
-  onToggleRoomMode: AppSidebarDrawerProps["settings"]["onToggleRoomMode"];
   onNotificationsMutedChange: AppSidebarDrawerProps["settings"]["onNotificationsMutedChange"];
   onHistorySettingsChange: (settings: AppSidebarDrawerProps["settings"]["historySettings"]) => void;
   onClearRoomHistory: AppSidebarDrawerProps["settings"]["onClearRoomHistory"];
@@ -216,6 +216,8 @@ export function useAppSidebarProps({
       if (teamId) onSelectTeam(teamId);
       onSelectRoom(roomId);
     },
+    onSetTeamLifecycle,
+    onSetRoomLifecycle,
     onSelectSidebarPanel,
     onToggleTheme
   };
@@ -253,9 +255,6 @@ export function useAppSidebarProps({
       defaultRelayHttpUrl,
       defaultRelayWsUrl,
       saveRelayDisabled: !relayHttpDraft.trim() || !relayWsDraft.trim(),
-      roomMode: selectedRoomMode,
-      roomModeLabels,
-      roomModesDisabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
       showRoomSettingsGate: !isActiveHost && hasSelectedRoom,
       roomSettingsGateMessage,
       notificationsMuted,
@@ -277,7 +276,6 @@ export function useAppSidebarProps({
       onRelayWsDraftChange,
       onResetRelay,
       onSaveRelay,
-      onToggleRoomMode,
       onNotificationsMutedChange,
       onHistoryEnabledChange: (enabled) =>
         onHistorySettingsChange({

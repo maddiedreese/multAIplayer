@@ -1,4 +1,5 @@
 import type { FilePreviewTab } from "../lib/filePreview";
+import type { WorkspaceFileSaveRequest } from "../types";
 
 export function useWorkspaceFilesPanelActions({
   selectedRoomId,
@@ -8,6 +9,8 @@ export function useWorkspaceFilesPanelActions({
   copyDiffSummaryMarkdown,
   attachSelectedFileToMessage,
   saveSelectedFileContent,
+  approveFileSaveRequest,
+  denyFileSaveRequest,
   setFilePreviewTabForRoom,
   setSelectedFileForRoom,
   setSelectedDiffForRoom,
@@ -20,6 +23,8 @@ export function useWorkspaceFilesPanelActions({
   copyDiffSummaryMarkdown: () => void;
   attachSelectedFileToMessage: () => void;
   saveSelectedFileContent: (content: string) => void;
+  approveFileSaveRequest: (request: WorkspaceFileSaveRequest) => void;
+  denyFileSaveRequest: (requestId: string) => void;
   setFilePreviewTabForRoom: (roomId: string, tab: FilePreviewTab) => void;
   setSelectedFileForRoom: (roomId: string, file: null) => void;
   setSelectedDiffForRoom: (roomId: string, diff: null) => void;
@@ -38,6 +43,8 @@ export function useWorkspaceFilesPanelActions({
     onCopyDiffSummaryMarkdown: copyDiffSummaryMarkdown,
     onAttachSelectedFileToMessage: attachSelectedFileToMessage,
     onSaveSelectedFileContent: saveSelectedFileContent,
+    onApproveFileSaveRequest: approveFileSaveRequest,
+    onDenyFileSaveRequest: denyFileSaveRequest,
     onFilePreviewTabChange: (tab: FilePreviewTab) => setFilePreviewTabForRoom(selectedRoomId, tab),
     onCloseFileViewer
   };

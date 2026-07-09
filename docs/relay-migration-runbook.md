@@ -1,6 +1,6 @@
 # Hosted-To-Self-Hosted Relay Migration Runbook
 
-This runbook is for a team that currently uses the hosted multAIplayer relay and wants to continue on a self-hosted relay. The relay routes encrypted envelopes, presence, invites, GitHub sign-in sessions, and encrypted blob storage; room keys and local room history stay on each device. A relay move therefore recreates relay-side team and room membership, while each device carries its own room keys and local history forward.
+This runbook is for a team using the hosted multAIplayer relay that wants to continue on a self-hosted relay. The relay routes encrypted envelopes, presence, invites, GitHub sign-in sessions, and encrypted blob storage; room keys and local room history stay on each device. A relay move therefore recreates relay-side team and room membership, while each device carries its own room keys and local history forward.
 
 Use this for planned migrations, hosted relay outage recovery, and any hosted relay sunset window.
 
@@ -123,7 +123,7 @@ If the hosted relay is in a sunset window, rollback is temporary. Use the remain
 
 ## Hosted Relay Sunset Policy
 
-For the official hosted relay, maintainers commit to at least 90 days' public notice before a planned shutdown. During that notice period:
+For the official hosted relay, maintainers commit to at least 30 days' public notice before a planned shutdown. The relay routes encrypted room traffic, identity/session state, invites, and encrypted blobs; it is not the source of truth for users' project folders, Git history, room keys, or device-local encrypted history. During that notice period:
 
 - sign-in and relay connectivity remain available for migration unless an emergency security or provider incident makes that impossible;
 - planned relay drains use `/readyz` not-ready, reject new work, close existing room WebSockets with `1012`, and flush the relay store before exit;

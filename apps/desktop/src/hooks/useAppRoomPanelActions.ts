@@ -129,6 +129,8 @@ export function useAppRoomPanelActions({
       copyDiffSummaryMarkdown: workspaceFlow.copyDiffSummaryMarkdown,
       attachSelectedFileToMessage: workspaceFlow.attachSelectedFileToMessage,
       saveSelectedFileContent: workspaceFlow.saveSelectedFileContent,
+      approveFileSaveRequest: workspaceFlow.approveFileSaveRequest,
+      denyFileSaveRequest: workspaceFlow.denyFileSaveRequest,
       setFilePreviewTabForRoom,
       setSelectedFileForRoom,
       setSelectedDiffForRoom,

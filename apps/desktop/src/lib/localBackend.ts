@@ -99,6 +99,19 @@ export interface CodexTurnResult {
   stderr: string;
 }
 
+export type CodexGoalStatus = "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
+
+export interface CodexGoal {
+  objective: string;
+  status: CodexGoalStatus;
+  threadId: string;
+  createdAt: number;
+  updatedAt: number;
+  timeUsedSeconds: number;
+  tokensUsed: number;
+  tokenBudget: number | null;
+}
+
 export interface BrowserOpenResult {
   label: string;
   url: string;
@@ -352,6 +365,52 @@ export async function runShellCommand(cwd: string, command: string): Promise<Com
     stdout: `$ ${command}\nPreview mode: open the Tauri app to run host commands.\n`,
     stderr: ""
   };
+}
+
+export async function setCodexGoal(
+  roomId: string,
+  threadId: string,
+  objective: string | null,
+  status?: CodexGoalStatus,
+  tokenBudget?: number | null
+): Promise<CodexGoal> {
+  if (isTauriRuntime()) {
+    return invoke<CodexGoal>("set_codex_goal", {
+      request: { roomId, threadId, objective, status, tokenBudget }
+    });
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  return {
+    objective: objective ?? "Preview Codex goal",
+    status: status ?? "active",
+    threadId,
+    createdAt: now,
+    updatedAt: now,
+    timeUsedSeconds: 0,
+    tokensUsed: 0,
+    tokenBudget: tokenBudget ?? null
+  };
+}
+
+export async function getCodexGoal(roomId: string, threadId: string): Promise<CodexGoal | null> {
+  if (isTauriRuntime()) {
+    return invoke<CodexGoal | null>("get_codex_goal", {
+      request: { roomId, threadId }
+    });
+  }
+
+  void roomId;
+  void threadId;
+  return null;
+}
+
+export async function clearCodexGoal(roomId: string, threadId: string): Promise<void> {
+  if (isTauriRuntime()) {
+    await invoke("clear_codex_goal", {
+      request: { roomId, threadId }
+    });
+  }
 }
 
 export async function startTerminal(

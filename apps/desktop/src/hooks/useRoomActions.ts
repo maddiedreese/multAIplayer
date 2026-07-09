@@ -100,6 +100,8 @@ export function useRoomActions({
   const setSelectedDiffForRoom = useAppStore((state) => state.setSelectedDiffForRoom);
   const setFilePreviewTabForRoom = useAppStore((state) => state.setFilePreviewTabForRoom);
   const setFileMessageForRoom = useAppStore((state) => state.setFileMessageForRoom);
+  const appendFileSaveRequest = useAppStore((state) => state.appendFileSaveRequest);
+  const updateFileSaveRequestStatus = useAppStore((state) => state.updateFileSaveRequestStatus);
   const resetFileContextForRoom = useAppStore((state) => state.resetFileContextForRoom);
   const setSelectedTerminalIdForRoom = useAppStore((state) => state.setSelectedTerminalIdForRoom);
   const setTerminalNameForRoom = useAppStore((state) => state.setTerminalNameForRoom);
@@ -200,6 +202,8 @@ export function useRoomActions({
     setSelectedDiffForRoom,
     setFilePreviewTabForRoom,
     setFileMessageForRoom,
+    appendFileSaveRequest,
+    updateFileSaveRequestStatus,
     setSelectedFileMessage: (message: string | null) => setFileMessageForRoom(selectedRoomId, message),
     resetFileContextForRoom,
     setSelectedTerminalIdForRoom,

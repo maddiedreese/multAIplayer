@@ -150,7 +150,7 @@ test("buildCodexApprovalSnapshot uses the workspace context permission option", 
   assert.deepEqual(snapshot.summary.terminals, []);
 });
 
-test("buildCodexTurnSummary hides workspace and browser context when room modes are off", () => {
+test("buildCodexTurnSummary ignores compatibility room mode bits", () => {
   const summary = buildCodexTurnSummary(
     messages,
     { ...room, mode: { ...room.mode, workspace: false, browser: false } },
@@ -158,9 +158,8 @@ test("buildCodexTurnSummary hides workspace and browser context when room modes 
     [{ url: "https://github.com/maddiedreese/multAIplayer", status: "approved" }]
   );
 
-  assert.equal(summary.workspacePath, null);
-  assert.equal(summary.git, null);
-  assert.deepEqual(summary.browserAccess, []);
+  assert.equal(summary.workspacePath, room.projectPath);
+  assert.deepEqual(summary.browserAccess, ["https://github.com"]);
 });
 
 test("buildCodexTurnSummary bounds git status context", () => {

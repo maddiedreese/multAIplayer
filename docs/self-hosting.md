@@ -269,7 +269,7 @@ VITE_RELAY_URL=ws://127.0.0.1:4321/rooms
 
 These env vars define the packaged defaults. The official packaged alpha app-shell CSP allows localhost development relays and the hosted multAIplayer relay origin; it does not allow arbitrary HTTPS/WSS relay origins. A custom self-hosted relay origin therefore requires a self-built desktop app with `apps/desktop/src-tauri/tauri.conf.json` updated so `connect-src` includes both the relay HTTP origin and the matching WebSocket origin. After the build permits those origins, desktop users can open Settings and change the relay HTTP API URL and WebSocket rooms URL. The override is stored locally on that device.
 
-The current alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured. Hosted and internet-facing deployments should use SQLite and should add backup/restore drills, token-rotation operations, and shared/external rate limiting before making production or multi-instance claims.
+The alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured. Hosted and internet-facing deployments should use SQLite and should add backup/restore drills, token-rotation operations, and shared/external rate limiting before making production or multi-instance claims.
 
 ## Migrating From The Hosted Relay
 

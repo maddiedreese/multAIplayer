@@ -2,7 +2,6 @@ import type { MutableRefObject } from "react";
 import type {
   ApprovalDelegationPolicy,
   ApprovalPolicy,
-  RoomMode,
   RoomRecord,
   RoomSettingsPlaintextPayload
 } from "@multaiplayer/protocol";
@@ -18,7 +17,6 @@ import {
   normalizeProjectPath,
   normalizeRoomName
 } from "../lib/workspaceCreation";
-import { shouldResetCodexApprovalForRoomModeChange } from "../lib/codexApproval";
 import { roomLockMessage } from "../lib/appRuntime";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
 import { formatCodexModel, formatCodexReasoningEffort, formatCodexSandboxLevel, formatCodexSpeed } from "../lib/appFormatters";
@@ -36,7 +34,6 @@ interface UseRoomSettingsActionsOptions {
   selectedCodexSandboxLevel: string;
   projectPathDraft: string;
   approvalPolicyLabels: Record<string, string>;
-  roomModeLabels: Record<keyof RoomMode, string>;
   roomSettingsGateMessage: string;
   roomSettingsActor: () => { requesterName: string; requesterUserId: string };
   reportRoomSettingsMutationInFlight: (
@@ -72,7 +69,6 @@ export function useRoomSettingsActions({
   selectedCodexSandboxLevel,
   projectPathDraft,
   approvalPolicyLabels,
-  roomModeLabels,
   roomSettingsGateMessage,
   roomSettingsActor,
   reportRoomSettingsMutationInFlight,
@@ -159,52 +155,6 @@ export function useRoomSettingsActions({
         setSettingsMessageForRoom(roomId, "Approval delegation updated.");
       }
       resetCodexApprovalForRoom(roomId);
-    } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
-    } finally {
-      setSettingsBusyForRoom(roomId, false);
-    }
-  }
-
-  async function toggleRoomMode(key: keyof RoomMode) {
-    if (!hasSelectedRoom) {
-      setSelectedSettingsMessage("Create or join a room before changing room settings.");
-      return;
-    }
-    if (isSelectedRoomLocked) {
-      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedSettingsMessage(roomSettingsGateMessage);
-      return;
-    }
-    const roomId = selectedRoom.id;
-    if (reportRoomSettingsMutationInFlight(roomId)) return;
-    setSettingsBusyForRoom(roomId, true);
-    setSettingsMessageForRoom(roomId, null);
-    try {
-      const nextMode: RoomMode = {
-        ...selectedRoom.mode,
-        [key]: !selectedRoom.mode[key]
-      };
-      const previousValue = `${key}:${selectedRoom.mode[key] ? "enabled" : "disabled"}`;
-      const nextValue = `${key}:${nextMode[key] ? "enabled" : "disabled"}`;
-      const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), mode: nextMode });
-      replaceRoom(room);
-      await publishRoomSettingsEvent(room, {
-        id: crypto.randomUUID(),
-        setting: "roomMode",
-        previousValue,
-        nextValue,
-        changedAt: new Date().toISOString()
-      });
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setSettingsMessageForRoom(roomId, `${roomModeLabels[key]} mode ${nextMode[key] ? "enabled" : "disabled"}.`);
-      }
-      if (shouldResetCodexApprovalForRoomModeChange(key)) {
-        resetCodexApprovalForRoom(roomId);
-      }
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
     } finally {
@@ -574,7 +524,6 @@ export function useRoomSettingsActions({
   return {
     setApprovalPolicy,
     setApprovalDelegationPolicy,
-    toggleRoomMode,
     setCodexModel,
     setCodexReasoningEffort,
     setCodexSpeed,

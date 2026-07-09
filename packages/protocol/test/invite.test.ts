@@ -17,16 +17,20 @@ import {
   LocalPreviewPlaintextPayload,
   RelayEnvelope,
   RoomId,
+  RoomRecord,
   RoomSettingsPlaintextPayload,
   RoomKeyRotationPlaintextPayload,
   TerminalResultPlaintextPayload,
   TeamId,
   TeamMemberRecord,
   TeamRecord,
+  WorkspaceFileSaveRequestPlaintextPayload,
   maxGitHubActionRuns,
   maxGitWorkflowResults,
   maxLongTextChars,
   maxUrlChars,
+  defaultCodexModel,
+  defaultRoomMode,
   maxWrappedCiphertextChars
 } from "../src/index";
 
@@ -108,10 +112,34 @@ test("team records can carry the current user's role", () => {
     id: "team-core",
     name: "Core Team",
     members: 4,
-    role: "owner"
+    role: "owner",
+    archivedAt: "2026-07-09T12:00:00.000Z"
   });
 
   assert.equal(parsed.role, "owner");
+  assert.equal(parsed.archivedAt, "2026-07-09T12:00:00.000Z");
+});
+
+test("room records can carry lifecycle timestamps", () => {
+  const parsed = RoomRecord.parse({
+    id: "room-desktop",
+    teamId: "team-core",
+    name: "Desktop",
+    projectPath: "/tmp/project",
+    host: "No host",
+    hostStatus: "offline",
+    approvalPolicy: "ask_every_turn",
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
+    mode: defaultRoomMode,
+    codexModel: defaultCodexModel,
+    browserAllowedOrigins: [],
+    browserProfilePersistent: true,
+    unread: 0,
+    deletedAt: "2026-07-09T12:05:00.000Z"
+  });
+
+  assert.equal(parsed.deletedAt, "2026-07-09T12:05:00.000Z");
 });
 
 test("team member records carry role and join metadata", () => {
@@ -594,6 +622,54 @@ test("local preview payloads and encrypted preview events are bounded", () => {
   });
 
   assert.equal(envelope.kind, "preview.event");
+});
+
+test("workspace file save requests use encrypted workspace envelopes", () => {
+  const request = WorkspaceFileSaveRequestPlaintextPayload.parse({
+    eventType: "workspace.file.save",
+    id: "file-save-1",
+    requester: "Maddie",
+    requesterUserId: "github:maddie",
+    path: "README.md",
+    previousContent: "# Old\n",
+    nextContent: "# New\n",
+    requestedAt: "2026-07-08T12:00:00.000Z"
+  });
+
+  assert.equal(request.path, "README.md");
+  assert.equal(WorkspaceFileSaveRequestPlaintextPayload.safeParse({
+    ...request,
+    eventType: "workspace.file.delete"
+  }).success, false);
+
+  assert.equal(RelayEnvelope.safeParse({
+    id: "env-workspace-request",
+    teamId: "team-core",
+    roomId: "room-desktop",
+    senderDeviceId: "device-maddie",
+    senderUserId: "github:maddie",
+    createdAt: "2026-07-08T12:00:00.000Z",
+    kind: "workspace.request",
+    payload: {
+      algorithm: "AES-GCM-256",
+      nonce: "nonce-file-save-request",
+      ciphertext: "encrypted-file-save-request"
+    }
+  }).success, true);
+  assert.equal(RelayEnvelope.safeParse({
+    id: "env-workspace-event",
+    teamId: "team-core",
+    roomId: "room-desktop",
+    senderDeviceId: "device-maddie",
+    senderUserId: "github:maddie",
+    createdAt: "2026-07-08T12:01:00.000Z",
+    kind: "workspace.event",
+    payload: {
+      algorithm: "AES-GCM-256",
+      nonce: "nonce-file-save-status",
+      ciphertext: "encrypted-file-save-status"
+    }
+  }).success, true);
 });
 
 test("decrypted workflow payloads reject unbounded local persistence fields", () => {

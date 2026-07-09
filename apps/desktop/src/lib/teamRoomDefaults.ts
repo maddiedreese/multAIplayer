@@ -36,7 +36,6 @@ const defaultTeamRoomDefaults: TeamRoomDefaults = {
 
 const approvalPolicies: ApprovalPolicy[] = [
   "ask_every_turn",
-  "auto_chat_only",
   "never_host"
 ];
 
@@ -62,9 +61,7 @@ export function sanitizeTeamRoomDefaults(defaults: Partial<TeamRoomDefaults>): T
     ? defaultTeamRoomDefaults.browserAllowedOrigins
     : normalizeBrowserAllowedOrigins(defaults.browserAllowedOrigins);
   return {
-    approvalPolicy: isApprovalPolicy(defaults.approvalPolicy)
-      ? defaults.approvalPolicy
-      : defaultTeamRoomDefaults.approvalPolicy,
+    approvalPolicy: sanitizeApprovalPolicy(defaults.approvalPolicy),
     codexModel: normalizeCodexModel(defaults.codexModel ?? "") ?? defaultTeamRoomDefaults.codexModel,
     browserAllowedOrigins: [...(browserAllowedOrigins ?? defaultTeamRoomDefaults.browserAllowedOrigins)],
     browserProfilePersistent: typeof defaults.browserProfilePersistent === "boolean"
@@ -102,4 +99,9 @@ export function teamRoomDefaultsKey(teamId: string): string {
 
 function isApprovalPolicy(value: unknown): value is ApprovalPolicy {
   return typeof value === "string" && approvalPolicies.includes(value as ApprovalPolicy);
+}
+
+function sanitizeApprovalPolicy(value: unknown): ApprovalPolicy {
+  if (value === "auto_chat_only" || value === "auto_browser_allowed_sites") return "ask_every_turn";
+  return isApprovalPolicy(value) ? value : defaultTeamRoomDefaults.approvalPolicy;
 }

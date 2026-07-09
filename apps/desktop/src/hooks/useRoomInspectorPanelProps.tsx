@@ -36,7 +36,6 @@ interface UseRoomInspectorPanelPropsOptions {
     onInviteApprovalGateChange: (enabled: boolean) => void;
   };
   approvalPolicy: Omit<WorkProps["approvalPolicy"], "selectedPolicy" | "selectedDelegationPolicy" | "disabled">;
-  roomMode: Omit<WorkProps["roomMode"], "mode" | "disabled">;
   selectedCodexModel: string;
   selectedCodexReasoningEffort: string;
   selectedCodexSpeed: string;
@@ -98,7 +97,6 @@ export function useRoomInspectorPanelProps({
   onAcceptHandoff,
   encryptedInvite,
   approvalPolicy,
-  roomMode,
   selectedCodexModel,
   selectedCodexReasoningEffort,
   selectedCodexSpeed,
@@ -137,11 +135,6 @@ export function useRoomInspectorPanelProps({
       selectedPolicy: selectedRoom.approvalPolicy,
       selectedDelegationPolicy: selectedRoom.approvalDelegationPolicy,
       selectedSandboxLevel: selectedCodexSandboxLevel,
-      disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost
-    },
-    roomMode: {
-      ...roomMode,
-      mode: selectedRoom.mode,
       disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost
     },
     model: {

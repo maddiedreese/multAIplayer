@@ -10,9 +10,9 @@ import {
   updateRoomGoalElapsed
 } from "../src/lib/roomGoals";
 
-test("parseRoomGoalCommand accepts /goal and /goals commands only", () => {
+test("parseRoomGoalCommand accepts /goal commands only", () => {
   assert.equal(parseRoomGoalCommand("/goal build the editor"), "build the editor");
-  assert.equal(parseRoomGoalCommand("/goals: polish alpha"), "polish alpha");
+  assert.equal(parseRoomGoalCommand("/goals: polish alpha"), null);
   assert.equal(parseRoomGoalCommand("@Codex /goal build"), null);
   assert.equal(parseRoomGoalCommand("/goal   "), null);
 });
@@ -31,7 +31,7 @@ test("room goal lifecycle tracks elapsed time while paused and resumed", () => {
   const resumed = resumeRoomGoal(paused, new Date("2026-07-07T10:01:00.000Z"));
   const edited = editRoomGoal(resumed, "Ship the alpha", new Date("2026-07-07T10:01:01.000Z"));
   assert.equal(edited.text, "Ship the alpha");
-  assert.equal(edited.status, "running");
+  assert.equal(edited.status, "active");
 });
 
 test("formatRoomGoalDuration keeps popup timers compact", () => {

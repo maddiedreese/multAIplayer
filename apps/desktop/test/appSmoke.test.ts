@@ -202,21 +202,6 @@ test("App smoke", async (t) => {
     });
   });
 
-  await t.test("starts a room goal from slash command", async () => {
-    resetAppSmokeDom();
-    render(createElement(App));
-
-    const composer = await screen.findByPlaceholderText(/Message the room/);
-    fireEvent.change(composer, { target: { value: "/goal finish the editor" } });
-    fireEvent.click(screen.getByLabelText("Send message"));
-
-    await waitFor(() => {
-      assert.equal(screen.getByText("Goal running").textContent, "Goal running");
-    });
-    assert.equal(screen.getByText("finish the editor").textContent, "finish the editor");
-    assert.equal(screen.queryByText("/goal finish the editor"), null);
-  });
-
   await t.test("wires header model, reasoning, and speed selectors to room settings", async () => {
     resetAppSmokeDom();
     render(createElement(App));

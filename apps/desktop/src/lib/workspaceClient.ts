@@ -56,6 +56,19 @@ export async function createTeam(name: string): Promise<TeamRecord> {
   return body.team as TeamRecord;
 }
 
+export async function updateTeamLifecycle(
+  teamId: string,
+  action: "archive" | "restore" | "delete"
+): Promise<{ team: TeamRecord; rooms: RoomRecord[] }> {
+  const response = await fetch(`${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/lifecycle`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action })
+  });
+  return readJsonResponse<{ team: TeamRecord; rooms: RoomRecord[] }>(response, "Failed to update team");
+}
+
 export async function loadTeamMembers(teamId: string): Promise<TeamMemberRecord[]> {
   const response = await fetch(`${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/members`, {
     credentials: "include"
@@ -176,6 +189,21 @@ export async function updateRoomSettings(
     body: JSON.stringify(settings)
   });
   const body = await readJsonResponse<{ room: RoomRecord }>(response, "Failed to update room settings");
+  return body.room as RoomRecord;
+}
+
+export async function updateRoomLifecycle(
+  roomId: string,
+  action: "archive" | "restore" | "delete",
+  requester: { requesterName: string; requesterUserId: string }
+): Promise<RoomRecord> {
+  const response = await fetch(`${getRelayHttpUrl()}/rooms/${encodeURIComponent(roomId)}/lifecycle`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action, ...requester })
+  });
+  const body = await readJsonResponse<{ room: RoomRecord }>(response, "Failed to update room");
   return body.room as RoomRecord;
 }
 

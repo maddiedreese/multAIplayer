@@ -1,4 +1,5 @@
 import {
+  Archive,
   ChevronDown,
   ChevronRight,
   Circle,
@@ -6,7 +7,9 @@ import {
   FolderGit2,
   Github,
   Plus,
+  RotateCcw,
   Search,
+  Trash2,
   UsersRound,
   X
 } from "lucide-react";
@@ -23,6 +26,7 @@ export interface SidebarTeamDisplay {
   name: string;
   meta: string;
   active: boolean;
+  archived: boolean;
 }
 
 export interface SidebarRoomDisplay {
@@ -33,6 +37,7 @@ export interface SidebarRoomDisplay {
   active: boolean;
   attention: number;
   unread: number;
+  archived: boolean;
 }
 
 export interface SidebarMessageHitDisplay {
@@ -75,6 +80,8 @@ export function DesktopSidebar({
   onChooseNewRoomProjectPath,
   onCreateRoom,
   onSelectRoom,
+  onSetTeamLifecycle,
+  onSetRoomLifecycle,
   onSelectSidebarPanel,
   onToggleTheme
 }: {
@@ -109,15 +116,26 @@ export function DesktopSidebar({
   onChooseNewRoomProjectPath: () => void;
   onCreateRoom: () => void;
   onSelectRoom: (roomId: string, teamId?: string) => void;
+  onSetTeamLifecycle: (teamId: string, action: "archive" | "restore" | "delete") => void;
+  onSetRoomLifecycle: (roomId: string, action: "archive" | "restore" | "delete") => void;
   onSelectSidebarPanel: (panel: SidebarPanelName) => void;
   onToggleTheme: () => void;
 }) {
   const [teamCreateOpen, setTeamCreateOpen] = useState(false);
   const [roomCreateOpen, setRoomCreateOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [collapsedTeams, setCollapsedTeams] = useState<Record<string, boolean>>({});
 
-  const teamFormVisible = !searchActive && teamCreateOpen;
-  const roomFormVisible = !searchActive && roomCreateOpen;
+  const teamFormVisible = !searchActive && !showArchived && teamCreateOpen;
+  const roomFormVisible = !searchActive && !showArchived && roomCreateOpen;
+  const visibleTeams = showArchived
+    ? teams.filter((team) => team.archived || rooms.some((room) => room.teamId === team.id && room.archived))
+    : teams.filter((team) => !team.archived);
+  const sectionLabel = searchActive ? "Matching teams" : showArchived ? "Archived" : "Teams";
+  const archivedCount = teams.filter((team) => team.archived).length + rooms.filter((room) => room.archived).length;
+  const roomsForTeam = (team: SidebarTeamDisplay) => rooms.filter((room) =>
+    room.teamId === team.id && (showArchived ? room.archived || team.archived : !room.archived && !team.archived)
+  );
 
   return (
     <aside className="sidebar">
@@ -173,15 +191,31 @@ export function DesktopSidebar({
 
       <section className="sidebar-section">
         <div className="section-title">
-          <span>{searchActive ? "Matching teams" : "Teams"}</span>
+          <span>{sectionLabel}</span>
           {!searchActive && (
-            <button
-              onClick={() => setTeamCreateOpen((open) => !open)}
-              aria-label={teamCreateOpen ? "Hide team form" : "New team"}
-              aria-expanded={teamCreateOpen}
-            >
-              {teamCreateOpen ? <X size={14} /> : <Plus size={15} />}
-            </button>
+            <div className="section-title-actions">
+              <button
+                onClick={() => {
+                  setShowArchived((current) => !current);
+                  setTeamCreateOpen(false);
+                  setRoomCreateOpen(false);
+                }}
+                aria-label={showArchived ? "Show active teams" : "Show archived teams and rooms"}
+                aria-pressed={showArchived}
+                title={showArchived ? "Show active teams" : "Show archived"}
+              >
+                {showArchived ? <UsersRound size={14} /> : <Archive size={14} />}
+              </button>
+              {!showArchived && (
+                <button
+                  onClick={() => setTeamCreateOpen((open) => !open)}
+                  aria-label={teamCreateOpen ? "Hide team form" : "New team"}
+                  aria-expanded={teamCreateOpen}
+                >
+                  {teamCreateOpen ? <X size={14} /> : <Plus size={15} />}
+                </button>
+              )}
+            </div>
           )}
         </div>
         {teamFormVisible && (
@@ -203,7 +237,9 @@ export function DesktopSidebar({
           </div>
         )}
         <div className="team-list nested-team-list">
-          {teams.map((team) => (
+          {visibleTeams.map((team) => {
+            const teamRooms = roomsForTeam(team);
+            return (
             <div className="team-group" key={team.id}>
               <div className={`team-button ${team.active ? "active" : ""}`}>
                 <button
@@ -227,13 +263,41 @@ export function DesktopSidebar({
                   }}
                 >
                   <UsersRound size={16} />
-                  <span>{team.name}</span>
+                  <span>{team.name}{team.archived ? " (archived)" : ""}</span>
                   <small>{team.meta}</small>
                 </button>
+                <div className="sidebar-row-actions">
+                  <button
+                    type="button"
+                    className="icon-only"
+                    aria-label={team.archived ? `Restore ${team.name}` : `Archive ${team.name}`}
+                    title={team.archived ? "Restore team" : "Archive team"}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onSetTeamLifecycle(team.id, team.archived ? "restore" : "archive");
+                    }}
+                  >
+                    {team.archived ? <RotateCcw size={13} /> : <Archive size={13} />}
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-only"
+                    aria-label={`Delete ${team.name}`}
+                    title="Delete team"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (window.confirm(`Delete ${team.name}?\n\nThis removes the team and its rooms from the workspace. It does not erase local copies or ciphertext already received by devices.`)) {
+                        onSetTeamLifecycle(team.id, "delete");
+                      }
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </div>
               {!collapsedTeams[team.id] && (
                 <div className="nested-room-list">
-                  {rooms.filter((room) => room.teamId === team.id).map((room) => (
+                  {teamRooms.map((room) => (
                     <button
                       key={room.id}
                       className={`room-button nested ${room.active ? "active" : ""}`}
@@ -241,32 +305,87 @@ export function DesktopSidebar({
                       title={`${room.name} · ${room.detail}`}
                     >
                       <div>
-                        <strong>{room.name}</strong>
+                        <strong>{room.name}{room.archived ? " (archived)" : ""}</strong>
                         <span>{room.detail}</span>
                       </div>
                       <div className="room-indicators">
                         {room.attention > 0 && <b className="attention">{room.attention}</b>}
                         {room.unread > 0 ? <b>{room.unread}</b> : room.attention === 0 ? <Circle size={8} /> : null}
                       </div>
+                      <span className="sidebar-row-actions">
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className="icon-only"
+                          aria-label={room.archived ? `Restore ${room.name}` : `Archive ${room.name}`}
+                          title={room.archived ? "Restore room" : "Archive room"}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onSetRoomLifecycle(room.id, room.archived ? "restore" : "archive");
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              onSetRoomLifecycle(room.id, room.archived ? "restore" : "archive");
+                            }
+                          }}
+                        >
+                          {room.archived ? <RotateCcw size={13} /> : <Archive size={13} />}
+                        </span>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className="icon-only"
+                          aria-label={`Delete ${room.name}`}
+                          title="Delete room"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (window.confirm(`Delete ${room.name}?\n\nThis removes the room from the workspace. It does not erase local copies or ciphertext already received by devices.`)) {
+                              onSetRoomLifecycle(room.id, "delete");
+                            }
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              if (window.confirm(`Delete ${room.name}?\n\nThis removes the room from the workspace. It does not erase local copies or ciphertext already received by devices.`)) {
+                                onSetRoomLifecycle(room.id, "delete");
+                              }
+                            }
+                          }}
+                        >
+                          <Trash2 size={13} />
+                        </span>
+                      </span>
                     </button>
                   ))}
-                  {rooms.filter((room) => room.teamId === team.id).length === 0 && (
+                  {teamRooms.length === 0 && (
                     <div className="sidebar-empty nested-empty">
-                      {team.active && !searchActive ? "No rooms yet. Create one for this team." : "No visible rooms."}
+                      {showArchived
+                        ? "No archived rooms in this team."
+                        : team.active && !searchActive
+                          ? "No rooms yet. Create one for this team."
+                          : "No visible rooms."}
                     </div>
                   )}
                 </div>
               )}
             </div>
-          ))}
-          {teams.length === 0 && (
+          );})}
+          {visibleTeams.length === 0 && (
             <div className="sidebar-empty">
-              {searchActive ? "No teams found." : "No teams yet. Create one to start."}
+              {searchActive
+                ? "No teams found."
+                : showArchived
+                  ? archivedCount === 0 ? "No archived teams or rooms." : "No archived teams found."
+                  : "No teams yet. Create one to start."}
             </div>
           )}
         </div>
       </section>
 
+      {!showArchived && (
       <section className="sidebar-section rooms room-create-section">
         <div className="section-title">
           <span>New room</span>
@@ -317,6 +436,7 @@ export function DesktopSidebar({
           </div>
         )}
       </section>
+      )}
 
       {searchActive && (
         <section className="sidebar-section">

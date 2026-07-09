@@ -27,29 +27,25 @@ const room: RoomRecord = {
   unread: 0
 };
 
-test("local workspace access requires active host, workspace mode, and unlocked room", () => {
+test("local workspace access requires an unlocked room", () => {
   assert.equal(canUseLocalWorkspace(room, { id: "github:maddie", name: "Maddie" }), true);
-  assert.equal(canUseLocalWorkspace(room, { id: "github:alex", name: "Alex" }), false);
-  assert.equal(canUseLocalWorkspace({ ...room, mode: { ...room.mode, workspace: false } }, { id: "github:maddie", name: "Maddie" }), false);
+  assert.equal(canUseLocalWorkspace(room, { id: "github:alex", name: "Alex" }), true);
+  assert.equal(canUseLocalWorkspace({ ...room, mode: { ...room.mode, workspace: false } }, { id: "github:maddie", name: "Maddie" }), true);
   assert.equal(canUseLocalWorkspace(room, { id: "github:maddie", name: "Maddie" }, true), false);
 });
 
-test("workspace action requests require workspace mode and an unlocked room", () => {
+test("workspace action requests require an unlocked room", () => {
   assert.equal(canRequestWorkspaceAction(room), true);
-  assert.equal(canRequestWorkspaceAction({ ...room, mode: { ...room.mode, workspace: false } }), false);
+  assert.equal(canRequestWorkspaceAction({ ...room, mode: { ...room.mode, workspace: false } }), true);
   assert.equal(canRequestWorkspaceAction(room, true), false);
 });
 
 test("local workspace gate messages explain the missing permission", () => {
   assert.equal(localWorkspaceGateMessage(room, true), "Unlock this room before reading local project files.");
-  assert.equal(
-    localWorkspaceGateMessage({ ...room, mode: { ...room.mode, workspace: false } }),
-    "Workspace mode is disabled for this room."
-  );
-  assert.equal(localWorkspaceGateMessage(room), "Only Maddie can read this room's local project files.");
+  assert.equal(localWorkspaceGateMessage(room), "Project files are available to room members.");
   assert.equal(
     localWorkspaceGateMessage({ ...room, host: "No host", hostUserId: undefined, hostStatus: "offline" }),
-    "Claim host before reading local project files."
+    "Project files are available to room members."
   );
 });
 

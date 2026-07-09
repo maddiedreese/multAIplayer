@@ -64,9 +64,9 @@ test("legacy browser auto-approval helper keeps old records conservative", () =>
   assert.equal(shouldAutoApproveBrowserRequestLegacy("https://docs.example.com/guide", room, false), false);
 });
 
-test("browser access requests require browser mode and an unlocked room", () => {
+test("browser access requests require an unlocked room", () => {
   assert.equal(canRequestBrowserAccess(room), true);
-  assert.equal(canRequestBrowserAccess({ ...room, mode: { ...room.mode, browser: false } }), false);
+  assert.equal(canRequestBrowserAccess({ ...room, mode: { ...room.mode, browser: false } }), true);
   assert.equal(canRequestBrowserAccess(room, true), false);
 });
 
@@ -79,10 +79,7 @@ test("browser host actions require active host access", () => {
 
 test("browser access gate messages explain missing browser access", () => {
   assert.equal(browserAccessGateMessage(room, true), "Unlock this room before using browser access.");
-  assert.equal(
-    browserAccessGateMessage({ ...room, mode: { ...room.mode, browser: false } }),
-    "Browser mode is disabled for this room."
-  );
+  assert.equal(browserAccessGateMessage({ ...room, mode: { ...room.mode, browser: false } }), "Browser access is available for this room.");
 });
 
 test("browser request actions require a request from the current room list", () => {

@@ -108,6 +108,11 @@ export function registerRoomRoutes({
       res.status(404).json({ error: "Team not found" });
       return;
     }
+    const team = store.getTeam(teamId);
+    if (team?.archivedAt || team?.deletedAt) {
+      res.status(409).json({ error: "Restore this team before creating rooms." });
+      return;
+    }
     if (session && !isTeamMember(teamId, session.user.id)) {
       res.status(403).json({ error: "Join this team before creating rooms." });
       return;
@@ -226,6 +231,10 @@ export function registerRoomRoutes({
       res.status(404).json({ error: "Room not found" });
       return;
     }
+    if (room.archivedAt || room.deletedAt || store.getTeam(room.teamId)?.archivedAt || store.getTeam(room.teamId)?.deletedAt) {
+      res.status(409).json({ error: "Restore this room before changing host state." });
+      return;
+    }
     if (session && !canAccessRoom(room.teamId, room.id, session.user.id)) {
       res.status(403).json({ error: "Join this room before changing host state." });
       return;
@@ -290,6 +299,10 @@ export function registerRoomRoutes({
     const room = store.getRoom(roomId);
     if (!room) {
       res.status(404).json({ error: "Room not found" });
+      return;
+    }
+    if (room.archivedAt || room.deletedAt || store.getTeam(room.teamId)?.archivedAt || store.getTeam(room.teamId)?.deletedAt) {
+      res.status(409).json({ error: "Restore this room before changing room settings." });
       return;
     }
     if (session && !canAccessRoom(room.teamId, room.id, session.user.id)) {
@@ -372,6 +385,51 @@ export function registerRoomRoutes({
     broadcastRoomUpdated(updated);
     res.json({ room: updated });
   });
+
+  app.patch("/rooms/:roomId/lifecycle", (req, res) => {
+    const session = getAuthSession(req.cookies?.multaiplayer_session);
+    if (!allowMutation(session, res)) return;
+
+    const roomId = String(req.params.roomId ?? "");
+    const action = String(req.body?.action ?? "");
+    const requester = requesterFromRequest(req.body, req.cookies?.multaiplayer_session);
+    const room = store.getRoom(roomId);
+    if (!room || room.deletedAt || store.getTeam(room.teamId)?.deletedAt) {
+      res.status(404).json({ error: "Room not found" });
+      return;
+    }
+    if (session && !canAccessRoom(room.teamId, room.id, session.user.id)) {
+      res.status(403).json({ error: "Join this room before changing its archive state." });
+      return;
+    }
+    if (!["archive", "restore", "delete"].includes(action)) {
+      res.status(400).json({ error: "action must be archive, restore, or delete" });
+      return;
+    }
+    const requesterRole = session ? store.getTeamMember(room.teamId, session.user.id)?.role : "owner";
+    const teamAdmin = requesterRole === "owner" || requesterRole === "admin";
+    const roomHost = room.hostStatus === "active" && isRoomHost(room, requester);
+    if (!teamAdmin && !roomHost) {
+      res.status(403).json({ error: "Only the active host or a team owner/admin can archive, restore, or delete a room." });
+      return;
+    }
+    const team = store.getTeam(room.teamId);
+    if (action === "restore" && team?.archivedAt) {
+      res.status(409).json({ error: "Restore the team before restoring this room." });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const updated: RoomRecord = action === "restore"
+      ? { ...room, archivedAt: undefined }
+      : action === "archive"
+        ? { ...room, archivedAt: room.archivedAt ?? now }
+        : { ...room, archivedAt: undefined, deletedAt: now };
+    store.setRoom(updated);
+    scheduleStoreSave();
+    broadcastRoomUpdated(updated);
+    res.json({ room: updated });
+  });
 }
 
 function allowTotalRoomQuota({
@@ -388,7 +446,7 @@ function allowTotalRoomQuota({
   recordQuotaRejection?: (type: string) => void;
 }): boolean {
   const quota = "total_user_rooms";
-  const used = store.allRooms().filter((room) => teamIds.has(room.teamId)).length;
+  const used = store.allRooms().filter((room) => teamIds.has(room.teamId) && !room.deletedAt).length;
   if (used < cap) return true;
   recordQuotaRejection?.(quota);
   res.status(429).json({

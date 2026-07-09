@@ -159,7 +159,7 @@ export function RoomChatPanel({
   onSendMessage: () => void;
 }) {
   useEffect(() => {
-    if (roomGoal?.status !== "running") return undefined;
+    if (roomGoal?.status !== "active") return undefined;
     const interval = window.setInterval(onTickGoalElapsed, 1000);
     return () => window.clearInterval(interval);
   }, [onTickGoalElapsed, roomGoal?.id, roomGoal?.status]);
@@ -254,7 +254,7 @@ export function RoomChatPanel({
                     onClick={() => {
                       if (attachment.canPreview && !roomLocked) onOpenAttachment(message.id, attachment.id);
                     }}
-                    title={attachment.canPreview ? "Open in file viewer" : undefined}
+                    title={attachment.canPreview ? "Open in file editor" : undefined}
                     disabled={!attachment.canPreview || roomLocked}
                   >
                     <FileCode2 size={15} />
@@ -420,7 +420,7 @@ export function RoomChatPanel({
                 ? lockedPlaceholder
                 : chatEnabled
                   ? "Message the room, or type @Codex to invoke the active host..."
-                  : "Chat mode is disabled for this room"
+                  : "Chat is unavailable"
             }
             value={draft}
             disabled={!canUseChat}
@@ -473,7 +473,7 @@ function RoomGoalPopup({
     <section className={`room-goal ${goal.status}`} aria-label="Room goal">
       <div className="room-goal-status">
         <Bot size={15} />
-        <strong>{goal.status === "running" ? "Goal running" : "Goal paused"}</strong>
+        <strong>{formatGoalStatus(goal.status)}</strong>
         <span>{formatRoomGoalDuration(goal.elapsedMs)}</span>
       </div>
       {editing ? (
@@ -494,7 +494,7 @@ function RoomGoalPopup({
         <p>{goal.text}</p>
       )}
       <div className="room-goal-actions">
-        {goal.status === "running" ? (
+        {goal.status === "active" ? (
           <button onClick={onPause} title="Pause goal" aria-label="Pause goal">
             <Pause size={14} />
           </button>
@@ -512,4 +512,21 @@ function RoomGoalPopup({
       </div>
     </section>
   );
+}
+
+function formatGoalStatus(status: RoomGoal["status"]): string {
+  switch (status) {
+    case "active":
+      return "Goal active";
+    case "paused":
+      return "Goal paused";
+    case "blocked":
+      return "Goal blocked";
+    case "usageLimited":
+      return "Goal usage limited";
+    case "budgetLimited":
+      return "Goal budget limited";
+    case "complete":
+      return "Goal complete";
+  }
 }

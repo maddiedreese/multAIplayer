@@ -74,6 +74,8 @@ export const RelayEnvelope = z.object({
     "codex.queue",
     "browser.request",
     "browser.event",
+    "workspace.request",
+    "workspace.event",
     "terminal.request",
     "terminal.event",
     "preview.event",
@@ -163,6 +165,17 @@ export const BrowserRequestPlaintextPayload = z.object({
   requesterUserId: z.string().min(1).max(maxUserIdChars),
   url: z.string().min(1).max(maxUrlChars),
   reason: z.string().max(maxMediumTextChars),
+  requestedAt: z.string().datetime()
+});
+
+export const WorkspaceFileSaveRequestPlaintextPayload = z.object({
+  eventType: z.literal("workspace.file.save"),
+  id: z.string().min(1).max(maxEnvelopeIdChars),
+  requester: z.string().min(1).max(maxDisplayNameChars),
+  requesterUserId: z.string().min(1).max(maxUserIdChars),
+  path: z.string().min(1).max(maxProjectPathChars),
+  previousContent: z.string().max(maxLongTextChars),
+  nextContent: z.string().max(maxLongTextChars),
   requestedAt: z.string().datetime()
 });
 
@@ -509,7 +522,9 @@ export const TeamRecord = z.object({
   id: TeamId,
   name: z.string().min(1).max(maxDisplayNameChars),
   members: z.number().int().nonnegative(),
-  role: TeamRole.optional()
+  role: TeamRole.optional(),
+  archivedAt: z.string().datetime().optional(),
+  deletedAt: z.string().datetime().optional()
 });
 
 export const TeamMemberRecord = z.object({
@@ -564,7 +579,9 @@ export const RoomRecord = z.object({
   codexSandboxLevel: z.enum(["read_only", "workspace_write", "workspace_write_network", "danger_full_access"]).optional(),
   browserAllowedOrigins: z.array(z.string().min(1).max(maxUrlChars)).max(20),
   browserProfilePersistent: z.boolean(),
-  unread: z.number().int().nonnegative()
+  unread: z.number().int().nonnegative(),
+  archivedAt: z.string().datetime().optional(),
+  deletedAt: z.string().datetime().optional()
 });
 
 export const InviteRecord = z.object({
@@ -665,6 +682,7 @@ export type ChatDeletePlaintextPayload = z.infer<typeof ChatDeletePlaintextPaylo
 export type ChatReactionPlaintextPayload = z.infer<typeof ChatReactionPlaintextPayload>;
 export type LocalPreviewPlaintextPayload = z.infer<typeof LocalPreviewPlaintextPayload>;
 export type BrowserRequestPlaintextPayload = z.infer<typeof BrowserRequestPlaintextPayload>;
+export type WorkspaceFileSaveRequestPlaintextPayload = z.infer<typeof WorkspaceFileSaveRequestPlaintextPayload>;
 export type TerminalRequestPlaintextPayload = z.infer<typeof TerminalRequestPlaintextPayload>;
 export type RequestStatusPlaintextPayload = z.infer<typeof RequestStatusPlaintextPayload>;
 export type InviteJoinRequestPlaintextPayload = z.infer<typeof InviteJoinRequestPlaintextPayload>;
@@ -725,5 +743,5 @@ export const defaultRoomMode: RoomMode = {
   chat: true,
   code: true,
   workspace: true,
-  browser: false
+  browser: true
 };
