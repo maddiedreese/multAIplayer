@@ -23,7 +23,7 @@ Chat messages can carry encrypted reply references. Message reactions are routed
 
 Host handoff packages are routed as encrypted `room.host` envelopes. The relay sees the envelope metadata but not the handoff summary contents.
 
-Room setting activity that should be visible in the transcript is routed as encrypted `room.settings` envelopes. The alpha uses this for host-controlled approval policy, approval delegation, room mode, Codex model, Codex reasoning/speed/sandbox settings, project path, browser allowlist, and browser profile persistence changes. The relay can store current room metadata, but it cannot read the human-readable before/after activity message.
+Room setting activity that should be visible in the transcript is routed as encrypted `room.settings` envelopes. The alpha uses this for host-controlled approval policy, legacy approval delegation metadata, room mode, Codex model, Codex reasoning/speed/sandbox settings, project path, browser allowlist, and browser profile persistence changes. Delegation metadata does not authorize Codex execution; every Codex invocation still requires the active host's approval. The relay can store current room metadata, but it cannot read the human-readable before/after activity message.
 
 Browser access requests are routed as encrypted `browser.request` envelopes. Host decisions are routed as encrypted `browser.event` envelopes and can render as local room transcript activity after decryption. The relay sees the envelope kind, room id, sender id, and timestamp, but not the URL, reason, requester display name, decider, or host decision state.
 
