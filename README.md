@@ -36,7 +36,7 @@ Copy `.env.example` to `.env` and set `GITHUB_CLIENT_ID` to enable GitHub sign-i
 
 For `NODE_ENV=production`, the relay requires auth by default even if GitHub OAuth is not configured, and demo rooms are not seeded. Self-hosters who intentionally want an unauthenticated private LAN relay must set `MULTAIPLAYER_RELAY_REQUIRE_AUTH=false` explicitly.
 
-Self-hosted relays can be selected from the in-app Settings drawer by changing the relay HTTP API URL and WebSocket rooms URL.
+Self-hosted relays can be selected from the in-app Settings drawer by changing the relay HTTP API URL and WebSocket rooms URL. The packaged public alpha app-shell CSP allows localhost development relays and the official hosted relay; custom HTTPS/WSS relay origins require a self-built desktop app whose CSP includes those origins.
 
 For an internet-facing relay, configure exact allowed origins, durable encrypted session storage, auth-required mode, persistent relay storage, and rate limits, then run:
 

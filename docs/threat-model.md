@@ -22,7 +22,7 @@ The relay also bounds stored and live routing metadata such as team names, room 
 
 Encrypted room envelopes have a serialized size ceiling before WebSocket fanout or backlog storage. The relay cannot inspect plaintext, but it can reject oversized ids, sender fields, nonces, ciphertext, and device-sealed invite key material to avoid unbounded encrypted-event storage.
 
-GitHub OAuth access tokens are used only by the relay-side GitHub proxy for identity, pull requests, and Actions reads. Relay sessions are memory-only unless a `MULTAIPLAYER_RELAY_SESSION_SECRET` of at least 32 characters is configured. With that secret set, GitHub access tokens are AES-GCM encrypted in the relay JSON store and expired sessions are pruned on load and save. Plaintext access-token records are ignored if encountered on disk.
+GitHub OAuth access tokens are used only by the relay-side GitHub proxy for identity, pull requests, and Actions reads. Relay sessions are memory-only unless a `MULTAIPLAYER_RELAY_SESSION_SECRET` of at least 32 characters is configured. With that secret set, GitHub access tokens are AES-GCM encrypted in the relay store and expired sessions are pruned on load and save. Plaintext access-token records are ignored if encountered on disk.
 
 If the relay JSON store is unreadable or has an unsupported version, the relay renames it with a `.corrupt-...` suffix before starting from clean state. This avoids repeatedly loading untrusted state while preserving the file for operator recovery.
 
