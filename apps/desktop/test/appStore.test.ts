@@ -5,6 +5,7 @@ import {
   projectGitHubActionsByRoom,
   projectGitWorkflowByRoom
 } from "../src/store/slices/gitWorkflowSlice";
+import { projectInvitePanelMaps } from "../src/store/slices/inviteSlice";
 
 test.beforeEach(() => {
   useAppStore.getState().resetAppStore();
@@ -499,7 +500,8 @@ test("desktop store keeps invite panel state room scoped", () => {
   assert.equal(state.inviteSecretInput, "multaiplayer://invite#secret");
   assert.equal(state.inviteByRoom["room-a"]?.link, "https://multaiplayer.com/invite/room-a");
   assert.equal(state.inviteByRoom["room-a"]?.approvalGate, true);
-  assert.equal(state.inviteByRoom["room-b"]?.approvalGate, undefined);
+  assert.equal(state.inviteByRoom["room-b"]?.approvalGate, false);
+  assert.equal(projectInvitePanelMaps(state.inviteByRoom).inviteApprovalGatesByRoom["room-b"], false);
   assert.equal(state.inviteByRoom["room-a"]?.message, "Invite created");
   assert.equal(state.inviteByRoom["room-b"]?.message, undefined);
   assert.equal(state.inviteByRoom["room-a"]?.keyRotationBusy, true);
@@ -522,7 +524,7 @@ test("desktop store exposes room invite actions", () => {
   assert.equal(state.inviteByRoom["room-a"]?.approvalGate, true);
   assert.equal(state.inviteByRoom["room-a"]?.message, undefined);
   assert.equal(state.inviteByRoom["room-b"]?.link, undefined);
-  assert.equal(state.inviteByRoom["room-b"]?.approvalGate, undefined);
+  assert.equal(state.inviteByRoom["room-b"]?.approvalGate, false);
 });
 
 test("desktop store keeps room chat composition state room scoped", () => {

@@ -40,6 +40,7 @@ These require a maintainer account, secret, device, or product decision:
 - Configure `multAIplayer.com` and final callback/origin values.
 - Create and store production relay secrets.
 - Set up Apple Developer ID signing and notarization secrets.
+- During dogfooding/release setup, set `VITE_RELAY_HTTP_URL` and `VITE_RELAY_URL` for hosted-relay-first desktop builds once the official relay URLs are final.
 - Decide release cadence, support expectations, and disclosure contact.
 - Publish or update the alpha update manifest at `https://multaiplayer.com/releases/latest.json`.
 - Run `node scripts/sqlite-backup-restore-drill.mjs --data-path=/path/to/relay-store.sqlite` against a staged copy of the real relay SQLite store.

@@ -41,6 +41,8 @@ VITE_RELAY_URL=wss://relay.multaiplayer.com/rooms
 
 Keep the packaged desktop CSP aligned with these origins. The alpha app shell intentionally allows localhost development relays and `https://relay.multaiplayer.com` / `wss://relay.multaiplayer.com`, not arbitrary HTTPS/WSS egress.
 
+Dogfood and public alpha release builds should set these `VITE_RELAY_*` defaults once the official relay URLs are final, so first launch points at the hosted relay instead of requiring local relay setup.
+
 For the relay:
 
 ```bash

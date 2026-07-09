@@ -4,6 +4,8 @@ multAIplayer is a private group chat app where your team can bring Codex into th
 
 People chat normally, like iMessage or Slack. When the group needs help, someone invokes Codex. The active host approves the turn, and their local Codex works from the recent chat, attachments, selected project folder, browser state, and terminals. Codex can make code changes, commit, push, and open a PR while the room watches progress together.
 
+Treat room membership as controlled access to the active host's machine: admitted members can ask Codex to act on the host's project, terminal, browser, Git, and GitHub context, subject to the host's approval settings.
+
 Short version: group chat for coding with Codex. Private by default. Open source.
 
 See [docs/product-architecture.md](docs/product-architecture.md) for the initial product and architecture spec.

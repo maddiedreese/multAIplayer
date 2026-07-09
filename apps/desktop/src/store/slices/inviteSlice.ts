@@ -54,8 +54,8 @@ export function projectInvitePanelMaps(inviteByRoom: InviteByRoom): InvitePanelM
     ),
     inviteApprovalGatesByRoom: Object.fromEntries(
       Object.entries(inviteByRoom)
-        .filter(([, invite]) => invite.approvalGate)
-        .map(([roomId]) => [roomId, true])
+        .filter(([, invite]) => typeof invite.approvalGate === "boolean")
+        .map(([roomId, invite]) => [roomId, invite.approvalGate === true])
     ),
     inviteMessagesByRoom: Object.fromEntries(
       Object.entries(inviteByRoom)
@@ -173,8 +173,7 @@ export const createInviteSlice: StateCreator<AppStoreState, [], [], InviteSlice>
   setInviteApprovalGateForRoom: (roomId, enabled) => {
     set((state) => ({
       inviteByRoom: updateInviteForRoom(state.inviteByRoom, roomId, (invite) => {
-        const { approvalGate, ...rest } = invite;
-        return enabled ? { ...invite, approvalGate: true } : rest;
+        return { ...invite, approvalGate: enabled };
       })
     }));
   },

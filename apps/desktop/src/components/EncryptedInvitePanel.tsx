@@ -66,8 +66,13 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
           disabled={gateDisabled}
           onChange={(event) => onInviteApprovalGateChange(event.target.checked)}
         />
-        <span>Ask host to approve joiners</span>
+        <span>Require host approval for joiners</span>
       </label>
+      {!inviteApprovalGate && (
+        <div className="empty-state compact">
+          Direct invite links include the room key. Use them only when the sharing channel is trusted.
+        </div>
+      )}
       <label>
         <span>Join from invite</span>
         <textarea
