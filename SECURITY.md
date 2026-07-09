@@ -21,7 +21,7 @@ Release-specific checks and unsigned macOS artifact notes are tracked in [docs/r
 
 ## Reporting
 
-Until a private security contact is published, please open a GitHub issue with a minimal description and mark it clearly as security-sensitive. Do not include live secrets, access tokens, private repo contents, real chat transcripts, or exploit payloads that would expose another user's data.
+Please report suspected vulnerabilities through GitHub's private vulnerability reporting feature by selecting **Report a vulnerability** on the repository's Security page. Do not open a public issue for a suspected vulnerability. If private reporting is unavailable, open a minimal issue asking the maintainers for a preferred private contact; do not include vulnerability details, live secrets, access tokens, private repo contents, real chat transcripts, or exploit payloads that would expose another user's data.
 
 Good reports include:
 
