@@ -1,11 +1,11 @@
 import { loadAppConfig } from "./appConfig";
 import { appVersion } from "./appVersion";
 import {
-  exportPersistedDiagnosticEntries,
   recordPersistedDiagnostic,
+  savePersistedDiagnosticBundle,
+  type DiagnosticExportOutcome,
   type PersistedDiagnosticEntry
 } from "./localBackend/diagnosticsBackend";
-import { isTauriRuntime } from "./localBackend/runtime";
 
 export type DiagnosticLevel = "warn" | "error";
 
@@ -21,15 +21,13 @@ const maxDiagnosticObjectDepth = 6;
 const maxDiagnosticObjectKeys = 40;
 const maxDiagnosticArrayItems = 40;
 const omittedValue = "[omitted]";
-const sensitiveDiagnosticKeys = new Set([
-  "body",
-  "plaintext",
-  "token",
+const exactSensitiveDiagnosticKeys = new Set(["body", "plaintext"]);
+const sensitiveDiagnosticKeySuffixes = [
   "key",
+  "token",
   "secret",
-  "passphrase",
-  "accesstoken"
-]);
+  "passphrase"
+] as const;
 let installed = false;
 let diagnosticEntries: DiagnosticEntry[] = [];
 
@@ -64,20 +62,13 @@ export function recordDiagnosticEvent(level: DiagnosticLevel, message: string, .
   appendDiagnosticEntry(nextEntry);
 }
 
-export async function buildDiagnosticBundle(now = new Date()): Promise<string> {
+export function buildWebPreviewDiagnosticBundle(now = new Date()): string {
   const config = safeLoadAppConfig();
-  const memoryEntriesBeforeExport = loadDiagnosticEntries();
-  const persistedEntries = isTauriRuntime() ? await exportPersistedDiagnosticEntries() : [];
-  const memoryEntriesAfterExport = loadDiagnosticEntries();
-  const entries = mergeDiagnosticEntries(
-    persistedEntries,
-    [...memoryEntriesBeforeExport, ...memoryEntriesAfterExport]
-  );
   const bundle = {
     generatedAt: now.toISOString(),
     app: {
       version: appVersion,
-      runtime: isTauriRuntime() ? "tauri" : "web-preview",
+      runtime: "web-preview",
       userAgent: typeof navigator === "undefined" ? "unavailable" : navigator.userAgent,
       language: typeof navigator === "undefined" ? "unavailable" : navigator.language,
       platform: typeof navigator === "undefined" ? "unavailable" : navigator.platform
@@ -86,9 +77,20 @@ export async function buildDiagnosticBundle(now = new Date()): Promise<string> {
       httpOrigin: config ? safeOrigin(config.relayHttpUrl) : "unavailable",
       wsOrigin: config ? safeOrigin(config.relayWsUrl) : "unavailable"
     },
-    entries
+    entries: loadDiagnosticEntries()
   };
   return `${JSON.stringify(bundle, null, 2)}\n`;
+}
+
+export async function saveNativeDiagnosticBundle(): Promise<DiagnosticExportOutcome> {
+  const config = safeLoadAppConfig();
+  return savePersistedDiagnosticBundle({
+    userAgent: typeof navigator === "undefined" ? "unavailable" : navigator.userAgent,
+    language: typeof navigator === "undefined" ? "unavailable" : navigator.language,
+    platform: typeof navigator === "undefined" ? "unavailable" : navigator.platform,
+    relayHttpOrigin: config ? safeOrigin(config.relayHttpUrl) : "unavailable",
+    relayWsOrigin: config ? safeOrigin(config.relayWsUrl) : "unavailable"
+  });
 }
 
 export function loadDiagnosticEntries(): DiagnosticEntry[] {
@@ -188,47 +190,9 @@ function readDataStringProperty(value: object, key: string): string | undefined 
 }
 
 function isSensitiveDiagnosticKey(key: string): boolean {
-  return sensitiveDiagnosticKeys.has(key.toLowerCase().replace(/[-_\s]/g, ""));
-}
-
-function mergeDiagnosticEntries(persisted: unknown[], memory: DiagnosticEntry[]): DiagnosticEntry[] {
-  const entries: DiagnosticEntry[] = [];
-  const seen = new Set<string>();
-  for (const candidate of [...persisted, ...memory]) {
-    const entry = normalizeDiagnosticEntry(candidate);
-    if (!entry) continue;
-    const identity = JSON.stringify([entry.level, entry.message, entry.detail ?? null, entry.createdAt]);
-    if (seen.has(identity)) continue;
-    seen.add(identity);
-    entries.push(entry);
-  }
-  return entries.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-}
-
-function normalizeDiagnosticEntry(value: unknown): DiagnosticEntry | null {
-  if (!value || typeof value !== "object") return null;
-  let descriptors: PropertyDescriptorMap;
-  try {
-    descriptors = Object.getOwnPropertyDescriptors(value);
-  } catch {
-    return null;
-  }
-  const level = dataString(descriptors.level);
-  const message = dataString(descriptors.message);
-  const detail = dataString(descriptors.detail);
-  const createdAt = dataString(descriptors.createdAt);
-  if ((level !== "warn" && level !== "error") || message === undefined || createdAt === undefined) return null;
-  if (!Number.isFinite(Date.parse(createdAt))) return null;
-  return {
-    level,
-    message: boundText(redactText(message), 240),
-    ...(detail === undefined ? {} : { detail: boundText(redactText(detail), 800) }),
-    createdAt
-  };
-}
-
-function dataString(descriptor: PropertyDescriptor | undefined): string | undefined {
-  return descriptor && "value" in descriptor && typeof descriptor.value === "string" ? descriptor.value : undefined;
+  const normalizedKey = key.toLowerCase().replace(/[-_\s]/g, "");
+  return exactSensitiveDiagnosticKeys.has(normalizedKey)
+    || sensitiveDiagnosticKeySuffixes.some((suffix) => normalizedKey.endsWith(suffix));
 }
 
 function redactText(value: string): string {

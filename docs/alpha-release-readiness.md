@@ -46,9 +46,9 @@ These require a maintainer account, secret, device, or product decision:
 - Run `node scripts/sqlite-backup-restore-drill.mjs --data-path=/path/to/relay-store.sqlite` against a staged copy of the real relay SQLite store.
 - Run a real multi-user test with at least two GitHub accounts and two machines.
 - Review final security/trust copy before public announcement.
-- Confirm ordinary bug reports ask users to copy diagnostics from Account settings and review the bundle before attaching it.
+- Confirm ordinary native-app bug reports ask users to save diagnostics from Account settings and review the bundle before attaching it; the memory-only web preview may copy its current-session bundle.
 - Confirm native diagnostics use the platform app log directory with `0600` file permissions, seven-day/256 KiB/500-entry bounds, corruption-tolerant parsing, and capture-time plus export-time redaction.
-- Confirm the web preview remains memory-only, no generic diagnostic read command is exposed, and review guidance prohibits logging payload objects in place of stable error codes and bounded ids.
+- Confirm the web preview remains memory-only, native Rust writes exports without returning stored entries or bundle contents to JavaScript, and review guidance prohibits logging payload objects in place of stable error codes and bounded ids.
 
 ## Required Dogfood Scenarios
 

@@ -51,7 +51,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app_version,
             record_diagnostic,
-            export_diagnostic_entries,
+            save_diagnostic_bundle,
             git_status,
             git_remote_origin,
             git_create_patch,
