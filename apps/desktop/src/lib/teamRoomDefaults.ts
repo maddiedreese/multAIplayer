@@ -31,7 +31,7 @@ const defaultTeamRoomDefaults: TeamRoomDefaults = {
   codexModel: defaultCodexModel,
   browserAllowedOrigins: [...defaultBrowserAllowedOrigins],
   browserProfilePersistent: defaultBrowserProfilePersistent,
-  inviteApprovalGate: false
+  inviteApprovalGate: true
 };
 
 const approvalPolicies: ApprovalPolicy[] = [

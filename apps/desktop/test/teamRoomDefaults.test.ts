@@ -77,7 +77,7 @@ test("team room defaults persist approval policy per team", () => {
     codexModel: defaultCodexModel,
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
-    inviteApprovalGate: false
+    inviteApprovalGate: true
   });
 });
 
@@ -87,7 +87,7 @@ test("team room defaults sanitize unsupported approval policies", () => {
     codexModel: defaultCodexModel,
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
-    inviteApprovalGate: false
+    inviteApprovalGate: true
   });
 
   localStorage.setItem(teamRoomDefaultsKey("team-core"), JSON.stringify({ approvalPolicy: "nope" }));
@@ -96,7 +96,7 @@ test("team room defaults sanitize unsupported approval policies", () => {
     codexModel: defaultCodexModel,
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
-    inviteApprovalGate: false
+    inviteApprovalGate: true
   });
 });
 
@@ -120,7 +120,7 @@ test("team room defaults sanitize Codex model", () => {
     codexModel: defaultCodexModel,
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
-    inviteApprovalGate: false
+    inviteApprovalGate: true
   });
 });
 
@@ -135,7 +135,7 @@ test("team room defaults sanitize browser policy", () => {
     codexModel: "gpt-5.4-thinking",
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
-    inviteApprovalGate: false
+    inviteApprovalGate: true
   });
 
   assert.deepEqual(sanitizeTeamRoomDefaults({
@@ -165,7 +165,7 @@ test("team room defaults sanitize invite policy", () => {
     codexModel: "gpt-5.4",
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
-    inviteApprovalGate: false
+    inviteApprovalGate: true
   });
 });
 
@@ -204,7 +204,7 @@ test("team room defaults drop corrupted storage", () => {
     codexModel: defaultCodexModel,
     browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true,
-    inviteApprovalGate: false
+    inviteApprovalGate: true
   });
   assert.equal(localStorage.getItem(teamRoomDefaultsKey("team-core")), null);
 });
