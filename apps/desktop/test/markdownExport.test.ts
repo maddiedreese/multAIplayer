@@ -9,7 +9,8 @@ import {
   buildRoomMarkdown,
   buildSelectedMessagesMarkdown,
   buildTerminalMarkdown,
-  fencedCode
+  fencedCode,
+  inlineCode
 } from "../src/lib/markdownExport";
 import type { RoomRecord } from "@multaiplayer/protocol";
 
@@ -51,7 +52,7 @@ test("buildMessageMarkdown includes escaped author, attachments, and reactions",
 
   assert.match(markdown, /^### Maddie\\_\\\[host\\\] \(human, 10:30\)/);
   assert.match(markdown, /Can you review `diff` output\?/);
-  assert.match(markdown, /`src\/app\\`main\\`\.tsx` \(code, 2 KB, encrypted blob preview 117 KB\)/);
+  assert.match(markdown, /``src\/app`main`\.tsx`` \(code, 2 KB, encrypted blob preview 117 KB\)/);
   assert.match(markdown, /\\\+1 Priya\\_A/);
 });
 
@@ -63,7 +64,7 @@ test("buildRoomMarkdown includes metadata and message separators", () => {
 
   assert.match(markdown, /^# Docs & Diff Room/);
   assert.match(markdown, /Team: Core\\_Team/);
-  assert.match(markdown, /Project: `\/Users\/maddie\/dev\/mult\\`AI\\`player`/);
+  assert.match(markdown, /Project: ``\/Users\/maddie\/dev\/mult`AI`player``/);
   assert.match(markdown, /Hosted by Maddie/);
   assert.match(markdown, /\n\n---\n\n/);
 });
@@ -75,7 +76,7 @@ test("buildSelectedMessagesMarkdown includes only selected transcript messages",
   ]);
 
   assert.match(markdown, /^# Docs & Diff Room Selected Messages/);
-  assert.match(markdown, /Project: `\/Users\/maddie\/dev\/mult\\`AI\\`player`/);
+  assert.match(markdown, /Project: ``\/Users\/maddie\/dev\/mult`AI`player``/);
   assert.match(markdown, /selected second/);
   assert.match(markdown, /selected output/);
   assert.doesNotMatch(markdown, /first unselected/);
@@ -200,9 +201,15 @@ test("buildPullRequestBody escapes authors and changed files", () => {
   );
 
   assert.match(markdown, /\*\*Maddie\\_\\\*\*\*: ship the `alpha`/);
-  assert.match(markdown, /`src\/new\\`file\\`\.ts` \(modified\)/);
+  assert.match(markdown, /``src\/new`file`\.ts`` \(modified\)/);
 });
 
 test("fencedCode expands fences beyond embedded backticks", () => {
   assert.equal(fencedCode("````\ninside\n````", "text"), "`````text\n````\ninside\n````\n`````");
+});
+
+test("inlineCode safely contains backticks, backslashes, whitespace, and newlines", () => {
+  assert.equal(inlineCode("src/`odd\\name`.ts"), "``src/`odd\\name`.ts``");
+  assert.equal(inlineCode("`edge`"), "`` `edge` ``");
+  assert.equal(inlineCode(" line one\nline two "), "`  line one line two  `");
 });

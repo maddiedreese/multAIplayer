@@ -10,9 +10,9 @@ export interface DiagnosticEntry {
   createdAt: string;
 }
 
-const diagnosticStorageKey = "multaiplayer:diagnostics:v1";
 const maxDiagnosticEntries = 80;
 let installed = false;
+let diagnosticEntries: DiagnosticEntry[] = [];
 
 export function installGlobalDiagnostics() {
   if (installed || typeof window === "undefined") return;
@@ -67,38 +67,15 @@ export function buildDiagnosticBundle(now = new Date()): string {
 }
 
 export function loadDiagnosticEntries(): DiagnosticEntry[] {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(diagnosticStorageKey) ?? "[]") as unknown;
-    if (!Array.isArray(parsed)) return [];
-    const entries: DiagnosticEntry[] = [];
-    for (const item of parsed) {
-      if (!item || typeof item !== "object") continue;
-        const record = item as Record<string, unknown>;
-        if (
-          record.level !== "warn" &&
-          record.level !== "error"
-        ) continue;
-      if (typeof record.message !== "string" || typeof record.createdAt !== "string") continue;
-      entries.push({
-          level: record.level,
-          message: boundText(redactText(record.message), 240),
-          detail: typeof record.detail === "string" ? boundText(redactText(record.detail), 800) : undefined,
-          createdAt: record.createdAt
-      });
-    }
-    return entries.slice(-maxDiagnosticEntries);
-  } catch {
-    localStorage.removeItem(diagnosticStorageKey);
-    return [];
-  }
+  return diagnosticEntries.map((entry) => ({ ...entry }));
 }
 
 function saveDiagnosticEntries(entries: DiagnosticEntry[]) {
-  try {
-    localStorage.setItem(diagnosticStorageKey, JSON.stringify(entries));
-  } catch {
-    // Diagnostics are best-effort and must never interrupt app behavior.
-  }
+  diagnosticEntries = entries.slice(-maxDiagnosticEntries).map((entry) => ({ ...entry }));
+}
+
+export function clearDiagnosticEntries() {
+  diagnosticEntries = [];
 }
 
 function formatDiagnosticValue(value: unknown): string {

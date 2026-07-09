@@ -42,7 +42,7 @@ export function buildPullRequestBody(
   files: Array<{ path: string; status: string }>
 ): string {
   const recentMessages = messages.slice(-8).map((message) => `- **${escapeMarkdown(message.author)}**: ${normalizeMarkdownText(message.body)}`);
-  const changedFiles = files.map((file) => `- \`${escapeBackticks(file.path)}\` (${escapeMarkdown(file.status)})`);
+  const changedFiles = files.map((file) => `- ${inlineCode(file.path)} (${escapeMarkdown(file.status)})`);
 
   return compactMarkdown([
     "## Summary",
@@ -65,7 +65,7 @@ export function buildRoomMarkdown(room: RoomRecord, teamName: string, messages: 
     `# ${escapeMarkdown(room.name)}`,
     "",
     `Team: ${escapeMarkdown(teamName)}`,
-    `Project: \`${escapeBackticks(room.projectPath)}\``,
+    `Project: ${inlineCode(room.projectPath)}`,
     `Host: ${escapeMarkdown(formatHostStatus(room))}`,
     `Model: ${escapeMarkdown(formatCodexModel(room.codexModel ?? defaultCodexModel))}`,
     `Approval policy: ${escapeMarkdown(approvalPolicyLabels[room.approvalPolicy])}`,
@@ -79,7 +79,7 @@ export function buildSelectedMessagesMarkdown(room: RoomRecord, messages: Markdo
   return compactMarkdown([
     `# ${escapeMarkdown(room.name)} Selected Messages`,
     "",
-    `Project: \`${escapeBackticks(room.projectPath)}\``,
+    `Project: ${inlineCode(room.projectPath)}`,
     `Model: ${escapeMarkdown(formatCodexModel(room.codexModel ?? defaultCodexModel))}`,
     "",
     "## Messages",
@@ -92,7 +92,7 @@ export function buildMessageMarkdown(message: MarkdownChatMessage): string {
     ? [
         "",
         "Attachments:",
-        ...message.attachments.map((attachment) => `- \`${escapeBackticks(attachment.name)}\` (${formatAttachmentMeta(attachment)})`)
+        ...message.attachments.map((attachment) => `- ${inlineCode(attachment.name)} (${formatAttachmentMeta(attachment)})`)
       ]
     : [];
   const reactions = message.reactions?.length
@@ -129,7 +129,7 @@ export function buildCodexOutputMarkdown(
   return compactMarkdown([
     `# ${escapeMarkdown(room.name)} Codex Turn Output`,
     "",
-    `Project: \`${escapeBackticks(room.projectPath)}\``,
+    `Project: ${inlineCode(room.projectPath)}`,
     `Model: ${escapeMarkdown(formatCodexModel(room.codexModel ?? defaultCodexModel))}`,
     `Time: ${escapeMarkdown(codexMessage.time)}`,
     "",
@@ -155,13 +155,13 @@ export function buildProjectMarkdown(
     const churn = typeof file.added === "number" || typeof file.removed === "number"
       ? ` (+${file.added ?? 0}/-${file.removed ?? 0})`
       : "";
-    return `- \`${escapeBackticks(file.path)}\` (${escapeMarkdown(file.status)})${churn}`;
+    return `- ${inlineCode(file.path)} (${escapeMarkdown(file.status)})${churn}`;
   });
 
   return compactMarkdown([
     `# ${escapeMarkdown(roomName)} Project Context`,
     "",
-    `Project: \`${escapeBackticks(projectPath)}\``,
+    `Project: ${inlineCode(projectPath)}`,
     "",
     ...sensitiveWarningBlock(sensitiveRisks),
     "",
@@ -198,13 +198,13 @@ export function buildDiffSummaryMarkdown(
   const changedFiles = files.map((file) => {
     const added = file.added ?? 0;
     const removed = file.removed ?? 0;
-    return `- \`${escapeBackticks(file.path)}\` (${escapeMarkdown(file.status)}, +${added}/-${removed})`;
+    return `- ${inlineCode(file.path)} (${escapeMarkdown(file.status)}, +${added}/-${removed})`;
   });
 
   return compactMarkdown([
     `# ${escapeMarkdown(room.name)} Diff Summary`,
     "",
-    `Project: \`${escapeBackticks(room.projectPath)}\``,
+    `Project: ${inlineCode(room.projectPath)}`,
     `Branch: ${escapeMarkdown(branch)}`,
     "",
     ...sensitiveWarningBlock(sensitiveRisks),
@@ -239,12 +239,12 @@ export function buildTerminalMarkdown(
   return compactMarkdown([
     `# ${escapeMarkdown(room.name)} Terminal Output`,
     "",
-    `Project: \`${escapeBackticks(room.projectPath)}\``,
+    `Project: ${inlineCode(room.projectPath)}`,
     `Terminal: ${escapeMarkdown(title)}`,
     ...(terminal
       ? [
-          `Command: \`${escapeBackticks(terminal.command)}\``,
-          `Working directory: \`${escapeBackticks(terminal.cwd)}\``,
+          `Command: ${inlineCode(terminal.command)}`,
+          `Working directory: ${inlineCode(terminal.cwd)}`,
           `Status: ${terminal.running ? "running" : terminal.exitStatus ?? "done"}`
         ]
       : []),
@@ -265,12 +265,18 @@ export function fencedCode(value: string, language = ""): string {
   return [`${fence}${language}`, value, fence].join("\n");
 }
 
-function normalizeMarkdownText(value: string): string {
-  return value || "_No content._";
+export function inlineCode(value: string): string {
+  const normalized = value.replace(/\r\n?|\n/g, " ");
+  const longestFence = normalized.match(/`+/g)?.reduce((longest, fence) => Math.max(longest, fence.length), 0) ?? 0;
+  const fence = "`".repeat(longestFence + 1);
+  const needsPadding = normalized.startsWith("`") || normalized.endsWith("`") ||
+    normalized.startsWith(" ") || normalized.endsWith(" ");
+  const content = needsPadding ? ` ${normalized} ` : normalized;
+  return `${fence}${content}${fence}`;
 }
 
-function escapeBackticks(value: string): string {
-  return value.replace(/`/g, "\\`");
+function normalizeMarkdownText(value: string): string {
+  return value || "_No content._";
 }
 
 function formatHostStatus(room: RoomRecord): string {

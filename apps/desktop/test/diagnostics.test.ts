@@ -3,6 +3,7 @@ import test, { beforeEach } from "node:test";
 import { JSDOM } from "jsdom";
 import {
   buildDiagnosticBundle,
+  clearDiagnosticEntries,
   loadDiagnosticEntries,
   recordDiagnosticEvent
 } from "../src/lib/diagnostics";
@@ -26,6 +27,7 @@ Object.defineProperty(globalThis, "localStorage", {
 
 beforeEach(() => {
   localStorage.clear();
+  clearDiagnosticEntries();
 });
 
 test("recordDiagnosticEvent stores bounded redacted diagnostics", () => {
@@ -41,6 +43,12 @@ test("recordDiagnosticEvent stores bounded redacted diagnostics", () => {
   assert.match(entries[0].detail ?? "", /https:\/\/relay\.example\.com\/invites/);
   assert.doesNotMatch(entries[0].detail ?? "", /token=abc/);
   assert.doesNotMatch(entries[0].detail ?? "", /gho_/);
+});
+
+test("diagnostics remain memory-only", () => {
+  recordDiagnosticEvent("warn", "Memory only");
+  assert.equal(localStorage.length, 0);
+  assert.equal(loadDiagnosticEntries().length, 1);
 });
 
 test("buildDiagnosticBundle includes app metadata and relay origins only", () => {
