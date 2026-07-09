@@ -117,6 +117,7 @@ const relayMetrics = createRelayMetrics();
 const relayPersistence = createRelayPersistence({ backend: storageBackend, dataPath });
 const originPolicy = createRelayOriginPolicy({ nodeEnv, allowedCorsOrigins });
 const app = express();
+app.use(originPolicy.enforceAllowedOrigin);
 app.use(cors(originPolicy.corsOptions));
 app.use(cookieParser());
 app.use(requestLoggingMiddleware(structuredLogsEnabled));
