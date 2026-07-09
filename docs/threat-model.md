@@ -65,7 +65,7 @@ Approved room browser pages run in a room/project-scoped native WebView profile.
 
 Project file previews that look like `.env` files, credential files, environment dumps, tokens, or private keys require an explicit review click before they can be attached to the next encrypted room message. The second click is labelled as an intentional override so the host can still share a needed file while seeing that it will be visible to the room and may enter Codex context.
 
-Terminal commands are also scanned before request or host approval. Commands that appear to dump environment variables, read `.env` or credential files, or include token-like text show an inline warning. This is a review aid, not a complete secret detector, and it does not replace host judgment. Approving a terminal command grants shell access on the host account, with the selected project folder only used as the working directory.
+Terminal output and received terminal command requests are scanned before sharing or host approval. Content that appears to dump environment variables, read `.env` or credential files, or include token-like text shows an inline warning. This is a review aid, not a complete secret detector, and it does not replace host judgment. Approving a terminal request grants shell access on the host account, with the selected project folder only used as the working directory.
 
 ## Device Key Agreement
 

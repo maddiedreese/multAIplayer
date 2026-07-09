@@ -441,7 +441,9 @@ mod tests {
         assert!(ensure_terminal_command(&"x".repeat(MAX_TERMINAL_COMMAND_CHARS + 1)).is_err());
 
         assert!(ensure_terminal_input("rs").is_ok());
-        assert!(ensure_terminal_input("\n").is_err());
+        assert!(ensure_terminal_input("\r").is_ok());
+        assert!(ensure_terminal_input("\u{3}").is_ok());
+        assert!(ensure_terminal_input("").is_err());
         assert!(ensure_terminal_input(&"x".repeat(MAX_TERMINAL_INPUT_CHARS + 1)).is_err());
     }
 

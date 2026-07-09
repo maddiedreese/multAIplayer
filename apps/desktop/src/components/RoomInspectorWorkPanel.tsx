@@ -11,7 +11,7 @@ import { RoomModePanel } from "./RoomModePanel";
 import { RoomMembersPanel, TeamRosterPanel } from "./RosterPanels";
 import { TerminalPanel } from "./TerminalPanel";
 import { WorkspaceFilesPanel } from "./WorkspaceFilesPanel";
-import type { InspectorTab } from "./InspectorTabs";
+import type { InspectorTab } from "./RoomInspectorPanel";
 import type { HostHandoffRecord, InviteJoinRequest } from "../types";
 
 export function RoomInspectorWorkPanel({
@@ -45,7 +45,7 @@ export function RoomInspectorWorkPanel({
   githubActions: ComponentProps<typeof GitHubActionsPanel>;
   terminal: ComponentProps<typeof TerminalPanel>;
 }) {
-  if (activeTab === "files" || activeTab === "diff") {
+  if (activeTab === "files") {
     return (
       <>
         <ProjectPanel {...project} />

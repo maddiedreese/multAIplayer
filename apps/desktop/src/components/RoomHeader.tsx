@@ -9,7 +9,7 @@ import {
   X
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import type { InspectorTab } from "./InspectorTabs";
+import type { InspectorTab } from "./RoomInspectorPanel";
 import { closeRoomBrowserSurface } from "../lib/browserSurfaceEvents";
 
 type HostStatus = "active" | "handoff" | "offline";

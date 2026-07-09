@@ -30,6 +30,7 @@ export function useRoomChatPanelActions({
   copyMarkdownWithFallback,
   setChatMessageForRoom,
   stopLocalPreview,
+  openBrowserUrl,
   setInspectorTabForRoom,
   setReplyToMessageForRoom,
   setDraftForRoom
@@ -75,7 +76,8 @@ export function useRoomChatPanelActions({
   ) => Promise<void>;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   stopLocalPreview: (previewId: string) => Promise<void>;
-  setInspectorTabForRoom: (roomId: string, tab: "files") => void;
+  openBrowserUrl: (room: RoomRecord, url: string, reason: string) => void;
+  setInspectorTabForRoom: (roomId: string, tab: "files" | "terminal" | "browser" | "room") => void;
   setReplyToMessageForRoom: (roomId: string, messageId: string | null) => void;
   setDraftForRoom: (roomId: string, draft: string) => void;
 }) {
@@ -128,7 +130,7 @@ export function useRoomChatPanelActions({
 
   function onOpenLocalPreview(previewId: string) {
     const preview = localPreviews.find((item) => item.id === previewId);
-    if (preview?.publicUrl) window.open(preview.publicUrl, "_blank", "noopener,noreferrer");
+    if (preview?.publicUrl) openBrowserUrl(selectedRoom, preview.publicUrl, "Opened from a shared local preview.");
   }
 
   function onCopyLocalPreviewLink(previewId: string) {

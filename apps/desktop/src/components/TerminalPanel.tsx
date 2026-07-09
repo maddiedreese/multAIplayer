@@ -1,8 +1,17 @@
+import { FitAddon } from "@xterm/addon-fit";
+import * as xtermModule from "@xterm/xterm";
 import { Check, Copy, Plus, Play, Square, Terminal, X } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { TerminalLine, TerminalSnapshot } from "../lib/localBackend";
-import { stripTerminalControlSequences } from "../lib/terminalText";
 import { InlineSecretWarning } from "./common";
+
+type XTermConstructor = typeof import("@xterm/xterm").Terminal;
+const xtermCompat = xtermModule as unknown as {
+  Terminal?: XTermConstructor;
+  default?: { Terminal: XTermConstructor };
+};
+const XTerm = xtermCompat.Terminal ?? xtermCompat.default?.Terminal;
+type XTermInstance = InstanceType<XTermConstructor>;
 
 export interface TerminalCommandRequestDisplay {
   id: string;
@@ -27,7 +36,6 @@ export interface TerminalOutputLineDisplay extends TerminalLine {
 }
 
 export function TerminalPanel({
-  terminalInput,
   terminalBusy,
   terminalError,
   terminalRisks,
@@ -47,17 +55,12 @@ export function TerminalPanel({
   onApproveTerminalRequest,
   onDenyTerminalRequest,
   onSelectTerminal,
-  onTerminalInputChange,
-  onSendTerminalInput,
+  onSendTerminalData,
   onRestartTerminal,
   onStopTerminal
 }: {
-  terminalName: string;
-  terminalCommand: string;
-  terminalInput: string;
   terminalBusy: boolean;
   terminalError: string | null;
-  terminalCommandRisks: string[];
   terminalRisks: string[];
   codexEvents: CodexEventDisplay[];
   commandRequests: TerminalCommandRequestDisplay[];
@@ -69,27 +72,124 @@ export function TerminalPanel({
   terminalOutputLines: TerminalOutputLineDisplay[];
   codexRunning: boolean;
   canReadLocalWorkspace: boolean;
-  canRequestWorkspace: boolean;
   canApproveTerminal: boolean;
   onCopyMarkdown: () => void;
-  onRunGitStatus: () => void;
   onOpenInteractiveTerminal: () => void;
-  onTerminalNameChange: (name: string) => void;
-  onTerminalCommandChange: (command: string) => void;
-  onStartTerminal: () => void;
-  onRequestTerminalCommand: () => void;
   onApproveTerminalRequest: (requestId: string) => void;
   onDenyTerminalRequest: (requestId: string) => void;
   onSelectTerminal: (terminalId: string) => void;
-  onTerminalInputChange: (input: string) => void;
-  onSendTerminalInput: () => void;
+  onSendTerminalData: (input: string) => void;
   onRestartTerminal: () => void;
   onStopTerminal: () => void;
 }) {
-  const terminalInputRef = useRef<HTMLInputElement | null>(null);
-  const visibleTerminalLines = terminalOutputLines.filter(
-    (line) => !(line.stream === "system" && line.text.trim() === "$ exec zsh -f")
-  );
+  const terminalHostRef = useRef<HTMLDivElement | null>(null);
+  const xtermRef = useRef<XTermInstance | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const selectedTerminalIdForEffect = selectedTerminal?.id ?? null;
+  const selectedTerminalRunningForEffect = selectedTerminal?.running ?? false;
+  const terminalControlRef = useRef({
+    canControl: selectedTerminalCanControl,
+    running: selectedTerminalRunningForEffect,
+    sendData: onSendTerminalData
+  });
+  const renderedTerminalIdRef = useRef<string | null>(null);
+  const renderedLineCountRef = useRef(0);
+
+  useEffect(() => {
+    terminalControlRef.current = {
+      canControl: selectedTerminalCanControl,
+      running: selectedTerminalRunningForEffect,
+      sendData: onSendTerminalData
+    };
+  }, [onSendTerminalData, selectedTerminalCanControl, selectedTerminalRunningForEffect]);
+
+  useEffect(() => {
+    const host = terminalHostRef.current;
+    if (!host) return;
+    if (!window.requestAnimationFrame) {
+      window.requestAnimationFrame = (callback) => window.setTimeout(() => callback(Date.now()), 16);
+      window.cancelAnimationFrame = (handle) => window.clearTimeout(handle);
+    }
+    const terminalColor = window.getComputedStyle?.(document.documentElement).getPropertyValue("--text").trim() || "#111111";
+    if (!XTerm) return;
+    const xterm = new XTerm({
+      cursorBlink: true,
+      convertEol: true,
+      fontFamily: "var(--font-mono)",
+      fontSize: 13,
+      lineHeight: 1.35,
+      theme: {
+        background: "transparent",
+        foreground: terminalColor,
+        cursor: terminalColor,
+        selectionBackground: "rgba(120, 120, 120, 0.3)"
+      }
+    });
+    const fitAddon = new FitAddon();
+    xterm.loadAddon(fitAddon);
+    xterm.open(host);
+    xtermRef.current = xterm;
+    fitAddonRef.current = fitAddon;
+
+    const dataDisposable = xterm.onData((data: string) => {
+      const control = terminalControlRef.current;
+      if (!control.canControl || !control.running) return;
+      control.sendData(data);
+    });
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => {
+      try {
+        fitAddon.fit();
+      } catch {
+        // The addon can throw while the panel is hidden or has no measurable width.
+      }
+    });
+    resizeObserver?.observe(host);
+    window.requestAnimationFrame(() => {
+      try {
+        fitAddon.fit();
+      } catch {
+        // Hidden panels are fitted again on the next resize or snapshot render.
+      }
+    });
+
+    return () => {
+      resizeObserver?.disconnect();
+      dataDisposable.dispose();
+      xterm.dispose();
+      xtermRef.current = null;
+      fitAddonRef.current = null;
+      renderedTerminalIdRef.current = null;
+      renderedLineCountRef.current = 0;
+    };
+  }, []);
+
+  useEffect(() => {
+    const xterm = xtermRef.current;
+    if (!xterm) return;
+    if (!selectedTerminal) {
+      xterm.clear();
+      renderedTerminalIdRef.current = null;
+      renderedLineCountRef.current = 0;
+      return;
+    }
+
+    if (renderedTerminalIdRef.current !== selectedTerminal.id) {
+      xterm.reset();
+      renderedTerminalIdRef.current = selectedTerminal.id;
+      renderedLineCountRef.current = 0;
+    }
+
+    const newLines = selectedTerminal.lines.slice(renderedLineCountRef.current);
+    for (const line of newLines) {
+      writeTerminalLine(xterm, line);
+    }
+    renderedLineCountRef.current = selectedTerminal.lines.length;
+    try {
+      fitAddonRef.current?.fit();
+    } catch {
+      // Hidden panels are fitted again when visible.
+    }
+  }, [selectedTerminal, selectedTerminal?.lines.length, selectedTerminalIdForEffect]);
 
   return (
     <section className="panel terminal-panel">
@@ -199,39 +299,11 @@ export function TerminalPanel({
         </div>
       )}
 
-      <div className="terminal-output" onClick={() => terminalInputRef.current?.focus()}>
+      <div className="terminal-output xterm-output" onClick={() => xtermRef.current?.focus()}>
         {terminalRisks.length > 0 && <InlineSecretWarning risks={terminalRisks} compact />}
-        {visibleTerminalLines.map((line, index) => (
-          <div className={`terminal-line ${line.stream} ${line.risks.length ? "sensitive" : ""}`} key={`${line.stream}-${index}-${line.text}`}>
-            {line.stream !== "stdout" && <span>{line.stream}</span>}
-            {stripTerminalControlSequences(line.text)}
-          </div>
-        ))}
+        <div className="xterm-host" ref={terminalHostRef} />
         {codexRunning && <div className="terminal-active">Codex is preparing a foreground terminal...</div>}
-        {selectedTerminal ? (
-          <form
-            className="terminal-command-line"
-            onSubmit={(event) => {
-              event.preventDefault();
-              onSendTerminalInput();
-            }}
-          >
-            <span>{selectedTerminal.name}</span>
-            <b>$</b>
-            <input
-              ref={terminalInputRef}
-              value={terminalInput}
-              onChange={(event) => onTerminalInputChange(event.target.value)}
-              placeholder={selectedTerminal.running ? "type a command" : "terminal stopped"}
-              disabled={!selectedTerminalCanControl || !selectedTerminal.running}
-              autoComplete="off"
-              autoCorrect="off"
-              spellCheck={false}
-            />
-          </form>
-        ) : (
-          <div className="terminal-active">Opening shell...</div>
-        )}
+        {!selectedTerminal && <div className="terminal-active">Opening shell...</div>}
       </div>
 
       {selectedTerminal && (
@@ -261,4 +333,14 @@ export function TerminalPanel({
       {terminalError && <div className="workflow-message">{terminalError}</div>}
     </section>
   );
+}
+
+function writeTerminalLine(terminal: XTermInstance, line: TerminalLine) {
+  if (line.stream === "stdin") return;
+  if (line.stream === "system") {
+    if (line.text.trim() === "$ exec zsh -f") return;
+    terminal.writeln(line.text);
+    return;
+  }
+  terminal.write(line.text);
 }

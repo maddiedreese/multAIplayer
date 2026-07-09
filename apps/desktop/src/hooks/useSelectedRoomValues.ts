@@ -10,7 +10,7 @@ import type { GitWorkflowRuntimeByRoom } from "../store/slices/gitWorkflowSlice"
 import type { InviteByRoom } from "../store/slices/inviteSlice";
 import type { RoomChatByRoom } from "../store/slices/roomChatSlice";
 import type { RoomSettingsByRoom } from "../store/slices/roomSettingsSlice";
-import type { TerminalRuntimeByRoom, TerminalRoomUiState } from "../store/slices/terminalSlice";
+import type { TerminalRuntimeByRoom } from "../store/slices/terminalSlice";
 import type {
   ChatAttachment,
   ChatMessage,
@@ -78,7 +78,6 @@ export function useSelectedRoomValues({
   const selectedDiff = filePanel.selectedDiff ?? null;
   const historyMessage = historyMessagesByRoom[roomId] ?? null;
   const teamHistoryMessage = teamHistoryMessagesByTeam[selectedTeam || "__no-team"] ?? null;
-  const terminalUi: TerminalRoomUiState = terminalRuntime.ui ?? {};
   const pendingAttachments: ChatAttachment[] = roomChat.pendingAttachments ?? [];
   const markdownCopyFallback: MarkdownCopyFallback | null = filePanel.markdownCopyFallback ?? null;
 
@@ -102,6 +101,8 @@ export function useSelectedRoomValues({
     browserUrl: browser.url ?? defaultBrowserUrl,
     browserReason: browser.reason ?? defaultBrowserReason,
     activeBrowserUrl: browser.activeUrl ?? null,
+    browserTabs: browser.tabs ?? [],
+    activeBrowserTabId: browser.activeTabId ?? null,
     gitStatus: gitWorkflow.status ?? null,
     gitWorkflowDraft: resolveGitWorkflowDraft({ [roomId]: gitWorkflow.draft ?? {} }, roomId),
     gitWorkflowBusy: gitWorkflow.busy ?? false,
@@ -113,10 +114,7 @@ export function useSelectedRoomValues({
     terminalLines: terminalRuntime.lines ?? [],
     terminalBusy: terminalRuntime.busy ?? false,
     selectedTerminalId: terminalRuntime.selectedTerminalId ?? null,
-    terminalName: terminalUi.name ?? "dev-server",
-    terminalCommand: terminalUi.command ?? "npm run dev:desktop",
-    terminalInput: terminalUi.input ?? "",
-    terminalError: terminalUi.error ?? null,
+    terminalError: terminalRuntime.ui?.error ?? null,
     fileQuery: filePanel.query ?? "",
     projectFiles: filePanel.projectFiles ?? [],
     selectedFile: filePanel.selectedFile ?? null,

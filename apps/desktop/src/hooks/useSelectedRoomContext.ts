@@ -8,7 +8,7 @@ interface UseSelectedRoomContextOptions {
   rooms: RoomRecord[];
   selectedRoomId: string;
   fallbackRoom: RoomRecord;
-  inspectorTabsByRoom: Record<string, InspectorTab | "diff">;
+  inspectorTabsByRoom: Record<string, InspectorTab>;
   secretWarningsVisibleByRoom: Record<string, boolean>;
   terminals: TerminalSnapshot[];
 }
@@ -23,9 +23,7 @@ export function useSelectedRoomContext({
 }: UseSelectedRoomContextOptions) {
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? fallbackRoom;
-  const inspectorTab = inspectorTabsByRoom[selectedRoom.id] === "diff"
-    ? "files"
-    : inspectorTabsByRoom[selectedRoom.id] ?? "files";
+  const inspectorTab = inspectorTabsByRoom[selectedRoom.id] ?? "files";
   const secretWarningVisible = hasSelectedRoom && (
     secretWarningsVisibleByRoom[selectedRoom.id ?? selectedRoomId] ??
     !hasAcknowledgedRoomVisibilityWarning(selectedRoom.id ?? selectedRoomId)

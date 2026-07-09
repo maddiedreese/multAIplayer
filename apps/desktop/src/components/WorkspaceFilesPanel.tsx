@@ -9,6 +9,7 @@ import type {
 import type { FilePreviewTab } from "../lib/filePreview";
 import { FilePreviewTabs } from "./FilePreviewTabs";
 import { InlineSecretWarning } from "./common";
+import { MonacoFileEditor } from "./MonacoFileEditor";
 
 export function WorkspaceFilesPanel({
   fileQuery,
@@ -198,13 +199,11 @@ export function WorkspaceFilesPanel({
             </div>
           ) : (
             selectedFile ? (
-              <textarea
-                className="file-editor"
+              <MonacoFileEditor
+                path={selectedFile.path}
                 value={editorContent}
-                onChange={(event) => setEditorContent(event.target.value)}
-                spellCheck={false}
+                onChange={setEditorContent}
                 disabled={!canReadLocalWorkspace || selectedFile.truncated}
-                aria-label={`Edit ${selectedFile.path}`}
               />
             ) : (
               <div className="empty-state compact">No current file content is available for this diff.</div>

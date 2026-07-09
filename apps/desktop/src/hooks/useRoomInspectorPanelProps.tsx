@@ -5,6 +5,7 @@ import { formatBytes, formatCodexModel, formatTimestamp } from "../lib/appFormat
 import { BrowserAccessPanel } from "../components/BrowserAccessPanel";
 import { RoomInspectorPanel } from "../components/RoomInspectorPanel";
 import { RoomInspectorWorkPanel } from "../components/RoomInspectorWorkPanel";
+import type { BrowserTab } from "../store/slices/browserSlice";
 
 type InspectorProps = ComponentProps<typeof RoomInspectorPanel>;
 type WorkProps = ComponentProps<typeof RoomInspectorWorkPanel>;
@@ -12,10 +13,14 @@ type WorkProps = ComponentProps<typeof RoomInspectorWorkPanel>;
 interface UseRoomInspectorPanelPropsOptions {
   activeTab: InspectorProps["activeTab"];
   activeBrowserUrl: string | null;
+  browserTabs: BrowserTab[];
+  activeBrowserTabId: string | null;
   browserUrl: string;
   canHostBrowser: boolean;
   onBrowserUrlChange: (url: string) => void;
   onOpenBrowserNow: () => void;
+  onSelectBrowserTab: (tabId: string) => void;
+  onCloseBrowserTab: (tabId: string) => void;
   selectedRoom: RoomRecord;
   projectPathDraft: string;
   gitStatus: WorkProps["workspaceFiles"]["gitStatus"];
@@ -76,10 +81,14 @@ interface UseRoomInspectorPanelPropsOptions {
 export function useRoomInspectorPanelProps({
   activeTab,
   activeBrowserUrl,
+  browserTabs,
+  activeBrowserTabId,
   browserUrl,
   canHostBrowser,
   onBrowserUrlChange,
   onOpenBrowserNow,
+  onSelectBrowserTab,
+  onCloseBrowserTab,
   selectedRoom,
   projectPathDraft,
   gitStatus,
@@ -177,10 +186,14 @@ export function useRoomInspectorPanelProps({
       <BrowserAccessPanel
         hidden={false}
         activeBrowserUrl={activeBrowserUrl}
+        browserTabs={browserTabs}
+        activeBrowserTabId={activeBrowserTabId}
         browserUrl={browserUrl}
         canHostBrowser={canHostBrowser}
         onBrowserUrlChange={onBrowserUrlChange}
         onOpenBrowserNow={onOpenBrowserNow}
+        onSelectBrowserTab={onSelectBrowserTab}
+        onCloseBrowserTab={onCloseBrowserTab}
       />
     ),
     filesPanel: (

@@ -7,7 +7,7 @@ import type { AppStoreState } from "../appStore";
 export type HistorySearchMessagesByRoom = Record<string, ChatMessage[]>;
 export type HistoryMessagesByRoom = Record<string, string | null>;
 export type TeamHistoryMessagesByTeam = Record<string, string | null>;
-export type InspectorTabsByRoom = Record<string, InspectorTab>;
+export type InspectorTabByRoom = Record<string, InspectorTab>;
 export type PresenceByRoom = Record<string, Record<string, RoomPresence>>;
 
 export interface HistoryPresenceRoomState {
@@ -23,6 +23,10 @@ export interface TeamHistoryState {
 
 export type HistoryPresenceByRoom = Record<string, HistoryPresenceRoomState>;
 export type TeamHistoryByTeam = Record<string, TeamHistoryState>;
+
+function normalizeInspectorTab(tab: InspectorTab | "diff" | undefined): InspectorTab {
+  return tab === "diff" || !tab ? "files" : tab;
+}
 
 function updateHistoryPresenceForRoom(
   current: HistoryPresenceByRoom,
@@ -70,11 +74,11 @@ export function projectHistoryMessagesByRoom(historyPresenceByRoom: HistoryPrese
   );
 }
 
-export function projectInspectorTabsByRoom(historyPresenceByRoom: HistoryPresenceByRoom): InspectorTabsByRoom {
+export function projectInspectorTabsByRoom(historyPresenceByRoom: HistoryPresenceByRoom): InspectorTabByRoom {
   return Object.fromEntries(
     Object.entries(historyPresenceByRoom)
       .filter(([, roomState]) => roomState.inspectorTab)
-      .map(([roomId, roomState]) => [roomId, roomState.inspectorTab ?? "files"])
+      .map(([roomId, roomState]) => [roomId, normalizeInspectorTab(roomState.inspectorTab as InspectorTab | "diff" | undefined)])
   );
 }
 

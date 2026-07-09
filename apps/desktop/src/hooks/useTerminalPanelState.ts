@@ -4,8 +4,7 @@ import {
   projectSelectedTerminalRuntimeIdsByRoom,
   projectTerminalRuntimeBusyByRoom,
   projectTerminalRuntimeLinesByRoom,
-  projectTerminalRuntimeRequestsByRoom,
-  projectTerminalRuntimeUiByRoom
+  projectTerminalRuntimeRequestsByRoom
 } from "../store/slices/terminalSlice";
 
 export function useTerminalPanelState({
@@ -24,14 +23,12 @@ export function useTerminalPanelState({
     terminalLinesByRoom,
     terminalBusyByRoom,
     terminalRequestsByRoom,
-    selectedTerminalIdsByRoom,
-    terminalUiByRoom
+    selectedTerminalIdsByRoom
   } = useMemo(() => ({
     terminalLinesByRoom: projectTerminalRuntimeLinesByRoom(terminalRuntimeByRoom),
     terminalBusyByRoom: projectTerminalRuntimeBusyByRoom(terminalRuntimeByRoom),
     terminalRequestsByRoom: projectTerminalRuntimeRequestsByRoom(terminalRuntimeByRoom),
-    selectedTerminalIdsByRoom: projectSelectedTerminalRuntimeIdsByRoom(terminalRuntimeByRoom),
-    terminalUiByRoom: projectTerminalRuntimeUiByRoom(terminalRuntimeByRoom)
+    selectedTerminalIdsByRoom: projectSelectedTerminalRuntimeIdsByRoom(terminalRuntimeByRoom)
   }), [terminalRuntimeByRoom]);
   const terminalAutoOpenedRoomsRef = useRef<Set<string>>(new Set());
 
@@ -50,7 +47,6 @@ export function useTerminalPanelState({
     upsertTerminalSnapshot,
     terminalRequestsByRoom,
     selectedTerminalIdsByRoom,
-    terminalUiByRoom,
     terminalAutoOpenedRoomsRef
   };
 }

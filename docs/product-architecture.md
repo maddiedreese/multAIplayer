@@ -75,6 +75,8 @@ The active project folder is a host-local path. The macOS app can attach it with
 
 Native project file access is confined to the selected project root and rejects parent-directory or symlink escapes. File previews are read with a byte cap, and native diff output is bounded to 200,000 characters with an explicit truncation marker so generated files or large diffs do not overwhelm the desktop UI or copied context.
 
+The workspace file editor uses Monaco Editor for the primary code editing surface. Monaco is embedded as an MIT-licensed dependency with attribution in `THIRD_PARTY_NOTICES.md`; multAIplayer owns the surrounding room/file selection, save, attachment-review, diff, and approval workflows.
+
 Project file search, file preview, Git status, diff reads, Git remote inference, and approved Git workflows are local workspace actions. They are available only when workspace mode is enabled and the current device is the active host for the room. Other members can still see room-shared encrypted chat, attachments, browser decisions, Codex/Git events, and copied/shared outputs, but their clients do not independently read the host's local project path.
 
 Desktop git-status summaries are scoped per room/project. Switching rooms clears the visible status for the incoming room until its own local `git status` read completes, so changed-file counts, PR drafts, and diff summaries do not reuse another room's project state.
@@ -173,35 +175,29 @@ Approval policies are host-side. They do not grant other users access to the hos
 
 In the alpha, Codex turns are not auto-approved. The chat-only preset is retained as a compatibility label for room defaults, but every invocation still becomes a proposal that requires the active host to approve before the local Codex app-server is called. High-privilege turns, such as full-access Codex or terminal/workspace/browser context, are called out distinctly in the approval sheet.
 
-### Terminal Requests
+### Terminals
 
-Rooms have persistent named terminals per project room, such as:
+Rooms have persistent named terminal sessions per project room, such as:
 
-- `dev-server`;
 - `tests`;
 - `logs`;
 - `shell`.
 
-Non-host members can request terminal commands. These are separate from Codex command proposals:
+The terminal surface uses xterm.js as the emulator and a Rust PTY layer through `portable-pty` in the Tauri host. The frontend sends raw terminal input from xterm.js to the native PTY command API, and the native host preserves PTY output/control sequences for xterm.js to render. New terminal creation, live terminal listing, terminal selection, restart, stop, and interactive input are active-host local workspace actions. The alpha does not present a separate command-composer UI beside xterm; users type directly into the terminal surface.
 
-- Human command request: a member proposes an exact command for the host to approve.
-- Codex command proposal: Codex proposes or runs commands according to the active sandbox and approval policy.
+Terminal request envelopes from existing room protocol flows are still encrypted room events. The relay can route the request but cannot read the command. If such a request is received, the active host sees the requester and command before approving or denying it locally. Approved terminal requests always execute from the active room's selected project folder on the host machine; the host app does not trust a requester-provided working directory. Approval grants shell access on the host account, not a project sandbox.
 
-Human command requests are encrypted room events. The relay can route the request but cannot read the command. The active host sees the requester and command before approving or denying it locally. Approved non-host terminal requests always execute from the active room's selected project folder on the host machine; the host app does not trust a requester-provided working directory. Approval grants shell access on the host account, not a project sandbox.
-
-Codex can spin up background or foreground terminals. A background terminal can be brought to the foreground by request or by host action.
-
-Live terminal listing, terminal start/restart/stop, terminal input, ad hoc host checks, and approved command execution are active-host local workspace actions. Non-host members can request terminal commands when the room is unlocked and workspace mode is enabled, but their clients do not list or control the active host's local terminal processes.
-
-The macOS alpha bounds approved one-shot terminal commands, persistent terminal launch commands, and interactive terminal input to 4,000 characters each, caps one-shot command output at 120,000 characters with an explicit truncation marker, and keeps the latest 1,000 output lines per terminal session in memory. Terminal snapshots are saved in encrypted local room history as stopped/restartable sessions, so a room can remember its named terminal roster and recent output after reload without claiming the underlying OS process survived. The desktop room activity feed for terminal, Codex, Git, and Actions events is also scoped per room and capped to the latest 1,000 lines per room.
+The macOS alpha bounds approved one-shot terminal commands and interactive terminal input to 4,000 characters each, caps one-shot command output at 120,000 characters with an explicit truncation marker, and keeps the latest 1,000 output chunks per terminal session in memory. Terminal snapshots are saved in encrypted local room history as stopped/restartable sessions, so a room can remember its named terminal roster and recent output after reload without claiming the underlying OS process survived. The desktop room activity feed for terminal, Codex, Git, and Actions events is also scoped per room and capped to the latest 1,000 lines per room.
 
 ### Browser Requests
 
-Browser mode is room-scoped. The active host can open a normal in-app browser column for the room, and Codex can ask to open a URL such as localhost in that same column. Browser URLs and signed-in pages are treated as host-visible room context, so Codex browser use stays behind the host approval boundary.
+Browser mode is room-scoped. The active host can open a normal in-app browser column for the room, and Codex can ask to open a URL such as localhost in that same column. The browser surface is a Tauri/Wry WebView with room-scoped tabs, address entry, refresh, expansion, and URL-stack navigation. The room keeps multiple browser tabs in local UI state, and the selected tab is mounted into the active WebView surface. Browser URLs and signed-in pages are treated as host-visible room context, so Codex browser use stays behind the host approval boundary.
 
 Browser access requests require an unlocked browser-enabled room. Browser approvals, denials, isolated browser opens, and browser profile resets require the current device to be the active host for that unlocked browser-enabled room.
 
-The relay can see that a `browser.request` or `browser.event` envelope exists, but not the requested URL, reason, or decision details. Browser approval and denial decisions render as local system transcript messages after decryption, so room members can see the host-side browser audit trail without exposing it to the relay. Approved URLs can be opened in a room/project-scoped Tauri WebView surface on the host machine. Browser profile persistence is a host-controlled room setting: profiles persist by default, hosts can reset them manually, and refresh mode closes and clears the room/project browser profile before each approved open. The alpha keeps this as an explicit host action; deeper browser automation can be added behind the same approval boundary.
+The relay can see that a `browser.request` or `browser.event` envelope exists, but not the requested URL, reason, or decision details. Browser approval and denial decisions render as local system transcript messages after decryption, so room members can see the host-side browser audit trail without exposing it to the relay. Approved URLs can be opened as tabs in a room/project-scoped Tauri/Wry WebView surface on the host machine. Browser profile persistence is a host-controlled room setting: profiles persist by default, hosts can reset them manually, and refresh mode closes and clears the room/project browser profile before each approved open. The alpha keeps this as an explicit host action; deeper browser automation can be added behind the same approval boundary.
+
+When a host shares a local build through a Cloudflare Quick Tunnel, the resulting `trycloudflare.com` URL is opened from the local preview card as a room browser tab inside multAIplayer, not as an external system browser tab. Copying the link remains an explicit separate action.
 
 ### GitHub And Git
 
@@ -341,6 +337,7 @@ v1 includes an isolated native WebView browser surface that Codex can use after 
 Security model:
 
 - separate browser profile per room and active project path;
+- multiple browser tabs per room, with one selected tab rendered into the active WebView surface at a time;
 - room browser profile path and native guard status indicators are scoped to the selected room/project;
 - state persists by default, with a room setting for refreshing the profile before each approved open and a host reset action;
 - no access to the user's normal Chrome profile, cookies, passwords, extensions, or tabs;
@@ -453,7 +450,7 @@ Bottom panel:
 - file explorer and file viewer;
 - red/green diff viewer;
 - persistent named terminals;
-- terminal command requests;
+- xterm.js interactive terminal surface;
 - isolated browser;
 - GitHub PR creation;
 - local git branch/commit/push;
@@ -566,7 +563,7 @@ docs/
 - File explorer/viewer.
 - Diff viewer.
 - Persistent named terminals.
-- Terminal command requests.
+- xterm.js interactive terminal surface.
 - Git status.
 
 ### Milestone 5: GitHub Workflow
@@ -592,4 +589,4 @@ docs/
 - Relay SQLite storage is alpha-scale. Encrypted room envelopes append and prune incrementally, but normalized non-envelope state is still saved by clearing and reinserting the full set of teams, rooms, invites, devices, members, and sessions on each debounced flush. Larger hosted relays should move those tables to incremental writes or a shared production store before whole-store rewrites become an operational limit.
 - GitHub OAuth is the alpha GitHub integration. GitHub App support remains a future option for tighter repo-level permissions and enterprise self-hosting.
 - The desktop discovers and runs the local `codex app-server`; multAIplayer does not proxy Codex credentials through the hosted relay.
-- Secret detection is a review aid for files, terminal commands, browser pages, and copied Markdown. The alpha warns and gates risky sharing without claiming automatic redaction.
+- Secret detection is a review aid for files, terminal output, received terminal command requests, browser pages, and copied Markdown. The alpha warns and gates risky sharing without claiming automatic redaction.

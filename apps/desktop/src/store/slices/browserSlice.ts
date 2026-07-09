@@ -10,9 +10,18 @@ export interface BrowserRoomState {
   message?: string | null;
   status?: BrowserStatus;
   activeUrl?: string | null;
+  tabs?: BrowserTab[];
+  activeTabId?: string | null;
 }
 
 export type BrowserByRoom = Record<string, BrowserRoomState>;
+
+export interface BrowserTab {
+  id: string;
+  url: string;
+  title: string;
+  openedAt: string;
+}
 
 export interface BrowserPanelMaps {
   browserRequestsByRoom: Record<string, BrowserAccessRequest[]>;
@@ -21,12 +30,23 @@ export interface BrowserPanelMaps {
   browserMessagesByRoom: Record<string, string | null>;
   browserStatusByRoom: Record<string, BrowserStatus>;
   activeBrowserUrlsByRoom: Record<string, string | null>;
+  browserTabsByRoom: Record<string, BrowserTab[]>;
+  activeBrowserTabIdsByRoom: Record<string, string | null>;
 }
 
 function compactBrowserRoomState(roomState: BrowserRoomState): BrowserRoomState {
   const next = { ...roomState };
   if (next.requests?.length === 0) {
     next.requests = [];
+  }
+  if (next.tabs?.length === 0) {
+    delete next.tabs;
+  }
+  if (!next.activeTabId) {
+    delete next.activeTabId;
+  }
+  if (!next.activeUrl) {
+    delete next.activeUrl;
   }
   return next;
 }
@@ -80,8 +100,21 @@ export function projectBrowserPanelMaps(browserByRoom: BrowserByRoom): BrowserPa
     ),
     activeBrowserUrlsByRoom: Object.fromEntries(
       Object.entries(browserByRoom)
-        .filter(([, roomBrowser]) => roomBrowser.activeUrl)
-        .map(([roomId, roomBrowser]) => [roomId, roomBrowser.activeUrl ?? null])
+        .filter(([, roomBrowser]) => roomBrowser.activeUrl || roomBrowser.activeTabId)
+        .map(([roomId, roomBrowser]) => {
+          const activeTab = activeBrowserTab(roomBrowser);
+          return [roomId, activeTab?.url ?? roomBrowser.activeUrl ?? null];
+        })
+    ),
+    browserTabsByRoom: Object.fromEntries(
+      Object.entries(browserByRoom)
+        .filter(([, roomBrowser]) => roomBrowser.tabs)
+        .map(([roomId, roomBrowser]) => [roomId, roomBrowser.tabs ?? []])
+    ),
+    activeBrowserTabIdsByRoom: Object.fromEntries(
+      Object.entries(browserByRoom)
+        .filter(([, roomBrowser]) => roomBrowser.activeTabId)
+        .map(([roomId, roomBrowser]) => [roomId, roomBrowser.activeTabId ?? null])
     )
   };
 }
@@ -91,6 +124,8 @@ export interface BrowserSlice {
   appendBrowserRequest: (roomId: string, request: BrowserAccessRequest) => void;
   updateBrowserRequestStatus: (roomId: string, requestId: string, status: BrowserAccessRequest["status"]) => void;
   openEmbeddedBrowserForRoom: (roomId: string, url: string) => void;
+  selectBrowserTabForRoom: (roomId: string, tabId: string) => void;
+  closeBrowserTabForRoom: (roomId: string, tabId: string) => void;
   resetEmbeddedBrowserForRoom: (roomId: string, profilePath: string | null) => void;
   setBrowserUrlForRoom: (roomId: string, url: string, defaultBrowserUrl: string) => void;
   setBrowserReasonForRoom: (roomId: string, reason: string, defaultBrowserReason: string) => void;
@@ -128,16 +163,57 @@ export const createBrowserSlice: StateCreator<AppStoreState, [], [], BrowserSlic
   },
   openEmbeddedBrowserForRoom: (roomId, url) => {
     set((state) => ({
-      browserByRoom: updateBrowserForRoom(state.browserByRoom, roomId, (roomState) => ({
-        ...roomState,
-        activeUrl: url,
-        status: {
-          profilePath: "Embedded in this room",
-          downloadsBlocked: false,
-          clipboardBlocked: false,
-          fileUploadsBlocked: false
-        }
-      }))
+      browserByRoom: updateBrowserForRoom(state.browserByRoom, roomId, (roomState) => {
+        const tabs = roomState.tabs ?? [];
+        const existingTab = tabs.find((tab) => tab.url === url);
+        const activeTab = existingTab ?? createBrowserTab(url);
+        const nextTabs = existingTab ? tabs : [...tabs, activeTab];
+        return {
+          ...roomState,
+          tabs: nextTabs,
+          activeTabId: activeTab.id,
+          activeUrl: activeTab.url,
+          status: {
+            profilePath: "Embedded in this room",
+            downloadsBlocked: false,
+            clipboardBlocked: false,
+            fileUploadsBlocked: false
+          }
+        };
+      })
+    }));
+  },
+  selectBrowserTabForRoom: (roomId, tabId) => {
+    set((state) => ({
+      browserByRoom: updateBrowserForRoom(state.browserByRoom, roomId, (roomState) => {
+        const tab = (roomState.tabs ?? []).find((item) => item.id === tabId);
+        if (!tab) return roomState;
+        return {
+          ...roomState,
+          activeTabId: tab.id,
+          activeUrl: tab.url
+        };
+      })
+    }));
+  },
+  closeBrowserTabForRoom: (roomId, tabId) => {
+    set((state) => ({
+      browserByRoom: updateBrowserForRoom(state.browserByRoom, roomId, (roomState) => {
+        const tabs = roomState.tabs ?? [];
+        const closingIndex = tabs.findIndex((tab) => tab.id === tabId);
+        if (closingIndex < 0) return roomState;
+        const nextTabs = tabs.filter((tab) => tab.id !== tabId);
+        const currentActiveId = roomState.activeTabId ?? activeBrowserTab(roomState)?.id ?? null;
+        const nextActiveTab = currentActiveId === tabId
+          ? nextTabs[Math.max(0, closingIndex - 1)] ?? nextTabs[0] ?? null
+          : nextTabs.find((tab) => tab.id === currentActiveId) ?? null;
+        return {
+          ...roomState,
+          tabs: nextTabs,
+          activeTabId: nextActiveTab?.id ?? null,
+          activeUrl: nextActiveTab?.url ?? null
+        };
+      })
     }));
   },
   resetEmbeddedBrowserForRoom: (roomId, profilePath) => {
@@ -145,6 +221,8 @@ export const createBrowserSlice: StateCreator<AppStoreState, [], [], BrowserSlic
       browserByRoom: updateBrowserForRoom(state.browserByRoom, roomId, (roomState) => {
         const nextRoom = { ...roomState };
         delete nextRoom.activeUrl;
+        delete nextRoom.tabs;
+        delete nextRoom.activeTabId;
         return {
           ...nextRoom,
           status: {
@@ -202,8 +280,42 @@ export const createBrowserSlice: StateCreator<AppStoreState, [], [], BrowserSlic
         const nextRoom = { ...roomState };
         delete nextRoom.status;
         delete nextRoom.activeUrl;
+        delete nextRoom.tabs;
+        delete nextRoom.activeTabId;
         return nextRoom;
       })
     }));
   }
 });
+
+function createBrowserTab(url: string): BrowserTab {
+  return {
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `browser-tab-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    url,
+    title: browserTabTitle(url),
+    openedAt: new Date().toISOString()
+  };
+}
+
+function activeBrowserTab(roomState: BrowserRoomState): BrowserTab | null {
+  const tabs = roomState.tabs ?? [];
+  if (roomState.activeTabId) {
+    const tab = tabs.find((item) => item.id === roomState.activeTabId);
+    if (tab) return tab;
+  }
+  if (roomState.activeUrl) {
+    return tabs.find((item) => item.url === roomState.activeUrl) ?? null;
+  }
+  return tabs[0] ?? null;
+}
+
+function browserTabTitle(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.host || parsed.toString();
+  } catch {
+    return url;
+  }
+}

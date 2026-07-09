@@ -12,13 +12,8 @@ type TerminalRequestsByRoom = Record<string, TerminalCommandRequest[]>;
 type SelectedTerminalIdsByRoom = Record<string, string | null>;
 
 export interface TerminalRoomUiState {
-  name?: string;
-  command?: string;
-  input?: string;
   error?: string;
 }
-
-export type TerminalUiByRoom = Record<string, TerminalRoomUiState>;
 
 export interface TerminalRoomState {
   lines?: string[];
@@ -81,14 +76,6 @@ export function projectSelectedTerminalRuntimeIdsByRoom(terminalRuntimeByRoom: T
   );
 }
 
-export function projectTerminalRuntimeUiByRoom(terminalRuntimeByRoom: TerminalRuntimeByRoom): TerminalUiByRoom {
-  return Object.fromEntries(
-    Object.entries(terminalRuntimeByRoom)
-      .filter(([, terminal]) => terminal.ui)
-      .map(([roomId, terminal]) => [roomId, terminal.ui ?? {}])
-  );
-}
-
 export interface TerminalSlice {
   terminalRuntimeByRoom: TerminalRuntimeByRoom;
   terminals: Terminals;
@@ -101,9 +88,6 @@ export interface TerminalSlice {
   appendTerminalRequest: (roomId: string, request: TerminalCommandRequest) => void;
   updateTerminalRequestStatus: (roomId: string, requestId: string, status: TerminalCommandRequest["status"]) => void;
   setSelectedTerminalIdForRoom: (roomId: string, terminalId: string | null) => void;
-  setTerminalNameForRoom: (roomId: string, name: string) => void;
-  setTerminalCommandForRoom: (roomId: string, command: string) => void;
-  setTerminalInputForRoom: (roomId: string, input: string) => void;
   setTerminalErrorForRoom: (roomId: string, error: string | null) => void;
   appendTerminalLinesForRoom: (roomId: string, lines: string[], maxTerminalActivityLines: number) => void;
 }
@@ -191,30 +175,6 @@ export const createTerminalSlice: StateCreator<AppStoreState, [], [], TerminalSl
         const { selectedTerminalId: _selectedTerminalId, ...rest } = roomTerminal;
         return terminalId ? { ...rest, selectedTerminalId: terminalId } : rest;
       })
-    }));
-  },
-  setTerminalNameForRoom: (roomId, name) => {
-    set((state) => ({
-      terminalRuntimeByRoom: updateTerminalRuntimeForRoom(state.terminalRuntimeByRoom, roomId, (roomTerminal) => updateTerminalUiForRoomState(roomTerminal, (roomUi) => {
-        const { name: _name, ...rest } = roomUi;
-        return name === "dev-server" ? rest : { ...rest, name };
-      }))
-    }));
-  },
-  setTerminalCommandForRoom: (roomId, command) => {
-    set((state) => ({
-      terminalRuntimeByRoom: updateTerminalRuntimeForRoom(state.terminalRuntimeByRoom, roomId, (roomTerminal) => updateTerminalUiForRoomState(roomTerminal, (roomUi) => {
-        const { command: _command, ...rest } = roomUi;
-        return command === "npm run dev:desktop" ? rest : { ...rest, command };
-      }))
-    }));
-  },
-  setTerminalInputForRoom: (roomId, input) => {
-    set((state) => ({
-      terminalRuntimeByRoom: updateTerminalRuntimeForRoom(state.terminalRuntimeByRoom, roomId, (roomTerminal) => updateTerminalUiForRoomState(roomTerminal, (roomUi) => {
-        const { input: _input, ...rest } = roomUi;
-        return input ? { ...rest, input } : rest;
-      }))
     }));
   },
   setTerminalErrorForRoom: (roomId, error) => {

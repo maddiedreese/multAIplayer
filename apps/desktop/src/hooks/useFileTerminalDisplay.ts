@@ -4,7 +4,7 @@ import {
   decideAttachmentReview,
   reviewedAttachmentPathForScope
 } from "../lib/attachmentPolicy";
-import { detectSecretRisks, detectTerminalCommandRisks } from "../lib/secretRisks";
+import { detectSecretRisks } from "../lib/secretRisks";
 import {
   buildCodexEventRows,
   buildTerminalOutputLines,
@@ -18,7 +18,6 @@ interface UseFileTerminalDisplayOptions {
   sensitiveAttachmentReviewKey: string | null;
   selectedTerminal: TerminalSnapshot | null;
   terminalLines: string[];
-  terminalCommand: string;
   terminalRequests: TerminalCommandRequest[];
   codexEvents: CodexRoomEvent[];
 }
@@ -30,7 +29,6 @@ export function useFileTerminalDisplay({
   sensitiveAttachmentReviewKey,
   selectedTerminal,
   terminalLines,
-  terminalCommand,
   terminalRequests,
   codexEvents
 }: UseFileTerminalDisplayOptions) {
@@ -52,7 +50,6 @@ export function useFileTerminalDisplay({
   const terminalRisks = selectedTerminal
     ? detectSecretRisks(selectedTerminal.lines.map((line) => line.text).join("\n"))
     : detectSecretRisks(terminalLines.join("\n"));
-  const terminalCommandRisks = detectTerminalCommandRisks(terminalCommand);
   const terminalOutputLines = buildTerminalOutputLines(selectedTerminal?.lines ?? terminalLines);
   const terminalRequestRows = buildTerminalRequestRows(terminalRequests);
   const codexEventRows = buildCodexEventRows(codexEvents);
@@ -63,7 +60,6 @@ export function useFileTerminalDisplay({
     selectedFileNeedsAttachmentReview,
     selectedSensitiveFileReviewed,
     terminalRisks,
-    terminalCommandRisks,
     terminalOutputLines,
     terminalRequestRows,
     codexEventRows

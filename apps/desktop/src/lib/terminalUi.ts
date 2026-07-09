@@ -14,8 +14,3 @@ export function nextShellTerminalName(terminals: TerminalNameCandidate[], baseNa
 
   return `${normalizedBase} ${Date.now()}`;
 }
-
-export function terminalInputForShellSubmit(input: string): string | null {
-  if (!input.trim()) return null;
-  return input.endsWith("\n") ? input : `${input}\n`;
-}

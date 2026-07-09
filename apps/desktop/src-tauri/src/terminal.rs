@@ -276,9 +276,7 @@ where
                 Ok(byte_count) => byte_count,
                 Err(_) => break,
             };
-            let text = String::from_utf8_lossy(&buffer[..byte_count])
-                .replace("\r\n", "\n")
-                .replace('\r', "\n");
+            let text = String::from_utf8_lossy(&buffer[..byte_count]).to_string();
             push_terminal_line(
                 &output,
                 TerminalLine {

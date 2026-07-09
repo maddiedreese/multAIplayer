@@ -31,8 +31,7 @@ export function useAppRoomDisplayContext({
   const {
     selectedRoom,
     selectedFile,
-    terminalLines,
-    terminalCommand
+    terminalLines
   } = selected;
   const visibleSidebarRooms = hideUnreadForLockedRooms(
     workspaceState.rooms,
@@ -49,7 +48,6 @@ export function useAppRoomDisplayContext({
       sensitiveAttachmentReviewKey: roomChatState.sensitiveAttachmentReviewKey,
       selectedTerminal: selectedRuntime.selectedTerminal,
       terminalLines,
-      terminalCommand,
       terminalRequests: selectedRuntime.terminalRequests,
       codexEvents: selectedRuntime.codexEvents
     },

@@ -1,7 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import type { InspectorTab } from "./InspectorTabs";
 
-export type { InspectorTab };
+export type InspectorTab = "files" | "terminal" | "browser" | "room";
 
 interface RoomInspectorPanelProps {
   activeTab: InspectorTab;
@@ -22,7 +21,6 @@ export function RoomInspectorPanel({
   const activeLabel = activeTab === "room" ? "room" : activeTab;
   const panelByTab: Record<InspectorTab, ReactNode> = {
     files: filesPanel,
-    diff: filesPanel,
     terminal: terminalPanel,
     browser: browserPanel,
     room: roomPanel

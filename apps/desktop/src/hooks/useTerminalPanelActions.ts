@@ -4,34 +4,22 @@ export function useTerminalPanelActions({
   selectedRoomId,
   terminalRequests,
   copyTerminalMarkdown,
-  runApprovedTerminalCheck,
   openInteractiveTerminal,
-  setTerminalNameForRoom,
-  setTerminalCommandForRoom,
-  startNamedTerminal,
-  requestTerminalCommand,
   approveTerminalRequest,
   denyTerminalRequest,
   setSelectedTerminalIdForRoom,
-  setTerminalInputForRoom,
-  sendTerminalInput,
+  sendTerminalData,
   restartSelectedTerminal,
   stopSelectedTerminal
 }: {
   selectedRoomId: string;
   terminalRequests: TerminalCommandRequest[];
   copyTerminalMarkdown: () => void;
-  runApprovedTerminalCheck: () => void;
   openInteractiveTerminal: (options?: { reuseExisting?: boolean; quiet?: boolean }) => void;
-  setTerminalNameForRoom: (roomId: string, name: string) => void;
-  setTerminalCommandForRoom: (roomId: string, command: string) => void;
-  startNamedTerminal: () => void;
-  requestTerminalCommand: () => void;
   approveTerminalRequest: (request: TerminalCommandRequest) => void;
   denyTerminalRequest: (requestId: string) => void;
   setSelectedTerminalIdForRoom: (roomId: string, terminalId: string | null) => void;
-  setTerminalInputForRoom: (roomId: string, input: string) => void;
-  sendTerminalInput: () => void;
+  sendTerminalData: (input: string) => void;
   restartSelectedTerminal: () => void;
   stopSelectedTerminal: () => void;
 }) {
@@ -42,17 +30,11 @@ export function useTerminalPanelActions({
 
   return {
     onCopyMarkdown: copyTerminalMarkdown,
-    onRunGitStatus: runApprovedTerminalCheck,
     onOpenInteractiveTerminal: () => openInteractiveTerminal({ reuseExisting: false }),
-    onTerminalNameChange: (name: string) => setTerminalNameForRoom(selectedRoomId, name),
-    onTerminalCommandChange: (command: string) => setTerminalCommandForRoom(selectedRoomId, command),
-    onStartTerminal: () => startNamedTerminal(),
-    onRequestTerminalCommand: () => requestTerminalCommand(),
     onApproveTerminalRequest,
     onDenyTerminalRequest: denyTerminalRequest,
     onSelectTerminal: (terminalId: string) => setSelectedTerminalIdForRoom(selectedRoomId, terminalId),
-    onTerminalInputChange: (input: string) => setTerminalInputForRoom(selectedRoomId, input),
-    onSendTerminalInput: () => sendTerminalInput(),
+    onSendTerminalData: (input: string) => sendTerminalData(input),
     onRestartTerminal: () => restartSelectedTerminal(),
     onStopTerminal: () => stopSelectedTerminal()
   };

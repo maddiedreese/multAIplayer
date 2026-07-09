@@ -191,7 +191,7 @@ pub(crate) fn ensure_terminal_command(command: &str) -> Result<(), String> {
 }
 
 pub(crate) fn ensure_terminal_input(input: &str) -> Result<(), String> {
-    if input.trim().is_empty() {
+    if input.is_empty() {
         return Err("Terminal input is required".to_string());
     }
     if input.chars().count() > MAX_TERMINAL_INPUT_CHARS {

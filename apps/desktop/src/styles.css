@@ -5887,6 +5887,13 @@ select {
   background: #151515;
 }
 
+.monaco-file-editor {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+}
+
 .inspector-panel-group:has(.file-viewer-open) {
   flex: 1;
   min-height: 0;
@@ -6059,6 +6066,34 @@ select {
   min-height: 360px;
   padding: 16px;
   cursor: text;
+}
+
+.terminal-output.xterm-output {
+  position: relative;
+  min-height: 420px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.xterm-host {
+  flex: 1;
+  min-height: 360px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.xterm-host .xterm {
+  height: 100%;
+}
+
+.terminal-command-line.fallback {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
 }
 
 .terminal-panel .panel-title {
@@ -6355,6 +6390,68 @@ select {
   border-radius: 8px;
   background: var(--button-bg);
   color: var(--text);
+}
+
+.browser-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 10px 8px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-strong);
+}
+
+.browser-tab {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  align-items: center;
+  flex: 0 0 168px;
+  max-width: 220px;
+  height: 30px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.browser-tab.active {
+  border-color: var(--border-strong);
+  background: var(--accent-soft);
+}
+
+.browser-tab-select,
+.browser-tab-close {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+}
+
+.browser-tab-select {
+  gap: 6px;
+  padding: 0 8px;
+  text-align: left;
+}
+
+.browser-tab-select span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.browser-tab-close {
+  justify-content: center;
+  padding: 0;
+  color: var(--text-muted);
 }
 
 .sidebar {

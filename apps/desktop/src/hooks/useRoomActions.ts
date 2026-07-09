@@ -67,6 +67,8 @@ export function useRoomActions({
   const setBrowserUrlForRoom = useAppStore((state) => state.setBrowserUrlForRoom);
   const setBrowserReasonForRoom = useAppStore((state) => state.setBrowserReasonForRoom);
   const setBrowserMessageForRoom = useAppStore((state) => state.setBrowserMessageForRoom);
+  const selectBrowserTabForRoom = useAppStore((state) => state.selectBrowserTabForRoom);
+  const closeBrowserTabForRoom = useAppStore((state) => state.closeBrowserTabForRoom);
   const clearBrowserStatusForRoom = useAppStore((state) => state.clearBrowserStatusForRoom);
   const setInviteLinkForRoom = useAppStore((state) => state.setInviteLinkForRoom);
   const setInviteApprovalGateForRoom = useAppStore((state) => state.setInviteApprovalGateForRoom);
@@ -102,9 +104,6 @@ export function useRoomActions({
   const setFileMessageForRoom = useAppStore((state) => state.setFileMessageForRoom);
   const resetFileContextForRoom = useAppStore((state) => state.resetFileContextForRoom);
   const setSelectedTerminalIdForRoom = useAppStore((state) => state.setSelectedTerminalIdForRoom);
-  const setTerminalNameForRoom = useAppStore((state) => state.setTerminalNameForRoom);
-  const setTerminalCommandForRoom = useAppStore((state) => state.setTerminalCommandForRoom);
-  const setTerminalInputForRoom = useAppStore((state) => state.setTerminalInputForRoom);
   const setTerminalErrorForRoom = useAppStore((state) => state.setTerminalErrorForRoom);
   const appendTerminalLinesForRoom = useAppStore((state) => state.appendTerminalLinesForRoom);
   const appendGitWorkflowEvent = useAppStore((state) => state.appendGitWorkflowEvent);
@@ -156,6 +155,8 @@ export function useRoomActions({
     setBrowserReasonForRoom: (roomId: string, reason: string) =>
       setBrowserReasonForRoom(roomId, reason, browser.defaultBrowserReason),
     setBrowserMessageForRoom,
+    selectBrowserTabForRoom,
+    closeBrowserTabForRoom,
     clearBrowserStatusForRoom,
     setSelectedBrowserMessage: (message: string | null) => setBrowserMessageForRoom(selectedRoomId, message),
     setInviteLinkForRoom,
@@ -203,9 +204,6 @@ export function useRoomActions({
     setSelectedFileMessage: (message: string | null) => setFileMessageForRoom(selectedRoomId, message),
     resetFileContextForRoom,
     setSelectedTerminalIdForRoom,
-    setTerminalNameForRoom,
-    setTerminalCommandForRoom,
-    setTerminalInputForRoom,
     setTerminalErrorForRoom,
     setSelectedTerminalError: (error: string | null) => setTerminalErrorForRoom(selectedRoomId, error),
     appendTerminalLinesForRoom: (roomId: string, lines: string[]) =>
