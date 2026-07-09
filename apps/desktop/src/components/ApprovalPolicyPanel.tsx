@@ -8,9 +8,7 @@ const selectableApprovalPolicies: ApprovalPolicy[] = [
 
 const selectableDelegationPolicies: ApprovalDelegationPolicy[] = [
   "host_only",
-  "members_can_request",
-  "members_can_approve",
-  "trusted_members_only"
+  "members_can_request"
 ];
 
 export function ApprovalPolicyPanel({
@@ -74,7 +72,7 @@ export function ApprovalPolicyPanel({
       </div>
       {delegatedExecution && (
         <div className="warning-card">
-          Room members can approve Codex turns that may use this host's project folder, terminal, browser context, Git, and Codex usage.
+          Legacy delegated approval settings no longer authorize Codex turns. Only the active host can approve execution on the host machine.
         </div>
       )}
       <div className="panel-subtitle">Codex sandbox</div>

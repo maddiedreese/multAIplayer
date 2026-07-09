@@ -2,7 +2,7 @@ import { useCodexInvokeActions } from "./useCodexInvokeActions";
 import { useCodexTurnActions } from "./useCodexTurnActions";
 
 type CodexTurnActionsOptions = Parameters<typeof useCodexTurnActions>[0];
-type CodexInvokeActionsOptions = Omit<Parameters<typeof useCodexInvokeActions>[0], "approveCodexTurn">;
+type CodexInvokeActionsOptions = Parameters<typeof useCodexInvokeActions>[0];
 
 export function useCodexRoomActions({
   turn,
@@ -21,8 +21,7 @@ export function useCodexRoomActions({
     deleteGoal,
     tickGoalElapsed
   } = useCodexInvokeActions({
-    ...invoke,
-    approveCodexTurn
+    ...invoke
   });
 
   return {

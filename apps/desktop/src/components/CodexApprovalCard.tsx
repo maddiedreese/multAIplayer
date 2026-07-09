@@ -7,6 +7,7 @@ export type CodexApprovalSummaryDisplay = {
   attachments: string;
   sandbox: string;
   riskFlags: CodexTurnRiskFlag[];
+  highPrivilegeLabels: string[];
 };
 
 export function CodexApprovalCard({
@@ -24,6 +25,7 @@ export function CodexApprovalCard({
   onApprove: () => void;
   onDeny: () => void;
 }) {
+  const highPrivilegeLabels = summary.highPrivilegeLabels ?? [];
   return (
     <section className="approval-card">
       <div className="approval-title">
@@ -42,6 +44,17 @@ export function CodexApprovalCard({
         <ApprovalItem label="Attachments" value={summary.attachments} />
         <ApprovalItem label="Sandbox" value={summary.sandbox} />
       </div>
+      {highPrivilegeLabels.length > 0 && (
+        <div className="approval-risk-list high-privilege">
+          <div className="approval-risk-title">
+            <AlertTriangle size={16} />
+            <strong>High-privilege host action</strong>
+          </div>
+          <div className="approval-risk-item">
+            This turn can use {highPrivilegeLabels.join(", ")} on the active host's machine.
+          </div>
+        </div>
+      )}
       {summary.riskFlags.length > 0 && (
         <div className="approval-risk-list">
           <div className="approval-risk-title">

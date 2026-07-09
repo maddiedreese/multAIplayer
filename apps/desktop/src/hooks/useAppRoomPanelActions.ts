@@ -4,6 +4,7 @@ import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { useAppStateSlices } from "./useAppStateSlices";
 import type { useRoomRuntimeContext } from "./useRoomRuntimeContext";
+import type { useAppRelaySync } from "./useAppRelaySync";
 import type { useWorkspaceFlowContext } from "./useWorkspaceFlowContext";
 import { useRoomPanelActions } from "./useRoomPanelActions";
 
@@ -13,6 +14,7 @@ type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
 type RoomActions = ReturnType<typeof useAppRoomActions>;
 type RoomRuntime = ReturnType<typeof useRoomRuntimeContext>;
+type RelaySync = ReturnType<typeof useAppRelaySync>;
 type WorkspaceFlow = ReturnType<typeof useWorkspaceFlowContext>;
 
 export function useAppRoomPanelActions({
@@ -22,6 +24,7 @@ export function useAppRoomPanelActions({
   roomInteraction,
   roomActions,
   roomRuntime,
+  relaySync,
   workspaceFlow
 }: {
   appState: AppStateSlices;
@@ -30,6 +33,7 @@ export function useAppRoomPanelActions({
   roomInteraction: RoomInteraction;
   roomActions: RoomActions;
   roomRuntime: RoomRuntime;
+  relaySync: RelaySync;
   workspaceFlow: WorkspaceFlow;
 }) {
   const {
@@ -77,6 +81,9 @@ export function useAppRoomPanelActions({
       promoteNextCodexApprovalForRoom: roomRuntime.promoteNextCodexApprovalForRoom,
       approveCodexTurn: roomRuntime.approveCodexTurn,
       handleCodexInvoke: roomRuntime.handleCodexInvoke,
+      activeCodexApproval: selectedRuntime.activeCodexApproval,
+      publishCodexQueueEvent: relaySync.publishCodexQueueEvent,
+      selectedRoom,
       pauseGoal: roomRuntime.pauseGoal,
       resumeGoal: roomRuntime.resumeGoal,
       editGoal: roomRuntime.editGoal,

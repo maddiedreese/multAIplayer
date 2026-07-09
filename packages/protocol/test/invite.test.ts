@@ -284,7 +284,7 @@ test("room settings payloads cover host-controlled room settings", () => {
   }
 });
 
-test("Codex approval payloads carry delegated host execution authorization", () => {
+test("legacy Codex approval payloads remain bounded for backlog compatibility", () => {
   const parsed = CodexApprovalPlaintextPayload.parse({
     eventType: "codex.approval",
     approvalId: "approval-1",
@@ -338,6 +338,20 @@ test("Codex queue payloads bound room-visible turn queue events", () => {
     ...queued,
     queueSize: 6
   }).success, false);
+  assert.equal(RelayEnvelope.safeParse({
+    id: "envelope-codex-queue-1",
+    teamId: "team-core",
+    roomId: "room-desktop",
+    senderDeviceId: "device-jordan",
+    senderUserId: "github:jordan",
+    createdAt: "2026-07-04T12:00:00.000Z",
+    kind: "codex.queue",
+    payload: {
+      algorithm: "AES-GCM-256",
+      nonce: "nonce-codex-queue-1",
+      ciphertext: "ciphertext"
+    }
+  }).success, true);
 });
 
 test("Codex turn events can carry bounded risk flags for encrypted audit history", () => {

@@ -1,6 +1,5 @@
 import type { MutableRefObject } from "react";
 import type {
-  CodexApprovalPlaintextPayload,
   CodexEventPlaintextPayload,
   RoomRecord
 } from "@multaiplayer/protocol";
@@ -17,9 +16,7 @@ import {
   type TerminalSnapshot
 } from "../lib/localBackend";
 import {
-  canApproveCodexTurn,
-  canDelegateApproveCodexTurn,
-  isDelegatedApprovalExecutionPolicy
+  canApproveCodexTurn
 } from "../lib/codexApproval";
 import {
   buildCodexApprovalSnapshot,
@@ -83,10 +80,6 @@ interface UseCodexTurnActionsOptions {
     event: Omit<CodexEventPlaintextPayload, "eventType" | "host" | "hostUserId" | "createdAt">,
     room?: RoomRecord
   ) => Promise<void>;
-  publishCodexApproval: (
-    event: Omit<CodexApprovalPlaintextPayload, "eventType" | "approver" | "approverUserId" | "approvedAt">,
-    room?: RoomRecord
-  ) => Promise<void>;
   publishChatMessage: (message: ChatMessage, room?: RoomRecord) => Promise<void>;
   publishHostHandoff: (
     room: RoomRecord,
@@ -94,6 +87,8 @@ interface UseCodexTurnActionsOptions {
     handoffMessages?: ChatMessage[]
   ) => Promise<void>;
 }
+
+const codexInvocationTimeoutMs = 15 * 60 * 1000;
 
 export function useCodexTurnActions({
   selectedRoom,
@@ -119,7 +114,6 @@ export function useCodexTurnActions({
   appendTerminalLinesForRoom,
   replaceRoom,
   publishCodexEvent,
-  publishCodexApproval,
   publishChatMessage,
   publishHostHandoff
 }: UseCodexTurnActionsOptions) {
@@ -129,6 +123,12 @@ export function useCodexTurnActions({
   function promoteNextCodexApprovalForRoom(roomId: string) {
     const nextTurn = queuedCodexApprovalsByRoom[roomId]?.[0];
     if (!nextTurn) return;
+    if (isExpiredCodexInvocation(nextTurn.queuedAt)) {
+      removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
+      setHostMessageForRoom(roomId, `Dropped ${nextTurn.requestedBy}'s Codex proposal because host approval timed out.`);
+      promoteNextCodexApprovalForRoom(roomId);
+      return;
+    }
     const room = roomsRef.current.find((item) => item.id === roomId);
     if (!room) {
       removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
@@ -224,24 +224,7 @@ export function useCodexTurnActions({
       return;
     }
     if (!canApproveCodexTurn(room, localUser, roomLocked)) {
-      if (canDelegateApproveCodexTurn(room, localUser, roomLocked)) {
-        if (!isDelegatedApprovalExecutionPolicy(room.approvalDelegationPolicy)) {
-          setHostMessageForRoom(roomId, "This room is not configured for delegated Codex approvals.");
-          return;
-        }
-        await publishCodexApproval({
-          approvalId: crypto.randomUUID(),
-          roomId,
-          delegationPolicy: room.approvalDelegationPolicy,
-          message: `${localUser.name} approved this Codex turn. The active host device will execute it.`
-        }, room);
-        setPendingCodexApprovalForRoom(roomId, null);
-        setApprovalVisibleForRoom(roomId, false);
-        setHostMessageForRoom(roomId, "Approval sent to the active host device.");
-        return;
-      }
       setHostMessageForRoom(roomId, roomHostGateMessage);
-      setPendingCodexApprovalForRoom(roomId, null);
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
@@ -271,6 +254,9 @@ export function useCodexTurnActions({
     }
     setPendingCodexApprovalForRoom(roomId, null);
     setApprovalVisibleForRoom(roomId, false);
+    if (approval?.turnId) {
+      removeQueuedCodexApprovalForRoom(roomId, approval.turnId);
+    }
     setCodexRunningForRoom(roomId, true);
     appendTerminalLinesForRoom(roomId, [
       "$ codex app-server",
@@ -423,6 +409,11 @@ export function useCodexTurnActions({
     approveCodexTurn,
     promoteNextCodexApprovalForRoom
   };
+}
+
+function isExpiredCodexInvocation(queuedAt: string, now = Date.now()): boolean {
+  const queuedAtMs = Date.parse(queuedAt);
+  return !Number.isFinite(queuedAtMs) || now - queuedAtMs > codexInvocationTimeoutMs;
 }
 
 function refreshApprovalMessagesFromRoom(approvalMessages: ChatMessage[], roomMessages: ChatMessage[]): ChatMessage[] {

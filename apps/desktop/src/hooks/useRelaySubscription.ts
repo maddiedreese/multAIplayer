@@ -4,6 +4,7 @@ import type {
   ChatDeletePlaintextPayload,
   ChatEditPlaintextPayload,
   CodexApprovalPlaintextPayload,
+  CodexQueuePlaintextPayload,
   ChatPlaintextPayload,
   ChatReactionPlaintextPayload,
   GitHubActionsEventPlaintextPayload,
@@ -34,6 +35,7 @@ import {
   isChatEditPlaintextPayload,
   isCodexApprovalPlaintextPayload,
   isCodexEventPlaintextPayload,
+  isCodexQueuePlaintextPayload,
   isGitHubActionsEventPlaintextPayload,
   isGitWorkflowEventPlaintextPayload,
   isLegacyDebugChatMessage,
@@ -57,6 +59,7 @@ import type {
   CodexRoomEvent,
   HostHandoffRecord,
   LocalPreviewRecord,
+  QueuedCodexTurn,
   RelayStatus,
   RoomPresence,
   TerminalCommandRequest
@@ -114,6 +117,10 @@ interface UseRelaySubscriptionOptions {
   setGitWorkflowMessageForRoom: (roomId: string, message: string | null) => void;
   applyGitHubActionsEventForRoom: (roomId: string, event: GitHubActionsEventPlaintextPayload) => void;
   appendCodexEvent: (roomId: string, event: CodexRoomEvent) => void;
+  enqueueCodexApprovalForRoom: (roomId: string, turn: QueuedCodexTurn) => void;
+  removeQueuedCodexApprovalForRoom: (roomId: string, turnId: string) => void;
+  setPendingCodexApprovalForRoom: (roomId: string, approval: null) => void;
+  setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   appendBrowserRequest: (roomId: string, request: BrowserAccessRequest) => void;
   updateBrowserRequestStatus: (roomId: string, requestId: string, status: BrowserAccessRequest["status"]) => void;
   appendLocalPreviewEvent: (roomId: string, event: LocalPreviewRecord) => void;
@@ -171,6 +178,10 @@ export function useRelaySubscription({
   setGitWorkflowMessageForRoom,
   applyGitHubActionsEventForRoom,
   appendCodexEvent,
+  enqueueCodexApprovalForRoom,
+  removeQueuedCodexApprovalForRoom,
+  setPendingCodexApprovalForRoom,
+  setApprovalVisibleForRoom,
   appendBrowserRequest,
   updateBrowserRequestStatus,
   appendLocalPreviewEvent,
@@ -348,6 +359,20 @@ export function useRelaySubscription({
               handleCodexApprovalEvent(plaintext, message.envelope.roomId);
             }
           }
+          if (message.envelope.kind === "codex.queue") {
+            const plaintext = await decryptJson<unknown>(roomPayload, secret);
+            if (isCodexQueuePlaintextPayload(plaintext)) {
+              handleCodexQueueEvent(
+                plaintext,
+                message.envelope.roomId,
+                enqueueCodexApprovalForRoom,
+                removeQueuedCodexApprovalForRoom,
+                setPendingCodexApprovalForRoom,
+                setApprovalVisibleForRoom,
+                setHostMessageForRoom
+              );
+            }
+          }
           if (message.envelope.kind === "browser.request") {
             const plaintext = await decryptJson<BrowserRequestPlaintextPayload>(roomPayload, secret);
             appendBrowserRequest(message.envelope.roomId, { ...plaintext, status: "pending" });
@@ -515,4 +540,31 @@ export function useRelaySubscription({
     selectedTeam,
     replaceRelayStatus
   ]);
+}
+
+function handleCodexQueueEvent(
+  event: CodexQueuePlaintextPayload,
+  roomId: string,
+  enqueueCodexApprovalForRoom: (roomId: string, turn: QueuedCodexTurn) => void,
+  removeQueuedCodexApprovalForRoom: (roomId: string, turnId: string) => void,
+  setPendingCodexApprovalForRoom: (roomId: string, approval: null) => void,
+  setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void,
+  setHostMessageForRoom: (roomId: string, message: string | null) => void
+) {
+  if (event.action === "queued" || event.action === "promoted") {
+    enqueueCodexApprovalForRoom(roomId, {
+      roomId,
+      turnId: event.turnId,
+      requestedBy: event.requestedBy,
+      requestedByUserId: event.requestedByUserId,
+      queuedAt: event.createdAt,
+      ...(event.triggerMessageId ? { triggerMessageId: event.triggerMessageId } : {})
+    });
+    setHostMessageForRoom(roomId, `${event.requestedBy} proposed a Codex turn for host approval.`);
+    return;
+  }
+  removeQueuedCodexApprovalForRoom(roomId, event.turnId);
+  setPendingCodexApprovalForRoom(roomId, null);
+  setApprovalVisibleForRoom(roomId, false);
+  setHostMessageForRoom(roomId, event.reason ?? `${event.requestedBy}'s Codex turn was ${event.action}.`);
 }

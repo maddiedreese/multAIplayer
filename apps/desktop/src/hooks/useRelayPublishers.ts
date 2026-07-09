@@ -1,7 +1,7 @@
 import type { MutableRefObject } from "react";
 import type {
-  CodexApprovalPlaintextPayload,
   CodexEventPlaintextPayload,
+  CodexQueuePlaintextPayload,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
   RelayEnvelope,
@@ -219,20 +219,18 @@ export function useRelayPublishers({
     });
   }
 
-  async function publishCodexApproval(
-    event: Omit<CodexApprovalPlaintextPayload, "eventType" | "approver" | "approverUserId" | "approvedAt">,
+  async function publishCodexQueueEvent(
+    event: Omit<CodexQueuePlaintextPayload, "eventType" | "queueEventId" | "requestedBy" | "requestedByUserId" | "createdAt">,
     room: RoomRecord = selectedRoom
   ) {
-    const payload: CodexApprovalPlaintextPayload = {
-      eventType: "codex.approval",
-      approver: localUser.name,
-      approverUserId: localUser.id,
-      approvedAt: new Date().toISOString(),
+    const payload: CodexQueuePlaintextPayload = {
+      eventType: "codex.queue",
+      queueEventId: crypto.randomUUID(),
+      requestedBy: localUser.name,
+      requestedByUserId: localUser.id,
+      createdAt: new Date().toISOString(),
       ...event
     };
-    appendTerminalLinesForRoom(room.id, [
-      `Codex approval delegated by ${payload.approver}; host device will execute if this room still allows delegated approvals.`
-    ]);
 
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
@@ -243,8 +241,8 @@ export function useRelayPublishers({
       roomId: room.id,
       senderDeviceId: deviceId,
       senderUserId: localUser.id,
-      createdAt: payload.approvedAt,
-      kind: "codex.approval",
+      createdAt: payload.createdAt,
+      kind: "codex.queue",
       payload: await encryptJson(payload, secret)
     });
   }
@@ -312,7 +310,7 @@ export function useRelayPublishers({
     publishTerminalResult,
     publishGitWorkflowEvent,
     publishCodexEvent,
-    publishCodexApproval,
+    publishCodexQueueEvent,
     publishRoomSettingsEvent,
     publishGitHubActionsEvent
   };
