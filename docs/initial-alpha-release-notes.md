@@ -16,7 +16,7 @@ These notes describe the public alpha release. Copy the final version into the G
 - Local preview sharing lets a host expose a local development server through room context during collaborative coding.
 - Release hardening includes production relay checks, branch protection, issue templates, signed/notarized macOS release enforcement, and alpha launch documentation.
 - The desktop app shows an in-app update banner from the public alpha release manifest, with a stronger label for security updates.
-- Account settings can copy a local diagnostics bundle for bug reports without including transcripts, room secrets, terminal output, browser contents, file contents, invite fragments, or GitHub tokens by design.
+- Account settings can copy a re-redacted local diagnostics bundle for bug reports. The native app retains bounded capture-redacted warning/error metadata in an owner-only app-log file for up to seven days, 256 KiB, or 500 entries; the web preview remains memory-only. The bundle is designed not to include transcripts, room secrets, terminal output, browser contents, file contents, invite fragments, or GitHub tokens.
 
 ## Security And Privacy Notes
 
@@ -34,6 +34,7 @@ These notes describe the public alpha release. Copy the final version into the G
 - Rate limiting is process-local.
 - Host handoff reconstructs context from room state and requires real two-person testing against actual Codex usage-limit failures before broader promotion.
 - Browser and terminal behavior is powerful and intentionally host-local; use private or regulated work only after an appropriate security review.
+- Native diagnostics are not encrypted at rest in this alpha. They are bounded, capture-redacted, owner-readable metadata and are re-redacted during export; revisit encryption before collecting richer diagnostic content.
 
 ## Upgrade And Test Notes
 

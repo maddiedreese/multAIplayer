@@ -10,7 +10,7 @@ GitHub sign-in is used for identity, draft pull requests, and GitHub Actions rea
 
 Each desktop install has a device identity used for encrypted invite approval and room-key delivery. The profile drawer shows the local device id and public key fingerprint. Resetting the device identity creates a new local device key, which can make other room members see the device as untrusted until they review the new fingerprint.
 
-`Copy diagnostics` creates a local JSON bundle for bug reports. It is designed to exclude transcripts, room secrets, terminal output, browser contents, file contents, invite fragments, and GitHub tokens. Review the bundle before attaching it to an issue.
+`Copy diagnostics` creates a local JSON bundle for bug reports. In the native app, capture-redacted warning/error entries are retained in an owner-only diagnostics file for up to seven days, 256 KiB, or 500 entries, whichever bound is reached first. The browser/web preview keeps diagnostics in memory only. Export validates and re-redacts stored entries; it is designed to exclude transcripts, room secrets, terminal output, browser contents, file contents, invite fragments, and GitHub tokens. Review the bundle before attaching it to an issue.
 
 ## Teams, Rooms, And Search
 

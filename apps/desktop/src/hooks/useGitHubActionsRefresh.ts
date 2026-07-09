@@ -131,8 +131,8 @@ export function useGitHubActionsRefresh({
         message,
         checkedAt,
         runs: result.runs
-      }, room).catch((error) => {
-        console.warn("Failed to publish GitHub Actions event", error);
+      }, room).catch(() => {
+        console.warn("Failed to publish GitHub Actions event");
       });
     } catch (error) {
       setActionsMessageForRoom(roomId, String(error));

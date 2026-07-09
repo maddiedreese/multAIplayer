@@ -2153,8 +2153,11 @@ dependencies = [
 name = "multaiplayer"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "keyring",
+ "libc",
  "portable-pty",
+ "regex",
  "serde",
  "serde_json",
  "tauri",

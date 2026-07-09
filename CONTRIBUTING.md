@@ -41,6 +41,7 @@ npm run verify
 - Prefer small, testable security boundaries over broad trust assumptions.
 - Keep native project file access confined to the selected project root.
 - Treat browser pages, terminal output, `.env` files, credentials, and signed-in sessions as sensitive by default.
+- Log stable error codes and bounded identifiers, never request/response bodies, decrypted plaintext, tokens, keys, secrets, passphrases, or other payload objects. The diagnostics object sanitizer is a safety net, not permission to log payloads.
 - Avoid adding OpenAI API quota bridging. The desktop app talks to the user's local Codex app-server instead.
 - Preserve the existing monorepo package boundaries unless a change genuinely needs to cross them.
 
@@ -52,7 +53,9 @@ Add focused tests when changing:
 - crypto primitives or invite payloads;
 - GitHub repo, branch, PR, or Actions validation;
 - desktop encrypted history, invite handling, browser policy, Codex turn assembly, Markdown export, secret warnings, terminal approvals, or workspace creation;
-- native Tauri file, Git, terminal, browser, Keychain, or Codex app-server commands.
+- native Tauri file, Git, terminal, browser, Keychain, diagnostics, or Codex app-server commands.
+
+Diagnostics changes need tests on both sides of the IPC boundary. Frontend tests should cover capture-time redaction and object-key omission. Rust tests should cover strict request shape, JSONL corruption recovery, file permissions, retention and size limits, concurrent writes, and export-time re-redaction. Do not add a generic command that returns the persisted diagnostics file to the webview.
 
 ## Security Reports
 

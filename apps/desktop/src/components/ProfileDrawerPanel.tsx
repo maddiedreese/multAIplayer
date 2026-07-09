@@ -35,7 +35,7 @@ export function ProfileDrawerPanel({
 }) {
   const [diagnosticsMessage, setDiagnosticsMessage] = useState<string | null>(null);
   async function copyDiagnostics() {
-    const result = await copyTextToClipboard(buildDiagnosticBundle());
+    const result = await copyTextToClipboard(await buildDiagnosticBundle());
     setDiagnosticsMessage(
       result.status === "copied"
         ? "Copied local diagnostics. Review before attaching to a bug report."

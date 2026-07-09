@@ -59,8 +59,8 @@ export function useHistorySearch({
         if (cancelled) return;
         setHistorySearchResultsByRoom(historySearchEntriesToMessagesByRoom(entries));
       })
-      .catch((error) => {
-        if (!cancelled) console.warn("Failed to search encrypted local history", error);
+      .catch(() => {
+        if (!cancelled) console.warn("Failed to search encrypted local history");
       })
       .finally(() => {
         if (!cancelled) finishHistorySearch();
