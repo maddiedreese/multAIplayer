@@ -3,8 +3,6 @@ import {
   approvalPolicyLabels,
   roomModeLabels
 } from "../seedData";
-import { canUserApprovalAuthorizeHostExecution } from "../lib/codexApproval";
-import { isLocalUserActiveHostForRoom } from "../lib/roomHost";
 import type { useAppHostHandoffActions } from "./useAppHostHandoffActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRelaySync } from "./useAppRelaySync";
@@ -168,7 +166,6 @@ export function useAppRoomRuntime({
         appendTerminalLinesForRoom,
         replaceRoom: workspaceRecords.replaceRoom,
         publishCodexEvent: relaySync.publishCodexEvent,
-        publishCodexApproval: relaySync.publishCodexApproval,
         publishChatMessage: roomInteraction.publishChatMessage,
         publishHostHandoff: hostHandoffActions.publishHostHandoff
       },
@@ -195,6 +192,7 @@ export function useAppRoomRuntime({
         queuedCodexApprovals: selectedRuntime.queuedCodexApprovals,
         publishChatMessage: roomInteraction.publishChatMessage,
         handleCodexBrowserOpenCommand: relaySync.handleCodexBrowserOpenCommand,
+        publishCodexQueueEvent: relaySync.publishCodexQueueEvent,
         setSelectedChatMessage,
         setChatMessageForRoom,
         setSelectedHostMessage,
@@ -465,40 +463,17 @@ export function useAppRoomRuntime({
   });
 
   useEffect(() => {
-    appRefs.delegatedCodexApprovalHandlerRef.current = (event, roomId) => {
-      const room = appRefs.roomsRef.current.find((item) => item.id === roomId);
-      if (!room) return;
-      if (!isLocalUserActiveHostForRoom(room, localIdentity.localUser)) return;
-      if (event.roomId !== roomId) {
-        setHostMessageForRoom(roomId, "Ignored delegated Codex approval for a different room.");
-        return;
-      }
-      if (!canUserApprovalAuthorizeHostExecution(room, event.approverUserId)) {
-        setHostMessageForRoom(roomId, `${event.approver} is not allowed to approve Codex turns for this host.`);
-        return;
-      }
-      const approval = codexRoomState.pendingCodexApprovalsByRoom[roomId] ?? null;
-      if (!approval) {
-        setHostMessageForRoom(roomId, `Received delegated Codex approval from ${event.approver}, but no Codex turn is waiting.`);
-        return;
-      }
-      setHostMessageForRoom(roomId, `${event.approver} approved this Codex turn. Running it on this host.`);
-      runtime.approveCodexTurn(approval).catch((error) => {
-        setHostMessageForRoom(roomId, `Delegated Codex approval could not run: ${String(error)}`);
-      });
-    };
-    return () => {
-      if (appRefs.delegatedCodexApprovalHandlerRef.current) {
-        appRefs.delegatedCodexApprovalHandlerRef.current = null;
-      }
-    };
+    if (!roomInteraction.isActiveHost) return;
+    if (selectedRuntime.activeCodexApproval || selectedRuntime.codexRunning) return;
+    if (selectedRuntime.queuedCodexApprovals.length === 0) return;
+    runtime.promoteNextCodexApprovalForRoom(selectedRoom.id);
   }, [
-    appRefs.delegatedCodexApprovalHandlerRef,
-    appRefs.roomsRef,
-    codexRoomState.pendingCodexApprovalsByRoom,
-    localIdentity.localUser,
+    roomInteraction.isActiveHost,
     runtime,
-    setHostMessageForRoom
+    selectedRoom.id,
+    selectedRuntime.activeCodexApproval,
+    selectedRuntime.codexRunning,
+    selectedRuntime.queuedCodexApprovals
   ]);
 
   return runtime;

@@ -141,7 +141,9 @@ Attachments are included by default. Before the turn starts, the active host see
 
 Codex turn execution is an active-host local workspace action in the macOS alpha. The approval summary includes project path, Git status, and terminal names only when workspace mode is enabled, the room is unlocked, and the current device is the active host for that room. Stale approval sheets are rechecked at approval time before the app calls the local Codex app-server.
 
-Codex invocations are queued when another turn is pending or running. The alpha queue is bounded to five waiting turns, renders in the room, can be cancelled by the requester or host, and is saved in encrypted local history so handoff/reload context stays coherent.
+Codex invocations are proposed before they run. Any member can tag Codex or press invoke, but that creates a pending room-visible proposal. Only the active host, checked by stable host user id at approval time, can authorize the proposal to spend that host's Codex subscription or touch that host's machine. If host role transfers while a proposal is waiting, the proposal remains queued and the new active host can approve or decline it.
+
+Codex proposals are queued when another proposal is pending or a turn is running. The alpha queue is bounded to five waiting turns, renders in the room, can be cancelled by the requester or host, times out if host approval does not arrive, and is saved in encrypted local history so handoff/reload context stays coherent.
 
 Example approval summary:
 
@@ -164,12 +166,12 @@ The host can approve, deny, or adjust included context where supported.
 Initial room approval presets:
 
 - Ask every Codex turn.
-- Auto-approve chat-only turns.
+- Host approves chat-only turns.
 - Never host this room.
 
 Approval policies are host-side. They do not grant other users access to the host's Codex credentials, project files, browser state, or shell.
 
-In the alpha, Auto-approve chat-only turns is intentionally narrow: it only runs automatically when the active host is invoking Codex and the turn package contains no attachments, no Git summary, no approved browser URLs, and no terminal context. The selected room project path can still be present because the local Codex app-server needs a working directory. Any richer host-side context falls back to the approval sheet.
+In the alpha, Codex turns are not auto-approved. The chat-only preset is retained as a compatibility label for room defaults, but every invocation still becomes a proposal that requires the active host to approve before the local Codex app-server is called. High-privilege turns, such as full-access Codex or terminal/workspace/browser context, are called out distinctly in the approval sheet.
 
 ### Terminal Requests
 

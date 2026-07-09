@@ -13,6 +13,8 @@ function renderChat(messages: RoomChatMessageDisplay[]) {
     approvalSummary: {
       messages: "0 since last Codex response",
       attachments: "None",
+      sandbox: "Workspace write",
+      highPrivilegeLabels: [],
       riskFlags: []
     },
     isActiveHost: true,
@@ -85,6 +87,8 @@ test("RoomChatPanel renders Codex approval risk warnings", () => {
     approvalSummary: {
       messages: "Maddie: inspect this output",
       attachments: "output.log (1 KB)",
+      sandbox: "Workspace write",
+      highPrivilegeLabels: [],
       riskFlags: [{
         id: "attachment-output.log:agent-directed",
         label: "attachment output.log contains agent-directed phrasing",
@@ -138,6 +142,62 @@ test("RoomChatPanel renders Codex approval risk warnings", () => {
   assert.equal(html.includes("attachment output.log contains agent-directed phrasing"), true);
 });
 
+test("RoomChatPanel distinguishes high-privilege Codex approvals", () => {
+  const html = renderToStaticMarkup(createElement(RoomChatPanel, {
+    messages: [],
+    approvalVisible: true,
+    approvalSummary: {
+      messages: "Maddie: run the deployment check",
+      attachments: "None",
+      sandbox: "Full access",
+      highPrivilegeLabels: ["full-access Codex", "terminal context"],
+      riskFlags: []
+    },
+    isActiveHost: true,
+    codexRunning: false,
+    canApproveCodex: true,
+    canUseChat: true,
+    canSendMessage: false,
+    roomLocked: false,
+    lockedPlaceholder: "Room locked",
+    chatEnabled: true,
+    draft: "",
+    replyTarget: null,
+    roomGoal: null,
+    pendingAttachments: [],
+    localPreviewCards: [],
+    pendingAttachmentSummary: "0/5 files",
+    onToggleMessageSelection: noop,
+    onCopyMessageMarkdown: noop,
+    onCopyCodexOutputMarkdown: noop,
+    onOpenAttachment: noop,
+    onToggleReaction: noop,
+    onEditMessage: noop,
+    onDeleteMessage: noop,
+    onDenyApproval: noop,
+    onApproveApproval: noop,
+    onInvokeCodex: noop,
+    onRemovePendingAttachment: noop,
+    onPauseGoal: noop,
+    onResumeGoal: noop,
+    onEditGoal: noop,
+    onDeleteGoal: noop,
+    onTickGoalElapsed: noop,
+    onOpenLocalPreview: noop,
+    onCopyLocalPreviewLink: noop,
+    onStopLocalPreview: noop,
+    onOpenFileSelector: noop,
+    onReplyToMessage: noop,
+    onCancelReply: noop,
+    onCancelQueuedCodexTurn: noop,
+    onDraftChange: noop,
+    onSendMessage: noop
+  }));
+
+  assert.equal(html.includes("High-privilege host action"), true);
+  assert.equal(html.includes("full-access Codex, terminal context"), true);
+});
+
 test("RoomChatPanel keeps reactions that have activity", () => {
   const html = renderChat([
     {
@@ -179,6 +239,8 @@ test("RoomChatPanel renders reply previews and composer reply target", () => {
     approvalSummary: {
       messages: "0 since last Codex response",
       attachments: "None",
+      sandbox: "Workspace write",
+      highPrivilegeLabels: [],
       riskFlags: []
     },
     isActiveHost: true,
@@ -238,6 +300,8 @@ test("RoomChatPanel renders queued Codex turns", () => {
     approvalSummary: {
       messages: "0 since last Codex response",
       attachments: "None",
+      sandbox: "Workspace write",
+      highPrivilegeLabels: [],
       riskFlags: []
     },
     isActiveHost: true,

@@ -38,9 +38,9 @@ const room: RoomRecord = {
   unread: 0
 };
 
-test("chat-only Codex turns are auto-approved for the active host", () => {
+test("chat-only Codex turns still require active-host approval", () => {
   assert.equal(isChatOnlyCodexTurn(baseSummary), true);
-  assert.equal(shouldAutoApproveChatOnlyTurn(baseSummary, true), true);
+  assert.equal(shouldAutoApproveChatOnlyTurn(baseSummary, true), false);
 });
 
 test("chat-only Codex turns with risk flags fall back to host approval", () => {
@@ -74,11 +74,11 @@ test("attachments require host approval", () => {
   assert.equal(shouldAutoApproveChatOnlyTurn(summary, true), false);
 });
 
-test("selected workspace path alone can still be chat-only", () => {
+test("selected workspace path alone can still be chat-only but not auto-approved", () => {
   const summary = { ...baseSummary, workspacePath: "/Users/maddie/project" };
 
   assert.equal(isChatOnlyCodexTurn(summary), true);
-  assert.equal(shouldAutoApproveChatOnlyTurn(summary, true), true);
+  assert.equal(shouldAutoApproveChatOnlyTurn(summary, true), false);
 });
 
 test("git context requires host approval", () => {
@@ -120,18 +120,18 @@ test("Codex approval requires an unlocked active host but not workspace mode", (
   assert.equal(canApproveCodexTurn({ ...room, approvalPolicy: "never_host" }, host), false);
 });
 
-test("delegated Codex approvals authorize host execution without making the non-host an executor", () => {
+test("delegated Codex approvals do not authorize host execution", () => {
   const member = { id: "github:peer", name: "Peer" };
   assert.equal(canDelegateApproveCodexTurn(room, member), false);
   assert.equal(canUserApprovalAuthorizeHostExecution(room, member.id), false);
 
   const delegatedRoom = { ...room, approvalDelegationPolicy: "members_can_approve" as const };
   assert.equal(canApproveCodexTurn(delegatedRoom, member), false);
-  assert.equal(canDelegateApproveCodexTurn(delegatedRoom, member), true);
-  assert.equal(canUserApprovalAuthorizeHostExecution(delegatedRoom, member.id), true);
+  assert.equal(canDelegateApproveCodexTurn(delegatedRoom, member), false);
+  assert.equal(canUserApprovalAuthorizeHostExecution(delegatedRoom, member.id), false);
 });
 
-test("trusted-only delegated approvals require the user to be listed", () => {
+test("trusted-only delegated approvals still cannot authorize host execution", () => {
   const member = { id: "github:peer", name: "Peer" };
   const trustedRoom = {
     ...room,
@@ -143,8 +143,8 @@ test("trusted-only delegated approvals require the user to be listed", () => {
     trustedApproverUserIds: ["github:other"]
   };
 
-  assert.equal(canDelegateApproveCodexTurn(trustedRoom, member), true);
-  assert.equal(canUserApprovalAuthorizeHostExecution(trustedRoom, member.id), true);
+  assert.equal(canDelegateApproveCodexTurn(trustedRoom, member), false);
+  assert.equal(canUserApprovalAuthorizeHostExecution(trustedRoom, member.id), false);
   assert.equal(canDelegateApproveCodexTurn(untrustedRoom, member), false);
   assert.equal(canUserApprovalAuthorizeHostExecution(untrustedRoom, member.id), false);
 });
@@ -173,6 +173,14 @@ test("Codex approvals reset when room execution context changes", () => {
   assert.equal(
     shouldResetCodexApprovalForRoomUpdate(room, { ...room, browserProfilePersistent: false }),
     true
+  );
+  assert.equal(
+    shouldResetCodexApprovalForRoomUpdate(room, { ...room, host: "Jordan", hostUserId: "github:jordan" }),
+    false
+  );
+  assert.equal(
+    shouldResetCodexApprovalForRoomUpdate(room, { ...room, hostStatus: "handoff" }),
+    false
   );
   assert.equal(shouldResetCodexApprovalForRoomUpdate(room, { ...room, unread: 2 }), false);
 });

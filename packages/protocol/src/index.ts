@@ -71,6 +71,7 @@ export const RelayEnvelope = z.object({
     "codex.invoke",
     "codex.event",
     "codex.approval",
+    "codex.queue",
     "browser.request",
     "browser.event",
     "terminal.request",

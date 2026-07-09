@@ -32,7 +32,7 @@ export interface MarkdownChatMessage {
 
 const approvalPolicyLabels: Record<ApprovalPolicy, string> = {
   ask_every_turn: "Ask every Codex turn",
-  auto_chat_only: "Auto-approve chat-only turns",
+  auto_chat_only: "Host approves chat-only turns",
   auto_browser_allowed_sites: "Legacy browser auto-approval",
   never_host: "Never host this room"
 };

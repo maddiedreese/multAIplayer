@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import type { CodexApprovalPlaintextPayload } from "@multaiplayer/protocol";
 import {
   approvalDelegationPolicyLabels,
   approvalPolicyLabels,
@@ -80,6 +79,10 @@ export function useAppRelaySync({
     appendGitHubActionsEvent,
     applyGitHubActionsEventForRoom,
     appendCodexEvent,
+    enqueueCodexApprovalForRoom,
+    removeQueuedCodexApprovalForRoom,
+    setPendingCodexApprovalForRoom,
+    setApprovalVisibleForRoom,
     appendLocalPreviewEvent,
     setChatMessageForRoom,
     setHostMessageForRoom,
@@ -87,14 +90,9 @@ export function useAppRelaySync({
     applyAcceptedHostHandoffForRoom,
     setInviteMessageForRoom
   } = roomActions;
-  const handleCodexApprovalEvent = useCallback((event: CodexApprovalPlaintextPayload, roomId: string) => {
-    const handler = appRefs.delegatedCodexApprovalHandlerRef.current;
-    if (handler) {
-      handler(event, roomId);
-    } else {
-      setHostMessageForRoom(roomId, "Received delegated Codex approval before the host runtime was ready.");
-    }
-  }, [appRefs.delegatedCodexApprovalHandlerRef, setHostMessageForRoom]);
+  const handleCodexApprovalEvent = useCallback((_event: unknown, roomId: string) => {
+    setHostMessageForRoom(roomId, "Ignored delegated Codex approval. Only the active host can authorize Codex turns.");
+  }, [setHostMessageForRoom]);
 
   return useRelaySyncContext({
     browserOpenCommand: {
@@ -153,6 +151,10 @@ export function useAppRelaySync({
         setGitWorkflowMessageForRoom,
         applyGitHubActionsEventForRoom,
         appendCodexEvent,
+        enqueueCodexApprovalForRoom,
+        removeQueuedCodexApprovalForRoom,
+        setPendingCodexApprovalForRoom,
+        setApprovalVisibleForRoom,
         appendBrowserRequest,
         updateBrowserRequestStatus,
         appendLocalPreviewEvent,

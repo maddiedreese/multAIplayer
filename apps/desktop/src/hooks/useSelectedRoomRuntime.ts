@@ -123,6 +123,9 @@ export function useSelectedRoomRuntime({
     messages: formatApprovalMessages(approvalTranscriptMessages),
     attachments: formatApprovalAttachments(approvalTranscriptMessages),
     sandbox: formatCodexSandboxLevel(selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel),
+    highPrivilegeLabels: activeCodexApproval
+      ? codexHighPrivilegeLabels(activeCodexApproval.summary, selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel)
+      : [],
     riskFlags: activeCodexApproval
       ? detectCodexTurnRiskFlags(approvalTranscriptMessages, selectedRoom, browserRequests, null)
       : []
@@ -186,4 +189,17 @@ export function useSelectedRoomRuntime({
     hostStatusLabel,
     roomCanUseChat
   };
+}
+
+function codexHighPrivilegeLabels(
+  summary: { attachments: unknown[]; workspacePath: string | null; git: unknown | null; browserAccess: unknown[]; terminals: unknown[] },
+  sandboxLevel: string
+): string[] {
+  const labels: string[] = [];
+  if (sandboxLevel === "danger_full_access") labels.push("full-access Codex");
+  if (summary.terminals.length > 0) labels.push("terminal context");
+  if (summary.workspacePath || summary.git) labels.push("workspace/Git context");
+  if (summary.browserAccess.length > 0) labels.push("browser context");
+  if (summary.attachments.length > 0) labels.push("attachments");
+  return labels;
 }

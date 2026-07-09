@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import type { CodexApprovalPlaintextPayload, RoomRecord } from "@multaiplayer/protocol";
+import type { RoomRecord } from "@multaiplayer/protocol";
 import type { RelayClient } from "../lib/relayClient";
 import type { GitWorkflowDraft } from "../lib/gitWorkflowDraft";
 import type { BrowserAccessRequest } from "../types";
@@ -37,7 +37,6 @@ export function useAppRefs({
   browserRequestsByRoom
 }: UseAppRefsOptions) {
   const relayRef = useRef<RelayClient | null>(null);
-  const delegatedCodexApprovalHandlerRef = useRef<((event: CodexApprovalPlaintextPayload, roomId: string) => void) | null>(null);
   const seenEnvelopeIds = useRef(new Set<string>());
   const historyLoadedRoomIds = useRef(new Set<string>());
   const roomsRef = useLatestRef(rooms);
@@ -55,7 +54,6 @@ export function useAppRefs({
 
   return {
     relayRef,
-    delegatedCodexApprovalHandlerRef,
     seenEnvelopeIds,
     historyLoadedRoomIds,
     roomsRef,

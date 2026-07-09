@@ -377,6 +377,7 @@ export function App() {
     roomInteraction,
     roomActions,
     roomRuntime,
+    relaySync,
     workspaceFlow
   });
   const appView = useAppViewModel({

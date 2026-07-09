@@ -1,4 +1,5 @@
-import type { ChatAttachment, ChatMessage, LocalPreviewRecord } from "../types";
+import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ChatAttachment, ChatMessage, LocalPreviewRecord, PendingCodexApproval } from "../types";
 import { formatMessageTime } from "../lib/appFormatters";
 
 export function useRoomChatPanelActions({
@@ -18,6 +19,9 @@ export function useRoomChatPanelActions({
   promoteNextCodexApprovalForRoom,
   approveCodexTurn,
   handleCodexInvoke,
+  activeCodexApproval,
+  publishCodexQueueEvent,
+  selectedRoom,
   pauseGoal,
   resumeGoal,
   editGoal,
@@ -46,6 +50,18 @@ export function useRoomChatPanelActions({
   promoteNextCodexApprovalForRoom: (roomId: string) => void;
   approveCodexTurn: () => void;
   handleCodexInvoke: () => void;
+  activeCodexApproval: PendingCodexApproval | null;
+  publishCodexQueueEvent: (
+    event: {
+      turnId: string;
+      action: "queued" | "cancelled" | "coalesced" | "promoted" | "dropped";
+      triggerMessageId?: string;
+      reason?: string;
+      queueSize: number;
+    },
+    room?: RoomRecord
+  ) => Promise<void>;
+  selectedRoom: RoomRecord;
   pauseGoal: () => void;
   resumeGoal: () => void;
   editGoal: (text: string) => void;
@@ -95,8 +111,18 @@ export function useRoomChatPanelActions({
   }
 
   function onDenyApproval() {
+    const deniedTurn = activeCodexApproval;
     setPendingCodexApprovalForRoom(selectedRoomId, null);
     setApprovalVisibleForRoom(selectedRoomId, false);
+    if (deniedTurn) {
+      removeQueuedCodexApprovalForRoom(selectedRoomId, deniedTurn.turnId);
+      void publishCodexQueueEvent({
+        turnId: deniedTurn.turnId,
+        action: "dropped",
+        reason: `${deniedTurn.requestedBy}'s Codex proposal was declined by the active host.`,
+        queueSize: 0
+      }, selectedRoom);
+    }
     promoteNextCodexApprovalForRoom(selectedRoomId);
   }
 
@@ -140,6 +166,12 @@ export function useRoomChatPanelActions({
     onCancelReply: () => setReplyToMessageForRoom(selectedRoomId, null),
     onCancelQueuedCodexTurn: (turnId: string) => {
       removeQueuedCodexApprovalForRoom(selectedRoomId, turnId);
+      void publishCodexQueueEvent({
+        turnId,
+        action: "cancelled",
+        reason: "Queued Codex turn cancelled.",
+        queueSize: 0
+      }, selectedRoom);
       void publishChatMessage({
         id: crypto.randomUUID(),
         author: "multAIplayer",

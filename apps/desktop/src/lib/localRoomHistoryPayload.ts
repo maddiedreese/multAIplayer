@@ -1,6 +1,7 @@
 import {
   DevicePublicKeyJwk,
   CodexApprovalPlaintextPayload as CodexApprovalPlaintextPayloadSchema,
+  CodexQueuePlaintextPayload as CodexQueuePlaintextPayloadSchema,
   LocalPreviewPlaintextPayload as LocalPreviewPlaintextPayloadSchema,
   RoomKeyRotationPlaintextPayload as RoomKeyRotationPlaintextPayloadSchema,
   ChatDeletePlaintextPayload as ChatDeletePlaintextPayloadSchema,
@@ -10,6 +11,7 @@ import {
   type ChatReactionPlaintextPayload,
   type CodexApprovalPlaintextPayload,
   type CodexEventPlaintextPayload,
+  type CodexQueuePlaintextPayload,
   type DevicePublicKeyJwk as DevicePublicKeyJwkType,
   type GitHubActionsEventPlaintextPayload,
   type GitWorkflowEventPlaintextPayload,
@@ -151,6 +153,10 @@ export function isChatDeletePlaintextPayload(value: unknown): value is ChatDelet
 
 export function isCodexApprovalPlaintextPayload(value: unknown): value is CodexApprovalPlaintextPayload {
   return CodexApprovalPlaintextPayloadSchema.safeParse(value).success;
+}
+
+export function isCodexQueuePlaintextPayload(value: unknown): value is CodexQueuePlaintextPayload {
+  return CodexQueuePlaintextPayloadSchema.safeParse(value).success;
 }
 
 export function isAttachmentBlobContent(value: unknown): value is {

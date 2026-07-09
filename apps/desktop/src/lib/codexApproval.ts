@@ -16,7 +16,10 @@ export function shouldAutoApproveChatOnlyTurn(
   activeHost: boolean,
   riskFlags: readonly CodexTurnRiskFlag[] = []
 ): boolean {
-  return activeHost && riskFlags.length === 0 && isChatOnlyCodexTurn(summary);
+  void summary;
+  void activeHost;
+  void riskFlags;
+  return false;
 }
 
 export function canApproveCodexTurn(room: RoomRecord, user: LocalHostUser, locked = false): boolean {
@@ -29,27 +32,15 @@ export function canApproveCodexTurn(room: RoomRecord, user: LocalHostUser, locke
 }
 
 export function canDelegateApproveCodexTurn(room: RoomRecord, user: LocalHostUser, locked = false): boolean {
-  if (
-    locked ||
-    !room.mode.code ||
-    room.approvalPolicy === "never_host" ||
-    isLocalUserActiveHostForRoom(room, user)
-  ) {
-    return false;
-  }
-  if (room.approvalDelegationPolicy === "members_can_approve") return true;
-  if (room.approvalDelegationPolicy === "trusted_members_only") {
-    return (room.trustedApproverUserIds ?? []).includes(user.id);
-  }
+  void room;
+  void user;
+  void locked;
   return false;
 }
 
 export function canUserApprovalAuthorizeHostExecution(room: RoomRecord, approverUserId: string): boolean {
-  if (!room.mode.code || room.approvalPolicy === "never_host") return false;
-  if (room.approvalDelegationPolicy === "members_can_approve") return true;
-  if (room.approvalDelegationPolicy === "trusted_members_only") {
-    return (room.trustedApproverUserIds ?? []).includes(approverUserId);
-  }
+  void room;
+  void approverUserId;
   return false;
 }
 
@@ -70,8 +61,6 @@ export function shouldResetCodexApprovalForRoomUpdate(previous: RoomRecord, next
     previous.approvalPolicy !== next.approvalPolicy ||
     previous.approvalDelegationPolicy !== next.approvalDelegationPolicy ||
     !sameStrings(previous.trustedApproverUserIds ?? [], next.trustedApproverUserIds ?? []) ||
-    previous.hostStatus !== next.hostStatus ||
-    previous.hostUserId !== next.hostUserId ||
     previous.mode.code !== next.mode.code ||
     previous.mode.workspace !== next.mode.workspace ||
     previous.mode.browser !== next.mode.browser ||

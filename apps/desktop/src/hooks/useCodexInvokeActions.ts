@@ -1,7 +1,6 @@
 import type { MutableRefObject } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { buildCodexApprovalSnapshot, hasActionableCodexTurnContext } from "../lib/codexTurn";
-import { shouldAutoApproveChatOnlyTurn } from "../lib/codexApproval";
 import { canUseRoomChat, roomChatGateMessage } from "../lib/chatPolicy";
 import { messageInvokesCodex } from "../lib/codexInvoke";
 import { roomLockMessage } from "../lib/appRuntime";
@@ -59,7 +58,17 @@ interface UseCodexInvokeActionsOptions {
   queuedCodexApprovals: QueuedCodexTurn[];
   publishChatMessage: (message: ChatMessage, room?: RoomRecord) => Promise<void>;
   handleCodexBrowserOpenCommand: (message: ChatMessage, room: RoomRecord) => boolean;
-  approveCodexTurn: (approval?: PendingCodexApproval | null) => Promise<void>;
+  publishCodexQueueEvent: (
+    event: {
+      turnId: string;
+      action: "queued" | "cancelled" | "coalesced" | "promoted" | "dropped";
+      triggerMessageId?: string;
+      reason?: string;
+      queuePosition?: number;
+      queueSize: number;
+    },
+    room?: RoomRecord
+  ) => Promise<void>;
   setSelectedChatMessage: (message: string | null) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   setSelectedHostMessage: (message: string | null) => void;
@@ -96,7 +105,7 @@ export function useCodexInvokeActions({
   queuedCodexApprovals,
   publishChatMessage,
   handleCodexBrowserOpenCommand,
-  approveCodexTurn,
+  publishCodexQueueEvent,
   setSelectedChatMessage,
   setChatMessageForRoom,
   setSelectedHostMessage,
@@ -228,13 +237,23 @@ export function useCodexInvokeActions({
       queuedAt: new Date().toISOString(),
       ...(pendingMessage?.id ? { triggerMessageId: pendingMessage.id } : {})
     };
-    if (activeCodexApproval || codexRunning) {
+    if (activeCodexApproval || codexRunning || queuedCodexApprovals.length > 0) {
       if (queuedCodexApprovals.length >= 5) {
         setHostMessageForRoom(roomId, "Codex queue is full. Wait for one turn to finish or cancel a queued turn.");
         return;
       }
       enqueueCodexApprovalForRoom(roomId, turnIntent);
-      setHostMessageForRoom(roomId, `Queued Codex turn ${queuedCodexApprovals.length + 1} of 5.`);
+      const queuePosition = queuedCodexApprovals.length + 1;
+      setHostMessageForRoom(roomId, `Proposed Codex turn ${queuePosition} of 5 for host approval.`);
+      publishCodexQueueEvent({
+        turnId: turnIntent.turnId,
+        action: "queued",
+        ...(turnIntent.triggerMessageId ? { triggerMessageId: turnIntent.triggerMessageId } : {}),
+        queuePosition,
+        queueSize: queuePosition
+      }, selectedRoom).catch((error) => {
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessageForRoom(roomId, String(error));
+      });
       return;
     }
     const approvalSnapshot: PendingCodexApproval = {
@@ -248,30 +267,24 @@ export function useCodexInvokeActions({
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
-    if (selectedRoom.approvalPolicy === "auto_chat_only") {
-      if (shouldAutoApproveChatOnlyTurn(approvalSnapshot.summary, isActiveHost, approvalSnapshot.riskFlags ?? [])) {
-        setPendingCodexApprovalForRoom(roomId, null);
-        setApprovalVisibleForRoom(roomId, false);
-        setHostMessageForRoom(roomId, "Auto-approved chat-only Codex turn.");
-        approveCodexTurn(approvalSnapshot).catch((error) => {
-          if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessageForRoom(roomId, String(error));
-        });
-        return;
-      }
-      setPendingCodexApprovalForRoom(roomId, approvalSnapshot);
-      setApprovalVisibleForRoom(roomId, true);
-      setHostMessageForRoom(
-        roomId,
-        isActiveHost
-          ? (approvalSnapshot.riskFlags ?? []).length > 0
-            ? "This turn includes content warnings, so host approval is required."
-            : "This turn includes workspace, browser, terminal, or attachment context, so host approval is required."
-          : hostGateMessage
-      );
-      return;
-    }
-    setPendingCodexApprovalForRoom(roomId, approvalSnapshot);
-    setApprovalVisibleForRoom(roomId, true);
+    enqueueCodexApprovalForRoom(roomId, turnIntent);
+    publishCodexQueueEvent({
+      turnId: turnIntent.turnId,
+      action: "queued",
+      ...(turnIntent.triggerMessageId ? { triggerMessageId: turnIntent.triggerMessageId } : {}),
+      queuePosition: 1,
+      queueSize: 1
+    }, selectedRoom).catch((error) => {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessageForRoom(roomId, String(error));
+    });
+    setPendingCodexApprovalForRoom(roomId, isActiveHost ? approvalSnapshot : null);
+    setApprovalVisibleForRoom(roomId, isActiveHost);
+    setHostMessageForRoom(
+      roomId,
+      isActiveHost
+        ? "Codex turn is waiting for active-host approval."
+        : hostGateMessage
+    );
   }
 
   return {
