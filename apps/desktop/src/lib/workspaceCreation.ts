@@ -1,4 +1,20 @@
-import { codexModelOptions, codexReasoningEffortOptions, codexSandboxLevelOptions, codexSpeedOptions } from "@multaiplayer/protocol";
+import {
+  codexModelOptions,
+  codexReasoningEffortOptions,
+  codexSandboxLevelOptions,
+  codexSpeedOptions,
+  maxCodexModelChars,
+  maxRoomNameChars,
+  maxRoomProjectPathChars,
+  maxTeamNameChars
+} from "@multaiplayer/protocol";
+
+export {
+  maxCodexModelChars,
+  maxRoomNameChars,
+  maxRoomProjectPathChars,
+  maxTeamNameChars
+};
 
 export interface WorkspaceCreatePlan {
   name: string;
@@ -9,11 +25,6 @@ export interface RoomCreatePlan {
   name: string;
   projectPath: string;
 }
-
-export const maxTeamNameChars = 120;
-export const maxRoomNameChars = 160;
-export const maxRoomProjectPathChars = 2048;
-export const maxCodexModelChars = 80;
 
 const controlCharacters = /[\u0000-\u001f\u007f]/;
 

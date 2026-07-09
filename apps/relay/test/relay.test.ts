@@ -8,6 +8,10 @@ import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import Database from "better-sqlite3";
 import { WebSocket } from "ws";
+import {
+  maxEnvelopeNonceChars,
+  maxRoomProjectPathChars
+} from "@multaiplayer/protocol";
 
 interface RelayHarness {
   baseUrl: string;
@@ -1266,7 +1270,7 @@ test("relay bounds room project paths and Codex model metadata", async () => {
       await postJsonStatus(relay.baseUrl, "/rooms", {
         teamId: "team-core",
         name: "Long path",
-        projectPath: `/${"a".repeat(2049)}`
+        projectPath: `/${"a".repeat(maxRoomProjectPathChars + 1)}`
       }),
       400
     );
@@ -2027,9 +2031,9 @@ test("relay drops malformed encrypted auth sessions loaded from disk", async () 
         user: { id: "github:huge-token", login: "huge-token" },
         encryptedAccessToken: {
           algorithm: "AES-GCM-256",
-          nonce: "x".repeat(513),
+          nonce: "x".repeat(maxEnvelopeNonceChars + 1),
           ciphertext: "x".repeat(20_000),
-          tag: "x".repeat(513)
+          tag: "x".repeat(maxEnvelopeNonceChars + 1)
         },
         expiresAt: Date.now() + 60_000
       }
@@ -2984,6 +2988,24 @@ test("relay enforces encrypted attachment blob size limits", async () => {
     assert.equal(controlType.status, 400);
     assert.match(await controlType.text(), /type must be/);
 
+    const protocolBoundaryNonce = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "protocol-boundary-nonce.txt",
+        type: "text/plain",
+        size: 4,
+        payload: {
+          algorithm: "AES-GCM-256",
+          nonce: "x".repeat(maxEnvelopeNonceChars),
+          ciphertext: "ciphertext"
+        }
+      })
+    });
+    assert.equal(protocolBoundaryNonce.status, 201);
+
     const oversizedNonce = await fetch(`${relay.baseUrl}/attachment-blobs`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -2995,13 +3017,13 @@ test("relay enforces encrypted attachment blob size limits", async () => {
         size: 4,
         payload: {
           algorithm: "AES-GCM-256",
-          nonce: "x".repeat(513),
+          nonce: "x".repeat(maxEnvelopeNonceChars + 1),
           ciphertext: "ciphertext"
         }
       })
     });
-    assert.equal(oversizedNonce.status, 413);
-    assert.match(await oversizedNonce.text(), /nonce exceeds 512 characters/);
+    assert.equal(oversizedNonce.status, 400);
+    assert.match(await oversizedNonce.text(), /valid ciphertext payload/);
 
     const oversizedDeclared = await fetch(`${relay.baseUrl}/attachment-blobs`, {
       method: "POST",
@@ -3135,7 +3157,7 @@ test("relay drops invalid persisted attachment blob metadata", async () => {
         size: 4,
         payload: {
           algorithm: "AES-GCM-256",
-          nonce: "x".repeat(513),
+          nonce: "x".repeat(maxEnvelopeNonceChars + 1),
           ciphertext: "ciphertext"
         },
         createdAt: new Date().toISOString(),
