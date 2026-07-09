@@ -16,7 +16,6 @@ interface RegisterAttachmentRoutesOptions {
   attachmentBlobTtlDays: number;
   maxAttachmentBlobNameChars: number;
   maxAttachmentBlobTypeChars: number;
-  maxEnvelopeNonceChars: number;
   getAuthSession: (sessionId: unknown) => AuthSession | null;
   allowRead: (session: AuthSession | null, res: Response) => boolean;
   allowMutation: (session: AuthSession | null, res: Response) => boolean;
@@ -47,7 +46,6 @@ export function registerAttachmentRoutes({
   attachmentBlobTtlDays,
   maxAttachmentBlobNameChars,
   maxAttachmentBlobTypeChars,
-  maxEnvelopeNonceChars,
   getAuthSession,
   allowRead,
   allowMutation,
@@ -103,10 +101,6 @@ export function registerAttachmentRoutes({
     }
     if (!payload.success) {
       res.status(400).json({ error: "payload must be a valid ciphertext payload" });
-      return;
-    }
-    if (payload.data.nonce.length > maxEnvelopeNonceChars) {
-      res.status(413).json({ error: `Attachment blob nonce exceeds ${maxEnvelopeNonceChars} characters` });
       return;
     }
     if (payload.data.ciphertext.length > maxCiphertextCharactersForBlob(attachmentBlobMaxBytes)) {

@@ -5,11 +5,16 @@ import {
   RoomId,
   TeamId,
   UserId,
+  maxAttachmentBlobIdChars,
+  maxAttachmentBlobNameChars,
+  maxAttachmentBlobTypeChars,
   maxCodexModelChars,
   maxDisplayNameChars,
   maxEnvelopeIdChars,
-  maxProjectPathChars,
-  maxShortTextChars,
+  maxPublicKeyFingerprintChars,
+  maxRoomNameChars,
+  maxRoomProjectPathChars,
+  maxTeamNameChars,
   maxUrlChars
 } from "./limits-ids.js";
 
@@ -17,7 +22,7 @@ export const TeamRole = z.enum(["owner", "admin", "member"]);
 
 export const TeamRecord = z.object({
   id: TeamId,
-  name: z.string().min(1).max(maxDisplayNameChars),
+  name: z.string().min(1).max(maxTeamNameChars),
   members: z.number().int().nonnegative(),
   role: TeamRole.optional(),
   archivedAt: z.string().datetime().optional(),
@@ -36,7 +41,7 @@ export const DeviceRecord = z.object({
   deviceId: DeviceId,
   displayName: z.string().min(1).max(maxDisplayNameChars),
   publicKeyJwk: DevicePublicKeyJwk,
-  publicKeyFingerprint: z.string().min(16).max(maxShortTextChars),
+  publicKeyFingerprint: z.string().min(16).max(maxPublicKeyFingerprintChars),
   registeredAt: z.string().datetime(),
   lastSeenAt: z.string().datetime()
 });
@@ -51,8 +56,8 @@ export const RoomModeSchema = z.object({
 export const RoomRecord = z.object({
   id: RoomId,
   teamId: TeamId,
-  name: z.string().min(1).max(maxDisplayNameChars),
-  projectPath: z.string().min(1).max(maxProjectPathChars),
+  name: z.string().min(1).max(maxRoomNameChars),
+  projectPath: z.string().min(1).max(maxRoomProjectPathChars),
   host: z.string().min(1).max(maxDisplayNameChars),
   hostUserId: UserId.optional(),
   hostStatus: z.enum(["active", "offline", "handoff"]),
@@ -90,11 +95,11 @@ export const InviteRecord = z.object({
 });
 
 export const AttachmentBlobRecord = z.object({
-  id: z.string().min(1).max(maxEnvelopeIdChars),
+  id: z.string().min(1).max(maxAttachmentBlobIdChars),
   teamId: TeamId,
   roomId: RoomId,
-  name: z.string().min(1).max(maxShortTextChars),
-  type: z.string().min(1).max(maxShortTextChars),
+  name: z.string().min(1).max(maxAttachmentBlobNameChars),
+  type: z.string().min(1).max(maxAttachmentBlobTypeChars),
   size: z.number().int().nonnegative(),
   uploadedByUserId: UserId.optional(),
   payload: CiphertextPayload,

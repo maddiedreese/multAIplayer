@@ -10,9 +10,29 @@ import {
 import {
   RelayEnvelope,
   RelayClientMessage,
+  maxAccessTokenChars,
+  maxAttachmentBlobIdChars,
+  maxAttachmentBlobNameChars,
+  maxAttachmentBlobTypeChars,
+  maxAuthSessionIdChars,
+  maxCodexModelChars,
+  maxDeviceIdChars,
+  maxDisplayNameChars,
+  maxEnvelopeIdChars,
+  maxEnvelopeNonceChars,
+  maxGitHubDeviceCodeChars,
+  maxHostNameChars,
   maxMediumTextChars,
+  maxPublicKeyFingerprintChars,
+  maxPublicKeyJwkChars,
+  maxRoomIdChars,
+  maxRoomNameChars,
+  maxRoomProjectPathChars,
   maxShortTextChars,
+  maxTeamIdChars,
+  maxTeamNameChars,
   maxUrlChars,
+  maxUserIdChars,
   type RoomRecord,
   type TeamMemberRecord,
   type TeamRecord,
@@ -142,28 +162,8 @@ const {
   transferTeamOwnership,
   canAccessRoom
 } = relayAuthz;
-const maxRoomProjectPathChars = 2048;
-const maxCodexModelChars = 80;
-const maxTeamNameChars = 120;
-const maxRoomNameChars = 160;
-const maxTeamIdChars = 160;
-const maxRoomIdChars = 160;
-const maxDisplayNameChars = 120;
-const maxUserIdChars = 160;
-const maxDeviceIdChars = 160;
-const maxHostNameChars = 120;
-const maxPublicKeyFingerprintChars = 128;
-const maxPublicKeyJwkChars = 4096;
-const maxAuthSessionIdChars = 160;
-const maxAccessTokenChars = 8192;
 const maxEncryptedAccessTokenChars = Math.ceil(maxAccessTokenChars * 4 / 3) + 1024;
-const maxGitHubDeviceCodeChars = 256;
-const maxEnvelopeIdChars = 160;
-const maxEnvelopeNonceChars = 512;
 const maxEnvelopeCiphertextChars = Math.ceil(encryptedEnvelopeMaxBytes * 4 / 3) + 1024;
-const maxAttachmentBlobIdChars = 160;
-const maxAttachmentBlobNameChars = 512;
-const maxAttachmentBlobTypeChars = 160;
 let relayStorePersistence: RelayStorePersistenceCoordinator;
 const relayLifecycle = createRelayLifecycle({
   server,
@@ -358,7 +358,6 @@ registerAttachmentRoutes({
   attachmentBlobTtlDays,
   maxAttachmentBlobNameChars,
   maxAttachmentBlobTypeChars,
-  maxEnvelopeNonceChars,
   getAuthSession,
   allowRead,
   allowMutation,
