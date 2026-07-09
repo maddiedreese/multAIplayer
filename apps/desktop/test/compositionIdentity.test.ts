@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { JSDOM } from "jsdom";
-import { cleanup, renderHook } from "@testing-library/react";
+import { cleanup, render, renderHook } from "@testing-library/react";
+import { createElement, StrictMode, useLayoutEffect, type ReactNode } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { createShellInput } from "../src/hooks/appViewModelShell";
 import type { UseInviteActionsOptions } from "../src/hooks/inviteActionTypes";
 import { useInviteActions } from "../src/hooks/useInviteActions";
-import { useStableComposition } from "../src/hooks/useStableComposition";
+import { useStablePlainObjectComposition } from "../src/hooks/useStablePlainObjectComposition";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://127.0.0.1:5173/"
@@ -30,6 +31,10 @@ Object.assign(globalThis, {
 });
 
 afterEach(() => cleanup());
+
+function StrictModeWrapper({ children }: { children: ReactNode }) {
+  return createElement(StrictMode, null, children);
+}
 
 const room: RoomRecord = {
   id: "room-invite",
@@ -88,7 +93,10 @@ const inviteOptions: UseInviteActionsOptions = {
 test("invite action identities survive wrapper-object rerenders", () => {
   const { result, rerender } = renderHook(
     ({ options }: { options: UseInviteActionsOptions }) => useInviteActions(options),
-    { initialProps: { options: inviteOptions } }
+    {
+      initialProps: { options: inviteOptions },
+      wrapper: StrictModeWrapper
+    }
   );
   const first = result.current;
 
@@ -145,7 +153,7 @@ test("view-model compositions preserve identities until rendered data changes", 
   }) as unknown as Parameters<typeof createShellInput>[0];
   const { result, rerender } = renderHook(
     ({ options }: { options: Parameters<typeof createShellInput>[0] }) =>
-      useStableComposition(createShellInput(options)),
+      useStablePlainObjectComposition(createShellInput(options)),
     { initialProps: { options: createOptions() } }
   );
   const first = result.current;
@@ -157,4 +165,47 @@ test("view-model compositions preserve identities until rendered data changes", 
   rerender({ options: createOptions(true) });
   assert.notEqual(result.current, first);
   assert.equal(result.current.sidebarCollapsed, true);
+});
+
+test("layout-effect consumers observe the latest callback implementation", () => {
+  const calls: number[] = [];
+
+  function LayoutEffectConsumer({ callback, version }: { callback: () => void; version: number }) {
+    useLayoutEffect(() => {
+      callback();
+    }, [callback, version]);
+    return null;
+  }
+
+  function Composition({ version }: { version: number }) {
+    const stable = useStablePlainObjectComposition({
+      callback: () => calls.push(version)
+    });
+    return createElement(LayoutEffectConsumer, { callback: stable.callback, version });
+  }
+
+  const view = render(createElement(Composition, { version: 1 }));
+  view.rerender(createElement(Composition, { version: 2 }));
+
+  assert.deepEqual(calls, [1, 2]);
+});
+
+test("arrays remain opaque and callbacks inside them are not proxied", () => {
+  const firstCallback = () => "first";
+  const secondCallback = () => "second";
+  const firstItems = [firstCallback];
+  const secondItems = [secondCallback];
+  const { result, rerender } = renderHook(
+    ({ items }: { items: Array<() => string> }) =>
+      useStablePlainObjectComposition({ items }),
+    { initialProps: { items: firstItems } }
+  );
+
+  assert.equal(result.current.items, firstItems);
+  assert.equal(result.current.items[0], firstCallback);
+
+  rerender({ items: secondItems });
+
+  assert.equal(result.current.items, secondItems);
+  assert.equal(result.current.items[0], secondCallback);
 });

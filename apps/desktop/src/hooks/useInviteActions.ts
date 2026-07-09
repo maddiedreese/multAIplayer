@@ -4,7 +4,7 @@ import { createInviteLinkActions } from "./inviteLinkActions";
 import { createInviteRelayActions } from "./inviteRelayActions";
 import { createRoomKeyRotationActions } from "./roomKeyRotationActions";
 import type { UseInviteActionsOptions } from "./inviteActionTypes";
-import { useStableComposition } from "./useStableComposition";
+import { useStablePlainObjectComposition } from "./useStablePlainObjectComposition";
 
 export function useInviteActions(options: UseInviteActionsOptions) {
   const setInviteAdmissionForRoom = useAppStore((state) => state.setInviteAdmissionForRoom);
@@ -20,7 +20,7 @@ export function useInviteActions(options: UseInviteActionsOptions) {
   const linkActions = createInviteLinkActions(options);
   const rotationActions = createRoomKeyRotationActions(options);
 
-  return useStableComposition({
+  return useStablePlainObjectComposition({
     ...joinActions,
     ...linkActions,
     decryptInviteEnvelope: relayActions.decryptInviteEnvelope,
