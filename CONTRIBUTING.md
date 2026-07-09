@@ -55,7 +55,7 @@ Add focused tests when changing:
 - desktop encrypted history, invite handling, browser policy, Codex turn assembly, Markdown export, secret warnings, terminal approvals, or workspace creation;
 - native Tauri file, Git, terminal, browser, Keychain, diagnostics, or Codex app-server commands.
 
-Diagnostics changes need tests on both sides of the IPC boundary. Frontend tests should cover capture-time redaction and object-key omission. Rust tests should cover strict request shape, JSONL corruption recovery, file permissions, retention and size limits, concurrent writes, and export-time re-redaction. Do not add a generic command that returns the persisted diagnostics file to the webview.
+Diagnostics changes need tests on both sides of the IPC boundary. Frontend tests should cover capture-time redaction, compound sensitive-key omission, ordered writes, and proof that native export does not return persisted records. Rust tests should cover strict request shape, JSONL corruption recovery, file permissions, retention and size limits, concurrent writes, native bundle assembly, export-time re-redaction, and safe destination writes. Do not add a command that returns persisted diagnostic entries, bundle contents, or the selected export path to the webview.
 
 ## Security Reports
 

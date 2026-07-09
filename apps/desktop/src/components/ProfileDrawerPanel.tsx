@@ -2,8 +2,9 @@ import { ClipboardList, ExternalLink, Github, X } from "lucide-react";
 import { useState } from "react";
 import type { DeviceIdentity } from "../lib/deviceIdentity";
 import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
-import { buildDiagnosticBundle } from "../lib/diagnostics";
+import { buildWebPreviewDiagnosticBundle, saveNativeDiagnosticBundle } from "../lib/diagnostics";
 import { copyTextToClipboard } from "../lib/clipboard";
+import { isTauriRuntime } from "../lib/localBackend/runtime";
 import { InfoRow } from "./common";
 
 export function ProfileDrawerPanel({
@@ -34,12 +35,25 @@ export function ProfileDrawerPanel({
   onSignOut: () => void;
 }) {
   const [diagnosticsMessage, setDiagnosticsMessage] = useState<string | null>(null);
-  async function copyDiagnostics() {
-    const result = await copyTextToClipboard(await buildDiagnosticBundle());
+  const nativeDiagnostics = isTauriRuntime();
+  async function exportDiagnostics() {
+    if (!nativeDiagnostics) {
+      const result = await copyTextToClipboard(buildWebPreviewDiagnosticBundle());
+      setDiagnosticsMessage(
+        result.status === "copied"
+          ? "Copied in-memory diagnostics. Review before attaching to a bug report."
+          : `Could not copy diagnostics: ${result.reason}`
+      );
+      return;
+    }
+
+    const outcome = await saveNativeDiagnosticBundle();
     setDiagnosticsMessage(
-      result.status === "copied"
-        ? "Copied local diagnostics. Review before attaching to a bug report."
-        : `Could not copy diagnostics: ${result.reason}`
+      outcome === "saved"
+        ? "Saved local diagnostics. Review the file before attaching it to a bug report."
+        : outcome === "cancelled"
+          ? "Diagnostics save cancelled."
+          : "Could not save diagnostics."
     );
   }
 
@@ -76,9 +90,9 @@ export function ProfileDrawerPanel({
       </button>
       {deviceIdentityMessage && <div className="workflow-message">{deviceIdentityMessage}</div>}
 
-      <button className="ghost-wide" onClick={copyDiagnostics}>
+      <button className="ghost-wide" onClick={exportDiagnostics}>
         <ClipboardList size={15} />
-        Copy diagnostics
+        {nativeDiagnostics ? "Save diagnostics" : "Copy diagnostics"}
       </button>
       {diagnosticsMessage && <div className="workflow-message">{diagnosticsMessage}</div>}
 

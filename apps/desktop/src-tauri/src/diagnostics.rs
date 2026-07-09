@@ -5,7 +5,8 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
-use tauri::State;
+use tauri::{AppHandle, State};
+use tauri_plugin_dialog::DialogExt;
 
 const MAX_MESSAGE_CHARS: usize = 240;
 const MAX_DETAIL_CHARS: usize = 800;
@@ -14,6 +15,10 @@ const MAX_LOG_ENTRIES: usize = 500;
 const MAX_ENCODED_LINE_BYTES: usize = 8 * 1024;
 const RETENTION_DAYS: i64 = 7;
 const MAX_FUTURE_SKEW_MINUTES: i64 = 5;
+const MAX_USER_AGENT_CHARS: usize = 240;
+const MAX_LANGUAGE_CHARS: usize = 64;
+const MAX_PLATFORM_CHARS: usize = 120;
+const MAX_RELAY_URL_CHARS: usize = 2_048;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -30,6 +35,49 @@ pub(crate) struct DiagnosticEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     detail: Option<String>,
     created_at: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields, rename_all = "camelCase")]
+pub(crate) struct DiagnosticExportContext {
+    user_agent: Option<String>,
+    language: Option<String>,
+    platform: Option<String>,
+    relay_http_origin: Option<String>,
+    relay_ws_origin: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum DiagnosticExportOutcome {
+    Saved,
+    Cancelled,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DiagnosticBundle {
+    generated_at: String,
+    app: DiagnosticBundleApp,
+    relay: DiagnosticBundleRelay,
+    entries: Vec<DiagnosticEntry>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DiagnosticBundleApp {
+    version: &'static str,
+    runtime: &'static str,
+    user_agent: String,
+    language: String,
+    platform: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DiagnosticBundleRelay {
+    http_origin: String,
+    ws_origin: String,
 }
 
 #[derive(Clone)]
@@ -166,10 +214,113 @@ pub(crate) fn record_diagnostic(
 }
 
 #[tauri::command]
-pub(crate) fn export_diagnostic_entries(
+pub(crate) async fn save_diagnostic_bundle(
+    app: AppHandle,
     state: State<'_, DiagnosticState>,
-) -> Result<Vec<DiagnosticEntry>, String> {
-    state.export(Utc::now())
+    context: DiagnosticExportContext,
+) -> Result<DiagnosticExportOutcome, String> {
+    let now = Utc::now();
+    let bundle = build_diagnostic_bundle(&state, context, now)?;
+    let suggested_name = format!("multaiplayer-diagnostics-{}.json", now.format("%Y-%m-%d"));
+    let Some(destination) = app
+        .dialog()
+        .file()
+        .add_filter("JSON", &["json"])
+        .set_file_name(suggested_name)
+        .set_title("Save multAIplayer diagnostics")
+        .blocking_save_file()
+    else {
+        return Ok(DiagnosticExportOutcome::Cancelled);
+    };
+    let destination = destination.into_path().map_err(|_| {
+        "The selected diagnostic export destination is not a local file".to_string()
+    })?;
+    write_diagnostic_bundle(&destination, &bundle)?;
+    Ok(DiagnosticExportOutcome::Saved)
+}
+
+fn build_diagnostic_bundle(
+    state: &DiagnosticState,
+    context: DiagnosticExportContext,
+    now: DateTime<Utc>,
+) -> Result<Vec<u8>, String> {
+    let context = validate_export_context(context)?;
+    let bundle = DiagnosticBundle {
+        generated_at: now.to_rfc3339_opts(SecondsFormat::Millis, true),
+        app: DiagnosticBundleApp {
+            version: env!("CARGO_PKG_VERSION"),
+            runtime: "tauri",
+            user_agent: sanitized_context_value(context.user_agent.as_deref()),
+            language: sanitized_context_value(context.language.as_deref()),
+            platform: sanitized_context_value(context.platform.as_deref()),
+        },
+        relay: DiagnosticBundleRelay {
+            http_origin: normalized_relay_origin(
+                context.relay_http_origin.as_deref(),
+                &["http", "https"],
+            ),
+            ws_origin: normalized_relay_origin(context.relay_ws_origin.as_deref(), &["ws", "wss"]),
+        },
+        entries: state.export(now)?,
+    };
+    let mut encoded = serde_json::to_vec_pretty(&bundle)
+        .map_err(|error| format!("Failed to serialize diagnostic bundle: {error}"))?;
+    encoded.push(b'\n');
+    Ok(encoded)
+}
+
+fn validate_export_context(
+    context: DiagnosticExportContext,
+) -> Result<DiagnosticExportContext, String> {
+    validate_optional_context_length(
+        "userAgent",
+        context.user_agent.as_deref(),
+        MAX_USER_AGENT_CHARS,
+    )?;
+    validate_optional_context_length("language", context.language.as_deref(), MAX_LANGUAGE_CHARS)?;
+    validate_optional_context_length("platform", context.platform.as_deref(), MAX_PLATFORM_CHARS)?;
+    validate_optional_context_length(
+        "relayHttpOrigin",
+        context.relay_http_origin.as_deref(),
+        MAX_RELAY_URL_CHARS,
+    )?;
+    validate_optional_context_length(
+        "relayWsOrigin",
+        context.relay_ws_origin.as_deref(),
+        MAX_RELAY_URL_CHARS,
+    )?;
+    Ok(context)
+}
+
+fn validate_optional_context_length(
+    field: &str,
+    value: Option<&str>,
+    max_chars: usize,
+) -> Result<(), String> {
+    if value.is_some_and(|value| value.chars().count() > max_chars) {
+        Err(format!(
+            "Diagnostic export {field} must be {max_chars} characters or fewer"
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn sanitized_context_value(value: Option<&str>) -> String {
+    value
+        .filter(|value| !value.trim().is_empty())
+        .map(redact_text)
+        .unwrap_or_else(|| "unavailable".to_string())
+}
+
+fn normalized_relay_origin(value: Option<&str>, allowed_schemes: &[&str]) -> String {
+    let Some(value) = value.filter(|value| !value.trim().is_empty()) else {
+        return "unavailable".to_string();
+    };
+    match tauri::Url::parse(value) {
+        Ok(url) if allowed_schemes.contains(&url.scheme()) => url.origin().ascii_serialization(),
+        _ => "unavailable".to_string(),
+    }
 }
 
 fn validate_and_redact(
@@ -316,6 +467,45 @@ fn append_line(path: &Path, encoded: &[u8]) -> Result<(), String> {
         .map_err(|error| format!("Failed to flush diagnostic entry: {error}"))
 }
 
+fn write_diagnostic_bundle(path: &Path, encoded: &[u8]) -> Result<(), String> {
+    ensure_safe_export_target(path)?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| "Diagnostic export path has no parent directory".to_string())?;
+    let file_name = path
+        .file_name()
+        .map(|name| name.to_string_lossy())
+        .unwrap_or_else(|| "diagnostics.json".into());
+    let temporary = parent.join(format!(
+        ".{file_name}.{}.{}.tmp",
+        std::process::id(),
+        temporary_file_nonce()
+    ));
+    let result = (|| {
+        let mut options = OpenOptions::new();
+        options.create_new(true).write(true);
+        configure_private_create_mode(&mut options);
+        let mut file = options
+            .open(&temporary)
+            .map_err(|error| format!("Failed to create diagnostic export: {error}"))?;
+        ensure_open_regular_file(&file)?;
+        ensure_private_file(&temporary)?;
+        file.write_all(encoded)
+            .map_err(|error| format!("Failed to write diagnostic export: {error}"))?;
+        file.flush()
+            .map_err(|error| format!("Failed to flush diagnostic export: {error}"))?;
+        file.sync_all()
+            .map_err(|error| format!("Failed to sync diagnostic export: {error}"))?;
+        drop(file);
+        replace_file(&temporary, path)?;
+        ensure_private_file(path)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
+}
+
 fn rewrite_entries(path: &Path, entries: &[DiagnosticEntry]) -> Result<(), String> {
     ensure_safe_log_target(path)?;
     let parent = path
@@ -414,6 +604,22 @@ fn ensure_safe_log_target(path: &Path) -> Result<(), String> {
     }
 }
 
+fn ensure_safe_export_target(path: &Path) -> Result<(), String> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            Err("Diagnostic export cannot replace a symbolic link".to_string())
+        }
+        Ok(metadata) if !metadata.is_file() => {
+            Err("Diagnostic export destination must be a regular file".to_string())
+        }
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!(
+            "Failed to inspect diagnostic export destination: {error}"
+        )),
+    }
+}
+
 fn ensure_open_regular_file(file: &File) -> Result<(), String> {
     if file
         .metadata()
@@ -485,6 +691,19 @@ mod tests {
                 .is_err()
         );
         assert!(serde_json::from_str::<DiagnosticEntry>(&valid.replace("warn", "info")).is_err());
+    }
+
+    #[test]
+    fn export_context_rejects_unknown_and_oversized_fields() {
+        assert!(serde_json::from_str::<DiagnosticExportContext>(
+            r#"{"language":"en-US","payload":"not allowed"}"#
+        )
+        .is_err());
+        let context = DiagnosticExportContext {
+            user_agent: Some("x".repeat(MAX_USER_AGENT_CHARS + 1)),
+            ..DiagnosticExportContext::default()
+        };
+        assert!(validate_export_context(context).is_err());
     }
 
     #[test]
@@ -624,6 +843,86 @@ mod tests {
         assert!(!serialized.contains("abcdefghijklmnopqrstuvwxyz1234567890"));
         assert!(serialized.contains("[redacted-token]"));
         let _ = fs::remove_dir_all(path.parent().expect("parent"));
+    }
+
+    #[test]
+    fn native_bundle_normalizes_context_and_never_exposes_unredacted_entries() {
+        let path = temp_path("native-bundle");
+        let state = DiagnosticState {
+            store: Arc::new(Mutex::new(
+                DiagnosticStore::initialize(path.clone(), now()).expect("initialize"),
+            )),
+            initialization_error: None,
+        };
+        state.record(entry(1), now()).expect("record");
+        state.lock_store().expect("lock").entries[0].detail = Some(
+            "legacy https://relay.example.com/path?secret=leaked abcdefghijklmnopqrstuvwxyz1234567890"
+                .to_string(),
+        );
+        let context = DiagnosticExportContext {
+            user_agent: Some("Browser abcdefghijklmnopqrstuvwxyz1234567890".to_string()),
+            language: Some("en-US".to_string()),
+            platform: Some("macOS".to_string()),
+            relay_http_origin: Some(
+                "https://user:password@relay.example.com/api?secret=leaked".to_string(),
+            ),
+            relay_ws_origin: Some("wss://relay.example.com/rooms?secret=leaked".to_string()),
+        };
+        let encoded = build_diagnostic_bundle(&state, context, now()).expect("build bundle");
+        let bundle: serde_json::Value = serde_json::from_slice(&encoded).expect("parse bundle");
+
+        assert_eq!(bundle["generatedAt"], "2026-07-09T12:00:00.000Z");
+        assert_eq!(bundle["app"]["runtime"], "tauri");
+        assert_eq!(bundle["app"]["language"], "en-US");
+        assert_eq!(bundle["relay"]["httpOrigin"], "https://relay.example.com");
+        assert_eq!(bundle["relay"]["wsOrigin"], "wss://relay.example.com");
+        let serialized = String::from_utf8(encoded).expect("utf8 bundle");
+        assert!(!serialized.contains("password"));
+        assert!(!serialized.contains("secret=leaked"));
+        assert!(!serialized.contains("abcdefghijklmnopqrstuvwxyz1234567890"));
+        assert!(serialized.contains("[redacted-token]"));
+        let _ = fs::remove_dir_all(path.parent().expect("parent"));
+    }
+
+    #[test]
+    fn bundle_writer_replaces_regular_files_and_writes_complete_json() {
+        let path = temp_path("bundle-write").with_file_name("diagnostics.json");
+        fs::create_dir_all(path.parent().expect("parent")).expect("create parent");
+        fs::write(&path, "old contents").expect("seed export");
+        let encoded = br#"{"complete":true}
+"#;
+        write_diagnostic_bundle(&path, encoded).expect("write bundle");
+        assert_eq!(fs::read(&path).expect("read bundle"), encoded);
+        let leftovers = fs::read_dir(path.parent().expect("parent"))
+            .expect("read parent")
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_name().to_string_lossy().ends_with(".tmp"))
+            .count();
+        assert_eq!(leftovers, 0);
+        let _ = fs::remove_dir_all(path.parent().expect("parent"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bundle_writer_is_private_and_rejects_symlink_destinations() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let path = temp_path("bundle-symlink").with_file_name("diagnostics.json");
+        let parent = path.parent().expect("parent");
+        fs::create_dir_all(parent).expect("create parent");
+        let outside = parent.join("outside.json");
+        fs::write(&outside, "do not overwrite").expect("write outside");
+        symlink(&outside, &path).expect("create symlink");
+        assert!(write_diagnostic_bundle(&path, b"{}\n").is_err());
+        assert_eq!(
+            fs::read_to_string(&outside).expect("read outside"),
+            "do not overwrite"
+        );
+
+        fs::remove_file(&path).expect("remove symlink");
+        write_diagnostic_bundle(&path, b"{}\n").expect("write bundle");
+        let mode = fs::metadata(&path).expect("metadata").permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        let _ = fs::remove_dir_all(parent);
     }
 
     #[cfg(unix)]

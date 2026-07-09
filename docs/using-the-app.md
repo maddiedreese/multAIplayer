@@ -4,13 +4,13 @@ This guide explains the main desktop app surfaces and what each feature means in
 
 ## Account And Device
 
-Use the profile drawer to sign in with GitHub, sign out, inspect relay auth settings, and copy diagnostics for bug reports.
+Use the profile drawer to sign in with GitHub, sign out, inspect relay auth settings, and save diagnostics for bug reports.
 
 GitHub sign-in is used for identity, draft pull requests, and GitHub Actions reads. The relay keeps GitHub access tokens server-side; desktop clients do not receive those tokens.
 
 Each desktop install has a device identity used for encrypted invite approval and room-key delivery. The profile drawer shows the local device id and public key fingerprint. Resetting the device identity creates a new local device key, which can make other room members see the device as untrusted until they review the new fingerprint.
 
-`Copy diagnostics` creates a local JSON bundle for bug reports. In the native app, capture-redacted warning/error entries are retained in an owner-only diagnostics file for up to seven days, 256 KiB, or 500 entries, whichever bound is reached first. The browser/web preview keeps diagnostics in memory only. Export validates and re-redacts stored entries; it is designed to exclude transcripts, room secrets, terminal output, browser contents, file contents, invite fragments, and GitHub tokens. Review the bundle before attaching it to an issue.
+`Save diagnostics` opens the system save dialog in the native app. Rust validates and re-redacts the owner-only diagnostic records, assembles the JSON bundle, and writes it directly to the selected file; stored entries and bundle contents are never returned to the webview. Capture-redacted warning/error entries are retained for up to seven days, 256 KiB, or 500 entries, whichever bound is reached first. The browser/web preview remains memory-only and shows `Copy diagnostics` for its current-session buffer. The bundle is designed to exclude transcripts, room secrets, terminal output, browser contents, file contents, invite fragments, and GitHub tokens. Review the saved or copied bundle before attaching it to an issue.
 
 ## Teams, Rooms, And Search
 

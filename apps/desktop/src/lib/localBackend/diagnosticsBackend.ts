@@ -9,6 +9,16 @@ export interface PersistedDiagnosticEntry {
   createdAt: string;
 }
 
+export interface DiagnosticExportContext {
+  userAgent?: string;
+  language?: string;
+  platform?: string;
+  relayHttpOrigin?: string;
+  relayWsOrigin?: string;
+}
+
+export type DiagnosticExportOutcome = "saved" | "cancelled" | "unavailable" | "failed";
+
 let diagnosticWriteQueue: Promise<void> = Promise.resolve();
 
 export function recordPersistedDiagnostic(entry: PersistedDiagnosticEntry): void {
@@ -19,13 +29,15 @@ export function recordPersistedDiagnostic(entry: PersistedDiagnosticEntry): void
     .catch(() => undefined);
 }
 
-export async function exportPersistedDiagnosticEntries(): Promise<unknown[]> {
-  if (!isTauriRuntime()) return [];
+export async function savePersistedDiagnosticBundle(
+  context: DiagnosticExportContext
+): Promise<DiagnosticExportOutcome> {
+  if (!isTauriRuntime()) return "unavailable";
   try {
     await diagnosticWriteQueue;
-    const entries = await invoke<PersistedDiagnosticEntry[]>("export_diagnostic_entries");
-    return Array.isArray(entries) ? entries : [];
+    const outcome = await invoke<"saved" | "cancelled">("save_diagnostic_bundle", { context });
+    return outcome === "saved" || outcome === "cancelled" ? outcome : "failed";
   } catch {
-    return [];
+    return "failed";
   }
 }

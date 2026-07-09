@@ -3,10 +3,11 @@ import test, { beforeEach } from "node:test";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { JSDOM } from "jsdom";
 import {
-  buildDiagnosticBundle,
+  buildWebPreviewDiagnosticBundle,
   clearDiagnosticEntries,
   loadDiagnosticEntries,
-  recordDiagnosticEvent
+  recordDiagnosticEvent,
+  saveNativeDiagnosticBundle
 } from "../src/lib/diagnostics";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
@@ -86,7 +87,7 @@ test("failed Tauri persistence is swallowed without changing the memory ring", a
   assert.equal(loadDiagnosticEntries().length, 1);
 });
 
-test("Tauri persistence is serialized and export waits for pending writes", async () => {
+test("Tauri persistence is serialized and native save waits for pending writes", async () => {
   const commands: string[] = [];
   let finishFirstWrite: (() => void) | undefined;
   const firstWrite = new Promise<void>((resolve) => {
@@ -97,18 +98,18 @@ test("Tauri persistence is serialized and export waits for pending writes", asyn
     if (command === "record_diagnostic" && commands.filter((value) => value === command).length === 1) {
       return firstWrite;
     }
-    if (command === "export_diagnostic_entries") return [];
+    if (command === "save_diagnostic_bundle") return "saved";
   });
 
   recordDiagnosticEvent("warn", "First write");
   recordDiagnosticEvent("warn", "Second write");
-  const bundlePromise = buildDiagnosticBundle();
+  const bundlePromise = saveNativeDiagnosticBundle();
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.deepEqual(commands, ["record_diagnostic"]);
   finishFirstWrite?.();
   await bundlePromise;
-  assert.deepEqual(commands, ["record_diagnostic", "record_diagnostic", "export_diagnostic_entries"]);
+  assert.deepEqual(commands, ["record_diagnostic", "record_diagnostic", "save_diagnostic_bundle"]);
 });
 
 test("object diagnostics deeply omit sensitive keys without executing object hooks", () => {
@@ -157,6 +158,61 @@ test("object diagnostics deeply omit sensitive keys without executing object hoo
   assert.match(detail, /"self":"\[circular\]"/);
 });
 
+test("object diagnostics omit compound sensitive keys while retaining benign near-matches", () => {
+  recordDiagnosticEvent("warn", "Compound key safety", {
+    apiKey: "api-key-value",
+    private_key: "private-key-value",
+    "signing key": "signing-key-value",
+    sessionToken: "session-token-value",
+    "refresh-token": "refresh-token-value",
+    roomSecret: "room-secret-value",
+    recoveryPassphrase: "recovery-passphrase-value",
+    BODY: "body-value",
+    plain_text: "plaintext-value",
+    keyboard: "retained-keyboard",
+    tokenCount: 3,
+    secretive: "retained-secretive",
+    passphrases: "retained-passphrases",
+    bodyLength: 10,
+    plaintextFormat: "retained-format"
+  });
+
+  const detail = loadDiagnosticEntries()[0].detail;
+  assert.ok(detail);
+  const sanitized = JSON.parse(detail) as Record<string, unknown>;
+  for (const key of [
+    "apiKey",
+    "private_key",
+    "signing key",
+    "sessionToken",
+    "refresh-token",
+    "roomSecret",
+    "recoveryPassphrase",
+    "BODY",
+    "plain_text"
+  ]) {
+    assert.equal(sanitized[key], "[omitted]", `${key} should be omitted`);
+  }
+  assert.deepEqual(
+    {
+      keyboard: sanitized.keyboard,
+      tokenCount: sanitized.tokenCount,
+      secretive: sanitized.secretive,
+      passphrases: sanitized.passphrases,
+      bodyLength: sanitized.bodyLength,
+      plaintextFormat: sanitized.plaintextFormat
+    },
+    {
+      keyboard: "retained-keyboard",
+      tokenCount: 3,
+      secretive: "retained-secretive",
+      passphrases: "retained-passphrases",
+      bodyLength: 10,
+      plaintextFormat: "retained-format"
+    }
+  );
+});
+
 test("object diagnostics bound depth, arrays, keys, and final detail length", () => {
   let deep: Record<string, unknown> = { tail: "unreachable" };
   for (let index = 0; index < 10; index += 1) deep = { nested: deep };
@@ -200,49 +256,49 @@ test("diagnostic memory ring retains only the newest 80 entries", () => {
   assert.equal(entries[79].message, "Event 84");
 });
 
-test("buildDiagnosticBundle includes app metadata and relay origins only", async () => {
+test("web-preview bundle includes app metadata and relay origins only", () => {
   localStorage.setItem("multaiplayer:app-config", JSON.stringify({
     relayHttpUrl: "https://relay.example.com/api?secret=1",
     relayWsUrl: "wss://relay.example.com/rooms?secret=1"
   }));
   recordDiagnosticEvent("warn", "Something happened");
-  const bundle = await buildDiagnosticBundle(new Date("2026-07-08T00:00:00.000Z"));
+  const bundle = buildWebPreviewDiagnosticBundle(new Date("2026-07-08T00:00:00.000Z"));
   assert.match(bundle, /"version": "0\.1\.0-alpha\.0"/);
   assert.match(bundle, /"httpOrigin": "https:\/\/relay\.example\.com"/);
   assert.match(bundle, /"wsOrigin": "wss:\/\/relay\.example\.com"/);
   assert.doesNotMatch(bundle, /secret=1/);
 });
 
-test("Tauri bundle export merges, deduplicates, validates, and re-redacts persisted entries", async () => {
-  let recordedEntry: unknown;
+test("native bundle save sends bounded context but never reads persisted entries into JavaScript", async () => {
+  localStorage.setItem("multaiplayer:app-config", JSON.stringify({
+    relayHttpUrl: "https://relay.example.com/api?secret=leaked",
+    relayWsUrl: "wss://relay.example.com/rooms?secret=leaked"
+  }));
+  const calls: Array<{ command: string; payload: Record<string, unknown> | undefined }> = [];
   mockIPC((command, payload) => {
-    if (command === "record_diagnostic") {
-      recordedEntry = payload?.entry;
-      return;
-    }
-    if (command === "export_diagnostic_entries") {
-      return [
-        recordedEntry,
-        {
-          level: "error",
-          message: "Persisted request https://relay.example.com/path?secret=leaked",
-          detail: "opaque_abcdefghijklmnopqrstuvwxyz1234567890",
-          createdAt: "2026-07-07T00:00:00.000Z"
-        },
-        { level: "debug", message: "invalid", createdAt: "2026-07-07T00:00:00.000Z" }
-      ];
-    }
+    calls.push({ command, payload });
+    if (command === "save_diagnostic_bundle") return "saved";
   });
   recordDiagnosticEvent("warn", "Current process entry");
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(await saveNativeDiagnosticBundle(), "saved");
 
-  const bundle = JSON.parse(await buildDiagnosticBundle(new Date("2026-07-08T00:00:00.000Z"))) as {
-    entries: Array<{ level: string; message: string; detail?: string }>;
-  };
+  assert.deepEqual(calls.map(({ command }) => command), ["record_diagnostic", "save_diagnostic_bundle"]);
+  assert.equal(calls.some(({ command }) => command === "export_diagnostic_entries"), false);
+  const context = calls[1].payload?.context as Record<string, unknown>;
+  assert.equal(context.relayHttpOrigin, "https://relay.example.com");
+  assert.equal(context.relayWsOrigin, "wss://relay.example.com");
+  assert.equal("entries" in context, false);
+  assert.doesNotMatch(JSON.stringify(context), /secret=leaked|Current process entry/);
+});
 
-  assert.equal(bundle.entries.length, 2);
-  assert.equal(bundle.entries[0].level, "error");
-  assert.doesNotMatch(bundle.entries[0].message, /secret=leaked/);
-  assert.doesNotMatch(bundle.entries[0].detail ?? "", /opaque_/);
-  assert.equal(bundle.entries[1].message, "Current process entry");
+test("native bundle save reduces rejected or malformed outcomes to a stable failure", async () => {
+  mockIPC((command) => {
+    if (command === "save_diagnostic_bundle") return "unexpected";
+  });
+  assert.equal(await saveNativeDiagnosticBundle(), "failed");
+
+  mockIPC((command) => {
+    if (command === "save_diagnostic_bundle") return Promise.reject(new Error("sensitive failure"));
+  });
+  assert.equal(await saveNativeDiagnosticBundle(), "failed");
 });
