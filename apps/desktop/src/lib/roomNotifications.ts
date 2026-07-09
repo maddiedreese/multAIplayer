@@ -153,8 +153,8 @@ export function registerRoomNotificationClickFocus({
       }
       listener = registeredListener;
     })
-  ).catch((error) => {
-    console.warn("Failed to register room notification click handler", error);
+  ).catch(() => {
+    console.warn("Failed to register room notification click handler");
   });
 
   return () => {

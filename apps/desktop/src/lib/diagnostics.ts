@@ -1,5 +1,11 @@
 import { loadAppConfig } from "./appConfig";
 import { appVersion } from "./appVersion";
+import {
+  exportPersistedDiagnosticEntries,
+  recordPersistedDiagnostic,
+  type PersistedDiagnosticEntry
+} from "./localBackend/diagnosticsBackend";
+import { isTauriRuntime } from "./localBackend/runtime";
 
 export type DiagnosticLevel = "warn" | "error";
 
@@ -11,6 +17,19 @@ export interface DiagnosticEntry {
 }
 
 const maxDiagnosticEntries = 80;
+const maxDiagnosticObjectDepth = 6;
+const maxDiagnosticObjectKeys = 40;
+const maxDiagnosticArrayItems = 40;
+const omittedValue = "[omitted]";
+const sensitiveDiagnosticKeys = new Set([
+  "body",
+  "plaintext",
+  "token",
+  "key",
+  "secret",
+  "passphrase",
+  "accesstoken"
+]);
 let installed = false;
 let diagnosticEntries: DiagnosticEntry[] = [];
 
@@ -36,18 +55,24 @@ export function installGlobalDiagnostics() {
 }
 
 export function recordDiagnosticEvent(level: DiagnosticLevel, message: string, ...details: unknown[]) {
-  const entries = loadDiagnosticEntries();
   const nextEntry: DiagnosticEntry = {
     level,
     message: boundText(redactText(message), 240),
     detail: details.length ? boundText(redactText(details.map(formatDiagnosticValue).join(" ")), 800) : undefined,
     createdAt: new Date().toISOString()
   };
-  saveDiagnosticEntries([...entries, nextEntry].slice(-maxDiagnosticEntries));
+  appendDiagnosticEntry(nextEntry);
 }
 
-export function buildDiagnosticBundle(now = new Date()): string {
+export async function buildDiagnosticBundle(now = new Date()): Promise<string> {
   const config = safeLoadAppConfig();
+  const memoryEntriesBeforeExport = loadDiagnosticEntries();
+  const persistedEntries = isTauriRuntime() ? await exportPersistedDiagnosticEntries() : [];
+  const memoryEntriesAfterExport = loadDiagnosticEntries();
+  const entries = mergeDiagnosticEntries(
+    persistedEntries,
+    [...memoryEntriesBeforeExport, ...memoryEntriesAfterExport]
+  );
   const bundle = {
     generatedAt: now.toISOString(),
     app: {
@@ -61,7 +86,7 @@ export function buildDiagnosticBundle(now = new Date()): string {
       httpOrigin: config ? safeOrigin(config.relayHttpUrl) : "unavailable",
       wsOrigin: config ? safeOrigin(config.relayWsUrl) : "unavailable"
     },
-    entries: loadDiagnosticEntries()
+    entries
   };
   return `${JSON.stringify(bundle, null, 2)}\n`;
 }
@@ -70,8 +95,9 @@ export function loadDiagnosticEntries(): DiagnosticEntry[] {
   return diagnosticEntries.map((entry) => ({ ...entry }));
 }
 
-function saveDiagnosticEntries(entries: DiagnosticEntry[]) {
-  diagnosticEntries = entries.slice(-maxDiagnosticEntries).map((entry) => ({ ...entry }));
+function appendDiagnosticEntry(entry: DiagnosticEntry) {
+  diagnosticEntries = [...diagnosticEntries, { ...entry }].slice(-maxDiagnosticEntries);
+  recordPersistedDiagnostic(entry satisfies PersistedDiagnosticEntry);
 }
 
 export function clearDiagnosticEntries() {
@@ -79,15 +105,130 @@ export function clearDiagnosticEntries() {
 }
 
 function formatDiagnosticValue(value: unknown): string {
-  if (value instanceof Error) return `${value.name}: ${value.message}`;
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   if (value === null || value === undefined) return "";
   try {
-    return JSON.stringify(value);
+    if (value instanceof Error) {
+      const name = readDataStringProperty(value, "name") ?? "Error";
+      const message = readDataStringProperty(value, "message") ?? "";
+      return message ? `${name}: ${message}` : name;
+    }
   } catch {
-    return String(value);
+    return "[unserializable]";
   }
+  try {
+    return JSON.stringify(sanitizeDiagnosticValue(value, 0, new WeakSet<object>()));
+  } catch {
+    return "[unserializable]";
+  }
+}
+
+function sanitizeDiagnosticValue(value: unknown, depth: number, seen: WeakSet<object>): unknown {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : String(value);
+  if (typeof value === "bigint") return `${value}n`;
+  if (typeof value === "undefined") return "[undefined]";
+  if (typeof value === "function") return "[function]";
+  if (typeof value === "symbol") return "[symbol]";
+  if (typeof value !== "object") return "[unserializable]";
+  if (depth >= maxDiagnosticObjectDepth) return "[max-depth]";
+  if (seen.has(value)) return "[circular]";
+  seen.add(value);
+
+  let descriptors: PropertyDescriptorMap;
+  try {
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    return "[unserializable]";
+  }
+
+  if (Array.isArray(value)) {
+    const lengthDescriptor = descriptors.length;
+    const length = typeof lengthDescriptor?.value === "number" ? lengthDescriptor.value : 0;
+    const itemCount = Math.min(length, maxDiagnosticArrayItems);
+    const result: unknown[] = [];
+    for (let index = 0; index < itemCount; index += 1) {
+      const descriptor = descriptors[String(index)];
+      result.push(descriptor && "value" in descriptor
+        ? sanitizeDiagnosticValue(descriptor.value, depth + 1, seen)
+        : "[unavailable]");
+    }
+    if (length > maxDiagnosticArrayItems) result.push("[truncated]");
+    return result;
+  }
+
+  const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+  const enumerableKeys = Object.keys(descriptors).filter((key) => descriptors[key]?.enumerable);
+  const keys = enumerableKeys.slice(0, maxDiagnosticObjectKeys);
+  for (const key of keys) {
+    if (isSensitiveDiagnosticKey(key)) {
+      result[key] = omittedValue;
+      continue;
+    }
+    const descriptor = descriptors[key];
+    result[key] = descriptor && "value" in descriptor
+      ? sanitizeDiagnosticValue(descriptor.value, depth + 1, seen)
+      : "[unavailable]";
+  }
+  if (enumerableKeys.length > maxDiagnosticObjectKeys) {
+    result["[truncated]"] = true;
+  }
+  return result;
+}
+
+function readDataStringProperty(value: object, key: string): string | undefined {
+  let current: object | null = value;
+  for (let depth = 0; current && depth < 8; depth += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(current, key);
+    if (descriptor) return "value" in descriptor && typeof descriptor.value === "string" ? descriptor.value : undefined;
+    current = Object.getPrototypeOf(current) as object | null;
+  }
+  return undefined;
+}
+
+function isSensitiveDiagnosticKey(key: string): boolean {
+  return sensitiveDiagnosticKeys.has(key.toLowerCase().replace(/[-_\s]/g, ""));
+}
+
+function mergeDiagnosticEntries(persisted: unknown[], memory: DiagnosticEntry[]): DiagnosticEntry[] {
+  const entries: DiagnosticEntry[] = [];
+  const seen = new Set<string>();
+  for (const candidate of [...persisted, ...memory]) {
+    const entry = normalizeDiagnosticEntry(candidate);
+    if (!entry) continue;
+    const identity = JSON.stringify([entry.level, entry.message, entry.detail ?? null, entry.createdAt]);
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    entries.push(entry);
+  }
+  return entries.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+}
+
+function normalizeDiagnosticEntry(value: unknown): DiagnosticEntry | null {
+  if (!value || typeof value !== "object") return null;
+  let descriptors: PropertyDescriptorMap;
+  try {
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    return null;
+  }
+  const level = dataString(descriptors.level);
+  const message = dataString(descriptors.message);
+  const detail = dataString(descriptors.detail);
+  const createdAt = dataString(descriptors.createdAt);
+  if ((level !== "warn" && level !== "error") || message === undefined || createdAt === undefined) return null;
+  if (!Number.isFinite(Date.parse(createdAt))) return null;
+  return {
+    level,
+    message: boundText(redactText(message), 240),
+    ...(detail === undefined ? {} : { detail: boundText(redactText(detail), 800) }),
+    createdAt
+  };
+}
+
+function dataString(descriptor: PropertyDescriptor | undefined): string | undefined {
+  return descriptor && "value" in descriptor && typeof descriptor.value === "string" ? descriptor.value : undefined;
 }
 
 function redactText(value: string): string {
@@ -121,8 +262,4 @@ function safeOrigin(value: string): string {
   } catch {
     return "unavailable";
   }
-}
-
-function isTauriRuntime(): boolean {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }

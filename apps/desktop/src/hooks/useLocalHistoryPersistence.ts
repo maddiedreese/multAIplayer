@@ -108,8 +108,8 @@ export function useLocalHistoryPersistence({
       ...(roomGoal ? { roomGoal } : {}),
       ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
     }, historySettings.retentionDays);
-    saveEncryptedHistory(selectedRoomId, payload satisfies LocalRoomHistoryPayload).catch((error) => {
-      console.warn("Failed to save encrypted local history", error);
+    saveEncryptedHistory(selectedRoomId, payload satisfies LocalRoomHistoryPayload).catch(() => {
+      console.warn("Failed to save encrypted local history");
     });
   }, [
     browserRequests,

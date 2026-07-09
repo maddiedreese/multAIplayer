@@ -3,7 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import type { CommandResult } from "./types";
 
 export function isTauriRuntime(): boolean {
-  return "__TAURI_INTERNALS__" in window;
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return false;
+  const internals = (window as Window & { __TAURI_INTERNALS__?: { invoke?: unknown } }).__TAURI_INTERNALS__;
+  return typeof internals?.invoke === "function";
 }
 
 export async function runShellCommand(cwd: string, command: string): Promise<CommandResult> {

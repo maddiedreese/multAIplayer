@@ -80,8 +80,9 @@ export function useWorkspaceRecordActions({
   }, [markRoomReadById]);
 
   function handleRelayError(message: string) {
-    console.warn("Relay error", message);
-    if (!isMembershipRemovedRelayError(message) || !hasSelectedRoom) return;
+    const membershipRemoved = isMembershipRemovedRelayError(message);
+    console.warn(membershipRemoved ? "Relay membership was removed" : "Relay request failed");
+    if (!membershipRemoved || !hasSelectedRoom) return;
 
     const room = selectedRoom;
     const userMessage = membershipRemovedRoomMessage(room.name);

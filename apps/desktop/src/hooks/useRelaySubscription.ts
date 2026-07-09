@@ -304,8 +304,8 @@ export function useRelaySubscription({
               forgottenRoomIds: forgottenRoomIdsRef.current,
               revokedRoomIds,
               revokedTeamIds
-            }).catch((error) => {
-              console.warn("Failed to send room notification", error);
+            }).catch(() => {
+              console.warn("Failed to send room notification");
             });
             if (envelopeRoom) handleCodexBrowserOpenCommand(chatMessage, envelopeRoom);
           }
@@ -482,8 +482,8 @@ export function useRelaySubscription({
               setInviteMessageForRoom(message.envelope.roomId, `${plaintext.rotatedBy} refreshed room access for future messages.`);
             }
           }
-        } catch (error) {
-          console.warn("Failed to decrypt relay envelope", error);
+        } catch {
+          console.warn("Failed to decrypt relay envelope");
         }
       },
       replaceRelayStatus,

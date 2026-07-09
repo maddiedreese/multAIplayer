@@ -117,7 +117,9 @@ After the first signed release succeeds, verify the GitHub Release says the arti
 
 Publish `https://multaiplayer.com/releases/latest.json` for every public alpha build. The desktop app reads this manifest and shows an update banner when `version` is newer than the installed app. Set `security: true` for security fixes so stale clients get a stronger in-app nudge. The alpha still uses manual downloads, not Tauri auto-update, so release announcements should tell users to install the new signed build.
 
-For ordinary bug reports, ask testers to open Account settings, click `Copy diagnostics`, review the JSON, and attach it to the GitHub issue. Diagnostics are local and redacted by default; do not ask users to paste terminal output, room transcripts, direct invite fragments, private repo files, or browser contents unless they explicitly choose to share that material.
+For ordinary bug reports, ask testers to open Account settings, click `Copy diagnostics`, review the JSON, and attach it to the GitHub issue. Native diagnostics are capture-redacted JSONL in the platform app log directory, owner-only (`0600`), and bounded to seven days, 256 KiB, and 500 entries; the web preview keeps only its in-memory ring. Export validates and re-redacts the records, and there is no generic diagnostic read command. The file is not encrypted at rest in this alpha, so do not expand collection beyond bounded warning/error metadata without revisiting that design. Do not ask users to paste terminal output, room transcripts, direct invite fragments, private repo files, or browser contents unless they explicitly choose to share that material.
+
+In code and review, require diagnostic calls to contain stable error codes and bounded ids, never payload objects. The sensitive-key omission and text redaction layers protect against mistakes but do not make arbitrary objects safe to log. Keeping diagnostics outside web storage narrows incidental exposure; it does not neutralize a compromised desktop shell or its other Tauri capabilities.
 
 ## Two-Person Dogfood
 

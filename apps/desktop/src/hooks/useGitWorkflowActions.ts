@@ -107,8 +107,8 @@ export function useGitWorkflowActions({
       branch: gitPlan.branch,
       push: gitPlan.push,
       message: `Started Git workflow on ${gitPlan.branch}.`
-    }, room).catch((error) => {
-      console.warn("Failed to publish git workflow start", error);
+    }, room).catch(() => {
+      console.warn("Failed to publish git workflow start");
     });
     try {
       const results = await runGitWorkflow(
@@ -137,8 +137,8 @@ export function useGitWorkflowActions({
           push: gitPlan.push,
           message,
           results
-        }, room).catch((error) => {
-          console.warn("Failed to publish git workflow failure", error);
+        }, room).catch(() => {
+          console.warn("Failed to publish git workflow failure");
         });
         return;
       }
@@ -165,8 +165,8 @@ export function useGitWorkflowActions({
             number: pr.number,
             url: pr.url
           }
-        }, room).catch((error) => {
-          console.warn("Failed to publish git workflow PR event", error);
+        }, room).catch(() => {
+          console.warn("Failed to publish git workflow PR event");
         });
         refreshGitHubActions(room, {
           owner: workflowDraft.prOwner,
@@ -182,8 +182,8 @@ export function useGitWorkflowActions({
           push: gitPlan.push,
           message,
           results
-        }, room).catch((error) => {
-          console.warn("Failed to publish git workflow completion", error);
+        }, room).catch(() => {
+          console.warn("Failed to publish git workflow completion");
         });
       }
 
@@ -198,8 +198,8 @@ export function useGitWorkflowActions({
         branch: gitPlan?.branch ?? workflowDraft.branchName,
         push: gitPlan?.push ?? workflowDraft.pushEnabled,
         message
-      }, room).catch((publishError) => {
-        console.warn("Failed to publish git workflow error", publishError);
+      }, room).catch(() => {
+        console.warn("Failed to publish git workflow error");
       });
     } finally {
       setGitWorkflowBusyForRoom(roomId, false);

@@ -1,5 +1,6 @@
 mod browser;
 mod codex;
+mod diagnostics;
 mod git;
 mod keychain;
 mod local_preview;
@@ -12,11 +13,13 @@ mod validation;
 mod workspace;
 use browser::*;
 use codex::*;
+use diagnostics::*;
 use git::*;
 use keychain::*;
 use local_preview::*;
 use project::*;
 use shell::*;
+use tauri::Manager;
 use terminal::*;
 
 #[tauri::command]
@@ -29,11 +32,26 @@ pub fn run() {
     tauri::Builder::default()
         .manage(TerminalState::default())
         .manage(LocalPreviewState::default())
+        .setup(|app| {
+            let state = match app.path().app_log_dir() {
+                Ok(log_dir) => DiagnosticState::initialize(log_dir.join("diagnostics.jsonl")),
+                Err(error) => DiagnosticState::unavailable(format!(
+                    "Failed to resolve the app log directory: {error}"
+                )),
+            };
+            if let Some(error) = state.initialization_error() {
+                eprintln!("Native diagnostic persistence is unavailable: {error}");
+            }
+            app.manage(state);
+            Ok(())
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             app_version,
+            record_diagnostic,
+            export_diagnostic_entries,
             git_status,
             git_remote_origin,
             git_create_patch,

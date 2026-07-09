@@ -58,8 +58,8 @@ export function useLocalHistoryHydration({
       const payload = pruneLocalRoomHistory(normalizeLocalRoomHistory(storedHistory), settings.retentionDays);
       hydrateLocalRoomHistoryForRoom(selectedRoomId, payload);
       hydrateRoomReadState(selectedRoomId, payload.readState);
-    }).catch((error) => {
-      if (!cancelled) console.warn("Failed to load encrypted local history", error);
+    }).catch(() => {
+      if (!cancelled) console.warn("Failed to load encrypted local history");
     }).finally(() => {
       if (!cancelled) historyLoadedRoomIds.current.add(selectedRoomId);
     });
