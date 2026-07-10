@@ -44,7 +44,12 @@ export function formatTeamRole(role: NonNullable<TeamRecord["role"]>): string {
 }
 
 export function formatTeamMemberInitial(userId: string): string {
-  return userId.replace(/^github:/, "").slice(0, 1).toUpperCase() || "?";
+  return (
+    userId
+      .replace(/^github:/, "")
+      .slice(0, 1)
+      .toUpperCase() || "?"
+  );
 }
 
 export function formatTeamMemberName(userId: string, currentUser: SignedInUser | null): string {
@@ -104,7 +109,9 @@ export function encodedBytes(value: string): number {
 }
 
 export function formatAttachmentMeta(attachment: ChatAttachment): string {
-  const blobNote = attachment.blobId ? `, encrypted blob${attachment.blobBytes ? ` preview ${formatBytes(attachment.blobBytes)}` : ""}` : "";
+  const blobNote = attachment.blobId
+    ? `, encrypted blob${attachment.blobBytes ? ` preview ${formatBytes(attachment.blobBytes)}` : ""}`
+    : "";
   return `${attachment.type}, ${formatBytes(attachment.size)}${blobNote}`;
 }
 

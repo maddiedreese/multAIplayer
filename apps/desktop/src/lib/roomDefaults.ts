@@ -24,10 +24,13 @@ export function ensureRoomDefaults(room: RoomRecord): RoomRecord {
     codexSandboxLevel: room.codexSandboxLevel ?? defaultCodexSandboxLevel,
     approvalDelegationPolicy: room.approvalDelegationPolicy ?? defaultApprovalDelegationPolicy,
     trustedApproverUserIds: Array.isArray(room.trustedApproverUserIds) ? room.trustedApproverUserIds : [],
-    browserAllowedOrigins: normalizeBrowserAllowedOrigins(room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins) ?? defaultBrowserAllowedOrigins,
-    browserProfilePersistent: typeof room.browserProfilePersistent === "boolean"
-      ? room.browserProfilePersistent
-      : defaultBrowserProfilePersistent
+    browserAllowedOrigins:
+      normalizeBrowserAllowedOrigins(room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins) ??
+      defaultBrowserAllowedOrigins,
+    browserProfilePersistent:
+      typeof room.browserProfilePersistent === "boolean"
+        ? room.browserProfilePersistent
+        : defaultBrowserProfilePersistent
   };
 }
 

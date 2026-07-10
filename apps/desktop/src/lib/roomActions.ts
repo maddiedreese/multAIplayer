@@ -1,6 +1,5 @@
 import type { MutableRefObject } from "react";
 import { useAppStore, type AppStoreState } from "../store/appStore";
-import type { RoomRecord } from "@multaiplayer/protocol";
 import { omitRecordKey } from "./setUtils";
 
 type BusyMap = Record<string, boolean>;
@@ -21,7 +20,7 @@ function updateBusyRef(ref: MutableRefObject<BusyMap>, roomId: string, busy: boo
 }
 
 type AppStoreActionName = {
-  [Key in keyof AppStoreState]: AppStoreState[Key] extends (...args: infer _Args) => infer _Result ? Key : never;
+  [Key in keyof AppStoreState]: AppStoreState[Key] extends (...args: never[]) => unknown ? Key : never;
 }[keyof AppStoreState];
 
 const storeActionCache = new Map<AppStoreActionName, AppStoreState[AppStoreActionName]>();
@@ -142,19 +141,23 @@ export function createRoomActions({
 
   return {
     setHostMessageForRoom,
-    setSelectedHostMessage: (message: string | null) => setHostMessageForRoom(useAppStore.getState().selectedRoomId, message),
+    setSelectedHostMessage: (message: string | null) =>
+      setHostMessageForRoom(useAppStore.getState().selectedRoomId, message),
     setChatMessageForRoom,
-    setSelectedChatMessage: (message: string | null) => setChatMessageForRoom(useAppStore.getState().selectedRoomId, message),
+    setSelectedChatMessage: (message: string | null) =>
+      setChatMessageForRoom(useAppStore.getState().selectedRoomId, message),
     setMarkdownCopyFallbackForRoom,
     setInspectorTabForRoom,
     setSecretWarningVisibleForRoom,
     setHistoryMessageForRoom,
-    setSelectedHistoryMessage: (message: string | null) => setHistoryMessageForRoom(useAppStore.getState().selectedRoomId, message),
+    setSelectedHistoryMessage: (message: string | null) =>
+      setHistoryMessageForRoom(useAppStore.getState().selectedRoomId, message),
     setTeamHistoryMessageForTeam,
     setSelectedTeamHistoryMessage: (message: string | null) =>
       setTeamHistoryMessageForTeam(useAppStore.getState().selectedTeam || "__no-team", message),
     setSettingsMessageForRoom,
-    setSelectedSettingsMessage: (message: string | null) => setSettingsMessageForRoom(useAppStore.getState().selectedRoomId, message),
+    setSelectedSettingsMessage: (message: string | null) =>
+      setSettingsMessageForRoom(useAppStore.getState().selectedRoomId, message),
     setGitWorkflowMessageForRoom,
     setSelectedGitWorkflowMessage: (message: string | null) =>
       setGitWorkflowMessageForRoom(useAppStore.getState().selectedRoomId, message),
@@ -168,19 +171,20 @@ export function createRoomActions({
       if (!roomId) return;
       editGitWorkflowDraftForRoom(roomId, patch);
     },
-    setBrowserUrlForRoom: (roomId: string, url: string) =>
-      setBrowserUrlForRoom(roomId, url, browser.defaultBrowserUrl),
+    setBrowserUrlForRoom: (roomId: string, url: string) => setBrowserUrlForRoom(roomId, url, browser.defaultBrowserUrl),
     setBrowserReasonForRoom: (roomId: string, reason: string) =>
       setBrowserReasonForRoom(roomId, reason, browser.defaultBrowserReason),
     setBrowserMessageForRoom,
     selectBrowserTabForRoom,
     closeBrowserTabForRoom,
     clearBrowserStatusForRoom,
-    setSelectedBrowserMessage: (message: string | null) => setBrowserMessageForRoom(useAppStore.getState().selectedRoomId, message),
+    setSelectedBrowserMessage: (message: string | null) =>
+      setBrowserMessageForRoom(useAppStore.getState().selectedRoomId, message),
     setInviteLinkForRoom,
     setInviteApprovalGateForRoom,
     setInviteMessageForRoom,
-    setSelectedInviteMessage: (message: string | null) => setInviteMessageForRoom(useAppStore.getState().selectedRoomId, message),
+    setSelectedInviteMessage: (message: string | null) =>
+      setInviteMessageForRoom(useAppStore.getState().selectedRoomId, message),
     setCustomCodexModelForRoom: (roomId: string, model: string) => {
       const room = useAppStore.getState().rooms.find((item) => item.id === roomId);
       setCustomCodexModelForRoom(roomId, model, room?.codexModel ?? project.defaultCodexModel);
@@ -221,11 +225,13 @@ export function createRoomActions({
     setFileMessageForRoom,
     appendFileSaveRequest,
     updateFileSaveRequestStatus,
-    setSelectedFileMessage: (message: string | null) => setFileMessageForRoom(useAppStore.getState().selectedRoomId, message),
+    setSelectedFileMessage: (message: string | null) =>
+      setFileMessageForRoom(useAppStore.getState().selectedRoomId, message),
     resetFileContextForRoom,
     setSelectedTerminalIdForRoom,
     setTerminalErrorForRoom,
-    setSelectedTerminalError: (error: string | null) => setTerminalErrorForRoom(useAppStore.getState().selectedRoomId, error),
+    setSelectedTerminalError: (error: string | null) =>
+      setTerminalErrorForRoom(useAppStore.getState().selectedRoomId, error),
     appendTerminalLinesForRoom: (roomId: string, lines: string[]) =>
       appendTerminalLinesForRoom(roomId, lines, maxTerminalActivityLines),
     setApprovalVisibleForRoom,

@@ -37,10 +37,7 @@ export interface HandoffRepoIdentity {
   repo: string;
 }
 
-export function isRoomHostMutationInFlight(
-  busyByRoom: Record<string, boolean>,
-  roomId: string
-): boolean {
+export function isRoomHostMutationInFlight(busyByRoom: Record<string, boolean>, roomId: string): boolean {
   return busyByRoom[roomId] === true;
 }
 
@@ -48,10 +45,7 @@ export function roomHostMutationInFlightMessage(): string {
   return "Host change is already in progress for this room.";
 }
 
-const approvalPolicies: ApprovalPolicy[] = [
-  "ask_every_turn",
-  "never_host"
-];
+const approvalPolicies: ApprovalPolicy[] = ["ask_every_turn", "never_host"];
 
 export function createHandoffSettingsPatch(handoff: HostHandoffPlaintextPayload): HandoffSettingsPatch {
   const projectPath = normalizeProjectPath(handoff.projectPath);
@@ -60,7 +54,9 @@ export function createHandoffSettingsPatch(handoff: HostHandoffPlaintextPayload)
   if (!codexModel) throw new Error("Host handoff is missing a supported Codex model.");
   const codexSandboxLevel = normalizeCodexSandboxLevel(handoff.codexSandboxLevel ?? defaultCodexSandboxLevel);
   if (!codexSandboxLevel) throw new Error("Host handoff is missing a supported Codex sandbox level.");
-  const codexReasoningEffort = normalizeCodexReasoningEffort(handoff.codexReasoningEffort ?? defaultCodexReasoningEffort);
+  const codexReasoningEffort = normalizeCodexReasoningEffort(
+    handoff.codexReasoningEffort ?? defaultCodexReasoningEffort
+  );
   if (!codexReasoningEffort) throw new Error("Host handoff is missing a supported Codex reasoning effort.");
   const codexSpeed = normalizeCodexSpeed(handoff.codexSpeed ?? defaultCodexSpeed);
   if (!codexSpeed) throw new Error("Host handoff is missing a supported Codex speed.");
@@ -92,25 +88,16 @@ export function createHandoffSettingsPatch(handoff: HostHandoffPlaintextPayload)
   };
 }
 
-export function findRoomHostHandoff<T extends HostHandoffCandidate>(
-  handoffs: T[],
-  handoffId: string
-): T | null {
+export function findRoomHostHandoff<T extends HostHandoffCandidate>(handoffs: T[], handoffId: string): T | null {
   return handoffs.find((handoff) => handoff.id === handoffId) ?? null;
 }
 
-export function canAcceptRoomHostHandoff<T extends HostHandoffCandidate>(
-  handoffs: T[],
-  handoffId: string
-): boolean {
+export function canAcceptRoomHostHandoff<T extends HostHandoffCandidate>(handoffs: T[], handoffId: string): boolean {
   const handoff = findRoomHostHandoff(handoffs, handoffId);
   return handoff?.status === "available";
 }
 
-export function roomHostHandoffMessage<T extends HostHandoffCandidate>(
-  handoffs: T[],
-  handoffId: string
-): string {
+export function roomHostHandoffMessage<T extends HostHandoffCandidate>(handoffs: T[], handoffId: string): string {
   const handoff = findRoomHostHandoff(handoffs, handoffId);
   if (!handoff) return "Host handoff is no longer available in this room.";
   if (handoff.status !== "available") {
@@ -119,32 +106,34 @@ export function roomHostHandoffMessage<T extends HostHandoffCandidate>(
   return "Host handoff is available.";
 }
 
-export function handoffRepoIdentity(handoff: Pick<HostHandoffPlaintextPayload, "gitRepoOwner" | "gitRepoName">): HandoffRepoIdentity | null {
+export function handoffRepoIdentity(
+  handoff: Pick<HostHandoffPlaintextPayload, "gitRepoOwner" | "gitRepoName">
+): HandoffRepoIdentity | null {
   const owner = handoff.gitRepoOwner?.trim();
   const repo = handoff.gitRepoName?.trim();
   if (!owner || !repo) return null;
   return { owner, repo };
 }
 
-export function sameHandoffRepo(
-  expected: HandoffRepoIdentity | null,
-  actual: HandoffRepoIdentity | null
-): boolean {
+export function sameHandoffRepo(expected: HandoffRepoIdentity | null, actual: HandoffRepoIdentity | null): boolean {
   if (!expected || !actual) return false;
-  return expected.owner.toLowerCase() === actual.owner.toLowerCase() &&
-    expected.repo.toLowerCase() === actual.repo.toLowerCase();
+  return (
+    expected.owner.toLowerCase() === actual.owner.toLowerCase() &&
+    expected.repo.toLowerCase() === actual.repo.toLowerCase()
+  );
 }
 
 export function hostHandoffTitle(handoff: Pick<HostHandoffPlaintextPayload, "reason" | "fromHost">): string {
-  return handoff.reason === "usage_limit"
-    ? `Continue with another host`
-    : `Host handoff from ${handoff.fromHost}`;
+  return handoff.reason === "usage_limit" ? `Continue with another host` : `Host handoff from ${handoff.fromHost}`;
 }
 
-export function hostHandoffDetail(handoff: Pick<HostHandoffPlaintextPayload, "reason" | "fromHost" | "gitRepoOwner" | "gitRepoName" | "gitBranch">): string {
-  const repo = handoff.gitRepoOwner && handoff.gitRepoName
-    ? `${handoff.gitRepoOwner}/${handoff.gitRepoName}${handoff.gitBranch ? `@${handoff.gitBranch}` : ""}`
-    : "an equivalent local project folder";
+export function hostHandoffDetail(
+  handoff: Pick<HostHandoffPlaintextPayload, "reason" | "fromHost" | "gitRepoOwner" | "gitRepoName" | "gitBranch">
+): string {
+  const repo =
+    handoff.gitRepoOwner && handoff.gitRepoName
+      ? `${handoff.gitRepoOwner}/${handoff.gitRepoName}${handoff.gitBranch ? `@${handoff.gitBranch}` : ""}`
+      : "an equivalent local project folder";
   return handoff.reason === "usage_limit"
     ? `${handoff.fromHost} is out of Codex usage. Attach ${repo} to continue from the room context.`
     : `Attach ${repo} to continue from ${handoff.fromHost}'s handoff.`;

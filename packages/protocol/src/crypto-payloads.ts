@@ -7,14 +7,17 @@ import {
   publicKeyCoordinatePattern
 } from "./limits-ids.js";
 
-export const DevicePublicKeyJwk = z.object({
-  kty: z.literal("EC"),
-  crv: z.literal("P-256"),
-  x: z.string().min(1).max(128).regex(publicKeyCoordinatePattern),
-  y: z.string().min(1).max(128).regex(publicKeyCoordinatePattern)
-}).passthrough().refine((jwk) => !("d" in jwk), {
-  message: "Device public key JWK must not include private key material"
-});
+export const DevicePublicKeyJwk = z
+  .object({
+    kty: z.literal("EC"),
+    crv: z.literal("P-256"),
+    x: z.string().min(1).max(128).regex(publicKeyCoordinatePattern),
+    y: z.string().min(1).max(128).regex(publicKeyCoordinatePattern)
+  })
+  .passthrough()
+  .refine((jwk) => !("d" in jwk), {
+    message: "Device public key JWK must not include private key material"
+  });
 
 export const CiphertextPayload = z.object({
   algorithm: z.literal("AES-GCM-256"),

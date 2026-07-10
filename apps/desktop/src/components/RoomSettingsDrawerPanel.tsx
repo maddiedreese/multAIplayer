@@ -8,10 +8,7 @@ export interface CodexModelOptionDisplay {
   label: string;
 }
 
-const selectableApprovalPolicies: ApprovalPolicy[] = [
-  "ask_every_turn",
-  "never_host"
-];
+const selectableApprovalPolicies: ApprovalPolicy[] = ["ask_every_turn", "never_host"];
 
 export function RoomSettingsDrawerPanel({
   relaySummary,
@@ -132,7 +129,8 @@ export function RoomSettingsDrawerPanel({
       <section className="drawer-section relay-config-section">
         <div className="drawer-section-title">App server / relay</div>
         <p className="drawer-help-text">
-          Local alpha builds use the dev relay at 127.0.0.1. Packaged builds only connect to relay origins allowed by the app shell CSP.
+          Local alpha builds use the dev relay at 127.0.0.1. Packaged builds only connect to relay origins allowed by
+          the app shell CSP.
         </p>
         <label>
           <span>HTTP API URL</span>
@@ -155,20 +153,14 @@ export function RoomSettingsDrawerPanel({
             <RefreshCw size={15} />
             Defaults
           </button>
-          <button
-            className="primary-wide"
-            onClick={onSaveRelay}
-            disabled={saveRelayDisabled}
-          >
+          <button className="primary-wide" onClick={onSaveRelay} disabled={saveRelayDisabled}>
             <Check size={15} />
             Save relay
           </button>
         </div>
       </section>
 
-      {showRoomSettingsGate && (
-        <div className="workflow-message">{roomSettingsGateMessage}</div>
-      )}
+      {showRoomSettingsGate && <div className="workflow-message">{roomSettingsGateMessage}</div>}
 
       <section className="drawer-section">
         <div className="drawer-section-title">Local history</div>
@@ -239,7 +231,9 @@ export function RoomSettingsDrawerPanel({
             onChange={(event) => onTeamDefaultApprovalPolicyChange(event.target.value as ApprovalPolicy)}
           >
             {selectableApprovalPolicies.map((policy) => (
-              <option key={policy} value={policy}>{approvalPolicyLabels[policy]}</option>
+              <option key={policy} value={policy}>
+                {approvalPolicyLabels[policy]}
+              </option>
             ))}
           </select>
         </label>
@@ -251,7 +245,9 @@ export function RoomSettingsDrawerPanel({
             onChange={(event) => onTeamDefaultCodexModelChange(event.target.value)}
           >
             {codexModelOptions.map((option) => (
-              <option key={option.id} value={option.id}>{option.label}</option>
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
             ))}
           </select>
         </label>
@@ -261,9 +257,9 @@ export function RoomSettingsDrawerPanel({
             checked={teamDefaultBrowserProfilePersistent}
             disabled={!selectedTeam}
             onChange={(event) => onTeamDefaultBrowserProfilePersistentChange(event.target.checked)}
-        />
-        <span>Persist browser profiles in new team rooms</span>
-      </label>
+          />
+          <span>Persist browser profiles in new team rooms</span>
+        </label>
         <label className="checkbox-row">
           <input
             type="checkbox"

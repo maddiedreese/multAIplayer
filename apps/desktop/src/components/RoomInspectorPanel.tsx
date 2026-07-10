@@ -44,11 +44,7 @@ export function RoomInspectorPanel({
         <strong>{activeLabel}</strong>
       </div>
 
-      <div
-        key={activeTab}
-        className={`inspector-panel-group inspector-panel-${activeTab}`}
-        data-active-tab={activeTab}
-      >
+      <div key={activeTab} className={`inspector-panel-group inspector-panel-${activeTab}`} data-active-tab={activeTab}>
         {panelByTab[activeTab]}
       </div>
     </aside>

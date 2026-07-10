@@ -19,13 +19,18 @@ try {
     createFixtureRelayStore(sourcePath);
   }
   if (!sourcePath) {
-    throw new Error("Set MULTAIPLAYER_RELAY_DATA_PATH, pass --data-path=/path/to/relay-store.sqlite, or use --fixture.");
+    throw new Error(
+      "Set MULTAIPLAYER_RELAY_DATA_PATH, pass --data-path=/path/to/relay-store.sqlite, or use --fixture."
+    );
   }
   if (!existsSync(sourcePath)) {
     throw new Error(`Relay SQLite store does not exist: ${sourcePath}`);
   }
 
-  const backupPath = join(tempDir ?? await mkdtemp(join(tmpdir(), "multaiplayer-sqlite-drill-")), "relay-store.backup.sqlite");
+  const backupPath = join(
+    tempDir ?? (await mkdtemp(join(tmpdir(), "multaiplayer-sqlite-drill-"))),
+    "relay-store.backup.sqlite"
+  );
   const source = new Database(sourcePath, { readonly: true });
   assertIntegrity(source, "source");
   await source.backup(backupPath);
@@ -65,10 +70,21 @@ function createFixtureRelayStore(path) {
   `);
   db.prepare("insert into relay_meta (key, value) values (?, ?)").run("version", "1");
   db.prepare("insert into relay_meta (key, value) values (?, ?)").run("savedAt", "2026-07-08T00:00:00.000Z");
-  db.prepare("insert into relay_teams (id, data_json) values (?, ?)").run("team-alpha", JSON.stringify({ id: "team-alpha", name: "Alpha" }));
-  db.prepare("insert into relay_rooms (id, data_json) values (?, ?)").run("room-alpha", JSON.stringify({ id: "room-alpha", teamId: "team-alpha", name: "Alpha" }));
-  db.prepare("insert into relay_team_members (team_id, data_json) values (?, ?)").run("team-alpha", JSON.stringify({ teamId: "team-alpha", members: [] }));
-  db.prepare("insert into relay_encrypted_envelopes (room_key, envelope_id, sort_order, created_at, data_json) values (?, ?, ?, ?, ?)").run(
+  db.prepare("insert into relay_teams (id, data_json) values (?, ?)").run(
+    "team-alpha",
+    JSON.stringify({ id: "team-alpha", name: "Alpha" })
+  );
+  db.prepare("insert into relay_rooms (id, data_json) values (?, ?)").run(
+    "room-alpha",
+    JSON.stringify({ id: "room-alpha", teamId: "team-alpha", name: "Alpha" })
+  );
+  db.prepare("insert into relay_team_members (team_id, data_json) values (?, ?)").run(
+    "team-alpha",
+    JSON.stringify({ teamId: "team-alpha", members: [] })
+  );
+  db.prepare(
+    "insert into relay_encrypted_envelopes (room_key, envelope_id, sort_order, created_at, data_json) values (?, ?, ?, ?, ?)"
+  ).run(
     "team-alpha:room-alpha",
     "env-alpha",
     0,
@@ -85,13 +101,7 @@ function assertIntegrity(db, label) {
 
 function assertRelayTables(db) {
   const tables = new Set(db.prepare("select name from sqlite_master where type = 'table'").pluck().all());
-  for (const table of [
-    "relay_meta",
-    "relay_teams",
-    "relay_rooms",
-    "relay_team_members",
-    "relay_encrypted_envelopes"
-  ]) {
+  for (const table of ["relay_meta", "relay_teams", "relay_rooms", "relay_team_members", "relay_encrypted_envelopes"]) {
     if (!tables.has(table)) throw new Error(`backup is missing relay table ${table}`);
   }
   const version = db.prepare("select value from relay_meta where key = ?").pluck().get("version");

@@ -1,11 +1,5 @@
 import type { StateCreator } from "zustand";
-import {
-  loadAppConfig,
-  normalizeAppConfig,
-  resetAppConfig,
-  saveAppConfig,
-  type AppConfig
-} from "../../lib/appConfig";
+import { loadAppConfig, normalizeAppConfig, resetAppConfig, saveAppConfig, type AppConfig } from "../../lib/appConfig";
 import type { AppStoreState } from "../appStore";
 
 export interface AppConfigState {
@@ -33,9 +27,7 @@ function configState(appConfig: AppConfig): AppConfigState {
 }
 
 export function loadAppConfigState(): AppConfigState {
-  const appConfig = typeof localStorage === "undefined"
-    ? normalizeAppConfig({})
-    : loadAppConfig();
+  const appConfig = typeof localStorage === "undefined" ? normalizeAppConfig({}) : loadAppConfig();
   return configState(appConfig);
 }
 

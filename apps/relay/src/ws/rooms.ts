@@ -129,7 +129,10 @@ export function createRelayRoomSocketManager({
       const workspaceSubscribed = session.workspaceSubscribed;
       if (!joinedRemovedTeam && !subscribedRemovedTeam && !workspaceSubscribed) continue;
 
-      send(session.socket, { type: "error", message: "Your team membership was removed. Rejoin with a fresh invite before continuing." });
+      send(session.socket, {
+        type: "error",
+        message: "Your team membership was removed. Rejoin with a fresh invite before continuing."
+      });
       leaveRoom(session);
       leaveTeams(session);
       leaveWorkspace(session);

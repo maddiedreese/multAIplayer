@@ -1,9 +1,5 @@
 import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
-import type {
-  SidebarMessageHitDisplay,
-  SidebarRoomDisplay,
-  SidebarTeamDisplay
-} from "../components/DesktopSidebar";
+import type { SidebarMessageHitDisplay, SidebarRoomDisplay, SidebarTeamDisplay } from "../components/DesktopSidebar";
 import type { BrowserAccessRequest, ChatMessage, TerminalCommandRequest } from "../types";
 import { formatTeamMeta } from "./appFormatters";
 import { inspectorAttentionCounts } from "./inspectorAttention";
@@ -56,7 +52,7 @@ export function buildSidebarRoomRows({
       id: room.id,
       teamId: room.teamId,
       name: room.name,
-      detail: searchActive ? team?.name ?? "Team" : room.projectPath.split("/").slice(-1)[0],
+      detail: searchActive ? (team?.name ?? "Team") : room.projectPath.split("/").slice(-1)[0],
       active: room.id === selectedRoomId,
       attention: roomAttentionTotal,
       unread: roomRecord.unread,

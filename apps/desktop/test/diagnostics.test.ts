@@ -257,10 +257,13 @@ test("diagnostic memory ring retains only the newest 80 entries", () => {
 });
 
 test("web-preview bundle includes app metadata and relay origins only", () => {
-  localStorage.setItem("multaiplayer:app-config", JSON.stringify({
-    relayHttpUrl: "https://relay.example.com/api?secret=1",
-    relayWsUrl: "wss://relay.example.com/rooms?secret=1"
-  }));
+  localStorage.setItem(
+    "multaiplayer:app-config",
+    JSON.stringify({
+      relayHttpUrl: "https://relay.example.com/api?secret=1",
+      relayWsUrl: "wss://relay.example.com/rooms?secret=1"
+    })
+  );
   recordDiagnosticEvent("warn", "Something happened");
   const bundle = buildWebPreviewDiagnosticBundle(new Date("2026-07-08T00:00:00.000Z"));
   assert.match(bundle, /"version": "0\.1\.0-alpha\.0"/);
@@ -270,10 +273,13 @@ test("web-preview bundle includes app metadata and relay origins only", () => {
 });
 
 test("native bundle save sends bounded context but never reads persisted entries into JavaScript", async () => {
-  localStorage.setItem("multaiplayer:app-config", JSON.stringify({
-    relayHttpUrl: "https://relay.example.com/api?secret=leaked",
-    relayWsUrl: "wss://relay.example.com/rooms?secret=leaked"
-  }));
+  localStorage.setItem(
+    "multaiplayer:app-config",
+    JSON.stringify({
+      relayHttpUrl: "https://relay.example.com/api?secret=leaked",
+      relayWsUrl: "wss://relay.example.com/rooms?secret=leaked"
+    })
+  );
   const calls: Array<{ command: string; payload: Record<string, unknown> | undefined }> = [];
   mockIPC((command, payload) => {
     calls.push({ command, payload });
@@ -282,8 +288,14 @@ test("native bundle save sends bounded context but never reads persisted entries
   recordDiagnosticEvent("warn", "Current process entry");
   assert.equal(await saveNativeDiagnosticBundle(), "saved");
 
-  assert.deepEqual(calls.map(({ command }) => command), ["record_diagnostic", "save_diagnostic_bundle"]);
-  assert.equal(calls.some(({ command }) => command === "export_diagnostic_entries"), false);
+  assert.deepEqual(
+    calls.map(({ command }) => command),
+    ["record_diagnostic", "save_diagnostic_bundle"]
+  );
+  assert.equal(
+    calls.some(({ command }) => command === "export_diagnostic_entries"),
+    false
+  );
   const context = calls[1].payload?.context as Record<string, unknown>;
   assert.equal(context.relayHttpOrigin, "https://relay.example.com");
   assert.equal(context.relayWsOrigin, "wss://relay.example.com");

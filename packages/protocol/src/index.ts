@@ -122,11 +122,6 @@ export {
   TeamRole
 } from "./room-team-records.js";
 
-export {
-  PresenceMessage,
-  RelayClientMessage,
-  RelayEnvelope,
-  RelayServerMessage
-} from "./relay-messages.js";
+export { PresenceMessage, RelayClientMessage, RelayEnvelope, RelayServerMessage } from "./relay-messages.js";
 
 export type { CodexTurnSummary } from "./app-types.js";

@@ -27,33 +27,51 @@ export function useAppSelectedRoomContext({
   defaultBrowserUrl: string;
   defaultBrowserReason: string;
 }) {
-  const selectedState = useAppStore(useShallow((state) => {
-    const roomId = state.rooms.find((room) => room.id === state.selectedRoomId)?.id ?? state.rooms[0]?.id ?? fallbackRoom.id;
-    return {
-      rooms: state.rooms,
-      teams: state.teams,
-      selectedRoomId: state.selectedRoomId,
-      selectedTeam: state.selectedTeam,
-      roomId,
-      teamRoster: state.teamRosterByTeam[state.selectedTeam],
-      messages: state.messagesByRoom[roomId],
-      roomChat: state.roomChatByRoom[roomId],
-      roomSettings: state.roomSettingsByRoom[roomId],
-      codexRuntime: state.codexRuntimeByRoom[roomId],
-      browser: state.browserByRoom[roomId],
-      gitRuntime: state.gitWorkflowRuntimeByRoom[roomId],
-      terminalRuntime: state.terminalRuntimeByRoom[roomId],
-      filePanel: state.filePanelByRoom[roomId],
-      invite: state.inviteByRoom[roomId],
-      historyPresence: state.historyPresenceByRoom[roomId],
-      teamHistory: state.teamHistoryByTeam[state.selectedTeam],
-      terminals: state.terminals
-    };
-  }));
+  const selectedState = useAppStore(
+    useShallow((state) => {
+      const roomId =
+        state.rooms.find((room) => room.id === state.selectedRoomId)?.id ?? state.rooms[0]?.id ?? fallbackRoom.id;
+      return {
+        rooms: state.rooms,
+        teams: state.teams,
+        selectedRoomId: state.selectedRoomId,
+        selectedTeam: state.selectedTeam,
+        roomId,
+        teamRoster: state.teamRosterByTeam[state.selectedTeam],
+        messages: state.messagesByRoom[roomId],
+        roomChat: state.roomChatByRoom[roomId],
+        roomSettings: state.roomSettingsByRoom[roomId],
+        codexRuntime: state.codexRuntimeByRoom[roomId],
+        browser: state.browserByRoom[roomId],
+        gitRuntime: state.gitWorkflowRuntimeByRoom[roomId],
+        terminalRuntime: state.terminalRuntimeByRoom[roomId],
+        filePanel: state.filePanelByRoom[roomId],
+        invite: state.inviteByRoom[roomId],
+        historyPresence: state.historyPresenceByRoom[roomId],
+        teamHistory: state.teamHistoryByTeam[state.selectedTeam],
+        terminals: state.terminals
+      };
+    })
+  );
   const {
-    rooms, teams, selectedRoomId, selectedTeam, roomId, teamRoster, messages, roomChat,
-    roomSettings, codexRuntime, browser, gitRuntime, terminalRuntime, filePanel, invite,
-    historyPresence, teamHistory, terminals
+    rooms,
+    teams,
+    selectedRoomId,
+    selectedTeam,
+    roomId,
+    teamRoster,
+    messages,
+    roomChat,
+    roomSettings,
+    codexRuntime,
+    browser,
+    gitRuntime,
+    terminalRuntime,
+    filePanel,
+    invite,
+    historyPresence,
+    teamHistory,
+    terminals
   } = selectedState;
   const teamRosterMap = useMemo(() => ({ [selectedTeam]: teamRoster ?? {} }), [selectedTeam, teamRoster]);
   const teamMembersByTeam = useMemo(() => projectTeamMembersByTeam(teamRosterMap), [teamRosterMap]);

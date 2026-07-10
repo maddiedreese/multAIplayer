@@ -43,7 +43,7 @@ Before opening a PR, run:
 npm run verify
 ```
 
-`npm run verify` type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the TypeScript workspaces. Run `npm run tauri:build -w @multaiplayer/desktop` when changing native packaging, Tauri config, browser windows, Keychain storage, terminals, or Codex app-server integration.
+`npm run verify` lints and checks formatting for TypeScript and JavaScript, type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the workspaces. Use `npm run format` to apply the repository's Prettier baseline. Run `npm run tauri:build -w @multaiplayer/desktop` when changing native packaging, Tauri config, browser windows, Keychain storage, terminals, or Codex app-server integration.
 
 ## Engineering Guidelines
 

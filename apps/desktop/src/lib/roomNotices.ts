@@ -7,11 +7,7 @@ interface BuildRoomNoticesOptions {
   chatMessage: string | null;
 }
 
-export function buildRoomNotices({
-  roomId,
-  hostMessage,
-  chatMessage
-}: BuildRoomNoticesOptions): RoomNoticeDisplay[] {
+export function buildRoomNotices({ roomId, hostMessage, chatMessage }: BuildRoomNoticesOptions): RoomNoticeDisplay[] {
   return [
     hostMessage
       ? {

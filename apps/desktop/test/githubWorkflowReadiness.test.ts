@@ -115,9 +115,7 @@ test("checkGitHubActionsReadiness rejects unsafe branch targets", () => {
   assert.equal(readiness.ready, false);
   assert.equal(readiness.target, null);
   assert.equal(readiness.normalizedTarget, null);
-  assert.deepEqual(readiness.messages, [
-    "Error: Unsafe GitHub branch name: bad branch"
-  ]);
+  assert.deepEqual(readiness.messages, ["Error: Unsafe GitHub branch name: bad branch"]);
 });
 
 test("checkGitHubActionsReadiness returns normalized Actions target when ready", () => {
@@ -136,7 +134,5 @@ test("checkGitHubActionsReadiness returns normalized Actions target when ready",
     repo: "multAIplayer",
     branch: "codex/actions"
   });
-  assert.deepEqual(readiness.messages, [
-    "Ready to check GitHub Actions for maddiedreese/multAIplayer@codex/actions."
-  ]);
+  assert.deepEqual(readiness.messages, ["Ready to check GitHub Actions for maddiedreese/multAIplayer@codex/actions."]);
 });

@@ -98,14 +98,17 @@ export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], Works
     set((state) => {
       const shouldSeedTeamMembers =
         Object.keys(teamMembersByTeam).length > 0 && Object.keys(state.teamRosterByTeam).length === 0;
-      const shouldSeedMessages = Object.keys(messagesByRoom).length > 0 && Object.keys(state.messagesByRoom).length === 0;
+      const shouldSeedMessages =
+        Object.keys(messagesByRoom).length > 0 && Object.keys(state.messagesByRoom).length === 0;
       if (!shouldSeedTeamMembers && !shouldSeedMessages) return state;
       return {
-        ...(shouldSeedTeamMembers ? {
-          teamRosterByTeam: Object.fromEntries(
-            Object.entries(teamMembersByTeam).map(([teamId, members]) => [teamId, { members }])
-          )
-        } : {}),
+        ...(shouldSeedTeamMembers
+          ? {
+              teamRosterByTeam: Object.fromEntries(
+                Object.entries(teamMembersByTeam).map(([teamId, members]) => [teamId, { members }])
+              )
+            }
+          : {}),
         ...(shouldSeedMessages ? { messagesByRoom } : {})
       };
     });
@@ -140,12 +143,14 @@ export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], Works
       return {
         teamRosterByTeam: updateTeamRosterForTeam(state.teamRosterByTeam, teamId, (roster) => ({
           ...roster,
-          members: [{
-            teamId,
-            userId,
-            role,
-            joinedAt: new Date().toISOString()
-          }]
+          members: [
+            {
+              teamId,
+              userId,
+              role,
+              joinedAt: new Date().toISOString()
+            }
+          ]
         }))
       };
     });
@@ -190,10 +195,12 @@ export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], Works
           editedByUserId: edit.editedByUserId
         };
       });
-      const approvalIncludesMessage = roomRuntime?.pendingApproval?.messages.some((message) => message.id === edit.messageId) ?? false;
-      const refreshedApproval = approvalIncludesMessage && roomRuntime?.pendingApproval
-        ? refreshPendingApprovalMessages(roomRuntime.pendingApproval, nextMessages)
-        : null;
+      const approvalIncludesMessage =
+        roomRuntime?.pendingApproval?.messages.some((message) => message.id === edit.messageId) ?? false;
+      const refreshedApproval =
+        approvalIncludesMessage && roomRuntime?.pendingApproval
+          ? refreshPendingApprovalMessages(roomRuntime.pendingApproval, nextMessages)
+          : null;
       return {
         messagesByRoom: {
           ...state.messagesByRoom,
@@ -201,22 +208,18 @@ export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], Works
         },
         chatEditsByRoom: {
           ...state.chatEditsByRoom,
-          [roomId]: appendUniqueAuditEvent(
-            state.chatEditsByRoom[roomId],
-            edit,
-            (item) => item.id
-          )
+          [roomId]: appendUniqueAuditEvent(state.chatEditsByRoom[roomId], edit, (item) => item.id)
         },
         ...(approvalIncludesMessage
           ? {
-            codexRuntimeByRoom: {
-              ...state.codexRuntimeByRoom,
-              [roomId]: {
-                ...roomRuntime,
-                ...(refreshedApproval ? { pendingApproval: refreshedApproval } : {})
+              codexRuntimeByRoom: {
+                ...state.codexRuntimeByRoom,
+                [roomId]: {
+                  ...roomRuntime,
+                  ...(refreshedApproval ? { pendingApproval: refreshedApproval } : {})
+                }
               }
             }
-          }
           : {})
       };
     });
@@ -241,12 +244,16 @@ export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], Works
           reactions: undefined
         };
       });
-      const approvalIncludesMessage = roomRuntime?.pendingApproval?.messages.some((message) => message.id === deletion.messageId) ?? false;
-      const queuedApprovals = roomRuntime?.queuedApprovals?.filter((turn) => turn.triggerMessageId !== deletion.messageId);
+      const approvalIncludesMessage =
+        roomRuntime?.pendingApproval?.messages.some((message) => message.id === deletion.messageId) ?? false;
+      const queuedApprovals = roomRuntime?.queuedApprovals?.filter(
+        (turn) => turn.triggerMessageId !== deletion.messageId
+      );
       const queueChanged = queuedApprovals && queuedApprovals.length !== (roomRuntime?.queuedApprovals ?? []).length;
-      const refreshedApproval = approvalIncludesMessage && roomRuntime?.pendingApproval
-        ? refreshPendingApprovalMessages(roomRuntime.pendingApproval, nextMessages)
-        : null;
+      const refreshedApproval =
+        approvalIncludesMessage && roomRuntime?.pendingApproval
+          ? refreshPendingApprovalMessages(roomRuntime.pendingApproval, nextMessages)
+          : null;
       return {
         messagesByRoom: {
           ...state.messagesByRoom,
@@ -254,23 +261,19 @@ export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], Works
         },
         chatDeletesByRoom: {
           ...state.chatDeletesByRoom,
-          [roomId]: appendUniqueAuditEvent(
-            state.chatDeletesByRoom[roomId],
-            deletion,
-            (item) => item.id
-          )
+          [roomId]: appendUniqueAuditEvent(state.chatDeletesByRoom[roomId], deletion, (item) => item.id)
         },
         ...(approvalIncludesMessage || queueChanged
           ? {
-            codexRuntimeByRoom: {
-              ...state.codexRuntimeByRoom,
-              [roomId]: updateCodexRuntimeAfterMessageDelete(
-                roomRuntime,
-                approvalIncludesMessage ? refreshedApproval : roomRuntime?.pendingApproval,
-                queueChanged ? queuedApprovals : roomRuntime?.queuedApprovals
-              )
+              codexRuntimeByRoom: {
+                ...state.codexRuntimeByRoom,
+                [roomId]: updateCodexRuntimeAfterMessageDelete(
+                  roomRuntime,
+                  approvalIncludesMessage ? refreshedApproval : roomRuntime?.pendingApproval,
+                  queueChanged ? queuedApprovals : roomRuntime?.queuedApprovals
+                )
+              }
             }
-          }
           : {})
       };
     });
@@ -286,9 +289,10 @@ export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], Works
             const reactions = message.reactions ?? [];
             const existing = reactions.find((item) => item.emoji === reaction.emoji);
             const reactors = existing?.reactors.filter((reactor) => reactor.userId !== reaction.reactorUserId) ?? [];
-            const nextReactors = reaction.action === "add"
-              ? [...reactors, { userId: reaction.reactorUserId, name: reaction.reactor }]
-              : reactors;
+            const nextReactors =
+              reaction.action === "add"
+                ? [...reactors, { userId: reaction.reactorUserId, name: reaction.reactor }]
+                : reactors;
             return {
               ...message,
               reactions: [
@@ -308,11 +312,7 @@ function updateCodexRuntimeAfterMessageDelete(
   pendingApproval: PendingCodexApproval | null | undefined,
   queuedApprovals = roomRuntime?.queuedApprovals
 ): AppStoreState["codexRuntimeByRoom"][string] {
-  const {
-    pendingApproval: _pendingApproval,
-    queuedApprovals: _queuedApprovals,
-    ...rest
-  } = roomRuntime ?? {};
+  const { pendingApproval: _pendingApproval, queuedApprovals: _queuedApprovals, ...rest } = roomRuntime ?? {};
   return {
     ...rest,
     ...(pendingApproval ? { pendingApproval } : {}),
@@ -340,7 +340,9 @@ function refreshPendingApprovalMessages(
   };
 }
 
-function formatApprovalAttachmentSummary(attachment: ChatAttachment): PendingCodexApproval["summary"]["attachments"][number] {
+function formatApprovalAttachmentSummary(
+  attachment: ChatAttachment
+): PendingCodexApproval["summary"]["attachments"][number] {
   return {
     id: attachment.id,
     name: attachment.name,
@@ -351,11 +353,7 @@ function formatApprovalAttachmentSummary(attachment: ChatAttachment): PendingCod
   };
 }
 
-function appendUniqueAuditEvent<T>(
-  current: T[] | undefined,
-  event: T,
-  keyFor: (event: T) => string
-): T[] {
+function appendUniqueAuditEvent<T>(current: T[] | undefined, event: T, keyFor: (event: T) => string): T[] {
   const events = current ?? [];
   const key = keyFor(event);
   if (events.some((item) => keyFor(item) === key)) return events;

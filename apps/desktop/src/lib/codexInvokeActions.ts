@@ -4,16 +4,9 @@ import { buildCodexApprovalSnapshot, hasActionableCodexTurnContext } from "./cod
 import { canUseRoomChat, roomChatGateMessage } from "./chatPolicy";
 import { messageInvokesCodex } from "./codexInvoke";
 import { roomLockMessage } from "./appRuntime";
-import {
-  formatMessageTime,
-  validatePendingAttachments
-} from "./appFormatters";
+import { formatMessageTime, validatePendingAttachments } from "./appFormatters";
 import { shouldApplyRoomScopedUiUpdate } from "./roomScopedUi";
-import {
-  codexGoalToRoomGoal,
-  parseRoomGoalCommand,
-  updateRoomGoalElapsed
-} from "./roomGoals";
+import { codexGoalToRoomGoal, parseRoomGoalCommand, updateRoomGoalElapsed } from "./roomGoals";
 import { clearCodexGoal, setCodexGoal } from "./localBackend";
 import { currentSelectedRoomContext } from "./selectedWorkspace";
 import type { ChatMessage, PendingCodexApproval, QueuedCodexTurn, RoomGoal } from "../types";
@@ -51,8 +44,7 @@ export function createCodexInvokeActions({
     const roomId = selectedRoom.id;
     const codexRuntime = state.codexRuntimeByRoom[roomId] ?? {};
     const roomChat = state.roomChatByRoom[roomId] ?? {};
-    const isSelectedRoomRevoked =
-      state.revokedRoomIds.has(roomId) || state.revokedTeamIds.has(selectedRoom.teamId);
+    const isSelectedRoomRevoked = state.revokedRoomIds.has(roomId) || state.revokedTeamIds.has(selectedRoom.teamId);
     return {
       isSelectedRoomRevoked,
       isSelectedRoomLocked:
@@ -173,7 +165,15 @@ export function createCodexInvokeActions({
       store().setChatMessageForRoom(selectedRoomIdRef.current, "Create or join a room before sending messages.");
       return;
     }
-    const { selectedRoom, localUser, isSelectedRoomLocked, isSelectedRoomRevoked, pendingAttachments, draft, replyToMessageId } = current;
+    const {
+      selectedRoom,
+      localUser,
+      isSelectedRoomLocked,
+      isSelectedRoomRevoked,
+      pendingAttachments,
+      draft,
+      replyToMessageId
+    } = current;
     const roomId = selectedRoom.id;
     if (isSelectedRoomLocked) {
       store().setChatMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
@@ -267,20 +267,27 @@ export function createCodexInvokeActions({
     };
     if (activeCodexApproval || codexRunning || queuedCodexApprovals.length > 0) {
       if (queuedCodexApprovals.length >= 5) {
-        store().setHostMessageForRoom(roomId, "Codex queue is full. Wait for one turn to finish or cancel a queued turn.");
+        store().setHostMessageForRoom(
+          roomId,
+          "Codex queue is full. Wait for one turn to finish or cancel a queued turn."
+        );
         return;
       }
       store().enqueueCodexApprovalForRoom(roomId, turnIntent);
       const queuePosition = queuedCodexApprovals.length + 1;
       store().setHostMessageForRoom(roomId, `Proposed Codex turn ${queuePosition} of 5 for host approval.`);
-      publishCodexQueueEvent({
-        turnId: turnIntent.turnId,
-        action: "queued",
-        ...(turnIntent.triggerMessageId ? { triggerMessageId: turnIntent.triggerMessageId } : {}),
-        queuePosition,
-        queueSize: queuePosition
-      }, selectedRoom).catch((error) => {
-        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) store().setHostMessageForRoom(roomId, String(error));
+      publishCodexQueueEvent(
+        {
+          turnId: turnIntent.turnId,
+          action: "queued",
+          ...(turnIntent.triggerMessageId ? { triggerMessageId: turnIntent.triggerMessageId } : {}),
+          queuePosition,
+          queueSize: queuePosition
+        },
+        selectedRoom
+      ).catch((error) => {
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+          store().setHostMessageForRoom(roomId, String(error));
       });
       return;
     }
@@ -291,27 +298,32 @@ export function createCodexInvokeActions({
       ...turnIntent
     };
     if (!hasActionableCodexTurnContext(approvalSnapshot.summary)) {
-      store().setHostMessageForRoom(roomId, "Codex needs a new message, attachment, or room context before starting another turn.");
+      store().setHostMessageForRoom(
+        roomId,
+        "Codex needs a new message, attachment, or room context before starting another turn."
+      );
       store().setApprovalVisibleForRoom(roomId, false);
       return;
     }
     store().enqueueCodexApprovalForRoom(roomId, turnIntent);
-    publishCodexQueueEvent({
-      turnId: turnIntent.turnId,
-      action: "queued",
-      ...(turnIntent.triggerMessageId ? { triggerMessageId: turnIntent.triggerMessageId } : {}),
-      queuePosition: 1,
-      queueSize: 1
-    }, selectedRoom).catch((error) => {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) store().setHostMessageForRoom(roomId, String(error));
+    publishCodexQueueEvent(
+      {
+        turnId: turnIntent.turnId,
+        action: "queued",
+        ...(turnIntent.triggerMessageId ? { triggerMessageId: turnIntent.triggerMessageId } : {}),
+        queuePosition: 1,
+        queueSize: 1
+      },
+      selectedRoom
+    ).catch((error) => {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        store().setHostMessageForRoom(roomId, String(error));
     });
     store().setPendingCodexApprovalForRoom(roomId, isActiveHost ? approvalSnapshot : null);
     store().setApprovalVisibleForRoom(roomId, isActiveHost);
     store().setHostMessageForRoom(
       roomId,
-      isActiveHost
-        ? "Codex turn is waiting for active-host approval."
-        : hostGateMessage
+      isActiveHost ? "Codex turn is waiting for active-host approval." : hostGateMessage
     );
   }
 

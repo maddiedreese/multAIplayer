@@ -22,9 +22,7 @@ export interface JsonRpcNotification<TParams = unknown> {
   params?: TParams;
 }
 
-export type JsonRpcMessage<TParams = unknown> =
-  | JsonRpcRequest<TParams>
-  | JsonRpcNotification<TParams>;
+export type JsonRpcMessage<TParams = unknown> = JsonRpcRequest<TParams> | JsonRpcNotification<TParams>;
 
 export interface JsonRpcResponse<TResult = unknown> {
   id: JsonRpcId;
@@ -90,12 +88,7 @@ export function createThreadStartRequest(id: JsonRpcId, model = defaultCodexMode
   };
 }
 
-export function createTurnStartRequest(
-  id: JsonRpcId,
-  threadId: string,
-  input: string,
-  cwd?: string
-): JsonRpcRequest {
+export function createTurnStartRequest(id: JsonRpcId, threadId: string, input: string, cwd?: string): JsonRpcRequest {
   return {
     method: "turn/start",
     id,
@@ -157,9 +150,7 @@ export class CodexAppServerClient extends EventEmitter<CodexAppServerEvents> {
   }
 
   async startThread(model = this.config.model ?? defaultCodexModel): Promise<CodexThreadStartResult> {
-    const response = await this.request<CodexThreadStartResult>(
-      createThreadStartRequest(this.allocateId(), model)
-    );
+    const response = await this.request<CodexThreadStartResult>(createThreadStartRequest(this.allocateId(), model));
     if (response.error) {
       throw new Error(response.error.message);
     }
@@ -170,10 +161,7 @@ export class CodexAppServerClient extends EventEmitter<CodexAppServerEvents> {
     return this.request(createTurnStartRequest(this.allocateId(), threadId, input, cwd));
   }
 
-  request<TResult = unknown>(
-    request: JsonRpcRequest,
-    timeoutMs = 120_000
-  ): Promise<JsonRpcResponse<TResult>> {
+  request<TResult = unknown>(request: JsonRpcRequest, timeoutMs = 120_000): Promise<JsonRpcResponse<TResult>> {
     this.ensureStarted();
     const id = request.id;
     return new Promise((resolve, reject) => {

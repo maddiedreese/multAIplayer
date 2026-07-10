@@ -1,9 +1,4 @@
-import {
-  approvalDelegationPolicyLabels,
-  approvalPolicyLabels,
-  defaultBrowserUrl,
-  roomModeLabels
-} from "../seedData";
+import { approvalDelegationPolicyLabels, approvalPolicyLabels, defaultBrowserUrl, roomModeLabels } from "../seedData";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { createAppRoomActions } from "../lib/appRoomActions";
@@ -40,10 +35,7 @@ export function useAppRelaySync({
   inviteActions: InviteActions;
   roomChatMutations: RoomChatMutations;
 }) {
-  const {
-    hasSelectedRoom,
-    selectedRoom
-  } = selected;
+  const { hasSelectedRoom, selectedRoom } = selected;
   const {
     appendTerminalLinesForRoom,
     appendGitWorkflowEvent,
@@ -52,20 +44,27 @@ export function useAppRelaySync({
     appendLocalPreviewEvent
   } = roomActions;
   const {
-    relayWsUrl, relayHttpUrl, selectedTeam, devicePublicKeyFingerprint, relayStatus,
-    forgottenRoomIds, revokedRoomIds, revokedTeamIds, selectedInviteAdmission
-  } = useAppStore(useShallow((state) => ({
-    relayWsUrl: state.appConfig.relayWsUrl,
-    relayHttpUrl: state.appConfig.relayHttpUrl,
-    selectedTeam: state.selectedTeam,
-    devicePublicKeyFingerprint: state.deviceIdentity?.publicKeyFingerprint,
-    relayStatus: state.relayStatus,
-    forgottenRoomIds: state.forgottenRoomIds,
-    revokedRoomIds: state.revokedRoomIds,
-    revokedTeamIds: state.revokedTeamIds,
-    selectedInviteAdmission: state.inviteByRoom[selectedRoom.id]?.admission
-  })));
-  const { refreshTeamMembers } = useTeamMembersRefresh({ selectedTeam, relayHttpUrl });
+    relayWsUrl,
+    selectedTeam,
+    devicePublicKeyFingerprint,
+    relayStatus,
+    forgottenRoomIds,
+    revokedRoomIds,
+    revokedTeamIds,
+    selectedInviteAdmission
+  } = useAppStore(
+    useShallow((state) => ({
+      relayWsUrl: state.appConfig.relayWsUrl,
+      selectedTeam: state.selectedTeam,
+      devicePublicKeyFingerprint: state.deviceIdentity?.publicKeyFingerprint,
+      relayStatus: state.relayStatus,
+      forgottenRoomIds: state.forgottenRoomIds,
+      revokedRoomIds: state.revokedRoomIds,
+      revokedTeamIds: state.revokedTeamIds,
+      selectedInviteAdmission: state.inviteByRoom[selectedRoom.id]?.admission
+    }))
+  );
+  const { refreshTeamMembers } = useTeamMembersRefresh({ selectedTeam });
 
   return useRelaySyncContext({
     browserOpenCommand: {

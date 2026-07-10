@@ -43,7 +43,10 @@ import type {
   WorkspaceFileSaveRequest
 } from "../types";
 
-export function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentionDays: number): LocalRoomHistoryPayload {
+export function pruneLocalRoomHistory(
+  payload: LocalRoomHistoryPayload,
+  retentionDays: number
+): LocalRoomHistoryPayload {
   const cutoffMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
   return {
     version: 3,
@@ -52,7 +55,9 @@ export function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentio
     chatDeletes: (payload.chatDeletes ?? []).filter((deletion) => isWithinRetention(deletion.deletedAt, cutoffMs)),
     ...(payload.readState ? { readState: payload.readState } : {}),
     terminalRequests: payload.terminalRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
-    fileSaveRequests: (payload.fileSaveRequests ?? []).filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
+    fileSaveRequests: (payload.fileSaveRequests ?? []).filter((request) =>
+      isWithinRetention(request.requestedAt, cutoffMs)
+    ),
     browserRequests: payload.browserRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     inviteRequests: payload.inviteRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     codexEvents: payload.codexEvents.filter((event) => isWithinRetention(event.createdAt, cutoffMs)),
@@ -67,9 +72,13 @@ export function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentio
     ),
     hostHandoffs: payload.hostHandoffs.filter((handoff) => isWithinRetention(handoff.createdAt, cutoffMs)),
     queuedCodexTurns: (payload.queuedCodexTurns ?? []).filter((turn) => isWithinRetention(turn.queuedAt, cutoffMs)),
-    ...(payload.roomGoal && isWithinRetention(payload.roomGoal.updatedAt, cutoffMs) ? { roomGoal: payload.roomGoal } : {}),
+    ...(payload.roomGoal && isWithinRetention(payload.roomGoal.updatedAt, cutoffMs)
+      ? { roomGoal: payload.roomGoal }
+      : {}),
     ...(payload.codexThreadId ? { codexThreadId: payload.codexThreadId } : {}),
-    ...(payload.codexThreadGraph?.activeThreadId ? { codexThreadGraph: normalizeCodexThreadGraph(payload.codexThreadGraph) } : {})
+    ...(payload.codexThreadGraph?.activeThreadId
+      ? { codexThreadGraph: normalizeCodexThreadGraph(payload.codexThreadGraph) }
+      : {})
   };
 }
 
@@ -99,7 +108,7 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
   if (Array.isArray(value)) {
     return {
       ...emptyLocalRoomHistoryPayload(),
-      messages: normalizeChatHistoryMessages(value),
+      messages: normalizeChatHistoryMessages(value)
     };
   }
 
@@ -111,8 +120,12 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
     chatEdits: Array.isArray(value.chatEdits) ? value.chatEdits.filter(isChatEditPlaintextPayload) : [],
     chatDeletes: Array.isArray(value.chatDeletes) ? value.chatDeletes.filter(isChatDeletePlaintextPayload) : [],
     readState: sanitizeLocalRoomReadState(value.readState),
-    terminalRequests: Array.isArray(value.terminalRequests) ? value.terminalRequests.filter(isTerminalCommandRequest) : [],
-    fileSaveRequests: Array.isArray(value.fileSaveRequests) ? value.fileSaveRequests.filter(isWorkspaceFileSaveRequest) : [],
+    terminalRequests: Array.isArray(value.terminalRequests)
+      ? value.terminalRequests.filter(isTerminalCommandRequest)
+      : [],
+    fileSaveRequests: Array.isArray(value.fileSaveRequests)
+      ? value.fileSaveRequests.filter(isWorkspaceFileSaveRequest)
+      : [],
     browserRequests: Array.isArray(value.browserRequests) ? value.browserRequests.filter(isBrowserAccessRequest) : [],
     inviteRequests: Array.isArray(value.inviteRequests) ? value.inviteRequests.filter(isInviteJoinRequest) : [],
     codexEvents: Array.isArray(value.codexEvents) ? value.codexEvents.filter(isCodexEventPlaintextPayloadLenient) : [],
@@ -132,10 +145,12 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
     hostHandoffs: Array.isArray(value.hostHandoffs) ? value.hostHandoffs.filter(isHostHandoffRecord) : [],
     queuedCodexTurns: Array.isArray(value.queuedCodexTurns) ? value.queuedCodexTurns.filter(isQueuedCodexTurn) : [],
     ...(isRoomGoal(value.roomGoal) ? { roomGoal: value.roomGoal } : {}),
-    ...(codexThreadGraph.activeThreadId ? {
-      codexThreadId: codexThreadGraph.activeThreadId,
-      codexThreadGraph
-    } : {})
+    ...(codexThreadGraph.activeThreadId
+      ? {
+          codexThreadId: codexThreadGraph.activeThreadId,
+          codexThreadGraph
+        }
+      : {})
   };
 }
 
@@ -143,7 +158,8 @@ export function isChatMessage(value: unknown): value is ChatMessage {
   const normalized = normalizeChatMessage(value);
   return Boolean(
     normalized &&
-      (normalized.reactions === undefined || (Array.isArray(normalized.reactions) && normalized.reactions.every(isChatReaction)))
+    (normalized.reactions === undefined ||
+      (Array.isArray(normalized.reactions) && normalized.reactions.every(isChatReaction)))
   );
 }
 
@@ -186,7 +202,9 @@ export function isBrowserDecisionSystemMessage(message: ChatMessage): boolean {
   return /^[^\n]+ (approved|denied) (https?:\/\/|a browser access request)/i.test(message.body.trim());
 }
 
-export function isWorkspaceFileSaveRequestPlaintextPayload(value: unknown): value is WorkspaceFileSaveRequestPlaintextPayload {
+export function isWorkspaceFileSaveRequestPlaintextPayload(
+  value: unknown
+): value is WorkspaceFileSaveRequestPlaintextPayload {
   return WorkspaceFileSaveRequestPlaintextPayloadSchema.safeParse(value).success;
 }
 
@@ -230,7 +248,10 @@ function isCodexEventPlaintextPayloadLenient(value: unknown): value is CodexEven
   return (
     value.eventType === "codex.turn" &&
     typeof value.turnId === "string" &&
-    (value.status === "started" || value.status === "event" || value.status === "completed" || value.status === "failed") &&
+    (value.status === "started" ||
+      value.status === "event" ||
+      value.status === "completed" ||
+      value.status === "failed") &&
     typeof value.message === "string" &&
     typeof value.model === "string" &&
     (value.threadId === undefined || typeof value.threadId === "string") &&
@@ -259,14 +280,15 @@ function isCodexTurnRiskFlags(value: unknown): boolean {
   return (
     Array.isArray(value) &&
     value.length <= 24 &&
-    value.every((flag) => (
-      isRecord(flag) &&
-      typeof flag.id === "string" &&
-      typeof flag.label === "string" &&
-      typeof flag.source === "string" &&
-      typeof flag.risk === "string" &&
-      flag.severity === "warning"
-    ))
+    value.every(
+      (flag) =>
+        isRecord(flag) &&
+        typeof flag.id === "string" &&
+        typeof flag.label === "string" &&
+        typeof flag.source === "string" &&
+        typeof flag.risk === "string" &&
+        flag.severity === "warning"
+    )
   );
 }
 
@@ -276,7 +298,10 @@ function isGitWorkflowEventPlaintextPayloadLenient(value: unknown): value is Git
   const pullRequest = value.pullRequest;
   return (
     value.eventType === "git.workflow" &&
-    (value.status === "started" || value.status === "completed" || value.status === "failed" || value.status === "pr_opened") &&
+    (value.status === "started" ||
+      value.status === "completed" ||
+      value.status === "failed" ||
+      value.status === "pr_opened") &&
     typeof value.branch === "string" &&
     typeof value.push === "boolean" &&
     typeof value.message === "string" &&
@@ -325,13 +350,17 @@ function normalizeChatHistoryMessages(value: unknown[]): ChatMessage[] {
 
 export function isLegacyDebugChatMessage(message: ChatMessage): boolean {
   const normalizedBody = message.body.trim().toLowerCase();
-  return normalizedBody === "relay-backed encrypted hello from the room." ||
+  return (
+    normalizedBody === "relay-backed encrypted hello from the room." ||
     normalizedBody === "ciphertext-only debug check." ||
     normalizedBody === "let's make the first pass feel like a coding room, not a generic chat wrapper." ||
     normalizedBody === "agree. the right rail should show files and diffs while codex is working." ||
-    normalizedBody === "@codex can you wire the approval sheet to show chat delta, attachments, browser access, terminals, and workspace?" ||
-    normalizedBody === "i can do that. i will use the current chat delta, selected project folder, and the dev-server terminal. i will not use browser access unless approved." ||
-    normalizedBody === "next turn should also include copy-as-markdown and the secret warning.";
+    normalizedBody ===
+      "@codex can you wire the approval sheet to show chat delta, attachments, browser access, terminals, and workspace?" ||
+    normalizedBody ===
+      "i can do that. i will use the current chat delta, selected project folder, and the dev-server terminal. i will not use browser access unless approved." ||
+    normalizedBody === "next turn should also include copy-as-markdown and the secret warning."
+  );
 }
 
 function isChatReaction(value: unknown): value is ChatReaction {

@@ -1,20 +1,13 @@
 import type { MutableRefObject } from "react";
 import type { GitHubActionsEventPlaintextPayload, RoomRecord } from "@multaiplayer/protocol";
-import {
-  listGitHubActionRuns,
-  type GitHubAuthConfig,
-  type SignedInUser
-} from "../lib/authClient";
+import { listGitHubActionRuns, type GitHubAuthConfig, type SignedInUser } from "../lib/authClient";
 import {
   checkGitHubActionsReadiness,
   gitHubActionsRefreshInFlightMessage,
   isGitHubActionsRefreshInFlight,
   type GitHubActionsTarget
 } from "../lib/githubWorkflowReadiness";
-import {
-  resolveGitWorkflowDraft,
-  type GitWorkflowDraft
-} from "../lib/gitWorkflowDraft";
+import { resolveGitWorkflowDraft, type GitWorkflowDraft } from "../lib/gitWorkflowDraft";
 import { summarizeActionRuns } from "../lib/githubActionsSummary";
 import { isLocalUserActiveHostForRoom } from "../lib/roomHost";
 import { canUseLocalWorkspace, localWorkspaceGateMessage } from "../lib/workspaceAccess";
@@ -123,15 +116,18 @@ export function useGitHubActionsRefresh({
         checkedAt,
         message: `${summary.label}: ${message}`
       });
-      publishGitHubActionsEvent({
-        owner: actionsTarget.owner,
-        repo: actionsTarget.repo,
-        branch: actionsTarget.branch,
-        summary,
-        message,
-        checkedAt,
-        runs: result.runs
-      }, room).catch(() => {
+      publishGitHubActionsEvent(
+        {
+          owner: actionsTarget.owner,
+          repo: actionsTarget.repo,
+          branch: actionsTarget.branch,
+          summary,
+          message,
+          checkedAt,
+          runs: result.runs
+        },
+        room
+      ).catch(() => {
         console.warn("Failed to publish GitHub Actions event");
       });
     } catch (error) {

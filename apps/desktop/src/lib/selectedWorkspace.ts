@@ -38,12 +38,14 @@ export function currentSelectedRoomContext() {
     canHostBrowser: canHostBrowserAction(room, localUser, locked),
     browserAccessMessage: browserAccessGateMessage(room, locked),
     localWorkspaceMessage: localWorkspaceGateMessage(room, locked),
-    hostGateMessage: room.hostStatus === "active"
-      ? `Only ${room.host} can approve host-side actions in this room.`
-      : "Claim host before approving host-side actions in this room.",
-    roomSettingsGateMessage: room.hostStatus === "active"
-      ? `Only ${room.host} can change room host settings.`
-      : "Claim host before changing room host settings."
+    hostGateMessage:
+      room.hostStatus === "active"
+        ? `Only ${room.host} can approve host-side actions in this room.`
+        : "Claim host before approving host-side actions in this room.",
+    roomSettingsGateMessage:
+      room.hostStatus === "active"
+        ? `Only ${room.host} can change room host settings.`
+        : "Claim host before changing room host settings."
   };
 }
 

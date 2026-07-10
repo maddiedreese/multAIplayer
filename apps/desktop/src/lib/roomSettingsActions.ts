@@ -20,7 +20,12 @@ import {
 import { roomLockMessage } from "./appRuntime";
 import { shouldApplyRoomScopedUiUpdate } from "./roomScopedUi";
 import { omitRecordKey } from "./setUtils";
-import { formatCodexModel, formatCodexReasoningEffort, formatCodexSandboxLevel, formatCodexSpeed } from "./appFormatters";
+import {
+  formatCodexModel,
+  formatCodexReasoningEffort,
+  formatCodexSandboxLevel,
+  formatCodexSpeed
+} from "./appFormatters";
 import { currentSelectedRoom, currentSelectedRoomContext } from "./selectedWorkspace";
 import { defaultCodexReasoningEffort, defaultCodexSandboxLevel, defaultCodexSpeed } from "@multaiplayer/protocol";
 
@@ -51,7 +56,8 @@ export function createRoomSettingsActions({
   publishRoomSettingsEvent
 }: CreateRoomSettingsActionsOptions) {
   const isCurrentUserActiveHost = () => currentSelectedRoomContext()?.isActiveHost ?? false;
-  const currentRoomSettingsGateMessage = () => currentSelectedRoomContext()?.roomSettingsGateMessage ?? "Claim host before changing room host settings.";
+  const currentRoomSettingsGateMessage = () =>
+    currentSelectedRoomContext()?.roomSettingsGateMessage ?? "Claim host before changing room host settings.";
   const currentRoomSettingsActor = () => {
     const localUser = currentSelectedRoomContext()?.localUser;
     return { requesterName: localUser?.name ?? "Local user", requesterUserId: localUser?.id ?? "local" };
@@ -80,14 +86,11 @@ export function createRoomSettingsActions({
     useAppStore.getState().setBrowserMessageForRoom(selectedRoomIdRef.current, message);
   const setBrowserMessageForRoom = (roomId: string, message: string | null) =>
     useAppStore.getState().setBrowserMessageForRoom(roomId, message);
-  const clearBrowserStatusForRoom = (roomId: string) =>
-    useAppStore.getState().clearBrowserStatusForRoom(roomId);
+  const clearBrowserStatusForRoom = (roomId: string) => useAppStore.getState().clearBrowserStatusForRoom(roomId);
   const setProjectPathDraftForRoom = (roomId: string, path: string) =>
     useAppStore.getState().setProjectPathDraftForRoom(roomId, path, currentSelectedRoom()?.projectPath ?? "");
-  const resetCodexApprovalForRoom = (roomId: string) =>
-    useAppStore.getState().resetCodexApprovalForRoom(roomId);
-  const resetFileContextForRoom = (roomId: string) =>
-    useAppStore.getState().resetFileContextForRoom(roomId);
+  const resetCodexApprovalForRoom = (roomId: string) => useAppStore.getState().resetCodexApprovalForRoom(roomId);
+  const resetFileContextForRoom = (roomId: string) => useAppStore.getState().resetFileContextForRoom(roomId);
   async function setApprovalPolicy(approvalPolicy: ApprovalPolicy) {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) {
@@ -122,7 +125,8 @@ export function createRoomSettingsActions({
       }
       resetCodexApprovalForRoom(roomId);
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setSettingsMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -162,7 +166,8 @@ export function createRoomSettingsActions({
       }
       resetCodexApprovalForRoom(roomId);
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setSettingsMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -171,7 +176,8 @@ export function createRoomSettingsActions({
   async function setCodexModel(codexModel: string) {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) return;
-    const selectedCodexModel = useAppStore.getState().roomSettingsByRoom[selectedRoom.id]?.customCodexModel ?? selectedRoom.codexModel;
+    const selectedCodexModel =
+      useAppStore.getState().roomSettingsByRoom[selectedRoom.id]?.customCodexModel ?? selectedRoom.codexModel;
     const nextModel = normalizeCodexModel(codexModel);
     if (!nextModel) {
       setSelectedSettingsMessage(`Use a known Codex model or a model-like id up to ${maxCodexModelChars} characters.`);
@@ -211,7 +217,8 @@ export function createRoomSettingsActions({
       }
       resetCodexApprovalForRoom(roomId);
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setSettingsMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -226,10 +233,8 @@ export function createRoomSettingsActions({
       setSelectedSettingsMessage("Choose a supported Codex reasoning level.");
       return;
     }
-    if (
-      nextReasoningEffort === selectedCodexReasoningEffort &&
-      selectedRoom.codexReasoningEffortPolicy === "pinned"
-    ) return;
+    if (nextReasoningEffort === selectedCodexReasoningEffort && selectedRoom.codexReasoningEffortPolicy === "pinned")
+      return;
     if (currentRoomAccess(selectedRoom).locked) {
       setSelectedSettingsMessage(roomLockMessage(selectedRoom, currentRoomAccess(selectedRoom).revoked));
       return;
@@ -263,7 +268,8 @@ export function createRoomSettingsActions({
       }
       resetCodexApprovalForRoom(roomId);
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setSettingsMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -312,7 +318,8 @@ export function createRoomSettingsActions({
       }
       resetCodexApprovalForRoom(roomId);
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setSettingsMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -360,7 +367,8 @@ export function createRoomSettingsActions({
       }
       resetCodexApprovalForRoom(roomId);
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setSettingsMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -398,7 +406,8 @@ export function createRoomSettingsActions({
         setSettingsMessageForRoom(roomId, `Room title changed to ${nextName}.`);
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setSettingsMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -447,7 +456,8 @@ export function createRoomSettingsActions({
         );
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setBrowserMessageForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setBrowserMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -456,10 +466,13 @@ export function createRoomSettingsActions({
   async function updateProjectPath() {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) return;
-    const projectPathDraft = useAppStore.getState().roomSettingsByRoom[selectedRoom.id]?.projectPathDraft ?? selectedRoom.projectPath;
+    const projectPathDraft =
+      useAppStore.getState().roomSettingsByRoom[selectedRoom.id]?.projectPathDraft ?? selectedRoom.projectPath;
     const nextProjectPath = normalizeProjectPath(projectPathDraft);
     if (!nextProjectPath) {
-      setSelectedSettingsMessage(`Enter a local project folder up to ${maxRoomProjectPathChars} characters without control characters.`);
+      setSelectedSettingsMessage(
+        `Enter a local project folder up to ${maxRoomProjectPathChars} characters without control characters.`
+      );
       return;
     }
     if (nextProjectPath === selectedRoom.projectPath) return;
@@ -493,7 +506,8 @@ export function createRoomSettingsActions({
         setSettingsMessageForRoom(roomId, `Project folder set to ${nextProjectPath}.`);
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setSettingsMessageForRoom(roomId, String(error));
     } finally {
       setSettingsBusyForRoom(roomId, false);
     }
@@ -502,7 +516,8 @@ export function createRoomSettingsActions({
   async function chooseProjectPath() {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) return;
-    const projectPathDraft = useAppStore.getState().roomSettingsByRoom[selectedRoom.id]?.projectPathDraft ?? selectedRoom.projectPath;
+    const projectPathDraft =
+      useAppStore.getState().roomSettingsByRoom[selectedRoom.id]?.projectPathDraft ?? selectedRoom.projectPath;
     if (currentRoomAccess(selectedRoom).locked) {
       setSelectedSettingsMessage(roomLockMessage(selectedRoom, currentRoomAccess(selectedRoom).revoked));
       return;
@@ -517,7 +532,10 @@ export function createRoomSettingsActions({
       const selectedPath = await chooseProjectFolder(projectPathDraft || selectedRoom.projectPath);
       if (!selectedPath) {
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setSettingsMessageForRoom(roomId, "Native folder picker is available in the Tauri app. In web preview, paste a local folder path.");
+          setSettingsMessageForRoom(
+            roomId,
+            "Native folder picker is available in the Tauri app. In web preview, paste a local folder path."
+          );
         }
         return;
       }
@@ -526,7 +544,8 @@ export function createRoomSettingsActions({
         setSettingsMessageForRoom(roomId, `Selected project folder: ${selectedPath}`);
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setSettingsMessageForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setSettingsMessageForRoom(roomId, String(error));
     }
   }
 

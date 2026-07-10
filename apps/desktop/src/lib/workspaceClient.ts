@@ -82,30 +82,39 @@ export async function updateTeamMemberRole(
   userId: string,
   role: Exclude<TeamRole, "owner">
 ): Promise<TeamMemberRecord[]> {
-  const response = await fetch(`${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ role })
-  });
+  const response = await fetch(
+    `${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ role })
+    }
+  );
   const body = await readJsonResponse<{ members: TeamMemberRecord[] }>(response, "Failed to update team member role");
   return body.members as TeamMemberRecord[];
 }
 
 export async function transferTeamOwnership(teamId: string, userId: string): Promise<TeamMemberRecord[]> {
-  const response = await fetch(`${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}/transfer-owner`, {
-    method: "POST",
-    credentials: "include"
-  });
+  const response = await fetch(
+    `${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}/transfer-owner`,
+    {
+      method: "POST",
+      credentials: "include"
+    }
+  );
   const body = await readJsonResponse<{ members: TeamMemberRecord[] }>(response, "Failed to transfer team ownership");
   return body.members as TeamMemberRecord[];
 }
 
 export async function removeTeamMember(teamId: string, userId: string): Promise<TeamMemberRecord[]> {
-  const response = await fetch(`${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`, {
-    method: "DELETE",
-    credentials: "include"
-  });
+  const response = await fetch(
+    `${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`,
+    {
+      method: "DELETE",
+      credentials: "include"
+    }
+  );
   const body = await readJsonResponse<{ members: TeamMemberRecord[] }>(response, "Failed to remove team member");
   return body.members as TeamMemberRecord[];
 }
@@ -238,15 +247,25 @@ export async function createAttachmentBlob(request: AttachmentBlobUploadRequest)
     headers: { "content-type": "application/json" },
     body: JSON.stringify(request)
   });
-  const body = await readJsonResponse<{ blob: AttachmentBlobRecord }>(response, "Failed to upload encrypted attachment blob");
+  const body = await readJsonResponse<{ blob: AttachmentBlobRecord }>(
+    response,
+    "Failed to upload encrypted attachment blob"
+  );
   return body.blob as AttachmentBlobRecord;
 }
 
-export async function loadAttachmentBlob(blobId: string, teamId: string, roomId: string): Promise<AttachmentBlobRecord> {
+export async function loadAttachmentBlob(
+  blobId: string,
+  teamId: string,
+  roomId: string
+): Promise<AttachmentBlobRecord> {
   const params = new URLSearchParams({ teamId, roomId });
   const response = await fetch(`${getRelayHttpUrl()}/attachment-blobs/${encodeURIComponent(blobId)}?${params}`, {
     credentials: "include"
   });
-  const body = await readJsonResponse<{ blob: AttachmentBlobRecord }>(response, "Failed to load encrypted attachment blob");
+  const body = await readJsonResponse<{ blob: AttachmentBlobRecord }>(
+    response,
+    "Failed to load encrypted attachment blob"
+  );
   return body.blob as AttachmentBlobRecord;
 }

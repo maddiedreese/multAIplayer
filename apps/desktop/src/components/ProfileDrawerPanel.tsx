@@ -105,13 +105,13 @@ export function ProfileDrawerPanel({
           Sign out
         </button>
       ) : (
-        <button
-          className="primary-wide"
-          onClick={onSignIn}
-          disabled={authBusy || authConfig?.configured === false}
-        >
+        <button className="primary-wide" onClick={onSignIn} disabled={authBusy || authConfig?.configured === false}>
           <Github size={15} />
-          {authConfig?.configured === false ? "GitHub sign-in not configured" : authBusy ? "Waiting for GitHub" : "Sign in with GitHub"}
+          {authConfig?.configured === false
+            ? "GitHub sign-in not configured"
+            : authBusy
+              ? "Waiting for GitHub"
+              : "Sign in with GitHub"}
         </button>
       )}
 

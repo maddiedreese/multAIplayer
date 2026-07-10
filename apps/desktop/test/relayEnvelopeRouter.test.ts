@@ -8,12 +8,24 @@ import { useAppStore } from "../src/store/appStore";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
-  get length() { return this.values.size; }
-  clear() { this.values.clear(); }
-  getItem(key: string) { return this.values.get(key) ?? null; }
-  key(index: number) { return Array.from(this.values.keys())[index] ?? null; }
-  removeItem(key: string) { this.values.delete(key); }
-  setItem(key: string, value: string) { this.values.set(key, value); }
+  get length() {
+    return this.values.size;
+  }
+  clear() {
+    this.values.clear();
+  }
+  getItem(key: string) {
+    return this.values.get(key) ?? null;
+  }
+  key(index: number) {
+    return Array.from(this.values.keys())[index] ?? null;
+  }
+  removeItem(key: string) {
+    this.values.delete(key);
+  }
+  setItem(key: string, value: string) {
+    this.values.set(key, value);
+  }
 }
 
 const localStorage = new MemoryStorage();
@@ -68,14 +80,16 @@ test("Codex queue routing dispatches through one store action surface", () => {
   handleCodexQueueEvent(queueEvent("queued", { triggerMessageId: "message-1" }), "room-a", useAppStore.getState());
 
   let state = useAppStore.getState();
-  assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.queuedApprovals, [{
-    roomId: "room-a",
-    turnId: "turn-1",
-    requestedBy: "Avery",
-    requestedByUserId: "github:avery",
-    queuedAt: "2026-07-09T12:00:00.000Z",
-    triggerMessageId: "message-1"
-  }]);
+  assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.queuedApprovals, [
+    {
+      roomId: "room-a",
+      turnId: "turn-1",
+      requestedBy: "Avery",
+      requestedByUserId: "github:avery",
+      queuedAt: "2026-07-09T12:00:00.000Z",
+      triggerMessageId: "message-1"
+    }
+  ]);
   assert.equal(state.roomSettingsByRoom["room-a"]?.hostMessage, "Avery proposed a Codex turn for host approval.");
 
   state.setApprovalVisibleForRoom("room-a", true);
@@ -88,28 +102,70 @@ test("Codex queue routing dispatches through one store action surface", () => {
 
 test("live relay routing rejects payloads that violate protocol schemas", async () => {
   const invalidPayloads: Array<[RelayEnvelope["kind"], unknown]> = [
-    ["chat.reaction", {
-      id: "reaction-1", messageId: "message-1", emoji: "👍", action: "add", reactor: "Peer",
-      reactorUserId: "github:peer", createdAt: "not-a-datetime"
-    }],
-    ["terminal.request", {
-      id: "terminal-1", requester: "Peer", requesterUserId: "github:peer", command: "pwd", cwd: "/tmp",
-      requestedAt: "not-a-datetime"
-    }],
+    [
+      "chat.reaction",
+      {
+        id: "reaction-1",
+        messageId: "message-1",
+        emoji: "👍",
+        action: "add",
+        reactor: "Peer",
+        reactorUserId: "github:peer",
+        createdAt: "not-a-datetime"
+      }
+    ],
+    [
+      "terminal.request",
+      {
+        id: "terminal-1",
+        requester: "Peer",
+        requesterUserId: "github:peer",
+        command: "pwd",
+        cwd: "/tmp",
+        requestedAt: "not-a-datetime"
+      }
+    ],
     ["browser.request", null],
     ["room.host", null],
-    ["git.event", {
-      eventType: "git.workflow", status: "completed", branch: "main", push: false, message: "Done",
-      runner: "Peer", runnerUserId: "github:peer", createdAt: "not-a-datetime"
-    }],
-    ["room.settings", {
-      eventType: "room.settings", id: "settings-1", setting: "roomName", previousValue: "Old", nextValue: "New",
-      changedBy: "Peer", changedByUserId: "github:peer", changedAt: "not-a-datetime"
-    }],
-    ["codex.event", {
-      eventType: "codex.turn", turnId: "turn-1", status: "event", message: "Working", model: "gpt-5.4",
-      host: "x".repeat(10_000), hostUserId: "github:peer", createdAt: "2026-07-09T12:00:00.000Z"
-    }]
+    [
+      "git.event",
+      {
+        eventType: "git.workflow",
+        status: "completed",
+        branch: "main",
+        push: false,
+        message: "Done",
+        runner: "Peer",
+        runnerUserId: "github:peer",
+        createdAt: "not-a-datetime"
+      }
+    ],
+    [
+      "room.settings",
+      {
+        eventType: "room.settings",
+        id: "settings-1",
+        setting: "roomName",
+        previousValue: "Old",
+        nextValue: "New",
+        changedBy: "Peer",
+        changedByUserId: "github:peer",
+        changedAt: "not-a-datetime"
+      }
+    ],
+    [
+      "codex.event",
+      {
+        eventType: "codex.turn",
+        turnId: "turn-1",
+        status: "event",
+        message: "Working",
+        model: "gpt-5.4",
+        host: "x".repeat(10_000),
+        hostUserId: "github:peer",
+        createdAt: "2026-07-09T12:00:00.000Z"
+      }
+    ]
   ];
 
   for (const [kind, payload] of invalidPayloads) {

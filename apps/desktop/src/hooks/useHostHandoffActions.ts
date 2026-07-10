@@ -1,10 +1,5 @@
 import type { MutableRefObject } from "react";
-import type {
-  CodexSandboxLevel,
-  HostHandoffPlaintextPayload,
-  RelayEnvelope,
-  RoomRecord
-} from "@multaiplayer/protocol";
+import type { CodexSandboxLevel, HostHandoffPlaintextPayload, RelayEnvelope, RoomRecord } from "@multaiplayer/protocol";
 import { defaultCodexSandboxLevel } from "@multaiplayer/protocol";
 import { encryptJson } from "@multaiplayer/crypto";
 import { loadOrCreateRoomSecret } from "../lib/localHistory";
@@ -39,13 +34,7 @@ import { roomLockMessage } from "../lib/appRuntime";
 import { formatCodexModel } from "../lib/appFormatters";
 import { useAppStore } from "../store/appStore";
 import type { RelayClient } from "../lib/relayClient";
-import type {
-  BrowserAccessRequest,
-  ChatMessage,
-  HostHandoffRecord,
-  QueuedCodexTurn,
-  RelayStatus
-} from "../types";
+import type { BrowserAccessRequest, ChatMessage, HostHandoffRecord, QueuedCodexTurn, RelayStatus } from "../types";
 
 interface LocalUser {
   id: string;
@@ -152,7 +141,7 @@ export function useHostHandoffActions({
     setHostMessageForRoom(roomId, null);
     try {
       const host = hostStatus === "active" ? localUser.name : hostStatus === "handoff" ? selectedRoom.host : "No host";
-      const hostUserId = hostStatus === "active" ? localUser.id : selectedRoom.hostUserId ?? localUser.id;
+      const hostUserId = hostStatus === "active" ? localUser.id : (selectedRoom.hostUserId ?? localUser.id);
       const room = await updateRoomHost(roomId, host, hostUserId, hostStatus);
       if (hostStatus !== "active") void shutdownCodexRoom(roomId);
       replaceRoom(room);
@@ -175,7 +164,8 @@ export function useHostHandoffActions({
       }
       resetCodexApprovalForRoom(roomId);
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessageForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setHostMessageForRoom(roomId, String(error));
     } finally {
       setHostBusyForRoom(roomId, false);
     }
@@ -209,7 +199,9 @@ export function useHostHandoffActions({
       if (roomHandoff.gitPatch && !roomHandoff.gitPatchTruncated) {
         const patchResult = await applyGitPatch(handoffProject.path, roomHandoff.gitPatch);
         if (patchResult.status !== 0) {
-          throw new Error(`Cloned or selected the repository, but could not apply ${roomHandoff.fromHost}'s local patch: ${patchResult.stderr || patchResult.stdout || "git apply failed"}`);
+          throw new Error(
+            `Cloned or selected the repository, but could not apply ${roomHandoff.fromHost}'s local patch: ${patchResult.stderr || patchResult.stdout || "git apply failed"}`
+          );
         }
       }
       const handoffProjectPath = handoffProject.path;
@@ -229,10 +221,7 @@ export function useHostHandoffActions({
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setProjectPathDraftForRoom(roomId, handoffProjectPath);
         setCustomCodexModelForRoom(roomId, patch.codexModel);
-        setSettingsMessageForRoom(
-          roomId,
-          buildAcceptedHandoffMessage(roomHandoff, handoffProject, patch.codexModel)
-        );
+        setSettingsMessageForRoom(roomId, buildAcceptedHandoffMessage(roomHandoff, handoffProject, patch.codexModel));
         setHostMessageForRoom(
           roomId,
           roomHandoff.reason === "usage_limit"
@@ -241,16 +230,14 @@ export function useHostHandoffActions({
         );
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setHostMessageForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setHostMessageForRoom(roomId, String(error));
     } finally {
       setHostBusyForRoom(roomId, false);
     }
   }
 
-  async function resolveHandoffProject(
-    handoff: HostHandoffRecord,
-    fallbackPath: string
-  ): Promise<HandoffProject> {
+  async function resolveHandoffProject(handoff: HostHandoffRecord, fallbackPath: string): Promise<HandoffProject> {
     const expectedRepo = handoffRepoIdentity(handoff);
 
     async function pathMatches(path: string): Promise<boolean> {
@@ -265,10 +252,12 @@ export function useHostHandoffActions({
     if (handoff.gitRemoteUrl && expectedRepo) {
       const parentDir = defaultProjectPath.slice(0, defaultProjectPath.lastIndexOf("/")) || defaultProjectPath;
       const cloneResult = await cloneGitRepository(handoff.gitRemoteUrl, parentDir, handoff.gitBranch);
-      if (cloneResult.status === 0 && await pathMatches(cloneResult.path)) {
+      if (cloneResult.status === 0 && (await pathMatches(cloneResult.path))) {
         return { path: cloneResult.path, source: "cloned", cloneResult };
       }
-      throw new Error(`Could not clone ${expectedRepo.owner}/${expectedRepo.repo}: ${cloneResult.stderr || cloneResult.stdout || "git clone failed"}`);
+      throw new Error(
+        `Could not clone ${expectedRepo.owner}/${expectedRepo.repo}: ${cloneResult.stderr || cloneResult.stdout || "git clone failed"}`
+      );
     }
 
     const selected = await chooseProjectFolder(defaultProjectPath);
@@ -293,13 +282,14 @@ export function useHostHandoffActions({
         : project.source === "selected"
           ? "selected locally"
           : "matched locally";
-    const patchMessage = handoff.gitPatch && !handoff.gitPatchTruncated
-      ? " Applied the previous host's local patch."
-      : handoff.gitPatchTruncated
-        ? " The previous host's patch was too large to apply automatically; ask them to push or share it."
-        : handoff.gitDirtyFiles?.length
-          ? " The previous host had local changes but no transferable patch was available."
-          : "";
+    const patchMessage =
+      handoff.gitPatch && !handoff.gitPatchTruncated
+        ? " Applied the previous host's local patch."
+        : handoff.gitPatchTruncated
+          ? " The previous host's patch was too large to apply automatically; ask them to push or share it."
+          : handoff.gitDirtyFiles?.length
+            ? " The previous host had local changes but no transferable patch was available."
+            : "";
     return `Accepted handoff from ${handoff.fromHost}; ${source}, using ${formatCodexModel(codexModel)} at ${project.path}.${patchMessage}`;
   }
 
@@ -310,10 +300,8 @@ export function useHostHandoffActions({
   ) {
     const remoteInfo = await getGitRemoteOrigin(room.projectPath).catch(() => ({ originUrl: null }));
     const repoRef = remoteInfo.originUrl ? parseGitHubRemoteUrl(remoteInfo.originUrl) : null;
-    const roomGitStatus = room.id === selectedRoom.id ? gitStatus : gitStatusByRoom[room.id] ?? null;
-    const patchResult = roomGitStatus?.files.length
-      ? await createGitPatch(room.projectPath).catch(() => null)
-      : null;
+    const roomGitStatus = room.id === selectedRoom.id ? gitStatus : (gitStatusByRoom[room.id] ?? null);
+    const patchResult = roomGitStatus?.files.length ? await createGitPatch(room.projectPath).catch(() => null) : null;
     const summary = buildCodexTurnSummary(
       contextMessages,
       room,
@@ -330,7 +318,9 @@ export function useHostHandoffActions({
       ...(remoteInfo.originUrl ? { gitRemoteUrl: remoteInfo.originUrl } : {}),
       ...(repoRef ? { gitRepoOwner: repoRef.owner, gitRepoName: repoRef.repo } : {}),
       ...(roomGitStatus?.branch ? { gitBranch: roomGitStatus.branch } : {}),
-      ...(roomGitStatus?.files.length ? { gitDirtyFiles: roomGitStatus.files.slice(0, 50).map((file) => file.path) } : {}),
+      ...(roomGitStatus?.files.length
+        ? { gitDirtyFiles: roomGitStatus.files.slice(0, 50).map((file) => file.path) }
+        : {}),
       ...(patchResult?.patch && !patchResult.truncated ? { gitPatch: patchResult.patch } : {}),
       ...(patchResult?.truncated ? { gitPatchTruncated: true } : {}),
       codexModel: room.codexModel,
@@ -345,9 +335,7 @@ export function useHostHandoffActions({
       queuedCodexTurns: queueForHandoff(room.id, queuedCodexTurns),
       attachmentNames: summary.attachments.map((attachment) => attachment.name),
       terminals: summary.terminals,
-      continuationSummary: reason === "usage_limit"
-        ? codexUsageLimitMessage(localUser.name)
-        : undefined,
+      continuationSummary: reason === "usage_limit" ? codexUsageLimitMessage(localUser.name) : undefined,
       createdAt: new Date().toISOString(),
       status: "available"
     };
@@ -451,10 +439,6 @@ export function useHostHandoffActions({
     };
     seenEnvelopeIds.current.add(envelope.id);
     client.publish({ type: "publish", envelope });
-  }
-
-  function markLatestHostHandoffAccepted(roomId: string) {
-    markLatestHostHandoffAcceptedForRoom(roomId);
   }
 
   function markHostHandoffAccepted(roomId: string, handoffId: string) {

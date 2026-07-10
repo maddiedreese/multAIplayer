@@ -107,7 +107,11 @@ function incrementMap(map: Map<string, number>, key: string) {
 }
 
 function normalizeMetricType(type: string): string {
-  const normalized = type.trim().toLowerCase().replace(/[^a-z0-9_.:-]+/g, "_").slice(0, 80);
+  const normalized = type
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_.:-]+/g, "_")
+    .slice(0, 80);
   return normalized || "unknown";
 }
 
@@ -142,9 +146,11 @@ function requestIdFromHeader(value: string | string[] | undefined): string | nul
 }
 
 function logJson(record: Record<string, unknown>) {
-  console.log(JSON.stringify({
-    service: "multaiplayer-relay",
-    at: new Date().toISOString(),
-    ...record
-  }));
+  console.log(
+    JSON.stringify({
+      service: "multaiplayer-relay",
+      at: new Date().toISOString(),
+      ...record
+    })
+  );
 }

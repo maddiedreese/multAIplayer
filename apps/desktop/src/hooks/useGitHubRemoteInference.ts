@@ -37,7 +37,10 @@ export function useGitHubRemoteInference({
         const { applyInferredGitHubRemoteForRoom, setGitWorkflowMessageForRoom } = useAppStore.getState();
         if (!applyInferredGitHubRemoteForRoom(roomId, repo)) return;
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setGitWorkflowMessageForRoom(roomId, `Detected GitHub remote ${repo.owner}/${repo.repo} for PRs and Actions.`);
+          setGitWorkflowMessageForRoom(
+            roomId,
+            `Detected GitHub remote ${repo.owner}/${repo.repo} for PRs and Actions.`
+          );
         }
       })
       .catch(() => {

@@ -21,8 +21,14 @@ const startedWithIds: CodexRoomEvent = {
 
 test("codexConsumedMessageIds derives exact started-turn package membership", () => {
   assert.deepEqual([...codexConsumedMessageIds([startedWithIds])], ["message-1"]);
-  assert.equal(messageIsBeforeCodexWatermark({ id: "message-1", createdAt: "2026-07-08T12:01:00.000Z" }, [startedWithIds]), false);
-  assert.equal(messageIsBeforeCodexWatermark({ id: "message-2", createdAt: "2026-07-08T12:01:00.000Z" }, [startedWithIds]), true);
+  assert.equal(
+    messageIsBeforeCodexWatermark({ id: "message-1", createdAt: "2026-07-08T12:01:00.000Z" }, [startedWithIds]),
+    false
+  );
+  assert.equal(
+    messageIsBeforeCodexWatermark({ id: "message-2", createdAt: "2026-07-08T12:01:00.000Z" }, [startedWithIds]),
+    true
+  );
 });
 
 test("messageIsBeforeCodexWatermark falls back to started timestamps for legacy events", () => {
@@ -34,7 +40,13 @@ test("messageIsBeforeCodexWatermark falls back to started timestamps for legacy 
   };
 
   assert.equal(latestCodexStartedAt([legacyStarted]), "2026-07-08T12:05:00.000Z");
-  assert.equal(messageIsBeforeCodexWatermark({ id: "before", createdAt: "2026-07-08T12:04:59.000Z" }, [legacyStarted]), false);
-  assert.equal(messageIsBeforeCodexWatermark({ id: "after", createdAt: "2026-07-08T12:05:01.000Z" }, [legacyStarted]), true);
+  assert.equal(
+    messageIsBeforeCodexWatermark({ id: "before", createdAt: "2026-07-08T12:04:59.000Z" }, [legacyStarted]),
+    false
+  );
+  assert.equal(
+    messageIsBeforeCodexWatermark({ id: "after", createdAt: "2026-07-08T12:05:01.000Z" }, [legacyStarted]),
+    true
+  );
   assert.equal(messageIsBeforeCodexWatermark({ id: "missing-created-at" }, [legacyStarted]), false);
 });

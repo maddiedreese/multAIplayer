@@ -116,8 +116,8 @@ export interface InviteJoinRequest extends InviteJoinRequestPlaintextPayload {
   status: "pending" | "approved" | "denied";
 }
 
-export interface CodexRoomEvent extends CodexEventPlaintextPayload {}
-export interface CodexActivity extends CodexActivityPlaintextPayload {}
+export type CodexRoomEvent = CodexEventPlaintextPayload;
+export type CodexActivity = CodexActivityPlaintextPayload;
 
 export interface CodexThreadGraphNode {
   id: string;
@@ -146,7 +146,7 @@ export interface HostHandoffRecord extends HostHandoffPlaintextPayload {
   status: "available" | "accepted";
 }
 
-export interface LocalPreviewRecord extends LocalPreviewPlaintextPayload {}
+export type LocalPreviewRecord = LocalPreviewPlaintextPayload;
 
 export interface LocalPreviewDialogState {
   open: boolean;

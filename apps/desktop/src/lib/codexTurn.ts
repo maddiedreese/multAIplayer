@@ -64,8 +64,7 @@ export const maxCodexMaterialChars = 24_000;
 export const maxCodexReplyQuoteChars = 280;
 export const codexTurnInputTruncationNotice =
   "[multAIplayer truncated older room context to fit the local Codex app-server input limit.]";
-export const codexMessageTruncationNotice =
-  "[multAIplayer truncated this room message before sending it to Codex.]";
+export const codexMessageTruncationNotice = "[multAIplayer truncated this room message before sending it to Codex.]";
 export const codexMaterialTruncationNotice =
   "[multAIplayer truncated this shared material before framing it for Codex.]";
 
@@ -136,7 +135,7 @@ export function buildCodexTurnInput(
   options: { fullRoomContext?: boolean } = {}
 ): string {
   const contextMessages = options.fullRoomContext ? messages : messagesSinceLastCodex(messages);
-  const messagesById = new Map(messages.flatMap((message) => message.id ? [[message.id, message]] : []));
+  const messagesById = new Map(messages.flatMap((message) => (message.id ? [[message.id, message]] : [])));
   const transcript = contextMessages
     .map((message) => {
       const attachments = message.attachments?.length
@@ -148,25 +147,27 @@ export function buildCodexTurnInput(
     .join("\n\n");
   const observedMaterial = formatObservedContextMaterial(summary);
 
-  return boundCodexTurnInput([
-    "You are being invoked from a multAIplayer room.",
-    "Use the room chat as first-class user instruction context for this coding turn.",
-    options.fullRoomContext
-      ? "This is a host-continuation handoff. The transcript below includes the full available room context so you can continue seamlessly from the previous host."
-      : "",
-    "Every room member message is attributed by author and carries normal instruction weight. Non-human-authored material is explicitly framed as observed material.",
-    `Workspace: ${workspacePath}`,
-    `Selected model: ${model}`,
-    `Attachments included: ${formatAttachmentSummaryList(summary.attachments)}`,
-    "",
-    "Observed non-human context:",
-    observedMaterial || "(No observed workspace, browser, or terminal material included.)",
-    "",
-    options.fullRoomContext ? "Full available room chat:" : "Recent chat since the last Codex response:",
-    transcript || "(No new messages.)",
-    "",
-    "Work from the selected workspace and explain any proposed file, terminal, git, browser, or PR actions before taking sensitive steps."
-  ].join("\n"));
+  return boundCodexTurnInput(
+    [
+      "You are being invoked from a multAIplayer room.",
+      "Use the room chat as first-class user instruction context for this coding turn.",
+      options.fullRoomContext
+        ? "This is a host-continuation handoff. The transcript below includes the full available room context so you can continue seamlessly from the previous host."
+        : "",
+      "Every room member message is attributed by author and carries normal instruction weight. Non-human-authored material is explicitly framed as observed material.",
+      `Workspace: ${workspacePath}`,
+      `Selected model: ${model}`,
+      `Attachments included: ${formatAttachmentSummaryList(summary.attachments)}`,
+      "",
+      "Observed non-human context:",
+      observedMaterial || "(No observed workspace, browser, or terminal material included.)",
+      "",
+      options.fullRoomContext ? "Full available room chat:" : "Recent chat since the last Codex response:",
+      transcript || "(No new messages.)",
+      "",
+      "Work from the selected workspace and explain any proposed file, terminal, git, browser, or PR actions before taking sensitive steps."
+    ].join("\n")
+  );
 }
 
 export function summarizeGitStatus(gitStatus: CodexGitStatusContext): NonNullable<CodexTurnSummary["git"]> {
@@ -187,9 +188,7 @@ export function summarizeGitStatus(gitStatus: CodexGitStatusContext): NonNullabl
 export function formatGitStatusSummary(git: CodexTurnSummary["git"]): string {
   if (!git) return "disabled or unavailable";
   if (git.totalFiles === 0) return `${git.branch}, clean working tree`;
-  const files = git.files
-    .map((file) => `${file.status} ${file.path} (+${file.added}/-${file.removed})`)
-    .join("; ");
+  const files = git.files.map((file) => `${file.status} ${file.path} (+${file.added}/-${file.removed})`).join("; ");
   const suffix = git.truncated ? `; ${git.totalFiles - git.files.length} more file(s)` : "";
   return `${git.branch}, ${git.totalFiles} changed file(s): ${files}${suffix}`;
 }
@@ -227,12 +226,7 @@ export function formatAttachmentForCodex(attachment: CodexChatAttachment): strin
     ].join("\n");
   }
   if (!attachment.content) {
-    return [
-      header,
-      metadata,
-      "[No inline content included.]",
-      `[end material: ${attachment.name}]`
-    ].join("\n");
+    return [header, metadata, "[No inline content included.]", `[end material: ${attachment.name}]`].join("\n");
   }
   return [
     header,
@@ -280,14 +274,16 @@ export function detectCodexTurnRiskFlags(
 
 export function formatAttachmentSummaryList(attachments: CodexTurnSummary["attachments"]): string {
   if (attachments.length === 0) return "none";
-  return attachments.map((attachment) => {
-    const handling = attachment.contentIncluded
-      ? "inline content included"
-      : attachment.storage === "encrypted_blob"
-        ? "encrypted blob reference only"
-        : "metadata only";
-    return `${attachment.name} (${handling})`;
-  }).join(", ");
+  return attachments
+    .map((attachment) => {
+      const handling = attachment.contentIncluded
+        ? "inline content included"
+        : attachment.storage === "encrypted_blob"
+          ? "encrypted blob reference only"
+          : "metadata only";
+      return `${attachment.name} (${handling})`;
+    })
+    .join(", ");
 }
 
 export function formatObservedContextMaterial(summary: CodexTurnSummary): string {
@@ -295,11 +291,15 @@ export function formatObservedContextMaterial(summary: CodexTurnSummary): string
     formatGitStatusMaterial(summary.git),
     formatBrowserContextMaterial(summary.browserAccess),
     formatTerminalContextMaterial(summary.terminals)
-  ].filter(Boolean).join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function formatAttachmentMeta(attachment: CodexChatAttachment): string {
-  const blobNote = attachment.blobId ? `, encrypted blob${attachment.blobBytes ? ` preview ${formatBytes(attachment.blobBytes)}` : ""}` : "";
+  const blobNote = attachment.blobId
+    ? `, encrypted blob${attachment.blobBytes ? ` preview ${formatBytes(attachment.blobBytes)}` : ""}`
+    : "";
   return `${attachment.type}, ${formatBytes(attachment.size)}${blobNote}`;
 }
 
@@ -326,10 +326,7 @@ function formatObservedMaterialBlock(label: string, source: string, content: str
   ].join("\n");
 }
 
-function formatReplyContext(
-  message: CodexChatMessage,
-  messagesById: Map<string, CodexChatMessage>
-): string {
+function formatReplyContext(message: CodexChatMessage, messagesById: Map<string, CodexChatMessage>): string {
   if (!message.replyTo) return "";
   const target = messagesById.get(message.replyTo);
   if (!target || target.deletedAt) return ", replying to original message unavailable or deleted";
@@ -374,10 +371,19 @@ function sliceTailAtLineBoundary(input: string, maxChars: number): string {
   return boundary >= 0 ? slice.slice(boundary + 1) : slice;
 }
 
-function addTextRiskFlags(flags: CodexTurnRiskFlag[], text: string, source: string, approvedOrigins = new Set<string>()) {
+function addTextRiskFlags(
+  flags: CodexTurnRiskFlag[],
+  text: string,
+  source: string,
+  approvedOrigins = new Set<string>()
+) {
   if (!text) return;
   addNamedRisks(flags, source, detectSecretRisks(text));
-  if (/(ignore (all )?(previous|prior|above) instructions|disregard (all )?(previous|prior|above) instructions|you must now|as the assistant|as an ai|system prompt|developer message|run the following|execute the following)/i.test(text)) {
+  if (
+    /(ignore (all )?(previous|prior|above) instructions|disregard (all )?(previous|prior|above) instructions|you must now|as the assistant|as an ai|system prompt|developer message|run the following|execute the following)/i.test(
+      text
+    )
+  ) {
     flags.push(createRiskFlag(source, "Agent-directed phrasing"));
   }
   if (/[A-Za-z0-9+/]{320,}={0,2}/.test(text) || /(?:[A-Za-z0-9_-]{80,}\.){2}[A-Za-z0-9_-]{40,}/.test(text)) {

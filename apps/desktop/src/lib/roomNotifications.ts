@@ -22,16 +22,10 @@ export interface RoomNotificationInput {
 }
 
 export type RoomNotificationSuppressionReason =
-  | "relay_closed"
-  | "missing_room"
-  | "focused_room"
-  | "local_sender"
-  | "muted"
-  | "locked";
+  "relay_closed" | "missing_room" | "focused_room" | "local_sender" | "muted" | "locked";
 
 export type RoomNotificationEligibility =
-  | { eligible: true }
-  | { eligible: false; reason: RoomNotificationSuppressionReason };
+  { eligible: true } | { eligible: false; reason: RoomNotificationSuppressionReason };
 
 function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -94,11 +88,7 @@ export async function sendRoomMessageNotification(input: RoomNotificationInput):
   const room = input.room;
   if (!room) return { eligible: false, reason: "missing_room" };
 
-  const {
-    isPermissionGranted,
-    requestPermission,
-    sendNotification
-  } = await import("@tauri-apps/plugin-notification");
+  const { isPermissionGranted, requestPermission, sendNotification } = await import("@tauri-apps/plugin-notification");
   let permissionGranted = await isPermissionGranted();
   if (!permissionGranted) {
     permissionGranted = (await requestPermission()) === "granted";
@@ -134,28 +124,30 @@ export function registerRoomNotificationClickFocus({
 
   let listener: PluginListener | null = null;
   let disposed = false;
-  void import("@tauri-apps/plugin-notification").then(({ onAction }) =>
-    onAction(async (notification) => {
-      const roomId = roomIdFromNotificationExtra(notification.extra);
-      if (!roomId) return;
-      const room = roomsRef.current.find((item) => item.id === roomId);
-      if (!room) return;
-      selectWorkspaceRoom(room.teamId, room.id);
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      const currentWindow = getCurrentWindow();
-      await currentWindow.show();
-      await currentWindow.unminimize();
-      await currentWindow.setFocus();
-    }).then((registeredListener) => {
-      if (disposed) {
-        registeredListener.unregister();
-        return;
-      }
-      listener = registeredListener;
-    })
-  ).catch(() => {
-    console.warn("Failed to register room notification click handler");
-  });
+  void import("@tauri-apps/plugin-notification")
+    .then(({ onAction }) =>
+      onAction(async (notification) => {
+        const roomId = roomIdFromNotificationExtra(notification.extra);
+        if (!roomId) return;
+        const room = roomsRef.current.find((item) => item.id === roomId);
+        if (!room) return;
+        selectWorkspaceRoom(room.teamId, room.id);
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const currentWindow = getCurrentWindow();
+        await currentWindow.show();
+        await currentWindow.unminimize();
+        await currentWindow.setFocus();
+      }).then((registeredListener) => {
+        if (disposed) {
+          registeredListener.unregister();
+          return;
+        }
+        listener = registeredListener;
+      })
+    )
+    .catch(() => {
+      console.warn("Failed to register room notification click handler");
+    });
 
   return () => {
     disposed = true;

@@ -101,19 +101,22 @@ test("team room defaults sanitize unsupported approval policies", () => {
 });
 
 test("team room defaults sanitize Codex model", () => {
-  assert.deepEqual(sanitizeTeamRoomDefaults({
-    approvalPolicy: "ask_every_turn",
-    codexModel: "gpt-5.4-mini",
-    browserAllowedOrigins: ["https://github.com"],
-    browserProfilePersistent: true,
-    inviteApprovalGate: false
-  }), {
-    approvalPolicy: "ask_every_turn",
-    codexModel: "gpt-5.4-mini",
-    browserAllowedOrigins: ["https://github.com"],
-    browserProfilePersistent: true,
-    inviteApprovalGate: false
-  });
+  assert.deepEqual(
+    sanitizeTeamRoomDefaults({
+      approvalPolicy: "ask_every_turn",
+      codexModel: "gpt-5.4-mini",
+      browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: true,
+      inviteApprovalGate: false
+    }),
+    {
+      approvalPolicy: "ask_every_turn",
+      codexModel: "gpt-5.4-mini",
+      browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: true,
+      inviteApprovalGate: false
+    }
+  );
 
   assert.deepEqual(sanitizeTeamRoomDefaults({ codexModel: "not a model id" }), {
     approvalPolicy: "ask_every_turn",
@@ -125,48 +128,57 @@ test("team room defaults sanitize Codex model", () => {
 });
 
 test("team room defaults sanitize browser policy", () => {
-  assert.deepEqual(sanitizeTeamRoomDefaults({
-    approvalPolicy: "auto_browser_allowed_sites",
-    codexModel: "gpt-5.4-thinking",
-    browserAllowedOrigins: ["https://github.com/path"],
-    browserProfilePersistent: "yes" as never
-  }), {
-    approvalPolicy: "ask_every_turn",
-    codexModel: "gpt-5.4-thinking",
-    browserAllowedOrigins: ["https://github.com"],
-    browserProfilePersistent: true,
-    inviteApprovalGate: true
-  });
+  assert.deepEqual(
+    sanitizeTeamRoomDefaults({
+      approvalPolicy: "auto_browser_allowed_sites",
+      codexModel: "gpt-5.4-thinking",
+      browserAllowedOrigins: ["https://github.com/path"],
+      browserProfilePersistent: "yes" as never
+    }),
+    {
+      approvalPolicy: "ask_every_turn",
+      codexModel: "gpt-5.4-thinking",
+      browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: true,
+      inviteApprovalGate: true
+    }
+  );
 
-  assert.deepEqual(sanitizeTeamRoomDefaults({
-    approvalPolicy: "auto_browser_allowed_sites",
-    codexModel: "gpt-5.4-mini",
-    browserAllowedOrigins: ["https://github.com", "https://github.com"],
-    browserProfilePersistent: false,
-    inviteApprovalGate: true
-  }), {
-    approvalPolicy: "ask_every_turn",
-    codexModel: "gpt-5.4-mini",
-    browserAllowedOrigins: ["https://github.com"],
-    browserProfilePersistent: false,
-    inviteApprovalGate: true
-  });
+  assert.deepEqual(
+    sanitizeTeamRoomDefaults({
+      approvalPolicy: "auto_browser_allowed_sites",
+      codexModel: "gpt-5.4-mini",
+      browserAllowedOrigins: ["https://github.com", "https://github.com"],
+      browserProfilePersistent: false,
+      inviteApprovalGate: true
+    }),
+    {
+      approvalPolicy: "ask_every_turn",
+      codexModel: "gpt-5.4-mini",
+      browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: false,
+      inviteApprovalGate: true
+    }
+  );
 });
 
 test("team room defaults sanitize invite policy", () => {
-  assert.deepEqual(sanitizeTeamRoomDefaults({
-    approvalPolicy: "ask_every_turn",
-    codexModel: "gpt-5.4",
-    browserAllowedOrigins: ["https://github.com"],
-    browserProfilePersistent: true,
-    inviteApprovalGate: "yes" as never
-  }), {
-    approvalPolicy: "ask_every_turn",
-    codexModel: "gpt-5.4",
-    browserAllowedOrigins: ["https://github.com"],
-    browserProfilePersistent: true,
-    inviteApprovalGate: true
-  });
+  assert.deepEqual(
+    sanitizeTeamRoomDefaults({
+      approvalPolicy: "ask_every_turn",
+      codexModel: "gpt-5.4",
+      browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: true,
+      inviteApprovalGate: "yes" as never
+    }),
+    {
+      approvalPolicy: "ask_every_turn",
+      codexModel: "gpt-5.4",
+      browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: true,
+      inviteApprovalGate: true
+    }
+  );
 });
 
 test("team defaults room settings include only host-controlled room settings", () => {

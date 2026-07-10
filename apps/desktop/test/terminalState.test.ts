@@ -6,13 +6,14 @@ const alphaTerminal = { id: "alpha:dev", roomId: "alpha", name: "dev", running: 
 const betaTerminal = { id: "beta:dev", roomId: "beta", name: "dev", running: true };
 
 test("replaceRoomTerminalSnapshots updates only one room", () => {
-  const next = replaceRoomTerminalSnapshots(
-    [alphaTerminal, betaTerminal],
-    "alpha",
-    [{ id: "alpha:test", roomId: "alpha", name: "test", running: false }]
-  );
+  const next = replaceRoomTerminalSnapshots([alphaTerminal, betaTerminal], "alpha", [
+    { id: "alpha:test", roomId: "alpha", name: "test", running: false }
+  ]);
 
-  assert.deepEqual(next.map((terminal) => terminal.id), ["alpha:test", "beta:dev"]);
+  assert.deepEqual(
+    next.map((terminal) => terminal.id),
+    ["alpha:test", "beta:dev"]
+  );
   assert.equal(next.find((terminal) => terminal.id === "beta:dev")?.running, true);
 });
 

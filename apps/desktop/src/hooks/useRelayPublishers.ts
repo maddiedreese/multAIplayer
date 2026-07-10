@@ -250,7 +250,10 @@ export function useRelayPublishers({
   }
 
   async function publishCodexQueueEvent(
-    event: Omit<CodexQueuePlaintextPayload, "eventType" | "queueEventId" | "requestedBy" | "requestedByUserId" | "createdAt">,
+    event: Omit<
+      CodexQueuePlaintextPayload,
+      "eventType" | "queueEventId" | "requestedBy" | "requestedByUserId" | "createdAt"
+    >,
     room: RoomRecord = selectedRoom
   ) {
     const payload: CodexQueuePlaintextPayload = {
@@ -287,11 +290,14 @@ export function useRelayPublishers({
       changedByUserId: localUser.id,
       ...event
     };
-    appendRoomMessage(room.id, buildRoomSettingsSystemMessage(payload, {
-      approvalPolicyLabels,
-      approvalDelegationPolicyLabels,
-      roomModeLabels
-    }));
+    appendRoomMessage(
+      room.id,
+      buildRoomSettingsSystemMessage(payload, {
+        approvalPolicyLabels,
+        approvalDelegationPolicyLabels,
+        roomModeLabels
+      })
+    );
 
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;

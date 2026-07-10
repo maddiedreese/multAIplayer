@@ -41,7 +41,10 @@ function acquireSmokeLock(token) {
     let descriptor;
     try {
       descriptor = openSync(lockPath, "wx", 0o600);
-      writeFileSync(descriptor, JSON.stringify({ pid: process.pid, runnerPid: process.pid, token, startedAt: new Date().toISOString() }));
+      writeFileSync(
+        descriptor,
+        JSON.stringify({ pid: process.pid, runnerPid: process.pid, token, startedAt: new Date().toISOString() })
+      );
       closeSync(descriptor);
       descriptor = undefined;
       return;
@@ -56,7 +59,12 @@ function acquireSmokeLock(token) {
         owner = null;
       }
       if (processIsAlive(owner?.pid)) {
-        throw new Error(`Desktop smoke test is already active in process ${owner.pid}. Refusing to launch another copy.`);
+        throw new Error(
+          `Desktop smoke test is already active in process ${owner.pid}. Refusing to launch another copy.`,
+          {
+            cause: error
+          }
+        );
       }
       try {
         unlinkSync(lockPath);
@@ -82,7 +90,9 @@ function updateSmokeLockOwner(token, childPid) {
   if (owner?.runnerPid !== process.pid || owner?.token !== token) {
     throw new Error("Desktop smoke-test lock ownership changed before the worker started");
   }
-  writeFileSync(lockPath, JSON.stringify({ ...owner, pid: childPid, workerStartedAt: new Date().toISOString() }), { mode: 0o600 });
+  writeFileSync(lockPath, JSON.stringify({ ...owner, pid: childPid, workerStartedAt: new Date().toISOString() }), {
+    mode: 0o600
+  });
 }
 
 function terminateProcessGroup(child, signal) {
@@ -97,16 +107,16 @@ function terminateProcessGroup(child, signal) {
 
 function runTsxTests(files, { label, timeoutMs, environment = {}, onSpawn }) {
   return new Promise((resolveRun, rejectRun) => {
-    const child = spawn(process.execPath, [
-      resolve(repositoryRoot, "node_modules", "tsx", "dist", "cli.mjs"),
-      "--test",
-      ...files
-    ], {
-      cwd: desktopRoot,
-      detached: process.platform !== "win32",
-      env: { ...process.env, ...environment },
-      stdio: "inherit"
-    });
+    const child = spawn(
+      process.execPath,
+      [resolve(repositoryRoot, "node_modules", "tsx", "dist", "cli.mjs"), "--test", ...files],
+      {
+        cwd: desktopRoot,
+        detached: process.platform !== "win32",
+        env: { ...process.env, ...environment },
+        stdio: "inherit"
+      }
+    );
     activeChild = child;
     let timedOut = false;
     let forceKillTimer;

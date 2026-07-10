@@ -17,7 +17,10 @@ test("messageInvokesCodex rejects ordinary words and longer handles", () => {
 
 test("extractCodexBrowserOpenUrl reads Codex-addressed browser commands", () => {
   assert.equal(extractCodexBrowserOpenUrl("codex, open localhost"), "http://localhost/");
-  assert.equal(extractCodexBrowserOpenUrl("@Codex open github.com/maddiedreese/multAIplayer"), "http://github.com/maddiedreese/multAIplayer");
+  assert.equal(
+    extractCodexBrowserOpenUrl("@Codex open github.com/maddiedreese/multAIplayer"),
+    "http://github.com/maddiedreese/multAIplayer"
+  );
   assert.equal(extractCodexBrowserOpenUrl("please open localhost"), null);
 });
 

@@ -1,14 +1,10 @@
-import {
-  approvalPolicyLabels
-} from "../seedData";
+import { approvalPolicyLabels } from "../seedData";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
 import type { createAppRoomActions } from "../lib/appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
-import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { WorkspaceRecordActions } from "../lib/workspaceRecordActions";
-import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import type { useRoomSettingsActor } from "./useRoomSettingsActor";
 import { useWorkspaceFlowContext } from "./useWorkspaceFlowContext";
@@ -16,10 +12,8 @@ import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
 
 type AppRefs = ReturnType<typeof useAppRefs>;
-type GitHubAuth = ReturnType<typeof useGitHubAuth>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
-type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
 type RoomActions = ReturnType<typeof createAppRoomActions>;
 type InviteActions = ReturnType<typeof useAppInviteActions>;
@@ -27,10 +21,8 @@ type RoomSettingsActor = ReturnType<typeof useRoomSettingsActor>;
 
 export function useAppWorkspaceFlow({
   appRefs,
-  githubAuth,
   localIdentity,
   selected,
-  selectedRuntime,
   roomInteraction,
   roomActions,
   workspaceRecords,
@@ -38,10 +30,8 @@ export function useAppWorkspaceFlow({
   roomSettingsActor
 }: {
   appRefs: AppRefs;
-  githubAuth: GitHubAuth;
   localIdentity: LocalIdentity;
   selected: SelectedRoomContext;
-  selectedRuntime: SelectedRoomRuntime;
   roomInteraction: RoomInteraction;
   roomActions: RoomActions;
   workspaceRecords: WorkspaceRecordActions;
@@ -49,32 +39,29 @@ export function useAppWorkspaceFlow({
   roomSettingsActor: RoomSettingsActor;
 }) {
   const {
-    relayHttpUrl, selectedRoomId, selectedTeam, deviceIdentity, forgottenRoomIds,
-    revokedRoomIds, revokedTeamIds, rooms, searchActive
-  } = useAppStore(useShallow((state) => ({
-    relayHttpUrl: state.appConfig.relayHttpUrl,
-    selectedRoomId: state.selectedRoomId,
-    selectedTeam: state.selectedTeam,
-    deviceIdentity: state.deviceIdentity,
-    forgottenRoomIds: state.forgottenRoomIds,
-    revokedRoomIds: state.revokedRoomIds,
-    revokedTeamIds: state.revokedTeamIds,
-    rooms: state.rooms,
-    searchActive: Boolean(state.sidebarQuery.trim())
-  })));
-  const {
-    hasSelectedRoom,
-    selectedRoom,
-    selectedTeamName,
-    messages,
-    selectedMessages,
-    browserRequests,
-    fileSaveRequests,
-    gitStatus,
-    selectedFile,
-    selectedDiff,
-    terminalLines
-  } = selected;
+    relayHttpUrl,
+    selectedRoomId,
+    selectedTeam,
+    deviceIdentity,
+    forgottenRoomIds,
+    revokedRoomIds,
+    revokedTeamIds,
+    rooms,
+    searchActive
+  } = useAppStore(
+    useShallow((state) => ({
+      relayHttpUrl: state.appConfig.relayHttpUrl,
+      selectedRoomId: state.selectedRoomId,
+      selectedTeam: state.selectedTeam,
+      deviceIdentity: state.deviceIdentity,
+      forgottenRoomIds: state.forgottenRoomIds,
+      revokedRoomIds: state.revokedRoomIds,
+      revokedTeamIds: state.revokedTeamIds,
+      rooms: state.rooms,
+      searchActive: Boolean(state.sidebarQuery.trim())
+    }))
+  );
+  const { hasSelectedRoom, selectedRoom } = selected;
   const {
     setSelectedInviteMessage,
     setSelectedTeamHistoryMessage,
@@ -113,8 +100,6 @@ export function useAppWorkspaceFlow({
         acceptInvite: inviteActions.acceptInvite,
         setSelectedInviteMessage
       }
-    },
-    markdownCopy: {
     },
     workspaceRoomActions: {
       members: {
@@ -186,7 +171,7 @@ export function useAppWorkspaceFlow({
 
 type AppStore = ReturnType<typeof useAppStore.getState>;
 type StoreActionKey = {
-  [K in keyof AppStore]: AppStore[K] extends (...args: any[]) => any ? K : never
+  [K in keyof AppStore]: AppStore[K] extends (...args: never[]) => unknown ? K : never;
 }[keyof AppStore];
 
 const cachedStoreActions = new Map<StoreActionKey, AppStore[StoreActionKey]>();

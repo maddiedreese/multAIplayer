@@ -34,7 +34,10 @@ test("room protocol derives its reasoning enum from the shared options", () => {
   });
 
   assert.equal(room.codexReasoningEffort, "max");
-  assert.deepEqual(codexReasoningEffortIds, codexReasoningEffortOptions.map(({ id }) => id));
+  assert.deepEqual(
+    codexReasoningEffortIds,
+    codexReasoningEffortOptions.map(({ id }) => id)
+  );
   assert.equal(defaultCodexModelPolicy, "auto");
   assert.equal(defaultCodexReasoningEffortPolicy, "auto");
   assert.equal(defaultCodexServiceTierPolicy, "auto");

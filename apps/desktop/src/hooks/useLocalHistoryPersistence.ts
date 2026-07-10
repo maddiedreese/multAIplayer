@@ -92,30 +92,38 @@ export function useLocalHistoryPersistence({
 }: UseLocalHistoryPersistenceOptions) {
   useEffect(() => {
     if (!hasSelectedRoom) return;
-    if (forgottenRoomIds.has(selectedRoomId) || revokedRoomIds.has(selectedRoomId) || revokedTeamIds.has(selectedRoomTeamId)) return;
+    if (
+      forgottenRoomIds.has(selectedRoomId) ||
+      revokedRoomIds.has(selectedRoomId) ||
+      revokedTeamIds.has(selectedRoomTeamId)
+    )
+      return;
     if (!historyLoadedRoomIds.current.has(selectedRoomId)) return;
-    const payload = pruneLocalRoomHistory({
-      version: 3,
-      messages,
-      chatEdits,
-      chatDeletes,
-      readState: localRoomReadStateForHistory(selectedRoom, messages),
-      terminalRequests,
-      fileSaveRequests,
-      browserRequests,
-      inviteRequests,
-      codexEvents,
-      codexActivities,
-      gitWorkflowEvents,
-      githubActionsEvents,
-      localPreviews,
-      terminalSnapshots: terminalsForLocalHistory(terminals.filter((terminal) => terminal.roomId === selectedRoomId)),
-      hostHandoffs,
-      queuedCodexTurns,
-      ...(roomGoal ? { roomGoal } : {}),
-      ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {}),
-      ...(codexThreadGraph.activeThreadId ? { codexThreadGraph } : {})
-    }, historySettings.retentionDays);
+    const payload = pruneLocalRoomHistory(
+      {
+        version: 3,
+        messages,
+        chatEdits,
+        chatDeletes,
+        readState: localRoomReadStateForHistory(selectedRoom, messages),
+        terminalRequests,
+        fileSaveRequests,
+        browserRequests,
+        inviteRequests,
+        codexEvents,
+        codexActivities,
+        gitWorkflowEvents,
+        githubActionsEvents,
+        localPreviews,
+        terminalSnapshots: terminalsForLocalHistory(terminals.filter((terminal) => terminal.roomId === selectedRoomId)),
+        hostHandoffs,
+        queuedCodexTurns,
+        ...(roomGoal ? { roomGoal } : {}),
+        ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {}),
+        ...(codexThreadGraph.activeThreadId ? { codexThreadGraph } : {})
+      },
+      historySettings.retentionDays
+    );
     saveEncryptedHistory(selectedRoomId, payload satisfies LocalRoomHistoryPayload).catch(() => {
       console.warn("Failed to save encrypted local history");
     });
@@ -124,6 +132,7 @@ export function useLocalHistoryPersistence({
     fileSaveRequests,
     historySettings.enabled,
     historySettings.retentionDays,
+    historyLoadedRoomIds,
     hostHandoffs,
     queuedCodexTurns,
     roomGoal,

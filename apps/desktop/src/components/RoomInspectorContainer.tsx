@@ -28,12 +28,7 @@ import { useFileTerminalDisplay } from "../hooks/useFileTerminalDisplay";
 import { useGitHubWorkflowState } from "../hooks/useGitHubWorkflowState";
 import { useLocalIdentity } from "../hooks/useLocalIdentity";
 import { useRoomAccess } from "../hooks/useRoomAccess";
-import {
-  approvalDelegationPolicyLabels,
-  approvalPolicyLabels,
-  defaultBrowserUrl,
-  emptyRoom
-} from "../seedData";
+import { approvalDelegationPolicyLabels, approvalPolicyLabels, defaultBrowserUrl, emptyRoom } from "../seedData";
 import { useAppStore } from "../store/appStore";
 import type { BrowserRoomState } from "../store/slices/browserSlice";
 import type { CodexRuntimeRoomState } from "../store/slices/codexHostHandoffSlice";
@@ -164,119 +159,155 @@ const emptyRoomSettings: RoomSettingsRoomState = {};
 const emptyTerminal: TerminalRoomState = {};
 
 export function RoomInspectorContainer({ sources }: { sources: RoomInspectorSources }) {
-  const capabilities = useMemo<RoomInspectorCapabilities>(() => ({
-    browser: { openNow: sources.roomRuntime.openRoomBrowserNow },
-    project: {
-      choosePath: sources.roomRuntime.chooseProjectPath,
-      updatePath: sources.roomRuntime.updateProjectPath
-    },
-    teamRoster: {
-      onPromote: (member) => sources.workspaceFlow.changeTeamMemberRole(member, "admin"),
-      onDemote: (member) => sources.workspaceFlow.changeTeamMemberRole(member, "member"),
-      onTransferOwnership: sources.workspaceFlow.transferOwnershipToTeamMember,
-      onRemove: sources.workspaceFlow.removeMemberFromTeam
-    },
-    roomMembers: {
-      onCopyFingerprint: (member) => sources.workspaceFlow.copyRoomMemberDeviceFingerprint(member, member.trusted),
-      onTrust: sources.workspaceFlow.trustRoomMemberDevice,
-      onUntrust: sources.workspaceFlow.untrustRoomMemberDevice
-    },
-    hostHandoff: { accept: sources.hostHandoff.acceptHostHandoff },
-    invite: {
-      onCopyInvite: sources.inviteActions.copyInviteLink,
-      onImportInvite: sources.inviteActions.joinInviteSecret,
-      onRotateRoomKey: sources.inviteActions.rotateSelectedRoomKey,
-      onDecideInviteRequest: sources.inviteActions.decideInviteJoinRequest
-    },
-    settings: {
-      selectApprovalPolicy: sources.roomRuntime.setApprovalPolicy,
-      selectApprovalDelegationPolicy: sources.roomRuntime.setApprovalDelegationPolicy,
-      selectSandboxLevel: sources.roomRuntime.setCodexSandboxLevel,
-      selectModel: sources.roomRuntime.setCodexModel,
-      selectReasoningEffort: sources.roomRuntime.setCodexReasoningEffort,
-      selectSpeed: sources.roomRuntime.setCodexSpeed
-    },
-    history: {
-      onHistoryEnabledChange: (enabled) => sources.workspaceFlow.updateLocalHistorySettings({
-        ...useAppStore.getState().historySettings,
-        enabled
-      }),
-      onHistoryRetentionDaysChange: (retentionDays) => sources.workspaceFlow.updateLocalHistorySettings({
-        ...useAppStore.getState().historySettings,
-        retentionDays
-      }),
-      onClearRoomHistory: sources.workspaceFlow.clearRoomHistory,
-      onForgetRoomLocalData: sources.workspaceFlow.forgetSelectedRoomLocalData,
-      onApplyTeamDefaultsToRoom: sources.workspaceFlow.applyTeamDefaultsToRoom,
-      onTeamHistoryEnabledChange: (enabled) => sources.workspaceFlow.updateTeamHistoryDefaults({
-        ...useAppStore.getState().teamHistorySettings,
-        enabled
-      }),
-      onTeamHistoryRetentionDaysChange: (retentionDays) => sources.workspaceFlow.updateTeamHistoryDefaults({
-        ...useAppStore.getState().teamHistorySettings,
-        retentionDays
-      }),
-      onTeamDefaultApprovalPolicyChange: sources.workspaceFlow.updateTeamDefaultApprovalPolicy,
-      onTeamDefaultCodexModelChange: sources.workspaceFlow.updateTeamDefaultCodexModel,
-      onTeamDefaultInviteApprovalGateChange: sources.workspaceFlow.updateTeamDefaultInviteApprovalGate
-    },
-    workspaceFiles: sources.roomPanels.workspaceFilesPanelActions,
-    git: {
-      onCopyPullRequestDraftMarkdown: sources.workspaceFlow.copyPullRequestDraftMarkdown,
-      onApproveGitWorkflow: sources.roomRuntime.approveGitWorkflow
-    },
-    github: { refresh: sources.roomRuntime.refreshGitHubActions },
-    terminal: sources.roomPanels.terminalPanelActions
-  }), [sources]);
-  const view = useAppStore(useShallow((state) => {
-    const selectedRoom = state.rooms.find((room) => room.id === state.selectedRoomId) ?? state.rooms[0] ?? emptyRoom;
-    const selectedTeamId = state.selectedTeam;
-    const presenceState = state.historyPresenceByRoom[selectedRoom.id];
-    return {
-      currentUser: state.currentUser,
-      authConfig: state.authConfig,
-      selectedRoom,
-      hasSelectedRoom: state.rooms.some((room) => room.id === state.selectedRoomId),
-      selectedTeamId,
-      selectedTeam: state.teams.find((team) => team.id === selectedTeamId) ?? null,
-      browser: state.browserByRoom[selectedRoom.id] ?? emptyBrowser,
-      codexRuntime: state.codexRuntimeByRoom[selectedRoom.id] ?? emptyCodexRuntime,
-      filePanel: state.filePanelByRoom[selectedRoom.id] ?? emptyFilePanel,
-      gitRuntime: state.gitWorkflowRuntimeByRoom[selectedRoom.id] ?? emptyGitRuntime,
-      invite: state.inviteByRoom[selectedRoom.id] ?? emptyInvite,
-      roomSettings: state.roomSettingsByRoom[selectedRoom.id] ?? emptyRoomSettings,
-      terminal: state.terminalRuntimeByRoom[selectedRoom.id] ?? emptyTerminal,
-      terminals: state.terminals,
-      teamRoster: state.teamRosterByTeam[selectedTeamId],
-      presence: presenceState?.presence,
-      inspectorTab: presenceState?.inspectorTab ?? "files",
-      historyMessage: presenceState?.historyMessage ?? null,
-      teamHistoryMessage: state.teamHistoryByTeam[selectedTeamId || "__no-team"]?.message ?? null,
-      sensitiveAttachmentReviewKey: state.sensitiveAttachmentReviewKey,
-      deviceIdentity: state.deviceIdentity,
-      deviceIdentityMessage: state.deviceIdentityMessage,
-      trustedDeviceKeys: state.trustedDeviceKeys,
-      forgottenRoomIds: state.forgottenRoomIds,
-      revokedRoomIds: state.revokedRoomIds,
-      revokedTeamIds: state.revokedTeamIds,
-      historySettings: state.historySettings,
-      teamHistorySettings: state.teamHistorySettings,
-      teamDefaultApprovalPolicy: state.teamDefaultApprovalPolicy,
-      teamDefaultCodexModel: state.teamDefaultCodexModel,
-      teamDefaultBrowserProfilePersistent: state.teamDefaultBrowserProfilePersistent,
-      teamDefaultInviteApprovalGate: state.teamDefaultInviteApprovalGate,
-      codexProbe: state.codexProbe,
-      inviteSecretInput: state.inviteSecretInput
-    };
-  }));
+  const capabilities = useMemo<RoomInspectorCapabilities>(
+    () => ({
+      browser: { openNow: sources.roomRuntime.openRoomBrowserNow },
+      project: {
+        choosePath: sources.roomRuntime.chooseProjectPath,
+        updatePath: sources.roomRuntime.updateProjectPath
+      },
+      teamRoster: {
+        onPromote: (member) => sources.workspaceFlow.changeTeamMemberRole(member, "admin"),
+        onDemote: (member) => sources.workspaceFlow.changeTeamMemberRole(member, "member"),
+        onTransferOwnership: sources.workspaceFlow.transferOwnershipToTeamMember,
+        onRemove: sources.workspaceFlow.removeMemberFromTeam
+      },
+      roomMembers: {
+        onCopyFingerprint: (member) => sources.workspaceFlow.copyRoomMemberDeviceFingerprint(member, member.trusted),
+        onTrust: sources.workspaceFlow.trustRoomMemberDevice,
+        onUntrust: sources.workspaceFlow.untrustRoomMemberDevice
+      },
+      hostHandoff: { accept: sources.hostHandoff.acceptHostHandoff },
+      invite: {
+        onCopyInvite: sources.inviteActions.copyInviteLink,
+        onImportInvite: sources.inviteActions.joinInviteSecret,
+        onRotateRoomKey: sources.inviteActions.rotateSelectedRoomKey,
+        onDecideInviteRequest: sources.inviteActions.decideInviteJoinRequest
+      },
+      settings: {
+        selectApprovalPolicy: sources.roomRuntime.setApprovalPolicy,
+        selectApprovalDelegationPolicy: sources.roomRuntime.setApprovalDelegationPolicy,
+        selectSandboxLevel: sources.roomRuntime.setCodexSandboxLevel,
+        selectModel: sources.roomRuntime.setCodexModel,
+        selectReasoningEffort: sources.roomRuntime.setCodexReasoningEffort,
+        selectSpeed: sources.roomRuntime.setCodexSpeed
+      },
+      history: {
+        onHistoryEnabledChange: (enabled) =>
+          sources.workspaceFlow.updateLocalHistorySettings({
+            ...useAppStore.getState().historySettings,
+            enabled
+          }),
+        onHistoryRetentionDaysChange: (retentionDays) =>
+          sources.workspaceFlow.updateLocalHistorySettings({
+            ...useAppStore.getState().historySettings,
+            retentionDays
+          }),
+        onClearRoomHistory: sources.workspaceFlow.clearRoomHistory,
+        onForgetRoomLocalData: sources.workspaceFlow.forgetSelectedRoomLocalData,
+        onApplyTeamDefaultsToRoom: sources.workspaceFlow.applyTeamDefaultsToRoom,
+        onTeamHistoryEnabledChange: (enabled) =>
+          sources.workspaceFlow.updateTeamHistoryDefaults({
+            ...useAppStore.getState().teamHistorySettings,
+            enabled
+          }),
+        onTeamHistoryRetentionDaysChange: (retentionDays) =>
+          sources.workspaceFlow.updateTeamHistoryDefaults({
+            ...useAppStore.getState().teamHistorySettings,
+            retentionDays
+          }),
+        onTeamDefaultApprovalPolicyChange: sources.workspaceFlow.updateTeamDefaultApprovalPolicy,
+        onTeamDefaultCodexModelChange: sources.workspaceFlow.updateTeamDefaultCodexModel,
+        onTeamDefaultInviteApprovalGateChange: sources.workspaceFlow.updateTeamDefaultInviteApprovalGate
+      },
+      workspaceFiles: sources.roomPanels.workspaceFilesPanelActions,
+      git: {
+        onCopyPullRequestDraftMarkdown: sources.workspaceFlow.copyPullRequestDraftMarkdown,
+        onApproveGitWorkflow: sources.roomRuntime.approveGitWorkflow
+      },
+      github: { refresh: sources.roomRuntime.refreshGitHubActions },
+      terminal: sources.roomPanels.terminalPanelActions
+    }),
+    [sources]
+  );
+  const view = useAppStore(
+    useShallow((state) => {
+      const selectedRoom = state.rooms.find((room) => room.id === state.selectedRoomId) ?? state.rooms[0] ?? emptyRoom;
+      const selectedTeamId = state.selectedTeam;
+      const presenceState = state.historyPresenceByRoom[selectedRoom.id];
+      return {
+        currentUser: state.currentUser,
+        authConfig: state.authConfig,
+        selectedRoom,
+        hasSelectedRoom: state.rooms.some((room) => room.id === state.selectedRoomId),
+        selectedTeamId,
+        selectedTeam: state.teams.find((team) => team.id === selectedTeamId) ?? null,
+        browser: state.browserByRoom[selectedRoom.id] ?? emptyBrowser,
+        codexRuntime: state.codexRuntimeByRoom[selectedRoom.id] ?? emptyCodexRuntime,
+        filePanel: state.filePanelByRoom[selectedRoom.id] ?? emptyFilePanel,
+        gitRuntime: state.gitWorkflowRuntimeByRoom[selectedRoom.id] ?? emptyGitRuntime,
+        invite: state.inviteByRoom[selectedRoom.id] ?? emptyInvite,
+        roomSettings: state.roomSettingsByRoom[selectedRoom.id] ?? emptyRoomSettings,
+        terminal: state.terminalRuntimeByRoom[selectedRoom.id] ?? emptyTerminal,
+        terminals: state.terminals,
+        teamRoster: state.teamRosterByTeam[selectedTeamId],
+        presence: presenceState?.presence,
+        inspectorTab: presenceState?.inspectorTab ?? "files",
+        historyMessage: presenceState?.historyMessage ?? null,
+        teamHistoryMessage: state.teamHistoryByTeam[selectedTeamId || "__no-team"]?.message ?? null,
+        sensitiveAttachmentReviewKey: state.sensitiveAttachmentReviewKey,
+        deviceIdentity: state.deviceIdentity,
+        deviceIdentityMessage: state.deviceIdentityMessage,
+        trustedDeviceKeys: state.trustedDeviceKeys,
+        forgottenRoomIds: state.forgottenRoomIds,
+        revokedRoomIds: state.revokedRoomIds,
+        revokedTeamIds: state.revokedTeamIds,
+        historySettings: state.historySettings,
+        teamHistorySettings: state.teamHistorySettings,
+        teamDefaultApprovalPolicy: state.teamDefaultApprovalPolicy,
+        teamDefaultCodexModel: state.teamDefaultCodexModel,
+        teamDefaultBrowserProfilePersistent: state.teamDefaultBrowserProfilePersistent,
+        teamDefaultInviteApprovalGate: state.teamDefaultInviteApprovalGate,
+        codexProbe: state.codexProbe,
+        inviteSecretInput: state.inviteSecretInput
+      };
+    })
+  );
   const {
-    currentUser, authConfig, selectedRoom, hasSelectedRoom, selectedTeamId, selectedTeam,
-    browser, codexRuntime, filePanel, gitRuntime, invite, roomSettings, terminal,
-    terminals, teamRoster, presence, inspectorTab, historyMessage, teamHistoryMessage,
-    sensitiveAttachmentReviewKey, deviceIdentity, deviceIdentityMessage, trustedDeviceKeys,
-    forgottenRoomIds, revokedRoomIds, revokedTeamIds, historySettings, teamHistorySettings,
-    teamDefaultApprovalPolicy, teamDefaultCodexModel, teamDefaultBrowserProfilePersistent,
-    teamDefaultInviteApprovalGate, codexProbe, inviteSecretInput
+    currentUser,
+    authConfig,
+    selectedRoom,
+    hasSelectedRoom,
+    selectedTeamId,
+    selectedTeam,
+    browser,
+    codexRuntime,
+    filePanel,
+    gitRuntime,
+    invite,
+    roomSettings,
+    terminal,
+    terminals,
+    teamRoster,
+    presence,
+    inspectorTab,
+    historyMessage,
+    teamHistoryMessage,
+    sensitiveAttachmentReviewKey,
+    deviceIdentity,
+    deviceIdentityMessage,
+    trustedDeviceKeys,
+    forgottenRoomIds,
+    revokedRoomIds,
+    revokedTeamIds,
+    historySettings,
+    teamHistorySettings,
+    teamDefaultApprovalPolicy,
+    teamDefaultCodexModel,
+    teamDefaultBrowserProfilePersistent,
+    teamDefaultInviteApprovalGate,
+    codexProbe,
+    inviteSecretInput
   } = view;
   const {
     setBrowserUrlForRoom,
@@ -340,23 +371,25 @@ export function RoomInspectorContainer({ sources }: { sources: RoomInspectorSour
   });
   const resolvedSettings = resolveCodexRunSettings(selectedRoom, codexProbe);
   const teamMemberRows = useMemo(
-    () => buildTeamMemberRows({
-      members: teamRoster?.members ?? [],
-      team: selectedTeam,
-      currentUser,
-      localUserId: localUser.id
-    }),
+    () =>
+      buildTeamMemberRows({
+        members: teamRoster?.members ?? [],
+        team: selectedTeam,
+        currentUser,
+        localUserId: localUser.id
+      }),
     [currentUser, localUser.id, selectedTeam, teamRoster?.members]
   );
   const roomMemberRows = useMemo(
-    () => buildRoomMemberRows({
-      presence: presence ?? {},
-      room: selectedRoom,
-      localUser,
-      localDeviceId: deviceId,
-      localPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
-      trustedDeviceKeys
-    }),
+    () =>
+      buildRoomMemberRows({
+        presence: presence ?? {},
+        room: selectedRoom,
+        localUser,
+        localDeviceId: deviceId,
+        localPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
+        trustedDeviceKeys
+      }),
     [deviceId, deviceIdentity?.publicKeyFingerprint, localUser, presence, selectedRoom, trustedDeviceKeys]
   );
   const gitStatus = gitRuntime.workflow?.status ?? null;
@@ -373,11 +406,16 @@ export function RoomInspectorContainer({ sources }: { sources: RoomInspectorSour
       branchLabel: gitStatus?.branch ?? "loading",
       disabled: !hasSelectedRoom || access.isSelectedRoomLocked || settingsBusy || !access.isActiveHost,
       attachDisabled:
-        !hasSelectedRoom || access.isSelectedRoomLocked || settingsBusy || !access.isActiveHost ||
-        !projectPathDraft.trim() || projectPathDraft.trim() === selectedRoom.projectPath,
+        !hasSelectedRoom ||
+        access.isSelectedRoomLocked ||
+        settingsBusy ||
+        !access.isActiveHost ||
+        !projectPathDraft.trim() ||
+        projectPathDraft.trim() === selectedRoom.projectPath,
       onProjectPathDraftChange: (path) => setProjectPathDraftForRoom(selectedRoom.id, path, selectedRoom.projectPath),
       onChooseProjectPath: capabilities.project.choosePath,
-      onUseDefaultProjectPath: () => setProjectPathDraftForRoom(selectedRoom.id, defaultProjectPath, selectedRoom.projectPath),
+      onUseDefaultProjectPath: () =>
+        setProjectPathDraftForRoom(selectedRoom.id, defaultProjectPath, selectedRoom.projectPath),
       onUpdateProjectPath: capabilities.project.updatePath
     },
     teamRoster: {
@@ -509,7 +547,9 @@ export function RoomInspectorContainer({ sources }: { sources: RoomInspectorSour
       lastChecked: gitRuntime.actions?.lastChecked ?? null,
       busy: Boolean(gitRuntime.actions?.busy),
       refreshDisabled:
-        !access.canReadLocalWorkspace || Boolean(gitRuntime.actions?.busy) || !access.isActiveHost ||
+        !access.canReadLocalWorkspace ||
+        Boolean(gitRuntime.actions?.busy) ||
+        !access.isActiveHost ||
         !github.githubActionsReadiness.ready,
       currentUserSignedIn: Boolean(currentUser),
       message: gitRuntime.actions?.message ?? null,
@@ -525,9 +565,13 @@ export function RoomInspectorContainer({ sources }: { sources: RoomInspectorSour
       roomTerminals,
       selectedTerminal,
       selectedTerminalId,
-      selectedTerminalCanControl: canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, access.isSelectedRoomLocked),
+      selectedTerminalCanControl: canControlRoomTerminal(
+        selectedRoom,
+        localUser,
+        selectedTerminal,
+        access.isSelectedRoomLocked
+      ),
       selectedTerminalCanRestart: Boolean(selectedTerminal && !selectedTerminal.running),
-      terminalOutputLines: fileDisplay.terminalOutputLines,
       codexRunning: Boolean(codexRuntime.running),
       canReadLocalWorkspace: access.canReadLocalWorkspace,
       canApproveTerminal: access.canReadLocalWorkspace && access.isActiveHost,
@@ -539,10 +583,12 @@ export function RoomInspectorContainer({ sources }: { sources: RoomInspectorSour
   return (
     <RoomInspectorPanel
       activeTab={inspectorTab}
-      browserPanel={(
+      browserPanel={
         <BrowserAccessPanel
           hidden={false}
-          activeBrowserUrl={browser.tabs?.find((tab) => tab.id === browser.activeTabId)?.url ?? browser.activeUrl ?? null}
+          activeBrowserUrl={
+            browser.tabs?.find((tab) => tab.id === browser.activeTabId)?.url ?? browser.activeUrl ?? null
+          }
           browserTabs={browser.tabs ?? []}
           activeBrowserTabId={browser.activeTabId ?? null}
           browserUrl={browser.url ?? defaultBrowserUrl}
@@ -552,7 +598,7 @@ export function RoomInspectorContainer({ sources }: { sources: RoomInspectorSour
           onSelectBrowserTab={(tabId) => selectBrowserTabForRoom(selectedRoom.id, tabId)}
           onCloseBrowserTab={(tabId) => closeBrowserTabForRoom(selectedRoom.id, tabId)}
         />
-      )}
+      }
       filesPanel={<RoomInspectorWorkPanel activeTab="files" {...commonWorkProps} />}
       terminalPanel={<RoomInspectorWorkPanel activeTab="terminal" {...commonWorkProps} />}
       roomPanel={<RoomInspectorWorkPanel activeTab="room" {...commonWorkProps} />}

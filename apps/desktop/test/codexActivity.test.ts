@@ -28,9 +28,13 @@ test.beforeEach(() => useAppStore.getState().resetAppStore());
 
 test("activity lifecycle updates upsert in one room without leaking to another", () => {
   useAppStore.getState().upsertCodexActivity("room-a", activity());
-  useAppStore.getState().upsertCodexActivity("room-a", activity({
-    status: "completed", updatedAt: "2026-07-09T12:00:02.000Z"
-  }));
+  useAppStore.getState().upsertCodexActivity(
+    "room-a",
+    activity({
+      status: "completed",
+      updatedAt: "2026-07-09T12:00:02.000Z"
+    })
+  );
   const runtime = useAppStore.getState().codexRuntimeByRoom;
   assert.equal(runtime["room-a"]?.activities?.length, 1);
   assert.equal(runtime["room-a"]?.activities?.[0]?.status, "completed");
@@ -39,11 +43,14 @@ test("activity lifecycle updates upsert in one room without leaking to another",
 
 test("activity timeline retains only the newest bounded room items", () => {
   for (let index = 0; index < 170; index += 1) {
-    useAppStore.getState().upsertCodexActivity("room-a", activity({
-      activityId: `turn-1-item-${index}`,
-      itemId: `item-${index}`,
-      updatedAt: new Date(Date.UTC(2026, 6, 9, 12, 0, index)).toISOString()
-    }));
+    useAppStore.getState().upsertCodexActivity(
+      "room-a",
+      activity({
+        activityId: `turn-1-item-${index}`,
+        itemId: `item-${index}`,
+        updatedAt: new Date(Date.UTC(2026, 6, 9, 12, 0, index)).toISOString()
+      })
+    );
   }
   const activities = useAppStore.getState().codexRuntimeByRoom["room-a"]?.activities ?? [];
   assert.equal(activities.length, 160);
@@ -57,9 +64,11 @@ test("legacy local history migrates to an empty canonical activity timeline", ()
 });
 
 test("activity timeline renders safe lifecycle metadata", () => {
-  const html = renderToStaticMarkup(React.createElement(CodexActivityTimelineView, {
-    activities: [activity({ status: "running" })]
-  }));
+  const html = renderToStaticMarkup(
+    React.createElement(CodexActivityTimelineView, {
+      activities: [activity({ status: "running" })]
+    })
+  );
   assert.match(html, /Codex activity/);
   assert.match(html, /Command execution/);
   assert.match(html, /in progress/);

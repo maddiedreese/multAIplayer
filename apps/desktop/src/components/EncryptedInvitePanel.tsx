@@ -51,9 +51,7 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
     <section className="panel invite-panel">
       <div className="panel-title">
         <span>Invites</span>
-        <small className="panel-state available">
-          {inviteApprovalGate ? "Host approval" : "Invite link"}
-        </small>
+        <small className="panel-state available">{inviteApprovalGate ? "Host approval" : "Invite link"}</small>
       </div>
       <button className="primary-wide" onClick={onCopyInvite} disabled={copyDisabled}>
         <Copy size={15} />
@@ -89,29 +87,33 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
         {keyRotationBusy ? "Refreshing room access" : "Refresh room access"}
       </button>
       <div className="empty-state compact">
-        Refreshing access updates future messages and invites for current members. It is not member removal in this alpha.
+        Refreshing access updates future messages and invites for current members. It is not member removal in this
+        alpha.
       </div>
       <div className="terminal-requests">
-        {inviteRequests.slice(-4).reverse().map((request) => (
-          <div className={`terminal-request ${request.status}`} key={request.id}>
-            <div>
-              <strong>{request.requester}</strong>
-              <span>{request.note ?? "Requesting room access."}</span>
-              <small>{request.requesterDeviceId === localDeviceId ? "This device" : request.requesterDeviceId}</small>
-            </div>
-            <small>{request.status}</small>
-            {request.status === "pending" && (
+        {inviteRequests
+          .slice(-4)
+          .reverse()
+          .map((request) => (
+            <div className={`terminal-request ${request.status}`} key={request.id}>
               <div>
-                <button onClick={() => onDecideInviteRequest(request, "approved")} disabled={approvalDisabled}>
-                  <Check size={13} />
-                </button>
-                <button onClick={() => onDecideInviteRequest(request, "denied")} disabled={approvalDisabled}>
-                  <X size={13} />
-                </button>
+                <strong>{request.requester}</strong>
+                <span>{request.note ?? "Requesting room access."}</span>
+                <small>{request.requesterDeviceId === localDeviceId ? "This device" : request.requesterDeviceId}</small>
               </div>
-            )}
-          </div>
-        ))}
+              <small>{request.status}</small>
+              {request.status === "pending" && (
+                <div>
+                  <button onClick={() => onDecideInviteRequest(request, "approved")} disabled={approvalDisabled}>
+                    <Check size={13} />
+                  </button>
+                  <button onClick={() => onDecideInviteRequest(request, "denied")} disabled={approvalDisabled}>
+                    <X size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
         {inviteRequests.length === 0 && (
           <div className="empty-state compact">No invite approval requests in this room.</div>
         )}

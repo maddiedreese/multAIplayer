@@ -9,13 +9,15 @@ export interface LocalPreviewDialogActions {
 }
 
 export function LocalPreviewDialogContainer(actions: LocalPreviewDialogActions) {
-  const state = useAppStore(useShallow((state) => {
-    const selectedRoomId = state.selectedRoomId;
-    return {
-      dialog: state.localPreviewDialog,
-      busy: selectedRoomId ? state.localPreviewByRoom[selectedRoomId]?.busy ?? false : false
-    };
-  }));
+  const state = useAppStore(
+    useShallow((state) => {
+      const selectedRoomId = state.selectedRoomId;
+      return {
+        dialog: state.localPreviewDialog,
+        busy: selectedRoomId ? (state.localPreviewByRoom[selectedRoomId]?.busy ?? false) : false
+      };
+    })
+  );
   const {
     closeLocalPreviewDialog: close,
     setLocalPreviewDialogSelectedUrl: setSelectedUrl,

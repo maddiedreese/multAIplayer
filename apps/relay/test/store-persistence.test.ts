@@ -163,20 +163,24 @@ test("relay store persistence close waits for pending encrypted envelope saves",
     storeCodec
   });
 
-  coordinator.saveEncryptedEnvelope("team:room", {
-    id: "envelope-close",
-    teamId: "team",
-    roomId: "room",
-    senderUserId: "user",
-    senderDeviceId: "device",
-    kind: "chat.message",
-    createdAt: "2026-07-07T00:00:01.000Z",
-    payload: {
-      algorithm: "AES-GCM-256",
-      nonce: "nonce",
-      ciphertext: "ciphertext"
-    }
-  }, []);
+  coordinator.saveEncryptedEnvelope(
+    "team:room",
+    {
+      id: "envelope-close",
+      teamId: "team",
+      roomId: "room",
+      senderUserId: "user",
+      senderDeviceId: "device",
+      kind: "chat.message",
+      createdAt: "2026-07-07T00:00:01.000Z",
+      payload: {
+        algorithm: "AES-GCM-256",
+        nonce: "nonce",
+        ciphertext: "ciphertext"
+      }
+    },
+    []
+  );
 
   await coordinator.closeRelayStore();
 
@@ -225,20 +229,22 @@ test("relay store persistence uses incremental encrypted backlog saves when avai
     storeCodec
   });
 
-  coordinator.saveEncryptedBacklog("team:room", [{
-    id: "envelope-a",
-    teamId: "team",
-    roomId: "room",
-    senderUserId: "user",
-    senderDeviceId: "device",
-    kind: "chat.message",
-    createdAt: "2026-07-07T00:00:00.000Z",
-    payload: {
-      algorithm: "AES-GCM-256",
-      nonce: "nonce",
-      ciphertext: "ciphertext"
+  coordinator.saveEncryptedBacklog("team:room", [
+    {
+      id: "envelope-a",
+      teamId: "team",
+      roomId: "room",
+      senderUserId: "user",
+      senderDeviceId: "device",
+      kind: "chat.message",
+      createdAt: "2026-07-07T00:00:00.000Z",
+      payload: {
+        algorithm: "AES-GCM-256",
+        nonce: "nonce",
+        ciphertext: "ciphertext"
+      }
     }
-  }]);
+  ]);
   await delay(150);
 
   assert.equal(backlogSaves.length, 1);
@@ -349,20 +355,24 @@ test("relay store persistence falls back to full save when encrypted envelope ap
     storeCodec
   });
 
-  coordinator.saveEncryptedEnvelope("team:room", {
-    id: "envelope-c",
-    teamId: "team",
-    roomId: "room",
-    senderUserId: "user",
-    senderDeviceId: "device",
-    kind: "chat.message",
-    createdAt: "2026-07-07T00:00:02.000Z",
-    payload: {
-      algorithm: "AES-GCM-256",
-      nonce: "nonce",
-      ciphertext: "ciphertext"
-    }
-  }, []);
+  coordinator.saveEncryptedEnvelope(
+    "team:room",
+    {
+      id: "envelope-c",
+      teamId: "team",
+      roomId: "room",
+      senderUserId: "user",
+      senderDeviceId: "device",
+      kind: "chat.message",
+      createdAt: "2026-07-07T00:00:02.000Z",
+      payload: {
+        algorithm: "AES-GCM-256",
+        nonce: "nonce",
+        ciphertext: "ciphertext"
+      }
+    },
+    []
+  );
   await delay(150);
 
   assert.equal(fullSaves, 1);

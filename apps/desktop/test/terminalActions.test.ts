@@ -80,20 +80,19 @@ test("terminal actions reuse a running shell through Zustand without starting an
 
   await actions.openInteractiveTerminal();
 
-  assert.equal(
-    useAppStore.getState().terminalRuntimeByRoom[room.id]?.selectedTerminalId,
-    runningTerminal.id
-  );
+  assert.equal(useAppStore.getState().terminalRuntimeByRoom[room.id]?.selectedTerminalId, runningTerminal.id);
 });
 
 test("terminal actions preserve the invocation-time in-flight safeguard", async () => {
   let reports = 0;
-  const actions = createTerminalActions(createOptions({
-    reportRoomTerminalActionInFlight: () => {
-      reports += 1;
-      return true;
-    }
-  }));
+  const actions = createTerminalActions(
+    createOptions({
+      reportRoomTerminalActionInFlight: () => {
+        reports += 1;
+        return true;
+      }
+    })
+  );
 
   await actions.openInteractiveTerminal({ reuseExisting: false });
 
@@ -112,17 +111,16 @@ test("terminal actions keep the busy ref and store synchronized on early approva
     requestedAt: "2026-07-09T12:01:00.000Z",
     status: "pending"
   };
-  const actions = createTerminalActions(createOptions({
-    terminalBusyRef
-  }));
+  const actions = createTerminalActions(
+    createOptions({
+      terminalBusyRef
+    })
+  );
   useAppStore.getState().appendTerminalRequest(room.id, request);
 
   await actions.approveTerminalRequest(request);
 
   assert.deepEqual(terminalBusyRef.current, {});
   assert.equal(useAppStore.getState().terminalRuntimeByRoom[room.id]?.busy ?? false, false);
-  assert.match(
-    useAppStore.getState().terminalRuntimeByRoom[room.id]?.ui?.error ?? "",
-    /command is required/i
-  );
+  assert.match(useAppStore.getState().terminalRuntimeByRoom[room.id]?.ui?.error ?? "", /command is required/i);
 });

@@ -33,31 +33,35 @@ export function useSidebarNavigation({
 }: UseSidebarNavigationOptions) {
   const normalizedSidebarQuery = sidebarQuery.trim().toLowerCase();
   const searchActive = normalizedSidebarQuery.length > 0;
-  const teamRooms = useMemo(
-    () => rooms.filter((room) => room.teamId === selectedTeam),
-    [rooms, selectedTeam]
-  );
+  const teamRooms = useMemo(() => rooms.filter((room) => room.teamId === selectedTeam), [rooms, selectedTeam]);
   const visibleRooms = useMemo(
     () =>
       searchActive
         ? rooms.filter((room) => {
             const team = teams.find((item) => item.id === room.teamId);
             return searchMatches(
-              [room.name, room.projectPath, room.host, room.hostStatus, room.codexModel, approvalPolicyLabels[room.approvalPolicy], team?.name ?? ""],
+              [
+                room.name,
+                room.projectPath,
+                room.host,
+                room.hostStatus,
+                room.codexModel,
+                approvalPolicyLabels[room.approvalPolicy],
+                team?.name ?? ""
+              ],
               normalizedSidebarQuery
             );
           })
         : teamRooms,
     [approvalPolicyLabels, normalizedSidebarQuery, rooms, searchActive, teamRooms, teams]
   );
-  const visibleTeams = useMemo(
-    () => {
-      if (!searchActive) return teams;
-      const visibleRoomTeamIds = new Set(visibleRooms.map((room) => room.teamId));
-      return teams.filter((team) => visibleRoomTeamIds.has(team.id) || searchMatches([team.name], normalizedSidebarQuery));
-    },
-    [normalizedSidebarQuery, searchActive, teams, visibleRooms]
-  );
+  const visibleTeams = useMemo(() => {
+    if (!searchActive) return teams;
+    const visibleRoomTeamIds = new Set(visibleRooms.map((room) => room.teamId));
+    return teams.filter(
+      (team) => visibleRoomTeamIds.has(team.id) || searchMatches([team.name], normalizedSidebarQuery)
+    );
+  }, [normalizedSidebarQuery, searchActive, teams, visibleRooms]);
   const searchableMessagesByRoom = useMemo(() => {
     return mergeSearchableMessages(messagesByRoom, historySearchMessagesByRoom);
   }, [historySearchMessagesByRoom, messagesByRoom]);

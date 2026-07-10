@@ -72,8 +72,12 @@ export function createTerminalActions({
 
   function currentRoomLock(selectedRoom: RoomRecord) {
     const { forgottenRoomIds, revokedRoomIds, revokedTeamIds } = useAppStore.getState();
-    return selectedRoom.archivedAt != null || forgottenRoomIds.has(selectedRoom.id) ||
-      revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId);
+    return (
+      selectedRoom.archivedAt != null ||
+      forgottenRoomIds.has(selectedRoom.id) ||
+      revokedRoomIds.has(selectedRoom.id) ||
+      revokedTeamIds.has(selectedRoom.teamId)
+    );
   }
 
   function setTerminalBusyForRoom(roomId: string, busy: boolean) {
@@ -103,11 +107,7 @@ export function createTerminalActions({
     useAppStore.getState().setSelectedTerminalIdForRoom(roomId, terminalId);
   }
 
-  function updateTerminalRequestStatus(
-    roomId: string,
-    requestId: string,
-    status: TerminalCommandRequest["status"]
-  ) {
+  function updateTerminalRequestStatus(roomId: string, requestId: string, status: TerminalCommandRequest["status"]) {
     useAppStore.getState().updateTerminalRequestStatus(roomId, requestId, status);
   }
 
@@ -142,12 +142,7 @@ export function createTerminalActions({
     setTerminalBusyForRoom(roomId, true);
     setTerminalErrorForRoom(roomId, null);
     try {
-      const snapshot = await startTerminal(
-        roomId,
-        name,
-        room.projectPath,
-        defaultInteractiveShellCommand
-      );
+      const snapshot = await startTerminal(roomId, name, room.projectPath, defaultInteractiveShellCommand);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         upsertTerminalSnapshot(snapshot);
         setSelectedTerminalIdForRoom(roomId, snapshot.id);
@@ -200,7 +195,8 @@ export function createTerminalActions({
         setSelectedTerminalIdForRoom(roomId, snapshot.id);
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalErrorForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setTerminalErrorForRoom(roomId, String(error));
     } finally {
       setTerminalBusyForRoom(roomId, false);
     }
@@ -239,7 +235,8 @@ export function createTerminalActions({
         upsertTerminalSnapshot(snapshot);
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalErrorForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setTerminalErrorForRoom(roomId, String(error));
     } finally {
       setTerminalBusyForRoom(roomId, false);
     }
@@ -282,7 +279,8 @@ export function createTerminalActions({
         upsertTerminalSnapshot(snapshot);
       }
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalErrorForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setTerminalErrorForRoom(roomId, String(error));
     }
   }
 
@@ -315,13 +313,15 @@ export function createTerminalActions({
     try {
       approvedRequest = terminalRequestForApprovedRun(roomRequest, room.projectPath);
     } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalErrorForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setTerminalErrorForRoom(roomId, String(error));
       setTerminalBusyForRoom(roomId, false);
       return;
     }
     updateTerminalRequestStatus(room.id, approvedRequest.id, "approved");
     publishRequestStatus("terminal.event", approvedRequest.id, "approved", room).catch((error) => {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalErrorForRoom(roomId, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setTerminalErrorForRoom(roomId, String(error));
     });
     const projectPath = room.projectPath;
     appendTerminalLinesForRoom(roomId, [
@@ -336,29 +336,40 @@ export function createTerminalActions({
       appendTerminalLinesForRoom(roomId, [
         output || `Command exited with ${result.status ?? "unknown"} and no output.`
       ]);
-      publishTerminalResult(approvedRequest, {
-        startedAt,
-        finishedAt: new Date().toISOString(),
-        exitStatus: result.status ?? null,
-        stdout: result.stdout,
-        stderr: result.stderr
-      }, room).catch((error) => {
-        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalErrorForRoom(roomId, String(error));
+      publishTerminalResult(
+        approvedRequest,
+        {
+          startedAt,
+          finishedAt: new Date().toISOString(),
+          exitStatus: result.status ?? null,
+          stdout: result.stdout,
+          stderr: result.stderr
+        },
+        room
+      ).catch((error) => {
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+          setTerminalErrorForRoom(roomId, String(error));
       });
       const status = await getGitStatus(projectPath);
       setGitStatusForRoom(roomId, status);
     } catch (error) {
       appendTerminalLinesForRoom(roomId, [String(error)]);
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalErrorForRoom(roomId, String(error));
-      publishTerminalResult(approvedRequest, {
-        startedAt,
-        finishedAt: new Date().toISOString(),
-        exitStatus: null,
-        stdout: "",
-        stderr: "",
-        error: String(error)
-      }, room).catch((publishError) => {
-        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setTerminalErrorForRoom(roomId, String(publishError));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setTerminalErrorForRoom(roomId, String(error));
+      publishTerminalResult(
+        approvedRequest,
+        {
+          startedAt,
+          finishedAt: new Date().toISOString(),
+          exitStatus: null,
+          stdout: "",
+          stderr: "",
+          error: String(error)
+        },
+        room
+      ).catch((publishError) => {
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+          setTerminalErrorForRoom(roomId, String(publishError));
       });
     } finally {
       setTerminalBusyForRoom(roomId, false);
@@ -387,7 +398,8 @@ export function createTerminalActions({
     }
     updateTerminalRequestStatus(room.id, requestId, "denied");
     publishRequestStatus("terminal.event", requestId, "denied", room).catch((error) => {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) setTerminalErrorForRoom(room.id, String(error));
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id))
+        setTerminalErrorForRoom(room.id, String(error));
     });
   }
 

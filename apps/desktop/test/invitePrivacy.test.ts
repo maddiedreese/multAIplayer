@@ -3,10 +3,7 @@ import test from "node:test";
 import { displayableInviteLink } from "../src/lib/invitePrivacy";
 
 test("displayableInviteLink hides direct room-key invite links", () => {
-  assert.equal(
-    displayableInviteLink("https://app/#multaiplayerInvite=secret", true),
-    ""
-  );
+  assert.equal(displayableInviteLink("https://app/#multaiplayerInvite=secret", true), "");
 });
 
 test("displayableInviteLink keeps gated no-secret invite links visible", () => {

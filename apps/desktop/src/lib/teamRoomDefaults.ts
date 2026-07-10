@@ -15,10 +15,7 @@ export interface TeamRoomDefaults {
   inviteApprovalGate: boolean;
 }
 
-export function isRoomSettingsMutationInFlight(
-  busyByRoom: Record<string, boolean>,
-  roomId: string
-): boolean {
+export function isRoomSettingsMutationInFlight(busyByRoom: Record<string, boolean>, roomId: string): boolean {
   return busyByRoom[roomId] === true;
 }
 
@@ -34,10 +31,7 @@ const defaultTeamRoomDefaults: TeamRoomDefaults = {
   inviteApprovalGate: true
 };
 
-const approvalPolicies: ApprovalPolicy[] = [
-  "ask_every_turn",
-  "never_host"
-];
+const approvalPolicies: ApprovalPolicy[] = ["ask_every_turn", "never_host"];
 
 export function loadTeamRoomDefaults(teamId: string): TeamRoomDefaults {
   const stored = localStorage.getItem(teamRoomDefaultsKey(teamId));
@@ -57,26 +51,28 @@ export function saveTeamRoomDefaults(teamId: string, defaults: TeamRoomDefaults)
 }
 
 export function sanitizeTeamRoomDefaults(defaults: Partial<TeamRoomDefaults>): TeamRoomDefaults {
-  const browserAllowedOrigins = defaults.browserAllowedOrigins === undefined
-    ? defaultTeamRoomDefaults.browserAllowedOrigins
-    : normalizeBrowserAllowedOrigins(defaults.browserAllowedOrigins);
+  const browserAllowedOrigins =
+    defaults.browserAllowedOrigins === undefined
+      ? defaultTeamRoomDefaults.browserAllowedOrigins
+      : normalizeBrowserAllowedOrigins(defaults.browserAllowedOrigins);
   return {
     approvalPolicy: sanitizeApprovalPolicy(defaults.approvalPolicy),
     codexModel: normalizeCodexModel(defaults.codexModel ?? "") ?? defaultTeamRoomDefaults.codexModel,
     browserAllowedOrigins: [...(browserAllowedOrigins ?? defaultTeamRoomDefaults.browserAllowedOrigins)],
-    browserProfilePersistent: typeof defaults.browserProfilePersistent === "boolean"
-      ? defaults.browserProfilePersistent
-      : defaultTeamRoomDefaults.browserProfilePersistent,
-    inviteApprovalGate: typeof defaults.inviteApprovalGate === "boolean"
-      ? defaults.inviteApprovalGate
-      : defaultTeamRoomDefaults.inviteApprovalGate
+    browserProfilePersistent:
+      typeof defaults.browserProfilePersistent === "boolean"
+        ? defaults.browserProfilePersistent
+        : defaultTeamRoomDefaults.browserProfilePersistent,
+    inviteApprovalGate:
+      typeof defaults.inviteApprovalGate === "boolean"
+        ? defaults.inviteApprovalGate
+        : defaultTeamRoomDefaults.inviteApprovalGate
   };
 }
 
-export function teamDefaultsRoomSettings(defaults: TeamRoomDefaults): Pick<
-  TeamRoomDefaults,
-  "approvalPolicy" | "codexModel" | "browserAllowedOrigins" | "browserProfilePersistent"
-> {
+export function teamDefaultsRoomSettings(
+  defaults: TeamRoomDefaults
+): Pick<TeamRoomDefaults, "approvalPolicy" | "codexModel" | "browserAllowedOrigins" | "browserProfilePersistent"> {
   const sanitized = sanitizeTeamRoomDefaults(defaults);
   return {
     approvalPolicy: sanitized.approvalPolicy,

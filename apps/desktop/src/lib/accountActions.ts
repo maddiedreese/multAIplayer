@@ -30,7 +30,9 @@ export function createAccountActions({
       const identity = await loadOrCreateDeviceIdentity();
       replaceDeviceIdentity(identity);
       untrustDeviceForRoom(useAppStore.getState().selectedRoomId, currentLocalIdentity().deviceId);
-      setDeviceIdentityStatusMessage("Created new local device identity. Public key registration will refresh automatically.");
+      setDeviceIdentityStatusMessage(
+        "Created new local device identity. Public key registration will refresh automatically."
+      );
     } catch (error) {
       setDeviceIdentityStatusMessage(`Device identity rotation failed: ${String(error)}`);
     }

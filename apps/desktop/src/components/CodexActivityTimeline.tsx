@@ -16,7 +16,9 @@ export function CodexActivityTimelineView({ activities }: { activities: CodexAct
     <section className="panel codex-activity-timeline" aria-label="Codex activity timeline">
       <header>
         <strong>Codex activity</strong>
-        <span>{activities.length} item{activities.length === 1 ? "" : "s"}</span>
+        <span>
+          {activities.length} item{activities.length === 1 ? "" : "s"}
+        </span>
       </header>
       <ol aria-live="polite">
         {visible.map((activity) => (
@@ -24,7 +26,9 @@ export function CodexActivityTimelineView({ activities }: { activities: CodexAct
             <span className="codex-activity-marker" aria-hidden="true" />
             <div>
               <strong>{activity.title}</strong>
-              <small>{formatActivityKind(activity.kind)} · {formatActivityStatus(activity.status)}</small>
+              <small>
+                {formatActivityKind(activity.kind)} · {formatActivityStatus(activity.status)}
+              </small>
             </div>
             <time dateTime={activity.updatedAt}>{formatActivityTime(activity.updatedAt)}</time>
           </li>

@@ -1,10 +1,7 @@
 import type { RelayEnvelope, RoomKeyRotationPlaintextPayload, RoomRecord } from "@multaiplayer/protocol";
 import { isEnvelopeFromActiveRoomHost } from "./roomHost";
 
-export function isRoomKeyRotationInFlight(
-  busyByRoom: Record<string, boolean>,
-  roomId: string
-): boolean {
+export function isRoomKeyRotationInFlight(busyByRoom: Record<string, boolean>, roomId: string): boolean {
   return busyByRoom[roomId] === true;
 }
 

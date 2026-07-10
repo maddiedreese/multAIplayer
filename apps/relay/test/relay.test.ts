@@ -8,11 +8,7 @@ import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import Database from "better-sqlite3";
 import { WebSocket } from "ws";
-import {
-  codexReasoningEffortIds,
-  maxEnvelopeNonceChars,
-  maxRoomProjectPathChars
-} from "@multaiplayer/protocol";
+import { codexReasoningEffortIds, maxEnvelopeNonceChars, maxRoomProjectPathChars } from "@multaiplayer/protocol";
 
 interface RelayHarness {
   baseUrl: string;
@@ -61,7 +57,11 @@ test("relay rejects non-host takeover and allows explicit handoff", async () => 
       403
     );
     assert.equal(
-      await patchHostStatus(relay.baseUrl, { host: "Maddie", hostUserId: "github:maddiedreese", hostStatus: "handoff" }),
+      await patchHostStatus(relay.baseUrl, {
+        host: "Maddie",
+        hostUserId: "github:maddiedreese",
+        hostStatus: "handoff"
+      }),
       200
     );
     assert.equal(
@@ -69,7 +69,11 @@ test("relay rejects non-host takeover and allows explicit handoff", async () => 
       200
     );
     assert.equal(
-      await patchHostStatus(relay.baseUrl, { host: "Maddie", hostUserId: "github:maddiedreese", hostStatus: "offline" }),
+      await patchHostStatus(relay.baseUrl, {
+        host: "Maddie",
+        hostUserId: "github:maddiedreese",
+        hostStatus: "offline"
+      }),
       403
     );
     assert.equal(
@@ -86,7 +90,7 @@ test("relay exposes content-free operational metrics", async () => {
   try {
     const response = await fetch(`${relay.baseUrl}/metrics`);
     assert.equal(response.status, 200);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       activeSockets?: unknown;
       liveAttachmentBlobCount?: unknown;
       liveAttachmentBlobBytes?: unknown;
@@ -131,13 +135,15 @@ test("relay broadcasts room.updated after room settings change", async () => {
   const socket = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(socket);
-    socket.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
 
     const updatePromise = waitForRoomUpdated(socket);
     const response = await fetch(`${relay.baseUrl}/rooms/room-desktop/settings`, {
@@ -170,12 +176,14 @@ test("relay broadcasts newly created rooms to team subscribers", async () => {
   const socket = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(socket);
-    socket.send(JSON.stringify({
-      type: "subscribe.team",
-      teamId: "team-core",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "subscribe.team",
+        teamId: "team-core",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
 
     const updatePromise = waitForRoomUpdated(socket);
     const response = await fetch(`${relay.baseUrl}/rooms`, {
@@ -222,7 +230,7 @@ test("relay accepts room defaults when creating a room", async () => {
       })
     });
     assert.equal(response.status, 201);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       room: {
         approvalPolicy: string;
         codexModel: string;
@@ -316,11 +324,13 @@ test("relay broadcasts newly created teams to workspace subscribers", async () =
   const socket = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(socket);
-    socket.send(JSON.stringify({
-      type: "subscribe.workspace",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "subscribe.workspace",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
 
     const updatePromise = waitForTeamUpdated(socket);
     const response = await fetch(`${relay.baseUrl}/teams`, {
@@ -347,13 +357,15 @@ test("relay drains readiness, sockets, and pending store writes on graceful shut
   const socket = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(socket);
-    socket.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
     await waitForJoined(socket);
 
     const createResponse = await fetch(`${relay.baseUrl}/teams`, {
@@ -398,12 +410,9 @@ test("relay drains readiness, sockets, and pending store writes on graceful shut
     const stored = JSON.parse(await readFile(relay.dataPath, "utf8")) as StoredRelayStateFixture;
     assert.ok(
       Array.isArray(stored.teams) &&
-      stored.teams.some((team) => (
-        typeof team === "object" &&
-        team !== null &&
-        "name" in team &&
-        team.name === "Shutdown flush team"
-      ))
+        stored.teams.some(
+          (team) => typeof team === "object" && team !== null && "name" in team && team.name === "Shutdown flush team"
+        )
     );
   } finally {
     socket.close();
@@ -435,7 +444,7 @@ test("relay enforces authenticated user daily team and room creation quotas", as
     });
     assert.equal(limitedTeam.status, 429);
     assert.ok(limitedTeam.headers.get("retry-after"));
-    const limitedTeamBody = await limitedTeam.json() as DailyCreationQuotaErrorBody;
+    const limitedTeamBody = (await limitedTeam.json()) as DailyCreationQuotaErrorBody;
     assert.equal(limitedTeamBody.error, "Daily team creation quota exceeded.");
     assert.equal(limitedTeamBody.code, "quota_exceeded");
     assert.equal(limitedTeamBody.retryAfterSeconds, Number(limitedTeam.headers.get("retry-after")));
@@ -477,7 +486,7 @@ test("relay enforces authenticated user daily team and room creation quotas", as
     });
     assert.equal(limitedRoom.status, 429);
     assert.ok(limitedRoom.headers.get("retry-after"));
-    const limitedRoomBody = await limitedRoom.json() as DailyCreationQuotaErrorBody;
+    const limitedRoomBody = (await limitedRoom.json()) as DailyCreationQuotaErrorBody;
     assert.deepEqual(limitedRoomBody, {
       error: "Daily room creation quota exceeded.",
       code: "quota_exceeded",
@@ -495,7 +504,7 @@ test("relay enforces authenticated user daily team and room creation quotas", as
 
     const metrics = await fetch(`${relay.baseUrl}/metrics`);
     assert.equal(metrics.status, 200);
-    const metricsBody = await metrics.json() as {
+    const metricsBody = (await metrics.json()) as {
       quotaRejectionsTotal?: unknown;
       quotaRejectionsByType?: Record<string, unknown>;
     };
@@ -523,7 +532,7 @@ test("relay enforces authenticated total room ceiling", async () => {
       })
     });
     assert.equal(limited.status, 429);
-    const body = await limited.json() as {
+    const body = (await limited.json()) as {
       error: string;
       code: string;
       quota: { type: string; limit: number; used: number; remaining: number };
@@ -541,7 +550,7 @@ test("relay enforces authenticated total room ceiling", async () => {
 
     const metrics = await fetch(`${relay.baseUrl}/metrics`);
     assert.equal(metrics.status, 200);
-    const metricsBody = await metrics.json() as {
+    const metricsBody = (await metrics.json()) as {
       quotaRejectionsTotal?: unknown;
       quotaRejectionsByType?: Record<string, unknown>;
     };
@@ -553,55 +562,66 @@ test("relay enforces authenticated total room ceiling", async () => {
 });
 
 test("relay updates team member count from room presence", async () => {
-  const relay = await startRelay({}, {
-    version: 1,
-    savedAt: new Date().toISOString(),
-    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
-    rooms: [{
-      id: "room-desktop",
-      teamId: "team-core",
-      name: "Desktop client",
-      projectPath: "/tmp/multaiplayer",
-      host: "No host",
-      hostStatus: "offline",
-      approvalPolicy: "ask_every_turn",
-      mode: { chat: true, code: true, workspace: true, browser: false },
-      codexModel: "gpt-5.4",
-      browserAllowedOrigins: ["https://github.com"],
-      browserProfilePersistent: true,
-      unread: 0
-    }],
-    invites: [],
-    teamMembers: [{ teamId: "team-core", userIds: ["github:first"] }],
-    encryptedBacklog: []
-  });
+  const relay = await startRelay(
+    {},
+    {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+      rooms: [
+        {
+          id: "room-desktop",
+          teamId: "team-core",
+          name: "Desktop client",
+          projectPath: "/tmp/multaiplayer",
+          host: "No host",
+          hostStatus: "offline",
+          approvalPolicy: "ask_every_turn",
+          mode: { chat: true, code: true, workspace: true, browser: false },
+          codexModel: "gpt-5.4",
+          browserAllowedOrigins: ["https://github.com"],
+          browserProfilePersistent: true,
+          unread: 0
+        }
+      ],
+      invites: [],
+      teamMembers: [{ teamId: "team-core", userIds: ["github:first"] }],
+      encryptedBacklog: []
+    }
+  );
   const workspace = new WebSocket(relay.wsUrl);
   const member = new WebSocket(relay.wsUrl);
   try {
     await Promise.all([onceOpen(workspace), onceOpen(member)]);
-    workspace.send(JSON.stringify({
-      type: "subscribe.workspace",
-      userId: "github:watcher",
-      deviceId: "device-watch-123"
-    }));
-    member.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:second",
-      deviceId: "device-second-123"
-    }));
+    workspace.send(
+      JSON.stringify({
+        type: "subscribe.workspace",
+        userId: "github:watcher",
+        deviceId: "device-watch-123"
+      })
+    );
+    member.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:second",
+        deviceId: "device-second-123"
+      })
+    );
     await waitForJoined(member);
 
     const updatePromise = waitForTeamUpdated(workspace);
-    member.send(JSON.stringify({
-      type: "presence",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:second",
-      deviceId: "device-second-123",
-      displayName: "Second"
-    }));
+    member.send(
+      JSON.stringify({
+        type: "presence",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:second",
+        deviceId: "device-second-123",
+        displayName: "Second"
+      })
+    );
 
     const updatedTeam = await updatePromise;
     assert.equal(updatedTeam.id, "team-core");
@@ -618,13 +638,15 @@ test("relay does not store plaintext room metadata events in encrypted backlog",
   const sender = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(sender);
-    sender.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    sender.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
 
     const response = await fetch(`${relay.baseUrl}/rooms/room-desktop/settings`, {
       method: "PATCH",
@@ -638,10 +660,12 @@ test("relay does not store plaintext room metadata events in encrypted backlog",
     assert.equal(response.status, 200);
     assert.deepEqual(await debugBacklog(relay.baseUrl), []);
 
-    sender.send(JSON.stringify({
-      type: "publish",
-      envelope: testEnvelope()
-    }));
+    sender.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: testEnvelope()
+      })
+    );
     await waitForDebugBacklog(relay.baseUrl, 1);
     const backlog = await debugBacklog(relay.baseUrl);
     assert.equal(backlog[0]?.envelopes, 1);
@@ -658,25 +682,31 @@ test("relay prunes encrypted backlog by retention window", async () => {
   const sender = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(sender);
-    sender.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
-
-    sender.send(JSON.stringify({
-      type: "publish",
-      envelope: testEnvelope({
-        id: "envelope-expired",
-        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+    sender.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
       })
-    }));
-    sender.send(JSON.stringify({
-      type: "publish",
-      envelope: testEnvelope({ id: "envelope-fresh" })
-    }));
+    );
+
+    sender.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: testEnvelope({
+          id: "envelope-expired",
+          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+        })
+      })
+    );
+    sender.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: testEnvelope({ id: "envelope-fresh" })
+      })
+    );
 
     await waitForDebugBacklog(relay.baseUrl, 1);
     const backlog = await debugBacklog(relay.baseUrl);
@@ -693,34 +723,40 @@ test("relay rejects oversized encrypted room envelopes", async () => {
   const sender = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(sender);
-    sender.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    sender.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
     await waitForJoined(sender);
 
     const idError = waitForError(sender);
-    sender.send(JSON.stringify({
-      type: "publish",
-      envelope: testEnvelope({ id: `envelope-${"x".repeat(200)}` })
-    }));
+    sender.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: testEnvelope({ id: `envelope-${"x".repeat(200)}` })
+      })
+    );
     assert.match(await idError, /Encrypted room envelope exceeds relay limits/);
 
     const sizeError = waitForError(sender);
-    sender.send(JSON.stringify({
-      type: "publish",
-      envelope: testEnvelope({
-        id: "envelope-oversized-ciphertext",
-        payload: {
-          algorithm: "AES-GCM-256",
-          nonce: "test-nonce",
-          ciphertext: "x".repeat(6000)
-        }
+    sender.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: testEnvelope({
+          id: "envelope-oversized-ciphertext",
+          payload: {
+            algorithm: "AES-GCM-256",
+            nonce: "test-nonce",
+            ciphertext: "x".repeat(6000)
+          }
+        })
       })
-    }));
+    );
     assert.match(await sizeError, /Encrypted room envelope exceeds relay limits/);
     assert.deepEqual(await debugBacklog(relay.baseUrl), []);
   } finally {
@@ -734,25 +770,31 @@ test("relay prunes oversized encrypted backlog loaded from store", async () => {
   try {
     await relay.close({ preserveData: true });
     const state = JSON.parse(await readFile(relay.dataPath, "utf8")) as StoredRelayStateFixture;
-    state.encryptedBacklog = [{
-      key: "team-core:room-desktop",
-      envelopes: [
-        testEnvelope({ id: "envelope-kept" }),
-        testEnvelope({
-          id: "envelope-pruned",
-          payload: {
-            algorithm: "AES-GCM-256",
-            nonce: "test-nonce",
-            ciphertext: "x".repeat(6000)
-          }
-        })
-      ]
-    }];
+    state.encryptedBacklog = [
+      {
+        key: "team-core:room-desktop",
+        envelopes: [
+          testEnvelope({ id: "envelope-kept" }),
+          testEnvelope({
+            id: "envelope-pruned",
+            payload: {
+              algorithm: "AES-GCM-256",
+              nonce: "test-nonce",
+              ciphertext: "x".repeat(6000)
+            }
+          })
+        ]
+      }
+    ];
     await writeFile(relay.dataPath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 
-    const restarted = await startRelay({
-      MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES: "4096"
-    }, undefined, relay.dataPath);
+    const restarted = await startRelay(
+      {
+        MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES: "4096"
+      },
+      undefined,
+      relay.dataPath
+    );
     try {
       const backlog = await debugBacklog(restarted.baseUrl);
       assert.equal(backlog[0]?.envelopes, 1);
@@ -766,53 +808,58 @@ test("relay prunes oversized encrypted backlog loaded from store", async () => {
 });
 
 test("relay drops malformed and cross-room encrypted backlog loaded from store", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_SEED_DEMO: "false" }, {
-    version: 1,
-    savedAt: new Date().toISOString(),
-    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
-    rooms: [{
-      id: "room-desktop",
-      teamId: "team-core",
-      name: "Desktop client",
-      projectPath: "/tmp/multaiplayer",
-      host: "No host",
-      hostStatus: "offline",
-      approvalPolicy: "ask_every_turn",
-      mode: { chat: true, code: true, workspace: true, browser: false },
-      codexModel: "gpt-5.4",
-      browserAllowedOrigins: ["https://github.com"],
-      browserProfilePersistent: true,
-      unread: 0
-    }],
-    invites: [],
-    encryptedBacklog: [
-      {
-        key: "team-core:room-desktop",
-        envelopes: [
-          testEnvelope({ id: "envelope-kept" }),
-          testEnvelope({ id: "envelope-wrong-room", roomId: "room-other" }),
-          testEnvelope({
-            id: "envelope-device-sealed-wrong-kind",
-            kind: "browser.event",
-            payload: deviceSealedPayload()
-          }),
-          { id: "not-a-valid-envelope" }
-        ]
-      },
-      {
-        key: "team-core:room-missing",
-        envelopes: [testEnvelope({ id: "envelope-missing-room" })]
-      },
-      {
-        key: "team-core:room-desktop:extra",
-        envelopes: [testEnvelope({ id: "envelope-bad-key" })]
-      },
-      {
-        key: "team-core:room-desktop",
-        envelopes: "not an array"
-      }
-    ]
-  });
+  const relay = await startRelay(
+    { MULTAIPLAYER_RELAY_SEED_DEMO: "false" },
+    {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+      rooms: [
+        {
+          id: "room-desktop",
+          teamId: "team-core",
+          name: "Desktop client",
+          projectPath: "/tmp/multaiplayer",
+          host: "No host",
+          hostStatus: "offline",
+          approvalPolicy: "ask_every_turn",
+          mode: { chat: true, code: true, workspace: true, browser: false },
+          codexModel: "gpt-5.4",
+          browserAllowedOrigins: ["https://github.com"],
+          browserProfilePersistent: true,
+          unread: 0
+        }
+      ],
+      invites: [],
+      encryptedBacklog: [
+        {
+          key: "team-core:room-desktop",
+          envelopes: [
+            testEnvelope({ id: "envelope-kept" }),
+            testEnvelope({ id: "envelope-wrong-room", roomId: "room-other" }),
+            testEnvelope({
+              id: "envelope-device-sealed-wrong-kind",
+              kind: "browser.event",
+              payload: deviceSealedPayload()
+            }),
+            { id: "not-a-valid-envelope" }
+          ]
+        },
+        {
+          key: "team-core:room-missing",
+          envelopes: [testEnvelope({ id: "envelope-missing-room" })]
+        },
+        {
+          key: "team-core:room-desktop:extra",
+          envelopes: [testEnvelope({ id: "envelope-bad-key" })]
+        },
+        {
+          key: "team-core:room-desktop",
+          envelopes: "not an array"
+        }
+      ]
+    }
+  );
   try {
     const backlog = await debugBacklog(relay.baseUrl);
     assert.equal(backlog.length, 1);
@@ -903,13 +950,15 @@ test("relay replays encrypted backlog after restart when a client rejoins", asyn
   let restarted: RelayHarness | null = null;
   try {
     await onceOpen(sender);
-    sender.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    sender.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
     await waitForJoined(sender);
 
     const envelope = testEnvelope({ id: "envelope-restart-backlog" });
@@ -924,13 +973,15 @@ test("relay replays encrypted backlog after restart when a client rejoins", asyn
     try {
       await onceOpen(receiver);
       const replayedEnvelope = waitForEnvelope(receiver, "browser.event");
-      receiver.send(JSON.stringify({
-        type: "join",
-        teamId: "team-core",
-        roomId: "room-desktop",
-        userId: "github:tester",
-        deviceId: "device-restart-456"
-      }));
+      receiver.send(
+        JSON.stringify({
+          type: "join",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          userId: "github:tester",
+          deviceId: "device-restart-456"
+        })
+      );
       await waitForJoined(receiver);
       assert.equal((await replayedEnvelope).id, envelope.id);
     } finally {
@@ -1043,15 +1094,17 @@ test("relay accepts device-sealed invite events and rejects other sealed event k
     assert.equal(receivedInvite.payload.algorithm, "ECDH-P256-HKDF-SHA256-AES-GCM-256");
 
     const rejected = waitForError(sender);
-    sender.send(JSON.stringify({
-      type: "publish",
-      envelope: testEnvelope({
-        id: "envelope-device-sealed-terminal",
-        senderDeviceId: "device-test-456",
-        kind: "terminal.event",
-        payload: deviceSealedPayload()
+    sender.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: testEnvelope({
+          id: "envelope-device-sealed-terminal",
+          senderDeviceId: "device-test-456",
+          kind: "terminal.event",
+          payload: deviceSealedPayload()
+        })
       })
-    }));
+    );
     assert.equal(await rejected, "Device-sealed envelopes are only supported for room invites.");
   } finally {
     receiver.close();
@@ -1067,46 +1120,56 @@ test("relay rejects websocket room and identity mismatches", async () => {
     await onceOpen(socket);
 
     const firstError = waitForError(socket);
-    socket.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-missing",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-missing",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
     assert.equal(await firstError, "Room not found");
 
     const publishBeforeJoinError = waitForError(socket);
-    socket.send(JSON.stringify({
-      type: "publish",
-      envelope: testEnvelope({ senderDeviceId: "device-test-123" })
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: testEnvelope({ senderDeviceId: "device-test-123" })
+      })
+    );
     assert.equal(await publishBeforeJoinError, "Join the room before publishing with this user and device.");
 
-    socket.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
 
     const publishMismatchError = waitForError(socket);
-    socket.send(JSON.stringify({
-      type: "publish",
-      envelope: testEnvelope({ senderDeviceId: "device-other-456" })
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: testEnvelope({ senderDeviceId: "device-other-456" })
+      })
+    );
     assert.equal(await publishMismatchError, "Join the room before publishing with this user and device.");
 
     const presenceMismatchError = waitForError(socket);
-    socket.send(JSON.stringify({
-      type: "presence",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:other",
-      deviceId: "device-test-123",
-      displayName: "Other"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "presence",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:other",
+        deviceId: "device-test-123",
+        displayName: "Other"
+      })
+    );
     assert.equal(await presenceMismatchError, "Join the room before publishing presence with this user and device.");
   } finally {
     socket.close();
@@ -1121,53 +1184,63 @@ test("relay bounds websocket identity and presence metadata", async () => {
     await onceOpen(socket);
 
     const joinError = waitForError(socket);
-    socket.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123".padEnd(170, "x")
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123".padEnd(170, "x")
+      })
+    );
     assert.match(await joinError, /WebSocket user and device ids must be bounded/);
 
     const subscribeError = waitForError(socket);
-    socket.send(JSON.stringify({
-      type: "subscribe.workspace",
-      userId: "github:tester".padEnd(170, "x"),
-      deviceId: "device-test-123"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "subscribe.workspace",
+        userId: "github:tester".padEnd(170, "x"),
+        deviceId: "device-test-123"
+      })
+    );
     assert.match(await subscribeError, /WebSocket user and device ids must be bounded/);
 
-    socket.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
     await waitForJoined(socket);
 
     const displayNameError = waitForError(socket);
-    socket.send(JSON.stringify({
-      type: "presence",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123",
-      displayName: "x".repeat(121)
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "presence",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123",
+        displayName: "x".repeat(121)
+      })
+    );
     assert.match(await displayNameError, /Presence display name/);
 
     const fingerprintError = waitForError(socket);
-    socket.send(JSON.stringify({
-      type: "presence",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123",
-      displayName: "Tester",
-      publicKeyFingerprint: "x".repeat(129)
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "presence",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123",
+        displayName: "Tester",
+        publicKeyFingerprint: "x".repeat(129)
+      })
+    );
     assert.match(await fingerprintError, /Presence display name/);
   } finally {
     socket.close();
@@ -1176,92 +1249,108 @@ test("relay bounds websocket identity and presence metadata", async () => {
 });
 
 test("relay enriches presence with registered device fingerprints", async () => {
-  const relay = await startRelay({}, {
-    version: 1,
-    savedAt: new Date().toISOString(),
-    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
-    rooms: [{
-      id: "room-desktop",
-      teamId: "team-core",
-      name: "Desktop client",
-      projectPath: "/tmp/multaiplayer",
-      host: "Maddie",
-      hostUserId: "github:maddiedreese",
-      hostStatus: "active",
-      approvalPolicy: "ask_every_turn",
-      mode: { chat: true, code: true, workspace: true, browser: false },
-      codexModel: "gpt-5.4-codex",
-      browserAllowedOrigins: ["https://github.com"],
-      browserProfilePersistent: true,
-      unread: 0
-    }],
-    invites: [],
-    devices: [{
-      userId: "github:tester",
-      deviceId: "device-test-123",
-      displayName: "Tester",
-      publicKeyJwk: { kty: "EC", crv: "P-256", x: "x", y: "y" },
-      publicKeyFingerprint: "sha256:registered-device-key",
-      registeredAt: new Date().toISOString(),
-      lastSeenAt: new Date().toISOString()
-    }, {
-      userId: "github:tester",
-      deviceId: "device-private-key",
-      displayName: "Tester",
-      publicKeyJwk: { kty: "EC", crv: "P-256", x: "x", y: "y", d: "private-material" },
-      publicKeyFingerprint: "sha256:must-not-be-trusted",
-      registeredAt: new Date().toISOString(),
-      lastSeenAt: new Date().toISOString()
-    }],
-    encryptedBacklog: []
-  });
+  const relay = await startRelay(
+    {},
+    {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+      rooms: [
+        {
+          id: "room-desktop",
+          teamId: "team-core",
+          name: "Desktop client",
+          projectPath: "/tmp/multaiplayer",
+          host: "Maddie",
+          hostUserId: "github:maddiedreese",
+          hostStatus: "active",
+          approvalPolicy: "ask_every_turn",
+          mode: { chat: true, code: true, workspace: true, browser: false },
+          codexModel: "gpt-5.4-codex",
+          browserAllowedOrigins: ["https://github.com"],
+          browserProfilePersistent: true,
+          unread: 0
+        }
+      ],
+      invites: [],
+      devices: [
+        {
+          userId: "github:tester",
+          deviceId: "device-test-123",
+          displayName: "Tester",
+          publicKeyJwk: { kty: "EC", crv: "P-256", x: "x", y: "y" },
+          publicKeyFingerprint: "sha256:registered-device-key",
+          registeredAt: new Date().toISOString(),
+          lastSeenAt: new Date().toISOString()
+        },
+        {
+          userId: "github:tester",
+          deviceId: "device-private-key",
+          displayName: "Tester",
+          publicKeyJwk: { kty: "EC", crv: "P-256", x: "x", y: "y", d: "private-material" },
+          publicKeyFingerprint: "sha256:must-not-be-trusted",
+          registeredAt: new Date().toISOString(),
+          lastSeenAt: new Date().toISOString()
+        }
+      ],
+      encryptedBacklog: []
+    }
+  );
   const socket = new WebSocket(relay.wsUrl);
   const untrustedSocket = new WebSocket(relay.wsUrl);
   try {
     await Promise.all([onceOpen(socket), onceOpen(untrustedSocket)]);
-    socket.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
     await waitForJoined(socket);
 
     const presencePromise = waitForPresence(socket, "device-test-123");
-    socket.send(JSON.stringify({
-      type: "presence",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123",
-      displayName: "Tester",
-      publicKeyFingerprint: "sha256:untrusted-client-value"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "presence",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123",
+        displayName: "Tester",
+        publicKeyFingerprint: "sha256:untrusted-client-value"
+      })
+    );
 
     const presence = await presencePromise;
     assert.equal(presence.publicKeyFingerprint, "sha256:registered-device-key");
     assert.equal(presence.status, "online");
 
-    untrustedSocket.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-private-key"
-    }));
+    untrustedSocket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-private-key"
+      })
+    );
     await waitForJoined(untrustedSocket);
 
     const untrustedPresencePromise = waitForPresence(untrustedSocket, "device-private-key");
-    untrustedSocket.send(JSON.stringify({
-      type: "presence",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-private-key",
-      displayName: "Tester",
-      publicKeyFingerprint: "sha256:client-presented-key"
-    }));
+    untrustedSocket.send(
+      JSON.stringify({
+        type: "presence",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-private-key",
+        displayName: "Tester",
+        publicKeyFingerprint: "sha256:client-presented-key"
+      })
+    );
 
     const untrustedPresence = await untrustedPresencePromise;
     assert.equal(untrustedPresence.publicKeyFingerprint, "sha256:client-presented-key");
@@ -1340,10 +1429,7 @@ test("relay bounds room project paths and Codex model metadata", async () => {
 test("relay bounds user-visible metadata strings", async () => {
   const relay = await startRelay();
   try {
-    assert.equal(
-      await postJsonStatus(relay.baseUrl, "/teams", { name: "x".repeat(121) }),
-      400
-    );
+    assert.equal(await postJsonStatus(relay.baseUrl, "/teams", { name: "x".repeat(121) }), 400);
     assert.equal(
       await postJsonStatus(relay.baseUrl, "/rooms", {
         teamId: "team-core",
@@ -1415,7 +1501,7 @@ test("relay reports configured GitHub OAuth scopes", async () => {
   try {
     const response = await fetch(`${relay.baseUrl}/auth/config`);
     assert.equal(response.status, 200);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       scopes: string[];
       mutationsRequireAuth: boolean;
       allowedOrigins: string[];
@@ -1461,11 +1547,15 @@ test("relay bounds GitHub device-code polling input", async () => {
 test("relay loads configuration from env files without overriding process env", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-env-test-"));
   const envPath = join(tempDir, ".env");
-  await writeFile(envPath, [
-    "GITHUB_OAUTH_SCOPES=\"read:user repo\"",
-    "MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://env-file.example/ # normalized",
-    "MULTAIPLAYER_RELAY_REQUIRE_AUTH=false"
-  ].join("\n"), "utf8");
+  await writeFile(
+    envPath,
+    [
+      'GITHUB_OAUTH_SCOPES="read:user repo"',
+      "MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://env-file.example/ # normalized",
+      "MULTAIPLAYER_RELAY_REQUIRE_AUTH=false"
+    ].join("\n"),
+    "utf8"
+  );
   const relay = await startRelay({
     GITHUB_OAUTH_SCOPES: "read:user workflow",
     MULTAIPLAYER_RELAY_ENV_FILE: envPath
@@ -1473,7 +1563,7 @@ test("relay loads configuration from env files without overriding process env", 
   try {
     const response = await fetch(`${relay.baseUrl}/auth/config`);
     assert.equal(response.status, 200);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       scopes: string[];
       mutationsRequireAuth: boolean;
       allowedOrigins: string[];
@@ -1489,12 +1579,13 @@ test("relay loads configuration from env files without overriding process env", 
 
 test("relay normalizes configured CORS origins", async () => {
   const relay = await startRelay({
-    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://multaiplayer.com/ https://multaiplayer.com tauri://localhost https://bad.example/path"
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS:
+      "https://multaiplayer.com/ https://multaiplayer.com tauri://localhost https://bad.example/path"
   });
   try {
     const response = await fetch(`${relay.baseUrl}/auth/config`);
     assert.equal(response.status, 200);
-    const body = await response.json() as { allowedOrigins: string[] };
+    const body = (await response.json()) as { allowedOrigins: string[] };
     assert.deepEqual(body.allowedOrigins, ["https://multaiplayer.com", "tauri://localhost"]);
   } finally {
     await relay.close();
@@ -1534,7 +1625,7 @@ test("relay reports memory-only sessions when persistence is disabled or weak", 
   try {
     const response = await fetch(`${relay.baseUrl}/auth/config`);
     assert.equal(response.status, 200);
-    const body = await response.json() as { sessionPersistence: string };
+    const body = (await response.json()) as { sessionPersistence: string };
     assert.equal(body.sessionPersistence, "memory_only");
   } finally {
     await relay.close();
@@ -1592,7 +1683,9 @@ test("relay ignores forwarded IP headers for rate limits unless explicitly trust
   try {
     const first = await fetch(`${directRelay.baseUrl}/teams`, { headers: { "x-forwarded-for": "203.0.113.20" } });
     assert.equal(first.status, 200);
-    const spoofedSecond = await fetch(`${directRelay.baseUrl}/teams`, { headers: { "x-forwarded-for": "203.0.113.21" } });
+    const spoofedSecond = await fetch(`${directRelay.baseUrl}/teams`, {
+      headers: { "x-forwarded-for": "203.0.113.21" }
+    });
     assert.equal(spoofedSecond.status, 429);
   } finally {
     await directRelay.close();
@@ -1606,9 +1699,13 @@ test("relay ignores forwarded IP headers for rate limits unless explicitly trust
   try {
     const first = await fetch(`${trustedProxyRelay.baseUrl}/teams`, { headers: { "x-forwarded-for": "203.0.113.30" } });
     assert.equal(first.status, 200);
-    const secondIp = await fetch(`${trustedProxyRelay.baseUrl}/teams`, { headers: { "x-forwarded-for": "203.0.113.31" } });
+    const secondIp = await fetch(`${trustedProxyRelay.baseUrl}/teams`, {
+      headers: { "x-forwarded-for": "203.0.113.31" }
+    });
     assert.equal(secondIp.status, 200);
-    const repeatedSecondIp = await fetch(`${trustedProxyRelay.baseUrl}/teams`, { headers: { "x-forwarded-for": "203.0.113.31" } });
+    const repeatedSecondIp = await fetch(`${trustedProxyRelay.baseUrl}/teams`, {
+      headers: { "x-forwarded-for": "203.0.113.31" }
+    });
     assert.equal(repeatedSecondIp.status, 429);
   } finally {
     await trustedProxyRelay.close();
@@ -1623,20 +1720,24 @@ test("relay rate limits room WebSocket events per client", async () => {
   const socket = new WebSocket(relay.wsUrl, { headers: { "x-forwarded-for": "203.0.113.12" } });
   try {
     await onceOpen(socket);
-    socket.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
     await waitForJoined(socket);
 
     const errorPromise = waitForError(socket);
-    socket.send(JSON.stringify({
-      type: "publish",
-      envelope: testEnvelope({ senderDeviceId: "device-test-123" })
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: testEnvelope({ senderDeviceId: "device-test-123" })
+      })
+    );
     assert.match(await errorPromise, /Rate limit exceeded/);
   } finally {
     socket.close();
@@ -1662,7 +1763,7 @@ test("relay rate limits WebSocket connection attempts per client", async () => {
 
     const metrics = await fetch(`${relay.baseUrl}/metrics`);
     assert.equal(metrics.status, 200);
-    const body = await metrics.json() as {
+    const body = (await metrics.json()) as {
       rateLimitRejectionsTotal?: unknown;
       rateLimitRejectionsByBucket?: Record<string, unknown>;
       webSocketConnectionAttemptsTotal?: unknown;
@@ -1690,31 +1791,35 @@ test("relay caps concurrent room WebSocket connections per device", async () => 
   const second = new WebSocket(relay.wsUrl);
   try {
     await Promise.all([onceOpen(first), onceOpen(second)]);
-    first.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    first.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
     await waitForJoined(first);
 
     const errorPromise = waitForError(second);
     const closePromise = waitForClose(second);
-    second.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    second.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
     assert.match(await errorPromise, /Concurrent WebSocket connection quota exceeded for this device/);
     const close = await closePromise;
     assert.equal(close.code, 1008);
 
     const metrics = await fetch(`${relay.baseUrl}/metrics`);
     assert.equal(metrics.status, 200);
-    const body = await metrics.json() as {
+    const body = (await metrics.json()) as {
       quotaRejectionsTotal?: unknown;
       quotaRejectionsByType?: Record<string, unknown>;
     };
@@ -1745,7 +1850,7 @@ test("relay caps concurrent WebSocket connections per user identity", async () =
 
     const metrics = await fetch(`${relay.baseUrl}/metrics`);
     assert.equal(metrics.status, 200);
-    const body = await metrics.json() as {
+    const body = (await metrics.json()) as {
       quotaRejectionsTotal?: unknown;
       quotaRejectionsByType?: Record<string, unknown>;
     };
@@ -1918,13 +2023,15 @@ test("relay treats malformed session cookies as unauthenticated", async () => {
     });
     await onceOpen(socket);
     const error = waitForError(socket);
-    socket.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:maddiedreese",
-      deviceId: "device-bad-cookie"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:maddiedreese",
+        deviceId: "device-bad-cookie"
+      })
+    );
     assert.match(await error, /Sign in and use a valid invite/);
     socket.close();
 
@@ -1933,13 +2040,15 @@ test("relay treats malformed session cookies as unauthenticated", async () => {
     });
     await onceOpen(socket);
     const oversizedCookieError = waitForError(socket);
-    socket.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:maddiedreese",
-      deviceId: "device-oversized-cookie"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:maddiedreese",
+        deviceId: "device-oversized-cookie"
+      })
+    );
     assert.match(await oversizedCookieError, /Sign in and use a valid invite/);
   } finally {
     socket?.close();
@@ -2027,21 +2136,28 @@ test("relay persists auth sessions encrypted when a session secret is configured
   let restarted: RelayHarness | null = null;
   try {
     const cookie = await createDebugSession(relay.baseUrl, "github:persisted", "persisted");
-    const stored = await waitForStoredState(relay.dataPath, (state) => Array.isArray(state.authSessions) && state.authSessions.length === 1);
+    const stored = await waitForStoredState(
+      relay.dataPath,
+      (state) => Array.isArray(state.authSessions) && state.authSessions.length === 1
+    );
     assert.doesNotMatch(JSON.stringify(stored), /debug-token/);
     assert.equal(stored.authSessions?.[0]?.encryptedAccessToken?.algorithm, "AES-GCM-256");
 
     await relay.close({ preserveData: true });
-    restarted = await startRelay({
-      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-      MULTAIPLAYER_RELAY_SESSION_SECRET: strongSecret
-    }, undefined, relay.dataPath);
+    restarted = await startRelay(
+      {
+        MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+        MULTAIPLAYER_RELAY_SESSION_SECRET: strongSecret
+      },
+      undefined,
+      relay.dataPath
+    );
 
     const me = await fetch(`${restarted.baseUrl}/auth/me`, {
       headers: { cookie }
     });
     assert.equal(me.status, 200);
-    const body = await me.json() as { user: { id: string; login: string } };
+    const body = (await me.json()) as { user: { id: string; login: string } };
     assert.equal(body.user.id, "github:persisted");
     assert.equal(body.user.login, "persisted");
   } finally {
@@ -2063,7 +2179,10 @@ test("relay drops malformed encrypted auth sessions loaded from disk", async () 
   let relayClosed = false;
   try {
     const validCookie = await createDebugSession(relay.baseUrl, "github:valid-session", "valid-session");
-    const stored = await waitForStoredState(relay.dataPath, (state) => Array.isArray(state.authSessions) && state.authSessions.length === 1);
+    const stored = await waitForStoredState(
+      relay.dataPath,
+      (state) => Array.isArray(state.authSessions) && state.authSessions.length === 1
+    );
     const encryptedAccessToken = stored.authSessions?.[0]?.encryptedAccessToken;
     assert.ok(encryptedAccessToken);
 
@@ -2109,10 +2228,14 @@ test("relay drops malformed encrypted auth sessions loaded from disk", async () 
     ];
     await writeFile(relay.dataPath, `${JSON.stringify(stored, null, 2)}\n`, "utf8");
 
-    restarted = await startRelay({
-      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-      MULTAIPLAYER_RELAY_SESSION_SECRET: strongSecret
-    }, undefined, relay.dataPath);
+    restarted = await startRelay(
+      {
+        MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+        MULTAIPLAYER_RELAY_SESSION_SECRET: strongSecret
+      },
+      undefined,
+      relay.dataPath
+    );
 
     const valid = await fetch(`${restarted.baseUrl}/auth/me`, {
       headers: { cookie: validCookie }
@@ -2147,10 +2270,14 @@ test("relay ignores weak auth session persistence secrets", async () => {
     assert.doesNotMatch(JSON.stringify(stored), /debug-token/);
 
     await relay.close({ preserveData: true });
-    restarted = await startRelay({
-      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-      MULTAIPLAYER_RELAY_SESSION_SECRET: "short-secret"
-    }, undefined, relay.dataPath);
+    restarted = await startRelay(
+      {
+        MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+        MULTAIPLAYER_RELAY_SESSION_SECRET: "short-secret"
+      },
+      undefined,
+      relay.dataPath
+    );
     const me = await fetch(`${restarted.baseUrl}/auth/me`, {
       headers: { cookie }
     });
@@ -2189,23 +2316,28 @@ test("relay keeps auth sessions memory-only without a session secret", async () 
 });
 
 test("relay ignores plaintext auth access tokens loaded from disk", async () => {
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-    MULTAIPLAYER_RELAY_SESSION_SECRET: "test-session-secret-with-at-least-32-characters"
-  }, {
-    version: 1,
-    savedAt: new Date().toISOString(),
-    teams: [],
-    rooms: [],
-    invites: [],
-    authSessions: [{
-      sessionId: "plain-session",
-      accessToken: "debug-token",
-      user: { id: "github:plain", login: "plain" },
-      expiresAt: Date.now() + 60_000
-    }],
-    encryptedBacklog: []
-  });
+  const relay = await startRelay(
+    {
+      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+      MULTAIPLAYER_RELAY_SESSION_SECRET: "test-session-secret-with-at-least-32-characters"
+    },
+    {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [],
+      rooms: [],
+      invites: [],
+      authSessions: [
+        {
+          sessionId: "plain-session",
+          accessToken: "debug-token",
+          user: { id: "github:plain", login: "plain" },
+          expiresAt: Date.now() + 60_000
+        }
+      ],
+      encryptedBacklog: []
+    }
+  );
   try {
     const me = await fetch(`${relay.baseUrl}/auth/me`, {
       headers: { cookie: "multaiplayer_session=plain-session" }
@@ -2242,9 +2374,12 @@ test("relay validates GitHub PR and Actions inputs before proxying", async () =>
     assert.equal(pullResponse.status, 400);
     assert.match(await pullResponse.text(), /GitHub owner/);
 
-    const actionsResponse = await fetch(`${relay.baseUrl}/github/actions/runs?owner=maddiedreese&repo=multAIplayer&branch=bad%20branch`, {
-      headers: { cookie }
-    });
+    const actionsResponse = await fetch(
+      `${relay.baseUrl}/github/actions/runs?owner=maddiedreese&repo=multAIplayer&branch=bad%20branch`,
+      {
+        headers: { cookie }
+      }
+    );
     assert.equal(actionsResponse.status, 400);
     assert.match(await actionsResponse.text(), /Unsafe GitHub branch name/);
   } finally {
@@ -2255,7 +2390,9 @@ test("relay validates GitHub PR and Actions inputs before proxying", async () =>
 test("relay normalizes GitHub proxy responses before returning them", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-github-proxy-test-"));
   const mockPath = join(tempDir, "mock-github-fetch.mjs");
-  await writeFile(mockPath, `
+  await writeFile(
+    mockPath,
+    `
 const nativeFetch = globalThis.fetch;
 globalThis.fetch = async (input, init = {}) => {
   const url = String(input);
@@ -2309,7 +2446,9 @@ globalThis.fetch = async (input, init = {}) => {
   }
   return nativeFetch(input, init);
 };
-`, "utf8");
+`,
+    "utf8"
+  );
 
   const relay = await startRelay({
     MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
@@ -2355,27 +2494,32 @@ globalThis.fetch = async (input, init = {}) => {
     assert.equal(errorResponse.status, 422);
     assert.deepEqual(await errorResponse.json(), { error: "GitHub request failed." });
 
-    const actionsResponse = await fetch(`${relay.baseUrl}/github/actions/runs?owner=maddiedreese&repo=multAIplayer&branch=codex%2Fbranch`, {
-      headers: { cookie }
-    });
+    const actionsResponse = await fetch(
+      `${relay.baseUrl}/github/actions/runs?owner=maddiedreese&repo=multAIplayer&branch=codex%2Fbranch`,
+      {
+        headers: { cookie }
+      }
+    );
     assert.equal(actionsResponse.status, 200);
     assert.deepEqual(await actionsResponse.json(), {
       totalCount: 2,
-      runs: [{
-        id: 456,
-        name: "CI",
-        displayTitle: "Harden proxy",
-        runNumber: 7,
-        workflowId: 8,
-        status: "completed",
-        conclusion: "success",
-        branch: "codex/security-relay-hardening",
-        headSha: "abc123",
-        event: "push",
-        url: "https://github.com/maddiedreese/multAIplayer/actions/runs/456",
-        createdAt: "2026-07-05T00:00:00Z",
-        updatedAt: "2026-07-05T00:01:00Z"
-      }]
+      runs: [
+        {
+          id: 456,
+          name: "CI",
+          displayTitle: "Harden proxy",
+          runNumber: 7,
+          workflowId: 8,
+          status: "completed",
+          conclusion: "success",
+          branch: "codex/security-relay-hardening",
+          headSha: "abc123",
+          event: "push",
+          url: "https://github.com/maddiedreese/multAIplayer/actions/runs/456",
+          createdAt: "2026-07-05T00:00:00Z",
+          updatedAt: "2026-07-05T00:01:00Z"
+        }
+      ]
     });
   } finally {
     await relay.close();
@@ -2413,11 +2557,14 @@ test("relay scopes authenticated workspace access to team members and admits inv
       headers: { cookie: maddieCookie }
     });
     assert.equal(memberWorkspace.status, 200);
-    const memberBody = await memberWorkspace.json() as {
+    const memberBody = (await memberWorkspace.json()) as {
       teams: Array<{ id: string; role?: string }>;
       rooms: Array<{ id: string }>;
     };
-    assert.deepEqual(memberBody.teams.map((team) => team.id), ["team-core"]);
+    assert.deepEqual(
+      memberBody.teams.map((team) => team.id),
+      ["team-core"]
+    );
     assert.equal(memberBody.teams[0]?.role, "owner");
     assert.ok(memberBody.rooms.some((room) => room.id === "room-desktop"));
     assert.ok(!memberBody.rooms.some((room) => room.id === "room-github"));
@@ -2428,29 +2575,34 @@ test("relay scopes authenticated workspace access to team members and admits inv
       body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
     });
     assert.equal(inviteResponse.status, 201);
-    const inviteBody = await inviteResponse.json() as { invite: { id: string } };
+    const inviteBody = (await inviteResponse.json()) as { invite: { id: string } };
 
     peerSocket = new WebSocket(relay.wsUrl, { headers: { cookie: peerCookie } });
     await onceOpen(peerSocket);
-    peerSocket.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:peer",
-      deviceId: "device-peer-123",
-      inviteId: inviteBody.invite.id
-    }));
+    peerSocket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:peer",
+        deviceId: "device-peer-123",
+        inviteId: inviteBody.invite.id
+      })
+    );
     await waitForJoined(peerSocket);
 
     const admittedWorkspace = await fetch(`${relay.baseUrl}/teams`, {
       headers: { cookie: peerCookie }
     });
     assert.equal(admittedWorkspace.status, 200);
-    const admittedBody = await admittedWorkspace.json() as {
+    const admittedBody = (await admittedWorkspace.json()) as {
       teams: Array<{ id: string; role?: string }>;
       rooms: Array<{ id: string }>;
     };
-    assert.deepEqual(admittedBody.teams.map((team) => team.id), ["team-core"]);
+    assert.deepEqual(
+      admittedBody.teams.map((team) => team.id),
+      ["team-core"]
+    );
     assert.equal(admittedBody.teams[0]?.role, "member");
     assert.ok(admittedBody.rooms.some((room) => room.id === "room-desktop"));
 
@@ -2458,7 +2610,7 @@ test("relay scopes authenticated workspace access to team members and admits inv
       headers: { cookie: peerCookie }
     });
     assert.equal(membersResponse.status, 200);
-    const membersBody = await membersResponse.json() as {
+    const membersBody = (await membersResponse.json()) as {
       members: Array<{ userId: string; role: string; joinedAt: string }>;
     };
     assert.equal(membersBody.members.find((member) => member.userId === "github:maddiedreese")?.role, "owner");
@@ -2482,18 +2634,20 @@ test("relay revokes live room access and stale invites when a team member is rem
       body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
     });
     assert.equal(inviteResponse.status, 201);
-    const inviteBody = await inviteResponse.json() as { invite: { id: string } };
+    const inviteBody = (await inviteResponse.json()) as { invite: { id: string } };
 
     peerSocket = new WebSocket(relay.wsUrl, { headers: { cookie: peerCookie } });
     await onceOpen(peerSocket);
-    peerSocket.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:peer",
-      deviceId: "device-peer-removed",
-      inviteId: inviteBody.invite.id
-    }));
+    peerSocket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:peer",
+        deviceId: "device-peer-removed",
+        inviteId: inviteBody.invite.id
+      })
+    );
     await waitForJoined(peerSocket);
 
     const removalError = waitForError(peerSocket);
@@ -2515,14 +2669,16 @@ test("relay revokes live room access and stale invites when a team member is rem
     staleInviteSocket = new WebSocket(relay.wsUrl, { headers: { cookie: peerCookie } });
     await onceOpen(staleInviteSocket);
     const staleInviteError = waitForError(staleInviteSocket);
-    staleInviteSocket.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:peer",
-      deviceId: "device-peer-stale-invite",
-      inviteId: inviteBody.invite.id
-    }));
+    staleInviteSocket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:peer",
+        deviceId: "device-peer-stale-invite",
+        inviteId: inviteBody.invite.id
+      })
+    );
     assert.match(await staleInviteError, /valid invite/);
   } finally {
     peerSocket?.close();
@@ -2544,7 +2700,7 @@ test("relay assigns team creators owner role", async () => {
       body: JSON.stringify({ name: "Owner Team" })
     });
     assert.equal(createResponse.status, 201);
-    const createBody = await createResponse.json() as { team: { id: string; members: number; role?: string } };
+    const createBody = (await createResponse.json()) as { team: { id: string; members: number; role?: string } };
     assert.equal(createBody.team.members, 1);
     assert.equal(createBody.team.role, "owner");
 
@@ -2552,7 +2708,7 @@ test("relay assigns team creators owner role", async () => {
       headers: { cookie }
     });
     assert.equal(membersResponse.status, 200);
-    const membersBody = await membersResponse.json() as {
+    const membersBody = (await membersResponse.json()) as {
       members: Array<{ userId: string; role: string }>;
     };
     assert.deepEqual(
@@ -2576,7 +2732,7 @@ test("relay lets authorized team roles manage non-owner members", async () => {
       body: JSON.stringify({ role: "admin" })
     });
     assert.equal(promoteResponse.status, 200);
-    const promoted = await promoteResponse.json() as {
+    const promoted = (await promoteResponse.json()) as {
       member: { userId: string; role: string };
       members: Array<{ userId: string; role: string }>;
     };
@@ -2604,10 +2760,13 @@ test("relay lets authorized team roles manage non-owner members", async () => {
     });
     assert.equal(memberPromoteResponse.status, 403);
 
-    const adminTransferResponse = await fetch(`${relay.baseUrl}/teams/team-core/members/github%3Atester/transfer-owner`, {
-      method: "POST",
-      headers: { cookie: adminCookie }
-    });
+    const adminTransferResponse = await fetch(
+      `${relay.baseUrl}/teams/team-core/members/github%3Atester/transfer-owner`,
+      {
+        method: "POST",
+        headers: { cookie: adminCookie }
+      }
+    );
     assert.equal(adminTransferResponse.status, 403);
 
     const transferResponse = await fetch(`${relay.baseUrl}/teams/team-core/members/github%3Aalex/transfer-owner`, {
@@ -2615,16 +2774,14 @@ test("relay lets authorized team roles manage non-owner members", async () => {
       headers: { cookie: ownerCookie }
     });
     assert.equal(transferResponse.status, 200);
-    const transferred = await transferResponse.json() as {
+    const transferred = (await transferResponse.json()) as {
       member: { userId: string; role: string };
       members: Array<{ userId: string; role: string }>;
     };
     assert.equal(transferred.member.userId, "github:alex");
     assert.equal(transferred.member.role, "owner");
     assert.deepEqual(
-      transferred.members
-        .filter((member) => member.role === "owner")
-        .map((member) => member.userId),
+      transferred.members.filter((member) => member.role === "owner").map((member) => member.userId),
       ["github:alex"]
     );
     assert.equal(transferred.members.find((member) => member.userId === "github:maddiedreese")?.role, "admin");
@@ -2640,7 +2797,7 @@ test("relay lets authorized team roles manage non-owner members", async () => {
       headers: { cookie: adminCookie }
     });
     assert.equal(removeMemberResponse.status, 200);
-    const removed = await removeMemberResponse.json() as { members: Array<{ userId: string }> };
+    const removed = (await removeMemberResponse.json()) as { members: Array<{ userId: string }> };
     assert.ok(!removed.members.some((member) => member.userId === "github:design"));
   } finally {
     await relay.close();
@@ -2665,13 +2822,17 @@ test("relay lets authorized users archive restore and delete rooms", async () =>
       body: JSON.stringify({ action: "archive", requesterName: "Maddie", requesterUserId: "github:maddiedreese" })
     });
     assert.equal(archiveResponse.status, 200);
-    const archived = await archiveResponse.json() as { room: { id: string; archivedAt?: string; deletedAt?: string } };
+    const archived = (await archiveResponse.json()) as {
+      room: { id: string; archivedAt?: string; deletedAt?: string };
+    };
     assert.equal(archived.room.id, "room-desktop");
     assert.ok(archived.room.archivedAt);
     assert.equal(archived.room.deletedAt, undefined);
 
     const workspaceWithArchived = await fetch(`${relay.baseUrl}/teams`, { headers: { cookie: ownerCookie } });
-    const archivedWorkspace = await workspaceWithArchived.json() as { rooms: Array<{ id: string; archivedAt?: string }> };
+    const archivedWorkspace = (await workspaceWithArchived.json()) as {
+      rooms: Array<{ id: string; archivedAt?: string }>;
+    };
     assert.ok(archivedWorkspace.rooms.find((room) => room.id === "room-desktop")?.archivedAt);
 
     const restoreResponse = await fetch(`${relay.baseUrl}/rooms/room-desktop/lifecycle`, {
@@ -2680,7 +2841,7 @@ test("relay lets authorized users archive restore and delete rooms", async () =>
       body: JSON.stringify({ action: "restore", requesterName: "Maddie", requesterUserId: "github:maddiedreese" })
     });
     assert.equal(restoreResponse.status, 200);
-    const restored = await restoreResponse.json() as { room: { id: string; archivedAt?: string } };
+    const restored = (await restoreResponse.json()) as { room: { id: string; archivedAt?: string } };
     assert.equal(restored.room.archivedAt, undefined);
 
     const deleteResponse = await fetch(`${relay.baseUrl}/rooms/room-desktop/lifecycle`, {
@@ -2689,11 +2850,11 @@ test("relay lets authorized users archive restore and delete rooms", async () =>
       body: JSON.stringify({ action: "delete", requesterName: "Maddie", requesterUserId: "github:maddiedreese" })
     });
     assert.equal(deleteResponse.status, 200);
-    const deleted = await deleteResponse.json() as { room: { id: string; deletedAt?: string } };
+    const deleted = (await deleteResponse.json()) as { room: { id: string; deletedAt?: string } };
     assert.ok(deleted.room.deletedAt);
 
     const workspaceAfterDelete = await fetch(`${relay.baseUrl}/teams`, { headers: { cookie: ownerCookie } });
-    const deletedWorkspace = await workspaceAfterDelete.json() as { rooms: Array<{ id: string }> };
+    const deletedWorkspace = (await workspaceAfterDelete.json()) as { rooms: Array<{ id: string }> };
     assert.ok(!deletedWorkspace.rooms.some((room) => room.id === "room-desktop"));
   } finally {
     await relay.close();
@@ -2711,7 +2872,7 @@ test("relay archives restores and deletes teams with their rooms", async () => {
       body: JSON.stringify({ action: "archive" })
     });
     assert.equal(archiveResponse.status, 200);
-    const archived = await archiveResponse.json() as {
+    const archived = (await archiveResponse.json()) as {
       team: { id: string; archivedAt?: string; deletedAt?: string };
       rooms: Array<{ id: string; archivedAt?: string; deletedAt?: string }>;
     };
@@ -2732,7 +2893,7 @@ test("relay archives restores and deletes teams with their rooms", async () => {
       body: JSON.stringify({ action: "restore" })
     });
     assert.equal(restoreResponse.status, 200);
-    const restored = await restoreResponse.json() as {
+    const restored = (await restoreResponse.json()) as {
       team: { archivedAt?: string };
       rooms: Array<{ archivedAt?: string }>;
     };
@@ -2752,7 +2913,7 @@ test("relay archives restores and deletes teams with their rooms", async () => {
       body: JSON.stringify({ action: "delete" })
     });
     assert.equal(deleteResponse.status, 200);
-    const deleted = await deleteResponse.json() as {
+    const deleted = (await deleteResponse.json()) as {
       team: { deletedAt?: string };
       rooms: Array<{ deletedAt?: string }>;
     };
@@ -2760,7 +2921,7 @@ test("relay archives restores and deletes teams with their rooms", async () => {
     assert.ok(deleted.rooms.every((room) => room.deletedAt));
 
     const workspaceAfterDelete = await fetch(`${relay.baseUrl}/teams`, { headers: { cookie: ownerCookie } });
-    const deletedWorkspace = await workspaceAfterDelete.json() as {
+    const deletedWorkspace = (await workspaceAfterDelete.json()) as {
       teams: Array<{ id: string }>;
       rooms: Array<{ teamId: string }>;
     };
@@ -2777,11 +2938,13 @@ test("relay preserves requester team role in workspace updates", async () => {
   const socket = new WebSocket(relay.wsUrl, { headers: { cookie: ownerCookie } });
   try {
     await onceOpen(socket);
-    socket.send(JSON.stringify({
-      type: "subscribe.workspace",
-      userId: "github:maddiedreese",
-      deviceId: "device-owner-123"
-    }));
+    socket.send(
+      JSON.stringify({
+        type: "subscribe.workspace",
+        userId: "github:maddiedreese",
+        deviceId: "device-owner-123"
+      })
+    );
     await waitForWorkspaceSubscribed(socket);
 
     const updatePromise = waitForTeamUpdated(socket);
@@ -2810,7 +2973,7 @@ test("relay creates invite metadata with expiry", async () => {
       body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
     });
     assert.equal(response.status, 201);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       invite: { createdAt: string; expiresAt?: string };
     };
     assert.ok(body.invite.expiresAt);
@@ -2840,7 +3003,7 @@ test("relay stores encrypted attachment blobs as ciphertext", async () => {
       })
     });
     assert.equal(response.status, 201);
-    const created = await response.json() as {
+    const created = (await response.json()) as {
       blob: { id: string; payload: { algorithm: string; ciphertext: string }; expiresAt?: string };
     };
     assert.match(created.blob.id, /^blob_/);
@@ -2851,15 +3014,19 @@ test("relay stores encrypted attachment blobs as ciphertext", async () => {
     const missingScopeResponse = await fetch(`${relay.baseUrl}/attachment-blobs/${created.blob.id}`);
     assert.equal(missingScopeResponse.status, 400);
 
-    const wrongScopeResponse = await fetch(`${relay.baseUrl}/attachment-blobs/${created.blob.id}?teamId=team-core&roomId=room-other`);
+    const wrongScopeResponse = await fetch(
+      `${relay.baseUrl}/attachment-blobs/${created.blob.id}?teamId=team-core&roomId=room-other`
+    );
     assert.equal(wrongScopeResponse.status, 404);
     const wrongScopeBody = await wrongScopeResponse.text();
     assert.doesNotMatch(wrongScopeBody, /large-file\.ts/);
     assert.doesNotMatch(wrongScopeBody, /ciphertext-without-plaintext/);
 
-    const loadedResponse = await fetch(`${relay.baseUrl}/attachment-blobs/${created.blob.id}?teamId=team-core&roomId=room-desktop`);
+    const loadedResponse = await fetch(
+      `${relay.baseUrl}/attachment-blobs/${created.blob.id}?teamId=team-core&roomId=room-desktop`
+    );
     assert.equal(loadedResponse.status, 200);
-    const loaded = await loadedResponse.json() as {
+    const loaded = (await loadedResponse.json()) as {
       blob: { name: string; payload: { ciphertext: string } };
     };
     assert.equal(loaded.blob.name, "large-file.ts");
@@ -2896,7 +3063,7 @@ test("relay enforces authenticated live encrypted attachment blob quotas", async
       body: JSON.stringify(uploadBody(6, "one.txt"))
     });
     assert.equal(first.status, 201);
-    const firstBody = await first.json() as { blob: { uploadedByUserId?: string } };
+    const firstBody = (await first.json()) as { blob: { uploadedByUserId?: string } };
     assert.equal(firstBody.blob.uploadedByUserId, "github:maddiedreese");
 
     const limited = await fetch(`${relay.baseUrl}/attachment-blobs`, {
@@ -2905,7 +3072,7 @@ test("relay enforces authenticated live encrypted attachment blob quotas", async
       body: JSON.stringify(uploadBody(5, "two.txt"))
     });
     assert.equal(limited.status, 413);
-    const limitedBody = await limited.json() as {
+    const limitedBody = (await limited.json()) as {
       error: string;
       code: string;
       quota: { type: string; limit: number; used: number; remaining: number };
@@ -2928,7 +3095,7 @@ test("relay enforces authenticated live encrypted attachment blob quotas", async
 
     const metrics = await fetch(`${relay.baseUrl}/metrics`);
     assert.equal(metrics.status, 200);
-    const metricsBody = await metrics.json() as {
+    const metricsBody = (await metrics.json()) as {
       quotaRejectionsTotal?: unknown;
       quotaRejectionsByType?: Record<string, unknown>;
     };
@@ -2975,7 +3142,7 @@ test("relay enforces authenticated encrypted attachment upload byte quotas", asy
     });
     assert.equal(limited.status, 429);
     assert.equal(limited.headers.get("retry-after"), "60");
-    const limitedBody = await limited.json() as {
+    const limitedBody = (await limited.json()) as {
       error: string;
       code: string;
       retryAfterSeconds: number;
@@ -2995,7 +3162,7 @@ test("relay enforces authenticated encrypted attachment upload byte quotas", asy
 
     const metrics = await fetch(`${relay.baseUrl}/metrics`);
     assert.equal(metrics.status, 200);
-    const metricsBody = await metrics.json() as {
+    const metricsBody = (await metrics.json()) as {
       liveAttachmentBlobCount?: unknown;
       liveAttachmentBlobBytes?: unknown;
       attachmentBlobUploadsTotal?: unknown;
@@ -3137,104 +3304,109 @@ test("relay enforces encrypted attachment blob size limits", async () => {
 });
 
 test("relay drops invalid persisted attachment blob metadata", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "16" }, {
-    version: 1,
-    savedAt: new Date().toISOString(),
-    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
-    rooms: [{
-      id: "room-desktop",
-      teamId: "team-core",
-      name: "Desktop client",
-      projectPath: "/tmp/multaiplayer",
-      host: "No host",
-      hostStatus: "offline",
-      approvalPolicy: "ask_every_turn",
-      mode: { chat: true, code: true, workspace: true, browser: false },
-      codexModel: "gpt-5.4",
-      browserAllowedOrigins: ["https://github.com"],
-      browserProfilePersistent: true,
-      unread: 0
-    }],
-    invites: [],
-    attachmentBlobs: [
-      {
-        id: "blob_live",
-        teamId: "team-core",
-        roomId: "room-desktop",
-        name: "live.txt",
-        type: "text/plain",
-        size: 4,
-        payload: {
-          algorithm: "AES-GCM-256",
-          nonce: "nonce-for-test",
-          ciphertext: "ciphertext"
+  const relay = await startRelay(
+    { MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "16" },
+    {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+      rooms: [
+        {
+          id: "room-desktop",
+          teamId: "team-core",
+          name: "Desktop client",
+          projectPath: "/tmp/multaiplayer",
+          host: "No host",
+          hostStatus: "offline",
+          approvalPolicy: "ask_every_turn",
+          mode: { chat: true, code: true, workspace: true, browser: false },
+          codexModel: "gpt-5.4",
+          browserAllowedOrigins: ["https://github.com"],
+          browserProfilePersistent: true,
+          unread: 0
+        }
+      ],
+      invites: [],
+      attachmentBlobs: [
+        {
+          id: "blob_live",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          name: "live.txt",
+          type: "text/plain",
+          size: 4,
+          payload: {
+            algorithm: "AES-GCM-256",
+            nonce: "nonce-for-test",
+            ciphertext: "ciphertext"
+          },
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
         },
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: "blob:bad",
-        teamId: "team-core",
-        roomId: "room-desktop",
-        name: "bad-id.txt",
-        type: "text/plain",
-        size: 4,
-        payload: {
-          algorithm: "AES-GCM-256",
-          nonce: "nonce-for-test",
-          ciphertext: "ciphertext"
+        {
+          id: "blob:bad",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          name: "bad-id.txt",
+          type: "text/plain",
+          size: 4,
+          payload: {
+            algorithm: "AES-GCM-256",
+            nonce: "nonce-for-test",
+            ciphertext: "ciphertext"
+          },
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
         },
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: "blob_orphan",
-        teamId: "team-core",
-        roomId: "room-missing",
-        name: "orphan.txt",
-        type: "text/plain",
-        size: 4,
-        payload: {
-          algorithm: "AES-GCM-256",
-          nonce: "nonce-for-test",
-          ciphertext: "ciphertext"
+        {
+          id: "blob_orphan",
+          teamId: "team-core",
+          roomId: "room-missing",
+          name: "orphan.txt",
+          type: "text/plain",
+          size: 4,
+          payload: {
+            algorithm: "AES-GCM-256",
+            nonce: "nonce-for-test",
+            ciphertext: "ciphertext"
+          },
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
         },
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: "blob_huge",
-        teamId: "team-core",
-        roomId: "room-desktop",
-        name: "huge.txt",
-        type: "text/plain",
-        size: 8,
-        payload: {
-          algorithm: "AES-GCM-256",
-          nonce: "nonce-for-test",
-          ciphertext: "x".repeat(1500)
+        {
+          id: "blob_huge",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          name: "huge.txt",
+          type: "text/plain",
+          size: 8,
+          payload: {
+            algorithm: "AES-GCM-256",
+            nonce: "nonce-for-test",
+            ciphertext: "x".repeat(1500)
+          },
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
         },
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: "blob_bad_nonce",
-        teamId: "team-core",
-        roomId: "room-desktop",
-        name: "bad-nonce.txt",
-        type: "text/plain",
-        size: 4,
-        payload: {
-          algorithm: "AES-GCM-256",
-          nonce: "x".repeat(maxEnvelopeNonceChars + 1),
-          ciphertext: "ciphertext"
-        },
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      }
-    ],
-    encryptedBacklog: []
-  });
+        {
+          id: "blob_bad_nonce",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          name: "bad-nonce.txt",
+          type: "text/plain",
+          size: 4,
+          payload: {
+            algorithm: "AES-GCM-256",
+            nonce: "x".repeat(maxEnvelopeNonceChars + 1),
+            ciphertext: "ciphertext"
+          },
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        }
+      ],
+      encryptedBacklog: []
+    }
+  );
   try {
     const debug = await debugRelayState(relay.baseUrl);
     assert.equal(debug.attachmentBlobs, 1);
@@ -3247,7 +3419,9 @@ test("relay drops invalid persisted attachment blob metadata", async () => {
     assert.equal(orphan.status, 404);
     const huge = await fetch(`${relay.baseUrl}/attachment-blobs/blob_huge?teamId=team-core&roomId=room-desktop`);
     assert.equal(huge.status, 404);
-    const badNonce = await fetch(`${relay.baseUrl}/attachment-blobs/blob_bad_nonce?teamId=team-core&roomId=room-desktop`);
+    const badNonce = await fetch(
+      `${relay.baseUrl}/attachment-blobs/blob_bad_nonce?teamId=team-core&roomId=room-desktop`
+    );
     assert.equal(badNonce.status, 404);
   } finally {
     await relay.close();
@@ -3255,33 +3429,40 @@ test("relay drops invalid persisted attachment blob metadata", async () => {
 });
 
 test("relay rejects expired invite metadata loaded from store", async () => {
-  const relay = await startRelay({}, {
-    version: 1,
-    savedAt: new Date().toISOString(),
-    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
-    rooms: [{
-      id: "room-desktop",
-      teamId: "team-core",
-      name: "Desktop client",
-      projectPath: "/tmp/multaiplayer",
-      host: "No host",
-      hostStatus: "offline",
-      approvalPolicy: "ask_every_turn",
-      mode: { chat: true, code: true, workspace: true, browser: false },
-      codexModel: "gpt-5.4",
-      browserAllowedOrigins: ["https://github.com"],
-      browserProfilePersistent: true,
-      unread: 0
-    }],
-    invites: [{
-      id: "invite_expired",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    }],
-    encryptedBacklog: []
-  });
+  const relay = await startRelay(
+    {},
+    {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+      rooms: [
+        {
+          id: "room-desktop",
+          teamId: "team-core",
+          name: "Desktop client",
+          projectPath: "/tmp/multaiplayer",
+          host: "No host",
+          hostStatus: "offline",
+          approvalPolicy: "ask_every_turn",
+          mode: { chat: true, code: true, workspace: true, browser: false },
+          codexModel: "gpt-5.4",
+          browserAllowedOrigins: ["https://github.com"],
+          browserProfilePersistent: true,
+          unread: 0
+        }
+      ],
+      invites: [
+        {
+          id: "invite_expired",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+          expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+        }
+      ],
+      encryptedBacklog: []
+    }
+  );
   try {
     const response = await fetch(`${relay.baseUrl}/invites/invite_expired`);
     assert.equal(response.status, 404);
@@ -3291,56 +3472,61 @@ test("relay rejects expired invite metadata loaded from store", async () => {
 });
 
 test("relay drops invalid persisted invite metadata", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_SEED_DEMO: "false" }, {
-    version: 1,
-    savedAt: new Date().toISOString(),
-    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
-    rooms: [{
-      id: "room-desktop",
-      teamId: "team-core",
-      name: "Desktop client",
-      projectPath: "/tmp/multaiplayer",
-      host: "No host",
-      hostStatus: "offline",
-      approvalPolicy: "ask_every_turn",
-      mode: { chat: true, code: true, workspace: true, browser: false },
-      codexModel: "gpt-5.4",
-      browserAllowedOrigins: ["https://github.com"],
-      browserProfilePersistent: true,
-      unread: 0
-    }],
-    invites: [
-      {
-        id: "invite_live",
-        teamId: "team-core",
-        roomId: "room-desktop",
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: "invite:bad",
-        teamId: "team-core",
-        roomId: "room-desktop",
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: "invite_orphan",
-        teamId: "team-core",
-        roomId: "room-missing",
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: "invite_bad_time",
-        teamId: "team-core",
-        roomId: "room-desktop",
-        createdAt: "not a date",
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      }
-    ],
-    encryptedBacklog: []
-  });
+  const relay = await startRelay(
+    { MULTAIPLAYER_RELAY_SEED_DEMO: "false" },
+    {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+      rooms: [
+        {
+          id: "room-desktop",
+          teamId: "team-core",
+          name: "Desktop client",
+          projectPath: "/tmp/multaiplayer",
+          host: "No host",
+          hostStatus: "offline",
+          approvalPolicy: "ask_every_turn",
+          mode: { chat: true, code: true, workspace: true, browser: false },
+          codexModel: "gpt-5.4",
+          browserAllowedOrigins: ["https://github.com"],
+          browserProfilePersistent: true,
+          unread: 0
+        }
+      ],
+      invites: [
+        {
+          id: "invite_live",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: "invite:bad",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: "invite_orphan",
+          teamId: "team-core",
+          roomId: "room-missing",
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: "invite_bad_time",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          createdAt: "not a date",
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        }
+      ],
+      encryptedBacklog: []
+    }
+  );
   try {
     const debug = await debugRelayState(relay.baseUrl);
     assert.equal(debug.invites, 1);
@@ -3359,48 +3545,57 @@ test("relay drops invalid persisted invite metadata", async () => {
 });
 
 test("relay prunes expired in-memory invites and attachment blobs", async () => {
-  const relay = await startRelay({}, {
-    version: 1,
-    savedAt: new Date().toISOString(),
-    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
-    rooms: [{
-      id: "room-desktop",
-      teamId: "team-core",
-      name: "Desktop client",
-      projectPath: "/tmp/multaiplayer",
-      host: "No host",
-      hostStatus: "offline",
-      approvalPolicy: "ask_every_turn",
-      mode: { chat: true, code: true, workspace: true, browser: false },
-      codexModel: "gpt-5.4",
-      browserAllowedOrigins: ["https://github.com"],
-      browserProfilePersistent: true,
-      unread: 0
-    }],
-    invites: [{
-      id: "invite_live",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    }],
-    attachmentBlobs: [{
-      id: "blob_expired",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      name: "expired.txt",
-      type: "text/plain",
-      size: 4,
-      payload: {
-        algorithm: "AES-GCM-256",
-        nonce: "nonce-for-test",
-        ciphertext: "ciphertext-for-test"
-      },
-      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    }],
-    encryptedBacklog: []
-  });
+  const relay = await startRelay(
+    {},
+    {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+      rooms: [
+        {
+          id: "room-desktop",
+          teamId: "team-core",
+          name: "Desktop client",
+          projectPath: "/tmp/multaiplayer",
+          host: "No host",
+          hostStatus: "offline",
+          approvalPolicy: "ask_every_turn",
+          mode: { chat: true, code: true, workspace: true, browser: false },
+          codexModel: "gpt-5.4",
+          browserAllowedOrigins: ["https://github.com"],
+          browserProfilePersistent: true,
+          unread: 0
+        }
+      ],
+      invites: [
+        {
+          id: "invite_live",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        }
+      ],
+      attachmentBlobs: [
+        {
+          id: "blob_expired",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          name: "expired.txt",
+          type: "text/plain",
+          size: 4,
+          payload: {
+            algorithm: "AES-GCM-256",
+            nonce: "nonce-for-test",
+            ciphertext: "ciphertext-for-test"
+          },
+          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+          expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+        }
+      ],
+      encryptedBacklog: []
+    }
+  );
   try {
     const debug = await debugRelayState(relay.baseUrl);
     assert.equal(debug.invites, 1);
@@ -3411,28 +3606,33 @@ test("relay prunes expired in-memory invites and attachment blobs", async () => 
 });
 
 test("relay restores persisted team member roles and legacy counts", async () => {
-  const relay = await startRelay({}, {
-    version: 1,
-    savedAt: new Date().toISOString(),
-    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
-    rooms: [],
-    invites: [],
-    teamMembers: [{
-      teamId: "team-core",
-      members: [{ userId: "github:first", role: "owner", joinedAt: "2026-07-04T12:00:00.000Z" }],
-      userIds: ["github:first", "github:second", "github:third"]
-    }],
-    encryptedBacklog: []
-  });
+  const relay = await startRelay(
+    {},
+    {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+      rooms: [],
+      invites: [],
+      teamMembers: [
+        {
+          teamId: "team-core",
+          members: [{ userId: "github:first", role: "owner", joinedAt: "2026-07-04T12:00:00.000Z" }],
+          userIds: ["github:first", "github:second", "github:third"]
+        }
+      ],
+      encryptedBacklog: []
+    }
+  );
   try {
     const response = await fetch(`${relay.baseUrl}/teams`);
     assert.equal(response.status, 200);
-    const body = await response.json() as { teams: Array<{ id: string; members: number }> };
+    const body = (await response.json()) as { teams: Array<{ id: string; members: number }> };
     assert.equal(body.teams.find((team) => team.id === "team-core")?.members, 3);
 
     const membersResponse = await fetch(`${relay.baseUrl}/teams/team-core/members`);
     assert.equal(membersResponse.status, 200);
-    const membersBody = await membersResponse.json() as {
+    const membersBody = (await membersResponse.json()) as {
       members: Array<{ userId: string; role: string }>;
     };
     assert.equal(membersBody.members.find((member) => member.userId === "github:first")?.role, "owner");
@@ -3443,26 +3643,31 @@ test("relay restores persisted team member roles and legacy counts", async () =>
 });
 
 test("relay drops unsafe persisted team member ids before granting access", async () => {
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-    MULTAIPLAYER_RELAY_SEED_DEMO: "false"
-  }, {
-    version: 1,
-    savedAt: new Date().toISOString(),
-    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
-    rooms: [],
-    invites: [],
-    teamMembers: [{
-      teamId: "team-core",
-      members: [
-        { userId: "github:valid", role: "owner", joinedAt: "2026-07-04T12:00:00.000Z" },
-        { userId: "github:bad\nmember", role: "admin", joinedAt: "2026-07-04T12:00:00.000Z" },
-        { userId: `github:${"x".repeat(200)}`, role: "member", joinedAt: "2026-07-04T12:00:00.000Z" }
+  const relay = await startRelay(
+    {
+      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+      MULTAIPLAYER_RELAY_SEED_DEMO: "false"
+    },
+    {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+      rooms: [],
+      invites: [],
+      teamMembers: [
+        {
+          teamId: "team-core",
+          members: [
+            { userId: "github:valid", role: "owner", joinedAt: "2026-07-04T12:00:00.000Z" },
+            { userId: "github:bad\nmember", role: "admin", joinedAt: "2026-07-04T12:00:00.000Z" },
+            { userId: `github:${"x".repeat(200)}`, role: "member", joinedAt: "2026-07-04T12:00:00.000Z" }
+          ],
+          userIds: ["github:legacy", "github:legacy\nbad", `github:${"y".repeat(200)}`]
+        }
       ],
-      userIds: ["github:legacy", "github:legacy\nbad", `github:${"y".repeat(200)}`]
-    }],
-    encryptedBacklog: []
-  });
+      encryptedBacklog: []
+    }
+  );
   const validCookie = await createDebugSession(relay.baseUrl, "github:valid", "valid");
   const legacyCookie = await createDebugSession(relay.baseUrl, "github:legacy", "legacy");
   const outsiderCookie = await createDebugSession(relay.baseUrl, "github:outsider", "outsider");
@@ -3471,20 +3676,20 @@ test("relay drops unsafe persisted team member ids before granting access", asyn
       headers: { cookie: validCookie }
     });
     assert.equal(membersResponse.status, 200);
-    const membersBody = await membersResponse.json() as {
+    const membersBody = (await membersResponse.json()) as {
       members: Array<{ userId: string; role: string }>;
     };
-    assert.deepEqual(
-      membersBody.members.map((member) => member.userId).sort(),
-      ["github:legacy", "github:valid"]
-    );
+    assert.deepEqual(membersBody.members.map((member) => member.userId).sort(), ["github:legacy", "github:valid"]);
 
     const legacyWorkspace = await fetch(`${relay.baseUrl}/teams`, {
       headers: { cookie: legacyCookie }
     });
     assert.equal(legacyWorkspace.status, 200);
-    const legacyBody = await legacyWorkspace.json() as { teams: Array<{ id: string }> };
-    assert.deepEqual(legacyBody.teams.map((team) => team.id), ["team-core"]);
+    const legacyBody = (await legacyWorkspace.json()) as { teams: Array<{ id: string }> };
+    assert.deepEqual(
+      legacyBody.teams.map((team) => team.id),
+      ["team-core"]
+    );
 
     const outsiderWorkspace = await fetch(`${relay.baseUrl}/teams`, {
       headers: { cookie: outsiderCookie }
@@ -3497,70 +3702,73 @@ test("relay drops unsafe persisted team member ids before granting access", asyn
 });
 
 test("relay drops invalid persisted team and room identifiers", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_SEED_DEMO: "false" }, {
-    version: 1,
-    savedAt: new Date().toISOString(),
-    teams: [
-      { id: "team-core", name: "Core Team", members: 1 },
-      { id: "team:bad", name: "Bad Team", members: 1 },
-      { id: " team-padded", name: "Padded Team", members: 1 }
-    ],
-    rooms: [
-      {
-        id: "room-desktop",
-        teamId: "team-core",
-        name: "Desktop client",
-        projectPath: "/tmp/multaiplayer",
-        host: "Maddie",
-        hostUserId: "github:maddiedreese",
-        hostStatus: "active",
-        approvalPolicy: "ask_every_turn",
-        mode: { chat: true, code: true, workspace: true, browser: false },
-        codexModel: "gpt-5.4",
-        browserAllowedOrigins: ["https://github.com"],
-        browserProfilePersistent: true,
-        unread: 1
-      },
-      {
-        id: "room:bad",
-        teamId: "team-core",
-        name: "Bad room",
-        projectPath: "/tmp/multaiplayer",
-        host: "No host",
-        hostStatus: "offline",
-        approvalPolicy: "ask_every_turn",
-        mode: { chat: true, code: true, workspace: true, browser: false },
-        codexModel: "gpt-5.4",
-        browserAllowedOrigins: ["https://github.com"],
-        browserProfilePersistent: true,
-        unread: 0
-      },
-      {
-        id: "room-orphan",
-        teamId: "team-missing",
-        name: "Orphan room",
-        projectPath: "/tmp/multaiplayer",
-        host: "No host",
-        hostStatus: "offline",
-        approvalPolicy: "ask_every_turn",
-        mode: { chat: true, code: true, workspace: true, browser: false },
-        codexModel: "gpt-5.4",
-        browserAllowedOrigins: ["https://github.com"],
-        browserProfilePersistent: true,
-        unread: 0
-      }
-    ],
-    invites: [],
-    teamMembers: [
-      { teamId: "team-core", userIds: ["github:first"] },
-      { teamId: "team:bad", userIds: ["github:bad"] }
-    ],
-    encryptedBacklog: []
-  });
+  const relay = await startRelay(
+    { MULTAIPLAYER_RELAY_SEED_DEMO: "false" },
+    {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [
+        { id: "team-core", name: "Core Team", members: 1 },
+        { id: "team:bad", name: "Bad Team", members: 1 },
+        { id: " team-padded", name: "Padded Team", members: 1 }
+      ],
+      rooms: [
+        {
+          id: "room-desktop",
+          teamId: "team-core",
+          name: "Desktop client",
+          projectPath: "/tmp/multaiplayer",
+          host: "Maddie",
+          hostUserId: "github:maddiedreese",
+          hostStatus: "active",
+          approvalPolicy: "ask_every_turn",
+          mode: { chat: true, code: true, workspace: true, browser: false },
+          codexModel: "gpt-5.4",
+          browserAllowedOrigins: ["https://github.com"],
+          browserProfilePersistent: true,
+          unread: 1
+        },
+        {
+          id: "room:bad",
+          teamId: "team-core",
+          name: "Bad room",
+          projectPath: "/tmp/multaiplayer",
+          host: "No host",
+          hostStatus: "offline",
+          approvalPolicy: "ask_every_turn",
+          mode: { chat: true, code: true, workspace: true, browser: false },
+          codexModel: "gpt-5.4",
+          browserAllowedOrigins: ["https://github.com"],
+          browserProfilePersistent: true,
+          unread: 0
+        },
+        {
+          id: "room-orphan",
+          teamId: "team-missing",
+          name: "Orphan room",
+          projectPath: "/tmp/multaiplayer",
+          host: "No host",
+          hostStatus: "offline",
+          approvalPolicy: "ask_every_turn",
+          mode: { chat: true, code: true, workspace: true, browser: false },
+          codexModel: "gpt-5.4",
+          browserAllowedOrigins: ["https://github.com"],
+          browserProfilePersistent: true,
+          unread: 0
+        }
+      ],
+      invites: [],
+      teamMembers: [
+        { teamId: "team-core", userIds: ["github:first"] },
+        { teamId: "team:bad", userIds: ["github:bad"] }
+      ],
+      encryptedBacklog: []
+    }
+  );
   try {
     const response = await fetch(`${relay.baseUrl}/teams`);
     assert.equal(response.status, 200);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       teams: Array<{ id: string }>;
       rooms: Array<{
         id: string;
@@ -3570,8 +3778,14 @@ test("relay drops invalid persisted team and room identifiers", async () => {
         codexServiceTierPolicy?: string;
       }>;
     };
-    assert.deepEqual(body.teams.map((team) => team.id), ["team-core"]);
-    assert.deepEqual(body.rooms.map((room) => room.id), ["room-desktop"]);
+    assert.deepEqual(
+      body.teams.map((team) => team.id),
+      ["team-core"]
+    );
+    assert.deepEqual(
+      body.rooms.map((room) => room.id),
+      ["room-desktop"]
+    );
     assert.equal(body.rooms[0]?.codexModelPolicy, "pinned");
     assert.equal(body.rooms[0]?.codexReasoningEffortPolicy, "pinned");
     assert.equal(body.rooms[0]?.codexServiceTierPolicy, "pinned");
@@ -3582,33 +3796,36 @@ test("relay drops invalid persisted team and room identifiers", async () => {
 });
 
 test("relay salvages valid persisted records from malformed collection fields", async () => {
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-    MULTAIPLAYER_RELAY_SEED_DEMO: "false"
-  }, {
-    version: 1,
-    savedAt: new Date().toISOString(),
-    teams: [{ id: "team-core", name: "Core Team", members: 0 }],
-    rooms: "not-an-array",
-    invites: null,
-    devices: { malformed: true },
-    teamMembers: [
-      null,
-      "not-a-member-record",
-      {
-        teamId: "team-core",
-        members: [
-          null,
-          { userId: "github:owner", role: "owner", joinedAt: "2026-07-04T12:00:00.000Z" },
-          { userId: "github:bad\nmember", role: "admin", joinedAt: "2026-07-04T12:00:00.000Z" }
-        ],
-        userIds: "github:not-an-array"
-      }
-    ],
-    authSessions: "not-an-array",
-    attachmentBlobs: false,
-    encryptedBacklog: { malformed: true }
-  });
+  const relay = await startRelay(
+    {
+      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+      MULTAIPLAYER_RELAY_SEED_DEMO: "false"
+    },
+    {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [{ id: "team-core", name: "Core Team", members: 0 }],
+      rooms: "not-an-array",
+      invites: null,
+      devices: { malformed: true },
+      teamMembers: [
+        null,
+        "not-a-member-record",
+        {
+          teamId: "team-core",
+          members: [
+            null,
+            { userId: "github:owner", role: "owner", joinedAt: "2026-07-04T12:00:00.000Z" },
+            { userId: "github:bad\nmember", role: "admin", joinedAt: "2026-07-04T12:00:00.000Z" }
+          ],
+          userIds: "github:not-an-array"
+        }
+      ],
+      authSessions: "not-an-array",
+      attachmentBlobs: false,
+      encryptedBacklog: { malformed: true }
+    }
+  );
   const ownerCookie = await createDebugSession(relay.baseUrl, "github:owner", "owner");
   const outsiderCookie = await createDebugSession(relay.baseUrl, "github:outsider", "outsider");
   try {
@@ -3616,7 +3833,10 @@ test("relay salvages valid persisted records from malformed collection fields", 
       headers: { cookie: ownerCookie }
     });
     assert.equal(ownerWorkspace.status, 200);
-    const ownerBody = await ownerWorkspace.json() as { teams: Array<{ id: string; members: number; role: string }>; rooms: unknown[] };
+    const ownerBody = (await ownerWorkspace.json()) as {
+      teams: Array<{ id: string; members: number; role: string }>;
+      rooms: unknown[];
+    };
     assert.deepEqual(ownerBody.teams, [{ id: "team-core", name: "Core Team", members: 1, role: "owner" }]);
     assert.deepEqual(ownerBody.rooms, []);
 
@@ -3638,7 +3858,7 @@ test("relay quarantines unreadable persisted stores", async () => {
   try {
     const response = await fetch(`${relay.baseUrl}/teams`);
     assert.equal(response.status, 200);
-    const body = await response.json() as { teams: unknown[]; rooms: unknown[] };
+    const body = (await response.json()) as { teams: unknown[]; rooms: unknown[] };
     assert.deepEqual(body.teams, []);
     assert.deepEqual(body.rooms, []);
     const files = await readdir(tempDir);
@@ -3651,12 +3871,16 @@ test("relay quarantines unreadable persisted stores", async () => {
 test("relay quarantines unsupported persisted store versions", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-unsupported-store-"));
   const dataPath = join(tempDir, "relay-store.json");
-  await writeFile(dataPath, `${JSON.stringify({ version: 99, teams: [], rooms: [], invites: [], encryptedBacklog: [] })}\n`, "utf8");
+  await writeFile(
+    dataPath,
+    `${JSON.stringify({ version: 99, teams: [], rooms: [], invites: [], encryptedBacklog: [] })}\n`,
+    "utf8"
+  );
   const relay = await startRelay({ MULTAIPLAYER_RELAY_SEED_DEMO: "false" }, undefined, dataPath);
   try {
     const response = await fetch(`${relay.baseUrl}/teams`);
     assert.equal(response.status, 200);
-    const body = await response.json() as { teams: unknown[]; rooms: unknown[] };
+    const body = (await response.json()) as { teams: unknown[]; rooms: unknown[] };
     assert.deepEqual(body.teams, []);
     assert.deepEqual(body.rooms, []);
     const files = await readdir(tempDir);
@@ -3669,10 +3893,14 @@ test("relay quarantines unsupported persisted store versions", async () => {
 test("relay persists workspace state through SQLite storage", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-sqlite-store-"));
   const dataPath = join(tempDir, "relay-store.sqlite");
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-    MULTAIPLAYER_RELAY_SEED_DEMO: "false"
-  }, undefined, dataPath);
+  const relay = await startRelay(
+    {
+      MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+      MULTAIPLAYER_RELAY_SEED_DEMO: "false"
+    },
+    undefined,
+    dataPath
+  );
   let restarted: RelayHarness | null = null;
   try {
     const createTeam = await fetch(`${relay.baseUrl}/teams`, {
@@ -3681,7 +3909,7 @@ test("relay persists workspace state through SQLite storage", async () => {
       body: JSON.stringify({ name: "SQLite Team", requesterUserId: "github:owner" })
     });
     assert.equal(createTeam.status, 201);
-    const team = await createTeam.json() as { team: { id: string } };
+    const team = (await createTeam.json()) as { team: { id: string } };
 
     const createRoom = await fetch(`${relay.baseUrl}/rooms`, {
       method: "POST",
@@ -3705,13 +3933,17 @@ test("relay persists workspace state through SQLite storage", async () => {
 
     await relay.close({ preserveData: true });
 
-    restarted = await startRelay({
-      MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-      MULTAIPLAYER_RELAY_SEED_DEMO: "false"
-    }, undefined, dataPath);
+    restarted = await startRelay(
+      {
+        MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+        MULTAIPLAYER_RELAY_SEED_DEMO: "false"
+      },
+      undefined,
+      dataPath
+    );
     const response = await fetch(`${restarted.baseUrl}/teams`);
     assert.equal(response.status, 200);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       teams: Array<{ name: string }>;
       rooms: Array<{ name: string }>;
     };
@@ -3727,43 +3959,60 @@ test("relay persists workspace state through SQLite storage", async () => {
 test("relay persists SQLite encrypted backlog as individual envelope rows", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-sqlite-backlog-"));
   const dataPath = join(tempDir, "relay-store.sqlite");
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-    MULTAIPLAYER_RELAY_BACKLOG_LIMIT: "1"
-  }, undefined, dataPath);
+  const relay = await startRelay(
+    {
+      MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+      MULTAIPLAYER_RELAY_BACKLOG_LIMIT: "1"
+    },
+    undefined,
+    dataPath
+  );
   const sender = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(sender);
-    sender.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    sender.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
     await waitForJoined(sender);
 
-    sender.send(JSON.stringify({
-      type: "publish",
-      envelope: testEnvelope({ id: "sqlite-backlog-first", createdAt: "2026-07-07T00:00:02.000Z" })
-    }));
-    await waitForSqliteBacklogRows(dataPath, (rows) => rows.length === 1 && rows[0]?.envelope_id === "sqlite-backlog-first");
+    sender.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: testEnvelope({ id: "sqlite-backlog-first", createdAt: "2026-07-07T00:00:02.000Z" })
+      })
+    );
+    await waitForSqliteBacklogRows(
+      dataPath,
+      (rows) => rows.length === 1 && rows[0]?.envelope_id === "sqlite-backlog-first"
+    );
 
-    sender.send(JSON.stringify({
-      type: "publish",
-      envelope: testEnvelope({ id: "sqlite-backlog-second", createdAt: "2026-07-07T00:00:01.000Z" })
-    }));
+    sender.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: testEnvelope({ id: "sqlite-backlog-second", createdAt: "2026-07-07T00:00:01.000Z" })
+      })
+    );
 
-    const rows = await waitForSqliteBacklogRows(dataPath, (currentRows) => (
-      currentRows.length === 1 &&
-      currentRows[0]?.envelope_id === "sqlite-backlog-second" &&
-      currentRows[0]?.sort_order === 0
-    ));
+    const rows = await waitForSqliteBacklogRows(
+      dataPath,
+      (currentRows) =>
+        currentRows.length === 1 &&
+        currentRows[0]?.envelope_id === "sqlite-backlog-second" &&
+        currentRows[0]?.sort_order === 0
+    );
     assert.equal(JSON.parse(rows[0]?.data_json ?? "{}").id, "sqlite-backlog-second");
 
     const db = new Database(dataPath, { readonly: true });
     try {
-      const legacyRows = db.prepare("select data_json from relay_encrypted_backlog").all() as Array<{ data_json: string }>;
+      const legacyRows = db.prepare("select data_json from relay_encrypted_backlog").all() as Array<{
+        data_json: string;
+      }>;
       assert.deepEqual(legacyRows, []);
     } finally {
       db.close();
@@ -3778,49 +4027,61 @@ test("relay persists SQLite encrypted backlog as individual envelope rows", asyn
 test("relay appends SQLite encrypted backlog rows without rewriting retained rows", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-sqlite-backlog-delta-"));
   const dataPath = join(tempDir, "relay-store.sqlite");
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-    MULTAIPLAYER_RELAY_BACKLOG_LIMIT: "2"
-  }, undefined, dataPath);
+  const relay = await startRelay(
+    {
+      MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+      MULTAIPLAYER_RELAY_BACKLOG_LIMIT: "2"
+    },
+    undefined,
+    dataPath
+  );
   const sender = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(sender);
-    sender.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    sender.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
     await waitForJoined(sender);
 
     for (const id of ["sqlite-delta-first", "sqlite-delta-second"]) {
-      sender.send(JSON.stringify({
-        type: "publish",
-        envelope: testEnvelope({ id, createdAt: `2026-07-07T00:00:0${id.endsWith("first") ? "1" : "2"}.000Z` })
-      }));
+      sender.send(
+        JSON.stringify({
+          type: "publish",
+          envelope: testEnvelope({ id, createdAt: `2026-07-07T00:00:0${id.endsWith("first") ? "1" : "2"}.000Z` })
+        })
+      );
     }
     const initialRows = await waitForSqliteBacklogRows(dataPath, (rows) => rows.length === 2);
     const retainedBeforeAppend = initialRows.find((row) => row.envelope_id === "sqlite-delta-second");
     assert.ok(retainedBeforeAppend);
 
-    sender.send(JSON.stringify({
-      type: "publish",
-      envelope: testEnvelope({ id: "sqlite-delta-third", createdAt: "2026-07-07T00:00:03.000Z" })
-    }));
+    sender.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: testEnvelope({ id: "sqlite-delta-third", createdAt: "2026-07-07T00:00:03.000Z" })
+      })
+    );
 
     const rows = await waitForSqliteBacklogRows(dataPath, (currentRows) => {
       const ids = currentRows.map((row) => row.envelope_id);
-      return currentRows.length === 2 &&
+      return (
+        currentRows.length === 2 &&
         !ids.includes("sqlite-delta-first") &&
         ids.includes("sqlite-delta-second") &&
-        ids.includes("sqlite-delta-third");
+        ids.includes("sqlite-delta-third")
+      );
     });
-    assert.deepEqual(rows.map((row) => JSON.parse(row.data_json).id), ["sqlite-delta-second", "sqlite-delta-third"]);
-    assert.equal(
-      rows.find((row) => row.envelope_id === "sqlite-delta-second")?.rowid,
-      retainedBeforeAppend.rowid
+    assert.deepEqual(
+      rows.map((row) => JSON.parse(row.data_json).id),
+      ["sqlite-delta-second", "sqlite-delta-third"]
     );
+    assert.equal(rows.find((row) => row.envelope_id === "sqlite-delta-second")?.rowid, retainedBeforeAppend.rowid);
   } finally {
     sender.close();
     await relay.close();
@@ -3831,40 +4092,57 @@ test("relay appends SQLite encrypted backlog rows without rewriting retained row
 test("relay prunes stale SQLite encrypted envelope rows on generic save", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-sqlite-backlog-prune-"));
   const dataPath = join(tempDir, "relay-store.sqlite");
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-    MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS: "365"
-  }, undefined, dataPath);
+  const relay = await startRelay(
+    {
+      MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+      MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS: "365"
+    },
+    undefined,
+    dataPath
+  );
   const sender = new WebSocket(relay.wsUrl);
   let restarted: RelayHarness | null = null;
   try {
     await onceOpen(sender);
-    sender.send(JSON.stringify({
-      type: "join",
-      teamId: "team-core",
-      roomId: "room-desktop",
-      userId: "github:tester",
-      deviceId: "device-test-123"
-    }));
+    sender.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-test-123"
+      })
+    );
     await waitForJoined(sender);
 
-    sender.send(JSON.stringify({
-      type: "publish",
-      envelope: testEnvelope({ id: "sqlite-stale-envelope", createdAt: "2026-07-05T00:00:00.000Z" })
-    }));
-    await waitForSqliteBacklogRows(dataPath, (rows) => rows.length === 1 && rows[0]?.envelope_id === "sqlite-stale-envelope");
+    sender.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: testEnvelope({ id: "sqlite-stale-envelope", createdAt: "2026-07-05T00:00:00.000Z" })
+      })
+    );
+    await waitForSqliteBacklogRows(
+      dataPath,
+      (rows) => rows.length === 1 && rows[0]?.envelope_id === "sqlite-stale-envelope"
+    );
     sender.close();
     await relay.close({ preserveData: true });
 
-    restarted = await startRelay({
-      MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-      MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS: "1"
-    }, undefined, dataPath);
+    restarted = await startRelay(
+      {
+        MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+        MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS: "1"
+      },
+      undefined,
+      dataPath
+    );
     await restarted.close({ preserveData: true });
 
     const db = new Database(dataPath, { readonly: true });
     try {
-      const rows = db.prepare("select envelope_id from relay_encrypted_envelopes where room_key = ?").all("team-core:room-desktop");
+      const rows = db
+        .prepare("select envelope_id from relay_encrypted_envelopes where room_key = ?")
+        .all("team-core:room-desktop");
       assert.deepEqual(rows, []);
     } finally {
       db.close();
@@ -3903,7 +4181,7 @@ test("relay requires auth in production by default even without GitHub OAuth con
   try {
     const config = await fetch(`${relay.baseUrl}/auth/config`);
     assert.equal(config.status, 200);
-    const configBody = await config.json() as { configured: boolean; mutationsRequireAuth: boolean };
+    const configBody = (await config.json()) as { configured: boolean; mutationsRequireAuth: boolean };
     assert.equal(configBody.configured, false);
     assert.equal(configBody.mutationsRequireAuth, true);
 
@@ -3922,7 +4200,7 @@ test("relay does not seed demo workspace in production by default when auth is e
   try {
     const response = await fetch(`${relay.baseUrl}/teams`);
     assert.equal(response.status, 200);
-    const body = await response.json() as { teams: unknown[]; rooms: unknown[] };
+    const body = (await response.json()) as { teams: unknown[]; rooms: unknown[] };
     assert.deepEqual(body.teams, []);
     assert.deepEqual(body.rooms, []);
   } finally {
@@ -3939,7 +4217,7 @@ test("relay can explicitly seed demo workspace in production", async () => {
   try {
     const response = await fetch(`${relay.baseUrl}/teams`);
     assert.equal(response.status, 200);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       teams: Array<{ id: string }>;
       rooms: Array<{ id: string }>;
     };
@@ -3955,7 +4233,9 @@ async function startRelay(
   storedState?: StoredRelayStateFixture,
   existingDataPath?: string
 ): Promise<RelayHarness> {
-  const tempDir = existingDataPath ? resolve(existingDataPath, "..") : await mkdtemp(join(tmpdir(), "multaiplayer-relay-test-"));
+  const tempDir = existingDataPath
+    ? resolve(existingDataPath, "..")
+    : await mkdtemp(join(tmpdir(), "multaiplayer-relay-test-"));
   const dataPath = existingDataPath ?? join(tempDir, "relay-store.json");
   if (storedState) {
     await writeFile(dataPath, `${JSON.stringify(storedState, null, 2)}\n`, "utf8");
@@ -4059,18 +4339,20 @@ async function createDebugSession(baseUrl: string, id: string, login: string, tt
   return cookie.split(";")[0] ?? cookie;
 }
 
-async function debugBacklog(baseUrl: string): Promise<Array<{
-  key: string;
-  envelopes: number;
-  sample?: {
-    id: string;
-    kind: string;
-    payloadAlgorithm: string;
-  };
-}>> {
+async function debugBacklog(baseUrl: string): Promise<
+  Array<{
+    key: string;
+    envelopes: number;
+    sample?: {
+      id: string;
+      kind: string;
+      payloadAlgorithm: string;
+    };
+  }>
+> {
   const response = await fetch(`${baseUrl}/debug/rooms`);
   assert.equal(response.status, 200);
-  const body = await response.json() as {
+  const body = (await response.json()) as {
     rooms: Array<{
       key: string;
       envelopes: number;
@@ -4090,7 +4372,7 @@ async function debugRelayState(baseUrl: string): Promise<{
 }> {
   const response = await fetch(`${baseUrl}/debug/rooms`);
   assert.equal(response.status, 200);
-  const body = await response.json() as {
+  const body = (await response.json()) as {
     invites?: number;
     attachmentBlobs?: number;
   };
@@ -4155,12 +4437,21 @@ async function waitForSqliteBacklogRows(
     let db: Database.Database | null = null;
     try {
       db = new Database(dataPath, { readonly: true });
-      const rows = db.prepare(`
+      const rows = db
+        .prepare(
+          `
         select rowid, envelope_id, sort_order, data_json
         from relay_encrypted_envelopes
         where room_key = ?
         order by sort_order, envelope_id
-      `).all("team-core:room-desktop") as Array<{ rowid: number; envelope_id: string; sort_order: number; data_json: string }>;
+      `
+        )
+        .all("team-core:room-desktop") as Array<{
+        rowid: number;
+        envelope_id: string;
+        sort_order: number;
+        data_json: string;
+      }>;
       if (predicate(rows)) return rows;
     } catch (error) {
       lastError = error;
@@ -4181,11 +4472,7 @@ async function waitForDebugBacklog(baseUrl: string, envelopes: number) {
   assert.fail(`Timed out waiting for debug backlog with ${envelopes} envelope(s)`);
 }
 
-async function waitForReady(
-  baseUrl: string,
-  child: ChildProcessWithoutNullStreams,
-  getOutput: () => string
-) {
+async function waitForReady(baseUrl: string, child: ChildProcessWithoutNullStreams, getOutput: () => string) {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     if (child.exitCode !== null) {
       throw new Error(`Relay exited before ready: ${getOutput()}`);
@@ -4207,7 +4494,7 @@ async function waitForNotReady(baseUrl: string): Promise<{ code: string }> {
     try {
       const response = await fetch(`${baseUrl}/readyz`);
       lastStatus = response.status;
-      if (response.status === 503) return await response.json() as { code: string };
+      if (response.status === 503) return (await response.json()) as { code: string };
     } catch {
       // Keep polling while the child is transitioning.
     }
@@ -4331,7 +4618,10 @@ function waitForJoined(socket: WebSocket): Promise<void> {
   });
 }
 
-function waitForPresence(socket: WebSocket, expectedDeviceId?: string): Promise<{
+function waitForPresence(
+  socket: WebSocket,
+  expectedDeviceId?: string
+): Promise<{
   userId: string;
   deviceId: string;
   publicKeyFingerprint?: string;
@@ -4398,16 +4688,18 @@ function waitForError(socket: WebSocket): Promise<string> {
   });
 }
 
-function testEnvelope(overrides: Partial<{
-  id: string;
-  senderDeviceId: string;
-  senderUserId: string;
-  teamId: string;
-  roomId: string;
-  createdAt: string;
-  kind: "browser.event" | "terminal.event" | "git.event" | "room.invite";
-  payload: Record<string, unknown>;
-}> = {}) {
+function testEnvelope(
+  overrides: Partial<{
+    id: string;
+    senderDeviceId: string;
+    senderUserId: string;
+    teamId: string;
+    roomId: string;
+    createdAt: string;
+    kind: "browser.event" | "terminal.event" | "git.event" | "room.invite";
+    payload: Record<string, unknown>;
+  }> = {}
+) {
   return {
     id: overrides.id ?? `envelope-${randomUUID()}`,
     teamId: overrides.teamId ?? "team-core",

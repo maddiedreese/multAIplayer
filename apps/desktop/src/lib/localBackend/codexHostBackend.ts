@@ -2,12 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import { isTauriRuntime } from "./runtime";
-import type {
-  CodexHostNotification,
-  CodexHostSnapshot,
-  CodexLoginStartResult,
-  CodexMcpLoginResult
-} from "./types";
+import type { CodexHostNotification, CodexHostSnapshot, CodexLoginStartResult, CodexMcpLoginResult } from "./types";
 
 export type CodexAppApprovalMode = "auto" | "prompt" | "writes";
 
@@ -31,10 +26,7 @@ export function shouldRefreshCodexHostSnapshot(
 }
 
 /** Coalesces bursts and guarantees at most one task execution at a time. */
-export function createCoalescedAsyncTask(
-  task: () => Promise<void>,
-  delayMs = 75
-): CoalescedAsyncTask {
+export function createCoalescedAsyncTask(task: () => Promise<void>, delayMs = 75): CoalescedAsyncTask {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let running = false;
   let queued = false;
@@ -42,21 +34,24 @@ export function createCoalescedAsyncTask(
 
   const schedule = () => {
     if (running || timer) return;
-    timer = setTimeout(() => {
-      timer = null;
-      if (running || !queued) return;
-      queued = false;
-      running = true;
-      const batch = waiters;
-      waiters = [];
-      void task()
-        .then(() => batch.forEach(({ resolve }) => resolve()))
-        .catch((error) => batch.forEach(({ reject }) => reject(error)))
-        .finally(() => {
-          running = false;
-          if (queued) schedule();
-        });
-    }, Math.max(0, delayMs));
+    timer = setTimeout(
+      () => {
+        timer = null;
+        if (running || !queued) return;
+        queued = false;
+        running = true;
+        const batch = waiters;
+        waiters = [];
+        void task()
+          .then(() => batch.forEach(({ resolve }) => resolve()))
+          .catch((error) => batch.forEach(({ reject }) => reject(error)))
+          .finally(() => {
+            running = false;
+            if (queued) schedule();
+          });
+      },
+      Math.max(0, delayMs)
+    );
   };
 
   return {

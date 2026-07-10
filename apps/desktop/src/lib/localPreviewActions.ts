@@ -5,11 +5,7 @@ import {
   startLocalPreviewTunnel,
   stopLocalPreviewTunnel
 } from "./localBackend";
-import {
-  localPreviewLabel,
-  normalizeLocalPreviewUrl,
-  quickTunnelDisclaimer
-} from "./localPreview";
+import { localPreviewLabel, normalizeLocalPreviewUrl, quickTunnelDisclaimer } from "./localPreview";
 import { roomLockMessage } from "./appRuntime";
 import { useAppStore } from "../store/appStore";
 import type { LocalPreviewRecord } from "../types";
@@ -19,9 +15,7 @@ interface LocalPreviewActionsOptions {
   publishLocalPreviewEvent: (payload: LocalPreviewRecord, room?: RoomRecord) => Promise<void>;
 }
 
-export function createLocalPreviewActions({
-  publishLocalPreviewEvent
-}: LocalPreviewActionsOptions) {
+export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPreviewActionsOptions) {
   const selectedRoom = () => {
     const state = useAppStore.getState();
     return state.rooms.find((room) => room.id === state.selectedRoomId);
@@ -31,15 +25,10 @@ export function createLocalPreviewActions({
     const room = selectedRoom();
     if (!room) return;
     const { forgottenRoomIds, revokedRoomIds, revokedTeamIds } = useAppStore.getState();
-    const isSelectedRoomRevoked =
-      revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
-    const isSelectedRoomLocked =
-      room.archivedAt != null || forgottenRoomIds.has(room.id) || isSelectedRoomRevoked;
+    const isSelectedRoomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
+    const isSelectedRoomLocked = room.archivedAt != null || forgottenRoomIds.has(room.id) || isSelectedRoomRevoked;
     if (isSelectedRoomLocked) {
-      useAppStore.getState().setChatMessageForRoom(
-        room.id,
-        roomLockMessage(room, isSelectedRoomRevoked)
-      );
+      useAppStore.getState().setChatMessageForRoom(room.id, roomLockMessage(room, isSelectedRoomRevoked));
       return;
     }
     useAppStore.getState().setLocalPreviewBusyForRoom(room.id, true);
@@ -50,10 +39,12 @@ export function createLocalPreviewActions({
         url: server.url,
         label: localPreviewLabel(server.url)
       }));
-      useAppStore.getState().setLocalPreviewDialogCandidates(
-        candidates,
-        candidates.length ? null : "No common local development servers were detected. Enter a local URL manually."
-      );
+      useAppStore
+        .getState()
+        .setLocalPreviewDialogCandidates(
+          candidates,
+          candidates.length ? null : "No common local development servers were detected. Enter a local URL manually."
+        );
     } catch (error) {
       useAppStore.getState().setLocalPreviewDialogError(`Could not detect local web servers: ${String(error)}`);
     } finally {
@@ -73,10 +64,9 @@ export function createLocalPreviewActions({
       useAppStore.getState().setLocalPreviewDialogSelectedUrl(normalizedUrl);
       const cloudflared = await probeCloudflared();
       if (!cloudflared.available) {
-        useAppStore.getState().setLocalPreviewDialogPhase(
-          "install",
-          cloudflared.error ?? "cloudflared is not installed."
-        );
+        useAppStore
+          .getState()
+          .setLocalPreviewDialogPhase("install", cloudflared.error ?? "cloudflared is not installed.");
         return;
       }
       useAppStore.getState().setLocalPreviewDialogConfirmation(room.id, normalizedUrl, cloudflared.version);
@@ -138,25 +128,32 @@ export function createLocalPreviewActions({
   async function stopLocalPreview(previewId: string) {
     const room = selectedRoom();
     if (!room) return;
-    const preview = (useAppStore.getState().localPreviewByRoom[room.id]?.previews ?? [])
-      .find((item) => item.id === previewId);
+    const preview = (useAppStore.getState().localPreviewByRoom[room.id]?.previews ?? []).find(
+      (item) => item.id === previewId
+    );
     if (!preview) return;
     useAppStore.getState().setLocalPreviewBusyForRoom(room.id, true);
     try {
       await stopLocalPreviewTunnel(previewId);
-      await publishLocalPreviewEvent({
-        ...preview,
-        status: "stopped",
-        message: "This preview is no longer available.",
-        updatedAt: new Date().toISOString()
-      }, room);
+      await publishLocalPreviewEvent(
+        {
+          ...preview,
+          status: "stopped",
+          message: "This preview is no longer available.",
+          updatedAt: new Date().toISOString()
+        },
+        room
+      );
     } catch (error) {
-      await publishLocalPreviewEvent({
-        ...preview,
-        status: "error",
-        message: `Tunnel process could not be terminated: ${String(error)}`,
-        updatedAt: new Date().toISOString()
-      }, room);
+      await publishLocalPreviewEvent(
+        {
+          ...preview,
+          status: "error",
+          message: `Tunnel process could not be terminated: ${String(error)}`,
+          updatedAt: new Date().toISOString()
+        },
+        room
+      );
     } finally {
       useAppStore.getState().setLocalPreviewBusyForRoom(room.id, false);
     }
@@ -170,18 +167,22 @@ export function createLocalPreviewActions({
       const room = useAppStore.getState().rooms.find((item) => item.id === roomId);
       if (!room) continue;
       for (const preview of previews) {
-        if (preview.sharedByUserId !== localUser.id || (preview.status !== "live" && preview.status !== "starting")) continue;
+        if (preview.sharedByUserId !== localUser.id || (preview.status !== "live" && preview.status !== "starting"))
+          continue;
         try {
           await stopLocalPreviewTunnel(preview.id);
         } catch {
           // The app may already be exiting or the tunnel may have already stopped.
         }
-        await publishLocalPreviewEvent({
-          ...preview,
-          status: "stopped",
-          message,
-          updatedAt: new Date().toISOString()
-        }, room);
+        await publishLocalPreviewEvent(
+          {
+            ...preview,
+            status: "stopped",
+            message,
+            updatedAt: new Date().toISOString()
+          },
+          room
+        );
       }
     }
   }

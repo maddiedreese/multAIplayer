@@ -54,26 +54,53 @@ test("an explicit fork is added as a child and becomes active without broad disc
 });
 
 test("agent tree is derived only from normalized subagent activities and remains distinct", () => {
-  const activities: CodexActivity[] = [activity(), activity({
-    activityId: "agent-spawn", itemId: "agent-spawn", kind: "agent",
-    agent: { action: "spawn", senderId: "agent-root", receiverIds: ["agent-child"] }
-  })];
-  assert.deepEqual(deriveCodexAgentTree(activities).map(({ id, parentId }) => ({ id, parentId })), [
-    { id: "agent-root", parentId: null },
-    { id: "agent-child", parentId: "agent-root" }
-  ]);
+  const activities: CodexActivity[] = [
+    activity(),
+    activity({
+      activityId: "agent-spawn",
+      itemId: "agent-spawn",
+      kind: "agent",
+      agent: { action: "spawn", senderId: "agent-root", receiverIds: ["agent-child"] }
+    })
+  ];
+  assert.deepEqual(
+    deriveCodexAgentTree(activities).map(({ id, parentId }) => ({ id, parentId })),
+    [
+      { id: "agent-root", parentId: null },
+      { id: "agent-child", parentId: "agent-root" }
+    ]
+  );
 });
 
 test("thread graph UI renders switch/fork controls and a separate agent tree", () => {
   const graph: CodexThreadGraph = {
     activeThreadId: "thread-root",
-    nodesById: { "thread-root": node("thread-root", "session-a"), "thread-child": node("thread-child", "session-a", "thread-root") }
+    nodesById: {
+      "thread-root": node("thread-root", "session-a"),
+      "thread-child": node("thread-child", "session-a", "thread-root")
+    }
   };
-  const html = renderToStaticMarkup(React.createElement(CodexThreadGraphView, {
-    graph,
-    agentTree: [{ id: "agent-child", parentId: "agent-root", status: "running", lastAction: "spawn", updatedAt: "2026-07-09T12:00:00.000Z" }],
-    busy: false, message: null, lastTurnId: "", onLastTurnIdChange() {}, onRefresh() {}, onFork() {}, onSwitch() {}
-  }));
+  const html = renderToStaticMarkup(
+    React.createElement(CodexThreadGraphView, {
+      graph,
+      agentTree: [
+        {
+          id: "agent-child",
+          parentId: "agent-root",
+          status: "running",
+          lastAction: "spawn",
+          updatedAt: "2026-07-09T12:00:00.000Z"
+        }
+      ],
+      busy: false,
+      message: null,
+      lastTurnId: "",
+      onLastTurnIdChange() {},
+      onRefresh() {},
+      onFork() {},
+      onSwitch() {}
+    })
+  );
   assert.match(html, /Thread graph/);
   assert.match(html, /Fork active/);
   assert.match(html, /Switch/);
@@ -81,14 +108,30 @@ test("thread graph UI renders switch/fork controls and a separate agent tree", (
 });
 
 function node(id: string, sessionId: string, parentThreadId?: string) {
-  return { id, sessionId, ...(parentThreadId ? { parentThreadId } : {}), title: id, status: "idle" as const, createdAt: 1, updatedAt: 1 };
+  return {
+    id,
+    sessionId,
+    ...(parentThreadId ? { parentThreadId } : {}),
+    title: id,
+    status: "idle" as const,
+    createdAt: 1,
+    updatedAt: 1
+  };
 }
 
 function activity(overrides: Partial<CodexActivity> = {}): CodexActivity {
   return {
-    eventType: "codex.activity", activityId: "command", turnId: "turn", itemId: "command",
-    kind: "command", status: "running", title: "Command execution",
-    startedAt: "2026-07-09T12:00:00.000Z", updatedAt: "2026-07-09T12:00:00.000Z",
-    host: "Host", hostUserId: "user-host", ...overrides
+    eventType: "codex.activity",
+    activityId: "command",
+    turnId: "turn",
+    itemId: "command",
+    kind: "command",
+    status: "running",
+    title: "Command execution",
+    startedAt: "2026-07-09T12:00:00.000Z",
+    updatedAt: "2026-07-09T12:00:00.000Z",
+    host: "Host",
+    hostUserId: "user-host",
+    ...overrides
   };
 }

@@ -43,22 +43,32 @@ export function registerGitHubProxyRoutes({
       return;
     }
 
-    const response = await fetch(`https://api.github.com/repos/${encodeURIComponent(draft.owner)}/${encodeURIComponent(draft.repo)}/pulls`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${session.accessToken}`,
-        accept: "application/vnd.github+json",
-        "content-type": "application/json",
-        "user-agent": "multAIplayer-alpha"
-      },
-      body: JSON.stringify(draft)
-    });
+    const response = await fetch(
+      `https://api.github.com/repos/${encodeURIComponent(draft.owner)}/${encodeURIComponent(draft.repo)}/pulls`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${session.accessToken}`,
+          accept: "application/vnd.github+json",
+          "content-type": "application/json",
+          "user-agent": "multAIplayer-alpha"
+        },
+        body: JSON.stringify(draft)
+      }
+    );
     const responseBody = await response.json();
     if (!response.ok) {
-      res.status(response.status).json(normalizeGitHubErrorResponse(responseBody, normalizeMetadataText, maxMediumTextChars));
+      res
+        .status(response.status)
+        .json(normalizeGitHubErrorResponse(responseBody, normalizeMetadataText, maxMediumTextChars));
       return;
     }
-    const pullRequest = normalizeGitHubPullResponse(responseBody, normalizeMetadataText, maxUrlChars, maxShortTextChars);
+    const pullRequest = normalizeGitHubPullResponse(
+      responseBody,
+      normalizeMetadataText,
+      maxUrlChars,
+      maxShortTextChars
+    );
     if (!pullRequest) {
       res.status(502).json({ error: "GitHub returned an invalid pull request response." });
       return;
@@ -86,17 +96,22 @@ export function registerGitHubProxyRoutes({
 
     const params = new URLSearchParams({ per_page: "6" });
     if (branch) params.set("branch", branch);
-    const response = await fetch(`https://api.github.com/repos/${encodeURIComponent(repoRef.owner)}/${encodeURIComponent(repoRef.repo)}/actions/runs?${params}`, {
-      headers: {
-        authorization: `Bearer ${session.accessToken}`,
-        accept: "application/vnd.github+json",
-        "user-agent": "multAIplayer-alpha",
-        "x-github-api-version": "2022-11-28"
+    const response = await fetch(
+      `https://api.github.com/repos/${encodeURIComponent(repoRef.owner)}/${encodeURIComponent(repoRef.repo)}/actions/runs?${params}`,
+      {
+        headers: {
+          authorization: `Bearer ${session.accessToken}`,
+          accept: "application/vnd.github+json",
+          "user-agent": "multAIplayer-alpha",
+          "x-github-api-version": "2022-11-28"
+        }
       }
-    });
+    );
     const responseBody = await response.json();
     if (!response.ok) {
-      res.status(response.status).json(normalizeGitHubErrorResponse(responseBody, normalizeMetadataText, maxMediumTextChars));
+      res
+        .status(response.status)
+        .json(normalizeGitHubErrorResponse(responseBody, normalizeMetadataText, maxMediumTextChars));
       return;
     }
 
@@ -109,9 +124,8 @@ function normalizeGitHubErrorResponse(
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null,
   maxMediumTextChars: number
 ): { error: string; message?: string } {
-  const message = isRecord(value) && !Array.isArray(value)
-    ? normalizeMetadataText(value.message, maxMediumTextChars)
-    : null;
+  const message =
+    isRecord(value) && !Array.isArray(value) ? normalizeMetadataText(value.message, maxMediumTextChars) : null;
   return {
     error: message ?? "GitHub request failed.",
     ...(message ? { message } : {})
@@ -201,9 +215,7 @@ function normalizeGitHubActionRun(
   const createdAt = normalizeMetadataText(value.created_at, maxShortTextChars);
   const updatedAt = normalizeMetadataText(value.updated_at, maxShortTextChars);
   if (id === null || !name || !status || !url || !createdAt || !updatedAt) return null;
-  const conclusion = value.conclusion === null
-    ? null
-    : normalizeMetadataText(value.conclusion, maxShortTextChars);
+  const conclusion = value.conclusion === null ? null : normalizeMetadataText(value.conclusion, maxShortTextChars);
   if (value.conclusion !== null && !conclusion) return null;
   const displayTitle = normalizeOptionalMetadataText(value.display_title, normalizeMetadataText, maxShortTextChars);
   const branch = normalizeOptionalMetadataText(value.head_branch, normalizeMetadataText, maxShortTextChars);
@@ -233,7 +245,7 @@ function normalizeSafeNonnegativeInteger(value: unknown): number | null {
 }
 
 function normalizeOptionalSafeNonnegativeInteger(value: unknown): number | undefined {
-  return value === undefined || value === null ? undefined : normalizeSafeNonnegativeInteger(value) ?? undefined;
+  return value === undefined || value === null ? undefined : (normalizeSafeNonnegativeInteger(value) ?? undefined);
 }
 
 function normalizeOptionalMetadataText(

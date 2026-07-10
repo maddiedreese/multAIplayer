@@ -59,9 +59,7 @@ export function normalizeLocalPreviewUrl(value: string): string {
 }
 
 export function localPreviewDetectionUrls(): string[] {
-  return localPreviewPorts.flatMap((port) =>
-    localPreviewHosts.map((host) => `http://${host}:${port}/`)
-  );
+  return localPreviewPorts.flatMap((port) => localPreviewHosts.map((host) => `http://${host}:${port}/`));
 }
 
 export function localPreviewLabel(url: string): string {

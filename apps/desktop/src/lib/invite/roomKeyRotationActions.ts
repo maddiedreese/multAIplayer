@@ -10,11 +10,7 @@ import { currentSelectedRoomContext } from "../selectedWorkspace";
 
 type RoomKeyRotationActionOptions = Pick<
   UseInviteActionsOptions,
-  | "historyLoadedRoomIds"
-  | "relayRef"
-  | "reportRoomKeyRotationInFlight"
-  | "seenEnvelopeIds"
-  | "selectedRoomIdRef"
+  "historyLoadedRoomIds" | "relayRef" | "reportRoomKeyRotationInFlight" | "seenEnvelopeIds" | "selectedRoomIdRef"
 >;
 
 type RoomKeyRotationStore = Pick<
@@ -30,13 +26,7 @@ export function createRoomKeyRotationActions(
   options: RoomKeyRotationActionOptions,
   store: RoomKeyRotationStore = useAppStore.getState()
 ) {
-  const {
-    historyLoadedRoomIds,
-    relayRef,
-    reportRoomKeyRotationInFlight,
-    seenEnvelopeIds,
-    selectedRoomIdRef
-  } = options;
+  const { historyLoadedRoomIds, relayRef, reportRoomKeyRotationInFlight, seenEnvelopeIds, selectedRoomIdRef } = options;
   const {
     appendRoomMessage,
     restoreForgottenRoom,
@@ -70,8 +60,8 @@ export function createRoomKeyRotationActions(
     if (reportRoomKeyRotationInFlight(selectedRoom.id)) return;
     const confirmed = window.confirm(
       `Refresh room access for ${selectedRoom.name}?\n\n` +
-      "This updates future messages and invites for current members. " +
-      "It is not full member removal in the alpha."
+        "This updates future messages and invites for current members. " +
+        "It is not full member removal in the alpha."
     );
     if (!confirmed) return;
 

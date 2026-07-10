@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowRight, CornerDownRight, Globe2, Maximize2, Minimize2, R
 import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import { Webview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { closeRoomBrowserSurfaceEvent } from "../lib/browserSurfaceEvents";
 import type { BrowserTab } from "../store/slices/browserSlice";
 
@@ -50,7 +50,7 @@ export function BrowserAccessPanel({
     onOpenBrowserNow();
   }
 
-  async function closeBrowserWebview() {
+  const closeBrowserWebview = useCallback(async () => {
     const webview = browserWebviewRef.current;
     browserWebviewRef.current = null;
     if (webview) {
@@ -60,7 +60,7 @@ export function BrowserAccessPanel({
       const labeledWebview = await Webview.getByLabel(browserWebviewLabel).catch(() => null);
       await labeledWebview?.close().catch(() => undefined);
     }
-  }
+  }, [tauriRuntime]);
 
   function navigateBrowserHistory(delta: -1 | 1) {
     const nextIndex = browserHistoryIndex + delta;
@@ -99,7 +99,7 @@ export function BrowserAccessPanel({
       setBrowserHistoryIndex(next.length);
       return [...next, activeBrowserUrl];
     });
-  }, [activeBrowserUrl]);
+  }, [activeBrowserUrl, browserHistoryIndex]);
 
   useEffect(() => {
     const close = () => {
@@ -107,7 +107,7 @@ export function BrowserAccessPanel({
     };
     window.addEventListener(closeRoomBrowserSurfaceEvent, close);
     return () => window.removeEventListener(closeRoomBrowserSurfaceEvent, close);
-  }, [tauriRuntime]);
+  }, [closeBrowserWebview]);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,7 +188,7 @@ export function BrowserAccessPanel({
       cleanupPositioning?.();
       void closeBrowserWebview();
     };
-  }, [browserSurfaceRevision, browserSurfaceUrl, browserExpanded, hidden, tauriRuntime]);
+  }, [browserSurfaceRevision, browserSurfaceUrl, browserExpanded, closeBrowserWebview, hidden, tauriRuntime]);
 
   return (
     <section className={panelClassName} hidden={hidden}>
@@ -283,13 +283,31 @@ function BrowserToolbar({
         aria-label="Browser URL"
       />
       <div className="browser-toolbar-actions">
-        <button type="button" disabled={!canGoBack} onClick={() => onNavigateHistory(-1)} aria-label="Back" title="Back">
+        <button
+          type="button"
+          disabled={!canGoBack}
+          onClick={() => onNavigateHistory(-1)}
+          aria-label="Back"
+          title="Back"
+        >
           <ArrowLeft size={14} />
         </button>
-        <button type="button" disabled={!canGoForward} onClick={() => onNavigateHistory(1)} aria-label="Forward" title="Forward">
+        <button
+          type="button"
+          disabled={!canGoForward}
+          onClick={() => onNavigateHistory(1)}
+          aria-label="Forward"
+          title="Forward"
+        >
           <ArrowRight size={14} />
         </button>
-        <button type="button" disabled={!browserSurfaceUrl} onClick={onRefreshBrowserSurface} aria-label="Refresh" title="Refresh">
+        <button
+          type="button"
+          disabled={!browserSurfaceUrl}
+          onClick={onRefreshBrowserSurface}
+          aria-label="Refresh"
+          title="Refresh"
+        >
           <RotateCw size={14} />
         </button>
         <button type="button" disabled={!canOpenUrl} onClick={onOpenBrowserUrl} aria-label="Open URL" title="Open URL">
@@ -326,10 +344,7 @@ function BrowserTabStrip({
       {tabs.map((tab) => {
         const active = tab.id === activeTabId;
         return (
-          <div
-            key={tab.id}
-            className={`browser-tab ${active ? "active" : ""}`}
-          >
+          <div key={tab.id} className={`browser-tab ${active ? "active" : ""}`}>
             <button
               type="button"
               className="browser-tab-select"

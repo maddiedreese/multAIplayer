@@ -33,16 +33,21 @@ export const ChatPlaintextPayload = z.object({
   time: z.string().min(1).max(maxShortTextChars),
   createdAt: z.string().datetime().optional(),
   replyTo: z.string().min(1).max(maxEnvelopeIdChars).optional(),
-  attachments: z.array(z.object({
-    id: z.string().min(1).max(maxEnvelopeIdChars),
-    name: z.string().min(1).max(maxShortTextChars),
-    type: z.string().min(1).max(maxShortTextChars),
-    size: z.number().int().nonnegative(),
-    content: z.string().max(maxEmbeddedAttachmentBytes).optional(),
-    blobId: z.string().min(1).max(maxEnvelopeIdChars).optional(),
-    blobBytes: z.number().int().nonnegative().optional(),
-    truncated: z.boolean().optional()
-  })).max(maxMessageAttachments).optional()
+  attachments: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(maxEnvelopeIdChars),
+        name: z.string().min(1).max(maxShortTextChars),
+        type: z.string().min(1).max(maxShortTextChars),
+        size: z.number().int().nonnegative(),
+        content: z.string().max(maxEmbeddedAttachmentBytes).optional(),
+        blobId: z.string().min(1).max(maxEnvelopeIdChars).optional(),
+        blobBytes: z.number().int().nonnegative().optional(),
+        truncated: z.boolean().optional()
+      })
+    )
+    .max(maxMessageAttachments)
+    .optional()
 });
 
 export const ChatEditPlaintextPayload = z.object({
@@ -202,11 +207,13 @@ export const CodexActivityPlaintextPayload = z.object({
   ]),
   status: z.enum(["started", "running", "completed", "failed", "declined"]),
   title: z.string().min(1).max(maxShortTextChars),
-  agent: z.object({
-    action: z.enum(["spawn", "send", "resume", "wait", "close"]),
-    senderId: z.string().min(1).max(maxCodexThreadIdChars),
-    receiverIds: z.array(z.string().min(1).max(maxCodexThreadIdChars)).max(16)
-  }).optional(),
+  agent: z
+    .object({
+      action: z.enum(["spawn", "send", "resume", "wait", "close"]),
+      senderId: z.string().min(1).max(maxCodexThreadIdChars),
+      receiverIds: z.array(z.string().min(1).max(maxCodexThreadIdChars)).max(16)
+    })
+    .optional(),
   startedAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   host: z.string().min(1).max(maxDisplayNameChars),
@@ -220,34 +227,36 @@ export const CodexApprovalPlaintextPayload = z.object({
   approver: z.string().min(1).max(maxDisplayNameChars),
   approverUserId: z.string().min(1).max(maxUserIdChars),
   approvedAt: z.string().datetime(),
-  delegationPolicy: z.enum([
-    "members_can_approve",
-    "trusted_members_only"
-  ]),
+  delegationPolicy: z.enum(["members_can_approve", "trusted_members_only"]),
   message: z.string().max(maxMediumTextChars).optional()
 });
 
-export const CodexQueuePlaintextPayload = z.object({
-  eventType: z.literal("codex.queue"),
-  queueEventId: z.string().min(1).max(maxEnvelopeIdChars),
-  turnId: z.string().min(1).max(maxEnvelopeIdChars),
-  action: z.enum(["queued", "cancelled", "coalesced", "promoted", "dropped"]),
-  requestedBy: z.string().min(1).max(maxDisplayNameChars),
-  requestedByUserId: z.string().min(1).max(maxUserIdChars),
-  triggerMessageId: z.string().min(1).max(maxEnvelopeIdChars).optional(),
-  reason: z.string().max(maxMediumTextChars).optional(),
-  queuePosition: z.number().int().min(1).max(maxCodexQueueSize).optional(),
-  queueSize: z.number().int().nonnegative().max(maxCodexQueueSize),
-  createdAt: z.string().datetime()
-}).refine((payload) => {
-  if (payload.action === "queued" || payload.action === "promoted") {
-    return typeof payload.queuePosition === "number";
-  }
-  return true;
-}, {
-  message: "Queued and promoted Codex queue events must include a queue position",
-  path: ["queuePosition"]
-});
+export const CodexQueuePlaintextPayload = z
+  .object({
+    eventType: z.literal("codex.queue"),
+    queueEventId: z.string().min(1).max(maxEnvelopeIdChars),
+    turnId: z.string().min(1).max(maxEnvelopeIdChars),
+    action: z.enum(["queued", "cancelled", "coalesced", "promoted", "dropped"]),
+    requestedBy: z.string().min(1).max(maxDisplayNameChars),
+    requestedByUserId: z.string().min(1).max(maxUserIdChars),
+    triggerMessageId: z.string().min(1).max(maxEnvelopeIdChars).optional(),
+    reason: z.string().max(maxMediumTextChars).optional(),
+    queuePosition: z.number().int().min(1).max(maxCodexQueueSize).optional(),
+    queueSize: z.number().int().nonnegative().max(maxCodexQueueSize),
+    createdAt: z.string().datetime()
+  })
+  .refine(
+    (payload) => {
+      if (payload.action === "queued" || payload.action === "promoted") {
+        return typeof payload.queuePosition === "number";
+      }
+      return true;
+    },
+    {
+      message: "Queued and promoted Codex queue events must include a queue position",
+      path: ["queuePosition"]
+    }
+  );
 
 export const TerminalResultPlaintextPayload = z.object({
   eventType: z.literal("terminal.result"),
@@ -273,17 +282,24 @@ export const GitWorkflowEventPlaintextPayload = z.object({
   runner: z.string().min(1).max(maxDisplayNameChars),
   runnerUserId: z.string().min(1).max(maxUserIdChars),
   createdAt: z.string().datetime(),
-  results: z.array(z.object({
-    command: z.string().min(1).max(maxMediumTextChars),
-    cwd: z.string().min(1).max(maxProjectPathChars),
-    status: z.number().int().nullable(),
-    stdout: z.string().max(maxLongTextChars),
-    stderr: z.string().max(maxLongTextChars)
-  })).max(maxGitWorkflowResults).optional(),
-  pullRequest: z.object({
-    number: z.number().int(),
-    url: z.string().min(1).max(maxUrlChars)
-  }).optional()
+  results: z
+    .array(
+      z.object({
+        command: z.string().min(1).max(maxMediumTextChars),
+        cwd: z.string().min(1).max(maxProjectPathChars),
+        status: z.number().int().nullable(),
+        stdout: z.string().max(maxLongTextChars),
+        stderr: z.string().max(maxLongTextChars)
+      })
+    )
+    .max(maxGitWorkflowResults)
+    .optional(),
+  pullRequest: z
+    .object({
+      number: z.number().int(),
+      url: z.string().min(1).max(maxUrlChars)
+    })
+    .optional()
 });
 
 export const GitHubActionsEventPlaintextPayload = z.object({
@@ -300,21 +316,25 @@ export const GitHubActionsEventPlaintextPayload = z.object({
   checkedBy: z.string().min(1).max(maxDisplayNameChars),
   checkedByUserId: z.string().min(1).max(maxUserIdChars),
   checkedAt: z.string().datetime(),
-  runs: z.array(z.object({
-    id: z.number().int(),
-    name: z.string().max(maxShortTextChars),
-    displayTitle: z.string().max(maxShortTextChars).optional(),
-    runNumber: z.number().int().optional(),
-    workflowId: z.number().int().optional(),
-    status: z.string().max(maxShortTextChars),
-    conclusion: z.string().max(maxShortTextChars).nullable(),
-    branch: z.string().max(maxShortTextChars).optional(),
-    headSha: z.string().max(maxShortTextChars).optional(),
-    event: z.string().max(maxShortTextChars).optional(),
-    url: z.string().min(1).max(maxUrlChars),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime()
-  })).max(maxGitHubActionRuns)
+  runs: z
+    .array(
+      z.object({
+        id: z.number().int(),
+        name: z.string().max(maxShortTextChars),
+        displayTitle: z.string().max(maxShortTextChars).optional(),
+        runNumber: z.number().int().optional(),
+        workflowId: z.number().int().optional(),
+        status: z.string().max(maxShortTextChars),
+        conclusion: z.string().max(maxShortTextChars).nullable(),
+        branch: z.string().max(maxShortTextChars).optional(),
+        headSha: z.string().max(maxShortTextChars).optional(),
+        event: z.string().max(maxShortTextChars).optional(),
+        url: z.string().min(1).max(maxUrlChars),
+        createdAt: z.string().datetime(),
+        updatedAt: z.string().datetime()
+      })
+    )
+    .max(maxGitHubActionRuns)
 });
 
 export const HostHandoffPlaintextPayload = z.object({
@@ -336,21 +356,23 @@ export const HostHandoffPlaintextPayload = z.object({
   codexReasoningEffortPolicy: z.enum(["auto", "pinned"]).optional(),
   codexSpeed: z.enum(["standard", "fast"]).optional(),
   codexServiceTierPolicy: z.enum(["auto", "pinned"]).optional(),
-  codexSandboxLevel: z.enum([
-    "read_only",
-    "workspace_write",
-    "workspace_write_network",
-    "danger_full_access"
-  ]).optional(),
+  codexSandboxLevel: z
+    .enum(["read_only", "workspace_write", "workspace_write_network", "danger_full_access"])
+    .optional(),
   approvalPolicy: z.string().min(1).max(maxShortTextChars),
   messagesSinceLastCodex: z.number().int().nonnegative(),
-  queuedCodexTurns: z.array(z.object({
-    turnId: z.string().min(1).max(maxEnvelopeIdChars),
-    requestedBy: z.string().min(1).max(maxDisplayNameChars),
-    requestedByUserId: z.string().min(1).max(maxUserIdChars),
-    queuedAt: z.string().datetime(),
-    triggerMessageId: z.string().min(1).max(maxEnvelopeIdChars).optional()
-  })).max(5).optional(),
+  queuedCodexTurns: z
+    .array(
+      z.object({
+        turnId: z.string().min(1).max(maxEnvelopeIdChars),
+        requestedBy: z.string().min(1).max(maxDisplayNameChars),
+        requestedByUserId: z.string().min(1).max(maxUserIdChars),
+        queuedAt: z.string().datetime(),
+        triggerMessageId: z.string().min(1).max(maxEnvelopeIdChars).optional()
+      })
+    )
+    .max(5)
+    .optional(),
   attachmentNames: z.array(z.string().min(1).max(maxShortTextChars)).max(maxMessageAttachments),
   terminals: z.array(z.string().min(1).max(maxShortTextChars)).max(maxTerminalSnapshots),
   continuationSummary: z.string().max(maxMediumTextChars).optional(),

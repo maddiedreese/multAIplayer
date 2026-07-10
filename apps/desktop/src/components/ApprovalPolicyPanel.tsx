@@ -1,14 +1,13 @@
-import type { ApprovalDelegationPolicy, ApprovalPolicy, CodexSandboxLevel, codexSandboxLevelOptions } from "@multaiplayer/protocol";
+import type {
+  ApprovalDelegationPolicy,
+  ApprovalPolicy,
+  CodexSandboxLevel,
+  codexSandboxLevelOptions
+} from "@multaiplayer/protocol";
 
-const selectableApprovalPolicies: ApprovalPolicy[] = [
-  "ask_every_turn",
-  "never_host"
-];
+const selectableApprovalPolicies: ApprovalPolicy[] = ["ask_every_turn", "never_host"];
 
-const selectableDelegationPolicies: ApprovalDelegationPolicy[] = [
-  "host_only",
-  "members_can_request"
-];
+const selectableDelegationPolicies: ApprovalDelegationPolicy[] = ["host_only", "members_can_request"];
 
 export function ApprovalPolicyPanel({
   selectedPolicy,
@@ -71,7 +70,8 @@ export function ApprovalPolicyPanel({
       </div>
       {delegatedExecution && (
         <div className="warning-card">
-          Legacy delegated approval settings no longer authorize Codex turns. Only the active host can approve execution on the host machine.
+          Legacy delegated approval settings no longer authorize Codex turns. Only the active host can approve execution
+          on the host machine.
         </div>
       )}
       <div className="panel-subtitle">Codex sandbox</div>

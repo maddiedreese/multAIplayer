@@ -30,7 +30,11 @@ export function replaceRoomPreservingUnread(rooms: RoomRecord[], room: RoomRecor
   return rooms.map((item) => (item.id === room.id ? { ...room, unread: existing.unread } : item));
 }
 
-export function applyLocalRoomReadState(rooms: RoomRecord[], roomId: string, readState?: LocalRoomReadState): RoomRecord[] {
+export function applyLocalRoomReadState(
+  rooms: RoomRecord[],
+  roomId: string,
+  readState?: LocalRoomReadState
+): RoomRecord[] {
   if (!readState) return rooms;
   const unread = sanitizeUnread(readState.unread);
   return rooms.map((room) => (room.id === roomId && room.unread !== unread ? { ...room, unread } : room));
@@ -43,16 +47,14 @@ export function hideUnreadForLockedRooms(
   revokedTeamIds: ReadonlySet<string>
 ): RoomRecord[] {
   return rooms.map((room) =>
-    (forgottenRoomIds.has(room.id) || revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId)) && room.unread !== 0
+    (forgottenRoomIds.has(room.id) || revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId)) &&
+    room.unread !== 0
       ? { ...room, unread: 0 }
       : room
   );
 }
 
-export function localRoomReadStateForHistory(
-  room: RoomRecord,
-  messages: readonly ChatMessage[]
-): LocalRoomReadState {
+export function localRoomReadStateForHistory(room: RoomRecord, messages: readonly ChatMessage[]): LocalRoomReadState {
   const lastReadMessageId = room.unread === 0 ? messages.at(-1)?.id : undefined;
   return {
     unread: sanitizeUnread(room.unread),

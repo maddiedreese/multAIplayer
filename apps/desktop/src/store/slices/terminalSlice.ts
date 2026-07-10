@@ -60,7 +60,9 @@ export function projectTerminalRuntimeBusyByRoom(terminalRuntimeByRoom: Terminal
   );
 }
 
-export function projectTerminalRuntimeRequestsByRoom(terminalRuntimeByRoom: TerminalRuntimeByRoom): TerminalRequestsByRoom {
+export function projectTerminalRuntimeRequestsByRoom(
+  terminalRuntimeByRoom: TerminalRuntimeByRoom
+): TerminalRequestsByRoom {
   return Object.fromEntries(
     Object.entries(terminalRuntimeByRoom)
       .filter(([, terminal]) => terminal.requests)
@@ -68,7 +70,9 @@ export function projectTerminalRuntimeRequestsByRoom(terminalRuntimeByRoom: Term
   );
 }
 
-export function projectSelectedTerminalRuntimeIdsByRoom(terminalRuntimeByRoom: TerminalRuntimeByRoom): SelectedTerminalIdsByRoom {
+export function projectSelectedTerminalRuntimeIdsByRoom(
+  terminalRuntimeByRoom: TerminalRuntimeByRoom
+): SelectedTerminalIdsByRoom {
   return Object.fromEntries(
     Object.entries(terminalRuntimeByRoom)
       .filter(([, terminal]) => terminal.selectedTerminalId)
@@ -92,11 +96,7 @@ export interface TerminalSlice {
   appendTerminalLinesForRoom: (roomId: string, lines: string[], maxTerminalActivityLines: number) => void;
 }
 
-export const emptyTerminalState: Pick<
-  TerminalSlice,
-  | "terminalRuntimeByRoom"
-  | "terminals"
-> = {
+export const emptyTerminalState: Pick<TerminalSlice, "terminalRuntimeByRoom" | "terminals"> = {
   terminalRuntimeByRoom: {},
   terminals: []
 };
@@ -123,7 +123,7 @@ export const createTerminalSlice: StateCreator<AppStoreState, [], [], TerminalSl
   },
   seedInitialTerminalLines: (linesByRoom) => {
     if (Object.keys(linesByRoom).length === 0) return;
-    set((state) => (
+    set((state) =>
       Object.values(state.terminalRuntimeByRoom).every((terminal) => !terminal.lines)
         ? {
             terminalRuntimeByRoom: Object.fromEntries(
@@ -137,7 +137,7 @@ export const createTerminalSlice: StateCreator<AppStoreState, [], [], TerminalSl
             )
           }
         : state
-    ));
+    );
   },
   setTerminalBusyForRoom: (roomId, busy) => {
     set((state) => ({
@@ -179,10 +179,12 @@ export const createTerminalSlice: StateCreator<AppStoreState, [], [], TerminalSl
   },
   setTerminalErrorForRoom: (roomId, error) => {
     set((state) => ({
-      terminalRuntimeByRoom: updateTerminalRuntimeForRoom(state.terminalRuntimeByRoom, roomId, (roomTerminal) => updateTerminalUiForRoomState(roomTerminal, (roomUi) => {
-        const { error: _error, ...rest } = roomUi;
-        return error ? { ...rest, error } : rest;
-      }))
+      terminalRuntimeByRoom: updateTerminalRuntimeForRoom(state.terminalRuntimeByRoom, roomId, (roomTerminal) =>
+        updateTerminalUiForRoomState(roomTerminal, (roomUi) => {
+          const { error: _error, ...rest } = roomUi;
+          return error ? { ...rest, error } : rest;
+        })
+      )
     }));
   },
   appendTerminalLinesForRoom: (roomId, lines, maxTerminalActivityLines) => {

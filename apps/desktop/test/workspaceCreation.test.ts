@@ -43,7 +43,10 @@ test("planRoomCreation rejects missing team, room, or project", () => {
 test("planRoomCreation rejects oversized and control-character room metadata", () => {
   assert.throws(() => planRoomCreation("team-core", "x".repeat(maxRoomNameChars + 1), "/tmp/project"), /room name/);
   assert.throws(() => planRoomCreation("team-core", "Room\u0007", "/tmp/project"), /room name/);
-  assert.throws(() => planRoomCreation("team-core", "Room", `/${"x".repeat(maxRoomProjectPathChars + 1)}`), /project folder/);
+  assert.throws(
+    () => planRoomCreation("team-core", "Room", `/${"x".repeat(maxRoomProjectPathChars + 1)}`),
+    /project folder/
+  );
   assert.throws(() => planRoomCreation("team-core", "Room", "/tmp/project\u0000secret"), /project folder/);
 });
 

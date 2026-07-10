@@ -4,11 +4,7 @@ import { maxEmbeddedAttachmentBytes } from "@multaiplayer/protocol";
 import { isTauriRuntime } from "./runtime";
 import type { ProjectFileContent, ProjectFileEntry, ProjectFileWriteResult } from "./types";
 
-export async function searchProjectFiles(
-  cwd: string,
-  query: string,
-  limit = 80
-): Promise<ProjectFileEntry[]> {
+export async function searchProjectFiles(cwd: string, query: string, limit = 80): Promise<ProjectFileEntry[]> {
   if (isTauriRuntime()) {
     return invoke<ProjectFileEntry[]>("project_files", {
       request: { cwd, query, limit }
@@ -48,11 +44,7 @@ export async function readProjectFile(
   };
 }
 
-export async function writeProjectFile(
-  cwd: string,
-  path: string,
-  content: string
-): Promise<ProjectFileWriteResult> {
+export async function writeProjectFile(cwd: string, path: string, content: string): Promise<ProjectFileWriteResult> {
   if (isTauriRuntime()) {
     return invoke<ProjectFileWriteResult>("project_file_write", {
       request: { cwd, path, content }

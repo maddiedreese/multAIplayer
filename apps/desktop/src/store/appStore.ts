@@ -14,11 +14,7 @@ import {
   type CodexHostHandoffSlice
 } from "./slices/codexHostHandoffSlice";
 import { createFilePanelSlice, emptyFilePanelState, type FilePanelSlice } from "./slices/filePanelSlice";
-import {
-  createGitWorkflowSlice,
-  emptyGitWorkflowState,
-  type GitWorkflowSlice
-} from "./slices/gitWorkflowSlice";
+import { createGitWorkflowSlice, emptyGitWorkflowState, type GitWorkflowSlice } from "./slices/gitWorkflowSlice";
 import {
   createHistoryPresenceSlice,
   emptyHistoryPresenceState,
@@ -29,28 +25,12 @@ import {
   emptyHistoryDefaultsState,
   type HistoryDefaultsSlice
 } from "./slices/historyDefaultsSlice";
-import {
-  createInviteSlice,
-  emptyInviteState,
-  type InviteSlice
-} from "./slices/inviteSlice";
-import {
-  createLocalPreviewSlice,
-  emptyLocalPreviewState,
-  type LocalPreviewSlice
-} from "./slices/localPreviewSlice";
-import {
-  createRoomSettingsSlice,
-  emptyRoomSettingsState,
-  type RoomSettingsSlice
-} from "./slices/roomSettingsSlice";
+import { createInviteSlice, emptyInviteState, type InviteSlice } from "./slices/inviteSlice";
+import { createLocalPreviewSlice, emptyLocalPreviewState, type LocalPreviewSlice } from "./slices/localPreviewSlice";
+import { createRoomSettingsSlice, emptyRoomSettingsState, type RoomSettingsSlice } from "./slices/roomSettingsSlice";
 import { createRoomChatSlice, emptyRoomChatState, type RoomChatSlice } from "./slices/roomChatSlice";
 import { createRoomLifecycleSlice, type RoomLifecycleSlice } from "./slices/roomLifecycleSlice";
-import {
-  createRelayRuntimeSlice,
-  emptyRelayRuntimeState,
-  type RelayRuntimeSlice
-} from "./slices/relayRuntimeSlice";
+import { createRelayRuntimeSlice, emptyRelayRuntimeState, type RelayRuntimeSlice } from "./slices/relayRuntimeSlice";
 import { createTerminalSlice, emptyTerminalState, type TerminalSlice } from "./slices/terminalSlice";
 import { createShellSlice, emptyShellState, type ShellSlice } from "./slices/shellSlice";
 import {
@@ -58,11 +38,7 @@ import {
   emptyWorkspaceDataState,
   type WorkspaceDataSlice
 } from "./slices/workspaceDataSlice";
-import {
-  createWorkspaceUiSlice,
-  emptyWorkspaceUiState,
-  type WorkspaceUiSlice
-} from "./slices/workspaceUiSlice";
+import { createWorkspaceUiSlice, emptyWorkspaceUiState, type WorkspaceUiSlice } from "./slices/workspaceUiSlice";
 
 const emptyAppStoreState = {
   ...emptyAppConfigState,
@@ -86,7 +62,8 @@ const emptyAppStoreState = {
 };
 
 export interface AppStoreState
-  extends AppConfigSlice,
+  extends
+    AppConfigSlice,
     AppRuntimeSlice,
     AuthSlice,
     BrowserSlice,
@@ -129,8 +106,9 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   ...createTerminalSlice(set, get, api),
   ...createWorkspaceDataSlice(set, get, api),
   ...createWorkspaceUiSlice(set, get, api),
-  resetAppStore: () => set({
-    ...emptyAppStoreState,
-    ...loadAppConfigState()
-  })
+  resetAppStore: () =>
+    set({
+      ...emptyAppStoreState,
+      ...loadAppConfigState()
+    })
 }));

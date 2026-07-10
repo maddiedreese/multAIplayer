@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react";
 import { Copy, FileCode2, Maximize2, Minimize2, Plus, RotateCcw, Save, Search, ShieldAlert, X } from "lucide-react";
-import type {
-  GitDiffResult,
-  GitStatusSummary,
-  ProjectFileContent,
-  ProjectFileEntry
-} from "../lib/localBackend";
+import type { GitDiffResult, GitStatusSummary, ProjectFileContent, ProjectFileEntry } from "../lib/localBackend";
 import type { FilePreviewTab } from "../lib/filePreview";
 import type { WorkspaceFileSaveRequest } from "../types";
 import { FilePreviewTabs } from "./FilePreviewTabs";
@@ -99,7 +94,11 @@ export function WorkspaceFilesPanel({
               onClick={onAttachSelectedFileToMessage}
               disabled={!selectedFile || !canReadLocalWorkspace || !canAttachSelectedFile}
             >
-              {selectedFileNeedsAttachmentReview && !selectedSensitiveFileReviewed ? <ShieldAlert size={14} /> : <Plus size={14} />}
+              {selectedFileNeedsAttachmentReview && !selectedSensitiveFileReviewed ? (
+                <ShieldAlert size={14} />
+              ) : (
+                <Plus size={14} />
+              )}
               {selectedAttachmentActionLabel}
             </button>
             <button
@@ -144,7 +143,9 @@ export function WorkspaceFilesPanel({
           <label>
             <span>Diff</span>
             <select
-              value={gitStatus?.files.some((file) => file.path === viewerPath) && filePreviewTab === "diff" ? viewerPath : ""}
+              value={
+                gitStatus?.files.some((file) => file.path === viewerPath) && filePreviewTab === "diff" ? viewerPath : ""
+              }
               onChange={(event) => {
                 if (event.target.value) onOpenProjectFile(event.target.value, "diff");
               }}
@@ -161,10 +162,7 @@ export function WorkspaceFilesPanel({
         </div>
 
         {selectedFileRisks.length > 0 && (
-          <InlineSecretWarning
-            risks={selectedFileRisks}
-            detail={selectedAttachmentWarningDetail}
-          />
+          <InlineSecretWarning risks={selectedFileRisks} detail={selectedAttachmentWarningDetail} />
         )}
         <div className="file-viewer-meta">
           <FilePreviewTabs
@@ -209,17 +207,15 @@ export function WorkspaceFilesPanel({
                 </div>
               ))}
             </div>
+          ) : selectedFile ? (
+            <MonacoFileEditor
+              path={selectedFile.path}
+              value={editorContent}
+              onChange={setEditorContent}
+              disabled={!canReadLocalWorkspace || selectedFile.truncated}
+            />
           ) : (
-            selectedFile ? (
-              <MonacoFileEditor
-                path={selectedFile.path}
-                value={editorContent}
-                onChange={setEditorContent}
-                disabled={!canReadLocalWorkspace || selectedFile.truncated}
-              />
-            ) : (
-              <div className="empty-state compact">No current file content is available for this diff.</div>
-            )
+            <div className="empty-state compact">No current file content is available for this diff.</div>
           )}
         </div>
         {pendingFileSaveRequests.length > 0 && (
@@ -285,9 +281,7 @@ export function WorkspaceFilesPanel({
               <small>{formatBytes(file.size)}</small>
             </button>
           ))}
-          {!fileBusy && projectFiles.length === 0 && (
-            <div className="empty-state">No files match this search.</div>
-          )}
+          {!fileBusy && projectFiles.length === 0 && <div className="empty-state">No files match this search.</div>}
         </div>
         {fileBusy && projectFiles.length === 0 && <div className="empty-state">Loading project files...</div>}
         {fileMessage && <div className="workflow-message">{fileMessage}</div>}
@@ -305,15 +299,20 @@ export function WorkspaceFilesPanel({
         </div>
         <div className="diff-list">
           {(gitStatus?.files.length ? gitStatus.files : []).map((file) => (
-            <button className="diff-row" key={file.path} onClick={() => onOpenProjectFile(file.path, "diff")} disabled={!canReadLocalWorkspace}>
+            <button
+              className="diff-row"
+              key={file.path}
+              onClick={() => onOpenProjectFile(file.path, "diff")}
+              disabled={!canReadLocalWorkspace}
+            >
               <FileCode2 size={15} />
               <span>{file.path}</span>
-              <small><b>+{file.added}</b> <i>-{file.removed}</i></small>
+              <small>
+                <b>+{file.added}</b> <i>-{file.removed}</i>
+              </small>
             </button>
           ))}
-          {gitStatus?.files.length === 0 && (
-            <div className="empty-state">No local file changes in this project.</div>
-          )}
+          {gitStatus?.files.length === 0 && <div className="empty-state">No local file changes in this project.</div>}
         </div>
       </section>
     </>
@@ -335,14 +334,25 @@ function formatRequestedContentPreview(content: string): string {
   return `${content.slice(0, maxPreviewChars)}\n\n... ${content.length - maxPreviewChars} more character(s)`;
 }
 
-function parseDiffLines(diff: string): Array<{ kind: "added" | "removed" | "hunk" | "meta" | "context"; prefix: string; text: string }> {
+function parseDiffLines(
+  diff: string
+): Array<{ kind: "added" | "removed" | "hunk" | "meta" | "context"; prefix: string; text: string }> {
   return diff.split("\n").map((line) => {
     if (line.startsWith("@@")) return { kind: "hunk", prefix: "", text: line };
-    if (line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff --git") || line.startsWith("index ")) {
+    if (
+      line.startsWith("+++") ||
+      line.startsWith("---") ||
+      line.startsWith("diff --git") ||
+      line.startsWith("index ")
+    ) {
       return { kind: "meta", prefix: "", text: line };
     }
     if (line.startsWith("+")) return { kind: "added", prefix: "+", text: line.slice(1) };
     if (line.startsWith("-")) return { kind: "removed", prefix: "-", text: line.slice(1) };
-    return { kind: "context", prefix: line.startsWith(" ") ? " " : "", text: line.startsWith(" ") ? line.slice(1) : line };
+    return {
+      kind: "context",
+      prefix: line.startsWith(" ") ? " " : "",
+      text: line.startsWith(" ") ? line.slice(1) : line
+    };
   });
 }

@@ -6,11 +6,7 @@ import { RoomMainColumnContainer, type RoomMainColumnSources } from "./RoomMainC
 import { isWebPreviewRuntime } from "../lib/appRuntime";
 import { useUpdateNotice } from "../hooks/useUpdateNotice";
 import { useShellLayout } from "../hooks/useShellLayout";
-import {
-  AppSidebarDrawerContainer,
-  DesktopSidebarContainer,
-  type SidebarSources
-} from "./SidebarContainers";
+import { AppSidebarDrawerContainer, DesktopSidebarContainer, type SidebarSources } from "./SidebarContainers";
 
 interface AppShellViewProps {
   sidebarSources: SidebarSources;
@@ -31,7 +27,10 @@ export function AppShellView({
   const webPreviewBanner: ReactNode = isWebPreviewRuntime() ? (
     <div className="web-preview-banner" role="status">
       <strong>Development web preview</strong>
-      <span>Do not use this fallback for private projects; room secrets use browser localStorage instead of the native Keychain.</span>
+      <span>
+        Do not use this fallback for private projects; room secrets use browser localStorage instead of the native
+        Keychain.
+      </span>
     </div>
   ) : null;
   const updateBanner: ReactNode = updateNotice ? (
@@ -41,9 +40,7 @@ export function AppShellView({
         {updateNotice.currentVersion} &rarr; {updateNotice.latestVersion}
         {updateNotice.notes ? `: ${updateNotice.notes}` : ""}
       </span>
-      <button onClick={() => window.open(updateNotice.url, "_blank", "noopener,noreferrer")}>
-        Download
-      </button>
+      <button onClick={() => window.open(updateNotice.url, "_blank", "noopener,noreferrer")}>Download</button>
     </div>
   ) : null;
   const shellBanner: ReactNode = (

@@ -29,11 +29,7 @@ export function AppSidebarDrawer({
       title={isProfile ? profileTitle : settingsTitle}
       onClose={onClose}
     >
-      {isProfile ? (
-        <ProfileDrawerPanel {...profile} />
-      ) : (
-        <RoomSettingsDrawerPanel {...settings} />
-      )}
+      {isProfile ? <ProfileDrawerPanel {...profile} /> : <RoomSettingsDrawerPanel {...settings} />}
     </SidebarDrawer>
   );
 }

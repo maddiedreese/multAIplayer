@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import {
-  createCoalescedAsyncTask,
-  shouldRefreshCodexHostSnapshot
-} from "../src/lib/localBackend/codexHostBackend";
+import { createCoalescedAsyncTask, shouldRefreshCodexHostSnapshot } from "../src/lib/localBackend/codexHostBackend";
 
 const repoRoot = new URL("../../..", import.meta.url);
 

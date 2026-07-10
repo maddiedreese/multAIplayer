@@ -41,9 +41,7 @@ function updateHistoryPresenceForRoom(
 }
 
 function removeEmptyHistoryPresenceRooms(current: HistoryPresenceByRoom): HistoryPresenceByRoom {
-  return Object.fromEntries(
-    Object.entries(current).filter(([, roomState]) => Object.keys(roomState).length > 0)
-  );
+  return Object.fromEntries(Object.entries(current).filter(([, roomState]) => Object.keys(roomState).length > 0));
 }
 
 export function projectHistorySearchMessagesByRoom(
@@ -78,7 +76,10 @@ export function projectInspectorTabsByRoom(historyPresenceByRoom: HistoryPresenc
   return Object.fromEntries(
     Object.entries(historyPresenceByRoom)
       .filter(([, roomState]) => roomState.inspectorTab)
-      .map(([roomId, roomState]) => [roomId, normalizeInspectorTab(roomState.inspectorTab as InspectorTab | "diff" | undefined)])
+      .map(([roomId, roomState]) => [
+        roomId,
+        normalizeInspectorTab(roomState.inspectorTab as InspectorTab | "diff" | undefined)
+      ])
   );
 }
 
@@ -111,11 +112,7 @@ export interface HistoryPresenceSlice {
   setRoomPresenceForDevice: (roomId: string, deviceId: string, presence: RoomPresence | null) => void;
 }
 
-export const emptyHistoryPresenceState: Pick<
-  HistoryPresenceSlice,
-  | "historyPresenceByRoom"
-  | "teamHistoryByTeam"
-> = {
+export const emptyHistoryPresenceState: Pick<HistoryPresenceSlice, "historyPresenceByRoom" | "teamHistoryByTeam"> = {
   historyPresenceByRoom: {},
   teamHistoryByTeam: {}
 };
@@ -157,14 +154,12 @@ export const createHistoryPresenceSlice: StateCreator<AppStoreState, [], [], His
   },
   setHistoryMessageForRoom: (roomId, message) => {
     set((state) => ({
-      historyPresenceByRoom: removeEmptyHistoryPresenceRooms(updateHistoryPresenceForRoom(
-        state.historyPresenceByRoom,
-        roomId,
-        (roomState) => {
+      historyPresenceByRoom: removeEmptyHistoryPresenceRooms(
+        updateHistoryPresenceForRoom(state.historyPresenceByRoom, roomId, (roomState) => {
           const { historyMessage: _historyMessage, ...rest } = roomState;
           return message ? { ...rest, historyMessage: message } : rest;
-        }
-      ))
+        })
+      )
     }));
   },
   setTeamHistoryMessageForTeam: (teamId, message) => {
@@ -200,14 +195,12 @@ export const createHistoryPresenceSlice: StateCreator<AppStoreState, [], [], His
   },
   clearPresenceForRoom: (roomId) => {
     set((state) => ({
-      historyPresenceByRoom: removeEmptyHistoryPresenceRooms(updateHistoryPresenceForRoom(
-        state.historyPresenceByRoom,
-        roomId,
-        (roomState) => {
+      historyPresenceByRoom: removeEmptyHistoryPresenceRooms(
+        updateHistoryPresenceForRoom(state.historyPresenceByRoom, roomId, (roomState) => {
           const { presence: _presence, ...rest } = roomState;
           return rest;
-        }
-      ))
+        })
+      )
     }));
   },
   setRoomPresenceForDevice: (roomId, deviceId, presence) => {

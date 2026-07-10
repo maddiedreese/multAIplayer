@@ -42,9 +42,7 @@ export function normalizeChatMessage(value: unknown): SanitizedChatMessage | nul
     return null;
   }
 
-  const attachments = Array.isArray(value.attachments)
-    ? normalizeChatAttachments(value.attachments)
-    : undefined;
+  const attachments = Array.isArray(value.attachments) ? normalizeChatAttachments(value.attachments) : undefined;
 
   return {
     ...value,
@@ -88,7 +86,8 @@ export function normalizeChatAttachment(value: unknown, index = 0): SanitizedCha
     ...(content !== undefined ? { content } : {}),
     ...(typeof value.blobId === "string" && value.blobId.trim() ? { blobId: value.blobId } : {}),
     ...(blobBytes !== undefined ? { blobBytes } : {}),
-    ...(value.truncated === true || (typeof value.content === "string" && value.content.length > maxEmbeddedAttachmentBytes)
+    ...(value.truncated === true ||
+    (typeof value.content === "string" && value.content.length > maxEmbeddedAttachmentBytes)
       ? { truncated: true }
       : {})
   };

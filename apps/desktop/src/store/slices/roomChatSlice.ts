@@ -86,11 +86,7 @@ export interface RoomChatSlice {
   setDraftForRoom: (roomId: string, value: string) => void;
 }
 
-export const emptyRoomChatState: Pick<
-  RoomChatSlice,
-  | "roomChatByRoom"
-  | "sensitiveAttachmentReviewKey"
-> = {
+export const emptyRoomChatState: Pick<RoomChatSlice, "roomChatByRoom" | "sensitiveAttachmentReviewKey"> = {
   roomChatByRoom: {},
   sensitiveAttachmentReviewKey: null
 };
@@ -103,9 +99,7 @@ export const createRoomChatSlice: StateCreator<AppStoreState, [], [], RoomChatSl
   toggleSelectedMessageForRoom: (roomId, messageId) => {
     set((state) => {
       const roomIds = state.roomChatByRoom[roomId]?.selectedMessageIds ?? [];
-      const nextIds = roomIds.includes(messageId)
-        ? roomIds.filter((id) => id !== messageId)
-        : [...roomIds, messageId];
+      const nextIds = roomIds.includes(messageId) ? roomIds.filter((id) => id !== messageId) : [...roomIds, messageId];
       return {
         roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => ({
           ...roomChat,
@@ -180,7 +174,9 @@ export const createRoomChatSlice: StateCreator<AppStoreState, [], [], RoomChatSl
   removePendingAttachmentForRoom: (roomId, attachmentId) => {
     set((state) => ({
       roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => {
-        const nextAttachments = (roomChat.pendingAttachments ?? []).filter((attachment) => attachment.id !== attachmentId);
+        const nextAttachments = (roomChat.pendingAttachments ?? []).filter(
+          (attachment) => attachment.id !== attachmentId
+        );
         if (nextAttachments.length) return { ...roomChat, pendingAttachments: nextAttachments };
         const { pendingAttachments, ...rest } = roomChat;
         return rest;

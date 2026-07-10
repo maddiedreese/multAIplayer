@@ -1,11 +1,6 @@
 import type { Express, Response } from "express";
 import { nanoid } from "nanoid";
-import type {
-  RoomRecord,
-  TeamMemberRecord,
-  TeamRecord,
-  TeamRole
-} from "@multaiplayer/protocol";
+import type { RoomRecord, TeamMemberRecord, TeamRecord, TeamRole } from "@multaiplayer/protocol";
 import { loadRelayConfig } from "../config.js";
 import type { AuthSession, RelayStore } from "../state.js";
 
@@ -20,7 +15,10 @@ interface RegisterTeamRoutesOptions {
   teamRoleRank: (role: TeamRole) => number;
   canSetTeamMemberRole: (requesterRole: TeamRole | undefined, targetRole: TeamRole, nextRole: TeamRole) => boolean;
   canRemoveTeamMember: (requesterRole: TeamRole | undefined, targetRole: TeamRole) => boolean;
-  transferTeamOwnership: (members: Map<string, TeamMemberRecord>, nextOwnerUserId: string) => Map<string, TeamMemberRecord>;
+  transferTeamOwnership: (
+    members: Map<string, TeamMemberRecord>,
+    nextOwnerUserId: string
+  ) => Map<string, TeamMemberRecord>;
   addTeamMember: (teamId: string, userId: string, role?: TeamRole) => void;
   revokeTeamInvites: (teamId: string) => void;
   revokeTeamMemberSessions: (teamId: string, userId: string) => void;
@@ -62,11 +60,12 @@ export function registerTeamRoutes({
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowRead(session, res)) return;
     const visibleTeamIds = session ? teamIdsForUser(session.user.id) : new Set(store.allTeams().map((team) => team.id));
-    const visibleTeams = store.allTeams()
-      .filter((team) => visibleTeamIds.has(team.id) && !team.deletedAt);
+    const visibleTeams = store.allTeams().filter((team) => visibleTeamIds.has(team.id) && !team.deletedAt);
     res.json({
       teams: visibleTeams.map((team) => teamRecordForUser(team, store, session?.user.id)),
-      rooms: store.allRooms().filter((room) => visibleTeamIds.has(room.teamId) && !room.deletedAt && !store.getTeam(room.teamId)?.deletedAt)
+      rooms: store
+        .allRooms()
+        .filter((room) => visibleTeamIds.has(room.teamId) && !room.deletedAt && !store.getTeam(room.teamId)?.deletedAt)
     });
   });
 
@@ -217,20 +216,22 @@ export function registerTeamRoutes({
     }
 
     const now = new Date().toISOString();
-    const updatedTeam: TeamRecord = action === "restore"
-      ? { ...team, archivedAt: undefined }
-      : action === "archive"
-        ? { ...team, archivedAt: team.archivedAt ?? now }
-        : { ...team, archivedAt: undefined, deletedAt: now };
+    const updatedTeam: TeamRecord =
+      action === "restore"
+        ? { ...team, archivedAt: undefined }
+        : action === "archive"
+          ? { ...team, archivedAt: team.archivedAt ?? now }
+          : { ...team, archivedAt: undefined, deletedAt: now };
     store.setTeam(updatedTeam);
 
     const updatedRooms: RoomRecord[] = [];
     for (const room of store.allRooms().filter((item) => item.teamId === teamId && !item.deletedAt)) {
-      const updatedRoom = action === "restore"
-        ? { ...room, archivedAt: undefined }
-        : action === "archive"
-          ? { ...room, archivedAt: room.archivedAt ?? now }
-          : { ...room, archivedAt: undefined, deletedAt: now };
+      const updatedRoom =
+        action === "restore"
+          ? { ...room, archivedAt: undefined }
+          : action === "archive"
+            ? { ...room, archivedAt: room.archivedAt ?? now }
+            : { ...room, archivedAt: undefined, deletedAt: now };
       store.setRoom(updatedRoom);
       updatedRooms.push(updatedRoom);
     }
@@ -251,14 +252,17 @@ export function registerTeamRoutes({
       res.status(400).json({ error: `Team name is required and must be up to ${maxTeamNameChars} characters` });
       return;
     }
-    if (session && !consumeDailyCreationQuota({
-      cap: dailyCreationCaps.teamsPerUser,
-      counts: dailyTeamCreationCounts,
-      quota: "daily_user_team_creations",
-      userId: session.user.id,
-      res,
-      recordQuotaRejection
-    })) {
+    if (
+      session &&
+      !consumeDailyCreationQuota({
+        cap: dailyCreationCaps.teamsPerUser,
+        counts: dailyTeamCreationCounts,
+        quota: "daily_user_team_creations",
+        userId: session.user.id,
+        res,
+        recordQuotaRejection
+      })
+    ) {
       return;
     }
     const team: TeamRecord = {
@@ -282,8 +286,9 @@ function listTeamMembers(
   store: RelayStore,
   teamRoleRank: (role: TeamRole) => number
 ): TeamMemberRecord[] {
-  return Array.from(store.getTeamMembers(teamId)?.values() ?? [])
-    .sort((a, b) => teamRoleRank(a.role) - teamRoleRank(b.role) || a.userId.localeCompare(b.userId));
+  return Array.from(store.getTeamMembers(teamId)?.values() ?? []).sort(
+    (a, b) => teamRoleRank(a.role) - teamRoleRank(b.role) || a.userId.localeCompare(b.userId)
+  );
 }
 
 export function teamRecordForUser(
@@ -340,7 +345,12 @@ function consumeDailyCreationQuota({
 
 function sendDailyCreationQuotaExceeded(
   res: Response,
-  { quota, limit, used, resetAt }: {
+  {
+    quota,
+    limit,
+    used,
+    resetAt
+  }: {
     quota: "daily_user_team_creations";
     limit: number;
     used: number;

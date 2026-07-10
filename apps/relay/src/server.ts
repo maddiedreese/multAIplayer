@@ -3,13 +3,9 @@ import cookieParser from "cookie-parser";
 import express from "express";
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
-import {
-  createRelayAuthSessionManager,
-  createRelayAuthSessionPersistence
-} from "./auth/session.js";
+import { createRelayAuthSessionManager, createRelayAuthSessionPersistence } from "./auth/session.js";
 import {
   RelayEnvelope,
-  RelayClientMessage,
   isRecord,
   maxAccessTokenChars,
   maxAttachmentBlobIdChars,
@@ -37,8 +33,7 @@ import {
   type RoomRecord,
   type TeamMemberRecord,
   type TeamRecord,
-  type TeamRole,
-  type RelayServerMessage
+  type TeamRole
 } from "@multaiplayer/protocol";
 import { createRelayAuthz } from "./authz.js";
 import { loadRelayConfig } from "./config.js";
@@ -58,7 +53,6 @@ import {
   isApprovalDelegationPolicy,
   isApprovalPolicy,
   isJsonStringifiableWithin,
-  isRelayEnvelopeWithinLimits as isRelayEnvelopeWithinConfiguredLimits,
   isRoomMode,
   maxCiphertextCharactersForBlob,
   normalizeBrowserAllowedOrigins,
@@ -75,9 +69,9 @@ import {
 import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
 import { createRelayPersistence } from "./persistence.js";
 import { seedWorkspace } from "./seed.js";
-import { createRelayStore, type AuthSession, type ClientSession, type PresenceRecord, type RoomKey } from "./state.js";
+import { createRelayStore, type AuthSession, type ClientSession, type RoomKey } from "./state.js";
 import { createRelayStoreCodec } from "./store-codec.js";
-import { createRelayStorePersistenceCoordinator, type RelayStorePersistenceCoordinator } from "./store-persistence.js";
+import { createRelayStorePersistenceCoordinator } from "./store-persistence.js";
 import { registerRelayWebSocketConnection } from "./ws/connection.js";
 import { createRelayFanout } from "./ws/fanout.js";
 import { createRelayRoomSocketManager } from "./ws/rooms.js";
@@ -145,12 +139,8 @@ const {
   workspaceSockets,
   roomPresence,
   authSessions,
-  teams,
-  rooms,
   invites,
-  devices,
   attachmentBlobs,
-  teamMembers,
   rateLimitStore
 } = relayStore;
 const relayAuthz = createRelayAuthz(relayStore);
@@ -163,9 +153,8 @@ const {
   transferTeamOwnership,
   canAccessRoom
 } = relayAuthz;
-const maxEncryptedAccessTokenChars = Math.ceil(maxAccessTokenChars * 4 / 3) + 1024;
-const maxEnvelopeCiphertextChars = Math.ceil(encryptedEnvelopeMaxBytes * 4 / 3) + 1024;
-let relayStorePersistence: RelayStorePersistenceCoordinator;
+const maxEncryptedAccessTokenChars = Math.ceil((maxAccessTokenChars * 4) / 3) + 1024;
+const maxEnvelopeCiphertextChars = Math.ceil((encryptedEnvelopeMaxBytes * 4) / 3) + 1024;
 const relayLifecycle = createRelayLifecycle({
   server,
   wss,
@@ -175,10 +164,8 @@ const relayLifecycle = createRelayLifecycle({
 });
 
 app.use((req, res, next) => {
-  relayLifecycle.shutdownMiddleware(
-    req.path,
-    next,
-    () => res.status(503).json({
+  relayLifecycle.shutdownMiddleware(req.path, next, () =>
+    res.status(503).json({
       error: "Relay is shutting down.",
       code: "relay_shutting_down"
     })
@@ -192,14 +179,8 @@ const authSessionManager = createRelayAuthSessionManager({
   normalizeSessionId: normalizeAuthSessionId,
   scheduleStoreSave
 });
-const {
-  authSessionMaxAgeMs,
-  authCookieOptions,
-  getAuthSession,
-  getAuthSessionFromRequest,
-  allowRead,
-  allowMutation
-} = authSessionManager;
+const { authSessionMaxAgeMs, authCookieOptions, getAuthSession, getAuthSessionFromRequest, allowRead, allowMutation } =
+  authSessionManager;
 const authSessionPersistence = createRelayAuthSessionPersistence({
   authSessionMaxAgeMs,
   maxAccessTokenChars,
@@ -211,10 +192,7 @@ const authSessionPersistence = createRelayAuthSessionPersistence({
   maxUserIdChars,
   sessionPersistenceSecret
 });
-const {
-  storedAuthSessions,
-  normalizeStoredAuthSession
-} = authSessionPersistence;
+const { storedAuthSessions, normalizeStoredAuthSession } = authSessionPersistence;
 const relayStoreCodec = createRelayStoreCodec({
   store: relayStore,
   attachmentBlobMaxBytes,
@@ -240,12 +218,8 @@ const relayStoreCodec = createRelayStoreCodec({
   pruneEncryptedBacklog,
   storedAuthSessions
 });
-const {
-  isExpiredInvite,
-  isExpiredAttachmentBlob,
-  pruneExpiredRelayState
-} = relayStoreCodec;
-relayStorePersistence = createRelayStorePersistenceCoordinator({
+const { isExpiredAttachmentBlob, pruneExpiredRelayState } = relayStoreCodec;
+const relayStorePersistence = createRelayStorePersistenceCoordinator({
   dataPath,
   persistence: relayPersistence,
   storeCodec: relayStoreCodec
@@ -259,28 +233,22 @@ const { rateLimitMiddleware, clientIdentityFromIncomingMessage, consumeRateLimit
   metrics: relayMetrics,
   normalizeSessionId: normalizeAuthSessionId
 });
-const {
-  send,
-  broadcast,
-  broadcastRoomUpdated,
-  broadcastWorkspaceUpdated,
-  publishEnvelope,
-  publishPresence
-} = createRelayFanout({
-  store: relayStore,
-  roomSockets,
-  teamSockets,
-  workspaceSockets,
-  sessions,
-  roomPresence,
-  metrics: relayMetrics,
-  roomKey,
-  pruneEncryptedBacklog,
-  addTeamMember,
-  saveEncryptedEnvelope: (roomKey, envelope, prunedEnvelopeIds) =>
-    relayStorePersistence.saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds),
-  teamRecordForUser
-});
+const { send, broadcast, broadcastRoomUpdated, broadcastWorkspaceUpdated, publishEnvelope, publishPresence } =
+  createRelayFanout({
+    store: relayStore,
+    roomSockets,
+    teamSockets,
+    workspaceSockets,
+    sessions,
+    roomPresence,
+    metrics: relayMetrics,
+    roomKey,
+    pruneEncryptedBacklog,
+    addTeamMember,
+    saveEncryptedEnvelope: (roomKey, envelope, prunedEnvelopeIds) =>
+      relayStorePersistence.saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds),
+    teamRecordForUser
+  });
 const {
   joinRoom,
   subscribeTeam,
@@ -523,18 +491,6 @@ function isAllowedEnvelopePayload(envelope: RelayEnvelope): boolean {
   return isAllowedEnvelopePayloadWithLimits(envelope);
 }
 
-function isRelayEnvelopeWithinLimits(envelope: RelayEnvelope): boolean {
-  return isRelayEnvelopeWithinConfiguredLimits(envelope, {
-    encryptedEnvelopeMaxBytes,
-    maxEnvelopeCiphertextChars,
-    maxDeviceIdChars,
-    maxEnvelopeIdChars,
-    maxEnvelopeNonceChars,
-    maxPublicKeyJwkChars,
-    maxUserIdChars
-  });
-}
-
 function revokeTeamInvites(teamId: string) {
   let revoked = false;
   for (const [inviteId, invite] of invites.entries()) {
@@ -570,10 +526,6 @@ function addTeamMember(teamId: string, userId: string, role: TeamRole = "member"
 
 function roomKey(teamId: string, roomId: string): RoomKey {
   return `${teamId}:${roomId}`;
-}
-
-function deviceKey(userId: string, deviceId: string): string {
-  return `${userId}:${deviceId}`;
 }
 
 function normalizeAuthSessionId(value: unknown): string {

@@ -55,13 +55,19 @@ test("Codex browser open commands write directly to the room store", () => {
     defaultBrowserUrl: "https://default.example.com"
   });
 
-  assert.equal(handleCommand({
-    id: "message-browser-open",
-    author: "Codex",
-    role: "codex",
-    body: "@codex open docs.example.com/guide",
-    time: "10:00"
-  }, room), true);
+  assert.equal(
+    handleCommand(
+      {
+        id: "message-browser-open",
+        author: "Codex",
+        role: "codex",
+        body: "@codex open docs.example.com/guide",
+        time: "10:00"
+      },
+      room
+    ),
+    true
+  );
 
   const state = useAppStore.getState();
   assert.equal(state.browserByRoom[room.id]?.requests?.length, 1);

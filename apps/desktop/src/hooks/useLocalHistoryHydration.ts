@@ -8,11 +8,7 @@ import {
   type LocalHistorySettings
 } from "../lib/localHistory";
 import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
-import type {
-  ChatMessage,
-  LocalRoomHistoryPayload,
-  LocalRoomReadState
-} from "../types";
+import type { ChatMessage, LocalRoomHistoryPayload, LocalRoomReadState } from "../types";
 
 interface LatestRef<T> {
   current: T;
@@ -53,22 +49,26 @@ export function useLocalHistoryHydration({
       saveHistorySettings(selectedRoomId, settings);
     }
     replaceHistorySettings(settings);
-    loadEncryptedHistory<ChatMessage[] | LocalRoomHistoryPayload>(selectedRoomId).then((storedHistory) => {
-      if (cancelled || !storedHistory) return;
-      const payload = pruneLocalRoomHistory(normalizeLocalRoomHistory(storedHistory), settings.retentionDays);
-      hydrateLocalRoomHistoryForRoom(selectedRoomId, payload);
-      hydrateRoomReadState(selectedRoomId, payload.readState);
-    }).catch(() => {
-      if (!cancelled) console.warn("Failed to load encrypted local history");
-    }).finally(() => {
-      if (!cancelled) historyLoadedRoomIds.current.add(selectedRoomId);
-    });
+    loadEncryptedHistory<ChatMessage[] | LocalRoomHistoryPayload>(selectedRoomId)
+      .then((storedHistory) => {
+        if (cancelled || !storedHistory) return;
+        const payload = pruneLocalRoomHistory(normalizeLocalRoomHistory(storedHistory), settings.retentionDays);
+        hydrateLocalRoomHistoryForRoom(selectedRoomId, payload);
+        hydrateRoomReadState(selectedRoomId, payload.readState);
+      })
+      .catch(() => {
+        if (!cancelled) console.warn("Failed to load encrypted local history");
+      })
+      .finally(() => {
+        if (!cancelled) historyLoadedRoomIds.current.add(selectedRoomId);
+      });
     return () => {
       cancelled = true;
     };
   }, [
     forgottenRoomIds,
     hasSelectedRoom,
+    historyLoadedRoomIds,
     hydrateLocalRoomHistoryForRoom,
     hydrateRoomReadState,
     selectedRoomTeamId,

@@ -20,7 +20,9 @@ export function createTerminalPanelActions({
 }) {
   function onApproveTerminalRequest(requestId: string) {
     const state = useAppStore.getState();
-    const request = (state.terminalRuntimeByRoom[state.selectedRoomId]?.requests ?? []).find((item) => item.id === requestId);
+    const request = (state.terminalRuntimeByRoom[state.selectedRoomId]?.requests ?? []).find(
+      (item) => item.id === requestId
+    );
     if (request) approveTerminalRequest(request);
   }
 

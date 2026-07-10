@@ -7,10 +7,7 @@ export interface InviteApprovalRequest {
   status: "pending" | "approved" | "denied";
 }
 
-export function findRoomInviteRequest<T extends InviteApprovalRequest>(
-  requests: T[],
-  requestId: string
-): T | null {
+export function findRoomInviteRequest<T extends InviteApprovalRequest>(requests: T[], requestId: string): T | null {
   return requests.find((request) => request.id === requestId) ?? null;
 }
 

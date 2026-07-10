@@ -2,11 +2,7 @@ import type { RoomRecord } from "@multaiplayer/protocol";
 import { isLocalUserActiveHostForRoom, type LocalHostUser } from "./roomHost";
 
 export function canApproveCodexTurn(room: RoomRecord, user: LocalHostUser, locked = false): boolean {
-  return (
-    !locked &&
-    room.approvalPolicy !== "never_host" &&
-    isLocalUserActiveHostForRoom(room, user)
-  );
+  return !locked && room.approvalPolicy !== "never_host" && isLocalUserActiveHostForRoom(room, user);
 }
 
 export function shouldResetCodexApprovalForRoomUpdate(previous: RoomRecord, next: RoomRecord): boolean {

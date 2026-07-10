@@ -33,14 +33,11 @@ const room: RoomRecord = {
 };
 
 test("normalizeBrowserAllowedOrigins accepts only bare http(s) origins", () => {
-  assert.deepEqual(
-    normalizeBrowserAllowedOrigins(" https://docs.example.com/path , https://github.com "),
-    null
-  );
-  assert.deepEqual(
-    normalizeBrowserAllowedOrigins("https://docs.example.com, https://github.com/"),
-    ["https://docs.example.com", "https://github.com"]
-  );
+  assert.deepEqual(normalizeBrowserAllowedOrigins(" https://docs.example.com/path , https://github.com "), null);
+  assert.deepEqual(normalizeBrowserAllowedOrigins("https://docs.example.com, https://github.com/"), [
+    "https://docs.example.com",
+    "https://github.com"
+  ]);
   assert.deepEqual(normalizeBrowserAllowedOrigins("file:///tmp"), null);
 });
 
@@ -58,9 +55,19 @@ test("shouldAutoApproveBrowserRequest no longer auto-approves browser pages", ()
 
 test("legacy browser auto-approval helper keeps old records conservative", () => {
   assert.equal(shouldAutoApproveBrowserRequestLegacy("https://docs.example.com/guide", room, true), true);
-  assert.equal(shouldAutoApproveBrowserRequestLegacy("https://github.com/maddiedreese/multAIplayer", room, true), false);
+  assert.equal(
+    shouldAutoApproveBrowserRequestLegacy("https://github.com/maddiedreese/multAIplayer", room, true),
+    false
+  );
   assert.equal(shouldAutoApproveBrowserRequestLegacy("https://docs.example.com/account/security", room, true), false);
-  assert.equal(shouldAutoApproveBrowserRequestLegacy("https://docs.example.com/guide", { ...room, approvalPolicy: "ask_every_turn" }, true), false);
+  assert.equal(
+    shouldAutoApproveBrowserRequestLegacy(
+      "https://docs.example.com/guide",
+      { ...room, approvalPolicy: "ask_every_turn" },
+      true
+    ),
+    false
+  );
   assert.equal(shouldAutoApproveBrowserRequestLegacy("https://docs.example.com/guide", room, false), false);
 });
 
@@ -73,13 +80,19 @@ test("browser access requests require an unlocked room", () => {
 test("browser host actions require active host access", () => {
   assert.equal(canHostBrowserAction(room, { id: "github:maddiedreese", name: "Maddie" }), true);
   assert.equal(canHostBrowserAction(room, { id: "github:peer", name: "Peer" }), false);
-  assert.equal(canHostBrowserAction({ ...room, hostStatus: "offline" }, { id: "github:maddiedreese", name: "Maddie" }), false);
+  assert.equal(
+    canHostBrowserAction({ ...room, hostStatus: "offline" }, { id: "github:maddiedreese", name: "Maddie" }),
+    false
+  );
   assert.equal(canHostBrowserAction(room, { id: "github:maddiedreese", name: "Maddie" }, true), false);
 });
 
 test("browser access gate messages explain missing browser access", () => {
   assert.equal(browserAccessGateMessage(room, true), "Unlock this room before using browser access.");
-  assert.equal(browserAccessGateMessage({ ...room, mode: { ...room.mode, browser: false } }), "Browser access is available for this room.");
+  assert.equal(
+    browserAccessGateMessage({ ...room, mode: { ...room.mode, browser: false } }),
+    "Browser access is available for this room."
+  );
 });
 
 test("browser request actions require a request from the current room list", () => {
@@ -96,8 +109,5 @@ test("browser request actions require a request from the current room list", () 
     roomBrowserRequestMessage(requests, "request-1", "approved"),
     "Browser request is pending, not approved."
   );
-  assert.equal(
-    roomBrowserRequestMessage(requests, "missing"),
-    "Browser request is no longer available in this room."
-  );
+  assert.equal(roomBrowserRequestMessage(requests, "missing"), "Browser request is no longer available in this room.");
 });

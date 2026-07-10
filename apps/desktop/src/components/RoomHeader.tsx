@@ -1,13 +1,4 @@
-import {
-  ChevronDown,
-  Copy,
-  FileText,
-  Globe2,
-  MonitorUp,
-  Terminal,
-  UsersRound,
-  X
-} from "lucide-react";
+import { ChevronDown, Copy, FileText, Globe2, MonitorUp, Terminal, UsersRound, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { InspectorTab } from "./RoomInspectorPanel";
 import { closeRoomBrowserSurface } from "../lib/browserSurfaceEvents";
@@ -161,7 +152,10 @@ export function RoomHeader({
       </nav>
       <div className="header-actions">
         <div className="host-controls">
-          <button onClick={() => onSetHost("active")} disabled={!hasRoom || roomLocked || hostBusy || hostStatus === "active"}>
+          <button
+            onClick={() => onSetHost("active")}
+            disabled={!hasRoom || roomLocked || hostBusy || hostStatus === "active"}
+          >
             Host
           </button>
           <button onClick={() => onSetHost("handoff")} disabled={!hasRoom || roomLocked || hostBusy || !isActiveHost}>
@@ -176,7 +170,10 @@ export function RoomHeader({
             <X size={14} />
           </button>
         </div>
-        <label className="header-model-switcher" title={isActiveHost ? "Switch Codex model for this room" : "Only the active host can switch models"}>
+        <label
+          className="header-model-switcher"
+          title={isActiveHost ? "Switch Codex model for this room" : "Only the active host can switch models"}
+        >
           <select
             aria-label="Codex host model"
             value={knownModel ? selectedModel : "custom"}
@@ -195,7 +192,10 @@ export function RoomHeader({
             {!knownModel && <option value="custom">{modelLabel}</option>}
           </select>
         </label>
-        <label className="header-model-switcher" title={isActiveHost ? "Switch Codex reasoning for this room" : "Only the active host can switch reasoning"}>
+        <label
+          className="header-model-switcher"
+          title={isActiveHost ? "Switch Codex reasoning for this room" : "Only the active host can switch reasoning"}
+        >
           <select
             aria-label="Codex reasoning"
             value={knownReasoningEffort ? selectedReasoningEffort : "medium"}
@@ -210,7 +210,10 @@ export function RoomHeader({
             {!knownReasoningEffort && <option value={selectedReasoningEffort}>{reasoningLabel}</option>}
           </select>
         </label>
-        <label className="header-model-switcher" title={isActiveHost ? "Switch Codex speed for this room" : "Only the active host can switch speed"}>
+        <label
+          className="header-model-switcher"
+          title={isActiveHost ? "Switch Codex speed for this room" : "Only the active host can switch speed"}
+        >
           <select
             aria-label="Codex speed"
             value={knownSpeed ? selectedSpeed : "standard"}
@@ -245,14 +248,13 @@ export function RoomHeader({
           disabled={!hasRoom}
         >
           <Copy size={14} />
-          {markdownSelectionMode
-            ? selectedCount
-              ? `Copy ${selectedCount}`
-              : "Select messages"
-            : "Selected"}
+          {markdownSelectionMode ? (selectedCount ? `Copy ${selectedCount}` : "Select messages") : "Selected"}
         </button>
         {markdownSelectionMode && (
-          <button className="header-copy" onClick={selectedCount > 0 ? onClearSelectedMessages : onToggleMarkdownSelection}>
+          <button
+            className="header-copy"
+            onClick={selectedCount > 0 ? onClearSelectedMessages : onToggleMarkdownSelection}
+          >
             <X size={14} />
             {selectedCount > 0 ? "Clear" : "Done"}
           </button>

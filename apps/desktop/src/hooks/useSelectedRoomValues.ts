@@ -1,5 +1,10 @@
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { defaultCodexModel, defaultCodexReasoningEffort, defaultCodexSandboxLevel, defaultCodexSpeed } from "@multaiplayer/protocol";
+import {
+  defaultCodexModel,
+  defaultCodexReasoningEffort,
+  defaultCodexSandboxLevel,
+  defaultCodexSpeed
+} from "@multaiplayer/protocol";
 import { resolveFilePreviewTab } from "../lib/filePreview";
 import { resolveGitWorkflowDraft } from "../lib/gitWorkflowDraft";
 import { embeddedAttachmentBytes } from "../lib/appFormatters";
@@ -11,11 +16,7 @@ import type { InviteByRoom } from "../store/slices/inviteSlice";
 import type { RoomChatByRoom } from "../store/slices/roomChatSlice";
 import type { RoomSettingsByRoom } from "../store/slices/roomSettingsSlice";
 import type { TerminalRuntimeByRoom } from "../store/slices/terminalSlice";
-import type {
-  ChatAttachment,
-  ChatMessage,
-  MarkdownCopyFallback
-} from "../types";
+import type { ChatAttachment, ChatMessage, MarkdownCopyFallback } from "../types";
 
 interface UseSelectedRoomValuesOptions {
   selectedRoom: RoomRecord;
@@ -119,10 +120,7 @@ export function useSelectedRoomValues({
     projectFiles: filePanel.projectFiles ?? [],
     selectedFile: filePanel.selectedFile ?? null,
     selectedDiff,
-    filePreviewTab: resolveFilePreviewTab(
-      filePanel.previewTab ?? "file",
-      Boolean(selectedDiff?.diff.trim())
-    ),
+    filePreviewTab: resolveFilePreviewTab(filePanel.previewTab ?? "file", Boolean(selectedDiff?.diff.trim())),
     fileBusy: filePanel.busy ?? false,
     fileMessage: filePanel.message ?? null,
     fileSaveRequests: filePanel.saveRequests ?? [],

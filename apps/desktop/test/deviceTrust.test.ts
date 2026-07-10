@@ -35,13 +35,8 @@ Object.defineProperty(globalThis, "localStorage", {
   value: localStorage
 });
 
-const {
-  buildDeviceFingerprintMarkdown,
-  isDeviceKeyTrusted,
-  loadTrustedDeviceKeys,
-  trustDeviceKey,
-  untrustDeviceKey
-} = await import("../src/lib/deviceTrust");
+const { buildDeviceFingerprintMarkdown, isDeviceKeyTrusted, loadTrustedDeviceKeys, trustDeviceKey, untrustDeviceKey } =
+  await import("../src/lib/deviceTrust");
 
 const trustStorageKey = "multaiplayer:trusted-device-keys:v1";
 

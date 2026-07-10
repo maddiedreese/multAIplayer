@@ -126,15 +126,12 @@ export function createRelayStoreCodec(options: {
     const id = normalizeRelayId(team.id, options.maxTeamIdChars);
     const name = normalizeMetadataText(team.name, options.maxTeamNameChars);
     if (!id || !name) return null;
-    const members = typeof team.members === "number" && Number.isSafeInteger(team.members) && team.members >= 0
-      ? team.members
-      : 0;
-    const archivedAt = typeof team.archivedAt === "string" && !Number.isNaN(Date.parse(team.archivedAt))
-      ? team.archivedAt
-      : undefined;
-    const deletedAt = typeof team.deletedAt === "string" && !Number.isNaN(Date.parse(team.deletedAt))
-      ? team.deletedAt
-      : undefined;
+    const members =
+      typeof team.members === "number" && Number.isSafeInteger(team.members) && team.members >= 0 ? team.members : 0;
+    const archivedAt =
+      typeof team.archivedAt === "string" && !Number.isNaN(Date.parse(team.archivedAt)) ? team.archivedAt : undefined;
+    const deletedAt =
+      typeof team.deletedAt === "string" && !Number.isNaN(Date.parse(team.deletedAt)) ? team.deletedAt : undefined;
     return { id, name, members, archivedAt, deletedAt };
   }
 
@@ -144,7 +141,10 @@ export function createRelayStoreCodec(options: {
     const userId = normalizeMetadataText(device.userId, options.maxUserIdChars);
     const deviceId = normalizeMetadataText(device.deviceId, options.maxDeviceIdChars);
     const displayName = normalizeMetadataText(device.displayName, options.maxDisplayNameChars);
-    const publicKeyFingerprint = normalizeMetadataText(device.publicKeyFingerprint, options.maxPublicKeyFingerprintChars);
+    const publicKeyFingerprint = normalizeMetadataText(
+      device.publicKeyFingerprint,
+      options.maxPublicKeyFingerprintChars
+    );
     if (!userId || !deviceId || !displayName || !publicKeyFingerprint || !publicKeyJwk) return null;
     if (typeof device.registeredAt !== "string" || typeof device.lastSeenAt !== "string") return null;
     return {
@@ -164,7 +164,8 @@ export function createRelayStoreCodec(options: {
     const id = normalizeRelayId(parsed.data.id, options.maxEnvelopeIdChars);
     if (!id) return null;
     if (!store.teams.has(parsed.data.teamId)) return null;
-    if (!store.rooms.has(parsed.data.roomId) || store.rooms.get(parsed.data.roomId)?.teamId !== parsed.data.teamId) return null;
+    if (!store.rooms.has(parsed.data.roomId) || store.rooms.get(parsed.data.roomId)?.teamId !== parsed.data.teamId)
+      return null;
     if (Number.isNaN(Date.parse(parsed.data.createdAt))) return null;
     if (parsed.data.expiresAt && Number.isNaN(Date.parse(parsed.data.expiresAt))) return null;
     return { ...parsed.data, id };
@@ -178,10 +179,12 @@ export function createRelayStoreCodec(options: {
     const type = normalizeMetadataText(parsed.data.type, options.maxAttachmentBlobTypeChars);
     if (!id || !name || !type) return null;
     if (!store.teams.has(parsed.data.teamId)) return null;
-    if (!store.rooms.has(parsed.data.roomId) || store.rooms.get(parsed.data.roomId)?.teamId !== parsed.data.teamId) return null;
+    if (!store.rooms.has(parsed.data.roomId) || store.rooms.get(parsed.data.roomId)?.teamId !== parsed.data.teamId)
+      return null;
     if (parsed.data.size > options.attachmentBlobMaxBytes) return null;
     if (parsed.data.payload.nonce.length > options.maxEnvelopeNonceChars) return null;
-    if (parsed.data.payload.ciphertext.length > maxCiphertextCharactersForBlob(options.attachmentBlobMaxBytes)) return null;
+    if (parsed.data.payload.ciphertext.length > maxCiphertextCharactersForBlob(options.attachmentBlobMaxBytes))
+      return null;
     if (Number.isNaN(Date.parse(parsed.data.createdAt))) return null;
     if (parsed.data.expiresAt && Number.isNaN(Date.parse(parsed.data.expiresAt))) return null;
     return { ...parsed.data, id, name, type };
@@ -218,19 +221,21 @@ export function createRelayStoreCodec(options: {
     const id = normalizeRelayId(room.id, options.maxRoomIdChars);
     const teamId = normalizeRelayId(room.teamId, options.maxTeamIdChars);
     if (!id || !teamId || !store.teams.has(teamId)) return null;
-    const hostStatus = room.hostStatus === "active" || room.hostStatus === "handoff" || room.hostStatus === "offline"
-      ? room.hostStatus
-      : "offline";
+    const hostStatus =
+      room.hostStatus === "active" || room.hostStatus === "handoff" || room.hostStatus === "offline"
+        ? room.hostStatus
+        : "offline";
     const name = normalizeMetadataText(room.name, options.maxRoomNameChars) ?? "Untitled room";
-    const host = hostStatus === "offline"
-      ? "No host"
-      : normalizeMetadataText(room.host, options.maxHostNameChars) ?? "No host";
-    const hostUserId = hostStatus === "offline"
-      ? undefined
-      : normalizeOptionalMetadataText(room.hostUserId, options.maxUserIdChars) || undefined;
-    const approvalPolicy = typeof room.approvalPolicy === "string" && isApprovalPolicy(room.approvalPolicy)
-      ? room.approvalPolicy
-      : "ask_every_turn";
+    const host =
+      hostStatus === "offline" ? "No host" : (normalizeMetadataText(room.host, options.maxHostNameChars) ?? "No host");
+    const hostUserId =
+      hostStatus === "offline"
+        ? undefined
+        : normalizeOptionalMetadataText(room.hostUserId, options.maxUserIdChars) || undefined;
+    const approvalPolicy =
+      typeof room.approvalPolicy === "string" && isApprovalPolicy(room.approvalPolicy)
+        ? room.approvalPolicy
+        : "ask_every_turn";
     const approvalDelegationPolicy =
       typeof (room as { approvalDelegationPolicy?: unknown }).approvalDelegationPolicy === "string" &&
       isApprovalDelegationPolicy((room as { approvalDelegationPolicy: string }).approvalDelegationPolicy)
@@ -243,15 +248,12 @@ export function createRelayStoreCodec(options: {
           .slice(0, 50)
       : [];
     const mode = isRoomMode(room.mode) ? room.mode : defaultRoomMode;
-    const unread = typeof room.unread === "number" && Number.isSafeInteger(room.unread) && room.unread >= 0
-      ? room.unread
-      : 0;
-    const archivedAt = typeof room.archivedAt === "string" && !Number.isNaN(Date.parse(room.archivedAt))
-      ? room.archivedAt
-      : undefined;
-    const deletedAt = typeof room.deletedAt === "string" && !Number.isNaN(Date.parse(room.deletedAt))
-      ? room.deletedAt
-      : undefined;
+    const unread =
+      typeof room.unread === "number" && Number.isSafeInteger(room.unread) && room.unread >= 0 ? room.unread : 0;
+    const archivedAt =
+      typeof room.archivedAt === "string" && !Number.isNaN(Date.parse(room.archivedAt)) ? room.archivedAt : undefined;
+    const deletedAt =
+      typeof room.deletedAt === "string" && !Number.isNaN(Date.parse(room.deletedAt)) ? room.deletedAt : undefined;
     return {
       id,
       teamId,
@@ -265,19 +267,27 @@ export function createRelayStoreCodec(options: {
       trustedApproverUserIds,
       mode,
       codexModel: normalizeModel(room.codexModel) ?? defaultCodexModel,
-      codexModelPolicy: normalizeCodexCatalogSelectionPolicy((room as { codexModelPolicy?: unknown }).codexModelPolicy)
-        ?? legacyCodexCatalogSelectionPolicy,
-      codexReasoningEffort: normalizeCodexReasoningEffortOrDefault((room as { codexReasoningEffort?: unknown }).codexReasoningEffort ?? defaultCodexReasoningEffort),
-      codexReasoningEffortPolicy: normalizeCodexCatalogSelectionPolicy((room as { codexReasoningEffortPolicy?: unknown }).codexReasoningEffortPolicy)
-        ?? legacyCodexCatalogSelectionPolicy,
+      codexModelPolicy:
+        normalizeCodexCatalogSelectionPolicy((room as { codexModelPolicy?: unknown }).codexModelPolicy) ??
+        legacyCodexCatalogSelectionPolicy,
+      codexReasoningEffort: normalizeCodexReasoningEffortOrDefault(
+        (room as { codexReasoningEffort?: unknown }).codexReasoningEffort ?? defaultCodexReasoningEffort
+      ),
+      codexReasoningEffortPolicy:
+        normalizeCodexCatalogSelectionPolicy(
+          (room as { codexReasoningEffortPolicy?: unknown }).codexReasoningEffortPolicy
+        ) ?? legacyCodexCatalogSelectionPolicy,
       codexSpeed: normalizeCodexSpeedOrDefault((room as { codexSpeed?: unknown }).codexSpeed ?? defaultCodexSpeed),
-      codexServiceTierPolicy: normalizeCodexCatalogSelectionPolicy((room as { codexServiceTierPolicy?: unknown }).codexServiceTierPolicy)
-        ?? legacyCodexCatalogSelectionPolicy,
-      browserAllowedOrigins: normalizeBrowserAllowedOrigins((room as { browserAllowedOrigins?: unknown }).browserAllowedOrigins)
-        ?? defaultBrowserAllowedOrigins,
-      browserProfilePersistent: typeof (room as { browserProfilePersistent?: unknown }).browserProfilePersistent === "boolean"
-        ? (room as { browserProfilePersistent: boolean }).browserProfilePersistent
-        : defaultBrowserProfilePersistent,
+      codexServiceTierPolicy:
+        normalizeCodexCatalogSelectionPolicy((room as { codexServiceTierPolicy?: unknown }).codexServiceTierPolicy) ??
+        legacyCodexCatalogSelectionPolicy,
+      browserAllowedOrigins:
+        normalizeBrowserAllowedOrigins((room as { browserAllowedOrigins?: unknown }).browserAllowedOrigins) ??
+        defaultBrowserAllowedOrigins,
+      browserProfilePersistent:
+        typeof (room as { browserProfilePersistent?: unknown }).browserProfilePersistent === "boolean"
+          ? (room as { browserProfilePersistent: boolean }).browserProfilePersistent
+          : defaultBrowserProfilePersistent,
       unread,
       archivedAt,
       deletedAt
@@ -297,9 +307,10 @@ export function createRelayStoreCodec(options: {
         teamId,
         userId,
         role: normalizeTeamRole(member.role),
-        joinedAt: typeof member.joinedAt === "string" && !Number.isNaN(Date.parse(member.joinedAt))
-          ? member.joinedAt
-          : new Date().toISOString()
+        joinedAt:
+          typeof member.joinedAt === "string" && !Number.isNaN(Date.parse(member.joinedAt))
+            ? member.joinedAt
+            : new Date().toISOString()
       });
     }
     for (const userId of storedArray(item.userIds)) {

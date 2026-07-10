@@ -1,10 +1,7 @@
 import { Check, KeyRound, X } from "lucide-react";
 import type { ApprovalPolicy } from "@multaiplayer/protocol";
 
-const selectableApprovalPolicies: ApprovalPolicy[] = [
-  "ask_every_turn",
-  "never_host"
-];
+const selectableApprovalPolicies: ApprovalPolicy[] = ["ask_every_turn", "never_host"];
 
 export interface HistorySettingsDisplay {
   enabled: boolean;
@@ -106,7 +103,11 @@ export function LocalHistoryPanel({
       <div className="history-defaults">
         <div>
           <strong>Team default</strong>
-          <span>{teamHistorySettings.enabled ? `${teamHistorySettings.retentionDays} days for new rooms` : "off for new rooms"}</span>
+          <span>
+            {teamHistorySettings.enabled
+              ? `${teamHistorySettings.retentionDays} days for new rooms`
+              : "off for new rooms"}
+          </span>
         </div>
         <button className="ghost-wide" onClick={onApplyTeamDefaultsToRoom} disabled={!hasSelectedRoom || settingsBusy}>
           <Check size={15} />
@@ -141,19 +142,27 @@ export function LocalHistoryPanel({
           onChange={(event) => onTeamDefaultApprovalPolicyChange(event.target.value as ApprovalPolicy)}
         >
           {selectableApprovalPolicies.map((policy) => (
-            <option key={policy} value={policy}>{approvalPolicyLabels[policy]}</option>
+            <option key={policy} value={policy}>
+              {approvalPolicyLabels[policy]}
+            </option>
           ))}
         </select>
       </label>
       <label className="history-retention">
         <span>New room model</span>
         <select
-          value={codexModelOptions.some((option) => option.id === teamDefaultCodexModel) ? teamDefaultCodexModel : defaultCodexModel}
+          value={
+            codexModelOptions.some((option) => option.id === teamDefaultCodexModel)
+              ? teamDefaultCodexModel
+              : defaultCodexModel
+          }
           disabled={!selectedTeam}
           onChange={(event) => onTeamDefaultCodexModelChange(event.target.value)}
         >
           {codexModelOptions.map((option) => (
-            <option key={option.id} value={option.id}>{option.label}</option>
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
           ))}
         </select>
       </label>

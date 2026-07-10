@@ -105,7 +105,10 @@ test("MCP form elicitations render typed bounded fields and structured content",
       }
     }
   });
-  assert.deepEqual(display.questions.map((question) => question.kind), ["select", "number", "boolean", "multiselect"]);
+  assert.deepEqual(
+    display.questions.map((question) => question.kind),
+    ["select", "number", "boolean", "multiselect"]
+  );
   assert.equal(display.canAccept({ region: "us", retries: "2", enabled: true, scopes: ["read"] }), true);
   assert.equal(display.canAccept({ region: "apac", retries: "4", enabled: true }), false);
   assert.deepEqual(display.accept({ region: "eu", retries: "3", enabled: false, scopes: ["read", "write"] }), {

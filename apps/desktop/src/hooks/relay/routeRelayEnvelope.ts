@@ -35,11 +35,7 @@ import {
 import { isLegacyDebugChatMessage } from "../../lib/localRoomHistoryPayload";
 import { formatMessageTime } from "../../lib/appFormatters";
 import { isRoomKeyRotationEnvelopeAuthorized } from "../../lib/roomKeyRotation";
-import {
-  findEnvelopeRoom,
-  isEnvelopeFromActiveRoomHost,
-  roomHostEnvelopeRejectionMessage
-} from "../../lib/roomHost";
+import { findEnvelopeRoom, isEnvelopeFromActiveRoomHost, roomHostEnvelopeRejectionMessage } from "../../lib/roomHost";
 import { sendRoomMessageNotification } from "../../lib/roomNotifications";
 import {
   approvalDelegationPolicyLabels,
@@ -227,7 +223,10 @@ export async function routeRelayEnvelope(
   if (envelope.kind === "codex.approval") {
     const parsed = CodexApprovalPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
     if (parsed.success) {
-      store.setHostMessageForRoom(roomId, "Ignored delegated Codex approval. Only the active host can authorize Codex turns.");
+      store.setHostMessageForRoom(
+        roomId,
+        "Ignored delegated Codex approval. Only the active host can authorize Codex turns."
+      );
     }
     return;
   }
@@ -271,7 +270,7 @@ export async function routeRelayEnvelope(
           ? `${parsed.data.sharedBy} shared a local preview.`
           : parsed.data.status === "stopped"
             ? `${parsed.data.sharedBy} stopped sharing a local preview.`
-            : parsed.data.message ?? "Local preview status changed."
+            : (parsed.data.message ?? "Local preview status changed.")
       );
     }
     return;
@@ -282,7 +281,10 @@ export async function routeRelayEnvelope(
     const plaintext = parsed.data;
     if (plaintext.status === "accepted") {
       if (plaintext.acceptedByUserId !== envelope.senderUserId) {
-        store.setHostMessageForRoom(roomId, "Rejected host handoff acceptance because the sender did not match the accepting user.");
+        store.setHostMessageForRoom(
+          roomId,
+          "Rejected host handoff acceptance because the sender did not match the accepting user."
+        );
         return;
       }
       store.applyAcceptedHostHandoffForRoom(roomId, { ...plaintext, status: "accepted" });
@@ -304,14 +306,20 @@ export async function routeRelayEnvelope(
     const parsed = RoomSettingsPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
     if (!parsed.success) return;
     const envelopeRoom = findEnvelopeRoom(context.roomsRef.current, roomId);
-    if (!isEnvelopeFromActiveRoomHost(envelopeRoom, envelope) || parsed.data.changedByUserId !== envelope.senderUserId) {
+    if (
+      !isEnvelopeFromActiveRoomHost(envelopeRoom, envelope) ||
+      parsed.data.changedByUserId !== envelope.senderUserId
+    ) {
       return;
     }
-    store.appendRoomMessage(roomId, buildRoomSettingsSystemMessage(parsed.data, {
-      approvalPolicyLabels,
-      approvalDelegationPolicyLabels,
-      roomModeLabels
-    }));
+    store.appendRoomMessage(
+      roomId,
+      buildRoomSettingsSystemMessage(parsed.data, {
+        approvalPolicyLabels,
+        approvalDelegationPolicyLabels,
+        roomModeLabels
+      })
+    );
     return;
   }
   if (envelope.kind === "room.key") {

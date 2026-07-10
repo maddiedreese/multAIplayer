@@ -36,12 +36,7 @@ export function useAppHostHandoffActions({
   workspaceRecords: WorkspaceRecordActions;
   roomSettingsActor: RoomSettingsActor;
 }) {
-  const {
-    hasSelectedRoom,
-    selectedRoom,
-    messages,
-    gitStatus
-  } = selected;
+  const { hasSelectedRoom, selectedRoom, messages, gitStatus } = selected;
   const {
     setHostBusyForRoom,
     setHostMessageForRoom,

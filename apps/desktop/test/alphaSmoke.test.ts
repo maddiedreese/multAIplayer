@@ -3,11 +3,7 @@ import { test } from "node:test";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { canRequestBrowserAccess, canHostBrowserAction } from "../src/lib/browserPolicy";
 import { canApproveCodexTurn } from "../src/lib/codexApproval";
-import {
-  buildCodexApprovalSnapshot,
-  buildCodexTurnInput,
-  type CodexChatMessage
-} from "../src/lib/codexTurn";
+import { buildCodexApprovalSnapshot, buildCodexTurnInput, type CodexChatMessage } from "../src/lib/codexTurn";
 import { resolveFilePreviewTab } from "../src/lib/filePreview";
 import { checkGitHubActionsReadiness, checkGitHubWorkflowReadiness } from "../src/lib/githubWorkflowReadiness";
 import { createHandoffSettingsPatch, hostHandoffDetail } from "../src/lib/hostHandoff";
@@ -45,7 +41,9 @@ class MemoryStorage {
   }
 
   dump(): string {
-    return Array.from(this.values.entries()).map(([key, value]) => `${key}=${value}`).join("\n");
+    return Array.from(this.values.entries())
+      .map(([key, value]) => `${key}=${value}`)
+      .join("\n");
   }
 }
 
@@ -84,8 +82,8 @@ test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, brow
     hostUserId: host.id,
     hostStatus: "active",
     approvalPolicy: "ask_every_turn",
-  approvalDelegationPolicy: "host_only",
-  trustedApproverUserIds: [],
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
     mode: { chat: true, code: true, workspace: true, browser: true },
     codexModel: normalizeCodexModel("gpt-5.4-thinking") ?? "gpt-5.4",
     browserAllowedOrigins: [],
@@ -107,13 +105,15 @@ test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, brow
       role: "human",
       body: "@Codex update the plan and tests.",
       time: "9:45 AM",
-      attachments: [{
-        id: "att-plan",
-        name: "docs/checklists/run-18.md",
-        type: "code",
-        size: 2048,
-        content: "# Updated plan\n\n- Add tests"
-      }]
+      attachments: [
+        {
+          id: "att-plan",
+          name: "docs/checklists/run-18.md",
+          type: "code",
+          size: 2048,
+          content: "# Updated plan\n\n- Add tests"
+        }
+      ]
     }
   ];
 
@@ -126,7 +126,10 @@ test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, brow
     { branch: "main", files: [{ path: "apps/desktop/src/App.tsx", status: "modified", added: 12, removed: 4 }] }
   );
   assert.equal(approval.summary.messagesSinceLastCodex, 1);
-  assert.deepEqual(approval.summary.attachments.map((attachment) => attachment.name), ["docs/checklists/run-18.md"]);
+  assert.deepEqual(
+    approval.summary.attachments.map((attachment) => attachment.name),
+    ["docs/checklists/run-18.md"]
+  );
   assert.equal(approval.summary.git?.totalFiles, 1);
   assert.deepEqual(approval.summary.browserAccess, ["http://localhost:5173"]);
   assert.deepEqual(approval.summary.terminals, ["shell"]);

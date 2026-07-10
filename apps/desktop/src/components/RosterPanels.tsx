@@ -51,33 +51,53 @@ export function TeamRosterPanel({
         <small className="panel-count">{members.length || 0}</small>
       </div>
       <div className="member-list">
-        {members.map(({ member, initial, name, roleLabel, joinedLabel, canPromote, canDemote, canTransferOwnership, canRemove }) => (
-          <div className="member-row team-member-row" key={`${member.teamId}:${member.userId}`}>
-            <span>{initial}</span>
-            <div>
-              <strong title={name}>{name}</strong>
-              <small title={member.userId}>{member.userId}</small>
+        {members.map(
+          ({
+            member,
+            initial,
+            name,
+            roleLabel,
+            joinedLabel,
+            canPromote,
+            canDemote,
+            canTransferOwnership,
+            canRemove
+          }) => (
+            <div className="member-row team-member-row" key={`${member.teamId}:${member.userId}`}>
+              <span>{initial}</span>
+              <div>
+                <strong title={name}>{name}</strong>
+                <small title={member.userId}>{member.userId}</small>
+              </div>
+              <div className="member-badges">
+                <b className={member.role === "owner" ? "trusted" : member.role === "admin" ? "verified" : ""}>
+                  {roleLabel}
+                </b>
+                {canPromote && (
+                  <button onClick={() => onPromote(member)} disabled={busy}>
+                    Promote
+                  </button>
+                )}
+                {canDemote && (
+                  <button onClick={() => onDemote(member)} disabled={busy}>
+                    Demote
+                  </button>
+                )}
+                {canTransferOwnership && (
+                  <button onClick={() => onTransferOwnership(member)} disabled={busy}>
+                    Make owner
+                  </button>
+                )}
+                {canRemove && (
+                  <button onClick={() => onRemove(member)} disabled={busy}>
+                    Remove
+                  </button>
+                )}
+              </div>
+              <small title={joinedLabel}>{joinedLabel}</small>
             </div>
-            <div className="member-badges">
-              <b className={member.role === "owner" ? "trusted" : member.role === "admin" ? "verified" : ""}>
-                {roleLabel}
-              </b>
-              {canPromote && (
-                <button onClick={() => onPromote(member)} disabled={busy}>Promote</button>
-              )}
-              {canDemote && (
-                <button onClick={() => onDemote(member)} disabled={busy}>Demote</button>
-              )}
-              {canTransferOwnership && (
-                <button onClick={() => onTransferOwnership(member)} disabled={busy}>Make owner</button>
-              )}
-              {canRemove && (
-                <button onClick={() => onRemove(member)} disabled={busy}>Remove</button>
-              )}
-            </div>
-            <small title={joinedLabel}>{joinedLabel}</small>
-          </div>
-        ))}
+          )
+        )}
       </div>
       {members.length === 0 && (
         <div className="sidebar-empty">
@@ -120,8 +140,8 @@ export function RoomMembersPanel({
             </div>
             <div className="member-badges">
               {member.isHost && <b>host</b>}
-              <b className={member.publicKeyFingerprint ? member.trusted ? "trusted" : "verified" : "warning"}>
-                {member.publicKeyFingerprint ? member.trusted ? "local trust" : "keyed" : "pending"}
+              <b className={member.publicKeyFingerprint ? (member.trusted ? "trusted" : "verified") : "warning"}>
+                {member.publicKeyFingerprint ? (member.trusted ? "local trust" : "keyed") : "pending"}
               </b>
               {member.publicKeyFingerprint && member.deviceId !== localDeviceId && (
                 <>

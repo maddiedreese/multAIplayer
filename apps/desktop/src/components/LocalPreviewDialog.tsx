@@ -37,7 +37,12 @@ export function LocalPreviewDialog({
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="modal local-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="local-preview-title">
+      <section
+        className="modal local-preview-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="local-preview-title"
+      >
         <div className="modal-header">
           <div>
             <span>Cloudflare Quick Tunnel</span>
@@ -59,10 +64,7 @@ export function LocalPreviewDialog({
             {dialog.candidates.length > 0 && (
               <label className="field-stack">
                 <span>Detected local servers</span>
-                <select
-                  value={dialog.selectedUrl}
-                  onChange={(event) => onSelectedUrlChange(event.target.value)}
-                >
+                <select value={dialog.selectedUrl} onChange={(event) => onSelectedUrlChange(event.target.value)}>
                   {dialog.candidates.map((candidate) => (
                     <option key={candidate.url} value={candidate.url}>
                       {candidate.label} · {candidate.url}
@@ -94,7 +96,8 @@ export function LocalPreviewDialog({
         {dialog.phase === "install" && (
           <>
             <p className="modal-copy">
-              cloudflared is required to start a Cloudflare Quick Tunnel on macOS. Install it with Homebrew, then come back here and check again.
+              cloudflared is required to start a Cloudflare Quick Tunnel on macOS. Install it with Homebrew, then come
+              back here and check again.
             </p>
             <div className="install-helper">
               <pre className="install-snippet">{cloudflaredInstallCommand}</pre>
@@ -118,9 +121,7 @@ export function LocalPreviewDialog({
         {(dialog.phase === "confirm" || dialog.phase === "starting") && (
           <>
             <div className="confirmation-copy">
-              {safetyText.split("\n").map((line, index) => (
-                line ? <p key={index}>{line}</p> : <br key={index} />
-              ))}
+              {safetyText.split("\n").map((line, index) => (line ? <p key={index}>{line}</p> : <br key={index} />))}
             </div>
             <dl className="local-preview-summary">
               <div>

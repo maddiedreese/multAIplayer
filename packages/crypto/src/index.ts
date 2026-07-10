@@ -38,11 +38,7 @@ export interface WrappedRoomSecret {
 }
 
 export async function createRoomSecret(): Promise<RoomSecret> {
-  const key = await crypto.subtle.generateKey(
-    { name: "AES-GCM", length: 256 },
-    true,
-    ["encrypt", "decrypt"]
-  );
+  const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
   const raw = await crypto.subtle.exportKey("raw", key);
   return {
     algorithm: "AES-GCM-256",
@@ -120,7 +116,10 @@ export async function decryptJson<T>(payload: CiphertextPayload, secret: RoomSec
   return JSON.parse(decoder.decode(plaintext)) as T;
 }
 
-export async function sealJsonToDevice(value: unknown, recipientPublicKeyJwk: JsonWebKey): Promise<DeviceSealedPayload> {
+export async function sealJsonToDevice(
+  value: unknown,
+  recipientPublicKeyJwk: JsonWebKey
+): Promise<DeviceSealedPayload> {
   const recipientPublicKey = await importEcdhPublicKey(recipientPublicKeyJwk);
   const ephemeralKeyPair = await crypto.subtle.generateKey(
     {
@@ -143,13 +142,18 @@ export async function sealJsonToDevice(value: unknown, recipientPublicKeyJwk: Js
   );
   return {
     algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
-    ephemeralPublicKeyJwk: jsonWebKeyToDevicePublicKeyJwk(await crypto.subtle.exportKey("jwk", ephemeralKeyPair.publicKey)),
+    ephemeralPublicKeyJwk: jsonWebKeyToDevicePublicKeyJwk(
+      await crypto.subtle.exportKey("jwk", ephemeralKeyPair.publicKey)
+    ),
     nonce: bytesToBase64(nonce),
     ciphertext: bytesToBase64(new Uint8Array(encrypted))
   };
 }
 
-export async function openDeviceSealedJson<T>(payload: DeviceSealedPayload, recipientPrivateKeyJwk: JsonWebKey): Promise<T> {
+export async function openDeviceSealedJson<T>(
+  payload: DeviceSealedPayload,
+  recipientPrivateKeyJwk: JsonWebKey
+): Promise<T> {
   if (payload.algorithm !== "ECDH-P256-HKDF-SHA256-AES-GCM-256") {
     throw new Error("Unsupported device-sealed payload");
   }
@@ -168,7 +172,10 @@ export async function openDeviceSealedJson<T>(payload: DeviceSealedPayload, reci
   return JSON.parse(decoder.decode(plaintext)) as T;
 }
 
-export async function wrapRoomSecretForDevice(secret: RoomSecret, recipientPublicKeyJwk: JsonWebKey): Promise<WrappedRoomSecret> {
+export async function wrapRoomSecretForDevice(
+  secret: RoomSecret,
+  recipientPublicKeyJwk: JsonWebKey
+): Promise<WrappedRoomSecret> {
   validateRoomSecret(secret);
   const recipientPublicKey = await importEcdhPublicKey(recipientPublicKeyJwk);
   const ephemeralKeyPair = await crypto.subtle.generateKey(
@@ -193,13 +200,18 @@ export async function wrapRoomSecretForDevice(secret: RoomSecret, recipientPubli
   return {
     version: 1,
     algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
-    ephemeralPublicKeyJwk: jsonWebKeyToDevicePublicKeyJwk(await crypto.subtle.exportKey("jwk", ephemeralKeyPair.publicKey)),
+    ephemeralPublicKeyJwk: jsonWebKeyToDevicePublicKeyJwk(
+      await crypto.subtle.exportKey("jwk", ephemeralKeyPair.publicKey)
+    ),
     nonce: bytesToBase64(nonce),
     ciphertext: bytesToBase64(new Uint8Array(encrypted))
   };
 }
 
-export async function unwrapRoomSecretForDevice(payload: WrappedRoomSecret, recipientPrivateKeyJwk: JsonWebKey): Promise<RoomSecret> {
+export async function unwrapRoomSecretForDevice(
+  payload: WrappedRoomSecret,
+  recipientPrivateKeyJwk: JsonWebKey
+): Promise<RoomSecret> {
   if (payload.version !== 1 || payload.algorithm !== "ECDH-P256-HKDF-SHA256-AES-GCM-256") {
     throw new Error("Unsupported wrapped room secret");
   }
@@ -222,13 +234,10 @@ export async function unwrapRoomSecretForDevice(payload: WrappedRoomSecret, reci
 
 async function importRoomKey(secret: RoomSecret): Promise<CryptoKey> {
   validateRoomSecret(secret);
-  return crypto.subtle.importKey(
-    "raw",
-    toArrayBuffer(base64ToBytes(secret.rawKey)),
-    { name: "AES-GCM" },
-    false,
-    ["encrypt", "decrypt"]
-  );
+  return crypto.subtle.importKey("raw", toArrayBuffer(base64ToBytes(secret.rawKey)), { name: "AES-GCM" }, false, [
+    "encrypt",
+    "decrypt"
+  ]);
 }
 
 export function validateRoomSecret(secret: unknown): asserts secret is RoomSecret {
@@ -319,12 +328,14 @@ export async function fingerprintPublicKey(publicKeyJwk: JsonWebKey): Promise<st
   });
   const bytes = encoder.encode(canonical);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("")
-    .match(/.{1,4}/g)
-    ?.slice(0, 8)
-    .join(":") ?? "";
+  return (
+    Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("")
+      .match(/.{1,4}/g)
+      ?.slice(0, 8)
+      .join(":") ?? ""
+  );
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {

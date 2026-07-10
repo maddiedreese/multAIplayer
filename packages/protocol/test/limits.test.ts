@@ -29,24 +29,14 @@ test("isRecord identifies non-null objects", () => {
 test("room, attachment, and device schemas enforce their exported semantic limits", () => {
   assert.equal(RoomRecord.shape.name.safeParse("r".repeat(maxRoomNameChars)).success, true);
   assert.equal(RoomRecord.shape.name.safeParse("r".repeat(maxRoomNameChars + 1)).success, false);
+  assert.equal(AttachmentBlobRecord.shape.type.safeParse("t".repeat(maxAttachmentBlobTypeChars)).success, true);
+  assert.equal(AttachmentBlobRecord.shape.type.safeParse("t".repeat(maxAttachmentBlobTypeChars + 1)).success, false);
   assert.equal(
-    AttachmentBlobRecord.shape.type.safeParse("t".repeat(maxAttachmentBlobTypeChars)).success,
+    DeviceRecord.shape.publicKeyFingerprint.safeParse("f".repeat(maxPublicKeyFingerprintChars)).success,
     true
   );
   assert.equal(
-    AttachmentBlobRecord.shape.type.safeParse("t".repeat(maxAttachmentBlobTypeChars + 1)).success,
-    false
-  );
-  assert.equal(
-    DeviceRecord.shape.publicKeyFingerprint.safeParse(
-      "f".repeat(maxPublicKeyFingerprintChars)
-    ).success,
-    true
-  );
-  assert.equal(
-    DeviceRecord.shape.publicKeyFingerprint.safeParse(
-      "f".repeat(maxPublicKeyFingerprintChars + 1)
-    ).success,
+    DeviceRecord.shape.publicKeyFingerprint.safeParse("f".repeat(maxPublicKeyFingerprintChars + 1)).success,
     false
   );
 });

@@ -26,15 +26,8 @@ export function useAppRoomInteractionContext({
   selected: SelectedRoomContext;
   roomActions: RoomActions;
 }) {
-  const {
-    hasSelectedRoom,
-    selectedRoom,
-    inviteApprovalGate,
-    hostMessage,
-    chatMessage,
-    actionRuns,
-    gitWorkflowDraft
-  } = selected;
+  const { hasSelectedRoom, selectedRoom, inviteApprovalGate, hostMessage, chatMessage, actionRuns, gitWorkflowDraft } =
+    selected;
   const {
     setHostMessageForRoom,
     setSettingsMessageForRoom,
@@ -43,18 +36,26 @@ export function useAppRoomInteractionContext({
     setTerminalErrorForRoom
   } = roomActions;
   const {
-    forgottenRoomIds, revokedRoomIds, revokedTeamIds, historySettings, roomPresence,
-    selectedRoomId, deviceIdentity, trustedDeviceKeys
-  } = useAppStore(useShallow((state) => ({
-    forgottenRoomIds: state.forgottenRoomIds,
-    revokedRoomIds: state.revokedRoomIds,
-    revokedTeamIds: state.revokedTeamIds,
-    historySettings: state.historySettings,
-    roomPresence: state.historyPresenceByRoom[selectedRoom.id]?.presence,
-    selectedRoomId: state.selectedRoomId,
-    deviceIdentity: state.deviceIdentity,
-    trustedDeviceKeys: state.trustedDeviceKeys
-  })));
+    forgottenRoomIds,
+    revokedRoomIds,
+    revokedTeamIds,
+    historySettings,
+    roomPresence,
+    selectedRoomId,
+    deviceIdentity,
+    trustedDeviceKeys
+  } = useAppStore(
+    useShallow((state) => ({
+      forgottenRoomIds: state.forgottenRoomIds,
+      revokedRoomIds: state.revokedRoomIds,
+      revokedTeamIds: state.revokedTeamIds,
+      historySettings: state.historySettings,
+      roomPresence: state.historyPresenceByRoom[selectedRoom.id]?.presence,
+      selectedRoomId: state.selectedRoomId,
+      deviceIdentity: state.deviceIdentity,
+      trustedDeviceKeys: state.trustedDeviceKeys
+    }))
+  );
 
   return useRoomInteractionContext({
     inFlightReporters: {
