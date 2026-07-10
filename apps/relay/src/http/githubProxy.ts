@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { normalizeGitHubBranchName, normalizeGitHubRepoRef, normalizePullRequestDraft } from "@multaiplayer/github";
+import { isRecord } from "@multaiplayer/protocol";
 import type { AuthSession } from "../state.js";
 
 export interface RegisterGitHubProxyRoutesOptions {
@@ -108,7 +109,7 @@ function normalizeGitHubErrorResponse(
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null,
   maxMediumTextChars: number
 ): { error: string; message?: string } {
-  const message = isRecord(value)
+  const message = isRecord(value) && !Array.isArray(value)
     ? normalizeMetadataText(value.message, maxMediumTextChars)
     : null;
   return {
@@ -128,7 +129,7 @@ function normalizeGitHubPullResponse(
   url: string;
   title: string;
 } | null {
-  if (!isRecord(value)) return null;
+  if (!isRecord(value) || Array.isArray(value)) return null;
   const id = normalizeSafeNonnegativeInteger(value.id);
   const number = normalizeSafeNonnegativeInteger(value.number);
   const url = normalizeMetadataText(value.html_url, maxUrlChars);
@@ -160,7 +161,7 @@ function normalizeGitHubActionsResponse(
     updatedAt: string;
   }>;
 } {
-  if (!isRecord(value)) return { totalCount: 0, runs: [] };
+  if (!isRecord(value) || Array.isArray(value)) return { totalCount: 0, runs: [] };
   return {
     totalCount: normalizeSafeNonnegativeInteger(value.total_count) ?? 0,
     runs: Array.isArray(value.workflow_runs)
@@ -192,7 +193,7 @@ function normalizeGitHubActionRun(
   createdAt: string;
   updatedAt: string;
 } | null {
-  if (!isRecord(value)) return null;
+  if (!isRecord(value) || Array.isArray(value)) return null;
   const id = normalizeSafeNonnegativeInteger(value.id);
   const name = normalizeMetadataText(value.name, maxShortTextChars);
   const status = normalizeMetadataText(value.status, maxShortTextChars);
@@ -243,8 +244,4 @@ function normalizeOptionalMetadataText(
   const text = String(value ?? "").trim();
   if (!text) return "";
   return normalizeMetadataText(text, maxChars);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }

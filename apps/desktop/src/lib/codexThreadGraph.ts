@@ -1,4 +1,4 @@
-import { maxCodexThreadIdChars } from "@multaiplayer/protocol";
+import { isRecord, maxCodexThreadIdChars } from "@multaiplayer/protocol";
 import type { CodexActivity, CodexAgentTreeNode, CodexThreadGraph, CodexThreadGraphNode } from "../types";
 import { normalizeCodexThreadId } from "./codexThread";
 
@@ -20,8 +20,8 @@ export function legacyCodexThreadGraph(threadId: string | null): CodexThreadGrap
 
 export function normalizeCodexThreadGraph(value: unknown, legacyThreadId?: unknown): CodexThreadGraph {
   const legacy = normalizeCodexThreadId(legacyThreadId);
-  if (!isRecord(value)) return legacyCodexThreadGraph(legacy);
-  const rawNodes = isRecord(value.nodesById) ? Object.values(value.nodesById) : [];
+  if (!isRecord(value) || Array.isArray(value)) return legacyCodexThreadGraph(legacy);
+  const rawNodes = isRecord(value.nodesById) && !Array.isArray(value.nodesById) ? Object.values(value.nodesById) : [];
   const nodes = rawNodes.map(normalizeNode).filter((node): node is CodexThreadGraphNode => Boolean(node));
   const bounded = nodes.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, maxCodexThreadGraphNodes);
   const nodesById = Object.fromEntries(bounded.map((node) => [node.id, node]));
@@ -71,7 +71,7 @@ export function deriveCodexAgentTree(activities: readonly CodexActivity[]): Code
 }
 
 function normalizeNode(value: unknown): CodexThreadGraphNode | null {
-  if (!isRecord(value)) return null;
+  if (!isRecord(value) || Array.isArray(value)) return null;
   const id = normalizeCodexThreadId(value.id);
   if (!id) return null;
   const parentThreadId = normalizeCodexThreadId(value.parentThreadId);
@@ -94,8 +94,4 @@ function normalizeNode(value: unknown): CodexThreadGraphNode | null {
 
 function safeTimestamp(value: unknown): number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

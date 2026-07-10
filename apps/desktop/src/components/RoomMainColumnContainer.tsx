@@ -30,7 +30,7 @@ import {
   acknowledgeRoomVisibilityWarning,
   hasAcknowledgedRoomVisibilityWarning
 } from "../lib/roomVisibilityWarning";
-import type { ChatMessage } from "../types";
+import type { ChatAttachment, ChatMessage, CodexRoomEvent } from "../types";
 import type { createAppRoomPanelActions } from "../lib/appRoomPanelActions";
 import type { useHostHandoffActions } from "../hooks/useHostHandoffActions";
 import type { useRoomRuntimeContext } from "../hooks/useRoomRuntimeContext";
@@ -112,6 +112,9 @@ const noBrowserRequests: NonNullable<
 const noPreviews: NonNullable<
   NonNullable<ReturnType<typeof useAppStore.getState>["localPreviewByRoom"][string]>["previews"]
 > = [];
+const noPendingAttachments: ChatAttachment[] = [];
+const noSelectedMessageIds: string[] = [];
+const noCodexEvents: CodexRoomEvent[] = [];
 
 export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSources }) {
   const capabilities = useMemo<RoomMainColumnCapabilities>(() => ({
@@ -238,13 +241,13 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
   };
   const roomLocked = forgotten || revoked || Boolean(selectedRoom.archivedAt);
   const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser);
-  const pendingAttachments = chat?.pendingAttachments ?? [];
-  const selectedMessageIds = chat?.selectedMessageIds ?? [];
+  const pendingAttachments = chat?.pendingAttachments ?? noPendingAttachments;
+  const selectedMessageIds = chat?.selectedMessageIds ?? noSelectedMessageIds;
   const markdownSelectionMode = chat?.markdownSelectionMode ?? false;
   const activeApproval = codex?.pendingApproval ?? null;
   const approvalMessages = messagesSinceLastCodex(activeApproval?.messages ?? messages) as ChatMessage[];
   const resolvedSettings = resolveCodexRunSettings(selectedRoom, codexProbe);
-  const codexEvents = codex?.events ?? [];
+  const codexEvents = codex?.events ?? noCodexEvents;
   const queuedApprovals = codex?.queuedApprovals ?? [];
   const currentMessagesSinceLastCodex = messagesSinceLastCodex(messages).length;
   const replyTargetMessage = chat?.replyToMessageId
@@ -301,6 +304,21 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
   const onRetryMarkdownCopy = useCallback(() => {
     if (fallback) capabilities.retryMarkdownCopy(fallback.title, fallback.markdown, roomId);
   }, [capabilities, fallback, roomId]);
+  const chatMessageRows = useMemo(() => buildRoomChatMessageRows({
+    messages,
+    markdownSelectionMode,
+    selectedMessageIds,
+    localUserId: localUser.id,
+    codexEvents
+  }), [codexEvents, localUser.id, markdownSelectionMode, messages, selectedMessageIds]);
+  const pendingAttachmentRows = useMemo(
+    () => buildPendingAttachmentRows(pendingAttachments),
+    [pendingAttachments]
+  );
+  const localPreviewCards = useMemo(
+    () => buildLocalPreviewCards(previews, localUser.id),
+    [localUser.id, previews]
+  );
   const headerProps: HeaderProps = {
     teams: teams.map((team) => ({ id: team.id, name: team.name })),
     selectedTeamId: selectedTeam,
@@ -330,13 +348,7 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
     ...headerCapabilities
   };
   const chatProps: ChatProps = {
-    messages: buildRoomChatMessageRows({
-      messages,
-      markdownSelectionMode,
-      selectedMessageIds,
-      localUserId: localUser.id,
-      codexEvents
-    }),
+    messages: chatMessageRows,
     approvalVisible: codex?.approvalVisible ?? false,
     approvalSummary: {
       messages: formatApprovalMessages(approvalMessages),
@@ -367,7 +379,7 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
         }
       : null,
     roomGoal: codex?.goal ?? null,
-    pendingAttachments: buildPendingAttachmentRows(pendingAttachments),
+    pendingAttachments: pendingAttachmentRows,
     queuedCodexTurns: queuedApprovals.map((turn) => ({
       turnId: turn.turnId,
       requestedBy: turn.requestedBy,
@@ -378,7 +390,7 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
         !roomLocked &&
         (turn.requestedByUserId === localUser.id || selectedRoom.hostUserId === localUser.id)
     })),
-    localPreviewCards: buildLocalPreviewCards(previews, localUser.id),
+    localPreviewCards,
     pendingAttachmentSummary:
       `${pendingAttachments.length}/${maxMessageAttachments} files · ` +
       `${formatBytes(embeddedAttachmentBytes(pendingAttachments))}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`,

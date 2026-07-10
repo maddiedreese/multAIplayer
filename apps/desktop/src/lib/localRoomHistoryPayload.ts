@@ -1,5 +1,6 @@
 import {
   DevicePublicKeyJwk,
+  isRecord,
   maxCodexActivitiesPerRoom,
   CodexApprovalPlaintextPayload as CodexApprovalPlaintextPayloadSchema,
   CodexActivityPlaintextPayload as CodexActivityPlaintextPayloadSchema,
@@ -11,21 +12,15 @@ import {
   ChatEditPlaintextPayload as ChatEditPlaintextPayloadSchema,
   type ChatDeletePlaintextPayload,
   type ChatEditPlaintextPayload,
-  type ChatReactionPlaintextPayload,
   type CodexApprovalPlaintextPayload,
   type CodexActivityPlaintextPayload,
   type CodexEventPlaintextPayload,
   type CodexQueuePlaintextPayload,
-  type DevicePublicKeyJwk as DevicePublicKeyJwkType,
   type GitHubActionsEventPlaintextPayload,
   type GitWorkflowEventPlaintextPayload,
   type InviteJoinRequestPlaintextPayload,
-  type InviteJoinStatusPlaintextPayload,
   type LocalPreviewPlaintextPayload,
-  type RequestStatusPlaintextPayload,
   type RoomKeyRotationPlaintextPayload,
-  type RoomSettingsPlaintextPayload,
-  type TerminalResultPlaintextPayload,
   type WorkspaceFileSaveRequestPlaintextPayload
 } from "@multaiplayer/protocol";
 import type { GitHubActionRun } from "./authClient";
@@ -120,15 +115,15 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
     fileSaveRequests: Array.isArray(value.fileSaveRequests) ? value.fileSaveRequests.filter(isWorkspaceFileSaveRequest) : [],
     browserRequests: Array.isArray(value.browserRequests) ? value.browserRequests.filter(isBrowserAccessRequest) : [],
     inviteRequests: Array.isArray(value.inviteRequests) ? value.inviteRequests.filter(isInviteJoinRequest) : [],
-    codexEvents: Array.isArray(value.codexEvents) ? value.codexEvents.filter(isCodexEventPlaintextPayload) : [],
+    codexEvents: Array.isArray(value.codexEvents) ? value.codexEvents.filter(isCodexEventPlaintextPayloadLenient) : [],
     codexActivities: Array.isArray(value.codexActivities)
       ? value.codexActivities.filter(isCodexActivityPlaintextPayload).slice(-maxCodexActivitiesPerRoom)
       : [],
     gitWorkflowEvents: Array.isArray(value.gitWorkflowEvents)
-      ? value.gitWorkflowEvents.filter(isGitWorkflowEventPlaintextPayload)
+      ? value.gitWorkflowEvents.filter(isGitWorkflowEventPlaintextPayloadLenient)
       : [],
     githubActionsEvents: Array.isArray(value.githubActionsEvents)
-      ? value.githubActionsEvents.filter(isGitHubActionsEventPlaintextPayload)
+      ? value.githubActionsEvents.filter(isGitHubActionsEventPlaintextPayloadLenient)
       : [],
     localPreviews: Array.isArray(value.localPreviews) ? value.localPreviews.filter(isLocalPreviewPlaintextPayload) : [],
     terminalSnapshots: Array.isArray(value.terminalSnapshots)
@@ -149,19 +144,6 @@ export function isChatMessage(value: unknown): value is ChatMessage {
   return Boolean(
     normalized &&
       (normalized.reactions === undefined || (Array.isArray(normalized.reactions) && normalized.reactions.every(isChatReaction)))
-  );
-}
-
-export function isChatReactionPlaintextPayload(value: unknown): value is ChatReactionPlaintextPayload {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value.id === "string" &&
-    typeof value.messageId === "string" &&
-    typeof value.emoji === "string" &&
-    (value.action === "add" || value.action === "remove") &&
-    typeof value.reactor === "string" &&
-    typeof value.reactorUserId === "string" &&
-    typeof value.createdAt === "string"
   );
 }
 
@@ -204,17 +186,6 @@ export function isBrowserDecisionSystemMessage(message: ChatMessage): boolean {
   return /^[^\n]+ (approved|denied) (https?:\/\/|a browser access request)/i.test(message.body.trim());
 }
 
-export function isRequestStatusPlaintextPayload(value: unknown): value is RequestStatusPlaintextPayload {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value.requestId === "string" &&
-    (value.status === "approved" || value.status === "denied") &&
-    typeof value.decidedBy === "string" &&
-    typeof value.decidedByUserId === "string" &&
-    typeof value.decidedAt === "string"
-  );
-}
-
 export function isWorkspaceFileSaveRequestPlaintextPayload(value: unknown): value is WorkspaceFileSaveRequestPlaintextPayload {
   return WorkspaceFileSaveRequestPlaintextPayloadSchema.safeParse(value).success;
 }
@@ -228,7 +199,7 @@ export function isWorkspaceFileSaveRequest(value: unknown): value is WorkspaceFi
   );
 }
 
-export function isInviteJoinRequestPlaintextPayload(value: unknown): value is InviteJoinRequestPlaintextPayload {
+function isInviteJoinRequestPlaintextPayloadLenient(value: unknown): value is InviteJoinRequestPlaintextPayload {
   if (!isRecord(value)) return false;
   return (
     value.eventType === "invite.request" &&
@@ -244,36 +215,6 @@ export function isInviteJoinRequestPlaintextPayload(value: unknown): value is In
   );
 }
 
-export function isInviteJoinStatusPlaintextPayload(value: unknown): value is InviteJoinStatusPlaintextPayload {
-  if (!isRecord(value)) return false;
-  return (
-    value.eventType === "invite.status" &&
-    typeof value.requestId === "string" &&
-    (value.status === "approved" || value.status === "denied") &&
-    typeof value.decidedBy === "string" &&
-    typeof value.decidedByUserId === "string" &&
-    typeof value.decidedAt === "string" &&
-    (value.recipientDeviceId === undefined || typeof value.recipientDeviceId === "string") &&
-    (value.recipientPublicKeyFingerprint === undefined || typeof value.recipientPublicKeyFingerprint === "string") &&
-    (value.wrappedRoomSecret === undefined || isWrappedRoomSecretPayload(value.wrappedRoomSecret))
-  );
-}
-
-export function isDeviceSealedPayload(value: unknown): value is {
-  algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256";
-  ephemeralPublicKeyJwk: DevicePublicKeyJwkType;
-  nonce: string;
-  ciphertext: string;
-} {
-  if (!isRecord(value)) return false;
-  return (
-    value.algorithm === "ECDH-P256-HKDF-SHA256-AES-GCM-256" &&
-    DevicePublicKeyJwk.safeParse(value.ephemeralPublicKeyJwk).success &&
-    typeof value.nonce === "string" &&
-    typeof value.ciphertext === "string"
-  );
-}
-
 export function isRoomKeyRotationPlaintextPayload(value: unknown): value is RoomKeyRotationPlaintextPayload {
   return RoomKeyRotationPlaintextPayloadSchema.safeParse(value).success;
 }
@@ -282,7 +223,7 @@ export function isLocalPreviewPlaintextPayload(value: unknown): value is LocalPr
   return LocalPreviewPlaintextPayloadSchema.safeParse(value).success;
 }
 
-export function isCodexEventPlaintextPayload(value: unknown): value is CodexEventPlaintextPayload {
+function isCodexEventPlaintextPayloadLenient(value: unknown): value is CodexEventPlaintextPayload {
   if (!isRecord(value)) return false;
   return (
     value.eventType === "codex.turn" &&
@@ -327,25 +268,7 @@ function isCodexTurnRiskFlags(value: unknown): boolean {
   );
 }
 
-export function isTerminalResultPlaintextPayload(value: unknown): value is TerminalResultPlaintextPayload {
-  if (!isRecord(value)) return false;
-  return (
-    value.eventType === "terminal.result" &&
-    typeof value.requestId === "string" &&
-    typeof value.command === "string" &&
-    typeof value.cwd === "string" &&
-    (typeof value.exitStatus === "number" || value.exitStatus === null) &&
-    typeof value.stdout === "string" &&
-    typeof value.stderr === "string" &&
-    (value.error === undefined || typeof value.error === "string") &&
-    typeof value.ranBy === "string" &&
-    typeof value.ranByUserId === "string" &&
-    typeof value.startedAt === "string" &&
-    typeof value.finishedAt === "string"
-  );
-}
-
-export function isGitWorkflowEventPlaintextPayload(value: unknown): value is GitWorkflowEventPlaintextPayload {
+function isGitWorkflowEventPlaintextPayloadLenient(value: unknown): value is GitWorkflowEventPlaintextPayload {
   if (!isRecord(value)) return false;
   const results = value.results;
   const pullRequest = value.pullRequest;
@@ -364,7 +287,7 @@ export function isGitWorkflowEventPlaintextPayload(value: unknown): value is Git
   );
 }
 
-export function isGitHubActionsEventPlaintextPayload(value: unknown): value is GitHubActionsEventPlaintextPayload {
+function isGitHubActionsEventPlaintextPayloadLenient(value: unknown): value is GitHubActionsEventPlaintextPayload {
   if (!isRecord(value)) return false;
   const summary = value.summary;
   return (
@@ -382,20 +305,6 @@ export function isGitHubActionsEventPlaintextPayload(value: unknown): value is G
     typeof value.checkedAt === "string" &&
     Array.isArray(value.runs) &&
     value.runs.every(isGitHubActionRun)
-  );
-}
-
-export function isRoomSettingsPlaintextPayload(value: unknown): value is RoomSettingsPlaintextPayload {
-  if (!isRecord(value)) return false;
-  return (
-    value.eventType === "room.settings" &&
-    typeof value.id === "string" &&
-    isRoomSettingsName(value.setting) &&
-    typeof value.previousValue === "string" &&
-    typeof value.nextValue === "string" &&
-    typeof value.changedBy === "string" &&
-    typeof value.changedByUserId === "string" &&
-    typeof value.changedAt === "string"
   );
 }
 
@@ -470,7 +379,7 @@ function isTerminalLine(value: unknown): value is { stream: string; text: string
 function isInviteJoinRequest(value: unknown): value is InviteJoinRequest {
   if (!isRecord(value)) return false;
   const status = value.status;
-  return isInviteJoinRequestPlaintextPayload(value) && isWorkflowStatus(status);
+  return isInviteJoinRequestPlaintextPayloadLenient(value) && isWorkflowStatus(status);
 }
 
 function isGitWorkflowResult(value: unknown): value is GitWorkflowResult {
@@ -500,21 +409,6 @@ function isGitHubActionRun(value: unknown): value is GitHubActionRun {
     typeof value.url === "string" &&
     typeof value.createdAt === "string" &&
     typeof value.updatedAt === "string"
-  );
-}
-
-function isRoomSettingsName(value: unknown): value is RoomSettingsPlaintextPayload["setting"] {
-  return (
-    value === "approvalPolicy" ||
-    value === "roomName" ||
-    value === "roomMode" ||
-    value === "codexModel" ||
-    value === "codexReasoningEffort" ||
-    value === "codexSpeed" ||
-    value === "codexSandboxLevel" ||
-    value === "projectPath" ||
-    value === "browserAllowedOrigins" ||
-    value === "browserProfilePersistent"
   );
 }
 
@@ -595,19 +489,4 @@ function isRoomGoalStatus(value: unknown): value is RoomGoal["status"] {
 
 function isWorkflowStatus(value: unknown): value is "pending" | "approved" | "denied" {
   return value === "pending" || value === "approved" || value === "denied";
-}
-
-function isWrappedRoomSecretPayload(value: unknown): boolean {
-  if (!isRecord(value)) return false;
-  return (
-    value.version === 1 &&
-    value.algorithm === "ECDH-P256-HKDF-SHA256-AES-GCM-256" &&
-    DevicePublicKeyJwk.safeParse(value.ephemeralPublicKeyJwk).success &&
-    typeof value.nonce === "string" &&
-    typeof value.ciphertext === "string"
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

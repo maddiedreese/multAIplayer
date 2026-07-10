@@ -20,8 +20,6 @@ export function useAppSelectedRoomRuntime({
 }) {
   const {
     selectedRoom,
-    markdownSelectionMode,
-    selectedMessageIds,
     messages,
     replyToMessageId,
     pendingAttachments,
@@ -45,8 +43,6 @@ export function useAppSelectedRoomRuntime({
   return useSelectedRoomRuntime({
     selectedRoom,
     selectedRoomId,
-    markdownSelectionMode,
-    selectedMessageIds,
     localUser: localIdentity.localUser,
     isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
     messages,

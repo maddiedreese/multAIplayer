@@ -1,5 +1,4 @@
-import { isRecord } from "./limits.js";
-import type { RelayEnvelope } from "@multaiplayer/protocol";
+import { isRecord, type RelayEnvelope } from "@multaiplayer/protocol";
 import type { RelayPersistence } from "./persistence.js";
 import type { RoomKey } from "./state.js";
 import type { RelayStoreCodec } from "./store-codec.js";

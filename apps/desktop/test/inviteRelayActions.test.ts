@@ -73,6 +73,30 @@ test("relay invite actions normalize incoming join requests as pending", async (
   assert.equal(appended[0]?.status, "pending");
 });
 
+test("relay invite actions reject schema-invalid decrypted payloads", async () => {
+  const { actions, appended, statusUpdates } = setup();
+
+  await actions.handleInviteEnvelopePlaintext(room.id, {
+    eventType: "invite.request",
+    id: "request-invalid",
+    requester: "Peer",
+    requesterUserId: "github:peer",
+    requesterDeviceId: "device-peer",
+    requestedAt: "not-a-datetime"
+  });
+  await actions.handleInviteEnvelopePlaintext(room.id, {
+    eventType: "invite.status",
+    requestId: "device-peer:request-invalid",
+    status: "denied",
+    decidedBy: "Maddie",
+    decidedByUserId: "github:maddie",
+    decidedAt: "not-a-datetime"
+  });
+
+  assert.deepEqual(appended, []);
+  assert.deepEqual(statusUpdates, []);
+});
+
 test("status events always update state but only update UI for this device", async () => {
   const { actions, roomMessages, statusUpdates } = setup();
   const status = {

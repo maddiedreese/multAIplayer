@@ -1,4 +1,4 @@
-import { maxEmbeddedAttachmentBytes, maxMessageAttachments } from "@multaiplayer/protocol";
+import { isRecord, maxEmbeddedAttachmentBytes, maxMessageAttachments } from "@multaiplayer/protocol";
 
 export interface SanitizedChatAttachment {
   id: string;
@@ -125,8 +125,4 @@ function encodedBytes(value: string): number {
 
 function isChatRole(value: unknown): value is SanitizedChatMessage["role"] {
   return value === "human" || value === "codex" || value === "system";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

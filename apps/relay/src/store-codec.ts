@@ -2,6 +2,7 @@ import {
   AttachmentBlobRecord,
   InviteRecord,
   RelayEnvelope,
+  isRecord,
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultApprovalDelegationPolicy,
@@ -21,7 +22,6 @@ import type { NormalizedStoredAuthSession, StoredAuthSession } from "./auth/sess
 import {
   isApprovalPolicy,
   isApprovalDelegationPolicy,
-  isRecord,
   isRoomMode,
   maxCiphertextCharactersForBlob,
   normalizeBrowserAllowedOrigins,

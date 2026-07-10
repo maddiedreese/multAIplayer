@@ -1,12 +1,26 @@
 import type { MutableRefObject } from "react";
-import type {
+import {
   BrowserRequestPlaintextPayload,
+  ChatDeletePlaintextPayload,
+  ChatEditPlaintextPayload,
   ChatPlaintextPayload,
+  ChatReactionPlaintextPayload,
+  CodexActivityPlaintextPayload,
+  CodexApprovalPlaintextPayload,
+  CodexEventPlaintextPayload,
+  CodexQueuePlaintextPayload,
+  GitHubActionsEventPlaintextPayload,
+  GitWorkflowEventPlaintextPayload,
   HostHandoffPlaintextPayload,
-  RelayEnvelope,
+  LocalPreviewPlaintextPayload,
   RequestStatusPlaintextPayload,
-  RoomRecord,
-  TerminalRequestPlaintextPayload
+  RoomKeyRotationPlaintextPayload,
+  RoomSettingsPlaintextPayload,
+  TerminalRequestPlaintextPayload,
+  TerminalResultPlaintextPayload,
+  WorkspaceFileSaveRequestPlaintextPayload,
+  type RelayEnvelope,
+  type RoomRecord
 } from "@multaiplayer/protocol";
 import { decryptJson } from "@multaiplayer/crypto";
 import { buildRoomSettingsSystemMessage } from "../../lib/roomSettingsMessages";
@@ -18,24 +32,7 @@ import {
   buildGitWorkflowEventLines,
   buildTerminalResultLines
 } from "../../lib/activityLines";
-import {
-  isChatReactionPlaintextPayload,
-  isChatDeletePlaintextPayload,
-  isChatEditPlaintextPayload,
-  isCodexApprovalPlaintextPayload,
-  isCodexEventPlaintextPayload,
-  isCodexActivityPlaintextPayload,
-  isCodexQueuePlaintextPayload,
-  isGitHubActionsEventPlaintextPayload,
-  isGitWorkflowEventPlaintextPayload,
-  isLegacyDebugChatMessage,
-  isLocalPreviewPlaintextPayload,
-  isRequestStatusPlaintextPayload,
-  isRoomKeyRotationPlaintextPayload,
-  isRoomSettingsPlaintextPayload,
-  isTerminalResultPlaintextPayload,
-  isWorkspaceFileSaveRequestPlaintextPayload
-} from "../../lib/localRoomHistoryPayload";
+import { isLegacyDebugChatMessage } from "../../lib/localRoomHistoryPayload";
 import { formatMessageTime } from "../../lib/appFormatters";
 import { isRoomKeyRotationEnvelopeAuthorized } from "../../lib/roomKeyRotation";
 import {
@@ -131,8 +128,9 @@ export async function routeRelayEnvelope(
   const roomPayload = envelope.payload;
 
   if (envelope.kind === "chat.message") {
-    const plaintext = await decryptJson<ChatPlaintextPayload>(roomPayload, secret);
-    const chatMessage = normalizeChatMessage(plaintext) as ChatMessage | null;
+    const parsed = ChatPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (!parsed.success) return;
+    const chatMessage = normalizeChatMessage(parsed.data) as ChatMessage | null;
     if (!chatMessage || isLegacyDebugChatMessage(chatMessage)) return;
     context.markIncomingChatUnread(
       roomId,
@@ -166,115 +164,122 @@ export async function routeRelayEnvelope(
   }
 
   if (envelope.kind === "chat.reaction") {
-    const plaintext = await decryptJson<unknown>(roomPayload, secret);
-    if (isChatReactionPlaintextPayload(plaintext)) store.applyMessageReaction(roomId, plaintext);
+    const parsed = ChatReactionPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (parsed.success) store.applyMessageReaction(roomId, parsed.data);
     return;
   }
   if (envelope.kind === "chat.edit") {
-    const plaintext = await decryptJson<unknown>(roomPayload, secret);
-    if (isChatEditPlaintextPayload(plaintext)) store.editRoomMessage(roomId, plaintext);
+    const parsed = ChatEditPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (parsed.success) store.editRoomMessage(roomId, parsed.data);
     return;
   }
   if (envelope.kind === "chat.delete") {
-    const plaintext = await decryptJson<unknown>(roomPayload, secret);
-    if (isChatDeletePlaintextPayload(plaintext)) store.deleteRoomMessage(roomId, plaintext);
+    const parsed = ChatDeletePlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (parsed.success) store.deleteRoomMessage(roomId, parsed.data);
     return;
   }
   if (envelope.kind === "terminal.request") {
-    const plaintext = await decryptJson<TerminalRequestPlaintextPayload>(roomPayload, secret);
-    store.appendTerminalRequest(roomId, { ...plaintext, status: "pending" });
+    const parsed = TerminalRequestPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (parsed.success) store.appendTerminalRequest(roomId, { ...parsed.data, status: "pending" });
     return;
   }
   if (envelope.kind === "terminal.event") {
     const plaintext = await decryptJson<unknown>(roomPayload, secret);
-    if (isRequestStatusPlaintextPayload(plaintext)) {
-      store.updateTerminalRequestStatus(roomId, plaintext.requestId, plaintext.status);
+    const result = TerminalResultPlaintextPayload.safeParse(plaintext);
+    if (result.success) {
+      store.appendTerminalLinesForRoom(roomId, buildTerminalResultLines(result.data), maxTerminalActivityLines);
+      return;
     }
-    if (isTerminalResultPlaintextPayload(plaintext)) {
-      store.appendTerminalLinesForRoom(roomId, buildTerminalResultLines(plaintext), maxTerminalActivityLines);
+    const status = RequestStatusPlaintextPayload.safeParse(plaintext);
+    if (status.success) {
+      store.updateTerminalRequestStatus(roomId, status.data.requestId, status.data.status);
     }
     return;
   }
   if (envelope.kind === "git.event") {
     const plaintext = await decryptJson<unknown>(roomPayload, secret);
-    if (isGitWorkflowEventPlaintextPayload(plaintext)) {
-      store.appendGitWorkflowEvent(roomId, plaintext);
-      store.appendTerminalLinesForRoom(roomId, buildGitWorkflowEventLines(plaintext), maxTerminalActivityLines);
-      store.setGitWorkflowMessageForRoom(roomId, plaintext.message);
+    const workflow = GitWorkflowEventPlaintextPayload.safeParse(plaintext);
+    if (workflow.success) {
+      store.appendGitWorkflowEvent(roomId, workflow.data);
+      store.appendTerminalLinesForRoom(roomId, buildGitWorkflowEventLines(workflow.data), maxTerminalActivityLines);
+      store.setGitWorkflowMessageForRoom(roomId, workflow.data.message);
     }
-    if (isGitHubActionsEventPlaintextPayload(plaintext)) {
-      store.applyGitHubActionsEventForRoom(roomId, plaintext);
-      store.appendTerminalLinesForRoom(roomId, buildGitHubActionsEventLines(plaintext), maxTerminalActivityLines);
+    const actions = GitHubActionsEventPlaintextPayload.safeParse(plaintext);
+    if (actions.success) {
+      store.applyGitHubActionsEventForRoom(roomId, actions.data);
+      store.appendTerminalLinesForRoom(roomId, buildGitHubActionsEventLines(actions.data), maxTerminalActivityLines);
     }
     return;
   }
   if (envelope.kind === "codex.event") {
-    const plaintext = await decryptJson<unknown>(roomPayload, secret);
-    if (isCodexEventPlaintextPayload(plaintext)) {
-      store.appendCodexEvent(roomId, plaintext);
-      store.appendTerminalLinesForRoom(roomId, [buildCodexEventLine(plaintext)], maxTerminalActivityLines);
+    const parsed = CodexEventPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (parsed.success) {
+      store.appendCodexEvent(roomId, parsed.data);
+      store.appendTerminalLinesForRoom(roomId, [buildCodexEventLine(parsed.data)], maxTerminalActivityLines);
     }
     return;
   }
   if (envelope.kind === "codex.activity") {
-    const plaintext = await decryptJson<unknown>(roomPayload, secret);
-    if (isCodexActivityPlaintextPayload(plaintext)) store.upsertCodexActivity(roomId, plaintext);
+    const parsed = CodexActivityPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (parsed.success) store.upsertCodexActivity(roomId, parsed.data);
     return;
   }
   if (envelope.kind === "codex.approval") {
-    const plaintext = await decryptJson<unknown>(roomPayload, secret);
-    if (isCodexApprovalPlaintextPayload(plaintext)) {
+    const parsed = CodexApprovalPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (parsed.success) {
       store.setHostMessageForRoom(roomId, "Ignored delegated Codex approval. Only the active host can authorize Codex turns.");
     }
     return;
   }
   if (envelope.kind === "codex.queue") {
-    const plaintext = await decryptJson<unknown>(roomPayload, secret);
-    if (isCodexQueuePlaintextPayload(plaintext)) handleCodexQueueEvent(plaintext, roomId, store);
+    const parsed = CodexQueuePlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (parsed.success) handleCodexQueueEvent(parsed.data, roomId, store);
     return;
   }
   if (envelope.kind === "browser.request") {
-    const plaintext = await decryptJson<BrowserRequestPlaintextPayload>(roomPayload, secret);
-    store.appendBrowserRequest(roomId, { ...plaintext, status: "pending" });
+    const parsed = BrowserRequestPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (parsed.success) store.appendBrowserRequest(roomId, { ...parsed.data, status: "pending" });
     return;
   }
   if (envelope.kind === "browser.event") {
-    const plaintext = await decryptJson<RequestStatusPlaintextPayload>(roomPayload, secret);
-    store.updateBrowserRequestStatus(roomId, plaintext.requestId, plaintext.status);
+    const parsed = RequestStatusPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (parsed.success) store.updateBrowserRequestStatus(roomId, parsed.data.requestId, parsed.data.status);
     return;
   }
   if (envelope.kind === "workspace.request") {
-    const plaintext = await decryptJson<unknown>(roomPayload, secret);
-    if (isWorkspaceFileSaveRequestPlaintextPayload(plaintext)) {
-      store.appendFileSaveRequest(roomId, { ...plaintext, status: "pending" });
-      store.setChatMessageForRoom(roomId, `${plaintext.requester} requested a file save.`);
+    const parsed = WorkspaceFileSaveRequestPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (parsed.success) {
+      store.appendFileSaveRequest(roomId, { ...parsed.data, status: "pending" });
+      store.setChatMessageForRoom(roomId, `${parsed.data.requester} requested a file save.`);
     }
     return;
   }
   if (envelope.kind === "workspace.event") {
-    const plaintext = await decryptJson<unknown>(roomPayload, secret);
-    if (isRequestStatusPlaintextPayload(plaintext)) {
-      store.updateFileSaveRequestStatus(roomId, plaintext.requestId, plaintext.status);
+    const parsed = RequestStatusPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (parsed.success) {
+      store.updateFileSaveRequestStatus(roomId, parsed.data.requestId, parsed.data.status);
     }
     return;
   }
   if (envelope.kind === "preview.event") {
-    const plaintext = await decryptJson<unknown>(roomPayload, secret);
-    if (isLocalPreviewPlaintextPayload(plaintext)) {
-      store.appendLocalPreviewEvent(roomId, plaintext);
+    const parsed = LocalPreviewPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (parsed.success) {
+      store.appendLocalPreviewEvent(roomId, parsed.data);
       store.setChatMessageForRoom(
         roomId,
-        plaintext.status === "live"
-          ? `${plaintext.sharedBy} shared a local preview.`
-          : plaintext.status === "stopped"
-            ? `${plaintext.sharedBy} stopped sharing a local preview.`
-            : plaintext.message ?? "Local preview status changed."
+        parsed.data.status === "live"
+          ? `${parsed.data.sharedBy} shared a local preview.`
+          : parsed.data.status === "stopped"
+            ? `${parsed.data.sharedBy} stopped sharing a local preview.`
+            : parsed.data.message ?? "Local preview status changed."
       );
     }
     return;
   }
   if (envelope.kind === "room.host") {
-    const plaintext = await decryptJson<HostHandoffPlaintextPayload>(roomPayload, secret);
+    const parsed = HostHandoffPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (!parsed.success) return;
+    const plaintext = parsed.data;
     if (plaintext.status === "accepted") {
       if (plaintext.acceptedByUserId !== envelope.senderUserId) {
         store.setHostMessageForRoom(roomId, "Rejected host handoff acceptance because the sender did not match the accepting user.");
@@ -296,9 +301,9 @@ export async function routeRelayEnvelope(
     return;
   }
   if (envelope.kind === "room.settings") {
-    const plaintext = await decryptJson<unknown>(roomPayload, secret);
-    if (isRoomSettingsPlaintextPayload(plaintext)) {
-      store.appendRoomMessage(roomId, buildRoomSettingsSystemMessage(plaintext, {
+    const parsed = RoomSettingsPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (parsed.success) {
+      store.appendRoomMessage(roomId, buildRoomSettingsSystemMessage(parsed.data, {
         approvalPolicyLabels,
         approvalDelegationPolicyLabels,
         roomModeLabels
@@ -307,8 +312,9 @@ export async function routeRelayEnvelope(
     return;
   }
   if (envelope.kind === "room.key") {
-    const plaintext = await decryptJson<unknown>(roomPayload, secret);
-    if (!isRoomKeyRotationPlaintextPayload(plaintext)) return;
+    const parsed = RoomKeyRotationPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
+    if (!parsed.success) return;
+    const plaintext = parsed.data;
     const envelopeRoom = findEnvelopeRoom(context.roomsRef.current, roomId);
     if (!isRoomKeyRotationEnvelopeAuthorized(envelopeRoom, envelope, plaintext)) {
       store.setInviteMessageForRoom(roomId, roomHostEnvelopeRejectionMessage(envelopeRoom, "room access refresh"));

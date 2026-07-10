@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { nanoid } from "nanoid";
-import type { RelayEnvelope } from "@multaiplayer/protocol";
+import { isRecord, type RelayEnvelope } from "@multaiplayer/protocol";
 import type { RoomKey } from "./state.js";
 
 export type RelayStorageBackend = "json" | "sqlite";
@@ -197,7 +197,7 @@ function loadNormalizedRelayState(db: Database.Database): unknown | null {
 }
 
 function saveNormalizedRelayState(db: Database.Database, state: unknown) {
-  if (!isRecord(state)) {
+  if (!isRecord(state) || Array.isArray(state)) {
     throw new Error("Cannot persist malformed relay state.");
   }
   const savedAt = typeof state.savedAt === "string" ? state.savedAt : new Date().toISOString();
@@ -266,9 +266,9 @@ function migrateLegacyEncryptedBacklogRows(db: Database.Database) {
   if (legacyRows.length === 0) return;
   db.transaction(() => {
     for (const item of legacyRows) {
-      if (!isRecord(item) || typeof item.key !== "string" || !Array.isArray(item.envelopes)) continue;
+      if (!isRecord(item) || Array.isArray(item) || typeof item.key !== "string" || !Array.isArray(item.envelopes)) continue;
       for (const [index, envelope] of item.envelopes.entries()) {
-        if (!isRecord(envelope) || typeof envelope.id !== "string" || typeof envelope.createdAt !== "string") continue;
+        if (!isRecord(envelope) || Array.isArray(envelope) || typeof envelope.id !== "string" || typeof envelope.createdAt !== "string") continue;
         db.prepare(`
           insert or ignore into relay_encrypted_envelopes (room_key, envelope_id, sort_order, created_at, data_json)
           values (?, ?, ?, ?, ?)
@@ -313,11 +313,11 @@ function pruneEncryptedEnvelopeRows(db: Database.Database, encryptedBacklog: unk
   if (!Array.isArray(encryptedBacklog)) return;
   const retainedByRoom = new Map<string, Set<string>>();
   for (const item of encryptedBacklog) {
-    if (!isRecord(item) || typeof item.key !== "string" || !Array.isArray(item.envelopes)) continue;
+    if (!isRecord(item) || Array.isArray(item) || typeof item.key !== "string" || !Array.isArray(item.envelopes)) continue;
     retainedByRoom.set(
       item.key,
       new Set(item.envelopes
-        .filter((envelope): envelope is Record<string, unknown> => isRecord(envelope))
+        .filter((envelope): envelope is Record<string, unknown> => isRecord(envelope) && !Array.isArray(envelope))
         .map((envelope) => envelope.id)
         .filter((id): id is string => typeof id === "string" && id.length > 0))
     );
@@ -383,7 +383,7 @@ function saveJsonRows(
   if (!Array.isArray(value)) return;
   const insert = db.prepare(`insert into ${table} (${keyColumn}, data_json) values (?, ?)`);
   for (const item of value) {
-    if (!isRecord(item)) continue;
+    if (!isRecord(item) || Array.isArray(item)) continue;
     const key = keyForItem(item);
     if (!key) continue;
     insert.run(key, JSON.stringify(item));
@@ -406,8 +406,4 @@ async function quarantinePath(path: string, reason: string) {
       console.warn(`Failed to move unreadable relay store at ${path}:`, error);
     }
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }

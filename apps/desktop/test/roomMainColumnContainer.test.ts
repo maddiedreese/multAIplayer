@@ -10,6 +10,7 @@ import {
 } from "../src/components/RoomMainColumnContainer";
 import { useAppStore } from "../src/store/appStore";
 import { seededRooms, seededTeams } from "../src/seedData";
+import type { ChatAttachment, ChatMessage, LocalPreviewRecord } from "../src/types";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://127.0.0.1:5173/"
@@ -152,3 +153,44 @@ test("selected-room store updates preserve effectful capability identity", () =>
     window.setInterval = originalSetInterval;
   }
 });
+
+test("draft updates reuse memoized chat rows, attachment rows, and preview cards", () => {
+  const selectedRoom = seededRooms[0];
+  assert.ok(selectedRoom);
+  let messageBuilds = 0;
+  let attachmentBuilds = 0;
+  let previewBuilds = 0;
+  const messages = trackArrayMethod([] as ChatMessage[], "filter", () => { messageBuilds += 1; });
+  const attachments = trackArrayMethod([] as ChatAttachment[], "map", () => { attachmentBuilds += 1; });
+  const previews = trackArrayMethod([] as LocalPreviewRecord[], "slice", () => { previewBuilds += 1; });
+  useAppStore.setState((state) => ({
+    messagesByRoom: { ...state.messagesByRoom, [selectedRoom.id]: messages },
+    roomChatByRoom: {
+      ...state.roomChatByRoom,
+      [selectedRoom.id]: { ...state.roomChatByRoom[selectedRoom.id], pendingAttachments: attachments }
+    },
+    localPreviewByRoom: {
+      ...state.localPreviewByRoom,
+      [selectedRoom.id]: { ...state.localPreviewByRoom[selectedRoom.id], previews }
+    }
+  }));
+
+  render(createElement(RoomMainColumnContainer, { sources }));
+  assert.ok(messageBuilds > 0);
+  assert.ok(attachmentBuilds > 0);
+  assert.ok(previewBuilds > 0);
+  const initialBuilds = { messageBuilds, attachmentBuilds, previewBuilds };
+
+  act(() => useAppStore.getState().setDraftForRoom(selectedRoom.id, "typing should not rebuild rows"));
+
+  assert.deepEqual({ messageBuilds, attachmentBuilds, previewBuilds }, initialBuilds);
+});
+
+function trackArrayMethod<T>(values: T[], method: string, onRead: () => void): T[] {
+  return new Proxy(values, {
+    get(target, property, receiver) {
+      if (property === method) onRead();
+      return Reflect.get(target, property, receiver);
+    }
+  });
+}

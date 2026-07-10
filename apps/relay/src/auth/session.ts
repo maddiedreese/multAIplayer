@@ -1,7 +1,8 @@
 import type { CookieOptions, Response } from "express";
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 import type { IncomingMessage } from "node:http";
-import { isRecord, normalizeMetadataText, normalizeRelayId } from "../limits.js";
+import { isRecord } from "@multaiplayer/protocol";
+import { normalizeMetadataText, normalizeRelayId } from "../limits.js";
 import type { AuthSession } from "../state.js";
 
 interface RelayAuthSessionManagerOptions {

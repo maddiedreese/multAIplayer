@@ -4,6 +4,7 @@ import {
   AttachmentBlobRecord,
   DeviceRecord,
   RoomRecord,
+  isRecord,
   maxAttachmentBlobTypeChars,
   maxCiphertextNonceChars,
   maxEnvelopeNonceChars,
@@ -16,6 +17,13 @@ import {
 test("semantic protocol limits share their canonical values", () => {
   assert.equal(maxRoomProjectPathChars, maxProjectPathChars);
   assert.equal(maxEnvelopeNonceChars, maxCiphertextNonceChars);
+});
+
+test("isRecord identifies non-null objects", () => {
+  assert.equal(isRecord({}), true);
+  assert.equal(isRecord([]), true);
+  assert.equal(isRecord(null), false);
+  assert.equal(isRecord("record"), false);
 });
 
 test("room, attachment, and device schemas enforce their exported semantic limits", () => {
