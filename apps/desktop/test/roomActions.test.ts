@@ -23,14 +23,10 @@ const room: RoomRecord = {
 };
 
 function createOptions() {
-  const selectedRoomIdRef = { current: room.id };
-  const selectedTeamIdRef = { current: room.teamId };
   const busyRef = () => ({ current: {} as Record<string, boolean> });
 
   return {
     options: {
-      selectedRoomIdRef,
-      selectedTeamIdRef,
       busy: {
         gitWorkflowBusyRef: busyRef(),
         actionsBusyRef: busyRef(),
@@ -47,17 +43,12 @@ function createOptions() {
         defaultBrowserReason: "Review the app"
       },
       project: {
-        roomsRef: { current: [room] },
         defaultCodexModel: "gpt-default",
         defaultProjectPath: "/workspace/default"
       }
-    },
-    selectedRoomIdRef,
-    selectedTeamIdRef
+    }
   } satisfies {
     options: Parameters<typeof createRoomActions>[0];
-    selectedRoomIdRef: { current: string };
-    selectedTeamIdRef: { current: string };
   };
 }
 
@@ -76,15 +67,15 @@ test("room actions resolve store implementations when invoked", () => {
   assert.deepEqual(calls, [["room-late", "latest action"]]);
 });
 
-test("selected wrappers read the current room and team refs", () => {
-  const { options, selectedRoomIdRef, selectedTeamIdRef } = createOptions();
+test("selected wrappers read the current room and team from the store", () => {
+  const { options } = createOptions();
   const actions = createRoomActions(options);
   const roomCalls: Array<[string, string | null]> = [];
   const teamCalls: Array<[string, string | null]> = [];
 
-  selectedRoomIdRef.current = "room-b";
-  selectedTeamIdRef.current = "team-b";
   useAppStore.setState({
+    selectedRoomId: "room-b",
+    selectedTeam: "team-b",
     setHostMessageForRoom: (roomId, message) => roomCalls.push([roomId, message]),
     setTeamHistoryMessageForTeam: (teamId, message) => teamCalls.push([teamId, message])
   });
@@ -103,6 +94,7 @@ test("room action adapters preserve external defaults and current room data", ()
   const pathCalls: unknown[][] = [];
 
   useAppStore.setState({
+    rooms: [room],
     setBrowserUrlForRoom: (...args) => browserCalls.push(args),
     setCustomCodexModelForRoom: (...args) => modelCalls.push(args),
     setProjectPathDraftForRoom: (...args) => pathCalls.push(args)

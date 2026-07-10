@@ -15,46 +15,11 @@ import {
   updateRoomGoalElapsed
 } from "./roomGoals";
 import { clearCodexGoal, setCodexGoal } from "./localBackend";
-import type {
-  BrowserAccessRequest,
-  ChatAttachment,
-  ChatMessage,
-  PendingCodexApproval,
-  QueuedCodexTurn,
-  RoomGoal
-} from "../types";
-import type {
-  GitStatusSummary,
-  TerminalSnapshot
-} from "./localBackend";
-
-interface LocalUser {
-  id: string;
-  name: string;
-}
+import { currentSelectedRoomContext } from "./selectedWorkspace";
+import type { ChatMessage, PendingCodexApproval, QueuedCodexTurn, RoomGoal } from "../types";
 
 export interface CodexInvokeActionsOptions {
-  hasSelectedRoom: boolean;
-  selectedRoom: RoomRecord;
   selectedRoomIdRef: { current: string };
-  isSelectedRoomLocked: boolean;
-  isSelectedRoomRevoked: boolean;
-  isActiveHost: boolean;
-  codexRunning: boolean;
-  canReadLocalWorkspace: boolean;
-  hostGateMessage: string;
-  localUser: LocalUser;
-  draft: string;
-  replyToMessageId: string | null;
-  roomGoal: RoomGoal | null;
-  pendingAttachments: ChatAttachment[];
-  messages: ChatMessage[];
-  roomTerminals: TerminalSnapshot[];
-  browserRequests: BrowserAccessRequest[];
-  gitStatus: GitStatusSummary | null;
-  activeCodexApproval: PendingCodexApproval | null;
-  queuedCodexApprovals: QueuedCodexTurn[];
-  codexThreadId: string | null;
   publishChatMessage: (message: ChatMessage, room?: RoomRecord) => Promise<void>;
   handleCodexBrowserOpenCommand: (message: ChatMessage, room: RoomRecord) => boolean;
   publishCodexQueueEvent: (
@@ -71,34 +36,48 @@ export interface CodexInvokeActionsOptions {
 }
 
 export function createCodexInvokeActions({
-  hasSelectedRoom,
-  selectedRoom,
   selectedRoomIdRef,
-  isSelectedRoomLocked,
-  isSelectedRoomRevoked,
-  isActiveHost,
-  codexRunning,
-  canReadLocalWorkspace,
-  hostGateMessage,
-  localUser,
-  draft,
-  replyToMessageId,
-  roomGoal,
-  pendingAttachments,
-  messages,
-  roomTerminals,
-  browserRequests,
-  gitStatus,
-  activeCodexApproval,
-  queuedCodexApprovals,
-  codexThreadId,
   publishChatMessage,
   handleCodexBrowserOpenCommand,
   publishCodexQueueEvent
 }: CodexInvokeActionsOptions) {
   const store = useAppStore.getState;
 
+  function currentRoomState() {
+    const state = store();
+    const context = currentSelectedRoomContext();
+    if (!context) return null;
+    const selectedRoom = context.room;
+    const roomId = selectedRoom.id;
+    const codexRuntime = state.codexRuntimeByRoom[roomId] ?? {};
+    const roomChat = state.roomChatByRoom[roomId] ?? {};
+    const isSelectedRoomRevoked =
+      state.revokedRoomIds.has(roomId) || state.revokedTeamIds.has(selectedRoom.teamId);
+    return {
+      isSelectedRoomRevoked,
+      isSelectedRoomLocked:
+        selectedRoom.archivedAt != null || state.forgottenRoomIds.has(roomId) || isSelectedRoomRevoked,
+      codexRunning: codexRuntime.running ?? false,
+      draft: roomChat.draft ?? "",
+      replyToMessageId: roomChat.replyToMessageId ?? null,
+      roomGoal: codexRuntime.goal ?? null,
+      pendingAttachments: roomChat.pendingAttachments ?? [],
+      messages: state.messagesByRoom[roomId] ?? [],
+      roomTerminals: state.terminals.filter((terminal) => terminal.roomId === roomId),
+      browserRequests: state.browserByRoom[roomId]?.requests ?? [],
+      gitStatus: state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.status ?? null,
+      activeCodexApproval: codexRuntime.pendingApproval ?? null,
+      queuedCodexApprovals: codexRuntime.queuedApprovals ?? [],
+      codexThreadId: codexRuntime.threadGraph?.activeThreadId ?? codexRuntime.threadId ?? null,
+      selectedRoom,
+      ...context
+    };
+  }
+
   async function startRoomGoal(text: string) {
+    const current = currentRoomState();
+    if (!current) return;
+    const { selectedRoom, codexThreadId } = current;
     const roomId = selectedRoom.id;
     if (!codexThreadId) {
       store().setChatMessageForRoom(roomId, "Start an approved Codex turn before setting a Codex goal.");
@@ -126,6 +105,9 @@ export function createCodexInvokeActions({
   }
 
   async function editGoal(text: string) {
+    const current = currentRoomState();
+    if (!current) return;
+    const { selectedRoom, roomGoal, codexThreadId } = current;
     if (!roomGoal) return;
     const nextText = text.trim();
     if (!nextText) return;
@@ -143,6 +125,9 @@ export function createCodexInvokeActions({
   }
 
   async function deleteGoal() {
+    const current = currentRoomState();
+    if (!current) return;
+    const { selectedRoom, codexThreadId } = current;
     if (!codexThreadId) {
       store().setRoomGoalForRoom(selectedRoom.id, null);
       return;
@@ -157,11 +142,17 @@ export function createCodexInvokeActions({
   }
 
   function tickGoalElapsed() {
+    const current = currentRoomState();
+    if (!current) return;
+    const { selectedRoom, roomGoal } = current;
     if (!roomGoal || roomGoal.status !== "active") return;
     store().setRoomGoalForRoom(selectedRoom.id, updateRoomGoalElapsed(roomGoal));
   }
 
   async function updateCodexGoalStatus(status: RoomGoal["status"], successMessage: string) {
+    const current = currentRoomState();
+    if (!current) return;
+    const { selectedRoom, roomGoal, codexThreadId } = current;
     if (!roomGoal) return;
     if (!codexThreadId) {
       store().setChatMessageForRoom(selectedRoom.id, "Start an approved Codex turn before updating a Codex goal.");
@@ -177,10 +168,12 @@ export function createCodexInvokeActions({
   }
 
   async function sendMessage() {
-    if (!hasSelectedRoom) {
+    const current = currentRoomState();
+    if (!current) {
       store().setChatMessageForRoom(selectedRoomIdRef.current, "Create or join a room before sending messages.");
       return;
     }
+    const { selectedRoom, localUser, isSelectedRoomLocked, isSelectedRoomRevoked, pendingAttachments, draft, replyToMessageId } = current;
     const roomId = selectedRoom.id;
     if (isSelectedRoomLocked) {
       store().setChatMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
@@ -226,10 +219,27 @@ export function createCodexInvokeActions({
   }
 
   function handleCodexInvoke(pendingMessage?: ChatMessage) {
-    if (!hasSelectedRoom) {
+    const current = currentRoomState();
+    if (!current) {
       store().setHostMessageForRoom(selectedRoomIdRef.current, "Create or join a room before invoking Codex.");
       return;
     }
+    const {
+      selectedRoom,
+      localUser,
+      isActiveHost,
+      canReadLocalWorkspace,
+      hostGateMessage,
+      isSelectedRoomLocked,
+      isSelectedRoomRevoked,
+      activeCodexApproval,
+      codexRunning,
+      queuedCodexApprovals,
+      messages,
+      roomTerminals,
+      browserRequests,
+      gitStatus
+    } = current;
     const roomId = selectedRoom.id;
     if (isSelectedRoomLocked) {
       store().setHostMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));

@@ -3,6 +3,7 @@ import type { ThemeMode } from "../components/DesktopSidebar";
 import { membershipRemovedRoomMessage } from "./relayAccess";
 
 export function loadOrCreateDeviceId(): string {
+  if (typeof localStorage === "undefined") return "device-nonbrowser-runtime";
   const key = "multaiplayer:device-id";
   const existing = localStorage.getItem(key);
   if (existing) return existing;

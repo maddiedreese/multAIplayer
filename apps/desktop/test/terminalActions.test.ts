@@ -45,11 +45,7 @@ function createOptions(overrides: Partial<Parameters<typeof createTerminalAction
     localWorkspaceMessage: "Workspace unavailable.",
     selectedRoom: room,
     selectedRoomIdRef: { current: room.id },
-    isSelectedRoomLocked: false,
     localUser: { id: "github:maddie", name: "Maddie" },
-    roomTerminals: [] as TerminalSnapshot[],
-    selectedTerminal: null,
-    terminalRequests: [],
     terminalBusyRef: { current: {} as Record<string, boolean> },
     reportRoomTerminalActionInFlight: () => false,
     maxTerminalActivityLines: 100,
@@ -60,22 +56,27 @@ function createOptions(overrides: Partial<Parameters<typeof createTerminalAction
 }
 
 test.beforeEach(() => {
-  useAppStore.getState().resetAppStore();
+  const store = useAppStore.getState();
+  store.resetAppStore();
+  store.initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
+  store.replaceCurrentUser({ id: "github:maddie", login: "maddie", name: "Maddie" });
 });
 
 test("terminal actions report host gating through the current store without React", async () => {
   const actions = createTerminalActions(createOptions({ isActiveHost: false }));
+  useAppStore.getState().replaceCurrentUser(null);
 
   await actions.openInteractiveTerminal();
 
   assert.equal(
     useAppStore.getState().terminalRuntimeByRoom[room.id]?.ui?.error,
-    "Only the active host can control terminals."
+    "Only Maddie can approve host-side actions in this room."
   );
 });
 
 test("terminal actions reuse a running shell through Zustand without starting another terminal", async () => {
-  const actions = createTerminalActions(createOptions({ roomTerminals: [runningTerminal] }));
+  const actions = createTerminalActions(createOptions());
+  useAppStore.getState().syncTerminalSnapshotsForRoom(room.id, [runningTerminal]);
 
   await actions.openInteractiveTerminal();
 
@@ -112,9 +113,9 @@ test("terminal actions keep the busy ref and store synchronized on early approva
     status: "pending"
   };
   const actions = createTerminalActions(createOptions({
-    terminalBusyRef,
-    terminalRequests: [request]
+    terminalBusyRef
   }));
+  useAppStore.getState().appendTerminalRequest(room.id, request);
 
   await actions.approveTerminalRequest(request);
 

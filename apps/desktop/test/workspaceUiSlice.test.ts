@@ -1,0 +1,159 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import { useAppStore } from "../src/store/appStore";
+
+const teamA: TeamRecord = { id: "team-a", name: "Team A", members: 1, role: "owner" };
+const teamB: TeamRecord = { id: "team-b", name: "Team B", members: 2 };
+
+const roomA: RoomRecord = {
+  id: "room-a",
+  teamId: teamA.id,
+  name: "Room A",
+  projectPath: "/tmp/a",
+  host: "Maddie",
+  hostUserId: "github:maddie",
+  hostStatus: "active",
+  approvalPolicy: "ask_every_turn",
+  approvalDelegationPolicy: "host_only",
+  trustedApproverUserIds: [],
+  mode: { chat: true, code: true, workspace: true, browser: true },
+  codexModel: "gpt-5.4",
+  browserAllowedOrigins: [],
+  browserProfilePersistent: true,
+  unread: 2
+};
+
+const roomB: RoomRecord = {
+  ...roomA,
+  id: "room-b",
+  teamId: teamB.id,
+  name: "Room B",
+  projectPath: "/tmp/b",
+  unread: 0
+};
+
+test.beforeEach(() => useAppStore.getState().resetAppStore());
+
+test("workspace UI initializes once from the React seed and resets coherently", () => {
+  let store = useAppStore.getState();
+  store.initializeWorkspaceUi({
+    teams: [teamA, teamB],
+    rooms: [roomA, roomB],
+    projectPath: "/tmp/new",
+    roomId: roomB.id
+  });
+  store.initializeWorkspaceUi({
+    teams: [],
+    rooms: [],
+    projectPath: "/ignored",
+    roomId: "ignored"
+  });
+
+  store = useAppStore.getState();
+  assert.equal(store.workspaceUiInitialized, true);
+  assert.deepEqual(store.teams, [teamA, teamB]);
+  assert.deepEqual(store.rooms, [roomA, roomB]);
+  assert.equal(store.selectedTeam, teamA.id);
+  assert.equal(store.selectedRoomId, roomB.id);
+  assert.equal(store.newRoomProjectPath, "/tmp/new");
+
+  store.resetAppStore();
+  store = useAppStore.getState();
+  store.initializeWorkspaceUi({
+    teams: [teamA],
+    rooms: [roomA],
+    projectPath: "/tmp/new",
+    roomId: "missing-room"
+  });
+  assert.equal(useAppStore.getState().selectedRoomId, roomA.id);
+
+  store.setWorkspaceStatusError("problem");
+  store.setActiveSidebarPanel("settings");
+  store.setNewTeamName("New team");
+  store.setNewRoomName("New room");
+  store.setSidebarQuery("needle");
+  store.resetAppStore();
+
+  store = useAppStore.getState();
+  assert.equal(store.workspaceUiInitialized, false);
+  assert.deepEqual(store.teams, []);
+  assert.deepEqual(store.rooms, []);
+  assert.equal(store.workspaceError, null);
+  assert.equal(store.activeSidebarPanel, null);
+  assert.equal(store.newTeamName, "");
+  assert.equal(store.newRoomName, "");
+  assert.equal(store.newRoomProjectPath, "");
+  assert.equal(store.sidebarQuery, "");
+});
+
+test("team replacement and upsert keep selection valid and preserve record update semantics", () => {
+  const store = useAppStore.getState();
+  store.initializeWorkspaceUi({ teams: [teamA, teamB], rooms: [], projectPath: "/tmp", roomId: "" });
+  store.setSelectedTeam(teamB.id);
+
+  store.replaceTeams([{ ...teamA, members: 3 }, { ...teamB, deletedAt: new Date().toISOString() }]);
+  let state = useAppStore.getState();
+  assert.deepEqual(state.teams, [{ ...teamA, members: 3 }]);
+  assert.equal(state.selectedTeam, teamA.id);
+
+  state.upsertTeamRecord(teamB);
+  state.updateTeamRoleForTeam(teamB.id, "admin");
+  state.updateTeamMemberCountForTeam(teamB.id, 4);
+  state = useAppStore.getState();
+  assert.deepEqual(state.teams.at(-1), { ...teamB, members: 4, role: "admin" });
+
+  state.setSelectedTeam(teamA.id);
+  state.upsertTeamRecord({ ...teamA, deletedAt: new Date().toISOString() });
+  state = useAppStore.getState();
+  assert.equal(state.selectedTeam, teamB.id);
+  assert.deepEqual(state.teams, [{ ...teamB, members: 4, role: "admin" }]);
+});
+
+test("room mutations preserve unread state and repair selection atomically", () => {
+  const store = useAppStore.getState();
+  store.initializeWorkspaceUi({
+    teams: [teamA, teamB],
+    rooms: [roomA, roomB],
+    projectPath: "/tmp",
+    roomId: roomA.id
+  });
+
+  store.upsertRoomRecord({ ...roomA, name: "Renamed", unread: 0 });
+  assert.equal(useAppStore.getState().rooms[0]?.unread, 2);
+  assert.equal(useAppStore.getState().rooms[0]?.name, "Renamed");
+
+  store.markIncomingChatUnread(roomA.id, roomB.id, "remote", "local");
+  assert.equal(useAppStore.getState().rooms[0]?.unread, 3);
+  store.markRoomReadById(roomA.id);
+  assert.equal(useAppStore.getState().rooms[0]?.unread, 0);
+  store.hydrateRoomReadState(roomA.id, { unread: 7 });
+  assert.equal(useAppStore.getState().rooms[0]?.unread, 7);
+
+  store.replaceRoomRecord({ ...roomA, name: "Server name", unread: 99 });
+  assert.equal(useAppStore.getState().rooms[0]?.unread, 7);
+  store.replaceRoomRecord({ ...roomA, deletedAt: new Date().toISOString() });
+  assert.equal(useAppStore.getState().selectedRoomId, roomB.id);
+  assert.deepEqual(useAppStore.getState().rooms.map((room) => room.id), [roomB.id]);
+});
+
+test("workspace selection helpers preserve explicit and team-relative navigation semantics", () => {
+  const store = useAppStore.getState();
+  store.initializeWorkspaceUi({
+    teams: [teamA, teamB],
+    rooms: [roomA, roomB],
+    projectPath: "/tmp",
+    roomId: roomA.id
+  });
+
+  store.selectWorkspaceRoom(teamB.id, roomB.id);
+  assert.equal(useAppStore.getState().selectedTeam, teamB.id);
+  assert.equal(useAppStore.getState().selectedRoomId, roomB.id);
+
+  store.selectTeamRoom(teamA.id, roomB.id);
+  assert.equal(useAppStore.getState().selectedTeam, teamA.id);
+  assert.equal(useAppStore.getState().selectedRoomId, roomA.id);
+
+  store.selectExistingRoomOrFirst([{ ...roomA, deletedAt: new Date().toISOString() }, roomB]);
+  assert.equal(useAppStore.getState().selectedRoomId, roomB.id);
+});

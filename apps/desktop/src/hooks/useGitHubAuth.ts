@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import {
   getAuthConfig,
   getCurrentUser,
@@ -6,9 +6,8 @@ import {
   pollGitHubDeviceFlow,
   startGitHubDeviceFlow,
   type GitHubAuthConfig,
-  type GitHubDeviceStart,
-  type SignedInUser
 } from "../lib/authClient";
+import { useAppStore } from "../store/appStore";
 
 const fallbackAuthConfig: GitHubAuthConfig = {
   provider: "github",
@@ -20,11 +19,16 @@ const fallbackAuthConfig: GitHubAuthConfig = {
 };
 
 export function useGitHubAuth(relayHttpUrl: string) {
-  const [authConfig, setAuthConfig] = useState<GitHubAuthConfig | null>(null);
-  const [currentUser, setCurrentUser] = useState<SignedInUser | null>(null);
-  const [deviceFlow, setDeviceFlow] = useState<GitHubDeviceStart | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [authBusy, setAuthBusy] = useState(false);
+  const authConfig = useAppStore((state) => state.authConfig);
+  const currentUser = useAppStore((state) => state.currentUser);
+  const deviceFlow = useAppStore((state) => state.deviceFlow);
+  const authError = useAppStore((state) => state.authError);
+  const authBusy = useAppStore((state) => state.authBusy);
+  const setAuthConfig = useAppStore((state) => state.replaceAuthConfig);
+  const setCurrentUser = useAppStore((state) => state.replaceCurrentUser);
+  const setDeviceFlow = useAppStore((state) => state.replaceDeviceFlow);
+  const setAuthError = useAppStore((state) => state.setAuthError);
+  const setAuthBusy = useAppStore((state) => state.setAuthBusy);
 
   useEffect(() => {
     setAuthError(null);
@@ -33,7 +37,7 @@ export function useGitHubAuth(relayHttpUrl: string) {
       setAuthError(String(error));
     });
     getCurrentUser().then(setCurrentUser).catch(() => setCurrentUser(null));
-  }, [relayHttpUrl]);
+  }, [relayHttpUrl, setAuthConfig, setAuthError, setCurrentUser]);
 
   useEffect(() => {
     if (!deviceFlow || currentUser) return;
@@ -59,7 +63,7 @@ export function useGitHubAuth(relayHttpUrl: string) {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [currentUser, deviceFlow]);
+  }, [currentUser, deviceFlow, setAuthBusy, setAuthError, setCurrentUser, setDeviceFlow]);
 
   const beginGitHubSignIn = useCallback(async () => {
     setAuthBusy(true);
@@ -72,14 +76,14 @@ export function useGitHubAuth(relayHttpUrl: string) {
       setAuthError(String(error));
       setAuthBusy(false);
     }
-  }, []);
+  }, [setAuthBusy, setAuthError, setDeviceFlow]);
 
   const signOutGitHub = useCallback(async () => {
     await logout();
     setCurrentUser(null);
     setDeviceFlow(null);
     setAuthBusy(false);
-  }, []);
+  }, [setAuthBusy, setCurrentUser, setDeviceFlow]);
 
   return {
     authConfig,

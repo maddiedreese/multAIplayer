@@ -1,34 +1,23 @@
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
-import type { useAppStateSlices } from "./useAppStateSlices";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import { useSelectedRoomRuntime } from "./useSelectedRoomRuntime";
+import { useAppStore } from "../store/appStore";
+import { useShallow } from "zustand/react/shallow";
 
-type AppStateSlices = ReturnType<typeof useAppStateSlices>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
 
 export function useAppSelectedRoomRuntime({
-  appState,
   localIdentity,
   selected,
   roomInteraction
 }: {
-  appState: AppStateSlices;
   localIdentity: LocalIdentity;
   selected: SelectedRoomContext;
   roomInteraction: RoomInteraction;
 }) {
-  const {
-    workspaceState,
-    roomSettingsState,
-    roomRuntimeState,
-    codexRoomState,
-    localPreviewState,
-    terminalPanelState,
-    invitePanelState
-  } = appState;
   const {
     selectedRoom,
     markdownSelectionMode,
@@ -41,10 +30,21 @@ export function useAppSelectedRoomRuntime({
     roomTerminals,
     selectedTerminalId
   } = selected;
+  const roomId = selectedRoom.id;
+  const { selectedRoomId, roomSettings, codexRuntime, localPreview, terminalRuntime, invite, gitRuntime } =
+    useAppStore(useShallow((state) => ({
+      selectedRoomId: state.selectedRoomId,
+      roomSettings: state.roomSettingsByRoom[roomId],
+      codexRuntime: state.codexRuntimeByRoom[roomId],
+      localPreview: state.localPreviewByRoom[roomId],
+      terminalRuntime: state.terminalRuntimeByRoom[roomId],
+      invite: state.inviteByRoom[roomId],
+      gitRuntime: state.gitWorkflowRuntimeByRoom[roomId]
+    })));
 
   return useSelectedRoomRuntime({
     selectedRoom,
-    selectedRoomId: workspaceState.selectedRoomId,
+    selectedRoomId,
     markdownSelectionMode,
     selectedMessageIds,
     localUser: localIdentity.localUser,
@@ -56,23 +56,27 @@ export function useAppSelectedRoomRuntime({
     browserRequests,
     roomTerminals,
     selectedTerminalId,
-    pendingCodexApprovalsByRoom: codexRoomState.pendingCodexApprovalsByRoom,
-    queuedCodexApprovalsByRoom: codexRoomState.queuedCodexApprovalsByRoom,
-    approvalVisibleByRoom: codexRoomState.approvalVisibleByRoom,
-    hostHandoffsByRoom: roomRuntimeState.hostHandoffsByRoom,
-    terminalRequestsByRoom: terminalPanelState.terminalRequestsByRoom,
-    localPreviewsByRoom: localPreviewState.localPreviewsByRoom,
-    localPreviewBusyByRoom: localPreviewState.localPreviewBusyByRoom,
-    inviteRequestsByRoom: invitePanelState.inviteRequestsByRoom,
-    codexEventsByRoom: codexRoomState.codexEventsByRoom,
-    codexActivitiesByRoom: codexRoomState.codexActivitiesByRoom,
-    gitWorkflowEventsByRoom: roomRuntimeState.gitWorkflowEventsByRoom,
-    githubActionsEventsByRoom: roomRuntimeState.githubActionsEventsByRoom,
-    codexThreadIdsByRoom: codexRoomState.codexThreadIdsByRoom,
-    codexThreadGraphsByRoom: codexRoomState.codexThreadGraphsByRoom,
-    codexRunningByRoom: codexRoomState.codexRunningByRoom,
-    hostBusyByRoom: roomSettingsState.hostBusyByRoom,
-    settingsBusyByRoom: roomSettingsState.settingsBusyByRoom,
-    keyRotationBusyByRoom: invitePanelState.keyRotationBusyByRoom
+    pendingCodexApprovalsByRoom: activeMap(roomId, codexRuntime?.pendingApproval),
+    queuedCodexApprovalsByRoom: activeMap(roomId, codexRuntime?.queuedApprovals),
+    approvalVisibleByRoom: activeMap(roomId, codexRuntime?.approvalVisible),
+    hostHandoffsByRoom: activeMap(roomId, codexRuntime?.hostHandoffs),
+    terminalRequestsByRoom: activeMap(roomId, terminalRuntime?.requests),
+    localPreviewsByRoom: activeMap(roomId, localPreview?.previews),
+    localPreviewBusyByRoom: activeMap(roomId, localPreview?.busy),
+    inviteRequestsByRoom: activeMap(roomId, invite?.requests),
+    codexEventsByRoom: activeMap(roomId, codexRuntime?.events),
+    codexActivitiesByRoom: activeMap(roomId, codexRuntime?.activities),
+    gitWorkflowEventsByRoom: activeMap(roomId, gitRuntime?.workflow?.events),
+    githubActionsEventsByRoom: activeMap(roomId, gitRuntime?.actions?.events),
+    codexThreadIdsByRoom: activeMap(roomId, codexRuntime?.threadGraph?.activeThreadId ?? codexRuntime?.threadId),
+    codexThreadGraphsByRoom: activeMap(roomId, codexRuntime?.threadGraph),
+    codexRunningByRoom: activeMap(roomId, codexRuntime?.running),
+    hostBusyByRoom: activeMap(roomId, roomSettings?.hostBusy),
+    settingsBusyByRoom: activeMap(roomId, roomSettings?.settingsBusy),
+    keyRotationBusyByRoom: activeMap(roomId, invite?.keyRotationBusy)
   });
+}
+
+function activeMap<T>(roomId: string, value: T | null | undefined): Record<string, T> {
+  return value == null ? {} : { [roomId]: value };
 }

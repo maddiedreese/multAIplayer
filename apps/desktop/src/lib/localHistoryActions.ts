@@ -1,9 +1,5 @@
 import type { MutableRefObject } from "react";
-import type {
-  GitHubActionsEventPlaintextPayload,
-  GitWorkflowEventPlaintextPayload,
-  RoomRecord
-} from "@multaiplayer/protocol";
+import type { RoomRecord } from "@multaiplayer/protocol";
 import {
   clearEncryptedHistory,
   forgetRoomLocalData,
@@ -17,9 +13,6 @@ import {
   teamDefaultsRoomSettings
 } from "./teamRoomDefaults";
 import { updateRoomSettings } from "./workspaceClient";
-import {
-  type TerminalSnapshot
-} from "./localBackend";
 import { roomLockMessage } from "./appRuntime";
 import { shouldApplyRoomScopedUiUpdate } from "./roomScopedUi";
 import {
@@ -29,87 +22,34 @@ import { pruneLocalRoomHistory } from "./localRoomHistoryPayload";
 import { clearRoomVisibilityWarningAcknowledgement } from "./roomVisibilityWarning";
 import { useAppStore } from "../store/appStore";
 import { omitRecordKey } from "./setUtils";
-import type {
-  BrowserAccessRequest,
-  ChatMessage,
-  CodexRoomEvent,
-  CodexActivity,
-  CodexThreadGraph,
-  HostHandoffRecord,
-  InviteJoinRequest,
-  LocalPreviewRecord,
-  RoomGoal,
-  TerminalCommandRequest,
-  WorkspaceFileSaveRequest
-} from "../types";
+import { currentSelectedRoomContext } from "./selectedWorkspace";
 
 type BusyMap = Record<string, boolean>;
 
 interface CreateLocalHistoryActionsOptions {
-  hasSelectedRoom: boolean;
-  selectedRoom: RoomRecord;
   selectedRoomIdRef: MutableRefObject<string>;
-  isSelectedRoomLocked: boolean;
-  isSelectedRoomRevoked: boolean;
-  isActiveHost: boolean;
-  messages: ChatMessage[];
-  terminalRequests: TerminalCommandRequest[];
-  fileSaveRequests: WorkspaceFileSaveRequest[];
-  browserRequests: BrowserAccessRequest[];
-  inviteRequests: InviteJoinRequest[];
-  codexEvents: CodexRoomEvent[];
-  codexActivities: CodexActivity[];
-  gitWorkflowEvents: GitWorkflowEventPlaintextPayload[];
-  githubActionsEvents: GitHubActionsEventPlaintextPayload[];
-  localPreviews: LocalPreviewRecord[];
-  terminals: TerminalSnapshot[];
-  hostHandoffs: HostHandoffRecord[];
-  roomGoal: RoomGoal | null;
-  selectedCodexThreadId: string | null;
-  codexThreadGraph: CodexThreadGraph;
   settingsBusyRef: MutableRefObject<BusyMap>;
   reportRoomSettingsMutationInFlight: (
     roomId: string,
     setMessage?: (roomId: string, message: string | null) => void
   ) => boolean;
-  roomSettingsActor: () => {
-    requesterName: string;
-    requesterUserId: string;
-  };
   replaceHistorySettings: (next: LocalHistorySettings) => void;
   replaceRoom: (room: RoomRecord) => void;
   historyLoadedRoomIds: MutableRefObject<Set<string>>;
 }
 
 export function createLocalHistoryActions({
-  hasSelectedRoom,
-  selectedRoom,
   selectedRoomIdRef,
-  isSelectedRoomLocked,
-  isSelectedRoomRevoked,
-  isActiveHost,
-  messages,
-  terminalRequests,
-  fileSaveRequests,
-  browserRequests,
-  inviteRequests,
-  codexEvents,
-  codexActivities,
-  gitWorkflowEvents,
-  githubActionsEvents,
-  localPreviews,
-  terminals,
-  hostHandoffs,
-  roomGoal,
-  selectedCodexThreadId,
-  codexThreadGraph,
   settingsBusyRef,
   reportRoomSettingsMutationInFlight,
-  roomSettingsActor,
   replaceHistorySettings,
   replaceRoom,
   historyLoadedRoomIds
 }: CreateLocalHistoryActionsOptions) {
+  const currentSelectedRoom = () => {
+    const state = useAppStore.getState();
+    return state.rooms.find((room) => room.id === state.selectedRoomId);
+  };
   const setSelectedHistoryMessage = (message: string | null) =>
     useAppStore.getState().setHistoryMessageForRoom(selectedRoomIdRef.current, message);
   const setHistoryMessageForRoom = (roomId: string, message: string | null) =>
@@ -122,7 +62,8 @@ export function createLocalHistoryActions({
   };
 
   function updateLocalHistorySettings(next: LocalHistorySettings) {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedHistoryMessage("Create or join a room before changing encrypted history settings.");
       return;
     }
@@ -130,22 +71,26 @@ export function createLocalHistoryActions({
     const saved = saveHistorySettings(roomId, next);
     replaceHistorySettings(saved);
     if (saved.enabled) {
+      const store = useAppStore.getState();
+      const codexRuntime = store.codexRuntimeByRoom[roomId] ?? {};
+      const gitRuntime = store.gitWorkflowRuntimeByRoom[roomId] ?? {};
+      const codexThreadGraph = codexRuntime.threadGraph ?? { activeThreadId: null, nodesById: {} };
       const payload = pruneLocalRoomHistory({
         version: 3,
-        messages,
-        terminalRequests,
-        fileSaveRequests,
-        browserRequests,
-        inviteRequests,
-        codexEvents,
-        codexActivities,
-        gitWorkflowEvents,
-        githubActionsEvents,
-        localPreviews,
-        terminalSnapshots: terminalsForLocalHistory(terminals.filter((terminal) => terminal.roomId === roomId)),
-        hostHandoffs,
-        ...(roomGoal ? { roomGoal } : {}),
-        ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {}),
+        messages: store.messagesByRoom[roomId] ?? [],
+        terminalRequests: store.terminalRuntimeByRoom[roomId]?.requests ?? [],
+        fileSaveRequests: store.filePanelByRoom[roomId]?.saveRequests ?? [],
+        browserRequests: store.browserByRoom[roomId]?.requests ?? [],
+        inviteRequests: store.inviteByRoom[roomId]?.requests ?? [],
+        codexEvents: codexRuntime.events ?? [],
+        codexActivities: codexRuntime.activities ?? [],
+        gitWorkflowEvents: gitRuntime.workflow?.events ?? [],
+        githubActionsEvents: gitRuntime.actions?.events ?? [],
+        localPreviews: store.localPreviewByRoom[roomId]?.previews ?? [],
+        terminalSnapshots: terminalsForLocalHistory(store.terminals.filter((terminal) => terminal.roomId === roomId)),
+        hostHandoffs: codexRuntime.hostHandoffs ?? [],
+        ...(codexRuntime.goal ? { roomGoal: codexRuntime.goal } : {}),
+        ...(codexThreadGraph.activeThreadId ? { codexThreadId: codexThreadGraph.activeThreadId } : {}),
         ...(codexThreadGraph.activeThreadId ? { codexThreadGraph } : {})
       }, saved.retentionDays);
       useAppStore.getState().hydrateLocalRoomHistoryForRoom(roomId, payload);
@@ -159,7 +104,8 @@ export function createLocalHistoryActions({
   }
 
   async function applyTeamDefaultsToRoom() {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedHistoryMessage("Create or join a room before applying team defaults.");
       return;
     }
@@ -170,11 +116,17 @@ export function createLocalHistoryActions({
     const roomDefaults = loadTeamRoomDefaults(teamId);
     updateLocalHistorySettings(historyDefaults);
     useAppStore.getState().setInviteApprovalGateForRoom(roomId, roomDefaults.inviteApprovalGate);
+    const { forgottenRoomIds, revokedRoomIds, revokedTeamIds } = useAppStore.getState();
+    const isSelectedRoomRevoked =
+      revokedRoomIds.has(roomId) || revokedTeamIds.has(selectedRoom.teamId);
+    const isSelectedRoomLocked =
+      selectedRoom.archivedAt != null || forgottenRoomIds.has(roomId) || isSelectedRoomRevoked;
     if (isSelectedRoomLocked) {
       setHistoryMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;
     }
-    if (!isActiveHost) {
+    const context = currentSelectedRoomContext();
+    if (!context?.isActiveHost) {
       setHistoryMessageForRoom(
         roomId,
         "Applied local history and invite defaults. Claim host to apply approval and browser defaults to this room."
@@ -185,7 +137,8 @@ export function createLocalHistoryActions({
     try {
       const roomSettings = teamDefaultsRoomSettings(roomDefaults);
       const room = await updateRoomSettings(roomId, {
-        ...roomSettingsActor(),
+        requesterName: context.localUser.name,
+        requesterUserId: context.localUser.id,
         ...roomSettings
       });
       replaceRoom(room);
@@ -203,7 +156,8 @@ export function createLocalHistoryActions({
   }
 
   async function clearRoomHistory() {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedHistoryMessage("Create or join a room before clearing local history.");
       return;
     }
@@ -214,7 +168,8 @@ export function createLocalHistoryActions({
   }
 
   async function forgetSelectedRoomLocalData() {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedHistoryMessage("Create or join a room before forgetting local room data.");
       return;
     }

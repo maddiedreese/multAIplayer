@@ -24,10 +24,6 @@ const room: RoomRecord = {
 
 function createActions(overrides: Partial<Parameters<typeof createWorkspaceRecordActions>[0]> = {}) {
   return createWorkspaceRecordActions({
-    hasSelectedRoom: true,
-    selectedRoom: room,
-    localUser: { id: "github:maddie", name: "Maddie" },
-    roomsRef: { current: [] },
     upsertTeamRecord: () => undefined,
     upsertRoomRecord: () => undefined,
     replaceRoomRecord: () => undefined,
@@ -42,7 +38,11 @@ function createActions(overrides: Partial<Parameters<typeof createWorkspaceRecor
   });
 }
 
-test.beforeEach(() => useAppStore.getState().resetAppStore());
+test.beforeEach(() => {
+  const store = useAppStore.getState();
+  store.resetAppStore();
+  store.replaceCurrentUser({ id: "github:maddie", login: "maddie", name: "Maddie" });
+});
 
 test("workspace record actions resolve Zustand actions when invoked", () => {
   const team: TeamRecord = { id: room.teamId, name: "Records Team", members: 1, role: "owner" };
@@ -59,6 +59,7 @@ test("workspace record actions resolve Zustand actions when invoked", () => {
 test("membership removal clears current room relay state and reports through external callbacks", () => {
   const calls: string[] = [];
   const store = useAppStore.getState();
+  store.initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
   store.setInviteAdmissionForRoom(room.id, "invite-1");
   store.setRoomPresenceForDevice(room.id, "device-alex", {
     userId: "github:alex",

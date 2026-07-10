@@ -1,4 +1,4 @@
-import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import React, { type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { ShellResizer } from "./AppShellLayout";
 
 interface AppWorkspaceShellProps {

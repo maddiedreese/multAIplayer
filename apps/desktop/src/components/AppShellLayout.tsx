@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import type { ReactNode, PointerEvent as ReactPointerEvent } from "react";
+import React, { type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
 
 interface ShellResizerProps {
   side: "left" | "right";

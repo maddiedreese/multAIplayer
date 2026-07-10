@@ -1,87 +1,46 @@
 import React from "react";
 import { listen } from "@tauri-apps/api/event";
-import type {
-  LocalPreviewPlaintextPayload
-} from "@multaiplayer/protocol";
-import {
-  codexModelOptions,
-  defaultBrowserProfilePersistent,
-  defaultCodexModel,
-} from "@multaiplayer/protocol";
-import { decryptJson } from "@multaiplayer/crypto";
-import { loadHistorySettings } from "./lib/localHistory";
+import { defaultCodexModel } from "@multaiplayer/protocol";
 import {
   defaultProjectPath,
-  type GitWorkflowResult,
-  type CodexActivityEvent,
+  type CodexActivityEvent
 } from "./lib/localBackend";
 import { isTauriRuntime } from "./lib/localBackend/runtime";
-import type { GitHubActionRun } from "./lib/authClient";
-import {
-  normalizeRoomName
-} from "./lib/workspaceCreation";
 import { registerRoomNotificationClickFocus } from "./lib/roomNotifications";
-import { attachmentReviewScopeKey } from "./lib/attachmentPolicy";
-import { roomChatGateMessage } from "./lib/chatPolicy";
-import type { GitHubActionsTarget } from "./lib/githubWorkflowReadiness";
-import type { GitWorkflowDraft } from "./lib/gitWorkflowDraft";
 import { createWorkspaceRecordActions } from "./lib/workspaceRecordActions";
-import {
-  embeddedAttachmentBytes,
-  encodedBytes,
-  attachmentTypeFromName,
-  formatTimestamp
-} from "./lib/appFormatters";
-import { useAppStateSlices } from "./hooks/useAppStateSlices";
+import { useInitializeAppState } from "./hooks/useInitializeAppState";
+import { useAppStore } from "./store/appStore";
 import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useRoomChatMutations } from "./hooks/useRoomChatMutations";
 import { useAppRoomInteractionContext } from "./hooks/useAppRoomInteractionContext";
 import { createAppRoomActions } from "./lib/appRoomActions";
 import { useAppSelectedRoomRuntime } from "./hooks/useAppSelectedRoomRuntime";
-import { useAppRoomDisplayContext } from "./hooks/useAppRoomDisplayContext";
-import { useThemeMode } from "./hooks/useThemeMode";
 import { useAppHostHandoffActions } from "./hooks/useAppHostHandoffActions";
 import { useAppInviteActions } from "./hooks/useAppInviteActions";
 import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
 import { useAppRefs } from "./hooks/useAppRefs";
 import { useAppSelectedRoomContext } from "./hooks/useAppSelectedRoomContext";
-import { useAppViewModel } from "./hooks/useAppViewModel";
 import { useAppWorkspaceFlow } from "./hooks/useAppWorkspaceFlow";
 import { useAppRelaySync } from "./hooks/useAppRelaySync";
 import { useAppRoomRuntime } from "./hooks/useAppRoomRuntime";
 import { createAppRoomPanelActions } from "./lib/appRoomPanelActions";
-import { InlineSecretWarning } from "./components/common";
 import { AppShellView } from "./components/AppShellView";
 import { CodexServerRequestDialog } from "./components/CodexServerRequestDialog";
-import type { InspectorTab } from "./components/RoomInspectorPanel";
-import type {
-  BrowserAccessRequest,
-  ChatAttachment,
-  ChatReaction,
-  LocalPreviewRecord,
-  NoSecretRoomInvite,
-  SidebarPanel,
-  TerminalCommandRequest
-} from "./types";
 import {
-  approvalPolicyLabels,
   defaultBrowserReason,
-  defaultBrowserStatus,
   defaultBrowserUrl,
   emptyRoom,
   initialMessagesByRoom,
   initialTerminalLinesByRoom,
   maxTerminalActivityLines,
-  roomModeLabels,
   seededRooms,
   seededTeamMembers,
   seededTeams
 } from "./seedData";
 
 export function App() {
-  const theme = useThemeMode();
-  const appState = useAppStateSlices({
+  useInitializeAppState({
     workspace: {
       initialTeams: seededTeams,
       initialRooms: seededRooms,
@@ -90,112 +49,26 @@ export function App() {
       initialRoomId: "room-desktop",
       initialMessagesByRoom
     },
-    historyDefaults: { initialTeamId: seededTeams[0].id },
-    terminals: { initialTerminalLinesByRoom }
+    initialTerminalLinesByRoom
   });
-  const {
-    workspaceState,
-    appConfigState,
-    roomChatState,
-    roomSettingsState,
-    historyDefaultsState,
-    roomRuntimeState,
-    codexRoomState,
-    localPreviewState,
-    appRuntimeState,
-    terminalPanelState,
-    browserPanelState,
-    githubWorkflowPanelState,
-    filePanelState,
-    invitePanelState,
-    shellLayout
-  } = appState;
-  const appRefs = useAppRefs({
-    rooms: workspaceState.rooms,
-    selectedRoomId: workspaceState.selectedRoomId,
-    selectedTeamId: workspaceState.selectedTeam,
-    gitWorkflowDraftsByRoom: githubWorkflowPanelState.gitWorkflowDraftsByRoom,
-    hostBusyByRoom: roomSettingsState.hostBusyByRoom,
-    settingsBusyByRoom: roomSettingsState.settingsBusyByRoom,
-    keyRotationBusyByRoom: invitePanelState.keyRotationBusyByRoom,
-    gitWorkflowBusyByRoom: githubWorkflowPanelState.gitWorkflowBusyByRoom,
-    actionsBusyByRoom: githubWorkflowPanelState.actionsBusyByRoom,
-    localPreviewBusyByRoom: localPreviewState.localPreviewBusyByRoom,
-    fileBusyByRoom: filePanelState.fileBusyByRoom,
-    terminalBusyByRoom: terminalPanelState.terminalBusyByRoom,
-    browserRequestsByRoom: browserPanelState.browserRequestsByRoom
-  });
+  const relayHttpUrl = useAppStore((state) => state.appConfig.relayHttpUrl);
+  const selectedRoomId = useAppStore((state) => state.selectedRoomId);
+  const appRefs = useAppRefs();
   React.useEffect(() => registerRoomNotificationClickFocus({
     roomsRef: appRefs.roomsRef,
-    selectWorkspaceRoom: workspaceState.selectWorkspaceRoom
-  }), [appRefs.roomsRef, workspaceState.selectWorkspaceRoom]);
-  const githubAuth = useGitHubAuth(appConfigState.appConfig.relayHttpUrl);
+    selectWorkspaceRoom: (teamId, roomId) => useAppStore.getState().selectWorkspaceRoom(teamId, roomId)
+  }), [appRefs.roomsRef]);
+  const githubAuth = useGitHubAuth(relayHttpUrl);
   const localIdentity = useLocalIdentity(githubAuth.currentUser);
   const roomSettingsActor = useRoomSettingsActor(localIdentity.localUser);
 
   const selectedContext = useAppSelectedRoomContext({
-    appState,
     githubAuth,
     localIdentity,
     fallbackRoom: emptyRoom,
     defaultBrowserUrl,
     defaultBrowserReason
   });
-  const {
-    selectedCodexModel,
-    hasSelectedRoom,
-    selectedRoom,
-    inspectorTab,
-    secretWarningVisible,
-    roomTerminals,
-    markdownSelectionMode,
-    selectedMessageIds,
-    clearSelectedMessages,
-    toggleMarkdownSelectionMode,
-    toggleMessageSelection,
-    selectedTeamName,
-    selectedTeamMembersMessage,
-    selectedTeamMembersBusy,
-    selectedTeamMemberRows,
-    customCodexModel,
-    projectPathDraft,
-    messages,
-    draft,
-    selectedMessages,
-    pendingAttachments,
-    pendingAttachmentBytes,
-    browserRequests,
-    browserUrl,
-    browserReason,
-    activeBrowserUrl,
-    gitStatus,
-    gitWorkflowDraft,
-    gitWorkflowBusy,
-    gitWorkflowMessage,
-    actionRuns,
-    actionsBusy,
-    actionsLastChecked,
-    actionsMessage,
-    terminalLines,
-    terminalBusy,
-    selectedTerminalId,
-    terminalError,
-    fileQuery,
-    projectFiles,
-    selectedFile,
-    selectedDiff,
-    filePreviewTab,
-    fileBusy,
-    fileMessage,
-    inviteLink,
-    inviteApprovalGate,
-    inviteMessage,
-    hostMessage,
-    chatMessage,
-    settingsMessage,
-    visibleHistoryMessage,
-    markdownCopyFallback
-  } = selectedContext;
   const roomActions = createAppRoomActions({
     appRefs,
     maxTerminalActivityLines,
@@ -274,23 +147,18 @@ export function App() {
   } = roomActions;
   const roomChatMutations = useRoomChatMutations();
   const workspaceRecords = createWorkspaceRecordActions({
-    hasSelectedRoom: selectedContext.hasSelectedRoom,
-    selectedRoom: selectedContext.selectedRoom,
-    localUser: localIdentity.localUser,
-    roomsRef: appRefs.roomsRef,
-    upsertTeamRecord: workspaceState.upsertTeamRecord,
-    upsertRoomRecord: workspaceState.upsertRoomRecord,
-    replaceRoomRecord: workspaceState.replaceRoomRecord,
+    upsertTeamRecord: (team) => useAppStore.getState().upsertTeamRecord(team),
+    upsertRoomRecord: (room) => useAppStore.getState().upsertRoomRecord(room),
+    replaceRoomRecord: (room) => useAppStore.getState().replaceRoomRecord(room),
     resetCodexApprovalForRoom,
-    revokeWorkspaceAccess: roomRuntimeState.revokeWorkspaceAccess,
+    revokeWorkspaceAccess: (teamId, roomId) => useAppStore.getState().revokeWorkspaceAccess(teamId, roomId),
     setInviteLinkForRoom,
     setInviteMessageForRoom,
     setChatMessageForRoom,
     setHostMessageForRoom,
-    setWorkspaceStatusError: workspaceState.setWorkspaceStatusError
+    setWorkspaceStatusError: (message) => useAppStore.getState().setWorkspaceStatusError(message)
   });
   const roomInteraction = useAppRoomInteractionContext({
-    appState,
     appRefs,
     githubAuth,
     localIdentity,
@@ -298,13 +166,11 @@ export function App() {
     roomActions
   });
   const selectedRuntime = useAppSelectedRoomRuntime({
-    appState,
     localIdentity,
     selected: selectedContext,
     roomInteraction
   });
   const hostHandoffActions = useAppHostHandoffActions({
-    appState,
     appRefs,
     localIdentity,
     selected: selectedContext,
@@ -315,23 +181,12 @@ export function App() {
     roomSettingsActor
   });
   const inviteActions = useAppInviteActions({
-    appState,
     appRefs,
-    localIdentity,
-    selected: selectedContext,
-    selectedRuntime,
     roomInteraction,
     workspaceRecords
   });
 
-  const roomDisplay = useAppRoomDisplayContext({
-    appState,
-    selected: selectedContext,
-    selectedRuntime,
-    approvalPolicyLabels
-  });
   const workspaceFlow = useAppWorkspaceFlow({
-    appState,
     appRefs,
     githubAuth,
     localIdentity,
@@ -341,18 +196,15 @@ export function App() {
     roomActions,
     workspaceRecords,
     inviteActions,
-    roomDisplay,
     roomSettingsActor
   });
 
   const relaySync = useAppRelaySync({
-    appState,
     appRefs,
     localIdentity,
     selected: selectedContext,
     roomActions,
     workspaceRecords,
-    roomDisplay,
     inviteActions,
     roomChatMutations
   });
@@ -379,7 +231,6 @@ export function App() {
     };
   }, [appRefs.roomsRef]);
   const roomRuntime = useAppRoomRuntime({
-    appState,
     appRefs,
     githubAuth,
     localIdentity,
@@ -397,36 +248,40 @@ export function App() {
   });
 
   const roomPanels = createAppRoomPanelActions({
-    appState,
-    selected: selectedContext,
-    selectedRuntime,
     roomInteraction,
     roomRuntime,
     relaySync,
     workspaceFlow
   });
-  const appView = useAppViewModel({
-    appState,
-    githubAuth,
-    localIdentity,
-    theme,
-    selected: selectedContext,
-    selectedRuntime,
-    roomInteraction,
-    roomActions,
-    roomDisplay,
-    roomPanels,
-    roomRuntime,
-    workspaceFlow,
-    hostHandoffActions,
-    inviteActions
-  });
 
   return (
     <>
-      <AppShellView {...appView.appShellViewProps} />
+      <AppShellView
+        sidebarSources={{
+          githubAuth,
+          roomRuntime,
+          workspaceFlow
+        }}
+        roomMainColumnSources={{
+          roomRuntime,
+          workspaceFlow,
+          hostHandoff: hostHandoffActions,
+          chatActions: roomPanels.roomChatPanelActions
+        }}
+        roomInspectorSources={{
+          roomRuntime,
+          workspaceFlow,
+          hostHandoff: hostHandoffActions,
+          inviteActions,
+          roomPanels
+        }}
+        localPreviewDialogActions={{
+          prepareLocalPreviewConfirmation: roomRuntime.prepareLocalPreviewConfirmation,
+          confirmLocalPreviewShare: roomRuntime.confirmLocalPreviewShare
+        }}
+      />
       <CodexServerRequestDialog
-        selectedRoomId={workspaceState.selectedRoomId}
+        selectedRoomId={selectedRoomId}
         canRespond={roomInteraction.isActiveHost && !roomInteraction.isSelectedRoomLocked}
       />
     </>

@@ -9,7 +9,6 @@ import { buildRoomNotices } from "../lib/roomNotices";
 export function useRoomInteractionContext({
   inFlightReporters,
   notices,
-  visibilityWarning,
   access,
   chat,
   githubWorkflow,
@@ -17,21 +16,16 @@ export function useRoomInteractionContext({
 }: {
   inFlightReporters: Parameters<typeof useRoomInFlightReporters>[0];
   notices: Parameters<typeof buildRoomNotices>[0];
-  visibilityWarning: Parameters<typeof createRoomVisibilityWarningActions>[0];
   access: Parameters<typeof useRoomAccess>[0];
-  chat: Omit<Parameters<typeof createChatActions>[0], "isSelectedRoomLocked" | "isSelectedRoomRevoked">;
+  chat: Parameters<typeof createChatActions>[0];
   githubWorkflow: Parameters<typeof useGitHubWorkflowState>[0];
   memberRows: Parameters<typeof useRoomMemberRows>[0];
 }) {
   const reporters = useRoomInFlightReporters(inFlightReporters);
   const roomNotices = buildRoomNotices(notices);
-  const visibilityActions = createRoomVisibilityWarningActions(visibilityWarning);
+  const visibilityActions = createRoomVisibilityWarningActions();
   const accessState = useRoomAccess(access);
-  const chatActions = createChatActions({
-    ...chat,
-    isSelectedRoomLocked: accessState.isSelectedRoomLocked,
-    isSelectedRoomRevoked: accessState.isSelectedRoomRevoked
-  });
+  const chatActions = createChatActions(chat);
   const githubWorkflowState = useGitHubWorkflowState(githubWorkflow);
   const roomMemberRows = useRoomMemberRows(memberRows);
 

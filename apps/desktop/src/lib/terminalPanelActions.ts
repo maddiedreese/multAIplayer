@@ -2,8 +2,6 @@ import type { TerminalCommandRequest } from "../types";
 import { useAppStore } from "../store/appStore";
 
 export function createTerminalPanelActions({
-  selectedRoomId,
-  terminalRequests,
   copyTerminalMarkdown,
   openInteractiveTerminal,
   approveTerminalRequest,
@@ -12,8 +10,6 @@ export function createTerminalPanelActions({
   restartSelectedTerminal,
   stopSelectedTerminal
 }: {
-  selectedRoomId: string;
-  terminalRequests: TerminalCommandRequest[];
   copyTerminalMarkdown: () => void;
   openInteractiveTerminal: (options?: { reuseExisting?: boolean; quiet?: boolean }) => void;
   approveTerminalRequest: (request: TerminalCommandRequest) => void;
@@ -23,7 +19,8 @@ export function createTerminalPanelActions({
   stopSelectedTerminal: () => void;
 }) {
   function onApproveTerminalRequest(requestId: string) {
-    const request = terminalRequests.find((item) => item.id === requestId);
+    const state = useAppStore.getState();
+    const request = (state.terminalRuntimeByRoom[state.selectedRoomId]?.requests ?? []).find((item) => item.id === requestId);
     if (request) approveTerminalRequest(request);
   }
 
@@ -32,8 +29,10 @@ export function createTerminalPanelActions({
     onOpenInteractiveTerminal: () => openInteractiveTerminal({ reuseExisting: false }),
     onApproveTerminalRequest,
     onDenyTerminalRequest: denyTerminalRequest,
-    onSelectTerminal: (terminalId: string) =>
-      useAppStore.getState().setSelectedTerminalIdForRoom(selectedRoomId, terminalId),
+    onSelectTerminal: (terminalId: string) => {
+      const state = useAppStore.getState();
+      state.setSelectedTerminalIdForRoom(state.selectedRoomId, terminalId);
+    },
     onSendTerminalData: (input: string) => sendTerminalData(input),
     onRestartTerminal: () => restartSelectedTerminal(),
     onStopTerminal: () => stopSelectedTerminal()

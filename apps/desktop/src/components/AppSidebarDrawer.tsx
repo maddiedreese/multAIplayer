@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react";
+import React, { type ComponentProps } from "react";
 import { SidebarDrawer } from "./AppShellLayout";
 import { ProfileDrawerPanel } from "./ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./RoomSettingsDrawerPanel";

@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react";
+import React, { type ComponentProps } from "react";
 import { ApprovalPolicyPanel } from "./ApprovalPolicyPanel";
 import { CodexActivityTimeline } from "./CodexActivityTimeline";
 import { CodexThreadGraphPanel } from "./CodexThreadGraphPanel";

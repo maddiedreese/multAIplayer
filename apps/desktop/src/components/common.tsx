@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
 import { ShieldAlert } from "lucide-react";
 
 export function ApprovalItem({ label, value }: { label: string; value: string }) {

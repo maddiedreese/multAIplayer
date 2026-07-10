@@ -12,47 +12,38 @@ import {
 } from "./localPreview";
 import { roomLockMessage } from "./appRuntime";
 import { useAppStore } from "../store/appStore";
-import type { LocalPreviewDialogState, LocalPreviewRecord } from "../types";
-
-interface LocalUser {
-  id: string;
-  name: string;
-}
+import type { LocalPreviewRecord } from "../types";
+import { currentLocalIdentity } from "./selectedWorkspace";
 
 interface LocalPreviewActionsOptions {
-  hasSelectedRoom: boolean;
-  isSelectedRoomLocked: boolean;
-  isSelectedRoomRevoked: boolean;
-  selectedRoom: RoomRecord;
-  rooms: RoomRecord[];
-  localUser: LocalUser;
-  localPreviewDialog: LocalPreviewDialogState;
-  localPreviewsByRoom: Record<string, LocalPreviewRecord[]>;
   publishLocalPreviewEvent: (payload: LocalPreviewRecord, room?: RoomRecord) => Promise<void>;
 }
 
 export function createLocalPreviewActions({
-  hasSelectedRoom,
-  isSelectedRoomLocked,
-  isSelectedRoomRevoked,
-  selectedRoom,
-  rooms,
-  localUser,
-  localPreviewDialog,
-  localPreviewsByRoom,
   publishLocalPreviewEvent
 }: LocalPreviewActionsOptions) {
+  const selectedRoom = () => {
+    const state = useAppStore.getState();
+    return state.rooms.find((room) => room.id === state.selectedRoomId);
+  };
+
   async function openLocalPreviewDialog() {
-    if (!hasSelectedRoom) return;
+    const room = selectedRoom();
+    if (!room) return;
+    const { forgottenRoomIds, revokedRoomIds, revokedTeamIds } = useAppStore.getState();
+    const isSelectedRoomRevoked =
+      revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
+    const isSelectedRoomLocked =
+      room.archivedAt != null || forgottenRoomIds.has(room.id) || isSelectedRoomRevoked;
     if (isSelectedRoomLocked) {
       useAppStore.getState().setChatMessageForRoom(
-        selectedRoom.id,
-        roomLockMessage(selectedRoom, isSelectedRoomRevoked)
+        room.id,
+        roomLockMessage(room, isSelectedRoomRevoked)
       );
       return;
     }
-    useAppStore.getState().setLocalPreviewBusyForRoom(selectedRoom.id, true);
-    useAppStore.getState().openLocalPreviewDialogForRoom(selectedRoom.id);
+    useAppStore.getState().setLocalPreviewBusyForRoom(room.id, true);
+    useAppStore.getState().openLocalPreviewDialogForRoom(room.id);
     try {
       const detected = await detectLocalPreviewServers();
       const candidates = detected.map((server) => ({
@@ -66,12 +57,15 @@ export function createLocalPreviewActions({
     } catch (error) {
       useAppStore.getState().setLocalPreviewDialogError(`Could not detect local web servers: ${String(error)}`);
     } finally {
-      useAppStore.getState().setLocalPreviewBusyForRoom(selectedRoom.id, false);
+      useAppStore.getState().setLocalPreviewBusyForRoom(room.id, false);
     }
   }
 
   async function prepareLocalPreviewConfirmation() {
-    const room = rooms.find((item) => item.id === localPreviewDialog.roomId) ?? selectedRoom;
+    const { localPreviewDialog } = useAppStore.getState();
+    const state = useAppStore.getState();
+    const room = state.rooms.find((item) => item.id === localPreviewDialog.roomId) ?? selectedRoom();
+    if (!room) return;
     const selectedUrl = localPreviewDialog.manualUrl.trim() || localPreviewDialog.selectedUrl;
     try {
       const normalizedUrl = normalizeLocalPreviewUrl(selectedUrl);
@@ -92,7 +86,11 @@ export function createLocalPreviewActions({
   }
 
   async function confirmLocalPreviewShare() {
-    const room = rooms.find((item) => item.id === localPreviewDialog.roomId) ?? selectedRoom;
+    const { localUser } = currentLocalIdentity();
+    const { localPreviewDialog } = useAppStore.getState();
+    const state = useAppStore.getState();
+    const room = state.rooms.find((item) => item.id === localPreviewDialog.roomId) ?? selectedRoom();
+    if (!room) return;
     const previewId = crypto.randomUUID();
     const sourceUrl = localPreviewDialog.selectedUrl;
     const now = new Date().toISOString();
@@ -138,8 +136,10 @@ export function createLocalPreviewActions({
   }
 
   async function stopLocalPreview(previewId: string) {
-    const room = selectedRoom;
-    const preview = (localPreviewsByRoom[room.id] ?? []).find((item) => item.id === previewId);
+    const room = selectedRoom();
+    if (!room) return;
+    const preview = (useAppStore.getState().localPreviewByRoom[room.id]?.previews ?? [])
+      .find((item) => item.id === previewId);
     if (!preview) return;
     useAppStore.getState().setLocalPreviewBusyForRoom(room.id, true);
     try {
@@ -163,8 +163,11 @@ export function createLocalPreviewActions({
   }
 
   async function stopOwnedLocalPreviews(message = "This preview is no longer available.") {
-    for (const [roomId, previews] of Object.entries(localPreviewsByRoom)) {
-      const room = rooms.find((item) => item.id === roomId);
+    const { localUser } = currentLocalIdentity();
+    const { localPreviewByRoom } = useAppStore.getState();
+    for (const [roomId, runtime] of Object.entries(localPreviewByRoom)) {
+      const previews = runtime.previews ?? [];
+      const room = useAppStore.getState().rooms.find((item) => item.id === roomId);
       if (!room) continue;
       for (const preview of previews) {
         if (preview.sharedByUserId !== localUser.id || (preview.status !== "live" && preview.status !== "starting")) continue;

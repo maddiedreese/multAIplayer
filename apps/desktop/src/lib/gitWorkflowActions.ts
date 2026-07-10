@@ -1,39 +1,21 @@
 import type { MutableRefObject } from "react";
 import type { GitWorkflowEventPlaintextPayload, RoomRecord } from "@multaiplayer/protocol";
 import { createPullRequest } from "./authClient";
-import {
-  getGitStatus,
-  runGitWorkflow,
-  type GitStatusSummary
-} from "./localBackend";
+import { getGitStatus, runGitWorkflow } from "./localBackend";
 import { buildPullRequestBody } from "./markdownExport";
 import {
   gitWorkflowInFlightMessage,
   isGitWorkflowInFlight,
-  type GitWorkflowDraft,
-  type buildGitWorkflowApprovalPreview
+  buildGitWorkflowApprovalPreview,
+  resolveGitWorkflowDraft
 } from "./gitWorkflowDraft";
-import type {
-  GitHubActionsTarget,
-  GitHubWorkflowReadiness
-} from "./githubWorkflowReadiness";
-import type { ChatMessage } from "../types";
+import { checkGitHubWorkflowReadiness, type GitHubActionsTarget } from "./githubWorkflowReadiness";
 import { useAppStore } from "../store/appStore";
 import { omitRecordKey } from "./setUtils";
+import { currentSelectedRoom, currentSelectedRoomContext } from "./selectedWorkspace";
 
 interface GitWorkflowActionsOptions {
-  hasSelectedRoom: boolean;
-  isActiveHost: boolean;
-  canReadLocalWorkspace: boolean;
-  hostGateMessage: string;
-  localWorkspaceMessage: string;
-  selectedRoom: RoomRecord;
   gitWorkflowBusyRef: MutableRefObject<Record<string, boolean>>;
-  gitWorkflowDraft: GitWorkflowDraft;
-  gitApprovalPreview: ReturnType<typeof buildGitWorkflowApprovalPreview>;
-  githubWorkflowReadiness: GitHubWorkflowReadiness;
-  messages: ChatMessage[];
-  gitStatus: GitStatusSummary | null;
   maxTerminalActivityLines: number;
   publishGitWorkflowEvent: (
     event: Omit<GitWorkflowEventPlaintextPayload, "eventType" | "runner" | "runnerUserId" | "createdAt">,
@@ -43,22 +25,12 @@ interface GitWorkflowActionsOptions {
 }
 
 export function createGitWorkflowActions({
-  hasSelectedRoom,
-  isActiveHost,
-  canReadLocalWorkspace,
-  hostGateMessage,
-  localWorkspaceMessage,
-  selectedRoom,
   gitWorkflowBusyRef,
-  gitWorkflowDraft,
-  gitApprovalPreview,
-  githubWorkflowReadiness,
-  messages,
-  gitStatus,
   maxTerminalActivityLines,
   publishGitWorkflowEvent,
   refreshGitHubActions
 }: GitWorkflowActionsOptions) {
+  const currentContext = () => currentSelectedRoomContext();
   function setGitWorkflowBusyForRoom(roomId: string, busy: boolean) {
     gitWorkflowBusyRef.current = busy
       ? { ...gitWorkflowBusyRef.current, [roomId]: true }
@@ -71,16 +43,17 @@ export function createGitWorkflowActions({
   }
 
   async function approveGitWorkflow() {
-    if (!hasSelectedRoom) {
-      useAppStore.getState().setGitWorkflowMessageForRoom(selectedRoom.id, "Create or join a room before approving a git workflow.");
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
+      useAppStore.getState().setGitWorkflowMessageForRoom(useAppStore.getState().selectedRoomId, "Create or join a room before approving a git workflow.");
       return;
     }
-    if (!isActiveHost) {
-      useAppStore.getState().setGitWorkflowMessageForRoom(selectedRoom.id, hostGateMessage);
+    if (!currentContext()?.isActiveHost) {
+      useAppStore.getState().setGitWorkflowMessageForRoom(selectedRoom.id, currentContext()?.hostGateMessage ?? "Claim host before continuing.");
       return;
     }
-    if (!canReadLocalWorkspace) {
-      useAppStore.getState().setGitWorkflowMessageForRoom(selectedRoom.id, localWorkspaceMessage);
+    if (!currentContext()?.canReadLocalWorkspace) {
+      useAppStore.getState().setGitWorkflowMessageForRoom(selectedRoom.id, currentContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
       return;
     }
     const room = selectedRoom;
@@ -90,7 +63,20 @@ export function createGitWorkflowActions({
       return;
     }
     const projectPath = room.projectPath;
-    const workflowDraft = gitWorkflowDraft;
+    const state = useAppStore.getState();
+    const workflowDraft = resolveGitWorkflowDraft({
+      [roomId]: state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.draft ?? {}
+    }, roomId);
+    const gitApprovalPreview = buildGitWorkflowApprovalPreview(projectPath, workflowDraft);
+    const githubWorkflowReadiness = checkGitHubWorkflowReadiness({
+      pushEnabled: workflowDraft.pushEnabled,
+      authConfig: state.authConfig,
+      currentUser: state.currentUser,
+      owner: workflowDraft.prOwner,
+      repo: workflowDraft.prRepo,
+      head: workflowDraft.branchName,
+      base: workflowDraft.prBase
+    });
     if (!gitApprovalPreview.plan) {
       useAppStore.getState().setGitWorkflowMessageForRoom(roomId, gitApprovalPreview.error ?? "Git workflow approval preview is invalid.");
       return;
@@ -149,6 +135,9 @@ export function createGitWorkflowActions({
       }
 
       if (gitPlan.push) {
+        const store = useAppStore.getState();
+        const messages = store.messagesByRoom[roomId] ?? [];
+        const gitStatus = store.gitWorkflowRuntimeByRoom[roomId]?.workflow?.status ?? null;
         const pr = await createPullRequest({
           owner: workflowDraft.prOwner,
           repo: workflowDraft.prRepo,

@@ -1,11 +1,23 @@
-import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useMemo, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { clamp } from "../lib/appFormatters";
+import { useAppStore } from "../store/appStore";
 
 export function useShellLayout() {
-  const [sidebarWidth, setSidebarWidth] = useState(280);
-  const [inspectorWidth, setInspectorWidth] = useState(372);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  const { sidebarWidth, inspectorWidth, sidebarCollapsed, inspectorCollapsed } = useAppStore(useShallow((state) => ({
+    sidebarWidth: state.sidebarWidth,
+    inspectorWidth: state.inspectorWidth,
+    sidebarCollapsed: state.sidebarCollapsed,
+    inspectorCollapsed: state.inspectorCollapsed
+  })));
+  const {
+    setSidebarWidth,
+    setInspectorWidth,
+    setSidebarCollapsed,
+    setInspectorCollapsed,
+    toggleSidebarCollapsed,
+    toggleInspectorCollapsed
+  } = useAppStore.getState();
 
   function beginShellResize(side: "sidebar" | "inspector", event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -31,17 +43,17 @@ export function useShellLayout() {
     window.addEventListener("pointerup", onPointerUp, { once: true });
   }
 
-  const shellStyle = {
+  const shellStyle = useMemo(() => ({
     "--sidebar-width": sidebarCollapsed ? "52px" : `${sidebarWidth}px`,
     "--rail-width": inspectorCollapsed ? "52px" : `${inspectorWidth}px`
-  } as CSSProperties;
+  } as CSSProperties), [inspectorCollapsed, inspectorWidth, sidebarCollapsed, sidebarWidth]);
 
   return {
     sidebarCollapsed,
     inspectorCollapsed,
     shellStyle,
     beginShellResize,
-    toggleSidebarCollapsed: () => setSidebarCollapsed((collapsed) => !collapsed),
-    toggleInspectorCollapsed: () => setInspectorCollapsed((collapsed) => !collapsed)
+    toggleSidebarCollapsed,
+    toggleInspectorCollapsed
   };
 }

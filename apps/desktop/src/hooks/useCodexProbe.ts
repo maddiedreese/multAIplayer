@@ -1,14 +1,17 @@
 import { useEffect } from "react";
-import { probeCodex, type CodexProbe } from "../lib/localBackend";
+import { probeCodex } from "../lib/localBackend";
+import { useAppStore } from "../store/appStore";
 
-interface UseCodexProbeOptions {
-  replaceCodexProbe: (next: CodexProbe | null) => void;
-}
-
-export function useCodexProbe({ replaceCodexProbe }: UseCodexProbeOptions) {
+export function useCodexProbe() {
   useEffect(() => {
-    probeCodex().then(replaceCodexProbe).catch((error) => {
-      replaceCodexProbe({ available: false, version: null, error: String(error), models: [], modelError: null });
+    probeCodex().then((probe) => useAppStore.getState().replaceCodexProbe(probe)).catch((error) => {
+      useAppStore.getState().replaceCodexProbe({
+        available: false,
+        version: null,
+        error: String(error),
+        models: [],
+        modelError: null
+      });
     });
-  }, [replaceCodexProbe]);
+  }, []);
 }

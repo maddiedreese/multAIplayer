@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { JSDOM } from "jsdom";
-import { createElement } from "react";
+import React, { createElement } from "react";
 import { useAppStore } from "../src/store/appStore";
 import { initialMessagesByRoom, seededRooms } from "../src/seedData";
 
@@ -27,6 +27,7 @@ Object.defineProperty(globalThis, "localStorage", {
 });
 
 Object.assign(globalThis, {
+  React,
   Element: dom.window.Element,
   Event: dom.window.Event,
   HTMLElement: dom.window.HTMLElement,
@@ -159,23 +160,29 @@ const App = appModule.App;
 
 test("App smoke", async (t) => {
   await t.test("renders seeded room and switches rooms", async () => {
+    console.warn("SMOKE_START_1");
     resetAppSmokeDom();
     render(createElement(App));
+    console.warn("SMOKE_1_RENDERED");
 
     await waitFor(() => {
       assert.ok(screen.getAllByText("Desktop app").length > 0);
     });
+    console.warn("SMOKE_1_FOUND");
     assert.match(screen.getByText("We need to capture onboarding progress and improve the stepper.").textContent ?? "", /onboarding/);
 
     fireEvent.click(screen.getByText("Relay ops"));
+    console.warn("SMOKE_1_CLICKED");
 
     await waitFor(() => {
       assert.ok(screen.getAllByText("Relay ops").length > 0);
     });
+    console.warn("SMOKE_1_SWITCHED");
     assert.equal(screen.getByText("No visible rooms.").textContent, "No visible rooms.");
   });
 
   await t.test("invoking Codex shows host approval context", async () => {
+    console.warn("SMOKE_START_2");
     resetAppSmokeDom();
     render(createElement(App));
 
@@ -190,6 +197,7 @@ test("App smoke", async (t) => {
   });
 
   await t.test("sends a normal room message", async () => {
+    console.warn("SMOKE_START_3");
     resetAppSmokeDom();
     render(createElement(App));
 
@@ -203,6 +211,7 @@ test("App smoke", async (t) => {
   });
 
   await t.test("wires header model, reasoning, and speed selectors to room settings", async () => {
+    console.warn("SMOKE_START_4");
     resetAppSmokeDom();
     render(createElement(App));
 
@@ -240,6 +249,7 @@ test("App smoke", async (t) => {
   });
 
   await t.test("switches inspector tabs after browser and files without blanking the rail", async () => {
+    console.warn("SMOKE_START_5");
     resetAppSmokeDom();
     render(createElement(App));
     const roomTools = await screen.findByRole("navigation", { name: "Room tools" });

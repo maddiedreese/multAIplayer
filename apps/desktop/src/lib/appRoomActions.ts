@@ -19,8 +19,6 @@ export function createAppRoomActions({
   defaultProjectPath: string;
 }) {
   return createRoomActions({
-    selectedRoomIdRef: appRefs.selectedRoomIdRef,
-    selectedTeamIdRef: appRefs.selectedTeamIdRef,
     busy: {
       gitWorkflowBusyRef: appRefs.gitWorkflowBusyRef,
       actionsBusyRef: appRefs.actionsBusyRef,
@@ -37,7 +35,6 @@ export function createAppRoomActions({
       defaultBrowserReason
     },
     project: {
-      roomsRef: appRefs.roomsRef,
       defaultCodexModel,
       defaultProjectPath
     }

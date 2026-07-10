@@ -2,25 +2,19 @@ import type { InspectorTab } from "../components/RoomInspectorPanel";
 import { useAppStore } from "../store/appStore";
 
 export function createRoomHeaderActions({
-  selectedRoomId,
-  selectedRoomIdForTabs,
-  activeBrowserUrl,
-  selectTeamRoom,
   openRoomBrowserNow
 }: {
-  selectedRoomId: string;
-  selectedRoomIdForTabs: string;
-  activeBrowserUrl: string | null;
-  selectTeamRoom: (teamId: string, fallbackRoomId: string) => void;
   openRoomBrowserNow: () => void;
 }) {
   function onSelectTeam(teamId: string) {
-    selectTeamRoom(teamId, selectedRoomId);
+    const state = useAppStore.getState();
+    state.selectTeamRoom(teamId, state.selectedRoomId);
   }
 
   function onSelectInspectorTab(tab: InspectorTab) {
-    useAppStore.getState().setInspectorTabForRoom(selectedRoomIdForTabs, tab);
-    if (tab === "browser" && !activeBrowserUrl) openRoomBrowserNow();
+    const state = useAppStore.getState();
+    state.setInspectorTabForRoom(state.selectedRoomId, tab);
+    if (tab === "browser" && !state.browserByRoom[state.selectedRoomId]?.activeUrl) openRoomBrowserNow();
   }
 
   return {

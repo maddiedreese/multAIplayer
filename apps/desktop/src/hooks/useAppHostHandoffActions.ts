@@ -3,13 +3,12 @@ import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContex
 import type { createAppRoomActions } from "../lib/appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
-import type { useAppStateSlices } from "./useAppStateSlices";
 import type { WorkspaceRecordActions } from "../lib/workspaceRecordActions";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import type { useRoomSettingsActor } from "./useRoomSettingsActor";
 import { useHostHandoffActions } from "./useHostHandoffActions";
+import { useAppStore } from "../store/appStore";
 
-type AppStateSlices = ReturnType<typeof useAppStateSlices>;
 type AppRefs = ReturnType<typeof useAppRefs>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
@@ -19,7 +18,6 @@ type RoomActions = ReturnType<typeof createAppRoomActions>;
 type RoomSettingsActor = ReturnType<typeof useRoomSettingsActor>;
 
 export function useAppHostHandoffActions({
-  appState,
   appRefs,
   localIdentity,
   selected,
@@ -29,7 +27,6 @@ export function useAppHostHandoffActions({
   workspaceRecords,
   roomSettingsActor
 }: {
-  appState: AppStateSlices;
   appRefs: AppRefs;
   localIdentity: LocalIdentity;
   selected: SelectedRoomContext;
@@ -39,15 +36,6 @@ export function useAppHostHandoffActions({
   workspaceRecords: WorkspaceRecordActions;
   roomSettingsActor: RoomSettingsActor;
 }) {
-  const {
-    workspaceState,
-    roomSettingsState,
-    roomRuntimeState,
-    appRuntimeState,
-    terminalPanelState,
-    browserPanelState,
-    githubWorkflowPanelState
-  } = appState;
   const {
     hasSelectedRoom,
     selectedRoom,
@@ -65,6 +53,10 @@ export function useAppHostHandoffActions({
     resetCodexApprovalForRoom,
     appendHostHandoff
   } = roomActions;
+  const relayStatus = useAppStore((state) => state.relayStatus);
+  const terminals = useAppStore((state) => state.terminals);
+  const browserRequests = useAppStore((state) => state.browserByRoom[selectedRoom.id]?.requests);
+  const roomGitStatus = useAppStore((state) => state.gitWorkflowRuntimeByRoom[selectedRoom.id]?.workflow?.status);
 
   return useHostHandoffActions({
     hasSelectedRoom,
@@ -78,14 +70,14 @@ export function useAppHostHandoffActions({
     queuedCodexTurns: selectedRuntime.queuedCodexApprovals,
     localUser: localIdentity.localUser,
     deviceId: localIdentity.deviceId,
-    relayStatus: appRuntimeState.relayStatus,
+    relayStatus,
     relayRef: appRefs.relayRef,
     seenEnvelopeIds: appRefs.seenEnvelopeIds,
     messages,
-    terminals: terminalPanelState.terminals,
-    browserRequestsByRoom: browserPanelState.browserRequestsByRoom,
+    terminals,
+    browserRequestsByRoom: browserRequests ? { [selectedRoom.id]: browserRequests } : {},
     gitStatus,
-    gitStatusByRoom: githubWorkflowPanelState.gitStatusByRoom,
+    gitStatusByRoom: roomGitStatus ? { [selectedRoom.id]: roomGitStatus } : {},
     reportRoomHostMutationInFlight: roomInteraction.reportRoomHostMutationInFlight,
     roomSettingsActor,
     replaceRoom: workspaceRecords.replaceRoom,

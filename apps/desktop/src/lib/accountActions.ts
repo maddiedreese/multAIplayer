@@ -1,8 +1,8 @@
 import { loadOrCreateDeviceIdentity, resetDeviceIdentity, type DeviceIdentity } from "./deviceIdentity";
+import { useAppStore } from "../store/appStore";
+import { currentLocalIdentity } from "./selectedWorkspace";
 
 interface AccountActionsOptions {
-  selectedRoomId: string;
-  deviceId: string;
   stopOwnedLocalPreviews: (reason: string) => Promise<void>;
   signOutGitHub: () => Promise<void>;
   replaceDeviceIdentity: (next: DeviceIdentity | null) => void;
@@ -11,8 +11,6 @@ interface AccountActionsOptions {
 }
 
 export function createAccountActions({
-  selectedRoomId,
-  deviceId,
   stopOwnedLocalPreviews,
   signOutGitHub,
   replaceDeviceIdentity,
@@ -31,7 +29,7 @@ export function createAccountActions({
       await resetDeviceIdentity();
       const identity = await loadOrCreateDeviceIdentity();
       replaceDeviceIdentity(identity);
-      untrustDeviceForRoom(selectedRoomId, deviceId);
+      untrustDeviceForRoom(useAppStore.getState().selectedRoomId, currentLocalIdentity().deviceId);
       setDeviceIdentityStatusMessage("Created new local device identity. Public key registration will refresh automatically.");
     } catch (error) {
       setDeviceIdentityStatusMessage(`Device identity rotation failed: ${String(error)}`);

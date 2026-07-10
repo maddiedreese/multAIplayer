@@ -8,6 +8,7 @@ export interface RoomChatRoomState {
   draft?: string;
   pendingAttachments?: ChatAttachment[];
   selectedMessageIds?: string[];
+  markdownSelectionMode?: boolean;
   replyToMessageId?: string;
 }
 
@@ -74,6 +75,8 @@ export interface RoomChatSlice {
   setSensitiveAttachmentReviewKey: (key: string | null) => void;
   toggleSelectedMessageForRoom: (roomId: string, messageId: string) => void;
   clearSelectedMessagesForRoom: (roomId: string) => void;
+  toggleMarkdownSelectionModeForRoom: (roomId: string) => void;
+  disableMarkdownSelectionModeForRoom: (roomId: string) => void;
   setReplyToMessageForRoom: (roomId: string, messageId: string | null) => void;
   setChatMessageForRoom: (roomId: string, message: string | null) => void;
   setPendingAttachmentsForRoom: (roomId: string, attachments: ChatAttachment[]) => void;
@@ -115,6 +118,25 @@ export const createRoomChatSlice: StateCreator<AppStoreState, [], [], RoomChatSl
     set((state) => ({
       roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => {
         const { selectedMessageIds, ...rest } = roomChat;
+        return rest;
+      })
+    }));
+  },
+  toggleMarkdownSelectionModeForRoom: (roomId) => {
+    set((state) => ({
+      roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => {
+        if (roomChat.markdownSelectionMode) {
+          const { markdownSelectionMode, selectedMessageIds, ...rest } = roomChat;
+          return rest;
+        }
+        return { ...roomChat, markdownSelectionMode: true };
+      })
+    }));
+  },
+  disableMarkdownSelectionModeForRoom: (roomId) => {
+    set((state) => ({
+      roomChatByRoom: updateRoomChatForRoom(state.roomChatByRoom, roomId, (roomChat) => {
+        const { markdownSelectionMode, selectedMessageIds, ...rest } = roomChat;
         return rest;
       })
     }));
