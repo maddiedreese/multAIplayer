@@ -58,6 +58,7 @@ export {
   ChatPlaintextPayload,
   ChatReactionPlaintextPayload,
   CodexApprovalPlaintextPayload,
+  CodexActivityPlaintextPayload,
   CodexEventPlaintextPayload,
   CodexQueuePlaintextPayload,
   CodexTurnRiskFlagPayload,
@@ -75,7 +76,8 @@ export {
   WorkspaceFileSaveRequestPlaintextPayload,
   maxEmbeddedAttachmentBytes,
   maxEmbeddedAttachmentBytesPerMessage,
-  maxMessageAttachments
+  maxMessageAttachments,
+  maxCodexActivitiesPerRoom
 } from "./plaintext-events.js";
 
 export {
@@ -87,14 +89,19 @@ export {
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultCodexModel,
+  defaultCodexModelPolicy,
   defaultCodexReasoningEffort,
+  defaultCodexReasoningEffortPolicy,
   defaultCodexSandboxLevel,
+  defaultCodexServiceTierPolicy,
   defaultCodexSpeed,
+  legacyCodexCatalogSelectionPolicy,
   defaultRoomMode
 } from "./defaults-options.js";
 export type {
   ApprovalDelegationPolicy,
   ApprovalPolicy,
+  CodexCatalogSelectionPolicy,
   CodexReasoningEffort,
   CodexSandboxLevel,
   CodexSpeed,

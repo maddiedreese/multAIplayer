@@ -1,5 +1,13 @@
 mod browser;
 mod codex;
+mod codex_account;
+mod codex_activity;
+mod codex_catalog;
+mod codex_goal;
+mod codex_requests;
+mod codex_rpc;
+mod codex_threads;
+mod codex_turn_lifecycle;
 mod diagnostics;
 mod git;
 mod keychain;
@@ -13,6 +21,11 @@ mod validation;
 mod workspace;
 use browser::*;
 use codex::*;
+use codex_account::*;
+use codex_catalog::*;
+use codex_goal::*;
+use codex_requests::CodexRpcState;
+use codex_threads::*;
 use diagnostics::*;
 use git::*;
 use keychain::*;
@@ -32,6 +45,8 @@ pub fn run() {
     tauri::Builder::default()
         .manage(TerminalState::default())
         .manage(LocalPreviewState::default())
+        .manage(CodexRpcState::default())
+        .manage(CodexHostState::default())
         .setup(|app| {
             let state = match app.path().app_log_dir() {
                 Ok(log_dir) => DiagnosticState::initialize(log_dir.join("diagnostics.jsonl")),
@@ -86,7 +101,17 @@ pub fn run() {
             set_codex_goal,
             get_codex_goal,
             clear_codex_goal,
-            shutdown_codex_room
+            shutdown_codex_room,
+            list_codex_server_requests,
+            respond_codex_server_request,
+            codex_host_snapshot,
+            codex_account_login_start,
+            codex_account_login_cancel,
+            codex_account_logout,
+            codex_mcp_login_start,
+            codex_app_approval_mode_set,
+            list_codex_threads,
+            fork_codex_thread
         ])
         .run(tauri::generate_context!())
         .expect("error while running multAIplayer");

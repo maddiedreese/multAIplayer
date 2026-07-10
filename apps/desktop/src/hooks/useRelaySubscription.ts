@@ -35,6 +35,7 @@ import {
   isChatEditPlaintextPayload,
   isCodexApprovalPlaintextPayload,
   isCodexEventPlaintextPayload,
+  isCodexActivityPlaintextPayload,
   isCodexQueuePlaintextPayload,
   isGitHubActionsEventPlaintextPayload,
   isGitWorkflowEventPlaintextPayload,
@@ -58,6 +59,7 @@ import type {
   BrowserAccessRequest,
   ChatMessage,
   CodexRoomEvent,
+  CodexActivity,
   HostHandoffRecord,
   LocalPreviewRecord,
   QueuedCodexTurn,
@@ -119,6 +121,7 @@ interface UseRelaySubscriptionOptions {
   setGitWorkflowMessageForRoom: (roomId: string, message: string | null) => void;
   applyGitHubActionsEventForRoom: (roomId: string, event: GitHubActionsEventPlaintextPayload) => void;
   appendCodexEvent: (roomId: string, event: CodexRoomEvent) => void;
+  upsertCodexActivity: (roomId: string, activity: CodexActivity) => void;
   enqueueCodexApprovalForRoom: (roomId: string, turn: QueuedCodexTurn) => void;
   removeQueuedCodexApprovalForRoom: (roomId: string, turnId: string) => void;
   setPendingCodexApprovalForRoom: (roomId: string, approval: null) => void;
@@ -182,6 +185,7 @@ export function useRelaySubscription({
   setGitWorkflowMessageForRoom,
   applyGitHubActionsEventForRoom,
   appendCodexEvent,
+  upsertCodexActivity,
   enqueueCodexApprovalForRoom,
   removeQueuedCodexApprovalForRoom,
   setPendingCodexApprovalForRoom,
@@ -357,6 +361,12 @@ export function useRelaySubscription({
             if (isCodexEventPlaintextPayload(plaintext)) {
               appendCodexEvent(message.envelope.roomId, plaintext);
               appendTerminalLinesForRoom(message.envelope.roomId, [buildCodexEventLine(plaintext)]);
+            }
+          }
+          if (message.envelope.kind === "codex.activity") {
+            const plaintext = await decryptJson<unknown>(roomPayload, secret);
+            if (isCodexActivityPlaintextPayload(plaintext)) {
+              upsertCodexActivity(message.envelope.roomId, plaintext);
             }
           }
           if (message.envelope.kind === "codex.approval") {

@@ -1,4 +1,5 @@
 import React from "react";
+import { listen } from "@tauri-apps/api/event";
 import type {
   LocalPreviewPlaintextPayload
 } from "@multaiplayer/protocol";
@@ -12,7 +13,9 @@ import { loadHistorySettings } from "./lib/localHistory";
 import {
   defaultProjectPath,
   type GitWorkflowResult,
+  type CodexActivityEvent,
 } from "./lib/localBackend";
+import { isTauriRuntime } from "./lib/localBackend/runtime";
 import type { GitHubActionRun } from "./lib/authClient";
 import {
   normalizeRoomName
@@ -50,6 +53,7 @@ import { useAppRoomRuntime } from "./hooks/useAppRoomRuntime";
 import { useAppRoomPanelActions } from "./hooks/useAppRoomPanelActions";
 import { InlineSecretWarning } from "./components/common";
 import { AppShellView } from "./components/AppShellView";
+import { CodexServerRequestDialog } from "./components/CodexServerRequestDialog";
 import type { InspectorTab } from "./components/RoomInspectorPanel";
 import type {
   BrowserAccessRequest,
@@ -349,6 +353,28 @@ export function App() {
     hostHandoffActions,
     roomChatMutations
   });
+  const publishCodexActivityRef = React.useRef(relaySync.publishCodexActivity);
+  publishCodexActivityRef.current = relaySync.publishCodexActivity;
+  React.useEffect(() => {
+    if (!isTauriRuntime()) return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listen<CodexActivityEvent>("codex://activity", (event) => {
+      const { roomId, ...activity } = event.payload;
+      const room = appRefs.roomsRef.current.find((candidate) => candidate.id === roomId);
+      if (!room) return;
+      void publishCodexActivityRef.current(activity, room).catch(() => {
+        console.warn("Failed to publish encrypted Codex activity");
+      });
+    }).then((stop) => {
+      if (disposed) stop();
+      else unlisten = stop;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [appRefs.roomsRef]);
   const roomRuntime = useAppRoomRuntime({
     appState,
     appRefs,
@@ -391,5 +417,13 @@ export function App() {
     inviteActions
   });
 
-  return <AppShellView {...appView.appShellViewProps} />;
+  return (
+    <>
+      <AppShellView {...appView.appShellViewProps} />
+      <CodexServerRequestDialog
+        selectedRoomId={workspaceState.selectedRoomId}
+        canRespond={roomInteraction.isActiveHost && !roomInteraction.isSelectedRoomLocked}
+      />
+    </>
+  );
 }

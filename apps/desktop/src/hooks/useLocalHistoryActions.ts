@@ -32,6 +32,8 @@ import type {
   BrowserAccessRequest,
   ChatMessage,
   CodexRoomEvent,
+  CodexActivity,
+  CodexThreadGraph,
   HostHandoffRecord,
   InviteJoinRequest,
   LocalPreviewRecord,
@@ -53,6 +55,7 @@ interface UseLocalHistoryActionsOptions {
   browserRequests: BrowserAccessRequest[];
   inviteRequests: InviteJoinRequest[];
   codexEvents: CodexRoomEvent[];
+  codexActivities: CodexActivity[];
   gitWorkflowEvents: GitWorkflowEventPlaintextPayload[];
   githubActionsEvents: GitHubActionsEventPlaintextPayload[];
   localPreviews: LocalPreviewRecord[];
@@ -60,6 +63,7 @@ interface UseLocalHistoryActionsOptions {
   hostHandoffs: HostHandoffRecord[];
   roomGoal: RoomGoal | null;
   selectedCodexThreadId: string | null;
+  codexThreadGraph: CodexThreadGraph;
   reportRoomSettingsMutationInFlight: (
     roomId: string,
     setMessage?: (roomId: string, message: string | null) => void
@@ -94,6 +98,7 @@ export function useLocalHistoryActions({
   browserRequests,
   inviteRequests,
   codexEvents,
+  codexActivities,
   gitWorkflowEvents,
   githubActionsEvents,
   localPreviews,
@@ -101,6 +106,7 @@ export function useLocalHistoryActions({
   hostHandoffs,
   roomGoal,
   selectedCodexThreadId,
+  codexThreadGraph,
   reportRoomSettingsMutationInFlight,
   roomSettingsActor,
   setSelectedHistoryMessage,
@@ -134,13 +140,15 @@ export function useLocalHistoryActions({
         browserRequests,
         inviteRequests,
         codexEvents,
+        codexActivities,
         gitWorkflowEvents,
         githubActionsEvents,
         localPreviews,
         terminalSnapshots: terminalsForLocalHistory(terminals.filter((terminal) => terminal.roomId === roomId)),
         hostHandoffs,
         ...(roomGoal ? { roomGoal } : {}),
-        ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {})
+        ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {}),
+        ...(codexThreadGraph.activeThreadId ? { codexThreadGraph } : {})
       }, saved.retentionDays);
       hydrateLocalRoomHistoryForRoom(roomId, payload);
     }

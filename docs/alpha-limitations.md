@@ -26,6 +26,9 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 ## Codex Hosting
 
 - Codex runs through the active host's local Codex app-server/session.
+- Codex app-server 0.133.0–0.144.0 is the supported compatibility range, with generated-schema fixtures at 0.133.0, 0.143.0, and 0.144.0. Older versions cannot host; newer versions are marked unverified and new security-sensitive capabilities remain fail closed until tested.
+- Fork-through-turn requires Codex 0.143.0 or newer. Version 0.133.0 supports full-thread forks only.
+- Codex account/app/MCP controls and the `auto`/`prompt`/`writes` app approval default are host-local; the approval default is global to that Codex installation, not isolated to one room.
 - Codex Browser Use and Codex Computer Use are not offered in multAIplayer because the Codex app-server API surface this app uses does not support them.
 - Usage-limit handoff is an alpha continuity flow. The replacement host must have their own Codex access and a suitable local project folder or repo checkout.
 
@@ -42,3 +45,4 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 - Real multi-device, multi-account dogfooding is required before a public alpha is promoted broadly.
 - Official relay hosting decisions, domains, secrets, and OAuth callback choices require maintainer input.
 - The visual design should continue to be reviewed in the native app on real screens, especially resizable columns and embedded browser behavior.
+- A room intentionally has one primary repository binding. Multi-repository rooms are deferred until app-server exposes a stable multi-root execution and sandbox contract; use separate rooms meanwhile. See [the accepted ADR](decisions/multi-repository-rooms.md).

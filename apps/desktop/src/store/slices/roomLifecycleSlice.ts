@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 import { normalizeCodexThreadId } from "../../lib/codexThread";
+import { normalizeCodexThreadGraph } from "../../lib/codexThreadGraph";
 import { omitRecordKey } from "../../lib/setUtils";
 import { replaceRoomTerminalSnapshots } from "../../lib/terminalState";
 import type { LocalRoomHistoryPayload } from "../../types";
@@ -22,7 +23,9 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       const shouldHydrateTerminalRuntime = payload.terminalRequests.length > 0 || Boolean(payload.terminalSnapshots.length && nextTerminalId);
       const queuedCodexTurns = payload.queuedCodexTurns ?? [];
       const codexThreadId = normalizeCodexThreadId(payload.codexThreadId);
+      const codexThreadGraph = normalizeCodexThreadGraph(payload.codexThreadGraph, codexThreadId);
       const {
+        threadGraph: _threadGraph,
         threadId: _threadId,
         ...codexRuntimeWithoutThread
       } = state.codexRuntimeByRoom[roomId] ?? {};
@@ -82,10 +85,14 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
           [roomId]: {
             ...codexRuntimeWithoutThread,
             events: payload.codexEvents,
+            activities: payload.codexActivities ?? [],
             hostHandoffs: payload.hostHandoffs,
             ...(queuedCodexTurns.length ? { queuedApprovals: queuedCodexTurns } : {}),
             ...(payload.roomGoal ? { goal: payload.roomGoal } : {}),
-            ...(codexThreadId ? { threadId: codexThreadId } : {})
+            ...(codexThreadGraph.activeThreadId ? {
+              threadId: codexThreadGraph.activeThreadId,
+              threadGraph: codexThreadGraph
+            } : {})
           }
         },
         gitWorkflowRuntimeByRoom: payload.gitWorkflowEvents.length || payload.githubActionsEvents.length
@@ -149,6 +156,7 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         ...state.codexRuntimeByRoom,
         [roomId]: {
           events: [],
+          activities: [],
           hostHandoffs: [],
           queuedApprovals: []
         }

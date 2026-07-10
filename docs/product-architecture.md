@@ -121,7 +121,7 @@ Codex approval distinguishes inline attachment content from encrypted blob refer
 
 Composer text and attachment drafts are scoped per room. If a user switches rooms, unfinished message text stays with its original room. If a large encrypted attachment blob finishes uploading after a switch, the finished attachment remains queued only for the room where the upload began.
 
-Room goals use Codex thread Goal mode. After a room has an approved Codex thread, `/goal <objective>` calls Codex app-server's thread goal API. Pause, resume, edit, and clear controls update the Codex thread goal, and local history can cache the latest displayed goal state with the room's Codex thread id.
+Room goals use Codex thread Goal mode. After a room has an approved Codex thread, `/goal <objective>` calls Codex app-server's thread goal API. Pause, resume, edit, and clear controls update the active thread's goal. Encrypted local history stores the normalized thread graph and active selection, with the legacy thread id retained only as a compatibility mirror.
 
 Project file previews and encrypted attachment blob opens are also tied to the originating room. If a room switch happens while a file read or blob decrypt is in flight, the completed read is ignored rather than rendered into the newly selected room's inspector. Attachment previews are blocked while a room is locally locked after forget or relay membership revocation.
 
@@ -149,7 +149,7 @@ Codex turn execution is an active-host local workspace action in the macOS app. 
 
 Codex invocations are proposed before they run. Any member can tag Codex or press invoke, but that creates a pending room-visible proposal. Only the active host, checked by stable host user id at approval time, can authorize the proposal to spend that host's Codex subscription or touch that host's machine. If host role transfers while a proposal is waiting, the proposal remains queued and the new active host can approve or decline it.
 
-Codex proposals are queued when another proposal is pending or a turn is running. The queue is bounded to five waiting turns, renders in the room, can be cancelled by the requester or host, times out if host approval does not arrive, and is saved in encrypted local history so handoff/reload context stays coherent.
+Codex proposals are queued when another proposal is pending or a turn is running. The queue is bounded to five waiting turns, renders in the room, can be cancelled by the requester or host, times out if host approval does not arrive, and is saved in encrypted local history so handoff/reload context stays coherent. Once a turn starts, server-initiated app-server requests are routed bidirectionally to the same active host/session. Human wait pauses active execution time but has a 15-minute wall-clock deadline; expiry and malformed or unauthorized responses fail closed.
 
 Example approval summary:
 
@@ -318,13 +318,13 @@ Defaults:
 - archived teams and rooms stay restorable; deleted teams and rooms are removed from workspace listings without claiming to erase content already received by devices;
 - attachment cache encrypted;
 - room keys in macOS Keychain in the native app;
-- user can clear local room history, including local room messages, workflow records, and the saved Codex thread id;
-- user can forget a room on one device, deleting local history, room history settings, the saved Codex thread id, the local room key, and the local visibility-warning acknowledgement; the room becomes locally locked until a fresh invite or room key is imported;
+- user can clear local room history, including local room messages, workflow records, canonical Codex activity, and the saved Codex thread graph;
+- user can forget a room on one device, deleting local history, room history settings, the saved Codex thread graph/active selection, the local room key, and the local visibility-warning acknowledgement; the room becomes locally locked until a fresh invite or room key is imported;
 - user can disable local history for sensitive rooms.
 
 ### Secrets Visibility
 
-By default, all room members see Codex event streams, terminal output, diffs, and tool logs.
+Room members can see content deliberately shared through chat, approved terminal results, diffs, Git/workflow events, and coarse Codex turn status. Canonical Codex activity shares lifecycle metadata only; it does not expose raw tool logs, commands, output, arguments, results, secrets, or token deltas.
 
 The app must warn that secrets may be exposed. The first-time room warning covers full visibility, is acknowledged per room on the local device, and reappears after the user forgets that room locally. Inline warnings should appear for:
 
@@ -375,9 +375,15 @@ The desktop app talks to local Codex via `codex app-server`.
 
 The app-server is treated as the UI-to-agent protocol. multAIplayer is a rich client built on top of the Codex harness, not a hosted quota bridge.
 
-The alpha shares Codex turn progress as encrypted `codex.event` room events. The event stream shows start, reported app-server events, completion, failure, model, host, and thread id where available, while the hosted relay only sees ciphertext envelopes.
+The alpha shares coarse turn state as encrypted `codex.event` room events and canonical item lifecycle metadata as encrypted `codex.activity` events. Activity projection is allowlisted and bounded: stable ids, type/status/timestamps, and limited normalized subagent relationships. The projector never copies raw app-server commands/output, tool arguments/results, upstream JSON, environment values, secret-bearing fields, account/auth data, token refreshes, or token/output deltas into room events or local room history. This does not change the separate, explicit sharing rules for chat, approved terminal results, or attachments.
 
-Each room keeps a local Codex thread id on the active host device. The first approved turn calls `thread/start`; later approved turns pass the stored id through `thread/resume` before `turn/start`. The thread id is saved inside the room's encrypted local-history payload, so app restarts can resume the same local Codex conversation without putting that id in plaintext app preferences or relay state. If resume fails because the local Codex session is unavailable or stale, the host starts a fresh thread and records that fallback in the encrypted event stream.
+Each room keeps a normalized encrypted Codex thread graph on the host device. The selected active thread drives `thread/resume`, `turn/start`, and goal operations. Hosts can list their active session tree, switch branches, and fork. Full forks work across the tested range; fork-through-turn using `lastTurnId` requires 0.143.0 or newer. Discovery fails closed until the active session is resolved and never imports prompt previews as titles. The separately rendered agent tree is derived only from normalized subagent activity and is not the conversation thread graph.
+
+The supported contract range is Codex app-server 0.133.0–0.144.0. Older versions cannot host. Newer versions show an unverified warning, and contract-sensitive account, authentication, approval, and fork behavior remains capability-gated rather than inferred.
+
+Room model settings are catalog intent. `auto` resolves model, reasoning effort, and service tier from the active host's local `model/list` defaults. `pinned` requests the stored choices; unsupported reasoning or service-tier selections fall back to a declared supported value with a visible warning. Legacy room selections remain pinned.
+
+Account/login, app inventory, MCP authentication, login refresh, and the persistent global app-tool approval default (`auto`, `prompt`, or supported `writes`) are host-local control surfaces. They never become room events/history. `writes` trusts only tools declared read-only and prompts for writes; because it changes Codex config, it may affect other Codex clients on that host.
 
 The macOS app validates Codex turn input before starting `codex app-server`: empty turn input is rejected, desktop turn assembly trims oversized room context to 220,000 characters with an explicit truncation marker, native input is still hard-bounded to 240,000 characters, and native app-server timeouts must be between 10 and 900 seconds. If the app-server handshake fails after launch, the native host terminates the child process before returning the error.
 
@@ -392,6 +398,8 @@ Responsibilities:
 - surface approvals to the active host;
 - map Codex events into chat/progress/file/diff/terminal UI;
 - respect sandbox and approval configuration.
+
+The alpha intentionally binds one primary repository/`cwd` per room. Multi-repository rooms are deferred until app-server provides a stable multi-root execution and sandbox contract; see [the accepted ADR](decisions/multi-repository-rooms.md).
 
 No custom system prompt is used. Room behavior should be shaped through:
 

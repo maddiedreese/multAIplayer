@@ -1,6 +1,8 @@
 import {
   DevicePublicKeyJwk,
+  maxCodexActivitiesPerRoom,
   CodexApprovalPlaintextPayload as CodexApprovalPlaintextPayloadSchema,
+  CodexActivityPlaintextPayload as CodexActivityPlaintextPayloadSchema,
   CodexQueuePlaintextPayload as CodexQueuePlaintextPayloadSchema,
   LocalPreviewPlaintextPayload as LocalPreviewPlaintextPayloadSchema,
   RoomKeyRotationPlaintextPayload as RoomKeyRotationPlaintextPayloadSchema,
@@ -11,6 +13,7 @@ import {
   type ChatEditPlaintextPayload,
   type ChatReactionPlaintextPayload,
   type CodexApprovalPlaintextPayload,
+  type CodexActivityPlaintextPayload,
   type CodexEventPlaintextPayload,
   type CodexQueuePlaintextPayload,
   type DevicePublicKeyJwk as DevicePublicKeyJwkType,
@@ -28,6 +31,7 @@ import {
 import type { GitHubActionRun } from "./authClient";
 import { normalizeChatMessage } from "./chatSanitizer";
 import { normalizeCodexThreadId } from "./codexThread";
+import { normalizeCodexThreadGraph } from "./codexThreadGraph";
 import { sanitizeLocalRoomReadState } from "./roomUnread";
 import type { GitWorkflowResult, TerminalSnapshot } from "./localBackend";
 import { terminalsForLocalHistory } from "./terminalState";
@@ -57,6 +61,9 @@ export function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentio
     browserRequests: payload.browserRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     inviteRequests: payload.inviteRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
     codexEvents: payload.codexEvents.filter((event) => isWithinRetention(event.createdAt, cutoffMs)),
+    codexActivities: (payload.codexActivities ?? [])
+      .filter((activity) => isWithinRetention(activity.updatedAt, cutoffMs))
+      .slice(-maxCodexActivitiesPerRoom),
     gitWorkflowEvents: payload.gitWorkflowEvents.filter((event) => isWithinRetention(event.createdAt, cutoffMs)),
     githubActionsEvents: payload.githubActionsEvents.filter((event) => isWithinRetention(event.checkedAt, cutoffMs)),
     localPreviews: payload.localPreviews.filter((preview) => isWithinRetention(preview.updatedAt, cutoffMs)),
@@ -66,7 +73,8 @@ export function pruneLocalRoomHistory(payload: LocalRoomHistoryPayload, retentio
     hostHandoffs: payload.hostHandoffs.filter((handoff) => isWithinRetention(handoff.createdAt, cutoffMs)),
     queuedCodexTurns: (payload.queuedCodexTurns ?? []).filter((turn) => isWithinRetention(turn.queuedAt, cutoffMs)),
     ...(payload.roomGoal && isWithinRetention(payload.roomGoal.updatedAt, cutoffMs) ? { roomGoal: payload.roomGoal } : {}),
-    ...(payload.codexThreadId ? { codexThreadId: payload.codexThreadId } : {})
+    ...(payload.codexThreadId ? { codexThreadId: payload.codexThreadId } : {}),
+    ...(payload.codexThreadGraph?.activeThreadId ? { codexThreadGraph: normalizeCodexThreadGraph(payload.codexThreadGraph) } : {})
   };
 }
 
@@ -82,6 +90,7 @@ export function emptyLocalRoomHistoryPayload(): LocalRoomHistoryPayload {
     browserRequests: [],
     inviteRequests: [],
     codexEvents: [],
+    codexActivities: [],
     gitWorkflowEvents: [],
     githubActionsEvents: [],
     localPreviews: [],
@@ -100,6 +109,7 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
   }
 
   const codexThreadId = normalizeCodexThreadId(value.codexThreadId);
+  const codexThreadGraph = normalizeCodexThreadGraph(value.codexThreadGraph, codexThreadId);
   return {
     version: 3,
     messages: Array.isArray(value.messages) ? normalizeChatHistoryMessages(value.messages) : [],
@@ -111,6 +121,9 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
     browserRequests: Array.isArray(value.browserRequests) ? value.browserRequests.filter(isBrowserAccessRequest) : [],
     inviteRequests: Array.isArray(value.inviteRequests) ? value.inviteRequests.filter(isInviteJoinRequest) : [],
     codexEvents: Array.isArray(value.codexEvents) ? value.codexEvents.filter(isCodexEventPlaintextPayload) : [],
+    codexActivities: Array.isArray(value.codexActivities)
+      ? value.codexActivities.filter(isCodexActivityPlaintextPayload).slice(-maxCodexActivitiesPerRoom)
+      : [],
     gitWorkflowEvents: Array.isArray(value.gitWorkflowEvents)
       ? value.gitWorkflowEvents.filter(isGitWorkflowEventPlaintextPayload)
       : [],
@@ -124,7 +137,10 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
     hostHandoffs: Array.isArray(value.hostHandoffs) ? value.hostHandoffs.filter(isHostHandoffRecord) : [],
     queuedCodexTurns: Array.isArray(value.queuedCodexTurns) ? value.queuedCodexTurns.filter(isQueuedCodexTurn) : [],
     ...(isRoomGoal(value.roomGoal) ? { roomGoal: value.roomGoal } : {}),
-    ...(codexThreadId ? { codexThreadId } : {})
+    ...(codexThreadGraph.activeThreadId ? {
+      codexThreadId: codexThreadGraph.activeThreadId,
+      codexThreadGraph
+    } : {})
   };
 }
 
@@ -282,6 +298,10 @@ export function isCodexEventPlaintextPayload(value: unknown): value is CodexEven
     typeof value.hostUserId === "string" &&
     typeof value.createdAt === "string"
   );
+}
+
+export function isCodexActivityPlaintextPayload(value: unknown): value is CodexActivityPlaintextPayload {
+  return CodexActivityPlaintextPayloadSchema.safeParse(value).success;
 }
 
 function isBoundedStringList(value: unknown, maxItems: number): boolean {

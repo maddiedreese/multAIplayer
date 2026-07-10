@@ -2,6 +2,7 @@ import type { ComponentProps } from "react";
 import { codexModelOptions, defaultCodexModel } from "@multaiplayer/protocol";
 import { defaultRelayHttpUrl, defaultRelayWsUrl } from "../lib/appConfig";
 import { formatCodexModel, formatSessionPersistence } from "../lib/appFormatters";
+import { formatCodexCompatibilitySummary } from "../lib/codexCompatibility";
 import { roomSecretStorageLabel } from "../lib/appRuntime";
 import { defaultProjectPath } from "../lib/localBackend";
 import { approvalPolicyLabels } from "../seedData";
@@ -243,7 +244,9 @@ export function useAppSidebarProps({
     settings: {
       relaySummary: `${relayStatus} · ${relayWsUrl}`,
       relayApi: relayHttpUrl,
-      codexSummary: codexProbe?.available ? codexProbe.version ?? "Available" : codexProbe?.error ?? "Not connected",
+      codexSummary: codexProbe?.available
+        ? formatCodexCompatibilitySummary(codexProbe.version)
+        : codexProbe?.error ?? "Not connected",
       projectPath,
       modelLabel: formatCodexModel(selectedCodexModel),
       approvalLabel: approvalPolicyLabels[selectedRoomApprovalPolicy],

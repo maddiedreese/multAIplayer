@@ -5,12 +5,16 @@ import {
   defaultBrowserProfilePersistent,
   defaultApprovalDelegationPolicy,
   defaultCodexModel,
+  defaultCodexModelPolicy,
   defaultCodexReasoningEffort,
+  defaultCodexReasoningEffortPolicy,
   defaultCodexSandboxLevel,
   defaultCodexSpeed,
+  defaultCodexServiceTierPolicy,
   defaultRoomMode,
   codexSandboxLevelOptions,
   type ApprovalDelegationPolicy,
+  type CodexCatalogSelectionPolicy,
   type RoomRecord
 } from "@multaiplayer/protocol";
 import { loadRelayConfig } from "../config.js";
@@ -95,10 +99,19 @@ export function registerRoomRoutes({
         : String(req.body.approvalDelegationPolicy);
     const trustedApproverUserIds = normalizeTrustedApproverUserIds(req.body?.trustedApproverUserIds, maxUserIdChars);
     const codexModel = req.body?.codexModel === undefined ? defaultCodexModel : normalizeCodexModel(req.body.codexModel);
+    const codexModelPolicy = normalizeCatalogSelectionPolicy(req.body?.codexModelPolicy, defaultCodexModelPolicy);
     const codexReasoningEffort = req.body?.codexReasoningEffort === undefined
       ? defaultCodexReasoningEffort
       : normalizeCodexReasoningEffort(req.body.codexReasoningEffort);
+    const codexReasoningEffortPolicy = normalizeCatalogSelectionPolicy(
+      req.body?.codexReasoningEffortPolicy,
+      defaultCodexReasoningEffortPolicy
+    );
     const codexSpeed = req.body?.codexSpeed === undefined ? defaultCodexSpeed : normalizeCodexSpeed(req.body.codexSpeed);
+    const codexServiceTierPolicy = normalizeCatalogSelectionPolicy(
+      req.body?.codexServiceTierPolicy,
+      defaultCodexServiceTierPolicy
+    );
     const codexSandboxLevel = req.body?.codexSandboxLevel === undefined
       ? defaultCodexSandboxLevel
       : normalizeCodexSandboxLevel(req.body.codexSandboxLevel);
@@ -141,8 +154,12 @@ export function registerRoomRoutes({
       res.status(400).json({ error: `codexModel must be a known model id or a model-like id up to ${maxCodexModelChars} characters` });
       return;
     }
+    if (!codexModelPolicy || !codexReasoningEffortPolicy || !codexServiceTierPolicy) {
+      res.status(400).json({ error: "Codex catalog selection policies must be auto or pinned" });
+      return;
+    }
     if (!codexReasoningEffort) {
-      res.status(400).json({ error: "codexReasoningEffort must be minimal, low, medium, high, or xhigh" });
+      res.status(400).json({ error: "codexReasoningEffort must be none, minimal, low, medium, high, or xhigh" });
       return;
     }
     if (!codexSpeed) {
@@ -197,8 +214,11 @@ export function registerRoomRoutes({
       trustedApproverUserIds,
       mode: defaultRoomMode,
       codexModel,
+      codexModelPolicy,
       codexReasoningEffort,
+      codexReasoningEffortPolicy,
       codexSpeed,
+      codexServiceTierPolicy,
       codexSandboxLevel,
       browserAllowedOrigins: normalizedBrowserAllowedOrigins,
       browserProfilePersistent: browserProfilePersistent ?? defaultBrowserProfilePersistent,
@@ -285,10 +305,13 @@ export function registerRoomRoutes({
         : normalizeTrustedApproverUserIds(req.body.trustedApproverUserIds, maxUserIdChars);
     const mode = req.body?.mode;
     const codexModel = req.body?.codexModel === undefined ? undefined : normalizeCodexModel(req.body.codexModel);
+    const codexModelPolicy = normalizeCatalogSelectionPolicy(req.body?.codexModelPolicy);
     const codexReasoningEffort = req.body?.codexReasoningEffort === undefined
       ? undefined
       : normalizeCodexReasoningEffort(req.body.codexReasoningEffort);
+    const codexReasoningEffortPolicy = normalizeCatalogSelectionPolicy(req.body?.codexReasoningEffortPolicy);
     const codexSpeed = req.body?.codexSpeed === undefined ? undefined : normalizeCodexSpeed(req.body.codexSpeed);
+    const codexServiceTierPolicy = normalizeCatalogSelectionPolicy(req.body?.codexServiceTierPolicy);
     const codexSandboxLevel = req.body?.codexSandboxLevel === undefined
       ? undefined
       : normalizeCodexSandboxLevel(req.body.codexSandboxLevel);
@@ -337,8 +360,16 @@ export function registerRoomRoutes({
       res.status(400).json({ error: `codexModel must be a known model id or a model-like id up to ${maxCodexModelChars} characters` });
       return;
     }
+    if (
+      (req.body?.codexModelPolicy !== undefined && !codexModelPolicy) ||
+      (req.body?.codexReasoningEffortPolicy !== undefined && !codexReasoningEffortPolicy) ||
+      (req.body?.codexServiceTierPolicy !== undefined && !codexServiceTierPolicy)
+    ) {
+      res.status(400).json({ error: "Codex catalog selection policies must be auto or pinned" });
+      return;
+    }
     if (codexReasoningEffort !== undefined && !codexReasoningEffort) {
-      res.status(400).json({ error: "codexReasoningEffort must be minimal, low, medium, high, or xhigh" });
+      res.status(400).json({ error: "codexReasoningEffort must be none, minimal, low, medium, high, or xhigh" });
       return;
     }
     if (codexSpeed !== undefined && !codexSpeed) {
@@ -374,8 +405,13 @@ export function registerRoomRoutes({
       trustedApproverUserIds: trustedApproverUserIds ?? room.trustedApproverUserIds,
       mode: mode ?? room.mode,
       codexModel: codexModel ?? room.codexModel,
+      codexModelPolicy: codexModelPolicy ?? (codexModel !== undefined ? "pinned" : room.codexModelPolicy),
       codexReasoningEffort: codexReasoningEffort ?? room.codexReasoningEffort,
+      codexReasoningEffortPolicy: codexReasoningEffortPolicy
+        ?? (codexReasoningEffort !== undefined ? "pinned" : room.codexReasoningEffortPolicy),
       codexSpeed: codexSpeed ?? room.codexSpeed,
+      codexServiceTierPolicy: codexServiceTierPolicy
+        ?? (codexSpeed !== undefined ? "pinned" : room.codexServiceTierPolicy),
       codexSandboxLevel: codexSandboxLevel ?? room.codexSandboxLevel,
       browserAllowedOrigins: normalizedBrowserAllowedOrigins ?? room.browserAllowedOrigins,
       browserProfilePersistent: browserProfilePersistent ?? room.browserProfilePersistent
@@ -430,6 +466,14 @@ export function registerRoomRoutes({
     broadcastRoomUpdated(updated);
     res.json({ room: updated });
   });
+}
+
+function normalizeCatalogSelectionPolicy(
+  value: unknown,
+  fallback?: CodexCatalogSelectionPolicy
+): CodexCatalogSelectionPolicy | undefined | null {
+  if (value === undefined) return fallback;
+  return value === "auto" || value === "pinned" ? value : null;
 }
 
 function allowTotalRoomQuota({

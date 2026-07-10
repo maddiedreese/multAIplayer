@@ -156,6 +156,7 @@ test("relay broadcasts room.updated after room settings change", async () => {
     assert.equal(updatedRoom.id, "room-desktop");
     assert.equal(updatedRoom.name, "Renamed desktop app");
     assert.equal(updatedRoom.codexModel, "gpt-5.4-thinking");
+    assert.equal(updatedRoom.codexModelPolicy, "pinned");
     assert.equal(updatedRoom.browserProfilePersistent, false);
   } finally {
     socket.close();
@@ -191,6 +192,9 @@ test("relay broadcasts newly created rooms to team subscribers", async () => {
     assert.equal(updatedRoom.name, "New project room");
     assert.equal(updatedRoom.teamId, "team-core");
     assert.equal(updatedRoom.approvalPolicy, "ask_every_turn");
+    assert.equal(updatedRoom.codexModelPolicy, "auto");
+    assert.equal(updatedRoom.codexReasoningEffortPolicy, "auto");
+    assert.equal(updatedRoom.codexServiceTierPolicy, "auto");
     assert.deepEqual(updatedRoom.browserAllowedOrigins, ["https://github.com"]);
     assert.equal(updatedRoom.browserProfilePersistent, true);
   } finally {
@@ -211,6 +215,7 @@ test("relay accepts room defaults when creating a room", async () => {
         projectPath: "/tmp/multaiplayer",
         approvalPolicy: "ask_every_turn",
         codexModel: "gpt-5.4-thinking",
+        codexReasoningEffort: "none",
         browserAllowedOrigins: ["https://github.com", "https://example.com"],
         browserProfilePersistent: false
       })
@@ -220,12 +225,14 @@ test("relay accepts room defaults when creating a room", async () => {
       room: {
         approvalPolicy: string;
         codexModel: string;
+        codexReasoningEffort: string;
         browserAllowedOrigins: string[];
         browserProfilePersistent: boolean;
       };
     };
     assert.equal(body.room.approvalPolicy, "ask_every_turn");
     assert.equal(body.room.codexModel, "gpt-5.4-thinking");
+    assert.equal(body.room.codexReasoningEffort, "none");
     assert.deepEqual(body.room.browserAllowedOrigins, ["https://github.com", "https://example.com"]);
     assert.equal(body.room.browserProfilePersistent, false);
 
@@ -3521,10 +3528,19 @@ test("relay drops invalid persisted team and room identifiers", async () => {
     assert.equal(response.status, 200);
     const body = await response.json() as {
       teams: Array<{ id: string }>;
-      rooms: Array<{ id: string; teamId: string }>;
+      rooms: Array<{
+        id: string;
+        teamId: string;
+        codexModelPolicy?: string;
+        codexReasoningEffortPolicy?: string;
+        codexServiceTierPolicy?: string;
+      }>;
     };
     assert.deepEqual(body.teams.map((team) => team.id), ["team-core"]);
     assert.deepEqual(body.rooms.map((room) => room.id), ["room-desktop"]);
+    assert.equal(body.rooms[0]?.codexModelPolicy, "pinned");
+    assert.equal(body.rooms[0]?.codexReasoningEffortPolicy, "pinned");
+    assert.equal(body.rooms[0]?.codexServiceTierPolicy, "pinned");
     assert.equal(body.rooms[0]?.teamId, "team-core");
   } finally {
     await relay.close();

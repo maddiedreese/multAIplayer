@@ -153,6 +153,7 @@ export function useAppRelaySync({
         setGitWorkflowMessageForRoom,
         applyGitHubActionsEventForRoom,
         appendCodexEvent,
+        upsertCodexActivity: roomActions.upsertCodexActivity,
         enqueueCodexApprovalForRoom,
         removeQueuedCodexApprovalForRoom,
         setPendingCodexApprovalForRoom,
@@ -182,6 +183,7 @@ export function useAppRelaySync({
         appendLocalPreviewEvent,
         appendGitWorkflowEvent,
         appendCodexEvent,
+        upsertCodexActivity: roomActions.upsertCodexActivity,
         appendTerminalLinesForRoom,
         appendRoomMessage: roomChatMutations.appendRoomMessage,
         appendGitHubActionsEvent

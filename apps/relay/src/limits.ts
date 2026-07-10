@@ -9,6 +9,7 @@ import {
   codexModelOptions,
   type DevicePublicKeyJwk as DevicePublicKeyJwkType,
   type ApprovalDelegationPolicy,
+  type CodexCatalogSelectionPolicy,
   type RoomRecord,
   type TeamRole
 } from "@multaiplayer/protocol";
@@ -127,6 +128,10 @@ export function normalizeCodexSpeed(value: unknown): RoomRecord["codexSpeed"] | 
   return codexSpeedOptions.some((option) => option.id === speed)
     ? speed as RoomRecord["codexSpeed"]
     : null;
+}
+
+export function normalizeCodexCatalogSelectionPolicy(value: unknown): CodexCatalogSelectionPolicy | null {
+  return value === "auto" || value === "pinned" ? value : null;
 }
 
 export function normalizeCodexReasoningEffortOrDefault(value: unknown): RoomRecord["codexReasoningEffort"] {

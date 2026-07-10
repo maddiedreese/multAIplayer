@@ -10,11 +10,17 @@ export type ApprovalDelegationPolicy =
   | "members_can_approve"
   | "trusted_members_only";
 
+export type CodexCatalogSelectionPolicy = "auto" | "pinned";
+
 export const defaultApprovalDelegationPolicy: ApprovalDelegationPolicy = "host_only";
 export const defaultCodexModel = "gpt-5.5";
 export const defaultCodexReasoningEffort = "medium";
 export const defaultCodexSpeed = "standard";
 export const defaultCodexSandboxLevel = "workspace_write";
+export const defaultCodexModelPolicy: CodexCatalogSelectionPolicy = "auto";
+export const defaultCodexReasoningEffortPolicy: CodexCatalogSelectionPolicy = "auto";
+export const defaultCodexServiceTierPolicy: CodexCatalogSelectionPolicy = "auto";
+export const legacyCodexCatalogSelectionPolicy: CodexCatalogSelectionPolicy = "pinned";
 export const defaultBrowserAllowedOrigins = ["https://github.com"];
 export const defaultBrowserProfilePersistent = true;
 

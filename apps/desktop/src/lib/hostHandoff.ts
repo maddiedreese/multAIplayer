@@ -1,14 +1,28 @@
 import {
+  defaultCodexReasoningEffort,
   defaultCodexSandboxLevel,
+  defaultCodexSpeed,
+  legacyCodexCatalogSelectionPolicy,
   type ApprovalPolicy,
   type HostHandoffPlaintextPayload,
   type RoomRecord
 } from "@multaiplayer/protocol";
-import { normalizeCodexModel, normalizeCodexSandboxLevel, normalizeProjectPath } from "./workspaceCreation";
+import {
+  normalizeCodexModel,
+  normalizeCodexReasoningEffort,
+  normalizeCodexSandboxLevel,
+  normalizeCodexSpeed,
+  normalizeProjectPath
+} from "./workspaceCreation";
 
 export interface HandoffSettingsPatch {
   projectPath: string;
   codexModel: string;
+  codexModelPolicy: RoomRecord["codexModelPolicy"];
+  codexReasoningEffort: RoomRecord["codexReasoningEffort"];
+  codexReasoningEffortPolicy: RoomRecord["codexReasoningEffortPolicy"];
+  codexSpeed: RoomRecord["codexSpeed"];
+  codexServiceTierPolicy: RoomRecord["codexServiceTierPolicy"];
   codexSandboxLevel: RoomRecord["codexSandboxLevel"];
   approvalPolicy: ApprovalPolicy;
 }
@@ -46,10 +60,22 @@ export function createHandoffSettingsPatch(handoff: HostHandoffPlaintextPayload)
   if (!codexModel) throw new Error("Host handoff is missing a supported Codex model.");
   const codexSandboxLevel = normalizeCodexSandboxLevel(handoff.codexSandboxLevel ?? defaultCodexSandboxLevel);
   if (!codexSandboxLevel) throw new Error("Host handoff is missing a supported Codex sandbox level.");
+  const codexReasoningEffort = normalizeCodexReasoningEffort(handoff.codexReasoningEffort ?? defaultCodexReasoningEffort);
+  if (!codexReasoningEffort) throw new Error("Host handoff is missing a supported Codex reasoning effort.");
+  const codexSpeed = normalizeCodexSpeed(handoff.codexSpeed ?? defaultCodexSpeed);
+  if (!codexSpeed) throw new Error("Host handoff is missing a supported Codex speed.");
+  const catalogSettings = {
+    codexModelPolicy: handoff.codexModelPolicy ?? legacyCodexCatalogSelectionPolicy,
+    codexReasoningEffort,
+    codexReasoningEffortPolicy: handoff.codexReasoningEffortPolicy ?? legacyCodexCatalogSelectionPolicy,
+    codexSpeed,
+    codexServiceTierPolicy: handoff.codexServiceTierPolicy ?? legacyCodexCatalogSelectionPolicy
+  };
   if (handoff.approvalPolicy === "auto_chat_only" || handoff.approvalPolicy === "auto_browser_allowed_sites") {
     return {
       projectPath,
       codexModel,
+      ...catalogSettings,
       codexSandboxLevel: codexSandboxLevel as RoomRecord["codexSandboxLevel"],
       approvalPolicy: "ask_every_turn"
     };
@@ -60,6 +86,7 @@ export function createHandoffSettingsPatch(handoff: HostHandoffPlaintextPayload)
   return {
     projectPath,
     codexModel,
+    ...catalogSettings,
     codexSandboxLevel: codexSandboxLevel as RoomRecord["codexSandboxLevel"],
     approvalPolicy: handoff.approvalPolicy as ApprovalPolicy
   };

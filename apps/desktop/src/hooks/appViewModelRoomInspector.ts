@@ -5,6 +5,12 @@ import {
   codexSpeedOptions,
   defaultCodexModel
 } from "@multaiplayer/protocol";
+import {
+  catalogModelOptions,
+  catalogReasoningOptionsForModel,
+  catalogSpeedOptionsForModel,
+  resolveCodexRunSettings
+} from "../lib/codexCatalogResolver";
 import { defaultProjectPath } from "../lib/localBackend";
 import { approvalDelegationPolicyLabels, approvalPolicyLabels } from "../seedData";
 import type { AppViewModelOptions } from "./appViewModelTypes";
@@ -86,6 +92,7 @@ export function createRoomInspectorInput({
     selectedTerminalId,
     inspectorTab
   } = selected;
+  const resolvedSettings = resolveCodexRunSettings(selectedRoom, appRuntimeState.codexProbe);
 
   return {
     activeTab: inspectorTab,
@@ -172,14 +179,18 @@ export function createRoomInspectorInput({
     customCodexModel,
     model: {
       customModel: customCodexModel,
-      modelOptions: codexModelOptions,
-      reasoningOptions: codexReasoningEffortOptions,
-      speedOptions: codexSpeedOptions,
+      modelOptions: catalogModelOptions(appRuntimeState.codexProbe),
+      reasoningOptions: catalogReasoningOptionsForModel(appRuntimeState.codexProbe, resolvedSettings.model),
+      speedOptions: catalogSpeedOptionsForModel(appRuntimeState.codexProbe, resolvedSettings.model),
       onSelectModel: roomRuntime.setCodexModel,
       onSelectReasoningEffort: roomRuntime.setCodexReasoningEffort,
       onSelectSpeed: roomRuntime.setCodexSpeed,
       onCustomModelChange: (model) => roomActions.setCustomCodexModelForRoom(selectedRoom.id, model),
       onApplyCustomModel: () => roomRuntime.setCodexModel(customCodexModel)
+    },
+    codexRuntime: {
+      roomId: selectedRoom.id,
+      projectPath: selectedRoom.projectPath
     },
     localHistory: {
       historySettings: historyDefaultsState.historySettings,

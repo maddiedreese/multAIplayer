@@ -1,7 +1,35 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { isTauriRuntime } from "./runtime";
-import type { CodexGoal, CodexGoalStatus, CodexProbe, CodexTurnResult } from "./types";
+import type {
+  CodexGoal,
+  CodexGoalStatus,
+  CodexProbe,
+  CodexServerRequest,
+  CodexServerResponse,
+  CodexThreadNode,
+  CodexTurnResult
+} from "./types";
+
+export async function listCodexThreads(roomId: string, cwd: string, limit = 100): Promise<CodexThreadNode[]> {
+  if (!isTauriRuntime()) return [];
+  return invoke<CodexThreadNode[]>("list_codex_threads", { request: { roomId, cwd, limit } });
+}
+
+export async function forkCodexThread(
+  roomId: string,
+  threadId: string,
+  cwd: string,
+  lastTurnId?: string
+): Promise<CodexThreadNode> {
+  if (!isTauriRuntime()) {
+    const now = Math.floor(Date.now() / 1000);
+    return { id: `${threadId}-fork`, parentThreadId: threadId, title: "Forked Codex thread", status: "idle", createdAt: now, updatedAt: now };
+  }
+  return invoke<CodexThreadNode>("fork_codex_thread", {
+    request: { roomId, threadId, cwd, ...(lastTurnId ? { lastTurnId } : {}) }
+  });
+}
 
 export async function setCodexGoal(
   roomId: string,
@@ -65,11 +93,13 @@ export async function probeCodex(): Promise<CodexProbe> {
 
 export async function runCodexTurn(
   roomId: string,
+  clientTurnId: string,
   cwd: string,
   input: string,
   model = "gpt-5.5",
   reasoningEffort = "medium",
   speed = "standard",
+  serviceTier: string | null = null,
   sandboxLevel = "workspace_write",
   previousThreadId: string | null = null,
   timeoutSeconds = 180
@@ -78,11 +108,13 @@ export async function runCodexTurn(
     return invoke<CodexTurnResult>("run_codex_turn", {
       request: {
         roomId,
+        clientTurnId,
         cwd,
         input,
         model,
         reasoningEffort,
         speed,
+        serviceTier,
         sandboxLevel,
         previousThreadId,
         timeoutSeconds
@@ -109,5 +141,17 @@ export async function shutdownCodexRoom(roomId: string): Promise<number> {
   if (!isTauriRuntime()) return 0;
   return invoke<number>("shutdown_codex_room", {
     request: { roomId }
+  });
+}
+
+export async function listCodexServerRequests(): Promise<CodexServerRequest[]> {
+  if (!isTauriRuntime()) return [];
+  return invoke<CodexServerRequest[]>("list_codex_server_requests");
+}
+
+export async function respondCodexServerRequest(requestKey: string, response: CodexServerResponse): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invoke("respond_codex_server_request", {
+    request: { requestKey, response }
   });
 }

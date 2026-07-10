@@ -136,6 +136,7 @@ export function useAppRoomRuntime({
     codexActions: {
       turn: {
         selectedRoom,
+        codexProbe: appRuntimeState.codexProbe,
         activeCodexApproval: selectedRuntime.activeCodexApproval,
         roomsRef: appRefs.roomsRef,
         selectedRoomIdRef: appRefs.selectedRoomIdRef,
@@ -361,6 +362,7 @@ export function useAppRoomRuntime({
         browserRequests,
         inviteRequests: selectedRuntime.inviteRequests,
         codexEvents: selectedRuntime.codexEvents,
+        codexActivities: selectedRuntime.codexActivities,
         gitWorkflowEvents: selectedRuntime.gitWorkflowEvents,
         githubActionsEvents: selectedRuntime.githubActionsEvents,
         localPreviews: selectedRuntime.localPreviews,
@@ -368,7 +370,8 @@ export function useAppRoomRuntime({
         hostHandoffs: selectedRuntime.hostHandoffs,
         queuedCodexTurns: selectedRuntime.queuedCodexApprovals,
         roomGoal,
-        selectedCodexThreadId: selectedRuntime.selectedCodexThreadId
+        selectedCodexThreadId: selectedRuntime.selectedCodexThreadId,
+        codexThreadGraph: selectedRuntime.codexThreadGraph
       },
       localPreviewPolling: {
         localPreviewsByRoom: localPreviewState.localPreviewsByRoom,

@@ -33,6 +33,11 @@ test("createHandoffSettingsPatch trims and returns inherited room settings", () 
   assert.deepEqual(createHandoffSettingsPatch(baseHandoff), {
     projectPath: "/tmp/multaiplayer",
     codexModel: "gpt-5.4-thinking",
+    codexModelPolicy: "pinned",
+    codexReasoningEffort: "medium",
+    codexReasoningEffortPolicy: "pinned",
+    codexSpeed: "standard",
+    codexServiceTierPolicy: "pinned",
     codexSandboxLevel: "workspace_write",
     approvalPolicy: "ask_every_turn"
   });

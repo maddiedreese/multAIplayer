@@ -6,6 +6,7 @@ import { buildWebPreviewDiagnosticBundle, saveNativeDiagnosticBundle } from "../
 import { copyTextToClipboard } from "../lib/clipboard";
 import { isTauriRuntime } from "../lib/localBackend/runtime";
 import { InfoRow } from "./common";
+import { CodexAccountPanel } from "./CodexAccountPanel";
 
 export function ProfileDrawerPanel({
   currentUser,
@@ -95,6 +96,8 @@ export function ProfileDrawerPanel({
         {nativeDiagnostics ? "Save diagnostics" : "Copy diagnostics"}
       </button>
       {diagnosticsMessage && <div className="workflow-message">{diagnosticsMessage}</div>}
+
+      <CodexAccountPanel />
 
       {currentUser ? (
         <button className="ghost-wide" onClick={onSignOut}>

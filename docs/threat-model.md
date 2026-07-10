@@ -43,7 +43,15 @@ The native desktop app stores room secrets and the device ECDH identity in the O
 
 The browser/web preview cannot access native keychain APIs, so it keeps using localStorage as a development fallback for room secrets and the device identity. Production security claims should be evaluated against the native app, not the web preview shell.
 
-Local room history is encrypted with the room secret before it is written to localStorage. The same encrypted payload includes room chat history, room workflow events, stopped terminal snapshots, and the active host's last Codex thread id, so app restarts can resume the local Codex conversation and restore restartable terminal context without storing those values in plaintext app preferences or sending them to the relay as metadata.
+Local room history is encrypted with the room secret before it is written to localStorage. The same encrypted payload includes room chat history, room workflow events, stopped terminal snapshots, bounded metadata-only Codex activities, and the normalized Codex thread graph/active selection, so app restarts can resume local context without storing those values in plaintext app preferences or relay metadata.
+
+## Codex App-server Boundary
+
+Codex account/login, app inventory, MCP authentication, login refreshes, and the persistent `auto`/`prompt`/`writes` app approval default remain host-local. They are not published into room envelopes or local room history. The global approval default can affect other Codex clients on the host and is labelled accordingly.
+
+Server-initiated app-server requests are bound to their native session and originating room. Only the active host can answer them. Unknown privileged methods, expanded permission responses, malformed ids/payloads, expiry after the 15-minute human deadline, shutdown, and version/capability mismatches fail closed. The supported compatibility range is 0.133.0–0.144.0, with generated-schema fixtures at 0.133.0, 0.143.0, and 0.144.0; newer versions are visibly unverified rather than assumed safe for new contract-sensitive features.
+
+Room-visible `codex.activity` data is projected through an allowlist. Raw commands, output, tool arguments/results, prompt previews, environment values, secrets, raw upstream JSON, token deltas, and account/auth/token-refresh data are discarded before an activity can enter encrypted relay traffic or encrypted local history. Thread discovery also fails closed until the active thread's session identity is resolved, preventing unrelated cwd-matching thread titles from entering room state.
 
 Draft message text and attachments are kept in memory per room. Large encrypted blob uploads append back to the originating room draft, so a delayed upload cannot attach project content to a different room after navigation.
 

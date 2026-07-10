@@ -1,42 +1,30 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::{mpsc, Mutex, OnceLock};
+use std::io::{BufRead, BufReader};
+use std::process::{Child, Command, Stdio};
+use std::sync::atomic::Ordering;
+use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
+use tauri::Emitter;
 
+use crate::codex_activity::{bounded_codex_identifier, project_codex_activity};
+use crate::codex_catalog::{normalize_reasoning_effort, normalize_service_tier};
+use crate::codex_requests::{
+    wait_for_response, wait_for_response_message, CodexRpcState, CodexServerRequestEvent,
+    PendingSessionGuard, RespondCodexServerRequest, RpcRequestContext,
+};
+use crate::codex_rpc::{
+    allocate_rpc_session_id, send_json_shared, ActiveTimeout, RpcId, RpcInbox, RpcMessage,
+    SharedStdin,
+};
+use crate::codex_turn_lifecycle::{cancel_codex_turns_for_room, CodexTurnLease};
 use crate::process::terminate_child;
 use crate::validation::{
     codex_timeout, ensure_codex_input, ensure_room_id, normalize_codex_thread_id,
 };
 use crate::workspace::ensure_existing_dir;
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct CodexProbe {
-    available: bool,
-    version: Option<String>,
-    error: Option<String>,
-    models: Vec<CodexModelOption>,
-    model_error: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct CodexModelOption {
-    id: String,
-    label: String,
-    description: String,
-    model: String,
-    hidden: bool,
-    is_default: bool,
-    default_reasoning_effort: String,
-    supported_reasoning_efforts: Vec<String>,
-    service_tiers: Vec<String>,
-    default_service_tier: Option<String>,
-}
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,48 +36,20 @@ pub(crate) struct CodexTurnResult {
     stderr: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct CodexGoal {
-    objective: String,
-    status: String,
-    thread_id: String,
-    created_at: i64,
-    updated_at: i64,
-    time_used_seconds: i64,
-    tokens_used: i64,
-    token_budget: Option<i64>,
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CodexTurnRequest {
     room_id: Option<String>,
+    client_turn_id: Option<String>,
     cwd: String,
     input: String,
     model: Option<String>,
     reasoning_effort: Option<String>,
     speed: Option<String>,
+    service_tier: Option<String>,
     sandbox_level: Option<String>,
     previous_thread_id: Option<String>,
     timeout_seconds: Option<u64>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct CodexGoalSetRequest {
-    room_id: String,
-    thread_id: String,
-    objective: Option<String>,
-    status: Option<String>,
-    token_budget: Option<i64>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct CodexGoalThreadRequest {
-    room_id: String,
-    thread_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -119,11 +79,15 @@ pub(crate) struct CodexSandboxConfig {
 
 struct CodexServerSession {
     child: Child,
-    stdin: ChildStdin,
-    line_rx: mpsc::Receiver<String>,
+    stdin: SharedStdin,
+    inbox: RpcInbox,
     stderr_rx: mpsc::Receiver<String>,
     next_id: i64,
     last_used: Instant,
+    session_id: u64,
+    rpc_state: CodexRpcState,
+    app: tauri::AppHandle,
+    room_id: String,
 }
 
 static CODEX_SESSIONS: OnceLock<Mutex<HashMap<CodexServerKey, CodexServerSession>>> =
@@ -132,44 +96,22 @@ static CODEX_SESSIONS: OnceLock<Mutex<HashMap<CodexServerKey, CodexServerSession
 const CODEX_SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(20 * 60);
 
 #[tauri::command]
-pub(crate) fn probe_codex() -> CodexProbe {
-    match Command::new("codex").arg("--version").output() {
-        Ok(output) if output.status.success() => {
-            let model_result = list_codex_models_once(Duration::from_secs(8));
-            CodexProbe {
-                available: true,
-                version: Some(String::from_utf8_lossy(&output.stdout).trim().to_string()),
-                error: None,
-                models: model_result.clone().unwrap_or_default(),
-                model_error: model_result.err(),
-            }
-        }
-        Ok(output) => CodexProbe {
-            available: false,
-            version: None,
-            error: Some(String::from_utf8_lossy(&output.stderr).trim().to_string()),
-            models: Vec::new(),
-            model_error: None,
-        },
-        Err(error) => CodexProbe {
-            available: false,
-            version: None,
-            error: Some(error.to_string()),
-            models: Vec::new(),
-            model_error: None,
-        },
-    }
-}
-
-#[tauri::command]
-pub(crate) fn run_codex_turn(request: CodexTurnRequest) -> Result<CodexTurnResult, String> {
+pub(crate) fn run_codex_turn(
+    request: CodexTurnRequest,
+    app: tauri::AppHandle,
+    rpc_state: tauri::State<'_, CodexRpcState>,
+) -> Result<CodexTurnResult, String> {
+    let lifecycle_room_id = request.room_id.as_deref().unwrap_or("__legacy_room");
+    ensure_room_id(lifecycle_room_id)?;
+    let turn_lease = CodexTurnLease::begin(lifecycle_room_id)?;
     ensure_existing_dir(&request.cwd)?;
     ensure_codex_input(&request.input)?;
     let previous_thread_id = normalize_codex_thread_id(request.previous_thread_id.as_deref())?;
     let timeout = codex_timeout(request.timeout_seconds)?;
     let model = request.model.unwrap_or_else(|| "gpt-5.5".to_string());
     let reasoning_effort = normalize_reasoning_effort(request.reasoning_effort.as_deref())?;
-    let service_tier = service_tier_for_speed(request.speed.as_deref())?;
+    let service_tier =
+        normalize_service_tier(request.service_tier.as_deref(), request.speed.as_deref())?;
     let sandbox_config = codex_sandbox_config(request.sandbox_level.as_deref())?;
     let key = codex_server_key(
         request.room_id.as_deref(),
@@ -179,7 +121,18 @@ pub(crate) fn run_codex_turn(request: CodexTurnRequest) -> Result<CodexTurnResul
         &service_tier,
         &sandbox_config,
     )?;
-    let mut session = checkout_codex_session(&key, timeout)?;
+    if turn_lease.is_cancelled() {
+        return Err("Codex turn was cancelled because the room host context changed".to_string());
+    }
+    let cancellation = turn_lease.cancellation_flag();
+    let mut session = checkout_codex_session(
+        &key,
+        timeout,
+        &app,
+        rpc_state.inner().clone(),
+        cancellation.clone(),
+    )?;
+    let client_turn_id = bounded_codex_identifier(request.client_turn_id.as_deref(), "turn");
     let result = session.run_turn(
         &request.cwd,
         &request.input,
@@ -187,367 +140,43 @@ pub(crate) fn run_codex_turn(request: CodexTurnRequest) -> Result<CodexTurnResul
         &reasoning_effort,
         &service_tier,
         previous_thread_id.as_deref(),
+        &client_turn_id,
         timeout,
+        cancellation,
     );
     if result.as_ref().is_ok_and(CodexTurnResult::is_reusable) && session.is_alive() {
-        checkin_codex_session(key, session);
+        let mut checked_out = Some(session);
+        turn_lease.run_if_active(|| {
+            checkin_codex_session(key, checked_out.take().expect("checked-out Codex session"));
+        });
     }
     result
 }
 
 #[tauri::command]
-pub(crate) fn set_codex_goal(request: CodexGoalSetRequest) -> Result<CodexGoal, String> {
+pub(crate) fn shutdown_codex_room(
+    request: CodexRoomShutdownRequest,
+    rpc_state: tauri::State<'_, CodexRpcState>,
+) -> Result<usize, String> {
     ensure_room_id(&request.room_id)?;
-    let thread_id = normalize_codex_thread_id(Some(&request.thread_id))?
-        .ok_or_else(|| "Codex thread id is required before setting a goal.".to_string())?;
-    let status = match request.status.as_deref() {
-        None
-        | Some("active")
-        | Some("paused")
-        | Some("blocked")
-        | Some("usageLimited")
-        | Some("budgetLimited")
-        | Some("complete") => request.status,
-        Some(_) => return Err("Codex goal status is invalid.".to_string()),
-    };
-    let response = run_codex_goal_request(json!({
-        "method": "thread/goal/set",
-        "params": {
-            "threadId": thread_id,
-            "objective": request.objective,
-            "status": status,
-            "tokenBudget": request.token_budget
-        }
-    }))?;
-    parse_codex_goal_response(&response)
+    rpc_state.cancel_room(&request.room_id, "Codex room shut down");
+    let active = cancel_codex_turns_for_room(&request.room_id);
+    Ok(active.saturating_add(shutdown_codex_room_sessions(&request.room_id)))
 }
 
 #[tauri::command]
-pub(crate) fn get_codex_goal(request: CodexGoalThreadRequest) -> Result<Option<CodexGoal>, String> {
-    ensure_room_id(&request.room_id)?;
-    let thread_id = normalize_codex_thread_id(Some(&request.thread_id))?
-        .ok_or_else(|| "Codex thread id is required before reading a goal.".to_string())?;
-    let response = run_codex_goal_request(json!({
-        "method": "thread/goal/get",
-        "params": {
-            "threadId": thread_id
-        }
-    }))?;
-    let Some(goal) = response
-        .get("result")
-        .and_then(|result| result.get("goal"))
-        .filter(|goal| !goal.is_null())
-    else {
-        return Ok(None);
-    };
-    Ok(Some(parse_codex_goal(goal)?))
+pub(crate) fn list_codex_server_requests(
+    rpc_state: tauri::State<'_, CodexRpcState>,
+) -> Result<Vec<CodexServerRequestEvent>, String> {
+    rpc_state.list()
 }
 
 #[tauri::command]
-pub(crate) fn clear_codex_goal(request: CodexGoalThreadRequest) -> Result<(), String> {
-    ensure_room_id(&request.room_id)?;
-    let thread_id = normalize_codex_thread_id(Some(&request.thread_id))?
-        .ok_or_else(|| "Codex thread id is required before clearing a goal.".to_string())?;
-    let _response = run_codex_goal_request(json!({
-        "method": "thread/goal/clear",
-        "params": {
-            "threadId": thread_id
-        }
-    }))?;
-    Ok(())
-}
-
-#[tauri::command]
-pub(crate) fn shutdown_codex_room(request: CodexRoomShutdownRequest) -> Result<usize, String> {
-    ensure_room_id(&request.room_id)?;
-    Ok(shutdown_codex_room_sessions(&request.room_id))
-}
-
-fn run_codex_goal_request(mut request: Value) -> Result<Value, String> {
-    let timeout = Duration::from_secs(20);
-    let started_at = Instant::now();
-    let mut child = Command::new("codex")
-        .arg("app-server")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("Failed to start codex app-server for goal: {error}"))?;
-    let mut stdin = child
-        .stdin
-        .take()
-        .ok_or_else(|| "Could not open codex app-server stdin for goal".to_string())?;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| "Could not open codex app-server stdout for goal".to_string())?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| "Could not open codex app-server stderr for goal".to_string())?;
-
-    let (line_tx, line_rx) = mpsc::channel::<String>();
-    thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().map_while(Result::ok) {
-            if line_tx.send(line).is_err() {
-                break;
-            }
-        }
-    });
-
-    let (stderr_tx, stderr_rx) = mpsc::channel::<String>();
-    thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines().map_while(Result::ok) {
-            if stderr_tx.send(line).is_err() {
-                break;
-            }
-        }
-    });
-
-    let result = (|| {
-        send_json(
-            &mut stdin,
-            json!({
-                "method": "initialize",
-                "id": 1,
-                "params": {
-                    "clientInfo": {
-                        "name": "multaiplayer",
-                        "title": "multAIplayer",
-                        "version": env!("CARGO_PKG_VERSION")
-                    },
-                    "capabilities": {
-                        "experimentalApi": true
-                    }
-                }
-            }),
-        )?;
-        wait_for_response(&line_rx, 1, started_at, timeout)?;
-        send_json(&mut stdin, json!({ "method": "initialized", "params": {} }))?;
-        request["id"] = json!(2);
-        send_json(&mut stdin, request)?;
-        wait_for_response(&line_rx, 2, started_at, timeout)
-    })();
-
-    terminate_child(&mut child);
-    result.map_err(|error| {
-        let stderr = stderr_rx.try_iter().collect::<Vec<_>>().join("\n");
-        if stderr.trim().is_empty() {
-            error
-        } else {
-            format!("{error}: {stderr}")
-        }
-    })
-}
-
-fn parse_codex_goal_response(value: &Value) -> Result<CodexGoal, String> {
-    let goal = value
-        .get("result")
-        .and_then(|result| result.get("goal"))
-        .ok_or_else(|| format!("Codex goal response did not include a goal: {value}"))?;
-    parse_codex_goal(goal)
-}
-
-fn parse_codex_goal(value: &Value) -> Result<CodexGoal, String> {
-    serde_json::from_value(value.clone())
-        .map_err(|error| format!("Codex goal response was invalid: {error}; {value}"))
-}
-
-fn normalize_reasoning_effort(value: Option<&str>) -> Result<String, String> {
-    let effort = value.unwrap_or("medium").trim();
-    match effort {
-        "none" | "minimal" | "low" | "medium" | "high" | "xhigh" => Ok(effort.to_string()),
-        _ => Err(
-            "Codex reasoning effort must be none, minimal, low, medium, high, or xhigh."
-                .to_string(),
-        ),
-    }
-}
-
-fn list_codex_models_once(timeout: Duration) -> Result<Vec<CodexModelOption>, String> {
-    let started_at = Instant::now();
-    let mut child = Command::new("codex")
-        .arg("app-server")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("Failed to start codex app-server for model list: {error}"))?;
-
-    let mut stdin = child
-        .stdin
-        .take()
-        .ok_or_else(|| "Could not open codex app-server stdin for model list".to_string())
-        .map_err(|error| {
-            terminate_child(&mut child);
-            error
-        })?;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| "Could not open codex app-server stdout for model list".to_string())
-        .map_err(|error| {
-            terminate_child(&mut child);
-            error
-        })?;
-    let stderr = child.stderr.take();
-
-    let (line_tx, line_rx) = mpsc::channel::<String>();
-    thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().map_while(Result::ok) {
-            if line_tx.send(line).is_err() {
-                break;
-            }
-        }
-    });
-
-    let (stderr_tx, stderr_rx) = mpsc::channel::<String>();
-    if let Some(stderr) = stderr {
-        thread::spawn(move || {
-            let reader = BufReader::new(stderr);
-            for line in reader.lines().map_while(Result::ok) {
-                if stderr_tx.send(line).is_err() {
-                    break;
-                }
-            }
-        });
-    }
-
-    let result = (|| {
-        send_json(
-            &mut stdin,
-            json!({
-                "method": "initialize",
-                "id": 1,
-                "params": {
-                    "clientInfo": {
-                        "name": "multaiplayer",
-                        "title": "multAIplayer",
-                        "version": env!("CARGO_PKG_VERSION")
-                    },
-                    "capabilities": {
-                        "experimentalApi": true
-                    }
-                }
-            }),
-        )?;
-        wait_for_response(&line_rx, 1, started_at, timeout)?;
-        send_json(&mut stdin, json!({ "method": "initialized", "params": {} }))?;
-        send_json(
-            &mut stdin,
-            json!({
-                "method": "model/list",
-                "id": 2,
-                "params": {
-                    "includeHidden": false,
-                    "limit": 100
-                }
-            }),
-        )?;
-        let response = wait_for_response_message(&line_rx, 2, started_at, timeout)?;
-        if let Some(error) = response.get("error") {
-            return Err(format!("model/list failed: {error}"));
-        }
-        let models = response
-            .get("result")
-            .and_then(|result| result.get("data"))
-            .and_then(Value::as_array)
-            .ok_or_else(|| format!("model/list did not return data: {response}"))?;
-        Ok(models.iter().filter_map(parse_codex_model_option).collect())
-    })();
-
-    terminate_child(&mut child);
-    result.map_err(|error| {
-        let stderr = stderr_rx.try_iter().collect::<Vec<_>>().join("\n");
-        if stderr.trim().is_empty() {
-            error
-        } else {
-            format!("{error}: {stderr}")
-        }
-    })
-}
-
-fn parse_codex_model_option(value: &Value) -> Option<CodexModelOption> {
-    let id = value.get("id")?.as_str()?.trim();
-    let label = value
-        .get("displayName")
-        .and_then(Value::as_str)
-        .unwrap_or(id)
-        .trim();
-    if id.is_empty() || label.is_empty() {
-        return None;
-    }
-    let model = value
-        .get("model")
-        .and_then(Value::as_str)
-        .unwrap_or(id)
-        .trim();
-    let supported_reasoning_efforts = value
-        .get("supportedReasoningEfforts")
-        .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| {
-                    item.get("reasoningEffort")
-                        .and_then(Value::as_str)
-                        .map(str::to_string)
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    let service_tiers = value
-        .get("serviceTiers")
-        .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| item.get("id").and_then(Value::as_str).map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default();
-
-    Some(CodexModelOption {
-        id: id.to_string(),
-        label: label.to_string(),
-        description: value
-            .get("description")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_string(),
-        model: model.to_string(),
-        hidden: value
-            .get("hidden")
-            .and_then(Value::as_bool)
-            .unwrap_or(false),
-        is_default: value
-            .get("isDefault")
-            .and_then(Value::as_bool)
-            .unwrap_or(false),
-        default_reasoning_effort: value
-            .get("defaultReasoningEffort")
-            .and_then(Value::as_str)
-            .unwrap_or("medium")
-            .to_string(),
-        supported_reasoning_efforts,
-        service_tiers,
-        default_service_tier: value
-            .get("defaultServiceTier")
-            .and_then(Value::as_str)
-            .map(str::to_string),
-    })
-}
-
-fn service_tier_for_speed(value: Option<&str>) -> Result<String, String> {
-    let speed = value.unwrap_or("standard").trim();
-    match speed {
-        "standard" => Ok("default".to_string()),
-        "fast" => Ok("fast".to_string()),
-        _ => Err("Codex speed must be standard or fast.".to_string()),
-    }
+pub(crate) fn respond_codex_server_request(
+    request: RespondCodexServerRequest,
+    rpc_state: tauri::State<'_, CodexRpcState>,
+) -> Result<(), String> {
+    rpc_state.respond(request)
 }
 
 pub(crate) fn codex_sandbox_config(value: Option<&str>) -> Result<CodexSandboxConfig, String> {
@@ -578,14 +207,18 @@ pub(crate) fn codex_sandbox_config(value: Option<&str>) -> Result<CodexSandboxCo
 }
 
 impl CodexServerSession {
+    #[allow(clippy::too_many_arguments)]
     fn start(
+        app: &tauri::AppHandle,
+        rpc_state: CodexRpcState,
+        room_id: &str,
         cwd: &str,
         reasoning_effort: &str,
         service_tier: &str,
         sandbox_config: &CodexSandboxConfig,
         timeout: Duration,
+        cancelled: Arc<std::sync::atomic::AtomicBool>,
     ) -> Result<Self, String> {
-        let started_at = Instant::now();
         let mut child = Command::new("codex")
             .arg("-c")
             .arg(format!("model_reasoning_effort=\"{reasoning_effort}\""))
@@ -611,9 +244,10 @@ impl CodexServerSession {
             .spawn()
             .map_err(|error| format!("Failed to start codex app-server: {error}"))?;
 
-        let mut stdin = child
+        let stdin = child
             .stdin
             .take()
+            .map(|stdin| Arc::new(Mutex::new(stdin)))
             .ok_or_else(|| "Could not open codex app-server stdin".to_string())
             .map_err(|error| {
                 terminate_child(&mut child);
@@ -656,10 +290,22 @@ impl CodexServerSession {
             }
         });
 
+        let session_id = allocate_rpc_session_id();
+        let mut inbox = RpcInbox::new(line_rx);
+        let mut budget = ActiveTimeout::new(timeout);
+        let context = RpcRequestContext {
+            app,
+            state: rpc_state.clone(),
+            room_id,
+            session_id,
+            stdin: stdin.clone(),
+            cancelled: Some(cancelled),
+        };
+        let mut pending_guard = PendingSessionGuard::new(rpc_state.clone(), session_id);
         cleanup_on_error(
             &mut child,
-            send_json(
-                &mut stdin,
+            send_json_shared(
+                &stdin,
                 json!({
                     "method": "initialize",
                     "id": 1,
@@ -678,24 +324,29 @@ impl CodexServerSession {
         )?;
         cleanup_on_error(
             &mut child,
-            wait_for_response(&line_rx, 1, started_at, timeout),
+            wait_for_response(&mut inbox, RpcId::Number(1.into()), &mut budget, &context),
         )?;
-
         cleanup_on_error(
             &mut child,
-            send_json(&mut stdin, json!({ "method": "initialized", "params": {} })),
+            send_json_shared(&stdin, json!({ "method": "initialized", "params": {} })),
         )?;
+        pending_guard.disarm();
 
         Ok(Self {
             child,
             stdin,
-            line_rx,
+            inbox,
             stderr_rx,
             next_id: 2,
             last_used: Instant::now(),
+            session_id,
+            rpc_state,
+            app: app.clone(),
+            room_id: room_id.to_string(),
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn run_turn(
         &mut self,
         cwd: &str,
@@ -704,20 +355,39 @@ impl CodexServerSession {
         reasoning_effort: &str,
         service_tier: &str,
         previous_thread_id: Option<&str>,
+        client_turn_id: &str,
         timeout: Duration,
+        cancelled: Arc<std::sync::atomic::AtomicBool>,
     ) -> Result<CodexTurnResult, String> {
-        let started_at = Instant::now();
+        let mut budget = ActiveTimeout::new(timeout);
+        let stdin = self.stdin.clone();
+        let app = self.app.clone();
+        let rpc_state = self.rpc_state.clone();
+        let room_id = self.room_id.clone();
+        let context = RpcRequestContext {
+            app: &app,
+            state: rpc_state,
+            room_id: &room_id,
+            session_id: self.session_id,
+            stdin,
+            cancelled: Some(cancelled.clone()),
+        };
         let thread_request_id = self.allocate_id();
         cleanup_on_error(
             &mut self.child,
-            send_json(
-                &mut self.stdin,
+            send_json_shared(
+                &self.stdin,
                 codex_thread_request(thread_request_id, previous_thread_id, cwd, model),
             ),
         )?;
         let thread_response = cleanup_on_error(
             &mut self.child,
-            wait_for_response_message(&self.line_rx, thread_request_id, started_at, timeout),
+            wait_for_response_message(
+                &mut self.inbox,
+                RpcId::Number(thread_request_id.into()),
+                &mut budget,
+                &context,
+            ),
         )?;
         let mut events = Vec::new();
         let mut thread_id = thread_response
@@ -738,20 +408,26 @@ impl CodexServerSession {
                 let Some(previous_thread_id) = previous_thread_id else {
                     return Err(error);
                 };
+                let _ = error;
                 events.push(format!(
-                    "{error}; starting a new thread instead of {previous_thread_id}."
+                    "thread/resume failed; starting a new thread instead of {previous_thread_id}."
                 ));
                 let fallback_request_id = self.allocate_id();
                 cleanup_on_error(
                     &mut self.child,
-                    send_json(
-                        &mut self.stdin,
+                    send_json_shared(
+                        &self.stdin,
                         codex_thread_start_request(fallback_request_id, cwd, model),
                     ),
                 )?;
                 let fallback_response = cleanup_on_error(
                     &mut self.child,
-                    wait_for_response(&self.line_rx, fallback_request_id, started_at, timeout),
+                    wait_for_response(
+                        &mut self.inbox,
+                        RpcId::Number(fallback_request_id.into()),
+                        &mut budget,
+                        &context,
+                    ),
                 )?;
                 fallback_response
                     .get("result")
@@ -778,8 +454,8 @@ impl CodexServerSession {
         let turn_request_id = self.allocate_id();
         cleanup_on_error(
             &mut self.child,
-            send_json(
-                &mut self.stdin,
+            send_json_shared(
+                &self.stdin,
                 json!({
                     "method": "turn/start",
                     "id": turn_request_id,
@@ -796,54 +472,98 @@ impl CodexServerSession {
         )?;
 
         let mut transcript = String::new();
+        let mut activity_started_at = HashMap::<String, String>::new();
 
         let status = loop {
-            if started_at.elapsed() > timeout {
+            if cancelled.load(Ordering::Acquire) {
+                break "cancelled".to_string();
+            }
+            if budget.expired(self.rpc_state.has_pending_session(self.session_id)) {
                 break "timeout".to_string();
             }
 
-            match self.line_rx.recv_timeout(Duration::from_millis(500)) {
-                Ok(line) => {
-                    let parsed: Value = match serde_json::from_str(&line) {
-                        Ok(parsed) => parsed,
-                        Err(error) => {
-                            events.push(format!("Invalid app-server JSON line: {error}"));
-                            break "error".to_string();
-                        }
-                    };
-                    if parsed.get("id").and_then(Value::as_i64) == Some(turn_request_id) {
+            let message = self
+                .inbox
+                .deferred
+                .pop_front()
+                .map(Ok)
+                .unwrap_or_else(|| self.inbox.receive(Duration::from_millis(500)));
+            match message {
+                Ok(RpcMessage::Response { id, value: parsed }) => {
+                    if id == RpcId::Number(turn_request_id.into()) {
                         events.push("turn/start acknowledged".to_string());
-                        if let Some(error) = parsed.get("error") {
-                            events.push(error.to_string());
+                        if parsed.get("error").is_some() {
+                            events.push("turn/start failed".to_string());
                             break "error".to_string();
                         }
-                        continue;
                     }
-
-                    let method = parsed.get("method").and_then(Value::as_str).unwrap_or("");
+                }
+                Ok(RpcMessage::ServerRequest { id, method, params }) => {
+                    if let Err(error) =
+                        self.rpc_state
+                            .register(&context, id, method.clone(), params)
+                    {
+                        events.push(format!("{method}: request handling failed: {error}"));
+                        break "error".to_string();
+                    }
+                    events.push(method);
+                }
+                Ok(RpcMessage::Notification {
+                    method,
+                    value: parsed,
+                }) => {
+                    if let Some(activity) = project_codex_activity(
+                        &method,
+                        &parsed,
+                        &room_id,
+                        client_turn_id,
+                        &mut activity_started_at,
+                    ) {
+                        let _ = self.app.emit("codex://activity", activity);
+                    }
+                    if method == "serverRequest/resolved" {
+                        if let Some(id) = parsed
+                            .get("params")
+                            .and_then(|params| params.get("requestId"))
+                            .and_then(RpcId::from_value)
+                        {
+                            if let Some(event) =
+                                self.rpc_state.remove_resolved(self.session_id, &id)
+                            {
+                                let _ = self.app.emit("codex://server-request-resolved", event);
+                            }
+                        }
+                    }
                     if method.contains("agentMessage") || method.contains("message") {
                         if let Some(delta) = extract_text_delta(&parsed) {
                             transcript.push_str(&delta);
                         }
                     }
 
-                    if !method.is_empty() {
-                        events.push(method.to_string());
-                    }
+                    events.push(method.clone());
 
                     if method == "turn/completed" {
                         break parsed
                             .get("params")
-                            .and_then(|params| params.get("status"))
+                            .and_then(|params| params.get("turn"))
+                            .and_then(|turn| turn.get("status"))
                             .and_then(Value::as_str)
                             .unwrap_or("completed")
                             .to_string();
                     }
                 }
-                Err(mpsc::RecvTimeoutError::Timeout) => continue,
-                Err(mpsc::RecvTimeoutError::Disconnected) => break "disconnected".to_string(),
+                Err(error) if error == "timeout" => continue,
+                Err(error) => {
+                    events.push(error);
+                    break "disconnected".to_string();
+                }
             }
         };
+
+        self.rpc_state.cancel_session(
+            self.session_id,
+            "Codex turn ended before the request was answered",
+        );
 
         self.last_used = Instant::now();
         let stderr = self.stderr_rx.try_iter().collect::<Vec<_>>().join("\n");
@@ -870,13 +590,18 @@ impl CodexServerSession {
 
 impl Drop for CodexServerSession {
     fn drop(&mut self) {
+        self.rpc_state
+            .cancel_session(self.session_id, "Codex app-server session ended");
         terminate_child(&mut self.child);
     }
 }
 
 impl CodexTurnResult {
     fn is_reusable(&self) -> bool {
-        !matches!(self.status.as_str(), "timeout" | "disconnected")
+        !matches!(
+            self.status.as_str(),
+            "timeout" | "disconnected" | "cancelled"
+        )
     }
 }
 
@@ -909,6 +634,9 @@ fn codex_sessions() -> &'static Mutex<HashMap<CodexServerKey, CodexServerSession
 fn checkout_codex_session(
     key: &CodexServerKey,
     timeout: Duration,
+    app: &tauri::AppHandle,
+    rpc_state: CodexRpcState,
+    cancelled: Arc<std::sync::atomic::AtomicBool>,
 ) -> Result<CodexServerSession, String> {
     prune_idle_codex_sessions();
     if let Some(mut session) = codex_sessions()
@@ -921,6 +649,9 @@ fn checkout_codex_session(
         }
     }
     CodexServerSession::start(
+        app,
+        rpc_state,
+        &key.room_id,
         &key.cwd,
         &key.reasoning_effort,
         &key.service_tier,
@@ -930,6 +661,7 @@ fn checkout_codex_session(
             network_access: key.network_access,
         },
         timeout,
+        cancelled,
     )
 }
 
@@ -995,49 +727,6 @@ fn codex_thread_resume_request(id: i64, thread_id: &str, cwd: &str, model: &str)
             "excludeTurns": true
         }
     })
-}
-
-fn send_json(stdin: &mut ChildStdin, value: Value) -> Result<(), String> {
-    writeln!(stdin, "{value}")
-        .map_err(|error| format!("Failed to write app-server JSON: {error}"))?;
-    stdin
-        .flush()
-        .map_err(|error| format!("Failed to flush app-server stdin: {error}"))
-}
-
-fn wait_for_response(
-    line_rx: &mpsc::Receiver<String>,
-    id: i64,
-    started_at: Instant,
-    timeout: Duration,
-) -> Result<Value, String> {
-    let parsed = wait_for_response_message(line_rx, id, started_at, timeout)?;
-    if let Some(error) = parsed.get("error") {
-        return Err(format!("App-server request {id} failed: {error}"));
-    }
-    Ok(parsed)
-}
-
-fn wait_for_response_message(
-    line_rx: &mpsc::Receiver<String>,
-    id: i64,
-    started_at: Instant,
-    timeout: Duration,
-) -> Result<Value, String> {
-    loop {
-        if started_at.elapsed() > timeout {
-            return Err(format!("Timed out waiting for app-server response id {id}"));
-        }
-
-        let line = line_rx
-            .recv_timeout(Duration::from_millis(500))
-            .map_err(|error| format!("App-server response channel closed: {error}"))?;
-        let parsed: Value = serde_json::from_str(&line)
-            .map_err(|error| format!("Invalid app-server JSON line: {error}; {line}"))?;
-        if parsed.get("id").and_then(Value::as_i64) == Some(id) {
-            return Ok(parsed);
-        }
-    }
 }
 
 fn extract_text_delta(value: &Value) -> Option<String> {

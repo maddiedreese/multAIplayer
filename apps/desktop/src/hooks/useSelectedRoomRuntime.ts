@@ -11,6 +11,8 @@ import type {
   ChatAttachment,
   ChatMessage,
   CodexRoomEvent,
+  CodexActivity,
+  CodexThreadGraph,
   HostHandoffRecord,
   InviteJoinRequest,
   LocalPreviewRecord,
@@ -51,9 +53,11 @@ interface UseSelectedRoomRuntimeOptions {
   localPreviewBusyByRoom: Record<string, boolean>;
   inviteRequestsByRoom: Record<string, InviteJoinRequest[]>;
   codexEventsByRoom: Record<string, CodexRoomEvent[]>;
+  codexActivitiesByRoom: Record<string, CodexActivity[]>;
   gitWorkflowEventsByRoom: Record<string, GitWorkflowEventPlaintextPayload[]>;
   githubActionsEventsByRoom: Record<string, GitHubActionsEventPlaintextPayload[]>;
   codexThreadIdsByRoom: Record<string, string | null>;
+  codexThreadGraphsByRoom: Record<string, CodexThreadGraph>;
   codexRunningByRoom: Record<string, boolean>;
   hostBusyByRoom: Record<string, boolean>;
   settingsBusyByRoom: Record<string, boolean>;
@@ -83,9 +87,11 @@ export function useSelectedRoomRuntime({
   localPreviewBusyByRoom,
   inviteRequestsByRoom,
   codexEventsByRoom,
+  codexActivitiesByRoom,
   gitWorkflowEventsByRoom,
   githubActionsEventsByRoom,
   codexThreadIdsByRoom,
+  codexThreadGraphsByRoom,
   codexRunningByRoom,
   hostBusyByRoom,
   settingsBusyByRoom,
@@ -105,9 +111,11 @@ export function useSelectedRoomRuntime({
   const inspectorAttention = inspectorAttentionCounts({ approvalVisible, terminalRequests, browserRequests });
   const inviteRequests = inviteRequestsByRoom[roomId] ?? [];
   const codexEvents = codexEventsByRoom[roomId] ?? [];
+  const codexActivities = codexActivitiesByRoom[roomId] ?? [];
   const gitWorkflowEvents = gitWorkflowEventsByRoom[roomId] ?? [];
   const githubActionsEvents = githubActionsEventsByRoom[roomId] ?? [];
   const selectedCodexThreadId = codexThreadIdsByRoom[roomId] ?? null;
+  const codexThreadGraph = codexThreadGraphsByRoom[roomId] ?? { activeThreadId: null, nodesById: {} };
   const codexRunning = codexRunningByRoom[roomId] ?? false;
   const approvalTranscriptMessages = messagesSinceLastCodex(activeCodexApproval?.messages ?? messages) as ChatMessage[];
   const replyTargetMessage = replyToMessageId ? messages.find((message) => message.id === replyToMessageId) ?? null : null;
@@ -171,9 +179,11 @@ export function useSelectedRoomRuntime({
     inspectorAttention,
     inviteRequests,
     codexEvents,
+    codexActivities,
     gitWorkflowEvents,
     githubActionsEvents,
     selectedCodexThreadId,
+    codexThreadGraph,
     codexRunning,
     approvalTranscriptMessages,
     codexApprovalSummaryDisplay,
