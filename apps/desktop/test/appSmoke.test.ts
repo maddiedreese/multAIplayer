@@ -105,6 +105,10 @@ class TestWebSocket {
     for (const socket of [...TestWebSocket.instances]) socket.close();
   }
 
+  static activeCount() {
+    return TestWebSocket.instances.size;
+  }
+
   private dispatch(type: string, event: MessageEvent | Event) {
     for (const listener of this.listeners.get(type) ?? []) {
       listener(event);
@@ -300,6 +304,30 @@ test("App smoke", { timeout: 25_000 }, async (t) => {
 
     await screen.findByRole("button", { name: "remote-shell" });
     await waitFor(() => assert.equal(document.activeElement, composer));
+  });
+
+  await t.test("releases global resize handlers when the app unmounts mid-drag", { timeout: 5_000 }, async () => {
+    resetAppSmokeDom();
+    const view = render(createElement(App));
+    const separator = await screen.findByRole("separator", { name: "Resize sidebar" });
+    const initialWidth = useAppStore.getState().sidebarWidth;
+
+    fireEvent.pointerDown(separator, { clientX: 100 });
+    view.unmount();
+    fireEvent.pointerMove(window, { clientX: 240 });
+
+    assert.equal(useAppStore.getState().sidebarWidth, initialWidth);
+  });
+
+  await t.test("repeated app mounts release relay sockets", { timeout: 5_000 }, async () => {
+    resetAppSmokeDom();
+    for (let cycle = 0; cycle < 5; cycle += 1) {
+      const view = render(createElement(App));
+      await waitFor(() => assert.ok(screen.getAllByText("Desktop app").length > 0));
+      view.unmount();
+      view.container.remove();
+      await waitFor(() => assert.equal(TestWebSocket.activeCount(), 0));
+    }
   });
 
   await t.test("switches inspector tabs after browser and files without blanking the rail", { timeout: 5_000 }, async () => {

@@ -1,9 +1,10 @@
-import { useMemo, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { clamp } from "../lib/appFormatters";
 import { useAppStore } from "../store/appStore";
 
 export function useShellLayout() {
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
   const { sidebarWidth, inspectorWidth, sidebarCollapsed, inspectorCollapsed } = useAppStore(useShallow((state) => ({
     sidebarWidth: state.sidebarWidth,
     inspectorWidth: state.inspectorWidth,
@@ -19,8 +20,11 @@ export function useShellLayout() {
     toggleInspectorCollapsed
   } = useAppStore.getState();
 
+  useEffect(() => () => resizeCleanupRef.current?.(), []);
+
   function beginShellResize(side: "sidebar" | "inspector", event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault();
+    resizeCleanupRef.current?.();
     const startX = event.clientX;
     const startWidth = side === "sidebar" ? sidebarWidth : inspectorWidth;
 
@@ -34,13 +38,15 @@ export function useShellLayout() {
       }
     }
 
-    function onPointerUp() {
+    function cleanupResize() {
       window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointerup", cleanupResize);
+      if (resizeCleanupRef.current === cleanupResize) resizeCleanupRef.current = null;
     }
 
     window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp, { once: true });
+    window.addEventListener("pointerup", cleanupResize, { once: true });
+    resizeCleanupRef.current = cleanupResize;
   }
 
   const shellStyle = useMemo(() => ({
