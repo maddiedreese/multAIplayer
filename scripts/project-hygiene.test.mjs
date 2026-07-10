@@ -88,3 +88,16 @@ test("TypeScript quality gates stay enforced", () => {
   assert.equal(rootPackage.devDependencies.eslint, "10.6.0");
   assert.equal(rootPackage.devDependencies.prettier, "3.9.5");
 });
+
+test("contributor architecture decisions stay indexed and structured", () => {
+  for (const decision of [
+    "zustand-store-boundaries.md",
+    "active-host-authorization.md",
+    "metadata-only-codex-activity.md"
+  ]) {
+    const record = readFileSync(`docs/decisions/${decision}`, "utf8");
+    assert.match(record, /^Status: accepted$/m, decision);
+    assert.match(record, /^## Decision$/m, decision);
+    assert.match(record, /^## Consequences$/m, decision);
+  }
+});
