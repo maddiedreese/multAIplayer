@@ -4,6 +4,42 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 const typescriptFiles = ["**/*.{ts,tsx}"];
+const workspacePackages = [
+  "@multaiplayer/codex",
+  "@multaiplayer/crypto",
+  "@multaiplayer/desktop",
+  "@multaiplayer/git",
+  "@multaiplayer/github",
+  "@multaiplayer/protocol",
+  "@multaiplayer/relay"
+];
+const relativeWorkspaceSourcePattern =
+  "^(?:\\.\\./)+(?:apps/(?:desktop|relay)|packages/(?:codex|crypto|git|github|protocol)|(?:desktop|relay|codex|crypto|git|github|protocol))(?:/|$)";
+
+function packageBoundaryRule(workspaceName, dependencies = []) {
+  const dependencySet = new Set(dependencies);
+  const forbiddenPackages = workspacePackages.filter((packageName) => !dependencySet.has(packageName));
+
+  return [
+    "error",
+    {
+      paths: forbiddenPackages.map((packageName) => ({
+        name: packageName,
+        message: `${workspaceName} does not depend on ${packageName}. Add an intentional package boundary before importing it.`
+      })),
+      patterns: [
+        {
+          group: workspacePackages.map((packageName) => `${packageName}/*`),
+          message: "Import from a workspace package's public entry point instead of reaching into its internals."
+        },
+        {
+          regex: relativeWorkspaceSourcePattern,
+          message: "Import workspace dependencies by package name instead of reaching across workspace source trees."
+        }
+      ]
+    }
+  ];
+}
 
 export default tseslint.config(
   {
@@ -53,5 +89,37 @@ export default tseslint.config(
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "error"
     }
-  }
+  },
+  {
+    files: ["apps/desktop/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": packageBoundaryRule("@multaiplayer/desktop", [
+        "@multaiplayer/crypto",
+        "@multaiplayer/git",
+        "@multaiplayer/github",
+        "@multaiplayer/protocol"
+      ])
+    }
+  },
+  {
+    files: ["apps/relay/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": packageBoundaryRule("@multaiplayer/relay", [
+        "@multaiplayer/github",
+        "@multaiplayer/protocol"
+      ])
+    }
+  },
+  {
+    files: ["packages/crypto/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": packageBoundaryRule("@multaiplayer/crypto", ["@multaiplayer/protocol"])
+    }
+  },
+  ...["codex", "git", "github", "protocol"].map((packageName) => ({
+    files: [`packages/${packageName}/**/*.{ts,tsx}`],
+    rules: {
+      "no-restricted-imports": packageBoundaryRule(`@multaiplayer/${packageName}`)
+    }
+  }))
 );
