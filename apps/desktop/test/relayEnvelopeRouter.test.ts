@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createRoomSecret, encryptJson, type RoomSecret } from "@multaiplayer/crypto";
-import type { CodexQueuePlaintextPayload, RelayEnvelope } from "@multaiplayer/protocol";
+import type { CodexQueuePlaintextPayload, RelayEnvelope, RoomRecord } from "@multaiplayer/protocol";
 import { handleCodexQueueEvent, routeRelayEnvelope } from "../src/hooks/relay/routeRelayEnvelope";
 import { importRoomSecret } from "../src/lib/localHistory";
 import { useAppStore } from "../src/store/appStore";
@@ -21,6 +21,23 @@ Object.defineProperty(globalThis, "localStorage", { configurable: true, value: l
 Object.defineProperty(globalThis, "window", { configurable: true, value: {} });
 
 const roomId = "room-relay-router";
+const relayRoom: RoomRecord = {
+  id: roomId,
+  teamId: "team-relay-router",
+  name: "Relay router",
+  projectPath: "/tmp/project",
+  host: "Peer",
+  hostUserId: "github:peer",
+  hostStatus: "active",
+  approvalPolicy: "ask_every_turn",
+  approvalDelegationPolicy: "host_only",
+  trustedApproverUserIds: [],
+  mode: { chat: true, code: true, workspace: true, browser: true },
+  codexModel: "gpt-5.4",
+  browserAllowedOrigins: [],
+  browserProfilePersistent: true,
+  unread: 0
+};
 let roomSecret: RoomSecret;
 
 test.beforeEach(async () => {
@@ -137,13 +154,35 @@ test("live routing accepts strict Codex and complete room-setting payloads", asy
   assert.equal(state.messagesByRoom[roomId]?.length, 2);
 });
 
-async function routePayload(kind: RelayEnvelope["kind"], plaintext: unknown): Promise<void> {
+test("live routing rejects room-setting notices not authored by the active host", async () => {
+  const payload = {
+    eventType: "room.settings",
+    id: "settings-unauthorized",
+    setting: "roomName",
+    previousValue: "Old",
+    nextValue: "Spoofed",
+    changedBy: "Member",
+    changedByUserId: "github:member",
+    changedAt: "2026-07-09T12:01:00.000Z"
+  } as const;
+
+  await routePayload("room.settings", payload, { senderUserId: "github:member" });
+  await routePayload("room.settings", payload);
+
+  assert.equal(useAppStore.getState().messagesByRoom[roomId]?.length ?? 0, 0);
+});
+
+async function routePayload(
+  kind: RelayEnvelope["kind"],
+  plaintext: unknown,
+  options: { senderUserId?: string; rooms?: RoomRecord[] } = {}
+): Promise<void> {
   const envelope: RelayEnvelope = {
     id: crypto.randomUUID(),
     teamId: "team-relay-router",
     roomId,
     senderDeviceId: "device-peer",
-    senderUserId: "github:peer",
+    senderUserId: options.senderUserId ?? "github:peer",
     createdAt: "2026-07-09T12:00:00.000Z",
     kind,
     payload: await encryptJson(plaintext, roomSecret)
@@ -151,7 +190,7 @@ async function routePayload(kind: RelayEnvelope["kind"], plaintext: unknown): Pr
   await routeRelayEnvelope(envelope, {
     deviceId: "device-local",
     localUser: { id: "github:local", name: "Local" },
-    roomsRef: { current: [] },
+    roomsRef: { current: options.rooms ?? [relayRoom] },
     selectedRoomIdRef: { current: roomId },
     historyLoadedRoomIds: { current: new Set<string>() },
     markIncomingChatUnread: () => undefined,

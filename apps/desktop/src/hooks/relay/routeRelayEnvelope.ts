@@ -302,13 +302,16 @@ export async function routeRelayEnvelope(
   }
   if (envelope.kind === "room.settings") {
     const parsed = RoomSettingsPlaintextPayload.safeParse(await decryptJson<unknown>(roomPayload, secret));
-    if (parsed.success) {
-      store.appendRoomMessage(roomId, buildRoomSettingsSystemMessage(parsed.data, {
-        approvalPolicyLabels,
-        approvalDelegationPolicyLabels,
-        roomModeLabels
-      }));
+    if (!parsed.success) return;
+    const envelopeRoom = findEnvelopeRoom(context.roomsRef.current, roomId);
+    if (!isEnvelopeFromActiveRoomHost(envelopeRoom, envelope) || parsed.data.changedByUserId !== envelope.senderUserId) {
+      return;
     }
+    store.appendRoomMessage(roomId, buildRoomSettingsSystemMessage(parsed.data, {
+      approvalPolicyLabels,
+      approvalDelegationPolicyLabels,
+      roomModeLabels
+    }));
     return;
   }
   if (envelope.kind === "room.key") {
