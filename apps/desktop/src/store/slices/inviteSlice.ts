@@ -91,11 +91,7 @@ export interface InviteSlice {
   setInviteMessageForRoom: (roomId: string, message: string | null) => void;
 }
 
-export const emptyInviteState: Pick<
-  InviteSlice,
-  | "inviteByRoom"
-  | "inviteSecretInput"
-> = {
+export const emptyInviteState: Pick<InviteSlice, "inviteByRoom" | "inviteSecretInput"> = {
   inviteByRoom: {},
   inviteSecretInput: ""
 };

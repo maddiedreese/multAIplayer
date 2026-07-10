@@ -81,7 +81,10 @@ function formatRoomModeChange(value: string, labels: RoomSettingsMessageLabels):
 }
 
 function formatOriginList(value: string): string {
-  const origins = value.split(",").map((origin) => origin.trim()).filter(Boolean);
+  const origins = value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
   if (!origins.length) return "no sites";
   return origins.map(formatBrowserAccessLabel).join(", ");
 }

@@ -30,26 +30,32 @@ export function useLocalPreviewPolling({
           readLocalPreviewTunnelStatus(preview.id)
             .then((status) => {
               if (status.running && status.localReachable) return;
-              void publishLocalPreviewEvent({
-                ...preview,
-                status: "error",
-                message: status.running
-                  ? "The local web server stopped responding. Stop sharing and restart the preview after the app is running again."
-                  : `Cloudflare Quick Tunnel exited${status.exitStatus === null ? "" : ` with status ${status.exitStatus}`}.`,
-                updatedAt: new Date().toISOString()
-              }, room);
+              void publishLocalPreviewEvent(
+                {
+                  ...preview,
+                  status: "error",
+                  message: status.running
+                    ? "The local web server stopped responding. Stop sharing and restart the preview after the app is running again."
+                    : `Cloudflare Quick Tunnel exited${status.exitStatus === null ? "" : ` with status ${status.exitStatus}`}.`,
+                  updatedAt: new Date().toISOString()
+                },
+                room
+              );
             })
             .catch((error) => {
-              void publishLocalPreviewEvent({
-                ...preview,
-                status: "error",
-                message: `Cloudflare Quick Tunnel is no longer running on this device: ${String(error)}`,
-                updatedAt: new Date().toISOString()
-              }, room);
+              void publishLocalPreviewEvent(
+                {
+                  ...preview,
+                  status: "error",
+                  message: `Cloudflare Quick Tunnel is no longer running on this device: ${String(error)}`,
+                  updatedAt: new Date().toISOString()
+                },
+                room
+              );
             });
         }
       }
     }, 5_000);
     return () => window.clearInterval(interval);
-  }, [localPreviewsByRoom, localUserId]);
+  }, [localPreviewsByRoom, localUserId, publishLocalPreviewEvent, roomsRef]);
 }

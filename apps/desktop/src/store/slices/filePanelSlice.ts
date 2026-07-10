@@ -115,10 +115,7 @@ export interface FilePanelSlice {
   resetFileContextForRoom: (roomId: string) => void;
 }
 
-export const emptyFilePanelState: Pick<
-  FilePanelSlice,
-  | "filePanelByRoom"
-> = {
+export const emptyFilePanelState: Pick<FilePanelSlice, "filePanelByRoom"> = {
   filePanelByRoom: {}
 };
 
@@ -201,7 +198,7 @@ export const createFilePanelSlice: StateCreator<AppStoreState, [], [], FilePanel
     set((state) => ({
       filePanelByRoom: updateFilePanelForRoom(state.filePanelByRoom, roomId, (roomPanel) => {
         const requests = roomPanel.saveRequests ?? [];
-        const nextRequests = requests.map((request) => request.id === requestId ? { ...request, status } : request);
+        const nextRequests = requests.map((request) => (request.id === requestId ? { ...request, status } : request));
         return { ...roomPanel, saveRequests: nextRequests };
       })
     }));

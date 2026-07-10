@@ -55,17 +55,19 @@ export function CodexThreadGraphPanel({ roomId, projectPath }: { roomId: string;
     }
   }
 
-  return <CodexThreadGraphView
-    graph={graph ?? { activeThreadId: null, nodesById: {} }}
-    agentTree={agentTree}
-    busy={busy}
-    message={message}
-    lastTurnId={lastTurnId}
-    onLastTurnIdChange={setLastTurnId}
-    onRefresh={() => void refreshThreads()}
-    onFork={() => void forkActiveThread()}
-    onSwitch={(threadId) => void switchThread(threadId)}
-  />;
+  return (
+    <CodexThreadGraphView
+      graph={graph ?? { activeThreadId: null, nodesById: {} }}
+      agentTree={agentTree}
+      busy={busy}
+      message={message}
+      lastTurnId={lastTurnId}
+      onLastTurnIdChange={setLastTurnId}
+      onRefresh={() => void refreshThreads()}
+      onFork={() => void forkActiveThread()}
+      onSwitch={(threadId) => void switchThread(threadId)}
+    />
+  );
 }
 
 export function CodexThreadGraphView({
@@ -94,30 +96,61 @@ export function CodexThreadGraphView({
     <section className="panel codex-thread-graph" aria-label="Codex thread graph">
       {graph?.activeThreadId ? (
         <>
-          <header><strong>Thread graph</strong><button type="button" disabled={busy} onClick={onRefresh}>Refresh</button></header>
+          <header>
+            <strong>Thread graph</strong>
+            <button type="button" disabled={busy} onClick={onRefresh}>
+              Refresh
+            </button>
+          </header>
           <ol>
             {nodes.map((node) => (
               <li key={node.id} data-active={node.id === graph.activeThreadId}>
                 <span>{node.parentThreadId ? "↳" : "●"}</span>
-                <div><strong>{node.title}</strong><small>{shortId(node.id)} · {node.status}</small></div>
-                {node.id === graph.activeThreadId
-                  ? <em>Active</em>
-                  : <button type="button" disabled={busy} onClick={() => onSwitch(node.id)}>Switch</button>}
+                <div>
+                  <strong>{node.title}</strong>
+                  <small>
+                    {shortId(node.id)} · {node.status}
+                  </small>
+                </div>
+                {node.id === graph.activeThreadId ? (
+                  <em>Active</em>
+                ) : (
+                  <button type="button" disabled={busy} onClick={() => onSwitch(node.id)}>
+                    Switch
+                  </button>
+                )}
               </li>
             ))}
           </ol>
           <div className="codex-thread-fork-controls">
-            <input aria-label="Last turn ID (optional)" placeholder="Last turn ID (optional)" value={lastTurnId} onChange={(event) => onLastTurnIdChange(event.target.value)} />
-            <button type="button" disabled={busy} onClick={onFork}>Fork active</button>
+            <input
+              aria-label="Last turn ID (optional)"
+              placeholder="Last turn ID (optional)"
+              value={lastTurnId}
+              onChange={(event) => onLastTurnIdChange(event.target.value)}
+            />
+            <button type="button" disabled={busy} onClick={onFork}>
+              Fork active
+            </button>
           </div>
         </>
       ) : null}
       {agentTree.length ? (
         <div className="codex-agent-tree" aria-label="Codex agent tree">
           <strong>Agent tree</strong>
-          <ol>{agentTree.map((agent) => (
-            <li key={agent.id}><span>{agent.parentId ? "↳" : "●"}</span><div><strong>{shortId(agent.id)}</strong><small>{agent.lastAction} · {agent.status}</small></div></li>
-          ))}</ol>
+          <ol>
+            {agentTree.map((agent) => (
+              <li key={agent.id}>
+                <span>{agent.parentId ? "↳" : "●"}</span>
+                <div>
+                  <strong>{shortId(agent.id)}</strong>
+                  <small>
+                    {agent.lastAction} · {agent.status}
+                  </small>
+                </div>
+              </li>
+            ))}
+          </ol>
         </div>
       ) : null}
       {message ? <p role="status">{message}</p> : null}

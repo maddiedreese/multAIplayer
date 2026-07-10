@@ -11,12 +11,7 @@ interface RoomMainColumnProps {
   chatProps: ComponentProps<typeof RoomChatPanel>;
 }
 
-export function RoomMainColumn({
-  headerProps,
-  statusProps,
-  markdownFallbackProps,
-  chatProps
-}: RoomMainColumnProps) {
+export function RoomMainColumn({ headerProps, statusProps, markdownFallbackProps, chatProps }: RoomMainColumnProps) {
   return (
     <main className="room">
       <RoomHeader {...headerProps} />

@@ -11,7 +11,6 @@ import type { WorkspaceRecordActions } from "../lib/workspaceRecordActions";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import { useRoomRuntimeContext } from "./useRoomRuntimeContext";
-import type { useRoomSettingsActor } from "./useRoomSettingsActor";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
 
@@ -24,7 +23,6 @@ type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
 type RoomActions = ReturnType<typeof createAppRoomActions>;
 type RelaySync = ReturnType<typeof useAppRelaySync>;
 type HostHandoffActions = ReturnType<typeof useAppHostHandoffActions>;
-type RoomSettingsActor = ReturnType<typeof useRoomSettingsActor>;
 
 export function useAppRoomRuntime({
   appRefs,
@@ -37,7 +35,6 @@ export function useAppRoomRuntime({
   relaySync,
   hostHandoffActions,
   workspaceRecords,
-  roomSettingsActor,
   maxTerminalActivityLines,
   defaultBrowserUrl,
   defaultBrowserReason
@@ -52,29 +49,20 @@ export function useAppRoomRuntime({
   relaySync: RelaySync;
   hostHandoffActions: HostHandoffActions;
   workspaceRecords: WorkspaceRecordActions;
-  roomSettingsActor: RoomSettingsActor;
   maxTerminalActivityLines: number;
   defaultBrowserUrl: string;
   defaultBrowserReason: string;
 }) {
   const {
     selectedCodexModel,
-    selectedCodexReasoningEffort,
-    selectedCodexSpeed,
-    selectedCodexSandboxLevel,
     hasSelectedRoom,
     selectedRoom,
     inspectorTab,
     roomTerminals,
-    projectPathDraft,
     messages,
-    replyToMessageId,
-    draft,
     roomGoal,
-    pendingAttachments,
     browserRequests,
     fileSaveRequests,
-    gitStatus,
     gitWorkflowDraft,
     fileQuery,
     terminalBusy,
@@ -82,56 +70,46 @@ export function useAppRoomRuntime({
   } = selected;
   const roomId = selectedRoom.id;
   const {
-    codexProbe, forgottenRoomIds, revokedRoomIds, revokedTeamIds, selectedRoomId,
-    roomMessages, terminals, selectedBrowserRequests, selectedGitStatus, selectedCodexRuntime,
-    historySettings, chatEdits, chatDeletes, selectedLocalPreviews
-  } = useAppStore(useShallow((state) => ({
-    codexProbe: state.codexProbe,
-    forgottenRoomIds: state.forgottenRoomIds,
-    revokedRoomIds: state.revokedRoomIds,
-    revokedTeamIds: state.revokedTeamIds,
-    selectedRoomId: state.selectedRoomId,
-    roomMessages: state.messagesByRoom[roomId],
-    terminals: state.terminals,
-    selectedBrowserRequests: state.browserByRoom[roomId]?.requests,
-    selectedGitStatus: state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.status,
-    selectedCodexRuntime: state.codexRuntimeByRoom[roomId],
-    historySettings: state.historySettings,
-    chatEdits: state.chatEditsByRoom[roomId],
-    chatDeletes: state.chatDeletesByRoom[roomId],
-    selectedLocalPreviews: state.localPreviewByRoom[roomId]?.previews
-  })));
+    codexProbe,
+    forgottenRoomIds,
+    revokedRoomIds,
+    revokedTeamIds,
+    selectedRoomId,
+    roomMessages,
+    terminals,
+    selectedBrowserRequests,
+    selectedGitStatus,
+    selectedCodexRuntime,
+    historySettings,
+    chatEdits,
+    chatDeletes,
+    selectedLocalPreviews
+  } = useAppStore(
+    useShallow((state) => ({
+      codexProbe: state.codexProbe,
+      forgottenRoomIds: state.forgottenRoomIds,
+      revokedRoomIds: state.revokedRoomIds,
+      revokedTeamIds: state.revokedTeamIds,
+      selectedRoomId: state.selectedRoomId,
+      roomMessages: state.messagesByRoom[roomId],
+      terminals: state.terminals,
+      selectedBrowserRequests: state.browserByRoom[roomId]?.requests,
+      selectedGitStatus: state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.status,
+      selectedCodexRuntime: state.codexRuntimeByRoom[roomId],
+      historySettings: state.historySettings,
+      chatEdits: state.chatEditsByRoom[roomId],
+      chatDeletes: state.chatDeletesByRoom[roomId],
+      selectedLocalPreviews: state.localPreviewByRoom[roomId]?.previews
+    }))
+  );
   const terminalAutoOpenedRoomsRef = useRef<Set<string>>(new Set());
   const {
     setHostMessageForRoom,
-    setSelectedHostMessage,
-    setChatMessageForRoom,
-    setSelectedChatMessage,
-    setSelectedSettingsMessage,
-    setSettingsMessageForRoom,
     setActionsBusyForRoom,
-    setLocalPreviewBusyForRoom,
-    setFileBusyForRoom,
-    setProjectFilesForRoom,
-    setSelectedFileForRoom,
-    setSelectedDiffForRoom,
-    setFileMessageForRoom,
-    resetFileContextForRoom,
-    setSelectedTerminalIdForRoom,
-    setTerminalErrorForRoom,
-    setSelectedTerminalError,
     appendTerminalLinesForRoom,
     setApprovalVisibleForRoom,
     setPendingCodexApprovalForRoom,
-    resetCodexApprovalForRoom,
-    setCodexRunningForRoom,
-    setRoomGoalForRoom,
-    clearPendingAttachmentsForRoom,
-    setDraftForRoom,
-    setProjectPathDraftForRoom,
-    setGitStatusForRoom,
-    appendTerminalRequest,
-    updateTerminalRequestStatus
+    setCodexRunningForRoom
   } = roomActions;
 
   const runtime = useRoomRuntimeContext({
@@ -150,10 +128,14 @@ export function useAppRoomRuntime({
         terminals,
         browserRequestsByRoom: selectedBrowserRequests ? { [roomId]: selectedBrowserRequests } : {},
         gitStatusByRoom: selectedGitStatus ? { [roomId]: selectedGitStatus } : {},
-        codexContinuationByRoom: selectedCodexRuntime?.continuation ? { [roomId]: selectedCodexRuntime.continuation } : {},
+        codexContinuationByRoom: selectedCodexRuntime?.continuation
+          ? { [roomId]: selectedCodexRuntime.continuation }
+          : {},
         codexThreadIdsByRoom: selectedCodexRuntime?.threadGraph?.activeThreadId
           ? { [roomId]: selectedCodexRuntime.threadGraph.activeThreadId }
-          : selectedCodexRuntime?.threadId ? { [roomId]: selectedCodexRuntime.threadId } : {},
+          : selectedCodexRuntime?.threadId
+            ? { [roomId]: selectedCodexRuntime.threadId }
+            : {},
         queuedCodexApprovalsByRoom: selectedCodexRuntime?.queuedApprovals
           ? { [roomId]: selectedCodexRuntime.queuedApprovals }
           : {},
@@ -199,7 +181,8 @@ export function useAppRoomRuntime({
         signOutGitHub: githubAuth.signOutGitHub,
         replaceDeviceIdentity: (identity) => useAppStore.getState().replaceDeviceIdentity(identity),
         setDeviceIdentityStatusMessage: (message) => useAppStore.getState().setDeviceIdentityStatusMessage(message),
-        untrustDeviceForRoom: (targetRoomId, deviceId) => useAppStore.getState().untrustDeviceForRoom(targetRoomId, deviceId)
+        untrustDeviceForRoom: (targetRoomId, deviceId) =>
+          useAppStore.getState().untrustDeviceForRoom(targetRoomId, deviceId)
       },
       githubActions: {
         hasSelectedRoom,
@@ -297,8 +280,7 @@ export function useAppRoomRuntime({
         canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
         selectedRoomId: selectedRoom.id,
         selectedTerminalId,
-        selectedTerminalRunning: selectedRuntime.selectedTerminal?.running,
-
+        selectedTerminalRunning: selectedRuntime.selectedTerminal?.running
       },
       terminalAutoOpen: {
         inspectorTab,
@@ -311,7 +293,6 @@ export function useAppRoomRuntime({
         selectedRoomId: selectedRoom.id,
         terminalAutoOpenedRoomsRef
       },
-      codexProbe: {},
       roomDraftCleanup: {
         hasSelectedRoom,
         selectedRoomId: selectedRoom.id,

@@ -1,11 +1,7 @@
-import type { RoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
 import { formatTeamMemberName, formatTeamRole } from "./appFormatters";
 import { buildDeviceFingerprintMarkdown } from "./deviceTrust";
-import {
-  removeTeamMember,
-  transferTeamOwnership,
-  updateTeamMemberRole
-} from "./workspaceClient";
+import { removeTeamMember, transferTeamOwnership, updateTeamMemberRole } from "./workspaceClient";
 import { useAppStore } from "../store/appStore";
 import type { RoomPresence } from "../types";
 import { currentLocalIdentity } from "./selectedWorkspace";
@@ -57,7 +53,9 @@ export function createMemberActions({
     const { selectedRoom } = currentWorkspace();
     if (!selectedRoom) return;
     untrustDeviceForRoom(selectedRoom.id, member.deviceId);
-    setDeviceIdentityMessage(`Removed local trust for ${member.displayName}'s device identity in ${selectedRoom.name}.`);
+    setDeviceIdentityMessage(
+      `Removed local trust for ${member.displayName}'s device identity in ${selectedRoom.name}.`
+    );
   }
 
   async function copyRoomMemberDeviceFingerprint(member: RoomPresence, trusted: boolean) {
@@ -91,10 +89,12 @@ export function createMemberActions({
     try {
       const members = await updateTeamMemberRole(selectedTeam, member.userId, role);
       useAppStore.getState().setTeamMembersForTeam(selectedTeam, members);
-      useAppStore.getState().setTeamMembersMessageForTeam(
-        selectedTeam,
-        `${formatTeamMemberName(member.userId, useAppStore.getState().currentUser)} is now ${formatTeamRole(role)}.`
-      );
+      useAppStore
+        .getState()
+        .setTeamMembersMessageForTeam(
+          selectedTeam,
+          `${formatTeamMemberName(member.userId, useAppStore.getState().currentUser)} is now ${formatTeamRole(role)}.`
+        );
     } catch (error) {
       useAppStore.getState().setTeamMembersMessageForTeam(selectedTeam, String(error));
     } finally {
@@ -113,10 +113,12 @@ export function createMemberActions({
       useAppStore.getState().setTeamMembersForTeam(selectedTeam, members);
       const localMember = members.find((item) => item.userId === localUser.id);
       updateTeamRoleForTeam(selectedTeam, localMember?.role);
-      useAppStore.getState().setTeamMembersMessageForTeam(
-        selectedTeam,
-        `${formatTeamMemberName(member.userId, useAppStore.getState().currentUser)} is now the team owner.`
-      );
+      useAppStore
+        .getState()
+        .setTeamMembersMessageForTeam(
+          selectedTeam,
+          `${formatTeamMemberName(member.userId, useAppStore.getState().currentUser)} is now the team owner.`
+        );
     } catch (error) {
       useAppStore.getState().setTeamMembersMessageForTeam(selectedTeam, String(error));
     } finally {
@@ -133,10 +135,12 @@ export function createMemberActions({
       const members = await removeTeamMember(selectedTeam, member.userId);
       useAppStore.getState().setTeamMembersForTeam(selectedTeam, members);
       updateTeamMemberCountForTeam(selectedTeam, members.length);
-      useAppStore.getState().setTeamMembersMessageForTeam(
-        selectedTeam,
-        `Removed ${formatTeamMemberName(member.userId, useAppStore.getState().currentUser)} from ${selectedTeamName}.`
-      );
+      useAppStore
+        .getState()
+        .setTeamMembersMessageForTeam(
+          selectedTeam,
+          `Removed ${formatTeamMemberName(member.userId, useAppStore.getState().currentUser)} from ${selectedTeamName}.`
+        );
     } catch (error) {
       useAppStore.getState().setTeamMembersMessageForTeam(selectedTeam, String(error));
     } finally {

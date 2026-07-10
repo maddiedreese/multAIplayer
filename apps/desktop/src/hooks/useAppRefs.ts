@@ -20,11 +20,15 @@ export function useAppRefs() {
   const roomsRef = useRef(initial.rooms);
   const selectedRoomIdRef = useRef(initial.selectedRoomId);
   const selectedTeamIdRef = useRef(initial.selectedTeam);
-  const gitWorkflowDraftsRef = useRef(projectGitHubWorkflowPanelMaps(initial.gitWorkflowRuntimeByRoom).gitWorkflowDraftsByRoom);
+  const gitWorkflowDraftsRef = useRef(
+    projectGitHubWorkflowPanelMaps(initial.gitWorkflowRuntimeByRoom).gitWorkflowDraftsByRoom
+  );
   const hostBusyRef = useRef(projectRoomSettingsPanelMaps(initial.roomSettingsByRoom).hostBusyByRoom);
   const settingsBusyRef = useRef(projectRoomSettingsPanelMaps(initial.roomSettingsByRoom).settingsBusyByRoom);
   const keyRotationBusyRef = useRef(projectInvitePanelMaps(initial.inviteByRoom).keyRotationBusyByRoom);
-  const gitWorkflowBusyRef = useRef(projectGitHubWorkflowPanelMaps(initial.gitWorkflowRuntimeByRoom).gitWorkflowBusyByRoom);
+  const gitWorkflowBusyRef = useRef(
+    projectGitHubWorkflowPanelMaps(initial.gitWorkflowRuntimeByRoom).gitWorkflowBusyByRoom
+  );
   const actionsBusyRef = useRef(projectGitHubWorkflowPanelMaps(initial.gitWorkflowRuntimeByRoom).actionsBusyByRoom);
   const terminalBusyRef = useRef(projectTerminalRuntimeBusyByRoom(initial.terminalRuntimeByRoom));
   const localPreviewBusyRef = useRef(projectLocalPreviewPanelMaps(initial.localPreviewByRoom).localPreviewBusyByRoom);

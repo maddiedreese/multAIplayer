@@ -12,10 +12,7 @@ export function canRequestWorkspaceAction(room: RoomRecord, locked = false): boo
   return !locked;
 }
 
-export function isRoomFileActionInFlight(
-  busyByRoom: Record<string, boolean>,
-  roomId: string
-): boolean {
+export function isRoomFileActionInFlight(busyByRoom: Record<string, boolean>, roomId: string): boolean {
   return busyByRoom[roomId] === true;
 }
 

@@ -64,7 +64,7 @@ test("local preview actions resolve the selected room when invoked", () => {
     tickGoalElapsed: noop,
     copyMarkdownWithFallback: noopAsync,
     stopLocalPreview: noopAsync,
-    openBrowserUrl: (targetRoom, url, reason) => opened.push({ room: targetRoom, url, reason }),
+    openBrowserUrl: (targetRoom, url, reason) => opened.push({ room: targetRoom, url, reason })
   });
 
   const nextRoom = { ...room, id: "room-preview-next", name: "Next Preview" };
@@ -121,15 +121,17 @@ test("terminal panel actions resolve request ids before approval", () => {
   const approved: string[] = [];
   const actions = createTerminalPanelActions({
     selectedRoomId: room.id,
-    terminalRequests: [{
-      id: "request-1",
-      roomId: room.id,
-      requestedBy: "Avery",
-      requestedByUserId: "github:avery",
-      command: "npm test",
-      status: "pending",
-      createdAt: "2026-07-09T12:00:00.000Z"
-    }],
+    terminalRequests: [
+      {
+        id: "request-1",
+        roomId: room.id,
+        requestedBy: "Avery",
+        requestedByUserId: "github:avery",
+        command: "npm test",
+        status: "pending",
+        createdAt: "2026-07-09T12:00:00.000Z"
+      }
+    ],
     copyTerminalMarkdown: noop,
     openInteractiveTerminal: noop,
     approveTerminalRequest: (request) => approved.push(request.id),
@@ -147,7 +149,9 @@ test("terminal panel actions resolve request ids before approval", () => {
 
 test("workspace file panel close clears all viewer state", () => {
   useAppStore.getState().resetAppStore();
-  useAppStore.getState().initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
+  useAppStore
+    .getState()
+    .initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
   useAppStore.getState().setSelectedFileForRoom(room.id, {
     path: "src/main.ts",
     content: "export {};",

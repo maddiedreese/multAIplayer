@@ -34,7 +34,7 @@ export async function getCurrentUser(): Promise<SignedInUser | null> {
   const response = await fetch(`${getRelayHttpUrl()}/auth/me`, { credentials: "include" });
   if (response.status === 401) return null;
   if (!response.ok) throw new Error(`Failed to load current user: ${response.status}`);
-  const body = await response.json() as { user: SignedInUser };
+  const body = (await response.json()) as { user: SignedInUser };
   return body.user;
 }
 

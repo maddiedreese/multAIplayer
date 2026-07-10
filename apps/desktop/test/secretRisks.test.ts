@@ -14,16 +14,13 @@ test("detectSecretRisks flags sensitive filenames", () => {
 });
 
 test("detectSecretRisks flags environment dumps and credential-looking output", () => {
-  const risks = detectSecretRisks([
-    "$ printenv",
-    "AWS_SECRET_ACCESS_KEY=abc123456789000000",
-    "api_token: redacted-but-still-sensitive-looking"
-  ].join("\n"));
+  const risks = detectSecretRisks(
+    ["$ printenv", "AWS_SECRET_ACCESS_KEY=abc123456789000000", "api_token: redacted-but-still-sensitive-looking"].join(
+      "\n"
+    )
+  );
 
-  assert.deepEqual(risks, [
-    "Environment variables",
-    "Credential-looking output"
-  ]);
+  assert.deepEqual(risks, ["Environment variables", "Credential-looking output"]);
 });
 
 test("detectSecretRisks flags token and private key patterns", () => {
@@ -31,9 +28,7 @@ test("detectSecretRisks flags token and private key patterns", () => {
     "Credential-looking output",
     "Token or private key pattern"
   ]);
-  assert.deepEqual(detectSecretRisks("-----BEGIN OPENSSH PRIVATE KEY-----\nabc"), [
-    "Token or private key pattern"
-  ]);
+  assert.deepEqual(detectSecretRisks("-----BEGIN OPENSSH PRIVATE KEY-----\nabc"), ["Token or private key pattern"]);
 });
 
 test("detectBrowserSecretRisks flags signed-in and account pages", () => {
@@ -44,9 +39,7 @@ test("detectBrowserSecretRisks flags signed-in and account pages", () => {
     "Signed-in browser page",
     "Account or credential page"
   ]);
-  assert.deepEqual(detectBrowserSecretRisks("https://example.com/account/security"), [
-    "Account or credential page"
-  ]);
+  assert.deepEqual(detectBrowserSecretRisks("https://example.com/account/security"), ["Account or credential page"]);
   assert.deepEqual(detectBrowserSecretRisks("not a url"), []);
 });
 
@@ -57,9 +50,9 @@ test("detectTerminalCommandRisks flags environment dumps and sensitive file read
 });
 
 test("detectTerminalCommandRisks flags credential-looking command text", () => {
-  assert.deepEqual(detectTerminalCommandRisks("curl -H 'Authorization: token=ghp_1234567890abcdefghijklmnop' https://api.github.com"), [
-    "Credential-looking command",
-    "Token or private key pattern"
-  ]);
+  assert.deepEqual(
+    detectTerminalCommandRisks("curl -H 'Authorization: token=ghp_1234567890abcdefghijklmnop' https://api.github.com"),
+    ["Credential-looking command", "Token or private key pattern"]
+  );
   assert.deepEqual(detectTerminalCommandRisks("npm test"), []);
 });

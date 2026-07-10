@@ -140,13 +140,15 @@ export function createRelayAuthSessionPersistence({
   sessionPersistenceSecret
 }: RelayAuthSessionPersistenceOptions): RelayAuthSessionPersistence {
   function sessionPersistenceKey(): Buffer {
-    return Buffer.from(hkdfSync(
-      "sha256",
-      Buffer.from(sessionPersistenceSecret ?? "", "utf8"),
-      "multaiplayer-relay-session-v1",
-      "github-session-access-token",
-      32
-    ));
+    return Buffer.from(
+      hkdfSync(
+        "sha256",
+        Buffer.from(sessionPersistenceSecret ?? "", "utf8"),
+        "multaiplayer-relay-session-v1",
+        "github-session-access-token",
+        32
+      )
+    );
   }
 
   function encryptSessionAccessToken(accessToken: string): StoredAuthSession["encryptedAccessToken"] | null {
@@ -180,10 +182,9 @@ export function createRelayAuthSessionPersistence({
     try {
       const decipher = createDecipheriv("aes-256-gcm", sessionPersistenceKey(), Buffer.from(encrypted.nonce, "base64"));
       decipher.setAuthTag(Buffer.from(encrypted.tag, "base64"));
-      return Buffer.concat([
-        decipher.update(Buffer.from(encrypted.ciphertext, "base64")),
-        decipher.final()
-      ]).toString("utf8");
+      return Buffer.concat([decipher.update(Buffer.from(encrypted.ciphertext, "base64")), decipher.final()]).toString(
+        "utf8"
+      );
     } catch {
       return null;
     }
@@ -213,7 +214,8 @@ export function createRelayAuthSessionPersistence({
       const userId = normalizeMetadataText(user?.id, maxUserIdChars);
       const login = normalizeMetadataText(user?.login, maxDisplayNameChars);
       const name = user?.name === undefined ? undefined : normalizeMetadataText(user.name, maxDisplayNameChars);
-      const avatarUrl = user?.avatarUrl === undefined ? undefined : normalizeMetadataText(user.avatarUrl, maxRoomProjectPathChars);
+      const avatarUrl =
+        user?.avatarUrl === undefined ? undefined : normalizeMetadataText(user.avatarUrl, maxRoomProjectPathChars);
       if (
         !sessionId ||
         typeof stored.expiresAt !== "number" ||

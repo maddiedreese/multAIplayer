@@ -46,7 +46,6 @@ export function TerminalPanel({
   selectedTerminalId,
   selectedTerminalCanControl,
   selectedTerminalCanRestart,
-  terminalOutputLines,
   codexRunning,
   canReadLocalWorkspace,
   canApproveTerminal,
@@ -69,7 +68,6 @@ export function TerminalPanel({
   selectedTerminalId: string | null;
   selectedTerminalCanControl: boolean;
   selectedTerminalCanRestart: boolean;
-  terminalOutputLines: TerminalOutputLineDisplay[];
   codexRunning: boolean;
   canReadLocalWorkspace: boolean;
   canApproveTerminal: boolean;
@@ -145,9 +143,12 @@ export function TerminalPanel({
     };
     const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleFit);
     resizeObserver?.observe(host);
-    const themeObserver = typeof window.MutationObserver === "undefined" ? null : new window.MutationObserver(() => {
-      xterm.options.theme = readTerminalTheme();
-    });
+    const themeObserver =
+      typeof window.MutationObserver === "undefined"
+        ? null
+        : new window.MutationObserver(() => {
+            xterm.options.theme = readTerminalTheme();
+          });
     themeObserver?.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     scheduleFit();
     const initialFocusFrame = window.requestAnimationFrame(() => xterm.focus());
@@ -220,7 +221,11 @@ export function TerminalPanel({
       <div className="panel-title">
         <span>Terminals</span>
         <div className="panel-title-actions">
-          <button className="primary-tool" onClick={onOpenInteractiveTerminal} disabled={!canReadLocalWorkspace || terminalBusy || !canApproveTerminal}>
+          <button
+            className="primary-tool"
+            onClick={onOpenInteractiveTerminal}
+            disabled={!canReadLocalWorkspace || terminalBusy || !canApproveTerminal}
+          >
             <Plus size={14} /> New terminal
           </button>
           <button className="ghost" onClick={onCopyMarkdown} disabled={!canReadLocalWorkspace}>
@@ -232,7 +237,10 @@ export function TerminalPanel({
       {(codexEvents.length > 0 || commandRequests.length > 0) && (
         <div className="terminal-requests">
           {codexEvents.map((event) => (
-            <div className={`terminal-request ${event.status === "failed" ? "denied" : event.status === "completed" ? "approved" : "pending"}`} key={event.key}>
+            <div
+              className={`terminal-request ${event.status === "failed" ? "denied" : event.status === "completed" ? "approved" : "pending"}`}
+              key={event.key}
+            >
               <div>
                 <strong>{event.statusLabel}</strong>
                 <span>{event.message}</span>
@@ -245,7 +253,9 @@ export function TerminalPanel({
             <div className={`terminal-request ${request.status}`} key={request.id}>
               <div>
                 <strong>{request.command}</strong>
-                <span>{request.requester} · {request.cwd}</span>
+                <span>
+                  {request.requester} · {request.cwd}
+                </span>
               </div>
               <small>{request.status}</small>
               {request.status === "pending" && (
@@ -293,19 +303,12 @@ export function TerminalPanel({
       {roomTerminals.length > 0 && (
         <div className="terminal-tabs">
           {roomTerminals.map((terminal) => (
-            <div
-              key={terminal.id}
-              className={`terminal-tab ${terminal.id === selectedTerminalId ? "active" : ""}`}
-            >
-              <button
-                type="button"
-                className="terminal-tab-select"
-                onClick={() => onSelectTerminal(terminal.id)}
-              >
+            <div key={terminal.id} className={`terminal-tab ${terminal.id === selectedTerminalId ? "active" : ""}`}>
+              <button type="button" className="terminal-tab-select" onClick={() => onSelectTerminal(terminal.id)}>
                 <Terminal size={13} />
                 {terminal.name}
               </button>
-              <span>{terminal.running ? "live" : terminal.exitStatus ?? "done"}</span>
+              <span>{terminal.running ? "live" : (terminal.exitStatus ?? "done")}</span>
               {terminal.id === selectedTerminalId && (
                 <button
                   type="button"
@@ -323,7 +326,11 @@ export function TerminalPanel({
         </div>
       )}
 
-      <div className="terminal-output xterm-output" onClick={() => xtermRef.current?.focus()} aria-label="Interactive terminal">
+      <div
+        className="terminal-output xterm-output"
+        onClick={() => xtermRef.current?.focus()}
+        aria-label="Interactive terminal"
+      >
         {terminalRisks.length > 0 && <InlineSecretWarning risks={terminalRisks} compact />}
         <div className="xterm-host" ref={terminalHostRef} />
         {codexRunning && <div className="terminal-active">Codex is preparing a foreground terminal...</div>}

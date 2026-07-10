@@ -16,7 +16,10 @@ checkOptionalFile(join("apps", "relay", ".env"), "optional: relay-local env file
 if (!productionRelay) {
   checkCommand("cargo", ["--version"], "Cargo is required for the Tauri desktop shell.");
   checkCommand("rustc", ["--version"], "rustc is required for native Tauri tests and builds.");
-  checkLocalFile(join("apps", "desktop", "src-tauri", "Cargo.lock"), "Cargo.lock is present for reproducible native builds.");
+  checkLocalFile(
+    join("apps", "desktop", "src-tauri", "Cargo.lock"),
+    "Cargo.lock is present for reproducible native builds."
+  );
 
   if (platform() === "darwin") {
     checkCommand("xcodebuild", ["-version"], "Xcode command line tools are required for macOS Tauri bundling.");
@@ -30,7 +33,10 @@ if (!productionRelay) {
 }
 
 checkOptionalEnv("GITHUB_CLIENT_ID", "GitHub sign-in and PR/Actions flows need a relay GitHub OAuth app.");
-checkOptionalEnv("MULTAIPLAYER_RELAY_SESSION_SECRET", "Set at least 32 characters to persist encrypted GitHub sessions across relay restarts.");
+checkOptionalEnv(
+  "MULTAIPLAYER_RELAY_SESSION_SECRET",
+  "Set at least 32 characters to persist encrypted GitHub sessions across relay restarts."
+);
 
 if (productionRelay) {
   checkProductionRelayEnv();
@@ -48,7 +54,9 @@ if (failed > 0) {
   process.exit(1);
 }
 
-console.log(productionRelay ? "\nmultAIplayer production relay setup looks ready." : "\nmultAIplayer setup looks ready.");
+console.log(
+  productionRelay ? "\nmultAIplayer production relay setup looks ready." : "\nmultAIplayer setup looks ready."
+);
 
 function checkNode() {
   const major = Number(process.versions.node.split(".")[0]);
@@ -124,9 +132,10 @@ function checkProductionRelayEnv() {
   checks.push({
     ok: sessionSecret.length >= 32,
     label: "production MULTAIPLAYER_RELAY_SESSION_SECRET",
-    detail: sessionSecret.length >= 32
-      ? "configured with at least 32 characters"
-      : "required: use a stable high-entropy value of at least 32 characters"
+    detail:
+      sessionSecret.length >= 32
+        ? "configured with at least 32 characters"
+        : "required: use a stable high-entropy value of at least 32 characters"
   });
   checks.push({
     ok: Boolean(allowedOrigins) && allowedOriginErrors.length === 0,
@@ -160,11 +169,12 @@ function checkProductionRelayEnv() {
   checks.push({
     ok: storage === "sqlite",
     label: "production MULTAIPLAYER_RELAY_STORAGE",
-    detail: storage === "sqlite"
-      ? "sqlite storage configured"
-      : storage === "json"
-        ? "must be sqlite for a hosted production relay"
-        : "must be sqlite"
+    detail:
+      storage === "sqlite"
+        ? "sqlite storage configured"
+        : storage === "json"
+          ? "must be sqlite for a hosted production relay"
+          : "must be sqlite"
   });
   checks.push({
     ok: Boolean(dataPath) && !dataPath.startsWith("/tmp/"),
@@ -185,44 +195,48 @@ function checkProductionRelayEnv() {
   checks.push({
     ok: attachmentBlobMaxBytes > 0 && attachmentBlobMaxBytes <= 50_000_000,
     label: "production MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES",
-    detail: attachmentBlobMaxBytes > 0 && attachmentBlobMaxBytes <= 50_000_000
-      ? `configured at ${attachmentBlobMaxBytes} bytes`
-      : "must be between 1 and 50000000 bytes"
+    detail:
+      attachmentBlobMaxBytes > 0 && attachmentBlobMaxBytes <= 50_000_000
+        ? `configured at ${attachmentBlobMaxBytes} bytes`
+        : "must be between 1 and 50000000 bytes"
   });
   checks.push({
     ok: attachmentBlobLiveQuotaBytes >= attachmentBlobMaxBytes && attachmentBlobLiveQuotaBytes <= 10_000_000_000,
     label: "production MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES",
-    detail: attachmentBlobLiveQuotaBytes >= attachmentBlobMaxBytes && attachmentBlobLiveQuotaBytes <= 10_000_000_000
-      ? `configured at ${attachmentBlobLiveQuotaBytes} bytes`
-      : "must be at least the blob max and no more than 10000000000 bytes"
+    detail:
+      attachmentBlobLiveQuotaBytes >= attachmentBlobMaxBytes && attachmentBlobLiveQuotaBytes <= 10_000_000_000
+        ? `configured at ${attachmentBlobLiveQuotaBytes} bytes`
+        : "must be at least the blob max and no more than 10000000000 bytes"
   });
   checks.push({
     ok: attachmentBlobUploadBytes >= attachmentBlobMaxBytes && attachmentBlobUploadBytes <= 10_000_000_000,
     label: "production MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW",
-    detail: attachmentBlobUploadBytes >= attachmentBlobMaxBytes && attachmentBlobUploadBytes <= 10_000_000_000
-      ? `configured at ${attachmentBlobUploadBytes} bytes`
-      : "must be at least the blob max and no more than 10000000000 bytes"
+    detail:
+      attachmentBlobUploadBytes >= attachmentBlobMaxBytes && attachmentBlobUploadBytes <= 10_000_000_000
+        ? `configured at ${attachmentBlobUploadBytes} bytes`
+        : "must be at least the blob max and no more than 10000000000 bytes"
   });
   checks.push({
     ok: websocketConnectionCap > 0 && websocketConnectionCap <= 1_000,
     label: "production MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER",
-    detail: websocketConnectionCap > 0 && websocketConnectionCap <= 1_000
-      ? `configured at ${websocketConnectionCap}`
-      : "must be between 1 and 1000"
+    detail:
+      websocketConnectionCap > 0 && websocketConnectionCap <= 1_000
+        ? `configured at ${websocketConnectionCap}`
+        : "must be between 1 and 1000"
   });
   checks.push({
     ok: websocketConnectRateLimit > 0 && websocketConnectRateLimit <= 100_000,
     label: "production MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT",
-    detail: websocketConnectRateLimit > 0 && websocketConnectRateLimit <= 100_000
-      ? `configured at ${websocketConnectRateLimit}`
-      : "must be between 1 and 100000"
+    detail:
+      websocketConnectRateLimit > 0 && websocketConnectRateLimit <= 100_000
+        ? `configured at ${websocketConnectRateLimit}`
+        : "must be between 1 and 100000"
   });
   checks.push({
     ok: totalRoomCap > 0 && totalRoomCap <= 100_000,
     label: "production MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER",
-    detail: totalRoomCap > 0 && totalRoomCap <= 100_000
-      ? `configured at ${totalRoomCap}`
-      : "must be between 1 and 100000"
+    detail:
+      totalRoomCap > 0 && totalRoomCap <= 100_000 ? `configured at ${totalRoomCap}` : "must be between 1 and 100000"
   });
 }
 
@@ -248,7 +262,10 @@ function envInteger(name, fallback) {
 function validateAllowedOrigins(value) {
   if (!value) return [];
   const errors = [];
-  const origins = value.split(",").map((origin) => origin.trim()).filter(Boolean);
+  const origins = value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
   if (origins.length === 0) return ["no origins were provided"];
   for (const origin of origins) {
     if (origin === "*") {

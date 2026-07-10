@@ -53,7 +53,8 @@ export function createRelayRequestGuards({
   }
 
   function rateLimitBucketForRequest(req: Request): RateLimitBucket | null {
-    if (req.path === "/healthz" || req.path === "/readyz" || req.path === "/metrics" || req.path === "/auth/config") return null;
+    if (req.path === "/healthz" || req.path === "/readyz" || req.path === "/metrics" || req.path === "/auth/config")
+      return null;
     if (req.path.startsWith("/auth/")) return "auth";
     if (req.path.startsWith("/attachment-blobs")) return "attachment";
     if (req.method === "GET") return "read";
@@ -61,7 +62,10 @@ export function createRelayRequestGuards({
     return null;
   }
 
-  function consumeRateLimit(bucket: RateLimitBucket, clientId: string): { allowed: true; resetAt: number } | { allowed: false; resetAt: number } {
+  function consumeRateLimit(
+    bucket: RateLimitBucket,
+    clientId: string
+  ): { allowed: true; resetAt: number } | { allowed: false; resetAt: number } {
     if (!rateLimitsEnabled) return { allowed: true, resetAt: Date.now() + rateLimitWindowMs };
     const now = Date.now();
     pruneRateLimitStore(now);
@@ -70,9 +74,7 @@ export function createRelayRequestGuards({
     const resetAt = current && current.resetAt > now ? current.resetAt : now + rateLimitWindowMs;
     const count = current && current.resetAt > now ? current.count + 1 : 1;
     rateLimitStore.set(key, { count, resetAt });
-    return count <= rateLimitCaps[bucket]
-      ? { allowed: true, resetAt }
-      : { allowed: false, resetAt };
+    return count <= rateLimitCaps[bucket] ? { allowed: true, resetAt } : { allowed: false, resetAt };
   }
 
   function pruneRateLimitStore(now = Date.now()) {

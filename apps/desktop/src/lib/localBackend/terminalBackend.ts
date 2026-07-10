@@ -28,7 +28,12 @@ export async function startTerminal(
     startedAt: String(Date.now()),
     lines: [
       { stream: "system", text: `$ ${command}` },
-      { stream: "stdout", text: command.startsWith("echo ") ? command.slice(5) : "Preview mode: open the Tauri app for persistent host terminals." }
+      {
+        stream: "stdout",
+        text: command.startsWith("echo ")
+          ? command.slice(5)
+          : "Preview mode: open the Tauri app for persistent host terminals."
+      }
     ]
   };
   previewTerminals.set(snapshot.id, snapshot);

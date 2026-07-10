@@ -28,9 +28,12 @@ test("supported Codex manifests preserve the app-server transport contract", () 
     assert.equal(manifest.codexVersion, version);
     assert.match(manifest.sourceBundleSha256, /^[a-f0-9]{64}$/);
     assert.deepEqual(manifest.requestIdTypes, ["integer", "string"], version);
-    for (const method of requiredClientMethods) assert.ok(manifest.clientRequestMethods.includes(method), `${version}: ${method}`);
-    for (const method of requiredNotifications) assert.ok(manifest.serverNotificationMethods.includes(method), `${version}: ${method}`);
-    for (const method of requiredServerRequests) assert.ok(manifest.serverRequestMethods.includes(method), `${version}: ${method}`);
+    for (const method of requiredClientMethods)
+      assert.ok(manifest.clientRequestMethods.includes(method), `${version}: ${method}`);
+    for (const method of requiredNotifications)
+      assert.ok(manifest.serverNotificationMethods.includes(method), `${version}: ${method}`);
+    for (const method of requiredServerRequests)
+      assert.ok(manifest.serverRequestMethods.includes(method), `${version}: ${method}`);
   }
 });
 

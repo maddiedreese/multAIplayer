@@ -47,20 +47,24 @@ export function CodexServerRequestDialog({
         });
         return;
       }
-      setRequests((current) => current.some((item) => item.requestKey === request.requestKey)
-        ? current
-        : [...current, request]);
+      setRequests((current) =>
+        current.some((item) => item.requestKey === request.requestKey) ? current : [...current, request]
+      );
     };
     const removeRequest = (requestKey: string) => {
       setRequests((current) => current.filter((item) => item.requestKey !== requestKey));
     };
     const subscriptions = Promise.all([
       listen<CodexServerRequest>("codex://server-request", (event) => addRequest(event.payload)),
-      listen<ResolvedRequestEvent>("codex://server-request-resolved", (event) => removeRequest(event.payload.requestKey))
+      listen<ResolvedRequestEvent>("codex://server-request-resolved", (event) =>
+        removeRequest(event.payload.requestKey)
+      )
     ]);
-    void listCodexServerRequests().then((pending) => {
-      if (active) pending.forEach(addRequest);
-    }).catch(() => undefined);
+    void listCodexServerRequests()
+      .then((pending) => {
+        if (active) pending.forEach(addRequest);
+      })
+      .catch(() => undefined);
     return () => {
       active = false;
       void subscriptions.then((unlisten) => unlisten.forEach((stop) => stop()));
@@ -68,7 +72,7 @@ export function CodexServerRequestDialog({
   }, []);
 
   const request = requests.find((item) => item.roomId === selectedRoomId) ?? null;
-  const display = useMemo(() => request ? describeCodexServerRequest(request) : null, [request]);
+  const display = useMemo(() => (request ? describeCodexServerRequest(request) : null), [request]);
   useEffect(() => {
     setAnswers({});
     setError(null);
@@ -99,7 +103,10 @@ export function CodexServerRequestDialog({
     <div className="modal-backdrop" role="presentation">
       <section className="modal codex-server-request-dialog" role="dialog" aria-modal="true" aria-label={display.title}>
         <div className="approval-title">
-          <div><KeyRound size={18} /><strong>{display.title}</strong></div>
+          <div>
+            <KeyRound size={18} />
+            <strong>{display.title}</strong>
+          </div>
         </div>
         <p>{display.message}</p>
         {display.detail && <pre className="codex-request-detail">{display.detail}</pre>}
@@ -119,27 +126,37 @@ export function CodexServerRequestDialog({
               />
             ) : question.kind === "select" ? (
               <select
-                value={typeof answers[question.id] === "string" ? answers[question.id] as string : ""}
+                value={typeof answers[question.id] === "string" ? (answers[question.id] as string) : ""}
                 onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))}
               >
                 <option value="">Select…</option>
-                {question.options.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+                {question.options.map((option) => (
+                  <option value={option.value} key={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             ) : question.kind === "multiselect" ? (
               <select
                 multiple
-                value={Array.isArray(answers[question.id]) ? answers[question.id] as string[] : []}
-                onChange={(event) => setAnswers((current) => ({
-                  ...current,
-                  [question.id]: Array.from(event.target.selectedOptions, (option) => option.value)
-                }))}
+                value={Array.isArray(answers[question.id]) ? (answers[question.id] as string[]) : []}
+                onChange={(event) =>
+                  setAnswers((current) => ({
+                    ...current,
+                    [question.id]: Array.from(event.target.selectedOptions, (option) => option.value)
+                  }))
+                }
               >
-                {question.options.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+                {question.options.map((option) => (
+                  <option value={option.value} key={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             ) : (
               <input
                 type={question.secret ? "password" : question.kind === "number" ? "number" : "text"}
-                value={typeof answers[question.id] === "string" ? answers[question.id] as string : ""}
+                value={typeof answers[question.id] === "string" ? (answers[question.id] as string) : ""}
                 min={question.min}
                 max={question.max}
                 onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))}
@@ -149,14 +166,20 @@ export function CodexServerRequestDialog({
           </label>
         ))}
         {!canRespond && (
-          <div className="approval-risk-item"><AlertTriangle size={14} /> Only the active host can answer this request.</div>
+          <div className="approval-risk-item">
+            <AlertTriangle size={14} /> Only the active host can answer this request.
+          </div>
         )}
         {error && <div className="error-text">{error}</div>}
         <div className="approval-actions">
           <button className="secondary" disabled={busy || !canRespond} onClick={() => void resolve(display.decline)}>
             <X size={15} /> Decline
           </button>
-          <button className="primary" disabled={busy || !canRespond || !display.canAccept(answers)} onClick={() => void resolve(display.accept(answers))}>
+          <button
+            className="primary"
+            disabled={busy || !canRespond || !display.canAccept(answers)}
+            onClick={() => void resolve(display.accept(answers))}
+          >
             <Check size={15} /> {busy ? "Responding…" : "Accept"}
           </button>
         </div>
@@ -242,14 +265,18 @@ export function describeCodexServerRequest(request: CodexServerRequest): CodexSe
                 return label ? [{ value: label, label }] : [];
               })
             : [];
-          return id ? [{
-            id,
-            label: text(question.question) ?? text(question.header) ?? "Codex question",
-            secret: question.isSecret === true,
-            required: true,
-            kind: options.length ? "select" as const : "text" as const,
-            options
-          }] : [];
+          return id
+            ? [
+                {
+                  id,
+                  label: text(question.question) ?? text(question.header) ?? "Codex question",
+                  secret: question.isSecret === true,
+                  required: true,
+                  kind: options.length ? ("select" as const) : ("text" as const),
+                  options
+                }
+              ]
+            : [];
         })
       : [];
     return {
@@ -261,9 +288,14 @@ export function describeCodexServerRequest(request: CodexServerRequest): CodexSe
       decline: { error: { code: -32000, message: "The user cancelled this input request." } },
       accept: (values) => ({
         result: {
-          answers: Object.fromEntries(questions.map(({ id }) => [id, {
-            answers: [typeof values[id] === "string" ? values[id] : ""]
-          }]))
+          answers: Object.fromEntries(
+            questions.map(({ id }) => [
+              id,
+              {
+                answers: [typeof values[id] === "string" ? values[id] : ""]
+              }
+            ])
+          )
         }
       }),
       canAccept: (values) => questions.every(({ id }) => typeof values[id] === "string" && values[id].trim().length > 0)
@@ -303,34 +335,37 @@ function describeMcpForm(params: Record<string, unknown>): {
 } {
   const schema = asRecord(params.requestedSchema);
   const properties = asRecord(schema.properties);
-  const required = new Set(Array.isArray(schema.required)
-    ? schema.required.filter((value): value is string => typeof value === "string")
-    : []);
-  const questions = Object.entries(properties).slice(0, 24).flatMap(([id, raw]) => {
-    const field = asRecord(raw);
-    const type = text(field.type);
-    const options = enumOptions(field);
-    const question: CodexRequestQuestion = {
-      id,
-      label: text(field.title) ?? text(field.description) ?? id,
-      secret: false,
-      required: required.has(id),
-      kind: type === "boolean"
-        ? "boolean"
-        : type === "number" || type === "integer"
-          ? "number"
-          : type === "array"
-            ? "multiselect"
-            : options.length
-              ? "select"
-              : "text",
-      options,
-      min: numeric(field.minimum) ?? numeric(type === "array" ? field.minItems : field.minLength) ?? undefined,
-      max: numeric(field.maximum) ?? numeric(type === "array" ? field.maxItems : field.maxLength) ?? undefined,
-      integer: type === "integer"
-    };
-    return type ? [question] : [];
-  });
+  const required = new Set(
+    Array.isArray(schema.required) ? schema.required.filter((value): value is string => typeof value === "string") : []
+  );
+  const questions = Object.entries(properties)
+    .slice(0, 24)
+    .flatMap(([id, raw]) => {
+      const field = asRecord(raw);
+      const type = text(field.type);
+      const options = enumOptions(field);
+      const question: CodexRequestQuestion = {
+        id,
+        label: text(field.title) ?? text(field.description) ?? id,
+        secret: false,
+        required: required.has(id),
+        kind:
+          type === "boolean"
+            ? "boolean"
+            : type === "number" || type === "integer"
+              ? "number"
+              : type === "array"
+                ? "multiselect"
+                : options.length
+                  ? "select"
+                  : "text",
+        options,
+        min: numeric(field.minimum) ?? numeric(type === "array" ? field.minItems : field.minLength) ?? undefined,
+        max: numeric(field.maximum) ?? numeric(type === "array" ? field.maxItems : field.maxLength) ?? undefined,
+        integer: type === "integer"
+      };
+      return type ? [question] : [];
+    });
   const content = (answers: Record<string, CodexRequestAnswer>) => {
     const entries: Array<[string, unknown]> = [];
     for (const question of questions) {
@@ -346,36 +381,51 @@ function describeMcpForm(params: Record<string, unknown>): {
     }
     return Object.fromEntries(entries);
   };
-  const canAccept = (answers: Record<string, CodexRequestAnswer>) => questions.every((question) => {
-    const answer = answers[question.id];
-    if (question.kind === "boolean") return answer === undefined || typeof answer === "boolean";
-    if (!question.required && (answer === undefined || answer === "" || (Array.isArray(answer) && answer.length === 0))) return true;
-    if (question.required && (answer === undefined || answer === "" || (Array.isArray(answer) && answer.length === 0))) return false;
-    if (question.kind === "multiselect") {
-      return Array.isArray(answer)
-        && (question.min === undefined || answer.length >= question.min)
-        && (question.max === undefined || answer.length <= question.max)
-        && answer.every((value) => question.options.some((option) => option.value === value));
-    }
-    if (typeof answer !== "string") return false;
-    if (question.kind === "number") {
-      const number = Number(answer);
-      return Number.isFinite(number)
-        && (!question.integer || Number.isInteger(number))
-        && (question.min === undefined || number >= question.min)
-        && (question.max === undefined || number <= question.max);
-    }
-    return (question.min === undefined || answer.length >= question.min)
-      && (question.max === undefined || answer.length <= question.max)
-      && (!question.options.length || question.options.some((option) => option.value === answer));
-  });
+  const canAccept = (answers: Record<string, CodexRequestAnswer>) =>
+    questions.every((question) => {
+      const answer = answers[question.id];
+      if (question.kind === "boolean") return answer === undefined || typeof answer === "boolean";
+      if (
+        !question.required &&
+        (answer === undefined || answer === "" || (Array.isArray(answer) && answer.length === 0))
+      )
+        return true;
+      if (
+        question.required &&
+        (answer === undefined || answer === "" || (Array.isArray(answer) && answer.length === 0))
+      )
+        return false;
+      if (question.kind === "multiselect") {
+        return (
+          Array.isArray(answer) &&
+          (question.min === undefined || answer.length >= question.min) &&
+          (question.max === undefined || answer.length <= question.max) &&
+          answer.every((value) => question.options.some((option) => option.value === value))
+        );
+      }
+      if (typeof answer !== "string") return false;
+      if (question.kind === "number") {
+        const number = Number(answer);
+        return (
+          Number.isFinite(number) &&
+          (!question.integer || Number.isInteger(number)) &&
+          (question.min === undefined || number >= question.min) &&
+          (question.max === undefined || number <= question.max)
+        );
+      }
+      return (
+        (question.min === undefined || answer.length >= question.min) &&
+        (question.max === undefined || answer.length <= question.max) &&
+        (!question.options.length || question.options.some((option) => option.value === answer))
+      );
+    });
   return { questions, content, canAccept };
 }
 
 function enumOptions(field: Record<string, unknown>): Array<{ value: string; label: string }> {
   const source = field.enum ?? asRecord(field.items).enum;
   if (Array.isArray(source)) {
-    return source.slice(0, 50).flatMap((value) => typeof value === "string" ? [{ value, label: value }] : []);
+    return source.slice(0, 50).flatMap((value) => (typeof value === "string" ? [{ value, label: value }] : []));
   }
   for (const key of ["oneOf", "anyOf"] as const) {
     const values = field[key] ?? asRecord(field.items)[key];
@@ -406,7 +456,7 @@ function numeric(value: unknown): number | null {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 function text(value: unknown): string | null {

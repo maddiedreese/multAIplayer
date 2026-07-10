@@ -39,14 +39,16 @@ test("buildMessageMarkdown includes escaped author, attachments, and reactions",
     role: "human",
     body: "Can you review `diff` output?",
     time: "10:30",
-    attachments: [{
-      id: "attachment-1",
-      name: "src/app`main`.tsx",
-      type: "code",
-      size: 2048,
-      blobId: "blob-1",
-      blobBytes: 120000
-    }],
+    attachments: [
+      {
+        id: "attachment-1",
+        name: "src/app`main`.tsx",
+        type: "code",
+        size: 2048,
+        blobId: "blob-1",
+        blobBytes: 120000
+      }
+    ],
     reactions: [{ emoji: "+1", reactors: [{ name: "Priya_A" }] }]
   });
 
@@ -100,12 +102,7 @@ test("buildCodexOutputMarkdown captures messages since the previous Codex turn",
 });
 
 test("project and diff exports use fences longer than embedded code fences", () => {
-  const diff = [
-    "diff --git a/README.md b/README.md",
-    "+```",
-    "+inside diff",
-    "+```"
-  ].join("\n");
+  const diff = ["diff --git a/README.md b/README.md", "+```", "+inside diff", "+```"].join("\n");
   const markdown = buildProjectMarkdown(
     room.name,
     room.projectPath,

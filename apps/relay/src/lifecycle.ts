@@ -3,11 +3,7 @@ import { WebSocket, type WebSocketServer } from "ws";
 
 export interface RelayLifecycle {
   isReady: () => boolean;
-  shutdownMiddleware: (
-    path: string,
-    next: () => void,
-    reject: () => void
-  ) => void;
+  shutdownMiddleware: (path: string, next: () => void, reject: () => void) => void;
   closeServer: () => Promise<void>;
   shutdown: () => Promise<void>;
 }
@@ -67,10 +63,7 @@ export function createRelayLifecycle({
   async function runShutdown() {
     if (drainMs > 0) await wait(drainMs);
     const socketClose = closeWebSockets(wss, graceMs, wait);
-    await Promise.allSettled([
-      closeServer(),
-      closeWebSocketServer(wss)
-    ]);
+    await Promise.allSettled([closeServer(), closeWebSocketServer(wss)]);
     await socketClose;
     await closeStore();
   }
@@ -93,11 +86,7 @@ async function closeWebSocketServer(wss: WebSocketServer) {
   });
 }
 
-async function closeWebSockets(
-  wss: WebSocketServer,
-  graceMs: number,
-  wait: (ms: number) => Promise<void>
-) {
+async function closeWebSockets(wss: WebSocketServer, graceMs: number, wait: (ms: number) => Promise<void>) {
   const sockets = Array.from(wss.clients);
   if (sockets.length === 0) return;
   const closed = Promise.all(sockets.map((socket) => waitForSocketClose(socket)));

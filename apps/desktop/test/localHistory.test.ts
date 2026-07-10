@@ -65,8 +65,6 @@ const {
 };
 
 const { emptyLocalRoomHistoryPayload, normalizeLocalRoomHistory } = await import("../src/lib/localRoomHistoryPayload");
-const { createRoomSecret } = await import("@multaiplayer/crypto");
-
 test.beforeEach(() => {
   localStorage.clear();
 });
@@ -126,55 +124,65 @@ test("encrypted history keeps Codex thread continuity local and encrypted", asyn
 test("history normalization retains legacy records that predate strict live payload limits", () => {
   const normalized = normalizeLocalRoomHistory({
     ...emptyLocalRoomHistoryPayload(),
-    inviteRequests: [{
-      eventType: "invite.request",
-      id: "invite-legacy",
-      requester: "Peer",
-      requesterUserId: "github:peer",
-      requesterDeviceId: "device-peer",
-      requestedAt: "legacy timestamp",
-      status: "pending"
-    }],
-    codexEvents: [{
-      eventType: "codex.turn",
-      turnId: "turn-legacy",
-      status: "event",
-      message: "Legacy event",
-      model: "gpt-5.4",
-      host: "Peer",
-      hostUserId: "github:peer",
-      createdAt: "legacy timestamp"
-    }],
-    gitWorkflowEvents: [{
-      eventType: "git.workflow",
-      status: "completed",
-      branch: "main",
-      push: false,
-      message: "Legacy workflow",
-      runner: "Peer",
-      runnerUserId: "github:peer",
-      createdAt: "legacy timestamp"
-    }],
-    githubActionsEvents: [{
-      eventType: "github.actions",
-      owner: "owner",
-      repo: "repo",
-      branch: "main",
-      summary: { label: "Done", detail: "Legacy run", tone: "green" },
-      message: "Legacy actions",
-      checkedBy: "Peer",
-      checkedByUserId: "github:peer",
-      checkedAt: "legacy timestamp",
-      runs: [{
-        id: 1,
-        name: "CI",
+    inviteRequests: [
+      {
+        eventType: "invite.request",
+        id: "invite-legacy",
+        requester: "Peer",
+        requesterUserId: "github:peer",
+        requesterDeviceId: "device-peer",
+        requestedAt: "legacy timestamp",
+        status: "pending"
+      }
+    ],
+    codexEvents: [
+      {
+        eventType: "codex.turn",
+        turnId: "turn-legacy",
+        status: "event",
+        message: "Legacy event",
+        model: "gpt-5.4",
+        host: "Peer",
+        hostUserId: "github:peer",
+        createdAt: "legacy timestamp"
+      }
+    ],
+    gitWorkflowEvents: [
+      {
+        eventType: "git.workflow",
         status: "completed",
-        conclusion: "success",
-        url: "https://example.test/run/1",
-        createdAt: "legacy timestamp",
-        updatedAt: "legacy timestamp"
-      }]
-    }]
+        branch: "main",
+        push: false,
+        message: "Legacy workflow",
+        runner: "Peer",
+        runnerUserId: "github:peer",
+        createdAt: "legacy timestamp"
+      }
+    ],
+    githubActionsEvents: [
+      {
+        eventType: "github.actions",
+        owner: "owner",
+        repo: "repo",
+        branch: "main",
+        summary: { label: "Done", detail: "Legacy run", tone: "green" },
+        message: "Legacy actions",
+        checkedBy: "Peer",
+        checkedByUserId: "github:peer",
+        checkedAt: "legacy timestamp",
+        runs: [
+          {
+            id: 1,
+            name: "CI",
+            status: "completed",
+            conclusion: "success",
+            url: "https://example.test/run/1",
+            createdAt: "legacy timestamp",
+            updatedAt: "legacy timestamp"
+          }
+        ]
+      }
+    ]
   });
 
   assert.equal(normalized.inviteRequests.length, 1);
@@ -187,21 +195,43 @@ test("encrypted history keeps canonical Codex activity metadata encrypted", asyn
   const roomId = "room-codex-activity-history";
   const payload = {
     version: 3,
-    messages: [], terminalRequests: [], browserRequests: [], inviteRequests: [], codexEvents: [],
-    gitWorkflowEvents: [], githubActionsEvents: [], terminalSnapshots: [], hostHandoffs: [],
-    codexActivities: [{
-      eventType: "codex.activity",
-      activityId: "turn-1-item-1", turnId: "turn-1", itemId: "item-1",
-      kind: "command", status: "completed", title: "Command execution",
-      startedAt: "2026-07-09T12:00:00.000Z", updatedAt: "2026-07-09T12:00:01.000Z",
-      host: "Host", hostUserId: "user-host"
-    }],
+    messages: [],
+    terminalRequests: [],
+    browserRequests: [],
+    inviteRequests: [],
+    codexEvents: [],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
+    terminalSnapshots: [],
+    hostHandoffs: [],
+    codexActivities: [
+      {
+        eventType: "codex.activity",
+        activityId: "turn-1-item-1",
+        turnId: "turn-1",
+        itemId: "item-1",
+        kind: "command",
+        status: "completed",
+        title: "Command execution",
+        startedAt: "2026-07-09T12:00:00.000Z",
+        updatedAt: "2026-07-09T12:00:01.000Z",
+        host: "Host",
+        hostUserId: "user-host"
+      }
+    ],
     codexThreadId: "thread-child",
     codexThreadGraph: {
       activeThreadId: "thread-child",
       nodesById: {
         "thread-root": { id: "thread-root", title: "Root", status: "idle", createdAt: 1, updatedAt: 1 },
-        "thread-child": { id: "thread-child", parentThreadId: "thread-root", title: "Branch", status: "idle", createdAt: 2, updatedAt: 2 }
+        "thread-child": {
+          id: "thread-child",
+          parentThreadId: "thread-root",
+          title: "Branch",
+          status: "idle",
+          createdAt: 2,
+          updatedAt: 2
+        }
       }
     }
   };
@@ -220,24 +250,28 @@ test("encrypted history keeps Codex turn risk flags local and encrypted", async 
     terminalRequests: [],
     browserRequests: [],
     inviteRequests: [],
-    codexEvents: [{
-      eventType: "codex.turn",
-      turnId: "turn-risk",
-      status: "started",
-      message: "Started Codex turn with GPT-5.5.",
-      model: "gpt-5.5",
-      consumedMessageIds: ["message-risk"],
-      riskFlags: [{
-        id: "message-risk",
-        label: "message from Maddie contains agent-directed phrasing",
-        source: "message from Maddie",
-        risk: "Agent-directed phrasing",
-        severity: "warning"
-      }],
-      host: "Maddie",
-      hostUserId: "github:maddie",
-      createdAt: "2026-07-06T00:06:00.000Z"
-    }],
+    codexEvents: [
+      {
+        eventType: "codex.turn",
+        turnId: "turn-risk",
+        status: "started",
+        message: "Started Codex turn with GPT-5.5.",
+        model: "gpt-5.5",
+        consumedMessageIds: ["message-risk"],
+        riskFlags: [
+          {
+            id: "message-risk",
+            label: "message from Maddie contains agent-directed phrasing",
+            source: "message from Maddie",
+            risk: "Agent-directed phrasing",
+            severity: "warning"
+          }
+        ],
+        host: "Maddie",
+        hostUserId: "github:maddie",
+        createdAt: "2026-07-06T00:06:00.000Z"
+      }
+    ],
     gitWorkflowEvents: [],
     githubActionsEvents: [],
     terminalSnapshots: [],
@@ -271,13 +305,15 @@ test("encrypted history keeps local room read state encrypted", async () => {
     localPreviews: [],
     terminalSnapshots: [],
     hostHandoffs: [],
-    queuedCodexTurns: [{
-      turnId: "turn-queued-1",
-      roomId,
-      requestedBy: "Maddie",
-      requestedByUserId: "github:maddie",
-      queuedAt: "2026-07-06T00:05:00.000Z"
-    }]
+    queuedCodexTurns: [
+      {
+        turnId: "turn-queued-1",
+        roomId,
+        requestedBy: "Maddie",
+        requestedByUserId: "github:maddie",
+        queuedAt: "2026-07-06T00:05:00.000Z"
+      }
+    ]
   };
 
   await saveEncryptedHistory(roomId, payload);
@@ -358,7 +394,7 @@ test("encrypted history keeps pre-Codex edit and delete audit records encrypted"
   assert.doesNotMatch(stored, /delete-secret/);
   assert.doesNotMatch(localStorage.dump(), /message-deleted/);
   assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
-  const normalized = normalizeLocalRoomHistory(await loadEncryptedHistory<typeof payload>(roomId) ?? []);
+  const normalized = normalizeLocalRoomHistory((await loadEncryptedHistory<typeof payload>(roomId)) ?? []);
   assert.equal(normalized.chatEdits?.[0]?.body, "private edited audit body");
   assert.equal(normalized.chatDeletes?.[0]?.deletedBy, "Jordan");
 });
@@ -380,14 +416,16 @@ test("local history normalization preserves sanitized room read state", () => {
     localPreviews: [],
     terminalSnapshots: [],
     hostHandoffs: [],
-    queuedCodexTurns: [{
-      turnId: "turn-queued-1",
-      roomId: "room-a",
-      requestedBy: "Maddie",
-      requestedByUserId: "github:maddie",
-      queuedAt: "2026-07-06T00:05:00.000Z",
-      triggerMessageId: "message-a"
-    }]
+    queuedCodexTurns: [
+      {
+        turnId: "turn-queued-1",
+        roomId: "room-a",
+        requestedBy: "Maddie",
+        requestedByUserId: "github:maddie",
+        queuedAt: "2026-07-06T00:05:00.000Z",
+        triggerMessageId: "message-a"
+      }
+    ]
   });
 
   assert.deepEqual(normalized.readState, {
@@ -437,7 +475,10 @@ test("local history normalization preserves file save requests", () => {
     queuedCodexTurns: []
   });
 
-  assert.deepEqual(payload.fileSaveRequests.map((request) => request.id), ["file-save-1"]);
+  assert.deepEqual(
+    payload.fileSaveRequests.map((request) => request.id),
+    ["file-save-1"]
+  );
   assert.equal(payload.fileSaveRequests[0]?.status, "pending");
 });
 
@@ -488,57 +529,65 @@ test("encrypted history keeps Git workflow and Actions events local and encrypte
     browserRequests: [],
     inviteRequests: [],
     codexEvents: [],
-    gitWorkflowEvents: [{
-      eventType: "git.workflow",
-      status: "pr_opened",
-      branch: "codex/add-history",
-      push: true,
-      message: "Opened draft PR #42: https://github.com/maddiedreese/multAIplayer/pull/42",
-      runner: "Maddie",
-      runnerUserId: "github:maddie",
-      createdAt: "2026-07-05T00:00:00.000Z",
-      results: [{
-        command: "git push origin codex/add-history",
-        cwd: "/Users/maddie/dev/multAIplayer",
-        status: 0,
-        stdout: "pushed branch",
-        stderr: ""
-      }],
-      pullRequest: {
-        number: 42,
-        url: "https://github.com/maddiedreese/multAIplayer/pull/42"
-      }
-    }],
-    githubActionsEvents: [{
-      eventType: "github.actions",
-      owner: "maddiedreese",
-      repo: "multAIplayer",
-      branch: "codex/add-history",
-      summary: {
-        label: "passing",
-        detail: "All loaded workflow runs are passing.",
-        tone: "green"
-      },
-      message: "Loaded 1 workflow run for codex/add-history.",
-      checkedBy: "Maddie",
-      checkedByUserId: "github:maddie",
-      checkedAt: "2026-07-05T00:01:00.000Z",
-      runs: [{
-        id: 28724623234,
-        name: "CI",
-        displayTitle: "Add encrypted Git history",
-        runNumber: 42,
-        workflowId: 1,
-        status: "completed",
-        conclusion: "success",
+    gitWorkflowEvents: [
+      {
+        eventType: "git.workflow",
+        status: "pr_opened",
         branch: "codex/add-history",
-        headSha: "abc123",
-        event: "push",
-        url: "https://github.com/maddiedreese/multAIplayer/actions/runs/28724623234",
-        createdAt: "2026-07-05T00:00:30.000Z",
-        updatedAt: "2026-07-05T00:01:00.000Z"
-      }]
-    }],
+        push: true,
+        message: "Opened draft PR #42: https://github.com/maddiedreese/multAIplayer/pull/42",
+        runner: "Maddie",
+        runnerUserId: "github:maddie",
+        createdAt: "2026-07-05T00:00:00.000Z",
+        results: [
+          {
+            command: "git push origin codex/add-history",
+            cwd: "/Users/maddie/dev/multAIplayer",
+            status: 0,
+            stdout: "pushed branch",
+            stderr: ""
+          }
+        ],
+        pullRequest: {
+          number: 42,
+          url: "https://github.com/maddiedreese/multAIplayer/pull/42"
+        }
+      }
+    ],
+    githubActionsEvents: [
+      {
+        eventType: "github.actions",
+        owner: "maddiedreese",
+        repo: "multAIplayer",
+        branch: "codex/add-history",
+        summary: {
+          label: "passing",
+          detail: "All loaded workflow runs are passing.",
+          tone: "green"
+        },
+        message: "Loaded 1 workflow run for codex/add-history.",
+        checkedBy: "Maddie",
+        checkedByUserId: "github:maddie",
+        checkedAt: "2026-07-05T00:01:00.000Z",
+        runs: [
+          {
+            id: 28724623234,
+            name: "CI",
+            displayTitle: "Add encrypted Git history",
+            runNumber: 42,
+            workflowId: 1,
+            status: "completed",
+            conclusion: "success",
+            branch: "codex/add-history",
+            headSha: "abc123",
+            event: "push",
+            url: "https://github.com/maddiedreese/multAIplayer/actions/runs/28724623234",
+            createdAt: "2026-07-05T00:00:30.000Z",
+            updatedAt: "2026-07-05T00:01:00.000Z"
+          }
+        ]
+      }
+    ],
     terminalSnapshots: [],
     hostHandoffs: []
   };
@@ -564,20 +613,22 @@ test("encrypted history keeps terminal snapshots local and encrypted", async () 
     codexEvents: [],
     gitWorkflowEvents: [],
     githubActionsEvents: [],
-    terminalSnapshots: [{
-      id: "room-terminal-history:dev-server",
-      roomId,
-      name: "dev-server",
-      cwd: "/Users/maddie/dev/multAIplayer",
-      command: "npm run dev:desktop",
-      running: false,
-      exitStatus: null,
-      startedAt: "2026-07-05T00:02:00.000Z",
-      lines: [
-        { stream: "system", text: "$ npm run dev:desktop" },
-        { stream: "stdout", text: "Local relay ready on http://127.0.0.1:4321" }
-      ]
-    }],
+    terminalSnapshots: [
+      {
+        id: "room-terminal-history:dev-server",
+        roomId,
+        name: "dev-server",
+        cwd: "/Users/maddie/dev/multAIplayer",
+        command: "npm run dev:desktop",
+        running: false,
+        exitStatus: null,
+        startedAt: "2026-07-05T00:02:00.000Z",
+        lines: [
+          { stream: "system", text: "$ npm run dev:desktop" },
+          { stream: "stdout", text: "Local relay ready on http://127.0.0.1:4321" }
+        ]
+      }
+    ],
     hostHandoffs: []
   };
 
@@ -644,14 +695,17 @@ test("expired encrypted history is removed on load", async () => {
 test("malformed encrypted history records are removed on load", async () => {
   const roomId = "room-malformed-history";
   const key = `multaiplayer:history:${roomId}`;
-  localStorage.setItem(key, JSON.stringify({
-    savedAt: "not-a-date",
-    ciphertext: {
-      algorithm: "AES-GCM-256",
-      nonce: "AAAAAAAAAAAAAAAA",
-      ciphertext: "AAAAAAAAAAAAAAAAAAAAAA=="
-    }
-  }));
+  localStorage.setItem(
+    key,
+    JSON.stringify({
+      savedAt: "not-a-date",
+      ciphertext: {
+        algorithm: "AES-GCM-256",
+        nonce: "AAAAAAAAAAAAAAAA",
+        ciphertext: "AAAAAAAAAAAAAAAAAAAAAA=="
+      }
+    })
+  );
 
   assert.equal(await loadEncryptedHistory(roomId), null);
   assert.equal(localStorage.getItem(key), null);
@@ -753,10 +807,13 @@ test("loadEncryptedHistory does not create a room secret when no history exists"
 test("invalid fallback room secrets are removed instead of migrated", async () => {
   const roomId = "room-invalid-fallback-secret";
   const key = `multaiplayer:room-secret:${roomId}`;
-  localStorage.setItem(key, JSON.stringify({
-    algorithm: "AES-GCM-256",
-    rawKey: "not-a-256-bit-key"
-  }));
+  localStorage.setItem(
+    key,
+    JSON.stringify({
+      algorithm: "AES-GCM-256",
+      rawKey: "not-a-256-bit-key"
+    })
+  );
 
   assert.equal(await loadRoomSecret(roomId), null);
   assert.equal(localStorage.getItem(key), null);
@@ -764,10 +821,11 @@ test("invalid fallback room secrets are removed instead of migrated", async () =
 
 test("room secret imports reject invalid key material", async () => {
   await assert.rejects(
-    () => importRoomSecret("room-invalid-import", {
-      algorithm: "AES-GCM-256",
-      rawKey: "not-a-256-bit-key"
-    }),
+    () =>
+      importRoomSecret("room-invalid-import", {
+        algorithm: "AES-GCM-256",
+        rawKey: "not-a-256-bit-key"
+      }),
     /Room key must be 256 bits/
   );
   assert.equal(localStorage.getItem("multaiplayer:room-secret:room-invalid-import"), null);

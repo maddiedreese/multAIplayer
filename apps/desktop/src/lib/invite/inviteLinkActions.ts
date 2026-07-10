@@ -6,17 +6,11 @@ import { canCreateRoomInvite } from "../invitePolicy";
 import { shouldApplyRoomScopedUiUpdate } from "../roomScopedUi";
 import { roomLockMessage } from "../appRuntime";
 import { useAppStore, type AppStoreState } from "../../store/appStore";
-import {
-  encodeNoSecretRoomInvite,
-  jsonWebKeyToDevicePublicKeyJwk
-} from "../noSecretRoomInvite";
+import { encodeNoSecretRoomInvite, jsonWebKeyToDevicePublicKeyJwk } from "../noSecretRoomInvite";
 import type { UseInviteActionsOptions } from "./inviteActionTypes";
 import { currentLocalIdentity, currentSelectedRoom } from "../selectedWorkspace";
 
-type InviteLinkActionOptions = Pick<
-  UseInviteActionsOptions,
-  | "selectedRoomIdRef"
->;
+type InviteLinkActionOptions = Pick<UseInviteActionsOptions, "selectedRoomIdRef">;
 
 type InviteLinkStore = Pick<AppStoreState, "setInviteLinkForRoom" | "setInviteMessageForRoom">;
 
@@ -24,9 +18,7 @@ export function createInviteLinkActions(
   options: InviteLinkActionOptions,
   store: InviteLinkStore = useAppStore.getState()
 ) {
-  const {
-    selectedRoomIdRef
-  } = options;
+  const { selectedRoomIdRef } = options;
   const { setInviteLinkForRoom, setInviteMessageForRoom } = store;
   const setSelectedInviteMessage = (message: string | null) =>
     setInviteMessageForRoom(selectedRoomIdRef.current, message);

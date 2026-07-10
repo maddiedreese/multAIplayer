@@ -1,11 +1,6 @@
 import type { MutableRefObject } from "react";
-import type {
-  CodexEventPlaintextPayload,
-  RoomRecord
-} from "@multaiplayer/protocol";
-import {
-  defaultCodexSandboxLevel
-} from "@multaiplayer/protocol";
+import type { CodexEventPlaintextPayload, RoomRecord } from "@multaiplayer/protocol";
+import { defaultCodexSandboxLevel } from "@multaiplayer/protocol";
 import {
   runCodexTurn,
   shutdownCodexRoom,
@@ -17,9 +12,7 @@ import {
 import { codexGoalToRoomGoal } from "../lib/roomGoals";
 import { assessCodexCompatibility } from "../lib/codexCompatibility";
 import { resolveCodexRunSettings } from "../lib/codexCatalogResolver";
-import {
-  canApproveCodexTurn
-} from "../lib/codexApproval";
+import { canApproveCodexTurn } from "../lib/codexApproval";
 import {
   buildCodexApprovalSnapshot,
   buildCodexTurnInput,
@@ -29,19 +22,9 @@ import {
   messagesSinceLastCodex
 } from "../lib/codexTurn";
 import { normalizeCodexThreadId } from "../lib/codexThread";
-import {
-  codexHostFailureRoomMessage,
-  projectCodexRoomEvent,
-  projectCodexRoomStatus
-} from "../lib/codexRoomSharing";
-import {
-  classifyCodexFailure,
-  codexUsageLimitMessage
-} from "../lib/codexFailure";
-import {
-  formatCodexModel,
-  formatMessageTime
-} from "../lib/appFormatters";
+import { codexHostFailureRoomMessage, projectCodexRoomEvent, projectCodexRoomStatus } from "../lib/codexRoomSharing";
+import { classifyCodexFailure, codexUsageLimitMessage } from "../lib/codexFailure";
+import { formatCodexModel, formatMessageTime } from "../lib/appFormatters";
 import { roomLockMessage } from "../lib/appRuntime";
 import { canUseLocalWorkspace } from "../lib/workspaceAccess";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
@@ -135,7 +118,10 @@ export function useCodexTurnActions({
     if (!nextTurn) return;
     if (isExpiredCodexInvocation(nextTurn.queuedAt)) {
       removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
-      setHostMessageForRoom(roomId, `Dropped ${nextTurn.requestedBy}'s Codex proposal because host approval timed out.`);
+      setHostMessageForRoom(
+        roomId,
+        `Dropped ${nextTurn.requestedBy}'s Codex proposal because host approval timed out.`
+      );
       promoteNextCodexApprovalForRoom(roomId);
       return;
     }
@@ -151,14 +137,17 @@ export function useCodexTurnActions({
       const cancellationMessage = roomLocked
         ? roomLockMessage(room, roomRevoked)
         : "Queued Codex turn was cancelled because Codex is unavailable in this room.";
-      void publishChatMessage({
-        id: crypto.randomUUID(),
-        author: "multAIplayer",
-        role: "system",
-        body: cancellationMessage,
-        time: formatMessageTime(),
-        createdAt: new Date().toISOString()
-      }, room);
+      void publishChatMessage(
+        {
+          id: crypto.randomUUID(),
+          author: "multAIplayer",
+          role: "system",
+          body: cancellationMessage,
+          time: formatMessageTime(),
+          createdAt: new Date().toISOString()
+        },
+        room
+      );
       setHostMessageForRoom(roomId, cancellationMessage);
       return;
     }
@@ -174,14 +163,17 @@ export function useCodexTurnActions({
     );
     if (!hasActionableCodexTurnContext(approvalSnapshot.summary)) {
       removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
-      void publishChatMessage({
-        id: crypto.randomUUID(),
-        author: "multAIplayer",
-        role: "system",
-        body: `Dropped ${nextTurn.requestedBy}'s queued Codex turn because there is no new room context to send.`,
-        time: formatMessageTime(),
-        createdAt: new Date().toISOString()
-      }, room);
+      void publishChatMessage(
+        {
+          id: crypto.randomUUID(),
+          author: "multAIplayer",
+          role: "system",
+          body: `Dropped ${nextTurn.requestedBy}'s queued Codex turn because there is no new room context to send.`,
+          time: formatMessageTime(),
+          createdAt: new Date().toISOString()
+        },
+        room
+      );
       setHostMessageForRoom(roomId, "Dropped an empty queued Codex turn.");
       promoteNextCodexApprovalForRoom(roomId);
       return;
@@ -290,16 +282,19 @@ export function useCodexTurnActions({
       .filter((id): id is string => Boolean(id));
     const previousThreadId = codexThreadIdsByRoom[roomId] ?? null;
     try {
-      await publishCodexEvent({
-        turnId,
-        status: "started",
-        message: previousThreadId
-          ? `Resuming Codex thread ${previousThreadId} with ${formatCodexModel(model)}.`
-          : `Started Codex turn with ${formatCodexModel(model)}.`,
-        model,
-        ...(consumedMessageIds.length ? { consumedMessageIds } : {}),
-        ...(riskFlags.length ? { riskFlags } : {})
-      }, room);
+      await publishCodexEvent(
+        {
+          turnId,
+          status: "started",
+          message: previousThreadId
+            ? `Resuming Codex thread ${previousThreadId} with ${formatCodexModel(model)}.`
+            : `Started Codex turn with ${formatCodexModel(model)}.`,
+          model,
+          ...(consumedMessageIds.length ? { consumedMessageIds } : {}),
+          ...(riskFlags.length ? { riskFlags } : {})
+        },
+        room
+      );
       const result = await runCodexTurn(
         roomId,
         turnId,
@@ -331,33 +326,42 @@ export function useCodexTurnActions({
         .slice(-16);
       const roomStatus = projectCodexRoomStatus(result.status);
       for (const eventName of roomEvents) {
-        await publishCodexEvent({
+        await publishCodexEvent(
+          {
+            turnId,
+            status: "event",
+            message: eventName,
+            eventName,
+            model,
+            ...(threadId ? { threadId } : {})
+          },
+          room
+        );
+      }
+      await publishCodexEvent(
+        {
           turnId,
-          status: "event",
-          message: eventName,
-          eventName,
+          status: roomStatus === "completed" ? "completed" : "failed",
+          message: `Codex turn finished with status: ${roomStatus}.`,
           model,
           ...(threadId ? { threadId } : {})
-        }, room);
-      }
-      await publishCodexEvent({
-        turnId,
-        status: roomStatus === "completed" ? "completed" : "failed",
-        message: `Codex turn finished with status: ${roomStatus}.`,
-        model,
-        ...(threadId ? { threadId } : {})
-      }, room);
+        },
+        room
+      );
       const body =
         result.transcript.trim() ||
         `Codex turn finished with status: ${roomStatus}.${roomEvents.length ? ` Events: ${roomEvents.slice(0, 8).join(", ")}` : ""}`;
-      await publishChatMessage({
-        id: crypto.randomUUID(),
-        author: `Codex via ${localUser.name}`,
-        role: "codex",
-        body,
-        time: formatMessageTime(),
-        createdAt: new Date().toISOString()
-      }, room);
+      await publishChatMessage(
+        {
+          id: crypto.randomUUID(),
+          author: `Codex via ${localUser.name}`,
+          role: "codex",
+          body,
+          time: formatMessageTime(),
+          createdAt: new Date().toISOString()
+        },
+        room
+      );
       appendTerminalLinesForRoom(roomId, [
         `Codex status: ${result.status}`,
         `Codex thread: ${result.threadId ?? "unknown"}`,
@@ -369,20 +373,26 @@ export function useCodexTurnActions({
         await handleCodexUsageLimit(room, turnId, model, turnMessages, [String(error)], String(error));
         return;
       }
-      await publishCodexEvent({
-        turnId,
-        status: "failed",
-        message: codexHostFailureRoomMessage,
-        model
-      }, room);
-      await publishChatMessage({
-        id: crypto.randomUUID(),
-        author: `Codex via ${localUser.name}`,
-        role: "codex",
-        body: codexHostFailureRoomMessage,
-        time: formatMessageTime(),
-        createdAt: new Date().toISOString()
-      }, room);
+      await publishCodexEvent(
+        {
+          turnId,
+          status: "failed",
+          message: codexHostFailureRoomMessage,
+          model
+        },
+        room
+      );
+      await publishChatMessage(
+        {
+          id: crypto.randomUUID(),
+          author: `Codex via ${localUser.name}`,
+          role: "codex",
+          body: codexHostFailureRoomMessage,
+          time: formatMessageTime(),
+          createdAt: new Date().toISOString()
+        },
+        room
+      );
       appendTerminalLinesForRoom(roomId, [`Codex error: ${String(error)}`]);
     } finally {
       if (continuationHandoff) {
@@ -402,32 +412,41 @@ export function useCodexTurnActions({
     stderr: string
   ) {
     const roomId = room.id;
-    await publishCodexEvent({
-      turnId,
-      status: "failed",
-      message: codexUsageLimitMessage(room.host),
-      model
-    }, room);
+    await publishCodexEvent(
+      {
+        turnId,
+        status: "failed",
+        message: codexUsageLimitMessage(room.host),
+        model
+      },
+      room
+    );
     appendTerminalLinesForRoom(roomId, [
       codexUsageLimitMessage(room.host),
       ...events.slice(-4).map((event) => `event: ${event}`),
       ...(stderr ? [`stderr: ${stderr}`] : [])
     ]);
-    await publishChatMessage({
-      id: crypto.randomUUID(),
-      author: "multAIplayer",
-      role: "system",
-      body: `${codexUsageLimitMessage(room.host)} Click Continue with another host in the room panel to keep going from this room context.`,
-      time: formatMessageTime(),
-      createdAt: new Date().toISOString()
-    }, room);
+    await publishChatMessage(
+      {
+        id: crypto.randomUUID(),
+        author: "multAIplayer",
+        role: "system",
+        body: `${codexUsageLimitMessage(room.host)} Click Continue with another host in the room panel to keep going from this room context.`,
+        time: formatMessageTime(),
+        createdAt: new Date().toISOString()
+      },
+      room
+    );
     try {
       const handedOff = await updateRoomHost(roomId, room.host, room.hostUserId ?? localUser.id, "handoff");
       void shutdownCodexRoom(roomId);
       replaceRoom(handedOff);
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setHostMessageForRoom(roomId, `Codex usage is unavailable, but host handoff could not update room host status: ${String(error)}`);
+        setHostMessageForRoom(
+          roomId,
+          `Codex usage is unavailable, but host handoff could not update room host status: ${String(error)}`
+        );
       }
     }
     await publishHostHandoff(room, "usage_limit", turnMessages);

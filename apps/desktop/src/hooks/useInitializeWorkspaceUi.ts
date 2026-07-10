@@ -36,12 +36,5 @@ export function useInitializeWorkspaceUi({
       teamMembersByTeam: initialTeamMembersByTeam,
       messagesByRoom: initialMessagesByRoom
     });
-  }, [
-    initialMessagesByRoom,
-    initialProjectPath,
-    initialRoomId,
-    initialRooms,
-    initialTeamMembersByTeam,
-    initialTeams,
-  ]);
+  }, [initialMessagesByRoom, initialProjectPath, initialRoomId, initialRooms, initialTeamMembersByTeam, initialTeams]);
 }

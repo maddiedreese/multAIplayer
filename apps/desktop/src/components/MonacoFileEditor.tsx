@@ -16,6 +16,10 @@ export function MonacoFileEditor({
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   const modelRef = useRef<Monaco.editor.ITextModel | null>(null);
   const onChangeRef = useRef(onChange);
+  const valueRef = useRef(value);
+  const disabledRef = useRef(disabled);
+  valueRef.current = value;
+  disabledRef.current = disabled;
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -30,11 +34,11 @@ export function MonacoFileEditor({
     void installMonaco().then((monaco) => {
       if (cancelled || !containerRef.current) return;
       const uri = monaco.Uri.parse(`file:///${path.replace(/^\/+/, "")}`);
-      const model = monaco.editor.createModel(value, languageForPath(path), uri);
+      const model = monaco.editor.createModel(valueRef.current, languageForPath(path), uri);
       modelRef.current = model;
       const editor = monaco.editor.create(containerRef.current, {
         model,
-        readOnly: disabled,
+        readOnly: disabledRef.current,
         automaticLayout: true,
         minimap: { enabled: false },
         fontFamily: "var(--font-mono)",

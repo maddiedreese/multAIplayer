@@ -41,10 +41,7 @@ export function CodexAccountPanel() {
       setBusy(false);
     }
   }, [native]);
-  const refreshTask = useMemo(
-    () => createCoalescedAsyncTask(performRefresh),
-    [performRefresh]
-  );
+  const refreshTask = useMemo(() => createCoalescedAsyncTask(performRefresh), [performRefresh]);
 
   useEffect(() => {
     void refreshTask.request().catch(() => undefined);
@@ -52,10 +49,18 @@ export function CodexAccountPanel() {
     let unlisten: () => void = () => undefined;
     void listenForCodexHostNotifications((notification) => {
       if (notification.method === "account/login/completed") {
-        setMessage(notification.params.success === true ? "Codex sign-in completed." : String(notification.params.error ?? "Codex sign-in failed."));
+        setMessage(
+          notification.params.success === true
+            ? "Codex sign-in completed."
+            : String(notification.params.error ?? "Codex sign-in failed.")
+        );
         setLogin(null);
       } else if (notification.method === "mcpServer/oauthLogin/completed") {
-        setMessage(notification.params.success === true ? `${String(notification.params.name ?? "MCP server")} connected.` : String(notification.params.error ?? "MCP sign-in failed."));
+        setMessage(
+          notification.params.success === true
+            ? `${String(notification.params.name ?? "MCP server")} connected.`
+            : String(notification.params.error ?? "MCP sign-in failed.")
+        );
       }
       if (shouldRefreshCodexHostSnapshot(notification.method, Date.now() - refreshStartedAt.current)) {
         void refreshTask.request().catch(() => undefined);
@@ -132,7 +137,11 @@ export function CodexAccountPanel() {
     try {
       await setCodexAppApprovalMode(mode);
       setApprovalMode(mode);
-      setMessage(mode === "writes" ? "Apps now prompt for writes while declared read-only tools proceed." : `Default app approval mode set to ${mode}.`);
+      setMessage(
+        mode === "writes"
+          ? "Apps now prompt for writes while declared read-only tools proceed."
+          : `Default app approval mode set to ${mode}.`
+      );
     } catch (error) {
       setMessage(String(error));
     } finally {
@@ -156,7 +165,12 @@ export function CodexAccountPanel() {
           <strong>Codex on this device</strong>
           <small>Host-local account and connector controls</small>
         </div>
-        <button className="icon-button" onClick={() => void refreshTask.request()} disabled={busy} aria-label="Refresh Codex account">
+        <button
+          className="icon-button"
+          onClick={() => void refreshTask.request()}
+          disabled={busy}
+          aria-label="Refresh Codex account"
+        >
           <RefreshCw size={15} />
         </button>
       </div>
@@ -170,10 +184,18 @@ export function CodexAccountPanel() {
 
       {!snapshot?.account ? (
         <div className="codex-account-actions">
-          <button className="primary-wide" onClick={() => void beginLogin("browser")} disabled={busy || !snapshot?.capabilities.supportsBrowserLogin}>
+          <button
+            className="primary-wide"
+            onClick={() => void beginLogin("browser")}
+            disabled={busy || !snapshot?.capabilities.supportsBrowserLogin}
+          >
             <LogIn size={15} /> Sign in with ChatGPT
           </button>
-          <button className="ghost-wide" onClick={() => void beginLogin("device")} disabled={busy || !snapshot?.capabilities.supportsDeviceLogin}>
+          <button
+            className="ghost-wide"
+            onClick={() => void beginLogin("device")}
+            disabled={busy || !snapshot?.capabilities.supportsDeviceLogin}
+          >
             Use device code
           </button>
         </div>
@@ -187,24 +209,35 @@ export function CodexAccountPanel() {
         <div className="device-flow drawer-flow">
           <span>{login.flow === "device" ? "ChatGPT device code" : "ChatGPT sign-in"}</span>
           {login.userCode && <strong>{login.userCode}</strong>}
-          <a href={login.url} target="_blank" rel="noreferrer">Open ChatGPT <ExternalLink size={13} /></a>
-          <button className="ghost-wide" onClick={() => void cancelLogin()} disabled={busy}>Cancel sign-in</button>
+          <a href={login.url} target="_blank" rel="noreferrer">
+            Open ChatGPT <ExternalLink size={13} />
+          </a>
+          <button className="ghost-wide" onClick={() => void cancelLogin()} disabled={busy}>
+            Cancel sign-in
+          </button>
         </div>
       )}
 
       <label className="codex-approval-mode">
-        <span><ShieldCheck size={14} /> Global app tool approvals</span>
+        <span>
+          <ShieldCheck size={14} /> Global app tool approvals
+        </span>
         <select
           value={approvalMode}
           disabled={busy || !snapshot?.capabilities.supportsApps}
           onChange={(event) => void updateApprovalMode(event.target.value as CodexAppApprovalMode)}
         >
-          <option value="" disabled>Choose a default…</option>
+          <option value="" disabled>
+            Choose a default…
+          </option>
           <option value="auto">Automatic</option>
           <option value="prompt">Always prompt</option>
           {snapshot?.capabilities.supportsWritesApproval && <option value="writes">Prompt for writes</option>}
         </select>
-        <small>This persists in the device-wide Codex config and affects other Codex clients. “Prompt for writes” trusts only tools that declare themselves read-only.</small>
+        <small>
+          This persists in the device-wide Codex config and affects other Codex clients. “Prompt for writes” trusts only
+          tools that declare themselves read-only.
+        </small>
       </label>
 
       <div className="codex-host-list">
@@ -221,7 +254,9 @@ export function CodexAccountPanel() {
       {mcpLogin && (
         <div className="device-flow drawer-flow">
           <span>{mcpLogin.name} authorization</span>
-          <a href={mcpLogin.url} target="_blank" rel="noreferrer">Open authorization <ExternalLink size={13} /></a>
+          <a href={mcpLogin.url} target="_blank" rel="noreferrer">
+            Open authorization <ExternalLink size={13} />
+          </a>
         </div>
       )}
 
@@ -230,9 +265,16 @@ export function CodexAccountPanel() {
         {snapshot?.mcpError && <small>{snapshot.mcpError}</small>}
         {snapshot?.mcpServers.map((server) => (
           <div key={server.name} className="codex-host-row">
-            <span>{server.name}<small>{server.toolCount} tools · {server.authStatus}</small></span>
+            <span>
+              {server.name}
+              <small>
+                {server.toolCount} tools · {server.authStatus}
+              </small>
+            </span>
             {server.authStatus === "notLoggedIn" && (
-              <button className="secondary" onClick={() => void connectMcp(server.name)} disabled={busy}>Connect</button>
+              <button className="secondary" onClick={() => void connectMcp(server.name)} disabled={busy}>
+                Connect
+              </button>
             )}
           </div>
         ))}

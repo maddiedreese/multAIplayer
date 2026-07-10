@@ -1,8 +1,4 @@
-const githubAvatarHosts = new Set([
-  "avatars.githubusercontent.com",
-  "github.com",
-  "githubusercontent.com"
-]);
+const githubAvatarHosts = new Set(["avatars.githubusercontent.com", "github.com", "githubusercontent.com"]);
 
 export function trustedAvatarUrl(value: string | undefined): string | undefined {
   if (!value) return undefined;

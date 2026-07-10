@@ -66,8 +66,7 @@ export function createFileActions({
 
   const setSelectedFileMessage = (message: string | null) =>
     useAppStore.getState().setFileMessageForRoom(useAppStore.getState().selectedRoomId, message);
-  const setFileBusyForRoom = (roomId: string, busy: boolean) =>
-    useAppStore.getState().setFileBusyForRoom(roomId, busy);
+  const setFileBusyForRoom = (roomId: string, busy: boolean) => useAppStore.getState().setFileBusyForRoom(roomId, busy);
   const setSelectedFileForRoom = (roomId: string, file: ProjectFileContent | null) =>
     useAppStore.getState().setSelectedFileForRoom(roomId, file);
   const setSelectedDiffForRoom = (roomId: string, diff: GitDiffResult | null) =>
@@ -78,11 +77,8 @@ export function createFileActions({
     useAppStore.getState().setFileMessageForRoom(roomId, message);
   const appendFileSaveRequest = (roomId: string, request: WorkspaceFileSaveRequest) =>
     useAppStore.getState().appendFileSaveRequest(roomId, request);
-  const updateFileSaveRequestStatus = (
-    roomId: string,
-    requestId: string,
-    status: WorkspaceFileSaveRequest["status"]
-  ) => useAppStore.getState().updateFileSaveRequestStatus(roomId, requestId, status);
+  const updateFileSaveRequestStatus = (roomId: string, requestId: string, status: WorkspaceFileSaveRequest["status"]) =>
+    useAppStore.getState().updateFileSaveRequestStatus(roomId, requestId, status);
   const appendPendingAttachmentForRoom = (roomId: string, attachment: ChatAttachment) =>
     useAppStore.getState().appendPendingAttachmentForRoom(roomId, attachment);
   const removePendingAttachmentForRoom = (roomId: string, attachmentId: string) =>
@@ -108,7 +104,9 @@ export function createFileActions({
     setFileMessageForRoom(room.id, null);
     try {
       const [fileResult, diff] = await Promise.all([
-        readProjectFile(room.projectPath, path).then((file) => ({ file, error: null })).catch((error) => ({ file: null, error })),
+        readProjectFile(room.projectPath, path)
+          .then((file) => ({ file, error: null }))
+          .catch((error) => ({ file: null, error })),
         getGitDiff(room.projectPath, path).catch(() => null)
       ]);
       if (selectedRoomIdRef.current !== room.id) return;
@@ -154,7 +152,12 @@ export function createFileActions({
     const review = decideAttachmentReview(
       fileToAttach.content,
       fileToAttach.path,
-      reviewedAttachmentPathForScope(store.sensitiveAttachmentReviewKey, roomId, selectedRoom.projectPath, fileToAttach.path)
+      reviewedAttachmentPathForScope(
+        store.sensitiveAttachmentReviewKey,
+        roomId,
+        selectedRoom.projectPath,
+        fileToAttach.path
+      )
     );
     if (!review.canAttach) {
       setSensitiveAttachmentReviewKey(attachmentReviewScopeKey(roomId, selectedRoom.projectPath, fileToAttach.path));
@@ -174,7 +177,8 @@ export function createFileActions({
       return;
     }
     const selectedContentBytes = encodedBytes(attachment.content ?? "");
-    const shouldUploadBlob = selectedContentBytes > maxEmbeddedAttachmentBytes ||
+    const shouldUploadBlob =
+      selectedContentBytes > maxEmbeddedAttachmentBytes ||
       embeddedAttachmentBytes(roomPendingAttachments) + selectedContentBytes > maxEmbeddedAttachmentBytesPerMessage;
     if (shouldUploadBlob) {
       if (reportRoomFileActionInFlight(roomId)) return;
@@ -187,13 +191,16 @@ export function createFileActions({
           name: fileToAttach.path,
           type: attachment.type,
           size: fileToAttach.size,
-          payload: await encryptJson({
-            name: fileToAttach.path,
-            type: attachment.type,
-            size: fileToAttach.size,
-            content: fileToAttach.content,
-            truncated: fileToAttach.truncated
-          }, secret)
+          payload: await encryptJson(
+            {
+              name: fileToAttach.path,
+              type: attachment.type,
+              size: fileToAttach.size,
+              content: fileToAttach.content,
+              truncated: fileToAttach.truncated
+            },
+            secret
+          )
         });
         attachment.content = undefined;
         attachment.blobId = blob.id;
@@ -211,15 +218,19 @@ export function createFileActions({
     const nextPendingAttachments = [...roomPendingAttachments, attachment];
     const validationError = validatePendingAttachments(nextPendingAttachments);
     if (validationError) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) setFileMessageForRoom(roomId, validationError);
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
+        setFileMessageForRoom(roomId, validationError);
       return;
     }
     appendPendingAttachmentForRoom(roomId, attachment);
     if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
       setSensitiveAttachmentReviewKey(null);
-      setFileMessageForRoom(roomId, attachment.blobId
-        ? `Attached ${fileToAttach.path} as an encrypted blob for the next room message.`
-        : `Attached ${fileToAttach.path} to the next room message.`);
+      setFileMessageForRoom(
+        roomId,
+        attachment.blobId
+          ? `Attached ${fileToAttach.path} as an encrypted blob for the next room message.`
+          : `Attached ${fileToAttach.path} to the next room message.`
+      );
     }
   }
 
@@ -331,7 +342,11 @@ export function createFileActions({
     }
   }
 
-  async function publishFileSaveStatus(room: RoomRecord, requestId: string, status: RequestStatusPlaintextPayload["status"]) {
+  async function publishFileSaveStatus(
+    room: RoomRecord,
+    requestId: string,
+    status: RequestStatusPlaintextPayload["status"]
+  ) {
     const client = relayRef.current;
     const { relayStatus } = useAppStore.getState();
     if (!client || relayStatus === "closed" || relayStatus === "error") return;

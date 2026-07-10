@@ -89,9 +89,7 @@ test("shutdown drains before closing listeners, sockets, or the store", async ()
 
   assert.deepEqual(waits, [250, 500]);
   assert.deepEqual(events, ["server.close", "wss.close"]);
-  assert.deepEqual(socket.closeCalls, [
-    { code: 1012, reason: "Relay shutting down" }
-  ]);
+  assert.deepEqual(socket.closeCalls, [{ code: 1012, reason: "Relay shutting down" }]);
   assert.equal(socket.terminateCalls, 0);
   assert.equal(events.includes("store.close"), false);
 

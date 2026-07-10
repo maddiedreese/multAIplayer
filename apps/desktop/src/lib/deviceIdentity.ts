@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 const deviceIdentityKey = "multaiplayer:device-identity:v1";
 
-export interface DeviceIdentity extends DeviceKeyAgreementIdentity {}
+export type DeviceIdentity = DeviceKeyAgreementIdentity;
 
 export async function loadOrCreateDeviceIdentity(): Promise<DeviceIdentity> {
   const nativeIdentity = await readNativeDeviceIdentity();

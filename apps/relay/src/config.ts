@@ -107,10 +107,7 @@ export function loadRelayConfig(): RelayConfig {
     mutationsRequireAuth: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_REQUIRE_AUTH, nodeEnv === "production"),
     rateLimitsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMITS, true),
     trustProxyHeaders: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS, false),
-    structuredLogsEnabled: parseBooleanEnv(
-      process.env.MULTAIPLAYER_RELAY_STRUCTURED_LOGS,
-      nodeEnv === "production"
-    ),
+    structuredLogsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_STRUCTURED_LOGS, nodeEnv === "production"),
     rateLimitWindowMs: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS, 60_000, 1_000, 3_600_000),
     rateLimitCaps: {
       auth: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_AUTH, 30, 1, 10_000),
@@ -159,12 +156,16 @@ function loadRelayEnvFiles() {
 }
 
 function relayEnvFileCandidates(): string[] {
-  return Array.from(new Set([
-    process.env.MULTAIPLAYER_RELAY_ENV_FILE ? resolve(process.env.MULTAIPLAYER_RELAY_ENV_FILE) : "",
-    resolve(process.cwd(), "apps/relay/.env"),
-    resolve(process.cwd(), ".env"),
-    resolve(process.cwd(), "../..", ".env")
-  ].filter(Boolean)));
+  return Array.from(
+    new Set(
+      [
+        process.env.MULTAIPLAYER_RELAY_ENV_FILE ? resolve(process.env.MULTAIPLAYER_RELAY_ENV_FILE) : "",
+        resolve(process.cwd(), "apps/relay/.env"),
+        resolve(process.cwd(), ".env"),
+        resolve(process.cwd(), "../..", ".env")
+      ].filter(Boolean)
+    )
+  );
 }
 
 function parseEnvFile(contents: string): Record<string, string> {
@@ -182,10 +183,7 @@ function parseEnvFile(contents: string): Record<string, string> {
 
 function normalizeEnvFileValue(value: string): string {
   const trimmed = value.trim();
-  if (
-    (trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
-  ) {
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
     return trimmed.slice(1, -1);
   }
   return trimmed.replace(/\s+#.*$/, "");
@@ -241,7 +239,9 @@ function normalizeSessionPersistenceSecret(value: string | undefined): string | 
   const secret = value?.trim();
   if (!secret) return null;
   if (secret.length < 32) {
-    console.warn("MULTAIPLAYER_RELAY_SESSION_SECRET must be at least 32 characters; durable auth sessions are disabled.");
+    console.warn(
+      "MULTAIPLAYER_RELAY_SESSION_SECRET must be at least 32 characters; durable auth sessions are disabled."
+    );
     return null;
   }
   return secret;

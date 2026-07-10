@@ -3,13 +3,10 @@ import test from "node:test";
 import { readJsonResponse } from "../src/lib/httpResponse";
 
 test("readJsonResponse surfaces relay auth errors", async () => {
-  const response = new Response(
-    JSON.stringify({ error: "Sign in with GitHub before reading workspace state." }),
-    {
-      status: 401,
-      headers: { "content-type": "application/json" }
-    }
-  );
+  const response = new Response(JSON.stringify({ error: "Sign in with GitHub before reading workspace state." }), {
+    status: 401,
+    headers: { "content-type": "application/json" }
+  });
 
   await assert.rejects(
     () => readJsonResponse(response, "Failed to load workspace"),

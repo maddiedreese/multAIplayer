@@ -17,12 +17,14 @@ export function useInviteUrlBootstrap({
     if (!invitePayload) return;
     window.history.replaceState(null, "", invitePayload.cleanupPath);
     if (invitePayload.kind === "join") {
-      requestNoSecretInviteAccess(invitePayload.encoded, invitePayload.inviteId)
-        .catch((error) => setSelectedInviteMessage(`Invite could not be read: ${String(error)}`));
+      requestNoSecretInviteAccess(invitePayload.encoded, invitePayload.inviteId).catch((error) =>
+        setSelectedInviteMessage(`Invite could not be read: ${String(error)}`)
+      );
       return;
     }
 
-    acceptInvite(invitePayload.encoded, invitePayload.inviteId, invitePayload.approvalRequested)
-      .catch((error) => setSelectedInviteMessage(`Invite could not be read: ${String(error)}`));
-  }, []);
+    acceptInvite(invitePayload.encoded, invitePayload.inviteId, invitePayload.approvalRequested).catch((error) =>
+      setSelectedInviteMessage(`Invite could not be read: ${String(error)}`)
+    );
+  }, [acceptInvite, requestNoSecretInviteAccess, setSelectedInviteMessage]);
 }

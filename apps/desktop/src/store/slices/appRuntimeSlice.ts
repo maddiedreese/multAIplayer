@@ -1,11 +1,6 @@
 import type { StateCreator } from "zustand";
 import type { DeviceIdentity } from "../../lib/deviceIdentity";
-import {
-  loadTrustedDeviceKeys,
-  trustDeviceKey,
-  untrustDeviceKey,
-  type TrustedDeviceKey
-} from "../../lib/deviceTrust";
+import { loadTrustedDeviceKeys, trustDeviceKey, untrustDeviceKey, type TrustedDeviceKey } from "../../lib/deviceTrust";
 import type { CodexProbe } from "../../lib/localBackend";
 import type { AppStoreState } from "../appStore";
 
@@ -44,12 +39,14 @@ export const createAppRuntimeSlice: StateCreator<AppStoreState, [], [], AppRunti
     if (get().trustedDeviceKeysLoaded) return;
     set({ trustedDeviceKeys: loadTrustedDeviceKeys(), trustedDeviceKeysLoaded: true });
   },
-  trustDeviceForRoom: (roomId, deviceId, fingerprint) => set((state) => ({
-    trustedDeviceKeys: trustDeviceKey(state.trustedDeviceKeys, roomId, deviceId, fingerprint)
-  })),
-  untrustDeviceForRoom: (roomId, deviceId) => set((state) => ({
-    trustedDeviceKeys: untrustDeviceKey(state.trustedDeviceKeys, roomId, deviceId)
-  })),
+  trustDeviceForRoom: (roomId, deviceId, fingerprint) =>
+    set((state) => ({
+      trustedDeviceKeys: trustDeviceKey(state.trustedDeviceKeys, roomId, deviceId, fingerprint)
+    })),
+  untrustDeviceForRoom: (roomId, deviceId) =>
+    set((state) => ({
+      trustedDeviceKeys: untrustDeviceKey(state.trustedDeviceKeys, roomId, deviceId)
+    })),
   startHistorySearch: () => set({ historySearchBusy: true }),
   finishHistorySearch: () => set({ historySearchBusy: false })
 });

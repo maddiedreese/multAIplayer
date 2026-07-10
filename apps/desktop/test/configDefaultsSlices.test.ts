@@ -80,10 +80,13 @@ test("relay configuration actions normalize, persist, and reset drafts atomicall
 });
 
 test("resetAppStore reloads the persisted relay configuration", () => {
-  localStorage.setItem("multaiplayer:app-config", JSON.stringify({
-    relayHttpUrl: "https://persisted.example.com",
-    relayWsUrl: "wss://persisted.example.com/rooms"
-  }));
+  localStorage.setItem(
+    "multaiplayer:app-config",
+    JSON.stringify({
+      relayHttpUrl: "https://persisted.example.com",
+      relayWsUrl: "wss://persisted.example.com/rooms"
+    })
+  );
 
   useAppStore.getState().resetAppStore();
 

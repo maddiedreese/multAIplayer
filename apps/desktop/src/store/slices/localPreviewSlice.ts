@@ -70,10 +70,7 @@ export interface LocalPreviewSlice {
   appendLocalPreviewEvent: (roomId: string, event: LocalPreviewRecord) => void;
 }
 
-export const emptyLocalPreviewState: Pick<
-  LocalPreviewSlice,
-  "localPreviewByRoom" | "localPreviewDialog"
-> = {
+export const emptyLocalPreviewState: Pick<LocalPreviewSlice, "localPreviewByRoom" | "localPreviewDialog"> = {
   localPreviewByRoom: {},
   localPreviewDialog: emptyLocalPreviewDialog
 };
@@ -169,7 +166,7 @@ export const createLocalPreviewSlice: StateCreator<AppStoreState, [], [], LocalP
     set((state) => {
       const roomEvents = state.localPreviewByRoom[roomId]?.previews ?? [];
       const nextEvents = roomEvents.some((existing) => existing.id === event.id)
-        ? roomEvents.map((existing) => existing.id === event.id ? event : existing)
+        ? roomEvents.map((existing) => (existing.id === event.id ? event : existing))
         : [...roomEvents, event];
       return {
         localPreviewByRoom: updateLocalPreviewForRoom(state.localPreviewByRoom, roomId, (roomPreview) => ({

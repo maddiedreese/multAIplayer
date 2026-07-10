@@ -25,7 +25,14 @@ export async function forkCodexThread(
 ): Promise<CodexThreadNode> {
   if (!isTauriRuntime()) {
     const now = Math.floor(Date.now() / 1000);
-    return { id: `${threadId}-fork`, parentThreadId: threadId, title: "Forked Codex thread", status: "idle", createdAt: now, updatedAt: now };
+    return {
+      id: `${threadId}-fork`,
+      parentThreadId: threadId,
+      title: "Forked Codex thread",
+      status: "idle",
+      createdAt: now,
+      updatedAt: now
+    };
   }
   return invoke<CodexThreadNode>("fork_codex_thread", {
     request: { roomId, threadId, cwd, ...(lastTurnId ? { lastTurnId } : {}) }

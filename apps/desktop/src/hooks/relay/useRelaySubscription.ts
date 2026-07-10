@@ -141,7 +141,8 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
           !hasSelectedRoom ||
           access.revokedRoomIds.has(selectedRoom.id) ||
           access.revokedTeamIds.has(selectedRoom.teamId)
-        ) return;
+        )
+          return;
         openClient.publish({
           type: "join",
           teamId: selectedRoom.teamId,

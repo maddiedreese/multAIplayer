@@ -12,12 +12,7 @@ import {
   type CodexSpeed
 } from "@multaiplayer/protocol";
 
-export {
-  maxCodexModelChars,
-  maxRoomNameChars,
-  maxRoomProjectPathChars,
-  maxTeamNameChars
-};
+export { maxCodexModelChars, maxRoomNameChars, maxRoomProjectPathChars, maxTeamNameChars };
 
 export interface WorkspaceCreatePlan {
   name: string;
@@ -60,32 +55,36 @@ export function normalizeCodexModel(model: string): string | null {
 
 export function normalizeCodexReasoningEffort(effort: string): CodexReasoningEffort | null {
   const trimmed = effort.trim();
-  return codexReasoningEffortOptions.some((option) => option.id === trimmed) ? trimmed as CodexReasoningEffort : null;
+  return codexReasoningEffortOptions.some((option) => option.id === trimmed) ? (trimmed as CodexReasoningEffort) : null;
 }
 
 export function normalizeCodexSpeed(speed: string): CodexSpeed | null {
   const trimmed = speed.trim();
-  return codexSpeedOptions.some((option) => option.id === trimmed) ? trimmed as CodexSpeed : null;
+  return codexSpeedOptions.some((option) => option.id === trimmed) ? (trimmed as CodexSpeed) : null;
 }
 
 export function normalizeCodexSandboxLevel(sandboxLevel: string): CodexSandboxLevel | null {
   const trimmed = sandboxLevel.trim();
-  return codexSandboxLevelOptions.some((option) => option.id === trimmed) ? trimmed as CodexSandboxLevel : null;
+  return codexSandboxLevelOptions.some((option) => option.id === trimmed) ? (trimmed as CodexSandboxLevel) : null;
 }
 
 export function planTeamCreation(name: string): WorkspaceCreatePlan {
   const trimmedName = normalizeTeamName(name);
-  if (!trimmedName) throw new Error(`Enter a team name up to ${maxTeamNameChars} characters without control characters.`);
+  if (!trimmedName)
+    throw new Error(`Enter a team name up to ${maxTeamNameChars} characters without control characters.`);
   return { name: trimmedName };
 }
 
 export function planRoomCreation(teamId: string, name: string, projectPath: string): RoomCreatePlan {
   if (!teamId) throw new Error("Create or select a team before creating a room.");
   const trimmedName = normalizeRoomName(name);
-  if (!trimmedName) throw new Error(`Enter a room name up to ${maxRoomNameChars} characters without control characters.`);
+  if (!trimmedName)
+    throw new Error(`Enter a room name up to ${maxRoomNameChars} characters without control characters.`);
   const trimmedProjectPath = normalizeProjectPath(projectPath);
   if (!trimmedProjectPath) {
-    throw new Error(`Enter or choose a local project folder up to ${maxRoomProjectPathChars} characters without control characters.`);
+    throw new Error(
+      `Enter or choose a local project folder up to ${maxRoomProjectPathChars} characters without control characters.`
+    );
   }
   return {
     teamId,

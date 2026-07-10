@@ -92,10 +92,7 @@ export interface RoomSettingsSlice {
   setRoomNotificationsMuted: (roomId: string, muted: boolean) => void;
 }
 
-export const emptyRoomSettingsState: Pick<
-  RoomSettingsSlice,
-  "roomSettingsByRoom"
-> = {
+export const emptyRoomSettingsState: Pick<RoomSettingsSlice, "roomSettingsByRoom"> = {
   roomSettingsByRoom: {}
 };
 

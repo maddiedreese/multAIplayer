@@ -71,11 +71,7 @@ test.beforeEach(() => {
 
 test("browser actions read the current room URL when invoked", async () => {
   const actions = createBrowserActions(createOptions());
-  useAppStore.getState().setBrowserUrlForRoom(
-    room.id,
-    "docs.example.com/current",
-    defaultBrowserUrl
-  );
+  useAppStore.getState().setBrowserUrlForRoom(room.id, "docs.example.com/current", defaultBrowserUrl);
 
   await actions.openRoomBrowserNow();
 
@@ -86,11 +82,13 @@ test("browser actions read the current room URL when invoked", async () => {
 
 test("browser actions approve requests added after action creation", () => {
   const published: Array<{ requestId: string; status: string }> = [];
-  const actions = createBrowserActions(createOptions({
-    publishRequestStatus: async (_kind, requestId, status) => {
-      published.push({ requestId, status });
-    }
-  }));
+  const actions = createBrowserActions(
+    createOptions({
+      publishRequestStatus: async (_kind, requestId, status) => {
+        published.push({ requestId, status });
+      }
+    })
+  );
   const request = pendingRequest();
   useAppStore.getState().appendBrowserRequest(room.id, request);
 
@@ -102,16 +100,8 @@ test("browser actions approve requests added after action creation", () => {
 
 test("disconnected browser requests use the current store draft", async () => {
   const actions = createBrowserActions(createOptions());
-  useAppStore.getState().setBrowserUrlForRoom(
-    room.id,
-    "https://example.com/from-store",
-    defaultBrowserUrl
-  );
-  useAppStore.getState().setBrowserReasonForRoom(
-    room.id,
-    "Current reason",
-    defaultBrowserReason
-  );
+  useAppStore.getState().setBrowserUrlForRoom(room.id, "https://example.com/from-store", defaultBrowserUrl);
+  useAppStore.getState().setBrowserReasonForRoom(room.id, "Current reason", defaultBrowserReason);
 
   await actions.requestBrowserAccess();
 

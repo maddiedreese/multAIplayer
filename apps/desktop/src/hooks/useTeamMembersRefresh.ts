@@ -4,28 +4,27 @@ import { useAppStore } from "../store/appStore";
 
 interface UseTeamMembersRefreshOptions {
   selectedTeam: string;
-  relayHttpUrl: string;
 }
 
-export function useTeamMembersRefresh({
-  selectedTeam,
-  relayHttpUrl
-}: UseTeamMembersRefreshOptions) {
+export function useTeamMembersRefresh({ selectedTeam }: UseTeamMembersRefreshOptions) {
   const setTeamMembersForTeam = useAppStore((state) => state.setTeamMembersForTeam);
   const setTeamMembersMessageForTeam = useAppStore((state) => state.setTeamMembersMessageForTeam);
 
-  const refreshTeamMembers = useCallback(async (teamId: string, showErrors = true): Promise<void> => {
-    if (!teamId) return;
-    try {
-      const members = await loadTeamMembers(teamId);
-      setTeamMembersForTeam(teamId, members);
-      setTeamMembersMessageForTeam(teamId, null);
-    } catch (error) {
-      if (showErrors) {
-        setTeamMembersMessageForTeam(teamId, String(error));
+  const refreshTeamMembers = useCallback(
+    async (teamId: string, showErrors = true): Promise<void> => {
+      if (!teamId) return;
+      try {
+        const members = await loadTeamMembers(teamId);
+        setTeamMembersForTeam(teamId, members);
+        setTeamMembersMessageForTeam(teamId, null);
+      } catch (error) {
+        if (showErrors) {
+          setTeamMembersMessageForTeam(teamId, String(error));
+        }
       }
-    }
-  }, [relayHttpUrl, setTeamMembersForTeam, setTeamMembersMessageForTeam]);
+    },
+    [setTeamMembersForTeam, setTeamMembersMessageForTeam]
+  );
 
   useEffect(() => {
     if (!selectedTeam) return;

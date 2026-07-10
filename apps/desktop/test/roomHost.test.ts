@@ -31,10 +31,7 @@ test("isLocalUserActiveHostForRoom prefers stable host user id", () => {
     isLocalUserActiveHostForRoom(activeRoom, { id: "github:maddiedreese", name: "Different Display Name" }),
     true
   );
-  assert.equal(
-    isLocalUserActiveHostForRoom(activeRoom, { id: "github:someone-else", name: "Maddie" }),
-    false
-  );
+  assert.equal(isLocalUserActiveHostForRoom(activeRoom, { id: "github:someone-else", name: "Maddie" }), false);
 });
 
 test("isLocalUserActiveHostForRoom falls back to host name for legacy rooms", () => {
@@ -45,11 +42,17 @@ test("isLocalUserActiveHostForRoom falls back to host name for legacy rooms", ()
 
 test("isLocalUserActiveHostForRoom rejects inactive host states", () => {
   assert.equal(
-    isLocalUserActiveHostForRoom({ ...activeRoom, hostStatus: "handoff" }, { id: "github:maddiedreese", name: "Maddie" }),
+    isLocalUserActiveHostForRoom(
+      { ...activeRoom, hostStatus: "handoff" },
+      { id: "github:maddiedreese", name: "Maddie" }
+    ),
     false
   );
   assert.equal(
-    isLocalUserActiveHostForRoom({ ...activeRoom, hostStatus: "offline" }, { id: "github:maddiedreese", name: "Maddie" }),
+    isLocalUserActiveHostForRoom(
+      { ...activeRoom, hostStatus: "offline" },
+      { id: "github:maddiedreese", name: "Maddie" }
+    ),
     false
   );
 });

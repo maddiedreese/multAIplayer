@@ -53,8 +53,14 @@ test("createHandoffSettingsPatch rejects incomplete handoff packages", () => {
 });
 
 test("createHandoffSettingsPatch rejects unsupported handoff room metadata", () => {
-  assert.throws(() => createHandoffSettingsPatch({ ...baseHandoff, projectPath: "/tmp/project\u0000secret" }), /project path/);
-  assert.throws(() => createHandoffSettingsPatch({ ...baseHandoff, codexModel: "bad model with spaces" }), /Codex model/);
+  assert.throws(
+    () => createHandoffSettingsPatch({ ...baseHandoff, projectPath: "/tmp/project\u0000secret" }),
+    /project path/
+  );
+  assert.throws(
+    () => createHandoffSettingsPatch({ ...baseHandoff, codexModel: "bad model with spaces" }),
+    /Codex model/
+  );
   assert.throws(() => createHandoffSettingsPatch({ ...baseHandoff, codexSandboxLevel: "nope" }), /sandbox/);
 });
 
@@ -67,14 +73,8 @@ test("host handoff acceptance requires an available handoff from the current roo
   assert.equal(canAcceptRoomHostHandoff(handoffs, available.id), true);
   assert.equal(canAcceptRoomHostHandoff(handoffs, accepted.id), false);
   assert.equal(canAcceptRoomHostHandoff(handoffs, "missing"), false);
-  assert.equal(
-    roomHostHandoffMessage(handoffs, accepted.id),
-    "Host handoff is accepted, not available."
-  );
-  assert.equal(
-    roomHostHandoffMessage(handoffs, "missing"),
-    "Host handoff is no longer available in this room."
-  );
+  assert.equal(roomHostHandoffMessage(handoffs, accepted.id), "Host handoff is accepted, not available.");
+  assert.equal(roomHostHandoffMessage(handoffs, "missing"), "Host handoff is no longer available in this room.");
 });
 
 test("host handoff helpers describe usage-limit continuation", () => {

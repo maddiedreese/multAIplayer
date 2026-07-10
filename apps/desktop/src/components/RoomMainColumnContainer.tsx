@@ -1,5 +1,9 @@
 import React, { useCallback, useMemo, type ComponentProps } from "react";
-import { defaultCodexSandboxLevel, maxEmbeddedAttachmentBytesPerMessage, maxMessageAttachments } from "@multaiplayer/protocol";
+import {
+  defaultCodexSandboxLevel,
+  maxEmbeddedAttachmentBytesPerMessage,
+  maxMessageAttachments
+} from "@multaiplayer/protocol";
 import { RoomMainColumn } from "./RoomMainColumn";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
@@ -26,10 +30,7 @@ import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessag
 import { detectCodexTurnRiskFlags, messagesSinceLastCodex } from "../lib/codexTurn";
 import { buildRoomNotices } from "../lib/roomNotices";
 import { isLocalUserActiveHostForRoom } from "../lib/roomHost";
-import {
-  acknowledgeRoomVisibilityWarning,
-  hasAcknowledgedRoomVisibilityWarning
-} from "../lib/roomVisibilityWarning";
+import { acknowledgeRoomVisibilityWarning, hasAcknowledgedRoomVisibilityWarning } from "../lib/roomVisibilityWarning";
 import type { ChatAttachment, ChatMessage, CodexRoomEvent } from "../types";
 import type { createAppRoomPanelActions } from "../lib/appRoomPanelActions";
 import type { useHostHandoffActions } from "../hooks/useHostHandoffActions";
@@ -96,10 +97,7 @@ export interface RoomMainColumnSources {
   >;
   workspaceFlow: Pick<
     WorkspaceFlow,
-    | "copyRoomMarkdown"
-    | "copySelectedMessagesMarkdown"
-    | "removePendingAttachment"
-    | "copyMarkdownWithFallback"
+    "copyRoomMarkdown" | "copySelectedMessagesMarkdown" | "removePendingAttachment" | "copyMarkdownWithFallback"
   >;
   hostHandoff: Pick<HostHandoffActions, "setRoomHost">;
   chatActions: RoomPanels["roomChatPanelActions"];
@@ -117,80 +115,80 @@ const noSelectedMessageIds: string[] = [];
 const noCodexEvents: CodexRoomEvent[] = [];
 
 export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSources }) {
-  const capabilities = useMemo<RoomMainColumnCapabilities>(() => ({
-    header: {
-      onSetHost: sources.hostHandoff.setRoomHost,
-      onRenameRoom: sources.roomRuntime.renameRoom,
-      onSelectModel: sources.roomRuntime.setCodexModel,
-      onSelectReasoningEffort: sources.roomRuntime.setCodexReasoningEffort,
-      onSelectSpeed: sources.roomRuntime.setCodexSpeed,
-      onCopyRoomMarkdown: sources.workspaceFlow.copyRoomMarkdown,
-      onCopySelectedMarkdown: sources.workspaceFlow.copySelectedMessagesMarkdown,
-      onShareLocalPreview: sources.roomRuntime.openLocalPreviewDialog,
-      onOpenRoomBrowser: sources.roomRuntime.openRoomBrowserNow
-    },
-    chat: {
-      onCopyMessageMarkdown: sources.chatActions.onCopyMessageMarkdown,
-      onCopyCodexOutputMarkdown: sources.chatActions.onCopyCodexOutputMarkdown,
-      onOpenAttachment: sources.chatActions.onOpenAttachment,
-      onToggleReaction: sources.chatActions.onToggleReaction,
-      onEditMessage: sources.chatActions.onEditMessage,
-      onDeleteMessage: sources.chatActions.onDeleteMessage,
-      onDenyApproval: sources.chatActions.onDenyApproval,
-      onApproveApproval: sources.chatActions.onApproveApproval,
-      onInvokeCodex: sources.chatActions.onInvokeCodex,
-      onRemovePendingAttachment: sources.workspaceFlow.removePendingAttachment,
-      onPauseGoal: sources.chatActions.onPauseGoal,
-      onResumeGoal: sources.chatActions.onResumeGoal,
-      onEditGoal: sources.chatActions.onEditGoal,
-      onDeleteGoal: sources.chatActions.onDeleteGoal,
-      onTickGoalElapsed: sources.chatActions.onTickGoalElapsed,
-      onOpenLocalPreview: sources.chatActions.onOpenLocalPreview,
-      onCopyLocalPreviewLink: sources.chatActions.onCopyLocalPreviewLink,
-      onStopLocalPreview: sources.chatActions.onStopLocalPreview,
-      onCancelQueuedCodexTurn: sources.chatActions.onCancelQueuedCodexTurn,
-      onSendMessage: sources.roomRuntime.sendMessage
-    },
-    retryMarkdownCopy: (title, markdown, roomId) => {
-      void sources.workspaceFlow.copyMarkdownWithFallback(
-        title,
-        markdown,
-        (message) => useAppStore.getState().setChatMessageForRoom(roomId, message),
-        roomId
-      );
-    }
-  }), [
-    sources.chatActions.onApproveApproval,
-    sources.chatActions.onCancelQueuedCodexTurn,
-    sources.chatActions.onCopyCodexOutputMarkdown,
-    sources.chatActions.onCopyLocalPreviewLink,
-    sources.chatActions.onCopyMessageMarkdown,
-    sources.chatActions.onDeleteGoal,
-    sources.chatActions.onDeleteMessage,
-    sources.chatActions.onDenyApproval,
-    sources.chatActions.onEditGoal,
-    sources.chatActions.onEditMessage,
-    sources.chatActions.onInvokeCodex,
-    sources.chatActions.onOpenAttachment,
-    sources.chatActions.onOpenLocalPreview,
-    sources.chatActions.onPauseGoal,
-    sources.chatActions.onResumeGoal,
-    sources.chatActions.onStopLocalPreview,
-    sources.chatActions.onTickGoalElapsed,
-    sources.chatActions.onToggleReaction,
-    sources.hostHandoff.setRoomHost,
-    sources.roomRuntime.openLocalPreviewDialog,
-    sources.roomRuntime.openRoomBrowserNow,
-    sources.roomRuntime.renameRoom,
-    sources.roomRuntime.sendMessage,
-    sources.roomRuntime.setCodexModel,
-    sources.roomRuntime.setCodexReasoningEffort,
-    sources.roomRuntime.setCodexSpeed,
-    sources.workspaceFlow.copyMarkdownWithFallback,
-    sources.workspaceFlow.copyRoomMarkdown,
-    sources.workspaceFlow.copySelectedMessagesMarkdown,
-    sources.workspaceFlow.removePendingAttachment
-  ]);
+  const capabilities = useMemo<RoomMainColumnCapabilities>(
+    () => ({
+      header: {
+        onSetHost: sources.hostHandoff.setRoomHost,
+        onRenameRoom: sources.roomRuntime.renameRoom,
+        onSelectModel: sources.roomRuntime.setCodexModel,
+        onSelectReasoningEffort: sources.roomRuntime.setCodexReasoningEffort,
+        onSelectSpeed: sources.roomRuntime.setCodexSpeed,
+        onCopyRoomMarkdown: sources.workspaceFlow.copyRoomMarkdown,
+        onCopySelectedMarkdown: sources.workspaceFlow.copySelectedMessagesMarkdown,
+        onShareLocalPreview: sources.roomRuntime.openLocalPreviewDialog,
+        onOpenRoomBrowser: sources.roomRuntime.openRoomBrowserNow
+      },
+      chat: {
+        onCopyMessageMarkdown: sources.chatActions.onCopyMessageMarkdown,
+        onCopyCodexOutputMarkdown: sources.chatActions.onCopyCodexOutputMarkdown,
+        onOpenAttachment: sources.chatActions.onOpenAttachment,
+        onToggleReaction: sources.chatActions.onToggleReaction,
+        onEditMessage: sources.chatActions.onEditMessage,
+        onDeleteMessage: sources.chatActions.onDeleteMessage,
+        onDenyApproval: sources.chatActions.onDenyApproval,
+        onApproveApproval: sources.chatActions.onApproveApproval,
+        onInvokeCodex: sources.chatActions.onInvokeCodex,
+        onRemovePendingAttachment: sources.workspaceFlow.removePendingAttachment,
+        onPauseGoal: sources.chatActions.onPauseGoal,
+        onResumeGoal: sources.chatActions.onResumeGoal,
+        onEditGoal: sources.chatActions.onEditGoal,
+        onDeleteGoal: sources.chatActions.onDeleteGoal,
+        onTickGoalElapsed: sources.chatActions.onTickGoalElapsed,
+        onOpenLocalPreview: sources.chatActions.onOpenLocalPreview,
+        onCopyLocalPreviewLink: sources.chatActions.onCopyLocalPreviewLink,
+        onStopLocalPreview: sources.chatActions.onStopLocalPreview,
+        onCancelQueuedCodexTurn: sources.chatActions.onCancelQueuedCodexTurn,
+        onSendMessage: sources.roomRuntime.sendMessage
+      },
+      retryMarkdownCopy: (title, markdown, roomId) => {
+        void sources.workspaceFlow.copyMarkdownWithFallback(
+          title,
+          markdown,
+          (message) => useAppStore.getState().setChatMessageForRoom(roomId, message),
+          roomId
+        );
+      }
+    }),
+    [
+      sources.chatActions.onApproveApproval,
+      sources.chatActions.onCancelQueuedCodexTurn,
+      sources.chatActions.onCopyCodexOutputMarkdown,
+      sources.chatActions.onCopyLocalPreviewLink,
+      sources.chatActions.onCopyMessageMarkdown,
+      sources.chatActions.onDeleteGoal,
+      sources.chatActions.onDeleteMessage,
+      sources.chatActions.onDenyApproval,
+      sources.chatActions.onEditGoal,
+      sources.chatActions.onEditMessage,
+      sources.chatActions.onInvokeCodex,
+      sources.chatActions.onOpenAttachment,
+      sources.chatActions.onOpenLocalPreview,
+      sources.chatActions.onPauseGoal,
+      sources.chatActions.onResumeGoal,
+      sources.chatActions.onStopLocalPreview,
+      sources.chatActions.onTickGoalElapsed,
+      sources.chatActions.onToggleReaction,
+      sources.workspaceFlow,
+      sources.hostHandoff.setRoomHost,
+      sources.roomRuntime.openLocalPreviewDialog,
+      sources.roomRuntime.openRoomBrowserNow,
+      sources.roomRuntime.renameRoom,
+      sources.roomRuntime.sendMessage,
+      sources.roomRuntime.setCodexModel,
+      sources.roomRuntime.setCodexReasoningEffort,
+      sources.roomRuntime.setCodexSpeed
+    ]
+  );
   const {
     teams,
     selectedTeam,
@@ -209,30 +207,31 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
     codexProbe,
     currentUser,
     browserRequests
-  } = useAppStore(useShallow((state) => {
-    const selectedRoom =
-      state.rooms.find((room) => room.id === state.selectedRoomId) ?? state.rooms[0] ?? emptyRoom;
-    const roomId = selectedRoom.id;
-    return {
-      teams: state.teams,
-      selectedTeam: state.selectedTeam,
-      selectedRoomId: state.selectedRoomId,
-      selectedRoom,
-      hasSelectedRoom: state.rooms.some((room) => room.id === state.selectedRoomId),
-      messages: state.messagesByRoom[roomId] ?? noMessages,
-      chat: state.roomChatByRoom[roomId],
-      settings: state.roomSettingsByRoom[roomId],
-      codex: state.codexRuntimeByRoom[roomId],
-      previews: state.localPreviewByRoom[roomId]?.previews ?? noPreviews,
-      fallback: state.filePanelByRoom[roomId]?.markdownCopyFallback ?? null,
-      inspectorTab: state.historyPresenceByRoom[roomId]?.inspectorTab ?? "files",
-      forgotten: state.forgottenRoomIds.has(roomId),
-      revoked: state.revokedRoomIds.has(roomId) || state.revokedTeamIds.has(selectedRoom.teamId),
-      codexProbe: state.codexProbe,
-      currentUser: state.currentUser,
-      browserRequests: state.browserByRoom[roomId]?.requests ?? noBrowserRequests
-    };
-  }));
+  } = useAppStore(
+    useShallow((state) => {
+      const selectedRoom = state.rooms.find((room) => room.id === state.selectedRoomId) ?? state.rooms[0] ?? emptyRoom;
+      const roomId = selectedRoom.id;
+      return {
+        teams: state.teams,
+        selectedTeam: state.selectedTeam,
+        selectedRoomId: state.selectedRoomId,
+        selectedRoom,
+        hasSelectedRoom: state.rooms.some((room) => room.id === state.selectedRoomId),
+        messages: state.messagesByRoom[roomId] ?? noMessages,
+        chat: state.roomChatByRoom[roomId],
+        settings: state.roomSettingsByRoom[roomId],
+        codex: state.codexRuntimeByRoom[roomId],
+        previews: state.localPreviewByRoom[roomId]?.previews ?? noPreviews,
+        fallback: state.filePanelByRoom[roomId]?.markdownCopyFallback ?? null,
+        inspectorTab: state.historyPresenceByRoom[roomId]?.inspectorTab ?? "files",
+        forgotten: state.forgottenRoomIds.has(roomId),
+        revoked: state.revokedRoomIds.has(roomId) || state.revokedTeamIds.has(selectedRoom.teamId),
+        codexProbe: state.codexProbe,
+        currentUser: state.currentUser,
+        browserRequests: state.browserByRoom[roomId]?.requests ?? noBrowserRequests
+      };
+    })
+  );
   const roomId = selectedRoom.id;
 
   const localUser = {
@@ -251,7 +250,7 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
   const queuedApprovals = codex?.queuedApprovals ?? [];
   const currentMessagesSinceLastCodex = messagesSinceLastCodex(messages).length;
   const replyTargetMessage = chat?.replyToMessageId
-    ? messages.find((message) => message.id === chat.replyToMessageId) ?? null
+    ? (messages.find((message) => message.id === chat.replyToMessageId) ?? null)
     : null;
 
   const { onOpenRoomBrowser, ...headerCapabilities } = capabilities.header;
@@ -259,12 +258,15 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
     (teamId: string) => useAppStore.getState().selectTeamRoom(teamId, selectedRoomId),
     [selectedRoomId]
   );
-  const onSelectInspectorTab = useCallback((tab: HeaderProps["activeInspectorTab"]) => {
-    useAppStore.getState().setInspectorTabForRoom(roomId, tab);
-    if (tab === "browser" && !useAppStore.getState().browserByRoom[roomId]?.activeUrl) {
-      onOpenRoomBrowser();
-    }
-  }, [onOpenRoomBrowser, roomId]);
+  const onSelectInspectorTab = useCallback(
+    (tab: HeaderProps["activeInspectorTab"]) => {
+      useAppStore.getState().setInspectorTabForRoom(roomId, tab);
+      if (tab === "browser" && !useAppStore.getState().browserByRoom[roomId]?.activeUrl) {
+        onOpenRoomBrowser();
+      }
+    },
+    [onOpenRoomBrowser, roomId]
+  );
   const onToggleMarkdownSelection = useCallback(
     () => useAppStore.getState().toggleMarkdownSelectionModeForRoom(roomId),
     [roomId]
@@ -285,14 +287,8 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
     (messageId: string) => useAppStore.getState().setReplyToMessageForRoom(roomId, messageId),
     [roomId]
   );
-  const onCancelReply = useCallback(
-    () => useAppStore.getState().setReplyToMessageForRoom(roomId, null),
-    [roomId]
-  );
-  const onDraftChange = useCallback(
-    (draft: string) => useAppStore.getState().setDraftForRoom(roomId, draft),
-    [roomId]
-  );
+  const onCancelReply = useCallback(() => useAppStore.getState().setReplyToMessageForRoom(roomId, null), [roomId]);
+  const onDraftChange = useCallback((draft: string) => useAppStore.getState().setDraftForRoom(roomId, draft), [roomId]);
   const onAcknowledgeSecretWarning = useCallback(() => {
     acknowledgeRoomVisibilityWarning(roomId);
     useAppStore.getState().setSecretWarningVisibleForRoom(roomId, false);
@@ -304,21 +300,19 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
   const onRetryMarkdownCopy = useCallback(() => {
     if (fallback) capabilities.retryMarkdownCopy(fallback.title, fallback.markdown, roomId);
   }, [capabilities, fallback, roomId]);
-  const chatMessageRows = useMemo(() => buildRoomChatMessageRows({
-    messages,
-    markdownSelectionMode,
-    selectedMessageIds,
-    localUserId: localUser.id,
-    codexEvents
-  }), [codexEvents, localUser.id, markdownSelectionMode, messages, selectedMessageIds]);
-  const pendingAttachmentRows = useMemo(
-    () => buildPendingAttachmentRows(pendingAttachments),
-    [pendingAttachments]
+  const chatMessageRows = useMemo(
+    () =>
+      buildRoomChatMessageRows({
+        messages,
+        markdownSelectionMode,
+        selectedMessageIds,
+        localUserId: localUser.id,
+        codexEvents
+      }),
+    [codexEvents, localUser.id, markdownSelectionMode, messages, selectedMessageIds]
   );
-  const localPreviewCards = useMemo(
-    () => buildLocalPreviewCards(previews, localUser.id),
-    [localUser.id, previews]
-  );
+  const pendingAttachmentRows = useMemo(() => buildPendingAttachmentRows(pendingAttachments), [pendingAttachments]);
+  const localPreviewCards = useMemo(() => buildLocalPreviewCards(previews, localUser.id), [localUser.id, previews]);
   const headerProps: HeaderProps = {
     teams: teams.map((team) => ({ id: team.id, name: team.name })),
     selectedTeamId: selectedTeam,
@@ -355,17 +349,14 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
       attachments: formatApprovalAttachments(approvalMessages),
       sandbox: formatCodexSandboxLevel(selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel),
       highPrivilegeLabels: highPrivilegeLabels(activeApproval?.summary, selectedRoom.codexSandboxLevel),
-      riskFlags: activeApproval
-        ? detectCodexTurnRiskFlags(approvalMessages, selectedRoom, browserRequests, null)
-        : []
+      riskFlags: activeApproval ? detectCodexTurnRiskFlags(approvalMessages, selectedRoom, browserRequests, null) : []
     },
     isActiveHost,
     codexRunning: codex?.running ?? false,
     canApproveCodex: hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, roomLocked),
     canUseChat: canUseRoomChat(selectedRoom, roomLocked),
     canSendMessage:
-      canUseRoomChat(selectedRoom, roomLocked) &&
-      (Boolean(chat?.draft?.trim()) || pendingAttachments.length > 0),
+      canUseRoomChat(selectedRoom, roomLocked) && (Boolean(chat?.draft?.trim()) || pendingAttachments.length > 0),
     roomLocked,
     lockedPlaceholder: roomLockMessage(selectedRoom, revoked),
     chatEnabled: !roomLocked,
@@ -386,9 +377,7 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
       requestedByUserId: turn.requestedByUserId,
       queuedAt: turn.queuedAt,
       messagesSinceLastCodex: currentMessagesSinceLastCodex,
-      canCancel:
-        !roomLocked &&
-        (turn.requestedByUserId === localUser.id || selectedRoom.hostUserId === localUser.id)
+      canCancel: !roomLocked && (turn.requestedByUserId === localUser.id || selectedRoom.hostUserId === localUser.id)
     })),
     localPreviewCards,
     pendingAttachmentSummary:
@@ -403,9 +392,8 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
     ...capabilities.chat
   };
 
-  const secretWarningVisible = hasSelectedRoom && (
-    codex?.secretWarningVisible ?? !hasAcknowledgedRoomVisibilityWarning(roomId)
-  );
+  const secretWarningVisible =
+    hasSelectedRoom && (codex?.secretWarningVisible ?? !hasAcknowledgedRoomVisibilityWarning(roomId));
   return (
     <RoomMainColumn
       headerProps={headerProps}
@@ -419,19 +407,31 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
         lockedMessage: roomLocked ? roomLockMessage(selectedRoom, revoked) : null,
         onAcknowledgeSecretWarning
       }}
-      markdownFallbackProps={fallback ? {
-        title: fallback.title,
-        markdown: fallback.markdown,
-        onRetryCopy: onRetryMarkdownCopy,
-        onDismiss: onDismissMarkdownFallback
-      } : null}
+      markdownFallbackProps={
+        fallback
+          ? {
+              title: fallback.title,
+              markdown: fallback.markdown,
+              onRetryCopy: onRetryMarkdownCopy,
+              onDismiss: onDismissMarkdownFallback
+            }
+          : null
+      }
       chatProps={chatProps}
     />
   );
 }
 
 function highPrivilegeLabels(
-  summary: { attachments: unknown[]; workspacePath: string | null; git: unknown | null; browserAccess: unknown[]; terminals: unknown[] } | undefined,
+  summary:
+    | {
+        attachments: unknown[];
+        workspacePath: string | null;
+        git: unknown | null;
+        browserAccess: unknown[];
+        terminals: unknown[];
+      }
+    | undefined,
   sandboxLevel: string | undefined
 ): string[] {
   if (!summary) return [];

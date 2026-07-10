@@ -17,10 +17,12 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       const latestGitWorkflowEvent = payload.gitWorkflowEvents.at(-1);
       const latestGitHubActionsEvent = payload.githubActionsEvents.at(-1);
       const currentTerminalId = state.terminalRuntimeByRoom[roomId]?.selectedTerminalId ?? null;
-      const nextTerminalId = currentTerminalId && payload.terminalSnapshots.some((terminal) => terminal.id === currentTerminalId)
-        ? currentTerminalId
-        : payload.terminalSnapshots[0]?.id ?? null;
-      const shouldHydrateTerminalRuntime = payload.terminalRequests.length > 0 || Boolean(payload.terminalSnapshots.length && nextTerminalId);
+      const nextTerminalId =
+        currentTerminalId && payload.terminalSnapshots.some((terminal) => terminal.id === currentTerminalId)
+          ? currentTerminalId
+          : (payload.terminalSnapshots[0]?.id ?? null);
+      const shouldHydrateTerminalRuntime =
+        payload.terminalRequests.length > 0 || Boolean(payload.terminalSnapshots.length && nextTerminalId);
       const queuedCodexTurns = payload.queuedCodexTurns ?? [];
       const codexThreadId = normalizeCodexThreadId(payload.codexThreadId);
       const codexThreadGraph = normalizeCodexThreadGraph(payload.codexThreadGraph, codexThreadId);
@@ -37,9 +39,7 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
         messagesByRoom: payload.messages.length
           ? { ...state.messagesByRoom, [roomId]: payload.messages }
           : state.messagesByRoom,
-        chatEditsByRoom: chatEdits.length
-          ? { ...state.chatEditsByRoom, [roomId]: chatEdits }
-          : state.chatEditsByRoom,
+        chatEditsByRoom: chatEdits.length ? { ...state.chatEditsByRoom, [roomId]: chatEdits } : state.chatEditsByRoom,
         chatDeletesByRoom: chatDeletes.length
           ? { ...state.chatDeletesByRoom, [roomId]: chatDeletes }
           : state.chatDeletesByRoom,
@@ -89,38 +89,47 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
             hostHandoffs: payload.hostHandoffs,
             ...(queuedCodexTurns.length ? { queuedApprovals: queuedCodexTurns } : {}),
             ...(payload.roomGoal ? { goal: payload.roomGoal } : {}),
-            ...(codexThreadGraph.activeThreadId ? {
-              threadId: codexThreadGraph.activeThreadId,
-              threadGraph: codexThreadGraph
-            } : {})
+            ...(codexThreadGraph.activeThreadId
+              ? {
+                  threadId: codexThreadGraph.activeThreadId,
+                  threadGraph: codexThreadGraph
+                }
+              : {})
           }
         },
-        gitWorkflowRuntimeByRoom: payload.gitWorkflowEvents.length || payload.githubActionsEvents.length
-          ? {
-              ...state.gitWorkflowRuntimeByRoom,
-              [roomId]: {
-                ...state.gitWorkflowRuntimeByRoom[roomId],
-                ...(payload.gitWorkflowEvents.length ? {
-                  workflow: {
-                    ...state.gitWorkflowRuntimeByRoom[roomId]?.workflow,
-                    events: payload.gitWorkflowEvents,
-                    message: latestGitWorkflowEvent?.message ?? null
-                  }
-                } : {}),
-                ...(payload.githubActionsEvents.length ? {
-                  actions: {
-                    ...state.gitWorkflowRuntimeByRoom[roomId]?.actions,
-                    events: payload.githubActionsEvents,
-                    ...(latestGitHubActionsEvent ? {
-                      runs: latestGitHubActionsEvent.runs,
-                      lastChecked: latestGitHubActionsEvent.checkedAt,
-                      message: `${latestGitHubActionsEvent.summary.label}: ${latestGitHubActionsEvent.message}`
-                    } : {})
-                  }
-                } : {})
+        gitWorkflowRuntimeByRoom:
+          payload.gitWorkflowEvents.length || payload.githubActionsEvents.length
+            ? {
+                ...state.gitWorkflowRuntimeByRoom,
+                [roomId]: {
+                  ...state.gitWorkflowRuntimeByRoom[roomId],
+                  ...(payload.gitWorkflowEvents.length
+                    ? {
+                        workflow: {
+                          ...state.gitWorkflowRuntimeByRoom[roomId]?.workflow,
+                          events: payload.gitWorkflowEvents,
+                          message: latestGitWorkflowEvent?.message ?? null
+                        }
+                      }
+                    : {}),
+                  ...(payload.githubActionsEvents.length
+                    ? {
+                        actions: {
+                          ...state.gitWorkflowRuntimeByRoom[roomId]?.actions,
+                          events: payload.githubActionsEvents,
+                          ...(latestGitHubActionsEvent
+                            ? {
+                                runs: latestGitHubActionsEvent.runs,
+                                lastChecked: latestGitHubActionsEvent.checkedAt,
+                                message: `${latestGitHubActionsEvent.summary.label}: ${latestGitHubActionsEvent.message}`
+                              }
+                            : {})
+                        }
+                      }
+                    : {})
+                }
               }
-            }
-          : state.gitWorkflowRuntimeByRoom,
+            : state.gitWorkflowRuntimeByRoom,
         localPreviewByRoom: payload.localPreviews.length
           ? {
               ...state.localPreviewByRoom,
@@ -132,7 +141,7 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
           : state.localPreviewByRoom,
         terminals: payload.terminalSnapshots.length
           ? replaceRoomTerminalSnapshots(state.terminals, roomId, payload.terminalSnapshots)
-          : state.terminals,
+          : state.terminals
       };
     });
   },

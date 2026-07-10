@@ -1,6 +1,4 @@
-export type ClipboardCopyResult =
-  | { status: "copied" }
-  | { status: "blocked"; reason: string };
+export type ClipboardCopyResult = { status: "copied" } | { status: "blocked"; reason: string };
 
 export async function copyTextToClipboard(
   text: string,

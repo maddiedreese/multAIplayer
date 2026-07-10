@@ -4,11 +4,7 @@ import { encryptJson } from "@multaiplayer/crypto";
 import { resetBrowserProfile } from "./localBackend";
 import { loadOrCreateRoomSecret } from "./localHistory";
 import type { RelayClient } from "./relayClient";
-import {
-  canActOnRoomBrowserRequest,
-  findRoomBrowserRequest,
-  roomBrowserRequestMessage
-} from "./browserPolicy";
+import { canActOnRoomBrowserRequest, findRoomBrowserRequest, roomBrowserRequestMessage } from "./browserPolicy";
 import { formatBrowserAccessLabel, normalizeBrowserLocationInput } from "./browserUi";
 import { shouldApplyRoomScopedUiUpdate } from "./roomScopedUi";
 import type { BrowserAccessRequest } from "../types";
@@ -83,10 +79,9 @@ export function createBrowserActions({
     if (!client || relayStatus === "closed" || relayStatus === "error") {
       useAppStore.getState().appendBrowserRequest(roomId, request);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        useAppStore.getState().setBrowserMessageForRoom(
-          roomId,
-          "Saved browser request locally because the relay is not connected."
-        );
+        useAppStore
+          .getState()
+          .setBrowserMessageForRoom(roomId, "Saved browser request locally because the relay is not connected.");
       }
       return;
     }
@@ -115,10 +110,9 @@ export function createBrowserActions({
       client.publish({ type: "publish", envelope });
       useAppStore.getState().appendBrowserRequest(roomId, request);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        useAppStore.getState().setBrowserMessageForRoom(
-          roomId,
-          `Requested browser access to ${formatBrowserAccessLabel(request.url)}.`
-        );
+        useAppStore
+          .getState()
+          .setBrowserMessageForRoom(roomId, `Requested browser access to ${formatBrowserAccessLabel(request.url)}.`);
       }
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
@@ -145,20 +139,18 @@ export function createBrowserActions({
     const browserRequests = browserRequestsForRoom(roomId);
     const roomRequest = findRoomBrowserRequest(browserRequests, request.id);
     if (!roomRequest || !canActOnRoomBrowserRequest(browserRequests, request.id, "pending")) {
-      useAppStore.getState().setBrowserMessageForRoom(
-        roomId,
-        roomBrowserRequestMessage(browserRequests, request.id, "pending")
-      );
+      useAppStore
+        .getState()
+        .setBrowserMessageForRoom(roomId, roomBrowserRequestMessage(browserRequests, request.id, "pending"));
       return;
     }
     useAppStore.getState().updateBrowserRequestStatus(roomId, roomRequest.id, "approved");
     publishRequestStatus("browser.event", roomRequest.id, "approved").catch((error) => {
       useAppStore.getState().setBrowserMessageForRoom(roomId, String(error));
     });
-    useAppStore.getState().setBrowserMessageForRoom(
-      roomId,
-      `Approved browser access to ${formatBrowserAccessLabel(roomRequest.url)}.`
-    );
+    useAppStore
+      .getState()
+      .setBrowserMessageForRoom(roomId, `Approved browser access to ${formatBrowserAccessLabel(roomRequest.url)}.`);
   }
 
   function denyBrowserRequest(requestId: string) {
@@ -178,10 +170,9 @@ export function createBrowserActions({
     const roomId = selectedRoom.id;
     const browserRequests = browserRequestsForRoom(roomId);
     if (!canActOnRoomBrowserRequest(browserRequests, requestId, "pending")) {
-      useAppStore.getState().setBrowserMessageForRoom(
-        roomId,
-        roomBrowserRequestMessage(browserRequests, requestId, "pending")
-      );
+      useAppStore
+        .getState()
+        .setBrowserMessageForRoom(roomId, roomBrowserRequestMessage(browserRequests, requestId, "pending"));
       return;
     }
     useAppStore.getState().updateBrowserRequestStatus(roomId, requestId, "denied");
@@ -209,10 +200,9 @@ export function createBrowserActions({
     const browserRequests = browserRequestsForRoom(room.id);
     const roomRequest = findRoomBrowserRequest(browserRequests, request.id);
     if (!roomRequest || !canActOnRoomBrowserRequest(browserRequests, request.id, "approved")) {
-      useAppStore.getState().setBrowserMessageForRoom(
-        room.id,
-        roomBrowserRequestMessage(browserRequests, request.id, "approved")
-      );
+      useAppStore
+        .getState()
+        .setBrowserMessageForRoom(room.id, roomBrowserRequestMessage(browserRequests, request.id, "approved"));
       return;
     }
     useAppStore.getState().setBrowserMessageForRoom(room.id, null);
@@ -267,10 +257,7 @@ export function createBrowserActions({
     const store = useAppStore.getState();
     store.openEmbeddedBrowserForRoom(room.id, url);
     if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
-      store.setBrowserMessageForRoom(
-        room.id,
-        `Opened in-room browser for ${formatBrowserAccessLabel(url)}.`
-      );
+      store.setBrowserMessageForRoom(room.id, `Opened in-room browser for ${formatBrowserAccessLabel(url)}.`);
       store.setInspectorTabForRoom(room.id, "browser");
     }
   }
@@ -294,10 +281,12 @@ export function createBrowserActions({
       const result = await resetBrowserProfile(room.id, room.projectPath);
       useAppStore.getState().resetEmbeddedBrowserForRoom(room.id, result.profilePath);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
-        useAppStore.getState().setBrowserMessageForRoom(
-          room.id,
-          "Reset isolated room browser state. The next approved page opens with a fresh profile."
-        );
+        useAppStore
+          .getState()
+          .setBrowserMessageForRoom(
+            room.id,
+            "Reset isolated room browser state. The next approved page opens with a fresh profile."
+          );
       }
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {

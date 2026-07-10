@@ -21,12 +21,24 @@ import type { ChatMessage } from "../src/types";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
-  get length() { return this.values.size; }
-  clear() { this.values.clear(); }
-  getItem(key: string) { return this.values.get(key) ?? null; }
-  key(index: number) { return Array.from(this.values.keys())[index] ?? null; }
-  removeItem(key: string) { this.values.delete(key); }
-  setItem(key: string, value: string) { this.values.set(key, value); }
+  get length() {
+    return this.values.size;
+  }
+  clear() {
+    this.values.clear();
+  }
+  getItem(key: string) {
+    return this.values.get(key) ?? null;
+  }
+  key(index: number) {
+    return Array.from(this.values.keys())[index] ?? null;
+  }
+  removeItem(key: string) {
+    this.values.delete(key);
+  }
+  setItem(key: string, value: string) {
+    this.values.set(key, value);
+  }
 }
 
 const localStorage = new MemoryStorage();
@@ -67,8 +79,12 @@ test("account sign-out actions preserve preview cleanup ordering without React",
   const actions = createAccountActions({
     selectedRoomId: room.id,
     deviceId: "device-1",
-    stopOwnedLocalPreviews: async (reason) => { calls.push(`preview:${reason}`); },
-    signOutGitHub: async () => { calls.push("github"); },
+    stopOwnedLocalPreviews: async (reason) => {
+      calls.push(`preview:${reason}`);
+    },
+    signOutGitHub: async () => {
+      calls.push("github");
+    },
     replaceDeviceIdentity: () => undefined,
     setDeviceIdentityStatusMessage: () => undefined,
     untrustDeviceForRoom: () => undefined
@@ -76,10 +92,7 @@ test("account sign-out actions preserve preview cleanup ordering without React",
 
   await actions.signOut();
 
-  assert.deepEqual(calls, [
-    "preview:Stopped because the sharing user signed out.",
-    "github"
-  ]);
+  assert.deepEqual(calls, ["preview:Stopped because the sharing user signed out.", "github"]);
 });
 
 test("visibility warning actions update persistence and the current Zustand store", () => {
@@ -136,14 +149,20 @@ test("local history actions resolve Zustand mutations when invoked without React
 
 test("member actions update the current Zustand roster without React", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({
-    members: [{
-      teamId: room.teamId,
-      userId: "github:alex",
-      role: "admin",
-      joinedAt: "2026-07-09T12:00:00.000Z"
-    }]
-  }), { status: 200, headers: { "content-type": "application/json" } });
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        members: [
+          {
+            teamId: room.teamId,
+            userId: "github:alex",
+            role: "admin",
+            joinedAt: "2026-07-09T12:00:00.000Z"
+          }
+        ]
+      }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    );
   try {
     const actions = createMemberActions({
       selectedTeam: room.teamId,
@@ -159,12 +178,15 @@ test("member actions update the current Zustand roster without React", async () 
       copyMarkdownWithFallback: async () => undefined
     });
 
-    await actions.changeTeamMemberRole({
-      teamId: room.teamId,
-      userId: "github:alex",
-      role: "member",
-      joinedAt: "2026-07-09T12:00:00.000Z"
-    }, "admin");
+    await actions.changeTeamMemberRole(
+      {
+        teamId: room.teamId,
+        userId: "github:alex",
+        role: "member",
+        joinedAt: "2026-07-09T12:00:00.000Z"
+      },
+      "admin"
+    );
 
     const roster = useAppStore.getState().teamRosterByTeam[room.teamId];
     assert.equal(roster?.members?.[0]?.role, "admin");
@@ -177,10 +199,11 @@ test("member actions update the current Zustand roster without React", async () 
 
 test("workspace creation actions restore the new room through the current store", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({ room }), {
-    status: 200,
-    headers: { "content-type": "application/json" }
-  });
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ room }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
   const store = useAppStore.getState();
   store.revokeWorkspaceAccess(room.teamId, room.id);
   useAppStore.setState({
@@ -459,10 +482,7 @@ test("Markdown copy actions report validation failures through Zustand without R
 
   await actions.copySelectedMessagesMarkdown();
 
-  assert.equal(
-    useAppStore.getState().roomChatByRoom[room.id]?.message,
-    "Select one or more messages to copy."
-  );
+  assert.equal(useAppStore.getState().roomChatByRoom[room.id]?.message, "Select one or more messages to copy.");
 });
 
 test("file actions resolve current Zustand file state when invoked without React", async () => {

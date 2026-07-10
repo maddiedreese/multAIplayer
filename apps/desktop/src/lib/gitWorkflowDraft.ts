@@ -24,10 +24,7 @@ export interface GitRemoteRepoRef {
   repo: string;
 }
 
-export function isGitWorkflowInFlight(
-  busyByRoom: Record<string, boolean>,
-  roomId: string
-): boolean {
+export function isGitWorkflowInFlight(busyByRoom: Record<string, boolean>, roomId: string): boolean {
   return busyByRoom[roomId] === true;
 }
 
@@ -61,12 +58,7 @@ export function updateGitWorkflowDraftRecord(
 
 export function buildGitWorkflowApprovalPreview(projectPath: string, draft: GitWorkflowDraft) {
   try {
-    const plan = createGitWorkflowApprovalPlan(
-      projectPath,
-      draft.branchName,
-      draft.commitMessage,
-      draft.pushEnabled
-    );
+    const plan = createGitWorkflowApprovalPlan(projectPath, draft.branchName, draft.commitMessage, draft.pushEnabled);
     const normalizedBase = draft.pushEnabled
       ? normalizeGitHubBranchName(draft.prBase.trim() || "main")
       : draft.prBase.trim();

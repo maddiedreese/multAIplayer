@@ -82,11 +82,7 @@ export function ModelPanel({
       </label>
       <label>
         <span>Speed</span>
-        <select
-          value={selectedSpeed}
-          disabled={disabled}
-          onChange={(event) => onSelectSpeed(event.target.value)}
-        >
+        <select value={selectedSpeed} disabled={disabled} onChange={(event) => onSelectSpeed(event.target.value)}>
           {speedOptions.map((option) => (
             <option key={option.id} value={option.id}>
               {option.label}

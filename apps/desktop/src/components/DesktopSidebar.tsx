@@ -131,9 +131,11 @@ export function DesktopSidebar({
     : teams.filter((team) => !team.archived);
   const sectionLabel = searchActive ? "Matching teams" : showArchived ? "Archived" : "Teams";
   const archivedCount = teams.filter((team) => team.archived).length + rooms.filter((room) => room.archived).length;
-  const roomsForTeam = (team: SidebarTeamDisplay) => rooms.filter((room) =>
-    room.teamId === team.id && (showArchived ? room.archived || team.archived : !room.archived && !team.archived)
-  );
+  const roomsForTeam = (team: SidebarTeamDisplay) =>
+    rooms.filter(
+      (room) =>
+        room.teamId === team.id && (showArchived ? room.archived || team.archived : !room.archived && !team.archived)
+    );
 
   return (
     <aside className="sidebar">
@@ -157,7 +159,11 @@ export function DesktopSidebar({
       ) : (
         <button className="github-button" onClick={onSignIn} disabled={authBusy || authConfig?.configured === false}>
           <Github size={16} />
-          {authConfig?.configured === false ? "GitHub sign-in not configured" : authBusy ? "Waiting for GitHub" : "Sign in with GitHub"}
+          {authConfig?.configured === false
+            ? "GitHub sign-in not configured"
+            : authBusy
+              ? "Waiting for GitHub"
+              : "Sign in with GitHub"}
         </button>
       )}
 
@@ -238,145 +244,166 @@ export function DesktopSidebar({
           {visibleTeams.map((team) => {
             const teamRooms = roomsForTeam(team);
             return (
-            <div className="team-group" key={team.id}>
-              <div className={`team-button ${team.active ? "active" : ""}`}>
-                <button
-                  type="button"
-                  className="team-disclosure"
-                  aria-label={collapsedTeams[team.id] ? `Expand ${team.name}` : `Collapse ${team.name}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setCollapsedTeams((current) => ({ ...current, [team.id]: !current[team.id] }));
-                  }}
-                >
-                  {collapsedTeams[team.id] ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                </button>
-                <button
-                  type="button"
-                  className="team-select"
-                  title={`${team.name} · ${team.meta}`}
-                  onClick={() => {
-                    onSelectTeam(team.id);
-                    setCollapsedTeams((current) => ({ ...current, [team.id]: false }));
-                  }}
-                >
-                  <UsersRound size={16} />
-                  <span>{team.name}{team.archived ? " (archived)" : ""}</span>
-                  <small>{team.meta}</small>
-                </button>
-                <div className="sidebar-row-actions">
+              <div className="team-group" key={team.id}>
+                <div className={`team-button ${team.active ? "active" : ""}`}>
                   <button
                     type="button"
-                    className="icon-only"
-                    aria-label={team.archived ? `Restore ${team.name}` : `Archive ${team.name}`}
-                    title={team.archived ? "Restore team" : "Archive team"}
+                    className="team-disclosure"
+                    aria-label={collapsedTeams[team.id] ? `Expand ${team.name}` : `Collapse ${team.name}`}
                     onClick={(event) => {
                       event.stopPropagation();
-                      onSetTeamLifecycle(team.id, team.archived ? "restore" : "archive");
+                      setCollapsedTeams((current) => ({ ...current, [team.id]: !current[team.id] }));
                     }}
                   >
-                    {team.archived ? <RotateCcw size={13} /> : <Archive size={13} />}
+                    {collapsedTeams[team.id] ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                   </button>
                   <button
                     type="button"
-                    className="icon-only"
-                    aria-label={`Delete ${team.name}`}
-                    title="Delete team"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      if (window.confirm(`Delete ${team.name}?\n\nThis removes the team and its rooms from the workspace. It does not erase local copies or ciphertext already received by devices.`)) {
-                        onSetTeamLifecycle(team.id, "delete");
-                      }
+                    className="team-select"
+                    title={`${team.name} · ${team.meta}`}
+                    onClick={() => {
+                      onSelectTeam(team.id);
+                      setCollapsedTeams((current) => ({ ...current, [team.id]: false }));
                     }}
                   >
-                    <Trash2 size={13} />
+                    <UsersRound size={16} />
+                    <span>
+                      {team.name}
+                      {team.archived ? " (archived)" : ""}
+                    </span>
+                    <small>{team.meta}</small>
                   </button>
-                </div>
-              </div>
-              {!collapsedTeams[team.id] && (
-                <div className="nested-room-list">
-                  {teamRooms.map((room) => (
+                  <div className="sidebar-row-actions">
                     <button
-                      key={room.id}
-                      className={`room-button nested ${room.active ? "active" : ""}`}
-                      onClick={() => onSelectRoom(room.id, room.teamId)}
-                      title={`${room.name} · ${room.detail}`}
+                      type="button"
+                      className="icon-only"
+                      aria-label={team.archived ? `Restore ${team.name}` : `Archive ${team.name}`}
+                      title={team.archived ? "Restore team" : "Archive team"}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSetTeamLifecycle(team.id, team.archived ? "restore" : "archive");
+                      }}
                     >
-                      <div>
-                        <strong>{room.name}{room.archived ? " (archived)" : ""}</strong>
-                        <span>{room.detail}</span>
-                      </div>
-                      <div className="room-indicators">
-                        {room.attention > 0 && <b className="attention">{room.attention}</b>}
-                        {room.unread > 0 ? <b>{room.unread}</b> : room.attention === 0 ? <Circle size={8} /> : null}
-                      </div>
-                      <span className="sidebar-row-actions">
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          className="icon-only"
-                          aria-label={room.archived ? `Restore ${room.name}` : `Archive ${room.name}`}
-                          title={room.archived ? "Restore room" : "Archive room"}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onSetRoomLifecycle(room.id, room.archived ? "restore" : "archive");
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
+                      {team.archived ? <RotateCcw size={13} /> : <Archive size={13} />}
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-only"
+                      aria-label={`Delete ${team.name}`}
+                      title="Delete team"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (
+                          window.confirm(
+                            `Delete ${team.name}?\n\nThis removes the team and its rooms from the workspace. It does not erase local copies or ciphertext already received by devices.`
+                          )
+                        ) {
+                          onSetTeamLifecycle(team.id, "delete");
+                        }
+                      }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+                {!collapsedTeams[team.id] && (
+                  <div className="nested-room-list">
+                    {teamRooms.map((room) => (
+                      <button
+                        key={room.id}
+                        className={`room-button nested ${room.active ? "active" : ""}`}
+                        onClick={() => onSelectRoom(room.id, room.teamId)}
+                        title={`${room.name} · ${room.detail}`}
+                      >
+                        <div>
+                          <strong>
+                            {room.name}
+                            {room.archived ? " (archived)" : ""}
+                          </strong>
+                          <span>{room.detail}</span>
+                        </div>
+                        <div className="room-indicators">
+                          {room.attention > 0 && <b className="attention">{room.attention}</b>}
+                          {room.unread > 0 ? <b>{room.unread}</b> : room.attention === 0 ? <Circle size={8} /> : null}
+                        </div>
+                        <span className="sidebar-row-actions">
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            className="icon-only"
+                            aria-label={room.archived ? `Restore ${room.name}` : `Archive ${room.name}`}
+                            title={room.archived ? "Restore room" : "Archive room"}
+                            onClick={(event) => {
                               event.stopPropagation();
                               onSetRoomLifecycle(room.id, room.archived ? "restore" : "archive");
-                            }
-                          }}
-                        >
-                          {room.archived ? <RotateCcw size={13} /> : <Archive size={13} />}
-                        </span>
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          className="icon-only"
-                          aria-label={`Delete ${room.name}`}
-                          title="Delete room"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            if (window.confirm(`Delete ${room.name}?\n\nThis removes the room from the workspace. It does not erase local copies or ciphertext already received by devices.`)) {
-                              onSetRoomLifecycle(room.id, "delete");
-                            }
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                onSetRoomLifecycle(room.id, room.archived ? "restore" : "archive");
+                              }
+                            }}
+                          >
+                            {room.archived ? <RotateCcw size={13} /> : <Archive size={13} />}
+                          </span>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            className="icon-only"
+                            aria-label={`Delete ${room.name}`}
+                            title="Delete room"
+                            onClick={(event) => {
                               event.stopPropagation();
-                              if (window.confirm(`Delete ${room.name}?\n\nThis removes the room from the workspace. It does not erase local copies or ciphertext already received by devices.`)) {
+                              if (
+                                window.confirm(
+                                  `Delete ${room.name}?\n\nThis removes the room from the workspace. It does not erase local copies or ciphertext already received by devices.`
+                                )
+                              ) {
                                 onSetRoomLifecycle(room.id, "delete");
                               }
-                            }
-                          }}
-                        >
-                          <Trash2 size={13} />
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                if (
+                                  window.confirm(
+                                    `Delete ${room.name}?\n\nThis removes the room from the workspace. It does not erase local copies or ciphertext already received by devices.`
+                                  )
+                                ) {
+                                  onSetRoomLifecycle(room.id, "delete");
+                                }
+                              }
+                            }}
+                          >
+                            <Trash2 size={13} />
+                          </span>
                         </span>
-                      </span>
-                    </button>
-                  ))}
-                  {teamRooms.length === 0 && (
-                    <div className="sidebar-empty nested-empty">
-                      {showArchived
-                        ? "No archived rooms in this team."
-                        : team.active && !searchActive
-                          ? "No rooms yet. Create one for this team."
-                          : "No visible rooms."}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );})}
+                      </button>
+                    ))}
+                    {teamRooms.length === 0 && (
+                      <div className="sidebar-empty nested-empty">
+                        {showArchived
+                          ? "No archived rooms in this team."
+                          : team.active && !searchActive
+                            ? "No rooms yet. Create one for this team."
+                            : "No visible rooms."}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           {visibleTeams.length === 0 && (
             <div className="sidebar-empty">
               {searchActive
                 ? "No teams found."
                 : showArchived
-                  ? archivedCount === 0 ? "No archived teams or rooms." : "No archived teams found."
+                  ? archivedCount === 0
+                    ? "No archived teams or rooms."
+                    : "No archived teams found."
                   : "No teams yet. Create one to start."}
             </div>
           )}
@@ -384,56 +411,63 @@ export function DesktopSidebar({
       </section>
 
       {!showArchived && (
-      <section className="sidebar-section rooms room-create-section">
-        <div className="section-title">
-          <span>New room</span>
-          {!searchActive && (
-            <button
-              onClick={() => setRoomCreateOpen((open) => !open)}
-              aria-label={roomCreateOpen ? "Hide room form" : "New room"}
-              aria-expanded={roomCreateOpen}
-              disabled={!selectedTeam}
-            >
-              {roomCreateOpen ? <X size={14} /> : <Plus size={15} />}
-            </button>
-          )}
-        </div>
-        {roomFormVisible && (
-          <div className="sidebar-create-form room-create-form">
-            <input
-              value={newRoomName}
-              onChange={(event) => onNewRoomNameChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && newRoomName.trim() && newRoomProjectPath.trim()) {
-                  event.preventDefault();
-                  onCreateRoom();
-                }
-              }}
-              placeholder="Room name"
-              disabled={!selectedTeam}
-            />
-            <div className="path-create-row">
+        <section className="sidebar-section rooms room-create-section">
+          <div className="section-title">
+            <span>New room</span>
+            {!searchActive && (
+              <button
+                onClick={() => setRoomCreateOpen((open) => !open)}
+                aria-label={roomCreateOpen ? "Hide room form" : "New room"}
+                aria-expanded={roomCreateOpen}
+                disabled={!selectedTeam}
+              >
+                {roomCreateOpen ? <X size={14} /> : <Plus size={15} />}
+              </button>
+            )}
+          </div>
+          {roomFormVisible && (
+            <div className="sidebar-create-form room-create-form">
               <input
-                value={newRoomProjectPath}
-                onChange={(event) => onNewRoomProjectPathChange(event.target.value)}
-                placeholder={defaultProjectPath}
+                value={newRoomName}
+                onChange={(event) => onNewRoomNameChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && newRoomName.trim() && newRoomProjectPath.trim()) {
+                    event.preventDefault();
+                    onCreateRoom();
+                  }
+                }}
+                placeholder="Room name"
                 disabled={!selectedTeam}
               />
-              <button onClick={onChooseNewRoomProjectPath} disabled={!selectedTeam} aria-label="Choose project folder">
-                <FolderGit2 size={14} />
+              <div className="path-create-row">
+                <input
+                  value={newRoomProjectPath}
+                  onChange={(event) => onNewRoomProjectPathChange(event.target.value)}
+                  placeholder={defaultProjectPath}
+                  disabled={!selectedTeam}
+                />
+                <button
+                  onClick={onChooseNewRoomProjectPath}
+                  disabled={!selectedTeam}
+                  aria-label="Choose project folder"
+                >
+                  <FolderGit2 size={14} />
+                </button>
+              </div>
+              <button
+                onClick={onCreateRoom}
+                disabled={!selectedTeam || !newRoomName.trim() || !newRoomProjectPath.trim()}
+              >
+                Create room
               </button>
             </div>
-            <button onClick={onCreateRoom} disabled={!selectedTeam || !newRoomName.trim() || !newRoomProjectPath.trim()}>
-              Create room
-            </button>
-          </div>
-        )}
-        {!roomFormVisible && !searchActive && (
-          <div className="sidebar-empty">
-            {selectedTeam ? "Create a room inside the selected team." : "Create a team before adding rooms."}
-          </div>
-        )}
-      </section>
+          )}
+          {!roomFormVisible && !searchActive && (
+            <div className="sidebar-empty">
+              {selectedTeam ? "Create a room inside the selected team." : "Create a team before adding rooms."}
+            </div>
+          )}
+        </section>
       )}
 
       {searchActive && (
@@ -443,10 +477,7 @@ export function DesktopSidebar({
           </div>
           <div className="message-hit-list">
             {messageHits.map((hit) => (
-              <button
-                key={hit.key}
-                onClick={() => onSelectRoom(hit.roomId, hit.teamId)}
-              >
+              <button key={hit.key} onClick={() => onSelectRoom(hit.roomId, hit.teamId)}>
                 <strong>{hit.author}</strong>
                 <span>{hit.preview}</span>
               </button>
@@ -461,9 +492,7 @@ export function DesktopSidebar({
       )}
 
       <div className="sidebar-footer">
-        <button onClick={toggleThemeMode}>
-          {themeMode === "dark" ? "Light" : "Dark"}
-        </button>
+        <button onClick={toggleThemeMode}>{themeMode === "dark" ? "Light" : "Dark"}</button>
         <button
           className={activeSidebarPanel === "settings" ? "active" : ""}
           onClick={() => onSelectSidebarPanel(activeSidebarPanel === "settings" ? null : "settings")}

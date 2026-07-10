@@ -20,24 +20,33 @@ test("initialize request identifies multAIplayer to codex app-server", () => {
 });
 
 test("classifies server requests before colliding responses", () => {
-  assert.equal(classifyJsonRpcMessage({
-    id: 2,
-    method: "item/commandExecution/requestApproval",
-    params: { threadId: "thread-1" }
-  }).kind, "serverRequest");
+  assert.equal(
+    classifyJsonRpcMessage({
+      id: 2,
+      method: "item/commandExecution/requestApproval",
+      params: { threadId: "thread-1" }
+    }).kind,
+    "serverRequest"
+  );
   assert.equal(classifyJsonRpcMessage({ id: 2, result: { ok: true } }).kind, "response");
 });
 
 test("accepts string request ids and notifications", () => {
-  assert.equal(classifyJsonRpcMessage({
-    id: "server-1",
-    method: "mcpServer/elicitation/request",
-    params: {}
-  }).kind, "serverRequest");
-  assert.equal(classifyJsonRpcMessage({
-    method: "turn/completed",
-    params: { turn: { status: "completed" } }
-  }).kind, "notification");
+  assert.equal(
+    classifyJsonRpcMessage({
+      id: "server-1",
+      method: "mcpServer/elicitation/request",
+      params: {}
+    }).kind,
+    "serverRequest"
+  );
+  assert.equal(
+    classifyJsonRpcMessage({
+      method: "turn/completed",
+      params: { turn: { status: "completed" } }
+    }).kind,
+    "notification"
+  );
 });
 
 test("rejects malformed and ambiguous app-server envelopes", () => {

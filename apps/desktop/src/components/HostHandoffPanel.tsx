@@ -45,47 +45,55 @@ export function HostHandoffPanel<T extends HostHandoffDisplay>({
         </small>
       </div>
       <div className="handoff-list">
-        {handoffs.slice(-3).reverse().map((handoff) => (
-          <div className={`handoff-row ${handoff.status}`} key={handoff.id}>
-            <div>
-              <strong className="handoff-title">
-                {handoff.reason === "usage_limit" ? <WandSparkles size={14} /> : null}
-                {hostHandoffTitle(handoff)}
-              </strong>
-              <span>{hostHandoffDetail(handoff)}</span>
-              <small>
-                {handoff.messagesSinceLastCodex} messages · {handoff.queuedCodexTurns?.length ?? 0} queued · {handoff.attachmentNames.length} attachments · {handoff.terminals.length} terminals · {formatModel(handoff.codexModel)}
-              </small>
-              {handoff.gitRepoOwner && handoff.gitRepoName ? (
+        {handoffs
+          .slice(-3)
+          .reverse()
+          .map((handoff) => (
+            <div className={`handoff-row ${handoff.status}`} key={handoff.id}>
+              <div>
+                <strong className="handoff-title">
+                  {handoff.reason === "usage_limit" ? <WandSparkles size={14} /> : null}
+                  {hostHandoffTitle(handoff)}
+                </strong>
+                <span>{hostHandoffDetail(handoff)}</span>
                 <small>
-                  <GitPullRequest size={12} />
-                  Continue from GitHub: {handoff.gitRepoOwner}/{handoff.gitRepoName}{handoff.gitBranch ? `@${handoff.gitBranch}` : ""}
+                  {handoff.messagesSinceLastCodex} messages · {handoff.queuedCodexTurns?.length ?? 0} queued ·{" "}
+                  {handoff.attachmentNames.length} attachments · {handoff.terminals.length} terminals ·{" "}
+                  {formatModel(handoff.codexModel)}
                 </small>
-              ) : null}
-              {handoff.gitDirtyFiles?.length ? (
-                <small>
-                  <GitBranch size={12} />
-                  {handoff.gitPatch && !handoff.gitPatchTruncated
-                    ? `Includes an encrypted patch for ${handoff.gitDirtyFiles.length} local change${handoff.gitDirtyFiles.length === 1 ? "" : "s"}.`
-                    : handoff.gitPatchTruncated
-                      ? "Local changes were too large for automatic patch transfer."
-                      : `Previous host has ${handoff.gitDirtyFiles.length} local change${handoff.gitDirtyFiles.length === 1 ? "" : "s"}; ask them to push or share a patch if needed.`}
-                </small>
-              ) : null}
+                {handoff.gitRepoOwner && handoff.gitRepoName ? (
+                  <small>
+                    <GitPullRequest size={12} />
+                    Continue from GitHub: {handoff.gitRepoOwner}/{handoff.gitRepoName}
+                    {handoff.gitBranch ? `@${handoff.gitBranch}` : ""}
+                  </small>
+                ) : null}
+                {handoff.gitDirtyFiles?.length ? (
+                  <small>
+                    <GitBranch size={12} />
+                    {handoff.gitPatch && !handoff.gitPatchTruncated
+                      ? `Includes an encrypted patch for ${handoff.gitDirtyFiles.length} local change${handoff.gitDirtyFiles.length === 1 ? "" : "s"}.`
+                      : handoff.gitPatchTruncated
+                        ? "Local changes were too large for automatic patch transfer."
+                        : `Previous host has ${handoff.gitDirtyFiles.length} local change${handoff.gitDirtyFiles.length === 1 ? "" : "s"}; ask them to push or share a patch if needed.`}
+                  </small>
+                ) : null}
+              </div>
+              {handoff.status === "available" ? (
+                <button
+                  className="handoff-continue-button"
+                  onClick={() => onAcceptHandoff(handoff)}
+                  disabled={acceptDisabled}
+                >
+                  <Check size={13} />
+                  {handoff.reason === "usage_limit" && handoff.gitRepoOwner ? "Continue from GitHub" : "Accept"}
+                </button>
+              ) : (
+                <b>{handoff.status}</b>
+              )}
             </div>
-            {handoff.status === "available" ? (
-              <button className="handoff-continue-button" onClick={() => onAcceptHandoff(handoff)} disabled={acceptDisabled}>
-                <Check size={13} />
-                {handoff.reason === "usage_limit" && handoff.gitRepoOwner ? "Continue from GitHub" : "Accept"}
-              </button>
-            ) : (
-              <b>{handoff.status}</b>
-            )}
-          </div>
-        ))}
-        {handoffs.length === 0 && (
-          <div className="empty-state compact">No host handoff package for this room.</div>
-        )}
+          ))}
+        {handoffs.length === 0 && <div className="empty-state compact">No host handoff package for this room.</div>}
       </div>
     </section>
   );

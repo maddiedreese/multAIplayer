@@ -59,14 +59,17 @@ test("chat payloads can carry encrypted reply references", () => {
   });
 
   assert.equal(parsed.replyTo, "message-1");
-  assert.equal(ChatPlaintextPayload.safeParse({
-    id: "message-3",
-    author: "Maddie",
-    role: "human",
-    body: "bad reply",
-    time: "9:44 AM",
-    replyTo: ""
-  }).success, false);
+  assert.equal(
+    ChatPlaintextPayload.safeParse({
+      id: "message-3",
+      author: "Maddie",
+      role: "human",
+      body: "bad reply",
+      time: "9:44 AM",
+      replyTo: ""
+    }).success,
+    false
+  );
 });
 
 test("chat payloads can carry author ids and encrypted edit/delete events", () => {
@@ -97,14 +100,17 @@ test("chat payloads can carry author ids and encrypted edit/delete events", () =
   assert.equal(message.authorUserId, "github:maddie");
   assert.equal(edit.body, "agreed, please do that");
   assert.equal(deletion.deletedByUserId, "github:maddie");
-  assert.equal(ChatEditPlaintextPayload.safeParse({
-    id: "bad-edit",
-    messageId: "message-2",
-    body: "",
-    editedBy: "Maddie",
-    editedByUserId: "github:maddie",
-    editedAt: "2026-07-08T12:00:00.000Z"
-  }).success, false);
+  assert.equal(
+    ChatEditPlaintextPayload.safeParse({
+      id: "bad-edit",
+      messageId: "message-2",
+      body: "",
+      editedBy: "Maddie",
+      editedByUserId: "github:maddie",
+      editedAt: "2026-07-08T12:00:00.000Z"
+    }).success,
+    false
+  );
 });
 
 test("team records can carry the current user's role", () => {
@@ -165,30 +171,42 @@ test("device public key JWKs require bounded public P-256 material", () => {
   assert.equal(parsed.kty, "EC");
   assert.equal(parsed.crv, "P-256");
 
-  assert.equal(DevicePublicKeyJwk.safeParse({
-    kty: "EC",
-    crv: "P-256",
-    x: "x-coordinate",
-    y: "y-coordinate",
-    d: "private-material"
-  }).success, false);
-  assert.equal(DevicePublicKeyJwk.safeParse({
-    kty: "EC",
-    crv: "P-384",
-    x: "x-coordinate",
-    y: "y-coordinate"
-  }).success, false);
-  assert.equal(DevicePublicKeyJwk.safeParse({
-    kty: "RSA",
-    n: "modulus",
-    e: "AQAB"
-  }).success, false);
-  assert.equal(DevicePublicKeyJwk.safeParse({
-    kty: "EC",
-    crv: "P-256",
-    x: "x".repeat(129),
-    y: "y-coordinate"
-  }).success, false);
+  assert.equal(
+    DevicePublicKeyJwk.safeParse({
+      kty: "EC",
+      crv: "P-256",
+      x: "x-coordinate",
+      y: "y-coordinate",
+      d: "private-material"
+    }).success,
+    false
+  );
+  assert.equal(
+    DevicePublicKeyJwk.safeParse({
+      kty: "EC",
+      crv: "P-384",
+      x: "x-coordinate",
+      y: "y-coordinate"
+    }).success,
+    false
+  );
+  assert.equal(
+    DevicePublicKeyJwk.safeParse({
+      kty: "RSA",
+      n: "modulus",
+      e: "AQAB"
+    }).success,
+    false
+  );
+  assert.equal(
+    DevicePublicKeyJwk.safeParse({
+      kty: "EC",
+      crv: "P-256",
+      x: "x".repeat(129),
+      y: "y-coordinate"
+    }).success,
+    false
+  );
 });
 
 test("device records carry bounded public key JWKs", () => {
@@ -228,13 +246,15 @@ test("host handoff payloads can report room-visible acceptance", () => {
     codexReasoningEffort: "max",
     approvalPolicy: "ask_every_turn",
     messagesSinceLastCodex: 2,
-    queuedCodexTurns: [{
-      turnId: "turn-queued-1",
-      requestedBy: "Jordan",
-      requestedByUserId: "github:jordan",
-      queuedAt: "2026-07-04T12:03:00.000Z",
-      triggerMessageId: "message-2"
-    }],
+    queuedCodexTurns: [
+      {
+        turnId: "turn-queued-1",
+        requestedBy: "Jordan",
+        requestedByUserId: "github:jordan",
+        queuedAt: "2026-07-04T12:03:00.000Z",
+        triggerMessageId: "message-2"
+      }
+    ],
     attachmentNames: [],
     terminals: ["tests"],
     continuationSummary: "Maddie is out of Codex usage.",
@@ -249,24 +269,27 @@ test("host handoff payloads can report room-visible acceptance", () => {
   assert.equal(parsed.codexReasoningEffort, "max");
   assert.equal(parsed.acceptedBy, "Alex");
   assert.equal(parsed.queuedCodexTurns?.[0]?.turnId, "turn-queued-1");
-  assert.equal(HostHandoffPlaintextPayload.safeParse({
-    id: "handoff-bad-queue",
-    fromHost: "Maddie",
-    fromUserId: "github:maddie",
-    projectPath: "/tmp/multaiplayer",
-    codexModel: "gpt-5.4",
-    approvalPolicy: "ask_every_turn",
-    messagesSinceLastCodex: 2,
-    queuedCodexTurns: Array.from({ length: 6 }, (_, index) => ({
-      turnId: `turn-${index}`,
-      requestedBy: "Jordan",
-      requestedByUserId: "github:jordan",
-      queuedAt: "2026-07-04T12:03:00.000Z"
-    })),
-    attachmentNames: [],
-    terminals: [],
-    createdAt: "2026-07-04T12:00:00.000Z"
-  }).success, false);
+  assert.equal(
+    HostHandoffPlaintextPayload.safeParse({
+      id: "handoff-bad-queue",
+      fromHost: "Maddie",
+      fromUserId: "github:maddie",
+      projectPath: "/tmp/multaiplayer",
+      codexModel: "gpt-5.4",
+      approvalPolicy: "ask_every_turn",
+      messagesSinceLastCodex: 2,
+      queuedCodexTurns: Array.from({ length: 6 }, (_, index) => ({
+        turnId: `turn-${index}`,
+        requestedBy: "Jordan",
+        requestedByUserId: "github:jordan",
+        queuedAt: "2026-07-04T12:03:00.000Z"
+      })),
+      attachmentNames: [],
+      terminals: [],
+      createdAt: "2026-07-04T12:00:00.000Z"
+    }).success,
+    false
+  );
 });
 
 test("room settings payloads can report model changes", () => {
@@ -327,10 +350,13 @@ test("legacy Codex approval payloads remain bounded for backlog compatibility", 
   });
 
   assert.equal(parsed.delegationPolicy, "members_can_approve");
-  assert.equal(CodexApprovalPlaintextPayload.safeParse({
-    ...parsed,
-    delegationPolicy: "host_only"
-  }).success, false);
+  assert.equal(
+    CodexApprovalPlaintextPayload.safeParse({
+      ...parsed,
+      delegationPolicy: "host_only"
+    }).success,
+    false
+  );
 });
 
 test("Codex queue payloads bound room-visible turn queue events", () => {
@@ -360,28 +386,37 @@ test("Codex queue payloads bound room-visible turn queue events", () => {
 
   assert.equal(queued.queuePosition, 2);
   assert.equal(cancelled.action, "cancelled");
-  assert.equal(CodexQueuePlaintextPayload.safeParse({
-    ...queued,
-    queuePosition: undefined
-  }).success, false);
-  assert.equal(CodexQueuePlaintextPayload.safeParse({
-    ...queued,
-    queueSize: 6
-  }).success, false);
-  assert.equal(RelayEnvelope.safeParse({
-    id: "envelope-codex-queue-1",
-    teamId: "team-core",
-    roomId: "room-desktop",
-    senderDeviceId: "device-jordan",
-    senderUserId: "github:jordan",
-    createdAt: "2026-07-04T12:00:00.000Z",
-    kind: "codex.queue",
-    payload: {
-      algorithm: "AES-GCM-256",
-      nonce: "nonce-codex-queue-1",
-      ciphertext: "ciphertext"
-    }
-  }).success, true);
+  assert.equal(
+    CodexQueuePlaintextPayload.safeParse({
+      ...queued,
+      queuePosition: undefined
+    }).success,
+    false
+  );
+  assert.equal(
+    CodexQueuePlaintextPayload.safeParse({
+      ...queued,
+      queueSize: 6
+    }).success,
+    false
+  );
+  assert.equal(
+    RelayEnvelope.safeParse({
+      id: "envelope-codex-queue-1",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      senderDeviceId: "device-jordan",
+      senderUserId: "github:jordan",
+      createdAt: "2026-07-04T12:00:00.000Z",
+      kind: "codex.queue",
+      payload: {
+        algorithm: "AES-GCM-256",
+        nonce: "nonce-codex-queue-1",
+        ciphertext: "ciphertext"
+      }
+    }).success,
+    true
+  );
 });
 
 test("Codex turn events can carry bounded risk flags for encrypted audit history", () => {
@@ -392,13 +427,15 @@ test("Codex turn events can carry bounded risk flags for encrypted audit history
     message: "Started Codex turn with GPT-5.5.",
     model: "gpt-5.5",
     consumedMessageIds: ["message-1", "message-2"],
-    riskFlags: [{
-      id: "message-1:agent-directed-phrasing",
-      label: "message from Maddie contains agent-directed phrasing",
-      source: "message from Maddie",
-      risk: "Agent-directed phrasing",
-      severity: "warning"
-    }],
+    riskFlags: [
+      {
+        id: "message-1:agent-directed-phrasing",
+        label: "message from Maddie contains agent-directed phrasing",
+        source: "message from Maddie",
+        risk: "Agent-directed phrasing",
+        severity: "warning"
+      }
+    ],
     host: "Maddie",
     hostUserId: "github:maddie",
     createdAt: "2026-07-04T12:00:00.000Z"
@@ -406,16 +443,19 @@ test("Codex turn events can carry bounded risk flags for encrypted audit history
 
   assert.deepEqual(parsed.consumedMessageIds, ["message-1", "message-2"]);
   assert.equal(parsed.riskFlags?.[0]?.risk, "Agent-directed phrasing");
-  assert.equal(CodexEventPlaintextPayload.safeParse({
-    ...parsed,
-    riskFlags: Array.from({ length: 25 }, (_, index) => ({
-      id: `flag-${index}`,
-      label: "too many flags",
-      source: "message",
-      risk: "risk",
-      severity: "warning"
-    }))
-  }).success, false);
+  assert.equal(
+    CodexEventPlaintextPayload.safeParse({
+      ...parsed,
+      riskFlags: Array.from({ length: 25 }, (_, index) => ({
+        id: `flag-${index}`,
+        label: "too many flags",
+        source: "message",
+        risk: "risk",
+        severity: "warning"
+      }))
+    }).success,
+    false
+  );
 });
 
 test("invite join request accepts optional requester device public key", () => {
@@ -506,50 +546,56 @@ test("relay envelope accepts device-sealed invite payloads", () => {
 });
 
 test("device-sealed and wrapped room secret payloads reject private keys and oversized ciphertext", () => {
-  assert.equal(RelayEnvelope.safeParse({
-    id: "envelope-oversized-sealed",
-    teamId: "team-1",
-    roomId: "room-1",
-    senderDeviceId: "device_12345678",
-    senderUserId: "github:maddie",
-    createdAt: "2026-07-04T12:02:00.000Z",
-    kind: "room.invite",
-    payload: {
-      algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
-      ephemeralPublicKeyJwk: {
-        kty: "EC",
-        crv: "P-256",
-        x: "ephemeral-x",
-        y: "ephemeral-y",
-        d: "private-material"
-      },
-      nonce: "nonce",
-      ciphertext: "ciphertext"
-    }
-  }).success, false);
+  assert.equal(
+    RelayEnvelope.safeParse({
+      id: "envelope-oversized-sealed",
+      teamId: "team-1",
+      roomId: "room-1",
+      senderDeviceId: "device_12345678",
+      senderUserId: "github:maddie",
+      createdAt: "2026-07-04T12:02:00.000Z",
+      kind: "room.invite",
+      payload: {
+        algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
+        ephemeralPublicKeyJwk: {
+          kty: "EC",
+          crv: "P-256",
+          x: "ephemeral-x",
+          y: "ephemeral-y",
+          d: "private-material"
+        },
+        nonce: "nonce",
+        ciphertext: "ciphertext"
+      }
+    }).success,
+    false
+  );
 
-  assert.equal(InviteJoinStatusPlaintextPayload.safeParse({
-    eventType: "invite.status",
-    requestId: "device_12345678:request",
-    status: "approved",
-    decidedBy: "Host",
-    decidedByUserId: "github:host",
-    decidedAt: "2026-07-04T12:01:00.000Z",
-    recipientDeviceId: "device_12345678",
-    recipientPublicKeyFingerprint: "1111:2222:3333:4444:5555:6666:7777:8888",
-    wrappedRoomSecret: {
-      version: 1,
-      algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
-      ephemeralPublicKeyJwk: {
-        kty: "EC",
-        crv: "P-256",
-        x: "ephemeral-x",
-        y: "ephemeral-y"
-      },
-      nonce: "nonce",
-      ciphertext: "x".repeat(maxWrappedCiphertextChars + 1)
-    }
-  }).success, false);
+  assert.equal(
+    InviteJoinStatusPlaintextPayload.safeParse({
+      eventType: "invite.status",
+      requestId: "device_12345678:request",
+      status: "approved",
+      decidedBy: "Host",
+      decidedByUserId: "github:host",
+      decidedAt: "2026-07-04T12:01:00.000Z",
+      recipientDeviceId: "device_12345678",
+      recipientPublicKeyFingerprint: "1111:2222:3333:4444:5555:6666:7777:8888",
+      wrappedRoomSecret: {
+        version: 1,
+        algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
+        ephemeralPublicKeyJwk: {
+          kty: "EC",
+          crv: "P-256",
+          x: "ephemeral-x",
+          y: "ephemeral-y"
+        },
+        nonce: "nonce",
+        ciphertext: "x".repeat(maxWrappedCiphertextChars + 1)
+      }
+    }).success,
+    false
+  );
 });
 
 test("room key rotation payload carries a new room secret", () => {
@@ -603,10 +649,13 @@ test("local preview payloads and encrypted preview events are bounded", () => {
   });
 
   assert.equal(parsed.status, "live");
-  assert.equal(LocalPreviewPlaintextPayload.safeParse({
-    ...parsed,
-    sourceUrl: "x".repeat(maxUrlChars + 1)
-  }).success, false);
+  assert.equal(
+    LocalPreviewPlaintextPayload.safeParse({
+      ...parsed,
+      sourceUrl: "x".repeat(maxUrlChars + 1)
+    }).success,
+    false
+  );
 
   const envelope = RelayEnvelope.parse({
     id: "envelope-preview",
@@ -639,92 +688,110 @@ test("workspace file save requests use encrypted workspace envelopes", () => {
   });
 
   assert.equal(request.path, "README.md");
-  assert.equal(WorkspaceFileSaveRequestPlaintextPayload.safeParse({
-    ...request,
-    eventType: "workspace.file.delete"
-  }).success, false);
+  assert.equal(
+    WorkspaceFileSaveRequestPlaintextPayload.safeParse({
+      ...request,
+      eventType: "workspace.file.delete"
+    }).success,
+    false
+  );
 
-  assert.equal(RelayEnvelope.safeParse({
-    id: "env-workspace-request",
-    teamId: "team-core",
-    roomId: "room-desktop",
-    senderDeviceId: "device-maddie",
-    senderUserId: "github:maddie",
-    createdAt: "2026-07-08T12:00:00.000Z",
-    kind: "workspace.request",
-    payload: {
-      algorithm: "AES-GCM-256",
-      nonce: "nonce-file-save-request",
-      ciphertext: "encrypted-file-save-request"
-    }
-  }).success, true);
-  assert.equal(RelayEnvelope.safeParse({
-    id: "env-workspace-event",
-    teamId: "team-core",
-    roomId: "room-desktop",
-    senderDeviceId: "device-maddie",
-    senderUserId: "github:maddie",
-    createdAt: "2026-07-08T12:01:00.000Z",
-    kind: "workspace.event",
-    payload: {
-      algorithm: "AES-GCM-256",
-      nonce: "nonce-file-save-status",
-      ciphertext: "encrypted-file-save-status"
-    }
-  }).success, true);
+  assert.equal(
+    RelayEnvelope.safeParse({
+      id: "env-workspace-request",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      senderDeviceId: "device-maddie",
+      senderUserId: "github:maddie",
+      createdAt: "2026-07-08T12:00:00.000Z",
+      kind: "workspace.request",
+      payload: {
+        algorithm: "AES-GCM-256",
+        nonce: "nonce-file-save-request",
+        ciphertext: "encrypted-file-save-request"
+      }
+    }).success,
+    true
+  );
+  assert.equal(
+    RelayEnvelope.safeParse({
+      id: "env-workspace-event",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      senderDeviceId: "device-maddie",
+      senderUserId: "github:maddie",
+      createdAt: "2026-07-08T12:01:00.000Z",
+      kind: "workspace.event",
+      payload: {
+        algorithm: "AES-GCM-256",
+        nonce: "nonce-file-save-status",
+        ciphertext: "encrypted-file-save-status"
+      }
+    }).success,
+    true
+  );
 });
 
 test("decrypted workflow payloads reject unbounded local persistence fields", () => {
-  assert.equal(TerminalResultPlaintextPayload.safeParse({
-    eventType: "terminal.result",
-    requestId: "request-1",
-    command: "npm test",
-    cwd: "/tmp/project",
-    exitStatus: 0,
-    stdout: "x".repeat(maxLongTextChars + 1),
-    stderr: "",
-    ranBy: "Host",
-    ranByUserId: "github:host",
-    startedAt: "2026-07-04T12:00:00.000Z",
-    finishedAt: "2026-07-04T12:01:00.000Z"
-  }).success, false);
-
-  assert.equal(GitWorkflowEventPlaintextPayload.safeParse({
-    eventType: "git.workflow",
-    status: "completed",
-    branch: "codex/security",
-    push: true,
-    message: "Done",
-    runner: "Host",
-    runnerUserId: "github:host",
-    createdAt: "2026-07-04T12:00:00.000Z",
-    results: Array.from({ length: maxGitWorkflowResults + 1 }, (_, index) => ({
-      command: `echo ${index}`,
+  assert.equal(
+    TerminalResultPlaintextPayload.safeParse({
+      eventType: "terminal.result",
+      requestId: "request-1",
+      command: "npm test",
       cwd: "/tmp/project",
-      status: 0,
-      stdout: "",
-      stderr: ""
-    }))
-  }).success, false);
+      exitStatus: 0,
+      stdout: "x".repeat(maxLongTextChars + 1),
+      stderr: "",
+      ranBy: "Host",
+      ranByUserId: "github:host",
+      startedAt: "2026-07-04T12:00:00.000Z",
+      finishedAt: "2026-07-04T12:01:00.000Z"
+    }).success,
+    false
+  );
 
-  assert.equal(GitHubActionsEventPlaintextPayload.safeParse({
-    eventType: "github.actions",
-    owner: "maddiedreese",
-    repo: "multAIplayer",
-    branch: "main",
-    summary: { label: "CI", detail: "Too many runs", tone: "yellow" },
-    message: "Checked Actions",
-    checkedBy: "Host",
-    checkedByUserId: "github:host",
-    checkedAt: "2026-07-04T12:00:00.000Z",
-    runs: Array.from({ length: maxGitHubActionRuns + 1 }, (_, index) => ({
-      id: index + 1,
-      name: "CI",
+  assert.equal(
+    GitWorkflowEventPlaintextPayload.safeParse({
+      eventType: "git.workflow",
       status: "completed",
-      conclusion: "success",
-      url: "https://github.com/maddiedreese/multAIplayer/actions",
+      branch: "codex/security",
+      push: true,
+      message: "Done",
+      runner: "Host",
+      runnerUserId: "github:host",
       createdAt: "2026-07-04T12:00:00.000Z",
-      updatedAt: "2026-07-04T12:01:00.000Z"
-    }))
-  }).success, false);
+      results: Array.from({ length: maxGitWorkflowResults + 1 }, (_, index) => ({
+        command: `echo ${index}`,
+        cwd: "/tmp/project",
+        status: 0,
+        stdout: "",
+        stderr: ""
+      }))
+    }).success,
+    false
+  );
+
+  assert.equal(
+    GitHubActionsEventPlaintextPayload.safeParse({
+      eventType: "github.actions",
+      owner: "maddiedreese",
+      repo: "multAIplayer",
+      branch: "main",
+      summary: { label: "CI", detail: "Too many runs", tone: "yellow" },
+      message: "Checked Actions",
+      checkedBy: "Host",
+      checkedByUserId: "github:host",
+      checkedAt: "2026-07-04T12:00:00.000Z",
+      runs: Array.from({ length: maxGitHubActionRuns + 1 }, (_, index) => ({
+        id: index + 1,
+        name: "CI",
+        status: "completed",
+        conclusion: "success",
+        url: "https://github.com/maddiedreese/multAIplayer/actions",
+        createdAt: "2026-07-04T12:00:00.000Z",
+        updatedAt: "2026-07-04T12:01:00.000Z"
+      }))
+    }).success,
+    false
+  );
 });

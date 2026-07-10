@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { useAppStore } from "../src/store/appStore";
-import {
-  projectGitHubActionsByRoom,
-  projectGitWorkflowByRoom
-} from "../src/store/slices/gitWorkflowSlice";
+import { projectGitHubActionsByRoom, projectGitWorkflowByRoom } from "../src/store/slices/gitWorkflowSlice";
 import { projectInvitePanelMaps } from "../src/store/slices/inviteSlice";
 
 test.beforeEach(() => {
@@ -94,8 +91,14 @@ test("desktop store keeps git workflow state room scoped", () => {
   assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.busy, true);
   assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.message, "Creating PR");
   assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-b"]?.message, null);
-  assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.status?.files[0]?.path, "apps/desktop/src/App.tsx");
-  assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-b"]?.draft?.branchName, "multaiplayer/alpha");
+  assert.equal(
+    projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.status?.files[0]?.path,
+    "apps/desktop/src/App.tsx"
+  );
+  assert.equal(
+    projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-b"]?.draft?.branchName,
+    "multaiplayer/alpha"
+  );
   assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-b"]?.draft?.prBase, "main");
 });
 
@@ -115,9 +118,15 @@ test("desktop store exposes room git workflow actions", () => {
   const state = useAppStore.getState();
   assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.message, "Creating PR");
   assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-b"]?.message, null);
-  assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.status?.files[0]?.path, "apps/desktop/src/App.tsx");
+  assert.equal(
+    projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.status?.files[0]?.path,
+    "apps/desktop/src/App.tsx"
+  );
   assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-b"]?.status, null);
-  assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.draft?.branchName, "multaiplayer/alpha");
+  assert.equal(
+    projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.draft?.branchName,
+    "multaiplayer/alpha"
+  );
   assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.draft?.commitMessage, "Build alpha");
   assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.draft?.prBase, "main");
 });
@@ -125,21 +134,27 @@ test("desktop store exposes room git workflow actions", () => {
 test("desktop store applies inferred GitHub remotes only to default draft targets", () => {
   const store = useAppStore.getState();
 
+  assert.equal(store.applyInferredGitHubRemoteForRoom("room-a", { owner: "openai", repo: "codex" }), true);
   assert.equal(
-    store.applyInferredGitHubRemoteForRoom("room-a", { owner: "openai", repo: "codex" }),
-    true
+    projectGitWorkflowByRoom(useAppStore.getState().gitWorkflowRuntimeByRoom)["room-a"]?.draft?.prOwner,
+    "openai"
   );
-  assert.equal(projectGitWorkflowByRoom(useAppStore.getState().gitWorkflowRuntimeByRoom)["room-a"]?.draft?.prOwner, "openai");
-  assert.equal(projectGitWorkflowByRoom(useAppStore.getState().gitWorkflowRuntimeByRoom)["room-a"]?.draft?.prRepo, "codex");
+  assert.equal(
+    projectGitWorkflowByRoom(useAppStore.getState().gitWorkflowRuntimeByRoom)["room-a"]?.draft?.prRepo,
+    "codex"
+  );
 
   store.editGitWorkflowDraftForRoom("room-b", { prOwner: "maddiedreese", prRepo: "custom" });
 
+  assert.equal(store.applyInferredGitHubRemoteForRoom("room-b", { owner: "openai", repo: "codex" }), false);
   assert.equal(
-    store.applyInferredGitHubRemoteForRoom("room-b", { owner: "openai", repo: "codex" }),
-    false
+    projectGitWorkflowByRoom(useAppStore.getState().gitWorkflowRuntimeByRoom)["room-b"]?.draft?.prOwner,
+    "maddiedreese"
   );
-  assert.equal(projectGitWorkflowByRoom(useAppStore.getState().gitWorkflowRuntimeByRoom)["room-b"]?.draft?.prOwner, "maddiedreese");
-  assert.equal(projectGitWorkflowByRoom(useAppStore.getState().gitWorkflowRuntimeByRoom)["room-b"]?.draft?.prRepo, "custom");
+  assert.equal(
+    projectGitWorkflowByRoom(useAppStore.getState().gitWorkflowRuntimeByRoom)["room-b"]?.draft?.prRepo,
+    "custom"
+  );
 });
 
 test("desktop store exposes room busy actions", () => {
@@ -310,17 +325,19 @@ test("desktop store applies GitHub Actions events as one room-scoped state updat
     checkedAt: "2026-07-06T00:03:00.000Z",
     summary: { label: "Passing", detail: "Latest loaded workflow runs are passing.", tone: "green" as const },
     message: "Loaded 1 workflow run for main.",
-    runs: [{
-      id: 7,
-      name: "CI",
-      status: "completed",
-      conclusion: "success",
-      url: "https://github.com/maddiedreese/multAIplayer/actions/runs/7",
-      branch: "main",
-      event: "push",
-      createdAt: "2026-07-06T00:00:00.000Z",
-      updatedAt: "2026-07-06T00:01:00.000Z"
-    }]
+    runs: [
+      {
+        id: 7,
+        name: "CI",
+        status: "completed",
+        conclusion: "success",
+        url: "https://github.com/maddiedreese/multAIplayer/actions/runs/7",
+        branch: "main",
+        event: "push",
+        createdAt: "2026-07-06T00:00:00.000Z",
+        updatedAt: "2026-07-06T00:01:00.000Z"
+      }
+    ]
   };
 
   store.applyGitHubActionsEventForRoom("room-a", event);
@@ -547,11 +564,7 @@ test("desktop store keeps room settings state room scoped", () => {
   store.setSettingsMessageForRoom("room-a", "Settings saved");
   store.setCustomCodexModelForRoom("room-a", "gpt-5.4", "gpt-5.3");
   store.setCustomCodexModelForRoom("room-b", "o4-mini", "gpt-5.3");
-  store.setProjectPathDraftForRoom(
-    "room-a",
-    "/Users/maddiedreese/Documents/MultAIplayer",
-    "/tmp/current-project"
-  );
+  store.setProjectPathDraftForRoom("room-a", "/Users/maddiedreese/Documents/MultAIplayer", "/tmp/current-project");
   store.setProjectPathDraftForRoom("room-b", "/tmp/example", "/tmp/current-project");
 
   const state = useAppStore.getState();
@@ -612,18 +625,20 @@ test("desktop store keeps local preview state room scoped", () => {
 test("desktop store keeps invite panel state room scoped", () => {
   const store = useAppStore.getState();
 
-  store.setInviteRequestsForRoom("room-a", [{
-    eventType: "invite.request",
-    id: "invite-request-1",
-    inviteId: "invite-1",
-    requester: "Jordan",
-    requesterUserId: "github:jordan",
-    requesterDeviceId: "device-jordan",
-    requesterPublicKeyFingerprint: "1234567890abcdef",
-    requestedAt: "2026-07-06T00:06:00.000Z",
-    note: "Joining from laptop",
-    status: "pending"
-  }]);
+  store.setInviteRequestsForRoom("room-a", [
+    {
+      eventType: "invite.request",
+      id: "invite-request-1",
+      inviteId: "invite-1",
+      requester: "Jordan",
+      requesterUserId: "github:jordan",
+      requesterDeviceId: "device-jordan",
+      requesterPublicKeyFingerprint: "1234567890abcdef",
+      requestedAt: "2026-07-06T00:06:00.000Z",
+      note: "Joining from laptop",
+      status: "pending"
+    }
+  ]);
   store.setInviteSecretInputValue("multaiplayer://invite#secret");
   store.setInviteLinkForRoom("room-a", "https://multaiplayer.com/invite/room-a");
   store.setInviteApprovalGateForRoom("room-a", true);
@@ -719,11 +734,17 @@ test("desktop store exposes room draft actions", () => {
 
   let state = useAppStore.getState();
   assert.equal(state.roomChatByRoom["room-a"]?.draft, "@Codex summarize this");
-  assert.deepEqual(state.roomChatByRoom["room-a"]?.pendingAttachments?.map((attachment) => attachment.name), ["README.md", "plan.md"]);
+  assert.deepEqual(
+    state.roomChatByRoom["room-a"]?.pendingAttachments?.map((attachment) => attachment.name),
+    ["README.md", "plan.md"]
+  );
 
   store.removePendingAttachmentForRoom("room-a", "attachment-1");
   state = useAppStore.getState();
-  assert.deepEqual(state.roomChatByRoom["room-a"]?.pendingAttachments?.map((attachment) => attachment.name), ["plan.md"]);
+  assert.deepEqual(
+    state.roomChatByRoom["room-a"]?.pendingAttachments?.map((attachment) => attachment.name),
+    ["plan.md"]
+  );
 
   store.clearPendingAttachmentsForRoom("room-a");
   state = useAppStore.getState();
@@ -828,7 +849,10 @@ test("desktop store keeps Codex room state room scoped", () => {
   assert.equal(state.codexRuntimeByRoom["room-a"]?.approvalVisible, true);
   assert.equal(state.codexRuntimeByRoom["room-b"]?.approvalVisible, undefined);
   assert.equal(state.codexRuntimeByRoom["room-a"]?.pendingApproval?.messages[0]?.body, "@Codex draft a plan");
-  assert.equal(state.codexRuntimeByRoom["room-a"]?.pendingApproval?.summary.workspacePath, "/Users/maddiedreese/Documents/MultAIplayer");
+  assert.equal(
+    state.codexRuntimeByRoom["room-a"]?.pendingApproval?.summary.workspacePath,
+    "/Users/maddiedreese/Documents/MultAIplayer"
+  );
   assert.equal(state.codexRuntimeByRoom["room-a"]?.running, true);
   assert.equal(state.codexRuntimeByRoom["room-b"]?.running, undefined);
   assert.equal(state.codexRuntimeByRoom["room-a"]?.goal?.text, "Finish the room");
@@ -962,14 +986,16 @@ test("desktop store edits and deletes messages while refreshing pending Codex ap
   assert.equal(state.codexRuntimeByRoom["room-a"]?.pendingApproval?.messages[0]?.body, "@Codex draft a safer plan");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.pendingApproval?.summary.messagesSinceLastCodex, 2);
   assert.equal(state.codexRuntimeByRoom["room-a"]?.approvalVisible, true);
-  assert.deepEqual(state.chatEditsByRoom["room-a"], [{
-    id: "edit-1",
-    messageId: "message-1",
-    body: "@Codex draft a safer plan",
-    editedBy: "Maddie",
-    editedByUserId: "github:maddie",
-    editedAt: "2026-07-08T12:01:00.000Z"
-  }]);
+  assert.deepEqual(state.chatEditsByRoom["room-a"], [
+    {
+      id: "edit-1",
+      messageId: "message-1",
+      body: "@Codex draft a safer plan",
+      editedBy: "Maddie",
+      editedByUserId: "github:maddie",
+      editedAt: "2026-07-08T12:01:00.000Z"
+    }
+  ]);
 
   store.deleteRoomMessage("room-a", {
     id: "delete-1",
@@ -992,13 +1018,15 @@ test("desktop store edits and deletes messages while refreshing pending Codex ap
   assert.equal(state.messagesByRoom["room-a"]?.[1]?.body, "");
   assert.equal(state.messagesByRoom["room-a"]?.[1]?.deletedAt, "2026-07-08T12:03:00.000Z");
   assert.equal(state.messagesByRoom["room-a"]?.[1]?.deletedBy, "Jordan");
-  assert.deepEqual(state.chatDeletesByRoom["room-a"], [{
-    id: "delete-2",
-    messageId: "message-2",
-    deletedBy: "Jordan",
-    deletedByUserId: "github:jordan",
-    deletedAt: "2026-07-08T12:03:00.000Z"
-  }]);
+  assert.deepEqual(state.chatDeletesByRoom["room-a"], [
+    {
+      id: "delete-2",
+      messageId: "message-2",
+      deletedBy: "Jordan",
+      deletedByUserId: "github:jordan",
+      deletedAt: "2026-07-08T12:03:00.000Z"
+    }
+  ]);
   assert.deepEqual(
     state.codexRuntimeByRoom["room-a"]?.pendingApproval?.messages.map((message) => message.id),
     ["message-1"]
@@ -1030,12 +1058,18 @@ test("desktop store keeps queued Codex turn intents in order", () => {
 
   let state = useAppStore.getState();
   assert.equal(state.codexRuntimeByRoom["room-a"]?.queuedApprovals?.length, 2);
-  assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.queuedApprovals?.map((turn) => turn.turnId), ["turn-queued-1", "turn-queued-2"]);
+  assert.deepEqual(
+    state.codexRuntimeByRoom["room-a"]?.queuedApprovals?.map((turn) => turn.turnId),
+    ["turn-queued-1", "turn-queued-2"]
+  );
 
   store.removeQueuedCodexApprovalForRoom("room-a", "turn-queued-2");
 
   state = useAppStore.getState();
-  assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.queuedApprovals?.map((turn) => turn.turnId), ["turn-queued-1"]);
+  assert.deepEqual(
+    state.codexRuntimeByRoom["room-a"]?.queuedApprovals?.map((turn) => turn.turnId),
+    ["turn-queued-1"]
+  );
 });
 
 test("desktop store rejects edit and delete mutations after a Codex started event consumes the message", () => {
@@ -1220,31 +1254,28 @@ test("desktop store keeps room runtime state room scoped", () => {
     runnerUserId: "github:maddie",
     createdAt: "2026-07-06T00:13:00.000Z"
   });
-  store.appendGitHubActionsEvent(
-    "room-b",
+  store.appendGitHubActionsEvent("room-b", {
+    eventType: "github.actions",
+    owner: "maddiedreese",
+    repo: "multAIplayer",
+    branch: "main",
+    summary: { label: "CI", detail: "All checks passed", tone: "green" },
+    message: "Checked Actions",
+    checkedBy: "Maddie",
+    checkedByUserId: "github:maddie",
+    checkedAt: "2026-07-06T00:14:00.000Z",
+    runs: [
       {
-        eventType: "github.actions",
-        owner: "maddiedreese",
-        repo: "multAIplayer",
-        branch: "main",
-        summary: { label: "CI", detail: "All checks passed", tone: "green" },
-        message: "Checked Actions",
-        checkedBy: "Maddie",
-        checkedByUserId: "github:maddie",
-        checkedAt: "2026-07-06T00:14:00.000Z",
-        runs: [
-          {
-            id: 18,
-            name: "Web, relay, and packages",
-            status: "completed",
-            conclusion: "success",
-            url: "https://github.com/maddiedreese/multAIplayer/actions/runs/18",
-            createdAt: "2026-07-06T00:13:00.000Z",
-            updatedAt: "2026-07-06T00:14:00.000Z"
-          }
-        ]
+        id: 18,
+        name: "Web, relay, and packages",
+        status: "completed",
+        conclusion: "success",
+        url: "https://github.com/maddiedreese/multAIplayer/actions/runs/18",
+        createdAt: "2026-07-06T00:13:00.000Z",
+        updatedAt: "2026-07-06T00:14:00.000Z"
       }
-  );
+    ]
+  });
 
   const state = useAppStore.getState();
   assert.equal(state.historyPresenceByRoom["room-a"]?.inspectorTab, "files");
@@ -1253,8 +1284,14 @@ test("desktop store keeps room runtime state room scoped", () => {
   assert.equal(state.historyPresenceByRoom["room-b"]?.presence?.["device-b"]?.displayName, "Jordan");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.hostHandoffs?.[0]?.reason, "usage_limit");
   assert.equal(state.codexRuntimeByRoom["room-b"]?.continuation?.acceptedBy, "Jordan");
-  assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.events?.[0]?.branch, "codex/runtime-state");
-  assert.equal(projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-b"]?.events?.[0]?.summary.tone, "green");
+  assert.equal(
+    projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.events?.[0]?.branch,
+    "codex/runtime-state"
+  );
+  assert.equal(
+    projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-b"]?.events?.[0]?.summary.tone,
+    "green"
+  );
 });
 
 test("desktop store exposes room presence actions", () => {
@@ -1327,8 +1364,8 @@ test("desktop store exposes room event append actions", () => {
     projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
     codexModel: "gpt-5.4",
     approvalPolicy: "ask",
-  approvalDelegationPolicy: "host_only",
-  trustedApproverUserIds: [],
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
     messagesSinceLastCodex: 4,
     attachmentNames: [],
     terminals: [],
@@ -1388,8 +1425,8 @@ test("desktop store exposes host handoff actions", () => {
     projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
     codexModel: "gpt-5.4",
     approvalPolicy: "ask",
-  approvalDelegationPolicy: "host_only",
-  trustedApproverUserIds: [],
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
     messagesSinceLastCodex: 1,
     attachmentNames: [],
     terminals: [],
@@ -1650,20 +1687,24 @@ test("desktop store clears local room-scoped state", () => {
   store.setSecretWarningVisibleForRoom("room-a", true);
   store.setSecretWarningVisibleForRoom("room-b", true);
   store.setHistorySearchResultsByRoom({
-    "room-a": [{
-      id: "history-search-a",
-      author: "Avery",
-      role: "human",
-      body: "Clear search result",
-      time: "10:01"
-    }],
-    "room-b": [{
-      id: "history-search-b",
-      author: "Jordan",
-      role: "human",
-      body: "Keep search result",
-      time: "10:02"
-    }]
+    "room-a": [
+      {
+        id: "history-search-a",
+        author: "Avery",
+        role: "human",
+        body: "Clear search result",
+        time: "10:01"
+      }
+    ],
+    "room-b": [
+      {
+        id: "history-search-b",
+        author: "Jordan",
+        role: "human",
+        body: "Keep search result",
+        time: "10:02"
+      }
+    ]
   });
   store.setInspectorTabForRoom("room-a", "browser");
   store.setInspectorTabForRoom("room-b", "terminal");
@@ -1778,7 +1819,10 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.filePanelByRoom["room-a"], undefined);
   assert.equal(state.localPreviewByRoom["room-a"], undefined);
   assert.equal(state.terminalRuntimeByRoom["room-a"]?.selectedTerminalId, undefined);
-  assert.equal(state.terminals.some((terminal) => terminal.roomId === "room-a"), false);
+  assert.equal(
+    state.terminals.some((terminal) => terminal.roomId === "room-a"),
+    false
+  );
   assert.equal(state.browserByRoom["room-a"]?.url, undefined);
   assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "keep");
   assert.equal(state.codexRuntimeByRoom["room-b"]?.events?.[0]?.turnId, "turn-b");
@@ -1788,7 +1832,10 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.historyPresenceByRoom["room-b"]?.presence?.["device-b"]?.displayName, "Jordan");
   assert.equal(state.codexRuntimeByRoom["room-b"]?.continuation?.acceptedBy, "Jordan");
   assert.deepEqual(state.roomChatByRoom["room-b"]?.selectedMessageIds, ["message-b"]);
-  assert.equal(state.terminals.some((terminal) => terminal.roomId === "room-b"), true);
+  assert.equal(
+    state.terminals.some((terminal) => terminal.roomId === "room-b"),
+    true
+  );
   assert.equal(state.browserByRoom["room-b"]?.url, "https://example.com");
 });
 
@@ -2039,8 +2086,8 @@ test("desktop store hydrates local room history through one room-scoped action",
         projectPath: "/Users/maddiedreese/Documents/MultAIplayer",
         codexModel: "gpt-5.4",
         approvalPolicy: "ask",
-  approvalDelegationPolicy: "host_only",
-  trustedApproverUserIds: [],
+        approvalDelegationPolicy: "host_only",
+        trustedApproverUserIds: [],
         messagesSinceLastCodex: 4,
         attachmentNames: [],
         terminals: [],
@@ -2078,15 +2125,30 @@ test("desktop store hydrates local room history through one room-scoped action",
   assert.equal(state.browserByRoom["room-a"]?.requests?.[0]?.url, "http://localhost:5173");
   assert.equal(state.inviteByRoom["room-a"]?.requests?.[0]?.requester, "Jordan");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.events?.[0]?.message, "Reading context");
-  assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.events?.[0]?.branch, "codex/history-hydration");
+  assert.equal(
+    projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.events?.[0]?.branch,
+    "codex/history-hydration"
+  );
   assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.message, "Opened draft PR");
-  assert.equal(projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.events?.[0]?.runs[0]?.name, "Web, relay, and packages");
+  assert.equal(
+    projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.events?.[0]?.runs[0]?.name,
+    "Web, relay, and packages"
+  );
   assert.equal(projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.runs?.[0]?.id, 18);
-  assert.equal(projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.lastChecked, "2026-07-06T00:08:00.000Z");
+  assert.equal(
+    projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.lastChecked,
+    "2026-07-06T00:08:00.000Z"
+  );
   assert.equal(projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.message, "CI: Checked Actions");
   assert.equal(state.localPreviewByRoom["room-a"]?.previews?.[0]?.status, "live");
-  assert.equal(state.terminals.some((terminal) => terminal.id === "terminal-a"), true);
-  assert.equal(state.terminals.some((terminal) => terminal.id === "terminal-b"), true);
+  assert.equal(
+    state.terminals.some((terminal) => terminal.id === "terminal-a"),
+    true
+  );
+  assert.equal(
+    state.terminals.some((terminal) => terminal.id === "terminal-b"),
+    true
+  );
   assert.equal(state.terminalRuntimeByRoom["room-a"]?.selectedTerminalId, "terminal-a");
   assert.equal(state.terminalRuntimeByRoom["room-b"]?.selectedTerminalId, "terminal-b");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.hostHandoffs?.[0]?.reason, "usage_limit");

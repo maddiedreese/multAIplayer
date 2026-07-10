@@ -101,7 +101,7 @@ export function registerGitHubAuthRoutes({
         grant_type: "urn:ietf:params:oauth:grant-type:device_code"
       })
     });
-    const tokenBody = await tokenResponse.json() as {
+    const tokenBody = (await tokenResponse.json()) as {
       access_token?: string;
       error?: string;
       error_description?: string;
@@ -123,7 +123,7 @@ export function registerGitHubAuthRoutes({
       res.status(userResponse.status).json({ error: "Failed to load GitHub user" });
       return;
     }
-    const githubUser = await userResponse.json() as {
+    const githubUser = (await userResponse.json()) as {
       id: number;
       login: string;
       name?: string | null;

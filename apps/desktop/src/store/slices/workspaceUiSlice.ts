@@ -40,12 +40,7 @@ export interface WorkspaceUiSlice {
   replaceRoomRecord: (room: RoomRecord) => void;
   markRoomReadById: (roomId: string) => void;
   hydrateRoomReadState: (roomId: string, readState?: LocalRoomReadState) => void;
-  markIncomingChatUnread: (
-    roomId: string,
-    activeRoomId: string,
-    senderDeviceId: string,
-    localDeviceId: string
-  ) => void;
+  markIncomingChatUnread: (roomId: string, activeRoomId: string, senderDeviceId: string, localDeviceId: string) => void;
   setWorkspaceStatusError: (message: string | null) => void;
   setActiveSidebarPanel: (panel: SidebarPanel) => void;
   setNewTeamName: (name: string) => void;
@@ -92,7 +87,7 @@ function activeRecords<T extends { deletedAt?: string }>(records: T[]): T[] {
 }
 
 function existingIdOrFirst<T extends { id: string }>(records: T[], currentId: string): string {
-  return records.some((record) => record.id === currentId) ? currentId : records[0]?.id ?? "";
+  return records.some((record) => record.id === currentId) ? currentId : (records[0]?.id ?? "");
 }
 
 export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], WorkspaceUiSlice> = (set) => ({
@@ -121,14 +116,12 @@ export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], Workspa
   },
   updateTeamRoleForTeam: (teamId, role) => {
     set((state) => ({
-      teams: state.teams.map((team) =>
-        team.id === teamId ? { ...team, role: role ?? team.role } : team
-      )
+      teams: state.teams.map((team) => (team.id === teamId ? { ...team, role: role ?? team.role } : team))
     }));
   },
   updateTeamMemberCountForTeam: (teamId, members) => {
     set((state) => ({
-      teams: state.teams.map((team) => team.id === teamId ? { ...team, members } : team)
+      teams: state.teams.map((team) => (team.id === teamId ? { ...team, members } : team))
     }));
   },
   upsertTeamRecord: (team) => {
@@ -136,7 +129,7 @@ export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], Workspa
       const teams = team.deletedAt
         ? state.teams.filter((item) => item.id !== team.id)
         : state.teams.some((item) => item.id === team.id)
-          ? state.teams.map((item) => item.id === team.id ? team : item)
+          ? state.teams.map((item) => (item.id === team.id ? team : item))
           : [...state.teams, team];
       return {
         teams,
@@ -183,13 +176,7 @@ export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], Workspa
   },
   markIncomingChatUnread: (roomId, activeRoomId, senderDeviceId, localDeviceId) => {
     set((state) => ({
-      rooms: markRoomUnreadForIncomingChat(
-        state.rooms,
-        roomId,
-        activeRoomId,
-        senderDeviceId,
-        localDeviceId
-      )
+      rooms: markRoomUnreadForIncomingChat(state.rooms, roomId, activeRoomId, senderDeviceId, localDeviceId)
     }));
   },
   setWorkspaceStatusError: (workspaceError) => set({ workspaceError }),

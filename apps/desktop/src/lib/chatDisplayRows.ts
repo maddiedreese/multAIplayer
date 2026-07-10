@@ -27,9 +27,10 @@ export function buildRoomChatMessageRows({
 }): RoomChatMessageDisplay[] {
   const visibleMessages = messages.filter((message) => !isBrowserDecisionSystemMessage(message));
   const messagesById = new Map(visibleMessages.map((message) => [message.id, message]));
-  const lastCodexIndex = visibleMessages.reduce((lastIndex, message, index) => (
-    message.role === "codex" ? index : lastIndex
-  ), -1);
+  const lastCodexIndex = visibleMessages.reduce(
+    (lastIndex, message, index) => (message.role === "codex" ? index : lastIndex),
+    -1
+  );
   return visibleMessages.map((message) => ({
     id: message.id,
     author: message.author,
@@ -38,26 +39,36 @@ export function buildRoomChatMessageRows({
     time: message.time,
     edited: Boolean(message.editedAt && !message.deletedAt),
     deleted: Boolean(message.deletedAt),
-    canEdit: canMutateMessage(message, localUserId) && visibleMessages.indexOf(message) > lastCodexIndex && messageIsBeforeCodexWatermark(message, codexEvents),
-    canDelete: canMutateMessage(message, localUserId) && visibleMessages.indexOf(message) > lastCodexIndex && messageIsBeforeCodexWatermark(message, codexEvents),
+    canEdit:
+      canMutateMessage(message, localUserId) &&
+      visibleMessages.indexOf(message) > lastCodexIndex &&
+      messageIsBeforeCodexWatermark(message, codexEvents),
+    canDelete:
+      canMutateMessage(message, localUserId) &&
+      visibleMessages.indexOf(message) > lastCodexIndex &&
+      messageIsBeforeCodexWatermark(message, codexEvents),
     replyPreview: message.replyTo ? buildReplyPreview(messagesById.get(message.replyTo)) : null,
     selected: markdownSelectionMode && selectedMessageIds.includes(message.id),
-    attachments: message.deletedAt ? [] : (message.attachments ?? []).map((attachment) => ({
-      id: attachment.id,
-      name: attachment.name,
-      meta: formatAttachmentMeta(attachment),
-      encryptedBlob: Boolean(attachment.blobId),
-      canPreview: canOpenChatAttachment(attachment)
-    })),
-    reactions: message.deletedAt ? [] : roomReactionEmoji.map((emoji) => {
-      const reaction = message.reactions?.find((item) => item.emoji === emoji);
-      return {
-        emoji,
-        count: reaction?.reactors.length ?? 0,
-        active: reaction?.reactors.some((reactor) => reactor.userId === localUserId) ?? false,
-        title: reaction?.reactors.map((reactor) => reactor.name).join(", ") || "React"
-      };
-    })
+    attachments: message.deletedAt
+      ? []
+      : (message.attachments ?? []).map((attachment) => ({
+          id: attachment.id,
+          name: attachment.name,
+          meta: formatAttachmentMeta(attachment),
+          encryptedBlob: Boolean(attachment.blobId),
+          canPreview: canOpenChatAttachment(attachment)
+        })),
+    reactions: message.deletedAt
+      ? []
+      : roomReactionEmoji.map((emoji) => {
+          const reaction = message.reactions?.find((item) => item.emoji === emoji);
+          return {
+            emoji,
+            count: reaction?.reactors.length ?? 0,
+            active: reaction?.reactors.some((reactor) => reactor.userId === localUserId) ?? false,
+            title: reaction?.reactors.map((reactor) => reactor.name).join(", ") || "React"
+          };
+        })
   }));
 }
 

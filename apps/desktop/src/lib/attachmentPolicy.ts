@@ -22,7 +22,7 @@ export function decideAttachmentReview(
     requiresReview,
     reviewed,
     canAttach: !requiresReview || reviewed,
-    actionLabel: requiresReview ? reviewed ? "Attach anyway" : "Review" : "Attach",
+    actionLabel: requiresReview ? (reviewed ? "Attach anyway" : "Review") : "Attach",
     warningDetail: requiresReview
       ? reviewed
         ? "Click Attach anyway to share this file preview."

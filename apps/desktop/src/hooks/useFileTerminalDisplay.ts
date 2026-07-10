@@ -1,15 +1,8 @@
 import type { ProjectFileContent, TerminalSnapshot } from "../lib/localBackend";
 import type { CodexRoomEvent, TerminalCommandRequest } from "../types";
-import {
-  decideAttachmentReview,
-  reviewedAttachmentPathForScope
-} from "../lib/attachmentPolicy";
+import { decideAttachmentReview, reviewedAttachmentPathForScope } from "../lib/attachmentPolicy";
 import { detectSecretRisks } from "../lib/secretRisks";
-import {
-  buildCodexEventRows,
-  buildTerminalOutputLines,
-  buildTerminalRequestRows
-} from "../lib/terminalDisplayRows";
+import { buildCodexEventRows, buildTerminalOutputLines, buildTerminalRequestRows } from "../lib/terminalDisplayRows";
 
 interface UseFileTerminalDisplayOptions {
   selectedFile: ProjectFileContent | null;

@@ -16,9 +16,7 @@ import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
 import { projectBrowserPanelMaps } from "../store/slices/browserSlice";
 import { projectCodexRuntimeMaps } from "../store/slices/codexHostHandoffSlice";
-import {
-  projectHistorySearchMessagesByRoom
-} from "../store/slices/historyPresenceSlice";
+import { projectHistorySearchMessagesByRoom } from "../store/slices/historyPresenceSlice";
 import { projectTerminalRuntimeRequestsByRoom } from "../store/slices/terminalSlice";
 import type { RoomSettingsRoomState } from "../store/slices/roomSettingsSlice";
 import type { useGitHubAuth } from "../hooks/useGitHubAuth";
@@ -117,40 +115,42 @@ export function DesktopSidebarContainer({ sources }: { sources: SidebarSources }
     selectWorkspaceRoom,
     setSelectedRoomId,
     setActiveSidebarPanel
-  } = useAppStore(useShallow((state) => ({
-    currentUser: state.currentUser,
-    authBusy: state.authBusy,
-    authConfig: state.authConfig,
-    authError: state.authError,
-    deviceFlow: state.deviceFlow,
-    sidebarQuery: state.sidebarQuery,
-    workspaceError: state.workspaceError,
-    newTeamName: state.newTeamName,
-    newRoomName: state.newRoomName,
-    newRoomProjectPath: state.newRoomProjectPath,
-    selectedTeam: state.selectedTeam,
-    selectedRoomId: state.selectedRoomId,
-    teams: state.teams,
-    rooms: state.rooms,
-    messagesByRoom: state.messagesByRoom,
-    historyPresenceByRoom: state.historyPresenceByRoom,
-    codexRuntimeByRoom: state.codexRuntimeByRoom,
-    terminalRuntimeByRoom: state.terminalRuntimeByRoom,
-    browserByRoom: state.browserByRoom,
-    forgottenRoomIds: state.forgottenRoomIds,
-    revokedRoomIds: state.revokedRoomIds,
-    revokedTeamIds: state.revokedTeamIds,
-    historySearchBusy: state.historySearchBusy,
-    activeSidebarPanel: state.activeSidebarPanel,
-    setSidebarQuery: state.setSidebarQuery,
-    setNewTeamName: state.setNewTeamName,
-    setNewRoomName: state.setNewRoomName,
-    setNewRoomProjectPath: state.setNewRoomProjectPath,
-    selectTeamRoom: state.selectTeamRoom,
-    selectWorkspaceRoom: state.selectWorkspaceRoom,
-    setSelectedRoomId: state.setSelectedRoomId,
-    setActiveSidebarPanel: state.setActiveSidebarPanel
-  })));
+  } = useAppStore(
+    useShallow((state) => ({
+      currentUser: state.currentUser,
+      authBusy: state.authBusy,
+      authConfig: state.authConfig,
+      authError: state.authError,
+      deviceFlow: state.deviceFlow,
+      sidebarQuery: state.sidebarQuery,
+      workspaceError: state.workspaceError,
+      newTeamName: state.newTeamName,
+      newRoomName: state.newRoomName,
+      newRoomProjectPath: state.newRoomProjectPath,
+      selectedTeam: state.selectedTeam,
+      selectedRoomId: state.selectedRoomId,
+      teams: state.teams,
+      rooms: state.rooms,
+      messagesByRoom: state.messagesByRoom,
+      historyPresenceByRoom: state.historyPresenceByRoom,
+      codexRuntimeByRoom: state.codexRuntimeByRoom,
+      terminalRuntimeByRoom: state.terminalRuntimeByRoom,
+      browserByRoom: state.browserByRoom,
+      forgottenRoomIds: state.forgottenRoomIds,
+      revokedRoomIds: state.revokedRoomIds,
+      revokedTeamIds: state.revokedTeamIds,
+      historySearchBusy: state.historySearchBusy,
+      activeSidebarPanel: state.activeSidebarPanel,
+      setSidebarQuery: state.setSidebarQuery,
+      setNewTeamName: state.setNewTeamName,
+      setNewRoomName: state.setNewRoomName,
+      setNewRoomProjectPath: state.setNewRoomProjectPath,
+      selectTeamRoom: state.selectTeamRoom,
+      selectWorkspaceRoom: state.selectWorkspaceRoom,
+      setSelectedRoomId: state.setSelectedRoomId,
+      setActiveSidebarPanel: state.setActiveSidebarPanel
+    }))
+  );
 
   const visibleRooms = useMemo(
     () => hideUnreadForLockedRooms(rooms, forgottenRoomIds, revokedRoomIds, revokedTeamIds),
@@ -281,49 +281,50 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
     saveRelayConfiguration,
     setRoomNotificationsMuted,
     setTeamDefaultBrowserProfilePersistent
-  } = useAppStore(useShallow((state) => {
-    const selectedRoom =
-      state.rooms.find((room) => room.id === state.selectedRoomId) ?? state.rooms[0] ?? emptyRoom;
-    return {
-      currentUser: state.currentUser,
-      authBusy: state.authBusy,
-      authConfig: state.authConfig,
-      authError: state.authError,
-      deviceFlow: state.deviceFlow,
-      selectedTeam: state.selectedTeam,
-      selectedRoom,
-      hasSelectedRoom: state.rooms.some((room) => room.id === state.selectedRoomId),
-      activeSidebarPanel: state.activeSidebarPanel,
-      appConfig: state.appConfig,
-      relayHttpDraft: state.relayHttpDraft,
-      relayWsDraft: state.relayWsDraft,
-      appConfigMessage: state.appConfigMessage,
-      relayStatus: state.relayStatus,
-      codexProbe: state.codexProbe,
-      deviceIdentity: state.deviceIdentity,
-      deviceIdentityMessage: state.deviceIdentityMessage,
-      forgottenRoomIds: state.forgottenRoomIds,
-      revokedRoomIds: state.revokedRoomIds,
-      revokedTeamIds: state.revokedTeamIds,
-      roomSettings: state.roomSettingsByRoom[selectedRoom.id] ?? emptyRoomSettings,
-      inviteApprovalGate: state.inviteByRoom[selectedRoom.id]?.approvalGate ?? true,
-      historySettings: state.historySettings,
-      teamHistorySettings: state.teamHistorySettings,
-      teamDefaultApprovalPolicy: state.teamDefaultApprovalPolicy,
-      teamDefaultCodexModel: state.teamDefaultCodexModel,
-      teamDefaultBrowserProfilePersistent: state.teamDefaultBrowserProfilePersistent,
-      teamDefaultInviteApprovalGate: state.teamDefaultInviteApprovalGate,
-      historyMessage: state.historyPresenceByRoom[selectedRoom.id]?.historyMessage ?? null,
-      teamHistoryMessage: state.teamHistoryByTeam[state.selectedTeam || "__no-team"]?.message ?? null,
-      setActiveSidebarPanel: state.setActiveSidebarPanel,
-      setRelayHttpDraft: state.setRelayHttpDraft,
-      setRelayWsDraft: state.setRelayWsDraft,
-      resetRelayConfiguration: state.resetRelayConfiguration,
-      saveRelayConfiguration: state.saveRelayConfiguration,
-      setRoomNotificationsMuted: state.setRoomNotificationsMuted,
-      setTeamDefaultBrowserProfilePersistent: state.setTeamDefaultBrowserProfilePersistent
-    };
-  }));
+  } = useAppStore(
+    useShallow((state) => {
+      const selectedRoom = state.rooms.find((room) => room.id === state.selectedRoomId) ?? state.rooms[0] ?? emptyRoom;
+      return {
+        currentUser: state.currentUser,
+        authBusy: state.authBusy,
+        authConfig: state.authConfig,
+        authError: state.authError,
+        deviceFlow: state.deviceFlow,
+        selectedTeam: state.selectedTeam,
+        selectedRoom,
+        hasSelectedRoom: state.rooms.some((room) => room.id === state.selectedRoomId),
+        activeSidebarPanel: state.activeSidebarPanel,
+        appConfig: state.appConfig,
+        relayHttpDraft: state.relayHttpDraft,
+        relayWsDraft: state.relayWsDraft,
+        appConfigMessage: state.appConfigMessage,
+        relayStatus: state.relayStatus,
+        codexProbe: state.codexProbe,
+        deviceIdentity: state.deviceIdentity,
+        deviceIdentityMessage: state.deviceIdentityMessage,
+        forgottenRoomIds: state.forgottenRoomIds,
+        revokedRoomIds: state.revokedRoomIds,
+        revokedTeamIds: state.revokedTeamIds,
+        roomSettings: state.roomSettingsByRoom[selectedRoom.id] ?? emptyRoomSettings,
+        inviteApprovalGate: state.inviteByRoom[selectedRoom.id]?.approvalGate ?? true,
+        historySettings: state.historySettings,
+        teamHistorySettings: state.teamHistorySettings,
+        teamDefaultApprovalPolicy: state.teamDefaultApprovalPolicy,
+        teamDefaultCodexModel: state.teamDefaultCodexModel,
+        teamDefaultBrowserProfilePersistent: state.teamDefaultBrowserProfilePersistent,
+        teamDefaultInviteApprovalGate: state.teamDefaultInviteApprovalGate,
+        historyMessage: state.historyPresenceByRoom[selectedRoom.id]?.historyMessage ?? null,
+        teamHistoryMessage: state.teamHistoryByTeam[state.selectedTeam || "__no-team"]?.message ?? null,
+        setActiveSidebarPanel: state.setActiveSidebarPanel,
+        setRelayHttpDraft: state.setRelayHttpDraft,
+        setRelayWsDraft: state.setRelayWsDraft,
+        resetRelayConfiguration: state.resetRelayConfiguration,
+        saveRelayConfiguration: state.saveRelayConfiguration,
+        setRoomNotificationsMuted: state.setRoomNotificationsMuted,
+        setTeamDefaultBrowserProfilePersistent: state.setTeamDefaultBrowserProfilePersistent
+      };
+    })
+  );
   const { deviceId, localUser } = useLocalIdentity(currentUser);
   const access = useRoomAccess({
     hasSelectedRoom,
@@ -362,13 +363,14 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         relayApi: appConfig.relayHttpUrl,
         codexSummary: codexProbe?.available
           ? formatCodexCompatibilitySummary(codexProbe.version)
-          : codexProbe?.error ?? "Not connected",
+          : (codexProbe?.error ?? "Not connected"),
         projectPath: selectedRoom.projectPath,
         modelLabel: formatCodexModel(selectedCodexModel),
         approvalLabel: approvalPolicyLabels[selectedRoom.approvalPolicy],
         roomKeysLabel: roomSecretStorageLabel(),
         posture: access.roomPosture,
-        chooseProjectDisabled: !hasSelectedRoom || access.isSelectedRoomLocked || Boolean(roomSettings.settingsBusy) || !access.isActiveHost,
+        chooseProjectDisabled:
+          !hasSelectedRoom || access.isSelectedRoomLocked || Boolean(roomSettings.settingsBusy) || !access.isActiveHost,
         relayHttpDraft,
         relayWsDraft,
         defaultRelayHttpUrl,
@@ -397,11 +399,14 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         onSaveRelay: saveRelayConfiguration,
         onNotificationsMutedChange: (muted) => setRoomNotificationsMuted(selectedRoom.id, muted),
         onHistoryEnabledChange: (enabled) => capabilities.updateLocalHistorySettings({ ...historySettings, enabled }),
-        onHistoryRetentionDaysChange: (retentionDays) => capabilities.updateLocalHistorySettings({ ...historySettings, retentionDays }),
+        onHistoryRetentionDaysChange: (retentionDays) =>
+          capabilities.updateLocalHistorySettings({ ...historySettings, retentionDays }),
         onClearRoomHistory: capabilities.clearRoomHistory,
         onForgetRoomLocalData: capabilities.forgetSelectedRoomLocalData,
-        onTeamHistoryEnabledChange: (enabled) => capabilities.updateTeamHistoryDefaults({ ...teamHistorySettings, enabled }),
-        onTeamHistoryRetentionDaysChange: (retentionDays) => capabilities.updateTeamHistoryDefaults({ ...teamHistorySettings, retentionDays }),
+        onTeamHistoryEnabledChange: (enabled) =>
+          capabilities.updateTeamHistoryDefaults({ ...teamHistorySettings, enabled }),
+        onTeamHistoryRetentionDaysChange: (retentionDays) =>
+          capabilities.updateTeamHistoryDefaults({ ...teamHistorySettings, retentionDays }),
         onTeamDefaultApprovalPolicyChange: capabilities.updateTeamDefaultApprovalPolicy,
         onTeamDefaultCodexModelChange: capabilities.updateTeamDefaultCodexModel,
         onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent,

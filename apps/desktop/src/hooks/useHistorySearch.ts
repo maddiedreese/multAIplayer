@@ -36,10 +36,8 @@ export function useHistorySearch({
     }
 
     let cancelled = false;
-    const searchableRooms = rooms.filter((room) =>
-      !forgottenRoomIds.has(room.id) &&
-      !revokedRoomIds.has(room.id) &&
-      !revokedTeamIds.has(room.teamId)
+    const searchableRooms = rooms.filter(
+      (room) => !forgottenRoomIds.has(room.id) && !revokedRoomIds.has(room.id) && !revokedTeamIds.has(room.teamId)
     );
     if (searchableRooms.length > 0) {
       startHistorySearch();

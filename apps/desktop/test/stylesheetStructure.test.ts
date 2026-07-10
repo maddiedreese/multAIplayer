@@ -37,7 +37,9 @@ function insideKeyframes(parent: { parent?: unknown; type?: string; name?: strin
   return false;
 }
 
-function cascadeContext(parent: { parent?: unknown; type?: string; name?: string; params?: string } | undefined): string {
+function cascadeContext(
+  parent: { parent?: unknown; type?: string; name?: string; params?: string } | undefined
+): string {
   const atRules: string[] = [];
   let current = parent;
   while (current) {

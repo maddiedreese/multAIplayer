@@ -61,14 +61,18 @@ export function buildRoomMemberRows({
   const roomMembers = Object.values(presence)
     .filter((member) => member.status === "online")
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
-  const visibleRoomMembers: RoomPresence[] = roomMembers.length ? roomMembers : [{
-    userId: localUser.id,
-    deviceId: localDeviceId,
-    displayName: localUser.name,
-    avatarUrl: localUser.avatarUrl,
-    publicKeyFingerprint: localPublicKeyFingerprint,
-    status: "online"
-  }];
+  const visibleRoomMembers: RoomPresence[] = roomMembers.length
+    ? roomMembers
+    : [
+        {
+          userId: localUser.id,
+          deviceId: localDeviceId,
+          displayName: localUser.name,
+          avatarUrl: localUser.avatarUrl,
+          publicKeyFingerprint: localPublicKeyFingerprint,
+          status: "online"
+        }
+      ];
 
   return visibleRoomMembers.map((member) => {
     const trusted = isDeviceKeyTrusted(trustedDeviceKeys, room.id, member.deviceId, member.publicKeyFingerprint);

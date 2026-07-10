@@ -53,6 +53,8 @@ export function useTerminalAutoOpen({
     isSelectedRoomLocked,
     roomTerminalCount,
     selectedRoomId,
+    openInteractiveTerminal,
+    terminalAutoOpenedRoomsRef,
     terminalBusy
   ]);
 }

@@ -77,7 +77,11 @@ export async function createGitPatch(cwd: string): Promise<GitPatchResult> {
   };
 }
 
-export async function cloneGitRepository(remoteUrl: string, parentDir: string, branch?: string): Promise<GitCloneResult> {
+export async function cloneGitRepository(
+  remoteUrl: string,
+  parentDir: string,
+  branch?: string
+): Promise<GitCloneResult> {
   if (isTauriRuntime()) {
     return invoke<GitCloneResult>("git_clone_repository", {
       request: { remoteUrl, parentDir, branch }
@@ -137,13 +141,15 @@ export async function runGitWorkflow(
       stderr: ""
     },
     ...(push
-      ? [{
-          cwd,
-          command: `git push -u origin ${branch}`,
-          status: 0,
-          stdout: "Preview mode: branch would be pushed in the native app.\n",
-          stderr: ""
-        }]
+      ? [
+          {
+            cwd,
+            command: `git push -u origin ${branch}`,
+            status: 0,
+            stdout: "Preview mode: branch would be pushed in the native app.\n",
+            stderr: ""
+          }
+        ]
       : [])
   ];
 }

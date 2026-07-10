@@ -45,15 +45,30 @@ export function createGitWorkflowActions({
   async function approveGitWorkflow() {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) {
-      useAppStore.getState().setGitWorkflowMessageForRoom(useAppStore.getState().selectedRoomId, "Create or join a room before approving a git workflow.");
+      useAppStore
+        .getState()
+        .setGitWorkflowMessageForRoom(
+          useAppStore.getState().selectedRoomId,
+          "Create or join a room before approving a git workflow."
+        );
       return;
     }
     if (!currentContext()?.isActiveHost) {
-      useAppStore.getState().setGitWorkflowMessageForRoom(selectedRoom.id, currentContext()?.hostGateMessage ?? "Claim host before continuing.");
+      useAppStore
+        .getState()
+        .setGitWorkflowMessageForRoom(
+          selectedRoom.id,
+          currentContext()?.hostGateMessage ?? "Claim host before continuing."
+        );
       return;
     }
     if (!currentContext()?.canReadLocalWorkspace) {
-      useAppStore.getState().setGitWorkflowMessageForRoom(selectedRoom.id, currentContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
+      useAppStore
+        .getState()
+        .setGitWorkflowMessageForRoom(
+          selectedRoom.id,
+          currentContext()?.localWorkspaceMessage ?? "Workspace unavailable."
+        );
       return;
     }
     const room = selectedRoom;
@@ -64,9 +79,12 @@ export function createGitWorkflowActions({
     }
     const projectPath = room.projectPath;
     const state = useAppStore.getState();
-    const workflowDraft = resolveGitWorkflowDraft({
-      [roomId]: state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.draft ?? {}
-    }, roomId);
+    const workflowDraft = resolveGitWorkflowDraft(
+      {
+        [roomId]: state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.draft ?? {}
+      },
+      roomId
+    );
     const gitApprovalPreview = buildGitWorkflowApprovalPreview(projectPath, workflowDraft);
     const githubWorkflowReadiness = checkGitHubWorkflowReadiness({
       pushEnabled: workflowDraft.pushEnabled,
@@ -78,7 +96,9 @@ export function createGitWorkflowActions({
       base: workflowDraft.prBase
     });
     if (!gitApprovalPreview.plan) {
-      useAppStore.getState().setGitWorkflowMessageForRoom(roomId, gitApprovalPreview.error ?? "Git workflow approval preview is invalid.");
+      useAppStore
+        .getState()
+        .setGitWorkflowMessageForRoom(roomId, gitApprovalPreview.error ?? "Git workflow approval preview is invalid.");
       return;
     }
     if (workflowDraft.pushEnabled && !githubWorkflowReadiness.ready) {
@@ -86,35 +106,31 @@ export function createGitWorkflowActions({
       return;
     }
     const gitPlan = gitApprovalPreview.plan;
-    const normalizedPrBase = workflowDraft.pushEnabled ? githubWorkflowReadiness.normalizedBase : gitApprovalPreview.normalizedBase;
+    const normalizedPrBase = workflowDraft.pushEnabled
+      ? githubWorkflowReadiness.normalizedBase
+      : gitApprovalPreview.normalizedBase;
     setGitWorkflowBusyForRoom(roomId, true);
     useAppStore.getState().setGitWorkflowMessageForRoom(roomId, null);
     appendTerminalLinesForRoom(roomId, [
       `Approve git workflow: branch=${gitPlan.branch}, push=${gitPlan.push}`,
       ...gitPlan.approvals.flatMap((approval) => approval.commands.map((command) => `$ ${command}`))
     ]);
-    publishGitWorkflowEvent({
-      status: "started",
-      branch: gitPlan.branch,
-      push: gitPlan.push,
-      message: `Started Git workflow on ${gitPlan.branch}.`
-    }, room).catch(() => {
+    publishGitWorkflowEvent(
+      {
+        status: "started",
+        branch: gitPlan.branch,
+        push: gitPlan.push,
+        message: `Started Git workflow on ${gitPlan.branch}.`
+      },
+      room
+    ).catch(() => {
       console.warn("Failed to publish git workflow start");
     });
     try {
-      const results = await runGitWorkflow(
-        gitPlan.cwd,
-        gitPlan.branch,
-        gitPlan.message,
-        gitPlan.push
-      );
+      const results = await runGitWorkflow(gitPlan.cwd, gitPlan.branch, gitPlan.message, gitPlan.push);
       appendTerminalLinesForRoom(roomId, [
         ...results
-          .flatMap((result) => [
-            `$ ${result.command}`,
-            result.stdout.trim(),
-            result.stderr.trim()
-          ])
+          .flatMap((result) => [`$ ${result.command}`, result.stdout.trim(), result.stderr.trim()])
           .filter(Boolean)
       ]);
 
@@ -122,13 +138,16 @@ export function createGitWorkflowActions({
       if (failed) {
         const message = `Stopped after failed command: ${failed.command}`;
         useAppStore.getState().setGitWorkflowMessageForRoom(roomId, message);
-        publishGitWorkflowEvent({
-          status: "failed",
-          branch: gitPlan.branch,
-          push: gitPlan.push,
-          message,
-          results
-        }, room).catch(() => {
+        publishGitWorkflowEvent(
+          {
+            status: "failed",
+            branch: gitPlan.branch,
+            push: gitPlan.push,
+            message,
+            results
+          },
+          room
+        ).catch(() => {
           console.warn("Failed to publish git workflow failure");
         });
         return;
@@ -149,17 +168,20 @@ export function createGitWorkflowActions({
         });
         const message = `Opened draft PR #${pr.number}: ${pr.url}`;
         useAppStore.getState().setGitWorkflowMessageForRoom(roomId, message);
-        publishGitWorkflowEvent({
-          status: "pr_opened",
-          branch: gitPlan.branch,
-          push: gitPlan.push,
-          message,
-          results,
-          pullRequest: {
-            number: pr.number,
-            url: pr.url
-          }
-        }, room).catch(() => {
+        publishGitWorkflowEvent(
+          {
+            status: "pr_opened",
+            branch: gitPlan.branch,
+            push: gitPlan.push,
+            message,
+            results,
+            pullRequest: {
+              number: pr.number,
+              url: pr.url
+            }
+          },
+          room
+        ).catch(() => {
           console.warn("Failed to publish git workflow PR event");
         });
         refreshGitHubActions(room, {
@@ -170,13 +192,16 @@ export function createGitWorkflowActions({
       } else {
         const message = "Created local branch and commit. Enable push when you are ready to open a PR.";
         useAppStore.getState().setGitWorkflowMessageForRoom(roomId, message);
-        publishGitWorkflowEvent({
-          status: "completed",
-          branch: gitPlan.branch,
-          push: gitPlan.push,
-          message,
-          results
-        }, room).catch(() => {
+        publishGitWorkflowEvent(
+          {
+            status: "completed",
+            branch: gitPlan.branch,
+            push: gitPlan.push,
+            message,
+            results
+          },
+          room
+        ).catch(() => {
           console.warn("Failed to publish git workflow completion");
         });
       }
@@ -187,12 +212,15 @@ export function createGitWorkflowActions({
       const message = String(error);
       useAppStore.getState().setGitWorkflowMessageForRoom(roomId, message);
       appendTerminalLinesForRoom(roomId, [`Git workflow error: ${message}`]);
-      publishGitWorkflowEvent({
-        status: "failed",
-        branch: gitPlan?.branch ?? workflowDraft.branchName,
-        push: gitPlan?.push ?? workflowDraft.pushEnabled,
-        message
-      }, room).catch(() => {
+      publishGitWorkflowEvent(
+        {
+          status: "failed",
+          branch: gitPlan?.branch ?? workflowDraft.branchName,
+          push: gitPlan?.push ?? workflowDraft.pushEnabled,
+          message
+        },
+        room
+      ).catch(() => {
         console.warn("Failed to publish git workflow error");
       });
     } finally {

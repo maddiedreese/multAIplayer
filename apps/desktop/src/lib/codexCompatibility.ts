@@ -50,7 +50,9 @@ export function formatCodexCompatibilitySummary(rawVersion: string | null | unde
   return label;
 }
 
-function parseCodexVersion(rawVersion: string | null | undefined): { text: string; parts: [number, number, number] } | null {
+function parseCodexVersion(
+  rawVersion: string | null | undefined
+): { text: string; parts: [number, number, number] } | null {
   if (!rawVersion) return null;
   const match = rawVersion.match(/(?:^|\s)(\d+)\.(\d+)\.(\d+)(?:[-+\s]|$)/);
   if (!match) return null;

@@ -1,10 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import type { WebSocketServer } from "ws";
-import {
-  RelayClientMessage,
-  type RelayEnvelope,
-  type RelayServerMessage
-} from "@multaiplayer/protocol";
+import { RelayClientMessage, type RelayEnvelope, type RelayServerMessage } from "@multaiplayer/protocol";
 import type { AuthSession, ClientSession, PresenceRecord, RelayStore, RoomKey } from "../state.js";
 
 type RateLimitResult = { allowed: boolean };
@@ -117,7 +113,11 @@ export function registerRelayWebSocketConnection({
       const existingUserConnectionId = existing.authSession?.user.id ?? existing.rateClientId;
       if (existingUserConnectionId !== userConnectionId) continue;
       userConnections += 1;
-      if (deviceConnectionId && existing.deviceId && `${existingUserConnectionId}:${existing.deviceId}` === deviceConnectionId) {
+      if (
+        deviceConnectionId &&
+        existing.deviceId &&
+        `${existingUserConnectionId}:${existing.deviceId}` === deviceConnectionId
+      ) {
         deviceConnections += 1;
       }
     }
@@ -146,15 +146,13 @@ export function registerRelayWebSocketConnection({
   }
 
   function isBoundedSocketIdentity(userId: string, deviceId: string): boolean {
-    return Boolean(
-      normalizeMetadataText(userId, maxUserIdChars) &&
-      normalizeMetadataText(deviceId, maxDeviceIdChars)
-    );
+    return Boolean(normalizeMetadataText(userId, maxUserIdChars) && normalizeMetadataText(deviceId, maxDeviceIdChars));
   }
 
   function isPresenceWithinLimits(presence: PresenceRecord): boolean {
     if (!normalizeMetadataText(presence.displayName, maxDisplayNameChars)) return false;
-    if (presence.avatarUrl !== undefined && !normalizeMetadataText(presence.avatarUrl, maxRoomProjectPathChars)) return false;
+    if (presence.avatarUrl !== undefined && !normalizeMetadataText(presence.avatarUrl, maxRoomProjectPathChars))
+      return false;
     if (
       presence.publicKeyFingerprint !== undefined &&
       !normalizeMetadataText(presence.publicKeyFingerprint, maxPublicKeyFingerprintChars)
@@ -197,24 +195,19 @@ export function registerRelayWebSocketConnection({
         isRecord(envelope.payload) &&
         typeof envelope.payload.nonce === "string" &&
         typeof envelope.payload.ciphertext === "string" &&
-        (
-          !normalizeMetadataText(envelope.id, maxEnvelopeIdChars) ||
+        (!normalizeMetadataText(envelope.id, maxEnvelopeIdChars) ||
           !normalizeMetadataText(envelope.senderUserId, maxUserIdChars) ||
           !normalizeMetadataText(envelope.senderDeviceId, maxDeviceIdChars) ||
           !normalizeMetadataText(envelope.payload.nonce, maxEnvelopeNonceChars) ||
           !envelope.payload.ciphertext ||
           envelope.payload.ciphertext.length > maxEnvelopeCiphertextChars ||
-          Buffer.byteLength(JSON.stringify(envelope), "utf8") > encryptedEnvelopeMaxBytes
-        )
+          Buffer.byteLength(JSON.stringify(envelope), "utf8") > encryptedEnvelopeMaxBytes)
       ) {
         return `Encrypted room envelope exceeds relay limits (${encryptedEnvelopeMaxBytes} bytes max).`;
       }
     }
     if (message.type === "presence") {
-      if (
-        typeof message.displayName === "string" &&
-        !normalizeMetadataText(message.displayName, maxDisplayNameChars)
-      ) {
+      if (typeof message.displayName === "string" && !normalizeMetadataText(message.displayName, maxDisplayNameChars)) {
         return "Presence display name, avatar URL, and fingerprint must be bounded strings without control characters.";
       }
       if (
@@ -247,7 +240,10 @@ export function registerRelayWebSocketConnection({
     if (!consumeRateLimit("websocketConnect", rateClientId).allowed) {
       recordRateLimitRejection?.("websocketConnect");
       recordConnectionRejection?.("rate_limit");
-      send(socket, { type: "error", message: "WebSocket connection rate limit exceeded. Slow down before reconnecting." });
+      send(socket, {
+        type: "error",
+        message: "WebSocket connection rate limit exceeded. Slow down before reconnecting."
+      });
       socket.close(1008, "WebSocket connection rate limit exceeded");
       return;
     }
@@ -284,7 +280,10 @@ export function registerRelayWebSocketConnection({
         const parsed = RelayClientMessage.parse(rawMessage);
         if (parsed.type === "join") {
           if (!isBoundedSocketIdentity(parsed.userId, parsed.deviceId)) {
-            send(socket, { type: "error", message: "WebSocket user and device ids must be bounded strings without control characters." });
+            send(socket, {
+              type: "error",
+              message: "WebSocket user and device ids must be bounded strings without control characters."
+            });
             return;
           }
           if (parsed.inviteId && !normalizeMetadataText(parsed.inviteId, maxEnvelopeIdChars)) {
@@ -321,7 +320,10 @@ export function registerRelayWebSocketConnection({
 
         if (parsed.type === "subscribe.team") {
           if (!isBoundedSocketIdentity(parsed.userId, parsed.deviceId)) {
-            send(socket, { type: "error", message: "WebSocket user and device ids must be bounded strings without control characters." });
+            send(socket, {
+              type: "error",
+              message: "WebSocket user and device ids must be bounded strings without control characters."
+            });
             return;
           }
           if (!hasTeam(parsed.teamId)) {
@@ -339,7 +341,10 @@ export function registerRelayWebSocketConnection({
 
         if (parsed.type === "subscribe.workspace") {
           if (!isBoundedSocketIdentity(parsed.userId, parsed.deviceId)) {
-            send(socket, { type: "error", message: "WebSocket user and device ids must be bounded strings without control characters." });
+            send(socket, {
+              type: "error",
+              message: "WebSocket user and device ids must be bounded strings without control characters."
+            });
             return;
           }
           if (!canSubscribeWorkspace(session, parsed.userId)) {
@@ -361,7 +366,10 @@ export function registerRelayWebSocketConnection({
             return;
           }
           if (!isRelayEnvelopeWithinLimits(parsed.envelope)) {
-            send(socket, { type: "error", message: `Encrypted room envelope exceeds relay limits (${encryptedEnvelopeMaxBytes} bytes max).` });
+            send(socket, {
+              type: "error",
+              message: `Encrypted room envelope exceeds relay limits (${encryptedEnvelopeMaxBytes} bytes max).`
+            });
             return;
           }
           publishEnvelope(parsed.envelope);
@@ -369,11 +377,18 @@ export function registerRelayWebSocketConnection({
         }
 
         if (!isPresenceForJoinedSession(session, parsed)) {
-          send(socket, { type: "error", message: "Join the room before publishing presence with this user and device." });
+          send(socket, {
+            type: "error",
+            message: "Join the room before publishing presence with this user and device."
+          });
           return;
         }
         if (!isPresenceWithinLimits(parsed)) {
-          send(socket, { type: "error", message: "Presence display name, avatar URL, and fingerprint must be bounded strings without control characters." });
+          send(socket, {
+            type: "error",
+            message:
+              "Presence display name, avatar URL, and fingerprint must be bounded strings without control characters."
+          });
           return;
         }
         publishPresence(session, parsed.teamId, parsed.roomId, {

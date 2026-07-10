@@ -64,16 +64,11 @@ export function parseIntegerValue(value: unknown, fallback: number, min: number,
 }
 
 export function maxCiphertextCharactersForBlob(maxBytes: number): number {
-  return Math.ceil((maxBytes + 1024) * 4 / 3) + 64;
+  return Math.ceil(((maxBytes + 1024) * 4) / 3) + 64;
 }
 
 export function isApprovalPolicy(value: string): value is RoomRecord["approvalPolicy"] {
-  return [
-    "ask_every_turn",
-    "auto_chat_only",
-    "auto_browser_allowed_sites",
-    "never_host"
-  ].includes(value);
+  return ["ask_every_turn", "auto_chat_only", "auto_browser_allowed_sites", "never_host"].includes(value);
 }
 
 export function isApprovalDelegationPolicy(value: string): value is ApprovalDelegationPolicy {
@@ -91,7 +86,10 @@ export function isRoomMode(value: unknown): value is RoomRecord["mode"] {
   return ["chat", "code", "workspace", "browser"].every((key) => typeof candidate[key] === "boolean");
 }
 
-export function normalizeDevicePublicKeyJwk(value: unknown, maxPublicKeyJwkChars: number): DevicePublicKeyJwkType | null {
+export function normalizeDevicePublicKeyJwk(
+  value: unknown,
+  maxPublicKeyJwkChars: number
+): DevicePublicKeyJwkType | null {
   if (!isJsonStringifiableWithin(value, maxPublicKeyJwkChars)) return null;
   const parsed = DevicePublicKeyJwk.safeParse(value);
   return parsed.success ? parsed.data : null;
@@ -115,15 +113,13 @@ export function normalizeCodexModel(value: unknown, maxCodexModelChars: number):
 export function normalizeCodexReasoningEffort(value: unknown): RoomRecord["codexReasoningEffort"] | null {
   const effort = String(value ?? "").trim();
   return codexReasoningEffortOptions.some((option) => option.id === effort)
-    ? effort as RoomRecord["codexReasoningEffort"]
+    ? (effort as RoomRecord["codexReasoningEffort"])
     : null;
 }
 
 export function normalizeCodexSpeed(value: unknown): RoomRecord["codexSpeed"] | null {
   const speed = String(value ?? "").trim();
-  return codexSpeedOptions.some((option) => option.id === speed)
-    ? speed as RoomRecord["codexSpeed"]
-    : null;
+  return codexSpeedOptions.some((option) => option.id === speed) ? (speed as RoomRecord["codexSpeed"]) : null;
 }
 
 export function normalizeCodexCatalogSelectionPolicy(value: unknown): CodexCatalogSelectionPolicy | null {
@@ -171,14 +167,18 @@ export function isRelayEnvelopeWithinLimits(envelope: RelayEnvelope, options: Re
   if (!normalizeMetadataText(envelope.senderUserId, options.maxUserIdChars)) return false;
   if (!normalizeMetadataText(envelope.senderDeviceId, options.maxDeviceIdChars)) return false;
   if (!normalizeMetadataText(envelope.payload.nonce, options.maxEnvelopeNonceChars)) return false;
-  if (!envelope.payload.ciphertext || envelope.payload.ciphertext.length > options.maxEnvelopeCiphertextChars) return false;
+  if (!envelope.payload.ciphertext || envelope.payload.ciphertext.length > options.maxEnvelopeCiphertextChars)
+    return false;
   if (envelope.payload.algorithm === "ECDH-P256-HKDF-SHA256-AES-GCM-256") {
     if (!isJsonStringifiableWithin(envelope.payload.ephemeralPublicKeyJwk, options.maxPublicKeyJwkChars)) return false;
   }
   return Buffer.byteLength(JSON.stringify(envelope), "utf8") <= options.encryptedEnvelopeMaxBytes;
 }
 
-export function pruneEncryptedBacklog(envelopes: RelayEnvelope[], options: EncryptedBacklogLimitOptions): RelayEnvelope[] {
+export function pruneEncryptedBacklog(
+  envelopes: RelayEnvelope[],
+  options: EncryptedBacklogLimitOptions
+): RelayEnvelope[] {
   const now = options.now ?? Date.now;
   const cutoffMs = now() - options.encryptedBacklogRetentionDays * 24 * 60 * 60 * 1000;
   return envelopes

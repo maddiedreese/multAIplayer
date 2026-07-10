@@ -164,16 +164,17 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
       const acceptedHandoff: HostHandoffRecord = { ...handoff, status: "accepted" };
       const roomHandoffs = state.codexRuntimeByRoom[roomId]?.hostHandoffs ?? [];
       const existingIndex = roomHandoffs.findIndex((existing) => existing.id === handoff.id);
-      const nextHandoffs = existingIndex >= 0
-        ? roomHandoffs.map((existing) =>
-            existing.id === handoff.id
-              ? {
-                  ...existing,
-                  ...acceptedHandoff
-                }
-              : existing
-          )
-        : [...roomHandoffs, acceptedHandoff];
+      const nextHandoffs =
+        existingIndex >= 0
+          ? roomHandoffs.map((existing) =>
+              existing.id === handoff.id
+                ? {
+                    ...existing,
+                    ...acceptedHandoff
+                  }
+                : existing
+            )
+          : [...roomHandoffs, acceptedHandoff];
       return {
         codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => ({
           ...roomRuntime,
@@ -223,11 +224,12 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
     set((state) => {
       const roomEvents = state.codexRuntimeByRoom[roomId]?.events ?? [];
       if (
-        roomEvents.some((existing) =>
-          existing.turnId === event.turnId &&
-          existing.createdAt === event.createdAt &&
-          existing.status === event.status &&
-          existing.message === event.message
+        roomEvents.some(
+          (existing) =>
+            existing.turnId === event.turnId &&
+            existing.createdAt === event.createdAt &&
+            existing.status === event.status &&
+            existing.message === event.message
         )
       ) {
         return state;
@@ -244,11 +246,14 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
     set((state) => {
       const activities = state.codexRuntimeByRoom[roomId]?.activities ?? [];
       const index = activities.findIndex((existing) => existing.activityId === activity.activityId);
-      const next = index < 0
-        ? [...activities, activity]
-        : activities.map((existing, current) => current === index && activity.updatedAt >= existing.updatedAt
-          ? { ...existing, ...activity, startedAt: existing.startedAt }
-          : existing);
+      const next =
+        index < 0
+          ? [...activities, activity]
+          : activities.map((existing, current) =>
+              current === index && activity.updatedAt >= existing.updatedAt
+                ? { ...existing, ...activity, startedAt: existing.startedAt }
+                : existing
+            );
       return {
         codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (runtime) => ({
           ...runtime,
@@ -269,9 +274,10 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
     set((state) => ({
       codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
         const { pendingApproval: _pendingApproval, queuedApprovals, ...rest } = roomRuntime;
-        const nextQueue = approval && queuedApprovals?.length
-          ? queuedApprovals.filter((queued) => queued.turnId !== approval.turnId)
-          : queuedApprovals;
+        const nextQueue =
+          approval && queuedApprovals?.length
+            ? queuedApprovals.filter((queued) => queued.turnId !== approval.turnId)
+            : queuedApprovals;
         return {
           ...rest,
           ...(nextQueue?.length ? { queuedApprovals: nextQueue } : {}),
@@ -284,7 +290,10 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
     set((state) => ({
       codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
         const queuedApprovals = roomRuntime.queuedApprovals ?? [];
-        if (roomRuntime.pendingApproval?.turnId === turn.turnId || queuedApprovals.some((queued) => queued.turnId === turn.turnId)) {
+        if (
+          roomRuntime.pendingApproval?.turnId === turn.turnId ||
+          queuedApprovals.some((queued) => queued.turnId === turn.turnId)
+        ) {
           return roomRuntime;
         }
         return {
@@ -346,7 +355,13 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
             activeThreadId: threadId,
             nodesById: {
               ...graph.nodesById,
-              [threadId]: existing ?? { id: threadId, title: "Codex thread", status: "unknown", createdAt: 0, updatedAt: 0 }
+              [threadId]: existing ?? {
+                id: threadId,
+                title: "Codex thread",
+                status: "unknown",
+                createdAt: 0,
+                updatedAt: 0
+              }
             }
           }
         };
@@ -357,7 +372,10 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
     set((state) => ({
       codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (runtime) => ({
         ...runtime,
-        threadGraph: mergeCodexThreadGraph(runtime.threadGraph ?? legacyCodexThreadGraph(runtime.threadId ?? null), nodes)
+        threadGraph: mergeCodexThreadGraph(
+          runtime.threadGraph ?? legacyCodexThreadGraph(runtime.threadId ?? null),
+          nodes
+        )
       }))
     }));
   },

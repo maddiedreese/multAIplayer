@@ -8,10 +8,7 @@ export interface TerminalApprovalRequest {
   status: "pending" | "approved" | "denied";
 }
 
-export function isRoomTerminalActionInFlight(
-  busyByRoom: Record<string, boolean>,
-  roomId: string
-): boolean {
+export function isRoomTerminalActionInFlight(busyByRoom: Record<string, boolean>, roomId: string): boolean {
   return busyByRoom[roomId] === true;
 }
 
@@ -38,10 +35,7 @@ export function terminalRequestForApprovedRun<T extends TerminalApprovalRequest>
   };
 }
 
-export function findRoomTerminalRequest<T extends TerminalApprovalRequest>(
-  requests: T[],
-  requestId: string
-): T | null {
+export function findRoomTerminalRequest<T extends TerminalApprovalRequest>(requests: T[], requestId: string): T | null {
   return requests.find((request) => request.id === requestId) ?? null;
 }
 

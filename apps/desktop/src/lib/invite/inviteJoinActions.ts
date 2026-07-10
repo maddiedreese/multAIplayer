@@ -23,14 +23,10 @@ type PublishInviteJoinRequest = (
 
 type InviteJoinActionOptions = Pick<
   UseInviteActionsOptions,
-  | "clearInviteSecretInput"
-  | "selectedRoomIdRef"
-  | "selectWorkspaceRoom"
-  | "upsertRoom"
-  | "upsertTeam"
+  "clearInviteSecretInput" | "selectedRoomIdRef" | "selectWorkspaceRoom" | "upsertRoom" | "upsertTeam"
 > & {
-    publishInviteJoinRequest: PublishInviteJoinRequest;
-  };
+  publishInviteJoinRequest: PublishInviteJoinRequest;
+};
 
 type InviteJoinStore = Pick<
   AppStoreState,
@@ -46,13 +42,7 @@ export function createInviteJoinActions(
   options: InviteJoinActionOptions,
   store: InviteJoinStore = useAppStore.getState()
 ) {
-  const {
-    clearInviteSecretInput,
-    publishInviteJoinRequest,
-    selectWorkspaceRoom,
-    upsertRoom,
-    upsertTeam
-  } = options;
+  const { clearInviteSecretInput, publishInviteJoinRequest, selectWorkspaceRoom, upsertRoom, upsertTeam } = options;
   const {
     appendInviteRequest,
     initializeMessagesForRoom,
@@ -64,15 +54,7 @@ export function createInviteJoinActions(
   const setSelectedInviteMessage = (message: string | null) =>
     setInviteMessageForRoom(options.selectedRoomIdRef.current, message);
 
-  function importInviteMetadata({
-    teamId,
-    roomId,
-    roomName
-  }: {
-    teamId: string;
-    roomId: string;
-    roomName: string;
-  }) {
+  function importInviteMetadata({ teamId, roomId, roomName }: { teamId: string; roomId: string; roomName: string }) {
     upsertTeam({ id: teamId, name: "Invited team", members: 1 });
     upsertRoom(buildFallbackInvitedRoom({ teamId, roomId, roomName }));
   }

@@ -32,6 +32,7 @@ Copy `.env.example` to `.env` when you need GitHub OAuth or self-hosted relay se
 - `apps/relay/src/server.ts` composes the relay from focused `http`, `ws`, and `auth` handlers plus state, persistence, limits, and lifecycle modules.
 - `packages/protocol` defines shared wire records and defaults; `packages/crypto` owns encrypted payload primitives.
 - `packages/codex`, `packages/git`, and `packages/github` isolate integrations used by the desktop and relay applications.
+- `docs/decisions` records cross-cutting architecture and trust decisions that contributors must preserve or explicitly supersede.
 - `scripts` contains repository-wide verification, security, release, and operational checks.
 - Root workspace metadata owns cross-workspace npm controls, including the Monaco/DOMPurify security override described below.
 
@@ -43,7 +44,7 @@ Before opening a PR, run:
 npm run verify
 ```
 
-`npm run verify` type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the TypeScript workspaces. Run `npm run tauri:build -w @multaiplayer/desktop` when changing native packaging, Tauri config, browser windows, Keychain storage, terminals, or Codex app-server integration.
+`npm run verify` lints and checks formatting for TypeScript and JavaScript, type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the workspaces. Use `npm run format` to apply the repository's Prettier baseline. Run `npm run tauri:build -w @multaiplayer/desktop` when changing native packaging, Tauri config, browser windows, Keychain storage, terminals, or Codex app-server integration.
 
 ## Engineering Guidelines
 

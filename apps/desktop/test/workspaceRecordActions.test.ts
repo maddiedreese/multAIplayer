@@ -50,10 +50,13 @@ test("workspace record actions resolve Zustand actions when invoked", () => {
 
   actions.upsertTeam(team);
 
-  assert.deepEqual(useAppStore.getState().teamRosterByTeam[team.id]?.members?.map((member) => ({
-    userId: member.userId,
-    role: member.role
-  })), [{ userId: "github:maddie", role: "owner" }]);
+  assert.deepEqual(
+    useAppStore.getState().teamRosterByTeam[team.id]?.members?.map((member) => ({
+      userId: member.userId,
+      role: member.role
+    })),
+    [{ userId: "github:maddie", role: "owner" }]
+  );
 });
 
 test("membership removal clears current room relay state and reports through external callbacks", () => {

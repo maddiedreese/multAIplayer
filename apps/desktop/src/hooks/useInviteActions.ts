@@ -22,25 +22,28 @@ export function useInviteActions(options: UseInviteActionsOptions) {
   const decideInviteJoinRequest = useStableEvent(relayActions.decideInviteJoinRequest);
   const handleInviteEnvelopePlaintext = useStableEvent(relayActions.handleInviteEnvelopePlaintext);
   const rotateSelectedRoomKey = useStableEvent(rotationActions.rotateSelectedRoomKey);
-  return useMemo(() => ({
-    acceptInvite,
-    joinInviteSecret,
-    requestNoSecretInviteAccess,
-    copyInviteLink,
-    decryptInviteEnvelope,
-    decideInviteJoinRequest,
-    handleInviteEnvelopePlaintext,
-    rotateSelectedRoomKey
-  }), [
-    acceptInvite,
-    joinInviteSecret,
-    requestNoSecretInviteAccess,
-    copyInviteLink,
-    decryptInviteEnvelope,
-    decideInviteJoinRequest,
-    handleInviteEnvelopePlaintext,
-    rotateSelectedRoomKey
-  ]);
+  return useMemo(
+    () => ({
+      acceptInvite,
+      joinInviteSecret,
+      requestNoSecretInviteAccess,
+      copyInviteLink,
+      decryptInviteEnvelope,
+      decideInviteJoinRequest,
+      handleInviteEnvelopePlaintext,
+      rotateSelectedRoomKey
+    }),
+    [
+      acceptInvite,
+      joinInviteSecret,
+      requestNoSecretInviteAccess,
+      copyInviteLink,
+      decryptInviteEnvelope,
+      decideInviteJoinRequest,
+      handleInviteEnvelopePlaintext,
+      rotateSelectedRoomKey
+    ]
+  );
 }
 
 /** Keeps effect-facing invite handlers stable while reading each render's action factory output. */

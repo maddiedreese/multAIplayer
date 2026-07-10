@@ -101,7 +101,17 @@ export interface CodexActivityEvent {
   turnId: string;
   itemId: string;
   threadId?: string;
-  kind: "command" | "file_change" | "tool" | "web_search" | "image_generation" | "agent" | "review" | "hook" | "reasoning" | "other";
+  kind:
+    | "command"
+    | "file_change"
+    | "tool"
+    | "web_search"
+    | "image_generation"
+    | "agent"
+    | "review"
+    | "hook"
+    | "reasoning"
+    | "other";
   status: "started" | "running" | "completed" | "failed" | "declined";
   title: string;
   agent?: {
@@ -199,8 +209,7 @@ export interface CodexHostNotification {
 }
 
 export type CodexServerResponse =
-  | { result: unknown; error?: never }
-  | { result?: never; error: { code: number; message: string; data?: unknown } };
+  { result: unknown; error?: never } | { result?: never; error: { code: number; message: string; data?: unknown } };
 
 export type CodexGoalStatus = "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
 

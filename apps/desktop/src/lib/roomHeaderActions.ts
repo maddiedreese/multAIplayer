@@ -1,11 +1,7 @@
 import type { InspectorTab } from "../components/RoomInspectorPanel";
 import { useAppStore } from "../store/appStore";
 
-export function createRoomHeaderActions({
-  openRoomBrowserNow
-}: {
-  openRoomBrowserNow: () => void;
-}) {
+export function createRoomHeaderActions({ openRoomBrowserNow }: { openRoomBrowserNow: () => void }) {
   function onSelectTeam(teamId: string) {
     const state = useAppStore.getState();
     state.selectTeamRoom(teamId, state.selectedRoomId);

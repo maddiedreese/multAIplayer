@@ -1,9 +1,6 @@
 import type { Express, Response } from "express";
 import { nanoid } from "nanoid";
-import {
-  CiphertextPayload,
-  type AttachmentBlobRecord as AttachmentBlobRecordType
-} from "@multaiplayer/protocol";
+import { CiphertextPayload, type AttachmentBlobRecord as AttachmentBlobRecordType } from "@multaiplayer/protocol";
 import type { AuthSession, RelayStore } from "../state.js";
 
 interface RegisterAttachmentRoutesOptions {
@@ -87,7 +84,9 @@ export function registerAttachmentRoutes({
       return;
     }
     if (!type) {
-      res.status(400).json({ error: "type must be a non-empty string up to 160 characters without control characters" });
+      res
+        .status(400)
+        .json({ error: "type must be a non-empty string up to 160 characters without control characters" });
       return;
     }
     if (!Number.isSafeInteger(size) || size < 0) {
@@ -125,15 +124,17 @@ export function registerAttachmentRoutes({
         });
         return;
       }
-      if (!consumeAttachmentUploadByteQuota({
-        userId: session.user.id,
-        bytes: size,
-        limit: attachmentBlobUploadBytesPerWindow,
-        windowMs: attachmentBlobUploadWindowMs,
-        recordQuotaRejection,
-        recordUploadRejection,
-        res
-      })) {
+      if (
+        !consumeAttachmentUploadByteQuota({
+          userId: session.user.id,
+          bytes: size,
+          limit: attachmentBlobUploadBytesPerWindow,
+          windowMs: attachmentBlobUploadWindowMs,
+          recordQuotaRejection,
+          recordUploadRejection,
+          res
+        })
+      ) {
         return;
       }
     }
@@ -209,9 +210,7 @@ function consumeAttachmentUploadByteQuota({
   const now = Date.now();
   pruneByteQuotaRecords(attachmentBlobUploadByteCounts, now);
   const current = attachmentBlobUploadByteCounts.get(userId);
-  const record = current && current.resetAt > now
-    ? current
-    : { bytes: 0, resetAt: now + windowMs };
+  const record = current && current.resetAt > now ? current : { bytes: 0, resetAt: now + windowMs };
   if (record.bytes + bytes > limit) {
     const retryAfterSeconds = Math.max(1, Math.ceil((record.resetAt - now) / 1000));
     recordQuotaRejection?.(quota);

@@ -80,10 +80,7 @@ export function createGitWorkflowApprovalPlan(
 ): GitWorkflowApprovalPlan {
   const safeBranch = assertSafeBranchName(branch);
   const normalizedMessage = normalizeCommitMessage(message);
-  const approvals = [
-    createBranchApproval(cwd, safeBranch),
-    createCommitApproval(cwd, normalizedMessage)
-  ];
+  const approvals = [createBranchApproval(cwd, safeBranch), createCommitApproval(cwd, normalizedMessage)];
   if (push) {
     approvals.push(createPushApproval(cwd, safeBranch));
     approvals.push(createPullRequestApproval(cwd, safeBranch));
@@ -100,9 +97,10 @@ export function createGitWorkflowApprovalPlan(
 export function formatGitWorkflowApprovalPreview(plan: GitWorkflowApprovalPlan): GitWorkflowApprovalPreview[] {
   return plan.approvals.map((approval) => ({
     title: approval.summary,
-    detail: approval.action === "pull_request"
-      ? "Uses the signed-in GitHub session to open a draft pull request after push succeeds."
-      : `Runs in ${approval.cwd}`,
+    detail:
+      approval.action === "pull_request"
+        ? "Uses the signed-in GitHub session to open a draft pull request after push succeeds."
+        : `Runs in ${approval.cwd}`,
     commands: [...approval.commands]
   }));
 }

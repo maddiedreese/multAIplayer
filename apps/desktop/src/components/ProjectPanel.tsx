@@ -58,11 +58,7 @@ export function ProjectPanel({
             <FolderGit2 size={15} />
             Current repo
           </button>
-          <button
-            className="primary-wide"
-            onClick={onUpdateProjectPath}
-            disabled={attachDisabled}
-          >
+          <button className="primary-wide" onClick={onUpdateProjectPath} disabled={attachDisabled}>
             <Check size={15} />
             Attach
           </button>

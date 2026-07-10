@@ -31,10 +31,7 @@ const room: RoomRecord = {
 };
 
 test("markRoomRead clears only the selected room unread count", () => {
-  const rooms = markRoomRead([
-    room,
-    { ...room, id: "room-b", unread: 3 }
-  ], "room-a");
+  const rooms = markRoomRead([room, { ...room, id: "room-b", unread: 3 }], "room-a");
 
   assert.equal(rooms[0].unread, 0);
   assert.equal(rooms[1].unread, 3);
@@ -89,7 +86,10 @@ test("hideUnreadForLockedRooms suppresses forgotten and revoked room badges", ()
     new Set(["team-c"])
   );
 
-  assert.deepEqual(rooms.map((item) => item.unread), [0, 0, 0]);
+  assert.deepEqual(
+    rooms.map((item) => item.unread),
+    [0, 0, 0]
+  );
 });
 
 test("localRoomReadStateForHistory stores the last read id only when a room is read", () => {

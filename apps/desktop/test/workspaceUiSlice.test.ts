@@ -92,7 +92,10 @@ test("team replacement and upsert keep selection valid and preserve record updat
   store.initializeWorkspaceUi({ teams: [teamA, teamB], rooms: [], projectPath: "/tmp", roomId: "" });
   store.setSelectedTeam(teamB.id);
 
-  store.replaceTeams([{ ...teamA, members: 3 }, { ...teamB, deletedAt: new Date().toISOString() }]);
+  store.replaceTeams([
+    { ...teamA, members: 3 },
+    { ...teamB, deletedAt: new Date().toISOString() }
+  ]);
   let state = useAppStore.getState();
   assert.deepEqual(state.teams, [{ ...teamA, members: 3 }]);
   assert.equal(state.selectedTeam, teamA.id);
@@ -134,7 +137,10 @@ test("room mutations preserve unread state and repair selection atomically", () 
   assert.equal(useAppStore.getState().rooms[0]?.unread, 7);
   store.replaceRoomRecord({ ...roomA, deletedAt: new Date().toISOString() });
   assert.equal(useAppStore.getState().selectedRoomId, roomB.id);
-  assert.deepEqual(useAppStore.getState().rooms.map((room) => room.id), [roomB.id]);
+  assert.deepEqual(
+    useAppStore.getState().rooms.map((room) => room.id),
+    [roomB.id]
+  );
 });
 
 test("workspace selection helpers preserve explicit and team-relative navigation semantics", () => {

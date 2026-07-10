@@ -1,10 +1,7 @@
 import React from "react";
 import { listen } from "@tauri-apps/api/event";
 import { defaultCodexModel } from "@multaiplayer/protocol";
-import {
-  defaultProjectPath,
-  type CodexActivityEvent
-} from "./lib/localBackend";
+import { defaultProjectPath, type CodexActivityEvent } from "./lib/localBackend";
 import { isTauriRuntime } from "./lib/localBackend/runtime";
 import { registerRoomNotificationClickFocus } from "./lib/roomNotifications";
 import { createWorkspaceRecordActions } from "./lib/workspaceRecordActions";
@@ -54,10 +51,14 @@ export function App() {
   const relayHttpUrl = useAppStore((state) => state.appConfig.relayHttpUrl);
   const selectedRoomId = useAppStore((state) => state.selectedRoomId);
   const appRefs = useAppRefs();
-  React.useEffect(() => registerRoomNotificationClickFocus({
-    roomsRef: appRefs.roomsRef,
-    selectWorkspaceRoom: (teamId, roomId) => useAppStore.getState().selectWorkspaceRoom(teamId, roomId)
-  }), [appRefs.roomsRef]);
+  React.useEffect(
+    () =>
+      registerRoomNotificationClickFocus({
+        roomsRef: appRefs.roomsRef,
+        selectWorkspaceRoom: (teamId, roomId) => useAppStore.getState().selectWorkspaceRoom(teamId, roomId)
+      }),
+    [appRefs.roomsRef]
+  );
   const githubAuth = useGitHubAuth(relayHttpUrl);
   const localIdentity = useLocalIdentity(githubAuth.currentUser);
   const roomSettingsActor = useRoomSettingsActor(localIdentity.localUser);
@@ -79,71 +80,10 @@ export function App() {
   });
   const {
     setHostMessageForRoom,
-    setSelectedHostMessage,
     setChatMessageForRoom,
-    setSelectedChatMessage,
-    setMarkdownCopyFallbackForRoom,
-    setSecretWarningVisibleForRoom,
-    setHistoryMessageForRoom,
-    setSelectedHistoryMessage,
-    setTeamHistoryMessageForTeam,
-    setSelectedTeamHistoryMessage,
-    setSettingsMessageForRoom,
-    setSelectedSettingsMessage,
-    setGitWorkflowBusyForRoom,
-    setActionsBusyForRoom,
-    setLocalPreviewBusyForRoom,
-    setHostBusyForRoom,
-    setSettingsBusyForRoom,
-    setKeyRotationBusyForRoom,
-    setFileBusyForRoom,
-    setTerminalBusyForRoom,
-    setFileQueryForRoom,
-    setProjectFilesForRoom,
-    setSelectedFileForRoom,
-    setSelectedDiffForRoom,
-    setFilePreviewTabForRoom,
-    setFileMessageForRoom,
-    setSelectedFileMessage,
-    resetFileContextForRoom,
-    setSelectedTerminalIdForRoom,
-    setTerminalErrorForRoom,
-    setSelectedTerminalError,
-    appendTerminalLinesForRoom,
-    setApprovalVisibleForRoom,
-    setPendingCodexApprovalForRoom,
     resetCodexApprovalForRoom,
-    setCodexRunningForRoom,
-    setBrowserUrlForRoom,
-    setBrowserReasonForRoom,
-    setBrowserMessageForRoom,
-    setSelectedBrowserMessage,
     setInviteLinkForRoom,
-    setInviteApprovalGateForRoom,
-    setInviteMessageForRoom,
-    setSelectedInviteMessage,
-    setPendingAttachmentsForRoom,
-    appendPendingAttachmentForRoom,
-    removePendingAttachmentForRoom,
-    clearPendingAttachmentsForRoom,
-    setDraftForRoom,
-    setCustomCodexModelForRoom,
-    setProjectPathDraftForRoom,
-    setGitWorkflowMessageForRoom,
-    setSelectedGitWorkflowMessage,
-    setGitStatusForRoom,
-    updateSelectedGitWorkflowDraft,
-    appendGitWorkflowEvent,
-    appendGitHubActionsEvent,
-    appendLocalPreviewEvent,
-    appendHostHandoff,
-    appendInviteRequest,
-    appendCodexEvent,
-    updateInviteRequestStatus,
-    appendTerminalRequest,
-    updateTerminalRequestStatus,
-    appendBrowserRequest,
-    updateBrowserRequestStatus
+    setInviteMessageForRoom
   } = roomActions;
   const roomChatMutations = useRoomChatMutations();
   const workspaceRecords = createWorkspaceRecordActions({
@@ -188,10 +128,8 @@ export function App() {
 
   const workspaceFlow = useAppWorkspaceFlow({
     appRefs,
-    githubAuth,
     localIdentity,
     selected: selectedContext,
-    selectedRuntime,
     roomInteraction,
     roomActions,
     workspaceRecords,
@@ -241,7 +179,6 @@ export function App() {
     relaySync,
     hostHandoffActions,
     workspaceRecords,
-    roomSettingsActor,
     maxTerminalActivityLines,
     defaultBrowserUrl,
     defaultBrowserReason

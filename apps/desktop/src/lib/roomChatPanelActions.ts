@@ -103,12 +103,15 @@ export function createRoomChatPanelActions({
     store.setApprovalVisibleForRoom(roomId, false);
     if (deniedTurn) {
       store.removeQueuedCodexApprovalForRoom(roomId, deniedTurn.turnId);
-      void publishCodexQueueEvent({
-        turnId: deniedTurn.turnId,
-        action: "dropped",
-        reason: `${deniedTurn.requestedBy}'s Codex proposal was declined by the active host.`,
-        queueSize: 0
-      }, selectedRoom);
+      void publishCodexQueueEvent(
+        {
+          turnId: deniedTurn.turnId,
+          action: "dropped",
+          reason: `${deniedTurn.requestedBy}'s Codex proposal was declined by the active host.`,
+          queueSize: 0
+        },
+        selectedRoom
+      );
     }
     promoteNextCodexApprovalForRoom(roomId);
   }
@@ -116,7 +119,8 @@ export function createRoomChatPanelActions({
   function onOpenLocalPreview(previewId: string) {
     const preview = selectedRoomPreviews().find((item) => item.id === previewId);
     const selectedRoom = currentSelectedRoom();
-    if (preview?.publicUrl && selectedRoom) openBrowserUrl(selectedRoom, preview.publicUrl, "Opened from a shared local preview.");
+    if (preview?.publicUrl && selectedRoom)
+      openBrowserUrl(selectedRoom, preview.publicUrl, "Opened from a shared local preview.");
   }
 
   function onCopyLocalPreviewLink(previewId: string) {
@@ -150,18 +154,22 @@ export function createRoomChatPanelActions({
     onCopyLocalPreviewLink,
     onStopLocalPreview: (previewId: string) => void stopLocalPreview(previewId),
     onOpenFileSelector: () => useAppStore.getState().setInspectorTabForRoom(selectedRoomId(), "files"),
-    onReplyToMessage: (messageId: string) => useAppStore.getState().setReplyToMessageForRoom(selectedRoomId(), messageId),
+    onReplyToMessage: (messageId: string) =>
+      useAppStore.getState().setReplyToMessageForRoom(selectedRoomId(), messageId),
     onCancelReply: () => useAppStore.getState().setReplyToMessageForRoom(selectedRoomId(), null),
     onCancelQueuedCodexTurn: (turnId: string) => {
       const roomId = selectedRoomId();
       const selectedRoom = currentSelectedRoom();
       useAppStore.getState().removeQueuedCodexApprovalForRoom(roomId, turnId);
-      void publishCodexQueueEvent({
-        turnId,
-        action: "cancelled",
-        reason: "Queued Codex turn cancelled.",
-        queueSize: 0
-      }, selectedRoom);
+      void publishCodexQueueEvent(
+        {
+          turnId,
+          action: "cancelled",
+          reason: "Queued Codex turn cancelled.",
+          queueSize: 0
+        },
+        selectedRoom
+      );
       void publishChatMessage({
         id: crypto.randomUUID(),
         author: "multAIplayer",

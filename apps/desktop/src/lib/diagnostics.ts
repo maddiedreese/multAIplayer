@@ -22,12 +22,7 @@ const maxDiagnosticObjectKeys = 40;
 const maxDiagnosticArrayItems = 40;
 const omittedValue = "[omitted]";
 const exactSensitiveDiagnosticKeys = new Set(["body", "plaintext"]);
-const sensitiveDiagnosticKeySuffixes = [
-  "key",
-  "token",
-  "secret",
-  "passphrase"
-] as const;
+const sensitiveDiagnosticKeySuffixes = ["key", "token", "secret", "passphrase"] as const;
 let installed = false;
 let diagnosticEntries: DiagnosticEntry[] = [];
 
@@ -152,9 +147,11 @@ function sanitizeDiagnosticValue(value: unknown, depth: number, seen: WeakSet<ob
     const result: unknown[] = [];
     for (let index = 0; index < itemCount; index += 1) {
       const descriptor = descriptors[String(index)];
-      result.push(descriptor && "value" in descriptor
-        ? sanitizeDiagnosticValue(descriptor.value, depth + 1, seen)
-        : "[unavailable]");
+      result.push(
+        descriptor && "value" in descriptor
+          ? sanitizeDiagnosticValue(descriptor.value, depth + 1, seen)
+          : "[unavailable]"
+      );
     }
     if (length > maxDiagnosticArrayItems) result.push("[truncated]");
     return result;
@@ -169,9 +166,10 @@ function sanitizeDiagnosticValue(value: unknown, depth: number, seen: WeakSet<ob
       continue;
     }
     const descriptor = descriptors[key];
-    result[key] = descriptor && "value" in descriptor
-      ? sanitizeDiagnosticValue(descriptor.value, depth + 1, seen)
-      : "[unavailable]";
+    result[key] =
+      descriptor && "value" in descriptor
+        ? sanitizeDiagnosticValue(descriptor.value, depth + 1, seen)
+        : "[unavailable]";
   }
   if (enumerableKeys.length > maxDiagnosticObjectKeys) {
     result["[truncated]"] = true;
@@ -191,8 +189,10 @@ function readDataStringProperty(value: object, key: string): string | undefined 
 
 function isSensitiveDiagnosticKey(key: string): boolean {
   const normalizedKey = key.toLowerCase().replace(/[-_\s]/g, "");
-  return exactSensitiveDiagnosticKeys.has(normalizedKey)
-    || sensitiveDiagnosticKeySuffixes.some((suffix) => normalizedKey.endsWith(suffix));
+  return (
+    exactSensitiveDiagnosticKeys.has(normalizedKey) ||
+    sensitiveDiagnosticKeySuffixes.some((suffix) => normalizedKey.endsWith(suffix))
+  );
 }
 
 function redactText(value: string): string {

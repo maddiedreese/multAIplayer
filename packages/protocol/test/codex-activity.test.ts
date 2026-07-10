@@ -25,9 +25,13 @@ test("canonical Codex activity is bounded and strips undeclared upstream data", 
 
 test("encrypted relay envelopes accept the canonical activity kind", () => {
   const result = RelayEnvelope.safeParse({
-    id: "envelope-1", teamId: "team-1", roomId: "room-1",
-    senderDeviceId: "device-1", senderUserId: "user-1",
-    createdAt: "2026-07-09T12:00:01.000Z", kind: "codex.activity",
+    id: "envelope-1",
+    teamId: "team-1",
+    roomId: "room-1",
+    senderDeviceId: "device-1",
+    senderUserId: "user-1",
+    createdAt: "2026-07-09T12:00:01.000Z",
+    kind: "codex.activity",
     payload: { algorithm: "AES-GCM-256", nonce: "a".repeat(16), ciphertext: "a".repeat(16) }
   });
   assert.equal(result.success, true);

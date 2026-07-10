@@ -24,10 +24,10 @@ export function useSelectedRoomContext({
   const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? fallbackRoom;
   const inspectorTab = inspectorTabsByRoom[selectedRoom.id] ?? "files";
-  const secretWarningVisible = hasSelectedRoom && (
-    secretWarningsVisibleByRoom[selectedRoom.id ?? selectedRoomId] ??
-    !hasAcknowledgedRoomVisibilityWarning(selectedRoom.id ?? selectedRoomId)
-  );
+  const secretWarningVisible =
+    hasSelectedRoom &&
+    (secretWarningsVisibleByRoom[selectedRoom.id ?? selectedRoomId] ??
+      !hasAcknowledgedRoomVisibilityWarning(selectedRoom.id ?? selectedRoomId));
   const roomTerminals = useMemo(
     () => terminals.filter((terminal) => terminal.roomId === selectedRoom.id),
     [terminals, selectedRoom.id]

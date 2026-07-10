@@ -3,9 +3,7 @@ import { isLocalUserActiveHostForRoom, type LocalHostUser } from "./roomHost";
 import { detectBrowserSecretRisks } from "./secretRisks";
 
 export function normalizeBrowserAllowedOrigins(value: string[] | string): string[] | null {
-  const rawOrigins = Array.isArray(value)
-    ? value
-    : value.split(/\r?\n|,/);
+  const rawOrigins = Array.isArray(value) ? value : value.split(/\r?\n|,/);
   if (rawOrigins.length > 20) return null;
 
   const origins = new Set<string>();
@@ -60,10 +58,7 @@ export interface BrowserRequestCandidate {
   status: "pending" | "approved" | "denied";
 }
 
-export function findRoomBrowserRequest<T extends BrowserRequestCandidate>(
-  requests: T[],
-  requestId: string
-): T | null {
+export function findRoomBrowserRequest<T extends BrowserRequestCandidate>(requests: T[], requestId: string): T | null {
   return requests.find((request) => request.id === requestId) ?? null;
 }
 

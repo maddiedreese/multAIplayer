@@ -1,5 +1,18 @@
 import { useEffect, useState } from "react";
-import { Bot, Copy, ExternalLink, FileCode2, Paperclip, Pause, Pencil, Play, Send, Square, Trash2, X } from "lucide-react";
+import {
+  Bot,
+  Copy,
+  ExternalLink,
+  FileCode2,
+  Paperclip,
+  Pause,
+  Pencil,
+  Play,
+  Send,
+  Square,
+  Trash2,
+  X
+} from "lucide-react";
 import { CodexApprovalCard, type CodexApprovalSummaryDisplay } from "./CodexApprovalCard";
 import { formatRoomGoalDuration } from "../lib/roomGoals";
 import type { RoomGoal } from "../types";
@@ -314,7 +327,10 @@ export function RoomChatPanel({
               {preview.status === "stopped" && <p>This preview is no longer available.</p>}
               {preview.message && preview.status !== "stopped" && <p>{preview.message}</p>}
               <div className="local-preview-actions">
-                <button onClick={() => onOpenLocalPreview(preview.id)} disabled={!preview.publicUrl || preview.status !== "live"}>
+                <button
+                  onClick={() => onOpenLocalPreview(preview.id)}
+                  disabled={!preview.publicUrl || preview.status !== "live"}
+                >
                   <ExternalLink size={14} />
                   Open Preview
                 </button>
@@ -323,7 +339,10 @@ export function RoomChatPanel({
                   Copy Link
                 </button>
                 {preview.canStop && (
-                  <button onClick={() => onStopLocalPreview(preview.id)} disabled={preview.status !== "live" && preview.status !== "starting"}>
+                  <button
+                    onClick={() => onStopLocalPreview(preview.id)}
+                    disabled={preview.status !== "live" && preview.status !== "starting"}
+                  >
                     <Square size={13} />
                     Stop Sharing
                   </button>
@@ -355,7 +374,10 @@ export function RoomChatPanel({
                 <span>{index + 1}</span>
                 <div>
                   <strong>{turn.requestedBy}</strong>
-                  <small>{turn.messagesSinceLastCodex} message{turn.messagesSinceLastCodex === 1 ? "" : "s"} ready at turn start</small>
+                  <small>
+                    {turn.messagesSinceLastCodex} message{turn.messagesSinceLastCodex === 1 ? "" : "s"} ready at turn
+                    start
+                  </small>
                 </div>
                 <button onClick={() => onCancelQueuedCodexTurn(turn.turnId)} disabled={roomLocked || !turn.canCancel}>
                   <X size={13} />
@@ -394,8 +416,12 @@ export function RoomChatPanel({
               {pendingAttachments.map((attachment) => (
                 <span key={attachment.id}>
                   <FileCode2 size={13} />
-                  {attachment.name}{attachment.encryptedBlob ? " (encrypted blob)" : ""}
-                  <button onClick={() => onRemovePendingAttachment(attachment.id)} aria-label={`Remove ${attachment.name}`}>
+                  {attachment.name}
+                  {attachment.encryptedBlob ? " (encrypted blob)" : ""}
+                  <button
+                    onClick={() => onRemovePendingAttachment(attachment.id)}
+                    aria-label={`Remove ${attachment.name}`}
+                  >
                     <X size={12} />
                   </button>
                 </span>

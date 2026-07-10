@@ -26,21 +26,30 @@ export function normalizeCodexThreadGraph(value: unknown, legacyThreadId?: unkno
   const bounded = nodes.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, maxCodexThreadGraphNodes);
   const nodesById = Object.fromEntries(bounded.map((node) => [node.id, node]));
   const requestedActive = normalizeCodexThreadId(value.activeThreadId);
-  const activeThreadId = requestedActive && nodesById[requestedActive]
-    ? requestedActive
-    : legacy && nodesById[legacy] ? legacy : bounded[0]?.id ?? legacy;
+  const activeThreadId =
+    requestedActive && nodesById[requestedActive]
+      ? requestedActive
+      : legacy && nodesById[legacy]
+        ? legacy
+        : (bounded[0]?.id ?? legacy);
   if (activeThreadId && !nodesById[activeThreadId]) {
     nodesById[activeThreadId] = legacyCodexThreadGraph(activeThreadId).nodesById[activeThreadId];
   }
   return { activeThreadId: activeThreadId ?? null, nodesById };
 }
 
-export function mergeCodexThreadGraph(graph: CodexThreadGraph, nodes: readonly CodexThreadGraphNode[]): CodexThreadGraph {
+export function mergeCodexThreadGraph(
+  graph: CodexThreadGraph,
+  nodes: readonly CodexThreadGraphNode[]
+): CodexThreadGraph {
   const activeNode = graph.activeThreadId ? nodes.find((node) => node.id === graph.activeThreadId) : undefined;
-  const sessionId = activeNode?.sessionId ?? (graph.activeThreadId ? graph.nodesById[graph.activeThreadId]?.sessionId : undefined);
+  const sessionId =
+    activeNode?.sessionId ?? (graph.activeThreadId ? graph.nodesById[graph.activeThreadId]?.sessionId : undefined);
   const eligible = sessionId
     ? nodes.filter((node) => node.sessionId === sessionId)
-    : graph.activeThreadId ? nodes.filter((node) => node.id === graph.activeThreadId) : [];
+    : graph.activeThreadId
+      ? nodes.filter((node) => node.id === graph.activeThreadId)
+      : [];
   return normalizeCodexThreadGraph({
     activeThreadId: graph.activeThreadId,
     nodesById: { ...graph.nodesById, ...Object.fromEntries(eligible.map((node) => [node.id, node])) }
@@ -53,14 +62,25 @@ export function deriveCodexAgentTree(activities: readonly CodexActivity[]): Code
     if (activity.kind !== "agent" || !activity.agent) continue;
     const { action, senderId, receiverIds } = activity.agent;
     if (!nodes.has(senderId)) {
-      nodes.set(senderId, { id: senderId, parentId: null, status: activity.status, lastAction: action, updatedAt: activity.updatedAt });
+      nodes.set(senderId, {
+        id: senderId,
+        parentId: null,
+        status: activity.status,
+        lastAction: action,
+        updatedAt: activity.updatedAt
+      });
     }
-    nodes.set(senderId, { ...nodes.get(senderId)!, status: activity.status, lastAction: action, updatedAt: activity.updatedAt });
+    nodes.set(senderId, {
+      ...nodes.get(senderId)!,
+      status: activity.status,
+      lastAction: action,
+      updatedAt: activity.updatedAt
+    });
     for (const receiverId of receiverIds) {
       const existing = nodes.get(receiverId);
       nodes.set(receiverId, {
         id: receiverId,
-        parentId: action === "spawn" ? senderId : existing?.parentId ?? null,
+        parentId: action === "spawn" ? senderId : (existing?.parentId ?? null),
         status: activity.status,
         lastAction: action,
         updatedAt: activity.updatedAt
@@ -77,10 +97,16 @@ function normalizeNode(value: unknown): CodexThreadGraphNode | null {
   const parentThreadId = normalizeCodexThreadId(value.parentThreadId);
   const sessionId = normalizeCodexThreadId(value.sessionId);
   const status = ["notLoaded", "idle", "systemError", "active", "unknown"].includes(String(value.status))
-    ? value.status as CodexThreadGraphNode["status"] : "unknown";
-  const title = typeof value.title === "string"
-    ? [...value.title].filter((character) => !/\p{Cc}/u.test(character)).slice(0, maxCodexThreadIdChars).join("").trim()
-    : "";
+    ? (value.status as CodexThreadGraphNode["status"])
+    : "unknown";
+  const title =
+    typeof value.title === "string"
+      ? [...value.title]
+          .filter((character) => !/\p{Cc}/u.test(character))
+          .slice(0, maxCodexThreadIdChars)
+          .join("")
+          .trim()
+      : "";
   return {
     id,
     ...(sessionId ? { sessionId } : {}),

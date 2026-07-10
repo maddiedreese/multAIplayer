@@ -5,9 +5,7 @@ interface UseSelectedTeamDefaultsOptions {
   selectedTeam: string;
 }
 
-export function useSelectedTeamDefaults({
-  selectedTeam
-}: UseSelectedTeamDefaultsOptions) {
+export function useSelectedTeamDefaults({ selectedTeam }: UseSelectedTeamDefaultsOptions) {
   const loadDefaultsForTeam = useAppStore((state) => state.loadDefaultsForTeam);
   useEffect(() => {
     if (!selectedTeam) return;

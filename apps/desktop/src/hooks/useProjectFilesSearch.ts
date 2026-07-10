@@ -25,12 +25,8 @@ export function useProjectFilesSearch({
     }
     const roomId = selectedRoomId;
     if (!canReadLocalWorkspace) {
-      const {
-        setProjectFilesForRoom,
-        setSelectedFileForRoom,
-        setSelectedDiffForRoom,
-        setFileMessageForRoom
-      } = useAppStore.getState();
+      const { setProjectFilesForRoom, setSelectedFileForRoom, setSelectedDiffForRoom, setFileMessageForRoom } =
+        useAppStore.getState();
       setProjectFilesForRoom(roomId, []);
       setSelectedFileForRoom(roomId, null);
       setSelectedDiffForRoom(roomId, null);
@@ -47,9 +43,16 @@ export function useProjectFilesSearch({
       })
       .catch((error) => {
         if (!cancelled) useAppStore.getState().setFileMessageForRoom(roomId, String(error));
-      })
+      });
     return () => {
       cancelled = true;
     };
-  }, [canReadLocalWorkspace, fileQuery, hasSelectedRoom, localWorkspaceMessage, selectedRoomId, selectedRoomProjectPath]);
+  }, [
+    canReadLocalWorkspace,
+    fileQuery,
+    hasSelectedRoom,
+    localWorkspaceMessage,
+    selectedRoomId,
+    selectedRoomProjectPath
+  ]);
 }

@@ -8,11 +8,7 @@ const safeCodexStatuses = new Set([
   "disconnected"
 ]);
 
-const safeStandaloneEvents = new Set([
-  "turn/start acknowledged",
-  "applyPatchApproval",
-  "execCommandApproval"
-]);
+const safeStandaloneEvents = new Set(["turn/start acknowledged", "applyPatchApproval", "execCommandApproval"]);
 
 const appServerMethodPattern = /^[a-z][A-Za-z0-9]*(?:\/[A-Za-z][A-Za-z0-9]*)+$/;
 
@@ -34,4 +30,5 @@ export function projectCodexRoomStatus(status: string): string {
   return safeCodexStatuses.has(value) ? value : "failed";
 }
 
-export const codexHostFailureRoomMessage = "Codex failed on the active host. The host can review local diagnostics and retry.";
+export const codexHostFailureRoomMessage =
+  "Codex failed on the active host. The host can review local diagnostics and retry.";

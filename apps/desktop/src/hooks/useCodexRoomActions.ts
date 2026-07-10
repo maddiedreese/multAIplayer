@@ -12,17 +12,10 @@ export function useCodexRoomActions({
   invoke: CodexInvokeActionsOptions;
 }) {
   const { approveCodexTurn, promoteNextCodexApprovalForRoom } = useCodexTurnActions(turn);
-  const {
-    handleCodexInvoke,
-    sendMessage,
-    pauseGoal,
-    resumeGoal,
-    editGoal,
-    deleteGoal,
-    tickGoalElapsed
-  } = createCodexInvokeActions({
-    ...invoke
-  });
+  const { handleCodexInvoke, sendMessage, pauseGoal, resumeGoal, editGoal, deleteGoal, tickGoalElapsed } =
+    createCodexInvokeActions({
+      ...invoke
+    });
 
   return {
     approveCodexTurn,

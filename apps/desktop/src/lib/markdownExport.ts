@@ -1,9 +1,4 @@
-import {
-  codexModelOptions,
-  defaultCodexModel,
-  type ApprovalPolicy,
-  type RoomRecord
-} from "@multaiplayer/protocol";
+import { codexModelOptions, defaultCodexModel, type ApprovalPolicy, type RoomRecord } from "@multaiplayer/protocol";
 import type { GitDiffResult, ProjectFileContent, TerminalSnapshot } from "./localBackend";
 import { stripTerminalControlSequences } from "./terminalText";
 
@@ -41,7 +36,9 @@ export function buildPullRequestBody(
   messages: MarkdownChatMessage[],
   files: Array<{ path: string; status: string }>
 ): string {
-  const recentMessages = messages.slice(-8).map((message) => `- **${escapeMarkdown(message.author)}**: ${normalizeMarkdownText(message.body)}`);
+  const recentMessages = messages
+    .slice(-8)
+    .map((message) => `- **${escapeMarkdown(message.author)}**: ${normalizeMarkdownText(message.body)}`);
   const changedFiles = files.map((file) => `- ${inlineCode(file.path)} (${escapeMarkdown(file.status)})`);
 
   return compactMarkdown([
@@ -92,15 +89,18 @@ export function buildMessageMarkdown(message: MarkdownChatMessage): string {
     ? [
         "",
         "Attachments:",
-        ...message.attachments.map((attachment) => `- ${inlineCode(attachment.name)} (${formatAttachmentMeta(attachment)})`)
+        ...message.attachments.map(
+          (attachment) => `- ${inlineCode(attachment.name)} (${formatAttachmentMeta(attachment)})`
+        )
       ]
     : [];
   const reactions = message.reactions?.length
     ? [
         "",
         "Reactions:",
-        ...message.reactions.map((reaction) =>
-          `- ${escapeMarkdown(reaction.emoji)} ${reaction.reactors.map((reactor) => escapeMarkdown(reactor.name)).join(", ")}`
+        ...message.reactions.map(
+          (reaction) =>
+            `- ${escapeMarkdown(reaction.emoji)} ${reaction.reactors.map((reactor) => escapeMarkdown(reactor.name)).join(", ")}`
         )
       ]
     : [];
@@ -119,12 +119,15 @@ export function buildCodexOutputMarkdown(
   messages: MarkdownChatMessage[]
 ): string {
   const messageIndex = messages.findIndex((message) => message.id === codexMessage.id);
-  const previousCodexIndex = messages
-    .slice(0, Math.max(messageIndex, 0))
-    .map((message, index) => ({ message, index }))
-    .filter((item) => item.message.role === "codex")
-    .at(-1)?.index ?? -1;
-  const turnContext = messages.slice(previousCodexIndex + 1, messageIndex).filter((message) => message.role !== "codex");
+  const previousCodexIndex =
+    messages
+      .slice(0, Math.max(messageIndex, 0))
+      .map((message, index) => ({ message, index }))
+      .filter((item) => item.message.role === "codex")
+      .at(-1)?.index ?? -1;
+  const turnContext = messages
+    .slice(previousCodexIndex + 1, messageIndex)
+    .filter((message) => message.role !== "codex");
 
   return compactMarkdown([
     `# ${escapeMarkdown(room.name)} Codex Turn Output`,
@@ -134,8 +137,9 @@ export function buildCodexOutputMarkdown(
     `Time: ${escapeMarkdown(codexMessage.time)}`,
     "",
     "## Room Context",
-    turnContext.map((message) => `- **${escapeMarkdown(message.author)}**: ${normalizeMarkdownText(message.body)}`).join("\n") ||
-      "- No room messages captured before this Codex turn.",
+    turnContext
+      .map((message) => `- **${escapeMarkdown(message.author)}**: ${normalizeMarkdownText(message.body)}`)
+      .join("\n") || "- No room messages captured before this Codex turn.",
     "",
     "## Codex Output",
     "",
@@ -152,9 +156,10 @@ export function buildProjectMarkdown(
   sensitiveRisks: string[] = []
 ): string {
   const changedFiles = files.map((file) => {
-    const churn = typeof file.added === "number" || typeof file.removed === "number"
-      ? ` (+${file.added ?? 0}/-${file.removed ?? 0})`
-      : "";
+    const churn =
+      typeof file.added === "number" || typeof file.removed === "number"
+        ? ` (+${file.added ?? 0}/-${file.removed ?? 0})`
+        : "";
     return `- ${inlineCode(file.path)} (${escapeMarkdown(file.status)})${churn}`;
   });
 
@@ -169,12 +174,7 @@ export function buildProjectMarkdown(
     changedFiles.join("\n") || "- No changed files reported.",
     "",
     ...(selectedDiff?.diff.trim()
-      ? [
-          `## Diff: ${escapeMarkdown(selectedDiff.path)}`,
-          "",
-          fencedCode(selectedDiff.diff, "diff"),
-          ""
-        ]
+      ? [`## Diff: ${escapeMarkdown(selectedDiff.path)}`, "", fencedCode(selectedDiff.diff, "diff"), ""]
       : []),
     ...(selectedFile
       ? [
@@ -213,11 +213,7 @@ export function buildDiffSummaryMarkdown(
     changedFiles.join("\n") || "- No changed files reported.",
     "",
     ...(selectedDiff?.diff.trim()
-      ? [
-          `## Selected Diff: ${escapeMarkdown(selectedDiff.path)}`,
-          "",
-          fencedCode(selectedDiff.diff, "diff")
-        ]
+      ? [`## Selected Diff: ${escapeMarkdown(selectedDiff.path)}`, "", fencedCode(selectedDiff.diff, "diff")]
       : ["## Selected Diff", "", "No changed file selected."])
   ]);
 }
@@ -231,10 +227,12 @@ export function buildTerminalMarkdown(
   const title = terminal ? terminal.name : "Room terminal log";
   const visibleLines = lines.filter((line) => !(line.stream === "system" && line.text.trim() === "$ exec zsh -f"));
   const output = visibleLines.length
-    ? visibleLines.map((line) => {
-        const text = stripTerminalControlSequences(line.text);
-        return line.stream === "stdout" ? text : `[${line.stream}] ${text}`;
-      }).join("\n")
+    ? visibleLines
+        .map((line) => {
+          const text = stripTerminalControlSequences(line.text);
+          return line.stream === "stdout" ? text : `[${line.stream}] ${text}`;
+        })
+        .join("\n")
     : "(No terminal output.)";
   return compactMarkdown([
     `# ${escapeMarkdown(room.name)} Terminal Output`,
@@ -245,7 +243,7 @@ export function buildTerminalMarkdown(
       ? [
           `Command: ${inlineCode(terminal.command)}`,
           `Working directory: ${inlineCode(terminal.cwd)}`,
-          `Status: ${terminal.running ? "running" : terminal.exitStatus ?? "done"}`
+          `Status: ${terminal.running ? "running" : (terminal.exitStatus ?? "done")}`
         ]
       : []),
     "",
@@ -269,8 +267,8 @@ export function inlineCode(value: string): string {
   const normalized = value.replace(/\r\n?|\n/g, " ");
   const longestFence = normalized.match(/`+/g)?.reduce((longest, fence) => Math.max(longest, fence.length), 0) ?? 0;
   const fence = "`".repeat(longestFence + 1);
-  const needsPadding = normalized.startsWith("`") || normalized.endsWith("`") ||
-    normalized.startsWith(" ") || normalized.endsWith(" ");
+  const needsPadding =
+    normalized.startsWith("`") || normalized.endsWith("`") || normalized.startsWith(" ") || normalized.endsWith(" ");
   const content = needsPadding ? ` ${normalized} ` : normalized;
   return `${fence}${content}${fence}`;
 }
@@ -290,7 +288,9 @@ function formatCodexModel(model: string): string {
 }
 
 function formatAttachmentMeta(attachment: MarkdownChatAttachment): string {
-  const blobNote = attachment.blobId ? `, encrypted blob${attachment.blobBytes ? ` preview ${formatBytes(attachment.blobBytes)}` : ""}` : "";
+  const blobNote = attachment.blobId
+    ? `, encrypted blob${attachment.blobBytes ? ` preview ${formatBytes(attachment.blobBytes)}` : ""}`
+    : "";
   return `${attachment.type}, ${formatBytes(attachment.size)}${blobNote}`;
 }
 
@@ -314,5 +314,8 @@ function encodedBytes(value: string): number {
 }
 
 function compactMarkdown(parts: string[]): string {
-  return parts.join("\n").replace(/\n{4,}/g, "\n\n\n").trimEnd();
+  return parts
+    .join("\n")
+    .replace(/\n{4,}/g, "\n\n\n")
+    .trimEnd();
 }

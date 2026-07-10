@@ -37,10 +37,7 @@ test("approved terminal requests require a room project and command", () => {
 });
 
 test("terminal request actions require a pending request from the current room list", () => {
-  const requests = [
-    request,
-    { ...request, id: "terminal-request-2", status: "approved" as const }
-  ];
+  const requests = [request, { ...request, id: "terminal-request-2", status: "approved" as const }];
 
   assert.deepEqual(findRoomTerminalRequest(requests, request.id), request);
   assert.equal(canActOnRoomTerminalRequest(requests, request.id), true);

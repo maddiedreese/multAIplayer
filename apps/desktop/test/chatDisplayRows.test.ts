@@ -48,13 +48,15 @@ test("buildRoomChatMessageRows keeps queued-but-not-started messages editable", 
 });
 
 test("buildRoomChatMessageRows shows deleter attribution on tombstones", () => {
-  const [row] = rows([{
-    ...ownMessage,
-    body: "",
-    deletedAt: "2026-07-08T12:02:00.000Z",
-    deletedBy: "Maddie",
-    deletedByUserId: "github:maddie"
-  }]);
+  const [row] = rows([
+    {
+      ...ownMessage,
+      body: "",
+      deletedAt: "2026-07-08T12:02:00.000Z",
+      deletedBy: "Maddie",
+      deletedByUserId: "github:maddie"
+    }
+  ]);
 
   assert.equal(row.body, "Message deleted by Maddie");
   assert.equal(row.deleted, true);

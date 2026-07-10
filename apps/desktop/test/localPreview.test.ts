@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  isTryCloudflareUrl,
-  localPreviewDetectionUrls,
-  normalizeLocalPreviewUrl
-} from "../src/lib/localPreview";
+import { isTryCloudflareUrl, localPreviewDetectionUrls, normalizeLocalPreviewUrl } from "../src/lib/localPreview";
 
 test("local preview detection covers common localhost and 127.0.0.1 dev ports", () => {
   const urls = localPreviewDetectionUrls();

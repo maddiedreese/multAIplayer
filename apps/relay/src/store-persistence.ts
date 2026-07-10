@@ -68,25 +68,31 @@ export function createRelayStorePersistenceCoordinator(options: {
   }
 
   function saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]) {
-    trackEncryptedSave(options.persistence.saveEncryptedBacklog(roomKey, envelopes)
-      .then((handled) => {
-        if (!handled) scheduleStoreSave();
-      })
-      .catch((error) => {
-        console.error("Failed to save encrypted relay backlog:", error);
-        scheduleStoreSave();
-      }));
+    trackEncryptedSave(
+      options.persistence
+        .saveEncryptedBacklog(roomKey, envelopes)
+        .then((handled) => {
+          if (!handled) scheduleStoreSave();
+        })
+        .catch((error) => {
+          console.error("Failed to save encrypted relay backlog:", error);
+          scheduleStoreSave();
+        })
+    );
   }
 
   function saveEncryptedEnvelope(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]) {
-    trackEncryptedSave(options.persistence.saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds)
-      .then((handled) => {
-        if (!handled) scheduleStoreSave();
-      })
-      .catch((error) => {
-        console.error("Failed to append encrypted relay envelope:", error);
-        scheduleStoreSave();
-      }));
+    trackEncryptedSave(
+      options.persistence
+        .saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds)
+        .then((handled) => {
+          if (!handled) scheduleStoreSave();
+        })
+        .catch((error) => {
+          console.error("Failed to append encrypted relay envelope:", error);
+          scheduleStoreSave();
+        })
+    );
   }
 
   async function saveRelayStore() {

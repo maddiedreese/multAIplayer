@@ -12,16 +12,8 @@ import {
   unwrapRoomSecretForDevice,
   wrapRoomSecretForDevice
 } from "@multaiplayer/crypto";
-import {
-  importRoomSecret,
-  loadOrCreateRoomSecret,
-  loadRoomSecret
-} from "../localHistory";
-import {
-  canActOnRoomInviteRequest,
-  findRoomInviteRequest,
-  roomInviteRequestMessage
-} from "../inviteApproval";
+import { importRoomSecret, loadOrCreateRoomSecret, loadRoomSecret } from "../localHistory";
+import { canActOnRoomInviteRequest, findRoomInviteRequest, roomInviteRequestMessage } from "../inviteApproval";
 import { shouldApplyRoomScopedUiUpdate } from "../roomScopedUi";
 import { roomLockMessage } from "../appRuntime";
 import { useAppStore, type AppStoreState } from "../../store/appStore";
@@ -29,12 +21,7 @@ import type { InviteJoinRequest } from "../../types";
 import type { UseInviteActionsOptions } from "./inviteActionTypes";
 import { currentLocalIdentity, currentSelectedRoomContext } from "../selectedWorkspace";
 
-type InviteRelayActionOptions = Pick<
-  UseInviteActionsOptions,
-  | "relayRef"
-  | "seenEnvelopeIds"
-  | "selectedRoomIdRef"
->;
+type InviteRelayActionOptions = Pick<UseInviteActionsOptions, "relayRef" | "seenEnvelopeIds" | "selectedRoomIdRef">;
 
 type InviteRelayStore = Pick<
   AppStoreState,
@@ -49,11 +36,7 @@ export function createInviteRelayActions(
   options: InviteRelayActionOptions,
   store: InviteRelayStore = useAppStore.getState()
 ) {
-  const {
-    relayRef,
-    seenEnvelopeIds,
-    selectedRoomIdRef
-  } = options;
+  const { relayRef, seenEnvelopeIds, selectedRoomIdRef } = options;
   const {
     appendInviteRequest,
     rememberForgottenRoom,
@@ -132,10 +115,7 @@ export function createInviteRelayActions(
       statusPayload.recipientDeviceId === deviceId &&
       deviceIdentity
     ) {
-      const secret = await unwrapRoomSecretForDevice(
-        statusPayload.wrappedRoomSecret,
-        deviceIdentity.privateKeyJwk
-      );
+      const secret = await unwrapRoomSecretForDevice(statusPayload.wrappedRoomSecret, deviceIdentity.privateKeyJwk);
       await importRoomSecret(roomId, secret);
       restoreForgottenRoom(roomId);
     }
@@ -188,9 +168,10 @@ export function createInviteRelayActions(
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
     try {
       const secret = await loadOrCreateRoomSecret(selectedRoom.id);
-      const wrappedRoomSecret = status === "approved" && roomRequest.requesterPublicKeyJwk
-        ? await wrapRoomSecretForDevice(secret, roomRequest.requesterPublicKeyJwk)
-        : undefined;
+      const wrappedRoomSecret =
+        status === "approved" && roomRequest.requesterPublicKeyJwk
+          ? await wrapRoomSecretForDevice(secret, roomRequest.requesterPublicKeyJwk)
+          : undefined;
       const payload: InviteJoinStatusPlaintextPayload = {
         eventType: "invite.status",
         requestId: roomRequest.id,

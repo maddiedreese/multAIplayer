@@ -160,9 +160,15 @@ test("draft updates reuse memoized chat rows, attachment rows, and preview cards
   let messageBuilds = 0;
   let attachmentBuilds = 0;
   let previewBuilds = 0;
-  const messages = trackArrayMethod([] as ChatMessage[], "filter", () => { messageBuilds += 1; });
-  const attachments = trackArrayMethod([] as ChatAttachment[], "map", () => { attachmentBuilds += 1; });
-  const previews = trackArrayMethod([] as LocalPreviewRecord[], "slice", () => { previewBuilds += 1; });
+  const messages = trackArrayMethod([] as ChatMessage[], "filter", () => {
+    messageBuilds += 1;
+  });
+  const attachments = trackArrayMethod([] as ChatAttachment[], "map", () => {
+    attachmentBuilds += 1;
+  });
+  const previews = trackArrayMethod([] as LocalPreviewRecord[], "slice", () => {
+    previewBuilds += 1;
+  });
   useAppStore.setState((state) => ({
     messagesByRoom: { ...state.messagesByRoom, [selectedRoom.id]: messages },
     roomChatByRoom: {

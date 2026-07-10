@@ -29,8 +29,8 @@ export function useAppSelectedRoomRuntime({
     selectedTerminalId
   } = selected;
   const roomId = selectedRoom.id;
-  const { selectedRoomId, roomSettings, codexRuntime, localPreview, terminalRuntime, invite, gitRuntime } =
-    useAppStore(useShallow((state) => ({
+  const { selectedRoomId, roomSettings, codexRuntime, localPreview, terminalRuntime, invite, gitRuntime } = useAppStore(
+    useShallow((state) => ({
       selectedRoomId: state.selectedRoomId,
       roomSettings: state.roomSettingsByRoom[roomId],
       codexRuntime: state.codexRuntimeByRoom[roomId],
@@ -38,7 +38,8 @@ export function useAppSelectedRoomRuntime({
       terminalRuntime: state.terminalRuntimeByRoom[roomId],
       invite: state.inviteByRoom[roomId],
       gitRuntime: state.gitWorkflowRuntimeByRoom[roomId]
-    })));
+    }))
+  );
 
   return useSelectedRoomRuntime({
     selectedRoom,

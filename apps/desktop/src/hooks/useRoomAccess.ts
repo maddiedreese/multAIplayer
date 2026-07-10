@@ -1,20 +1,12 @@
 import type { RoomRecord } from "@multaiplayer/protocol";
 import type { LocalHistorySettings } from "../lib/localHistory";
 import type { LocalHostUser } from "../lib/roomHost";
-import {
-  browserAccessGateMessage,
-  canHostBrowserAction,
-  canRequestBrowserAccess
-} from "../lib/browserPolicy";
+import { browserAccessGateMessage, canHostBrowserAction, canRequestBrowserAccess } from "../lib/browserPolicy";
 import { canCreateRoomInvite } from "../lib/invitePolicy";
 import { roomLockMessage } from "../lib/appRuntime";
 import { isLocalUserActiveHostForRoom } from "../lib/roomHost";
 import { roomPostureSummary } from "../lib/roomPosture";
-import {
-  canRequestWorkspaceAction,
-  canUseLocalWorkspace,
-  localWorkspaceGateMessage
-} from "../lib/workspaceAccess";
+import { canRequestWorkspaceAction, canUseLocalWorkspace, localWorkspaceGateMessage } from "../lib/workspaceAccess";
 
 interface UseRoomAccessOptions {
   hasSelectedRoom: boolean;

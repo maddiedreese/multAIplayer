@@ -35,11 +35,12 @@ export function findSidebarMessageHits<TMessage extends SidebarSearchMessage>(
   return Object.entries(messagesByRoom)
     .flatMap(([roomId, roomMessages]) =>
       roomMessages
-        .filter((message) => searchMatches([
-          message.author,
-          message.body,
-          message.attachments?.map((attachment) => attachment.name).join(" ") ?? ""
-        ], normalizedQuery))
+        .filter((message) =>
+          searchMatches(
+            [message.author, message.body, message.attachments?.map((attachment) => attachment.name).join(" ") ?? ""],
+            normalizedQuery
+          )
+        )
         .map((message) => ({ roomId, message }))
     )
     .slice(-limit);

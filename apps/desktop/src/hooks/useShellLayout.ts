@@ -5,12 +5,14 @@ import { useAppStore } from "../store/appStore";
 
 export function useShellLayout() {
   const resizeCleanupRef = useRef<(() => void) | null>(null);
-  const { sidebarWidth, inspectorWidth, sidebarCollapsed, inspectorCollapsed } = useAppStore(useShallow((state) => ({
-    sidebarWidth: state.sidebarWidth,
-    inspectorWidth: state.inspectorWidth,
-    sidebarCollapsed: state.sidebarCollapsed,
-    inspectorCollapsed: state.inspectorCollapsed
-  })));
+  const { sidebarWidth, inspectorWidth, sidebarCollapsed, inspectorCollapsed } = useAppStore(
+    useShallow((state) => ({
+      sidebarWidth: state.sidebarWidth,
+      inspectorWidth: state.inspectorWidth,
+      sidebarCollapsed: state.sidebarCollapsed,
+      inspectorCollapsed: state.inspectorCollapsed
+    }))
+  );
   const {
     setSidebarWidth,
     setInspectorWidth,
@@ -49,10 +51,14 @@ export function useShellLayout() {
     resizeCleanupRef.current = cleanupResize;
   }
 
-  const shellStyle = useMemo(() => ({
-    "--sidebar-width": sidebarCollapsed ? "52px" : `${sidebarWidth}px`,
-    "--rail-width": inspectorCollapsed ? "52px" : `${inspectorWidth}px`
-  } as CSSProperties), [inspectorCollapsed, inspectorWidth, sidebarCollapsed, sidebarWidth]);
+  const shellStyle = useMemo(
+    () =>
+      ({
+        "--sidebar-width": sidebarCollapsed ? "52px" : `${sidebarWidth}px`,
+        "--rail-width": inspectorCollapsed ? "52px" : `${inspectorWidth}px`
+      }) as CSSProperties,
+    [inspectorCollapsed, inspectorWidth, sidebarCollapsed, sidebarWidth]
+  );
 
   return {
     sidebarCollapsed,

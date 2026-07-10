@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { listTerminals, readTerminal, type TerminalSnapshot } from "../lib/localBackend";
+import { listTerminals, readTerminal } from "../lib/localBackend";
 import { mergeTerminalSnapshots } from "../lib/terminalState";
 import { useAppStore } from "../store/appStore";
 
@@ -40,9 +40,10 @@ export function useTerminalLifecycle({
         );
         useAppStore.getState().syncTerminalSnapshotsForRoom(roomId, mergedSnapshots);
         const currentTerminalId = useAppStore.getState().terminalRuntimeByRoom[roomId]?.selectedTerminalId ?? null;
-        const nextTerminalId = currentTerminalId && mergedSnapshots.some((terminal) => terminal.id === currentTerminalId)
-          ? currentTerminalId
-          : mergedSnapshots[0]?.id ?? null;
+        const nextTerminalId =
+          currentTerminalId && mergedSnapshots.some((terminal) => terminal.id === currentTerminalId)
+            ? currentTerminalId
+            : (mergedSnapshots[0]?.id ?? null);
         useAppStore.getState().setSelectedTerminalIdForRoom(roomId, nextTerminalId);
       })
       .catch((error) => {
@@ -72,5 +73,5 @@ export function useTerminalLifecycle({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [hasSelectedRoom, selectedRoomId, selectedTerminalRunning, selectedTerminalId]);
+  }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoomId, selectedTerminalRunning, selectedTerminalId]);
 }

@@ -39,10 +39,7 @@ export interface GitHubActionsReadiness {
   normalizedTarget: GitHubActionsTarget | null;
 }
 
-export function isGitHubActionsRefreshInFlight(
-  busyByRoom: Record<string, boolean>,
-  roomId: string
-): boolean {
+export function isGitHubActionsRefreshInFlight(busyByRoom: Record<string, boolean>, roomId: string): boolean {
   return busyByRoom[roomId] === true;
 }
 

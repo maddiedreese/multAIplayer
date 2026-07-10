@@ -5,10 +5,7 @@ interface UseSelectedRoomReadReceiptOptions {
   markRoomRead: (roomId: string) => void;
 }
 
-export function useSelectedRoomReadReceipt({
-  selectedRoomId,
-  markRoomRead
-}: UseSelectedRoomReadReceiptOptions) {
+export function useSelectedRoomReadReceipt({ selectedRoomId, markRoomRead }: UseSelectedRoomReadReceiptOptions) {
   useEffect(() => {
     if (!selectedRoomId) return;
     markRoomRead(selectedRoomId);

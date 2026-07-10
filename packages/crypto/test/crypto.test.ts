@@ -31,10 +31,7 @@ test("room secret wraps to a device public key and unwraps with its private key"
   const unwrapped = await unwrapRoomSecretForDevice(wrapped, recipient.privateKeyJwk);
 
   assert.deepEqual(unwrapped, secret);
-  await assert.rejects(
-    () => unwrapRoomSecretForDevice(wrapped, otherDevice.privateKeyJwk),
-    decryptionFailure
-  );
+  await assert.rejects(() => unwrapRoomSecretForDevice(wrapped, otherDevice.privateKeyJwk), decryptionFailure);
 });
 
 test("wrapped room secret can decrypt room ciphertext after recovery", async () => {
@@ -52,19 +49,13 @@ test("wrapped room secret can decrypt room ciphertext after recovery", async () 
 test("device-sealed JSON opens only for the target device", async () => {
   const recipient = await createDeviceKeyAgreementIdentity();
   const otherDevice = await createDeviceKeyAgreementIdentity();
-  const sealed = await sealJsonToDevice(
-    { eventType: "invite.request", requester: "Maddie" },
-    recipient.publicKeyJwk
-  );
+  const sealed = await sealJsonToDevice({ eventType: "invite.request", requester: "Maddie" }, recipient.publicKeyJwk);
 
   assert.deepEqual(await openDeviceSealedJson(sealed, recipient.privateKeyJwk), {
     eventType: "invite.request",
     requester: "Maddie"
   });
-  await assert.rejects(
-    () => openDeviceSealedJson(sealed, otherDevice.privateKeyJwk),
-    decryptionFailure
-  );
+  await assert.rejects(() => openDeviceSealedJson(sealed, otherDevice.privateKeyJwk), decryptionFailure);
 });
 
 test("device public key fingerprints are stable for canonical public fields", async () => {
@@ -114,10 +105,7 @@ test("device-sealed payload rejects ciphertext tampering", async () => {
   const sealed = await sealJsonToDevice({ private: "invite" }, recipient.publicKeyJwk);
 
   await assert.rejects(
-    () => openDeviceSealedJson(
-      { ...sealed, ciphertext: flipBase64Bit(sealed.ciphertext) },
-      recipient.privateKeyJwk
-    ),
+    () => openDeviceSealedJson({ ...sealed, ciphertext: flipBase64Bit(sealed.ciphertext) }, recipient.privateKeyJwk),
     decryptionFailure
   );
 });
@@ -127,10 +115,8 @@ test("wrapped room secret rejects ciphertext tampering", async () => {
   const wrapped = await wrapRoomSecretForDevice(await createRoomSecret(), recipient.publicKeyJwk);
 
   await assert.rejects(
-    () => unwrapRoomSecretForDevice(
-      { ...wrapped, ciphertext: flipBase64Bit(wrapped.ciphertext) },
-      recipient.privateKeyJwk
-    ),
+    () =>
+      unwrapRoomSecretForDevice({ ...wrapped, ciphertext: flipBase64Bit(wrapped.ciphertext) }, recipient.privateKeyJwk),
     decryptionFailure
   );
 });
@@ -141,10 +127,7 @@ test("device seal and room-secret wrap contexts cannot be interchanged", async (
   const sealed = await sealJsonToDevice(secret, recipient.publicKeyJwk);
   const wrapped = await wrapRoomSecretForDevice(secret, recipient.publicKeyJwk);
 
-  await assert.rejects(
-    () => openDeviceSealedJson(wrapped, recipient.privateKeyJwk),
-    decryptionFailure
-  );
+  await assert.rejects(() => openDeviceSealedJson(wrapped, recipient.privateKeyJwk), decryptionFailure);
   await assert.rejects(
     () => unwrapRoomSecretForDevice({ ...sealed, version: 1 }, recipient.privateKeyJwk),
     decryptionFailure
@@ -168,10 +151,7 @@ test("crypto entry points reject malformed base64 payloads cleanly", async () =>
     /Invalid base64 encoding/
   );
   assert.throws(() => decodeRoomInviteSecret("%%%"), /Invalid base64 encoding/);
-  assert.throws(
-    () => validateRoomSecret({ algorithm: "AES-GCM-256", rawKey: "%%%" }),
-    /Room key must be 256 bits/
-  );
+  assert.throws(() => validateRoomSecret({ algorithm: "AES-GCM-256", rawKey: "%%%" }), /Room key must be 256 bits/);
 });
 
 test("public key fingerprints ignore non-public metadata and distinguish keys", async () => {

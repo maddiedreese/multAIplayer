@@ -42,14 +42,12 @@ export function GitHubActionsPanel({
       <div className="panel-title">
         <span>GitHub Actions</span>
         <div className="panel-title-actions">
-          <small className={`panel-state ${summary.tone === "green" ? "available" : summary.tone === "yellow" ? "attention" : ""}`}>
+          <small
+            className={`panel-state ${summary.tone === "green" ? "available" : summary.tone === "yellow" ? "attention" : ""}`}
+          >
             {summary.label}
           </small>
-          <button
-            className="ghost"
-            onClick={onRefresh}
-            disabled={refreshDisabled}
-          >
+          <button className="ghost" onClick={onRefresh} disabled={refreshDisabled}>
             <RefreshCw size={14} />
             {busy ? "Checking" : "Refresh"}
           </button>
@@ -62,19 +60,24 @@ export function GitHubActionsPanel({
           {lastChecked ? ` · checked ${formatTimestamp(lastChecked)}` : ""}
         </span>
       </div>
-      <div className={`workflow-message ${readiness.ready ? "" : "danger"}`}>
-        {readiness.messages.join(" ")}
-      </div>
+      <div className={`workflow-message ${readiness.ready ? "" : "danger"}`}>{readiness.messages.join(" ")}</div>
       <div className="actions-list">
         {runs.map((run) => (
-          <a href={run.url} target="_blank" rel="noreferrer" className={`action-run ${run.conclusion ?? run.status}`} key={run.id}>
+          <a
+            href={run.url}
+            target="_blank"
+            rel="noreferrer"
+            className={`action-run ${run.conclusion ?? run.status}`}
+            key={run.id}
+          >
             <span className={`run-dot ${run.conclusion ?? run.status}`} />
             <div>
               <strong>{run.displayTitle ?? run.name}</strong>
               <small>
                 {run.name}
                 {run.runNumber ? ` #${run.runNumber}` : ""} · {run.status}
-                {run.conclusion ? ` / ${run.conclusion}` : ""} · {run.event ?? "event unknown"} · {formatTimestamp(run.updatedAt)}
+                {run.conclusion ? ` / ${run.conclusion}` : ""} · {run.event ?? "event unknown"} ·{" "}
+                {formatTimestamp(run.updatedAt)}
               </small>
             </div>
             <ExternalLink size={13} />

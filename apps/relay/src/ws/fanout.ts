@@ -1,10 +1,5 @@
 import type { WebSocket } from "ws";
-import type {
-  RelayEnvelope,
-  RelayServerMessage,
-  RoomRecord,
-  TeamRecord
-} from "@multaiplayer/protocol";
+import type { RelayEnvelope, RelayServerMessage, RoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import type { RelayMetrics } from "../observability.js";
 import type { ClientSession, PresenceRecord, RelayStore, RoomKey } from "../state.js";
 
@@ -65,7 +60,10 @@ export function createRelayFanout({
   function broadcastWorkspaceUpdated(team: TeamRecord) {
     for (const socket of workspaceSockets) {
       const session = sessions.get(socket);
-      send(socket, { type: "team.updated", team: teamRecordForUser(team, store, session?.authSession?.user.id ?? session?.userId) });
+      send(socket, {
+        type: "team.updated",
+        team: teamRecordForUser(team, store, session?.authSession?.user.id ?? session?.userId)
+      });
     }
   }
 

@@ -40,7 +40,9 @@ export const emptyHistoryDefaultsState: HistoryDefaultsState = {
   teamDefaultInviteApprovalGate: defaultTeamRoomSettings.inviteApprovalGate
 };
 
-export function loadHistoryDefaultsState(teamId: string): Pick<
+export function loadHistoryDefaultsState(
+  teamId: string
+): Pick<
   HistoryDefaultsState,
   | "teamHistorySettings"
   | "teamDefaultApprovalPolicy"
@@ -67,7 +69,6 @@ export const createHistoryDefaultsSlice: StateCreator<AppStoreState, [], [], His
   setTeamDefaultCodexModel: (teamDefaultCodexModel) => set({ teamDefaultCodexModel }),
   setTeamDefaultBrowserProfilePersistent: (teamDefaultBrowserProfilePersistent) =>
     set({ teamDefaultBrowserProfilePersistent }),
-  setTeamDefaultInviteApprovalGate: (teamDefaultInviteApprovalGate) =>
-    set({ teamDefaultInviteApprovalGate }),
+  setTeamDefaultInviteApprovalGate: (teamDefaultInviteApprovalGate) => set({ teamDefaultInviteApprovalGate }),
   loadDefaultsForTeam: (teamId) => set(loadHistoryDefaultsState(teamId))
 });

@@ -32,27 +32,32 @@ const probe: CodexProbe = {
   version: "0.144.0",
   error: null,
   modelError: null,
-  models: [{
-    id: "catalog-default",
-    model: "gpt-next",
-    label: "GPT Next",
-    description: "Local default",
-    hidden: false,
-    isDefault: true,
-    defaultReasoningEffort: "low",
-    supportedReasoningEfforts: ["none", "low"],
-    serviceTiers: ["default"],
-    defaultServiceTier: "default"
-  }]
+  models: [
+    {
+      id: "catalog-default",
+      model: "gpt-next",
+      label: "GPT Next",
+      description: "Local default",
+      hidden: false,
+      isDefault: true,
+      defaultReasoningEffort: "low",
+      supportedReasoningEfforts: ["none", "low"],
+      serviceTiers: ["default"],
+      defaultServiceTier: "default"
+    }
+  ]
 };
 
 test("auto policies resolve all run inputs from the host-local model catalog", () => {
-  const resolved = resolveCodexRunSettings({
-    ...room,
-    codexModelPolicy: "auto",
-    codexReasoningEffortPolicy: "auto",
-    codexServiceTierPolicy: "auto"
-  }, probe);
+  const resolved = resolveCodexRunSettings(
+    {
+      ...room,
+      codexModelPolicy: "auto",
+      codexReasoningEffortPolicy: "auto",
+      codexServiceTierPolicy: "auto"
+    },
+    probe
+  );
 
   assert.equal(resolved.model, "gpt-next");
   assert.equal(resolved.reasoningEffort, "low");
@@ -74,17 +79,23 @@ test("model-specific UI choices include none and omit unsupported speed tiers", 
     catalogReasoningOptionsForModel(probe, "gpt-next").map((option) => option.id),
     ["none", "low"]
   );
-  assert.deepEqual(catalogSpeedOptionsForModel(probe, "gpt-next").map((option) => option.id), ["standard"]);
+  assert.deepEqual(
+    catalogSpeedOptionsForModel(probe, "gpt-next").map((option) => option.id),
+    ["standard"]
+  );
 });
 
 test("pinned unsupported choices resolve to catalog defaults for a known model", () => {
-  const resolved = resolveCodexRunSettings({
-    ...room,
-    codexModel: "gpt-next",
-    codexModelPolicy: "pinned",
-    codexReasoningEffortPolicy: "pinned",
-    codexServiceTierPolicy: "pinned"
-  }, probe);
+  const resolved = resolveCodexRunSettings(
+    {
+      ...room,
+      codexModel: "gpt-next",
+      codexModelPolicy: "pinned",
+      codexReasoningEffortPolicy: "pinned",
+      codexServiceTierPolicy: "pinned"
+    },
+    probe
+  );
   assert.equal(resolved.reasoningEffort, "low");
   assert.equal(resolved.speed, "standard");
   assert.equal(resolved.warnings.length, 2);

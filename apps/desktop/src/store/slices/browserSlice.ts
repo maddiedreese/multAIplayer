@@ -204,9 +204,10 @@ export const createBrowserSlice: StateCreator<AppStoreState, [], [], BrowserSlic
         if (closingIndex < 0) return roomState;
         const nextTabs = tabs.filter((tab) => tab.id !== tabId);
         const currentActiveId = roomState.activeTabId ?? activeBrowserTab(roomState)?.id ?? null;
-        const nextActiveTab = currentActiveId === tabId
-          ? nextTabs[Math.max(0, closingIndex - 1)] ?? nextTabs[0] ?? null
-          : nextTabs.find((tab) => tab.id === currentActiveId) ?? null;
+        const nextActiveTab =
+          currentActiveId === tabId
+            ? (nextTabs[Math.max(0, closingIndex - 1)] ?? nextTabs[0] ?? null)
+            : (nextTabs.find((tab) => tab.id === currentActiveId) ?? null);
         return {
           ...roomState,
           tabs: nextTabs,
@@ -290,9 +291,10 @@ export const createBrowserSlice: StateCreator<AppStoreState, [], [], BrowserSlic
 
 function createBrowserTab(url: string): BrowserTab {
   return {
-    id: typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `browser-tab-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    id:
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `browser-tab-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     url,
     title: browserTabTitle(url),
     openedAt: new Date().toISOString()

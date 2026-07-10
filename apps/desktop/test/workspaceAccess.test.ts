@@ -30,7 +30,13 @@ const room: RoomRecord = {
 test("local workspace access requires an unlocked room", () => {
   assert.equal(canUseLocalWorkspace(room, { id: "github:maddie", name: "Maddie" }), true);
   assert.equal(canUseLocalWorkspace(room, { id: "github:alex", name: "Alex" }), true);
-  assert.equal(canUseLocalWorkspace({ ...room, mode: { ...room.mode, workspace: false } }, { id: "github:maddie", name: "Maddie" }), true);
+  assert.equal(
+    canUseLocalWorkspace(
+      { ...room, mode: { ...room.mode, workspace: false } },
+      { id: "github:maddie", name: "Maddie" }
+    ),
+    true
+  );
   assert.equal(canUseLocalWorkspace(room, { id: "github:maddie", name: "Maddie" }, true), false);
 });
 

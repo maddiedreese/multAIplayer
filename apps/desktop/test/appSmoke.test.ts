@@ -6,7 +6,9 @@ import { useAppStore } from "../src/store/appStore";
 import { initialMessagesByRoom, seededRooms } from "../src/seedData";
 
 if (!process.env.MULTAIPLAYER_SMOKE_WATCHDOG) {
-  throw new Error("App smoke must run through `npm run test:smoke -w @multaiplayer/desktop` so the external timeout and single-instance lock are active.");
+  throw new Error(
+    "App smoke must run through `npm run test:smoke -w @multaiplayer/desktop` so the external timeout and single-instance lock are active."
+  );
 }
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
@@ -82,7 +84,10 @@ class TestWebSocket {
   }
 
   removeEventListener(type: string, listener: (event: MessageEvent | Event) => void) {
-    this.listeners.set(type, (this.listeners.get(type) ?? []).filter((current) => current !== listener));
+    this.listeners.set(
+      type,
+      (this.listeners.get(type) ?? []).filter((current) => current !== listener)
+    );
   }
 
   send(message: string) {
@@ -199,7 +204,10 @@ test("App smoke", { timeout: 25_000 }, async (t) => {
     await waitFor(() => {
       assert.ok(screen.getAllByText("Desktop app").length > 0);
     });
-    assert.match(screen.getByText("We need to capture onboarding progress and improve the stepper.").textContent ?? "", /onboarding/);
+    assert.match(
+      screen.getByText("We need to capture onboarding progress and improve the stepper.").textContent ?? "",
+      /onboarding/
+    );
 
     fireEvent.click(screen.getByText("Relay ops"));
 
@@ -240,14 +248,22 @@ test("App smoke", { timeout: 25_000 }, async (t) => {
     resetAppSmokeDom();
     render(createElement(App));
 
-    const modelSelect = await screen.findByLabelText("Codex host model") as HTMLSelectElement;
+    const modelSelect = (await screen.findByLabelText("Codex host model")) as HTMLSelectElement;
     const reasoningSelect = screen.getByLabelText("Codex reasoning") as HTMLSelectElement;
     const speedSelect = screen.getByLabelText("Codex speed") as HTMLSelectElement;
     const modelOptions = Array.from(modelSelect.options).map((option) => option.value);
     const reasoningOptions = Array.from(reasoningSelect.options).map((option) => option.value);
     const speedOptions = Array.from(speedSelect.options).map((option) => option.value);
 
-    assert.deepEqual(modelOptions, ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.5-cyber", "gpt-5.3-codex", "gpt-5.3-codex-spark"]);
+    assert.deepEqual(modelOptions, [
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
+      "gpt-5.5",
+      "gpt-5.5-cyber",
+      "gpt-5.3-codex",
+      "gpt-5.3-codex-spark"
+    ]);
     assert.deepEqual(reasoningOptions, ["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
     assert.deepEqual(speedOptions, ["standard", "fast"]);
 
@@ -330,51 +346,58 @@ test("App smoke", { timeout: 25_000 }, async (t) => {
     }
   });
 
-  await t.test("switches inspector tabs after browser and files without blanking the rail", { timeout: 5_000 }, async () => {
-    resetAppSmokeDom();
-    render(createElement(App));
-    const roomTools = await screen.findByRole("navigation", { name: "Room tools" });
+  await t.test(
+    "switches inspector tabs after browser and files without blanking the rail",
+    { timeout: 5_000 },
+    async () => {
+      resetAppSmokeDom();
+      render(createElement(App));
+      const roomTools = await screen.findByRole("navigation", { name: "Room tools" });
 
-    fireEvent.click(within(roomTools).getByRole("button", { name: /browser/i }));
-    await waitFor(() => {
-      assert.ok(screen.getByLabelText("Browser URL"));
-    });
+      fireEvent.click(within(roomTools).getByRole("button", { name: /browser/i }));
+      await waitFor(() => {
+        assert.ok(screen.getByLabelText("Browser URL"));
+      });
 
-    fireEvent.click(within(roomTools).getByRole("button", { name: /terminal/i }));
-    await waitFor(() => {
-      assert.ok(screen.getByRole("button", { name: /New terminal/i }));
-    });
-    assert.equal(document.querySelector(".browser-panel"), null);
-    assert.equal(document.querySelector(".inspector-panel-terminal"), document.querySelector("[data-active-tab='terminal']"));
+      fireEvent.click(within(roomTools).getByRole("button", { name: /terminal/i }));
+      await waitFor(() => {
+        assert.ok(screen.getByRole("button", { name: /New terminal/i }));
+      });
+      assert.equal(document.querySelector(".browser-panel"), null);
+      assert.equal(
+        document.querySelector(".inspector-panel-terminal"),
+        document.querySelector("[data-active-tab='terminal']")
+      );
 
-    fireEvent.click(within(roomTools).getByRole("button", { name: /browser/i }));
-    await waitFor(() => {
-      assert.ok(screen.getByLabelText("Browser URL"));
-    });
+      fireEvent.click(within(roomTools).getByRole("button", { name: /browser/i }));
+      await waitFor(() => {
+        assert.ok(screen.getByLabelText("Browser URL"));
+      });
 
-    fireEvent.click(within(roomTools).getByRole("button", { name: /room/i }));
-    await waitFor(() => {
-      assert.ok(screen.getByText("Team roster"));
-    });
-    assert.equal(document.querySelector(".browser-panel"), null);
-    assert.equal(document.querySelector("[data-active-tab='room']")?.textContent?.includes("Team roster"), true);
+      fireEvent.click(within(roomTools).getByRole("button", { name: /room/i }));
+      await waitFor(() => {
+        assert.ok(screen.getByText("Team roster"));
+      });
+      assert.equal(document.querySelector(".browser-panel"), null);
+      assert.equal(document.querySelector("[data-active-tab='room']")?.textContent?.includes("Team roster"), true);
 
-    fireEvent.click(within(roomTools).getByRole("button", { name: /files/i }));
-    await waitFor(() => {
-      assert.ok(screen.getByPlaceholderText("Search project files"));
-      assert.ok(screen.getByText("Changed files"));
-    });
+      fireEvent.click(within(roomTools).getByRole("button", { name: /files/i }));
+      await waitFor(() => {
+        assert.ok(screen.getByPlaceholderText("Search project files"));
+        assert.ok(screen.getByText("Changed files"));
+      });
 
-    fireEvent.click(within(roomTools).getByRole("button", { name: /room/i }));
-    await waitFor(() => {
-      assert.ok(screen.getByText("Team roster"));
-    });
-    assert.equal(document.querySelector(".browser-panel"), null);
+      fireEvent.click(within(roomTools).getByRole("button", { name: /room/i }));
+      await waitFor(() => {
+        assert.ok(screen.getByText("Team roster"));
+      });
+      assert.equal(document.querySelector(".browser-panel"), null);
 
-    fireEvent.click(within(roomTools).getByRole("button", { name: /terminal/i }));
-    await waitFor(() => {
-      assert.ok(screen.getByRole("button", { name: /New terminal/i }));
-    });
-    assert.equal(document.querySelector("[data-active-tab='terminal']")?.textContent?.includes("New terminal"), true);
-  });
+      fireEvent.click(within(roomTools).getByRole("button", { name: /terminal/i }));
+      await waitFor(() => {
+        assert.ok(screen.getByRole("button", { name: /New terminal/i }));
+      });
+      assert.equal(document.querySelector("[data-active-tab='terminal']")?.textContent?.includes("New terminal"), true);
+    }
+  );
 });

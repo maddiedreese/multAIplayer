@@ -1,4 +1,3 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
 import type { TerminalLine } from "./localBackend";
 import { copyTextToClipboard } from "./clipboard";
 import {
@@ -16,11 +15,7 @@ import type { ChatMessage } from "../types";
 import { useAppStore } from "../store/appStore";
 import { currentSelectedRoom, currentSelectedRoomContext } from "./selectedWorkspace";
 
-interface MarkdownCopyActionsOptions {
-}
-
-export function createMarkdownCopyActions({
-}: MarkdownCopyActionsOptions) {
+export function createMarkdownCopyActions() {
   async function copyMarkdownWithFallback(
     title: string,
     markdown: string,
@@ -40,11 +35,21 @@ export function createMarkdownCopyActions({
   async function copyProjectMarkdown() {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) {
-      useAppStore.getState().setFileMessageForRoom(useAppStore.getState().selectedRoomId, "Create or join a room before copying project context.");
+      useAppStore
+        .getState()
+        .setFileMessageForRoom(
+          useAppStore.getState().selectedRoomId,
+          "Create or join a room before copying project context."
+        );
       return;
     }
     if (!currentSelectedRoomContext()?.canReadLocalWorkspace) {
-      useAppStore.getState().setFileMessageForRoom(selectedRoom.id, currentSelectedRoomContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
+      useAppStore
+        .getState()
+        .setFileMessageForRoom(
+          selectedRoom.id,
+          currentSelectedRoomContext()?.localWorkspaceMessage ?? "Workspace unavailable."
+        );
       return;
     }
     const roomId = selectedRoom.id;
@@ -64,25 +69,49 @@ export function createMarkdownCopyActions({
           ? detectSecretRisks(selectedDiff.diff, selectedDiff.path)
           : []
     );
-    await copyMarkdownWithFallback("project context", markdown, (message) => useAppStore.getState().setFileMessageForRoom(roomId, message), roomId);
+    await copyMarkdownWithFallback(
+      "project context",
+      markdown,
+      (message) => useAppStore.getState().setFileMessageForRoom(roomId, message),
+      roomId
+    );
   }
 
   async function copyRoomMarkdown() {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) {
-      useAppStore.getState().setChatMessageForRoom(useAppStore.getState().selectedRoomId, "Create or join a room before copying room chat.");
+      useAppStore
+        .getState()
+        .setChatMessageForRoom(
+          useAppStore.getState().selectedRoomId,
+          "Create or join a room before copying room chat."
+        );
       return;
     }
     const roomId = selectedRoom.id;
     const messages = useAppStore.getState().messagesByRoom[roomId] ?? [];
-    const markdown = buildRoomMarkdown(selectedRoom, useAppStore.getState().teams.find((team) => team.id === selectedRoom.teamId)?.name ?? "Unknown team", messages);
-    await copyMarkdownWithFallback("room chat", markdown, (message) => useAppStore.getState().setChatMessageForRoom(roomId, message), roomId);
+    const markdown = buildRoomMarkdown(
+      selectedRoom,
+      useAppStore.getState().teams.find((team) => team.id === selectedRoom.teamId)?.name ?? "Unknown team",
+      messages
+    );
+    await copyMarkdownWithFallback(
+      "room chat",
+      markdown,
+      (message) => useAppStore.getState().setChatMessageForRoom(roomId, message),
+      roomId
+    );
   }
 
   async function copySelectedMessagesMarkdown() {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) {
-      useAppStore.getState().setChatMessageForRoom(useAppStore.getState().selectedRoomId, "Create or join a room before copying selected messages.");
+      useAppStore
+        .getState()
+        .setChatMessageForRoom(
+          useAppStore.getState().selectedRoomId,
+          "Create or join a room before copying selected messages."
+        );
       return;
     }
     const roomId = selectedRoom.id;
@@ -95,35 +124,65 @@ export function createMarkdownCopyActions({
       return;
     }
     const markdown = buildSelectedMessagesMarkdown(selectedRoom, selectedMessages);
-    await copyMarkdownWithFallback("selected messages", markdown, (message) => useAppStore.getState().setChatMessageForRoom(roomId, message), roomId);
+    await copyMarkdownWithFallback(
+      "selected messages",
+      markdown,
+      (message) => useAppStore.getState().setChatMessageForRoom(roomId, message),
+      roomId
+    );
   }
 
   async function copyMessageMarkdown(message: ChatMessage) {
     const roomId = useAppStore.getState().selectedRoomId;
     const markdown = buildMessageMarkdown(message);
-    await copyMarkdownWithFallback("message", markdown, (copyMessage) => useAppStore.getState().setChatMessageForRoom(roomId, copyMessage), roomId);
+    await copyMarkdownWithFallback(
+      "message",
+      markdown,
+      (copyMessage) => useAppStore.getState().setChatMessageForRoom(roomId, copyMessage),
+      roomId
+    );
   }
 
   async function copyCodexOutputMarkdown(message: ChatMessage) {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) {
-      useAppStore.getState().setChatMessageForRoom(useAppStore.getState().selectedRoomId, "Create or join a room before copying Codex output.");
+      useAppStore
+        .getState()
+        .setChatMessageForRoom(
+          useAppStore.getState().selectedRoomId,
+          "Create or join a room before copying Codex output."
+        );
       return;
     }
     const roomId = selectedRoom.id;
     const messages = useAppStore.getState().messagesByRoom[roomId] ?? [];
     const markdown = buildCodexOutputMarkdown(selectedRoom, message, messages);
-    await copyMarkdownWithFallback("Codex turn output", markdown, (copyMessage) => useAppStore.getState().setChatMessageForRoom(roomId, copyMessage), roomId);
+    await copyMarkdownWithFallback(
+      "Codex turn output",
+      markdown,
+      (copyMessage) => useAppStore.getState().setChatMessageForRoom(roomId, copyMessage),
+      roomId
+    );
   }
 
   async function copyTerminalMarkdown() {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) {
-      useAppStore.getState().setTerminalErrorForRoom(useAppStore.getState().selectedRoomId, "Create or join a room before copying terminal output.");
+      useAppStore
+        .getState()
+        .setTerminalErrorForRoom(
+          useAppStore.getState().selectedRoomId,
+          "Create or join a room before copying terminal output."
+        );
       return;
     }
     if (!currentSelectedRoomContext()?.canReadLocalWorkspace) {
-      useAppStore.getState().setTerminalErrorForRoom(selectedRoom.id, currentSelectedRoomContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
+      useAppStore
+        .getState()
+        .setTerminalErrorForRoom(
+          selectedRoom.id,
+          currentSelectedRoomContext()?.localWorkspaceMessage ?? "Workspace unavailable."
+        );
       return;
     }
     const roomId = selectedRoom.id;
@@ -131,20 +190,36 @@ export function createMarkdownCopyActions({
     const selectedTerminalId = store.terminalRuntimeByRoom[roomId]?.selectedTerminalId;
     const selectedTerminal = store.terminals.find((terminal) => terminal.id === selectedTerminalId) ?? null;
     const terminalLines = store.terminalRuntimeByRoom[roomId]?.lines ?? [];
-    const lines: TerminalLine[] = selectedTerminal?.lines ?? terminalLines.map((line) => ({ stream: "system", text: line }));
+    const lines: TerminalLine[] =
+      selectedTerminal?.lines ?? terminalLines.map((line) => ({ stream: "system", text: line }));
     const terminalRisks = detectSecretRisks(lines.map((line) => line.text).join("\n"));
     const markdown = buildTerminalMarkdown(selectedRoom, selectedTerminal, lines, terminalRisks);
-    await copyMarkdownWithFallback("terminal output", markdown, (message) => useAppStore.getState().setTerminalErrorForRoom(roomId, message), roomId);
+    await copyMarkdownWithFallback(
+      "terminal output",
+      markdown,
+      (message) => useAppStore.getState().setTerminalErrorForRoom(roomId, message),
+      roomId
+    );
   }
 
   async function copyDiffSummaryMarkdown() {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) {
-      useAppStore.getState().setFileMessageForRoom(useAppStore.getState().selectedRoomId, "Create or join a room before copying a diff summary.");
+      useAppStore
+        .getState()
+        .setFileMessageForRoom(
+          useAppStore.getState().selectedRoomId,
+          "Create or join a room before copying a diff summary."
+        );
       return;
     }
     if (!currentSelectedRoomContext()?.canReadLocalWorkspace) {
-      useAppStore.getState().setFileMessageForRoom(selectedRoom.id, currentSelectedRoomContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
+      useAppStore
+        .getState()
+        .setFileMessageForRoom(
+          selectedRoom.id,
+          currentSelectedRoomContext()?.localWorkspaceMessage ?? "Workspace unavailable."
+        );
       return;
     }
     const roomId = selectedRoom.id;
@@ -158,25 +233,45 @@ export function createMarkdownCopyActions({
       selectedDiff,
       selectedDiff ? detectSecretRisks(selectedDiff.diff, selectedDiff.path) : []
     );
-    await copyMarkdownWithFallback("diff summary", markdown, (message) => useAppStore.getState().setFileMessageForRoom(roomId, message), roomId);
+    await copyMarkdownWithFallback(
+      "diff summary",
+      markdown,
+      (message) => useAppStore.getState().setFileMessageForRoom(roomId, message),
+      roomId
+    );
   }
 
   async function copyPullRequestDraftMarkdown() {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) {
-      useAppStore.getState().setGitWorkflowMessageForRoom(useAppStore.getState().selectedRoomId, "Create or join a room before copying a PR draft.");
+      useAppStore
+        .getState()
+        .setGitWorkflowMessageForRoom(
+          useAppStore.getState().selectedRoomId,
+          "Create or join a room before copying a PR draft."
+        );
       return;
     }
     const roomId = selectedRoom.id;
     if (!currentSelectedRoomContext()?.canReadLocalWorkspace) {
-      useAppStore.getState().setGitWorkflowMessageForRoom(roomId, currentSelectedRoomContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
+      useAppStore
+        .getState()
+        .setGitWorkflowMessageForRoom(
+          roomId,
+          currentSelectedRoomContext()?.localWorkspaceMessage ?? "Workspace unavailable."
+        );
       return;
     }
     const store = useAppStore.getState();
     const messages = store.messagesByRoom[roomId] ?? [];
     const gitStatus = store.gitWorkflowRuntimeByRoom[roomId]?.workflow?.status ?? null;
     const markdown = buildPullRequestBody(messages, gitStatus?.files ?? []);
-    await copyMarkdownWithFallback("PR description draft", markdown, (message) => useAppStore.getState().setGitWorkflowMessageForRoom(roomId, message), roomId);
+    await copyMarkdownWithFallback(
+      "PR description draft",
+      markdown,
+      (message) => useAppStore.getState().setGitWorkflowMessageForRoom(roomId, message),
+      roomId
+    );
   }
 
   return {

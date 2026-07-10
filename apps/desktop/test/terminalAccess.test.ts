@@ -35,7 +35,10 @@ test("terminal control requires active host access and matching room terminal", 
 
 test("terminal control messages explain unavailable controls", () => {
   assert.equal(roomTerminalControlMessage(room, terminal, true), "Unlock this room before controlling terminals.");
-  assert.equal(roomTerminalControlMessage({ ...room, mode: { ...room.mode, workspace: false } }, terminal), "Terminal control is available.");
+  assert.equal(
+    roomTerminalControlMessage({ ...room, mode: { ...room.mode, workspace: false } }, terminal),
+    "Terminal control is available."
+  );
   assert.equal(roomTerminalControlMessage(room, null), "Select a terminal in this room before controlling it.");
   assert.equal(
     roomTerminalControlMessage(room, { roomId: "other-room" }),

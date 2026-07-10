@@ -5,7 +5,7 @@ import {
   logout,
   pollGitHubDeviceFlow,
   startGitHubDeviceFlow,
-  type GitHubAuthConfig,
+  type GitHubAuthConfig
 } from "../lib/authClient";
 import { useAppStore } from "../store/appStore";
 
@@ -32,11 +32,15 @@ export function useGitHubAuth(relayHttpUrl: string) {
 
   useEffect(() => {
     setAuthError(null);
-    getAuthConfig().then(setAuthConfig).catch((error) => {
-      setAuthConfig(fallbackAuthConfig);
-      setAuthError(String(error));
-    });
-    getCurrentUser().then(setCurrentUser).catch(() => setCurrentUser(null));
+    getAuthConfig()
+      .then(setAuthConfig)
+      .catch((error) => {
+        setAuthConfig(fallbackAuthConfig);
+        setAuthError(String(error));
+      });
+    getCurrentUser()
+      .then(setCurrentUser)
+      .catch(() => setCurrentUser(null));
   }, [relayHttpUrl, setAuthConfig, setAuthError, setCurrentUser]);
 
   useEffect(() => {

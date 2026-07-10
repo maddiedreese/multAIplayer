@@ -45,33 +45,41 @@ function withoutValue(current: Set<string>, value: string): Set<string> {
 export const createRelayRuntimeSlice: StateCreator<AppStoreState, [], [], RelayRuntimeSlice> = (set) => ({
   ...emptyRelayRuntimeState,
   replaceRelayStatus: (relayStatus) => set({ relayStatus }),
-  rememberForgottenRoom: (roomId) => set((state) => ({
-    forgottenRoomIds: withValue(state.forgottenRoomIds, roomId)
-  })),
-  restoreForgottenRoom: (roomId) => set((state) => ({
-    forgottenRoomIds: withoutValue(state.forgottenRoomIds, roomId)
-  })),
-  revokeRoomAccess: (roomId) => set((state) => ({
-    revokedRoomIds: withValue(state.revokedRoomIds, roomId)
-  })),
-  restoreRoomAccess: (roomId) => set((state) => ({
-    revokedRoomIds: withoutValue(state.revokedRoomIds, roomId)
-  })),
-  revokeTeamAccess: (teamId) => set((state) => ({
-    revokedTeamIds: withValue(state.revokedTeamIds, teamId)
-  })),
-  restoreTeamAccess: (teamId) => set((state) => ({
-    revokedTeamIds: withoutValue(state.revokedTeamIds, teamId)
-  })),
-  revokeWorkspaceAccess: (teamId, roomId) => set((state) => ({
-    forgottenRoomIds: withValue(state.forgottenRoomIds, roomId),
-    revokedRoomIds: withValue(state.revokedRoomIds, roomId),
-    revokedTeamIds: withValue(state.revokedTeamIds, teamId)
-  })),
-  restoreWorkspaceAccess: (teamId, roomId) => set((state) => ({
-    // Restoring relay authorization does not restore the local room secret. Keep the
-    // room forgotten until an invite import or key rotation supplies that secret.
-    revokedRoomIds: withoutValue(state.revokedRoomIds, roomId),
-    revokedTeamIds: withoutValue(state.revokedTeamIds, teamId)
-  }))
+  rememberForgottenRoom: (roomId) =>
+    set((state) => ({
+      forgottenRoomIds: withValue(state.forgottenRoomIds, roomId)
+    })),
+  restoreForgottenRoom: (roomId) =>
+    set((state) => ({
+      forgottenRoomIds: withoutValue(state.forgottenRoomIds, roomId)
+    })),
+  revokeRoomAccess: (roomId) =>
+    set((state) => ({
+      revokedRoomIds: withValue(state.revokedRoomIds, roomId)
+    })),
+  restoreRoomAccess: (roomId) =>
+    set((state) => ({
+      revokedRoomIds: withoutValue(state.revokedRoomIds, roomId)
+    })),
+  revokeTeamAccess: (teamId) =>
+    set((state) => ({
+      revokedTeamIds: withValue(state.revokedTeamIds, teamId)
+    })),
+  restoreTeamAccess: (teamId) =>
+    set((state) => ({
+      revokedTeamIds: withoutValue(state.revokedTeamIds, teamId)
+    })),
+  revokeWorkspaceAccess: (teamId, roomId) =>
+    set((state) => ({
+      forgottenRoomIds: withValue(state.forgottenRoomIds, roomId),
+      revokedRoomIds: withValue(state.revokedRoomIds, roomId),
+      revokedTeamIds: withValue(state.revokedTeamIds, teamId)
+    })),
+  restoreWorkspaceAccess: (teamId, roomId) =>
+    set((state) => ({
+      // Restoring relay authorization does not restore the local room secret. Keep the
+      // room forgotten until an invite import or key rotation supplies that secret.
+      revokedRoomIds: withoutValue(state.revokedRoomIds, roomId),
+      revokedTeamIds: withoutValue(state.revokedTeamIds, teamId)
+    }))
 });

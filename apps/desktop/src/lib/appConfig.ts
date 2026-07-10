@@ -3,9 +3,11 @@ export interface AppConfig {
   relayWsUrl: string;
 }
 
-const viteEnv = (import.meta as ImportMeta & {
-  env?: Record<string, string | undefined>;
-}).env;
+const viteEnv = (
+  import.meta as ImportMeta & {
+    env?: Record<string, string | undefined>;
+  }
+).env;
 
 export const defaultRelayHttpUrl = (viteEnv?.VITE_RELAY_HTTP_URL ?? "http://127.0.0.1:4321").replace(/\/$/, "");
 export const defaultRelayWsUrl = viteEnv?.VITE_RELAY_URL ?? "ws://127.0.0.1:4321/rooms";

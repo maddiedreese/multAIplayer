@@ -62,18 +62,8 @@ export const RoomRecord = z.object({
   host: z.string().min(1).max(maxDisplayNameChars),
   hostUserId: UserId.optional(),
   hostStatus: z.enum(["active", "offline", "handoff"]),
-  approvalPolicy: z.enum([
-    "ask_every_turn",
-    "auto_chat_only",
-    "auto_browser_allowed_sites",
-    "never_host"
-  ]),
-  approvalDelegationPolicy: z.enum([
-    "host_only",
-    "members_can_request",
-    "members_can_approve",
-    "trusted_members_only"
-  ]),
+  approvalPolicy: z.enum(["ask_every_turn", "auto_chat_only", "auto_browser_allowed_sites", "never_host"]),
+  approvalDelegationPolicy: z.enum(["host_only", "members_can_request", "members_can_approve", "trusted_members_only"]),
   trustedApproverUserIds: z.array(UserId).max(50),
   mode: RoomModeSchema,
   codexModel: z.string().min(1).max(maxCodexModelChars),
@@ -82,7 +72,9 @@ export const RoomRecord = z.object({
   codexReasoningEffortPolicy: z.enum(["auto", "pinned"]).optional(),
   codexSpeed: z.enum(["standard", "fast"]).optional(),
   codexServiceTierPolicy: z.enum(["auto", "pinned"]).optional(),
-  codexSandboxLevel: z.enum(["read_only", "workspace_write", "workspace_write_network", "danger_full_access"]).optional(),
+  codexSandboxLevel: z
+    .enum(["read_only", "workspace_write", "workspace_write_network", "danger_full_access"])
+    .optional(),
   browserAllowedOrigins: z.array(z.string().min(1).max(maxUrlChars)).max(20),
   browserProfilePersistent: z.boolean(),
   unread: z.number().int().nonnegative(),

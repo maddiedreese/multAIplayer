@@ -100,23 +100,27 @@ export function registerRoomRoutes({
         ? defaultApprovalDelegationPolicy
         : String(req.body.approvalDelegationPolicy);
     const trustedApproverUserIds = normalizeTrustedApproverUserIds(req.body?.trustedApproverUserIds, maxUserIdChars);
-    const codexModel = req.body?.codexModel === undefined ? defaultCodexModel : normalizeCodexModel(req.body.codexModel);
+    const codexModel =
+      req.body?.codexModel === undefined ? defaultCodexModel : normalizeCodexModel(req.body.codexModel);
     const codexModelPolicy = normalizeCatalogSelectionPolicy(req.body?.codexModelPolicy, defaultCodexModelPolicy);
-    const codexReasoningEffort = req.body?.codexReasoningEffort === undefined
-      ? defaultCodexReasoningEffort
-      : normalizeCodexReasoningEffort(req.body.codexReasoningEffort);
+    const codexReasoningEffort =
+      req.body?.codexReasoningEffort === undefined
+        ? defaultCodexReasoningEffort
+        : normalizeCodexReasoningEffort(req.body.codexReasoningEffort);
     const codexReasoningEffortPolicy = normalizeCatalogSelectionPolicy(
       req.body?.codexReasoningEffortPolicy,
       defaultCodexReasoningEffortPolicy
     );
-    const codexSpeed = req.body?.codexSpeed === undefined ? defaultCodexSpeed : normalizeCodexSpeed(req.body.codexSpeed);
+    const codexSpeed =
+      req.body?.codexSpeed === undefined ? defaultCodexSpeed : normalizeCodexSpeed(req.body.codexSpeed);
     const codexServiceTierPolicy = normalizeCatalogSelectionPolicy(
       req.body?.codexServiceTierPolicy,
       defaultCodexServiceTierPolicy
     );
-    const codexSandboxLevel = req.body?.codexSandboxLevel === undefined
-      ? defaultCodexSandboxLevel
-      : normalizeCodexSandboxLevel(req.body.codexSandboxLevel);
+    const codexSandboxLevel =
+      req.body?.codexSandboxLevel === undefined
+        ? defaultCodexSandboxLevel
+        : normalizeCodexSandboxLevel(req.body.codexSandboxLevel);
     const browserAllowedOrigins = req.body?.browserAllowedOrigins;
     const browserProfilePersistent = req.body?.browserProfilePersistent;
     if (!store.hasTeam(teamId)) {
@@ -137,7 +141,9 @@ export function registerRoomRoutes({
       return;
     }
     if (!projectPath) {
-      res.status(400).json({ error: `projectPath must be a non-empty string up to ${maxRoomProjectPathChars} characters` });
+      res
+        .status(400)
+        .json({ error: `projectPath must be a non-empty string up to ${maxRoomProjectPathChars} characters` });
       return;
     }
     if (!isApprovalPolicy(approvalPolicy)) {
@@ -153,7 +159,9 @@ export function registerRoomRoutes({
       return;
     }
     if (!codexModel) {
-      res.status(400).json({ error: `codexModel must be a known model id or a model-like id up to ${maxCodexModelChars} characters` });
+      res.status(400).json({
+        error: `codexModel must be a known model id or a model-like id up to ${maxCodexModelChars} characters`
+      });
       return;
     }
     if (!codexModelPolicy || !codexReasoningEffortPolicy || !codexServiceTierPolicy) {
@@ -169,14 +177,18 @@ export function registerRoomRoutes({
       return;
     }
     if (!codexSandboxLevel) {
-      res.status(400).json({ error: "codexSandboxLevel must be read_only, workspace_write, workspace_write_network, or danger_full_access" });
+      res.status(400).json({
+        error: "codexSandboxLevel must be read_only, workspace_write, workspace_write_network, or danger_full_access"
+      });
       return;
     }
     let normalizedBrowserAllowedOrigins = defaultBrowserAllowedOrigins;
     if (browserAllowedOrigins !== undefined) {
       const parsedBrowserAllowedOrigins = normalizeBrowserAllowedOrigins(browserAllowedOrigins);
       if (parsedBrowserAllowedOrigins === null) {
-        res.status(400).json({ error: "browserAllowedOrigins must be up to 20 http(s) origins such as https://github.com" });
+        res
+          .status(400)
+          .json({ error: "browserAllowedOrigins must be up to 20 http(s) origins such as https://github.com" });
         return;
       }
       normalizedBrowserAllowedOrigins = parsedBrowserAllowedOrigins;
@@ -185,23 +197,29 @@ export function registerRoomRoutes({
       res.status(400).json({ error: "browserProfilePersistent must be a boolean" });
       return;
     }
-    if (session && !allowTotalRoomQuota({
-      store,
-      teamIds: teamIdsForUser(session.user.id),
-      cap: totalRoomCapPerUser,
-      res,
-      recordQuotaRejection
-    })) {
+    if (
+      session &&
+      !allowTotalRoomQuota({
+        store,
+        teamIds: teamIdsForUser(session.user.id),
+        cap: totalRoomCapPerUser,
+        res,
+        recordQuotaRejection
+      })
+    ) {
       return;
     }
-    if (session && !consumeDailyCreationQuota({
-      cap: dailyCreationCaps.roomsPerUser,
-      counts: dailyRoomCreationCounts,
-      quota: "daily_user_room_creations",
-      userId: session.user.id,
-      res,
-      recordQuotaRejection
-    })) {
+    if (
+      session &&
+      !consumeDailyCreationQuota({
+        cap: dailyCreationCaps.roomsPerUser,
+        counts: dailyRoomCreationCounts,
+        quota: "daily_user_room_creations",
+        userId: session.user.id,
+        res,
+        recordQuotaRejection
+      })
+    ) {
       return;
     }
     const room: RoomRecord = {
@@ -253,7 +271,12 @@ export function registerRoomRoutes({
       res.status(404).json({ error: "Room not found" });
       return;
     }
-    if (room.archivedAt || room.deletedAt || store.getTeam(room.teamId)?.archivedAt || store.getTeam(room.teamId)?.deletedAt) {
+    if (
+      room.archivedAt ||
+      room.deletedAt ||
+      store.getTeam(room.teamId)?.archivedAt ||
+      store.getTeam(room.teamId)?.deletedAt
+    ) {
       res.status(409).json({ error: "Restore this room before changing host state." });
       return;
     }
@@ -271,7 +294,9 @@ export function registerRoomRoutes({
     }
 
     if (hostStatus === "active" && room.hostStatus === "active" && !isRoomHost(room, requester)) {
-      res.status(409).json({ error: `${room.host} is already the active host. Ask them to hand off or release the room first.` });
+      res
+        .status(409)
+        .json({ error: `${room.host} is already the active host. Ask them to hand off or release the room first.` });
       return;
     }
 
@@ -308,16 +333,17 @@ export function registerRoomRoutes({
     const mode = req.body?.mode;
     const codexModel = req.body?.codexModel === undefined ? undefined : normalizeCodexModel(req.body.codexModel);
     const codexModelPolicy = normalizeCatalogSelectionPolicy(req.body?.codexModelPolicy);
-    const codexReasoningEffort = req.body?.codexReasoningEffort === undefined
-      ? undefined
-      : normalizeCodexReasoningEffort(req.body.codexReasoningEffort);
+    const codexReasoningEffort =
+      req.body?.codexReasoningEffort === undefined
+        ? undefined
+        : normalizeCodexReasoningEffort(req.body.codexReasoningEffort);
     const codexReasoningEffortPolicy = normalizeCatalogSelectionPolicy(req.body?.codexReasoningEffortPolicy);
     const codexSpeed = req.body?.codexSpeed === undefined ? undefined : normalizeCodexSpeed(req.body.codexSpeed);
     const codexServiceTierPolicy = normalizeCatalogSelectionPolicy(req.body?.codexServiceTierPolicy);
-    const codexSandboxLevel = req.body?.codexSandboxLevel === undefined
-      ? undefined
-      : normalizeCodexSandboxLevel(req.body.codexSandboxLevel);
-    const projectPath = req.body?.projectPath === undefined ? undefined : normalizeRoomProjectPath(req.body.projectPath);
+    const codexSandboxLevel =
+      req.body?.codexSandboxLevel === undefined ? undefined : normalizeCodexSandboxLevel(req.body.codexSandboxLevel);
+    const projectPath =
+      req.body?.projectPath === undefined ? undefined : normalizeRoomProjectPath(req.body.projectPath);
     const browserAllowedOrigins = req.body?.browserAllowedOrigins;
     const browserProfilePersistent = req.body?.browserProfilePersistent;
     const requester = requesterFromRequest(req.body, req.cookies?.multaiplayer_session);
@@ -326,7 +352,12 @@ export function registerRoomRoutes({
       res.status(404).json({ error: "Room not found" });
       return;
     }
-    if (room.archivedAt || room.deletedAt || store.getTeam(room.teamId)?.archivedAt || store.getTeam(room.teamId)?.deletedAt) {
+    if (
+      room.archivedAt ||
+      room.deletedAt ||
+      store.getTeam(room.teamId)?.archivedAt ||
+      store.getTeam(room.teamId)?.deletedAt
+    ) {
       res.status(409).json({ error: "Restore this room before changing room settings." });
       return;
     }
@@ -359,7 +390,9 @@ export function registerRoomRoutes({
       return;
     }
     if (codexModel !== undefined && !codexModel) {
-      res.status(400).json({ error: `codexModel must be a known model id or a model-like id up to ${maxCodexModelChars} characters` });
+      res.status(400).json({
+        error: `codexModel must be a known model id or a model-like id up to ${maxCodexModelChars} characters`
+      });
       return;
     }
     if (
@@ -379,18 +412,23 @@ export function registerRoomRoutes({
       return;
     }
     if (codexSandboxLevel !== undefined && !codexSandboxLevel) {
-      res.status(400).json({ error: "codexSandboxLevel must be read_only, workspace_write, workspace_write_network, or danger_full_access" });
+      res.status(400).json({
+        error: "codexSandboxLevel must be read_only, workspace_write, workspace_write_network, or danger_full_access"
+      });
       return;
     }
     if (projectPath !== undefined && !projectPath) {
-      res.status(400).json({ error: `projectPath must be a non-empty string up to ${maxRoomProjectPathChars} characters` });
+      res
+        .status(400)
+        .json({ error: `projectPath must be a non-empty string up to ${maxRoomProjectPathChars} characters` });
       return;
     }
-    const normalizedBrowserAllowedOrigins = browserAllowedOrigins === undefined
-      ? undefined
-      : normalizeBrowserAllowedOrigins(browserAllowedOrigins);
+    const normalizedBrowserAllowedOrigins =
+      browserAllowedOrigins === undefined ? undefined : normalizeBrowserAllowedOrigins(browserAllowedOrigins);
     if (browserAllowedOrigins !== undefined && normalizedBrowserAllowedOrigins === null) {
-      res.status(400).json({ error: "browserAllowedOrigins must be up to 20 http(s) origins such as https://github.com" });
+      res
+        .status(400)
+        .json({ error: "browserAllowedOrigins must be up to 20 http(s) origins such as https://github.com" });
       return;
     }
     if (browserProfilePersistent !== undefined && typeof browserProfilePersistent !== "boolean") {
@@ -409,11 +447,11 @@ export function registerRoomRoutes({
       codexModel: codexModel ?? room.codexModel,
       codexModelPolicy: codexModelPolicy ?? (codexModel !== undefined ? "pinned" : room.codexModelPolicy),
       codexReasoningEffort: codexReasoningEffort ?? room.codexReasoningEffort,
-      codexReasoningEffortPolicy: codexReasoningEffortPolicy
-        ?? (codexReasoningEffort !== undefined ? "pinned" : room.codexReasoningEffortPolicy),
+      codexReasoningEffortPolicy:
+        codexReasoningEffortPolicy ?? (codexReasoningEffort !== undefined ? "pinned" : room.codexReasoningEffortPolicy),
       codexSpeed: codexSpeed ?? room.codexSpeed,
-      codexServiceTierPolicy: codexServiceTierPolicy
-        ?? (codexSpeed !== undefined ? "pinned" : room.codexServiceTierPolicy),
+      codexServiceTierPolicy:
+        codexServiceTierPolicy ?? (codexSpeed !== undefined ? "pinned" : room.codexServiceTierPolicy),
       codexSandboxLevel: codexSandboxLevel ?? room.codexSandboxLevel,
       browserAllowedOrigins: normalizedBrowserAllowedOrigins ?? room.browserAllowedOrigins,
       browserProfilePersistent: browserProfilePersistent ?? room.browserProfilePersistent
@@ -448,7 +486,9 @@ export function registerRoomRoutes({
     const teamAdmin = requesterRole === "owner" || requesterRole === "admin";
     const roomHost = room.hostStatus === "active" && isRoomHost(room, requester);
     if (!teamAdmin && !roomHost) {
-      res.status(403).json({ error: "Only the active host or a team owner/admin can archive, restore, or delete a room." });
+      res
+        .status(403)
+        .json({ error: "Only the active host or a team owner/admin can archive, restore, or delete a room." });
       return;
     }
     const team = store.getTeam(room.teamId);
@@ -458,11 +498,12 @@ export function registerRoomRoutes({
     }
 
     const now = new Date().toISOString();
-    const updated: RoomRecord = action === "restore"
-      ? { ...room, archivedAt: undefined }
-      : action === "archive"
-        ? { ...room, archivedAt: room.archivedAt ?? now }
-        : { ...room, archivedAt: undefined, deletedAt: now };
+    const updated: RoomRecord =
+      action === "restore"
+        ? { ...room, archivedAt: undefined }
+        : action === "archive"
+          ? { ...room, archivedAt: room.archivedAt ?? now }
+          : { ...room, archivedAt: undefined, deletedAt: now };
     store.setRoom(updated);
     scheduleStoreSave();
     broadcastRoomUpdated(updated);
@@ -512,7 +553,7 @@ function normalizeCodexSandboxLevel(value: unknown): RoomRecord["codexSandboxLev
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return codexSandboxLevelOptions.some((option) => option.id === trimmed)
-    ? trimmed as RoomRecord["codexSandboxLevel"]
+    ? (trimmed as RoomRecord["codexSandboxLevel"])
     : null;
 }
 
@@ -569,7 +610,12 @@ function consumeDailyCreationQuota({
 
 function sendDailyCreationQuotaExceeded(
   res: Response,
-  { quota, limit, used, resetAt }: {
+  {
+    quota,
+    limit,
+    used,
+    resetAt
+  }: {
     quota: "daily_user_room_creations";
     limit: number;
     used: number;

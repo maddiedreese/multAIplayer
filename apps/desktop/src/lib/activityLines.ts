@@ -6,9 +6,7 @@ import type {
 } from "@multaiplayer/protocol";
 
 export function buildTerminalResultLines(result: TerminalResultPlaintextPayload): string[] {
-  const output = [result.stdout.trim(), result.stderr.trim(), result.error?.trim()]
-    .filter(Boolean)
-    .join("\n");
+  const output = [result.stdout.trim(), result.stderr.trim(), result.error?.trim()].filter(Boolean).join("\n");
   return [
     `${result.ranBy} ran approved terminal request: ${result.command}`,
     output || `Command exited with ${result.exitStatus ?? "unknown"} and no output.`
@@ -18,22 +16,16 @@ export function buildTerminalResultLines(result: TerminalResultPlaintextPayload)
 export function buildGitWorkflowEventLines(event: GitWorkflowEventPlaintextPayload): string[] {
   const header = `${event.runner} ${formatGitWorkflowStatus(event.status)}: ${event.message}`;
   const commandLines = (event.results ?? [])
-    .flatMap((result) => [
-      `$ ${result.command}`,
-      result.stdout.trim(),
-      result.stderr.trim()
-    ])
+    .flatMap((result) => [`$ ${result.command}`, result.stdout.trim(), result.stderr.trim()])
     .filter(Boolean);
   return [header, ...commandLines];
 }
 
 export function buildGitHubActionsEventLines(event: GitHubActionsEventPlaintextPayload): string[] {
-  const runSummary = event.runs
-    .slice(0, 4)
-    .map((run) => {
-      const status = run.conclusion ? `${run.status}/${run.conclusion}` : run.status;
-      return `- ${run.displayTitle ?? run.name}: ${status}`;
-    });
+  const runSummary = event.runs.slice(0, 4).map((run) => {
+    const status = run.conclusion ? `${run.status}/${run.conclusion}` : run.status;
+    return `- ${run.displayTitle ?? run.name}: ${status}`;
+  });
   return [
     `${event.checkedBy} refreshed GitHub Actions for ${event.owner}/${event.repo}@${event.branch}: ${event.summary.label}`,
     event.summary.detail,

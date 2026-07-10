@@ -31,12 +31,15 @@ export function buildTerminalRequestRows(requests: TerminalCommandRequest[]): Te
 }
 
 export function buildCodexEventRows(events: CodexRoomEvent[]): CodexEventDisplay[] {
-  return events.slice(-5).reverse().map((event) => ({
-    key: `${event.turnId}-${event.createdAt}-${event.status}`,
-    status: event.status,
-    statusLabel: formatCodexEventStatus(event.status),
-    message: event.message,
-    detail: `${event.threadId ?? formatCodexModel(event.model)} · ${formatTimestamp(event.createdAt)}`,
-    host: event.host
-  }));
+  return events
+    .slice(-5)
+    .reverse()
+    .map((event) => ({
+      key: `${event.turnId}-${event.createdAt}-${event.status}`,
+      status: event.status,
+      statusLabel: formatCodexEventStatus(event.status),
+      message: event.message,
+      detail: `${event.threadId ?? formatCodexModel(event.model)} · ${formatTimestamp(event.createdAt)}`,
+      host: event.host
+    }));
 }

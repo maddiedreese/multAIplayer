@@ -64,10 +64,8 @@ export function isDeviceKeyTrusted(
   if (!fingerprint) return false;
   const key = normalizeTrustKey(roomId, deviceId, fingerprint);
   if (!key) return false;
-  return current.some((item) =>
-    item.roomId === key.roomId &&
-    item.deviceId === key.deviceId &&
-    item.fingerprint === key.fingerprint
+  return current.some(
+    (item) => item.roomId === key.roomId && item.deviceId === key.deviceId && item.fingerprint === key.fingerprint
   );
 }
 

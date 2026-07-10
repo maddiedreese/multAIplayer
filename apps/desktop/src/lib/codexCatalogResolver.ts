@@ -55,17 +55,16 @@ export function resolveCodexRunSettings(
   }
 
   const requestedReasoning = normalizeReasoning(room.codexReasoningEffort) ?? defaultCodexReasoningEffort;
-  const supportedReasoning = modelEntry?.supportedReasoningEfforts
-    .map(normalizeReasoning)
-    .filter((effort): effort is CodexReasoningEffort => Boolean(effort)) ?? [];
+  const supportedReasoning =
+    modelEntry?.supportedReasoningEfforts
+      .map(normalizeReasoning)
+      .filter((effort): effort is CodexReasoningEffort => Boolean(effort)) ?? [];
   const catalogReasoning = normalizeReasoning(modelEntry?.defaultReasoningEffort);
-  let reasoningEffort = reasoningEffortPolicy === "auto"
-    ? catalogReasoning ?? requestedReasoning
-    : requestedReasoning;
+  let reasoningEffort =
+    reasoningEffortPolicy === "auto" ? (catalogReasoning ?? requestedReasoning) : requestedReasoning;
   if (supportedReasoning.length && !supportedReasoning.includes(reasoningEffort)) {
-    const fallback = catalogReasoning && supportedReasoning.includes(catalogReasoning)
-      ? catalogReasoning
-      : supportedReasoning[0];
+    const fallback =
+      catalogReasoning && supportedReasoning.includes(catalogReasoning) ? catalogReasoning : supportedReasoning[0];
     warnings.push(`Reasoning effort ${reasoningEffort} is not supported by ${model}; using ${fallback}.`);
     reasoningEffort = fallback;
   }
@@ -73,13 +72,19 @@ export function resolveCodexRunSettings(
   const requestedSpeed = normalizeSpeed(room.codexSpeed) ?? defaultCodexSpeed;
   const requestedTier = requestedSpeed === "fast" ? "fast" : "default";
   const supportedTiers = modelEntry?.serviceTiers.filter(Boolean) ?? [];
-  let serviceTier = serviceTierPolicy === "auto"
-    ? modelEntry?.defaultServiceTier || (supportedTiers.includes("default") ? "default" : supportedTiers[0]) || requestedTier
-    : requestedTier;
+  let serviceTier =
+    serviceTierPolicy === "auto"
+      ? modelEntry?.defaultServiceTier ||
+        (supportedTiers.includes("default") ? "default" : supportedTiers[0]) ||
+        requestedTier
+      : requestedTier;
   if (supportedTiers.length && !supportedTiers.includes(serviceTier)) {
-    const fallback = modelEntry?.defaultServiceTier && supportedTiers.includes(modelEntry.defaultServiceTier)
-      ? modelEntry.defaultServiceTier
-      : supportedTiers.includes("default") ? "default" : supportedTiers[0];
+    const fallback =
+      modelEntry?.defaultServiceTier && supportedTiers.includes(modelEntry.defaultServiceTier)
+        ? modelEntry.defaultServiceTier
+        : supportedTiers.includes("default")
+          ? "default"
+          : supportedTiers[0];
     warnings.push(`Service tier ${serviceTier} is not supported by ${model}; using ${fallback}.`);
     serviceTier = fallback;
   }
@@ -108,19 +113,13 @@ export function catalogModelOptions(probe: Pick<CodexProbe, "available" | "model
     }));
 }
 
-export function catalogReasoningOptionsForModel(
-  probe: Pick<CodexProbe, "available" | "models"> | null,
-  model: string
-) {
+export function catalogReasoningOptionsForModel(probe: Pick<CodexProbe, "available" | "models"> | null, model: string) {
   const supported = findCatalogModel(probe?.models ?? [], model)?.supportedReasoningEfforts ?? [];
   if (!supported.length) return codexReasoningEffortOptions;
   return codexReasoningEffortOptions.filter((option) => supported.includes(option.id));
 }
 
-export function catalogSpeedOptionsForModel(
-  probe: Pick<CodexProbe, "available" | "models"> | null,
-  model: string
-) {
+export function catalogSpeedOptionsForModel(probe: Pick<CodexProbe, "available" | "models"> | null, model: string) {
   const tiers = findCatalogModel(probe?.models ?? [], model)?.serviceTiers ?? [];
   if (!tiers.length) return codexSpeedOptions;
   return codexSpeedOptions.filter((option) => tiers.includes(option.serviceTier));
@@ -132,12 +131,12 @@ function findCatalogModel(models: CodexModelOption[], model: string): CodexModel
 
 function normalizeReasoning(value: unknown): CodexReasoningEffort | null {
   return typeof value === "string" && codexReasoningEffortOptions.some((option) => option.id === value)
-    ? value as CodexReasoningEffort
+    ? (value as CodexReasoningEffort)
     : null;
 }
 
 function normalizeSpeed(value: unknown): CodexSpeed | null {
   return typeof value === "string" && codexSpeedOptions.some((option) => option.id === value)
-    ? value as CodexSpeed
+    ? (value as CodexSpeed)
     : null;
 }

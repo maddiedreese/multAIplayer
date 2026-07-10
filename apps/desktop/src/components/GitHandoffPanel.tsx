@@ -83,13 +83,14 @@ export function GitHandoffPanel({
           ))
         )}
         {draft.pushEnabled && !preview.error && (
-          <small>Draft PR target: {readiness.target ?? `${draft.prOwner}/${draft.prRepo} to ${readiness.normalizedBase || "main"}`}</small>
+          <small>
+            Draft PR target:{" "}
+            {readiness.target ?? `${draft.prOwner}/${draft.prRepo} to ${readiness.normalizedBase || "main"}`}
+          </small>
         )}
       </div>
       {draft.pushEnabled && (
-        <div className={`workflow-message ${readiness.ready ? "" : "danger"}`}>
-          {readiness.messages.join(" ")}
-        </div>
+        <div className={`workflow-message ${readiness.ready ? "" : "danger"}`}>{readiness.messages.join(" ")}</div>
       )}
       <button className="ghost-wide" onClick={onCopyPullRequestDraftMarkdown} disabled={!canReadLocalWorkspace}>
         <Copy size={15} />
@@ -98,7 +99,13 @@ export function GitHandoffPanel({
       <button
         className="primary-wide"
         onClick={onApproveGitWorkflow}
-        disabled={!canReadLocalWorkspace || gitWorkflowBusy || !isActiveHost || Boolean(preview.error) || (draft.pushEnabled && !readiness.ready)}
+        disabled={
+          !canReadLocalWorkspace ||
+          gitWorkflowBusy ||
+          !isActiveHost ||
+          Boolean(preview.error) ||
+          (draft.pushEnabled && !readiness.ready)
+        }
       >
         <Github size={15} />
         {gitWorkflowBusy ? "Running approved git workflow" : "Approve git workflow"}
