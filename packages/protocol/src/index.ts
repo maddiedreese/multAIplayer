@@ -84,6 +84,7 @@ export {
 
 export {
   codexModelOptions,
+  codexReasoningEffortIds,
   codexReasoningEffortOptions,
   codexSandboxLevelOptions,
   codexSpeedOptions,

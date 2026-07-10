@@ -79,7 +79,10 @@ export function createInitializeRequest(id: JsonRpcId): JsonRpcRequest {
   };
 }
 
-export function createThreadStartRequest(id: JsonRpcId, model = "gpt-5.6-sol"): JsonRpcRequest {
+// Keep this dependency-free fallback aligned with @multaiplayer/protocol's defaultCodexModel.
+const defaultCodexModel = "gpt-5.6-sol";
+
+export function createThreadStartRequest(id: JsonRpcId, model = defaultCodexModel): JsonRpcRequest {
   return {
     method: "thread/start",
     id,
@@ -153,7 +156,7 @@ export class CodexAppServerClient extends EventEmitter<CodexAppServerEvents> {
     return response;
   }
 
-  async startThread(model = this.config.model ?? "gpt-5.6-sol"): Promise<CodexThreadStartResult> {
+  async startThread(model = this.config.model ?? defaultCodexModel): Promise<CodexThreadStartResult> {
     const response = await this.request<CodexThreadStartResult>(
       createThreadStartRequest(this.allocateId(), model)
     );

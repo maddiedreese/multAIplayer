@@ -183,7 +183,7 @@ after(() => {
   dom.window.close();
 });
 
-const { cleanup, fireEvent, render, screen, waitFor, within } = await import("@testing-library/react");
+const { act, cleanup, fireEvent, render, screen, waitFor, within } = await import("@testing-library/react");
 const appModule = await import("../src/App");
 const App = appModule.App;
 
@@ -267,6 +267,39 @@ test("App smoke", { timeout: 25_000 }, async (t) => {
     await waitFor(() => {
       assert.equal(speedSelect.value, "fast");
     });
+  });
+
+  await t.test("terminal selection updates do not steal focus from the chat composer", { timeout: 5_000 }, async () => {
+    resetAppSmokeDom();
+    render(createElement(App));
+
+    fireEvent.click(await screen.findByRole("button", { name: "terminal" }));
+    const terminalInput = await screen.findByLabelText("Terminal input");
+    await waitFor(() => assert.equal(document.activeElement, terminalInput));
+
+    const composer = screen.getByPlaceholderText(/Message the room/) as HTMLTextAreaElement;
+    composer.focus();
+    assert.equal(document.activeElement, composer);
+
+    const roomId = useAppStore.getState().selectedRoomId;
+    assert.ok(roomId);
+    act(() => {
+      useAppStore.getState().upsertTerminalSnapshot({
+        id: `${roomId}:remote-shell`,
+        roomId,
+        name: "remote-shell",
+        cwd: "/tmp/multaiplayer",
+        command: "zsh -f",
+        running: true,
+        exitStatus: null,
+        startedAt: "2026-07-10T00:00:00.000Z",
+        lines: []
+      });
+      useAppStore.getState().setSelectedTerminalIdForRoom(roomId, `${roomId}:remote-shell`);
+    });
+
+    await screen.findByRole("button", { name: "remote-shell" });
+    await waitFor(() => assert.equal(document.activeElement, composer));
   });
 
   await t.test("switches inspector tabs after browser and files without blanking the rail", { timeout: 5_000 }, async () => {

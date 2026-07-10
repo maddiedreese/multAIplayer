@@ -66,6 +66,7 @@ test("normalizeCodexReasoningEffort accepts current Codex reasoning choices", ()
   assert.equal(normalizeCodexReasoningEffort("medium"), "medium");
   assert.equal(normalizeCodexReasoningEffort("high"), "high");
   assert.equal(normalizeCodexReasoningEffort("xhigh"), "xhigh");
+  assert.equal(normalizeCodexReasoningEffort("max"), "max");
   assert.equal(normalizeCodexReasoningEffort("extra"), null);
 });
 

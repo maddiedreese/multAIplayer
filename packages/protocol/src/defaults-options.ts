@@ -44,6 +44,14 @@ export const codexReasoningEffortOptions = [
   { id: "max", label: "Max", description: "Maximum reasoning depth for the hardest quality-first work" }
 ] as const;
 
+export type CodexReasoningEffort = typeof codexReasoningEffortOptions[number]["id"];
+
+// This enum is wire-visible. Revisit mixed-version handling before widening it after stable releases.
+export const codexReasoningEffortIds = Object.freeze(codexReasoningEffortOptions.map(({ id }) => id)) as readonly [
+  CodexReasoningEffort,
+  ...CodexReasoningEffort[]
+];
+
 export const codexSpeedOptions = [
   { id: "standard", label: "Standard", serviceTier: "default", description: "Default Codex speed and usage behavior" },
   { id: "fast", label: "Fast", serviceTier: "fast", description: "Fast mode for supported Codex models when available" }
@@ -84,7 +92,6 @@ export const codexSandboxLevelOptions = [
   }
 ] as const;
 
-export type CodexReasoningEffort = typeof codexReasoningEffortOptions[number]["id"];
 export type CodexSpeed = typeof codexSpeedOptions[number]["id"];
 export type CodexSandboxLevel = typeof codexSandboxLevelOptions[number]["id"];
 

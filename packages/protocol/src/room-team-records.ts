@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CiphertextPayload, DevicePublicKeyJwk } from "./crypto-payloads.js";
+import { codexReasoningEffortIds } from "./defaults-options.js";
 import {
   DeviceId,
   RoomId,
@@ -77,7 +78,7 @@ export const RoomRecord = z.object({
   mode: RoomModeSchema,
   codexModel: z.string().min(1).max(maxCodexModelChars),
   codexModelPolicy: z.enum(["auto", "pinned"]).optional(),
-  codexReasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
+  codexReasoningEffort: z.enum(codexReasoningEffortIds).optional(),
   codexReasoningEffortPolicy: z.enum(["auto", "pinned"]).optional(),
   codexSpeed: z.enum(["standard", "fast"]).optional(),
   codexServiceTierPolicy: z.enum(["auto", "pinned"]).optional(),

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { defaultCodexModel } from "@multaiplayer/protocol";
 
 import { isTauriRuntime } from "./runtime";
 import type {
@@ -96,7 +97,7 @@ export async function runCodexTurn(
   clientTurnId: string,
   cwd: string,
   input: string,
-  model = "gpt-5.6-sol",
+  model = defaultCodexModel,
   reasoningEffort = "medium",
   speed = "standard",
   serviceTier: string | null = null,
