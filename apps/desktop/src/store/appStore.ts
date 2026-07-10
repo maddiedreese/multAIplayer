@@ -33,6 +33,11 @@ import {
 } from "./slices/roomSettingsSlice";
 import { createRoomChatSlice, emptyRoomChatState, type RoomChatSlice } from "./slices/roomChatSlice";
 import { createRoomLifecycleSlice, type RoomLifecycleSlice } from "./slices/roomLifecycleSlice";
+import {
+  createRelayRuntimeSlice,
+  emptyRelayRuntimeState,
+  type RelayRuntimeSlice
+} from "./slices/relayRuntimeSlice";
 import { createTerminalSlice, emptyTerminalState, type TerminalSlice } from "./slices/terminalSlice";
 import {
   createWorkspaceDataSlice,
@@ -51,7 +56,8 @@ const emptyAppStoreState = {
   ...emptyRoomChatState,
   ...emptyCodexHostHandoffState,
   ...emptyTerminalState,
-  ...emptyWorkspaceDataState
+  ...emptyWorkspaceDataState,
+  ...emptyRelayRuntimeState
 };
 
 export interface AppStoreState
@@ -65,6 +71,7 @@ export interface AppStoreState
     RoomSettingsSlice,
     RoomChatSlice,
     RoomLifecycleSlice,
+    RelayRuntimeSlice,
     TerminalSlice,
     WorkspaceDataSlice {
   resetAppStore: () => void;
@@ -82,6 +89,7 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   ...createRoomSettingsSlice(set, get, api),
   ...createRoomChatSlice(set, get, api),
   ...createRoomLifecycleSlice(set, get, api),
+  ...createRelayRuntimeSlice(set, get, api),
   ...createTerminalSlice(set, get, api),
   ...createWorkspaceDataSlice(set, get, api),
   resetAppStore: () => set(emptyAppStoreState)

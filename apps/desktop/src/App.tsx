@@ -345,12 +345,10 @@ export function App() {
     appRefs,
     localIdentity,
     selected: selectedContext,
-    roomInteraction,
     roomActions,
     workspaceRecords,
     roomDisplay,
     inviteActions,
-    hostHandoffActions,
     roomChatMutations
   });
   const publishCodexActivityRef = React.useRef(relaySync.publishCodexActivity);

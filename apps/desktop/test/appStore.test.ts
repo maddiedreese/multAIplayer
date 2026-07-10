@@ -11,6 +11,35 @@ test.beforeEach(() => {
   useAppStore.getState().resetAppStore();
 });
 
+test("desktop store keeps relay access runtime state atomic and resettable", () => {
+  const store = useAppStore.getState();
+
+  store.replaceRelayStatus("open");
+  store.rememberForgottenRoom("room-a");
+  store.revokeWorkspaceAccess("team-a", "room-a");
+
+  let state = useAppStore.getState();
+  assert.equal(state.relayStatus, "open");
+  assert.equal(state.forgottenRoomIds.has("room-a"), true);
+  assert.equal(state.revokedRoomIds.has("room-a"), true);
+  assert.equal(state.revokedTeamIds.has("team-a"), true);
+
+  state.restoreWorkspaceAccess("team-a", "room-a");
+  state.restoreForgottenRoom("room-a");
+  state = useAppStore.getState();
+  assert.equal(state.forgottenRoomIds.has("room-a"), false);
+  assert.equal(state.revokedRoomIds.has("room-a"), false);
+  assert.equal(state.revokedTeamIds.has("team-a"), false);
+
+  state.revokeRoomAccess("room-b");
+  state.revokeTeamAccess("team-b");
+  state.resetAppStore();
+  state = useAppStore.getState();
+  assert.equal(state.relayStatus, "closed");
+  assert.equal(state.revokedRoomIds.size, 0);
+  assert.equal(state.revokedTeamIds.size, 0);
+});
+
 test("desktop store keeps git workflow state room scoped", () => {
   const store = useAppStore.getState();
 

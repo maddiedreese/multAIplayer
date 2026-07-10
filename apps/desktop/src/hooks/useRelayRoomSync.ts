@@ -1,5 +1,5 @@
 import { useRelayPublishers } from "./useRelayPublishers";
-import { useRelaySubscription } from "./useRelaySubscription";
+import { useRelaySubscription } from "./relay/useRelaySubscription";
 
 export function useRelayRoomSync({
   subscription,
