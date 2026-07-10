@@ -143,7 +143,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npm run tauri:build -w @multaiplayer/desktop
+        run: npm run tauri:build:prebuilt -w @multaiplayer/desktop
 
       - name: Verify signed and notarized app
         run: |

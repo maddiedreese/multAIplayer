@@ -166,7 +166,10 @@ export function BrowserAccessPanel({
       window.addEventListener("resize", reposition);
       window.addEventListener("scroll", reposition, true);
       const animationFrame = window.requestAnimationFrame(reposition);
-      const secondAnimationFrame = window.requestAnimationFrame(() => window.requestAnimationFrame(reposition));
+      let nestedAnimationFrame: number | null = null;
+      const secondAnimationFrame = window.requestAnimationFrame(() => {
+        nestedAnimationFrame = window.requestAnimationFrame(reposition);
+      });
       const interval = window.setInterval(reposition, 250);
 
       cleanupPositioning = () => {
@@ -175,6 +178,7 @@ export function BrowserAccessPanel({
         window.removeEventListener("scroll", reposition, true);
         window.cancelAnimationFrame(animationFrame);
         window.cancelAnimationFrame(secondAnimationFrame);
+        if (nestedAnimationFrame !== null) window.cancelAnimationFrame(nestedAnimationFrame);
         window.clearInterval(interval);
       };
     });

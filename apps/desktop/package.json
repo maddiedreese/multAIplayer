@@ -12,7 +12,8 @@
     "test:smoke": "node ../../scripts/run-desktop-tests.mjs --smoke-only",
     "preview": "vite preview",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "tauri:build:prebuilt": "tauri build --config src-tauri/tauri.prebuilt.conf.json"
   },
   "dependencies": {
     "@multaiplayer/crypto": "0.1.0-alpha.0",

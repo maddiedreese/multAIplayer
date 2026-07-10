@@ -32,14 +32,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type-check workspaces
-        run: npm run check
-
-      - name: Test workspaces
-        run: npm test
-
-      - name: Build workspaces
-        run: npm run build
+      - name: Verify web, relay, and packages
+        run: npm run verify:web
 
   macos-desktop:
     name: macOS desktop package
@@ -71,11 +65,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify workspaces and native tests
-        run: npm run verify
+      - name: Verify native formatting and tests
+        run: npm run verify:native
+
+      - name: Build desktop prerequisites
+        run: npm run build:packages && npm run build -w @multaiplayer/desktop
 
       - name: Build unsigned Tauri app
-        run: npm run tauri:build -w @multaiplayer/desktop
+        run: npm run tauri:build:prebuilt -w @multaiplayer/desktop
 
       - name: Upload macOS app bundle
         uses: actions/upload-artifact@v6
