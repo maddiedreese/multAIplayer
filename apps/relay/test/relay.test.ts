@@ -9,6 +9,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import Database from "better-sqlite3";
 import { WebSocket } from "ws";
 import {
+  codexReasoningEffortIds,
   maxEnvelopeNonceChars,
   maxRoomProjectPathChars
 } from "@multaiplayer/protocol";
@@ -272,6 +273,39 @@ test("relay accepts room defaults when creating a room", async () => {
       }),
       400
     );
+  } finally {
+    await relay.close();
+  }
+});
+
+test("relay reasoning-effort errors list every current protocol option", async () => {
+  const relay = await startRelay();
+  const expectedError = `codexReasoningEffort must be one of ${codexReasoningEffortIds.join(", ")}`;
+  try {
+    const createResponse = await fetch(`${relay.baseUrl}/rooms`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        teamId: "team-core",
+        name: "Invalid effort room",
+        projectPath: "/tmp/multaiplayer",
+        codexReasoningEffort: "ultra"
+      })
+    });
+    assert.equal(createResponse.status, 400);
+    assert.deepEqual(await createResponse.json(), { error: expectedError });
+
+    const updateResponse = await fetch(`${relay.baseUrl}/rooms/room-desktop/settings`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        requesterName: "Maddie",
+        requesterUserId: "github:maddiedreese",
+        codexReasoningEffort: "ultra"
+      })
+    });
+    assert.equal(updateResponse.status, 400);
+    assert.deepEqual(await updateResponse.json(), { error: expectedError });
   } finally {
     await relay.close();
   }

@@ -225,6 +225,7 @@ test("host handoff payloads can report room-visible acceptance", () => {
     gitPatch: "diff --git a/README.md b/README.md\n",
     gitPatchTruncated: false,
     codexModel: "gpt-5.4",
+    codexReasoningEffort: "max",
     approvalPolicy: "ask_every_turn",
     messagesSinceLastCodex: 2,
     queuedCodexTurns: [{
@@ -245,6 +246,7 @@ test("host handoff payloads can report room-visible acceptance", () => {
   });
 
   assert.equal(parsed.status, "accepted");
+  assert.equal(parsed.codexReasoningEffort, "max");
   assert.equal(parsed.acceptedBy, "Alex");
   assert.equal(parsed.queuedCodexTurns?.[0]?.turnId, "turn-queued-1");
   assert.equal(HostHandoffPlaintextPayload.safeParse({

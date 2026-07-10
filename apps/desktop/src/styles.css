@@ -6268,7 +6268,6 @@ select {
   width: 100%;
   height: clamp(300px, 42vh, 460px);
   min-height: 0;
-  max-height: 460px;
   padding: 0;
   overflow: hidden;
 }
@@ -6785,6 +6784,18 @@ select {
 .member-row i {
   grid-column: 2;
   justify-self: start;
+}
+
+.team-member-row > span {
+  grid-area: avatar;
+}
+
+.team-member-row > div:first-of-type {
+  grid-area: identity;
+}
+
+.team-member-row > small {
+  grid-area: joined;
 }
 
 .header-model-switcher {

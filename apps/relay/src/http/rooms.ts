@@ -12,6 +12,7 @@ import {
   defaultCodexSpeed,
   defaultCodexServiceTierPolicy,
   defaultRoomMode,
+  codexReasoningEffortIds,
   codexSandboxLevelOptions,
   type ApprovalDelegationPolicy,
   type CodexCatalogSelectionPolicy,
@@ -52,6 +53,7 @@ interface RegisterRoomRoutesOptions {
 }
 
 const dailyRoomCreationCounts = new Map<string, DailyCreationQuotaRecord>();
+const codexReasoningEffortError = `codexReasoningEffort must be one of ${codexReasoningEffortIds.join(", ")}`;
 
 export function registerRoomRoutes({
   app,
@@ -159,7 +161,7 @@ export function registerRoomRoutes({
       return;
     }
     if (!codexReasoningEffort) {
-      res.status(400).json({ error: "codexReasoningEffort must be none, minimal, low, medium, high, or xhigh" });
+      res.status(400).json({ error: codexReasoningEffortError });
       return;
     }
     if (!codexSpeed) {
@@ -369,7 +371,7 @@ export function registerRoomRoutes({
       return;
     }
     if (codexReasoningEffort !== undefined && !codexReasoningEffort) {
-      res.status(400).json({ error: "codexReasoningEffort must be none, minimal, low, medium, high, or xhigh" });
+      res.status(400).json({ error: codexReasoningEffortError });
       return;
     }
     if (codexSpeed !== undefined && !codexSpeed) {

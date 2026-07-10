@@ -83,6 +83,7 @@ export function TerminalPanel({
   onStopTerminal: () => void;
 }) {
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
+  const terminalPanelRef = useRef<HTMLElement | null>(null);
   const xtermRef = useRef<XTermInstance | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const selectedTerminalIdForEffect = selectedTerminal?.id ?? null;
@@ -110,9 +111,6 @@ export function TerminalPanel({
       window.requestAnimationFrame = (callback) => window.setTimeout(() => callback(Date.now()), 16);
       window.cancelAnimationFrame = (handle) => window.clearTimeout(handle);
     }
-    const rootStyles = window.getComputedStyle?.(document.documentElement);
-    const terminalColor = rootStyles?.getPropertyValue("--code-text").trim() || "#111111";
-    const terminalBackground = rootStyles?.getPropertyValue("--code-bg").trim() || "#fafafa";
     if (!XTerm) return;
     const xterm = new XTerm({
       cursorBlink: true,
@@ -120,12 +118,7 @@ export function TerminalPanel({
       fontFamily: "var(--font-mono)",
       fontSize: 13,
       lineHeight: 1.35,
-      theme: {
-        background: terminalBackground,
-        foreground: terminalColor,
-        cursor: terminalColor,
-        selectionBackground: "rgba(120, 120, 120, 0.3)"
-      }
+      theme: readTerminalTheme()
     });
     const fitAddon = new FitAddon();
     xterm.loadAddon(fitAddon);
@@ -152,11 +145,18 @@ export function TerminalPanel({
     };
     const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleFit);
     resizeObserver?.observe(host);
+    const themeObserver = typeof window.MutationObserver === "undefined" ? null : new window.MutationObserver(() => {
+      xterm.options.theme = readTerminalTheme();
+    });
+    themeObserver?.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     scheduleFit();
+    const initialFocusFrame = window.requestAnimationFrame(() => xterm.focus());
 
     return () => {
       resizeObserver?.disconnect();
+      themeObserver?.disconnect();
       if (fitFrame !== null) window.cancelAnimationFrame(fitFrame);
+      window.cancelAnimationFrame(initialFocusFrame);
       dataDisposable.dispose();
       xterm.dispose();
       xtermRef.current = null;
@@ -202,13 +202,21 @@ export function TerminalPanel({
       } catch {
         // Hidden panels are fitted again when visible.
       }
-      xtermRef.current?.focus();
+      const activeElement = document.activeElement;
+      if (
+        !activeElement ||
+        activeElement === document.body ||
+        activeElement === document.documentElement ||
+        terminalPanelRef.current?.contains(activeElement)
+      ) {
+        xtermRef.current?.focus();
+      }
     });
     return () => window.cancelAnimationFrame(focusFrame);
   }, [selectedTerminalIdForEffect]);
 
   return (
-    <section className="panel terminal-panel">
+    <section className="panel terminal-panel" ref={terminalPanelRef}>
       <div className="panel-title">
         <span>Terminals</span>
         <div className="panel-title-actions">
@@ -359,4 +367,15 @@ function writeTerminalLine(terminal: XTermInstance, line: TerminalLine) {
     return;
   }
   terminal.write(line.text);
+}
+
+function readTerminalTheme() {
+  const rootStyles = window.getComputedStyle?.(document.documentElement);
+  const foreground = rootStyles?.getPropertyValue("--code-text").trim() || "#111111";
+  return {
+    background: rootStyles?.getPropertyValue("--code-bg").trim() || "#fafafa",
+    foreground,
+    cursor: foreground,
+    selectionBackground: "rgba(120, 120, 120, 0.3)"
+  };
 }
