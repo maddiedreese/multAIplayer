@@ -96,7 +96,7 @@ export async function runCodexTurn(
   clientTurnId: string,
   cwd: string,
   input: string,
-  model = "gpt-5.5",
+  model = "gpt-5.6-sol",
   reasoningEffort = "medium",
   speed = "standard",
   serviceTier: string | null = null,

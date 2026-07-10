@@ -55,8 +55,8 @@ export function TeamRosterPanel({
           <div className="member-row team-member-row" key={`${member.teamId}:${member.userId}`}>
             <span>{initial}</span>
             <div>
-              <strong>{name}</strong>
-              <small>{member.userId}</small>
+              <strong title={name}>{name}</strong>
+              <small title={member.userId}>{member.userId}</small>
             </div>
             <div className="member-badges">
               <b className={member.role === "owner" ? "trusted" : member.role === "admin" ? "verified" : ""}>
@@ -75,7 +75,7 @@ export function TeamRosterPanel({
                 <button onClick={() => onRemove(member)} disabled={busy}>Remove</button>
               )}
             </div>
-            <small>{joinedLabel}</small>
+            <small title={joinedLabel}>{joinedLabel}</small>
           </div>
         ))}
       </div>

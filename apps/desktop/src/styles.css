@@ -6264,14 +6264,19 @@ select {
 
 .terminal-output.xterm-output {
   position: relative;
-  min-height: 420px;
+  flex: 0 0 auto;
+  width: 100%;
+  height: clamp(300px, 42vh, 460px);
+  min-height: 0;
+  max-height: 460px;
   padding: 0;
   overflow: hidden;
 }
 
 .xterm-host {
-  flex: 1;
-  min-height: 360px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   padding: 12px;
   overflow: hidden;
 }
@@ -6754,6 +6759,28 @@ select {
   min-width: 0;
 }
 
+/* Preserve the team roster's named areas after the generic member grid collapses to two columns. */
+.team-member-row {
+  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-areas:
+    "avatar identity"
+    "avatar joined"
+    "badges badges";
+  align-items: center;
+}
+
+.team-member-row .member-badges {
+  grid-area: badges;
+  max-width: none;
+  justify-content: flex-start;
+}
+
+.team-member-row strong,
+.team-member-row small {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .team-member-row > small,
 .member-row i {
   grid-column: 2;
@@ -6800,6 +6827,47 @@ select {
 .browser-toolbar {
   min-height: 62px;
   padding: 12px 12px 14px;
+}
+
+/* Keep the URL useful in the narrow inspector instead of squeezing it behind five fixed controls. */
+.browser-panel {
+  container-type: inline-size;
+}
+
+.browser-toolbar {
+  flex: 0 0 auto;
+  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+}
+
+.browser-toolbar-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  width: 100%;
+}
+
+.browser-toolbar-actions button {
+  width: 100%;
+  min-width: 0;
+}
+
+@container (min-width: 700px) {
+  .browser-toolbar {
+    grid-template-columns: 18px minmax(180px, 1fr) auto;
+    grid-template-rows: auto;
+  }
+
+  .browser-toolbar-actions {
+    grid-column: auto;
+    display: flex;
+    width: auto;
+  }
+
+  .browser-toolbar-actions button {
+    width: 34px;
+    min-width: 34px;
+  }
 }
 
 .browser-open .browser-viewport {

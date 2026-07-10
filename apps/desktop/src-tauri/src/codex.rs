@@ -108,7 +108,7 @@ pub(crate) fn run_codex_turn(
     ensure_codex_input(&request.input)?;
     let previous_thread_id = normalize_codex_thread_id(request.previous_thread_id.as_deref())?;
     let timeout = codex_timeout(request.timeout_seconds)?;
-    let model = request.model.unwrap_or_else(|| "gpt-5.5".to_string());
+    let model = request.model.unwrap_or_else(|| "gpt-5.6-sol".to_string());
     let reasoning_effort = normalize_reasoning_effort(request.reasoning_effort.as_deref())?;
     let service_tier =
         normalize_service_tier(request.service_tier.as_deref(), request.speed.as_deref())?;
