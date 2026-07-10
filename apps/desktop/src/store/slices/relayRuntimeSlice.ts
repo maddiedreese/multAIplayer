@@ -69,6 +69,8 @@ export const createRelayRuntimeSlice: StateCreator<AppStoreState, [], [], RelayR
     revokedTeamIds: withValue(state.revokedTeamIds, teamId)
   })),
   restoreWorkspaceAccess: (teamId, roomId) => set((state) => ({
+    // Restoring relay authorization does not restore the local room secret. Keep the
+    // room forgotten until an invite import or key rotation supplies that secret.
     revokedRoomIds: withoutValue(state.revokedRoomIds, roomId),
     revokedTeamIds: withoutValue(state.revokedTeamIds, teamId)
   }))

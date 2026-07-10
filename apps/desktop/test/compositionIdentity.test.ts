@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
-import { afterEach, test } from "node:test";
+import { afterEach, beforeEach, test } from "node:test";
 import { JSDOM } from "jsdom";
 import { cleanup, render, renderHook } from "@testing-library/react";
 import { createElement, StrictMode, useLayoutEffect, type ReactNode } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { createShellInput } from "../src/hooks/appViewModelShell";
-import type { UseInviteActionsOptions } from "../src/hooks/inviteActionTypes";
+import type { UseInviteActionsOptions } from "../src/lib/invite/inviteActionTypes";
 import { useInviteActions } from "../src/hooks/useInviteActions";
 import { useStablePlainObjectComposition } from "../src/hooks/useStablePlainObjectComposition";
+import { useAppStore } from "../src/store/appStore";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://127.0.0.1:5173/"
@@ -31,6 +32,7 @@ Object.assign(globalThis, {
 });
 
 afterEach(() => cleanup());
+beforeEach(() => useAppStore.getState().resetAppStore());
 
 function StrictModeWrapper({ children }: { children: ReactNode }) {
   return createElement(StrictMode, null, children);
@@ -76,18 +78,8 @@ const inviteOptions: UseInviteActionsOptions = {
   reportRoomKeyRotationInFlight: () => false,
   upsertTeam: noop,
   upsertRoom: noop,
-  appendInviteRequest: noop,
-  updateInviteRequestStatus: noop,
-  appendRoomMessage: noop,
-  setSelectedInviteMessage: noop,
-  setInviteMessageForRoom: noop,
-  setInviteLinkForRoom: noop,
   clearInviteSecretInput: noop,
-  selectWorkspaceRoom: noop,
-  rememberForgottenRoom: noop,
-  restoreForgottenRoom: noop,
-  restoreWorkspaceAccess: noop,
-  setKeyRotationBusyForRoom: noop
+  selectWorkspaceRoom: noop
 };
 
 test("invite action identities survive wrapper-object rerenders", () => {
@@ -110,7 +102,6 @@ test("invite action identities survive wrapper-object rerenders", () => {
 });
 
 test("stable invite actions call the latest implementation after inputs change", async () => {
-  const messages: Array<string | null> = [];
   const { result, rerender } = renderHook(
     ({ options }: { options: UseInviteActionsOptions }) => useInviteActions(options),
     { initialProps: { options: inviteOptions } }
@@ -120,8 +111,7 @@ test("stable invite actions call the latest implementation after inputs change",
   rerender({
     options: {
       ...inviteOptions,
-      hasSelectedRoom: false,
-      setSelectedInviteMessage: (message) => messages.push(message)
+      hasSelectedRoom: false
     }
   });
   await result.current.copyInviteLink();
@@ -131,7 +121,10 @@ test("stable invite actions call the latest implementation after inputs change",
   assert.equal(result.current.copyInviteLink, first.copyInviteLink);
   assert.equal(result.current.decideInviteJoinRequest, first.decideInviteJoinRequest);
   assert.equal(result.current.rotateSelectedRoomKey, first.rotateSelectedRoomKey);
-  assert.deepEqual(messages, ["Create or join a room before copying an invite."]);
+  assert.equal(
+    useAppStore.getState().inviteByRoom[room.id]?.message,
+    "Create or join a room before copying an invite."
+  );
 });
 
 test("view-model compositions preserve identities until rendered data changes", () => {

@@ -1,10 +1,10 @@
-import { useChatActions } from "./useChatActions";
+import { createChatActions } from "../lib/chatActions";
+import { createRoomVisibilityWarningActions } from "../lib/roomVisibilityWarningActions";
 import { useGitHubWorkflowState } from "./useGitHubWorkflowState";
 import { useRoomAccess } from "./useRoomAccess";
 import { useRoomInFlightReporters } from "./useRoomInFlightReporters";
 import { useRoomMemberRows } from "./useRoomMemberRows";
-import { useRoomNotices } from "./useRoomNotices";
-import { useRoomVisibilityWarningActions } from "./useRoomVisibilityWarningActions";
+import { buildRoomNotices } from "../lib/roomNotices";
 
 export function useRoomInteractionContext({
   inFlightReporters,
@@ -16,18 +16,18 @@ export function useRoomInteractionContext({
   memberRows
 }: {
   inFlightReporters: Parameters<typeof useRoomInFlightReporters>[0];
-  notices: Parameters<typeof useRoomNotices>[0];
-  visibilityWarning: Parameters<typeof useRoomVisibilityWarningActions>[0];
+  notices: Parameters<typeof buildRoomNotices>[0];
+  visibilityWarning: Parameters<typeof createRoomVisibilityWarningActions>[0];
   access: Parameters<typeof useRoomAccess>[0];
-  chat: Omit<Parameters<typeof useChatActions>[0], "isSelectedRoomLocked" | "isSelectedRoomRevoked">;
+  chat: Omit<Parameters<typeof createChatActions>[0], "isSelectedRoomLocked" | "isSelectedRoomRevoked">;
   githubWorkflow: Parameters<typeof useGitHubWorkflowState>[0];
   memberRows: Parameters<typeof useRoomMemberRows>[0];
 }) {
   const reporters = useRoomInFlightReporters(inFlightReporters);
-  const roomNotices = useRoomNotices(notices);
-  const visibilityActions = useRoomVisibilityWarningActions(visibilityWarning);
+  const roomNotices = buildRoomNotices(notices);
+  const visibilityActions = createRoomVisibilityWarningActions(visibilityWarning);
   const accessState = useRoomAccess(access);
-  const chatActions = useChatActions({
+  const chatActions = createChatActions({
     ...chat,
     isSelectedRoomLocked: accessState.isSelectedRoomLocked,
     isSelectedRoomRevoked: accessState.isSelectedRoomRevoked

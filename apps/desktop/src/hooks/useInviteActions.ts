@@ -1,21 +1,15 @@
-import { useAppStore } from "../store/appStore";
-import { createInviteJoinActions } from "./inviteJoinActions";
-import { createInviteLinkActions } from "./inviteLinkActions";
-import { createInviteRelayActions } from "./inviteRelayActions";
-import { createRoomKeyRotationActions } from "./roomKeyRotationActions";
-import type { UseInviteActionsOptions } from "./inviteActionTypes";
+import { createInviteJoinActions } from "../lib/invite/inviteJoinActions";
+import { createInviteLinkActions } from "../lib/invite/inviteLinkActions";
+import { createInviteRelayActions } from "../lib/invite/inviteRelayActions";
+import { createRoomKeyRotationActions } from "../lib/invite/roomKeyRotationActions";
+import type { UseInviteActionsOptions } from "../lib/invite/inviteActionTypes";
 import { useStablePlainObjectComposition } from "./useStablePlainObjectComposition";
 
 export function useInviteActions(options: UseInviteActionsOptions) {
-  const setInviteAdmissionForRoom = useAppStore((state) => state.setInviteAdmissionForRoom);
-  const initializeMessagesForRoom = useAppStore((state) => state.initializeMessagesForRoom);
-
   const relayActions = createInviteRelayActions(options);
   const joinActions = createInviteJoinActions({
     ...options,
-    initializeMessagesForRoom,
-    publishInviteJoinRequest: relayActions.publishInviteJoinRequest,
-    setInviteAdmissionForRoom
+    publishInviteJoinRequest: relayActions.publishInviteJoinRequest
   });
   const linkActions = createInviteLinkActions(options);
   const rotationActions = createRoomKeyRotationActions(options);

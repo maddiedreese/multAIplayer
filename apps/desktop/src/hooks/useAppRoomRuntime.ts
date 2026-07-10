@@ -4,11 +4,11 @@ import type { useAppHostHandoffActions } from "./useAppHostHandoffActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRelaySync } from "./useAppRelaySync";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
-import type { useAppRoomActions } from "./useAppRoomActions";
+import type { createAppRoomActions } from "../lib/appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { useAppStateSlices } from "./useAppStateSlices";
-import type { useAppWorkspaceRecords } from "./useAppWorkspaceRecords";
+import type { WorkspaceRecordActions } from "../lib/workspaceRecordActions";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import { useRoomRuntimeContext } from "./useRoomRuntimeContext";
@@ -21,10 +21,9 @@ type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
-type RoomActions = ReturnType<typeof useAppRoomActions>;
+type RoomActions = ReturnType<typeof createAppRoomActions>;
 type RelaySync = ReturnType<typeof useAppRelaySync>;
 type HostHandoffActions = ReturnType<typeof useAppHostHandoffActions>;
-type WorkspaceRecords = ReturnType<typeof useAppWorkspaceRecords>;
 type RoomSettingsActor = ReturnType<typeof useRoomSettingsActor>;
 
 export function useAppRoomRuntime({
@@ -39,7 +38,10 @@ export function useAppRoomRuntime({
   relaySync,
   hostHandoffActions,
   workspaceRecords,
-  roomSettingsActor
+  roomSettingsActor,
+  maxTerminalActivityLines,
+  defaultBrowserUrl,
+  defaultBrowserReason
 }: {
   appState: AppStateSlices;
   appRefs: AppRefs;
@@ -51,8 +53,11 @@ export function useAppRoomRuntime({
   roomActions: RoomActions;
   relaySync: RelaySync;
   hostHandoffActions: HostHandoffActions;
-  workspaceRecords: WorkspaceRecords;
+  workspaceRecords: WorkspaceRecordActions;
   roomSettingsActor: RoomSettingsActor;
+  maxTerminalActivityLines: number;
+  defaultBrowserUrl: string;
+  defaultBrowserReason: string;
 }) {
   const {
     workspaceState,
@@ -84,8 +89,6 @@ export function useAppRoomRuntime({
     pendingAttachments,
     browserRequests,
     fileSaveRequests,
-    browserUrl,
-    browserReason,
     gitStatus,
     gitWorkflowDraft,
     fileQuery,
@@ -99,7 +102,6 @@ export function useAppRoomRuntime({
     setSelectedChatMessage,
     setSelectedSettingsMessage,
     setSettingsMessageForRoom,
-    setGitWorkflowBusyForRoom,
     setActionsBusyForRoom,
     setLocalPreviewBusyForRoom,
     setFileBusyForRoom,
@@ -117,19 +119,12 @@ export function useAppRoomRuntime({
     resetCodexApprovalForRoom,
     setCodexRunningForRoom,
     setRoomGoalForRoom,
-    setBrowserUrlForRoom,
-    setBrowserMessageForRoom,
-    setSelectedBrowserMessage,
     clearPendingAttachmentsForRoom,
     setDraftForRoom,
     setProjectPathDraftForRoom,
-    setGitWorkflowMessageForRoom,
-    setSelectedGitWorkflowMessage,
     setGitStatusForRoom,
     appendTerminalRequest,
-    updateTerminalRequestStatus,
-    appendBrowserRequest,
-    updateBrowserRequestStatus
+    updateTerminalRequestStatus
   } = roomActions;
 
   const runtime = useRoomRuntimeContext({
@@ -186,18 +181,7 @@ export function useAppRoomRuntime({
         codexThreadId: selectedRuntime.selectedCodexThreadId,
         publishChatMessage: roomInteraction.publishChatMessage,
         handleCodexBrowserOpenCommand: relaySync.handleCodexBrowserOpenCommand,
-        publishCodexQueueEvent: relaySync.publishCodexQueueEvent,
-        setSelectedChatMessage,
-        setChatMessageForRoom,
-        setSelectedHostMessage,
-        setHostMessageForRoom,
-        setPendingCodexApprovalForRoom,
-        enqueueCodexApprovalForRoom: roomActions.enqueueCodexApprovalForRoom,
-        setApprovalVisibleForRoom,
-        setDraftForRoom,
-        setReplyToMessageForRoom: roomActions.setReplyToMessageForRoom,
-        setRoomGoalForRoom,
-        clearPendingAttachmentsForRoom
+        publishCodexQueueEvent: relaySync.publishCodexQueueEvent
       }
     },
     toolActions: {
@@ -208,6 +192,7 @@ export function useAppRoomRuntime({
         isActiveHost: roomInteraction.isActiveHost,
         selectedRoom,
         selectedRoomIdRef: appRefs.selectedRoomIdRef,
+        settingsBusyRef: appRefs.settingsBusyRef,
         selectedCodexModel,
         selectedCodexReasoningEffort,
         selectedCodexSpeed,
@@ -217,16 +202,7 @@ export function useAppRoomRuntime({
         roomSettingsGateMessage: roomInteraction.roomSettingsGateMessage,
         roomSettingsActor,
         reportRoomSettingsMutationInFlight: roomInteraction.reportRoomSettingsMutationInFlight,
-        setSettingsBusyForRoom: roomActions.setSettingsBusyForRoom,
-        setSelectedSettingsMessage,
-        setSettingsMessageForRoom,
-        setSelectedBrowserMessage,
-        setBrowserMessageForRoom,
         replaceRoom: workspaceRecords.replaceRoom,
-        clearBrowserStatusForRoom: roomActions.clearBrowserStatusForRoom,
-        setProjectPathDraftForRoom,
-        resetCodexApprovalForRoom,
-        resetFileContextForRoom,
         publishRoomSettingsEvent: relaySync.publishRoomSettingsEvent
       },
       terminal: {
@@ -242,15 +218,9 @@ export function useAppRoomRuntime({
         roomTerminals,
         selectedTerminal: selectedRuntime.selectedTerminal,
         terminalRequests: selectedRuntime.terminalRequests,
+        terminalBusyRef: appRefs.terminalBusyRef,
         reportRoomTerminalActionInFlight: roomInteraction.reportRoomTerminalActionInFlight,
-        setTerminalBusyForRoom: roomActions.setTerminalBusyForRoom,
-        setSelectedTerminalError,
-        setTerminalErrorForRoom,
-        appendTerminalLinesForRoom,
-        setGitStatusForRoom,
-        upsertTerminalSnapshot: terminalPanelState.upsertTerminalSnapshot,
-        setSelectedTerminalIdForRoom,
-        updateTerminalRequestStatus,
+        maxTerminalActivityLines,
         publishRequestStatus: relaySync.publishRequestStatus,
         publishTerminalResult: relaySync.publishTerminalResult
       },
@@ -263,16 +233,6 @@ export function useAppRoomRuntime({
         localUser: localIdentity.localUser,
         localPreviewDialog: localPreviewState.localPreviewDialog,
         localPreviewsByRoom: localPreviewState.localPreviewsByRoom,
-        openLocalPreviewDialogForRoom: localPreviewState.openLocalPreviewDialogForRoom,
-        closeLocalPreviewDialog: localPreviewState.closeLocalPreviewDialog,
-        setLocalPreviewDialogCandidates: localPreviewState.setLocalPreviewDialogCandidates,
-        setLocalPreviewDialogSelectedUrl: localPreviewState.setLocalPreviewDialogSelectedUrl,
-        setLocalPreviewDialogPhase: localPreviewState.setLocalPreviewDialogPhase,
-        setLocalPreviewDialogConfirmation: localPreviewState.setLocalPreviewDialogConfirmation,
-        setLocalPreviewDialogError: localPreviewState.setLocalPreviewDialogError,
-        setLocalPreviewBusyForRoom,
-        setSelectedChatMessage,
-        setChatMessageForRoom,
         publishLocalPreviewEvent: relaySync.publishLocalPreviewEvent
       },
       account: {
@@ -311,11 +271,7 @@ export function useAppRoomRuntime({
         githubWorkflowReadiness: roomInteraction.githubWorkflowReadiness,
         messages,
         gitStatus,
-        setSelectedGitWorkflowMessage,
-        setGitWorkflowMessageForRoom,
-        setGitWorkflowBusyForRoom,
-        appendTerminalLinesForRoom,
-        setGitStatusForRoom,
+        maxTerminalActivityLines,
         publishGitWorkflowEvent: relaySync.publishGitWorkflowEvent
       },
       browser: {
@@ -327,19 +283,13 @@ export function useAppRoomRuntime({
         hostGateMessage: roomInteraction.hostGateMessage,
         selectedRoom,
         selectedRoomIdRef: appRefs.selectedRoomIdRef,
-        browserUrl,
-        browserReason,
-        browserRequests,
+        defaultBrowserUrl,
+        defaultBrowserReason,
         localUser: localIdentity.localUser,
         deviceId: localIdentity.deviceId,
         relayStatus: appRuntimeState.relayStatus,
         relayRef: appRefs.relayRef,
         seenEnvelopeIds: appRefs.seenEnvelopeIds,
-        setSelectedBrowserMessage,
-        setBrowserMessageForRoom,
-        setBrowserUrlForRoom,
-        appendBrowserRequest,
-        updateBrowserRequestStatus,
         publishRequestStatus: relaySync.publishRequestStatus
       }
     },
@@ -383,16 +333,14 @@ export function useAppRoomRuntime({
         hasSelectedRoom,
         canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
         selectedRoomId: selectedRoom.id,
-        selectedRoomProjectPath: selectedRoom.projectPath,
-        setGitStatusForRoom
+        selectedRoomProjectPath: selectedRoom.projectPath
       },
       gitHubRemoteInference: {
         hasSelectedRoom,
         canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
         selectedRoomId: selectedRoom.id,
         selectedRoomProjectPath: selectedRoom.projectPath,
-        selectedRoomIdRef: appRefs.selectedRoomIdRef,
-        setGitWorkflowMessageForRoom
+        selectedRoomIdRef: appRefs.selectedRoomIdRef
       },
       gitHubActionsDraftReset: {
         hasSelectedRoom,
@@ -405,12 +353,7 @@ export function useAppRoomRuntime({
         selectedRoomId: selectedRoom.id,
         selectedRoomProjectPath: selectedRoom.projectPath,
         fileQuery,
-        localWorkspaceMessage: roomInteraction.localWorkspaceMessage,
-        setProjectFilesForRoom,
-        setSelectedFileForRoom,
-        setSelectedDiffForRoom,
-        setFileBusyForRoom,
-        setFileMessageForRoom
+        localWorkspaceMessage: roomInteraction.localWorkspaceMessage
       },
       terminalLifecycle: {
         hasSelectedRoom,

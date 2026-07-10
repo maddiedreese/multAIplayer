@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { useRoomChatPanelActions } from "../src/hooks/useRoomChatPanelActions";
+import { createRoomChatPanelActions } from "../src/lib/roomChatPanelActions";
+import { createRoomHeaderActions } from "../src/lib/roomHeaderActions";
+import { createTerminalPanelActions } from "../src/lib/terminalPanelActions";
+import { createWorkspaceFilesPanelActions } from "../src/lib/workspaceFilesPanelActions";
+import { useAppStore } from "../src/store/appStore";
 
 const room: RoomRecord = {
   id: "room-preview",
@@ -26,7 +30,7 @@ const noopAsync = async () => undefined;
 
 test("local preview open action opens the Cloudflare URL in the room browser", () => {
   const opened: Array<{ room: RoomRecord; url: string; reason: string }> = [];
-  const actions = useRoomChatPanelActions({
+  const actions = createRoomChatPanelActions({
     selectedRoomId: room.id,
     messages: [],
     localPreviews: [
@@ -49,9 +53,6 @@ test("local preview open action opens the Cloudflare URL in the room browser", (
     publishChatMessageEdit: noopAsync,
     publishChatMessageDelete: noopAsync,
     publishChatMessage: noopAsync,
-    setPendingCodexApprovalForRoom: noop,
-    setApprovalVisibleForRoom: noop,
-    removeQueuedCodexApprovalForRoom: noop,
     promoteNextCodexApprovalForRoom: noop,
     approveCodexTurn: noop,
     handleCodexInvoke: noop,
@@ -64,12 +65,8 @@ test("local preview open action opens the Cloudflare URL in the room browser", (
     deleteGoal: noop,
     tickGoalElapsed: noop,
     copyMarkdownWithFallback: noopAsync,
-    setChatMessageForRoom: noop,
     stopLocalPreview: noopAsync,
     openBrowserUrl: (targetRoom, url, reason) => opened.push({ room: targetRoom, url, reason }),
-    setInspectorTabForRoom: noop,
-    setReplyToMessageForRoom: noop,
-    setDraftForRoom: noop
   });
 
   actions.onOpenLocalPreview("preview-1");
@@ -81,4 +78,86 @@ test("local preview open action opens the Cloudflare URL in the room browser", (
       reason: "Opened from a shared local preview."
     }
   ]);
+});
+
+test("room header actions mutate the store without a React subscription", () => {
+  useAppStore.getState().resetAppStore();
+  let browserOpenCount = 0;
+  const actions = createRoomHeaderActions({
+    selectedRoomId: "room-fallback",
+    selectedRoomIdForTabs: room.id,
+    activeBrowserUrl: null,
+    selectTeamRoom: noop,
+    openRoomBrowserNow: () => {
+      browserOpenCount += 1;
+    }
+  });
+
+  actions.onSelectInspectorTab("browser");
+
+  assert.equal(useAppStore.getState().historyPresenceByRoom[room.id]?.inspectorTab, "browser");
+  assert.equal(browserOpenCount, 1);
+  useAppStore.getState().resetAppStore();
+});
+
+test("terminal panel actions resolve request ids before approval", () => {
+  const approved: string[] = [];
+  const actions = createTerminalPanelActions({
+    selectedRoomId: room.id,
+    terminalRequests: [{
+      id: "request-1",
+      roomId: room.id,
+      requestedBy: "Avery",
+      requestedByUserId: "github:avery",
+      command: "npm test",
+      status: "pending",
+      createdAt: "2026-07-09T12:00:00.000Z"
+    }],
+    copyTerminalMarkdown: noop,
+    openInteractiveTerminal: noop,
+    approveTerminalRequest: (request) => approved.push(request.id),
+    denyTerminalRequest: noop,
+    sendTerminalData: noop,
+    restartSelectedTerminal: noop,
+    stopSelectedTerminal: noop
+  });
+
+  actions.onApproveTerminalRequest("missing");
+  actions.onApproveTerminalRequest("request-1");
+
+  assert.deepEqual(approved, ["request-1"]);
+});
+
+test("workspace file panel close clears all viewer state", () => {
+  useAppStore.getState().resetAppStore();
+  useAppStore.getState().setSelectedFileForRoom(room.id, {
+    path: "src/main.ts",
+    content: "export {};",
+    truncated: false
+  });
+  useAppStore.getState().setSelectedDiffForRoom(room.id, {
+    path: "src/main.ts",
+    diff: "diff --git a/src/main.ts b/src/main.ts",
+    truncated: false
+  });
+  useAppStore.getState().setSensitiveAttachmentReviewKey("review-key");
+  const actions = createWorkspaceFilesPanelActions({
+    selectedRoomId: room.id,
+    copyProjectMarkdown: noop,
+    setFileQueryForRoom: noop,
+    openProjectFile: noop,
+    copyDiffSummaryMarkdown: noop,
+    attachSelectedFileToMessage: noop,
+    saveSelectedFileContent: noop,
+    approveFileSaveRequest: noop,
+    denyFileSaveRequest: noop
+  });
+
+  actions.onCloseFileViewer();
+
+  const store = useAppStore.getState();
+  assert.equal(store.filePanelByRoom[room.id]?.selectedFile, undefined);
+  assert.equal(store.filePanelByRoom[room.id]?.selectedDiff, undefined);
+  assert.equal(store.sensitiveAttachmentReviewKey, null);
+  store.resetAppStore();
 });

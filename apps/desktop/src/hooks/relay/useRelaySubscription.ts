@@ -57,6 +57,7 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
     seenEnvelopeIds
   } = options;
   const latest = useLatestRef(options);
+  const selectedRoomInviteAdmission = inviteAdmissionsByRoom[selectedRoom.id];
 
   useEffect(() => {
     let cancelled = false;
@@ -147,7 +148,7 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
           roomId: selectedRoom.id,
           userId: localUser.id,
           deviceId,
-          inviteId: inviteAdmissionsByRoom[selectedRoom.id]
+          inviteId: selectedRoomInviteAdmission
         });
         openClient.publish({
           type: "presence",
@@ -173,7 +174,6 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
     deviceId,
     devicePublicKeyFingerprint,
     hasSelectedRoom,
-    inviteAdmissionsByRoom,
     latest,
     localUser.avatarUrl,
     localUser.id,
@@ -181,6 +181,7 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
     relayRef,
     seenEnvelopeIds,
     selectedRoom.id,
+    selectedRoomInviteAdmission,
     selectedRoom.teamId,
     selectedTeam
   ]);

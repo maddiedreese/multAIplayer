@@ -5,11 +5,11 @@ import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRoomDisplayContext } from "./useAppRoomDisplayContext";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
-import type { useAppRoomActions } from "./useAppRoomActions";
+import type { createAppRoomActions } from "../lib/appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { useAppStateSlices } from "./useAppStateSlices";
-import type { useAppWorkspaceRecords } from "./useAppWorkspaceRecords";
+import type { WorkspaceRecordActions } from "../lib/workspaceRecordActions";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import type { useRoomSettingsActor } from "./useRoomSettingsActor";
@@ -22,8 +22,7 @@ type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
-type RoomActions = ReturnType<typeof useAppRoomActions>;
-type WorkspaceRecords = ReturnType<typeof useAppWorkspaceRecords>;
+type RoomActions = ReturnType<typeof createAppRoomActions>;
 type InviteActions = ReturnType<typeof useAppInviteActions>;
 type RoomDisplay = ReturnType<typeof useAppRoomDisplayContext>;
 type RoomSettingsActor = ReturnType<typeof useRoomSettingsActor>;
@@ -50,7 +49,7 @@ export function useAppWorkspaceFlow({
   selectedRuntime: SelectedRoomRuntime;
   roomInteraction: RoomInteraction;
   roomActions: RoomActions;
-  workspaceRecords: WorkspaceRecords;
+  workspaceRecords: WorkspaceRecordActions;
   inviteActions: InviteActions;
   roomDisplay: RoomDisplay;
   roomSettingsActor: RoomSettingsActor;
@@ -69,7 +68,6 @@ export function useAppWorkspaceFlow({
     hasSelectedRoom,
     selectedRoom,
     selectedTeamName,
-    selectedTeamMembersBusy,
     messages,
     selectedMessages,
     browserRequests,
@@ -81,32 +79,9 @@ export function useAppWorkspaceFlow({
   } = selected;
   const {
     setSelectedInviteMessage,
-    setMarkdownCopyFallbackForRoom,
-    setSelectedChatMessage,
-    setChatMessageForRoom,
-    setSelectedFileMessage,
-    setFileMessageForRoom,
-    setSelectedTerminalError,
-    setTerminalErrorForRoom,
-    setSelectedGitWorkflowMessage,
-    setGitWorkflowMessageForRoom,
-    setInviteApprovalGateForRoom,
     setSelectedTeamHistoryMessage,
     setTeamHistoryMessageForTeam,
-    setSelectedHistoryMessage,
-    setHistoryMessageForRoom,
-    setSettingsBusyForRoom,
-    setSecretWarningVisibleForRoom,
-    setFileBusyForRoom,
-    setSelectedFileForRoom,
-    setSelectedDiffForRoom,
-    setFilePreviewTabForRoom,
-    appendFileSaveRequest,
-    updateFileSaveRequestStatus,
-    appendPendingAttachmentForRoom,
-    removePendingAttachmentForRoom,
-    hydrateLocalRoomHistoryForRoom,
-    clearBrowserStatusForRoom
+    hydrateLocalRoomHistoryForRoom
   } = roomActions;
 
   return useWorkspaceFlowContext({
@@ -121,7 +96,7 @@ export function useAppWorkspaceFlow({
       },
       selectedRoomReadReceipt: {
         selectedRoomId: workspaceState.selectedRoomId,
-        markRoomRead: workspaceRecords.markRoomRead
+        markRoomRead: workspaceState.markRoomReadById
       },
       deviceIdentity: {
         relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
@@ -160,22 +135,12 @@ export function useAppWorkspaceFlow({
       selectedFileRisks: roomDisplay.selectedFileRisks,
       selectedTerminal: selectedRuntime.selectedTerminal,
       terminalLines,
-      terminalRisks: roomDisplay.terminalRisks,
-      setMarkdownCopyFallbackForRoom,
-      setSelectedChatMessage,
-      setChatMessageForRoom,
-      setSelectedFileMessage,
-      setFileMessageForRoom,
-      setSelectedTerminalError,
-      setTerminalErrorForRoom,
-      setSelectedGitWorkflowMessage,
-      setGitWorkflowMessageForRoom
+      terminalRisks: roomDisplay.terminalRisks
     },
     workspaceRoomActions: {
       members: {
         selectedTeam: workspaceState.selectedTeam,
         selectedTeamName,
-        selectedTeamMembersBusy,
         selectedRoom,
         localUser: localIdentity.localUser,
         currentUser: githubAuth.currentUser,
@@ -196,10 +161,6 @@ export function useAppWorkspaceFlow({
         setNewTeamName: workspaceState.setNewTeamName,
         setNewRoomName: workspaceState.setNewRoomName,
         setNewRoomProjectPath: workspaceState.setNewRoomProjectPath,
-        restoreRoomAccess: roomRuntimeState.restoreRoomAccess,
-        restoreTeamAccess: roomRuntimeState.restoreTeamAccess,
-        restoreForgottenRoom: roomRuntimeState.restoreForgottenRoom,
-        setInviteApprovalGateForRoom,
         upsertTeam: workspaceRecords.upsertTeam,
         upsertRoom: workspaceRecords.upsertRoom,
         roomSettingsActor
@@ -237,18 +198,11 @@ export function useAppWorkspaceFlow({
         roomGoal: selected.roomGoal,
         selectedCodexThreadId: selectedRuntime.selectedCodexThreadId,
         codexThreadGraph: selectedRuntime.codexThreadGraph,
+        settingsBusyRef: appRefs.settingsBusyRef,
         reportRoomSettingsMutationInFlight: roomInteraction.reportRoomSettingsMutationInFlight,
         roomSettingsActor,
-        setSelectedHistoryMessage,
-        setHistoryMessageForRoom,
-        setInviteApprovalGateForRoom,
-        setSettingsBusyForRoom,
-        setSecretWarningVisibleForRoom,
         replaceHistorySettings: historyDefaultsState.replaceHistorySettings,
-        hydrateLocalRoomHistoryForRoom,
         replaceRoom: workspaceRecords.replaceRoom,
-        clearBrowserStatusForRoom,
-        rememberForgottenRoom: roomRuntimeState.rememberForgottenRoom,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds
       },
       files: {
@@ -261,27 +215,12 @@ export function useAppWorkspaceFlow({
         selectedRoomIdRef: appRefs.selectedRoomIdRef,
         isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
         isSelectedRoomRevoked: roomInteraction.isSelectedRoomRevoked,
-        selectedFile,
-        fileSaveRequests,
         localUser: localIdentity.localUser,
         deviceId: localIdentity.deviceId,
         relayStatus: appRuntimeState.relayStatus,
         relayRef: appRefs.relayRef,
         seenEnvelopeIds: appRefs.seenEnvelopeIds,
-        pendingAttachmentsByRoom: roomChatState.pendingAttachmentsByRoom,
-        sensitiveAttachmentReviewKey: roomChatState.sensitiveAttachmentReviewKey,
-        setSensitiveAttachmentReviewKey: roomChatState.setSensitiveAttachmentReviewKey,
-        reportRoomFileActionInFlight: roomInteraction.reportRoomFileActionInFlight,
-        setFileBusyForRoom,
-        setSelectedFileForRoom,
-        setSelectedDiffForRoom,
-        setFilePreviewTabForRoom,
-        appendFileSaveRequest,
-        updateFileSaveRequestStatus,
-        setSelectedFileMessage,
-        setFileMessageForRoom,
-        appendPendingAttachmentForRoom,
-        removePendingAttachmentForRoom
+        reportRoomFileActionInFlight: roomInteraction.reportRoomFileActionInFlight
       }
     },
     historyEffects: {

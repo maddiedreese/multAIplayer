@@ -1,15 +1,16 @@
 import {
   approvalDelegationPolicyLabels,
   approvalPolicyLabels,
+  defaultBrowserUrl,
   roomModeLabels
 } from "../seedData";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRoomDisplayContext } from "./useAppRoomDisplayContext";
-import type { useAppRoomActions } from "./useAppRoomActions";
+import type { createAppRoomActions } from "../lib/appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppStateSlices } from "./useAppStateSlices";
-import type { useAppWorkspaceRecords } from "./useAppWorkspaceRecords";
+import type { WorkspaceRecordActions } from "../lib/workspaceRecordActions";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import type { useRoomChatMutations } from "./useRoomChatMutations";
 import { useRelaySyncContext } from "./useRelaySyncContext";
@@ -18,8 +19,7 @@ type AppStateSlices = ReturnType<typeof useAppStateSlices>;
 type AppRefs = ReturnType<typeof useAppRefs>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
-type RoomActions = ReturnType<typeof useAppRoomActions>;
-type WorkspaceRecords = ReturnType<typeof useAppWorkspaceRecords>;
+type RoomActions = ReturnType<typeof createAppRoomActions>;
 type RoomDisplay = ReturnType<typeof useAppRoomDisplayContext>;
 type InviteActions = ReturnType<typeof useAppInviteActions>;
 type RoomChatMutations = ReturnType<typeof useRoomChatMutations>;
@@ -40,7 +40,7 @@ export function useAppRelaySync({
   localIdentity: LocalIdentity;
   selected: SelectedRoomContext;
   roomActions: RoomActions;
-  workspaceRecords: WorkspaceRecords;
+  workspaceRecords: WorkspaceRecordActions;
   roomDisplay: RoomDisplay;
   inviteActions: InviteActions;
   roomChatMutations: RoomChatMutations;
@@ -57,9 +57,6 @@ export function useAppRelaySync({
     selectedRoom
   } = selected;
   const {
-    appendBrowserRequest,
-    setBrowserMessageForRoom,
-    setBrowserUrlForRoom,
     appendTerminalLinesForRoom,
     appendGitWorkflowEvent,
     appendGitHubActionsEvent,
@@ -74,9 +71,7 @@ export function useAppRelaySync({
       forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
       revokedRoomIds: roomRuntimeState.revokedRoomIds,
       revokedTeamIds: roomRuntimeState.revokedTeamIds,
-      appendBrowserRequest,
-      setBrowserMessageForRoom,
-      setBrowserUrlForRoom
+      defaultBrowserUrl
     },
     relayRoomSync: {
       subscription: {

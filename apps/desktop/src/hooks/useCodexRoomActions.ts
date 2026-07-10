@@ -1,8 +1,8 @@
-import { useCodexInvokeActions } from "./useCodexInvokeActions";
+import { createCodexInvokeActions } from "../lib/codexInvokeActions";
 import { useCodexTurnActions } from "./useCodexTurnActions";
 
 type CodexTurnActionsOptions = Parameters<typeof useCodexTurnActions>[0];
-type CodexInvokeActionsOptions = Parameters<typeof useCodexInvokeActions>[0];
+type CodexInvokeActionsOptions = Parameters<typeof createCodexInvokeActions>[0];
 
 export function useCodexRoomActions({
   turn,
@@ -20,7 +20,7 @@ export function useCodexRoomActions({
     editGoal,
     deleteGoal,
     tickGoalElapsed
-  } = useCodexInvokeActions({
+  } = createCodexInvokeActions({
     ...invoke
   });
 

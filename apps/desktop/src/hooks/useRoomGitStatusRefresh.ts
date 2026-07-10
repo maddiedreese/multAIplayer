@@ -1,34 +1,33 @@
 import { useEffect } from "react";
-import { getGitStatus, type GitStatusSummary } from "../lib/localBackend";
+import { getGitStatus } from "../lib/localBackend";
+import { useAppStore } from "../store/appStore";
 
 interface UseRoomGitStatusRefreshOptions {
   hasSelectedRoom: boolean;
   canReadLocalWorkspace: boolean;
   selectedRoomId: string;
   selectedRoomProjectPath: string;
-  setGitStatusForRoom: (roomId: string, status: GitStatusSummary | null) => void;
 }
 
 export function useRoomGitStatusRefresh({
   hasSelectedRoom,
   canReadLocalWorkspace,
   selectedRoomId,
-  selectedRoomProjectPath,
-  setGitStatusForRoom
+  selectedRoomProjectPath
 }: UseRoomGitStatusRefreshOptions) {
   useEffect(() => {
     if (!hasSelectedRoom) {
       return;
     }
     if (!canReadLocalWorkspace) {
-      setGitStatusForRoom(selectedRoomId, null);
+      useAppStore.getState().setGitStatusForRoom(selectedRoomId, null);
       return;
     }
-    setGitStatusForRoom(selectedRoomId, null);
+    useAppStore.getState().setGitStatusForRoom(selectedRoomId, null);
     getGitStatus(selectedRoomProjectPath)
-      .then((status) => setGitStatusForRoom(selectedRoomId, status))
+      .then((status) => useAppStore.getState().setGitStatusForRoom(selectedRoomId, status))
       .catch((error) => {
-        setGitStatusForRoom(selectedRoomId, {
+        useAppStore.getState().setGitStatusForRoom(selectedRoomId, {
           branch: "unknown",
           files: [{ path: String(error), status: "error", added: 0, removed: 0 }]
         });

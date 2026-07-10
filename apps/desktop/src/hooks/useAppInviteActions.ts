@@ -1,12 +1,10 @@
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
-import type { useAppRoomActions } from "./useAppRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { useAppStateSlices } from "./useAppStateSlices";
-import type { useAppWorkspaceRecords } from "./useAppWorkspaceRecords";
+import type { WorkspaceRecordActions } from "../lib/workspaceRecordActions";
 import type { useLocalIdentity } from "./useLocalIdentity";
-import type { useRoomChatMutations } from "./useRoomChatMutations";
 import { useInviteActions } from "./useInviteActions";
 
 type AppStateSlices = ReturnType<typeof useAppStateSlices>;
@@ -15,9 +13,6 @@ type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
-type RoomActions = ReturnType<typeof useAppRoomActions>;
-type RoomChatMutations = ReturnType<typeof useRoomChatMutations>;
-type WorkspaceRecords = ReturnType<typeof useAppWorkspaceRecords>;
 
 export function useAppInviteActions({
   appState,
@@ -26,8 +21,6 @@ export function useAppInviteActions({
   selected,
   selectedRuntime,
   roomInteraction,
-  roomActions,
-  roomChatMutations,
   workspaceRecords
 }: {
   appState: AppStateSlices;
@@ -36,13 +29,10 @@ export function useAppInviteActions({
   selected: SelectedRoomContext;
   selectedRuntime: SelectedRoomRuntime;
   roomInteraction: RoomInteraction;
-  roomActions: RoomActions;
-  roomChatMutations: RoomChatMutations;
-  workspaceRecords: WorkspaceRecords;
+  workspaceRecords: WorkspaceRecordActions;
 }) {
   const {
     workspaceState,
-    roomRuntimeState,
     invitePanelState,
     appRuntimeState
   } = appState;
@@ -51,15 +41,6 @@ export function useAppInviteActions({
     selectedRoom,
     inviteApprovalGate
   } = selected;
-  const {
-    appendInviteRequest,
-    updateInviteRequestStatus,
-    setSelectedInviteMessage,
-    setInviteMessageForRoom,
-    setInviteLinkForRoom,
-    setKeyRotationBusyForRoom
-  } = roomActions;
-
   return useInviteActions({
     hasSelectedRoom,
     selectedRoom,
@@ -81,17 +62,7 @@ export function useAppInviteActions({
     reportRoomKeyRotationInFlight: roomInteraction.reportRoomKeyRotationInFlight,
     upsertTeam: workspaceRecords.upsertTeam,
     upsertRoom: workspaceRecords.upsertRoom,
-    appendInviteRequest,
-    updateInviteRequestStatus,
-    appendRoomMessage: roomChatMutations.appendRoomMessage,
-    setSelectedInviteMessage,
-    setInviteMessageForRoom,
-    setInviteLinkForRoom,
     clearInviteSecretInput: invitePanelState.clearInviteSecretInput,
-    selectWorkspaceRoom: workspaceState.selectWorkspaceRoom,
-    rememberForgottenRoom: roomRuntimeState.rememberForgottenRoom,
-    restoreForgottenRoom: roomRuntimeState.restoreForgottenRoom,
-    restoreWorkspaceAccess: roomRuntimeState.restoreWorkspaceAccess,
-    setKeyRotationBusyForRoom
+    selectWorkspaceRoom: workspaceState.selectWorkspaceRoom
   });
 }

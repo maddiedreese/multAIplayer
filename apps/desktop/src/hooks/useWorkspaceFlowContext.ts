@@ -1,12 +1,12 @@
 import { useAppBootstrapEffects } from "./useAppBootstrapEffects";
-import { useMarkdownCopyActions } from "./useMarkdownCopyActions";
+import { createMarkdownCopyActions } from "../lib/markdownCopyActions";
 import { useWorkspaceHistoryEffects } from "./useWorkspaceHistoryEffects";
-import { useWorkspaceRoomActions } from "./useWorkspaceRoomActions";
+import { createWorkspaceRoomActions } from "../lib/workspaceRoomActions";
 
 type AppBootstrapOptions = Parameters<typeof useAppBootstrapEffects>[0];
-type MarkdownCopyOptions = Parameters<typeof useMarkdownCopyActions>[0];
+type MarkdownCopyOptions = Parameters<typeof createMarkdownCopyActions>[0];
 type WorkspaceHistoryOptions = Parameters<typeof useWorkspaceHistoryEffects>[0];
-type WorkspaceRoomActionOptions = Parameters<typeof useWorkspaceRoomActions>[0];
+type WorkspaceRoomActionOptions = Parameters<typeof createWorkspaceRoomActions>[0];
 type WorkspaceMemberOptions = WorkspaceRoomActionOptions["members"];
 
 export function useWorkspaceFlowContext({
@@ -23,8 +23,8 @@ export function useWorkspaceFlowContext({
   historyEffects: WorkspaceHistoryOptions;
 }) {
   useAppBootstrapEffects(bootstrap);
-  const markdownCopyActions = useMarkdownCopyActions(markdownCopy);
-  const workspaceActions = useWorkspaceRoomActions({
+  const markdownCopyActions = createMarkdownCopyActions(markdownCopy);
+  const workspaceActions = createWorkspaceRoomActions({
     ...workspaceRoomActions,
     members: {
       ...workspaceRoomActions.members,

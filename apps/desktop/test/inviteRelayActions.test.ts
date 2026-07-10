@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { createInviteRelayActions } from "../src/hooks/inviteRelayActions";
+import { createInviteRelayActions } from "../src/lib/invite/inviteRelayActions";
 import type { InviteJoinRequest } from "../src/types";
 
 const room: RoomRecord = {
@@ -27,8 +27,7 @@ function setup(overrides: Record<string, unknown> = {}) {
   const statusUpdates: Array<{ requestId: string; status: InviteJoinRequest["status"] }> = [];
   const roomMessages: Array<string | null> = [];
   const selectedMessages: Array<string | null> = [];
-  const actions = createInviteRelayActions({
-    appendInviteRequest: (_roomId, request) => appended.push(request),
+  const options = {
     deviceId: "device-local",
     deviceIdentity: null,
     hasSelectedRoom: true,
@@ -40,15 +39,20 @@ function setup(overrides: Record<string, unknown> = {}) {
     localUser: { id: "github:maddie", name: "Maddie" },
     relayRef: { current: null },
     relayStatus: "closed",
-    rememberForgottenRoom: () => undefined,
-    restoreForgottenRoom: () => undefined,
     seenEnvelopeIds: { current: new Set<string>() },
     selectedRoom: room,
     selectedRoomIdRef: { current: room.id },
-    setInviteMessageForRoom: (_roomId, message) => roomMessages.push(message),
-    setSelectedInviteMessage: (message) => selectedMessages.push(message),
-    updateInviteRequestStatus: (_roomId, requestId, status) => statusUpdates.push({ requestId, status }),
     ...overrides
+  };
+  const actions = createInviteRelayActions(options, {
+    appendInviteRequest: (_roomId, request) => appended.push(request),
+    rememberForgottenRoom: () => undefined,
+    restoreForgottenRoom: () => undefined,
+    setInviteMessageForRoom: (roomId, message) => {
+      roomMessages.push(message);
+      if (roomId === options.selectedRoomIdRef.current) selectedMessages.push(message);
+    },
+    updateInviteRequestStatus: (_roomId, requestId, status) => statusUpdates.push({ requestId, status })
   });
   return { actions, appended, roomMessages, selectedMessages, statusUpdates };
 }

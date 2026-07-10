@@ -10,6 +10,7 @@ type BusyMap = Record<string, boolean>;
 interface UseAppRefsOptions {
   rooms: RoomRecord[];
   selectedRoomId: string;
+  selectedTeamId: string;
   gitWorkflowDraftsByRoom: Record<string, Partial<GitWorkflowDraft>>;
   hostBusyByRoom: BusyMap;
   settingsBusyByRoom: BusyMap;
@@ -25,6 +26,7 @@ interface UseAppRefsOptions {
 export function useAppRefs({
   rooms,
   selectedRoomId,
+  selectedTeamId,
   gitWorkflowDraftsByRoom,
   hostBusyByRoom,
   settingsBusyByRoom,
@@ -41,6 +43,7 @@ export function useAppRefs({
   const historyLoadedRoomIds = useRef(new Set<string>());
   const roomsRef = useLatestRef(rooms);
   const selectedRoomIdRef = useLatestRef(selectedRoomId);
+  const selectedTeamIdRef = useLatestRef(selectedTeamId);
   const gitWorkflowDraftsRef = useLatestRef(gitWorkflowDraftsByRoom);
   const hostBusyRef = useLatestRef(hostBusyByRoom);
   const settingsBusyRef = useLatestRef(settingsBusyByRoom);
@@ -58,6 +61,7 @@ export function useAppRefs({
     historyLoadedRoomIds,
     roomsRef,
     selectedRoomIdRef,
+    selectedTeamIdRef,
     gitWorkflowDraftsRef,
     hostBusyRef,
     settingsBusyRef,

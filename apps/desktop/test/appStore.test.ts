@@ -25,11 +25,13 @@ test("desktop store keeps relay access runtime state atomic and resettable", () 
   assert.equal(state.revokedTeamIds.has("team-a"), true);
 
   state.restoreWorkspaceAccess("team-a", "room-a");
-  state.restoreForgottenRoom("room-a");
   state = useAppStore.getState();
-  assert.equal(state.forgottenRoomIds.has("room-a"), false);
+  assert.equal(state.forgottenRoomIds.has("room-a"), true);
   assert.equal(state.revokedRoomIds.has("room-a"), false);
   assert.equal(state.revokedTeamIds.has("team-a"), false);
+
+  state.restoreForgottenRoom("room-a");
+  assert.equal(useAppStore.getState().forgottenRoomIds.has("room-a"), false);
 
   state.revokeRoomAccess("room-b");
   state.revokeTeamAccess("team-b");

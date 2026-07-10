@@ -25,6 +25,7 @@ import { attachmentReviewScopeKey } from "./lib/attachmentPolicy";
 import { roomChatGateMessage } from "./lib/chatPolicy";
 import type { GitHubActionsTarget } from "./lib/githubWorkflowReadiness";
 import type { GitWorkflowDraft } from "./lib/gitWorkflowDraft";
+import { createWorkspaceRecordActions } from "./lib/workspaceRecordActions";
 import {
   embeddedAttachmentBytes,
   encodedBytes,
@@ -36,11 +37,10 @@ import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useRoomChatMutations } from "./hooks/useRoomChatMutations";
 import { useAppRoomInteractionContext } from "./hooks/useAppRoomInteractionContext";
-import { useAppRoomActions } from "./hooks/useAppRoomActions";
+import { createAppRoomActions } from "./lib/appRoomActions";
 import { useAppSelectedRoomRuntime } from "./hooks/useAppSelectedRoomRuntime";
 import { useAppRoomDisplayContext } from "./hooks/useAppRoomDisplayContext";
 import { useThemeMode } from "./hooks/useThemeMode";
-import { useAppWorkspaceRecords } from "./hooks/useAppWorkspaceRecords";
 import { useAppHostHandoffActions } from "./hooks/useAppHostHandoffActions";
 import { useAppInviteActions } from "./hooks/useAppInviteActions";
 import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
@@ -50,7 +50,7 @@ import { useAppViewModel } from "./hooks/useAppViewModel";
 import { useAppWorkspaceFlow } from "./hooks/useAppWorkspaceFlow";
 import { useAppRelaySync } from "./hooks/useAppRelaySync";
 import { useAppRoomRuntime } from "./hooks/useAppRoomRuntime";
-import { useAppRoomPanelActions } from "./hooks/useAppRoomPanelActions";
+import { createAppRoomPanelActions } from "./lib/appRoomPanelActions";
 import { InlineSecretWarning } from "./components/common";
 import { AppShellView } from "./components/AppShellView";
 import { CodexServerRequestDialog } from "./components/CodexServerRequestDialog";
@@ -113,6 +113,7 @@ export function App() {
   const appRefs = useAppRefs({
     rooms: workspaceState.rooms,
     selectedRoomId: workspaceState.selectedRoomId,
+    selectedTeamId: workspaceState.selectedTeam,
     gitWorkflowDraftsByRoom: githubWorkflowPanelState.gitWorkflowDraftsByRoom,
     hostBusyByRoom: roomSettingsState.hostBusyByRoom,
     settingsBusyByRoom: roomSettingsState.settingsBusyByRoom,
@@ -195,10 +196,8 @@ export function App() {
     visibleHistoryMessage,
     markdownCopyFallback
   } = selectedContext;
-  const roomActions = useAppRoomActions({
-    appState,
+  const roomActions = createAppRoomActions({
     appRefs,
-    selectedRoom,
     maxTerminalActivityLines,
     defaultBrowserUrl,
     defaultBrowserReason,
@@ -274,12 +273,21 @@ export function App() {
     updateBrowserRequestStatus
   } = roomActions;
   const roomChatMutations = useRoomChatMutations();
-  const workspaceRecords = useAppWorkspaceRecords({
-    appState,
-    appRefs,
-    localIdentity,
-    selected: selectedContext,
-    roomActions
+  const workspaceRecords = createWorkspaceRecordActions({
+    hasSelectedRoom: selectedContext.hasSelectedRoom,
+    selectedRoom: selectedContext.selectedRoom,
+    localUser: localIdentity.localUser,
+    roomsRef: appRefs.roomsRef,
+    upsertTeamRecord: workspaceState.upsertTeamRecord,
+    upsertRoomRecord: workspaceState.upsertRoomRecord,
+    replaceRoomRecord: workspaceState.replaceRoomRecord,
+    resetCodexApprovalForRoom,
+    revokeWorkspaceAccess: roomRuntimeState.revokeWorkspaceAccess,
+    setInviteLinkForRoom,
+    setInviteMessageForRoom,
+    setChatMessageForRoom,
+    setHostMessageForRoom,
+    setWorkspaceStatusError: workspaceState.setWorkspaceStatusError
   });
   const roomInteraction = useAppRoomInteractionContext({
     appState,
@@ -287,7 +295,6 @@ export function App() {
     githubAuth,
     localIdentity,
     selected: selectedContext,
-    roomChatMutations,
     roomActions
   });
   const selectedRuntime = useAppSelectedRoomRuntime({
@@ -314,8 +321,6 @@ export function App() {
     selected: selectedContext,
     selectedRuntime,
     roomInteraction,
-    roomActions,
-    roomChatMutations,
     workspaceRecords
   });
 
@@ -385,15 +390,17 @@ export function App() {
     relaySync,
     hostHandoffActions,
     workspaceRecords,
-    roomSettingsActor
+    roomSettingsActor,
+    maxTerminalActivityLines,
+    defaultBrowserUrl,
+    defaultBrowserReason
   });
 
-  const roomPanels = useAppRoomPanelActions({
+  const roomPanels = createAppRoomPanelActions({
     appState,
     selected: selectedContext,
     selectedRuntime,
     roomInteraction,
-    roomActions,
     roomRuntime,
     relaySync,
     workspaceFlow

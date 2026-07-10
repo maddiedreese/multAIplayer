@@ -1,10 +1,10 @@
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
-import type { useAppRoomActions } from "./useAppRoomActions";
+import type { createAppRoomActions } from "../lib/appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { useAppStateSlices } from "./useAppStateSlices";
-import type { useAppWorkspaceRecords } from "./useAppWorkspaceRecords";
+import type { WorkspaceRecordActions } from "../lib/workspaceRecordActions";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import type { useRoomSettingsActor } from "./useRoomSettingsActor";
 import { useHostHandoffActions } from "./useHostHandoffActions";
@@ -15,8 +15,7 @@ type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
-type RoomActions = ReturnType<typeof useAppRoomActions>;
-type WorkspaceRecords = ReturnType<typeof useAppWorkspaceRecords>;
+type RoomActions = ReturnType<typeof createAppRoomActions>;
 type RoomSettingsActor = ReturnType<typeof useRoomSettingsActor>;
 
 export function useAppHostHandoffActions({
@@ -37,7 +36,7 @@ export function useAppHostHandoffActions({
   selectedRuntime: SelectedRoomRuntime;
   roomInteraction: RoomInteraction;
   roomActions: RoomActions;
-  workspaceRecords: WorkspaceRecords;
+  workspaceRecords: WorkspaceRecordActions;
   roomSettingsActor: RoomSettingsActor;
 }) {
   const {

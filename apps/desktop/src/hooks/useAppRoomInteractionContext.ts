@@ -1,10 +1,9 @@
 import type { useAppRefs } from "./useAppRefs";
-import type { useAppRoomActions } from "./useAppRoomActions";
+import type { createAppRoomActions } from "../lib/appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppStateSlices } from "./useAppStateSlices";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
-import type { useRoomChatMutations } from "./useRoomChatMutations";
 import { useRoomInteractionContext } from "./useRoomInteractionContext";
 
 type AppStateSlices = ReturnType<typeof useAppStateSlices>;
@@ -12,8 +11,7 @@ type AppRefs = ReturnType<typeof useAppRefs>;
 type GitHubAuth = ReturnType<typeof useGitHubAuth>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
-type RoomChatMutations = ReturnType<typeof useRoomChatMutations>;
-type RoomActions = ReturnType<typeof useAppRoomActions>;
+type RoomActions = ReturnType<typeof createAppRoomActions>;
 
 export function useAppRoomInteractionContext({
   appState,
@@ -21,7 +19,6 @@ export function useAppRoomInteractionContext({
   githubAuth,
   localIdentity,
   selected,
-  roomChatMutations,
   roomActions
 }: {
   appState: AppStateSlices;
@@ -29,7 +26,6 @@ export function useAppRoomInteractionContext({
   githubAuth: GitHubAuth;
   localIdentity: LocalIdentity;
   selected: SelectedRoomContext;
-  roomChatMutations: RoomChatMutations;
   roomActions: RoomActions;
 }) {
   const {
@@ -52,10 +48,7 @@ export function useAppRoomInteractionContext({
     setSettingsMessageForRoom,
     setInviteMessageForRoom,
     setFileMessageForRoom,
-    setTerminalErrorForRoom,
-    setChatMessageForRoom,
-    setSelectedChatMessage,
-    setSecretWarningVisibleForRoom
+    setTerminalErrorForRoom
   } = roomActions;
 
   return useRoomInteractionContext({
@@ -74,14 +67,11 @@ export function useAppRoomInteractionContext({
     notices: {
       roomId: selectedRoom.id,
       hostMessage,
-      chatMessage,
-      setHostMessageForRoom,
-      setChatMessageForRoom
+      chatMessage
     },
     visibilityWarning: {
       hasSelectedRoom,
-      selectedRoomId: selectedRoom.id,
-      setSecretWarningVisibleForRoom
+      selectedRoomId: selectedRoom.id
     },
     access: {
       hasSelectedRoom,
@@ -95,6 +85,7 @@ export function useAppRoomInteractionContext({
     },
     chat: {
       hasSelectedRoom,
+      selectedRoomId: workspaceState.selectedRoomId,
       selectedRoom,
       forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
       revokedRoomIds: roomRuntimeState.revokedRoomIds,
@@ -104,13 +95,7 @@ export function useAppRoomInteractionContext({
       relayStatus: appRuntimeState.relayStatus,
       relayRef: appRefs.relayRef,
       seenEnvelopeIds: appRefs.seenEnvelopeIds,
-      codexEventsByRoom: appState.codexRoomState.codexEventsByRoom,
-      appendRoomMessage: roomChatMutations.appendRoomMessage,
-      editRoomMessage: roomChatMutations.editRoomMessage,
-      deleteRoomMessage: roomChatMutations.deleteRoomMessage,
-      applyMessageReaction: roomChatMutations.applyMessageReaction,
-      setChatMessageForRoom,
-      setSelectedChatMessage
+      codexEventsByRoom: appState.codexRoomState.codexEventsByRoom
     },
     githubWorkflow: {
       actionRuns,

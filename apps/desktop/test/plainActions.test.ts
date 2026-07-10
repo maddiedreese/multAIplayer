@@ -1,0 +1,473 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { RoomRecord } from "@multaiplayer/protocol";
+import { createAccountActions } from "../src/lib/accountActions";
+import { createChatActions } from "../src/lib/chatActions";
+import { createCodexInvokeActions } from "../src/lib/codexInvokeActions";
+import { createFileActions } from "../src/lib/fileActions";
+import { createGitWorkflowActions } from "../src/lib/gitWorkflowActions";
+import { buildGitWorkflowApprovalPreview, defaultGitWorkflowDraft } from "../src/lib/gitWorkflowDraft";
+import { checkGitHubWorkflowReadiness } from "../src/lib/githubWorkflowReadiness";
+import { createMarkdownCopyActions } from "../src/lib/markdownCopyActions";
+import { createMemberActions } from "../src/lib/memberActions";
+import { createLocalPreviewActions } from "../src/lib/localPreviewActions";
+import { createLocalHistoryActions } from "../src/lib/localHistoryActions";
+import { createRoomVisibilityWarningActions } from "../src/lib/roomVisibilityWarningActions";
+import { createRoomSettingsActions } from "../src/lib/roomSettingsActions";
+import { createTeamDefaultActions } from "../src/lib/teamDefaultActions";
+import { createWorkspaceCreationActions } from "../src/lib/workspaceCreationActions";
+import { useAppStore } from "../src/store/appStore";
+import type { ChatMessage } from "../src/types";
+
+class MemoryStorage {
+  private readonly values = new Map<string, string>();
+  get length() { return this.values.size; }
+  clear() { this.values.clear(); }
+  getItem(key: string) { return this.values.get(key) ?? null; }
+  key(index: number) { return Array.from(this.values.keys())[index] ?? null; }
+  removeItem(key: string) { this.values.delete(key); }
+  setItem(key: string, value: string) { this.values.set(key, value); }
+}
+
+const localStorage = new MemoryStorage();
+Object.defineProperty(globalThis, "localStorage", { configurable: true, value: localStorage });
+
+const room: RoomRecord = {
+  id: "room-actions",
+  teamId: "team-actions",
+  name: "Actions",
+  projectPath: "/tmp/actions",
+  host: "Maddie",
+  hostUserId: "github:maddie",
+  hostStatus: "active",
+  approvalPolicy: "ask_every_turn",
+  approvalDelegationPolicy: "host_only",
+  trustedApproverUserIds: [],
+  mode: { chat: true, code: true, workspace: true, browser: true },
+  codexModel: "gpt-5.4",
+  browserAllowedOrigins: [],
+  browserProfilePersistent: true,
+  unread: 0
+};
+
+test.beforeEach(() => {
+  localStorage.clear();
+  useAppStore.getState().resetAppStore();
+});
+
+test("account sign-out actions preserve preview cleanup ordering without React", async () => {
+  const calls: string[] = [];
+  const actions = createAccountActions({
+    selectedRoomId: room.id,
+    deviceId: "device-1",
+    stopOwnedLocalPreviews: async (reason) => { calls.push(`preview:${reason}`); },
+    signOutGitHub: async () => { calls.push("github"); },
+    replaceDeviceIdentity: () => undefined,
+    setDeviceIdentityStatusMessage: () => undefined,
+    untrustDeviceForRoom: () => undefined
+  });
+
+  await actions.signOut();
+
+  assert.deepEqual(calls, [
+    "preview:Stopped because the sharing user signed out.",
+    "github"
+  ]);
+});
+
+test("visibility warning actions update persistence and the current Zustand store", () => {
+  useAppStore.getState().setSecretWarningVisibleForRoom(room.id, true);
+  const actions = createRoomVisibilityWarningActions({ hasSelectedRoom: true, selectedRoomId: room.id });
+
+  actions.acknowledgeRoomVisibilityWarning();
+
+  assert.equal(localStorage.getItem(`multaiplayer:room-visibility-warning:${room.id}`), "acknowledged");
+  assert.equal(useAppStore.getState().codexRuntimeByRoom[room.id]?.secretWarningVisible ?? false, false);
+});
+
+test("local history actions resolve Zustand mutations when invoked without React", () => {
+  const replacedSettings: Array<{ enabled: boolean; retentionDays: number }> = [];
+  const actions = createLocalHistoryActions({
+    hasSelectedRoom: true,
+    selectedRoom: room,
+    selectedRoomIdRef: { current: room.id },
+    isSelectedRoomLocked: false,
+    isSelectedRoomRevoked: false,
+    isActiveHost: true,
+    messages: [],
+    terminalRequests: [],
+    fileSaveRequests: [],
+    browserRequests: [],
+    inviteRequests: [],
+    codexEvents: [],
+    codexActivities: [],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
+    localPreviews: [],
+    terminals: [],
+    hostHandoffs: [],
+    roomGoal: null,
+    selectedCodexThreadId: null,
+    codexThreadGraph: { activeThreadId: null, nodesById: {} },
+    settingsBusyRef: { current: {} },
+    reportRoomSettingsMutationInFlight: () => false,
+    roomSettingsActor: () => ({ requesterName: "Maddie", requesterUserId: "github:maddie" }),
+    replaceHistorySettings: (settings) => replacedSettings.push(settings),
+    replaceRoom: () => undefined,
+    historyLoadedRoomIds: { current: new Set() }
+  });
+  const messages: Array<[string, string | null]> = [];
+  useAppStore.setState({
+    setHistoryMessageForRoom: (roomId, message) => messages.push([roomId, message])
+  });
+
+  actions.updateLocalHistorySettings({ enabled: false, retentionDays: 14 });
+
+  assert.deepEqual(replacedSettings, [{ enabled: false, retentionDays: 14 }]);
+  assert.deepEqual(messages, [[room.id, "Encrypted local history is disabled for this room."]]);
+});
+
+test("member actions update the current Zustand roster without React", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    members: [{
+      teamId: room.teamId,
+      userId: "github:alex",
+      role: "admin",
+      joinedAt: "2026-07-09T12:00:00.000Z"
+    }]
+  }), { status: 200, headers: { "content-type": "application/json" } });
+  try {
+    const actions = createMemberActions({
+      selectedTeam: room.teamId,
+      selectedTeamName: "Actions Team",
+      selectedRoom: room,
+      localUser: { id: "github:maddie", name: "Maddie" },
+      currentUser: null,
+      setDeviceIdentityMessage: () => undefined,
+      trustDeviceForRoom: () => undefined,
+      untrustDeviceForRoom: () => undefined,
+      updateTeamRoleForTeam: () => undefined,
+      updateTeamMemberCountForTeam: () => undefined,
+      copyMarkdownWithFallback: async () => undefined
+    });
+
+    await actions.changeTeamMemberRole({
+      teamId: room.teamId,
+      userId: "github:alex",
+      role: "member",
+      joinedAt: "2026-07-09T12:00:00.000Z"
+    }, "admin");
+
+    const roster = useAppStore.getState().teamRosterByTeam[room.teamId];
+    assert.equal(roster?.members?.[0]?.role, "admin");
+    assert.equal(roster?.busy, false);
+    assert.match(roster?.message ?? "", /alex is now Admin/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("workspace creation actions restore the new room through the current store", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ room }), {
+    status: 200,
+    headers: { "content-type": "application/json" }
+  });
+  const store = useAppStore.getState();
+  store.revokeWorkspaceAccess(room.teamId, room.id);
+  const upsertedRooms: RoomRecord[] = [];
+  try {
+    const actions = createWorkspaceCreationActions({
+      selectedTeam: room.teamId,
+      newTeamName: "",
+      newRoomName: room.name,
+      newRoomProjectPath: room.projectPath,
+      setWorkspaceStatusError: () => undefined,
+      setSelectedTeam: () => undefined,
+      setSelectedRoomId: () => undefined,
+      setNewTeamName: () => undefined,
+      setNewRoomName: () => undefined,
+      setNewRoomProjectPath: () => undefined,
+      upsertTeam: () => undefined,
+      upsertRoom: (nextRoom) => upsertedRooms.push(nextRoom),
+      roomSettingsActor: () => ({ requesterName: "Maddie", requesterUserId: "github:maddie" })
+    });
+
+    await actions.addRoom();
+
+    const current = useAppStore.getState();
+    assert.equal(upsertedRooms[0]?.id, room.id);
+    assert.equal(current.revokedRoomIds.has(room.id), false);
+    assert.equal(current.revokedTeamIds.has(room.teamId), false);
+    assert.equal(current.forgottenRoomIds.has(room.id), false);
+    assert.deepEqual(current.messagesByRoom[room.id], []);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("chat actions append through the latest store when the relay is offline", async () => {
+  const message: ChatMessage = {
+    id: "message-1",
+    author: "Maddie",
+    authorUserId: "github:maddie",
+    role: "human",
+    body: "Hello",
+    time: "9:43",
+    createdAt: "2026-07-09T12:00:00.000Z"
+  };
+  const actions = createChatActions({
+    hasSelectedRoom: true,
+    selectedRoomId: room.id,
+    selectedRoom: room,
+    isSelectedRoomLocked: false,
+    isSelectedRoomRevoked: false,
+    forgottenRoomIds: new Set(),
+    revokedRoomIds: new Set(),
+    revokedTeamIds: new Set(),
+    localUser: { id: "github:maddie", name: "Maddie" },
+    deviceId: "device-1",
+    relayStatus: "closed",
+    relayRef: { current: null },
+    seenEnvelopeIds: { current: new Set() },
+    codexEventsByRoom: {}
+  });
+
+  await actions.publishChatMessage(message);
+
+  assert.deepEqual(useAppStore.getState().messagesByRoom[room.id], [message]);
+});
+
+test("Codex invoke actions report room locks through Zustand without React", () => {
+  const actions = createCodexInvokeActions({
+    hasSelectedRoom: true,
+    selectedRoom: room,
+    selectedRoomIdRef: { current: room.id },
+    isSelectedRoomLocked: true,
+    isSelectedRoomRevoked: false,
+    isActiveHost: true,
+    codexRunning: false,
+    canReadLocalWorkspace: true,
+    hostGateMessage: "Only the active host can approve this turn.",
+    localUser: { id: "github:maddie", name: "Maddie" },
+    draft: "",
+    replyToMessageId: null,
+    roomGoal: null,
+    pendingAttachments: [],
+    messages: [],
+    roomTerminals: [],
+    browserRequests: [],
+    gitStatus: null,
+    activeCodexApproval: null,
+    queuedCodexApprovals: [],
+    codexThreadId: null,
+    publishChatMessage: async () => undefined,
+    handleCodexBrowserOpenCommand: () => false,
+    publishCodexQueueEvent: async () => undefined
+  });
+
+  actions.handleCodexInvoke();
+
+  assert.match(useAppStore.getState().roomSettingsByRoom[room.id]?.hostMessage ?? "", /forgotten|locked/i);
+  assert.equal(useAppStore.getState().codexRuntimeByRoom[room.id]?.approvalVisible ?? false, false);
+});
+
+test("local preview actions report a room lock through the current store without React", async () => {
+  const actions = createLocalPreviewActions({
+    hasSelectedRoom: true,
+    isSelectedRoomLocked: true,
+    isSelectedRoomRevoked: false,
+    selectedRoom: room,
+    rooms: [room],
+    localUser: { id: "github:maddie", name: "Maddie" },
+    localPreviewDialog: useAppStore.getState().localPreviewDialog,
+    localPreviewsByRoom: {},
+    publishLocalPreviewEvent: async () => undefined
+  });
+
+  await actions.openLocalPreviewDialog();
+
+  assert.match(useAppStore.getState().roomChatByRoom[room.id]?.message ?? "", /forgotten on this device/i);
+  assert.equal(useAppStore.getState().localPreviewDialog.open, false);
+});
+
+test("local preview confirmation validation writes through the current store", async () => {
+  const actions = createLocalPreviewActions({
+    hasSelectedRoom: true,
+    isSelectedRoomLocked: false,
+    isSelectedRoomRevoked: false,
+    selectedRoom: room,
+    rooms: [room],
+    localUser: { id: "github:maddie", name: "Maddie" },
+    localPreviewDialog: {
+      ...useAppStore.getState().localPreviewDialog,
+      roomId: room.id,
+      selectedUrl: "not a local URL"
+    },
+    localPreviewsByRoom: {},
+    publishLocalPreviewEvent: async () => undefined
+  });
+
+  await actions.prepareLocalPreviewConfirmation();
+
+  assert.match(useAppStore.getState().localPreviewDialog.error ?? "", /valid.*URL/i);
+});
+
+test("room settings actions report room locks through the current store without React", async () => {
+  const settingsBusyRef = { current: {} as Record<string, boolean> };
+  const actions = createRoomSettingsActions({
+    hasSelectedRoom: true,
+    isSelectedRoomLocked: true,
+    isSelectedRoomRevoked: false,
+    isActiveHost: true,
+    selectedRoom: room,
+    selectedRoomIdRef: { current: room.id },
+    settingsBusyRef,
+    selectedCodexModel: room.codexModel,
+    selectedCodexReasoningEffort: "high",
+    selectedCodexSpeed: "standard",
+    selectedCodexSandboxLevel: "workspace-write",
+    projectPathDraft: room.projectPath,
+    approvalPolicyLabels: { auto: "Auto", ask_every_turn: "Ask every turn" },
+    roomSettingsGateMessage: "Only the active host can change room settings.",
+    roomSettingsActor: () => ({ requesterName: "Maddie", requesterUserId: "github:maddie" }),
+    reportRoomSettingsMutationInFlight: () => false,
+    replaceRoom: () => undefined,
+    publishRoomSettingsEvent: async () => undefined
+  });
+
+  await actions.setApprovalPolicy("auto");
+
+  assert.match(useAppStore.getState().roomSettingsByRoom[room.id]?.settingsMessage ?? "", /forgotten|locked/i);
+  assert.deepEqual(settingsBusyRef.current, {});
+});
+
+test("team default actions report missing selection without touching storage", () => {
+  const messages: Array<string | null> = [];
+  const actions = createTeamDefaultActions({
+    selectedTeam: "",
+    approvalPolicyLabels: {},
+    setSelectedTeamHistoryMessage: (message) => messages.push(message),
+    setTeamHistoryMessageForTeam: () => undefined,
+    setTeamHistorySettings: () => undefined,
+    setTeamDefaultApprovalPolicy: () => undefined,
+    setTeamDefaultCodexModel: () => undefined,
+    setTeamDefaultBrowserProfilePersistent: () => undefined,
+    setTeamDefaultInviteApprovalGate: () => undefined
+  });
+
+  actions.updateTeamDefaultCodexModel("gpt-5.4");
+
+  assert.deepEqual(messages, ["Create or select a team before changing team defaults."]);
+  assert.equal(localStorage.length, 0);
+});
+
+test("Markdown copy actions report validation failures through Zustand without React", async () => {
+  const actions = createMarkdownCopyActions({
+    hasSelectedRoom: true,
+    canReadLocalWorkspace: true,
+    localWorkspaceMessage: "Workspace unavailable.",
+    selectedRoom: room,
+    teams: [],
+    messages: [],
+    selectedMessages: [],
+    gitStatus: null,
+    selectedFile: null,
+    selectedDiff: null,
+    selectedFileRisks: [],
+    selectedTerminal: null,
+    terminalLines: [],
+    terminalRisks: []
+  });
+
+  await actions.copySelectedMessagesMarkdown();
+
+  assert.equal(
+    useAppStore.getState().roomChatByRoom[room.id]?.message,
+    "Select one or more messages to copy."
+  );
+});
+
+test("file actions resolve current Zustand file state when invoked without React", async () => {
+  const selectedRoomIdRef = { current: room.id };
+  const actions = createFileActions({
+    hasSelectedRoom: true,
+    canReadLocalWorkspace: true,
+    localWorkspaceMessage: "Workspace unavailable.",
+    isActiveHost: true,
+    hostGateMessage: "Only the active host can edit files.",
+    selectedRoom: room,
+    selectedRoomIdRef,
+    isSelectedRoomLocked: false,
+    isSelectedRoomRevoked: false,
+    localUser: { id: "github:maddie", name: "Maddie" },
+    deviceId: "device-1",
+    relayStatus: "closed",
+    relayRef: { current: null },
+    seenEnvelopeIds: { current: new Set() },
+    reportRoomFileActionInFlight: () => false
+  });
+  useAppStore.getState().setSelectedFileForRoom(room.id, {
+    path: "notes.txt",
+    content: "Attach me after the actions already exist.",
+    size: 42,
+    truncated: false
+  });
+
+  await actions.attachSelectedFileToMessage();
+
+  const [attachment] = useAppStore.getState().roomChatByRoom[room.id]?.pendingAttachments ?? [];
+  assert.equal(attachment?.name, "notes.txt");
+  actions.removePendingAttachment(attachment.id);
+  assert.deepEqual(useAppStore.getState().roomChatByRoom[room.id]?.pendingAttachments ?? [], []);
+
+  useAppStore.getState().appendFileSaveRequest(room.id, {
+    eventType: "workspace.file.save",
+    id: "save-after-create",
+    requester: "Alex",
+    requesterUserId: "github:alex",
+    path: "notes.txt",
+    previousContent: "before",
+    nextContent: "after",
+    requestedAt: "2026-07-09T12:00:00.000Z",
+    status: "pending"
+  });
+  actions.denyFileSaveRequest("save-after-create");
+  assert.equal(useAppStore.getState().filePanelByRoom[room.id]?.saveRequests?.[0]?.status, "denied");
+});
+
+test("git workflow actions report host gating through Zustand without React", async () => {
+  const actions = createGitWorkflowActions({
+    hasSelectedRoom: true,
+    isActiveHost: false,
+    canReadLocalWorkspace: true,
+    hostGateMessage: "Only the active host can approve this workflow.",
+    localWorkspaceMessage: "Workspace unavailable.",
+    selectedRoom: room,
+    gitWorkflowBusyRef: { current: {} },
+    gitWorkflowDraft: defaultGitWorkflowDraft,
+    gitApprovalPreview: buildGitWorkflowApprovalPreview(room.projectPath, defaultGitWorkflowDraft),
+    githubWorkflowReadiness: checkGitHubWorkflowReadiness({
+      pushEnabled: false,
+      authConfig: null,
+      currentUser: null,
+      owner: defaultGitWorkflowDraft.prOwner,
+      repo: defaultGitWorkflowDraft.prRepo,
+      head: defaultGitWorkflowDraft.branchName,
+      base: defaultGitWorkflowDraft.prBase
+    }),
+    messages: [],
+    gitStatus: null,
+    maxTerminalActivityLines: 100,
+    publishGitWorkflowEvent: async () => undefined,
+    refreshGitHubActions: async () => undefined
+  });
+
+  await actions.approveGitWorkflow();
+
+  assert.equal(
+    useAppStore.getState().gitWorkflowRuntimeByRoom[room.id]?.workflow?.message,
+    "Only the active host can approve this workflow."
+  );
+});

@@ -14,7 +14,6 @@ interface UseGitHubRemoteInferenceOptions {
   selectedRoomId: string;
   selectedRoomProjectPath: string;
   selectedRoomIdRef: LatestRef<string>;
-  setGitWorkflowMessageForRoom: (roomId: string, message: string | null) => void;
 }
 
 export function useGitHubRemoteInference({
@@ -22,11 +21,8 @@ export function useGitHubRemoteInference({
   canReadLocalWorkspace,
   selectedRoomId,
   selectedRoomProjectPath,
-  selectedRoomIdRef,
-  setGitWorkflowMessageForRoom
+  selectedRoomIdRef
 }: UseGitHubRemoteInferenceOptions) {
-  const applyInferredGitHubRemoteForRoom = useAppStore((state) => state.applyInferredGitHubRemoteForRoom);
-
   useEffect(() => {
     if (!hasSelectedRoom) return;
     if (!canReadLocalWorkspace) return;
@@ -38,6 +34,7 @@ export function useGitHubRemoteInference({
         if (cancelled || !remote.originUrl) return;
         const repo = parseGitHubRemoteUrl(remote.originUrl);
         if (!repo) return;
+        const { applyInferredGitHubRemoteForRoom, setGitWorkflowMessageForRoom } = useAppStore.getState();
         if (!applyInferredGitHubRemoteForRoom(roomId, repo)) return;
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
           setGitWorkflowMessageForRoom(roomId, `Detected GitHub remote ${repo.owner}/${repo.repo} for PRs and Actions.`);
@@ -49,5 +46,5 @@ export function useGitHubRemoteInference({
     return () => {
       cancelled = true;
     };
-  }, [applyInferredGitHubRemoteForRoom, canReadLocalWorkspace, hasSelectedRoom, selectedRoomId, selectedRoomProjectPath]);
+  }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoomId, selectedRoomProjectPath, selectedRoomIdRef]);
 }

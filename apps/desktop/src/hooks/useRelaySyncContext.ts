@@ -1,16 +1,16 @@
-import { useCodexBrowserOpenCommand } from "./useCodexBrowserOpenCommand";
+import { createCodexBrowserOpenCommand } from "../lib/codexBrowserOpenCommand";
 import { useRelayRoomSync } from "./useRelayRoomSync";
 
 export function useRelaySyncContext({
   browserOpenCommand,
   relayRoomSync
 }: {
-  browserOpenCommand: Parameters<typeof useCodexBrowserOpenCommand>[0];
+  browserOpenCommand: Parameters<typeof createCodexBrowserOpenCommand>[0];
   relayRoomSync: Omit<Parameters<typeof useRelayRoomSync>[0], "subscription"> & {
     subscription: Omit<Parameters<typeof useRelayRoomSync>[0]["subscription"], "handleCodexBrowserOpenCommand">;
   };
 }) {
-  const { handleCodexBrowserOpenCommand } = useCodexBrowserOpenCommand(browserOpenCommand);
+  const handleCodexBrowserOpenCommand = createCodexBrowserOpenCommand(browserOpenCommand);
   const relayPublishers = useRelayRoomSync({
     ...relayRoomSync,
     subscription: {

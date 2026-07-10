@@ -1,10 +1,6 @@
 import { useEffect } from "react";
-import {
-  searchProjectFiles,
-  type GitDiffResult,
-  type ProjectFileContent,
-  type ProjectFileEntry
-} from "../lib/localBackend";
+import { searchProjectFiles } from "../lib/localBackend";
+import { useAppStore } from "../store/appStore";
 
 interface UseProjectFilesSearchOptions {
   hasSelectedRoom: boolean;
@@ -13,11 +9,6 @@ interface UseProjectFilesSearchOptions {
   selectedRoomProjectPath: string;
   fileQuery: string;
   localWorkspaceMessage: string;
-  setProjectFilesForRoom: (roomId: string, files: ProjectFileEntry[]) => void;
-  setSelectedFileForRoom: (roomId: string, file: ProjectFileContent | null) => void;
-  setSelectedDiffForRoom: (roomId: string, diff: GitDiffResult | null) => void;
-  setFileBusyForRoom: (roomId: string, busy: boolean) => void;
-  setFileMessageForRoom: (roomId: string, message: string | null) => void;
 }
 
 export function useProjectFilesSearch({
@@ -26,11 +17,7 @@ export function useProjectFilesSearch({
   selectedRoomId,
   selectedRoomProjectPath,
   fileQuery,
-  localWorkspaceMessage,
-  setProjectFilesForRoom,
-  setSelectedFileForRoom,
-  setSelectedDiffForRoom,
-  setFileMessageForRoom
+  localWorkspaceMessage
 }: UseProjectFilesSearchOptions) {
   useEffect(() => {
     if (!hasSelectedRoom) {
@@ -38,6 +25,12 @@ export function useProjectFilesSearch({
     }
     const roomId = selectedRoomId;
     if (!canReadLocalWorkspace) {
+      const {
+        setProjectFilesForRoom,
+        setSelectedFileForRoom,
+        setSelectedDiffForRoom,
+        setFileMessageForRoom
+      } = useAppStore.getState();
       setProjectFilesForRoom(roomId, []);
       setSelectedFileForRoom(roomId, null);
       setSelectedDiffForRoom(roomId, null);
@@ -48,11 +41,12 @@ export function useProjectFilesSearch({
     searchProjectFiles(selectedRoomProjectPath, fileQuery, 80)
       .then((files) => {
         if (cancelled) return;
+        const { setProjectFilesForRoom, setFileMessageForRoom } = useAppStore.getState();
         setProjectFilesForRoom(roomId, files);
         setFileMessageForRoom(roomId, null);
       })
       .catch((error) => {
-        if (!cancelled) setFileMessageForRoom(roomId, String(error));
+        if (!cancelled) useAppStore.getState().setFileMessageForRoom(roomId, String(error));
       })
     return () => {
       cancelled = true;
