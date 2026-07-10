@@ -331,7 +331,7 @@ export const HostHandoffPlaintextPayload = z.object({
   gitPatchTruncated: z.boolean().optional(),
   codexModel: z.string().min(1).max(maxCodexModelChars),
   codexModelPolicy: z.enum(["auto", "pinned"]).optional(),
-  codexReasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh"]).optional(),
+  codexReasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
   codexReasoningEffortPolicy: z.enum(["auto", "pinned"]).optional(),
   codexSpeed: z.enum(["standard", "fast"]).optional(),
   codexServiceTierPolicy: z.enum(["auto", "pinned"]).optional(),

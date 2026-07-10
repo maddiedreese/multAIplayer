@@ -13,7 +13,7 @@ export type ApprovalDelegationPolicy =
 export type CodexCatalogSelectionPolicy = "auto" | "pinned";
 
 export const defaultApprovalDelegationPolicy: ApprovalDelegationPolicy = "host_only";
-export const defaultCodexModel = "gpt-5.5";
+export const defaultCodexModel = "gpt-5.6-sol";
 export const defaultCodexReasoningEffort = "medium";
 export const defaultCodexSpeed = "standard";
 export const defaultCodexSandboxLevel = "workspace_write";
@@ -25,6 +25,9 @@ export const defaultBrowserAllowedOrigins = ["https://github.com"];
 export const defaultBrowserProfilePersistent = true;
 
 export const codexModelOptions = [
+  { id: "gpt-5.6-sol", label: "GPT-5.6 Sol", description: "Flagship GPT-5.6 model for frontier capability and complex software work." },
+  { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", description: "GPT-5.6 model balancing strong capability with lower cost." },
+  { id: "gpt-5.6-luna", label: "GPT-5.6 Luna", description: "Efficient GPT-5.6 model for fast, high-volume coding workflows." },
   { id: "gpt-5.5", label: "GPT-5.5", description: "Current frontier Codex model for complex coding, research, and real-world work." },
   { id: "gpt-5.5-cyber", label: "GPT-5.5 Cyber", description: "Specialized Codex model for eligible cyber and security workflows." },
   { id: "gpt-5.3-codex", label: "GPT-5.3 Codex", description: "Codex model used for review-oriented software work." },
@@ -37,7 +40,8 @@ export const codexReasoningEffortOptions = [
   { id: "low", label: "Low", description: "Fast responses with lighter reasoning" },
   { id: "medium", label: "Medium", description: "Balances speed and reasoning depth for everyday tasks" },
   { id: "high", label: "High", description: "Greater reasoning depth for complex problems" },
-  { id: "xhigh", label: "Extra high", description: "Extra high reasoning depth for complex problems" }
+  { id: "xhigh", label: "Extra high", description: "Extra high reasoning depth for complex problems" },
+  { id: "max", label: "Max", description: "Maximum reasoning depth for the hardest quality-first work" }
 ] as const;
 
 export const codexSpeedOptions = [

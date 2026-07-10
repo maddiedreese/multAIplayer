@@ -73,9 +73,9 @@ pub(crate) fn probe_codex(
 pub(crate) fn normalize_reasoning_effort(value: Option<&str>) -> Result<String, String> {
     let effort = value.unwrap_or("medium").trim();
     match effort {
-        "none" | "minimal" | "low" | "medium" | "high" | "xhigh" => Ok(effort.to_string()),
+        "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" => Ok(effort.to_string()),
         _ => Err(
-            "Codex reasoning effort must be none, minimal, low, medium, high, or xhigh."
+            "Codex reasoning effort must be none, minimal, low, medium, high, xhigh, or max."
                 .to_string(),
         ),
     }
@@ -330,6 +330,7 @@ mod tests {
             normalize_reasoning_effort(Some(" xhigh ")).unwrap(),
             "xhigh"
         );
+        assert_eq!(normalize_reasoning_effort(Some("max")).unwrap(), "max");
         assert!(normalize_reasoning_effort(Some("extreme")).is_err());
         assert_eq!(normalize_service_tier(None, Some("fast")).unwrap(), "fast");
         assert_eq!(

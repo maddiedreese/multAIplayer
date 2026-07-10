@@ -110,7 +110,9 @@ export function TerminalPanel({
       window.requestAnimationFrame = (callback) => window.setTimeout(() => callback(Date.now()), 16);
       window.cancelAnimationFrame = (handle) => window.clearTimeout(handle);
     }
-    const terminalColor = window.getComputedStyle?.(document.documentElement).getPropertyValue("--text").trim() || "#111111";
+    const rootStyles = window.getComputedStyle?.(document.documentElement);
+    const terminalColor = rootStyles?.getPropertyValue("--code-text").trim() || "#111111";
+    const terminalBackground = rootStyles?.getPropertyValue("--code-bg").trim() || "#fafafa";
     if (!XTerm) return;
     const xterm = new XTerm({
       cursorBlink: true,
@@ -119,7 +121,7 @@ export function TerminalPanel({
       fontSize: 13,
       lineHeight: 1.35,
       theme: {
-        background: "transparent",
+        background: terminalBackground,
         foreground: terminalColor,
         cursor: terminalColor,
         selectionBackground: "rgba(120, 120, 120, 0.3)"
@@ -136,24 +138,25 @@ export function TerminalPanel({
       if (!control.canControl || !control.running) return;
       control.sendData(data);
     });
-    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => {
-      try {
-        fitAddon.fit();
-      } catch {
-        // The addon can throw while the panel is hidden or has no measurable width.
-      }
-    });
+    let fitFrame: number | null = null;
+    const scheduleFit = () => {
+      if (fitFrame !== null) window.cancelAnimationFrame(fitFrame);
+      fitFrame = window.requestAnimationFrame(() => {
+        fitFrame = null;
+        try {
+          fitAddon.fit();
+        } catch {
+          // The addon can throw while the panel is hidden or has no measurable width.
+        }
+      });
+    };
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleFit);
     resizeObserver?.observe(host);
-    window.requestAnimationFrame(() => {
-      try {
-        fitAddon.fit();
-      } catch {
-        // Hidden panels are fitted again on the next resize or snapshot render.
-      }
-    });
+    scheduleFit();
 
     return () => {
       resizeObserver?.disconnect();
+      if (fitFrame !== null) window.cancelAnimationFrame(fitFrame);
       dataDisposable.dispose();
       xterm.dispose();
       xtermRef.current = null;
@@ -190,6 +193,19 @@ export function TerminalPanel({
       // Hidden panels are fitted again when visible.
     }
   }, [selectedTerminal, selectedTerminal?.lines.length, selectedTerminalIdForEffect]);
+
+  useEffect(() => {
+    if (!selectedTerminalIdForEffect) return;
+    const focusFrame = window.requestAnimationFrame(() => {
+      try {
+        fitAddonRef.current?.fit();
+      } catch {
+        // Hidden panels are fitted again when visible.
+      }
+      xtermRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(focusFrame);
+  }, [selectedTerminalIdForEffect]);
 
   return (
     <section className="panel terminal-panel">
@@ -299,7 +315,7 @@ export function TerminalPanel({
         </div>
       )}
 
-      <div className="terminal-output xterm-output" onClick={() => xtermRef.current?.focus()}>
+      <div className="terminal-output xterm-output" onClick={() => xtermRef.current?.focus()} aria-label="Interactive terminal">
         {terminalRisks.length > 0 && <InlineSecretWarning risks={terminalRisks} compact />}
         <div className="xterm-host" ref={terminalHostRef} />
         {codexRunning && <div className="terminal-active">Codex is preparing a foreground terminal...</div>}

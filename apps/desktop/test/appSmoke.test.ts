@@ -243,21 +243,21 @@ test("App smoke", { timeout: 25_000 }, async (t) => {
     const reasoningOptions = Array.from(reasoningSelect.options).map((option) => option.value);
     const speedOptions = Array.from(speedSelect.options).map((option) => option.value);
 
-    assert.deepEqual(modelOptions, ["gpt-5.5", "gpt-5.5-cyber", "gpt-5.3-codex", "gpt-5.3-codex-spark"]);
-    assert.deepEqual(reasoningOptions, ["none", "minimal", "low", "medium", "high", "xhigh"]);
+    assert.deepEqual(modelOptions, ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.5-cyber", "gpt-5.3-codex", "gpt-5.3-codex-spark"]);
+    assert.deepEqual(reasoningOptions, ["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
     assert.deepEqual(speedOptions, ["standard", "fast"]);
 
-    fireEvent.change(modelSelect, { target: { value: "gpt-5.3-codex-spark" } });
+    fireEvent.change(modelSelect, { target: { value: "gpt-5.6-luna" } });
     await waitFor(() => {
-      assert.equal(modelSelect.value, "gpt-5.3-codex-spark");
+      assert.equal(modelSelect.value, "gpt-5.6-luna");
     });
     await waitFor(() => {
       assert.equal(reasoningSelect.disabled, false);
     });
 
-    fireEvent.change(reasoningSelect, { target: { value: "xhigh" } });
+    fireEvent.change(reasoningSelect, { target: { value: "max" } });
     await waitFor(() => {
-      assert.equal(reasoningSelect.value, "xhigh");
+      assert.equal(reasoningSelect.value, "max");
     });
     await waitFor(() => {
       assert.equal(speedSelect.disabled, false);
