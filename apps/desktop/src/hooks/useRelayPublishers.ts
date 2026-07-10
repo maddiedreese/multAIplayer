@@ -1,6 +1,7 @@
 import type { MutableRefObject } from "react";
 import type {
   CodexEventPlaintextPayload,
+  CodexActivityPlaintextPayload,
   CodexQueuePlaintextPayload,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
@@ -18,6 +19,7 @@ import { buildCodexEventLine } from "../lib/activityLines";
 import type {
   ChatMessage,
   CodexRoomEvent,
+  CodexActivity,
   LocalPreviewRecord,
   RelayStatus,
   TerminalCommandRequest
@@ -41,6 +43,7 @@ interface UseRelayPublishersOptions {
   appendLocalPreviewEvent: (roomId: string, event: LocalPreviewRecord) => void;
   appendGitWorkflowEvent: (roomId: string, event: GitWorkflowEventPlaintextPayload) => void;
   appendCodexEvent: (roomId: string, event: CodexRoomEvent) => void;
+  upsertCodexActivity: (roomId: string, activity: CodexActivity) => void;
   appendTerminalLinesForRoom: (roomId: string, lines: string[]) => void;
   appendRoomMessage: (roomId: string, message: ChatMessage) => void;
   appendGitHubActionsEvent: (roomId: string, event: GitHubActionsEventPlaintextPayload) => void;
@@ -59,6 +62,7 @@ export function useRelayPublishers({
   appendLocalPreviewEvent,
   appendGitWorkflowEvent,
   appendCodexEvent,
+  upsertCodexActivity,
   appendTerminalLinesForRoom,
   appendRoomMessage,
   appendGitHubActionsEvent
@@ -219,6 +223,32 @@ export function useRelayPublishers({
     });
   }
 
+  async function publishCodexActivity(
+    event: Omit<CodexActivityPlaintextPayload, "eventType" | "host" | "hostUserId">,
+    room: RoomRecord = selectedRoom
+  ) {
+    const payload: CodexActivityPlaintextPayload = {
+      eventType: "codex.activity",
+      host: localUser.name,
+      hostUserId: localUser.id,
+      ...event
+    };
+    upsertCodexActivity(room.id, payload);
+    const client = relayRef.current;
+    if (!client || relayStatus === "closed" || relayStatus === "error") return;
+    const secret = await loadOrCreateRoomSecret(room.id);
+    await publishEnvelope({
+      id: crypto.randomUUID(),
+      teamId: room.teamId,
+      roomId: room.id,
+      senderDeviceId: deviceId,
+      senderUserId: localUser.id,
+      createdAt: payload.updatedAt,
+      kind: "codex.activity",
+      payload: await encryptJson(payload, secret)
+    });
+  }
+
   async function publishCodexQueueEvent(
     event: Omit<CodexQueuePlaintextPayload, "eventType" | "queueEventId" | "requestedBy" | "requestedByUserId" | "createdAt">,
     room: RoomRecord = selectedRoom
@@ -310,6 +340,7 @@ export function useRelayPublishers({
     publishTerminalResult,
     publishGitWorkflowEvent,
     publishCodexEvent,
+    publishCodexActivity,
     publishCodexQueueEvent,
     publishRoomSettingsEvent,
     publishGitHubActionsEvent

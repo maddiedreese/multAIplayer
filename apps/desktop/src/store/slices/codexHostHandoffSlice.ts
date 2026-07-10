@@ -1,7 +1,12 @@
 import type { StateCreator } from "zustand";
+import { maxCodexActivitiesPerRoom } from "@multaiplayer/protocol";
 import { omitRecordKey } from "../../lib/setUtils";
+import { legacyCodexThreadGraph, mergeCodexThreadGraph } from "../../lib/codexThreadGraph";
 import type {
   CodexRoomEvent,
+  CodexActivity,
+  CodexThreadGraph,
+  CodexThreadGraphNode,
   HostHandoffRecord,
   PendingCodexApproval,
   QueuedCodexTurn,
@@ -11,12 +16,15 @@ import type { AppStoreState } from "../appStore";
 
 export interface CodexRuntimeRoomState {
   events?: CodexRoomEvent[];
+  activities?: CodexActivity[];
   approvalVisible?: boolean;
   pendingApproval?: PendingCodexApproval;
   queuedApprovals?: QueuedCodexTurn[];
   running?: boolean;
   goal?: RoomGoal;
   secretWarningVisible?: boolean;
+  threadGraph?: CodexThreadGraph;
+  /** Legacy mirror; threadGraph.activeThreadId is authoritative. */
   threadId?: string;
   hostHandoffs?: HostHandoffRecord[];
   continuation?: HostHandoffRecord;
@@ -26,6 +34,7 @@ export type CodexRuntimeByRoom = Record<string, CodexRuntimeRoomState>;
 
 export interface CodexRuntimeMaps {
   codexEventsByRoom: Record<string, CodexRoomEvent[]>;
+  codexActivitiesByRoom: Record<string, CodexActivity[]>;
   approvalVisibleByRoom: Record<string, boolean>;
   pendingCodexApprovalsByRoom: Record<string, PendingCodexApproval>;
   queuedCodexApprovalsByRoom: Record<string, QueuedCodexTurn[]>;
@@ -33,6 +42,7 @@ export interface CodexRuntimeMaps {
   roomGoalsByRoom: Record<string, RoomGoal>;
   secretWarningsVisibleByRoom: Record<string, boolean>;
   codexThreadIdsByRoom: Record<string, string>;
+  codexThreadGraphsByRoom: Record<string, CodexThreadGraph>;
 }
 
 export interface CodexHostHandoffMaps {
@@ -42,6 +52,7 @@ export interface CodexHostHandoffMaps {
 
 export function projectCodexRuntimeMaps(codexRuntimeByRoom: CodexRuntimeByRoom): CodexRuntimeMaps {
   const codexEventsByRoom: Record<string, CodexRoomEvent[]> = {};
+  const codexActivitiesByRoom: Record<string, CodexActivity[]> = {};
   const approvalVisibleByRoom: Record<string, boolean> = {};
   const pendingCodexApprovalsByRoom: Record<string, PendingCodexApproval> = {};
   const queuedCodexApprovalsByRoom: Record<string, QueuedCodexTurn[]> = {};
@@ -49,27 +60,34 @@ export function projectCodexRuntimeMaps(codexRuntimeByRoom: CodexRuntimeByRoom):
   const roomGoalsByRoom: Record<string, RoomGoal> = {};
   const secretWarningsVisibleByRoom: Record<string, boolean> = {};
   const codexThreadIdsByRoom: Record<string, string> = {};
+  const codexThreadGraphsByRoom: Record<string, CodexThreadGraph> = {};
 
   Object.entries(codexRuntimeByRoom).forEach(([roomId, runtime]) => {
     if (runtime.events) codexEventsByRoom[roomId] = runtime.events;
+    if (runtime.activities) codexActivitiesByRoom[roomId] = runtime.activities;
     if (runtime.approvalVisible) approvalVisibleByRoom[roomId] = true;
     if (runtime.pendingApproval) pendingCodexApprovalsByRoom[roomId] = runtime.pendingApproval;
     if (runtime.queuedApprovals?.length) queuedCodexApprovalsByRoom[roomId] = runtime.queuedApprovals;
     if (runtime.running) codexRunningByRoom[roomId] = true;
     if (runtime.goal) roomGoalsByRoom[roomId] = runtime.goal;
     if (runtime.secretWarningVisible) secretWarningsVisibleByRoom[roomId] = true;
-    if (runtime.threadId) codexThreadIdsByRoom[roomId] = runtime.threadId;
+    if (runtime.threadGraph) {
+      codexThreadGraphsByRoom[roomId] = runtime.threadGraph;
+      if (runtime.threadGraph.activeThreadId) codexThreadIdsByRoom[roomId] = runtime.threadGraph.activeThreadId;
+    } else if (runtime.threadId) codexThreadIdsByRoom[roomId] = runtime.threadId;
   });
 
   return {
     codexEventsByRoom,
+    codexActivitiesByRoom,
     approvalVisibleByRoom,
     pendingCodexApprovalsByRoom,
     queuedCodexApprovalsByRoom,
     codexRunningByRoom,
     roomGoalsByRoom,
     secretWarningsVisibleByRoom,
-    codexThreadIdsByRoom
+    codexThreadIdsByRoom,
+    codexThreadGraphsByRoom
   };
 }
 
@@ -108,6 +126,7 @@ export interface CodexHostHandoffSlice {
   markLatestHostHandoffAcceptedForRoom: (roomId: string) => void;
   setCodexContinuationForRoom: (roomId: string, handoff: HostHandoffRecord | null) => void;
   appendCodexEvent: (roomId: string, event: CodexRoomEvent) => void;
+  upsertCodexActivity: (roomId: string, activity: CodexActivity) => void;
   setApprovalVisibleForRoom: (roomId: string, visible: boolean) => void;
   setPendingCodexApprovalForRoom: (roomId: string, approval: PendingCodexApproval | null) => void;
   enqueueCodexApprovalForRoom: (roomId: string, turn: QueuedCodexTurn) => void;
@@ -116,6 +135,9 @@ export interface CodexHostHandoffSlice {
   setCodexRunningForRoom: (roomId: string, running: boolean) => void;
   setRoomGoalForRoom: (roomId: string, goal: RoomGoal | null) => void;
   setCodexThreadIdForRoom: (roomId: string, threadId: string | null) => void;
+  mergeCodexThreadsForRoom: (roomId: string, nodes: CodexThreadGraphNode[]) => void;
+  addCodexForkForRoom: (roomId: string, node: CodexThreadGraphNode) => void;
+  setActiveCodexThreadForRoom: (roomId: string, threadId: string) => void;
   setSecretWarningVisibleForRoom: (roomId: string, visible: boolean) => void;
 }
 
@@ -218,6 +240,23 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
       };
     });
   },
+  upsertCodexActivity: (roomId, activity) => {
+    set((state) => {
+      const activities = state.codexRuntimeByRoom[roomId]?.activities ?? [];
+      const index = activities.findIndex((existing) => existing.activityId === activity.activityId);
+      const next = index < 0
+        ? [...activities, activity]
+        : activities.map((existing, current) => current === index && activity.updatedAt >= existing.updatedAt
+          ? { ...existing, ...activity, startedAt: existing.startedAt }
+          : existing);
+      return {
+        codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (runtime) => ({
+          ...runtime,
+          activities: next.slice(-maxCodexActivitiesPerRoom)
+        }))
+      };
+    });
+  },
   setApprovalVisibleForRoom: (roomId, visible) => {
     set((state) => ({
       codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
@@ -296,8 +335,51 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
   setCodexThreadIdForRoom: (roomId, threadId) => {
     set((state) => ({
       codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
-        const { threadId: _threadId, ...rest } = roomRuntime;
-        return threadId ? { ...rest, threadId } : rest;
+        const { threadGraph: _threadGraph, threadId: _threadId, ...rest } = roomRuntime;
+        if (!threadId) return rest;
+        const graph = roomRuntime.threadGraph ?? legacyCodexThreadGraph(null);
+        const existing = graph.nodesById[threadId];
+        return {
+          ...rest,
+          threadId,
+          threadGraph: {
+            activeThreadId: threadId,
+            nodesById: {
+              ...graph.nodesById,
+              [threadId]: existing ?? { id: threadId, title: "Codex thread", status: "unknown", createdAt: 0, updatedAt: 0 }
+            }
+          }
+        };
+      })
+    }));
+  },
+  mergeCodexThreadsForRoom: (roomId, nodes) => {
+    set((state) => ({
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (runtime) => ({
+        ...runtime,
+        threadGraph: mergeCodexThreadGraph(runtime.threadGraph ?? legacyCodexThreadGraph(runtime.threadId ?? null), nodes)
+      }))
+    }));
+  },
+  addCodexForkForRoom: (roomId, node) => {
+    set((state) => ({
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (runtime) => {
+        const graph = runtime.threadGraph ?? legacyCodexThreadGraph(runtime.threadId ?? null);
+        if (!graph.activeThreadId || node.parentThreadId !== graph.activeThreadId) return runtime;
+        return {
+          ...runtime,
+          threadId: node.id,
+          threadGraph: { activeThreadId: node.id, nodesById: { ...graph.nodesById, [node.id]: node } }
+        };
+      })
+    }));
+  },
+  setActiveCodexThreadForRoom: (roomId, threadId) => {
+    set((state) => ({
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (runtime) => {
+        const graph = runtime.threadGraph;
+        if (!graph?.nodesById[threadId]) return runtime;
+        return { ...runtime, threadId, threadGraph: { ...graph, activeThreadId: threadId } };
       })
     }));
   },

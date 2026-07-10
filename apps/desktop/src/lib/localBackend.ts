@@ -1,5 +1,6 @@
 export * from "./localBackend/browserBackend";
 export * from "./localBackend/codexBackend";
+export * from "./localBackend/codexHostBackend";
 export * from "./localBackend/constants";
 export * from "./localBackend/dialogBackend";
 export * from "./localBackend/gitBackend";

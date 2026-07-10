@@ -8,6 +8,7 @@ import {
   defaultCodexModel,
   defaultCodexReasoningEffort,
   defaultCodexSpeed,
+  legacyCodexCatalogSelectionPolicy,
   defaultRoomMode,
   type AttachmentBlobRecord as AttachmentBlobRecordType,
   type DeviceRecord,
@@ -25,6 +26,7 @@ import {
   maxCiphertextCharactersForBlob,
   normalizeBrowserAllowedOrigins,
   normalizeCodexModel,
+  normalizeCodexCatalogSelectionPolicy,
   normalizeCodexReasoningEffortOrDefault,
   normalizeCodexSpeedOrDefault,
   normalizeDevicePublicKeyJwk,
@@ -263,8 +265,14 @@ export function createRelayStoreCodec(options: {
       trustedApproverUserIds,
       mode,
       codexModel: normalizeModel(room.codexModel) ?? defaultCodexModel,
+      codexModelPolicy: normalizeCodexCatalogSelectionPolicy((room as { codexModelPolicy?: unknown }).codexModelPolicy)
+        ?? legacyCodexCatalogSelectionPolicy,
       codexReasoningEffort: normalizeCodexReasoningEffortOrDefault((room as { codexReasoningEffort?: unknown }).codexReasoningEffort ?? defaultCodexReasoningEffort),
+      codexReasoningEffortPolicy: normalizeCodexCatalogSelectionPolicy((room as { codexReasoningEffortPolicy?: unknown }).codexReasoningEffortPolicy)
+        ?? legacyCodexCatalogSelectionPolicy,
       codexSpeed: normalizeCodexSpeedOrDefault((room as { codexSpeed?: unknown }).codexSpeed ?? defaultCodexSpeed),
+      codexServiceTierPolicy: normalizeCodexCatalogSelectionPolicy((room as { codexServiceTierPolicy?: unknown }).codexServiceTierPolicy)
+        ?? legacyCodexCatalogSelectionPolicy,
       browserAllowedOrigins: normalizeBrowserAllowedOrigins((room as { browserAllowedOrigins?: unknown }).browserAllowedOrigins)
         ?? defaultBrowserAllowedOrigins,
       browserProfilePersistent: typeof (room as { browserProfilePersistent?: unknown }).browserProfilePersistent === "boolean"

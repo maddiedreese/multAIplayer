@@ -130,8 +130,11 @@ export async function createRoom(
     approvalDelegationPolicy?: RoomRecord["approvalDelegationPolicy"];
     trustedApproverUserIds?: string[];
     codexModel?: string;
+    codexModelPolicy?: RoomRecord["codexModelPolicy"];
     codexReasoningEffort?: RoomRecord["codexReasoningEffort"];
+    codexReasoningEffortPolicy?: RoomRecord["codexReasoningEffortPolicy"];
     codexSpeed?: RoomRecord["codexSpeed"];
+    codexServiceTierPolicy?: RoomRecord["codexServiceTierPolicy"];
     codexSandboxLevel?: RoomRecord["codexSandboxLevel"];
     browserAllowedOrigins?: string[];
     browserProfilePersistent?: boolean;
@@ -172,8 +175,11 @@ export async function updateRoomSettings(
     trustedApproverUserIds?: string[];
     mode?: RoomRecord["mode"];
     codexModel?: string;
+    codexModelPolicy?: RoomRecord["codexModelPolicy"];
     codexReasoningEffort?: RoomRecord["codexReasoningEffort"];
+    codexReasoningEffortPolicy?: RoomRecord["codexReasoningEffortPolicy"];
     codexSpeed?: RoomRecord["codexSpeed"];
+    codexServiceTierPolicy?: RoomRecord["codexServiceTierPolicy"];
     codexSandboxLevel?: RoomRecord["codexSandboxLevel"];
     projectPath?: string;
     browserAllowedOrigins?: string[];

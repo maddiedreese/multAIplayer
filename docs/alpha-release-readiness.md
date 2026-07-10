@@ -58,6 +58,12 @@ Before a wider alpha, manually run these in the native macOS app:
 - Send encrypted chat messages and attachments.
 - Select a local project folder and open files/diffs from the inspector.
 - Invoke Codex from chat and approve a turn as active host.
+- Verify Codex 0.133.0, 0.143.0, and 0.144.0 compatibility labels, plus the warning shown for a simulated newer version.
+- Exercise a server-initiated command/file/permission or tool-input request, approve and deny it as active host, and confirm the 15-minute expiry path fails closed without publishing request contents.
+- Verify automatic and pinned model/reasoning/service-tier resolution against two different host catalogs and confirm unsupported pinned choices show their fallback.
+- Confirm account, app, MCP authentication, login refreshes, and global app approval settings remain host-local and absent from relay backlog/local room history.
+- Run a turn with command and subagent activity; confirm the room receives only encrypted canonical lifecycle metadata and no raw command, output, arguments, secrets, token deltas, or raw JSON.
+- Refresh the thread graph, switch branches, fully fork on 0.133.0, fork through `lastTurnId` on 0.143.0+, and confirm the agent tree remains separate from the thread graph.
 - Open the in-app browser from the browser tab and from a Codex instruction such as `@Codex open localhost`.
 - Open the terminal tab, type into the auto-created shell, create a second terminal, stop/restart a terminal, and copy terminal Markdown.
 - Create a branch, commit, push, open a draft PR, and refresh GitHub Actions.

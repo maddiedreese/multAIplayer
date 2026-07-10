@@ -12,6 +12,32 @@ Instead, a room has one active host. The host is a desktop user who has local ac
 
 People chat normally in the room. When someone clicks Codex or types `@Codex`, the app prepares a proposed Codex turn from the room context. The active host reviews and approves that turn. If approved, the host's local desktop app sends the prepared input to the host's local Codex app-server and streams the result back into the room as encrypted room events.
 
+## Compatibility And Catalog Selection
+
+The supported Codex app-server compatibility range is 0.133.0–0.144.0, with generated-schema contract fixtures for 0.133.0, 0.143.0, and 0.144.0. Versions older than 0.133.0 cannot host turns. A version newer than 0.144.0 is labelled unverified: ordinary compatible behavior can continue, but security-sensitive features stay behind manifest/capability checks and fail closed when their contract is unknown.
+
+Model settings express room intent and are resolved against the active host's local `model/list` catalog. `auto` selects the catalog's default model, reasoning effort, and service tier. `pinned` requests the saved choice; if the host catalog does not support a pinned reasoning effort or service tier, the desktop uses a catalog-supported fallback and shows the fallback. Legacy rooms remain pinned for compatibility.
+
+## Bidirectional Requests And Host Approval
+
+App-server is bidirectional JSON-RPC. In addition to responses and notifications, Codex can request command, file-change, permission, tool-input, MCP elicitation, dynamic-tool, or authentication decisions. Supported interactive requests are shown only to the active host for the originating room; dynamic-tool, token-refresh, attestation, and unknown requests are rejected natively without sending their parameters to the webview. The host's decision is returned to the same native app-server session; it is not treated as permission for another room or process.
+
+Waiting for a person pauses the active execution timeout, but each pending request has a 15-minute wall-clock deadline. Expiry, room shutdown, host-session shutdown, malformed requests, unknown privileged methods, or invalid responses fail closed and send a bounded cancellation/error response to Codex.
+
+## Host-local Codex Account, Apps, And MCP
+
+The profile drawer can inspect the host's Codex account, start browser/device login, list available apps, inspect MCP authentication status, and begin MCP OAuth. This state stays host-local. Login ids, authorization refresh data, account tokens, raw app/MCP responses, and token-refresh notifications are never room events or local room history.
+
+The device-wide app-tool approval default can be `auto`, `prompt`, or, on supported versions, `writes`. This writes the host's persistent Codex configuration and can affect other Codex clients on that device. `writes` trusts only tools that declare themselves read-only and prompts before writes; it is not a room-scoped override.
+
+## Activity And Thread Continuity
+
+The room activity timeline uses a bounded canonical `codex.activity` record projected from item lifecycle notifications. It contains stable ids, category, lifecycle status, timestamps, and limited normalized subagent relationships. It never contains raw upstream JSON, command text, command output, tool arguments/results, environment data, secrets, or token deltas. Activity records are encrypted before relay transport and encrypted in local room history; lifecycle updates coalesce by stable activity id.
+
+Each device stores a normalized encrypted thread graph per room and selects one active thread for turns and goals. Hosts can refresh, switch, or fork a thread. Fork-through-turn (`lastTurnId`) requires Codex 0.143.0 or newer; 0.133.0 can list and fully fork threads but rejects that narrower operation with an upgrade message. Thread discovery admits only the active session tree and excludes prompt previews from stored titles.
+
+The agent tree is separate from the conversation thread graph. It is derived only from normalized subagent activity (`spawn`, `send`, `resume`, `wait`, and `close`) and never from raw app-server payloads.
+
 ## What The Relay Can See
 
 The relay routes metadata and ciphertext. It should not receive:

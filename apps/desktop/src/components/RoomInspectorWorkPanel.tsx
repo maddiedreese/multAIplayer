@@ -1,5 +1,7 @@
 import type { ComponentProps } from "react";
 import { ApprovalPolicyPanel } from "./ApprovalPolicyPanel";
+import { CodexActivityTimeline } from "./CodexActivityTimeline";
+import { CodexThreadGraphPanel } from "./CodexThreadGraphPanel";
 import { EncryptedInvitePanel } from "./EncryptedInvitePanel";
 import { GitHandoffPanel } from "./GitHandoffPanel";
 import { GitHubActionsPanel } from "./GitHubActionsPanel";
@@ -22,6 +24,7 @@ export function RoomInspectorWorkPanel({
   encryptedInvite,
   approvalPolicy,
   model,
+  codexRuntime,
   localHistory,
   workspaceFiles,
   gitHandoff,
@@ -36,6 +39,7 @@ export function RoomInspectorWorkPanel({
   encryptedInvite: ComponentProps<typeof EncryptedInvitePanel<InviteJoinRequest>>;
   approvalPolicy: ComponentProps<typeof ApprovalPolicyPanel>;
   model: ComponentProps<typeof ModelPanel>;
+  codexRuntime: { roomId: string; projectPath: string };
   localHistory: ComponentProps<typeof LocalHistoryPanel>;
   workspaceFiles: ComponentProps<typeof WorkspaceFilesPanel>;
   gitHandoff: ComponentProps<typeof GitHandoffPanel>;
@@ -70,6 +74,8 @@ export function RoomInspectorWorkPanel({
       <EncryptedInvitePanel {...encryptedInvite} />
       <ApprovalPolicyPanel {...approvalPolicy} />
       <ModelPanel {...model} />
+      <CodexThreadGraphPanel {...codexRuntime} />
+      <CodexActivityTimeline roomId={codexRuntime.roomId} />
       <LocalHistoryPanel {...localHistory} />
     </>
   );

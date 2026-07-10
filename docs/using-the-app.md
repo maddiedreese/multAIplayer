@@ -6,6 +6,8 @@ This guide explains the main desktop app surfaces and what each feature means in
 
 Use the profile drawer to sign in with GitHub, sign out, inspect relay auth settings, and save diagnostics for bug reports.
 
+The same drawer has host-local Codex controls. It can show the local Codex account, apps, and MCP authentication status; start Codex browser/device login or MCP OAuth; and set the device-wide app approval default to `auto`, `prompt`, or supported `writes`. These controls use the host's local app-server and persistent Codex config. They are not shared room settings, and Codex tokens, login refresh data, and raw account/app/MCP responses never enter room events or room history.
+
 GitHub sign-in is used for identity, draft pull requests, and GitHub Actions reads. The relay keeps GitHub access tokens server-side; desktop clients do not receive those tokens.
 
 Each desktop install has a device identity used for encrypted invite approval and room-key delivery. The profile drawer shows the local device id and public key fingerprint. Resetting the device identity creates a new local device key, which can make other room members see the device as untrusted until they review the new fingerprint.
@@ -62,6 +64,14 @@ The Codex sandbox controls the local Codex app-server request:
 
 Reasoning and speed controls are passed to supported Codex models. A custom model id can be entered when the target local Codex installation supports it.
 
+Model, reasoning, and speed/service-tier controls can be automatic or pinned. Automatic choices follow the active host's local app-server catalog. Pinned choices are used when supported; otherwise the app shows the catalog fallback selected for that host. The supported compatibility range is Codex 0.133.0 through 0.144.0, with generated-schema fixtures at 0.133.0, 0.143.0, and 0.144.0. Older versions must be updated before hosting, while newer versions show an unverified-version warning and keep contract-sensitive features fail closed.
+
+Codex can pause a running turn to ask the active host for a command, file, permission, tool-input, MCP, or authentication decision. These requests are room-scoped and bidirectional; answering the proposal card is separate from answering later app-server requests. A pending app-server request expires after 15 minutes of human wait.
+
+The Codex activity timeline shows encrypted metadata-only command, file, tool, web, image, review, reasoning, and subagent lifecycle entries. It deliberately does not share command text, output, arguments, results, environment values, raw JSON, secrets, or token deltas.
+
+After a thread exists, the thread graph can refresh the active session tree, switch the active branch, or fork it. An optional last-turn id forks through that turn on Codex 0.143.0 or newer. The selected thread is used for the next turn and `/goal`. The adjacent agent tree is a different view derived from normalized subagent activity; it is not the conversation branch graph.
+
 ## Host Handoff
 
 Host handoff lets the active host pass continuity to another eligible member, including when the host hits Codex usage limits or needs to step away.
@@ -114,9 +124,9 @@ Room-key rotation changes the key used for future room messages and invite links
 
 ## Local History, Notifications, And Forgetting A Room
 
-Local history is encrypted on the device and has a configurable retention window. It can include chat, workflow events, terminal snapshots, browser approvals, Codex events, Git events, GitHub Actions refreshes, host handoff packages, local previews, and Codex thread continuity.
+Local history is encrypted on the device and has a configurable retention window. It can include chat, workflow events, terminal snapshots, browser approvals, Codex turn events, bounded metadata-only Codex activities, Git events, GitHub Actions refreshes, host handoff packages, local previews, and the normalized Codex thread graph/active selection.
 
-Clearing local history removes saved local room history while keeping the room key. Forgetting a room on one device removes local history, local room settings, saved Codex thread id, the local room key, and warning acknowledgements. The room becomes locked on that device until a fresh invite or key is imported.
+Clearing local history removes saved local room history while keeping the room key. Forgetting a room on one device removes local history, local room settings, the saved Codex thread graph/active selection, the local room key, and warning acknowledgements. The room becomes locked on that device until a fresh invite or key is imported.
 
 Room notifications can be muted per room. Muting affects local notifications/unread attention on that device; it does not mute the room for other members.
 

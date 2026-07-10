@@ -1,8 +1,9 @@
 import {
-  codexModelOptions,
-  codexReasoningEffortOptions,
-  codexSpeedOptions
-} from "@multaiplayer/protocol";
+  catalogModelOptions,
+  catalogReasoningOptionsForModel,
+  catalogSpeedOptionsForModel,
+  resolveCodexRunSettings
+} from "../lib/codexCatalogResolver";
 import type { AppViewModelOptions } from "./appViewModelTypes";
 import type { useAppViewProps } from "./useAppViewProps";
 
@@ -33,7 +34,7 @@ export function createRoomMainColumnInput({
   workspaceFlow,
   hostHandoffActions
 }: RoomMainColumnOptions): RoomMainColumnInput {
-  const { workspaceState } = appState;
+  const { workspaceState, appRuntimeState } = appState;
   const {
     selectedRoom,
     hasSelectedRoom,
@@ -52,6 +53,7 @@ export function createRoomMainColumnInput({
     clearSelectedMessages,
     toggleMessageSelection
   } = selected;
+  const resolvedSettings = resolveCodexRunSettings(selectedRoom, appRuntimeState.codexProbe);
 
   return {
     teamRecords: workspaceState.teams,
@@ -63,12 +65,12 @@ export function createRoomMainColumnInput({
     isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
     isSelectedRoomRevoked: roomInteraction.isSelectedRoomRevoked,
     hasSelectedRoom,
-    selectedCodexModel,
-    selectedCodexReasoningEffort,
-    selectedCodexSpeed,
-    modelOptions: codexModelOptions,
-    reasoningOptions: codexReasoningEffortOptions,
-    speedOptions: codexSpeedOptions,
+    selectedCodexModel: resolvedSettings.model,
+    selectedCodexReasoningEffort: resolvedSettings.reasoningEffort,
+    selectedCodexSpeed: resolvedSettings.speed,
+    modelOptions: catalogModelOptions(appRuntimeState.codexProbe),
+    reasoningOptions: catalogReasoningOptionsForModel(appRuntimeState.codexProbe, resolvedSettings.model),
+    speedOptions: catalogSpeedOptionsForModel(appRuntimeState.codexProbe, resolvedSettings.model),
     settingsBusy: selectedRuntime.settingsBusy,
     selectedMessages,
     markdownSelectionMode,

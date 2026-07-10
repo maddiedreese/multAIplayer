@@ -4,19 +4,19 @@ import type {
   RoomRecord
 } from "@multaiplayer/protocol";
 import {
-  defaultCodexModel,
-  defaultCodexReasoningEffort,
-  defaultCodexSandboxLevel,
-  defaultCodexSpeed
+  defaultCodexSandboxLevel
 } from "@multaiplayer/protocol";
 import {
   runCodexTurn,
   shutdownCodexRoom,
   getCodexGoal,
+  type CodexProbe,
   type GitStatusSummary,
   type TerminalSnapshot
 } from "../lib/localBackend";
 import { codexGoalToRoomGoal } from "../lib/roomGoals";
+import { assessCodexCompatibility } from "../lib/codexCompatibility";
+import { resolveCodexRunSettings } from "../lib/codexCatalogResolver";
 import {
   canApproveCodexTurn
 } from "../lib/codexApproval";
@@ -29,6 +29,11 @@ import {
   messagesSinceLastCodex
 } from "../lib/codexTurn";
 import { normalizeCodexThreadId } from "../lib/codexThread";
+import {
+  codexHostFailureRoomMessage,
+  projectCodexRoomEvent,
+  projectCodexRoomStatus
+} from "../lib/codexRoomSharing";
 import {
   classifyCodexFailure,
   codexUsageLimitMessage
@@ -57,6 +62,7 @@ interface LocalUser {
 
 interface UseCodexTurnActionsOptions {
   selectedRoom: RoomRecord;
+  codexProbe: CodexProbe | null;
   activeCodexApproval: PendingCodexApproval | null;
   roomsRef: MutableRefObject<RoomRecord[]>;
   selectedRoomIdRef: MutableRefObject<string>;
@@ -94,6 +100,7 @@ const codexInvocationTimeoutMs = 15 * 60 * 1000;
 
 export function useCodexTurnActions({
   selectedRoom,
+  codexProbe,
   activeCodexApproval,
   roomsRef,
   selectedRoomIdRef,
@@ -225,6 +232,12 @@ export function useCodexTurnActions({
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
+    const compatibility = assessCodexCompatibility(codexProbe?.version);
+    if (codexProbe?.available && compatibility.status === "unsupported_older") {
+      setHostMessageForRoom(roomId, compatibility.message);
+      setApprovalVisibleForRoom(roomId, true);
+      return;
+    }
     const currentRoomMessages = messagesByRoom[roomId] ?? [];
     const turnMessages = approval?.messages
       ? refreshApprovalMessagesFromRoom(approval.messages, currentRoomMessages)
@@ -237,9 +250,8 @@ export function useCodexTurnActions({
       gitStatusByRoom[roomId] ?? null,
       { includeWorkspaceContext: roomCanReadLocalWorkspace }
     );
-    const model = room.codexModel ?? defaultCodexModel;
-    const reasoningEffort = room.codexReasoningEffort ?? defaultCodexReasoningEffort;
-    const speed = room.codexSpeed ?? defaultCodexSpeed;
+    const resolvedSettings = resolveCodexRunSettings(room, codexProbe);
+    const { model, reasoningEffort, speed } = resolvedSettings;
     const sandboxLevel = room.codexSandboxLevel ?? defaultCodexSandboxLevel;
     const projectPath = room.projectPath;
     if (!hasActionableCodexTurnContext(turnSummary)) {
@@ -257,7 +269,8 @@ export function useCodexTurnActions({
     setCodexRunningForRoom(roomId, true);
     appendTerminalLinesForRoom(roomId, [
       "$ codex app-server",
-      `Starting approved Codex turn with ${formatCodexModel(model)} from encrypted room context...`
+      `Starting approved Codex turn with ${formatCodexModel(model)} from encrypted room context...`,
+      ...resolvedSettings.warnings.map((warning) => `Catalog fallback: ${warning}`)
     ]);
 
     const turnId = approval?.turnId ?? crypto.randomUUID();
@@ -287,7 +300,18 @@ export function useCodexTurnActions({
         ...(consumedMessageIds.length ? { consumedMessageIds } : {}),
         ...(riskFlags.length ? { riskFlags } : {})
       }, room);
-      const result = await runCodexTurn(roomId, projectPath, input, model, reasoningEffort, speed, sandboxLevel, previousThreadId);
+      const result = await runCodexTurn(
+        roomId,
+        turnId,
+        projectPath,
+        input,
+        model,
+        reasoningEffort,
+        speed,
+        resolvedSettings.serviceTier,
+        sandboxLevel,
+        previousThreadId
+      );
       if (classifyCodexFailure([result.status, result.stderr, result.transcript, ...result.events]) === "usage_limit") {
         await handleCodexUsageLimit(room, turnId, model, turnMessages, result.events, result.stderr);
         return;
@@ -301,7 +325,12 @@ export function useCodexTurnActions({
           })
           .catch(() => undefined);
       }
-      for (const eventName of result.events.slice(-16)) {
+      const roomEvents = result.events
+        .map(projectCodexRoomEvent)
+        .filter((eventName): eventName is string => Boolean(eventName))
+        .slice(-16);
+      const roomStatus = projectCodexRoomStatus(result.status);
+      for (const eventName of roomEvents) {
         await publishCodexEvent({
           turnId,
           status: "event",
@@ -313,14 +342,14 @@ export function useCodexTurnActions({
       }
       await publishCodexEvent({
         turnId,
-        status: "completed",
-        message: `Codex turn finished with status: ${result.status}.`,
+        status: roomStatus === "completed" ? "completed" : "failed",
+        message: `Codex turn finished with status: ${roomStatus}.`,
         model,
         ...(threadId ? { threadId } : {})
       }, room);
       const body =
         result.transcript.trim() ||
-        `Codex turn finished with status: ${result.status}. Events: ${result.events.slice(0, 8).join(", ")}`;
+        `Codex turn finished with status: ${roomStatus}.${roomEvents.length ? ` Events: ${roomEvents.slice(0, 8).join(", ")}` : ""}`;
       await publishChatMessage({
         id: crypto.randomUUID(),
         author: `Codex via ${localUser.name}`,
@@ -343,14 +372,14 @@ export function useCodexTurnActions({
       await publishCodexEvent({
         turnId,
         status: "failed",
-        message: String(error),
+        message: codexHostFailureRoomMessage,
         model
       }, room);
       await publishChatMessage({
         id: crypto.randomUUID(),
         author: `Codex via ${localUser.name}`,
         role: "codex",
-        body: `Codex could not start from this host: ${String(error)}`,
+        body: codexHostFailureRoomMessage,
         time: formatMessageTime(),
         createdAt: new Date().toISOString()
       }, room);

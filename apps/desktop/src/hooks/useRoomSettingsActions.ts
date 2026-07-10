@@ -168,7 +168,7 @@ export function useRoomSettingsActions({
       setSelectedSettingsMessage(`Use a known Codex model or a model-like id up to ${maxCodexModelChars} characters.`);
       return;
     }
-    if (nextModel === selectedCodexModel) return;
+    if (nextModel === selectedCodexModel && selectedRoom.codexModelPolicy === "pinned") return;
     if (!hasSelectedRoom) {
       setSelectedSettingsMessage("Create or join a room before changing the Codex model.");
       return;
@@ -187,7 +187,11 @@ export function useRoomSettingsActions({
     setSettingsMessageForRoom(roomId, null);
     try {
       const previousModel = selectedCodexModel;
-      const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), codexModel: nextModel });
+      const room = await updateRoomSettings(roomId, {
+        ...roomSettingsActor(),
+        codexModel: nextModel,
+        codexModelPolicy: "pinned"
+      });
       void shutdownCodexRoom(roomId);
       replaceRoom(room);
       await publishRoomSettingsEvent(room, {
@@ -214,7 +218,10 @@ export function useRoomSettingsActions({
       setSelectedSettingsMessage("Choose a supported Codex reasoning level.");
       return;
     }
-    if (nextReasoningEffort === selectedCodexReasoningEffort) return;
+    if (
+      nextReasoningEffort === selectedCodexReasoningEffort &&
+      selectedRoom.codexReasoningEffortPolicy === "pinned"
+    ) return;
     if (!hasSelectedRoom) {
       setSelectedSettingsMessage("Create or join a room before changing Codex reasoning.");
       return;
@@ -235,7 +242,8 @@ export function useRoomSettingsActions({
       const previousValue = selectedCodexReasoningEffort;
       const room = await updateRoomSettings(roomId, {
         ...roomSettingsActor(),
-        codexReasoningEffort: nextReasoningEffort as RoomRecord["codexReasoningEffort"]
+        codexReasoningEffort: nextReasoningEffort as RoomRecord["codexReasoningEffort"],
+        codexReasoningEffortPolicy: "pinned"
       });
       void shutdownCodexRoom(roomId);
       replaceRoom(room);
@@ -263,7 +271,7 @@ export function useRoomSettingsActions({
       setSelectedSettingsMessage("Choose a supported Codex speed.");
       return;
     }
-    if (nextSpeed === selectedCodexSpeed) return;
+    if (nextSpeed === selectedCodexSpeed && selectedRoom.codexServiceTierPolicy === "pinned") return;
     if (!hasSelectedRoom) {
       setSelectedSettingsMessage("Create or join a room before changing Codex speed.");
       return;
@@ -284,7 +292,8 @@ export function useRoomSettingsActions({
       const previousValue = selectedCodexSpeed;
       const room = await updateRoomSettings(roomId, {
         ...roomSettingsActor(),
-        codexSpeed: nextSpeed as RoomRecord["codexSpeed"]
+        codexSpeed: nextSpeed as RoomRecord["codexSpeed"],
+        codexServiceTierPolicy: "pinned"
       });
       void shutdownCodexRoom(roomId);
       replaceRoom(room);

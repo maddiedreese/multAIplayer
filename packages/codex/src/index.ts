@@ -9,9 +9,11 @@ export interface CodexAppServerConfig {
   cwd?: string;
 }
 
+export type JsonRpcId = string | number;
+
 export interface JsonRpcRequest<TParams = unknown> {
   method: string;
-  id: number;
+  id: JsonRpcId;
   params?: TParams;
 }
 
@@ -25,7 +27,7 @@ export type JsonRpcMessage<TParams = unknown> =
   | JsonRpcNotification<TParams>;
 
 export interface JsonRpcResponse<TResult = unknown> {
-  id: number;
+  id: JsonRpcId;
   result?: TResult;
   error?: {
     code: number;
@@ -33,6 +35,17 @@ export interface JsonRpcResponse<TResult = unknown> {
     data?: unknown;
   };
 }
+
+export interface JsonRpcServerRequest<TParams = unknown> {
+  method: string;
+  id: JsonRpcId;
+  params?: TParams;
+}
+
+export type JsonRpcInboundMessage =
+  | { kind: "response"; message: JsonRpcResponse }
+  | { kind: "notification"; message: JsonRpcNotification }
+  | { kind: "serverRequest"; message: JsonRpcServerRequest };
 
 export interface CodexThreadStartResult {
   thread?: {
@@ -42,11 +55,14 @@ export interface CodexThreadStartResult {
 
 export interface CodexAppServerEvents {
   notification: [JsonRpcNotification];
+  serverRequest: [JsonRpcServerRequest];
+  orphanResponse: [JsonRpcResponse];
+  protocolError: [Error];
   stderr: [string];
   exit: [{ code: number | null; signal: NodeJS.Signals | null }];
 }
 
-export function createInitializeRequest(id: number): JsonRpcRequest {
+export function createInitializeRequest(id: JsonRpcId): JsonRpcRequest {
   return {
     method: "initialize",
     id,
@@ -63,7 +79,7 @@ export function createInitializeRequest(id: number): JsonRpcRequest {
   };
 }
 
-export function createThreadStartRequest(id: number, model = "gpt-5.5"): JsonRpcRequest {
+export function createThreadStartRequest(id: JsonRpcId, model = "gpt-5.5"): JsonRpcRequest {
   return {
     method: "thread/start",
     id,
@@ -72,7 +88,7 @@ export function createThreadStartRequest(id: number, model = "gpt-5.5"): JsonRpc
 }
 
 export function createTurnStartRequest(
-  id: number,
+  id: JsonRpcId,
   threadId: string,
   input: string,
   cwd?: string
@@ -93,7 +109,7 @@ export class CodexAppServerClient extends EventEmitter<CodexAppServerEvents> {
   private rl: Interface | null = null;
   private nextId = 1;
   private pending = new Map<
-    number,
+    JsonRpcId,
     {
       resolve: (value: JsonRpcResponse) => void;
       reject: (error: Error) => void;
@@ -172,6 +188,16 @@ export class CodexAppServerClient extends EventEmitter<CodexAppServerEvents> {
     this.write(notification);
   }
 
+  respond<TResult = unknown>(id: JsonRpcId, result: TResult): void {
+    this.ensureStarted();
+    this.write({ id, result });
+  }
+
+  respondError(id: JsonRpcId, code: number, message: string, data?: unknown): void {
+    this.ensureStarted();
+    this.write({ id, error: { code, message, ...(data === undefined ? {} : { data }) } });
+  }
+
   close(): void {
     this.rl?.close();
     this.proc?.kill();
@@ -181,19 +207,32 @@ export class CodexAppServerClient extends EventEmitter<CodexAppServerEvents> {
   }
 
   private handleLine(line: string): void {
-    const message = JSON.parse(line) as JsonRpcResponse | JsonRpcNotification;
-    if ("id" in message) {
-      const pending = this.pending.get(message.id);
-      if (!pending) return;
-      clearTimeout(pending.timeout);
-      this.pending.delete(message.id);
-      pending.resolve(message);
+    let inbound: JsonRpcInboundMessage;
+    try {
+      inbound = classifyJsonRpcMessage(JSON.parse(line));
+    } catch (error) {
+      this.emit("protocolError", error instanceof Error ? error : new Error(String(error)));
       return;
     }
-    this.emit("notification", message);
+    if (inbound.kind === "response") {
+      const pending = this.pending.get(inbound.message.id);
+      if (!pending) {
+        this.emit("orphanResponse", inbound.message);
+        return;
+      }
+      clearTimeout(pending.timeout);
+      this.pending.delete(inbound.message.id);
+      pending.resolve(inbound.message);
+      return;
+    }
+    if (inbound.kind === "serverRequest") {
+      this.emit("serverRequest", inbound.message);
+      return;
+    }
+    this.emit("notification", inbound.message);
   }
 
-  private write(message: JsonRpcMessage): void {
+  private write(message: JsonRpcMessage | JsonRpcResponse): void {
     this.proc?.stdin.write(`${JSON.stringify(message)}\n`);
   }
 
@@ -214,4 +253,29 @@ export class CodexAppServerClient extends EventEmitter<CodexAppServerEvents> {
       this.pending.delete(id);
     }
   }
+}
+
+export function classifyJsonRpcMessage(value: unknown): JsonRpcInboundMessage {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("App-server message must be a JSON object");
+  }
+  const message = value as Record<string, unknown>;
+  const hasId = isJsonRpcId(message.id);
+  const hasMethod = typeof message.method === "string" && message.method.length > 0;
+  if (hasMethod && hasId) {
+    return { kind: "serverRequest", message: message as unknown as JsonRpcServerRequest };
+  }
+  if (hasMethod && message.id === undefined) {
+    return { kind: "notification", message: message as unknown as JsonRpcNotification };
+  }
+  const hasResult = Object.prototype.hasOwnProperty.call(message, "result");
+  const hasError = Object.prototype.hasOwnProperty.call(message, "error");
+  if (hasId && hasResult !== hasError) {
+    return { kind: "response", message: message as unknown as JsonRpcResponse };
+  }
+  throw new Error("App-server message is not a valid response, notification, or server request");
+}
+
+function isJsonRpcId(value: unknown): value is JsonRpcId {
+  return typeof value === "string" || (typeof value === "number" && Number.isSafeInteger(value));
 }

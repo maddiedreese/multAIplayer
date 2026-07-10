@@ -201,6 +201,11 @@ test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, brow
   assert.deepEqual(createHandoffSettingsPatch(handoff), {
     projectPath: room.projectPath,
     codexModel: room.codexModel,
+    codexModelPolicy: "pinned",
+    codexReasoningEffort: "medium",
+    codexReasoningEffortPolicy: "pinned",
+    codexSpeed: "standard",
+    codexServiceTierPolicy: "pinned",
     codexSandboxLevel: "workspace_write",
     approvalPolicy: room.approvalPolicy
   });

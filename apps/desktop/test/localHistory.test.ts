@@ -123,6 +123,35 @@ test("encrypted history keeps Codex thread continuity local and encrypted", asyn
   assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
 });
 
+test("encrypted history keeps canonical Codex activity metadata encrypted", async () => {
+  const roomId = "room-codex-activity-history";
+  const payload = {
+    version: 3,
+    messages: [], terminalRequests: [], browserRequests: [], inviteRequests: [], codexEvents: [],
+    gitWorkflowEvents: [], githubActionsEvents: [], terminalSnapshots: [], hostHandoffs: [],
+    codexActivities: [{
+      eventType: "codex.activity",
+      activityId: "turn-1-item-1", turnId: "turn-1", itemId: "item-1",
+      kind: "command", status: "completed", title: "Command execution",
+      startedAt: "2026-07-09T12:00:00.000Z", updatedAt: "2026-07-09T12:00:01.000Z",
+      host: "Host", hostUserId: "user-host"
+    }],
+    codexThreadId: "thread-child",
+    codexThreadGraph: {
+      activeThreadId: "thread-child",
+      nodesById: {
+        "thread-root": { id: "thread-root", title: "Root", status: "idle", createdAt: 1, updatedAt: 1 },
+        "thread-child": { id: "thread-child", parentThreadId: "thread-root", title: "Branch", status: "idle", createdAt: 2, updatedAt: 2 }
+      }
+    }
+  };
+  await saveEncryptedHistory(roomId, payload);
+  const stored = localStorage.getItem(`multaiplayer:history:${roomId}`);
+  assert.ok(stored);
+  assert.doesNotMatch(stored, /Command execution|turn-1-item-1|thread-child|Branch/);
+  assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
+});
+
 test("encrypted history keeps Codex turn risk flags local and encrypted", async () => {
   const roomId = "room-codex-risk-history";
   const payload = {

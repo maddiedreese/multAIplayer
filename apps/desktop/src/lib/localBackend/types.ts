@@ -95,6 +95,113 @@ export interface CodexTurnResult {
   stderr: string;
 }
 
+export interface CodexActivityEvent {
+  roomId: string;
+  activityId: string;
+  turnId: string;
+  itemId: string;
+  threadId?: string;
+  kind: "command" | "file_change" | "tool" | "web_search" | "image_generation" | "agent" | "review" | "hook" | "reasoning" | "other";
+  status: "started" | "running" | "completed" | "failed" | "declined";
+  title: string;
+  agent?: {
+    action: "spawn" | "send" | "resume" | "wait" | "close";
+    senderId: string;
+    receiverIds: string[];
+  };
+  startedAt: string;
+  updatedAt: string;
+}
+
+export interface CodexThreadNode {
+  id: string;
+  sessionId?: string;
+  parentThreadId?: string;
+  title: string;
+  status: "notLoaded" | "idle" | "systemError" | "active" | "unknown";
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CodexServerRequest {
+  requestKey: string;
+  roomId: string;
+  method: string;
+  params: unknown;
+  expiresAtMs: number;
+}
+
+export interface CodexHostCapabilities {
+  codexVersion: string;
+  manifestVersion: string;
+  supportsAccount: boolean;
+  supportsBrowserLogin: boolean;
+  supportsDeviceLogin: boolean;
+  supportsHostedLoginSuccess: boolean;
+  supportsApps: boolean;
+  supportsMcp: boolean;
+  supportsWritesApproval: boolean;
+  compatibilityWarning: string | null;
+}
+
+export interface CodexHostAccount {
+  accountType: string;
+  email: string | null;
+  planType: string | null;
+}
+
+export interface CodexHostApp {
+  id: string;
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  accessible: boolean;
+}
+
+export interface CodexHostMcpServer {
+  name: string;
+  authStatus: string;
+  toolCount: number;
+  resourceCount: number;
+  resourceTemplateCount: number;
+}
+
+export interface CodexHostSnapshot {
+  capabilities: CodexHostCapabilities;
+  requiresOpenaiAuth: boolean;
+  account: CodexHostAccount | null;
+  apps: CodexHostApp[];
+  appsError: string | null;
+  mcpServers: CodexHostMcpServer[];
+  mcpError: string | null;
+}
+
+export interface CodexLoginStartResult {
+  flow: "browser" | "device";
+  loginId: string;
+  url: string;
+  userCode: string | null;
+}
+
+export interface CodexMcpLoginResult {
+  name: string;
+  authorizationUrl: string;
+}
+
+export interface CodexHostNotification {
+  method:
+    | "account/login/completed"
+    | "account/updated"
+    | "mcpServer/oauthLogin/completed"
+    | "mcpServer/startupStatus/updated"
+    | "app/list/updated";
+  params: Record<string, unknown>;
+}
+
+export type CodexServerResponse =
+  | { result: unknown; error?: never }
+  | { result?: never; error: { code: number; message: string; data?: unknown } };
+
 export type CodexGoalStatus = "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
 
 export interface CodexGoal {

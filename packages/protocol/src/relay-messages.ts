@@ -28,6 +28,7 @@ export const RelayEnvelope = z.object({
     "chat.delete",
     "codex.invoke",
     "codex.event",
+    "codex.activity",
     "codex.approval",
     "codex.queue",
     "browser.request",

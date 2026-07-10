@@ -14,6 +14,8 @@ Start with [docs/using-the-app.md](docs/using-the-app.md) for the desktop featur
 
 The desktop app uses Monaco Editor for workspace file editing, xterm.js for the terminal emulator, a Rust PTY layer through `portable-pty` for host shell sessions, and Tauri/Wry WebViews for multi-tab in-room web browsing. These are embedded as open source dependencies with attribution in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
+Codex hosting uses the active host's local app-server. The supported compatibility range is 0.133.0–0.144.0, with generated-schema fixtures for 0.133.0, 0.143.0, and 0.144.0; newer versions are labelled unverified and contract-sensitive features fail closed. See [docs/codex-hosting.md](docs/codex-hosting.md) for catalog selection, bidirectional approvals, metadata-only activity, host-local account/MCP controls, and thread forks.
+
 ## Download
 
 Public macOS alpha downloads are published through [GitHub Releases](https://github.com/maddiedreese/multAIplayer/releases).

@@ -179,6 +179,39 @@ export const CodexEventPlaintextPayload = z.object({
   createdAt: z.string().datetime()
 });
 
+export const maxCodexActivitiesPerRoom = 160;
+
+export const CodexActivityPlaintextPayload = z.object({
+  eventType: z.literal("codex.activity"),
+  activityId: z.string().min(1).max(maxEnvelopeIdChars),
+  turnId: z.string().min(1).max(maxEnvelopeIdChars),
+  itemId: z.string().min(1).max(maxEnvelopeIdChars),
+  threadId: z.string().min(1).max(maxCodexThreadIdChars).optional(),
+  kind: z.enum([
+    "command",
+    "file_change",
+    "tool",
+    "web_search",
+    "image_generation",
+    "agent",
+    "review",
+    "hook",
+    "reasoning",
+    "other"
+  ]),
+  status: z.enum(["started", "running", "completed", "failed", "declined"]),
+  title: z.string().min(1).max(maxShortTextChars),
+  agent: z.object({
+    action: z.enum(["spawn", "send", "resume", "wait", "close"]),
+    senderId: z.string().min(1).max(maxCodexThreadIdChars),
+    receiverIds: z.array(z.string().min(1).max(maxCodexThreadIdChars)).max(16)
+  }).optional(),
+  startedAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  host: z.string().min(1).max(maxDisplayNameChars),
+  hostUserId: z.string().min(1).max(maxUserIdChars)
+});
+
 export const CodexApprovalPlaintextPayload = z.object({
   eventType: z.literal("codex.approval"),
   approvalId: z.string().min(1).max(maxEnvelopeIdChars),
@@ -297,6 +330,11 @@ export const HostHandoffPlaintextPayload = z.object({
   gitPatch: z.string().max(maxLongTextChars).optional(),
   gitPatchTruncated: z.boolean().optional(),
   codexModel: z.string().min(1).max(maxCodexModelChars),
+  codexModelPolicy: z.enum(["auto", "pinned"]).optional(),
+  codexReasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh"]).optional(),
+  codexReasoningEffortPolicy: z.enum(["auto", "pinned"]).optional(),
+  codexSpeed: z.enum(["standard", "fast"]).optional(),
+  codexServiceTierPolicy: z.enum(["auto", "pinned"]).optional(),
   codexSandboxLevel: z.enum([
     "read_only",
     "workspace_write",
@@ -360,6 +398,7 @@ export type InviteJoinStatusPlaintextPayload = z.infer<typeof InviteJoinStatusPl
 export type RoomKeyRotationPlaintextPayload = z.infer<typeof RoomKeyRotationPlaintextPayload>;
 export type CodexTurnRiskFlagPayload = z.infer<typeof CodexTurnRiskFlagPayload>;
 export type CodexEventPlaintextPayload = z.infer<typeof CodexEventPlaintextPayload>;
+export type CodexActivityPlaintextPayload = z.infer<typeof CodexActivityPlaintextPayload>;
 export type CodexApprovalPlaintextPayload = z.infer<typeof CodexApprovalPlaintextPayload>;
 export type CodexQueuePlaintextPayload = z.infer<typeof CodexQueuePlaintextPayload>;
 export type TerminalResultPlaintextPayload = z.infer<typeof TerminalResultPlaintextPayload>;

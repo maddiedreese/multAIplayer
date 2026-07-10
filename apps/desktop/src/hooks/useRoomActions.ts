@@ -115,6 +115,7 @@ export function useRoomActions({
   const applyAcceptedHostHandoffForRoom = useAppStore((state) => state.applyAcceptedHostHandoffForRoom);
   const appendInviteRequest = useAppStore((state) => state.appendInviteRequest);
   const appendCodexEvent = useAppStore((state) => state.appendCodexEvent);
+  const upsertCodexActivity = useAppStore((state) => state.upsertCodexActivity);
 
   const applyBusyForRoom = (
     ref: MutableRefObject<BusyMap>,
@@ -226,6 +227,7 @@ export function useRoomActions({
     applyAcceptedHostHandoffForRoom,
     appendInviteRequest,
     appendCodexEvent,
+    upsertCodexActivity,
     updateInviteRequestStatus,
     appendTerminalRequest,
     updateTerminalRequestStatus,

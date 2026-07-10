@@ -49,6 +49,7 @@ interface UseRoomInspectorPanelPropsOptions {
     WorkProps["model"],
     "selectedModel" | "selectedModelLabel" | "selectedReasoningEffort" | "selectedSpeed" | "disabled" | "canApplyCustomModel"
   >;
+  codexRuntime: WorkProps["codexRuntime"];
   customCodexModel: string;
   localHistory: WorkProps["localHistory"];
   workspaceFiles: Omit<
@@ -111,6 +112,7 @@ export function useRoomInspectorPanelProps({
   selectedCodexSpeed,
   selectedCodexSandboxLevel,
   model,
+  codexRuntime,
   customCodexModel,
   localHistory,
   workspaceFiles,
@@ -155,6 +157,7 @@ export function useRoomInspectorPanelProps({
       disabled: !hasSelectedRoom || isSelectedRoomLocked || settingsBusy || !isActiveHost,
       canApplyCustomModel: Boolean(customCodexModel.trim()) && customCodexModel.trim() !== selectedCodexModel
     },
+    codexRuntime,
     localHistory,
     workspaceFiles: {
       ...workspaceFiles,

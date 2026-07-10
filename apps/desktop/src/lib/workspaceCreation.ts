@@ -6,7 +6,10 @@ import {
   maxCodexModelChars,
   maxRoomNameChars,
   maxRoomProjectPathChars,
-  maxTeamNameChars
+  maxTeamNameChars,
+  type CodexReasoningEffort,
+  type CodexSandboxLevel,
+  type CodexSpeed
 } from "@multaiplayer/protocol";
 
 export {
@@ -55,19 +58,19 @@ export function normalizeCodexModel(model: string): string | null {
   return trimmed;
 }
 
-export function normalizeCodexReasoningEffort(effort: string): string | null {
+export function normalizeCodexReasoningEffort(effort: string): CodexReasoningEffort | null {
   const trimmed = effort.trim();
-  return codexReasoningEffortOptions.some((option) => option.id === trimmed) ? trimmed : null;
+  return codexReasoningEffortOptions.some((option) => option.id === trimmed) ? trimmed as CodexReasoningEffort : null;
 }
 
-export function normalizeCodexSpeed(speed: string): string | null {
+export function normalizeCodexSpeed(speed: string): CodexSpeed | null {
   const trimmed = speed.trim();
-  return codexSpeedOptions.some((option) => option.id === trimmed) ? trimmed : null;
+  return codexSpeedOptions.some((option) => option.id === trimmed) ? trimmed as CodexSpeed : null;
 }
 
-export function normalizeCodexSandboxLevel(sandboxLevel: string): string | null {
+export function normalizeCodexSandboxLevel(sandboxLevel: string): CodexSandboxLevel | null {
   const trimmed = sandboxLevel.trim();
-  return codexSandboxLevelOptions.some((option) => option.id === trimmed) ? trimmed : null;
+  return codexSandboxLevelOptions.some((option) => option.id === trimmed) ? trimmed as CodexSandboxLevel : null;
 }
 
 export function planTeamCreation(name: string): WorkspaceCreatePlan {

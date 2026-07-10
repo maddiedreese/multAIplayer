@@ -3,6 +3,7 @@ import type {
   ChatDeletePlaintextPayload,
   ChatEditPlaintextPayload,
   CodexEventPlaintextPayload,
+  CodexActivityPlaintextPayload,
   CodexTurnSummary,
   DevicePublicKeyJwk as DevicePublicKeyJwkType,
   GitHubActionsEventPlaintextPayload,
@@ -116,6 +117,30 @@ export interface InviteJoinRequest extends InviteJoinRequestPlaintextPayload {
 }
 
 export interface CodexRoomEvent extends CodexEventPlaintextPayload {}
+export interface CodexActivity extends CodexActivityPlaintextPayload {}
+
+export interface CodexThreadGraphNode {
+  id: string;
+  sessionId?: string;
+  parentThreadId?: string;
+  title: string;
+  status: "notLoaded" | "idle" | "systemError" | "active" | "unknown";
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CodexThreadGraph {
+  activeThreadId: string | null;
+  nodesById: Record<string, CodexThreadGraphNode>;
+}
+
+export interface CodexAgentTreeNode {
+  id: string;
+  parentId: string | null;
+  status: CodexActivity["status"];
+  lastAction: NonNullable<CodexActivity["agent"]>["action"];
+  updatedAt: string;
+}
 
 export interface HostHandoffRecord extends HostHandoffPlaintextPayload {
   status: "available" | "accepted";
@@ -160,6 +185,8 @@ export interface LocalRoomHistoryPayload {
   browserRequests: BrowserAccessRequest[];
   inviteRequests: InviteJoinRequest[];
   codexEvents: CodexRoomEvent[];
+  /** Added additively in v3; absent legacy payloads migrate to an empty timeline. */
+  codexActivities?: CodexActivity[];
   gitWorkflowEvents: GitWorkflowEventPlaintextPayload[];
   githubActionsEvents: GitHubActionsEventPlaintextPayload[];
   localPreviews: LocalPreviewRecord[];
@@ -168,6 +195,7 @@ export interface LocalRoomHistoryPayload {
   queuedCodexTurns?: QueuedCodexTurn[];
   roomGoal?: RoomGoal;
   codexThreadId?: string;
+  codexThreadGraph?: CodexThreadGraph;
 }
 
 export interface LocalRoomReadState {
