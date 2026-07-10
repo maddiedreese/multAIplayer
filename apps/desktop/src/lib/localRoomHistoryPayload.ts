@@ -199,6 +199,8 @@ export function isWorkspaceFileSaveRequest(value: unknown): value is WorkspaceFi
   );
 }
 
+// History decode accepts records that predate current protocol limits.
+// The live network paths validate strictly in routeRelayEnvelope and inviteRelayActions.
 function isInviteJoinRequestPlaintextPayloadLenient(value: unknown): value is InviteJoinRequestPlaintextPayload {
   if (!isRecord(value)) return false;
   return (
