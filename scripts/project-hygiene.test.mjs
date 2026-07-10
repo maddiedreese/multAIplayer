@@ -65,3 +65,15 @@ test("RustSec audit is pinned, scoped to the native lockfile, and scheduled", ()
   assert.match(workflow, /schedule:/);
   assert.match(workflow, /checks: write/);
 });
+
+test("desktop owns Monaco while the root enforces its DOMPurify security override", () => {
+  const desktopPackage = readJson("apps/desktop/package.json");
+  const packageLock = readJson("package-lock.json");
+
+  assert.equal(rootPackage.devDependencies.dompurify, "3.4.11");
+  assert.equal(rootPackage.overrides["monaco-editor"].dompurify, "$dompurify");
+  assert.equal(rootPackage.devDependencies["monaco-editor"], undefined);
+  assert.equal(desktopPackage.devDependencies["monaco-editor"], "0.55.1");
+  assert.equal(packageLock.packages["node_modules/dompurify"].version, "3.4.11");
+  assert.equal(packageLock.packages["apps/desktop"].devDependencies["monaco-editor"], "0.55.1");
+});

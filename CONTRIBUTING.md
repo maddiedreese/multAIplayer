@@ -25,6 +25,16 @@ npm run tauri:dev
 
 Copy `.env.example` to `.env` when you need GitHub OAuth or self-hosted relay settings. The relay loads the repo root `.env`, a relay-local `apps/relay/.env`, or an explicit `MULTAIPLAYER_RELAY_ENV_FILE`; shell-exported variables take precedence. The app can run in local seeded-room mode without GitHub OAuth.
 
+## Code Map
+
+- `apps/desktop/src` contains the React desktop UI, hooks, stores, and local backend adapters.
+- `apps/desktop/src-tauri/src` contains native Rust commands, split by capability; `lib.rs` wires those modules into Tauri.
+- `apps/relay/src/server.ts` composes the relay from focused `http`, `ws`, and `auth` handlers plus state, persistence, limits, and lifecycle modules.
+- `packages/protocol` defines shared wire records and defaults; `packages/crypto` owns encrypted payload primitives.
+- `packages/codex`, `packages/git`, and `packages/github` isolate integrations used by the desktop and relay applications.
+- `scripts` contains repository-wide verification, security, release, and operational checks.
+- Root workspace metadata owns cross-workspace npm controls, including the Monaco/DOMPurify security override described below.
+
 ## Verification
 
 Before opening a PR, run:
@@ -44,6 +54,11 @@ npm run verify
 - Log stable error codes and bounded identifiers, never request/response bodies, decrypted plaintext, tokens, keys, secrets, passphrases, or other payload objects. The diagnostics object sanitizer is a safety net, not permission to log payloads.
 - Avoid adding OpenAI API quota bridging. The desktop app talks to the user's local Codex app-server instead.
 - Preserve the existing monorepo package boundaries unless a change genuinely needs to cross them.
+- Use imperative, outcome-specific commit subjects and keep each commit cohesive and reviewable; split unrelated or unusually broad changes when practical.
+
+### Monaco DOMPurify Security Pin
+
+Monaco is consumed by the desktop editor, but its DOMPurify override and the direct `dompurify` pin intentionally live in the root `package.json`. npm applies workspace overrides only from the workspace root, and the direct dependency fixes the version referenced by that override. The desktop Vite resolver directs Monaco's sanitizer import to the patched package, while `scripts/verify-desktop-security-deps.mjs` fails the desktop build if the vulnerable bundled DOMPurify version appears in the output. Keep these pieces aligned when upgrading Monaco or DOMPurify; do not move or remove the root pin without replacing and testing the security control.
 
 ## Tests To Add
 
