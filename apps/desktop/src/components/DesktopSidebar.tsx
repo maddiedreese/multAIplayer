@@ -13,8 +13,9 @@ import {
   UsersRound,
   X
 } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
 import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
+import { useThemeMode } from "../hooks/useThemeMode";
 
 const brandIcon = new URL("../assets/multaiplayer-icon.png", import.meta.url).href;
 
@@ -67,7 +68,6 @@ export function DesktopSidebar({
   messageHits,
   historySearchBusy,
   activeSidebarPanel,
-  themeMode,
   onSignIn,
   onSignOut,
   onSidebarQueryChange,
@@ -82,8 +82,7 @@ export function DesktopSidebar({
   onSelectRoom,
   onSetTeamLifecycle,
   onSetRoomLifecycle,
-  onSelectSidebarPanel,
-  onToggleTheme
+  onSelectSidebarPanel
 }: {
   currentUser: SignedInUser | null;
   authBusy: boolean;
@@ -103,7 +102,6 @@ export function DesktopSidebar({
   messageHits: SidebarMessageHitDisplay[];
   historySearchBusy: boolean;
   activeSidebarPanel: SidebarPanelName;
-  themeMode: ThemeMode;
   onSignIn: () => void;
   onSignOut: () => void;
   onSidebarQueryChange: (query: string) => void;
@@ -119,8 +117,8 @@ export function DesktopSidebar({
   onSetTeamLifecycle: (teamId: string, action: "archive" | "restore" | "delete") => void;
   onSetRoomLifecycle: (roomId: string, action: "archive" | "restore" | "delete") => void;
   onSelectSidebarPanel: (panel: SidebarPanelName) => void;
-  onToggleTheme: () => void;
 }) {
+  const { themeMode, toggleThemeMode } = useThemeMode();
   const [teamCreateOpen, setTeamCreateOpen] = useState(false);
   const [roomCreateOpen, setRoomCreateOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -463,7 +461,7 @@ export function DesktopSidebar({
       )}
 
       <div className="sidebar-footer">
-        <button onClick={onToggleTheme}>
+        <button onClick={toggleThemeMode}>
           {themeMode === "dark" ? "Light" : "Dark"}
         </button>
         <button

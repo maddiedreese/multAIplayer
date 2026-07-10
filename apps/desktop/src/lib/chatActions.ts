@@ -13,57 +13,39 @@ import { canUseRoomChat, roomChatGateMessage } from "./chatPolicy";
 import { roomLockMessage } from "./appRuntime";
 import { messageIsBeforeCodexWatermark } from "./codexMessageWatermark";
 import type { RelayClient } from "./relayClient";
-import type { ChatMessage, CodexRoomEvent, RelayStatus } from "../types";
-
-interface LocalUser {
-  id: string;
-  name: string;
-}
+import type { ChatMessage } from "../types";
+import { currentLocalIdentity } from "./selectedWorkspace";
 
 interface MutableRef<T> {
   current: T;
 }
 
 interface ChatActionsOptions {
-  hasSelectedRoom: boolean;
-  selectedRoomId: string;
-  selectedRoom: RoomRecord;
-  isSelectedRoomLocked: boolean;
-  isSelectedRoomRevoked: boolean;
-  forgottenRoomIds: Set<string>;
-  revokedRoomIds: Set<string>;
-  revokedTeamIds: Set<string>;
-  localUser: LocalUser;
-  deviceId: string;
-  relayStatus: RelayStatus;
   relayRef: MutableRef<RelayClient | null>;
   seenEnvelopeIds: MutableRef<Set<string>>;
-  codexEventsByRoom: Record<string, CodexRoomEvent[]>;
 }
 
 export function createChatActions({
-  hasSelectedRoom,
-  selectedRoomId,
-  selectedRoom,
-  isSelectedRoomLocked,
-  isSelectedRoomRevoked,
-  forgottenRoomIds,
-  revokedRoomIds,
-  revokedTeamIds,
-  localUser,
-  deviceId,
-  relayStatus,
   relayRef,
-  seenEnvelopeIds,
-  codexEventsByRoom
+  seenEnvelopeIds
 }: ChatActionsOptions) {
-  async function publishChatMessage(message: ChatMessage, room: RoomRecord = selectedRoom) {
+  const identity = () => currentLocalIdentity();
+  const currentSelectedRoom = () => {
+    const state = useAppStore.getState();
+    return state.rooms.find((room) => room.id === state.selectedRoomId);
+  };
+
+  async function publishChatMessage(message: ChatMessage, roomArg?: RoomRecord) {
+    const room = roomArg ?? currentSelectedRoom();
+    if (!room) return;
+    const { forgottenRoomIds, revokedRoomIds, revokedTeamIds } = useAppStore.getState();
     const revoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
     if (forgottenRoomIds.has(room.id) || revoked) {
       useAppStore.getState().setChatMessageForRoom(room.id, roomLockMessage(room, revoked));
       return;
     }
     const client = relayRef.current;
+    const { relayStatus } = useAppStore.getState();
     if (!client || relayStatus === "closed" || relayStatus === "error") {
       useAppStore.getState().appendRoomMessage(room.id, message);
       return;
@@ -74,8 +56,8 @@ export function createChatActions({
       id: crypto.randomUUID(),
       teamId: room.teamId,
       roomId: room.id,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
+      senderDeviceId: identity().deviceId,
+      senderUserId: identity().localUser.id,
       createdAt: new Date().toISOString(),
       kind: "chat.message",
       payload: await encryptJson(message satisfies ChatPlaintextPayload, secret)
@@ -86,11 +68,15 @@ export function createChatActions({
   }
 
   async function toggleMessageReaction(message: ChatMessage, emoji: string) {
-    if (!hasSelectedRoom) {
-      useAppStore.getState().setChatMessageForRoom(selectedRoomId, "Create or join a room before reacting to messages.");
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
+      useAppStore.getState().setChatMessageForRoom(useAppStore.getState().selectedRoomId, "Create or join a room before reacting to messages.");
       return;
     }
     const roomId = selectedRoom.id;
+    const { forgottenRoomIds, revokedRoomIds, revokedTeamIds } = useAppStore.getState();
+    const isSelectedRoomRevoked = revokedRoomIds.has(roomId) || revokedTeamIds.has(selectedRoom.teamId);
+    const isSelectedRoomLocked = selectedRoom.archivedAt != null || forgottenRoomIds.has(roomId) || isSelectedRoomRevoked;
     if (isSelectedRoomLocked) {
       useAppStore.getState().setChatMessageForRoom(roomId, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;
@@ -101,19 +87,20 @@ export function createChatActions({
     }
     const hasReacted = message.reactions
       ?.find((reaction) => reaction.emoji === emoji)
-      ?.reactors.some((reactor) => reactor.userId === localUser.id) ?? false;
+      ?.reactors.some((reactor) => reactor.userId === identity().localUser.id) ?? false;
     const payload: ChatReactionPlaintextPayload = {
       id: crypto.randomUUID(),
       messageId: message.id,
       emoji,
       action: hasReacted ? "remove" : "add",
-      reactor: localUser.name,
-      reactorUserId: localUser.id,
+      reactor: identity().localUser.name,
+      reactorUserId: identity().localUser.id,
       createdAt: new Date().toISOString()
     };
     useAppStore.getState().applyMessageReaction(roomId, payload);
 
     const client = relayRef.current;
+    const { relayStatus } = useAppStore.getState();
     if (!client || relayStatus === "closed" || relayStatus === "error") {
       useAppStore.getState().setChatMessageForRoom(roomId, "Saved reaction locally because the relay is not connected.");
       return;
@@ -123,8 +110,8 @@ export function createChatActions({
       id: crypto.randomUUID(),
       teamId: selectedRoom.teamId,
       roomId,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
+      senderDeviceId: identity().deviceId,
+      senderUserId: identity().localUser.id,
       createdAt: payload.createdAt,
       kind: "chat.reaction",
       payload: await encryptJson(payload, secret)
@@ -134,13 +121,14 @@ export function createChatActions({
   }
 
   async function publishChatMessageEdit(message: ChatMessage, body: string) {
-    if (!canMutateSelectedMessage(message)) return;
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom || !canMutateSelectedMessage(message, selectedRoom)) return;
     const payload: ChatEditPlaintextPayload = {
       id: crypto.randomUUID(),
       messageId: message.id,
       body,
-      editedBy: localUser.name,
-      editedByUserId: localUser.id,
+      editedBy: identity().localUser.name,
+      editedByUserId: identity().localUser.id,
       editedAt: new Date().toISOString()
     };
     useAppStore.getState().editRoomMessage(selectedRoom.id, payload);
@@ -148,12 +136,13 @@ export function createChatActions({
   }
 
   async function publishChatMessageDelete(message: ChatMessage) {
-    if (!canMutateSelectedMessage(message)) return;
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom || !canMutateSelectedMessage(message, selectedRoom)) return;
     const payload: ChatDeletePlaintextPayload = {
       id: crypto.randomUUID(),
       messageId: message.id,
-      deletedBy: localUser.name,
-      deletedByUserId: localUser.id,
+      deletedBy: identity().localUser.name,
+      deletedByUserId: identity().localUser.id,
       deletedAt: new Date().toISOString()
     };
     useAppStore.getState().deleteRoomMessage(selectedRoom.id, payload);
@@ -165,7 +154,10 @@ export function createChatActions({
     payload: ChatEditPlaintextPayload | ChatDeletePlaintextPayload,
     createdAt: string
   ) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) return;
     const client = relayRef.current;
+    const { relayStatus } = useAppStore.getState();
     if (!client || relayStatus === "closed" || relayStatus === "error") {
       useAppStore.getState().setChatMessageForRoom(selectedRoom.id, "Saved message change locally because the relay is not connected.");
       return;
@@ -175,8 +167,8 @@ export function createChatActions({
       id: crypto.randomUUID(),
       teamId: selectedRoom.teamId,
       roomId: selectedRoom.id,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
+      senderDeviceId: identity().deviceId,
+      senderUserId: identity().localUser.id,
       createdAt,
       kind,
       payload: await encryptJson(payload, secret)
@@ -185,11 +177,12 @@ export function createChatActions({
     client.publish({ type: "publish", envelope });
   }
 
-  function canMutateSelectedMessage(message: ChatMessage) {
-    if (!hasSelectedRoom) {
-      useAppStore.getState().setChatMessageForRoom(selectedRoomId, "Create or join a room before editing messages.");
-      return false;
-    }
+  function canMutateSelectedMessage(message: ChatMessage, selectedRoom: RoomRecord) {
+    const { forgottenRoomIds, revokedRoomIds, revokedTeamIds, codexRuntimeByRoom } = useAppStore.getState();
+    const isSelectedRoomRevoked =
+      revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId);
+    const isSelectedRoomLocked =
+      selectedRoom.archivedAt != null || forgottenRoomIds.has(selectedRoom.id) || isSelectedRoomRevoked;
     if (isSelectedRoomLocked) {
       useAppStore.getState().setChatMessageForRoom(selectedRoom.id, roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return false;
@@ -198,11 +191,11 @@ export function createChatActions({
       useAppStore.getState().setChatMessageForRoom(selectedRoom.id, roomChatGateMessage(selectedRoom));
       return false;
     }
-    if (message.authorUserId !== localUser.id || message.deletedAt || message.role === "codex") {
+    if (message.authorUserId !== identity().localUser.id || message.deletedAt || message.role === "codex") {
       useAppStore.getState().setChatMessageForRoom(selectedRoom.id, "Only your own messages can be changed before Codex uses them.");
       return false;
     }
-    if (!messageIsBeforeCodexWatermark(message, codexEventsByRoom[selectedRoom.id] ?? [])) {
+    if (!messageIsBeforeCodexWatermark(message, codexRuntimeByRoom[selectedRoom.id]?.events ?? [])) {
       useAppStore.getState().setChatMessageForRoom(selectedRoom.id, "That message was already sent to Codex. Post a follow-up correction instead.");
       return false;
     }

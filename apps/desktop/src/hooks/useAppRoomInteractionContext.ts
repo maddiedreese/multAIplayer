@@ -1,12 +1,12 @@
 import type { useAppRefs } from "./useAppRefs";
 import type { createAppRoomActions } from "../lib/appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
-import type { useAppStateSlices } from "./useAppStateSlices";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import { useRoomInteractionContext } from "./useRoomInteractionContext";
+import { useAppStore } from "../store/appStore";
+import { useShallow } from "zustand/react/shallow";
 
-type AppStateSlices = ReturnType<typeof useAppStateSlices>;
 type AppRefs = ReturnType<typeof useAppRefs>;
 type GitHubAuth = ReturnType<typeof useGitHubAuth>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
@@ -14,26 +14,18 @@ type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type RoomActions = ReturnType<typeof createAppRoomActions>;
 
 export function useAppRoomInteractionContext({
-  appState,
   appRefs,
   githubAuth,
   localIdentity,
   selected,
   roomActions
 }: {
-  appState: AppStateSlices;
   appRefs: AppRefs;
   githubAuth: GitHubAuth;
   localIdentity: LocalIdentity;
   selected: SelectedRoomContext;
   roomActions: RoomActions;
 }) {
-  const {
-    workspaceState,
-    roomRuntimeState,
-    historyDefaultsState,
-    appRuntimeState
-  } = appState;
   const {
     hasSelectedRoom,
     selectedRoom,
@@ -50,6 +42,19 @@ export function useAppRoomInteractionContext({
     setFileMessageForRoom,
     setTerminalErrorForRoom
   } = roomActions;
+  const {
+    forgottenRoomIds, revokedRoomIds, revokedTeamIds, historySettings, roomPresence,
+    selectedRoomId, deviceIdentity, trustedDeviceKeys
+  } = useAppStore(useShallow((state) => ({
+    forgottenRoomIds: state.forgottenRoomIds,
+    revokedRoomIds: state.revokedRoomIds,
+    revokedTeamIds: state.revokedTeamIds,
+    historySettings: state.historySettings,
+    roomPresence: state.historyPresenceByRoom[selectedRoom.id]?.presence,
+    selectedRoomId: state.selectedRoomId,
+    deviceIdentity: state.deviceIdentity,
+    trustedDeviceKeys: state.trustedDeviceKeys
+  })));
 
   return useRoomInteractionContext({
     inFlightReporters: {
@@ -69,33 +74,19 @@ export function useAppRoomInteractionContext({
       hostMessage,
       chatMessage
     },
-    visibilityWarning: {
-      hasSelectedRoom,
-      selectedRoomId: selectedRoom.id
-    },
     access: {
       hasSelectedRoom,
       selectedRoom,
       localUser: localIdentity.localUser,
-      forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
-      revokedRoomIds: roomRuntimeState.revokedRoomIds,
-      revokedTeamIds: roomRuntimeState.revokedTeamIds,
-      historySettings: historyDefaultsState.historySettings,
+      forgottenRoomIds,
+      revokedRoomIds,
+      revokedTeamIds,
+      historySettings,
       inviteApprovalGate
     },
     chat: {
-      hasSelectedRoom,
-      selectedRoomId: workspaceState.selectedRoomId,
-      selectedRoom,
-      forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
-      revokedRoomIds: roomRuntimeState.revokedRoomIds,
-      revokedTeamIds: roomRuntimeState.revokedTeamIds,
-      localUser: localIdentity.localUser,
-      deviceId: localIdentity.deviceId,
-      relayStatus: appRuntimeState.relayStatus,
       relayRef: appRefs.relayRef,
-      seenEnvelopeIds: appRefs.seenEnvelopeIds,
-      codexEventsByRoom: appState.codexRoomState.codexEventsByRoom
+      seenEnvelopeIds: appRefs.seenEnvelopeIds
     },
     githubWorkflow: {
       actionRuns,
@@ -105,13 +96,13 @@ export function useAppRoomInteractionContext({
       projectPath: selectedRoom.projectPath
     },
     memberRows: {
-      presenceByRoom: roomRuntimeState.presenceByRoom,
+      presenceByRoom: roomPresence ? { [selectedRoom.id]: roomPresence } : {},
       selectedRoom,
-      selectedRoomId: workspaceState.selectedRoomId,
+      selectedRoomId,
       localUser: localIdentity.localUser,
       localDeviceId: localIdentity.deviceId,
-      localPublicKeyFingerprint: appRuntimeState.deviceIdentity?.publicKeyFingerprint,
-      trustedDeviceKeys: appRuntimeState.trustedDeviceKeys
+      localPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
+      trustedDeviceKeys
     }
   });
 }

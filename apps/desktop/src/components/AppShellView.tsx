@@ -1,47 +1,32 @@
-import type { ComponentProps, ReactNode } from "react";
-import { AppSidebarDrawer } from "./AppSidebarDrawer";
+import React, { type ReactNode } from "react";
 import { AppWorkspaceShell } from "./AppWorkspaceShell";
-import { DesktopSidebar } from "./DesktopSidebar";
-import { LocalPreviewDialog } from "./LocalPreviewDialog";
-import { RoomInspectorPanel } from "./RoomInspectorPanel";
-import { RoomMainColumn } from "./RoomMainColumn";
+import { LocalPreviewDialogContainer, type LocalPreviewDialogActions } from "./LocalPreviewDialogContainer";
+import { RoomInspectorContainer, type RoomInspectorSources } from "./RoomInspectorContainer";
+import { RoomMainColumnContainer, type RoomMainColumnSources } from "./RoomMainColumnContainer";
 import { isWebPreviewRuntime } from "../lib/appRuntime";
 import { useUpdateNotice } from "../hooks/useUpdateNotice";
-
-type AppWorkspaceShellProps = ComponentProps<typeof AppWorkspaceShell>;
+import { useShellLayout } from "../hooks/useShellLayout";
+import {
+  AppSidebarDrawerContainer,
+  DesktopSidebarContainer,
+  type SidebarSources
+} from "./SidebarContainers";
 
 interface AppShellViewProps {
-  sidebarCollapsed: AppWorkspaceShellProps["sidebarCollapsed"];
-  inspectorCollapsed: AppWorkspaceShellProps["inspectorCollapsed"];
-  shellStyle: AppWorkspaceShellProps["shellStyle"];
-  onBeginSidebarResize: AppWorkspaceShellProps["onBeginSidebarResize"];
-  onBeginInspectorResize: AppWorkspaceShellProps["onBeginInspectorResize"];
-  onToggleSidebarCollapsed: AppWorkspaceShellProps["onToggleSidebarCollapsed"];
-  onToggleInspectorCollapsed: AppWorkspaceShellProps["onToggleInspectorCollapsed"];
-  sidebarProps: ComponentProps<typeof DesktopSidebar>;
-  drawerProps: ComponentProps<typeof AppSidebarDrawer>;
-  roomMainColumnProps: ComponentProps<typeof RoomMainColumn>;
-  roomInspectorPanelProps: ComponentProps<typeof RoomInspectorPanel>;
-  localPreviewDialogOpen: boolean;
-  localPreviewDialogProps: ComponentProps<typeof LocalPreviewDialog>;
+  sidebarSources: SidebarSources;
+  roomMainColumnSources: RoomMainColumnSources;
+  roomInspectorSources: RoomInspectorSources;
+  localPreviewDialogActions: LocalPreviewDialogActions;
 }
 
 export function AppShellView({
-  sidebarCollapsed,
-  inspectorCollapsed,
-  shellStyle,
-  onBeginSidebarResize,
-  onBeginInspectorResize,
-  onToggleSidebarCollapsed,
-  onToggleInspectorCollapsed,
-  sidebarProps,
-  drawerProps,
-  roomMainColumnProps,
-  roomInspectorPanelProps,
-  localPreviewDialogOpen,
-  localPreviewDialogProps
+  sidebarSources,
+  roomMainColumnSources,
+  roomInspectorSources,
+  localPreviewDialogActions
 }: AppShellViewProps) {
-  const dialog: ReactNode = localPreviewDialogOpen ? <LocalPreviewDialog {...localPreviewDialogProps} /> : null;
+  const shellLayout = useShellLayout();
+  const dialog: ReactNode = <LocalPreviewDialogContainer {...localPreviewDialogActions} />;
   const updateNotice = useUpdateNotice();
   const webPreviewBanner: ReactNode = isWebPreviewRuntime() ? (
     <div className="web-preview-banner" role="status">
@@ -70,17 +55,17 @@ export function AppShellView({
 
   return (
     <AppWorkspaceShell
-      sidebarCollapsed={sidebarCollapsed}
-      inspectorCollapsed={inspectorCollapsed}
-      shellStyle={shellStyle}
-      onBeginSidebarResize={onBeginSidebarResize}
-      onBeginInspectorResize={onBeginInspectorResize}
-      onToggleSidebarCollapsed={onToggleSidebarCollapsed}
-      onToggleInspectorCollapsed={onToggleInspectorCollapsed}
-      sidebar={<DesktopSidebar {...sidebarProps} />}
-      drawer={<AppSidebarDrawer {...drawerProps} />}
-      main={<RoomMainColumn {...roomMainColumnProps} />}
-      inspector={<RoomInspectorPanel {...roomInspectorPanelProps} />}
+      sidebarCollapsed={shellLayout.sidebarCollapsed}
+      inspectorCollapsed={shellLayout.inspectorCollapsed}
+      shellStyle={shellLayout.shellStyle}
+      onBeginSidebarResize={(event) => shellLayout.beginShellResize("sidebar", event)}
+      onBeginInspectorResize={(event) => shellLayout.beginShellResize("inspector", event)}
+      onToggleSidebarCollapsed={shellLayout.toggleSidebarCollapsed}
+      onToggleInspectorCollapsed={shellLayout.toggleInspectorCollapsed}
+      sidebar={<DesktopSidebarContainer sources={sidebarSources} />}
+      drawer={<AppSidebarDrawerContainer sources={sidebarSources} />}
+      main={<RoomMainColumnContainer sources={roomMainColumnSources} />}
+      inspector={<RoomInspectorContainer sources={roomInspectorSources} />}
       dialog={dialog}
       shellBanner={updateBanner || webPreviewBanner ? shellBanner : null}
     />

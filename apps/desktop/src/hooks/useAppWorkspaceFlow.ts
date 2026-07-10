@@ -3,19 +3,18 @@ import {
 } from "../seedData";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRefs } from "./useAppRefs";
-import type { useAppRoomDisplayContext } from "./useAppRoomDisplayContext";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
 import type { createAppRoomActions } from "../lib/appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
-import type { useAppStateSlices } from "./useAppStateSlices";
 import type { WorkspaceRecordActions } from "../lib/workspaceRecordActions";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import type { useRoomSettingsActor } from "./useRoomSettingsActor";
 import { useWorkspaceFlowContext } from "./useWorkspaceFlowContext";
+import { useAppStore } from "../store/appStore";
+import { useShallow } from "zustand/react/shallow";
 
-type AppStateSlices = ReturnType<typeof useAppStateSlices>;
 type AppRefs = ReturnType<typeof useAppRefs>;
 type GitHubAuth = ReturnType<typeof useGitHubAuth>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
@@ -24,11 +23,9 @@ type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
 type RoomActions = ReturnType<typeof createAppRoomActions>;
 type InviteActions = ReturnType<typeof useAppInviteActions>;
-type RoomDisplay = ReturnType<typeof useAppRoomDisplayContext>;
 type RoomSettingsActor = ReturnType<typeof useRoomSettingsActor>;
 
 export function useAppWorkspaceFlow({
-  appState,
   appRefs,
   githubAuth,
   localIdentity,
@@ -38,10 +35,8 @@ export function useAppWorkspaceFlow({
   roomActions,
   workspaceRecords,
   inviteActions,
-  roomDisplay,
   roomSettingsActor
 }: {
-  appState: AppStateSlices;
   appRefs: AppRefs;
   githubAuth: GitHubAuth;
   localIdentity: LocalIdentity;
@@ -51,19 +46,22 @@ export function useAppWorkspaceFlow({
   roomActions: RoomActions;
   workspaceRecords: WorkspaceRecordActions;
   inviteActions: InviteActions;
-  roomDisplay: RoomDisplay;
   roomSettingsActor: RoomSettingsActor;
 }) {
   const {
-    workspaceState,
-    appConfigState,
-    roomChatState,
-    historyDefaultsState,
-    roomRuntimeState,
-    appRuntimeState,
-    terminalPanelState,
-    filePanelState
-  } = appState;
+    relayHttpUrl, selectedRoomId, selectedTeam, deviceIdentity, forgottenRoomIds,
+    revokedRoomIds, revokedTeamIds, rooms, searchActive
+  } = useAppStore(useShallow((state) => ({
+    relayHttpUrl: state.appConfig.relayHttpUrl,
+    selectedRoomId: state.selectedRoomId,
+    selectedTeam: state.selectedTeam,
+    deviceIdentity: state.deviceIdentity,
+    forgottenRoomIds: state.forgottenRoomIds,
+    revokedRoomIds: state.revokedRoomIds,
+    revokedTeamIds: state.revokedTeamIds,
+    rooms: state.rooms,
+    searchActive: Boolean(state.sidebarQuery.trim())
+  })));
   const {
     hasSelectedRoom,
     selectedRoom,
@@ -87,33 +85,28 @@ export function useAppWorkspaceFlow({
   return useWorkspaceFlowContext({
     bootstrap: {
       workspace: {
-        relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
-        replaceTeams: workspaceState.replaceTeams,
-        replaceRooms: workspaceState.replaceRooms,
-        selectExistingTeamOrFirst: workspaceState.selectExistingTeamOrFirst,
-        selectExistingRoomOrFirst: workspaceState.selectExistingRoomOrFirst,
-        setWorkspaceStatusError: workspaceState.setWorkspaceStatusError
+        relayHttpUrl,
+        replaceTeams: storeAction("replaceTeams"),
+        replaceRooms: storeAction("replaceRooms"),
+        selectExistingTeamOrFirst: storeAction("selectExistingTeamOrFirst"),
+        selectExistingRoomOrFirst: storeAction("selectExistingRoomOrFirst"),
+        setWorkspaceStatusError: storeAction("setWorkspaceStatusError")
       },
       selectedRoomReadReceipt: {
-        selectedRoomId: workspaceState.selectedRoomId,
-        markRoomRead: workspaceState.markRoomReadById
+        selectedRoomId,
+        markRoomRead: storeAction("markRoomReadById")
       },
       deviceIdentity: {
-        relayHttpUrl: appConfigState.appConfig.relayHttpUrl,
+        relayHttpUrl,
         deviceId: localIdentity.deviceId,
         userId: localIdentity.localUser.id,
         displayName: localIdentity.localUser.name,
-        deviceIdentity: appRuntimeState.deviceIdentity,
-        replaceDeviceIdentity: appRuntimeState.replaceDeviceIdentity,
-        setDeviceIdentityStatusMessage: appRuntimeState.setDeviceIdentityStatusMessage
+        deviceIdentity,
+        replaceDeviceIdentity: storeAction("replaceDeviceIdentity"),
+        setDeviceIdentityStatusMessage: storeAction("setDeviceIdentityStatusMessage")
       },
       selectedTeamDefaults: {
-        selectedTeam: workspaceState.selectedTeam,
-        replaceTeamHistorySettings: historyDefaultsState.replaceTeamHistorySettings,
-        replaceTeamDefaultApprovalPolicy: historyDefaultsState.replaceTeamDefaultApprovalPolicy,
-        replaceTeamDefaultCodexModel: historyDefaultsState.replaceTeamDefaultCodexModel,
-        replaceTeamDefaultBrowserProfilePersistent: historyDefaultsState.replaceTeamDefaultBrowserProfilePersistent,
-        replaceTeamDefaultInviteApprovalGate: historyDefaultsState.replaceTeamDefaultInviteApprovalGate
+        selectedTeam
       },
       inviteUrl: {
         requestNoSecretInviteAccess: inviteActions.requestNoSecretInviteAccess,
@@ -122,102 +115,46 @@ export function useAppWorkspaceFlow({
       }
     },
     markdownCopy: {
-      hasSelectedRoom,
-      canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
-      localWorkspaceMessage: roomInteraction.localWorkspaceMessage,
-      selectedRoom,
-      teams: workspaceState.teams,
-      messages,
-      selectedMessages,
-      gitStatus,
-      selectedFile,
-      selectedDiff,
-      selectedFileRisks: roomDisplay.selectedFileRisks,
-      selectedTerminal: selectedRuntime.selectedTerminal,
-      terminalLines,
-      terminalRisks: roomDisplay.terminalRisks
     },
     workspaceRoomActions: {
       members: {
-        selectedTeam: workspaceState.selectedTeam,
-        selectedTeamName,
-        selectedRoom,
-        localUser: localIdentity.localUser,
-        currentUser: githubAuth.currentUser,
-        setDeviceIdentityMessage: appRuntimeState.setDeviceIdentityStatusMessage,
-        trustDeviceForRoom: appRuntimeState.trustDeviceForRoom,
-        untrustDeviceForRoom: appRuntimeState.untrustDeviceForRoom,
-        updateTeamRoleForTeam: workspaceState.updateTeamRoleForTeam,
-        updateTeamMemberCountForTeam: workspaceState.updateTeamMemberCountForTeam
+        setDeviceIdentityMessage: storeAction("setDeviceIdentityStatusMessage"),
+        trustDeviceForRoom: storeAction("trustDeviceForRoom"),
+        untrustDeviceForRoom: storeAction("untrustDeviceForRoom"),
+        updateTeamRoleForTeam: storeAction("updateTeamRoleForTeam"),
+        updateTeamMemberCountForTeam: storeAction("updateTeamMemberCountForTeam")
       },
       workspaceCreation: {
-        selectedTeam: workspaceState.selectedTeam,
-        newTeamName: workspaceState.newTeamName,
-        newRoomName: workspaceState.newRoomName,
-        newRoomProjectPath: workspaceState.newRoomProjectPath,
-        setWorkspaceStatusError: workspaceState.setWorkspaceStatusError,
-        setSelectedTeam: workspaceState.setSelectedTeam,
-        setSelectedRoomId: workspaceState.setSelectedRoomId,
-        setNewTeamName: workspaceState.setNewTeamName,
-        setNewRoomName: workspaceState.setNewRoomName,
-        setNewRoomProjectPath: workspaceState.setNewRoomProjectPath,
+        setWorkspaceStatusError: storeAction("setWorkspaceStatusError"),
+        setSelectedTeam: storeAction("setSelectedTeam"),
+        setSelectedRoomId: storeAction("setSelectedRoomId"),
+        setNewTeamName: storeAction("setNewTeamName"),
+        setNewRoomName: storeAction("setNewRoomName"),
+        setNewRoomProjectPath: storeAction("setNewRoomProjectPath"),
         upsertTeam: workspaceRecords.upsertTeam,
         upsertRoom: workspaceRecords.upsertRoom,
         roomSettingsActor
       },
       teamDefaults: {
-        selectedTeam: workspaceState.selectedTeam,
         approvalPolicyLabels,
         setSelectedTeamHistoryMessage,
         setTeamHistoryMessageForTeam,
-        setTeamHistorySettings: historyDefaultsState.setTeamHistorySettings,
-        setTeamDefaultApprovalPolicy: historyDefaultsState.setTeamDefaultApprovalPolicy,
-        setTeamDefaultCodexModel: historyDefaultsState.setTeamDefaultCodexModel,
-        setTeamDefaultBrowserProfilePersistent: historyDefaultsState.setTeamDefaultBrowserProfilePersistent,
-        setTeamDefaultInviteApprovalGate: historyDefaultsState.setTeamDefaultInviteApprovalGate
+        setTeamHistorySettings: storeAction("setTeamHistorySettings"),
+        setTeamDefaultApprovalPolicy: storeAction("setTeamDefaultApprovalPolicy"),
+        setTeamDefaultCodexModel: storeAction("setTeamDefaultCodexModel"),
+        setTeamDefaultBrowserProfilePersistent: storeAction("setTeamDefaultBrowserProfilePersistent"),
+        setTeamDefaultInviteApprovalGate: storeAction("setTeamDefaultInviteApprovalGate")
       },
       localHistory: {
-        hasSelectedRoom,
-        selectedRoom,
         selectedRoomIdRef: appRefs.selectedRoomIdRef,
-        isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
-        isSelectedRoomRevoked: roomInteraction.isSelectedRoomRevoked,
-        isActiveHost: roomInteraction.isActiveHost,
-        messages,
-        terminalRequests: selectedRuntime.terminalRequests,
-        fileSaveRequests,
-        browserRequests,
-        inviteRequests: selectedRuntime.inviteRequests,
-        codexEvents: selectedRuntime.codexEvents,
-        codexActivities: selectedRuntime.codexActivities,
-        gitWorkflowEvents: selectedRuntime.gitWorkflowEvents,
-        githubActionsEvents: selectedRuntime.githubActionsEvents,
-        localPreviews: selectedRuntime.localPreviews,
-        terminals: terminalPanelState.terminals,
-        hostHandoffs: selectedRuntime.hostHandoffs,
-        roomGoal: selected.roomGoal,
-        selectedCodexThreadId: selectedRuntime.selectedCodexThreadId,
-        codexThreadGraph: selectedRuntime.codexThreadGraph,
         settingsBusyRef: appRefs.settingsBusyRef,
         reportRoomSettingsMutationInFlight: roomInteraction.reportRoomSettingsMutationInFlight,
-        roomSettingsActor,
-        replaceHistorySettings: historyDefaultsState.replaceHistorySettings,
+        replaceHistorySettings: storeAction("setHistorySettings"),
         replaceRoom: workspaceRecords.replaceRoom,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds
       },
       files: {
-        hasSelectedRoom,
-        canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
-        localWorkspaceMessage: roomInteraction.localWorkspaceMessage,
-        isActiveHost: roomInteraction.isActiveHost,
-        hostGateMessage: roomInteraction.hostGateMessage,
-        selectedRoom,
         selectedRoomIdRef: appRefs.selectedRoomIdRef,
-        isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
-        isSelectedRoomRevoked: roomInteraction.isSelectedRoomRevoked,
-        localUser: localIdentity.localUser,
-        deviceId: localIdentity.deviceId,
-        relayStatus: appRuntimeState.relayStatus,
         relayRef: appRefs.relayRef,
         seenEnvelopeIds: appRefs.seenEnvelopeIds,
         reportRoomFileActionInFlight: roomInteraction.reportRoomFileActionInFlight
@@ -226,23 +163,41 @@ export function useAppWorkspaceFlow({
     historyEffects: {
       hydration: {
         hasSelectedRoom,
-        selectedRoomId: workspaceState.selectedRoomId,
+        selectedRoomId,
         selectedRoomTeamId: selectedRoom.teamId,
-        forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
+        forgottenRoomIds,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
-        replaceHistorySettings: historyDefaultsState.replaceHistorySettings,
+        replaceHistorySettings: storeAction("setHistorySettings"),
         hydrateLocalRoomHistoryForRoom,
-        hydrateRoomReadState: workspaceState.hydrateRoomReadState
+        hydrateRoomReadState: storeAction("hydrateRoomReadState")
       },
       search: {
-        searchActive: roomDisplay.searchActive,
-        rooms: workspaceState.rooms,
-        forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
-        revokedRoomIds: roomRuntimeState.revokedRoomIds,
-        revokedTeamIds: roomRuntimeState.revokedTeamIds,
-        startHistorySearch: appRuntimeState.startHistorySearch,
-        finishHistorySearch: appRuntimeState.finishHistorySearch
+        searchActive,
+        rooms,
+        forgottenRoomIds,
+        revokedRoomIds,
+        revokedTeamIds,
+        startHistorySearch: storeAction("startHistorySearch"),
+        finishHistorySearch: storeAction("finishHistorySearch")
       }
     }
   });
+}
+
+type AppStore = ReturnType<typeof useAppStore.getState>;
+type StoreActionKey = {
+  [K in keyof AppStore]: AppStore[K] extends (...args: any[]) => any ? K : never
+}[keyof AppStore];
+
+const cachedStoreActions = new Map<StoreActionKey, AppStore[StoreActionKey]>();
+
+function storeAction<K extends StoreActionKey>(key: K): AppStore[K] {
+  const cached = cachedStoreActions.get(key);
+  if (cached) return cached as AppStore[K];
+  const action = ((...args: unknown[]) => {
+    const action = useAppStore.getState()[key] as (...values: unknown[]) => unknown;
+    return action(...args);
+  }) as AppStore[K];
+  cachedStoreActions.set(key, action);
+  return action;
 }

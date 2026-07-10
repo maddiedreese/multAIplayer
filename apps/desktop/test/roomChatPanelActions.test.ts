@@ -28,24 +28,24 @@ const room: RoomRecord = {
 const noop = () => undefined;
 const noopAsync = async () => undefined;
 
-test("local preview open action opens the Cloudflare URL in the room browser", () => {
+test("local preview actions resolve the selected room when invoked", () => {
   const opened: Array<{ room: RoomRecord; url: string; reason: string }> = [];
+  const preview = {
+    eventType: "local.preview" as const,
+    id: "preview-1",
+    sharedBy: "Maddie",
+    sharedByUserId: "github:maddiedreese",
+    sourceUrl: "http://localhost:5173/",
+    publicUrl: "https://example.trycloudflare.com",
+    status: "live" as const,
+    createdAt: "2026-07-09T12:00:00.000Z",
+    updatedAt: "2026-07-09T12:01:00.000Z"
+  };
+  const store = useAppStore.getState();
+  store.resetAppStore();
+  store.initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
+  store.appendLocalPreviewEvent(room.id, preview);
   const actions = createRoomChatPanelActions({
-    selectedRoomId: room.id,
-    messages: [],
-    localPreviews: [
-      {
-        eventType: "local.preview",
-        id: "preview-1",
-        sharedBy: "Maddie",
-        sharedByUserId: "github:maddiedreese",
-        sourceUrl: "http://localhost:5173/",
-        publicUrl: "https://example.trycloudflare.com",
-        status: "live",
-        createdAt: "2026-07-09T12:00:00.000Z",
-        updatedAt: "2026-07-09T12:01:00.000Z"
-      }
-    ],
     copyMessageMarkdown: noop,
     copyCodexOutputMarkdown: noop,
     openEncryptedAttachmentBlob: noop,
@@ -56,9 +56,7 @@ test("local preview open action opens the Cloudflare URL in the room browser", (
     promoteNextCodexApprovalForRoom: noop,
     approveCodexTurn: noop,
     handleCodexInvoke: noop,
-    activeCodexApproval: null,
     publishCodexQueueEvent: noopAsync,
-    selectedRoom: room,
     pauseGoal: noop,
     resumeGoal: noop,
     editGoal: noop,
@@ -69,11 +67,16 @@ test("local preview open action opens the Cloudflare URL in the room browser", (
     openBrowserUrl: (targetRoom, url, reason) => opened.push({ room: targetRoom, url, reason }),
   });
 
+  const nextRoom = { ...room, id: "room-preview-next", name: "Next Preview" };
+  store.replaceRooms([room, nextRoom]);
+  store.setSelectedRoomId(nextRoom.id);
+  store.appendLocalPreviewEvent(nextRoom.id, preview);
+
   actions.onOpenLocalPreview("preview-1");
 
   assert.deepEqual(opened, [
     {
-      room,
+      room: nextRoom,
       url: "https://example.trycloudflare.com",
       reason: "Opened from a shared local preview."
     }
@@ -81,7 +84,9 @@ test("local preview open action opens the Cloudflare URL in the room browser", (
 });
 
 test("room header actions mutate the store without a React subscription", () => {
-  useAppStore.getState().resetAppStore();
+  const store = useAppStore.getState();
+  store.resetAppStore();
+  store.initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
   let browserOpenCount = 0;
   const actions = createRoomHeaderActions({
     selectedRoomId: "room-fallback",
@@ -101,6 +106,18 @@ test("room header actions mutate the store without a React subscription", () => 
 });
 
 test("terminal panel actions resolve request ids before approval", () => {
+  const store = useAppStore.getState();
+  store.resetAppStore();
+  store.initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
+  store.appendTerminalRequest(room.id, {
+    id: "request-1",
+    roomId: room.id,
+    requestedBy: "Avery",
+    requestedByUserId: "github:avery",
+    command: "npm test",
+    status: "pending",
+    createdAt: "2026-07-09T12:00:00.000Z"
+  });
   const approved: string[] = [];
   const actions = createTerminalPanelActions({
     selectedRoomId: room.id,
@@ -130,6 +147,7 @@ test("terminal panel actions resolve request ids before approval", () => {
 
 test("workspace file panel close clears all viewer state", () => {
   useAppStore.getState().resetAppStore();
+  useAppStore.getState().initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
   useAppStore.getState().setSelectedFileForRoom(room.id, {
     path: "src/main.ts",
     content: "export {};",

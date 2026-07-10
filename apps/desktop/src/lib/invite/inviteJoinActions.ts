@@ -12,6 +12,7 @@ import {
 } from "../inviteActionsHelpers";
 import { useAppStore, type AppStoreState } from "../../store/appStore";
 import type { UseInviteActionsOptions } from "./inviteActionTypes";
+import { currentLocalIdentity } from "../selectedWorkspace";
 
 type PublishInviteJoinRequest = (
   teamId: string,
@@ -23,10 +24,6 @@ type PublishInviteJoinRequest = (
 type InviteJoinActionOptions = Pick<
   UseInviteActionsOptions,
   | "clearInviteSecretInput"
-  | "deviceId"
-  | "deviceIdentity"
-  | "inviteSecretInput"
-  | "localUser"
   | "selectedRoomIdRef"
   | "selectWorkspaceRoom"
   | "upsertRoom"
@@ -51,10 +48,6 @@ export function createInviteJoinActions(
 ) {
   const {
     clearInviteSecretInput,
-    deviceId,
-    deviceIdentity,
-    inviteSecretInput,
-    localUser,
     publishInviteJoinRequest,
     selectWorkspaceRoom,
     upsertRoom,
@@ -85,6 +78,8 @@ export function createInviteJoinActions(
   }
 
   async function requestNoSecretInviteAccess(encodedInvite: string, inviteId?: string | null) {
+    const { deviceIdentity } = useAppStore.getState();
+    const { localUser, deviceId } = currentLocalIdentity();
     const inviteSecret = decodeNoSecretRoomInvite(encodedInvite);
     let acceptedRoomName = inviteSecret.roomName;
     if (inviteId) {
@@ -127,6 +122,8 @@ export function createInviteJoinActions(
   }
 
   async function acceptInvite(encodedSecret: string, inviteId?: string | null, approvalRequested = false) {
+    const { deviceIdentity } = useAppStore.getState();
+    const { localUser, deviceId } = currentLocalIdentity();
     const inviteSecret = decodeRoomInviteSecret(encodedSecret);
     let acceptedRoomName = inviteSecret.roomName;
     if (inviteId) {
@@ -174,6 +171,7 @@ export function createInviteJoinActions(
   }
 
   async function joinInviteSecret() {
+    const { inviteSecretInput } = useAppStore.getState();
     const raw = inviteSecretInput.trim();
     if (!raw) return;
     setSelectedInviteMessage(null);

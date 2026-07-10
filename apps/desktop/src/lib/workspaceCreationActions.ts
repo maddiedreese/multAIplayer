@@ -8,10 +8,6 @@ import { createRoom, createTeam, updateRoomLifecycle, updateTeamLifecycle } from
 import { useAppStore } from "../store/appStore";
 
 interface WorkspaceCreationActionsOptions {
-  selectedTeam: string;
-  newTeamName: string;
-  newRoomName: string;
-  newRoomProjectPath: string;
   setWorkspaceStatusError: (message: string | null) => void;
   setSelectedTeam: (teamId: string) => void;
   setSelectedRoomId: (roomId: string) => void;
@@ -24,10 +20,6 @@ interface WorkspaceCreationActionsOptions {
 }
 
 export function createWorkspaceCreationActions({
-  selectedTeam,
-  newTeamName,
-  newRoomName,
-  newRoomProjectPath,
   setWorkspaceStatusError,
   setSelectedTeam,
   setSelectedRoomId,
@@ -39,6 +31,7 @@ export function createWorkspaceCreationActions({
   roomSettingsActor
 }: WorkspaceCreationActionsOptions) {
   async function addTeam() {
+    const { newTeamName } = useAppStore.getState();
     let plan: ReturnType<typeof planTeamCreation>;
     try {
       plan = planTeamCreation(newTeamName);
@@ -58,6 +51,7 @@ export function createWorkspaceCreationActions({
   }
 
   async function addRoom() {
+    const { selectedTeam, newRoomName, newRoomProjectPath } = useAppStore.getState();
     let plan: ReturnType<typeof planRoomCreation>;
     try {
       plan = planRoomCreation(selectedTeam, newRoomName, newRoomProjectPath);
@@ -91,6 +85,7 @@ export function createWorkspaceCreationActions({
   }
 
   async function chooseNewRoomProjectPath() {
+    const { newRoomProjectPath } = useAppStore.getState();
     try {
       const path = await chooseProjectFolder(newRoomProjectPath || defaultProjectPath);
       if (!path) return;

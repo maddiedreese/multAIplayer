@@ -39,44 +39,33 @@ import type { ChatAttachment } from "../types";
 import type { RelayClient } from "./relayClient";
 import type { WorkspaceFileSaveRequest } from "../types";
 import { useAppStore } from "../store/appStore";
+import { currentSelectedRoom, currentSelectedRoomContext } from "./selectedWorkspace";
 
 interface FileActionsOptions {
-  hasSelectedRoom: boolean;
-  canReadLocalWorkspace: boolean;
-  localWorkspaceMessage: string;
-  isActiveHost: boolean;
-  hostGateMessage: string;
-  selectedRoom: RoomRecord;
   selectedRoomIdRef: MutableRefObject<string>;
-  isSelectedRoomLocked: boolean;
-  isSelectedRoomRevoked: boolean;
-  localUser: { id: string; name: string };
-  deviceId: string;
-  relayStatus: "connecting" | "open" | "closed" | "error";
   relayRef: MutableRefObject<RelayClient | null>;
   seenEnvelopeIds: MutableRefObject<Set<string>>;
   reportRoomFileActionInFlight: (roomId: string) => boolean;
 }
 
 export function createFileActions({
-  hasSelectedRoom,
-  canReadLocalWorkspace,
-  localWorkspaceMessage,
-  isActiveHost,
-  hostGateMessage,
-  selectedRoom,
   selectedRoomIdRef,
-  isSelectedRoomLocked,
-  isSelectedRoomRevoked,
-  localUser,
-  deviceId,
-  relayStatus,
   relayRef,
   seenEnvelopeIds,
   reportRoomFileActionInFlight
 }: FileActionsOptions) {
+  const currentContext = () => currentSelectedRoomContext();
+  function currentRoomAccess(selectedRoom: RoomRecord) {
+    const store = useAppStore.getState();
+    const revoked = store.revokedRoomIds.has(selectedRoom.id) || store.revokedTeamIds.has(selectedRoom.teamId);
+    return {
+      revoked,
+      locked: selectedRoom.archivedAt != null || store.forgottenRoomIds.has(selectedRoom.id) || revoked
+    };
+  }
+
   const setSelectedFileMessage = (message: string | null) =>
-    useAppStore.getState().setFileMessageForRoom(selectedRoomIdRef.current, message);
+    useAppStore.getState().setFileMessageForRoom(useAppStore.getState().selectedRoomId, message);
   const setFileBusyForRoom = (roomId: string, busy: boolean) =>
     useAppStore.getState().setFileBusyForRoom(roomId, busy);
   const setSelectedFileForRoom = (roomId: string, file: ProjectFileContent | null) =>
@@ -104,12 +93,13 @@ export function createFileActions({
     useAppStore.getState().setInspectorTabForRoom(roomId, tab);
 
   async function openProjectFile(path: string, preferredPreview: FilePreviewTab = "file") {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedFileMessage("Create or join a room before opening project files.");
       return;
     }
-    if (!canReadLocalWorkspace) {
-      setSelectedFileMessage(localWorkspaceMessage);
+    if (!currentContext()?.canReadLocalWorkspace) {
+      setSelectedFileMessage(currentContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
       return;
     }
     const room = selectedRoom;
@@ -137,16 +127,18 @@ export function createFileActions({
   }
 
   async function attachSelectedFileToMessage() {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedFileMessage("Create or join a room before attaching project files.");
       return;
     }
-    if (!canReadLocalWorkspace) {
-      setSelectedFileMessage(localWorkspaceMessage);
+    if (!currentContext()?.canReadLocalWorkspace) {
+      setSelectedFileMessage(currentContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
       return;
     }
-    if (!canStageRoomChatAttachment(selectedRoom, isSelectedRoomLocked)) {
-      setSelectedFileMessage(roomChatGateMessage(selectedRoom, isSelectedRoomLocked));
+    const { locked } = currentRoomAccess(selectedRoom);
+    if (!canStageRoomChatAttachment(selectedRoom, locked)) {
+      setSelectedFileMessage(roomChatGateMessage(selectedRoom, locked));
       return;
     }
     const store = useAppStore.getState();
@@ -232,16 +224,18 @@ export function createFileActions({
   }
 
   async function saveSelectedFileContent(content: string) {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedFileMessage("Create or join a room before editing project files.");
       return;
     }
-    if (!canReadLocalWorkspace) {
-      setSelectedFileMessage(localWorkspaceMessage);
+    if (!currentContext()?.canReadLocalWorkspace) {
+      setSelectedFileMessage(currentContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
       return;
     }
-    if (isSelectedRoomLocked) {
-      setSelectedFileMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+    const { locked, revoked } = currentRoomAccess(selectedRoom);
+    if (locked) {
+      setSelectedFileMessage(roomLockMessage(selectedRoom, revoked));
       return;
     }
     const selectedFile = useAppStore.getState().filePanelByRoom[selectedRoom.id]?.selectedFile ?? null;
@@ -251,7 +245,7 @@ export function createFileActions({
     }
     const room = selectedRoom;
     const path = selectedFile.path;
-    if (!isActiveHost) {
+    if (!currentContext()?.isActiveHost) {
       await requestFileSaveApproval(room, selectedFile, content);
       return;
     }
@@ -262,8 +256,8 @@ export function createFileActions({
     const request: WorkspaceFileSaveRequest = {
       eventType: "workspace.file.save",
       id: crypto.randomUUID(),
-      requester: localUser.name,
-      requesterUserId: localUser.id,
+      requester: currentContext()?.localUser.name ?? "Local user",
+      requesterUserId: currentContext()?.localUser.id ?? "local",
       path: file.path,
       previousContent: file.content,
       nextContent: content,
@@ -271,6 +265,7 @@ export function createFileActions({
       status: "pending"
     };
     const client = relayRef.current;
+    const { relayStatus } = useAppStore.getState();
     if (!client || relayStatus === "closed" || relayStatus === "error") {
       appendFileSaveRequest(room.id, request);
       setFileMessageForRoom(room.id, "Saved file edit request locally because the relay is not connected.");
@@ -292,8 +287,8 @@ export function createFileActions({
         id: crypto.randomUUID(),
         teamId: room.teamId,
         roomId: room.id,
-        senderDeviceId: deviceId,
-        senderUserId: localUser.id,
+        senderDeviceId: currentContext()?.deviceId ?? "local-device",
+        senderUserId: currentContext()?.localUser.id ?? "local",
         createdAt: request.requestedAt,
         kind: "workspace.request",
         payload: await encryptJson(payload, secret)
@@ -338,12 +333,13 @@ export function createFileActions({
 
   async function publishFileSaveStatus(room: RoomRecord, requestId: string, status: RequestStatusPlaintextPayload["status"]) {
     const client = relayRef.current;
+    const { relayStatus } = useAppStore.getState();
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
     const payload: RequestStatusPlaintextPayload = {
       requestId,
       status,
-      decidedBy: localUser.name,
-      decidedByUserId: localUser.id,
+      decidedBy: currentContext()?.localUser.name ?? "Local user",
+      decidedByUserId: currentContext()?.localUser.id ?? "local",
       decidedAt: new Date().toISOString()
     };
     const secret = await loadOrCreateRoomSecret(room.id);
@@ -351,8 +347,8 @@ export function createFileActions({
       id: crypto.randomUUID(),
       teamId: room.teamId,
       roomId: room.id,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
+      senderDeviceId: currentContext()?.deviceId ?? "local-device",
+      senderUserId: currentContext()?.localUser.id ?? "local",
       createdAt: payload.decidedAt,
       kind: "workspace.event",
       payload: await encryptJson(payload, secret)
@@ -362,20 +358,22 @@ export function createFileActions({
   }
 
   async function approveFileSaveRequest(request: WorkspaceFileSaveRequest) {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedFileMessage("Create or join a room before approving file edits.");
       return;
     }
-    if (!isActiveHost) {
-      setSelectedFileMessage(hostGateMessage);
+    if (!currentContext()?.isActiveHost) {
+      setSelectedFileMessage(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
       return;
     }
-    if (!canReadLocalWorkspace) {
-      setSelectedFileMessage(localWorkspaceMessage);
+    if (!currentContext()?.canReadLocalWorkspace) {
+      setSelectedFileMessage(currentContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
       return;
     }
-    if (isSelectedRoomLocked) {
-      setSelectedFileMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+    const { locked, revoked } = currentRoomAccess(selectedRoom);
+    if (locked) {
+      setSelectedFileMessage(roomLockMessage(selectedRoom, revoked));
       return;
     }
     const fileSaveRequests = useAppStore.getState().filePanelByRoom[selectedRoom.id]?.saveRequests ?? [];
@@ -391,12 +389,13 @@ export function createFileActions({
   }
 
   function denyFileSaveRequest(requestId: string) {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedFileMessage("Create or join a room before denying file edits.");
       return;
     }
-    if (!isActiveHost) {
-      setSelectedFileMessage(hostGateMessage);
+    if (!currentContext()?.isActiveHost) {
+      setSelectedFileMessage(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
       return;
     }
     const fileSaveRequests = useAppStore.getState().filePanelByRoom[selectedRoom.id]?.saveRequests ?? [];
@@ -411,16 +410,19 @@ export function createFileActions({
   }
 
   function removePendingAttachment(attachmentId: string) {
-    removePendingAttachmentForRoom(selectedRoom.id, attachmentId);
+    const selectedRoom = currentSelectedRoom();
+    if (selectedRoom) removePendingAttachmentForRoom(selectedRoom.id, attachmentId);
   }
 
   async function openEncryptedAttachmentBlob(attachment: ChatAttachment) {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedFileMessage("Create or join a room before opening encrypted attachments.");
       return;
     }
-    if (isSelectedRoomLocked) {
-      setSelectedFileMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+    const { locked, revoked } = currentRoomAccess(selectedRoom);
+    if (locked) {
+      setSelectedFileMessage(roomLockMessage(selectedRoom, revoked));
       return;
     }
     const room = selectedRoom;

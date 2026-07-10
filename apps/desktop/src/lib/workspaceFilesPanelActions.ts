@@ -3,7 +3,6 @@ import type { WorkspaceFileSaveRequest } from "../types";
 import { useAppStore } from "../store/appStore";
 
 export function createWorkspaceFilesPanelActions({
-  selectedRoomId,
   copyProjectMarkdown,
   openProjectFile,
   copyDiffSummaryMarkdown,
@@ -12,7 +11,6 @@ export function createWorkspaceFilesPanelActions({
   approveFileSaveRequest,
   denyFileSaveRequest
 }: {
-  selectedRoomId: string;
   copyProjectMarkdown: () => void;
   openProjectFile: (path: string, preferredPreview?: FilePreviewTab) => void;
   copyDiffSummaryMarkdown: () => void;
@@ -23,6 +21,7 @@ export function createWorkspaceFilesPanelActions({
 }) {
   function onCloseFileViewer() {
     const store = useAppStore.getState();
+    const selectedRoomId = store.selectedRoomId;
     store.setSelectedFileForRoom(selectedRoomId, null);
     store.setSelectedDiffForRoom(selectedRoomId, null);
     store.setSensitiveAttachmentReviewKey(null);
@@ -30,15 +29,20 @@ export function createWorkspaceFilesPanelActions({
 
   return {
     onCopyProjectMarkdown: copyProjectMarkdown,
-    onFileQueryChange: (query: string) => useAppStore.getState().setFileQueryForRoom(selectedRoomId, query),
+    onFileQueryChange: (query: string) => {
+      const state = useAppStore.getState();
+      state.setFileQueryForRoom(state.selectedRoomId, query);
+    },
     onOpenProjectFile: openProjectFile,
     onCopyDiffSummaryMarkdown: copyDiffSummaryMarkdown,
     onAttachSelectedFileToMessage: attachSelectedFileToMessage,
     onSaveSelectedFileContent: saveSelectedFileContent,
     onApproveFileSaveRequest: approveFileSaveRequest,
     onDenyFileSaveRequest: denyFileSaveRequest,
-    onFilePreviewTabChange: (tab: FilePreviewTab) =>
-      useAppStore.getState().setFilePreviewTabForRoom(selectedRoomId, tab),
+    onFilePreviewTabChange: (tab: FilePreviewTab) => {
+      const state = useAppStore.getState();
+      state.setFilePreviewTabForRoom(state.selectedRoomId, tab);
+    },
     onCloseFileViewer
   };
 }

@@ -2,9 +2,9 @@ import type { ApprovalPolicy } from "@multaiplayer/protocol";
 import { formatCodexModel } from "./appFormatters";
 import { saveTeamHistorySettings, type LocalHistorySettings } from "./localHistory";
 import { loadTeamRoomDefaults, saveTeamRoomDefaults } from "./teamRoomDefaults";
+import { useAppStore } from "../store/appStore";
 
 interface TeamDefaultActionsOptions {
-  selectedTeam: string;
   approvalPolicyLabels: Record<string, string>;
   setSelectedTeamHistoryMessage: (message: string | null) => void;
   setTeamHistoryMessageForTeam: (teamId: string, message: string | null) => void;
@@ -16,7 +16,6 @@ interface TeamDefaultActionsOptions {
 }
 
 export function createTeamDefaultActions({
-  selectedTeam,
   approvalPolicyLabels,
   setSelectedTeamHistoryMessage,
   setTeamHistoryMessageForTeam,
@@ -27,6 +26,7 @@ export function createTeamDefaultActions({
   setTeamDefaultInviteApprovalGate
 }: TeamDefaultActionsOptions) {
   function updateTeamHistoryDefaults(next: LocalHistorySettings) {
+    const { selectedTeam } = useAppStore.getState();
     if (!selectedTeam) {
       setSelectedTeamHistoryMessage("Create or select a team before changing team history defaults.");
       return;
@@ -49,6 +49,7 @@ export function createTeamDefaultActions({
   }
 
   function updateTeamDefaultApprovalPolicy(approvalPolicy: ApprovalPolicy) {
+    const { selectedTeam } = useAppStore.getState();
     if (!selectedTeam) {
       setSelectedTeamHistoryMessage("Create or select a team before changing team defaults.");
       return;
@@ -62,6 +63,7 @@ export function createTeamDefaultActions({
   }
 
   function updateTeamDefaultCodexModel(codexModel: string) {
+    const { selectedTeam } = useAppStore.getState();
     if (!selectedTeam) {
       setSelectedTeamHistoryMessage("Create or select a team before changing team defaults.");
       return;
@@ -75,6 +77,7 @@ export function createTeamDefaultActions({
   }
 
   function updateTeamDefaultInviteApprovalGate(inviteApprovalGate: boolean) {
+    const { selectedTeam } = useAppStore.getState();
     if (!selectedTeam) {
       setSelectedTeamHistoryMessage("Create or select a team before changing team defaults.");
       return;

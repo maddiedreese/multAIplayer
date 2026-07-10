@@ -53,6 +53,13 @@ const room: RoomRecord = {
 test.beforeEach(() => {
   localStorage.clear();
   useAppStore.getState().resetAppStore();
+  useAppStore.setState({
+    teams: [{ id: room.teamId, name: "Actions team", members: 1 }],
+    rooms: [room],
+    selectedTeam: room.teamId,
+    selectedRoomId: room.id,
+    currentUser: { id: "github:maddie", login: "maddie", name: "Maddie" }
+  });
 });
 
 test("account sign-out actions preserve preview cleanup ordering without React", async () => {
@@ -77,7 +84,7 @@ test("account sign-out actions preserve preview cleanup ordering without React",
 
 test("visibility warning actions update persistence and the current Zustand store", () => {
   useAppStore.getState().setSecretWarningVisibleForRoom(room.id, true);
-  const actions = createRoomVisibilityWarningActions({ hasSelectedRoom: true, selectedRoomId: room.id });
+  const actions = createRoomVisibilityWarningActions();
 
   actions.acknowledgeRoomVisibilityWarning();
 
@@ -176,13 +183,13 @@ test("workspace creation actions restore the new room through the current store"
   });
   const store = useAppStore.getState();
   store.revokeWorkspaceAccess(room.teamId, room.id);
+  useAppStore.setState({
+    newRoomName: room.name,
+    newRoomProjectPath: room.projectPath
+  });
   const upsertedRooms: RoomRecord[] = [];
   try {
     const actions = createWorkspaceCreationActions({
-      selectedTeam: room.teamId,
-      newTeamName: "",
-      newRoomName: room.name,
-      newRoomProjectPath: room.projectPath,
       setWorkspaceStatusError: () => undefined,
       setSelectedTeam: () => undefined,
       setSelectedRoomId: () => undefined,
@@ -221,17 +228,10 @@ test("chat actions append through the latest store when the relay is offline", a
     hasSelectedRoom: true,
     selectedRoomId: room.id,
     selectedRoom: room,
-    isSelectedRoomLocked: false,
-    isSelectedRoomRevoked: false,
-    forgottenRoomIds: new Set(),
-    revokedRoomIds: new Set(),
-    revokedTeamIds: new Set(),
     localUser: { id: "github:maddie", name: "Maddie" },
     deviceId: "device-1",
-    relayStatus: "closed",
     relayRef: { current: null },
-    seenEnvelopeIds: { current: new Set() },
-    codexEventsByRoom: {}
+    seenEnvelopeIds: { current: new Set() }
   });
 
   await actions.publishChatMessage(message);
@@ -239,34 +239,116 @@ test("chat actions append through the latest store when the relay is offline", a
   assert.deepEqual(useAppStore.getState().messagesByRoom[room.id], [message]);
 });
 
+test("chat actions observe relay and access changes made after creation", async () => {
+  const message: ChatMessage = {
+    id: "message-latest-state",
+    author: "Maddie",
+    authorUserId: "github:maddie",
+    role: "human",
+    body: "Hello",
+    time: "9:43",
+    createdAt: "2026-07-09T12:00:00.000Z"
+  };
+  const published: unknown[] = [];
+  useAppStore.getState().replaceRelayStatus("open");
+  const actions = createChatActions({
+    hasSelectedRoom: true,
+    selectedRoomId: room.id,
+    selectedRoom: room,
+    localUser: { id: "github:maddie", name: "Maddie" },
+    deviceId: "device-1",
+    relayRef: { current: { publish: (payload: unknown) => published.push(payload) } as never },
+    seenEnvelopeIds: { current: new Set() }
+  });
+
+  useAppStore.getState().replaceRelayStatus("closed");
+  await actions.publishChatMessage(message);
+  assert.deepEqual(published, []);
+  assert.deepEqual(useAppStore.getState().messagesByRoom[room.id], [message]);
+
+  useAppStore.getState().revokeRoomAccess(room.id);
+  await actions.publishChatMessage({ ...message, id: "message-revoked" });
+  assert.equal(useAppStore.getState().messagesByRoom[room.id]?.length, 1);
+  assert.match(useAppStore.getState().roomChatByRoom[room.id]?.message ?? "", /removed|revoked|locked/i);
+});
+
+test("chat edits observe Codex watermark changes made after creation", async () => {
+  const message: ChatMessage = {
+    id: "message-before-codex",
+    author: "Maddie",
+    authorUserId: "github:maddie",
+    role: "human",
+    body: "Original",
+    time: "9:43",
+    createdAt: "2026-07-09T12:00:00.000Z"
+  };
+  const actions = createChatActions({
+    hasSelectedRoom: true,
+    selectedRoomId: room.id,
+    selectedRoom: room,
+    localUser: { id: "github:maddie", name: "Maddie" },
+    deviceId: "device-1",
+    relayRef: { current: null },
+    seenEnvelopeIds: { current: new Set() }
+  });
+
+  useAppStore.getState().appendCodexEvent(room.id, {
+    eventType: "codex.turn",
+    turnId: "turn-after-creation",
+    status: "started",
+    message: "Started Codex turn.",
+    model: "gpt-5.4",
+    consumedMessageIds: [message.id],
+    host: "Maddie",
+    hostUserId: "github:maddie",
+    createdAt: "2026-07-09T12:01:00.000Z"
+  });
+  await actions.publishChatMessageEdit(message, "Changed");
+
+  assert.deepEqual(useAppStore.getState().chatEditsByRoom[room.id] ?? [], []);
+  assert.match(useAppStore.getState().roomChatByRoom[room.id]?.message ?? "", /already sent to Codex/i);
+});
+
+test("chat actions resolve the selected room when invoked, not when created", async () => {
+  const nextRoom = { ...room, id: "room-actions-next", name: "Next Actions" };
+  const actions = createChatActions({
+    localUser: { id: "github:maddie", name: "Maddie" },
+    deviceId: "device-1",
+    relayRef: { current: null },
+    seenEnvelopeIds: { current: new Set() }
+  });
+  useAppStore.setState({ rooms: [room, nextRoom], selectedRoomId: nextRoom.id });
+  const message: ChatMessage = {
+    id: "message-after-selection-change",
+    author: "Maddie",
+    authorUserId: "github:maddie",
+    role: "human",
+    body: "New room",
+    time: "9:43",
+    createdAt: "2026-07-09T12:00:00.000Z"
+  };
+
+  await actions.publishChatMessage(message);
+
+  assert.deepEqual(useAppStore.getState().messagesByRoom[nextRoom.id], [message]);
+  assert.equal(useAppStore.getState().messagesByRoom[room.id], undefined);
+});
+
 test("Codex invoke actions report room locks through Zustand without React", () => {
   const actions = createCodexInvokeActions({
     hasSelectedRoom: true,
     selectedRoom: room,
     selectedRoomIdRef: { current: room.id },
-    isSelectedRoomLocked: true,
-    isSelectedRoomRevoked: false,
     isActiveHost: true,
-    codexRunning: false,
     canReadLocalWorkspace: true,
     hostGateMessage: "Only the active host can approve this turn.",
     localUser: { id: "github:maddie", name: "Maddie" },
-    draft: "",
-    replyToMessageId: null,
-    roomGoal: null,
-    pendingAttachments: [],
-    messages: [],
-    roomTerminals: [],
-    browserRequests: [],
-    gitStatus: null,
-    activeCodexApproval: null,
-    queuedCodexApprovals: [],
-    codexThreadId: null,
     publishChatMessage: async () => undefined,
     handleCodexBrowserOpenCommand: () => false,
     publishCodexQueueEvent: async () => undefined
   });
 
+  useAppStore.getState().rememberForgottenRoom(room.id);
   actions.handleCodexInvoke();
 
   assert.match(useAppStore.getState().roomSettingsByRoom[room.id]?.hostMessage ?? "", /forgotten|locked/i);
@@ -276,16 +358,13 @@ test("Codex invoke actions report room locks through Zustand without React", () 
 test("local preview actions report a room lock through the current store without React", async () => {
   const actions = createLocalPreviewActions({
     hasSelectedRoom: true,
-    isSelectedRoomLocked: true,
-    isSelectedRoomRevoked: false,
     selectedRoom: room,
     rooms: [room],
     localUser: { id: "github:maddie", name: "Maddie" },
-    localPreviewDialog: useAppStore.getState().localPreviewDialog,
-    localPreviewsByRoom: {},
     publishLocalPreviewEvent: async () => undefined
   });
 
+  useAppStore.getState().rememberForgottenRoom(room.id);
   await actions.openLocalPreviewDialog();
 
   assert.match(useAppStore.getState().roomChatByRoom[room.id]?.message ?? "", /forgotten on this device/i);
@@ -295,20 +374,19 @@ test("local preview actions report a room lock through the current store without
 test("local preview confirmation validation writes through the current store", async () => {
   const actions = createLocalPreviewActions({
     hasSelectedRoom: true,
-    isSelectedRoomLocked: false,
-    isSelectedRoomRevoked: false,
     selectedRoom: room,
     rooms: [room],
     localUser: { id: "github:maddie", name: "Maddie" },
+    publishLocalPreviewEvent: async () => undefined
+  });
+
+  useAppStore.setState({
     localPreviewDialog: {
       ...useAppStore.getState().localPreviewDialog,
       roomId: room.id,
       selectedUrl: "not a local URL"
-    },
-    localPreviewsByRoom: {},
-    publishLocalPreviewEvent: async () => undefined
+    }
   });
-
   await actions.prepareLocalPreviewConfirmation();
 
   assert.match(useAppStore.getState().localPreviewDialog.error ?? "", /valid.*URL/i);
@@ -318,8 +396,6 @@ test("room settings actions report room locks through the current store without 
   const settingsBusyRef = { current: {} as Record<string, boolean> };
   const actions = createRoomSettingsActions({
     hasSelectedRoom: true,
-    isSelectedRoomLocked: true,
-    isSelectedRoomRevoked: false,
     isActiveHost: true,
     selectedRoom: room,
     selectedRoomIdRef: { current: room.id },
@@ -328,7 +404,6 @@ test("room settings actions report room locks through the current store without 
     selectedCodexReasoningEffort: "high",
     selectedCodexSpeed: "standard",
     selectedCodexSandboxLevel: "workspace-write",
-    projectPathDraft: room.projectPath,
     approvalPolicyLabels: { auto: "Auto", ask_every_turn: "Ask every turn" },
     roomSettingsGateMessage: "Only the active host can change room settings.",
     roomSettingsActor: () => ({ requesterName: "Maddie", requesterUserId: "github:maddie" }),
@@ -337,6 +412,7 @@ test("room settings actions report room locks through the current store without 
     publishRoomSettingsEvent: async () => undefined
   });
 
+  useAppStore.getState().rememberForgottenRoom(room.id);
   await actions.setApprovalPolicy("auto");
 
   assert.match(useAppStore.getState().roomSettingsByRoom[room.id]?.settingsMessage ?? "", /forgotten|locked/i);
@@ -346,7 +422,6 @@ test("room settings actions report room locks through the current store without 
 test("team default actions report missing selection without touching storage", () => {
   const messages: Array<string | null> = [];
   const actions = createTeamDefaultActions({
-    selectedTeam: "",
     approvalPolicyLabels: {},
     setSelectedTeamHistoryMessage: (message) => messages.push(message),
     setTeamHistoryMessageForTeam: () => undefined,
@@ -357,6 +432,7 @@ test("team default actions report missing selection without touching storage", (
     setTeamDefaultInviteApprovalGate: () => undefined
   });
 
+  useAppStore.getState().setSelectedTeam("");
   actions.updateTeamDefaultCodexModel("gpt-5.4");
 
   assert.deepEqual(messages, ["Create or select a team before changing team defaults."]);
@@ -464,10 +540,11 @@ test("git workflow actions report host gating through Zustand without React", as
     refreshGitHubActions: async () => undefined
   });
 
+  useAppStore.getState().replaceCurrentUser(null);
   await actions.approveGitWorkflow();
 
   assert.equal(
     useAppStore.getState().gitWorkflowRuntimeByRoom[room.id]?.workflow?.message,
-    "Only the active host can approve this workflow."
+    "Only Maddie can approve host-side actions in this room."
   );
 });

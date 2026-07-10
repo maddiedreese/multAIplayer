@@ -31,22 +31,12 @@ import { roomLockMessage } from "../appRuntime";
 import { useAppStore, type AppStoreState } from "../../store/appStore";
 import type { InviteJoinRequest } from "../../types";
 import type { UseInviteActionsOptions } from "./inviteActionTypes";
+import { currentLocalIdentity, currentSelectedRoomContext } from "../selectedWorkspace";
 
 type InviteRelayActionOptions = Pick<
   UseInviteActionsOptions,
-  | "deviceId"
-  | "deviceIdentity"
-  | "hasSelectedRoom"
-  | "hostGateMessage"
-  | "inviteRequests"
-  | "isActiveHost"
-  | "isSelectedRoomLocked"
-  | "isSelectedRoomRevoked"
-  | "localUser"
   | "relayRef"
-  | "relayStatus"
   | "seenEnvelopeIds"
-  | "selectedRoom"
   | "selectedRoomIdRef"
 >;
 
@@ -64,19 +54,8 @@ export function createInviteRelayActions(
   store: InviteRelayStore = useAppStore.getState()
 ) {
   const {
-    deviceId,
-    deviceIdentity,
-    hasSelectedRoom,
-    hostGateMessage,
-    inviteRequests,
-    isActiveHost,
-    isSelectedRoomLocked,
-    isSelectedRoomRevoked,
-    localUser,
     relayRef,
-    relayStatus,
     seenEnvelopeIds,
-    selectedRoom,
     selectedRoomIdRef
   } = options;
   const {
@@ -95,7 +74,9 @@ export function createInviteRelayActions(
     request: InviteJoinRequestPlaintextPayload,
     recipientPublicKeyJwk?: Record<string, unknown>
   ) {
+    const { localUser, deviceId } = currentLocalIdentity();
     const client = relayRef.current;
+    const { relayStatus } = useAppStore.getState();
     if (!client || relayStatus === "closed" || relayStatus === "error") return false;
     const payload = recipientPublicKeyJwk
       ? await sealJsonToDevice(request, recipientPublicKeyJwk)
@@ -116,6 +97,7 @@ export function createInviteRelayActions(
   }
 
   async function decryptInviteEnvelope(envelope: RelayEnvelope): Promise<unknown | null> {
+    const { deviceIdentity } = useAppStore.getState();
     if (deviceIdentity && isDeviceSealedPayload(envelope.payload)) {
       try {
         return await openDeviceSealedJson<unknown>(envelope.payload, deviceIdentity.privateKeyJwk);
@@ -135,6 +117,8 @@ export function createInviteRelayActions(
   }
 
   async function handleInviteEnvelopePlaintext(roomId: string, plaintext: unknown) {
+    const { deviceIdentity } = useAppStore.getState();
+    const { deviceId } = currentLocalIdentity();
     if (isInviteJoinRequestPlaintextPayload(plaintext)) {
       appendInviteRequest(roomId, { ...plaintext, status: "pending" });
       return;
@@ -168,10 +152,18 @@ export function createInviteRelayActions(
   }
 
   async function decideInviteJoinRequest(request: InviteJoinRequest, status: InviteJoinRequest["status"]) {
-    if (!hasSelectedRoom) {
+    const context = currentSelectedRoomContext();
+    if (!context) {
       setSelectedInviteMessage("Create or join a room before deciding invite requests.");
       return;
     }
+    const { room: selectedRoom, isActiveHost, hostGateMessage, localUser, deviceId } = context;
+    const appStore = useAppStore.getState();
+    const isSelectedRoomRevoked =
+      appStore.revokedRoomIds.has(selectedRoom.id) || appStore.revokedTeamIds.has(selectedRoom.teamId);
+    const isSelectedRoomLocked =
+      selectedRoom.archivedAt != null || appStore.forgottenRoomIds.has(selectedRoom.id) || isSelectedRoomRevoked;
+    const inviteRequests = appStore.inviteByRoom[selectedRoom.id]?.requests ?? [];
     if (isSelectedRoomLocked) {
       setSelectedInviteMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;
@@ -192,6 +184,7 @@ export function createInviteRelayActions(
       `${status === "approved" ? "Approved" : "Denied"} ${roomRequest.requester}'s join request.`
     );
     const client = relayRef.current;
+    const { relayStatus } = useAppStore.getState();
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
     try {
       const secret = await loadOrCreateRoomSecret(selectedRoom.id);

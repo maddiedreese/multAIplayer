@@ -6,22 +6,14 @@ import { roomLockMessage } from "../appRuntime";
 import { formatMessageTime } from "../appFormatters";
 import { useAppStore, type AppStoreState } from "../../store/appStore";
 import type { UseInviteActionsOptions } from "./inviteActionTypes";
+import { currentSelectedRoomContext } from "../selectedWorkspace";
 
 type RoomKeyRotationActionOptions = Pick<
   UseInviteActionsOptions,
-  | "deviceId"
-  | "hasSelectedRoom"
   | "historyLoadedRoomIds"
-  | "hostGateMessage"
-  | "isActiveHost"
-  | "isSelectedRoomLocked"
-  | "isSelectedRoomRevoked"
-  | "localUser"
   | "relayRef"
-  | "relayStatus"
   | "reportRoomKeyRotationInFlight"
   | "seenEnvelopeIds"
-  | "selectedRoom"
   | "selectedRoomIdRef"
 >;
 
@@ -39,19 +31,10 @@ export function createRoomKeyRotationActions(
   store: RoomKeyRotationStore = useAppStore.getState()
 ) {
   const {
-    deviceId,
-    hasSelectedRoom,
     historyLoadedRoomIds,
-    hostGateMessage,
-    isActiveHost,
-    isSelectedRoomLocked,
-    isSelectedRoomRevoked,
-    localUser,
     relayRef,
-    relayStatus,
     reportRoomKeyRotationInFlight,
     seenEnvelopeIds,
-    selectedRoom,
     selectedRoomIdRef
   } = options;
   const {
@@ -65,10 +48,17 @@ export function createRoomKeyRotationActions(
     setInviteMessageForRoom(selectedRoomIdRef.current, message);
 
   async function rotateSelectedRoomKey() {
-    if (!hasSelectedRoom) {
+    const context = currentSelectedRoomContext();
+    if (!context) {
       setSelectedInviteMessage("Create or join a room before refreshing room access.");
       return;
     }
+    const { room: selectedRoom, isActiveHost, hostGateMessage, localUser, deviceId } = context;
+    const appStore = useAppStore.getState();
+    const isSelectedRoomRevoked =
+      appStore.revokedRoomIds.has(selectedRoom.id) || appStore.revokedTeamIds.has(selectedRoom.teamId);
+    const isSelectedRoomLocked =
+      selectedRoom.archivedAt != null || appStore.forgottenRoomIds.has(selectedRoom.id) || isSelectedRoomRevoked;
     if (isSelectedRoomLocked) {
       setSelectedInviteMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;
@@ -102,6 +92,7 @@ export function createRoomKeyRotationActions(
       };
 
       const client = relayRef.current;
+      const { relayStatus } = useAppStore.getState();
       if (client && relayStatus !== "closed" && relayStatus !== "error") {
         const envelope: RelayEnvelope = {
           id: crypto.randomUUID(),

@@ -6,52 +6,40 @@ import {
 } from "../seedData";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRefs } from "./useAppRefs";
-import type { useAppRoomDisplayContext } from "./useAppRoomDisplayContext";
 import type { createAppRoomActions } from "../lib/appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
-import type { useAppStateSlices } from "./useAppStateSlices";
 import type { WorkspaceRecordActions } from "../lib/workspaceRecordActions";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import type { useRoomChatMutations } from "./useRoomChatMutations";
 import { useRelaySyncContext } from "./useRelaySyncContext";
+import { useAppStore } from "../store/appStore";
+import { useShallow } from "zustand/react/shallow";
+import { useTeamMembersRefresh } from "./useTeamMembersRefresh";
 
-type AppStateSlices = ReturnType<typeof useAppStateSlices>;
 type AppRefs = ReturnType<typeof useAppRefs>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type RoomActions = ReturnType<typeof createAppRoomActions>;
-type RoomDisplay = ReturnType<typeof useAppRoomDisplayContext>;
 type InviteActions = ReturnType<typeof useAppInviteActions>;
 type RoomChatMutations = ReturnType<typeof useRoomChatMutations>;
 
 export function useAppRelaySync({
-  appState,
   appRefs,
   localIdentity,
   selected,
   roomActions,
   workspaceRecords,
-  roomDisplay,
   inviteActions,
   roomChatMutations
 }: {
-  appState: AppStateSlices;
   appRefs: AppRefs;
   localIdentity: LocalIdentity;
   selected: SelectedRoomContext;
   roomActions: RoomActions;
   workspaceRecords: WorkspaceRecordActions;
-  roomDisplay: RoomDisplay;
   inviteActions: InviteActions;
   roomChatMutations: RoomChatMutations;
 }) {
-  const {
-    workspaceState,
-    appConfigState,
-    roomRuntimeState,
-    appRuntimeState,
-    invitePanelState
-  } = appState;
   const {
     hasSelectedRoom,
     selectedRoom
@@ -63,43 +51,58 @@ export function useAppRelaySync({
     appendCodexEvent,
     appendLocalPreviewEvent
   } = roomActions;
+  const {
+    relayWsUrl, relayHttpUrl, selectedTeam, devicePublicKeyFingerprint, relayStatus,
+    forgottenRoomIds, revokedRoomIds, revokedTeamIds, selectedInviteAdmission
+  } = useAppStore(useShallow((state) => ({
+    relayWsUrl: state.appConfig.relayWsUrl,
+    relayHttpUrl: state.appConfig.relayHttpUrl,
+    selectedTeam: state.selectedTeam,
+    devicePublicKeyFingerprint: state.deviceIdentity?.publicKeyFingerprint,
+    relayStatus: state.relayStatus,
+    forgottenRoomIds: state.forgottenRoomIds,
+    revokedRoomIds: state.revokedRoomIds,
+    revokedTeamIds: state.revokedTeamIds,
+    selectedInviteAdmission: state.inviteByRoom[selectedRoom.id]?.admission
+  })));
+  const { refreshTeamMembers } = useTeamMembersRefresh({ selectedTeam, relayHttpUrl });
 
   return useRelaySyncContext({
     browserOpenCommand: {
       localUser: localIdentity.localUser,
       selectedRoomIdRef: appRefs.selectedRoomIdRef,
-      forgottenRoomIds: roomRuntimeState.forgottenRoomIds,
-      revokedRoomIds: roomRuntimeState.revokedRoomIds,
-      revokedTeamIds: roomRuntimeState.revokedTeamIds,
+      forgottenRoomIds,
+      revokedRoomIds,
+      revokedTeamIds,
       defaultBrowserUrl
     },
     relayRoomSync: {
       subscription: {
-        relayWsUrl: appConfigState.appConfig.relayWsUrl,
+        relayWsUrl,
         deviceId: localIdentity.deviceId,
         localUser: localIdentity.localUser,
-        devicePublicKeyFingerprint: appRuntimeState.deviceIdentity?.publicKeyFingerprint,
-        selectedTeam: workspaceState.selectedTeam,
+        devicePublicKeyFingerprint,
+        selectedTeam,
         selectedRoom,
         hasSelectedRoom,
-        inviteAdmissionsByRoom: invitePanelState.inviteAdmissionsByRoom,
+        inviteAdmissionsByRoom: selectedInviteAdmission ? { [selectedRoom.id]: selectedInviteAdmission } : {},
         relayRef: appRefs.relayRef,
         seenEnvelopeIds: appRefs.seenEnvelopeIds,
         roomsRef: appRefs.roomsRef,
         selectedRoomIdRef: appRefs.selectedRoomIdRef,
         historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
-        markIncomingChatUnread: workspaceState.markIncomingChatUnread,
+        markIncomingChatUnread: (...args) => useAppStore.getState().markIncomingChatUnread(...args),
         handleRelayError: workspaceRecords.handleRelayError,
         upsertRoom: workspaceRecords.upsertRoom,
         upsertTeam: workspaceRecords.upsertTeam,
-        refreshTeamMembers: roomDisplay.refreshTeamMembers,
+        refreshTeamMembers,
         decryptInviteEnvelope: inviteActions.decryptInviteEnvelope,
         handleInviteEnvelopePlaintext: inviteActions.handleInviteEnvelopePlaintext
       },
       publishers: {
         relayRef: appRefs.relayRef,
         seenEnvelopeIds: appRefs.seenEnvelopeIds,
-        relayStatus: appRuntimeState.relayStatus,
+        relayStatus,
         selectedRoom,
         deviceId: localIdentity.deviceId,
         localUser: localIdentity.localUser,

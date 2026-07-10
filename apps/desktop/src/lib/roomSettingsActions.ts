@@ -21,26 +21,16 @@ import { roomLockMessage } from "./appRuntime";
 import { shouldApplyRoomScopedUiUpdate } from "./roomScopedUi";
 import { omitRecordKey } from "./setUtils";
 import { formatCodexModel, formatCodexReasoningEffort, formatCodexSandboxLevel, formatCodexSpeed } from "./appFormatters";
+import { currentSelectedRoom, currentSelectedRoomContext } from "./selectedWorkspace";
+import { defaultCodexReasoningEffort, defaultCodexSandboxLevel, defaultCodexSpeed } from "@multaiplayer/protocol";
 
 type CurrentRef<T> = { current: T };
 type BusyMap = Record<string, boolean>;
 
 interface CreateRoomSettingsActionsOptions {
-  hasSelectedRoom: boolean;
-  isSelectedRoomLocked: boolean;
-  isSelectedRoomRevoked: boolean;
-  isActiveHost: boolean;
-  selectedRoom: RoomRecord;
   selectedRoomIdRef: CurrentRef<string>;
   settingsBusyRef: CurrentRef<BusyMap>;
-  selectedCodexModel: string;
-  selectedCodexReasoningEffort: string;
-  selectedCodexSpeed: string;
-  selectedCodexSandboxLevel: string;
-  projectPathDraft: string;
   approvalPolicyLabels: Record<string, string>;
-  roomSettingsGateMessage: string;
-  roomSettingsActor: () => { requesterName: string; requesterUserId: string };
   reportRoomSettingsMutationInFlight: (
     roomId: string,
     setMessage?: (roomId: string, message: string | null) => void
@@ -53,25 +43,27 @@ interface CreateRoomSettingsActionsOptions {
 }
 
 export function createRoomSettingsActions({
-  hasSelectedRoom,
-  isSelectedRoomLocked,
-  isSelectedRoomRevoked,
-  isActiveHost,
-  selectedRoom,
   selectedRoomIdRef,
   settingsBusyRef,
-  selectedCodexModel,
-  selectedCodexReasoningEffort,
-  selectedCodexSpeed,
-  selectedCodexSandboxLevel,
-  projectPathDraft,
   approvalPolicyLabels,
-  roomSettingsGateMessage,
-  roomSettingsActor,
   reportRoomSettingsMutationInFlight,
   replaceRoom,
   publishRoomSettingsEvent
 }: CreateRoomSettingsActionsOptions) {
+  const isCurrentUserActiveHost = () => currentSelectedRoomContext()?.isActiveHost ?? false;
+  const currentRoomSettingsGateMessage = () => currentSelectedRoomContext()?.roomSettingsGateMessage ?? "Claim host before changing room host settings.";
+  const currentRoomSettingsActor = () => {
+    const localUser = currentSelectedRoomContext()?.localUser;
+    return { requesterName: localUser?.name ?? "Local user", requesterUserId: localUser?.id ?? "local" };
+  };
+  const currentRoomAccess = (selectedRoom: RoomRecord) => {
+    const store = useAppStore.getState();
+    const revoked = store.revokedRoomIds.has(selectedRoom.id) || store.revokedTeamIds.has(selectedRoom.teamId);
+    return {
+      revoked,
+      locked: selectedRoom.archivedAt != null || store.forgottenRoomIds.has(selectedRoom.id) || revoked
+    };
+  };
   const setSettingsBusyForRoom = (roomId: string, busy: boolean) => {
     if (busy) {
       settingsBusyRef.current = { ...settingsBusyRef.current, [roomId]: true };
@@ -91,22 +83,23 @@ export function createRoomSettingsActions({
   const clearBrowserStatusForRoom = (roomId: string) =>
     useAppStore.getState().clearBrowserStatusForRoom(roomId);
   const setProjectPathDraftForRoom = (roomId: string, path: string) =>
-    useAppStore.getState().setProjectPathDraftForRoom(roomId, path, selectedRoom.projectPath);
+    useAppStore.getState().setProjectPathDraftForRoom(roomId, path, currentSelectedRoom()?.projectPath ?? "");
   const resetCodexApprovalForRoom = (roomId: string) =>
     useAppStore.getState().resetCodexApprovalForRoom(roomId);
   const resetFileContextForRoom = (roomId: string) =>
     useAppStore.getState().resetFileContextForRoom(roomId);
   async function setApprovalPolicy(approvalPolicy: ApprovalPolicy) {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedSettingsMessage("Create or join a room before changing room settings.");
       return;
     }
-    if (isSelectedRoomLocked) {
-      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+    if (currentRoomAccess(selectedRoom).locked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, currentRoomAccess(selectedRoom).revoked));
       return;
     }
-    if (!isActiveHost) {
-      setSelectedSettingsMessage(roomSettingsGateMessage);
+    if (!isCurrentUserActiveHost()) {
+      setSelectedSettingsMessage(currentRoomSettingsGateMessage());
       return;
     }
     const roomId = selectedRoom.id;
@@ -115,7 +108,7 @@ export function createRoomSettingsActions({
     setSettingsMessageForRoom(roomId, null);
     try {
       const previousPolicy = selectedRoom.approvalPolicy;
-      const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), approvalPolicy });
+      const room = await updateRoomSettings(roomId, { ...currentRoomSettingsActor(), approvalPolicy });
       replaceRoom(room);
       await publishRoomSettingsEvent(room, {
         id: crypto.randomUUID(),
@@ -136,16 +129,17 @@ export function createRoomSettingsActions({
   }
 
   async function setApprovalDelegationPolicy(approvalDelegationPolicy: ApprovalDelegationPolicy) {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedSettingsMessage("Create or join a room before changing room settings.");
       return;
     }
-    if (isSelectedRoomLocked) {
-      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+    if (currentRoomAccess(selectedRoom).locked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, currentRoomAccess(selectedRoom).revoked));
       return;
     }
-    if (!isActiveHost) {
-      setSelectedSettingsMessage(roomSettingsGateMessage);
+    if (!isCurrentUserActiveHost()) {
+      setSelectedSettingsMessage(currentRoomSettingsGateMessage());
       return;
     }
     const roomId = selectedRoom.id;
@@ -154,7 +148,7 @@ export function createRoomSettingsActions({
     setSettingsMessageForRoom(roomId, null);
     try {
       const previousPolicy = selectedRoom.approvalDelegationPolicy;
-      const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), approvalDelegationPolicy });
+      const room = await updateRoomSettings(roomId, { ...currentRoomSettingsActor(), approvalDelegationPolicy });
       replaceRoom(room);
       await publishRoomSettingsEvent(room, {
         id: crypto.randomUUID(),
@@ -175,22 +169,21 @@ export function createRoomSettingsActions({
   }
 
   async function setCodexModel(codexModel: string) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) return;
+    const selectedCodexModel = useAppStore.getState().roomSettingsByRoom[selectedRoom.id]?.customCodexModel ?? selectedRoom.codexModel;
     const nextModel = normalizeCodexModel(codexModel);
     if (!nextModel) {
       setSelectedSettingsMessage(`Use a known Codex model or a model-like id up to ${maxCodexModelChars} characters.`);
       return;
     }
     if (nextModel === selectedCodexModel && selectedRoom.codexModelPolicy === "pinned") return;
-    if (!hasSelectedRoom) {
-      setSelectedSettingsMessage("Create or join a room before changing the Codex model.");
+    if (currentRoomAccess(selectedRoom).locked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, currentRoomAccess(selectedRoom).revoked));
       return;
     }
-    if (isSelectedRoomLocked) {
-      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedSettingsMessage(roomSettingsGateMessage);
+    if (!isCurrentUserActiveHost()) {
+      setSelectedSettingsMessage(currentRoomSettingsGateMessage());
       return;
     }
     const roomId = selectedRoom.id;
@@ -200,7 +193,7 @@ export function createRoomSettingsActions({
     try {
       const previousModel = selectedCodexModel;
       const room = await updateRoomSettings(roomId, {
-        ...roomSettingsActor(),
+        ...currentRoomSettingsActor(),
         codexModel: nextModel,
         codexModelPolicy: "pinned"
       });
@@ -225,6 +218,9 @@ export function createRoomSettingsActions({
   }
 
   async function setCodexReasoningEffort(reasoningEffort: string) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) return;
+    const selectedCodexReasoningEffort = selectedRoom.codexReasoningEffort ?? defaultCodexReasoningEffort;
     const nextReasoningEffort = normalizeCodexReasoningEffort(reasoningEffort);
     if (!nextReasoningEffort) {
       setSelectedSettingsMessage("Choose a supported Codex reasoning level.");
@@ -234,16 +230,12 @@ export function createRoomSettingsActions({
       nextReasoningEffort === selectedCodexReasoningEffort &&
       selectedRoom.codexReasoningEffortPolicy === "pinned"
     ) return;
-    if (!hasSelectedRoom) {
-      setSelectedSettingsMessage("Create or join a room before changing Codex reasoning.");
+    if (currentRoomAccess(selectedRoom).locked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, currentRoomAccess(selectedRoom).revoked));
       return;
     }
-    if (isSelectedRoomLocked) {
-      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedSettingsMessage(roomSettingsGateMessage);
+    if (!isCurrentUserActiveHost()) {
+      setSelectedSettingsMessage(currentRoomSettingsGateMessage());
       return;
     }
     const roomId = selectedRoom.id;
@@ -253,7 +245,7 @@ export function createRoomSettingsActions({
     try {
       const previousValue = selectedCodexReasoningEffort;
       const room = await updateRoomSettings(roomId, {
-        ...roomSettingsActor(),
+        ...currentRoomSettingsActor(),
         codexReasoningEffort: nextReasoningEffort as RoomRecord["codexReasoningEffort"],
         codexReasoningEffortPolicy: "pinned"
       });
@@ -278,22 +270,21 @@ export function createRoomSettingsActions({
   }
 
   async function setCodexSpeed(speed: string) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) return;
+    const selectedCodexSpeed = selectedRoom.codexSpeed ?? defaultCodexSpeed;
     const nextSpeed = normalizeCodexSpeed(speed);
     if (!nextSpeed) {
       setSelectedSettingsMessage("Choose a supported Codex speed.");
       return;
     }
     if (nextSpeed === selectedCodexSpeed && selectedRoom.codexServiceTierPolicy === "pinned") return;
-    if (!hasSelectedRoom) {
-      setSelectedSettingsMessage("Create or join a room before changing Codex speed.");
+    if (currentRoomAccess(selectedRoom).locked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, currentRoomAccess(selectedRoom).revoked));
       return;
     }
-    if (isSelectedRoomLocked) {
-      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedSettingsMessage(roomSettingsGateMessage);
+    if (!isCurrentUserActiveHost()) {
+      setSelectedSettingsMessage(currentRoomSettingsGateMessage());
       return;
     }
     const roomId = selectedRoom.id;
@@ -303,7 +294,7 @@ export function createRoomSettingsActions({
     try {
       const previousValue = selectedCodexSpeed;
       const room = await updateRoomSettings(roomId, {
-        ...roomSettingsActor(),
+        ...currentRoomSettingsActor(),
         codexSpeed: nextSpeed as RoomRecord["codexSpeed"],
         codexServiceTierPolicy: "pinned"
       });
@@ -328,22 +319,21 @@ export function createRoomSettingsActions({
   }
 
   async function setCodexSandboxLevel(sandboxLevel: string) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) return;
+    const selectedCodexSandboxLevel = selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel;
     const nextSandboxLevel = normalizeCodexSandboxLevel(sandboxLevel);
     if (!nextSandboxLevel) {
       setSelectedSettingsMessage("Choose a supported Codex sandbox level.");
       return;
     }
     if (nextSandboxLevel === selectedCodexSandboxLevel) return;
-    if (!hasSelectedRoom) {
-      setSelectedSettingsMessage("Create or join a room before changing the Codex sandbox.");
+    if (currentRoomAccess(selectedRoom).locked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, currentRoomAccess(selectedRoom).revoked));
       return;
     }
-    if (isSelectedRoomLocked) {
-      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedSettingsMessage(roomSettingsGateMessage);
+    if (!isCurrentUserActiveHost()) {
+      setSelectedSettingsMessage(currentRoomSettingsGateMessage());
       return;
     }
     const roomId = selectedRoom.id;
@@ -353,7 +343,7 @@ export function createRoomSettingsActions({
     try {
       const previousValue = selectedCodexSandboxLevel;
       const room = await updateRoomSettings(roomId, {
-        ...roomSettingsActor(),
+        ...currentRoomSettingsActor(),
         codexSandboxLevel: nextSandboxLevel as RoomRecord["codexSandboxLevel"]
       });
       void shutdownCodexRoom(roomId);
@@ -377,14 +367,16 @@ export function createRoomSettingsActions({
   }
 
   async function renameRoom(name: string) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) return;
     const nextName = normalizeRoomName(name);
     if (!nextName) {
       setSelectedSettingsMessage("Use a room title up to 160 characters without control characters.");
       return;
     }
-    if (!hasSelectedRoom || nextName === selectedRoom.name) return;
-    if (isSelectedRoomLocked) {
-      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+    if (nextName === selectedRoom.name) return;
+    if (currentRoomAccess(selectedRoom).locked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, currentRoomAccess(selectedRoom).revoked));
       return;
     }
     const roomId = selectedRoom.id;
@@ -393,7 +385,7 @@ export function createRoomSettingsActions({
     setSettingsMessageForRoom(roomId, null);
     try {
       const previousName = selectedRoom.name;
-      const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), name: nextName });
+      const room = await updateRoomSettings(roomId, { ...currentRoomSettingsActor(), name: nextName });
       replaceRoom(room);
       await publishRoomSettingsEvent(room, {
         id: crypto.randomUUID(),
@@ -413,16 +405,14 @@ export function createRoomSettingsActions({
   }
 
   async function setBrowserProfilePersistence(browserProfilePersistent: boolean) {
-    if (!hasSelectedRoom) {
-      setSelectedBrowserMessage("Create or join a room before changing browser profile persistence.");
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) return;
+    if (currentRoomAccess(selectedRoom).locked) {
+      setSelectedBrowserMessage(roomLockMessage(selectedRoom, currentRoomAccess(selectedRoom).revoked));
       return;
     }
-    if (isSelectedRoomLocked) {
-      setSelectedBrowserMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedBrowserMessage(roomSettingsGateMessage);
+    if (!isCurrentUserActiveHost()) {
+      setSelectedBrowserMessage(currentRoomSettingsGateMessage());
       return;
     }
     if (browserProfilePersistent === selectedRoom.browserProfilePersistent) return;
@@ -433,7 +423,7 @@ export function createRoomSettingsActions({
     try {
       const previousPersistence = selectedRoom.browserProfilePersistent;
       const room = await updateRoomSettings(roomId, {
-        ...roomSettingsActor(),
+        ...currentRoomSettingsActor(),
         browserProfilePersistent
       });
       replaceRoom(room);
@@ -464,22 +454,21 @@ export function createRoomSettingsActions({
   }
 
   async function updateProjectPath() {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) return;
+    const projectPathDraft = useAppStore.getState().roomSettingsByRoom[selectedRoom.id]?.projectPathDraft ?? selectedRoom.projectPath;
     const nextProjectPath = normalizeProjectPath(projectPathDraft);
     if (!nextProjectPath) {
       setSelectedSettingsMessage(`Enter a local project folder up to ${maxRoomProjectPathChars} characters without control characters.`);
       return;
     }
-    if (!hasSelectedRoom) {
-      setSelectedSettingsMessage("Create or join a room before attaching a project folder.");
-      return;
-    }
     if (nextProjectPath === selectedRoom.projectPath) return;
-    if (isSelectedRoomLocked) {
-      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+    if (currentRoomAccess(selectedRoom).locked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, currentRoomAccess(selectedRoom).revoked));
       return;
     }
-    if (!isActiveHost) {
-      setSelectedSettingsMessage(roomSettingsGateMessage);
+    if (!isCurrentUserActiveHost()) {
+      setSelectedSettingsMessage(currentRoomSettingsGateMessage());
       return;
     }
     const roomId = selectedRoom.id;
@@ -488,7 +477,7 @@ export function createRoomSettingsActions({
     setSettingsMessageForRoom(roomId, null);
     try {
       const previousProjectPath = selectedRoom.projectPath;
-      const room = await updateRoomSettings(roomId, { ...roomSettingsActor(), projectPath: nextProjectPath });
+      const room = await updateRoomSettings(roomId, { ...currentRoomSettingsActor(), projectPath: nextProjectPath });
       void shutdownCodexRoom(roomId);
       replaceRoom(room);
       await publishRoomSettingsEvent(room, {
@@ -511,16 +500,15 @@ export function createRoomSettingsActions({
   }
 
   async function chooseProjectPath() {
-    if (!hasSelectedRoom) {
-      setSelectedSettingsMessage("Create or join a room before choosing a project folder.");
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) return;
+    const projectPathDraft = useAppStore.getState().roomSettingsByRoom[selectedRoom.id]?.projectPathDraft ?? selectedRoom.projectPath;
+    if (currentRoomAccess(selectedRoom).locked) {
+      setSelectedSettingsMessage(roomLockMessage(selectedRoom, currentRoomAccess(selectedRoom).revoked));
       return;
     }
-    if (isSelectedRoomLocked) {
-      setSelectedSettingsMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
-      return;
-    }
-    if (!isActiveHost) {
-      setSelectedSettingsMessage(roomSettingsGateMessage);
+    if (!isCurrentUserActiveHost()) {
+      setSelectedSettingsMessage(currentRoomSettingsGateMessage());
       return;
     }
     const roomId = selectedRoom.id;

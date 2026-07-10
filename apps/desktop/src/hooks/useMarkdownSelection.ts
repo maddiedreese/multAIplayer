@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useAppStore } from "../store/appStore";
+
+const noSelectedMessageIds: string[] = [];
 
 interface UseMarkdownSelectionOptions {
   activeRoomId: string;
@@ -8,16 +10,20 @@ interface UseMarkdownSelectionOptions {
 }
 
 export function useMarkdownSelection({ activeRoomId, enabled, resetKey }: UseMarkdownSelectionOptions) {
-  const [markdownSelectionMode, setMarkdownSelectionMode] = useState(false);
-  const roomChatByRoom = useAppStore((state) => state.roomChatByRoom);
+  const markdownSelectionMode = useAppStore(
+    (state) => state.roomChatByRoom[activeRoomId]?.markdownSelectionMode ?? false
+  );
+  const selectedMessageIds = useAppStore(
+    (state) => state.roomChatByRoom[activeRoomId]?.selectedMessageIds ?? noSelectedMessageIds
+  );
   const toggleSelectedMessageForRoom = useAppStore((state) => state.toggleSelectedMessageForRoom);
   const clearSelectedMessagesForRoom = useAppStore((state) => state.clearSelectedMessagesForRoom);
+  const toggleMarkdownSelectionModeForRoom = useAppStore((state) => state.toggleMarkdownSelectionModeForRoom);
+  const disableMarkdownSelectionModeForRoom = useAppStore((state) => state.disableMarkdownSelectionModeForRoom);
 
   useEffect(() => {
-    setMarkdownSelectionMode(false);
-  }, [resetKey]);
-
-  const selectedMessageIds = roomChatByRoom[activeRoomId]?.selectedMessageIds ?? [];
+    disableMarkdownSelectionModeForRoom(activeRoomId);
+  }, [activeRoomId, disableMarkdownSelectionModeForRoom, resetKey]);
 
   function toggleMessageSelection(messageId: string) {
     if (!enabled) return;
@@ -29,10 +35,7 @@ export function useMarkdownSelection({ activeRoomId, enabled, resetKey }: UseMar
   }
 
   function toggleMarkdownSelectionMode() {
-    setMarkdownSelectionMode((current) => {
-      if (current) clearSelectedMessages();
-      return !current;
-    });
+    toggleMarkdownSelectionModeForRoom(activeRoomId);
   }
 
   return {

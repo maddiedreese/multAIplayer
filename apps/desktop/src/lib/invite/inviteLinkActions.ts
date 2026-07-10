@@ -11,17 +11,10 @@ import {
   jsonWebKeyToDevicePublicKeyJwk
 } from "../noSecretRoomInvite";
 import type { UseInviteActionsOptions } from "./inviteActionTypes";
+import { currentLocalIdentity, currentSelectedRoom } from "../selectedWorkspace";
 
 type InviteLinkActionOptions = Pick<
   UseInviteActionsOptions,
-  | "deviceId"
-  | "deviceIdentity"
-  | "hasSelectedRoom"
-  | "inviteApprovalGate"
-  | "isSelectedRoomLocked"
-  | "isSelectedRoomRevoked"
-  | "localUser"
-  | "selectedRoom"
   | "selectedRoomIdRef"
 >;
 
@@ -32,14 +25,6 @@ export function createInviteLinkActions(
   store: InviteLinkStore = useAppStore.getState()
 ) {
   const {
-    deviceId,
-    deviceIdentity,
-    hasSelectedRoom,
-    inviteApprovalGate,
-    isSelectedRoomLocked,
-    isSelectedRoomRevoked,
-    localUser,
-    selectedRoom,
     selectedRoomIdRef
   } = options;
   const { setInviteLinkForRoom, setInviteMessageForRoom } = store;
@@ -47,10 +32,19 @@ export function createInviteLinkActions(
     setInviteMessageForRoom(selectedRoomIdRef.current, message);
 
   async function copyInviteLink() {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedInviteMessage("Create or join a room before copying an invite.");
       return;
     }
+    const appStore = useAppStore.getState();
+    const { localUser, deviceId } = currentLocalIdentity();
+    const { deviceIdentity } = appStore;
+    const isSelectedRoomRevoked =
+      appStore.revokedRoomIds.has(selectedRoom.id) || appStore.revokedTeamIds.has(selectedRoom.teamId);
+    const isSelectedRoomLocked =
+      selectedRoom.archivedAt != null || appStore.forgottenRoomIds.has(selectedRoom.id) || isSelectedRoomRevoked;
+    const inviteApprovalGate = appStore.inviteByRoom[selectedRoom.id]?.approvalGate ?? false;
     if (isSelectedRoomLocked) {
       setSelectedInviteMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;

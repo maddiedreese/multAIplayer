@@ -9,11 +9,6 @@ interface UseTerminalLifecycleOptions {
   selectedRoomId: string;
   selectedTerminalId: string | null;
   selectedTerminalRunning: boolean | undefined;
-  clearTerminalSnapshots: () => void;
-  clearTerminalSnapshotsForRoom: (roomId: string) => void;
-  syncTerminalSnapshotsForRoom: (roomId: string, snapshots: TerminalSnapshot[]) => void;
-  upsertTerminalSnapshot: (snapshot: TerminalSnapshot) => void;
-  setTerminalErrorForRoom: (roomId: string, message: string | null) => void;
 }
 
 export function useTerminalLifecycle({
@@ -21,24 +16,18 @@ export function useTerminalLifecycle({
   canReadLocalWorkspace,
   selectedRoomId,
   selectedTerminalId,
-  selectedTerminalRunning,
-  clearTerminalSnapshots,
-  clearTerminalSnapshotsForRoom,
-  syncTerminalSnapshotsForRoom,
-  upsertTerminalSnapshot,
-  setTerminalErrorForRoom
+  selectedTerminalRunning
 }: UseTerminalLifecycleOptions) {
-  const setSelectedTerminalIdForRoom = useAppStore((state) => state.setSelectedTerminalIdForRoom);
-
   useEffect(() => {
     if (!hasSelectedRoom) {
-      clearTerminalSnapshots();
+      useAppStore.getState().clearTerminalSnapshots();
       return;
     }
     const roomId = selectedRoomId;
     if (!canReadLocalWorkspace) {
-      clearTerminalSnapshotsForRoom(roomId);
-      setSelectedTerminalIdForRoom(roomId, null);
+      const store = useAppStore.getState();
+      store.clearTerminalSnapshotsForRoom(roomId);
+      store.setSelectedTerminalIdForRoom(roomId, null);
       return;
     }
     let cancelled = false;
@@ -49,20 +38,20 @@ export function useTerminalLifecycle({
           useAppStore.getState().terminals.filter((terminal) => terminal.roomId === roomId),
           snapshots
         );
-        syncTerminalSnapshotsForRoom(roomId, mergedSnapshots);
+        useAppStore.getState().syncTerminalSnapshotsForRoom(roomId, mergedSnapshots);
         const currentTerminalId = useAppStore.getState().terminalRuntimeByRoom[roomId]?.selectedTerminalId ?? null;
         const nextTerminalId = currentTerminalId && mergedSnapshots.some((terminal) => terminal.id === currentTerminalId)
           ? currentTerminalId
           : mergedSnapshots[0]?.id ?? null;
-        setSelectedTerminalIdForRoom(roomId, nextTerminalId);
+        useAppStore.getState().setSelectedTerminalIdForRoom(roomId, nextTerminalId);
       })
       .catch((error) => {
-        if (!cancelled) setTerminalErrorForRoom(roomId, String(error));
+        if (!cancelled) useAppStore.getState().setTerminalErrorForRoom(roomId, String(error));
       });
     return () => {
       cancelled = true;
     };
-  }, [canReadLocalWorkspace, clearTerminalSnapshots, clearTerminalSnapshotsForRoom, hasSelectedRoom, selectedRoomId, setSelectedTerminalIdForRoom, syncTerminalSnapshotsForRoom]);
+  }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoomId]);
 
   useEffect(() => {
     if (!canReadLocalWorkspace || !selectedTerminalId || !selectedTerminalRunning) return;
@@ -71,15 +60,17 @@ export function useTerminalLifecycle({
       readTerminal(selectedTerminalId)
         .then((snapshot) => {
           if (cancelled) return;
-          upsertTerminalSnapshot(snapshot);
+          useAppStore.getState().upsertTerminalSnapshot(snapshot);
         })
         .catch((error) => {
-          if (!cancelled && hasSelectedRoom) setTerminalErrorForRoom(selectedRoomId, String(error));
+          if (!cancelled && hasSelectedRoom) {
+            useAppStore.getState().setTerminalErrorForRoom(selectedRoomId, String(error));
+          }
         });
     }, 1500);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [hasSelectedRoom, selectedRoomId, selectedTerminalRunning, selectedTerminalId, upsertTerminalSnapshot]);
+  }, [hasSelectedRoom, selectedRoomId, selectedTerminalRunning, selectedTerminalId]);
 }

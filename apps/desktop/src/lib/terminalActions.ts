@@ -21,27 +21,12 @@ import { nextShellTerminalName } from "./terminalUi";
 import { omitRecordKey } from "./setUtils";
 import { useAppStore } from "../store/appStore";
 import type { TerminalCommandRequest } from "../types";
+import { currentSelectedRoom, currentSelectedRoomContext } from "./selectedWorkspace";
 
 const defaultInteractiveShellCommand = "exec zsh -f";
 
-interface LocalUser {
-  id: string;
-  name: string;
-}
-
 interface TerminalActionsOptions {
-  hasSelectedRoom: boolean;
-  isActiveHost: boolean;
-  canReadLocalWorkspace: boolean;
-  hostGateMessage: string;
-  localWorkspaceMessage: string;
-  selectedRoom: RoomRecord;
   selectedRoomIdRef: MutableRefObject<string>;
-  isSelectedRoomLocked: boolean;
-  localUser: LocalUser;
-  roomTerminals: TerminalSnapshot[];
-  selectedTerminal: TerminalSnapshot | null;
-  terminalRequests: TerminalCommandRequest[];
   terminalBusyRef: MutableRefObject<Record<string, boolean>>;
   reportRoomTerminalActionInFlight: (roomId: string) => boolean;
   maxTerminalActivityLines: number;
@@ -66,24 +51,31 @@ interface TerminalActionsOptions {
 }
 
 export function createTerminalActions({
-  hasSelectedRoom,
-  isActiveHost,
-  canReadLocalWorkspace,
-  hostGateMessage,
-  localWorkspaceMessage,
-  selectedRoom,
   selectedRoomIdRef,
-  isSelectedRoomLocked,
-  localUser,
-  roomTerminals,
-  selectedTerminal,
-  terminalRequests,
   terminalBusyRef,
   reportRoomTerminalActionInFlight,
   maxTerminalActivityLines,
   publishRequestStatus,
   publishTerminalResult
 }: TerminalActionsOptions) {
+  const currentContext = () => currentSelectedRoomContext();
+  function currentTerminalState(selectedRoom: RoomRecord) {
+    const store = useAppStore.getState();
+    const roomTerminals = store.terminals.filter((terminal) => terminal.roomId === selectedRoom.id);
+    const selectedTerminalId = store.terminalRuntimeByRoom[selectedRoom.id]?.selectedTerminalId;
+    return {
+      roomTerminals,
+      selectedTerminal: roomTerminals.find((terminal) => terminal.id === selectedTerminalId) ?? null,
+      terminalRequests: store.terminalRuntimeByRoom[selectedRoom.id]?.requests ?? []
+    };
+  }
+
+  function currentRoomLock(selectedRoom: RoomRecord) {
+    const { forgottenRoomIds, revokedRoomIds, revokedTeamIds } = useAppStore.getState();
+    return selectedRoom.archivedAt != null || forgottenRoomIds.has(selectedRoom.id) ||
+      revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId);
+  }
+
   function setTerminalBusyForRoom(roomId: string, busy: boolean) {
     terminalBusyRef.current = busy
       ? { ...terminalBusyRef.current, [roomId]: true }
@@ -92,7 +84,7 @@ export function createTerminalActions({
   }
 
   function setSelectedTerminalError(message: string | null) {
-    useAppStore.getState().setTerminalErrorForRoom(selectedRoom.id, message);
+    useAppStore.getState().setTerminalErrorForRoom(useAppStore.getState().selectedRoomId, message);
   }
 
   function setTerminalErrorForRoom(roomId: string, message: string | null) {
@@ -123,20 +115,22 @@ export function createTerminalActions({
     useAppStore.getState().setGitStatusForRoom(roomId, status);
   }
   async function openInteractiveTerminal(options: { reuseExisting?: boolean; quiet?: boolean } = {}) {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedTerminalError("Create or join a room before opening a terminal.");
       return;
     }
-    if (!isActiveHost) {
-      setSelectedTerminalError(hostGateMessage);
+    if (!currentContext()?.isActiveHost) {
+      setSelectedTerminalError(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
       return;
     }
-    if (!canReadLocalWorkspace) {
-      setSelectedTerminalError(localWorkspaceMessage);
+    if (!currentContext()?.canReadLocalWorkspace) {
+      setSelectedTerminalError(currentContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
       return;
     }
     const room = selectedRoom;
     const roomId = room.id;
+    const { roomTerminals } = currentTerminalState(selectedRoom);
     const existingShell = roomTerminals.find((terminal) => terminal.running);
     if (options.reuseExisting !== false && existingShell) {
       setSelectedTerminalIdForRoom(roomId, existingShell.id);
@@ -169,19 +163,22 @@ export function createTerminalActions({
   }
 
   async function restartSelectedTerminal() {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedTerminalError("Create or join a room before restarting terminals.");
       return;
     }
-    if (!isActiveHost) {
-      setSelectedTerminalError(hostGateMessage);
+    if (!currentContext()?.isActiveHost) {
+      setSelectedTerminalError(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
       return;
     }
-    if (!canReadLocalWorkspace) {
-      setSelectedTerminalError(localWorkspaceMessage);
+    if (!currentContext()?.canReadLocalWorkspace) {
+      setSelectedTerminalError(currentContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
       return;
     }
-    if (!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked)) {
+    const { selectedTerminal } = currentTerminalState(selectedRoom);
+    const isSelectedRoomLocked = currentRoomLock(selectedRoom);
+    if (!canControlRoomTerminal(selectedRoom, currentContext()!.localUser, selectedTerminal, isSelectedRoomLocked)) {
       setSelectedTerminalError(roomTerminalControlMessage(selectedRoom, selectedTerminal, isSelectedRoomLocked));
       return;
     }
@@ -210,19 +207,22 @@ export function createTerminalActions({
   }
 
   async function stopSelectedTerminal() {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedTerminalError("Create or join a room before stopping terminals.");
       return;
     }
-    if (!isActiveHost) {
-      setSelectedTerminalError(hostGateMessage);
+    if (!currentContext()?.isActiveHost) {
+      setSelectedTerminalError(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
       return;
     }
-    if (!canReadLocalWorkspace) {
-      setSelectedTerminalError(localWorkspaceMessage);
+    if (!currentContext()?.canReadLocalWorkspace) {
+      setSelectedTerminalError(currentContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
       return;
     }
-    if (!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked)) {
+    const { selectedTerminal } = currentTerminalState(selectedRoom);
+    const isSelectedRoomLocked = currentRoomLock(selectedRoom);
+    if (!canControlRoomTerminal(selectedRoom, currentContext()!.localUser, selectedTerminal, isSelectedRoomLocked)) {
       setSelectedTerminalError(roomTerminalControlMessage(selectedRoom, selectedTerminal, isSelectedRoomLocked));
       return;
     }
@@ -251,19 +251,22 @@ export function createTerminalActions({
   }
 
   async function writeRawTerminalInput(input: string) {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedTerminalError("Create or join a room before sending terminal input.");
       return;
     }
-    if (!isActiveHost) {
-      setSelectedTerminalError(hostGateMessage);
+    if (!currentContext()?.isActiveHost) {
+      setSelectedTerminalError(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
       return;
     }
-    if (!canReadLocalWorkspace) {
-      setSelectedTerminalError(localWorkspaceMessage);
+    if (!currentContext()?.canReadLocalWorkspace) {
+      setSelectedTerminalError(currentContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
       return;
     }
-    if (!canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked)) {
+    const { selectedTerminal } = currentTerminalState(selectedRoom);
+    const isSelectedRoomLocked = currentRoomLock(selectedRoom);
+    if (!canControlRoomTerminal(selectedRoom, currentContext()!.localUser, selectedTerminal, isSelectedRoomLocked)) {
       setSelectedTerminalError(roomTerminalControlMessage(selectedRoom, selectedTerminal, isSelectedRoomLocked));
       return;
     }
@@ -284,20 +287,22 @@ export function createTerminalActions({
   }
 
   async function approveTerminalRequest(request: TerminalCommandRequest) {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedTerminalError("Create or join a room before approving terminal requests.");
       return;
     }
-    if (!isActiveHost) {
-      setSelectedTerminalError(hostGateMessage);
+    if (!currentContext()?.isActiveHost) {
+      setSelectedTerminalError(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
       return;
     }
-    if (!canReadLocalWorkspace) {
-      setSelectedTerminalError(localWorkspaceMessage);
+    if (!currentContext()?.canReadLocalWorkspace) {
+      setSelectedTerminalError(currentContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
       return;
     }
     const room = selectedRoom;
     const roomId = room.id;
+    const { terminalRequests } = currentTerminalState(selectedRoom);
     if (reportRoomTerminalActionInFlight(roomId)) return;
     const roomRequest = findRoomTerminalRequest(terminalRequests, request.id);
     if (!roomRequest || !canActOnRoomTerminalRequest(terminalRequests, request.id)) {
@@ -361,19 +366,21 @@ export function createTerminalActions({
   }
 
   function denyTerminalRequest(requestId: string) {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedTerminalError("Create or join a room before denying terminal requests.");
       return;
     }
-    if (!isActiveHost) {
-      setSelectedTerminalError(hostGateMessage);
+    if (!currentContext()?.isActiveHost) {
+      setSelectedTerminalError(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
       return;
     }
-    if (!canReadLocalWorkspace) {
-      setSelectedTerminalError(localWorkspaceMessage);
+    if (!currentContext()?.canReadLocalWorkspace) {
+      setSelectedTerminalError(currentContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
       return;
     }
     const room = selectedRoom;
+    const { terminalRequests } = currentTerminalState(selectedRoom);
     if (!canActOnRoomTerminalRequest(terminalRequests, requestId)) {
       setTerminalErrorForRoom(room.id, roomTerminalRequestMessage(terminalRequests, requestId));
       return;

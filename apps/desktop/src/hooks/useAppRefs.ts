@@ -1,59 +1,58 @@
-import { useRef } from "react";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import { useEffect, useRef } from "react";
 import type { RelayClient } from "../lib/relayClient";
-import type { GitWorkflowDraft } from "../lib/gitWorkflowDraft";
-import type { BrowserAccessRequest } from "../types";
-import { useLatestRef } from "./useLatestRef";
+import { projectBrowserPanelMaps } from "../store/slices/browserSlice";
+import { projectGitHubWorkflowPanelMaps } from "../store/slices/gitWorkflowSlice";
+import { projectInvitePanelMaps } from "../store/slices/inviteSlice";
+import { projectLocalPreviewPanelMaps } from "../store/slices/localPreviewSlice";
+import { projectRoomSettingsPanelMaps } from "../store/slices/roomSettingsSlice";
+import { projectTerminalRuntimeBusyByRoom } from "../store/slices/terminalSlice";
+import { useAppStore, type AppStoreState } from "../store/appStore";
 
-type BusyMap = Record<string, boolean>;
-
-interface UseAppRefsOptions {
-  rooms: RoomRecord[];
-  selectedRoomId: string;
-  selectedTeamId: string;
-  gitWorkflowDraftsByRoom: Record<string, Partial<GitWorkflowDraft>>;
-  hostBusyByRoom: BusyMap;
-  settingsBusyByRoom: BusyMap;
-  keyRotationBusyByRoom: BusyMap;
-  gitWorkflowBusyByRoom: BusyMap;
-  actionsBusyByRoom: BusyMap;
-  localPreviewBusyByRoom: BusyMap;
-  fileBusyByRoom: BusyMap;
-  terminalBusyByRoom: BusyMap;
-  browserRequestsByRoom: Record<string, BrowserAccessRequest[]>;
-}
-
-export function useAppRefs({
-  rooms,
-  selectedRoomId,
-  selectedTeamId,
-  gitWorkflowDraftsByRoom,
-  hostBusyByRoom,
-  settingsBusyByRoom,
-  keyRotationBusyByRoom,
-  gitWorkflowBusyByRoom,
-  actionsBusyByRoom,
-  localPreviewBusyByRoom,
-  fileBusyByRoom,
-  terminalBusyByRoom,
-  browserRequestsByRoom
-}: UseAppRefsOptions) {
+/**
+ * Mutable bridges for imperative relay/native handlers. Store subscriptions update
+ * these refs without subscribing App's render tree to every room-scoped map.
+ */
+export function useAppRefs() {
+  const initial = useAppStore.getState();
   const relayRef = useRef<RelayClient | null>(null);
   const seenEnvelopeIds = useRef(new Set<string>());
   const historyLoadedRoomIds = useRef(new Set<string>());
-  const roomsRef = useLatestRef(rooms);
-  const selectedRoomIdRef = useLatestRef(selectedRoomId);
-  const selectedTeamIdRef = useLatestRef(selectedTeamId);
-  const gitWorkflowDraftsRef = useLatestRef(gitWorkflowDraftsByRoom);
-  const hostBusyRef = useLatestRef(hostBusyByRoom);
-  const settingsBusyRef = useLatestRef(settingsBusyByRoom);
-  const keyRotationBusyRef = useLatestRef(keyRotationBusyByRoom);
-  const gitWorkflowBusyRef = useLatestRef(gitWorkflowBusyByRoom);
-  const actionsBusyRef = useLatestRef(actionsBusyByRoom);
-  const terminalBusyRef = useLatestRef(terminalBusyByRoom);
-  const localPreviewBusyRef = useRef(localPreviewBusyByRoom);
-  const fileBusyRef = useLatestRef(fileBusyByRoom);
-  const browserRequestsRef = useLatestRef(browserRequestsByRoom);
+  const roomsRef = useRef(initial.rooms);
+  const selectedRoomIdRef = useRef(initial.selectedRoomId);
+  const selectedTeamIdRef = useRef(initial.selectedTeam);
+  const gitWorkflowDraftsRef = useRef(projectGitHubWorkflowPanelMaps(initial.gitWorkflowRuntimeByRoom).gitWorkflowDraftsByRoom);
+  const hostBusyRef = useRef(projectRoomSettingsPanelMaps(initial.roomSettingsByRoom).hostBusyByRoom);
+  const settingsBusyRef = useRef(projectRoomSettingsPanelMaps(initial.roomSettingsByRoom).settingsBusyByRoom);
+  const keyRotationBusyRef = useRef(projectInvitePanelMaps(initial.inviteByRoom).keyRotationBusyByRoom);
+  const gitWorkflowBusyRef = useRef(projectGitHubWorkflowPanelMaps(initial.gitWorkflowRuntimeByRoom).gitWorkflowBusyByRoom);
+  const actionsBusyRef = useRef(projectGitHubWorkflowPanelMaps(initial.gitWorkflowRuntimeByRoom).actionsBusyByRoom);
+  const terminalBusyRef = useRef(projectTerminalRuntimeBusyByRoom(initial.terminalRuntimeByRoom));
+  const localPreviewBusyRef = useRef(projectLocalPreviewPanelMaps(initial.localPreviewByRoom).localPreviewBusyByRoom);
+  const fileBusyRef = useRef(fileBusyByRoom(initial));
+  const browserRequestsRef = useRef(projectBrowserPanelMaps(initial.browserByRoom).browserRequestsByRoom);
+
+  useEffect(() => {
+    const syncRefs = (state: AppStoreState) => {
+      const roomSettings = projectRoomSettingsPanelMaps(state.roomSettingsByRoom);
+      const gitWorkflow = projectGitHubWorkflowPanelMaps(state.gitWorkflowRuntimeByRoom);
+      roomsRef.current = state.rooms;
+      selectedRoomIdRef.current = state.selectedRoomId;
+      selectedTeamIdRef.current = state.selectedTeam;
+      gitWorkflowDraftsRef.current = gitWorkflow.gitWorkflowDraftsByRoom;
+      hostBusyRef.current = roomSettings.hostBusyByRoom;
+      settingsBusyRef.current = roomSettings.settingsBusyByRoom;
+      keyRotationBusyRef.current = projectInvitePanelMaps(state.inviteByRoom).keyRotationBusyByRoom;
+      gitWorkflowBusyRef.current = gitWorkflow.gitWorkflowBusyByRoom;
+      actionsBusyRef.current = gitWorkflow.actionsBusyByRoom;
+      terminalBusyRef.current = projectTerminalRuntimeBusyByRoom(state.terminalRuntimeByRoom);
+      localPreviewBusyRef.current = projectLocalPreviewPanelMaps(state.localPreviewByRoom).localPreviewBusyByRoom;
+      fileBusyRef.current = fileBusyByRoom(state);
+      browserRequestsRef.current = projectBrowserPanelMaps(state.browserByRoom).browserRequestsByRoom;
+    };
+    // Initialization runs in a parent layout effect before this passive effect.
+    syncRefs(useAppStore.getState());
+    return useAppStore.subscribe(syncRefs);
+  }, []);
 
   return {
     relayRef,
@@ -73,4 +72,12 @@ export function useAppRefs({
     fileBusyRef,
     browserRequestsRef
   };
+}
+
+function fileBusyByRoom(state: AppStoreState): Record<string, boolean> {
+  return Object.fromEntries(
+    Object.entries(state.filePanelByRoom)
+      .filter(([, panel]) => panel.busy)
+      .map(([roomId]) => [roomId, true])
+  );
 }

@@ -1,17 +1,10 @@
 import { useAppStore } from "../store/appStore";
 import { acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement } from "./roomVisibilityWarning";
 
-interface RoomVisibilityWarningActionsOptions {
-  hasSelectedRoom: boolean;
-  selectedRoomId: string;
-}
-
-export function createRoomVisibilityWarningActions({
-  hasSelectedRoom,
-  selectedRoomId
-}: RoomVisibilityWarningActionsOptions) {
+export function createRoomVisibilityWarningActions() {
   function acknowledgeRoomVisibilityWarning() {
-    if (!hasSelectedRoom) return;
+    const { selectedRoomId } = useAppStore.getState();
+    if (!selectedRoomId) return;
     saveRoomVisibilityWarningAcknowledgement(selectedRoomId);
     useAppStore.getState().setSecretWarningVisibleForRoom(selectedRoomId, false);
   }

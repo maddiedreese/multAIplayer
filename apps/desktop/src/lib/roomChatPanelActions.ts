@@ -1,12 +1,10 @@
 import type { RoomRecord } from "@multaiplayer/protocol";
-import type { ChatAttachment, ChatMessage, LocalPreviewRecord, PendingCodexApproval } from "../types";
+import type { ChatAttachment, ChatMessage } from "../types";
 import { formatMessageTime } from "./appFormatters";
 import { useAppStore } from "../store/appStore";
+import { currentSelectedRoom } from "./selectedWorkspace";
 
 export function createRoomChatPanelActions({
-  selectedRoomId,
-  messages,
-  localPreviews,
   copyMessageMarkdown,
   copyCodexOutputMarkdown,
   openEncryptedAttachmentBlob,
@@ -17,9 +15,7 @@ export function createRoomChatPanelActions({
   promoteNextCodexApprovalForRoom,
   approveCodexTurn,
   handleCodexInvoke,
-  activeCodexApproval,
   publishCodexQueueEvent,
-  selectedRoom,
   pauseGoal,
   resumeGoal,
   editGoal,
@@ -29,9 +25,6 @@ export function createRoomChatPanelActions({
   stopLocalPreview,
   openBrowserUrl
 }: {
-  selectedRoomId: string;
-  messages: ChatMessage[];
-  localPreviews: LocalPreviewRecord[];
   copyMessageMarkdown: (message: ChatMessage) => void;
   copyCodexOutputMarkdown: (message: ChatMessage) => void;
   openEncryptedAttachmentBlob: (attachment: ChatAttachment) => void;
@@ -42,7 +35,6 @@ export function createRoomChatPanelActions({
   promoteNextCodexApprovalForRoom: (roomId: string) => void;
   approveCodexTurn: () => void;
   handleCodexInvoke: () => void;
-  activeCodexApproval: PendingCodexApproval | null;
   publishCodexQueueEvent: (
     event: {
       turnId: string;
@@ -53,7 +45,6 @@ export function createRoomChatPanelActions({
     },
     room?: RoomRecord
   ) => Promise<void>;
-  selectedRoom: RoomRecord;
   pauseGoal: () => void;
   resumeGoal: () => void;
   editGoal: (text: string) => void;
@@ -68,44 +59,50 @@ export function createRoomChatPanelActions({
   stopLocalPreview: (previewId: string) => Promise<void>;
   openBrowserUrl: (room: RoomRecord, url: string, reason: string) => void;
 }) {
+  const selectedRoomId = () => useAppStore.getState().selectedRoomId;
+  const selectedRoomMessages = () => useAppStore.getState().messagesByRoom[selectedRoomId()] ?? [];
+  const selectedRoomPreviews = () => useAppStore.getState().localPreviewByRoom[selectedRoomId()]?.previews ?? [];
+
   function onCopyMessageMarkdown(messageId: string) {
-    const message = messages.find((item) => item.id === messageId);
+    const message = selectedRoomMessages().find((item) => item.id === messageId);
     if (message) copyMessageMarkdown(message);
   }
 
   function onCopyCodexOutputMarkdown(messageId: string) {
-    const message = messages.find((item) => item.id === messageId);
+    const message = selectedRoomMessages().find((item) => item.id === messageId);
     if (message) copyCodexOutputMarkdown(message);
   }
 
   function onOpenAttachment(messageId: string, attachmentId: string) {
-    const message = messages.find((item) => item.id === messageId);
+    const message = selectedRoomMessages().find((item) => item.id === messageId);
     const attachment = message?.attachments?.find((item) => item.id === attachmentId);
     if (attachment) openEncryptedAttachmentBlob(attachment);
   }
 
   function onToggleReaction(messageId: string, emoji: string) {
-    const message = messages.find((item) => item.id === messageId);
+    const message = selectedRoomMessages().find((item) => item.id === messageId);
     if (message) toggleMessageReaction(message, emoji);
   }
 
   function onEditMessage(messageId: string, nextBody: string) {
-    const message = messages.find((item) => item.id === messageId);
+    const message = selectedRoomMessages().find((item) => item.id === messageId);
     if (message) void publishChatMessageEdit(message, nextBody);
   }
 
   function onDeleteMessage(messageId: string) {
-    const message = messages.find((item) => item.id === messageId);
+    const message = selectedRoomMessages().find((item) => item.id === messageId);
     if (message) void publishChatMessageDelete(message);
   }
 
   function onDenyApproval() {
-    const deniedTurn = activeCodexApproval;
+    const roomId = selectedRoomId();
+    const selectedRoom = currentSelectedRoom();
+    const deniedTurn = useAppStore.getState().codexRuntimeByRoom[roomId]?.pendingApproval ?? null;
     const store = useAppStore.getState();
-    store.setPendingCodexApprovalForRoom(selectedRoomId, null);
-    store.setApprovalVisibleForRoom(selectedRoomId, false);
+    store.setPendingCodexApprovalForRoom(roomId, null);
+    store.setApprovalVisibleForRoom(roomId, false);
     if (deniedTurn) {
-      store.removeQueuedCodexApprovalForRoom(selectedRoomId, deniedTurn.turnId);
+      store.removeQueuedCodexApprovalForRoom(roomId, deniedTurn.turnId);
       void publishCodexQueueEvent({
         turnId: deniedTurn.turnId,
         action: "dropped",
@@ -113,22 +110,23 @@ export function createRoomChatPanelActions({
         queueSize: 0
       }, selectedRoom);
     }
-    promoteNextCodexApprovalForRoom(selectedRoomId);
+    promoteNextCodexApprovalForRoom(roomId);
   }
 
   function onOpenLocalPreview(previewId: string) {
-    const preview = localPreviews.find((item) => item.id === previewId);
-    if (preview?.publicUrl) openBrowserUrl(selectedRoom, preview.publicUrl, "Opened from a shared local preview.");
+    const preview = selectedRoomPreviews().find((item) => item.id === previewId);
+    const selectedRoom = currentSelectedRoom();
+    if (preview?.publicUrl && selectedRoom) openBrowserUrl(selectedRoom, preview.publicUrl, "Opened from a shared local preview.");
   }
 
   function onCopyLocalPreviewLink(previewId: string) {
-    const preview = localPreviews.find((item) => item.id === previewId);
+    const preview = selectedRoomPreviews().find((item) => item.id === previewId);
     if (preview?.publicUrl) {
       void copyMarkdownWithFallback(
         "local preview link",
         preview.publicUrl,
-        (message) => useAppStore.getState().setChatMessageForRoom(selectedRoomId, message),
-        selectedRoomId
+        (message) => useAppStore.getState().setChatMessageForRoom(selectedRoomId(), message),
+        selectedRoomId()
       );
     }
   }
@@ -151,11 +149,13 @@ export function createRoomChatPanelActions({
     onOpenLocalPreview,
     onCopyLocalPreviewLink,
     onStopLocalPreview: (previewId: string) => void stopLocalPreview(previewId),
-    onOpenFileSelector: () => useAppStore.getState().setInspectorTabForRoom(selectedRoomId, "files"),
-    onReplyToMessage: (messageId: string) => useAppStore.getState().setReplyToMessageForRoom(selectedRoomId, messageId),
-    onCancelReply: () => useAppStore.getState().setReplyToMessageForRoom(selectedRoomId, null),
+    onOpenFileSelector: () => useAppStore.getState().setInspectorTabForRoom(selectedRoomId(), "files"),
+    onReplyToMessage: (messageId: string) => useAppStore.getState().setReplyToMessageForRoom(selectedRoomId(), messageId),
+    onCancelReply: () => useAppStore.getState().setReplyToMessageForRoom(selectedRoomId(), null),
     onCancelQueuedCodexTurn: (turnId: string) => {
-      useAppStore.getState().removeQueuedCodexApprovalForRoom(selectedRoomId, turnId);
+      const roomId = selectedRoomId();
+      const selectedRoom = currentSelectedRoom();
+      useAppStore.getState().removeQueuedCodexApprovalForRoom(roomId, turnId);
       void publishCodexQueueEvent({
         turnId,
         action: "cancelled",
@@ -171,6 +171,6 @@ export function createRoomChatPanelActions({
         createdAt: new Date().toISOString()
       });
     },
-    onDraftChange: (nextDraft: string) => useAppStore.getState().setDraftForRoom(selectedRoomId, nextDraft)
+    onDraftChange: (nextDraft: string) => useAppStore.getState().setDraftForRoom(selectedRoomId(), nextDraft)
   };
 }

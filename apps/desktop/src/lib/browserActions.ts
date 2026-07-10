@@ -13,26 +13,12 @@ import { formatBrowserAccessLabel, normalizeBrowserLocationInput } from "./brows
 import { shouldApplyRoomScopedUiUpdate } from "./roomScopedUi";
 import type { BrowserAccessRequest } from "../types";
 import { useAppStore } from "../store/appStore";
-
-interface LocalUser {
-  id: string;
-  name: string;
-}
+import { currentSelectedRoom, currentSelectedRoomContext } from "./selectedWorkspace";
 
 interface BrowserActionsOptions {
-  hasSelectedRoom: boolean;
-  isActiveHost: boolean;
-  canRequestBrowser: boolean;
-  canHostBrowser: boolean;
-  browserAccessMessage: string;
-  hostGateMessage: string;
-  selectedRoom: RoomRecord;
   selectedRoomIdRef: MutableRefObject<string>;
   defaultBrowserUrl: string;
   defaultBrowserReason: string;
-  localUser: LocalUser;
-  deviceId: string;
-  relayStatus: "connecting" | "open" | "closed" | "error";
   relayRef: MutableRefObject<RelayClient | null>;
   seenEnvelopeIds: MutableRefObject<Set<string>>;
   publishRequestStatus: (
@@ -44,38 +30,29 @@ interface BrowserActionsOptions {
 }
 
 export function createBrowserActions({
-  hasSelectedRoom,
-  isActiveHost,
-  canRequestBrowser,
-  canHostBrowser,
-  browserAccessMessage,
-  hostGateMessage,
-  selectedRoom,
   selectedRoomIdRef,
   defaultBrowserUrl,
   defaultBrowserReason,
-  localUser,
-  deviceId,
-  relayStatus,
   relayRef,
   seenEnvelopeIds,
   publishRequestStatus
 }: BrowserActionsOptions) {
+  const currentContext = () => currentSelectedRoomContext();
   const setSelectedBrowserMessage = (message: string | null) =>
-    useAppStore.getState().setBrowserMessageForRoom(selectedRoom.id, message);
+    useAppStore.getState().setBrowserMessageForRoom(useAppStore.getState().selectedRoomId, message);
 
   function browserRequestsForRoom(roomId: string) {
     return useAppStore.getState().browserByRoom[roomId]?.requests ?? [];
   }
 
   async function requestBrowserAccess() {
-    if (!hasSelectedRoom) {
+    const room = currentSelectedRoom();
+    if (!room) {
       setSelectedBrowserMessage("Create or join a room before requesting browser access.");
       return;
     }
-    const room = selectedRoom;
-    if (!canRequestBrowser) {
-      setSelectedBrowserMessage(browserAccessMessage);
+    if (!currentContext()?.canRequestBrowser) {
+      setSelectedBrowserMessage(currentContext()?.browserAccessMessage ?? "Browser access is unavailable.");
       return;
     }
     const roomId = room.id;
@@ -93,8 +70,8 @@ export function createBrowserActions({
 
     const request: BrowserAccessRequest = {
       id: crypto.randomUUID(),
-      requester: localUser.name,
-      requesterUserId: localUser.id,
+      requester: currentContext()?.localUser.name ?? "Local user",
+      requesterUserId: currentContext()?.localUser.id ?? "local",
       url: parsedUrl.toString(),
       reason: (roomBrowser?.reason ?? defaultBrowserReason).trim() || "No reason provided.",
       requestedAt: new Date().toISOString(),
@@ -102,6 +79,7 @@ export function createBrowserActions({
     };
 
     const client = relayRef.current;
+    const { relayStatus } = useAppStore.getState();
     if (!client || relayStatus === "closed" || relayStatus === "error") {
       useAppStore.getState().appendBrowserRequest(roomId, request);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
@@ -127,8 +105,8 @@ export function createBrowserActions({
         id: crypto.randomUUID(),
         teamId: room.teamId,
         roomId: room.id,
-        senderDeviceId: deviceId,
-        senderUserId: localUser.id,
+        senderDeviceId: currentContext()?.deviceId ?? "local-device",
+        senderUserId: currentContext()?.localUser.id ?? "local",
         createdAt: new Date().toISOString(),
         kind: "browser.request",
         payload: await encryptJson(payload, secret)
@@ -150,16 +128,17 @@ export function createBrowserActions({
   }
 
   function approveBrowserRequest(request: BrowserAccessRequest) {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedBrowserMessage("Create or join a room before approving browser access.");
       return;
     }
-    if (!isActiveHost) {
-      setSelectedBrowserMessage(hostGateMessage);
+    if (!currentContext()?.isActiveHost) {
+      setSelectedBrowserMessage(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
       return;
     }
-    if (!canHostBrowser) {
-      setSelectedBrowserMessage(browserAccessMessage);
+    if (!currentContext()?.canHostBrowser) {
+      setSelectedBrowserMessage(currentContext()?.browserAccessMessage ?? "Browser access is unavailable.");
       return;
     }
     const roomId = selectedRoom.id;
@@ -183,16 +162,17 @@ export function createBrowserActions({
   }
 
   function denyBrowserRequest(requestId: string) {
-    if (!hasSelectedRoom) {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
       setSelectedBrowserMessage("Create or join a room before denying browser access.");
       return;
     }
-    if (!isActiveHost) {
-      setSelectedBrowserMessage(hostGateMessage);
+    if (!currentContext()?.isActiveHost) {
+      setSelectedBrowserMessage(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
       return;
     }
-    if (!canHostBrowser) {
-      setSelectedBrowserMessage(browserAccessMessage);
+    if (!currentContext()?.canHostBrowser) {
+      setSelectedBrowserMessage(currentContext()?.browserAccessMessage ?? "Browser access is unavailable.");
       return;
     }
     const roomId = selectedRoom.id;
@@ -213,19 +193,19 @@ export function createBrowserActions({
 
   async function openApprovedBrowserRequest(request: BrowserAccessRequest) {
     if (request.status !== "approved") return;
-    if (!hasSelectedRoom) {
+    const room = currentSelectedRoom();
+    if (!room) {
       setSelectedBrowserMessage("Create or join a room before opening the room browser.");
       return;
     }
-    if (!isActiveHost) {
-      setSelectedBrowserMessage(hostGateMessage);
+    if (!currentContext()?.isActiveHost) {
+      setSelectedBrowserMessage(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
       return;
     }
-    if (!canHostBrowser) {
-      setSelectedBrowserMessage(browserAccessMessage);
+    if (!currentContext()?.canHostBrowser) {
+      setSelectedBrowserMessage(currentContext()?.browserAccessMessage ?? "Browser access is unavailable.");
       return;
     }
-    const room = selectedRoom;
     const browserRequests = browserRequestsForRoom(room.id);
     const roomRequest = findRoomBrowserRequest(browserRequests, request.id);
     if (!roomRequest || !canActOnRoomBrowserRequest(browserRequests, request.id, "approved")) {
@@ -240,19 +220,19 @@ export function createBrowserActions({
   }
 
   async function openRoomBrowserNow() {
-    if (!hasSelectedRoom) {
+    const room = currentSelectedRoom();
+    if (!room) {
       setSelectedBrowserMessage("Create or join a room before opening the room browser.");
       return;
     }
-    if (!isActiveHost) {
-      setSelectedBrowserMessage(hostGateMessage);
+    if (!currentContext()?.isActiveHost) {
+      setSelectedBrowserMessage(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
       return;
     }
-    if (!canHostBrowser) {
-      setSelectedBrowserMessage(browserAccessMessage);
+    if (!currentContext()?.canHostBrowser) {
+      setSelectedBrowserMessage(currentContext()?.browserAccessMessage ?? "Browser access is unavailable.");
       return;
     }
-    const room = selectedRoom;
     const rawUrl = (useAppStore.getState().browserByRoom[room.id]?.url ?? defaultBrowserUrl).trim();
     if (!rawUrl) {
       useAppStore.getState().setBrowserMessageForRoom(room.id, "Enter a URL to open in the room browser.");
@@ -269,8 +249,8 @@ export function createBrowserActions({
   function openRoomBrowserForUrl(room: RoomRecord, url: string, reason: string) {
     const request: BrowserAccessRequest = {
       id: crypto.randomUUID(),
-      requester: localUser.name,
-      requesterUserId: localUser.id,
+      requester: currentContext()?.localUser.name ?? "Local user",
+      requesterUserId: currentContext()?.localUser.id ?? "local",
       url,
       reason,
       requestedAt: new Date().toISOString(),
@@ -296,19 +276,19 @@ export function createBrowserActions({
   }
 
   async function resetRoomBrowserProfile() {
-    if (!hasSelectedRoom) {
+    const room = currentSelectedRoom();
+    if (!room) {
       setSelectedBrowserMessage("Create or join a room before resetting browser state.");
       return;
     }
-    if (!isActiveHost) {
-      setSelectedBrowserMessage(hostGateMessage);
+    if (!currentContext()?.isActiveHost) {
+      setSelectedBrowserMessage(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
       return;
     }
-    if (!canHostBrowser) {
-      setSelectedBrowserMessage(browserAccessMessage);
+    if (!currentContext()?.canHostBrowser) {
+      setSelectedBrowserMessage(currentContext()?.browserAccessMessage ?? "Browser access is unavailable.");
       return;
     }
-    const room = selectedRoom;
     useAppStore.getState().setBrowserMessageForRoom(room.id, null);
     try {
       const result = await resetBrowserProfile(room.id, room.projectPath);

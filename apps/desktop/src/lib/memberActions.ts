@@ -1,5 +1,4 @@
 import type { RoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
-import type { SignedInUser } from "./authClient";
 import { formatTeamMemberName, formatTeamRole } from "./appFormatters";
 import { buildDeviceFingerprintMarkdown } from "./deviceTrust";
 import {
@@ -9,18 +8,9 @@ import {
 } from "./workspaceClient";
 import { useAppStore } from "../store/appStore";
 import type { RoomPresence } from "../types";
-
-interface LocalUser {
-  id: string;
-  name: string;
-}
+import { currentLocalIdentity } from "./selectedWorkspace";
 
 interface MemberActionsOptions {
-  selectedTeam: string;
-  selectedTeamName: string;
-  selectedRoom: RoomRecord;
-  localUser: LocalUser;
-  currentUser: SignedInUser | null;
   setDeviceIdentityMessage: (message: string | null) => void;
   trustDeviceForRoom: (roomId: string, deviceId: string, fingerprint: string) => void;
   untrustDeviceForRoom: (roomId: string, deviceId: string) => void;
@@ -35,11 +25,6 @@ interface MemberActionsOptions {
 }
 
 export function createMemberActions({
-  selectedTeam,
-  selectedTeamName,
-  selectedRoom,
-  localUser,
-  currentUser,
   setDeviceIdentityMessage,
   trustDeviceForRoom,
   untrustDeviceForRoom,
@@ -47,7 +32,18 @@ export function createMemberActions({
   updateTeamMemberCountForTeam,
   copyMarkdownWithFallback
 }: MemberActionsOptions) {
+  const currentWorkspace = () => {
+    const { selectedTeam, selectedRoomId, teams, rooms } = useAppStore.getState();
+    return {
+      selectedTeam,
+      selectedTeamName: teams.find((team) => team.id === selectedTeam)?.name ?? "Selected team",
+      selectedRoom: rooms.find((room) => room.id === selectedRoomId)
+    };
+  };
+
   function trustRoomMemberDevice(member: RoomPresence) {
+    const { selectedRoom } = currentWorkspace();
+    if (!selectedRoom) return;
     const fingerprint = member.publicKeyFingerprint;
     if (!fingerprint) {
       setDeviceIdentityMessage(`${member.displayName} has no registered device identity to trust.`);
@@ -58,11 +54,15 @@ export function createMemberActions({
   }
 
   function untrustRoomMemberDevice(member: RoomPresence) {
+    const { selectedRoom } = currentWorkspace();
+    if (!selectedRoom) return;
     untrustDeviceForRoom(selectedRoom.id, member.deviceId);
     setDeviceIdentityMessage(`Removed local trust for ${member.displayName}'s device identity in ${selectedRoom.name}.`);
   }
 
   async function copyRoomMemberDeviceFingerprint(member: RoomPresence, trusted: boolean) {
+    const { selectedRoom } = currentWorkspace();
+    if (!selectedRoom) return;
     const fingerprint = member.publicKeyFingerprint;
     if (!fingerprint) {
       setDeviceIdentityMessage(`${member.displayName} has no registered device identity to copy.`);
@@ -84,6 +84,7 @@ export function createMemberActions({
   }
 
   async function changeTeamMemberRole(member: TeamMemberRecord, role: "admin" | "member") {
+    const { selectedTeam } = currentWorkspace();
     if (!selectedTeam || useAppStore.getState().teamRosterByTeam[selectedTeam]?.busy) return;
     useAppStore.getState().setTeamMembersBusyForTeam(selectedTeam, true);
     useAppStore.getState().setTeamMembersMessageForTeam(selectedTeam, null);
@@ -92,7 +93,7 @@ export function createMemberActions({
       useAppStore.getState().setTeamMembersForTeam(selectedTeam, members);
       useAppStore.getState().setTeamMembersMessageForTeam(
         selectedTeam,
-        `${formatTeamMemberName(member.userId, currentUser)} is now ${formatTeamRole(role)}.`
+        `${formatTeamMemberName(member.userId, useAppStore.getState().currentUser)} is now ${formatTeamRole(role)}.`
       );
     } catch (error) {
       useAppStore.getState().setTeamMembersMessageForTeam(selectedTeam, String(error));
@@ -102,6 +103,8 @@ export function createMemberActions({
   }
 
   async function transferOwnershipToTeamMember(member: TeamMemberRecord) {
+    const { selectedTeam } = currentWorkspace();
+    const { localUser } = currentLocalIdentity();
     if (!selectedTeam || useAppStore.getState().teamRosterByTeam[selectedTeam]?.busy) return;
     useAppStore.getState().setTeamMembersBusyForTeam(selectedTeam, true);
     useAppStore.getState().setTeamMembersMessageForTeam(selectedTeam, null);
@@ -112,7 +115,7 @@ export function createMemberActions({
       updateTeamRoleForTeam(selectedTeam, localMember?.role);
       useAppStore.getState().setTeamMembersMessageForTeam(
         selectedTeam,
-        `${formatTeamMemberName(member.userId, currentUser)} is now the team owner.`
+        `${formatTeamMemberName(member.userId, useAppStore.getState().currentUser)} is now the team owner.`
       );
     } catch (error) {
       useAppStore.getState().setTeamMembersMessageForTeam(selectedTeam, String(error));
@@ -122,6 +125,7 @@ export function createMemberActions({
   }
 
   async function removeMemberFromTeam(member: TeamMemberRecord) {
+    const { selectedTeam, selectedTeamName } = currentWorkspace();
     if (!selectedTeam || useAppStore.getState().teamRosterByTeam[selectedTeam]?.busy) return;
     useAppStore.getState().setTeamMembersBusyForTeam(selectedTeam, true);
     useAppStore.getState().setTeamMembersMessageForTeam(selectedTeam, null);
@@ -131,7 +135,7 @@ export function createMemberActions({
       updateTeamMemberCountForTeam(selectedTeam, members.length);
       useAppStore.getState().setTeamMembersMessageForTeam(
         selectedTeam,
-        `Removed ${formatTeamMemberName(member.userId, currentUser)} from ${selectedTeamName}.`
+        `Removed ${formatTeamMemberName(member.userId, useAppStore.getState().currentUser)} from ${selectedTeamName}.`
       );
     } catch (error) {
       useAppStore.getState().setTeamMembersMessageForTeam(selectedTeam, String(error));

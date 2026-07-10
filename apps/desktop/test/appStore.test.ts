@@ -11,6 +11,42 @@ test.beforeEach(() => {
   useAppStore.getState().resetAppStore();
 });
 
+test("desktop store owns shell, authentication, and host runtime state", () => {
+  const store = useAppStore.getState();
+  store.setSidebarWidth(320);
+  store.setInspectorCollapsed(true);
+  store.toggleSidebarCollapsed();
+  store.setAuthBusy(true);
+  store.setAuthError("Sign-in pending");
+  store.replaceCodexProbe({
+    available: true,
+    version: "0.42.0",
+    error: null,
+    models: [],
+    modelError: null
+  });
+  store.setDeviceIdentityStatusMessage("Identity ready");
+  store.startHistorySearch();
+
+  const state = useAppStore.getState();
+  assert.equal(state.sidebarWidth, 320);
+  assert.equal(state.inspectorCollapsed, true);
+  assert.equal(state.sidebarCollapsed, true);
+  assert.equal(state.authBusy, true);
+  assert.equal(state.authError, "Sign-in pending");
+  assert.equal(state.codexProbe?.available, true);
+  assert.equal(state.deviceIdentityMessage, "Identity ready");
+  assert.equal(state.historySearchBusy, true);
+
+  state.finishHistorySearch();
+  useAppStore.getState().resetAppStore();
+  const reset = useAppStore.getState();
+  assert.equal(reset.sidebarWidth, 280);
+  assert.equal(reset.authBusy, false);
+  assert.equal(reset.codexProbe, null);
+  assert.equal(reset.historySearchBusy, false);
+});
+
 test("desktop store keeps relay access runtime state atomic and resettable", () => {
   const store = useAppStore.getState();
 

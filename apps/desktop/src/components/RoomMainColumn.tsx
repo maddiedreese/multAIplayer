@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react";
+import React, { type ComponentProps } from "react";
 import { MarkdownFallbackPanel } from "./MarkdownFallbackPanel";
 import { RoomChatPanel } from "./RoomChatPanel";
 import { RoomHeader } from "./RoomHeader";

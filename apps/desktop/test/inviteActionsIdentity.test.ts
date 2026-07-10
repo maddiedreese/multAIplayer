@@ -1,13 +1,11 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 import { JSDOM } from "jsdom";
-import { cleanup, render, renderHook } from "@testing-library/react";
-import { createElement, StrictMode, useLayoutEffect, type ReactNode } from "react";
+import { cleanup, renderHook } from "@testing-library/react";
+import { createElement, StrictMode, type ReactNode } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { createShellInput } from "../src/hooks/appViewModelShell";
 import type { UseInviteActionsOptions } from "../src/lib/invite/inviteActionTypes";
 import { useInviteActions } from "../src/hooks/useInviteActions";
-import { useStablePlainObjectComposition } from "../src/hooks/useStablePlainObjectComposition";
 import { useAppStore } from "../src/store/appStore";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
@@ -125,80 +123,4 @@ test("stable invite actions call the latest implementation after inputs change",
     useAppStore.getState().inviteByRoom[room.id]?.message,
     "Create or join a room before copying an invite."
   );
-});
-
-test("view-model compositions preserve identities until rendered data changes", () => {
-  const beginShellResize = () => undefined;
-  const toggleSidebarCollapsed = () => undefined;
-  const toggleInspectorCollapsed = () => undefined;
-  const shellLayout = {
-    sidebarCollapsed: false,
-    inspectorCollapsed: false,
-    shellStyle: { "--sidebar-width": "280px" },
-    beginShellResize,
-    toggleSidebarCollapsed,
-    toggleInspectorCollapsed
-  };
-  const createOptions = (sidebarCollapsed = false) => ({
-    appState: {
-      shellLayout: { ...shellLayout, sidebarCollapsed }
-    }
-  }) as unknown as Parameters<typeof createShellInput>[0];
-  const { result, rerender } = renderHook(
-    ({ options }: { options: Parameters<typeof createShellInput>[0] }) =>
-      useStablePlainObjectComposition(createShellInput(options)),
-    { initialProps: { options: createOptions() } }
-  );
-  const first = result.current;
-
-  rerender({ options: createOptions() });
-  assert.equal(result.current, first);
-  assert.equal(result.current.onBeginSidebarResize, first.onBeginSidebarResize);
-
-  rerender({ options: createOptions(true) });
-  assert.notEqual(result.current, first);
-  assert.equal(result.current.sidebarCollapsed, true);
-});
-
-test("layout-effect consumers observe the latest callback implementation", () => {
-  const calls: number[] = [];
-
-  function LayoutEffectConsumer({ callback, version }: { callback: () => void; version: number }) {
-    useLayoutEffect(() => {
-      callback();
-    }, [callback, version]);
-    return null;
-  }
-
-  function Composition({ version }: { version: number }) {
-    const stable = useStablePlainObjectComposition({
-      callback: () => calls.push(version)
-    });
-    return createElement(LayoutEffectConsumer, { callback: stable.callback, version });
-  }
-
-  const view = render(createElement(Composition, { version: 1 }));
-  view.rerender(createElement(Composition, { version: 2 }));
-
-  assert.deepEqual(calls, [1, 2]);
-});
-
-test("arrays remain opaque and callbacks inside them are not proxied", () => {
-  const firstCallback = () => "first";
-  const secondCallback = () => "second";
-  const firstItems = [firstCallback];
-  const secondItems = [secondCallback];
-  const { result, rerender } = renderHook(
-    ({ items }: { items: Array<() => string> }) =>
-      useStablePlainObjectComposition({ items }),
-    { initialProps: { items: firstItems } }
-  );
-
-  assert.equal(result.current.items, firstItems);
-  assert.equal(result.current.items[0], firstCallback);
-
-  rerender({ items: secondItems });
-
-  assert.equal(result.current.items, secondItems);
-  assert.equal(result.current.items[0], secondCallback);
 });

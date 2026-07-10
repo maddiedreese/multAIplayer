@@ -1,18 +1,14 @@
-import { useEffect, useState } from "react";
-import type { ThemeMode } from "../components/DesktopSidebar";
-import { loadThemeMode } from "../lib/appRuntime";
+import { useEffect } from "react";
+import { useAppStore } from "../store/appStore";
 
 export function useThemeMode() {
-  const [themeMode, setThemeMode] = useState<ThemeMode>(() => loadThemeMode());
+  const themeMode = useAppStore((state) => state.themeMode);
+  const toggleThemeMode = useAppStore.getState().toggleThemeMode;
 
   useEffect(() => {
     document.documentElement.dataset.theme = themeMode;
     localStorage.setItem("multaiplayer:theme", themeMode);
   }, [themeMode]);
-
-  function toggleThemeMode() {
-    setThemeMode((current) => current === "dark" ? "light" : "dark");
-  }
 
   return { themeMode, toggleThemeMode };
 }

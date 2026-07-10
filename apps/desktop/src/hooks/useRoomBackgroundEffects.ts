@@ -29,7 +29,7 @@ export function useRoomBackgroundEffects({
   projectFilesSearch: Parameters<typeof useProjectFilesSearch>[0];
   terminalLifecycle: Parameters<typeof useTerminalLifecycle>[0];
   terminalAutoOpen: Parameters<typeof useTerminalAutoOpen>[0];
-  codexProbe: Parameters<typeof useCodexProbe>[0];
+  codexProbe: Record<string, never>;
   roomDraftCleanup: Parameters<typeof useRoomDraftCleanup>[0];
 }) {
   useLocalHistoryPersistence(localHistoryPersistence);
@@ -40,6 +40,6 @@ export function useRoomBackgroundEffects({
   useProjectFilesSearch(projectFilesSearch);
   useTerminalLifecycle(terminalLifecycle);
   useTerminalAutoOpen(terminalAutoOpen);
-  useCodexProbe(codexProbe);
+  useCodexProbe();
   useRoomDraftCleanup(roomDraftCleanup);
 }
