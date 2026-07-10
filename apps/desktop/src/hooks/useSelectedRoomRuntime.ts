@@ -22,7 +22,6 @@ import type {
 } from "../types";
 import { formatBytes, formatCodexSandboxLevel, formatHostStatus } from "../lib/appFormatters";
 import { formatApprovalAttachments, formatApprovalMessages } from "../lib/codexApprovalSummary";
-import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessageRows } from "../lib/chatDisplayRows";
 import { detectCodexTurnRiskFlags, messagesSinceLastCodex } from "../lib/codexTurn";
 import { inspectorAttentionCounts } from "../lib/inspectorAttention";
 import { canUseRoomChat } from "../lib/chatPolicy";
@@ -33,8 +32,6 @@ import type { RoomRecord } from "@multaiplayer/protocol";
 interface UseSelectedRoomRuntimeOptions {
   selectedRoom: RoomRecord;
   selectedRoomId: string;
-  markdownSelectionMode: boolean;
-  selectedMessageIds: string[];
   localUser: LocalHostUser;
   isSelectedRoomLocked: boolean;
   messages: ChatMessage[];
@@ -67,8 +64,6 @@ interface UseSelectedRoomRuntimeOptions {
 export function useSelectedRoomRuntime({
   selectedRoom,
   selectedRoomId,
-  markdownSelectionMode,
-  selectedMessageIds,
   localUser,
   isSelectedRoomLocked,
   messages,
@@ -147,15 +142,6 @@ export function useSelectedRoomRuntime({
     messagesSinceLastCodex: currentMessagesSinceLastCodex,
     canCancel: !isSelectedRoomLocked && (turn.requestedByUserId === localUser.id || selectedRoom.hostUserId === localUser.id)
   }));
-  const chatMessageRows = buildRoomChatMessageRows({
-    messages,
-    markdownSelectionMode,
-    selectedMessageIds,
-    localUserId: localUser.id,
-    codexEvents
-  });
-  const pendingAttachmentRows = buildPendingAttachmentRows(pendingAttachments);
-  const localPreviewCards = buildLocalPreviewCards(localPreviews, localUser.id);
   const pendingAttachmentSummary =
     `${pendingAttachments.length}/${maxMessageAttachments} files · ` +
     `${formatBytes(pendingAttachmentBytes)}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`;
@@ -188,10 +174,7 @@ export function useSelectedRoomRuntime({
     approvalTranscriptMessages,
     codexApprovalSummaryDisplay,
     queuedCodexTurnRows,
-    chatMessageRows,
     replyTarget,
-    pendingAttachmentRows,
-    localPreviewCards,
     pendingAttachmentSummary,
     hostBusy,
     settingsBusy,

@@ -57,10 +57,6 @@ export function isJsonStringifiableWithin(value: unknown, maxChars: number): boo
   }
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
 export function parseIntegerValue(value: unknown, fallback: number, min: number, max: number): number {
   const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
   if (!Number.isFinite(parsed)) return fallback;

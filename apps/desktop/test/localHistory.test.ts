@@ -64,7 +64,7 @@ const {
   ...(await import("../src/lib/roomVisibilityWarning"))
 };
 
-const { normalizeLocalRoomHistory } = await import("../src/lib/localRoomHistoryPayload");
+const { emptyLocalRoomHistoryPayload, normalizeLocalRoomHistory } = await import("../src/lib/localRoomHistoryPayload");
 const { createRoomSecret } = await import("@multaiplayer/crypto");
 
 test.beforeEach(() => {
@@ -121,6 +121,66 @@ test("encrypted history keeps Codex thread continuity local and encrypted", asyn
   assert.ok(stored);
   assert.doesNotMatch(stored, /thr_room_123/);
   assert.deepEqual(await loadEncryptedHistory<typeof payload>(roomId), payload);
+});
+
+test("history normalization retains legacy records that predate strict live payload limits", () => {
+  const normalized = normalizeLocalRoomHistory({
+    ...emptyLocalRoomHistoryPayload(),
+    inviteRequests: [{
+      eventType: "invite.request",
+      id: "invite-legacy",
+      requester: "Peer",
+      requesterUserId: "github:peer",
+      requesterDeviceId: "device-peer",
+      requestedAt: "legacy timestamp",
+      status: "pending"
+    }],
+    codexEvents: [{
+      eventType: "codex.turn",
+      turnId: "turn-legacy",
+      status: "event",
+      message: "Legacy event",
+      model: "gpt-5.4",
+      host: "Peer",
+      hostUserId: "github:peer",
+      createdAt: "legacy timestamp"
+    }],
+    gitWorkflowEvents: [{
+      eventType: "git.workflow",
+      status: "completed",
+      branch: "main",
+      push: false,
+      message: "Legacy workflow",
+      runner: "Peer",
+      runnerUserId: "github:peer",
+      createdAt: "legacy timestamp"
+    }],
+    githubActionsEvents: [{
+      eventType: "github.actions",
+      owner: "owner",
+      repo: "repo",
+      branch: "main",
+      summary: { label: "Done", detail: "Legacy run", tone: "green" },
+      message: "Legacy actions",
+      checkedBy: "Peer",
+      checkedByUserId: "github:peer",
+      checkedAt: "legacy timestamp",
+      runs: [{
+        id: 1,
+        name: "CI",
+        status: "completed",
+        conclusion: "success",
+        url: "https://example.test/run/1",
+        createdAt: "legacy timestamp",
+        updatedAt: "legacy timestamp"
+      }]
+    }]
+  });
+
+  assert.equal(normalized.inviteRequests.length, 1);
+  assert.equal(normalized.codexEvents.length, 1);
+  assert.equal(normalized.gitWorkflowEvents.length, 1);
+  assert.equal(normalized.githubActionsEvents.length, 1);
 });
 
 test("encrypted history keeps canonical Codex activity metadata encrypted", async () => {

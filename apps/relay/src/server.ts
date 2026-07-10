@@ -10,6 +10,7 @@ import {
 import {
   RelayEnvelope,
   RelayClientMessage,
+  isRecord,
   maxAccessTokenChars,
   maxAttachmentBlobIdChars,
   maxAttachmentBlobNameChars,
@@ -58,7 +59,6 @@ import {
   isApprovalPolicy,
   isJsonStringifiableWithin,
   isRelayEnvelopeWithinLimits as isRelayEnvelopeWithinConfiguredLimits,
-  isRecord,
   isRoomMode,
   maxCiphertextCharactersForBlob,
   normalizeBrowserAllowedOrigins,

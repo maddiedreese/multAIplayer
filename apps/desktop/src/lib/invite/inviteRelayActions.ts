@@ -1,7 +1,8 @@
-import type {
+import {
+  DeviceSealedPayload,
   InviteJoinRequestPlaintextPayload,
   InviteJoinStatusPlaintextPayload,
-  RelayEnvelope
+  type RelayEnvelope
 } from "@multaiplayer/protocol";
 import {
   decryptJson,
@@ -22,11 +23,6 @@ import {
   roomInviteRequestMessage
 } from "../inviteApproval";
 import { shouldApplyRoomScopedUiUpdate } from "../roomScopedUi";
-import {
-  isDeviceSealedPayload,
-  isInviteJoinRequestPlaintextPayload,
-  isInviteJoinStatusPlaintextPayload
-} from "../localRoomHistoryPayload";
 import { roomLockMessage } from "../appRuntime";
 import { useAppStore, type AppStoreState } from "../../store/appStore";
 import type { InviteJoinRequest } from "../../types";
@@ -98,9 +94,10 @@ export function createInviteRelayActions(
 
   async function decryptInviteEnvelope(envelope: RelayEnvelope): Promise<unknown | null> {
     const { deviceIdentity } = useAppStore.getState();
-    if (deviceIdentity && isDeviceSealedPayload(envelope.payload)) {
+    const sealedPayload = DeviceSealedPayload.safeParse(envelope.payload);
+    if (deviceIdentity && sealedPayload.success) {
       try {
-        return await openDeviceSealedJson<unknown>(envelope.payload, deviceIdentity.privateKeyJwk);
+        return await openDeviceSealedJson<unknown>(sealedPayload.data, deviceIdentity.privateKeyJwk);
       } catch {
         return null;
       }
@@ -119,21 +116,24 @@ export function createInviteRelayActions(
   async function handleInviteEnvelopePlaintext(roomId: string, plaintext: unknown) {
     const { deviceIdentity } = useAppStore.getState();
     const { deviceId } = currentLocalIdentity();
-    if (isInviteJoinRequestPlaintextPayload(plaintext)) {
-      appendInviteRequest(roomId, { ...plaintext, status: "pending" });
+    const request = InviteJoinRequestPlaintextPayload.safeParse(plaintext);
+    if (request.success) {
+      appendInviteRequest(roomId, { ...request.data, status: "pending" });
       return;
     }
-    if (!isInviteJoinStatusPlaintextPayload(plaintext)) return;
-    updateInviteRequestStatus(roomId, plaintext.requestId, plaintext.status);
-    if (!plaintext.requestId.startsWith(`${deviceId}:`)) return;
+    const status = InviteJoinStatusPlaintextPayload.safeParse(plaintext);
+    if (!status.success) return;
+    const statusPayload = status.data;
+    updateInviteRequestStatus(roomId, statusPayload.requestId, statusPayload.status);
+    if (!statusPayload.requestId.startsWith(`${deviceId}:`)) return;
     if (
-      plaintext.status === "approved" &&
-      plaintext.wrappedRoomSecret &&
-      plaintext.recipientDeviceId === deviceId &&
+      statusPayload.status === "approved" &&
+      statusPayload.wrappedRoomSecret &&
+      statusPayload.recipientDeviceId === deviceId &&
       deviceIdentity
     ) {
       const secret = await unwrapRoomSecretForDevice(
-        plaintext.wrappedRoomSecret,
+        statusPayload.wrappedRoomSecret,
         deviceIdentity.privateKeyJwk
       );
       await importRoomSecret(roomId, secret);
@@ -142,11 +142,11 @@ export function createInviteRelayActions(
     if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
       setInviteMessageForRoom(
         roomId,
-        plaintext.status === "approved"
-          ? plaintext.wrappedRoomSecret
-            ? `${plaintext.decidedBy} approved your room join request. This room is unlocked on this device.`
-            : `${plaintext.decidedBy} approved your room join request.`
-          : `${plaintext.decidedBy} denied your room join request.`
+        statusPayload.status === "approved"
+          ? statusPayload.wrappedRoomSecret
+            ? `${statusPayload.decidedBy} approved your room join request. This room is unlocked on this device.`
+            : `${statusPayload.decidedBy} approved your room join request.`
+          : `${statusPayload.decidedBy} denied your room join request.`
       );
     }
   }

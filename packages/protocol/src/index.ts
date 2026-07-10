@@ -42,6 +42,8 @@ export {
   relayIdPattern
 } from "./limits-ids.js";
 
+export { isRecord } from "./type-guards.js";
+
 export {
   CiphertextPayload,
   DevicePublicKeyJwk,
