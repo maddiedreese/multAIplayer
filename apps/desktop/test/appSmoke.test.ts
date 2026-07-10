@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
-import { afterEach, test } from "node:test";
+import { after, afterEach, test } from "node:test";
 import { JSDOM } from "jsdom";
 import React, { createElement } from "react";
 import { useAppStore } from "../src/store/appStore";
 import { initialMessagesByRoom, seededRooms } from "../src/seedData";
+
+if (!process.env.MULTAIPLAYER_SMOKE_WATCHDOG) {
+  throw new Error("App smoke must run through `npm run test:smoke -w @multaiplayer/desktop` so the external timeout and single-instance lock are active.");
+}
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://127.0.0.1:5173/"
@@ -59,11 +63,15 @@ class TestWebSocket {
   readonly url: string;
   readyState = TestWebSocket.CONNECTING;
   sentMessages: string[] = [];
+  private static readonly instances = new Set<TestWebSocket>();
   private readonly listeners = new Map<string, Array<(event: MessageEvent | Event) => void>>();
+  private openTimer: ReturnType<typeof setTimeout> | null;
 
   constructor(url: string) {
     this.url = url;
-    setTimeout(() => {
+    TestWebSocket.instances.add(this);
+    this.openTimer = setTimeout(() => {
+      this.openTimer = null;
       this.readyState = TestWebSocket.OPEN;
       this.dispatch("open", new Event("open"));
     }, 0);
@@ -82,8 +90,19 @@ class TestWebSocket {
   }
 
   close() {
+    if (this.readyState === TestWebSocket.CLOSED) return;
+    if (this.openTimer !== null) {
+      clearTimeout(this.openTimer);
+      this.openTimer = null;
+    }
     this.readyState = TestWebSocket.CLOSED;
     this.dispatch("close", new Event("close"));
+    this.listeners.clear();
+    TestWebSocket.instances.delete(this);
+  }
+
+  static closeAll() {
+    for (const socket of [...TestWebSocket.instances]) socket.close();
   }
 
   private dispatch(type: string, event: MessageEvent | Event) {
@@ -152,37 +171,41 @@ function resetAppSmokeDom() {
 
 afterEach(() => {
   cleanup();
+  TestWebSocket.closeAll();
+  useAppStore.getState().resetAppStore();
+  localStorage.clear();
+  document.body.innerHTML = "";
+});
+
+after(() => {
+  cleanup();
+  TestWebSocket.closeAll();
+  dom.window.close();
 });
 
 const { cleanup, fireEvent, render, screen, waitFor, within } = await import("@testing-library/react");
 const appModule = await import("../src/App");
 const App = appModule.App;
 
-test("App smoke", async (t) => {
-  await t.test("renders seeded room and switches rooms", async () => {
-    console.warn("SMOKE_START_1");
+test("App smoke", { timeout: 25_000 }, async (t) => {
+  await t.test("renders seeded room and switches rooms", { timeout: 5_000 }, async () => {
     resetAppSmokeDom();
     render(createElement(App));
-    console.warn("SMOKE_1_RENDERED");
 
     await waitFor(() => {
       assert.ok(screen.getAllByText("Desktop app").length > 0);
     });
-    console.warn("SMOKE_1_FOUND");
     assert.match(screen.getByText("We need to capture onboarding progress and improve the stepper.").textContent ?? "", /onboarding/);
 
     fireEvent.click(screen.getByText("Relay ops"));
-    console.warn("SMOKE_1_CLICKED");
 
     await waitFor(() => {
       assert.ok(screen.getAllByText("Relay ops").length > 0);
     });
-    console.warn("SMOKE_1_SWITCHED");
     assert.equal(screen.getByText("No visible rooms.").textContent, "No visible rooms.");
   });
 
-  await t.test("invoking Codex shows host approval context", async () => {
-    console.warn("SMOKE_START_2");
+  await t.test("invoking Codex shows host approval context", { timeout: 5_000 }, async () => {
     resetAppSmokeDom();
     render(createElement(App));
 
@@ -196,8 +219,7 @@ test("App smoke", async (t) => {
     assert.ok(within(approvalCard as HTMLElement).getByText("No new messages."));
   });
 
-  await t.test("sends a normal room message", async () => {
-    console.warn("SMOKE_START_3");
+  await t.test("sends a normal room message", { timeout: 5_000 }, async () => {
     resetAppSmokeDom();
     render(createElement(App));
 
@@ -210,8 +232,7 @@ test("App smoke", async (t) => {
     });
   });
 
-  await t.test("wires header model, reasoning, and speed selectors to room settings", async () => {
-    console.warn("SMOKE_START_4");
+  await t.test("wires header model, reasoning, and speed selectors to room settings", { timeout: 5_000 }, async () => {
     resetAppSmokeDom();
     render(createElement(App));
 
@@ -248,8 +269,7 @@ test("App smoke", async (t) => {
     });
   });
 
-  await t.test("switches inspector tabs after browser and files without blanking the rail", async () => {
-    console.warn("SMOKE_START_5");
+  await t.test("switches inspector tabs after browser and files without blanking the rail", { timeout: 5_000 }, async () => {
     resetAppSmokeDom();
     render(createElement(App));
     const roomTools = await screen.findByRole("navigation", { name: "Room tools" });

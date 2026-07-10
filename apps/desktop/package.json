@@ -8,7 +8,8 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build && node ../../scripts/verify-desktop-security-deps.mjs",
     "check": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts",
+    "test": "node ../../scripts/run-desktop-tests.mjs",
+    "test:smoke": "node ../../scripts/run-desktop-tests.mjs --smoke-only",
     "preview": "vite preview",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
