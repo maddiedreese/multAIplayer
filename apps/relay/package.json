@@ -9,7 +9,7 @@
     "start": "node dist/index.js",
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts"
+    "test": "tsx --test test/*.test.ts test/*/*.test.ts"
   },
   "dependencies": {
     "@multaiplayer/github": "0.1.0-alpha.0",
