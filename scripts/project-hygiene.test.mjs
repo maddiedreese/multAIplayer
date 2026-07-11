@@ -118,11 +118,11 @@ test("desktop owns Monaco while the root enforces its DOMPurify security overrid
   const desktopPackage = readJson("apps/desktop/package.json");
   const packageLock = readJson("package-lock.json");
 
-  assert.equal(rootPackage.devDependencies.dompurify, "3.4.11");
+  assert.equal(rootPackage.devDependencies.dompurify, "3.4.12");
   assert.equal(rootPackage.overrides["monaco-editor"].dompurify, "$dompurify");
   assert.equal(rootPackage.devDependencies["monaco-editor"], undefined);
   assert.equal(desktopPackage.devDependencies["monaco-editor"], "0.55.1");
-  assert.equal(packageLock.packages["node_modules/dompurify"].version, "3.4.11");
+  assert.equal(packageLock.packages["node_modules/dompurify"].version, "3.4.12");
   assert.equal(packageLock.packages["apps/desktop"].devDependencies["monaco-editor"], "0.55.1");
 });
 
@@ -133,7 +133,7 @@ test("TypeScript quality gates stay enforced", () => {
     'prettier --check eslint.config.mjs "{apps,packages,scripts,e2e}/**/*.{ts,tsx,mjs}"'
   );
   assert.match(rootPackage.scripts["verify:web"], /^npm run lint && npm run format:check && /);
-  assert.equal(rootPackage.devDependencies.eslint, "10.6.0");
+  assert.equal(rootPackage.devDependencies.eslint, "10.7.0");
   assert.equal(rootPackage.devDependencies.prettier, "3.9.5");
 });
 
