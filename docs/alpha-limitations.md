@@ -17,6 +17,7 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 
 ## Privacy And Encryption
 
+- The custom cryptographic protocol and implementation are unaudited. End-to-end encryption is design intent backed by tests, not an independently verified guarantee.
 - Room chat and local history are encrypted, and the relay should not store plaintext transcripts or attachments.
 - The relay sees routing metadata such as team names, room names, host labels, project path labels, invite ids, encrypted envelope sizes, and encrypted blob metadata.
 - Invite links contain a private single-use bearer capability and public host binding, never the room key. Anyone who obtains a complete link can submit a device-bound request, so links must be shared privately; the active host validates the requester before delivering the current epoch key.

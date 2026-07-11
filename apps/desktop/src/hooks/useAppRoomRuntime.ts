@@ -70,32 +70,22 @@ export function useAppRoomRuntime({
   } = selected;
   const roomId = selectedRoom.id;
   const {
-    codexProbe,
     forgottenRoomIds,
     revokedRoomIds,
     revokedTeamIds,
     selectedRoomId,
-    roomMessages,
     terminals,
-    selectedBrowserRequests,
-    selectedGitStatus,
-    selectedCodexRuntime,
     historySettings,
     chatEdits,
     chatDeletes,
     selectedLocalPreviews
   } = useAppStore(
     useShallow((state) => ({
-      codexProbe: state.codexProbe,
       forgottenRoomIds: state.forgottenRoomIds,
       revokedRoomIds: state.revokedRoomIds,
       revokedTeamIds: state.revokedTeamIds,
       selectedRoomId: state.selectedRoomId,
-      roomMessages: state.messagesByRoom[roomId],
       terminals: state.terminals,
-      selectedBrowserRequests: state.browserByRoom[roomId]?.requests,
-      selectedGitStatus: state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.status,
-      selectedCodexRuntime: state.codexRuntimeByRoom[roomId],
       historySettings: state.historySettings,
       chatEdits: state.chatEditsByRoom[roomId],
       chatDeletes: state.chatDeletesByRoom[roomId],
@@ -103,48 +93,13 @@ export function useAppRoomRuntime({
     }))
   );
   const terminalAutoOpenedRoomsRef = useRef<Set<string>>(new Set());
-  const {
-    setHostMessageForRoom,
-    setActionsBusyForRoom,
-    appendTerminalLinesForRoom,
-    setApprovalVisibleForRoom,
-    setPendingCodexApprovalForRoom,
-    setCodexRunningForRoom
-  } = roomActions;
+  const { setActionsBusyForRoom } = roomActions;
 
   const runtime = useRoomRuntimeContext({
     codexActions: {
       turn: {
-        selectedRoom,
         localUser: localIdentity.localUser,
-        codexProbe,
-        activeCodexApproval: selectedRuntime.activeCodexApproval,
-        roomsRef: appRefs.roomsRef,
-        selectedRoomIdRef: appRefs.selectedRoomIdRef,
-        forgottenRoomIds,
-        revokedRoomIds,
-        revokedTeamIds,
-        messagesByRoom: roomMessages ? { [roomId]: roomMessages } : {},
-        terminals,
-        browserRequestsByRoom: selectedBrowserRequests ? { [roomId]: selectedBrowserRequests } : {},
-        gitStatusByRoom: selectedGitStatus ? { [roomId]: selectedGitStatus } : {},
-        codexContinuationByRoom: selectedCodexRuntime?.continuation
-          ? { [roomId]: selectedCodexRuntime.continuation }
-          : {},
-        codexThreadIdsByRoom: selectedCodexRuntime?.threadGraph?.activeThreadId
-          ? { [roomId]: selectedCodexRuntime.threadGraph.activeThreadId }
-          : selectedCodexRuntime?.threadId
-            ? { [roomId]: selectedCodexRuntime.threadId }
-            : {},
-        queuedCodexApprovalsByRoom: selectedCodexRuntime?.queuedApprovals
-          ? { [roomId]: selectedCodexRuntime.queuedApprovals }
-          : {},
-        setHostMessageForRoom,
-        setPendingCodexApprovalForRoom,
-        setApprovalVisibleForRoom,
-        removeQueuedCodexApprovalForRoom: roomActions.removeQueuedCodexApprovalForRoom,
-        setCodexRunningForRoom,
-        appendTerminalLinesForRoom,
+        maxTerminalActivityLines,
         replaceRoom: workspaceRecords.replaceRoom,
         publishCodexEvent: relaySync.publishCodexEvent,
         publishChatMessage: roomInteraction.publishChatMessage,

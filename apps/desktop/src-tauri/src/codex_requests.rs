@@ -5,6 +5,7 @@ use crate::codex_rpc::{
     wait_for_response_message as wait_for_rpc_response_message, ActiveTimeout, RpcId, RpcInbox,
     SharedStdin,
 };
+use crate::command_safety::blocked_server_request_reason;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -38,6 +39,8 @@ pub(crate) struct CodexServerRequestEvent {
     method: String,
     params: Value,
     expires_at_ms: u64,
+    proposed_by: Option<String>,
+    context_summary: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -91,6 +94,8 @@ pub(crate) struct RpcRequestContext<'a> {
     pub(crate) session_id: u64,
     pub(crate) stdin: SharedStdin,
     pub(crate) cancelled: Option<Arc<std::sync::atomic::AtomicBool>>,
+    pub(crate) proposed_by: Option<&'a str>,
+    pub(crate) context_summary: Option<&'a str>,
 }
 
 impl RpcRequestContext<'_> {
@@ -278,6 +283,9 @@ impl CodexRpcState {
                 "Unsupported app-server request",
             );
         }
+        if let Some(reason) = blocked_server_request_reason(&method, &params) {
+            return send_rpc_error(&context.stdin, &id, -32001, reason);
+        }
         let projected = match project_server_request(&method, &params) {
             Ok(projected) => projected,
             Err(_) => {
@@ -324,6 +332,8 @@ impl CodexRpcState {
             method,
             params: projected,
             expires_at_ms,
+            proposed_by: context.proposed_by.map(str::to_string),
+            context_summary: context.context_summary.map(str::to_string),
         };
         pending.insert(
             request_key,

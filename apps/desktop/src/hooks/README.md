@@ -15,7 +15,7 @@ Use this index to find the React lifecycle or composition point for a desktop be
 
 - `useCodexProbe.ts` tracks local Codex availability.
 - `useCodexRoomActions.ts` composes Codex actions for one room.
-- `useCodexTurnActions.ts` owns Codex turn invocation, queuing, approvals, and completion.
+- `useCodexTurnActions.ts` owns Codex turn invocation, queuing, approvals, and completion. Its boundary accepts only effectful capabilities; actions read current room state and mutations through `useAppStore.getState()` when invoked.
 - `useAppHostHandoffActions.ts` adapts host-handoff actions to application state.
 - `useHostHandoffActions.ts` owns room host-handoff behavior.
 

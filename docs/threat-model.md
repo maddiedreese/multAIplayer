@@ -2,6 +2,8 @@
 
 This document describes the security model for multAIplayer. The product goal is that the relay never stores plaintext transcripts, plaintext attachments, Codex credentials, OpenAI credentials, repo contents, or plaintext GitHub access tokens.
 
+The custom cryptographic design and implementation have not received an independent professional security audit. End-to-end encryption is a design intent supported by implementation review and automated tests, not a verified guarantee. Material changes to the assumptions and claims below are recorded in the public [threat-model changelog](threat-model-changelog.md).
+
 Initial trust boundaries:
 
 - Desktop app: trusted by the local user and open source for inspection.
@@ -38,6 +40,8 @@ Known high-risk areas:
 - `.env` and credential file access;
 - git push and PR creation;
 - attachment previews and downloads.
+
+Host handoff is a future-authority transition, not retroactive erasure. A malicious outgoing host can retain every plaintext, credential, key, export, or external capability it previously observed. The incoming host must re-verify room membership and device keys, its local project and credential context, all pending actions, and its approval policy before it creates a fresh epoch and accepts authority. The complete trust decision is recorded in the [host-handoff ADR](decisions/host-handoff.md).
 
 ## Local Secret Storage
 

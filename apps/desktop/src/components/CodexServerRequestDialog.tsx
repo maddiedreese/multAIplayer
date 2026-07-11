@@ -109,6 +109,16 @@ export function CodexServerRequestDialog({
           </div>
         </div>
         <p>{display.message}</p>
+        <div className="approval-grid codex-request-provenance">
+          <div className="approval-item">
+            <span>Proposed by</span>
+            <strong>{request.proposedBy ?? "Unknown Codex turn source"}</strong>
+          </div>
+          <div className="approval-item">
+            <span>Context supplied</span>
+            <strong>{request.contextSummary ?? "No provenance summary was supplied; decline if unexpected."}</strong>
+          </div>
+        </div>
         {display.detail && <pre className="codex-request-detail">{display.detail}</pre>}
         {display.url && (
           <a className="codex-request-url" href={display.url} target="_blank" rel="noreferrer noopener">

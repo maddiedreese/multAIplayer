@@ -139,6 +139,8 @@ export interface CodexServerRequest {
   method: string;
   params: unknown;
   expiresAtMs: number;
+  proposedBy: string | null;
+  contextSummary: string | null;
 }
 
 export interface CodexHostCapabilities {

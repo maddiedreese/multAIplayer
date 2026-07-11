@@ -10,6 +10,7 @@ mod codex_requests;
 mod codex_rpc;
 mod codex_threads;
 mod codex_turn_lifecycle;
+mod command_safety;
 mod diagnostics;
 mod git;
 mod keychain;

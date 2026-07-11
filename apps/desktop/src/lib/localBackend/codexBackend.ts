@@ -110,7 +110,8 @@ export async function runCodexTurn(
   serviceTier: string | null = null,
   sandboxLevel = "workspace_write",
   previousThreadId: string | null = null,
-  timeoutSeconds = 180
+  timeoutSeconds = 180,
+  provenance: { proposedBy: string; contextSummary: string } | null = null
 ): Promise<CodexTurnResult> {
   if (isTauriRuntime()) {
     return invoke<CodexTurnResult>("run_codex_turn", {
@@ -125,7 +126,9 @@ export async function runCodexTurn(
         serviceTier,
         sandboxLevel,
         previousThreadId,
-        timeoutSeconds
+        timeoutSeconds,
+        proposedBy: provenance?.proposedBy ?? null,
+        contextSummary: provenance?.contextSummary ?? null
       }
     });
   }
