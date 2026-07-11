@@ -91,6 +91,53 @@ export default tseslint.config(
     }
   },
   {
+    files: ["apps/desktop/src/hooks/**/*.{ts,tsx}", "apps/desktop/src/lib/**/*.{ts,tsx}"],
+    ignores: ["apps/desktop/src/**/*.test.{ts,tsx}", "apps/desktop/src/**/*.spec.{ts,tsx}"],
+    rules: {
+      "max-lines": ["error", { max: 575, skipBlankLines: true, skipComments: true }]
+    }
+  },
+  {
+    files: ["apps/desktop/src/hooks/useCodexTurnActions.ts"],
+    rules: {
+      "max-lines": ["error", { max: 380, skipBlankLines: true, skipComments: true }]
+    }
+  },
+  {
+    files: ["apps/desktop/src/hooks/useHostHandoffActions.ts"],
+    rules: {
+      "max-lines": ["error", { max: 400, skipBlankLines: true, skipComments: true }]
+    }
+  },
+  {
+    files: ["apps/desktop/src/hooks/relay/routeRelayEnvelope.ts"],
+    rules: {
+      "max-lines": ["error", { max: 100, skipBlankLines: true, skipComments: true }]
+    }
+  },
+  {
+    files: [
+      "apps/desktop/src/hooks/relay/routeActivityEnvelope.ts",
+      "apps/desktop/src/hooks/relay/routeChatEnvelope.ts",
+      "apps/desktop/src/hooks/relay/routeRoomEnvelope.ts"
+    ],
+    rules: {
+      "max-lines": ["error", { max: 200, skipBlankLines: true, skipComments: true }]
+    }
+  },
+  {
+    files: ["apps/desktop/src/lib/roomSettingsActions.ts"],
+    rules: {
+      "max-lines": ["error", { max: 50, skipBlankLines: true, skipComments: true }]
+    }
+  },
+  {
+    files: ["apps/desktop/src/lib/roomSettingsActionsImpl.ts"],
+    rules: {
+      "max-lines": ["error", { max: 400, skipBlankLines: true, skipComments: true }]
+    }
+  },
+  {
     files: ["apps/desktop/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": packageBoundaryRule("@multaiplayer/desktop", [

@@ -37,6 +37,8 @@ export interface DeviceKeyAgreementIdentity {
   createdAt: string;
 }
 
+export type DevicePrivateKey = JsonWebKey | CryptoKey;
+
 export interface WrappedRoomSecret {
   version: 1 | 2;
   algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256";
@@ -62,7 +64,7 @@ export interface DeviceCryptoContext {
 
 export async function wrapRoomSecretAuthenticatedForDevice(
   secret: RoomSecret,
-  senderIdentity: Pick<DeviceKeyAgreementIdentity, "publicKeyJwk" | "privateKeyJwk">,
+  senderIdentity: { publicKeyJwk: JsonWebKey; privateKeyJwk: DevicePrivateKey },
   recipientPublicKeyJwk: JsonWebKey,
   context: DeviceCryptoContext
 ): Promise<AuthenticatedWrappedRoomSecretPayload> {
@@ -88,7 +90,7 @@ export async function wrapRoomSecretAuthenticatedForDevice(
 
 export async function unwrapRoomSecretAuthenticatedFromDevice(
   payload: AuthenticatedWrappedRoomSecretPayload,
-  recipientPrivateKeyJwk: JsonWebKey,
+  recipientPrivateKeyJwk: DevicePrivateKey,
   expectedSenderPublicKeyJwk: JsonWebKey,
   context: DeviceCryptoContext
 ): Promise<RoomSecret> {
@@ -99,10 +101,10 @@ export async function unwrapRoomSecretAuthenticatedFromDevice(
   }
   const recipientPrivateKey = await importEcdhPrivateKey(recipientPrivateKeyJwk);
   const senderPublicKey = await importEcdhPublicKey(actualSender);
-  const canonical = payload.version === 3;
-  const aad = canonical
-    ? authenticatedWrapAdditionalData(context)
-    : legacyCryptoContextAdditionalData("multaiplayer:authenticated-room-secret-wrap:v2", context);
+  // There is no authenticated room-generation marker that could safely scope a v2 migration.
+  // Fail closed instead of letting received ciphertext select the legacy AAD representation.
+  if (payload.version !== 3) throw new Error("Unsupported authenticated room-secret wrap version");
+  const aad = authenticatedWrapAdditionalData(context);
   const wrappingKey = await deriveAuthenticatedWrappingKey(recipientPrivateKey, senderPublicKey, aad);
   const plaintext = await decryptWithAdditionalData(
     wrappingKey,
@@ -122,13 +124,6 @@ export interface LocalCryptoContext {
   savedAt: string;
 }
 
-export interface RoomEpochDerivationContext {
-  teamId: string;
-  roomId: string;
-  previousEpoch: number;
-  newEpoch: number;
-}
-
 export interface AttachmentCryptoContext {
   teamId: string;
   roomId: string;
@@ -144,51 +139,6 @@ export async function createRoomSecret(): Promise<RoomSecret> {
     algorithm: "AES-GCM-256",
     rawKey: bytesToBase64(new Uint8Array(raw))
   };
-}
-
-/** Deterministic single-authority epoch derivation prevents concurrent host rotations from splitting keys. */
-export async function deriveNextRoomSecret(
-  previousSecret: RoomSecret,
-  hostPrivateKeyJwk: JsonWebKey,
-  context: RoomEpochDerivationContext
-): Promise<RoomSecret> {
-  validateRoomSecret(previousSecret);
-  if (
-    typeof hostPrivateKeyJwk.d !== "string" ||
-    !context.teamId ||
-    !context.roomId ||
-    !Number.isSafeInteger(context.previousEpoch) ||
-    context.previousEpoch < 1 ||
-    context.newEpoch !== context.previousEpoch + 1
-  ) {
-    throw new Error("Invalid room epoch derivation context");
-  }
-  const privateMaterial = encoder.encode(hostPrivateKeyJwk.d);
-  const previousMaterial = base64ToBytes(previousSecret.rawKey);
-  const combined = new Uint8Array(previousMaterial.length + privateMaterial.length);
-  combined.set(previousMaterial);
-  combined.set(privateMaterial, previousMaterial.length);
-  const ikm = await crypto.subtle.digest("SHA-256", combined);
-  const hkdfKey = await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits(
-    {
-      name: "HKDF",
-      hash: "SHA-256",
-      salt: encoder.encode("multaiplayer:room-epoch-derivation:v1"),
-      info: encoder.encode(
-        JSON.stringify([
-          "multaiplayer:room-epoch:v1",
-          context.teamId,
-          context.roomId,
-          context.previousEpoch,
-          context.newEpoch
-        ])
-      )
-    },
-    hkdfKey,
-    256
-  );
-  return { algorithm: "AES-GCM-256", rawKey: bytesToBase64(new Uint8Array(bits)) };
 }
 
 export async function createDeviceKeyAgreementIdentity(): Promise<DeviceKeyAgreementIdentity> {
@@ -366,7 +316,7 @@ export async function sealJsonToDevice(
 
 export async function openDeviceSealedJson<T>(
   payload: DeviceSealedPayload,
-  recipientPrivateKeyJwk: JsonWebKey,
+  recipientPrivateKeyJwk: DevicePrivateKey,
   context: DeviceCryptoContext
 ): Promise<T> {
   if (payload.algorithm !== "ECDH-P256-HKDF-SHA256-AES-GCM-256") {
@@ -426,7 +376,7 @@ export async function wrapRoomSecretForDevice(
 
 export async function unwrapRoomSecretForDevice(
   payload: WrappedRoomSecret,
-  recipientPrivateKeyJwk: JsonWebKey,
+  recipientPrivateKeyJwk: DevicePrivateKey,
   context: DeviceCryptoContext
 ): Promise<RoomSecret> {
   if ((payload.version !== 1 && payload.version !== 2) || payload.algorithm !== "ECDH-P256-HKDF-SHA256-AES-GCM-256") {
@@ -490,7 +440,17 @@ async function importEcdhPublicKey(publicKeyJwk: JsonWebKey): Promise<CryptoKey>
   );
 }
 
-async function importEcdhPrivateKey(privateKeyJwk: JsonWebKey): Promise<CryptoKey> {
+async function importEcdhPrivateKey(privateKeyJwk: DevicePrivateKey): Promise<CryptoKey> {
+  if (privateKeyJwk instanceof CryptoKey) {
+    if (
+      privateKeyJwk.type !== "private" ||
+      privateKeyJwk.algorithm.name !== "ECDH" ||
+      (privateKeyJwk.algorithm as EcKeyAlgorithm).namedCurve !== "P-256"
+    ) {
+      throw new Error("Device private key must be a P-256 ECDH private key");
+    }
+    return privateKeyJwk;
+  }
   const importable = { ...privateKeyJwk };
   delete importable.key_ops;
   delete importable.use;
@@ -504,6 +464,11 @@ async function importEcdhPrivateKey(privateKeyJwk: JsonWebKey): Promise<CryptoKe
     false,
     ["deriveKey", "deriveBits"]
   );
+}
+
+/** Imports persisted device material into a non-extractable runtime handle. */
+export async function importDevicePrivateKey(privateKeyJwk: JsonWebKey): Promise<CryptoKey> {
+  return importEcdhPrivateKey(privateKeyJwk);
 }
 
 async function deriveAuthenticatedWrappingKey(privateKey: CryptoKey, publicKey: CryptoKey, aad: Uint8Array) {

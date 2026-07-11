@@ -6,7 +6,6 @@ import {
   canonicalAuthenticatedRecord,
   computeInviteCapabilityMac,
   createRoomSecret,
-  deriveNextRoomSecret,
   decryptAttachmentJson,
   decryptJson,
   decryptLocalJson,
@@ -26,17 +25,13 @@ import {
 
 const decryptionFailure = /operation-specific reason|decrypt|bad decrypt|The operation failed/i;
 
-test("same host authority deterministically derives one key for concurrent next-epoch rotations", async () => {
+test("room epoch secrets are independent CSPRNG values", async () => {
   const previous = await createRoomSecret();
-  const host = await createDeviceKeyAgreementIdentity();
-  const context = { teamId: "team-cas", roomId: "room-cas", previousEpoch: 3, newEpoch: 4 };
-  const first = await deriveNextRoomSecret(previous, host.privateKeyJwk, context);
-  const concurrent = await deriveNextRoomSecret(previous, host.privateKeyJwk, context);
-  assert.deepEqual(concurrent, first);
-  assert.notDeepEqual(
-    await deriveNextRoomSecret(previous, host.privateKeyJwk, { ...context, roomId: "room-other" }),
-    first
-  );
+  const first = await createRoomSecret();
+  const concurrent = await createRoomSecret();
+  assert.notDeepEqual(first, previous);
+  assert.notDeepEqual(concurrent, previous);
+  assert.notDeepEqual(first, concurrent);
 });
 
 test("invite capabilities authenticate every canonical request binding", async () => {
@@ -263,14 +258,20 @@ test("rotation wraps authenticate the pinned static host key and epoch transitio
   );
 });
 
-test("version 2 authenticated room-secret wraps remain readable", async () => {
+test("version 2 authenticated room-secret wraps are rejected without attempting legacy AAD", async () => {
   const host = await createDeviceKeyAgreementIdentity();
   const recipient = await createDeviceKeyAgreementIdentity();
   const secret = await createRoomSecret();
   const wrapped = await legacyAuthenticatedWrap(secret, host, recipient, rotationContext);
-  assert.deepEqual(
-    await unwrapRoomSecretAuthenticatedFromDevice(wrapped, recipient.privateKeyJwk, host.publicKeyJwk, rotationContext),
-    secret
+  await assert.rejects(
+    () =>
+      unwrapRoomSecretAuthenticatedFromDevice(
+        wrapped as never,
+        recipient.privateKeyJwk,
+        host.publicKeyJwk,
+        rotationContext
+      ),
+    /Unsupported authenticated room-secret wrap version/
   );
 });
 

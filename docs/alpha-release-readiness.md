@@ -28,6 +28,7 @@ Expected automated coverage:
 - Local setup checks for Node, npm, Rust, Cargo, lockfiles, env templates, and macOS packaging tools.
 - Project package license consistency and dependency license scanning.
 - SQLite relay backup/restore drill in fixture mode.
+- SQLite default-backend migration, restart/idempotency, fail-closed import, and live database/WAL/SHM plaintext-content invariants using production client encryption.
 - Hosted relay sanity checks for GitHub OAuth, session secret strength, exact HTTP(S) allowed origins, auth-required mode, disabled debug endpoints, disabled demo seeding, enabled rate limits, persistent data path, and conservative proxy-header handling.
 - An alpha smoke test that covers room creation, encrypted local history, chat attachments, Codex approval context, file/diff preview selection, terminal approval, GitHub PR/Actions readiness, browser gating, usage-limit host handoff context, and locked-room blocking.
 
@@ -77,7 +78,7 @@ Before a wider alpha, manually run these in the native macOS app:
 - Public macOS alpha artifacts are Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
 - The alpha app checks a hosted release manifest and shows an in-app update banner, but users still manually download and install updated builds.
 - Member-removal dogfood must confirm relay revocation, invite invalidation, per-device epoch delivery, and exclusion of removed devices from future ciphertext.
-- JSON relay storage is for local/dev self-hosting. Hosted or internet-facing alpha relays should use SQLite and still need backup/restore drills before production claims.
+- SQLite is the default relay storage backend. JSON is an explicit local-development/migration compatibility mode; the former implicit JSON path is imported once into SQLite with a preserved backup. Hosted or internet-facing alpha relays still need backup/restore drills before production claims.
 - Rate limiting is process-local; multi-instance hosting needs an edge or shared-store limiter.
 - The browser and terminal expose host-local capabilities after approval and need continued security review.
 - Codex continuity uses local app-server behavior and reconstructed room context; it should be tested against real Codex failures before relying on it during important work.

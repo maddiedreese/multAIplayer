@@ -83,6 +83,17 @@ test("terminal actions reuse a running shell through Zustand without starting an
   assert.equal(useAppStore.getState().terminalRuntimeByRoom[room.id]?.selectedTerminalId, runningTerminal.id);
 });
 
+test("terminal actions revoke native exact-command repeats and report the room-scoped result", async () => {
+  const actions = createTerminalActions(createOptions());
+
+  await actions.revokeExactCommandGrants();
+
+  assert.deepEqual(useAppStore.getState().terminalRuntimeByRoom[room.id]?.lines, [
+    "Revoked 0 native exact-command grants."
+  ]);
+  assert.equal(useAppStore.getState().terminalRuntimeByRoom[room.id]?.ui?.error ?? null, null);
+});
+
 test("terminal actions preserve the invocation-time in-flight safeguard", async () => {
   let reports = 0;
   const actions = createTerminalActions(

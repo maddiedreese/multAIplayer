@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createDeviceKeyAgreementIdentity, createRoomSecret } from "@multaiplayer/crypto";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import {
+  createDeviceKeyAgreementIdentity,
+  createRoomSecret,
+  decryptJson,
+  encryptJson,
+  unwrapRoomSecretAuthenticatedFromDevice
+} from "@multaiplayer/crypto";
+import { RoomKeyRotationPlaintextPayload, type RelayEnvelope, type RoomRecord } from "@multaiplayer/protocol";
 import { createRoomKeyRotationActions } from "../src/lib/invite/roomKeyRotationActions";
 import { pinInviteDeviceKey } from "../src/lib/inviteCapabilityStore";
 import { importRoomSecret } from "../src/lib/localHistory";
@@ -97,6 +103,101 @@ test("rotation rejects relay-substituted and injected unpinned recipient keys be
         /unverified device keys/
       );
     }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("failed rotation retry after removal rebuilds without wrapping to the removed device", async () => {
+  localStorage.clear();
+  useAppStore.getState().resetAppStore();
+  const host = await createDeviceKeyAgreementIdentity();
+  const removed = await createDeviceKeyAgreementIdentity();
+  useAppStore.setState({ deviceIdentity: host, relayStatus: "open", trustedDeviceKeys: [] });
+  const oldSecret = await createRoomSecret();
+  await importRoomSecret(room.id, oldSecret);
+  assert.equal(
+    pinInviteDeviceKey(room.id, "github:removed", "device-removed", removed.publicKeyFingerprint, removed.publicKeyJwk),
+    true
+  );
+  const devices = [
+    {
+      userId: "github:host",
+      deviceId: "device-host",
+      displayName: "Host",
+      publicKeyJwk: host.publicKeyJwk,
+      publicKeyFingerprint: host.publicKeyFingerprint,
+      registeredAt: "2026-07-10T12:00:00.000Z",
+      lastSeenAt: "2026-07-10T12:00:00.000Z"
+    },
+    {
+      userId: "github:removed",
+      deviceId: "device-removed",
+      displayName: "Removed",
+      publicKeyJwk: removed.publicKeyJwk,
+      publicKeyFingerprint: removed.publicKeyFingerprint,
+      registeredAt: "2026-07-10T12:00:00.000Z",
+      lastSeenAt: "2026-07-10T12:00:00.000Z"
+    }
+  ];
+  const originalFetch = globalThis.fetch;
+  const published: RelayEnvelope[] = [];
+  let attempt = 0;
+  try {
+    globalThis.fetch = async (input) =>
+      String(input).includes("/devices")
+        ? new Response(JSON.stringify({ devices }), { status: 200, headers: { "content-type": "application/json" } })
+        : new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+    const relay = {
+      publish: () => undefined,
+      publishAndWaitForAck: async ({ envelope }: { envelope: RelayEnvelope }) => {
+        published.push(envelope);
+        if (attempt++ === 0) throw new Error("simulated publish failure");
+      },
+      close: () => undefined
+    };
+    const actions = createRoomKeyRotationActions({
+      historyLoadedRoomIds: { current: new Set<string>() },
+      relayRef: { current: relay },
+      seenEnvelopeIds: { current: new Set<string>() },
+      selectedRoomIdRef: { current: room.id },
+      reportRoomKeyRotationInFlight: () => false
+    });
+    await assert.rejects(
+      actions.rotateRoomKeyForDevices(room, { id: "github:host", name: "Host" }, "device-host"),
+      /simulated publish failure/
+    );
+    await actions.rotateRoomKeyForDevices(
+      room,
+      { id: "github:host", name: "Host" },
+      "device-host",
+      new Set(["github:removed"])
+    );
+
+    const payload = RoomKeyRotationPlaintextPayload.parse(
+      await decryptJson(published[1]!.payload, oldSecret, published[1]!)
+    );
+    assert.deepEqual(
+      payload.recipients.map(({ userId }) => userId),
+      ["github:host"]
+    );
+    assert.notEqual(published[0]!.payload.ciphertext, published[1]!.payload.ciphertext);
+    const hostWrap = payload.recipients[0]!.wrappedRoomSecret;
+    const newSecret = await unwrapRoomSecretAuthenticatedFromDevice(hostWrap, host.privateKeyJwk, host.publicKeyJwk, {
+      purpose: "room-key-rotation",
+      teamId: room.teamId,
+      roomId: room.id,
+      senderUserId: "github:host",
+      senderDeviceId: "device-host",
+      recipientDeviceId: "device-host",
+      operationId: payload.id,
+      keyEpoch: payload.previousEpoch,
+      previousEpoch: payload.previousEpoch,
+      newEpoch: payload.newEpoch
+    });
+    const metadata = { ...published[1]!, id: "future", kind: "chat.message" as const, keyEpoch: payload.newEpoch };
+    const future = await encryptJson({ marker: "future-secret" }, newSecret, metadata);
+    await assert.rejects(() => decryptJson(future, oldSecret, metadata));
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -228,6 +228,103 @@ test("live routing rejects room-setting notices not authored by the active host"
   assert.equal(useAppStore.getState().messagesByRoom[roomId]?.length ?? 0, 0);
 });
 
+test("live routing accepts a handoff package after the authenticated room-state transition", async () => {
+  const payload = {
+    id: "handoff-race",
+    fromHost: "Peer",
+    fromUserId: "github:peer",
+    projectPath: "/tmp/project",
+    codexModel: "gpt-5.4",
+    approvalPolicy: "ask_every_turn",
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
+    messagesSinceLastCodex: 0,
+    attachmentNames: [],
+    terminals: [],
+    createdAt: "2026-07-09T12:00:00.000Z"
+  } as const;
+  const handoffRoom = { ...relayRoom, hostStatus: "handoff" as const };
+
+  await routePayload("room.host", payload, { rooms: [handoffRoom] });
+  assert.equal(useAppStore.getState().codexRuntimeByRoom[roomId]?.hostHandoffs?.[0]?.id, payload.id);
+
+  useAppStore.getState().resetAppStore();
+  await routePayload(
+    "room.host",
+    { ...payload, fromUserId: "github:attacker" },
+    {
+      senderUserId: "github:attacker",
+      rooms: [handoffRoom]
+    }
+  );
+  assert.equal(useAppStore.getState().codexRuntimeByRoom[roomId]?.hostHandoffs?.length ?? 0, 0);
+});
+
+test("live routing binds handoff acceptance to the active host and exact available package", async () => {
+  const available = {
+    id: "handoff-accept",
+    fromHost: "Peer",
+    fromUserId: "github:peer",
+    projectPath: "/tmp/project",
+    codexModel: "gpt-5.4",
+    approvalPolicy: "ask_every_turn",
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
+    messagesSinceLastCodex: 0,
+    attachmentNames: [],
+    terminals: [],
+    createdAt: "2026-07-09T12:00:00.000Z",
+    status: "available" as const
+  };
+  const accepted = {
+    ...available,
+    status: "accepted" as const,
+    acceptedBy: "Successor",
+    acceptedByUserId: "github:successor",
+    acceptedAt: "2026-07-09T12:01:00.000Z"
+  };
+  const successorRoom = {
+    ...relayRoom,
+    host: "Successor",
+    hostUserId: "github:successor",
+    hostStatus: "active" as const
+  };
+
+  useAppStore.getState().appendHostHandoff(roomId, available);
+  await routePayload("room.host", accepted, { senderUserId: "github:successor", rooms: [successorRoom] });
+  assert.equal(useAppStore.getState().codexRuntimeByRoom[roomId]?.hostHandoffs?.[0]?.status, "accepted");
+
+  const rejectedCases = [
+    { label: "unknown", payload: { ...accepted, id: "unknown" }, sender: "github:successor", room: successorRoom },
+    {
+      label: "mismatched source",
+      payload: { ...accepted, fromUserId: "github:other" },
+      sender: "github:successor",
+      room: successorRoom
+    },
+    { label: "non-host", payload: accepted, sender: "github:attacker", room: successorRoom },
+    {
+      label: "stale room host",
+      payload: accepted,
+      sender: "github:successor",
+      room: { ...successorRoom, hostStatus: "handoff" as const }
+    }
+  ];
+  for (const rejected of rejectedCases) {
+    useAppStore.getState().resetAppStore();
+    useAppStore.getState().appendHostHandoff(roomId, available);
+    await routePayload("room.host", rejected.payload, {
+      senderUserId: rejected.sender,
+      rooms: [rejected.room]
+    });
+    assert.equal(
+      useAppStore.getState().codexRuntimeByRoom[roomId]?.hostHandoffs?.[0]?.status,
+      "available",
+      rejected.label
+    );
+  }
+});
+
 async function routePayload(
   kind: RelayEnvelope["kind"],
   plaintext: unknown,

@@ -85,6 +85,7 @@ const {
   githubOAuthScopes,
   dataPath,
   storageBackend,
+  legacyJsonImportPath,
   encryptedBacklogLimit,
   encryptedBacklogRetentionDays,
   inviteTtlDays,
@@ -110,7 +111,7 @@ const {
   shutdown
 } = relayConfig;
 const relayMetrics = createRelayMetrics();
-const relayPersistence = createRelayPersistence({ backend: storageBackend, dataPath });
+const relayPersistence = createRelayPersistence({ backend: storageBackend, dataPath, legacyJsonImportPath });
 const originPolicy = createRelayOriginPolicy({ nodeEnv, allowedCorsOrigins });
 const app = express();
 app.use(originPolicy.enforceAllowedOrigin);

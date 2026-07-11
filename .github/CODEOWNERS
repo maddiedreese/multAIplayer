@@ -1,0 +1,4 @@
+# Security boundaries require review by the repository's human maintainer.
+/packages/crypto/ @maddiedreese
+/packages/protocol/ @maddiedreese
+/apps/desktop/src-tauri/ @maddiedreese

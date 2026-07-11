@@ -1,6 +1,7 @@
 import type { MutableRefObject } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import {
+  clearShellExecutionGrants,
   getGitStatus,
   runShellCommand,
   startTerminal,
@@ -242,6 +243,30 @@ export function createTerminalActions({
     }
   }
 
+  async function revokeExactCommandGrants() {
+    const selectedRoom = currentSelectedRoom();
+    if (!selectedRoom) {
+      setSelectedTerminalError("Create or join a room before revoking command grants.");
+      return;
+    }
+    if (!currentContext()?.isActiveHost) {
+      setSelectedTerminalError(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
+      return;
+    }
+    const roomId = selectedRoom.id;
+    setTerminalErrorForRoom(roomId, null);
+    try {
+      const revoked = await clearShellExecutionGrants(roomId);
+      appendTerminalLinesForRoom(roomId, [
+        revoked === 1 ? "Revoked 1 native exact-command grant." : `Revoked ${revoked} native exact-command grants.`
+      ]);
+    } catch (error) {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+        setTerminalErrorForRoom(roomId, String(error));
+      }
+    }
+  }
+
   async function sendTerminalData(input: string) {
     if (!input) return;
     await writeRawTerminalInput(input);
@@ -412,6 +437,7 @@ export function createTerminalActions({
     openInteractiveTerminal,
     restartSelectedTerminal,
     stopSelectedTerminal,
+    revokeExactCommandGrants,
     sendTerminalData,
     approveTerminalRequest,
     denyTerminalRequest
