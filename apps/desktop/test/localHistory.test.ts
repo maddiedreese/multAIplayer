@@ -54,6 +54,7 @@ const {
   importRoomSecret,
   installRoomSecretEpoch,
   clearPendingRoomRotation,
+  clearWebPreviewRoomKeyringsForTests,
   loadEncryptedHistory,
   loadHistorySettings,
   loadRoomSecret,
@@ -72,6 +73,7 @@ const {
 const { emptyLocalRoomHistoryPayload, normalizeLocalRoomHistory } = await import("../src/lib/localRoomHistoryPayload");
 test.beforeEach(() => {
   localStorage.clear();
+  clearWebPreviewRoomKeyringsForTests();
 });
 
 test("encrypted history stores no plaintext transcript while remaining recoverable", async () => {
@@ -663,7 +665,7 @@ test("replaceRoomSecret clears stale encrypted history", async () => {
   assert.equal(localStorage.getItem(`multaiplayer:history:${roomId}`), null);
 });
 
-test("legacy room secrets migrate to a versioned epoch-one keyring", async () => {
+test("legacy room secrets migrate into a memory-only epoch-one keyring", async () => {
   const roomId = "room-legacy-keyring";
   const legacySecret = { algorithm: "AES-GCM-256" as const, rawKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" };
   localStorage.setItem(`multaiplayer:room-secret:${roomId}`, JSON.stringify(legacySecret));
@@ -674,7 +676,7 @@ test("legacy room secrets migrate to a versioned epoch-one keyring", async () =>
     currentEpoch: 1,
     keys: { "1": legacySecret }
   });
-  assert.match(localStorage.getItem(`multaiplayer:room-secret:${roomId}`) ?? "", /"version":2/);
+  assert.equal(localStorage.getItem(`multaiplayer:room-secret:${roomId}`), null);
 });
 
 test("room keyrings retain specific prior epochs while advancing current access", async () => {

@@ -41,7 +41,7 @@ Known high-risk areas:
 
 The native desktop app stores room secrets and the device ECDH identity in the OS keychain using a multAIplayer service namespace. Room secrets use room-scoped account names; the device identity uses a fixed account name for the local install. Existing alpha localStorage room secrets and device identities are migrated into native storage on first access and then removed from localStorage.
 
-The browser/web preview cannot access native keychain APIs, so it keeps using localStorage as a development fallback for room secrets and the device identity. Production security claims should be evaluated against the native app, not the web preview shell.
+The browser/web preview cannot access native keychain APIs, so it keeps room secrets only in process memory and loses room access on reload. Its development device identity remains in localStorage. Production security claims should be evaluated against the native app, not the web preview shell.
 
 Local room history is encrypted with the room secret before it is written to localStorage. The same encrypted payload includes room chat history, room workflow events, stopped terminal snapshots, bounded metadata-only Codex activities, and the normalized Codex thread graph/active selection, so app restarts can resume local context without storing those values in plaintext app preferences or relay metadata.
 

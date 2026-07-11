@@ -16,6 +16,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 const defaultRetentionDays = 30;
 const knownCurrentEpochs = new Map<string, number>();
+const webPreviewRoomKeyrings = new Map<string, RoomKeyring>();
 
 export interface LocalHistorySettings {
   enabled: boolean;
@@ -102,6 +103,7 @@ export async function clearEncryptedHistory(roomId: string): Promise<void> {
 
 export async function forgetRoomLocalData(roomId: string): Promise<void> {
   knownCurrentEpochs.delete(roomId);
+  webPreviewRoomKeyrings.delete(roomId);
   localStorage.removeItem(historyKey(roomId));
   localStorage.removeItem(settingsKey(roomId));
   localStorage.removeItem(secretKey(roomId));
@@ -309,13 +311,18 @@ async function readStoredRoomKeyMaterial(roomId: string): Promise<string | null>
     const native = await invoke<string | null>("room_secret_get", { roomId });
     if (native) return native;
   }
-  return localStorage.getItem(secretKey(roomId));
+  const memoryKeyring = webPreviewRoomKeyrings.get(roomId);
+  if (memoryKeyring) return JSON.stringify(memoryKeyring);
+  const legacy = localStorage.getItem(secretKey(roomId));
+  if (legacy) localStorage.removeItem(secretKey(roomId));
+  return legacy;
 }
 
 async function writeRoomKeyring(roomId: string, keyring: RoomKeyring): Promise<void> {
   const serialized = JSON.stringify(keyring);
   if (!isTauriRuntime()) {
-    localStorage.setItem(secretKey(roomId), serialized);
+    webPreviewRoomKeyrings.set(roomId, JSON.parse(serialized) as RoomKeyring);
+    localStorage.removeItem(secretKey(roomId));
     return;
   }
   await invoke("room_secret_set", {
@@ -325,6 +332,11 @@ async function writeRoomKeyring(roomId: string, keyring: RoomKeyring): Promise<v
     }
   });
   localStorage.removeItem(secretKey(roomId));
+}
+
+export function clearWebPreviewRoomKeyringsForTests(): void {
+  webPreviewRoomKeyrings.clear();
+  knownCurrentEpochs.clear();
 }
 
 async function deleteNativeRoomSecret(roomId: string): Promise<void> {

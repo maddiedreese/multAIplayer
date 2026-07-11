@@ -14,7 +14,7 @@ The intended security properties are:
 - invite approval binds a single-use capability to the authenticated requester and host device keys before any room key is delivered;
 - membership changes advance the room key epoch and deliver the new key only to eligible registered devices;
 - native desktop room secrets and device identities are stored in the macOS Keychain;
-- the browser/web preview is a development fallback and keeps room secrets in localStorage;
+- the browser/web preview is a development fallback that keeps room secrets in process memory and loses room access on reload;
 - GitHub session persistence is memory-only unless a strong `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured, in which case access tokens are encrypted at rest.
 - production relays require authentication by default; unauthenticated relay mode is an explicit self-host opt-out.
 

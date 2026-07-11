@@ -290,7 +290,7 @@ E2EE model:
 - invite links carry a 256-bit capability, epoch, and exact host public binding, never a room secret;
 - active hosts rotate room keys by advancing the epoch and delivering the next key independently to eligible devices;
 - AES-GCM additional data authenticates canonical envelope id, team, room, sender, timestamp, event kind, and key epoch;
-- room keys and the device ECDH identity are stored in macOS Keychain in the native app, with localStorage used only by the web preview fallback;
+- room keys and the device ECDH identity are stored in macOS Keychain in the native app; the web preview keeps room keys in process memory and uses localStorage only for its development device identity;
 - encrypted local history is stored on device;
 - losing a device/key may make old local history unrecoverable until recovery is designed.
 
