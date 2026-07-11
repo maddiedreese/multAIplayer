@@ -2,106 +2,109 @@ import type { IncomingMessage } from "node:http";
 import type { WebSocketServer } from "ws";
 import { RelayClientMessage, type RelayEnvelope, type RelayServerMessage } from "@multaiplayer/protocol";
 import type { AuthSession, ClientSession, PresenceRecord, RelayStore, RoomKey } from "../state.js";
+import type { RelayLimits } from "../limits.js";
 
 type RateLimitResult = { allowed: boolean };
 type WebSocketRateLimitBucket = "websocket" | "websocketConnect";
 
 interface RegisterRelayWebSocketConnectionOptions {
-  wss: WebSocketServer;
-  store: Pick<RelayStore, "getEncryptedBacklog">;
-  sessions: Map<ClientSession["socket"], ClientSession>;
-  roomPresence: Map<RoomKey, Map<string, PresenceRecord>>;
-  encryptedEnvelopeMaxBytes: number;
-  maxDisplayNameChars: number;
-  maxDeviceIdChars: number;
-  maxEnvelopeCiphertextChars: number;
-  maxEnvelopeIdChars: number;
-  maxEnvelopeNonceChars: number;
-  maxPublicKeyFingerprintChars: number;
-  maxPublicKeyJwkChars: number;
-  maxRoomProjectPathChars: number;
-  maxUserIdChars: number;
-  getAuthSessionFromRequest: (request: IncomingMessage) => AuthSession | undefined;
-  clientIdentityFromIncomingMessage: (request: IncomingMessage) => string;
-  consumeRateLimit: (bucket: WebSocketRateLimitBucket, clientId: string) => RateLimitResult;
-  websocketConnectionCaps: {
-    perUser: number;
-    perDevice: number;
+  transport: {
+    wss: WebSocketServer;
+    send: (socket: ClientSession["socket"], message: RelayServerMessage) => void;
+    isReady?: () => boolean;
   };
-  recordQuotaRejection?: (type: string) => void;
-  recordRateLimitRejection?: (bucket: string) => void;
-  recordConnectionAttempt?: () => void;
-  recordConnectionAccepted?: () => void;
-  recordConnectionRejection?: (reason: string) => void;
-  isReady?: () => boolean;
-  send: (socket: ClientSession["socket"], message: RelayServerMessage) => void;
-  roomKey: (teamId: string, roomId: string) => RoomKey;
-  isKnownRoom: (teamId: string, roomId: string) => boolean;
-  canJoinRoom: (session: ClientSession, teamId: string, roomId: string, userId: string, inviteId?: string) => boolean;
-  joinRoom: (session: ClientSession, teamId: string, roomId: string, userId: string, deviceId: string) => void;
-  canSubscribeTeam: (session: ClientSession, teamId: string, userId: string) => boolean;
-  subscribeTeam: (session: ClientSession, teamId: string) => void;
-  hasTeam: (teamId: string) => boolean;
-  canSubscribeWorkspace: (session: ClientSession, userId: string) => boolean;
-  subscribeWorkspace: (session: ClientSession) => void;
-  canPublishEnvelope: (session: ClientSession, envelope: RelayEnvelope) => boolean;
-  isAllowedEnvelopePayload: (envelope: RelayEnvelope) => boolean;
-  publishEnvelope: (envelope: RelayEnvelope) => Promise<void>;
-  publishPresence: (session: ClientSession, teamId: string, roomId: string, presence: PresenceRecord) => void;
-  leaveRoom: (session: ClientSession) => void;
-  leaveTeams: (session: ClientSession) => void;
-  leaveWorkspace: (session: ClientSession) => void;
-  normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
-  isJsonStringifiableWithin: (value: unknown, maxChars: number) => boolean;
-  isRecord: (value: unknown) => value is Record<string, unknown>;
+  state: {
+    store: Pick<RelayStore, "getEncryptedBacklog">;
+    sessions: Map<ClientSession["socket"], ClientSession>;
+    roomPresence: Map<RoomKey, Map<string, PresenceRecord>>;
+  };
+  limits: RelayLimits;
+  authentication: {
+    getAuthSessionFromRequest: (request: IncomingMessage) => AuthSession | undefined;
+    clientIdentityFromIncomingMessage: (request: IncomingMessage) => string;
+  };
+  rateLimiting: {
+    consume: (bucket: WebSocketRateLimitBucket, clientId: string) => RateLimitResult;
+    connectionCaps: {
+      perUser: number;
+      perDevice: number;
+    };
+  };
+  metrics: {
+    recordQuotaRejection?: (type: string) => void;
+    recordRateLimitRejection?: (bucket: string) => void;
+    recordConnectionAttempt?: () => void;
+    recordConnectionAccepted?: () => void;
+    recordConnectionRejection?: (reason: string) => void;
+  };
+  rooms: {
+    roomKey: (teamId: string, roomId: string) => RoomKey;
+    isKnownRoom: (teamId: string, roomId: string) => boolean;
+    canJoinRoom: (session: ClientSession, teamId: string, roomId: string, userId: string, inviteId?: string) => boolean;
+    joinRoom: (session: ClientSession, teamId: string, roomId: string, userId: string, deviceId: string) => void;
+    canSubscribeTeam: (session: ClientSession, teamId: string, userId: string) => boolean;
+    subscribeTeam: (session: ClientSession, teamId: string) => void;
+    hasTeam: (teamId: string) => boolean;
+    canSubscribeWorkspace: (session: ClientSession, userId: string) => boolean;
+    subscribeWorkspace: (session: ClientSession) => void;
+    canPublishEnvelope: (session: ClientSession, envelope: RelayEnvelope) => boolean;
+    isAllowedEnvelopePayload: (envelope: RelayEnvelope) => boolean;
+    publishEnvelope: (envelope: RelayEnvelope) => Promise<void>;
+    publishPresence: (session: ClientSession, teamId: string, roomId: string, presence: PresenceRecord) => void;
+    leaveRoom: (session: ClientSession) => void;
+    leaveTeams: (session: ClientSession) => void;
+    leaveWorkspace: (session: ClientSession) => void;
+  };
+  validation: {
+    normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
+    isJsonStringifiableWithin: (value: unknown, maxChars: number) => boolean;
+    isRecord: (value: unknown) => value is Record<string, unknown>;
+  };
 }
 
-export function registerRelayWebSocketConnection({
-  wss,
-  store,
-  sessions,
-  roomPresence,
-  encryptedEnvelopeMaxBytes,
-  maxDisplayNameChars,
-  maxDeviceIdChars,
-  maxEnvelopeCiphertextChars,
-  maxEnvelopeIdChars,
-  maxEnvelopeNonceChars,
-  maxPublicKeyFingerprintChars,
-  maxPublicKeyJwkChars,
-  maxRoomProjectPathChars,
-  maxUserIdChars,
-  getAuthSessionFromRequest,
-  clientIdentityFromIncomingMessage,
-  consumeRateLimit,
-  websocketConnectionCaps,
-  recordQuotaRejection,
-  recordRateLimitRejection,
-  recordConnectionAttempt,
-  recordConnectionAccepted,
-  recordConnectionRejection,
-  isReady = () => true,
-  send,
-  roomKey,
-  isKnownRoom,
-  canJoinRoom,
-  joinRoom,
-  canSubscribeTeam,
-  subscribeTeam,
-  hasTeam,
-  canSubscribeWorkspace,
-  subscribeWorkspace,
-  canPublishEnvelope,
-  isAllowedEnvelopePayload,
-  publishEnvelope,
-  publishPresence,
-  leaveRoom,
-  leaveTeams,
-  leaveWorkspace,
-  normalizeMetadataText,
-  isJsonStringifiableWithin,
-  isRecord
-}: RegisterRelayWebSocketConnectionOptions) {
+export function registerRelayWebSocketConnection(options: RegisterRelayWebSocketConnectionOptions) {
+  const { wss, send, isReady = () => true } = options.transport;
+  const { store, sessions, roomPresence } = options.state;
+  const {
+    encryptedEnvelopeMaxBytes,
+    maxDisplayNameChars,
+    maxDeviceIdChars,
+    maxEnvelopeCiphertextChars,
+    maxEnvelopeIdChars,
+    maxEnvelopeNonceChars,
+    maxPublicKeyFingerprintChars,
+    maxPublicKeyJwkChars,
+    maxRoomProjectPathChars,
+    maxUserIdChars
+  } = options.limits;
+  const { getAuthSessionFromRequest, clientIdentityFromIncomingMessage } = options.authentication;
+  const { consume: consumeRateLimit, connectionCaps: websocketConnectionCaps } = options.rateLimiting;
+  const {
+    recordQuotaRejection,
+    recordRateLimitRejection,
+    recordConnectionAttempt,
+    recordConnectionAccepted,
+    recordConnectionRejection
+  } = options.metrics;
+  const {
+    roomKey,
+    isKnownRoom,
+    canJoinRoom,
+    joinRoom,
+    canSubscribeTeam,
+    subscribeTeam,
+    hasTeam,
+    canSubscribeWorkspace,
+    subscribeWorkspace,
+    canPublishEnvelope,
+    isAllowedEnvelopePayload,
+    publishEnvelope,
+    publishPresence,
+    leaveRoom,
+    leaveTeams,
+    leaveWorkspace
+  } = options.rooms;
+  const { normalizeMetadataText, isJsonStringifiableWithin, isRecord } = options.validation;
   function socketConnectionQuotaError(session: ClientSession): string | null {
     const userConnectionId = session.authSession?.user.id ?? session.rateClientId;
     const deviceConnectionId = session.deviceId ? `${userConnectionId}:${session.deviceId}` : null;

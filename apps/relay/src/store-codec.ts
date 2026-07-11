@@ -257,6 +257,16 @@ export function createRelayStoreCodec(options: {
     return {
       id,
       teamId,
+      keyEpoch:
+        typeof room.keyEpoch === "number" && Number.isSafeInteger(room.keyEpoch) && room.keyEpoch > 0
+          ? room.keyEpoch
+          : 1,
+      epochEnvelopeCount:
+        typeof room.epochEnvelopeCount === "number" &&
+        Number.isSafeInteger(room.epochEnvelopeCount) &&
+        room.epochEnvelopeCount >= 0
+          ? room.epochEnvelopeCount
+          : 0,
       name,
       projectPath: normalizeProjectPath(room.projectPath) ?? "/",
       host,

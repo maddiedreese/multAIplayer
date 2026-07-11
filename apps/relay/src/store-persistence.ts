@@ -83,8 +83,9 @@ export function createRelayStorePersistenceCoordinator(options: {
   }
 
   function saveEncryptedEnvelope(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]) {
+    options.storeCodec.pruneExpiredRelayState();
     const save = options.persistence
-      .saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds)
+      .saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds, options.storeCodec.toStoredRelayState())
       .then(async (handled) => {
         if (!handled) await saveRelayStore();
       });

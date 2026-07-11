@@ -19,6 +19,7 @@
     "format:check": "prettier --check eslint.config.mjs \"{apps,packages,scripts,e2e}/**/*.{ts,tsx,mjs}\"",
     "test:scripts": "node --test scripts/*.test.mjs",
     "test:workspaces": "npm run test --workspaces --if-present",
+    "test:coverage": "npm run test:coverage -w @multaiplayer/relay",
     "test": "npm run build:packages && npm run test:scripts && npm run test:workspaces",
     "test:e2e": "node scripts/run-e2e.mjs",
     "fmt:rust:check": "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
@@ -41,6 +42,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@playwright/test": "^1.61.1",
+    "c8": "^11.0.0",
     "concurrently": "^9.2.3",
     "dompurify": "3.4.11",
     "eslint": "10.6.0",

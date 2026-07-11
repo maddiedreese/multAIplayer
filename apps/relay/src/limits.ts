@@ -14,6 +14,31 @@ import {
   type TeamRole
 } from "@multaiplayer/protocol";
 
+export interface RelayLimits {
+  readonly encryptedEnvelopeMaxBytes: number;
+  readonly maxEnvelopeCiphertextChars: number;
+  readonly maxDisplayNameChars: number;
+  readonly maxDeviceIdChars: number;
+  readonly maxEnvelopeIdChars: number;
+  readonly maxEnvelopeNonceChars: number;
+  readonly maxPublicKeyFingerprintChars: number;
+  readonly maxPublicKeyJwkChars: number;
+  readonly maxRoomProjectPathChars: number;
+  readonly maxUserIdChars: number;
+}
+
+/** Build the immutable set of limits shared by relay request boundaries. */
+export function createRelayLimits(
+  encryptedEnvelopeMaxBytes: number,
+  values: Omit<RelayLimits, "encryptedEnvelopeMaxBytes" | "maxEnvelopeCiphertextChars">
+): Readonly<RelayLimits> {
+  return Object.freeze({
+    ...values,
+    encryptedEnvelopeMaxBytes,
+    maxEnvelopeCiphertextChars: Math.ceil((encryptedEnvelopeMaxBytes * 4) / 3) + 1024
+  });
+}
+
 export interface RelayEnvelopeLimitOptions {
   encryptedEnvelopeMaxBytes: number;
   maxEnvelopeCiphertextChars: number;

@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmodSync, existsSync } from "node:fs";
+import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { nanoid } from "nanoid";
 import { isRecord, type RelayEnvelope } from "@multaiplayer/protocol";
@@ -12,7 +13,12 @@ export interface RelayPersistence {
   load(): Promise<unknown | null>;
   save(state: unknown): Promise<void>;
   saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): Promise<boolean>;
-  saveEncryptedEnvelope(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]): Promise<boolean>;
+  saveEncryptedEnvelope(
+    roomKey: RoomKey,
+    envelope: RelayEnvelope,
+    prunedEnvelopeIds: string[],
+    state: unknown
+  ): Promise<boolean>;
   saveRoomKeyTransition(
     roomKey: RoomKey,
     envelope: RelayEnvelope,
@@ -45,18 +51,21 @@ class JsonFileRelayPersistence implements RelayPersistence {
   }
 
   async save(state: unknown): Promise<void> {
-    await mkdir(dirname(this.dataPath), { recursive: true });
+    const dataDirectory = dirname(this.dataPath);
+    await ensureDataDirectory(dataDirectory);
     const tempPath = `${this.dataPath}.${process.pid}.${nanoid(8)}.tmp`;
-    await writeFile(tempPath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    await writeFile(tempPath, `${JSON.stringify(state, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
     await rename(tempPath, this.dataPath);
+    await chmod(this.dataPath, 0o600);
   }
 
   async saveEncryptedBacklog(): Promise<boolean> {
     return false;
   }
 
-  async saveEncryptedEnvelope(): Promise<boolean> {
-    return false;
+  async saveEncryptedEnvelope(_roomKey: RoomKey, _envelope: RelayEnvelope, _pruned: string[], state: unknown) {
+    await this.save(state);
+    return true;
   }
 
   async saveRoomKeyTransition(
@@ -82,7 +91,7 @@ class SqliteRelayPersistence implements RelayPersistence {
   constructor(private readonly dataPath: string) {}
 
   async load(): Promise<unknown | null> {
-    await mkdir(dirname(this.dataPath), { recursive: true });
+    await ensureDataDirectory(dirname(this.dataPath));
     const db = this.getDb();
     const normalized = loadNormalizedRelayState(db);
     if (normalized !== null) return normalized;
@@ -93,12 +102,12 @@ class SqliteRelayPersistence implements RelayPersistence {
   }
 
   async save(state: unknown): Promise<void> {
-    await mkdir(dirname(this.dataPath), { recursive: true });
+    await ensureDataDirectory(dirname(this.dataPath));
     saveNormalizedRelayState(this.getDb(), state);
   }
 
   async saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): Promise<boolean> {
-    await mkdir(dirname(this.dataPath), { recursive: true });
+    await ensureDataDirectory(dirname(this.dataPath));
     saveEncryptedBacklogRows(this.getDb(), roomKey, envelopes);
     return true;
   }
@@ -106,15 +115,19 @@ class SqliteRelayPersistence implements RelayPersistence {
   async saveEncryptedEnvelope(
     roomKey: RoomKey,
     envelope: RelayEnvelope,
-    prunedEnvelopeIds: string[]
+    prunedEnvelopeIds: string[],
+    state: unknown
   ): Promise<boolean> {
-    await mkdir(dirname(this.dataPath), { recursive: true });
-    appendEncryptedBacklogRow(this.getDb(), roomKey, envelope, prunedEnvelopeIds);
+    await ensureDataDirectory(dirname(this.dataPath));
+    this.getDb().transaction(() => {
+      appendEncryptedBacklogRow(this.getDb(), roomKey, envelope, prunedEnvelopeIds);
+      saveRoomRecord(this.getDb(), state, envelope.roomId);
+    })();
     return true;
   }
 
   async saveRoomKeyTransition(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[], state: unknown) {
-    await mkdir(dirname(this.dataPath), { recursive: true });
+    await ensureDataDirectory(dirname(this.dataPath));
     this.getDb().transaction(() => {
       appendEncryptedBacklogRow(this.getDb(), roomKey, envelope, prunedEnvelopeIds);
       saveNormalizedRelayState(this.getDb(), state);
@@ -133,6 +146,7 @@ class SqliteRelayPersistence implements RelayPersistence {
   private getDb(): Database.Database {
     if (this.db) return this.db;
     const db = new Database(this.dataPath);
+    chmodSync(this.dataPath, 0o600);
     db.pragma("journal_mode = WAL");
     db.pragma("foreign_keys = ON");
     db.exec(`
@@ -186,6 +200,7 @@ class SqliteRelayPersistence implements RelayPersistence {
         primary key (room_key, envelope_id)
       )
     `);
+    secureSqliteSidecars(this.dataPath);
     migrateLegacyEncryptedBacklogRows(db);
     this.db = db;
     return db;
@@ -194,6 +209,31 @@ class SqliteRelayPersistence implements RelayPersistence {
   close() {
     this.db?.close();
     this.db = null;
+  }
+}
+
+function saveRoomRecord(db: Database.Database, state: unknown, roomId: string) {
+  if (!isRecord(state) || !Array.isArray(state.rooms)) return;
+  const room = state.rooms.find((item) => isRecord(item) && item.id === roomId);
+  if (!room) return;
+  db.prepare(
+    "insert into relay_rooms (id, data_json) values (?, ?) on conflict(id) do update set data_json = excluded.data_json"
+  ).run(roomId, JSON.stringify(room));
+}
+
+async function ensureDataDirectory(path: string): Promise<void> {
+  try {
+    await stat(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    await mkdir(path, { recursive: true, mode: 0o700 });
+    await chmod(path, 0o700);
+  }
+}
+
+function secureSqliteSidecars(dataPath: string) {
+  for (const path of [dataPath, `${dataPath}-wal`, `${dataPath}-shm`]) {
+    if (existsSync(path)) chmodSync(path, 0o600);
   }
 }
 

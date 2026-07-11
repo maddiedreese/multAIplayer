@@ -29,6 +29,7 @@ test("failed envelope persistence restores the exact prior backlog and does not 
     saveRoomKeyTransition: async () => {
       throw new Error("disk unavailable");
     },
+    roomEpochEnvelopeLimit: 1_000_000,
     teamRecordForUser: (team) => team
   });
 
@@ -64,10 +65,10 @@ test("room epoch compare-and-swap rejects competing transitions from the same ep
   });
 
   const accepted = fanout.publishEnvelope(first);
-  await assert.rejects(fanout.publishEnvelope(competing), /transition is already being accepted/);
+  const rejectedCompeting = fanout.publishEnvelope(competing);
   releasePersistence();
   await accepted;
-  await assert.rejects(fanout.publishEnvelope(competing), /does not match accepted epoch 2/);
+  await assert.rejects(rejectedCompeting, /does not match accepted epoch 2/);
   assert.deepEqual(
     store.getEncryptedBacklog(key)?.map((envelope) => envelope.id),
     [first.id]
@@ -89,6 +90,7 @@ test("room epoch compare-and-swap rejects competing transitions from the same ep
     addTeamMember: () => undefined,
     saveEncryptedEnvelope: async () => undefined,
     saveRoomKeyTransition: async () => undefined,
+    roomEpochEnvelopeLimit: 1_000_000,
     teamRecordForUser: (team) => team
   });
   await assert.doesNotReject(

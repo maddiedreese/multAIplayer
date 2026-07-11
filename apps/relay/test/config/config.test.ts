@@ -1,5 +1,19 @@
 import { test } from "node:test";
 import { assert, join, mkdtemp, rm, startRelay, tmpdir, writeFile } from "../support/relay.js";
+import { loadRelayConfig } from "../../src/config.js";
+
+test("relay validates PORT with the bounded integer parser", () => {
+  const previous = process.env.PORT;
+  try {
+    process.env.PORT = "not-a-port";
+    assert.equal(loadRelayConfig().port, 4321);
+    process.env.PORT = "999999";
+    assert.equal(loadRelayConfig().port, 65_535);
+  } finally {
+    if (previous === undefined) delete process.env.PORT;
+    else process.env.PORT = previous;
+  }
+});
 
 test("relay loads configuration from env files without overriding process env", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-env-test-"));

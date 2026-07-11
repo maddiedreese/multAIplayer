@@ -79,7 +79,7 @@ Approved room browser pages run in a room/project-scoped native WebView profile.
 
 Project file previews that look like `.env` files, credential files, environment dumps, tokens, or private keys require an explicit review click before they can be attached to the next encrypted room message. The second click is labelled as an intentional override so the host can still share a needed file while seeing that it will be visible to the room and may enter Codex context.
 
-Terminal output and received terminal command requests are scanned before sharing or host approval. Content that appears to dump environment variables, read `.env` or credential files, or include token-like text shows an inline warning. This is a review aid, not a complete secret detector, and it does not replace host judgment. Approving a terminal request grants shell access on the host account, with the selected project folder only used as the working directory.
+Terminal output and received terminal command requests are scanned before sharing or host approval. Content that appears to dump environment variables, read `.env` or credential files, or include token-like text shows an inline warning. This is a review aid, not a complete secret detector, and it does not replace host judgment. Shell process creation and interactive input are also enforced outside the webview: a native operating-system dialog must approve the exact room, working directory, command, and execution kind before a spawn, and must approve the exact room, terminal session, and visibly escaped input before every PTY write. Rust consumes each resulting short-lived authorization once. Substitution, replay, expiry, cancellation, concurrent prompt attempts, and calls without native authorization fail closed for one-shot requests, interactive PTY creation, and subsequent input. Approving a terminal request grants shell access on the host account, with the selected project folder only used as the working directory.
 
 ## Device Key Agreement
 
@@ -94,6 +94,8 @@ Invite links do not carry the room key. Version 3 links carry room metadata, the
 The capability is a confidential bearer authenticator. It reaches the recipient in the URL fragment rather than the relay-visible query string, is scrubbed on import, remains process-memory-only on the requester, and crosses the relay only inside a request sealed to the pinned host key. The issuer persists only a domain-separated verifier. Relay compromise alone therefore does not reveal the capability MAC key. Compromise of an endpoint or any channel used to share the complete link can reveal it; anyone holding it can submit a device-bound request, so host review remains required.
 
 Room key rotation advances an explicit key epoch. The host creates a fresh key and authenticates a separate delivery to every eligible registered device; the next key is never broadcast under the previous room key. Envelopes authenticate their epoch and canonical routing metadata with AES-GCM additional data. Clients retain older epoch keys only as needed for already-received local history.
+
+Random 96-bit AES-GCM nonces are additionally bounded by a relay-enforced message budget for every room epoch. A monotonic room counter is persisted independently of backlog retention and survives restarts. Ordinary publishes stop at the configured ceiling while the authenticated host rotation event remains allowed and atomically resets the counter, ensuring rotation can advance to a fresh key and nonce budget.
 
 ## Member Removal And Key Epochs
 

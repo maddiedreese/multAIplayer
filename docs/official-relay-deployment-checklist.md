@@ -50,6 +50,8 @@ MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER=500
 MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS=0
 MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS=10000
 MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
+MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=false
+MULTAIPLAYER_RELAY_EPOCH_ENVELOPE_LIMIT=1000000
 ```
 
 Use `GITHUB_OAUTH_SCOPES="read:user repo"` only if the official alpha is intentionally asking for private repository PR access. The narrower `read:user public_repo` scope is the better default for a public open-source alpha.
@@ -86,8 +88,8 @@ The check must pass. It verifies GitHub OAuth presence, strong durable session e
 - Ensure WebSocket upgrades reach `/rooms`.
 - Restrict CORS and WebSocket browser origins to exact bare origins such as `https://multaiplayer.com`.
 - Do not use `*`, path-scoped origins, query strings, fragments, credentials, or non-HTTP(S) origins in `MULTAIPLAYER_RELAY_ALLOWED_ORIGINS`.
-- Keep `MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false` unless a trusted reverse proxy strips client-supplied forwarding headers and writes its own.
-- If the relay runs behind a trusted proxy and `TRUST_PROXY_HEADERS=true`, add provider documentation to the deploy notes explaining why spoofed forwarding headers cannot reach Node.
+- Keep both proxy settings false unless a trusted reverse proxy strips client-supplied forwarding headers and writes its own.
+- If the relay runs behind that boundary, set both `MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=true` and `MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=true`, and add provider documentation explaining why spoofed forwarding headers cannot reach Node. The production doctor rejects a header-trust setting without that explicit pairing.
 
 ## Health Checks
 

@@ -19,6 +19,7 @@ export interface RelayConfig {
   attachmentBlobUploadWindowMs: number;
   jsonBodyLimitBytes: number;
   encryptedEnvelopeMaxBytes: number;
+  roomEpochEnvelopeLimit: number;
   sessionPersistenceSecret: string | null;
   debugEndpointsEnabled: boolean;
   allowedCorsOrigins: string[];
@@ -65,7 +66,7 @@ export function loadRelayConfig(): RelayConfig {
 
   return {
     nodeEnv,
-    port: Number(process.env.PORT ?? 4321),
+    port: parseIntegerEnv(process.env.PORT, 4321, 1, 65_535),
     githubClientId: process.env.GITHUB_CLIENT_ID,
     githubOAuthScopes: parseGitHubScopes(process.env.GITHUB_OAUTH_SCOPES),
     dataPath: resolve(process.env.MULTAIPLAYER_RELAY_DATA_PATH ?? ".multaiplayer/relay-store.json"),
@@ -100,13 +101,21 @@ export function loadRelayConfig(): RelayConfig {
       4096,
       5_000_000
     ),
+    roomEpochEnvelopeLimit: parseIntegerEnv(
+      process.env.MULTAIPLAYER_RELAY_EPOCH_ENVELOPE_LIMIT,
+      1_000_000,
+      1,
+      100_000_000
+    ),
     sessionPersistenceSecret: normalizeSessionPersistenceSecret(process.env.MULTAIPLAYER_RELAY_SESSION_SECRET),
-    debugEndpointsEnabled: nodeEnv !== "production" || process.env.MULTAIPLAYER_RELAY_DEBUG === "true",
+    debugEndpointsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_DEBUG, false),
     allowedCorsOrigins: parseAllowedOriginEnv(process.env.MULTAIPLAYER_RELAY_ALLOWED_ORIGINS),
     seedDemoWorkspace: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_SEED_DEMO, nodeEnv !== "production"),
     mutationsRequireAuth: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_REQUIRE_AUTH, nodeEnv === "production"),
     rateLimitsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMITS, true),
-    trustProxyHeaders: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS, false),
+    trustProxyHeaders:
+      parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS, false) &&
+      parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED, false),
     structuredLogsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_STRUCTURED_LOGS, nodeEnv === "production"),
     rateLimitWindowMs: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS, 60_000, 1_000, 3_600_000),
     rateLimitCaps: {

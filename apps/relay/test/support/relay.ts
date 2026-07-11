@@ -75,6 +75,8 @@ export async function startRelay(
       cwd: resolve("."),
       env: {
         ...process.env,
+        MULTAIPLAYER_RELAY_DEBUG:
+          extraEnv.MULTAIPLAYER_RELAY_DEBUG ?? (extraEnv.NODE_ENV === "production" ? "false" : "true"),
         ...extraEnv,
         PORT: String(port),
         MULTAIPLAYER_RELAY_DATA_PATH: dataPath

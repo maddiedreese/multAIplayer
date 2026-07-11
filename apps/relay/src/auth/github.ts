@@ -1,6 +1,7 @@
 import type { CookieOptions, Express } from "express";
 import { nanoid } from "nanoid";
 import type { AuthSession } from "../state.js";
+import { fetchUpstream } from "../http/upstream.js";
 
 export interface RegisterGitHubAuthRoutesOptions {
   app: Express;
@@ -60,7 +61,7 @@ export function registerGitHubAuthRoutes({
       return;
     }
 
-    const response = await fetch("https://github.com/login/device/code", {
+    const response = await fetchUpstream("https://github.com/login/device/code", {
       method: "POST",
       headers: {
         accept: "application/json",
@@ -89,7 +90,7 @@ export function registerGitHubAuthRoutes({
       return;
     }
 
-    const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
+    const tokenResponse = await fetchUpstream("https://github.com/login/oauth/access_token", {
       method: "POST",
       headers: {
         accept: "application/json",
@@ -112,7 +113,7 @@ export function registerGitHubAuthRoutes({
       return;
     }
 
-    const userResponse = await fetch("https://api.github.com/user", {
+    const userResponse = await fetchUpstream("https://api.github.com/user", {
       headers: {
         authorization: `Bearer ${tokenBody.access_token}`,
         accept: "application/vnd.github+json",

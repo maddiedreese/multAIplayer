@@ -1,6 +1,7 @@
 import type { CookieOptions, Response } from "express";
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 import type { IncomingMessage } from "node:http";
+import { parse as parseCookie } from "cookie";
 import { isRecord } from "@multaiplayer/protocol";
 import { normalizeMetadataText, normalizeRelayId } from "../limits.js";
 import type { AuthSession } from "../state.js";
@@ -117,15 +118,9 @@ export function createRelayAuthSessionManager({
 }
 
 export function parseCookieHeader(header: string | undefined): Map<string, string> {
-  const cookies = new Map<string, string>();
-  for (const item of (header ?? "").split(";")) {
-    const [rawName, ...rawValue] = item.split("=");
-    const name = rawName?.trim();
-    if (!name) continue;
-    const value = safeDecodeCookieValue(rawValue.join("=").trim());
-    if (value !== null) cookies.set(name, value);
-  }
-  return cookies;
+  return new Map(
+    Object.entries(parseCookie(header ?? "")).filter((entry): entry is [string, string] => entry[1] !== undefined)
+  );
 }
 
 export function createRelayAuthSessionPersistence({
@@ -247,12 +242,4 @@ export function createRelayAuthSessionPersistence({
       };
     }
   };
-}
-
-function safeDecodeCookieValue(value: string): string | null {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return null;
-  }
 }

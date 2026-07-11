@@ -169,9 +169,13 @@ MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT=120
 MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER=20
 MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE=5
 MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
+MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=false
+MULTAIPLAYER_RELAY_EPOCH_ENVELOPE_LIMIT=1000000
 ```
 
-These limits are keyed by signed-in session when available, otherwise by client IP. By default, the relay uses the direct socket address and ignores `X-Forwarded-For`, because direct internet clients can spoof that header. Set `MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=true` only when the relay sits behind a trusted reverse proxy that removes client-supplied forwarding headers and writes its own. HTTP requests over the limit receive `429` with `Retry-After`; room WebSocket clients receive an encrypted-room-safe error message and remain connected. The alpha limiter is process-local, so multi-instance deployments should add an edge or shared-store limiter in front of the relay.
+These limits are keyed by signed-in session when available, otherwise by client IP. By default, the relay uses the direct socket address and ignores `X-Forwarded-For`, because direct internet clients can spoof that header. Forwarded addresses are used only when both proxy variables are true. Set them only when a trusted reverse proxy removes client-supplied forwarding headers and writes its own; the production doctor rejects the unsafe one-sided configuration. HTTP requests over the limit receive `429` with `Retry-After`; room WebSocket clients receive an encrypted-room-safe error message and remain connected. The alpha limiter is process-local, so multi-instance deployments should add an edge or shared-store limiter in front of the relay.
+
+The relay also enforces a durable envelope budget for each room-key epoch. A monotonic count is stored with the room independently of backlog retention and survives restarts. At the ceiling, ordinary publishes stop and the active host must publish a `room.key` transition; that transition remains permitted and atomically resets the counter for the next epoch, so the room cannot deadlock. The one-million-envelope default keeps random 96-bit AES-GCM nonce use far below its birthday bound without disrupting realistic rooms.
 
 Concurrent WebSocket connection caps are also enforced per signed-in user when available, otherwise per client identity, and per room device id after join. These caps are intentionally above normal use; they exist to prevent a runaway client from holding unbounded sockets.
 
@@ -187,11 +191,13 @@ Daily creation quota rejections return `429` with `Retry-After` and a structured
 
 Authenticated quotas use the GitHub session identity. If a self-hosted relay deliberately disables auth, rate limits still fall back to client IP, but authenticated per-user creation and blob-volume quotas cannot identify a durable account and are correspondingly weaker.
 
-Debug endpoints are available in non-production relay runs. In production (`NODE_ENV=production`), they are disabled unless explicitly enabled:
+Debug endpoints are disabled in every environment unless explicitly enabled, and enabled routes accept requests only from the local loopback socket:
 
 ```bash
 MULTAIPLAYER_RELAY_DEBUG=true
 ```
+
+The relay's GitHub OAuth and PR/Actions upstream requests have a ten-second deadline. Timeout and network failures return bounded gateway errors instead of occupying handlers indefinitely. JSON and SQLite store files (including SQLite sidecars) use owner-only permissions (`0600`). A missing dedicated data directory is created as `0700`; an existing operator-supplied parent directory is not re-permissioned.
 
 Production relays emit structured JSON request logs by default. Local development can opt in:
 

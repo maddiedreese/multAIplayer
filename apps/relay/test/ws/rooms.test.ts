@@ -21,6 +21,7 @@ import {
   waitForRoomUpdated,
   waitForTeamUpdated,
   writeFile,
+  type RelayHarness,
   type StoredRelayStateFixture
 } from "../support/relay.js";
 
@@ -596,6 +597,140 @@ test("relay rejects non-host room key transitions before epoch CAS", async () =>
     );
   } finally {
     member.close();
+    await relay.close();
+  }
+});
+
+test("relay requires key rotation at the per-epoch envelope budget and permits the rotation at the ceiling", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_EPOCH_ENVELOPE_LIMIT: "1" });
+  let activeRelay: RelayHarness = relay;
+  let host = new WebSocket(relay.wsUrl);
+  try {
+    await onceOpen(host);
+    host.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:maddiedreese",
+        deviceId: "device-host-budget"
+      })
+    );
+    await waitForJoined(host);
+
+    const first = testEnvelope({
+      id: "epoch-budget-first",
+      senderUserId: "github:maddiedreese",
+      senderDeviceId: "device-host-budget"
+    });
+    const firstAck = waitForPublished(host, first.id);
+    host.send(JSON.stringify({ type: "publish", envelope: first }));
+    await firstAck;
+
+    host.close();
+    await relay.close({ preserveData: true });
+    const stored = JSON.parse(await readFile(relay.dataPath, "utf8")) as StoredRelayStateFixture;
+    const backlogEntries = stored.encryptedBacklog as Array<{ envelopes: Array<{ createdAt: string }> }>;
+    backlogEntries[0]!.envelopes[0]!.createdAt = "2000-01-01T00:00:00.000Z";
+    await writeFile(relay.dataPath, `${JSON.stringify(stored, null, 2)}\n`, "utf8");
+    activeRelay = await startRelay(
+      { MULTAIPLAYER_RELAY_EPOCH_ENVELOPE_LIMIT: "1", MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS: "1" },
+      undefined,
+      relay.dataPath
+    );
+    assert.deepEqual(await debugBacklog(activeRelay.baseUrl), []);
+    host = new WebSocket(activeRelay.wsUrl);
+    await onceOpen(host);
+    host.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:maddiedreese",
+        deviceId: "device-host-budget"
+      })
+    );
+    await waitForJoined(host);
+
+    const rejected = waitForError(host);
+    host.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: { ...first, id: "epoch-budget-overflow", createdAt: new Date().toISOString() }
+      })
+    );
+    assert.match(await rejected, /reached its 1-envelope safety limit/);
+
+    const rotation = {
+      ...first,
+      id: "epoch-budget-rotation",
+      kind: "room.key" as const,
+      createdAt: new Date().toISOString()
+    };
+    const rotationAck = waitForPublished(host, rotation.id);
+    host.send(JSON.stringify({ type: "publish", envelope: rotation }));
+    await rotationAck;
+  } finally {
+    host.close();
+    await activeRelay.close();
+  }
+});
+
+test("relay serializes concurrent publishes at the epoch envelope boundary", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_EPOCH_ENVELOPE_LIMIT: "1" });
+  const firstHost = new WebSocket(relay.wsUrl);
+  const secondHost = new WebSocket(relay.wsUrl);
+  try {
+    await Promise.all([onceOpen(firstHost), onceOpen(secondHost)]);
+    firstHost.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:maddiedreese",
+        deviceId: "device-host-concurrent-1"
+      })
+    );
+    secondHost.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:maddiedreese",
+        deviceId: "device-host-concurrent-2"
+      })
+    );
+    await Promise.all([waitForJoined(firstHost), waitForJoined(secondHost)]);
+
+    const first = testEnvelope({
+      id: "epoch-concurrent-first",
+      senderUserId: "github:maddiedreese",
+      senderDeviceId: "device-host-concurrent-1"
+    });
+    const second = testEnvelope({
+      id: "epoch-concurrent-second",
+      senderUserId: "github:maddiedreese",
+      senderDeviceId: "device-host-concurrent-2"
+    });
+    const firstOutcome = Promise.race([
+      waitForPublished(firstHost, first.id).then(() => "published" as const),
+      waitForError(firstHost).then(() => "rejected" as const)
+    ]);
+    const secondOutcome = Promise.race([
+      waitForPublished(secondHost, second.id).then(() => "published" as const),
+      waitForError(secondHost).then(() => "rejected" as const)
+    ]);
+    firstHost.send(JSON.stringify({ type: "publish", envelope: first }));
+    secondHost.send(JSON.stringify({ type: "publish", envelope: second }));
+
+    assert.deepEqual((await Promise.all([firstOutcome, secondOutcome])).sort(), ["published", "rejected"]);
+    await waitForDebugBacklog(relay.baseUrl, 1);
+    const backlog = await debugBacklog(relay.baseUrl);
+    assert.equal(backlog[0]?.envelopes, 1);
+    assert.ok([first.id, second.id].includes(backlog[0]?.sample?.id ?? ""));
+  } finally {
+    firstHost.close();
+    secondHost.close();
     await relay.close();
   }
 });
