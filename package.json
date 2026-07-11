@@ -18,6 +18,7 @@
     "format": "prettier --write eslint.config.mjs \"{apps,packages,scripts,e2e}/**/*.{ts,tsx,mjs}\"",
     "format:check": "prettier --check eslint.config.mjs \"{apps,packages,scripts,e2e}/**/*.{ts,tsx,mjs}\"",
     "test:scripts": "node --test scripts/*.test.mjs",
+    "mutation:summary": "node scripts/summarize-mutation-report.mjs",
     "test:workspaces": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage:packages && npm run test:coverage -w @multaiplayer/relay",
     "test:coverage:packages": "npm run test:coverage -w @multaiplayer/crypto && npm run test:coverage -w @multaiplayer/protocol && npm run test:coverage -w @multaiplayer/codex && npm run test:coverage -w @multaiplayer/git && npm run test:coverage -w @multaiplayer/github",

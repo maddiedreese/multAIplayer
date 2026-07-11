@@ -54,7 +54,7 @@ Run the smallest relevant loop while iterating, then run `npm run verify` before
 | --- | --- |
 | Relay HTTP, WebSocket, auth, persistence, or limits | `npm run check -w @multaiplayer/relay` and `npm run test -w @multaiplayer/relay`; run `npm run test:fuzz -w @multaiplayer/relay` after parser/schema changes |
 | Desktop React UI, hooks, stores, or adapters | `npm run check -w @multaiplayer/desktop` and `npm run test:smoke -w @multaiplayer/desktop`; run `npm run test -w @multaiplayer/desktop` before handoff |
-| One shared package | `npm run check -w @multaiplayer/protocol` and `npm run test -w @multaiplayer/protocol`, replacing `protocol` with `crypto`, `codex`, `git`, or `github` as needed |
+| One shared package | `npm run check -w @multaiplayer/protocol` and `npm run test -w @multaiplayer/protocol`, replacing `protocol` with `crypto`, `codex`, `git`, or `github` as needed; crypto authorization or validation changes also require `npm run test:mutation -w @multaiplayer/crypto` |
 | Native Tauri/Rust code | `npm run fmt:rust:check` and `npm run test:native` |
 | Native packaging, Tauri config, browser windows, Keychain, terminals, or Codex app-server integration | Native checks above, then `npm run tauri:build -w @multaiplayer/desktop` |
 | Cross-cutting TypeScript or workspace configuration | `npm run verify:web` |

@@ -7,7 +7,13 @@ export default {
   },
   checkers: ["typescript"],
   tsconfigFile: "tsconfig.json",
-  reporters: ["clear-text", "progress", "html"],
+  reporters: ["clear-text", "progress", "html", "json"],
+  htmlReporter: {
+    fileName: "reports/mutation/mutation.html"
+  },
+  jsonReporter: {
+    fileName: "reports/mutation/mutation.json"
+  },
   coverageAnalysis: "off",
   // Error-message wording and WebCrypto extractability flags do not change the
   // package's authentication decisions. Keep the gate focused on logic mutants.
