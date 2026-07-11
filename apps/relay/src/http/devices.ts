@@ -136,7 +136,7 @@ function fingerprintDevicePublicKey(publicKeyJwk: DevicePublicKeyJwkType): strin
     y: publicKeyJwk.y
   });
   const hex = createHash("sha256").update(canonical, "utf8").digest("hex");
-  return hex.match(/.{1,4}/g)?.join(":") ?? hex;
+  return `sha256:${hex.match(/.{1,4}/g)?.join(":") ?? hex}`;
 }
 
 function constantTimeTextEqual(left: string, right: string): boolean {

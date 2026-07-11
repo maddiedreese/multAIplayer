@@ -416,7 +416,17 @@ export function createInviteRelayActions(
         createdAt: payload.decidedAt,
         kind: "room.invite",
         keyEpoch: roomRequest.keyEpoch,
-        payload: await sealJsonToDevice(payload, roomRequest.requesterPublicKeyJwk, cryptoContext)
+        // The outer seal authenticates routing metadata that is available before
+        // decryption. Request-specific fields remain authenticated by the
+        // capability MAC and by the inner wrapped-secret context.
+        payload: await sealJsonToDevice(payload, roomRequest.requesterPublicKeyJwk, {
+          purpose: "invite-response",
+          teamId: selectedRoom.teamId,
+          roomId: selectedRoom.id,
+          senderUserId: localUser.id,
+          senderDeviceId: deviceId,
+          recipientDeviceId: roomRequest.requesterDeviceId
+        })
       };
       await client.publishAndWaitForAck({ type: "publish", envelope });
       seenEnvelopeIds.current.add(envelope.id);
