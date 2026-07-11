@@ -127,17 +127,15 @@ fn list_codex_models_once(
         .take()
         .map(|stdin| Arc::new(Mutex::new(stdin)))
         .ok_or_else(|| "Could not open codex app-server stdin for model list".to_string())
-        .map_err(|error| {
+        .inspect_err(|_| {
             terminate_child(&mut child);
-            error
         })?;
     let stdout = child
         .stdout
         .take()
         .ok_or_else(|| "Could not open codex app-server stdout for model list".to_string())
-        .map_err(|error| {
+        .inspect_err(|_| {
             terminate_child(&mut child);
-            error
         })?;
     let stderr = child.stderr.take();
 

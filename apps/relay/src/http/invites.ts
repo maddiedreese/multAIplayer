@@ -75,4 +75,26 @@ export function registerInviteRoutes({
 
     res.json({ invite, team, room });
   });
+
+  app.delete("/teams/:teamId/rooms/:roomId/invites", (req, res) => {
+    const session = getAuthSession(req.cookies?.multaiplayer_session);
+    if (!allowMutation(session, res)) return;
+    const { teamId, roomId } = req.params;
+    const room = store.getRoom(roomId);
+    if (!room || room.teamId !== teamId) {
+      res.status(404).json({ error: "Room not found" });
+      return;
+    }
+    if (session && room.hostUserId !== session.user.id) {
+      res.status(403).json({ error: "Only the active host can revoke room invites." });
+      return;
+    }
+
+    let revoked = 0;
+    for (const [inviteId, invite] of store.invites.entries()) {
+      if (invite.teamId === teamId && invite.roomId === roomId && store.deleteInvite(inviteId)) revoked += 1;
+    }
+    if (revoked > 0) scheduleStoreSave();
+    res.json({ revoked });
+  });
 }

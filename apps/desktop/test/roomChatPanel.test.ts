@@ -60,6 +60,28 @@ function renderChat(messages: RoomChatMessageDisplay[]) {
   );
 }
 
+test("RoomChatPanel composes transcript content before the composer", () => {
+  const html = renderChat([
+    {
+      id: "m-boundary",
+      author: "Avery",
+      role: "human",
+      body: "Keep the content boundary explicit.",
+      time: "10:02",
+      selected: false,
+      attachments: [],
+      reactions: []
+    }
+  ]);
+
+  const contentIndex = html.indexOf('class="chat-scroll"');
+  const composerIndex = html.indexOf('class="composer"');
+  assert.ok(contentIndex >= 0);
+  assert.ok(composerIndex > contentIndex);
+  assert.equal(html.match(/class="chat-scroll"/g)?.length, 1);
+  assert.match(html, /Keep the content boundary explicit\./);
+});
+
 test("RoomChatPanel hides zero-count reaction placeholders", () => {
   const html = renderChat([
     {

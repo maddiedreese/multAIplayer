@@ -9,3 +9,5 @@ target/
 .multaiplayer/
 apps/desktop/src-tauri/gen/
 apps/desktop/src-tauri/target/
+playwright-report/
+test-results/
