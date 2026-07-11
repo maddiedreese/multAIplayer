@@ -529,7 +529,10 @@ test("device seal and room-secret wrap contexts cannot be interchanged", async (
   const sealed = await sealJsonToDevice(secret, recipient.publicKeyJwk, deviceContext);
   const wrapped = await wrapRoomSecretForDevice(secret, recipient.publicKeyJwk, deviceContext);
 
-  await assert.rejects(() => openDeviceSealedJson(wrapped, recipient.privateKeyJwk, deviceContext), decryptionFailure);
+  await assert.rejects(
+    () => openDeviceSealedJson(wrapped, recipient.privateKeyJwk, deviceContext),
+    /Unsupported device-sealed payload version/
+  );
   await assert.rejects(
     () => unwrapRoomSecretForDevice({ ...sealed, version: 1 }, recipient.privateKeyJwk, deviceContext),
     decryptionFailure
