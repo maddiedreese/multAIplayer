@@ -1,7 +1,7 @@
 import { FitAddon } from "@xterm/addon-fit";
 import * as xtermModule from "@xterm/xterm";
-import { Check, Copy, Plus, Play, Square, Terminal, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Check, Copy, Maximize2, Minimize2, Plus, Play, Square, Terminal, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { TerminalLine, TerminalSnapshot } from "../lib/localBackend";
 import { InlineSecretWarning } from "./common";
 
@@ -80,6 +80,7 @@ export function TerminalPanel({
   onRestartTerminal: () => void;
   onStopTerminal: () => void;
 }) {
+  const [terminalExpanded, setTerminalExpanded] = useState(false);
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
   const terminalPanelRef = useRef<HTMLElement | null>(null);
   const xtermRef = useRef<XTermInstance | null>(null);
@@ -220,7 +221,7 @@ export function TerminalPanel({
   }, [selectedTerminalIdForEffect]);
 
   return (
-    <section className="panel terminal-panel" ref={terminalPanelRef}>
+    <section className={`panel terminal-panel ${terminalExpanded ? "expanded" : ""}`} ref={terminalPanelRef}>
       <div className="panel-title">
         <span>Terminals</span>
         <div className="panel-title-actions">
@@ -233,6 +234,14 @@ export function TerminalPanel({
           </button>
           <button className="ghost" onClick={onCopyMarkdown} disabled={!canReadLocalWorkspace}>
             <Copy size={14} /> Markdown
+          </button>
+          <button
+            className="ghost icon-only terminal-expand-button"
+            onClick={() => setTerminalExpanded((current) => !current)}
+            aria-label={terminalExpanded ? "Return terminal to column" : "Expand terminal"}
+            title={terminalExpanded ? "Return to column" : "Expand"}
+          >
+            {terminalExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
         </div>
       </div>
