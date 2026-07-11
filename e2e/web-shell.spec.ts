@@ -2,8 +2,21 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
 const appUrl = "http://127.0.0.1:1421";
 
+function attachPageDiagnostics(page: Page): void {
+  page.on("pageerror", (error) => console.error(`[browser page error] ${error.stack ?? error.message}`));
+  page.on("console", (message) => {
+    if (message.type() === "error") console.error(`[browser console] ${message.text()}`);
+  });
+  page.on("requestfailed", (request) =>
+    console.error(`[browser request failed] ${request.method()} ${request.url()} ${request.failure()?.errorText ?? ""}`)
+  );
+}
+
+test.beforeEach(({ page }) => attachPageDiagnostics(page));
+
 async function openApp(context: BrowserContext): Promise<Page> {
   const page = await context.newPage();
+  attachPageDiagnostics(page);
   await page.goto(appUrl);
   await expect(page.getByText("Development web preview")).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Room title" })).toHaveValue("Desktop app");

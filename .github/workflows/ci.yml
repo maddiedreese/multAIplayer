@@ -58,6 +58,15 @@ jobs:
       - name: Run web shell journeys
         run: npm run test:e2e
 
+      - name: Upload journey failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: web-shell-journey-failures
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
   macos-desktop:
     name: macOS desktop package
     runs-on: macos-15
