@@ -107,6 +107,27 @@ test("device seal and room-secret wrap bind every required and optional context 
   assert.deepEqual(await unwrapRoomSecretForDevice(wrapped, recipient.privateKeyJwk, context), secret);
 });
 
+test("device seal and room-secret wrap validate every optional epoch as a positive safe integer", async () => {
+  const recipient = await createDeviceKeyAgreementIdentity();
+  const secret = await createRoomSecret();
+  const epochFields = ["keyEpoch", "previousEpoch", "newEpoch"] as const;
+  const invalidEpochs = [0, -1, 1.5, Number.NaN, Infinity, -Infinity, Number.MAX_SAFE_INTEGER + 1];
+
+  for (const field of epochFields) {
+    const expected = new RegExp(`Device crypto context ${field} must be a positive safe integer`);
+    for (const epoch of invalidEpochs) {
+      const invalid = { ...deviceContext, [field]: epoch };
+      await assert.rejects(sealJsonToDevice({ value: 1 }, recipient.publicKeyJwk, invalid), expected);
+      await assert.rejects(wrapRoomSecretForDevice(secret, recipient.publicKeyJwk, invalid), expected);
+    }
+    for (const epoch of [1, Number.MAX_SAFE_INTEGER]) {
+      const valid = { ...deviceContext, [field]: epoch };
+      await assert.doesNotReject(sealJsonToDevice({ value: 1 }, recipient.publicKeyJwk, valid));
+      await assert.doesNotReject(wrapRoomSecretForDevice(secret, recipient.publicKeyJwk, valid));
+    }
+  }
+});
+
 test("local encryption validates room, timestamp, and positive safe-integer epoch boundaries", async () => {
   const secret = await createRoomSecret();
   const invalidContexts: Array<[LocalCryptoContext, RegExp]> = [

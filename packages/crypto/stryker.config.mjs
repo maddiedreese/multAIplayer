@@ -15,6 +15,9 @@ export default {
     fileName: "reports/mutation/mutation.json"
   },
   coverageAnalysis: "off",
+  // WebCrypto-heavy mutation cases can exceed Stryker's default budget on CI.
+  // Timeouts still fail repository policy; this only prevents false detections.
+  timeoutMS: 15000,
   thresholds: {
     high: 75,
     low: 55,
