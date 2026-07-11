@@ -57,6 +57,11 @@
   "overrides": {
     "monaco-editor": {
       "dompurify": "$dompurify"
+    },
+    "@stryker-mutator/core": {
+      "typed-rest-client": {
+        "qs": "6.15.3"
+      }
     }
   }
 }
