@@ -365,3 +365,130 @@ pub(crate) fn ensure_device_identity_payload(identity: &str) -> Result<(), Strin
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    type StringValidator = fn(&str) -> Result<(), String>;
+
+    #[test]
+    fn project_path_rejects_empty_whitespace_relative_and_control_characters() {
+        for invalid in ["", "   ", " /tmp/project", "/tmp/project ", "project"] {
+            assert!(
+                ensure_project_path(invalid).is_err(),
+                "accepted {invalid:?}"
+            );
+        }
+        for control in ['\0', '\t', '\n', '\r'] {
+            let path = format!("/tmp/pro{control}ject");
+            assert!(ensure_project_path(&path).is_err(), "accepted {path:?}");
+        }
+    }
+
+    #[test]
+    fn project_path_length_counts_characters_not_bytes() {
+        let at_limit = format!("/{}", "é".repeat(MAX_PROJECT_PATH_CHARS - 1));
+        assert_eq!(at_limit.chars().count(), MAX_PROJECT_PATH_CHARS);
+        assert!(at_limit.len() > MAX_PROJECT_PATH_CHARS);
+        assert!(ensure_project_path(&at_limit).is_ok());
+
+        let over_limit = format!("{at_limit}é");
+        assert!(ensure_project_path(&over_limit).is_err());
+    }
+
+    #[test]
+    fn project_path_allows_parent_segments_for_later_filesystem_resolution() {
+        assert!(ensure_project_path("/tmp/project/../other").is_ok());
+    }
+
+    #[test]
+    fn character_count_limits_accept_boundary_and_reject_next_character() {
+        let cases: &[(usize, StringValidator, &str)] = &[
+            (MAX_TERMINAL_COMMAND_CHARS, ensure_terminal_command, "x"),
+            (MAX_TERMINAL_INPUT_CHARS, ensure_terminal_input, "x"),
+            (MAX_CODEX_INPUT_CHARS, ensure_codex_input, "x"),
+            (MAX_GIT_PATCH_CHARS, ensure_git_patch, "x"),
+        ];
+
+        for &(limit, validator, prefix) in cases {
+            let at_limit = prefix.repeat(limit);
+            assert!(validator(&at_limit).is_ok(), "rejected limit {limit}");
+            let over_limit = format!("{at_limit}x");
+            assert!(
+                validator(&over_limit).is_err(),
+                "accepted limit + 1 ({limit})"
+            );
+        }
+    }
+
+    #[test]
+    fn specialized_length_limits_accept_boundary_and_reject_next_character() {
+        let thread_at_limit = "a".repeat(MAX_CODEX_THREAD_ID_CHARS);
+        assert!(normalize_codex_thread_id(Some(&thread_at_limit)).is_ok());
+        assert!(normalize_codex_thread_id(Some(&format!("{thread_at_limit}a"))).is_err());
+
+        let branch_at_limit = "a".repeat(MAX_GIT_BRANCH_CHARS);
+        assert!(ensure_safe_branch_name(&branch_at_limit).is_ok());
+        assert!(ensure_safe_branch_name(&format!("{branch_at_limit}a")).is_err());
+
+        let commit_at_limit = "a".repeat(MAX_COMMIT_MESSAGE_CHARS);
+        assert!(normalize_commit_message(&commit_at_limit).is_ok());
+        assert!(normalize_commit_message(&format!("{commit_at_limit}a")).is_err());
+
+        let preview_id_at_limit = "a".repeat(MAX_PREVIEW_ID_CHARS);
+        assert!(ensure_preview_id(&preview_id_at_limit).is_ok());
+        assert!(ensure_preview_id(&format!("{preview_id_at_limit}a")).is_err());
+
+        let room_id_at_limit = "a".repeat(MAX_ROOM_ID_CHARS);
+        assert!(ensure_room_id(&room_id_at_limit).is_ok());
+        assert!(ensure_room_id(&format!("{room_id_at_limit}a")).is_err());
+    }
+
+    #[test]
+    fn byte_count_limits_accept_boundary_and_reject_next_byte() {
+        let preview_at_limit = format!(
+            "http://localhost:8000/{}",
+            "a".repeat(MAX_PREVIEW_URL_CHARS - "http://localhost:8000/".len())
+        );
+        assert_eq!(preview_at_limit.len(), MAX_PREVIEW_URL_CHARS);
+        assert!(validate_local_preview_url(&preview_at_limit).is_ok());
+        assert!(validate_local_preview_url(&format!("{preview_at_limit}a")).is_err());
+
+        let identity_at_limit = format!("{{{}}}", "a".repeat(MAX_DEVICE_IDENTITY_CHARS - 2));
+        assert_eq!(identity_at_limit.len(), MAX_DEVICE_IDENTITY_CHARS);
+        assert!(ensure_device_identity_payload(&identity_at_limit).is_ok());
+        let identity_over_limit = format!("{{{}}}", "a".repeat(MAX_DEVICE_IDENTITY_CHARS - 1));
+        assert!(ensure_device_identity_payload(&identity_over_limit).is_err());
+    }
+
+    #[test]
+    fn project_path_and_remote_url_share_their_documented_limit() {
+        let project_at_limit = format!("/{}", "a".repeat(MAX_PROJECT_PATH_CHARS - 1));
+        assert!(ensure_project_path(&project_at_limit).is_ok());
+        assert!(ensure_project_path(&format!("{project_at_limit}a")).is_err());
+
+        let prefix = "https://github.com/";
+        let remote_at_limit = format!(
+            "{prefix}{}",
+            "a".repeat(MAX_PROJECT_PATH_CHARS - prefix.len())
+        );
+        assert!(ensure_git_remote_url(&remote_at_limit).is_ok());
+        assert!(ensure_git_remote_url(&format!("{remote_at_limit}a")).is_err());
+    }
+
+    #[test]
+    fn codex_timeout_accepts_bounds_and_rejects_values_outside_them() {
+        assert_eq!(codex_timeout(None).unwrap(), Duration::from_secs(180));
+        assert_eq!(
+            codex_timeout(Some(MIN_CODEX_TIMEOUT_SECONDS)).unwrap(),
+            Duration::from_secs(MIN_CODEX_TIMEOUT_SECONDS)
+        );
+        assert_eq!(
+            codex_timeout(Some(MAX_CODEX_TIMEOUT_SECONDS)).unwrap(),
+            Duration::from_secs(MAX_CODEX_TIMEOUT_SECONDS)
+        );
+        assert!(codex_timeout(Some(MIN_CODEX_TIMEOUT_SECONDS - 1)).is_err());
+        assert!(codex_timeout(Some(MAX_CODEX_TIMEOUT_SECONDS + 1)).is_err());
+    }
+}

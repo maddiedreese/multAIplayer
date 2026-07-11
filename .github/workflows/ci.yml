@@ -35,6 +35,38 @@ jobs:
       - name: Verify web, relay, and packages
         run: npm run verify:web
 
+  web-shell-e2e:
+    name: Web shell journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run web shell journeys
+        run: npm run test:e2e
+
+      - name: Upload journey failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: web-shell-journey-failures
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
   macos-desktop:
     name: macOS desktop package
     runs-on: macos-15
@@ -65,7 +97,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify native formatting and tests
+      - name: Verify native formatting, lints, and tests
         run: npm run verify:native
 
       - name: Build desktop prerequisites

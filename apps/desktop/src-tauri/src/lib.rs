@@ -4,6 +4,8 @@ mod codex_account;
 mod codex_activity;
 mod codex_catalog;
 mod codex_goal;
+mod codex_request_projection;
+mod codex_request_validation;
 mod codex_requests;
 mod codex_rpc;
 mod codex_threads;

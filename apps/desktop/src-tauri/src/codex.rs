@@ -250,25 +250,22 @@ impl CodexServerSession {
             .take()
             .map(|stdin| Arc::new(Mutex::new(stdin)))
             .ok_or_else(|| "Could not open codex app-server stdin".to_string())
-            .map_err(|error| {
+            .inspect_err(|_| {
                 terminate_child(&mut child);
-                error
             })?;
         let stdout = child
             .stdout
             .take()
             .ok_or_else(|| "Could not open codex app-server stdout".to_string())
-            .map_err(|error| {
+            .inspect_err(|_| {
                 terminate_child(&mut child);
-                error
             })?;
         let stderr = child
             .stderr
             .take()
             .ok_or_else(|| "Could not open codex app-server stderr".to_string())
-            .map_err(|error| {
+            .inspect_err(|_| {
                 terminate_child(&mut child);
-                error
             })?;
 
         let (line_tx, line_rx) = mpsc::channel::<String>();
@@ -442,9 +439,8 @@ impl CodexServerSession {
                         )
                     })
             })
-            .map_err(|error| {
+            .inspect_err(|_| {
                 terminate_child(&mut self.child);
-                error
             })?;
         if previous_thread_id == Some(thread_id.as_str()) {
             events.push(format!("thread/resume: {thread_id}"));

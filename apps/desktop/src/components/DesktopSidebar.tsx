@@ -49,6 +49,302 @@ export interface SidebarMessageHitDisplay {
   preview: string;
 }
 
+interface SidebarAccountSectionProps {
+  currentUser: SignedInUser | null;
+  authBusy: boolean;
+  authConfig: GitHubAuthConfig | null;
+  authError: string | null;
+  deviceFlow: GitHubDeviceStart | null;
+  sidebarQuery: string;
+  workspaceError: string | null;
+  onSignIn: () => void;
+  onSignOut: () => void;
+  onSidebarQueryChange: (query: string) => void;
+  onClearSidebarQuery: () => void;
+}
+
+function SidebarAccountSection({
+  currentUser,
+  authBusy,
+  authConfig,
+  authError,
+  deviceFlow,
+  sidebarQuery,
+  workspaceError,
+  onSignIn,
+  onSignOut,
+  onSidebarQueryChange,
+  onClearSidebarQuery
+}: SidebarAccountSectionProps) {
+  return (
+    <>
+      <div className="brand">
+        <img className="brand-mark" src={brandIcon} alt="" />
+        <div>
+          <strong>multAIplayer</strong>
+          <span>group chat for Codex</span>
+        </div>
+      </div>
+      {currentUser ? (
+        <div className="profile-card">
+          {currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" /> : <Github size={18} />}
+          <div>
+            <strong>{currentUser.name ?? currentUser.login}</strong>
+            <span>@{currentUser.login}</span>
+          </div>
+          <button onClick={onSignOut}>Sign out</button>
+        </div>
+      ) : (
+        <button className="github-button" onClick={onSignIn} disabled={authBusy || authConfig?.configured === false}>
+          <Github size={16} />
+          {authConfig?.configured === false
+            ? "GitHub sign-in not configured"
+            : authBusy
+              ? "Waiting for GitHub"
+              : "Sign in with GitHub"}
+        </button>
+      )}
+      {deviceFlow && (
+        <div className="device-flow">
+          <span>Enter this code on GitHub</span>
+          <strong>{deviceFlow.user_code}</strong>
+          <a href={deviceFlow.verification_uri} target="_blank" rel="noreferrer">
+            Open GitHub <ExternalLink size={13} />
+          </a>
+        </div>
+      )}
+      {authError && <div className="auth-error">{authError}</div>}
+      <label className="search-box">
+        <Search size={16} />
+        <input
+          placeholder="Search rooms, projects, chats"
+          value={sidebarQuery}
+          onChange={(event) => onSidebarQueryChange(event.target.value)}
+        />
+        {sidebarQuery && (
+          <button onClick={onClearSidebarQuery} aria-label="Clear search">
+            <X size={14} />
+          </button>
+        )}
+      </label>
+      {workspaceError && <div className="workspace-error">{workspaceError}</div>}
+    </>
+  );
+}
+
+interface SidebarTeamGroupProps {
+  team: SidebarTeamDisplay;
+  rooms: SidebarRoomDisplay[];
+  collapsed: boolean;
+  showArchived: boolean;
+  searchActive: boolean;
+  onToggleCollapsed: () => void;
+  onSelectTeam: (teamId: string) => void;
+  onSelectRoom: (roomId: string, teamId?: string) => void;
+  onSetTeamLifecycle: DesktopSidebarProps["onSetTeamLifecycle"];
+  onSetRoomLifecycle: DesktopSidebarProps["onSetRoomLifecycle"];
+}
+
+function SidebarTeamGroup({
+  team,
+  rooms,
+  collapsed,
+  showArchived,
+  searchActive,
+  onToggleCollapsed,
+  onSelectTeam,
+  onSelectRoom,
+  onSetTeamLifecycle,
+  onSetRoomLifecycle
+}: SidebarTeamGroupProps) {
+  const confirmDelete = (kind: "team" | "room", name: string) =>
+    window.confirm(
+      `Delete ${name}?\n\nThis removes the ${kind} ${kind === "team" ? "and its rooms " : ""}from the workspace. It does not erase local copies or ciphertext already received by devices.`
+    );
+  return (
+    <div className="team-group">
+      <div className={`team-button ${team.active ? "active" : ""}`}>
+        <button
+          type="button"
+          className="team-disclosure"
+          aria-label={collapsed ? `Expand ${team.name}` : `Collapse ${team.name}`}
+          onClick={onToggleCollapsed}
+        >
+          {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+        </button>
+        <button
+          type="button"
+          className="team-select"
+          title={`${team.name} · ${team.meta}`}
+          onClick={() => onSelectTeam(team.id)}
+        >
+          <UsersRound size={16} />
+          <span>
+            {team.name}
+            {team.archived ? " (archived)" : ""}
+          </span>
+          <small>{team.meta}</small>
+        </button>
+        <div className="sidebar-row-actions">
+          <button
+            type="button"
+            className="icon-only"
+            aria-label={team.archived ? `Restore ${team.name}` : `Archive ${team.name}`}
+            title={team.archived ? "Restore team" : "Archive team"}
+            onClick={() => onSetTeamLifecycle(team.id, team.archived ? "restore" : "archive")}
+          >
+            {team.archived ? <RotateCcw size={13} /> : <Archive size={13} />}
+          </button>
+          <button
+            type="button"
+            className="icon-only"
+            aria-label={`Delete ${team.name}`}
+            title="Delete team"
+            onClick={() => confirmDelete("team", team.name) && onSetTeamLifecycle(team.id, "delete")}
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
+      </div>
+      {!collapsed && (
+        <div className="nested-room-list">
+          {rooms.map((room) => (
+            <button
+              key={room.id}
+              className={`room-button nested ${room.active ? "active" : ""}`}
+              onClick={() => onSelectRoom(room.id, room.teamId)}
+              title={`${room.name} · ${room.detail}`}
+            >
+              <div>
+                <strong>
+                  {room.name}
+                  {room.archived ? " (archived)" : ""}
+                </strong>
+                <span>{room.detail}</span>
+              </div>
+              <div className="room-indicators">
+                {room.attention > 0 && <b className="attention">{room.attention}</b>}
+                {room.unread > 0 ? <b>{room.unread}</b> : room.attention === 0 ? <Circle size={8} /> : null}
+              </div>
+              <span className="sidebar-row-actions">
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="icon-only"
+                  aria-label={room.archived ? `Restore ${room.name}` : `Archive ${room.name}`}
+                  title={room.archived ? "Restore room" : "Archive room"}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSetRoomLifecycle(room.id, room.archived ? "restore" : "archive");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onSetRoomLifecycle(room.id, room.archived ? "restore" : "archive");
+                    }
+                  }}
+                >
+                  {room.archived ? <RotateCcw size={13} /> : <Archive size={13} />}
+                </span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="icon-only"
+                  aria-label={`Delete ${room.name}`}
+                  title="Delete room"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (confirmDelete("room", room.name)) onSetRoomLifecycle(room.id, "delete");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (confirmDelete("room", room.name)) onSetRoomLifecycle(room.id, "delete");
+                    }
+                  }}
+                >
+                  <Trash2 size={13} />
+                </span>
+              </span>
+            </button>
+          ))}
+          {rooms.length === 0 && (
+            <div className="sidebar-empty nested-empty">
+              {showArchived
+                ? "No archived rooms in this team."
+                : team.active && !searchActive
+                  ? "No rooms yet. Create one for this team."
+                  : "No visible rooms."}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SidebarFooter({
+  activeSidebarPanel,
+  onSelectSidebarPanel
+}: Pick<DesktopSidebarProps, "activeSidebarPanel" | "onSelectSidebarPanel">) {
+  const { themeMode, toggleThemeMode } = useThemeMode();
+  return (
+    <div className="sidebar-footer">
+      <button onClick={toggleThemeMode}>{themeMode === "dark" ? "Light" : "Dark"}</button>
+      <button
+        className={activeSidebarPanel === "settings" ? "active" : ""}
+        onClick={() => onSelectSidebarPanel(activeSidebarPanel === "settings" ? null : "settings")}
+      >
+        Settings
+      </button>
+      <button
+        className={activeSidebarPanel === "profile" ? "active" : ""}
+        onClick={() => onSelectSidebarPanel(activeSidebarPanel === "profile" ? null : "profile")}
+      >
+        Profile
+      </button>
+    </div>
+  );
+}
+
+export interface DesktopSidebarProps {
+  currentUser: SignedInUser | null;
+  authBusy: boolean;
+  authConfig: GitHubAuthConfig | null;
+  authError: string | null;
+  deviceFlow: GitHubDeviceStart | null;
+  sidebarQuery: string;
+  searchActive: boolean;
+  workspaceError: string | null;
+  newTeamName: string;
+  newRoomName: string;
+  newRoomProjectPath: string;
+  defaultProjectPath: string;
+  selectedTeam: boolean;
+  teams: SidebarTeamDisplay[];
+  rooms: SidebarRoomDisplay[];
+  messageHits: SidebarMessageHitDisplay[];
+  historySearchBusy: boolean;
+  activeSidebarPanel: SidebarPanelName;
+  onSignIn: () => void;
+  onSignOut: () => void;
+  onSidebarQueryChange: (query: string) => void;
+  onClearSidebarQuery: () => void;
+  onNewTeamNameChange: (name: string) => void;
+  onCreateTeam: () => void;
+  onSelectTeam: (teamId: string) => void;
+  onNewRoomNameChange: (name: string) => void;
+  onNewRoomProjectPathChange: (path: string) => void;
+  onChooseNewRoomProjectPath: () => void;
+  onCreateRoom: () => void;
+  onSelectRoom: (roomId: string, teamId?: string) => void;
+  onSetTeamLifecycle: (teamId: string, action: "archive" | "restore" | "delete") => void;
+  onSetRoomLifecycle: (roomId: string, action: "archive" | "restore" | "delete") => void;
+  onSelectSidebarPanel: (panel: SidebarPanelName) => void;
+}
+
 export function DesktopSidebar({
   currentUser,
   authBusy,
@@ -83,42 +379,7 @@ export function DesktopSidebar({
   onSetTeamLifecycle,
   onSetRoomLifecycle,
   onSelectSidebarPanel
-}: {
-  currentUser: SignedInUser | null;
-  authBusy: boolean;
-  authConfig: GitHubAuthConfig | null;
-  authError: string | null;
-  deviceFlow: GitHubDeviceStart | null;
-  sidebarQuery: string;
-  searchActive: boolean;
-  workspaceError: string | null;
-  newTeamName: string;
-  newRoomName: string;
-  newRoomProjectPath: string;
-  defaultProjectPath: string;
-  selectedTeam: boolean;
-  teams: SidebarTeamDisplay[];
-  rooms: SidebarRoomDisplay[];
-  messageHits: SidebarMessageHitDisplay[];
-  historySearchBusy: boolean;
-  activeSidebarPanel: SidebarPanelName;
-  onSignIn: () => void;
-  onSignOut: () => void;
-  onSidebarQueryChange: (query: string) => void;
-  onClearSidebarQuery: () => void;
-  onNewTeamNameChange: (name: string) => void;
-  onCreateTeam: () => void;
-  onSelectTeam: (teamId: string) => void;
-  onNewRoomNameChange: (name: string) => void;
-  onNewRoomProjectPathChange: (path: string) => void;
-  onChooseNewRoomProjectPath: () => void;
-  onCreateRoom: () => void;
-  onSelectRoom: (roomId: string, teamId?: string) => void;
-  onSetTeamLifecycle: (teamId: string, action: "archive" | "restore" | "delete") => void;
-  onSetRoomLifecycle: (roomId: string, action: "archive" | "restore" | "delete") => void;
-  onSelectSidebarPanel: (panel: SidebarPanelName) => void;
-}) {
-  const { themeMode, toggleThemeMode } = useThemeMode();
+}: DesktopSidebarProps) {
   const [teamCreateOpen, setTeamCreateOpen] = useState(false);
   const [roomCreateOpen, setRoomCreateOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -139,59 +400,19 @@ export function DesktopSidebar({
 
   return (
     <aside className="sidebar">
-      <div className="brand">
-        <img className="brand-mark" src={brandIcon} alt="" />
-        <div>
-          <strong>multAIplayer</strong>
-          <span>group chat for Codex</span>
-        </div>
-      </div>
-
-      {currentUser ? (
-        <div className="profile-card">
-          {currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" /> : <Github size={18} />}
-          <div>
-            <strong>{currentUser.name ?? currentUser.login}</strong>
-            <span>@{currentUser.login}</span>
-          </div>
-          <button onClick={onSignOut}>Sign out</button>
-        </div>
-      ) : (
-        <button className="github-button" onClick={onSignIn} disabled={authBusy || authConfig?.configured === false}>
-          <Github size={16} />
-          {authConfig?.configured === false
-            ? "GitHub sign-in not configured"
-            : authBusy
-              ? "Waiting for GitHub"
-              : "Sign in with GitHub"}
-        </button>
-      )}
-
-      {deviceFlow && (
-        <div className="device-flow">
-          <span>Enter this code on GitHub</span>
-          <strong>{deviceFlow.user_code}</strong>
-          <a href={deviceFlow.verification_uri} target="_blank" rel="noreferrer">
-            Open GitHub <ExternalLink size={13} />
-          </a>
-        </div>
-      )}
-      {authError && <div className="auth-error">{authError}</div>}
-
-      <label className="search-box">
-        <Search size={16} />
-        <input
-          placeholder="Search rooms, projects, chats"
-          value={sidebarQuery}
-          onChange={(event) => onSidebarQueryChange(event.target.value)}
-        />
-        {sidebarQuery && (
-          <button onClick={onClearSidebarQuery} aria-label="Clear search">
-            <X size={14} />
-          </button>
-        )}
-      </label>
-      {workspaceError && <div className="workspace-error">{workspaceError}</div>}
+      <SidebarAccountSection
+        currentUser={currentUser}
+        authBusy={authBusy}
+        authConfig={authConfig}
+        authError={authError}
+        deviceFlow={deviceFlow}
+        sidebarQuery={sidebarQuery}
+        workspaceError={workspaceError}
+        onSignIn={onSignIn}
+        onSignOut={onSignOut}
+        onSidebarQueryChange={onSidebarQueryChange}
+        onClearSidebarQuery={onClearSidebarQuery}
+      />
 
       <section className="sidebar-section">
         <div className="section-title">
@@ -241,161 +462,24 @@ export function DesktopSidebar({
           </div>
         )}
         <div className="team-list nested-team-list">
-          {visibleTeams.map((team) => {
-            const teamRooms = roomsForTeam(team);
-            return (
-              <div className="team-group" key={team.id}>
-                <div className={`team-button ${team.active ? "active" : ""}`}>
-                  <button
-                    type="button"
-                    className="team-disclosure"
-                    aria-label={collapsedTeams[team.id] ? `Expand ${team.name}` : `Collapse ${team.name}`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setCollapsedTeams((current) => ({ ...current, [team.id]: !current[team.id] }));
-                    }}
-                  >
-                    {collapsedTeams[team.id] ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                  </button>
-                  <button
-                    type="button"
-                    className="team-select"
-                    title={`${team.name} · ${team.meta}`}
-                    onClick={() => {
-                      onSelectTeam(team.id);
-                      setCollapsedTeams((current) => ({ ...current, [team.id]: false }));
-                    }}
-                  >
-                    <UsersRound size={16} />
-                    <span>
-                      {team.name}
-                      {team.archived ? " (archived)" : ""}
-                    </span>
-                    <small>{team.meta}</small>
-                  </button>
-                  <div className="sidebar-row-actions">
-                    <button
-                      type="button"
-                      className="icon-only"
-                      aria-label={team.archived ? `Restore ${team.name}` : `Archive ${team.name}`}
-                      title={team.archived ? "Restore team" : "Archive team"}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onSetTeamLifecycle(team.id, team.archived ? "restore" : "archive");
-                      }}
-                    >
-                      {team.archived ? <RotateCcw size={13} /> : <Archive size={13} />}
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-only"
-                      aria-label={`Delete ${team.name}`}
-                      title="Delete team"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        if (
-                          window.confirm(
-                            `Delete ${team.name}?\n\nThis removes the team and its rooms from the workspace. It does not erase local copies or ciphertext already received by devices.`
-                          )
-                        ) {
-                          onSetTeamLifecycle(team.id, "delete");
-                        }
-                      }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </div>
-                {!collapsedTeams[team.id] && (
-                  <div className="nested-room-list">
-                    {teamRooms.map((room) => (
-                      <button
-                        key={room.id}
-                        className={`room-button nested ${room.active ? "active" : ""}`}
-                        onClick={() => onSelectRoom(room.id, room.teamId)}
-                        title={`${room.name} · ${room.detail}`}
-                      >
-                        <div>
-                          <strong>
-                            {room.name}
-                            {room.archived ? " (archived)" : ""}
-                          </strong>
-                          <span>{room.detail}</span>
-                        </div>
-                        <div className="room-indicators">
-                          {room.attention > 0 && <b className="attention">{room.attention}</b>}
-                          {room.unread > 0 ? <b>{room.unread}</b> : room.attention === 0 ? <Circle size={8} /> : null}
-                        </div>
-                        <span className="sidebar-row-actions">
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            className="icon-only"
-                            aria-label={room.archived ? `Restore ${room.name}` : `Archive ${room.name}`}
-                            title={room.archived ? "Restore room" : "Archive room"}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onSetRoomLifecycle(room.id, room.archived ? "restore" : "archive");
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                onSetRoomLifecycle(room.id, room.archived ? "restore" : "archive");
-                              }
-                            }}
-                          >
-                            {room.archived ? <RotateCcw size={13} /> : <Archive size={13} />}
-                          </span>
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            className="icon-only"
-                            aria-label={`Delete ${room.name}`}
-                            title="Delete room"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              if (
-                                window.confirm(
-                                  `Delete ${room.name}?\n\nThis removes the room from the workspace. It does not erase local copies or ciphertext already received by devices.`
-                                )
-                              ) {
-                                onSetRoomLifecycle(room.id, "delete");
-                              }
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                if (
-                                  window.confirm(
-                                    `Delete ${room.name}?\n\nThis removes the room from the workspace. It does not erase local copies or ciphertext already received by devices.`
-                                  )
-                                ) {
-                                  onSetRoomLifecycle(room.id, "delete");
-                                }
-                              }
-                            }}
-                          >
-                            <Trash2 size={13} />
-                          </span>
-                        </span>
-                      </button>
-                    ))}
-                    {teamRooms.length === 0 && (
-                      <div className="sidebar-empty nested-empty">
-                        {showArchived
-                          ? "No archived rooms in this team."
-                          : team.active && !searchActive
-                            ? "No rooms yet. Create one for this team."
-                            : "No visible rooms."}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {visibleTeams.map((team) => (
+            <SidebarTeamGroup
+              key={team.id}
+              team={team}
+              rooms={roomsForTeam(team)}
+              collapsed={Boolean(collapsedTeams[team.id])}
+              showArchived={showArchived}
+              searchActive={searchActive}
+              onToggleCollapsed={() => setCollapsedTeams((current) => ({ ...current, [team.id]: !current[team.id] }))}
+              onSelectTeam={(teamId) => {
+                onSelectTeam(teamId);
+                setCollapsedTeams((current) => ({ ...current, [teamId]: false }));
+              }}
+              onSelectRoom={onSelectRoom}
+              onSetTeamLifecycle={onSetTeamLifecycle}
+              onSetRoomLifecycle={onSetRoomLifecycle}
+            />
+          ))}
           {visibleTeams.length === 0 && (
             <div className="sidebar-empty">
               {searchActive
@@ -491,21 +575,7 @@ export function DesktopSidebar({
         </section>
       )}
 
-      <div className="sidebar-footer">
-        <button onClick={toggleThemeMode}>{themeMode === "dark" ? "Light" : "Dark"}</button>
-        <button
-          className={activeSidebarPanel === "settings" ? "active" : ""}
-          onClick={() => onSelectSidebarPanel(activeSidebarPanel === "settings" ? null : "settings")}
-        >
-          Settings
-        </button>
-        <button
-          className={activeSidebarPanel === "profile" ? "active" : ""}
-          onClick={() => onSelectSidebarPanel(activeSidebarPanel === "profile" ? null : "profile")}
-        >
-          Profile
-        </button>
-      </div>
+      <SidebarFooter activeSidebarPanel={activeSidebarPanel} onSelectSidebarPanel={onSelectSidebarPanel} />
     </aside>
   );
 }

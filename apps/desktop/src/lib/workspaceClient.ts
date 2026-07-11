@@ -240,6 +240,15 @@ export async function lookupInvite(inviteId: string): Promise<InviteLookupResult
   return readJsonResponse<InviteLookupResult>(response, "Failed to load invite metadata");
 }
 
+export async function revokeRoomInvites(teamId: string, roomId: string): Promise<number> {
+  const response = await fetch(
+    `${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/rooms/${encodeURIComponent(roomId)}/invites`,
+    { method: "DELETE", credentials: "include" }
+  );
+  const body = await readJsonResponse<{ revoked: number }>(response, "Failed to revoke room invites");
+  return body.revoked;
+}
+
 export async function createAttachmentBlob(request: AttachmentBlobUploadRequest): Promise<AttachmentBlobRecord> {
   const response = await fetch(`${getRelayHttpUrl()}/attachment-blobs`, {
     method: "POST",

@@ -7,6 +7,7 @@ import { formatMessageTime } from "../appFormatters";
 import { useAppStore, type AppStoreState } from "../../store/appStore";
 import type { UseInviteActionsOptions } from "./inviteActionTypes";
 import { currentSelectedRoomContext } from "../selectedWorkspace";
+import { revokeRoomInvites } from "../workspaceClient";
 
 type RoomKeyRotationActionOptions = Pick<
   UseInviteActionsOptions,
@@ -97,6 +98,8 @@ export function createRoomKeyRotationActions(
         seenEnvelopeIds.current.add(envelope.id);
         client.publish({ type: "publish", envelope });
       }
+
+      await revokeRoomInvites(selectedRoom.teamId, selectedRoom.id);
 
       await replaceRoomSecret(selectedRoom.id, newSecret);
       historyLoadedRoomIds.current.add(selectedRoom.id);

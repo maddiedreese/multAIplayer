@@ -20,6 +20,28 @@ test("relay creates invite metadata with expiry", async () => {
   }
 });
 
+test("relay revokes every outstanding invite for a room", async () => {
+  const relay = await startRelay();
+  try {
+    const create = () =>
+      fetch(`${relay.baseUrl}/invites`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
+      });
+    const first = (await (await create()).json()) as { invite: { id: string } };
+    const second = (await (await create()).json()) as { invite: { id: string } };
+
+    const revoked = await fetch(`${relay.baseUrl}/teams/team-core/rooms/room-desktop/invites`, { method: "DELETE" });
+    assert.equal(revoked.status, 200);
+    assert.deepEqual(await revoked.json(), { revoked: 2 });
+    assert.equal((await fetch(`${relay.baseUrl}/invites/${first.invite.id}`)).status, 404);
+    assert.equal((await fetch(`${relay.baseUrl}/invites/${second.invite.id}`)).status, 404);
+  } finally {
+    await relay.close();
+  }
+});
+
 test("relay rejects expired invite metadata loaded from store", async () => {
   const relay = await startRelay(
     {},
