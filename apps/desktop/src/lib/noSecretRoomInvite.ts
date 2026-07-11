@@ -12,10 +12,15 @@ export function encodeNoSecretRoomInvite(invite: NoSecretRoomInvite): string {
 export function decodeNoSecretRoomInvite(value: string): NoSecretRoomInvite {
   const decoded = JSON.parse(new TextDecoder().decode(base64UrlToBytes(value))) as Partial<NoSecretRoomInvite>;
   if (
-    decoded.version !== 1 ||
+    decoded.version !== 2 ||
     typeof decoded.teamId !== "string" ||
     typeof decoded.roomId !== "string" ||
     typeof decoded.roomName !== "string" ||
+    typeof decoded.inviteCapability !== "string" ||
+    !/^[A-Za-z0-9_-]{43}$/.test(decoded.inviteCapability) ||
+    !Number.isSafeInteger(decoded.keyEpoch) ||
+    (decoded.keyEpoch ?? 0) < 1 ||
+    typeof decoded.hostUserId !== "string" ||
     typeof decoded.hostDeviceId !== "string" ||
     !DevicePublicKeyJwk.safeParse(decoded.hostPublicKeyJwk).success ||
     typeof decoded.hostPublicKeyFingerprint !== "string"
@@ -28,6 +33,9 @@ export function decodeNoSecretRoomInvite(value: string): NoSecretRoomInvite {
     teamId: decoded.teamId,
     roomId: decoded.roomId,
     roomName: decoded.roomName,
+    inviteCapability: decoded.inviteCapability,
+    keyEpoch: decoded.keyEpoch!,
+    hostUserId: decoded.hostUserId,
     hostDeviceId: decoded.hostDeviceId,
     hostPublicKeyJwk,
     hostPublicKeyFingerprint: decoded.hostPublicKeyFingerprint

@@ -14,6 +14,7 @@ test("relay stores encrypted attachment blobs as ciphertext", async () => {
         type: "text/typescript",
         size: 120000,
         payload: {
+          version: 2,
           algorithm: "AES-GCM-256",
           nonce: "nonce-for-test",
           ciphertext: "ciphertext-without-plaintext"
@@ -69,6 +70,7 @@ test("relay enforces authenticated live encrypted attachment blob quotas", async
       type: "text/plain",
       size,
       payload: {
+        version: 2,
         algorithm: "AES-GCM-256",
         nonce: "nonce-for-test",
         ciphertext: "tiny"
@@ -140,6 +142,7 @@ test("relay enforces authenticated encrypted attachment upload byte quotas", asy
       type: "text/plain",
       size,
       payload: {
+        version: 2,
         algorithm: "AES-GCM-256",
         nonce: "nonce-for-test",
         ciphertext: "tiny"
@@ -214,6 +217,7 @@ test("relay enforces encrypted attachment blob size limits", async () => {
         type: "text/plain",
         size: 4,
         payload: {
+          version: 2,
           algorithm: "AES-GCM-256",
           nonce: "nonce-for-test",
           ciphertext: "ciphertext"
@@ -233,6 +237,7 @@ test("relay enforces encrypted attachment blob size limits", async () => {
         type: "text\nplain",
         size: 4,
         payload: {
+          version: 2,
           algorithm: "AES-GCM-256",
           nonce: "nonce-for-test",
           ciphertext: "ciphertext"
@@ -252,6 +257,7 @@ test("relay enforces encrypted attachment blob size limits", async () => {
         type: "text/plain",
         size: 4,
         payload: {
+          version: 2,
           algorithm: "AES-GCM-256",
           nonce: "x".repeat(maxEnvelopeNonceChars),
           ciphertext: "ciphertext"
@@ -270,6 +276,7 @@ test("relay enforces encrypted attachment blob size limits", async () => {
         type: "text/plain",
         size: 4,
         payload: {
+          version: 2,
           algorithm: "AES-GCM-256",
           nonce: "x".repeat(maxEnvelopeNonceChars + 1),
           ciphertext: "ciphertext"
@@ -289,6 +296,7 @@ test("relay enforces encrypted attachment blob size limits", async () => {
         type: "text/plain",
         size: 17,
         payload: {
+          version: 2,
           algorithm: "AES-GCM-256",
           nonce: "nonce-for-test",
           ciphertext: "short-ciphertext"
@@ -308,6 +316,7 @@ test("relay enforces encrypted attachment blob size limits", async () => {
         type: "text/plain",
         size: 8,
         payload: {
+          version: 2,
           algorithm: "AES-GCM-256",
           nonce: "nonce-for-test",
           ciphertext: "x".repeat(1500)
@@ -354,6 +363,7 @@ test("relay drops invalid persisted attachment blob metadata", async () => {
           type: "text/plain",
           size: 4,
           payload: {
+            version: 2,
             algorithm: "AES-GCM-256",
             nonce: "nonce-for-test",
             ciphertext: "ciphertext"
@@ -369,6 +379,7 @@ test("relay drops invalid persisted attachment blob metadata", async () => {
           type: "text/plain",
           size: 4,
           payload: {
+            version: 2,
             algorithm: "AES-GCM-256",
             nonce: "nonce-for-test",
             ciphertext: "ciphertext"
@@ -384,6 +395,7 @@ test("relay drops invalid persisted attachment blob metadata", async () => {
           type: "text/plain",
           size: 4,
           payload: {
+            version: 2,
             algorithm: "AES-GCM-256",
             nonce: "nonce-for-test",
             ciphertext: "ciphertext"
@@ -399,6 +411,7 @@ test("relay drops invalid persisted attachment blob metadata", async () => {
           type: "text/plain",
           size: 8,
           payload: {
+            version: 2,
             algorithm: "AES-GCM-256",
             nonce: "nonce-for-test",
             ciphertext: "x".repeat(1500)
@@ -414,6 +427,7 @@ test("relay drops invalid persisted attachment blob metadata", async () => {
           type: "text/plain",
           size: 4,
           payload: {
+            version: 2,
             algorithm: "AES-GCM-256",
             nonce: "x".repeat(maxEnvelopeNonceChars + 1),
             ciphertext: "ciphertext"

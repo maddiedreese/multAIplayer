@@ -76,7 +76,7 @@ Before a wider alpha, manually run these in the native macOS app:
 
 - Public macOS alpha artifacts are Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
 - The alpha app checks a hosted release manifest and shows an in-app update banner, but users still manually download and install updated builds.
-- Production-grade cryptographic member removal still needs key epochs and per-device key delivery.
+- Member-removal dogfood must confirm relay revocation, invite invalidation, per-device epoch delivery, and exclusion of removed devices from future ciphertext.
 - JSON relay storage is for local/dev self-hosting. Hosted or internet-facing alpha relays should use SQLite and still need backup/restore drills before production claims.
 - Rate limiting is process-local; multi-instance hosting needs an edge or shared-store limiter.
 - The browser and terminal expose host-local capabilities after approval and need continued security review.

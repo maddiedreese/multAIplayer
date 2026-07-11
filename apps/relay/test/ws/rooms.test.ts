@@ -16,6 +16,7 @@ import {
   waitForError,
   waitForJoined,
   waitForPresence,
+  waitForPublished,
   waitForRejectedOpen,
   waitForRoomUpdated,
   waitForTeamUpdated,
@@ -541,11 +542,15 @@ test("relay ignores duplicate encrypted envelopes by room id", async () => {
       kind: "browser.event"
     });
     const firstEnvelopePromise = waitForEnvelope(receiver, "browser.event");
+    const firstAck = waitForPublished(sender, envelope.id);
     sender.send(JSON.stringify({ type: "publish", envelope }));
 
     assert.equal((await firstEnvelopePromise).id, envelope.id);
+    assert.equal(await firstAck, envelope.id);
     const duplicateEnvelopePromise = waitForEnvelope(receiver, "browser.event", 300);
+    const duplicateAck = waitForPublished(sender, envelope.id);
     sender.send(JSON.stringify({ type: "publish", envelope }));
+    assert.equal(await duplicateAck, envelope.id);
     await assert.rejects(duplicateEnvelopePromise, /Timed out waiting for envelope/);
     await waitForDebugBacklog(relay.baseUrl, 1);
     const backlog = await debugBacklog(relay.baseUrl);
@@ -554,6 +559,43 @@ test("relay ignores duplicate encrypted envelopes by room id", async () => {
   } finally {
     receiver.close();
     sender.close();
+    await relay.close();
+  }
+});
+
+test("relay rejects non-host room key transitions before epoch CAS", async () => {
+  const relay = await startRelay();
+  const member = new WebSocket(relay.wsUrl);
+  try {
+    await onceOpen(member);
+    member.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:tester",
+        deviceId: "device-member-rotation"
+      })
+    );
+    await waitForJoined(member);
+    const rejected = waitForError(member);
+    member.send(
+      JSON.stringify({
+        type: "publish",
+        envelope: {
+          ...testEnvelope({ id: "unauthorized-room-key", senderDeviceId: "device-member-rotation" }),
+          kind: "room.key",
+          keyEpoch: 1
+        }
+      })
+    );
+    assert.match(await rejected, /Join the room before publishing/);
+    assert.equal(
+      (await debugBacklog(relay.baseUrl)).flatMap((entry) => entry.sample?.id ?? []).includes("unauthorized-room-key"),
+      false
+    );
+  } finally {
+    member.close();
     await relay.close();
   }
 });
@@ -893,7 +935,8 @@ test("relay enriches presence with registered device fingerprints", async () => 
           deviceId: "device-test-123",
           displayName: "Tester",
           publicKeyJwk: { kty: "EC", crv: "P-256", x: "x", y: "y" },
-          publicKeyFingerprint: "sha256:registered-device-key",
+          publicKeyFingerprint:
+            "sha256:9536:18c0:f88e:54b9:c41a:7ff6:b5e7:5a26:cf7b:7ec1:df4d:d474:8ddb:0b25:5176:46e0",
           registeredAt: new Date().toISOString(),
           lastSeenAt: new Date().toISOString()
         },
@@ -934,12 +977,15 @@ test("relay enriches presence with registered device fingerprints", async () => 
         userId: "github:tester",
         deviceId: "device-test-123",
         displayName: "Tester",
-        publicKeyFingerprint: "sha256:untrusted-client-value"
+        publicKeyFingerprint: "sha256:1111:1111:1111:1111:1111:1111:1111:1111:1111:1111:1111:1111:1111:1111:1111:1111"
       })
     );
 
     const presence = await presencePromise;
-    assert.equal(presence.publicKeyFingerprint, "sha256:registered-device-key");
+    assert.equal(
+      presence.publicKeyFingerprint,
+      "sha256:9536:18c0:f88e:54b9:c41a:7ff6:b5e7:5a26:cf7b:7ec1:df4d:d474:8ddb:0b25:5176:46e0"
+    );
     assert.equal(presence.status, "online");
 
     untrustedSocket.send(
@@ -962,12 +1008,15 @@ test("relay enriches presence with registered device fingerprints", async () => 
         userId: "github:tester",
         deviceId: "device-private-key",
         displayName: "Tester",
-        publicKeyFingerprint: "sha256:client-presented-key"
+        publicKeyFingerprint: "sha256:2222:2222:2222:2222:2222:2222:2222:2222:2222:2222:2222:2222:2222:2222:2222:2222"
       })
     );
 
     const untrustedPresence = await untrustedPresencePromise;
-    assert.equal(untrustedPresence.publicKeyFingerprint, "sha256:client-presented-key");
+    assert.equal(
+      untrustedPresence.publicKeyFingerprint,
+      "sha256:2222:2222:2222:2222:2222:2222:2222:2222:2222:2222:2222:2222:2222:2222:2222:2222"
+    );
   } finally {
     socket.close();
     untrustedSocket.close();

@@ -32,7 +32,8 @@ test("encrypted relay envelopes accept the canonical activity kind", () => {
     senderUserId: "user-1",
     createdAt: "2026-07-09T12:00:01.000Z",
     kind: "codex.activity",
-    payload: { algorithm: "AES-GCM-256", nonce: "a".repeat(16), ciphertext: "a".repeat(16) }
+    keyEpoch: 1,
+    payload: { version: 2, algorithm: "AES-GCM-256", nonce: "a".repeat(16), ciphertext: "a".repeat(16) }
   });
   assert.equal(result.success, true);
 });

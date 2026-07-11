@@ -1,6 +1,5 @@
 import type { MutableRefObject } from "react";
 import type { BrowserRequestPlaintextPayload, RelayEnvelope, RoomRecord } from "@multaiplayer/protocol";
-import { encryptJson } from "@multaiplayer/crypto";
 import { resetBrowserProfile } from "./localBackend";
 import { loadOrCreateRoomSecret } from "./localHistory";
 import type { RelayClient } from "./relayClient";
@@ -8,6 +7,7 @@ import { canActOnRoomBrowserRequest, findRoomBrowserRequest, roomBrowserRequestM
 import { formatBrowserAccessLabel, normalizeBrowserLocationInput } from "./browserUi";
 import { shouldApplyRoomScopedUiUpdate } from "./roomScopedUi";
 import type { BrowserAccessRequest } from "../types";
+import { createEncryptedRoomEnvelope, roomKeyEpoch } from "./encryptedEnvelope";
 import { useAppStore } from "../store/appStore";
 import { currentSelectedRoom, currentSelectedRoomContext } from "./selectedWorkspace";
 
@@ -96,16 +96,20 @@ export function createBrowserActions({
         requestedAt: request.requestedAt
       };
       const secret = await loadOrCreateRoomSecret(room.id);
-      const envelope: RelayEnvelope = {
-        id: crypto.randomUUID(),
-        teamId: room.teamId,
-        roomId: room.id,
-        senderDeviceId: currentContext()?.deviceId ?? "local-device",
-        senderUserId: currentContext()?.localUser.id ?? "local",
-        createdAt: new Date().toISOString(),
-        kind: "browser.request",
-        payload: await encryptJson(payload, secret)
-      };
+      const envelope: RelayEnvelope = await createEncryptedRoomEnvelope(
+        {
+          id: crypto.randomUUID(),
+          teamId: room.teamId,
+          roomId: room.id,
+          senderDeviceId: currentContext()?.deviceId ?? "local-device",
+          senderUserId: currentContext()?.localUser.id ?? "local",
+          createdAt: new Date().toISOString(),
+          kind: "browser.request",
+          keyEpoch: roomKeyEpoch(room)
+        },
+        payload,
+        secret
+      );
       seenEnvelopeIds.current.add(envelope.id);
       client.publish({ type: "publish", envelope });
       useAppStore.getState().appendBrowserRequest(roomId, request);

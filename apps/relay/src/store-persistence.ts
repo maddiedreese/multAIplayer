@@ -7,7 +7,8 @@ export interface RelayStorePersistenceCoordinator {
   loadRelayStore(): Promise<void>;
   scheduleStoreSave(): void;
   saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): void;
-  saveEncryptedEnvelope(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]): void;
+  saveEncryptedEnvelope(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]): Promise<void>;
+  saveRoomKeyTransition(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]): Promise<void>;
   saveRelayStore(): Promise<void>;
   flushRelayStore(): Promise<void>;
   closeRelayStore(): Promise<void>;
@@ -82,17 +83,25 @@ export function createRelayStorePersistenceCoordinator(options: {
   }
 
   function saveEncryptedEnvelope(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]) {
-    trackEncryptedSave(
-      options.persistence
-        .saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds)
-        .then((handled) => {
-          if (!handled) scheduleStoreSave();
-        })
-        .catch((error) => {
-          console.error("Failed to append encrypted relay envelope:", error);
-          scheduleStoreSave();
-        })
+    const save = options.persistence
+      .saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds)
+      .then(async (handled) => {
+        if (!handled) await saveRelayStore();
+      });
+    trackEncryptedSave(save);
+    return save;
+  }
+
+  function saveRoomKeyTransition(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]) {
+    options.storeCodec.pruneExpiredRelayState();
+    const save = options.persistence.saveRoomKeyTransition(
+      roomKey,
+      envelope,
+      prunedEnvelopeIds,
+      options.storeCodec.toStoredRelayState()
     );
+    trackEncryptedSave(save);
+    return save;
   }
 
   async function saveRelayStore() {
@@ -123,6 +132,7 @@ export function createRelayStorePersistenceCoordinator(options: {
     scheduleStoreSave,
     saveEncryptedBacklog,
     saveEncryptedEnvelope,
+    saveRoomKeyTransition,
     saveRelayStore,
     flushRelayStore,
     closeRelayStore

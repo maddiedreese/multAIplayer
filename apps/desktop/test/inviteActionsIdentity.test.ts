@@ -93,7 +93,7 @@ test("invite action identities survive wrapper-object rerenders", () => {
   rerender({ options: { ...inviteOptions } });
 
   assert.equal(result.current, first);
-  assert.equal(result.current.acceptInvite, first.acceptInvite);
+  assert.equal(result.current.joinInviteSecret, first.joinInviteSecret);
   assert.equal(result.current.copyInviteLink, first.copyInviteLink);
   assert.equal(result.current.decideInviteJoinRequest, first.decideInviteJoinRequest);
   assert.equal(result.current.rotateSelectedRoomKey, first.rotateSelectedRoomKey);

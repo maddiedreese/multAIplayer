@@ -6,7 +6,6 @@ import type {
   RelayEnvelope,
   RoomRecord
 } from "@multaiplayer/protocol";
-import { encryptJson } from "@multaiplayer/crypto";
 import { useAppStore } from "../store/appStore";
 import { loadOrCreateRoomSecret } from "./localHistory";
 import { canUseRoomChat, roomChatGateMessage } from "./chatPolicy";
@@ -15,6 +14,7 @@ import { messageIsBeforeCodexWatermark } from "./codexMessageWatermark";
 import type { RelayClient } from "./relayClient";
 import type { ChatMessage } from "../types";
 import { currentLocalIdentity } from "./selectedWorkspace";
+import { createEncryptedRoomEnvelope, roomKeyEpoch } from "./encryptedEnvelope";
 
 interface MutableRef<T> {
   current: T;
@@ -49,16 +49,21 @@ export function createChatActions({ relayRef, seenEnvelopeIds }: ChatActionsOpti
     }
 
     const secret = await loadOrCreateRoomSecret(room.id);
-    const envelope: RelayEnvelope = {
-      id: crypto.randomUUID(),
-      teamId: room.teamId,
-      roomId: room.id,
-      senderDeviceId: identity().deviceId,
-      senderUserId: identity().localUser.id,
-      createdAt: new Date().toISOString(),
-      kind: "chat.message",
-      payload: await encryptJson(message satisfies ChatPlaintextPayload, secret)
-    };
+    const liveMessage: ChatPlaintextPayload = { ...message, authorUserId: identity().localUser.id };
+    const envelope: RelayEnvelope = await createEncryptedRoomEnvelope(
+      {
+        id: crypto.randomUUID(),
+        teamId: room.teamId,
+        roomId: room.id,
+        senderDeviceId: identity().deviceId,
+        senderUserId: identity().localUser.id,
+        createdAt: new Date().toISOString(),
+        kind: "chat.message",
+        keyEpoch: roomKeyEpoch(room)
+      },
+      liveMessage,
+      secret
+    );
     seenEnvelopeIds.current.add(envelope.id);
     client.publish({ type: "publish", envelope });
     useAppStore.getState().appendRoomMessage(room.id, message);
@@ -112,16 +117,20 @@ export function createChatActions({ relayRef, seenEnvelopeIds }: ChatActionsOpti
       return;
     }
     const secret = await loadOrCreateRoomSecret(roomId);
-    const envelope: RelayEnvelope = {
-      id: crypto.randomUUID(),
-      teamId: selectedRoom.teamId,
-      roomId,
-      senderDeviceId: identity().deviceId,
-      senderUserId: identity().localUser.id,
-      createdAt: payload.createdAt,
-      kind: "chat.reaction",
-      payload: await encryptJson(payload, secret)
-    };
+    const envelope: RelayEnvelope = await createEncryptedRoomEnvelope(
+      {
+        id: crypto.randomUUID(),
+        teamId: selectedRoom.teamId,
+        roomId,
+        senderDeviceId: identity().deviceId,
+        senderUserId: identity().localUser.id,
+        createdAt: payload.createdAt,
+        kind: "chat.reaction",
+        keyEpoch: roomKeyEpoch(selectedRoom)
+      },
+      payload,
+      secret
+    );
     seenEnvelopeIds.current.add(envelope.id);
     client.publish({ type: "publish", envelope });
   }
@@ -171,16 +180,20 @@ export function createChatActions({ relayRef, seenEnvelopeIds }: ChatActionsOpti
       return;
     }
     const secret = await loadOrCreateRoomSecret(selectedRoom.id);
-    const envelope: RelayEnvelope = {
-      id: crypto.randomUUID(),
-      teamId: selectedRoom.teamId,
-      roomId: selectedRoom.id,
-      senderDeviceId: identity().deviceId,
-      senderUserId: identity().localUser.id,
-      createdAt,
-      kind,
-      payload: await encryptJson(payload, secret)
-    };
+    const envelope: RelayEnvelope = await createEncryptedRoomEnvelope(
+      {
+        id: crypto.randomUUID(),
+        teamId: selectedRoom.teamId,
+        roomId: selectedRoom.id,
+        senderDeviceId: identity().deviceId,
+        senderUserId: identity().localUser.id,
+        createdAt,
+        kind,
+        keyEpoch: roomKeyEpoch(selectedRoom)
+      },
+      payload,
+      secret
+    );
     seenEnvelopeIds.current.add(envelope.id);
     client.publish({ type: "publish", envelope });
   }

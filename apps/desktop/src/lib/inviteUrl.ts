@@ -7,10 +7,7 @@ export type InviteUrlPayload =
       cleanupPath: string;
     }
   | {
-      kind: "secret";
-      encoded: string;
-      inviteId: string | null;
-      approvalRequested: boolean;
+      kind: "legacy-secret";
       cleanupPath: string;
     };
 
@@ -37,10 +34,7 @@ export function readInviteUrlPayload(location: InviteUrlParts): InviteUrlPayload
   const secretInvite = fragment.get("multaiplayerInvite");
   if (secretInvite) {
     return {
-      kind: "secret",
-      encoded: secretInvite,
-      inviteId,
-      approvalRequested,
+      kind: "legacy-secret",
       cleanupPath: location.pathname
     };
   }

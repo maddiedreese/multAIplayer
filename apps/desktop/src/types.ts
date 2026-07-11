@@ -165,10 +165,13 @@ export interface MarkdownCopyFallback {
 }
 
 export interface NoSecretRoomInvite {
-  version: 1;
+  version: 2;
   teamId: string;
   roomId: string;
   roomName: string;
+  inviteCapability: string;
+  keyEpoch: number;
+  hostUserId: string;
   hostDeviceId: string;
   hostPublicKeyJwk: DevicePublicKeyJwkType;
   hostPublicKeyFingerprint: string;

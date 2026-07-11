@@ -175,6 +175,7 @@ test("member actions update the current Zustand roster without React", async () 
       untrustDeviceForRoom: () => undefined,
       updateTeamRoleForTeam: () => undefined,
       updateTeamMemberCountForTeam: () => undefined,
+      rotateRoomKeyForDevices: async () => undefined,
       copyMarkdownWithFallback: async () => undefined
     });
 
@@ -192,6 +193,88 @@ test("member actions update the current Zustand roster without React", async () 
     assert.equal(roster?.members?.[0]?.role, "admin");
     assert.equal(roster?.busy, false);
     assert.match(roster?.message ?? "", /alex is now Admin/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("member removal aborts before relay revocation unless every active room is locally hosted", async () => {
+  let fetchCount = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    fetchCount += 1;
+    return new Response(JSON.stringify({ members: [] }), { status: 200 });
+  };
+  useAppStore.setState({ rooms: [{ ...room, hostUserId: "github:other" }] });
+  try {
+    const actions = createMemberActions({
+      setDeviceIdentityMessage: () => undefined,
+      trustDeviceForRoom: () => undefined,
+      untrustDeviceForRoom: () => undefined,
+      updateTeamRoleForTeam: () => undefined,
+      updateTeamMemberCountForTeam: () => undefined,
+      rotateRoomKeyForDevices: async () => undefined,
+      copyMarkdownWithFallback: async () => undefined
+    });
+    await actions.removeMemberFromTeam({
+      teamId: room.teamId,
+      userId: "github:alex",
+      role: "member",
+      joinedAt: "2026-07-09T12:00:00.000Z"
+    });
+    assert.equal(fetchCount, 0);
+    assert.match(useAppStore.getState().teamRosterByTeam[room.teamId]?.message ?? "", /Removal was not started/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("member removal reports relay-revoked but incomplete cryptographic transitions explicitly", async () => {
+  const originalFetch = globalThis.fetch;
+  let removalCalls = 0;
+  globalThis.fetch = async () => {
+    removalCalls += 1;
+    return removalCalls === 1
+      ? new Response(JSON.stringify({ members: [] }), { status: 200, headers: { "content-type": "application/json" } })
+      : new Response(JSON.stringify({ error: "Team member not found" }), {
+          status: 404,
+          headers: { "content-type": "application/json" }
+        });
+  };
+  try {
+    const target = {
+      teamId: room.teamId,
+      userId: "github:alex",
+      role: "member" as const,
+      joinedAt: "2026-07-09T12:00:00.000Z"
+    };
+    useAppStore.getState().setTeamMembersForTeam(room.teamId, [target]);
+    let rotationAttempts = 0;
+    const actions = createMemberActions({
+      setDeviceIdentityMessage: () => undefined,
+      trustDeviceForRoom: () => undefined,
+      untrustDeviceForRoom: () => undefined,
+      updateTeamRoleForTeam: () => undefined,
+      updateTeamMemberCountForTeam: () => undefined,
+      rotateRoomKeyForDevices: async () => {
+        rotationAttempts += 1;
+        if (rotationAttempts === 1) throw new Error("distribution failed");
+      },
+      copyMarkdownWithFallback: async () => undefined
+    });
+    await actions.removeMemberFromTeam(target);
+    const message = useAppStore.getState().teamRosterByTeam[room.teamId]?.message ?? "";
+    assert.match(message, /relay access was removed/);
+    assert.match(message, /cryptographic access rotation is incomplete/);
+    assert.match(message, /Actions: Error: distribution failed/);
+    assert.doesNotMatch(message, /^Removed /);
+    assert.equal(useAppStore.getState().teamRosterByTeam[room.teamId]?.members?.[0]?.userId, target.userId);
+
+    await actions.removeMemberFromTeam(target);
+    assert.equal(removalCalls, 2);
+    assert.equal(rotationAttempts, 2);
+    assert.deepEqual(useAppStore.getState().teamRosterByTeam[room.teamId]?.members, []);
+    assert.match(useAppStore.getState().teamRosterByTeam[room.teamId]?.message ?? "", /^Removed /);
   } finally {
     globalThis.fetch = originalFetch;
   }

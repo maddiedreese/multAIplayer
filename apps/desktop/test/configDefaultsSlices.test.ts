@@ -113,7 +113,7 @@ test("team defaults load into one coherent store snapshot", () => {
   assert.equal(state.teamDefaultApprovalPolicy, "never_host");
   assert.equal(state.teamDefaultCodexModel, "gpt-5.4-thinking");
   assert.equal(state.teamDefaultBrowserProfilePersistent, false);
-  assert.equal(state.teamDefaultInviteApprovalGate, false);
+  assert.equal(state.teamDefaultInviteApprovalGate, true);
 });
 
 test("history defaults setters are reset without mutating persisted team defaults", () => {

@@ -87,7 +87,7 @@ For each member and device:
 4. Have the member open the invite, switch their Settings relay URLs to the self-hosted relay, and join.
 5. Confirm the member can send and receive an encrypted test message in the new room.
 
-Do not paste old direct invite links into public issue trackers, chats, logs, or docs. Direct invite fragments can carry room key material.
+Do not paste legacy room-key-bearing invite links into public issue trackers, chats, logs, or docs. Current invite links contain no room key; generate fresh capability-authenticated invites for the destination relay.
 
 ## 4. Verify Room Continuity
 
@@ -113,7 +113,7 @@ Once the verification checklist passes:
 2. Keep the hosted relay rooms quiet/read-only by convention.
 3. Post a final hosted-relay room message that points to the self-hosted relay URLs and notes the cutover time.
 4. Keep the hosted relay available through the planned observation period or through the hosted sunset window.
-5. Rotate room keys where appropriate after everyone has joined the replacement room. In the alpha, room-key rotation is hygiene for future messages, not full cryptographic member removal.
+5. Refresh room access after everyone has joined the replacement room. This advances the key epoch and delivers the new key independently to eligible registered devices.
 
 ## Rollback
 

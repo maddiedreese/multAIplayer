@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EncryptedPayload } from "./crypto-payloads.js";
+import { EncryptedPayload, PublicKeyFingerprint } from "./crypto-payloads.js";
 import {
   DeviceId,
   RoomId,
@@ -8,43 +8,49 @@ import {
   maxDisplayNameChars,
   maxEnvelopeIdChars,
   maxMediumTextChars,
-  maxShortTextChars,
   maxUrlChars
 } from "./limits-ids.js";
 import { RoomRecord, TeamRecord } from "./room-team-records.js";
 
-export const RelayEnvelope = z.object({
+export const RelayEnvelopeKind = z.enum([
+  "chat.message",
+  "chat.attachment",
+  "chat.reaction",
+  "chat.edit",
+  "chat.delete",
+  "codex.invoke",
+  "codex.event",
+  "codex.activity",
+  "codex.approval",
+  "codex.queue",
+  "browser.request",
+  "browser.event",
+  "workspace.request",
+  "workspace.event",
+  "terminal.request",
+  "terminal.event",
+  "preview.event",
+  "git.event",
+  "room.presence",
+  "room.invite",
+  "room.host",
+  "room.settings",
+  "room.key"
+]);
+
+/** Metadata authenticated as AES-GCM additional data for every room payload. */
+export const RoomEnvelopeMetadata = z.object({
   id: z.string().min(1).max(maxEnvelopeIdChars),
   teamId: TeamId,
   roomId: RoomId,
   senderDeviceId: DeviceId,
   senderUserId: UserId,
   createdAt: z.string().datetime(),
-  kind: z.enum([
-    "chat.message",
-    "chat.attachment",
-    "chat.reaction",
-    "chat.edit",
-    "chat.delete",
-    "codex.invoke",
-    "codex.event",
-    "codex.activity",
-    "codex.approval",
-    "codex.queue",
-    "browser.request",
-    "browser.event",
-    "workspace.request",
-    "workspace.event",
-    "terminal.request",
-    "terminal.event",
-    "preview.event",
-    "git.event",
-    "room.presence",
-    "room.invite",
-    "room.host",
-    "room.settings",
-    "room.key"
-  ]),
+  kind: RelayEnvelopeKind,
+  keyEpoch: z.number().int().positive()
+});
+
+export const RelayEnvelope = RoomEnvelopeMetadata.extend({
   payload: EncryptedPayload
 });
 
@@ -56,7 +62,7 @@ export const PresenceMessage = z.object({
   deviceId: DeviceId,
   displayName: z.string().min(1).max(maxDisplayNameChars),
   avatarUrl: z.string().max(maxUrlChars).optional(),
-  publicKeyFingerprint: z.string().max(maxShortTextChars).optional()
+  publicKeyFingerprint: PublicKeyFingerprint.optional()
 });
 
 export const RelayClientMessage = z.discriminatedUnion("type", [
@@ -100,6 +106,10 @@ export const RelayServerMessage = z.discriminatedUnion("type", [
     type: z.literal("workspace.subscribed")
   }),
   z.object({
+    type: z.literal("published"),
+    envelopeId: z.string().min(1).max(maxEnvelopeIdChars)
+  }),
+  z.object({
     type: z.literal("envelope"),
     envelope: RelayEnvelope
   }),
@@ -111,7 +121,7 @@ export const RelayServerMessage = z.discriminatedUnion("type", [
     deviceId: DeviceId,
     displayName: z.string().min(1).max(maxDisplayNameChars),
     avatarUrl: z.string().max(maxUrlChars).optional(),
-    publicKeyFingerprint: z.string().max(maxShortTextChars).optional(),
+    publicKeyFingerprint: PublicKeyFingerprint.optional(),
     status: z.enum(["online", "offline"])
   }),
   z.object({
@@ -129,6 +139,8 @@ export const RelayServerMessage = z.discriminatedUnion("type", [
 ]);
 
 export type RelayEnvelope = z.infer<typeof RelayEnvelope>;
+export type RelayEnvelopeKind = z.infer<typeof RelayEnvelopeKind>;
+export type RoomEnvelopeMetadata = z.infer<typeof RoomEnvelopeMetadata>;
 export type PresenceMessage = z.infer<typeof PresenceMessage>;
 export type RelayClientMessage = z.infer<typeof RelayClientMessage>;
 export type RelayServerMessage = z.infer<typeof RelayServerMessage>;

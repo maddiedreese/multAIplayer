@@ -28,8 +28,7 @@ export function AppShellView({
     <div className="web-preview-banner" role="status">
       <strong>Development web preview</strong>
       <span>
-        Do not use this fallback for private projects; room secrets use browser localStorage instead of the native
-        Keychain.
+        Do not use this fallback for private projects; room secrets are memory-only and room access is lost on reload.
       </span>
     </div>
   ) : null;

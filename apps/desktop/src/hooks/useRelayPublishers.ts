@@ -11,8 +11,8 @@ import type {
   RoomSettingsPlaintextPayload,
   TerminalResultPlaintextPayload
 } from "@multaiplayer/protocol";
-import { encryptJson } from "@multaiplayer/crypto";
 import { loadOrCreateRoomSecret } from "../lib/localHistory";
+import { createEncryptedRoomEnvelope, roomKeyEpoch } from "../lib/encryptedEnvelope";
 import type { RelayClient } from "../lib/relayClient";
 import { buildRoomSettingsSystemMessage } from "../lib/roomSettingsMessages";
 import { buildCodexEventLine } from "../lib/activityLines";
@@ -87,6 +87,26 @@ export function useRelayPublishers({
     client.publish({ type: "publish", envelope });
   }
 
+  async function publishPlaintext(room: RoomRecord, kind: RelayEnvelope["kind"], createdAt: string, payload: unknown) {
+    const secret = await loadOrCreateRoomSecret(room.id);
+    await publishEnvelope(
+      await createEncryptedRoomEnvelope(
+        {
+          id: crypto.randomUUID(),
+          teamId: room.teamId,
+          roomId: room.id,
+          senderDeviceId: deviceId,
+          senderUserId: localUser.id,
+          createdAt,
+          kind,
+          keyEpoch: roomKeyEpoch(room)
+        },
+        payload,
+        secret
+      )
+    );
+  }
+
   async function publishRequestStatus(
     kind: "terminal.event" | "browser.event",
     requestId: string,
@@ -95,35 +115,15 @@ export function useRelayPublishers({
   ) {
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
-    const secret = await loadOrCreateRoomSecret(room.id);
     const payload = buildLocalRequestStatusPayload(requestId, status);
-    await publishEnvelope({
-      id: crypto.randomUUID(),
-      teamId: room.teamId,
-      roomId: room.id,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
-      createdAt: payload.decidedAt,
-      kind,
-      payload: await encryptJson(payload, secret)
-    });
+    await publishPlaintext(room, kind, payload.decidedAt, payload);
   }
 
   async function publishLocalPreviewEvent(payload: LocalPreviewRecord, room: RoomRecord = selectedRoom) {
     appendLocalPreviewEvent(room.id, payload);
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
-    const secret = await loadOrCreateRoomSecret(room.id);
-    await publishEnvelope({
-      id: crypto.randomUUID(),
-      teamId: room.teamId,
-      roomId: room.id,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
-      createdAt: payload.updatedAt,
-      kind: "preview.event",
-      payload: await encryptJson(payload, secret)
-    });
+    await publishPlaintext(room, "preview.event", payload.updatedAt, payload);
   }
 
   async function publishTerminalResult(
@@ -140,7 +140,6 @@ export function useRelayPublishers({
   ) {
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
-    const secret = await loadOrCreateRoomSecret(room.id);
     const payload: TerminalResultPlaintextPayload = {
       eventType: "terminal.result",
       requestId: request.id,
@@ -155,16 +154,7 @@ export function useRelayPublishers({
       startedAt: result.startedAt,
       finishedAt: result.finishedAt
     };
-    await publishEnvelope({
-      id: crypto.randomUUID(),
-      teamId: room.teamId,
-      roomId: room.id,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
-      createdAt: payload.finishedAt,
-      kind: "terminal.event",
-      payload: await encryptJson(payload, secret)
-    });
+    await publishPlaintext(room, "terminal.event", payload.finishedAt, payload);
   }
 
   async function publishGitWorkflowEvent(
@@ -181,17 +171,7 @@ export function useRelayPublishers({
     appendGitWorkflowEvent(room.id, payload);
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
-    const secret = await loadOrCreateRoomSecret(room.id);
-    await publishEnvelope({
-      id: crypto.randomUUID(),
-      teamId: room.teamId,
-      roomId: room.id,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
-      createdAt: payload.createdAt,
-      kind: "git.event",
-      payload: await encryptJson(payload, secret)
-    });
+    await publishPlaintext(room, "git.event", payload.createdAt, payload);
   }
 
   async function publishCodexEvent(
@@ -210,17 +190,7 @@ export function useRelayPublishers({
 
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
-    const secret = await loadOrCreateRoomSecret(room.id);
-    await publishEnvelope({
-      id: crypto.randomUUID(),
-      teamId: room.teamId,
-      roomId: room.id,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
-      createdAt: payload.createdAt,
-      kind: "codex.event",
-      payload: await encryptJson(payload, secret)
-    });
+    await publishPlaintext(room, "codex.event", payload.createdAt, payload);
   }
 
   async function publishCodexActivity(
@@ -236,17 +206,7 @@ export function useRelayPublishers({
     upsertCodexActivity(room.id, payload);
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
-    const secret = await loadOrCreateRoomSecret(room.id);
-    await publishEnvelope({
-      id: crypto.randomUUID(),
-      teamId: room.teamId,
-      roomId: room.id,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
-      createdAt: payload.updatedAt,
-      kind: "codex.activity",
-      payload: await encryptJson(payload, secret)
-    });
+    await publishPlaintext(room, "codex.activity", payload.updatedAt, payload);
   }
 
   async function publishCodexQueueEvent(
@@ -267,17 +227,7 @@ export function useRelayPublishers({
 
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
-    const secret = await loadOrCreateRoomSecret(room.id);
-    await publishEnvelope({
-      id: crypto.randomUUID(),
-      teamId: room.teamId,
-      roomId: room.id,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
-      createdAt: payload.createdAt,
-      kind: "codex.queue",
-      payload: await encryptJson(payload, secret)
-    });
+    await publishPlaintext(room, "codex.queue", payload.createdAt, payload);
   }
 
   async function publishRoomSettingsEvent(
@@ -301,17 +251,7 @@ export function useRelayPublishers({
 
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
-    const secret = await loadOrCreateRoomSecret(room.id);
-    await publishEnvelope({
-      id: crypto.randomUUID(),
-      teamId: room.teamId,
-      roomId: room.id,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
-      createdAt: payload.changedAt,
-      kind: "room.settings",
-      payload: await encryptJson(payload, secret)
-    });
+    await publishPlaintext(room, "room.settings", payload.changedAt, payload);
   }
 
   async function publishGitHubActionsEvent(
@@ -327,17 +267,7 @@ export function useRelayPublishers({
     appendGitHubActionsEvent(room.id, payload);
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
-    const secret = await loadOrCreateRoomSecret(room.id);
-    await publishEnvelope({
-      id: crypto.randomUUID(),
-      teamId: room.teamId,
-      roomId: room.id,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
-      createdAt: payload.checkedAt,
-      kind: "git.event",
-      payload: await encryptJson(payload, secret)
-    });
+    await publishPlaintext(room, "git.event", payload.checkedAt, payload);
   }
 
   return {

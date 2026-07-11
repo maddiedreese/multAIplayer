@@ -1,6 +1,4 @@
 import type { InviteJoinRequestPlaintextPayload } from "@multaiplayer/protocol";
-import { decodeRoomInviteSecret } from "@multaiplayer/crypto";
-import { importRoomSecret } from "../localHistory";
 import { lookupInvite } from "../workspaceClient";
 import { decodeNoSecretRoomInvite } from "../noSecretRoomInvite";
 import { ensureRoomDefaults } from "../roomDefaults";
@@ -13,6 +11,8 @@ import {
 import { useAppStore, type AppStoreState } from "../../store/appStore";
 import type { UseInviteActionsOptions } from "./inviteActionTypes";
 import { currentLocalIdentity } from "../selectedWorkspace";
+import { rememberPendingInviteCapability } from "../inviteCapabilityStore";
+import { fingerprintPublicKey } from "@multaiplayer/crypto";
 
 type PublishInviteJoinRequest = (
   teamId: string,
@@ -32,7 +32,6 @@ type InviteJoinStore = Pick<
   AppStoreState,
   | "appendInviteRequest"
   | "initializeMessagesForRoom"
-  | "restoreForgottenRoom"
   | "restoreWorkspaceAccess"
   | "setInviteAdmissionForRoom"
   | "setInviteMessageForRoom"
@@ -46,7 +45,6 @@ export function createInviteJoinActions(
   const {
     appendInviteRequest,
     initializeMessagesForRoom,
-    restoreForgottenRoom,
     restoreWorkspaceAccess,
     setInviteAdmissionForRoom,
     setInviteMessageForRoom
@@ -63,11 +61,17 @@ export function createInviteJoinActions(
     const { deviceIdentity } = useAppStore.getState();
     const { localUser, deviceId } = currentLocalIdentity();
     const inviteSecret = decodeNoSecretRoomInvite(encodedInvite);
+    if ((await fingerprintPublicKey(inviteSecret.hostPublicKeyJwk)) !== inviteSecret.hostPublicKeyFingerprint) {
+      throw new Error("Invite host public key fingerprint does not match the embedded key.");
+    }
     let acceptedRoomName = inviteSecret.roomName;
     if (inviteId) {
       const metadata = await lookupInvite(inviteId);
       if (metadata.invite.teamId !== inviteSecret.teamId || metadata.invite.roomId !== inviteSecret.roomId) {
         throw new Error("Invite metadata does not match the no-secret invite fragment.");
+      }
+      if (metadata.room.hostUserId && metadata.room.hostUserId !== inviteSecret.hostUserId) {
+        throw new Error("Invite host identity does not match the room's active host.");
       }
       upsertTeam(metadata.team);
       upsertRoom(ensureRoomDefaults(metadata.room));
@@ -81,12 +85,22 @@ export function createInviteJoinActions(
     initializeMessagesForRoom(inviteSecret.roomId);
     selectWorkspaceRoom(inviteSecret.teamId, inviteSecret.roomId);
     clearInviteSecretInput();
-    const request = buildPendingInviteJoinRequest({
+    const request = await buildPendingInviteJoinRequest({
       deviceId,
       deviceIdentity,
       inviteId,
       localUser,
-      roomName: acceptedRoomName
+      roomName: acceptedRoomName,
+      capabilityInvite: inviteSecret
+    });
+    rememberPendingInviteCapability({
+      ...inviteSecret,
+      inviteId: request.inviteId!,
+      requestId: request.id,
+      requestNonce: request.requestNonce,
+      requesterUserId: request.requesterUserId,
+      requesterDeviceId: request.requesterDeviceId,
+      requesterPublicKeyFingerprint: request.requesterPublicKeyFingerprint
     });
     appendInviteRequest(inviteSecret.roomId, request);
     const published = await publishInviteJoinRequest(
@@ -103,55 +117,6 @@ export function createInviteJoinActions(
     );
   }
 
-  async function acceptInvite(encodedSecret: string, inviteId?: string | null, approvalRequested = false) {
-    const { deviceIdentity } = useAppStore.getState();
-    const { localUser, deviceId } = currentLocalIdentity();
-    const inviteSecret = decodeRoomInviteSecret(encodedSecret);
-    let acceptedRoomName = inviteSecret.roomName;
-    if (inviteId) {
-      const metadata = await lookupInvite(inviteId);
-      if (metadata.invite.teamId !== inviteSecret.teamId || metadata.invite.roomId !== inviteSecret.roomId) {
-        throw new Error("Invite metadata does not match this invite.");
-      }
-      upsertTeam(metadata.team);
-      upsertRoom(ensureRoomDefaults(metadata.room));
-      acceptedRoomName = metadata.room.name;
-      restoreWorkspaceAccess(inviteSecret.teamId, inviteSecret.roomId);
-    } else {
-      importInviteMetadata(inviteSecret);
-    }
-
-    await importRoomSecret(inviteSecret.roomId, inviteSecret.secret);
-    restoreForgottenRoom(inviteSecret.roomId);
-    if (inviteId) setInviteAdmissionForRoom(inviteSecret.roomId, inviteId);
-    initializeMessagesForRoom(inviteSecret.roomId);
-    selectWorkspaceRoom(inviteSecret.teamId, inviteSecret.roomId);
-    clearInviteSecretInput();
-    if (approvalRequested) {
-      const request = buildPendingInviteJoinRequest({
-        deviceId,
-        deviceIdentity,
-        inviteId,
-        localUser,
-        roomName: acceptedRoomName
-      });
-      appendInviteRequest(inviteSecret.roomId, request);
-      const published = await publishInviteJoinRequest(
-        inviteSecret.teamId,
-        inviteSecret.roomId,
-        inviteJoinRequestPlaintext(request)
-      );
-      setInviteMessageForRoom(
-        inviteSecret.roomId,
-        published
-          ? `Imported ${acceptedRoomName} and sent a join request to the active host.`
-          : `Imported ${acceptedRoomName}. Send again after the relay reconnects so the host can approve access.`
-      );
-      return;
-    }
-    setInviteMessageForRoom(inviteSecret.roomId, `Joined ${acceptedRoomName}.`);
-  }
-
   async function joinInviteSecret() {
     const { inviteSecretInput } = useAppStore.getState();
     const raw = inviteSecretInput.trim();
@@ -159,16 +124,12 @@ export function createInviteJoinActions(
     setSelectedInviteMessage(null);
     clearInviteSecretInput();
     try {
-      const { approvalRequested, encodedInvite, inviteId, joinInvite } = parseInviteInput(raw);
-      if (joinInvite) {
-        await requestNoSecretInviteAccess(joinInvite, inviteId);
-        return;
-      }
-      await acceptInvite(encodedInvite, inviteId, approvalRequested);
+      const { inviteId, joinInvite } = parseInviteInput(raw);
+      await requestNoSecretInviteAccess(joinInvite, inviteId);
     } catch (error) {
       setSelectedInviteMessage(`Invite could not be imported: ${String(error)}`);
     }
   }
 
-  return { acceptInvite, joinInviteSecret, requestNoSecretInviteAccess };
+  return { joinInviteSecret, requestNoSecretInviteAccess };
 }

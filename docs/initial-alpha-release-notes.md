@@ -28,7 +28,7 @@ These notes describe the public alpha release. Copy the final version into the G
 ## Known Alpha Limitations
 
 - Public macOS alpha artifacts are Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
-- Member removal does not provide production-grade cryptographic key epochs in the alpha.
+- Member removal revokes relay access, invalidates outstanding invites, and advances affected rooms to a new key epoch delivered only to eligible registered devices. Content already delivered cannot be erased.
 - The official/self-host relay uses SQLite table storage in this alpha. It needs backup/restore drills and external/shared rate limiting before production claims.
 - Release preflight includes a fixture SQLite backup/restore drill and dependency license scan; maintainers should also run the SQLite drill against a staged copy of the real relay store before tagging.
 - Rate limiting is process-local.

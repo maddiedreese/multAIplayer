@@ -46,7 +46,7 @@ interface RegisterRelayWebSocketConnectionOptions {
   subscribeWorkspace: (session: ClientSession) => void;
   canPublishEnvelope: (session: ClientSession, envelope: RelayEnvelope) => boolean;
   isAllowedEnvelopePayload: (envelope: RelayEnvelope) => boolean;
-  publishEnvelope: (envelope: RelayEnvelope) => void;
+  publishEnvelope: (envelope: RelayEnvelope) => Promise<void>;
   publishPresence: (session: ClientSession, teamId: string, roomId: string, presence: PresenceRecord) => void;
   leaveRoom: (session: ClientSession) => void;
   leaveTeams: (session: ClientSession) => void;
@@ -264,148 +264,155 @@ export function registerRelayWebSocketConnection({
     sessions.set(socket, session);
     recordConnectionAccepted?.();
 
+    let messageChain = Promise.resolve();
     socket.on("message", (raw) => {
-      try {
-        if (!consumeRateLimit("websocket", session.rateClientId).allowed) {
-          recordRateLimitRejection?.("websocket");
-          send(socket, { type: "error", message: "Rate limit exceeded. Slow down before sending more room events." });
-          return;
-        }
-        const rawMessage = JSON.parse(raw.toString());
-        const preflightError = relayClientMessagePreflightError(rawMessage);
-        if (preflightError) {
-          send(socket, { type: "error", message: preflightError });
-          return;
-        }
-        const parsed = RelayClientMessage.parse(rawMessage);
-        if (parsed.type === "join") {
-          if (!isBoundedSocketIdentity(parsed.userId, parsed.deviceId)) {
+      messageChain = messageChain.then(async () => {
+        try {
+          if (!consumeRateLimit("websocket", session.rateClientId).allowed) {
+            recordRateLimitRejection?.("websocket");
+            send(socket, { type: "error", message: "Rate limit exceeded. Slow down before sending more room events." });
+            return;
+          }
+          const rawMessage = JSON.parse(raw.toString());
+          const preflightError = relayClientMessagePreflightError(rawMessage);
+          if (preflightError) {
+            send(socket, { type: "error", message: preflightError });
+            return;
+          }
+          const parsed = RelayClientMessage.parse(rawMessage);
+          if (parsed.type === "join") {
+            if (!isBoundedSocketIdentity(parsed.userId, parsed.deviceId)) {
+              send(socket, {
+                type: "error",
+                message: "WebSocket user and device ids must be bounded strings without control characters."
+              });
+              return;
+            }
+            if (parsed.inviteId && !normalizeMetadataText(parsed.inviteId, maxEnvelopeIdChars)) {
+              send(socket, {
+                type: "error",
+                message: "Invite id must be a bounded string without control characters."
+              });
+              return;
+            }
+            if (!isKnownRoom(parsed.teamId, parsed.roomId)) {
+              send(socket, { type: "error", message: "Room not found" });
+              return;
+            }
+            if (!canJoinRoom(session, parsed.teamId, parsed.roomId, parsed.userId, parsed.inviteId)) {
+              send(socket, { type: "error", message: "Sign in and use a valid invite before joining this room." });
+              return;
+            }
+            session.userId = parsed.userId;
+            session.deviceId = parsed.deviceId;
+            const quotaError = socketConnectionQuotaError(session);
+            if (quotaError) {
+              recordConnectionRejection?.("quota_after_join");
+              send(socket, { type: "error", message: quotaError });
+              socket.close(1008, "WebSocket connection quota exceeded");
+              return;
+            }
+            joinRoom(session, parsed.teamId, parsed.roomId, parsed.userId, parsed.deviceId);
+            send(socket, { type: "joined", teamId: parsed.teamId, roomId: parsed.roomId });
+            for (const envelope of store.getEncryptedBacklog(roomKey(parsed.teamId, parsed.roomId)) ?? []) {
+              send(socket, { type: "envelope", envelope });
+            }
+            for (const presence of roomPresence.get(roomKey(parsed.teamId, parsed.roomId))?.values() ?? []) {
+              send(socket, { type: "presence", ...presence, status: "online" });
+            }
+            return;
+          }
+
+          if (parsed.type === "subscribe.team") {
+            if (!isBoundedSocketIdentity(parsed.userId, parsed.deviceId)) {
+              send(socket, {
+                type: "error",
+                message: "WebSocket user and device ids must be bounded strings without control characters."
+              });
+              return;
+            }
+            if (!hasTeam(parsed.teamId)) {
+              send(socket, { type: "error", message: "Team not found" });
+              return;
+            }
+            if (!canSubscribeTeam(session, parsed.teamId, parsed.userId)) {
+              send(socket, { type: "error", message: "Join this team before subscribing to it." });
+              return;
+            }
+            subscribeTeam(session, parsed.teamId);
+            send(socket, { type: "team.subscribed", teamId: parsed.teamId });
+            return;
+          }
+
+          if (parsed.type === "subscribe.workspace") {
+            if (!isBoundedSocketIdentity(parsed.userId, parsed.deviceId)) {
+              send(socket, {
+                type: "error",
+                message: "WebSocket user and device ids must be bounded strings without control characters."
+              });
+              return;
+            }
+            if (!canSubscribeWorkspace(session, parsed.userId)) {
+              send(socket, { type: "error", message: "Sign in before subscribing to the workspace." });
+              return;
+            }
+            subscribeWorkspace(session);
+            send(socket, { type: "workspace.subscribed" });
+            return;
+          }
+
+          if (parsed.type === "publish") {
+            if (!canPublishEnvelope(session, parsed.envelope)) {
+              send(socket, { type: "error", message: "Join the room before publishing with this user and device." });
+              return;
+            }
+            if (!isAllowedEnvelopePayload(parsed.envelope)) {
+              send(socket, { type: "error", message: "Device-sealed envelopes are only supported for room invites." });
+              return;
+            }
+            if (!isRelayEnvelopeWithinLimits(parsed.envelope)) {
+              send(socket, {
+                type: "error",
+                message: `Encrypted room envelope exceeds relay limits (${encryptedEnvelopeMaxBytes} bytes max).`
+              });
+              return;
+            }
+            await publishEnvelope(parsed.envelope);
+            send(socket, { type: "published", envelopeId: parsed.envelope.id });
+            return;
+          }
+
+          if (!isPresenceForJoinedSession(session, parsed)) {
             send(socket, {
               type: "error",
-              message: "WebSocket user and device ids must be bounded strings without control characters."
+              message: "Join the room before publishing presence with this user and device."
             });
             return;
           }
-          if (parsed.inviteId && !normalizeMetadataText(parsed.inviteId, maxEnvelopeIdChars)) {
-            send(socket, { type: "error", message: "Invite id must be a bounded string without control characters." });
-            return;
-          }
-          if (!isKnownRoom(parsed.teamId, parsed.roomId)) {
-            send(socket, { type: "error", message: "Room not found" });
-            return;
-          }
-          if (!canJoinRoom(session, parsed.teamId, parsed.roomId, parsed.userId, parsed.inviteId)) {
-            send(socket, { type: "error", message: "Sign in and use a valid invite before joining this room." });
-            return;
-          }
-          session.userId = parsed.userId;
-          session.deviceId = parsed.deviceId;
-          const quotaError = socketConnectionQuotaError(session);
-          if (quotaError) {
-            recordConnectionRejection?.("quota_after_join");
-            send(socket, { type: "error", message: quotaError });
-            socket.close(1008, "WebSocket connection quota exceeded");
-            return;
-          }
-          joinRoom(session, parsed.teamId, parsed.roomId, parsed.userId, parsed.deviceId);
-          send(socket, { type: "joined", teamId: parsed.teamId, roomId: parsed.roomId });
-          for (const envelope of store.getEncryptedBacklog(roomKey(parsed.teamId, parsed.roomId)) ?? []) {
-            send(socket, { type: "envelope", envelope });
-          }
-          for (const presence of roomPresence.get(roomKey(parsed.teamId, parsed.roomId))?.values() ?? []) {
-            send(socket, { type: "presence", ...presence, status: "online" });
-          }
-          return;
-        }
-
-        if (parsed.type === "subscribe.team") {
-          if (!isBoundedSocketIdentity(parsed.userId, parsed.deviceId)) {
+          if (!isPresenceWithinLimits(parsed)) {
             send(socket, {
               type: "error",
-              message: "WebSocket user and device ids must be bounded strings without control characters."
+              message:
+                "Presence display name, avatar URL, and fingerprint must be bounded strings without control characters."
             });
             return;
           }
-          if (!hasTeam(parsed.teamId)) {
-            send(socket, { type: "error", message: "Team not found" });
-            return;
-          }
-          if (!canSubscribeTeam(session, parsed.teamId, parsed.userId)) {
-            send(socket, { type: "error", message: "Join this team before subscribing to it." });
-            return;
-          }
-          subscribeTeam(session, parsed.teamId);
-          send(socket, { type: "team.subscribed", teamId: parsed.teamId });
-          return;
-        }
-
-        if (parsed.type === "subscribe.workspace") {
-          if (!isBoundedSocketIdentity(parsed.userId, parsed.deviceId)) {
-            send(socket, {
-              type: "error",
-              message: "WebSocket user and device ids must be bounded strings without control characters."
-            });
-            return;
-          }
-          if (!canSubscribeWorkspace(session, parsed.userId)) {
-            send(socket, { type: "error", message: "Sign in before subscribing to the workspace." });
-            return;
-          }
-          subscribeWorkspace(session);
-          send(socket, { type: "workspace.subscribed" });
-          return;
-        }
-
-        if (parsed.type === "publish") {
-          if (!canPublishEnvelope(session, parsed.envelope)) {
-            send(socket, { type: "error", message: "Join the room before publishing with this user and device." });
-            return;
-          }
-          if (!isAllowedEnvelopePayload(parsed.envelope)) {
-            send(socket, { type: "error", message: "Device-sealed envelopes are only supported for room invites." });
-            return;
-          }
-          if (!isRelayEnvelopeWithinLimits(parsed.envelope)) {
-            send(socket, {
-              type: "error",
-              message: `Encrypted room envelope exceeds relay limits (${encryptedEnvelopeMaxBytes} bytes max).`
-            });
-            return;
-          }
-          publishEnvelope(parsed.envelope);
-          return;
-        }
-
-        if (!isPresenceForJoinedSession(session, parsed)) {
+          publishPresence(session, parsed.teamId, parsed.roomId, {
+            teamId: parsed.teamId,
+            roomId: parsed.roomId,
+            userId: parsed.userId,
+            deviceId: parsed.deviceId,
+            displayName: parsed.displayName,
+            avatarUrl: parsed.avatarUrl,
+            publicKeyFingerprint: parsed.publicKeyFingerprint
+          });
+        } catch (error) {
           send(socket, {
             type: "error",
-            message: "Join the room before publishing presence with this user and device."
+            message: error instanceof Error ? error.message : "Invalid relay message"
           });
-          return;
         }
-        if (!isPresenceWithinLimits(parsed)) {
-          send(socket, {
-            type: "error",
-            message:
-              "Presence display name, avatar URL, and fingerprint must be bounded strings without control characters."
-          });
-          return;
-        }
-        publishPresence(session, parsed.teamId, parsed.roomId, {
-          teamId: parsed.teamId,
-          roomId: parsed.roomId,
-          userId: parsed.userId,
-          deviceId: parsed.deviceId,
-          displayName: parsed.displayName,
-          avatarUrl: parsed.avatarUrl,
-          publicKeyFingerprint: parsed.publicKeyFingerprint
-        });
-      } catch (error) {
-        send(socket, {
-          type: "error",
-          message: error instanceof Error ? error.message : "Invalid relay message"
-        });
-      }
+      });
     });
 
     socket.on("close", () => {

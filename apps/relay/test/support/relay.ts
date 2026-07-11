@@ -259,7 +259,7 @@ export async function waitForSqliteBacklogRows(
   predicate: (rows: Array<{ rowid: number; envelope_id: string; sort_order: number; data_json: string }>) => boolean
 ): Promise<Array<{ rowid: number; envelope_id: string; sort_order: number; data_json: string }>> {
   let lastError: unknown = null;
-  for (let attempt = 0; attempt < 30; attempt += 1) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
     let db: Database.Database | null = null;
     try {
       db = new Database(dataPath, { readonly: true });
@@ -405,6 +405,7 @@ export function waitForTeamUpdated(socket: WebSocket): Promise<{
     socket.on("message", (raw) => {
       const message = JSON.parse(raw.toString()) as {
         type: string;
+        message?: string;
         team?: { id: string; name: string; members: number; role?: string };
       };
       if (message.type === "team.updated" && message.team) {
@@ -463,6 +464,11 @@ export function waitForPresence(
         publicKeyFingerprint?: string;
         status?: string;
       };
+      if (message.type === "error") {
+        clearTimeout(timer);
+        rejectPresence(new Error(message.message ?? "Relay rejected presence"));
+        return;
+      }
       if (
         message.type === "presence" &&
         message.userId &&
@@ -504,6 +510,20 @@ export function waitForEnvelope(
   });
 }
 
+export function waitForPublished(socket: WebSocket, envelopeId: string): Promise<string> {
+  return new Promise((resolvePublished, rejectPublished) => {
+    const timer = setTimeout(() => rejectPublished(new Error("Timed out waiting for publish acknowledgement")), 5_000);
+    socket.on("message", (raw) => {
+      const message = JSON.parse(raw.toString()) as { type: string; envelopeId?: string };
+      if (message.type === "published" && message.envelopeId === envelopeId) {
+        clearTimeout(timer);
+        resolvePublished(message.envelopeId);
+      }
+    });
+    socket.once("error", rejectPublished);
+  });
+}
+
 export function waitForError(socket: WebSocket): Promise<string> {
   return new Promise((resolveError, rejectError) => {
     const timer = setTimeout(() => rejectError(new Error("Timed out waiting for relay error")), 5_000);
@@ -526,6 +546,7 @@ export function testEnvelope(
     teamId: string;
     roomId: string;
     createdAt: string;
+    keyEpoch: number;
     kind: "browser.event" | "terminal.event" | "git.event" | "room.invite";
     payload: Record<string, unknown>;
   }> = {}
@@ -538,7 +559,9 @@ export function testEnvelope(
     senderUserId: overrides.senderUserId ?? "github:tester",
     createdAt: overrides.createdAt ?? new Date().toISOString(),
     kind: overrides.kind ?? "browser.event",
+    keyEpoch: overrides.keyEpoch ?? 1,
     payload: overrides.payload ?? {
+      version: 2,
       algorithm: "AES-GCM-256",
       nonce: "test-nonce",
       ciphertext: "test-ciphertext"

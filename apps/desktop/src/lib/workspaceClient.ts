@@ -130,6 +130,14 @@ export async function registerDevice(request: DeviceRegistrationRequest): Promis
   return body.device as DeviceRecord;
 }
 
+export async function loadTeamDevices(teamId: string): Promise<DeviceRecord[]> {
+  const response = await fetch(`${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/devices`, {
+    credentials: "include"
+  });
+  const body = await readJsonResponse<{ devices: DeviceRecord[] }>(response, "Failed to load team devices");
+  return body.devices as DeviceRecord[];
+}
+
 export async function createRoom(
   teamId: string,
   name: string,

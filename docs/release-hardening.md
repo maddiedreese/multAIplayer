@@ -89,7 +89,7 @@ Release workflows and logs must not expose:
 - GitHub OAuth client secrets;
 - GitHub access tokens;
 - OpenAI or Codex credentials;
-- direct room-key invite fragments;
+- legacy room-key-bearing invite fragments;
 - decrypted room payloads;
 - private repo files, diffs, or terminal output.
 
@@ -103,11 +103,10 @@ Manual release dispatches must point at an existing tag that starts with `v` and
 
 ## Before A Non-Alpha Release
 
-Before presenting multAIplayer as production-ready, the post-alpha roadmap should add:
+Before presenting multAIplayer as production-ready, release hardening should include:
 
 - documented maintainer release key custody;
-- stronger member-removal key epochs;
 - backup/restore drills and operational runbooks for SQLite relay storage;
 - external or shared-store rate limiting for multi-instance relays;
 - private security contact and disclosure process;
-- end-to-end multi-device invite, removal, and recovery tests.
+- recurring end-to-end multi-device invite, removal, recovery, malicious-relay substitution, and key-epoch tests.

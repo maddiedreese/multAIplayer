@@ -10,6 +10,8 @@ import type { DeviceIdentity } from "./deviceIdentity";
 import { jsonWebKeyToDevicePublicKeyJwk } from "./noSecretRoomInvite";
 import { ensureRoomDefaults } from "./roomDefaults";
 import type { InviteJoinRequest } from "../types";
+import { computeInviteCapabilityMac, type InviteCapabilityRequestBinding } from "@multaiplayer/crypto";
+import type { NoSecretRoomInvite } from "../types";
 
 interface LocalUser {
   id: string;
@@ -43,12 +45,13 @@ export function buildFallbackInvitedRoom({
   });
 }
 
-export function buildPendingInviteJoinRequest({
+export async function buildPendingInviteJoinRequest({
   deviceId,
   deviceIdentity,
   inviteId,
   localUser,
   roomName,
+  capabilityInvite,
   requestedAt = new Date().toISOString()
 }: {
   deviceId: string;
@@ -56,21 +59,55 @@ export function buildPendingInviteJoinRequest({
   inviteId?: string | null;
   localUser: LocalUser;
   roomName: string;
+  capabilityInvite: NoSecretRoomInvite;
   requestedAt?: string;
-}): InviteJoinRequest {
+}): Promise<InviteJoinRequest> {
+  if (!deviceIdentity || !inviteId) throw new Error("Authenticated device identity and invite id are required");
+  const id = `${deviceId}:${crypto.randomUUID()}`;
+  const requestNonce = randomNonce();
+  const binding: InviteCapabilityRequestBinding = {
+    phase: "request",
+    inviteId,
+    teamId: capabilityInvite.teamId,
+    roomId: capabilityInvite.roomId,
+    keyEpoch: capabilityInvite.keyEpoch,
+    requestId: id,
+    requestNonce,
+    requesterUserId: localUser.id,
+    requesterDeviceId: deviceId,
+    requesterPublicKeyFingerprint: deviceIdentity.publicKeyFingerprint,
+    hostUserId: capabilityInvite.hostUserId,
+    hostDeviceId: capabilityInvite.hostDeviceId,
+    hostPublicKeyFingerprint: capabilityInvite.hostPublicKeyFingerprint
+  };
   return {
     eventType: "invite.request",
-    id: `${deviceId}:${crypto.randomUUID()}`,
+    id,
     inviteId: inviteId ?? undefined,
     requester: localUser.name,
     requesterUserId: localUser.id,
     requesterDeviceId: deviceId,
-    requesterPublicKeyJwk: deviceIdentity ? jsonWebKeyToDevicePublicKeyJwk(deviceIdentity.publicKeyJwk) : undefined,
-    requesterPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
+    requesterPublicKeyJwk: jsonWebKeyToDevicePublicKeyJwk(deviceIdentity.publicKeyJwk),
+    requesterPublicKeyFingerprint: deviceIdentity.publicKeyFingerprint,
+    hostUserId: capabilityInvite.hostUserId,
+    hostDeviceId: capabilityInvite.hostDeviceId,
+    hostPublicKeyFingerprint: capabilityInvite.hostPublicKeyFingerprint,
+    keyEpoch: capabilityInvite.keyEpoch,
+    requestNonce,
+    capability: capabilityInvite.inviteCapability,
+    capabilityMac: await computeInviteCapabilityMac(capabilityInvite.inviteCapability, binding),
     requestedAt,
     note: `Requesting access to ${roomName}.`,
     status: "pending"
   };
+}
+
+function randomNonce(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 export function inviteJoinRequestPlaintext(request: InviteJoinRequest): InviteJoinRequestPlaintextPayload {
@@ -83,6 +120,13 @@ export function inviteJoinRequestPlaintext(request: InviteJoinRequest): InviteJo
     requesterDeviceId: request.requesterDeviceId,
     requesterPublicKeyJwk: request.requesterPublicKeyJwk,
     requesterPublicKeyFingerprint: request.requesterPublicKeyFingerprint,
+    hostUserId: request.hostUserId,
+    hostDeviceId: request.hostDeviceId,
+    hostPublicKeyFingerprint: request.hostPublicKeyFingerprint,
+    keyEpoch: request.keyEpoch,
+    requestNonce: request.requestNonce,
+    capability: request.capability,
+    capabilityMac: request.capabilityMac,
     requestedAt: request.requestedAt,
     note: request.note
   };
@@ -95,11 +139,18 @@ export function parseInviteInput(raw: string) {
     : null;
   const fragment = afterHash ?? raw;
   const params = new URLSearchParams(fragment.replace(/^#/, ""));
+  if (params.has("multaiplayerInvite")) {
+    throw new Error(
+      "This legacy invite contains a room key and is no longer accepted. Ask the active host for a new invite."
+    );
+  }
+  const joinInvite = params.get("multaiplayerJoin");
+  if (!joinInvite) {
+    throw new Error("Only host-approved multAIplayer invite links are accepted.");
+  }
 
   return {
     inviteId,
-    joinInvite: params.get("multaiplayerJoin"),
-    encodedInvite: params.get("multaiplayerInvite") ?? raw,
-    approvalRequested: params.get("approval") === "request"
+    joinInvite
   };
 }

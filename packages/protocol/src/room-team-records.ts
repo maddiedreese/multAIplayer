@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CiphertextPayload, DevicePublicKeyJwk } from "./crypto-payloads.js";
+import { CiphertextPayload, DevicePublicKeyJwk, PublicKeyFingerprint } from "./crypto-payloads.js";
 import { codexReasoningEffortIds } from "./defaults-options.js";
 import {
   DeviceId,
@@ -12,7 +12,6 @@ import {
   maxCodexModelChars,
   maxDisplayNameChars,
   maxEnvelopeIdChars,
-  maxPublicKeyFingerprintChars,
   maxRoomNameChars,
   maxRoomProjectPathChars,
   maxTeamNameChars,
@@ -42,7 +41,7 @@ export const DeviceRecord = z.object({
   deviceId: DeviceId,
   displayName: z.string().min(1).max(maxDisplayNameChars),
   publicKeyJwk: DevicePublicKeyJwk,
-  publicKeyFingerprint: z.string().min(16).max(maxPublicKeyFingerprintChars),
+  publicKeyFingerprint: PublicKeyFingerprint,
   registeredAt: z.string().datetime(),
   lastSeenAt: z.string().datetime()
 });
@@ -57,6 +56,7 @@ export const RoomModeSchema = z.object({
 export const RoomRecord = z.object({
   id: RoomId,
   teamId: TeamId,
+  keyEpoch: z.number().int().positive().optional(),
   name: z.string().min(1).max(maxRoomNameChars),
   projectPath: z.string().min(1).max(maxRoomProjectPathChars),
   host: z.string().min(1).max(maxDisplayNameChars),

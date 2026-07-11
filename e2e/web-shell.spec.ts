@@ -1,6 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
 const appUrl = "http://127.0.0.1:1421";
+const relayUrl = "http://127.0.0.1:4322";
 
 function attachPageDiagnostics(page: Page): void {
   page.on("pageerror", (error) => console.error(`[browser page error] ${error.stack ?? error.message}`));
@@ -23,6 +24,20 @@ async function openApp(context: BrowserContext): Promise<Page> {
   return page;
 }
 
+async function authenticateContext(context: BrowserContext): Promise<void> {
+  const response = await fetch(`${relayUrl}/debug/auth-session`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: "github:maddiedreese", login: "maddiedreese", name: "Maddie" })
+  });
+  expect(response.status).toBe(201);
+  const sessionCookie = response.headers.get("set-cookie")?.match(/multaiplayer_session=([^;]+)/)?.[1];
+  expect(sessionCookie).toBeTruthy();
+  await context.addCookies([
+    { name: "multaiplayer_session", value: sessionCookie!, url: relayUrl, httpOnly: true, sameSite: "Lax" }
+  ]);
+}
+
 async function createRoom(page: Page, name: string): Promise<void> {
   const newRoom = page.getByRole("button", { name: "New room", exact: true });
   await newRoom.scrollIntoViewIfNeeded();
@@ -34,20 +49,26 @@ async function createRoom(page: Page, name: string): Promise<void> {
   await expect(page.getByRole("textbox", { name: "Room title" })).toHaveValue(name);
 }
 
-async function copyDirectInvite(page: Page): Promise<string> {
+async function copyApprovalInvite(page: Page): Promise<string> {
   await page.getByRole("button", { name: "Room", exact: true }).click();
-  const gate = page.getByRole("checkbox", { name: "Require host approval for joiners" });
-  if (await gate.isChecked()) await gate.uncheck();
   await page.getByRole("button", { name: "Copy room invite" }).click();
-  await expect(page.getByText(/Copied direct invite link/)).toBeVisible();
+  await expect(page.getByText(/Copied invite link/)).toBeVisible();
   return page.evaluate(() => navigator.clipboard.readText());
 }
 
-async function importInvite(page: Page, invite: string): Promise<void> {
+async function requestInviteAccess(page: Page, invite: string): Promise<void> {
   await page.getByRole("button", { name: "Room", exact: true }).click();
   await page.locator('textarea[placeholder="Paste a multAIplayer invite..."]:visible').fill(invite);
   await page.locator("button:visible", { hasText: "Import invite" }).click();
-  await expect(page.getByText(/Joined .+\./)).toBeVisible();
+  await expect(page.getByText(/Requested access to/)).toBeVisible();
+}
+
+async function approvePendingInvite(host: Page, guest: Page): Promise<void> {
+  const pendingRequest = host.locator(".terminal-request.pending").first();
+  await expect(pendingRequest).toBeVisible();
+  await pendingRequest.locator("button").first().click();
+  await expect(host.getByText(/Approved .+'s join request/)).toBeVisible();
+  await expect(guest.getByText(/approved your room join request.*unlocked/i)).toBeVisible();
 }
 
 test("loads the seeded workspace in the development web shell", async ({ page }) => {
@@ -65,15 +86,46 @@ test("creates a room through the relay-backed workspace flow", async ({ page }) 
   await expect(page.getByRole("textbox", { name: "Room title" })).toHaveValue(roomName);
 });
 
-test("a direct invite lets a second browser context receive encrypted chat", async ({ browser }) => {
+test("revoking room invites invalidates a previously copied capability", async ({ browser }) => {
+  const hostContext = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+  const guestContext = await browser.newContext();
+  try {
+    await authenticateContext(hostContext);
+    await authenticateContext(guestContext);
+    const host = await openApp(hostContext);
+    const oldInvite = await copyApprovalInvite(host);
+    const revoked = await host.evaluate(async () => {
+      const response = await fetch("http://127.0.0.1:4322/teams/team-core/rooms/room-desktop/invites", {
+        method: "DELETE",
+        credentials: "include"
+      });
+      return response.ok;
+    });
+    expect(revoked).toBe(true);
+
+    const guest = await openApp(guestContext);
+    await guest.getByRole("button", { name: "Room", exact: true }).click();
+    await guest.locator('textarea[placeholder="Paste a multAIplayer invite..."]:visible').fill(oldInvite);
+    await guest.locator("button:visible", { hasText: "Import invite" }).click();
+    await expect(guest.getByText(/Invite could not be imported/)).toBeVisible();
+  } finally {
+    await hostContext.close();
+    await guestContext.close();
+  }
+});
+
+test("an approved invite lets a second browser context receive encrypted chat", async ({ browser }) => {
   const hostContext = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
   const guestContext = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
   try {
+    await authenticateContext(hostContext);
+    await authenticateContext(guestContext);
     const host = await openApp(hostContext);
-    const invite = await copyDirectInvite(host);
+    const invite = await copyApprovalInvite(host);
 
     const guest = await openApp(guestContext);
-    await importInvite(guest, invite);
+    await requestInviteAccess(guest, invite);
+    await approvePendingInvite(host, guest);
     const message = `encrypted hello ${Date.now()}`;
     await host.getByPlaceholder(/Message the room/).fill(message);
     await host.getByRole("button", { name: "Send message" }).click();
@@ -88,11 +140,14 @@ test("an imported invite selects the shared room and records membership locally"
   const hostContext = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
   const guestContext = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
   try {
+    await authenticateContext(hostContext);
+    await authenticateContext(guestContext);
     const host = await openApp(hostContext);
     const roomName = "Desktop app";
-    const invite = await copyDirectInvite(host);
+    const invite = await copyApprovalInvite(host);
     const guest = await openApp(guestContext);
-    await importInvite(guest, invite);
+    await requestInviteAccess(guest, invite);
+    await approvePendingInvite(host, guest);
     await expect(guest.getByRole("textbox", { name: "Room title" })).toHaveValue(roomName);
     await expect(guest.locator(".room-button.nested.active", { hasText: roomName })).toBeVisible();
   } finally {
@@ -113,27 +168,6 @@ test("room model and reasoning settings persist across reload", async ({ page })
   await page.reload();
   await expect(page.getByLabel("Codex host model")).toHaveValue("gpt-5.5");
   await expect(page.getByLabel("Codex reasoning")).toHaveValue("high");
-});
-
-test("refreshing room access invalidates a previously copied invite", async ({ browser }) => {
-  const hostContext = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
-  const guestContext = await browser.newContext();
-  try {
-    const host = await openApp(hostContext);
-    const oldInvite = await copyDirectInvite(host);
-    host.once("dialog", (dialog) => dialog.accept());
-    await host.getByRole("button", { name: "Refresh room access" }).click();
-    await expect(host.getByText(/Refreshed room access/)).toBeVisible();
-
-    const guest = await openApp(guestContext);
-    await guest.getByRole("button", { name: "Room", exact: true }).click();
-    await guest.locator('textarea[placeholder="Paste a multAIplayer invite..."]:visible').fill(oldInvite);
-    await guest.locator("button:visible", { hasText: "Import invite" }).click();
-    await expect(guest.getByText(/Invite could not be imported/)).toBeVisible();
-  } finally {
-    await hostContext.close();
-    await guestContext.close();
-  }
 });
 
 test("terminal clearly exposes the native-only fallback in web preview", async ({ page }) => {

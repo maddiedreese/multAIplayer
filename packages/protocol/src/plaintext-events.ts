@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { DevicePublicKeyJwk, RoomSecretPayload, WrappedRoomSecretPayload } from "./crypto-payloads.js";
+import { AuthenticatedWrappedRoomSecretPayload, DevicePublicKeyJwk, PublicKeyFingerprint } from "./crypto-payloads.js";
 import { codexReasoningEffortIds } from "./defaults-options.js";
 import {
   DeviceId,
   RoomId,
+  UserId,
   maxCodexModelChars,
   maxCodexQueueSize,
   maxCodexThreadIdChars,
@@ -27,7 +28,7 @@ export const maxEmbeddedAttachmentBytesPerMessage = 200_000;
 export const ChatPlaintextPayload = z.object({
   id: z.string().min(1).max(maxEnvelopeIdChars),
   author: z.string().min(1).max(maxDisplayNameChars),
-  authorUserId: z.string().min(1).max(maxUserIdChars).optional(),
+  authorUserId: z.string().min(1).max(maxUserIdChars),
   role: z.enum(["human", "codex", "system"]),
   body: z.string().max(maxLongTextChars),
   time: z.string().min(1).max(maxShortTextChars),
@@ -134,8 +135,15 @@ export const InviteJoinRequestPlaintextPayload = z.object({
   requester: z.string().min(1).max(maxDisplayNameChars),
   requesterUserId: z.string().min(1).max(maxUserIdChars),
   requesterDeviceId: DeviceId,
-  requesterPublicKeyJwk: DevicePublicKeyJwk.optional(),
-  requesterPublicKeyFingerprint: z.string().min(16).max(maxShortTextChars).optional(),
+  requesterPublicKeyJwk: DevicePublicKeyJwk,
+  requesterPublicKeyFingerprint: PublicKeyFingerprint,
+  hostUserId: UserId,
+  hostDeviceId: DeviceId,
+  hostPublicKeyFingerprint: PublicKeyFingerprint,
+  keyEpoch: z.number().int().positive(),
+  requestNonce: z.string().regex(/^[A-Za-z0-9_-]{22,128}$/),
+  capability: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  capabilityMac: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   requestedAt: z.string().datetime(),
   note: z.string().max(maxMediumTextChars).optional()
 });
@@ -147,20 +155,60 @@ export const InviteJoinStatusPlaintextPayload = z.object({
   decidedBy: z.string().min(1).max(maxDisplayNameChars),
   decidedByUserId: z.string().min(1).max(maxUserIdChars),
   decidedAt: z.string().datetime(),
-  recipientDeviceId: DeviceId.optional(),
-  recipientPublicKeyFingerprint: z.string().min(16).max(maxShortTextChars).optional(),
-  wrappedRoomSecret: WrappedRoomSecretPayload.optional()
+  recipientUserId: UserId,
+  recipientDeviceId: DeviceId,
+  recipientPublicKeyFingerprint: PublicKeyFingerprint,
+  hostDeviceId: DeviceId,
+  hostPublicKeyFingerprint: PublicKeyFingerprint,
+  requestNonce: z.string().regex(/^[A-Za-z0-9_-]{22,128}$/),
+  keyEpoch: z.number().int().positive(),
+  capabilityMac: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  wrappedRoomSecret: AuthenticatedWrappedRoomSecretPayload.optional()
 });
 
-export const RoomKeyRotationPlaintextPayload = z.object({
-  eventType: z.literal("room.key.rotated"),
-  id: z.string().min(1).max(maxEnvelopeIdChars),
-  rotatedBy: z.string().min(1).max(maxDisplayNameChars),
-  rotatedByUserId: z.string().min(1).max(maxUserIdChars),
-  rotatedAt: z.string().datetime(),
-  newSecret: RoomSecretPayload,
-  note: z.string().max(maxMediumTextChars).optional()
-});
+export const RoomKeyRotationPlaintextPayload = z
+  .object({
+    eventType: z.literal("room.key.rotated"),
+    id: z.string().min(1).max(maxEnvelopeIdChars),
+    rotatedBy: z.string().min(1).max(maxDisplayNameChars),
+    rotatedByUserId: z.string().min(1).max(maxUserIdChars),
+    rotatedAt: z.string().datetime(),
+    previousEpoch: z.number().int().positive(),
+    newEpoch: z.number().int().positive(),
+    recipients: z
+      .array(
+        z.object({
+          userId: UserId,
+          deviceId: DeviceId,
+          publicKeyFingerprint: PublicKeyFingerprint,
+          wrappedRoomSecret: AuthenticatedWrappedRoomSecretPayload
+        })
+      )
+      .min(1)
+      .max(1024),
+    note: z.string().max(maxMediumTextChars).optional()
+  })
+  .superRefine((value, context) => {
+    if (value.newEpoch !== value.previousEpoch + 1) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["newEpoch"],
+        message: "newEpoch must immediately follow previousEpoch"
+      });
+    }
+    const devices = new Set<string>();
+    value.recipients.forEach((recipient, index) => {
+      const identity = `${recipient.userId}\u0000${recipient.deviceId}`;
+      if (devices.has(identity)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["recipients", index, "deviceId"],
+          message: "Each device may appear only once"
+        });
+      }
+      devices.add(identity);
+    });
+  });
 
 export const CodexTurnRiskFlagPayload = z.object({
   id: z.string().min(1).max(maxEnvelopeIdChars),

@@ -25,7 +25,6 @@ export function LocalHistoryPanel({
   defaultCodexModel,
   codexModelOptions,
   teamDefaultBrowserProfilePersistent,
-  teamDefaultInviteApprovalGate,
   message,
   onHistoryEnabledChange,
   onHistoryRetentionDaysChange,
@@ -36,8 +35,7 @@ export function LocalHistoryPanel({
   onTeamHistoryRetentionDaysChange,
   onTeamDefaultApprovalPolicyChange,
   onTeamDefaultCodexModelChange,
-  onTeamDefaultBrowserProfilePersistentChange,
-  onTeamDefaultInviteApprovalGateChange
+  onTeamDefaultBrowserProfilePersistentChange
 }: {
   historySettings: HistorySettingsDisplay;
   teamHistorySettings: HistorySettingsDisplay;
@@ -174,15 +172,6 @@ export function LocalHistoryPanel({
           onChange={(event) => onTeamDefaultBrowserProfilePersistentChange(event.target.checked)}
         />
         <span>Persist browser profiles in new team rooms</span>
-      </label>
-      <label className="checkbox-row">
-        <input
-          type="checkbox"
-          checked={teamDefaultInviteApprovalGate}
-          disabled={!selectedTeam}
-          onChange={(event) => onTeamDefaultInviteApprovalGateChange(event.target.checked)}
-        />
-        <span>Require host approval for new room invites</span>
       </label>
       {message && <div className="workflow-message">{message}</div>}
     </section>

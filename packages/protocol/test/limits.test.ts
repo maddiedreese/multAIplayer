@@ -9,7 +9,6 @@ import {
   maxCiphertextNonceChars,
   maxEnvelopeNonceChars,
   maxProjectPathChars,
-  maxPublicKeyFingerprintChars,
   maxRoomNameChars,
   maxRoomProjectPathChars
 } from "../src/index.js";
@@ -32,11 +31,8 @@ test("room, attachment, and device schemas enforce their exported semantic limit
   assert.equal(AttachmentBlobRecord.shape.type.safeParse("t".repeat(maxAttachmentBlobTypeChars)).success, true);
   assert.equal(AttachmentBlobRecord.shape.type.safeParse("t".repeat(maxAttachmentBlobTypeChars + 1)).success, false);
   assert.equal(
-    DeviceRecord.shape.publicKeyFingerprint.safeParse("f".repeat(maxPublicKeyFingerprintChars)).success,
+    DeviceRecord.shape.publicKeyFingerprint.safeParse("sha256:" + "ffff:".repeat(15) + "ffff").success,
     true
   );
-  assert.equal(
-    DeviceRecord.shape.publicKeyFingerprint.safeParse("f".repeat(maxPublicKeyFingerprintChars + 1)).success,
-    false
-  );
+  assert.equal(DeviceRecord.shape.publicKeyFingerprint.safeParse("ffff:ffff").success, false);
 });

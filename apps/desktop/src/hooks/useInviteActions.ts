@@ -14,7 +14,6 @@ export function useInviteActions(options: UseInviteActionsOptions) {
   const linkActions = createInviteLinkActions(options);
   const rotationActions = createRoomKeyRotationActions(options);
 
-  const acceptInvite = useStableEvent(joinActions.acceptInvite);
   const joinInviteSecret = useStableEvent(joinActions.joinInviteSecret);
   const requestNoSecretInviteAccess = useStableEvent(joinActions.requestNoSecretInviteAccess);
   const copyInviteLink = useStableEvent(linkActions.copyInviteLink);
@@ -22,26 +21,27 @@ export function useInviteActions(options: UseInviteActionsOptions) {
   const decideInviteJoinRequest = useStableEvent(relayActions.decideInviteJoinRequest);
   const handleInviteEnvelopePlaintext = useStableEvent(relayActions.handleInviteEnvelopePlaintext);
   const rotateSelectedRoomKey = useStableEvent(rotationActions.rotateSelectedRoomKey);
+  const rotateRoomKeyForDevices = useStableEvent(rotationActions.rotateRoomKeyForDevices);
   return useMemo(
     () => ({
-      acceptInvite,
       joinInviteSecret,
       requestNoSecretInviteAccess,
       copyInviteLink,
       decryptInviteEnvelope,
       decideInviteJoinRequest,
       handleInviteEnvelopePlaintext,
-      rotateSelectedRoomKey
+      rotateSelectedRoomKey,
+      rotateRoomKeyForDevices
     }),
     [
-      acceptInvite,
       joinInviteSecret,
       requestNoSecretInviteAccess,
       copyInviteLink,
       decryptInviteEnvelope,
       decideInviteJoinRequest,
       handleInviteEnvelopePlaintext,
-      rotateSelectedRoomKey
+      rotateSelectedRoomKey,
+      rotateRoomKeyForDevices
     ]
   );
 }

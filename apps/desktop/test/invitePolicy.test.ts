@@ -21,20 +21,19 @@ const room: RoomRecord = {
   unread: 0
 };
 
-test("direct room invites can be created by room members while unlocked", () => {
-  assert.equal(canCreateRoomInvite(room, { id: "github:peer", name: "Peer" }), true);
+test("room invites require the active host", () => {
+  assert.equal(canCreateRoomInvite(room, { id: "github:peer", name: "Peer" }), false);
 });
 
-test("gated room invites require the active host device", () => {
-  assert.equal(canCreateRoomInvite(room, { id: "github:maddiedreese", name: "Maddie" }, false, true), true);
-  assert.equal(canCreateRoomInvite(room, { id: "github:peer", name: "Peer" }, false, true), false);
+test("room invites remain unavailable during host handoff", () => {
+  assert.equal(canCreateRoomInvite(room, { id: "github:maddiedreese", name: "Maddie" }), true);
+  assert.equal(canCreateRoomInvite(room, { id: "github:peer", name: "Peer" }), false);
   assert.equal(
-    canCreateRoomInvite({ ...room, hostStatus: "handoff" }, { id: "github:maddiedreese", name: "Maddie" }, false, true),
+    canCreateRoomInvite({ ...room, hostStatus: "handoff" }, { id: "github:maddiedreese", name: "Maddie" }),
     false
   );
 });
 
-test("locked rooms cannot create direct or gated invites", () => {
+test("locked rooms cannot create invites", () => {
   assert.equal(canCreateRoomInvite(room, { id: "github:maddiedreese", name: "Maddie" }, true), false);
-  assert.equal(canCreateRoomInvite(room, { id: "github:maddiedreese", name: "Maddie" }, true, true), false);
 });

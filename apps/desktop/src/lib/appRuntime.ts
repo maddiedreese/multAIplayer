@@ -25,7 +25,7 @@ export function roomLockMessage(room: RoomRecord, revoked: boolean): string {
 }
 
 export function roomSecretStorageLabel(): string {
-  return isTauriRuntime() ? "macOS Keychain" : "web preview localStorage";
+  return isTauriRuntime() ? "macOS Keychain" : "web preview process memory";
 }
 
 export function isWebPreviewRuntime(): boolean {

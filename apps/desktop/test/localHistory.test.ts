@@ -52,10 +52,16 @@ const {
   forgetRoomLocalData,
   hasAcknowledgedRoomVisibilityWarning,
   importRoomSecret,
+  installRoomSecretEpoch,
+  clearPendingRoomRotation,
+  clearWebPreviewRoomKeyringsForTests,
   loadEncryptedHistory,
   loadHistorySettings,
   loadRoomSecret,
+  loadRoomKeyring,
+  loadPendingRoomRotation,
   replaceRoomSecret,
+  savePendingRoomRotation,
   roomVisibilityWarningKey,
   saveEncryptedHistory,
   saveHistorySettings
@@ -67,6 +73,7 @@ const {
 const { emptyLocalRoomHistoryPayload, normalizeLocalRoomHistory } = await import("../src/lib/localRoomHistoryPayload");
 test.beforeEach(() => {
   localStorage.clear();
+  clearWebPreviewRoomKeyringsForTests();
 });
 
 test("encrypted history stores no plaintext transcript while remaining recoverable", async () => {
@@ -656,6 +663,94 @@ test("replaceRoomSecret clears stale encrypted history", async () => {
   const nextSecret = await loadRoomSecret(roomId);
   assert.notEqual(nextSecret?.rawKey, oldSecret.rawKey);
   assert.equal(localStorage.getItem(`multaiplayer:history:${roomId}`), null);
+});
+
+test("legacy room secrets migrate into a memory-only epoch-one keyring", async () => {
+  const roomId = "room-legacy-keyring";
+  const legacySecret = { algorithm: "AES-GCM-256" as const, rawKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" };
+  localStorage.setItem(`multaiplayer:room-secret:${roomId}`, JSON.stringify(legacySecret));
+
+  assert.deepEqual(await loadRoomSecret(roomId), legacySecret);
+  assert.deepEqual(await loadRoomKeyring(roomId), {
+    version: 2,
+    currentEpoch: 1,
+    keys: { "1": legacySecret }
+  });
+  assert.equal(localStorage.getItem(`multaiplayer:room-secret:${roomId}`), null);
+});
+
+test("room keyrings retain specific prior epochs while advancing current access", async () => {
+  const roomId = "room-epoch-keyring";
+  const first = { algorithm: "AES-GCM-256" as const, rawKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" };
+  const second = { algorithm: "AES-GCM-256" as const, rawKey: "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=" };
+  await importRoomSecret(roomId, first);
+  await saveEncryptedHistory(roomId, { retained: "epoch-one-history" });
+  await installRoomSecretEpoch(roomId, 2, second);
+
+  assert.deepEqual(await loadRoomSecret(roomId), second);
+  assert.deepEqual(await loadRoomSecret(roomId, 1), first);
+  assert.deepEqual(await loadRoomSecret(roomId, 2), second);
+  assert.deepEqual(await loadEncryptedHistory(roomId), { retained: "epoch-one-history" });
+  await clearEncryptedHistory(roomId);
+  assert.equal(await loadRoomSecret(roomId, 1), null);
+  await assert.rejects(() => installRoomSecretEpoch(roomId, 4, first), /does not immediately follow/);
+});
+
+test("pending rotations survive restart-style reload and clear only after completion", async () => {
+  const roomId = "room-pending-rotation";
+  const first = { algorithm: "AES-GCM-256" as const, rawKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" };
+  const second = { algorithm: "AES-GCM-256" as const, rawKey: "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=" };
+  await importRoomSecret(roomId, first);
+  const pending = {
+    envelope: {
+      id: "envelope-pending",
+      teamId: "team-pending",
+      roomId,
+      senderDeviceId: "device-host",
+      senderUserId: "github:host",
+      createdAt: "2026-07-10T12:00:00.000Z",
+      kind: "room.key" as const,
+      keyEpoch: 1,
+      payload: { version: 2 as const, algorithm: "AES-GCM-256" as const, nonce: "nonce", ciphertext: "ciphertext" }
+    },
+    payload: {
+      eventType: "room.key.rotated" as const,
+      id: "rotation-pending",
+      rotatedBy: "Host",
+      rotatedByUserId: "github:host",
+      rotatedAt: "2026-07-10T12:00:00.000Z",
+      previousEpoch: 1,
+      newEpoch: 2,
+      recipients: [
+        {
+          userId: "github:host",
+          deviceId: "device-host",
+          publicKeyFingerprint: `sha256:${Array(16).fill("0000").join(":")}`,
+          wrappedRoomSecret: {
+            version: 2 as const,
+            algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256" as const,
+            ephemeralPublicKeyJwk: { kty: "EC" as const, crv: "P-256" as const, x: "eA", y: "eQ" },
+            nonce: "nonce",
+            ciphertext: "ciphertext",
+            senderPublicKeyJwk: { kty: "EC" as const, crv: "P-256" as const, x: "eA", y: "eQ" },
+            signature: "signature"
+          }
+        }
+      ],
+      note: "test"
+    },
+    newSecret: second,
+    installed: false
+  };
+  await savePendingRoomRotation(roomId, pending);
+  assert.deepEqual(await loadPendingRoomRotation(roomId), pending);
+  await installRoomSecretEpoch(roomId, 2, second);
+  await assert.doesNotReject(() => installRoomSecretEpoch(roomId, 2, second));
+  await assert.rejects(() => installRoomSecretEpoch(roomId, 2, first), /different key material/);
+  await savePendingRoomRotation(roomId, { ...pending, installed: true });
+  assert.equal((await loadPendingRoomRotation(roomId))?.installed, true);
+  await clearPendingRoomRotation(roomId, pending.payload.id);
+  assert.equal(await loadPendingRoomRotation(roomId), null);
 });
 
 test("disabled history clears stored ciphertext and prevents new saves", async () => {

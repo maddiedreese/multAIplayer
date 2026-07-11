@@ -233,7 +233,7 @@ async function routePayload(
   plaintext: unknown,
   options: { senderUserId?: string; rooms?: RoomRecord[] } = {}
 ): Promise<void> {
-  const envelope: RelayEnvelope = {
+  const metadata = {
     id: crypto.randomUUID(),
     teamId: "team-relay-router",
     roomId,
@@ -241,8 +241,9 @@ async function routePayload(
     senderUserId: options.senderUserId ?? "github:peer",
     createdAt: "2026-07-09T12:00:00.000Z",
     kind,
-    payload: await encryptJson(plaintext, roomSecret)
+    keyEpoch: 1
   };
+  const envelope: RelayEnvelope = { ...metadata, payload: await encryptJson(plaintext, roomSecret, metadata) };
   await routeRelayEnvelope(envelope, {
     deviceId: "device-local",
     localUser: { id: "github:local", name: "Local" },

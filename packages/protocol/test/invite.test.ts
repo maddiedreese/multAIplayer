@@ -16,6 +16,7 @@ import {
   HostHandoffPlaintextPayload,
   LocalPreviewPlaintextPayload,
   RelayEnvelope,
+  RelayServerMessage,
   RoomId,
   RoomRecord,
   RoomSettingsPlaintextPayload,
@@ -48,10 +49,19 @@ test("team and room ids use relay-safe bounded identifiers", () => {
   }
 });
 
+test("relay publish acknowledgements identify the durably accepted envelope", () => {
+  assert.deepEqual(RelayServerMessage.parse({ type: "published", envelopeId: "envelope-accepted" }), {
+    type: "published",
+    envelopeId: "envelope-accepted"
+  });
+  assert.equal(RelayServerMessage.safeParse({ type: "published", envelopeId: "" }).success, false);
+});
+
 test("chat payloads can carry encrypted reply references", () => {
   const parsed = ChatPlaintextPayload.parse({
     id: "message-2",
     author: "Maddie",
+    authorUserId: "github:maddie",
     role: "human",
     body: "agreed, do that",
     time: "9:43 AM",
@@ -59,10 +69,12 @@ test("chat payloads can carry encrypted reply references", () => {
   });
 
   assert.equal(parsed.replyTo, "message-1");
+  assert.equal(ChatPlaintextPayload.safeParse({ ...parsed, authorUserId: undefined }).success, false);
   assert.equal(
     ChatPlaintextPayload.safeParse({
       id: "message-3",
       author: "Maddie",
+      authorUserId: "github:maddie",
       role: "human",
       body: "bad reply",
       time: "9:44 AM",
@@ -221,7 +233,7 @@ test("device records carry bounded public key JWKs", () => {
       y: "y-coordinate",
       ext: true
     },
-    publicKeyFingerprint: "1111:2222:3333:4444",
+    publicKeyFingerprint: "sha256:" + "1111:".repeat(15) + "1111",
     registeredAt: "2026-07-04T12:00:00.000Z",
     lastSeenAt: "2026-07-04T12:01:00.000Z"
   });
@@ -409,7 +421,9 @@ test("Codex queue payloads bound room-visible turn queue events", () => {
       senderUserId: "github:jordan",
       createdAt: "2026-07-04T12:00:00.000Z",
       kind: "codex.queue",
+      keyEpoch: 1,
       payload: {
+        version: 2,
         algorithm: "AES-GCM-256",
         nonce: "nonce-codex-queue-1",
         ciphertext: "ciphertext"
@@ -458,7 +472,7 @@ test("Codex turn events can carry bounded risk flags for encrypted audit history
   );
 });
 
-test("invite join request accepts optional requester device public key", () => {
+test("invite join request requires capability-authenticated device bindings", () => {
   const parsed = InviteJoinRequestPlaintextPayload.parse({
     eventType: "invite.request",
     id: "device_12345678:request",
@@ -472,7 +486,14 @@ test("invite join request accepts optional requester device public key", () => {
       x: "x-coordinate",
       y: "y-coordinate"
     },
-    requesterPublicKeyFingerprint: "1111:2222:3333:4444:5555:6666:7777:8888",
+    requesterPublicKeyFingerprint: "sha256:" + "1111:".repeat(15) + "1111",
+    hostUserId: "github:host",
+    hostDeviceId: "device_host1234",
+    hostPublicKeyFingerprint: "sha256:" + "2222:".repeat(15) + "2222",
+    keyEpoch: 1,
+    requestNonce: "abcdefghijklmnopqrstuv",
+    capability: "A".repeat(43),
+    capabilityMac: "B".repeat(43),
     requestedAt: "2026-07-04T12:00:00.000Z",
     note: "Requesting access."
   });
@@ -480,7 +501,7 @@ test("invite join request accepts optional requester device public key", () => {
   assert.equal(parsed.requesterPublicKeyJwk.kty, "EC");
 });
 
-test("invite status accepts optional device-wrapped room secret", () => {
+test("invite status accepts capability-authenticated device-wrapped room secret", () => {
   const parsed = InviteJoinStatusPlaintextPayload.parse({
     eventType: "invite.status",
     requestId: "device_12345678:request",
@@ -488,12 +509,18 @@ test("invite status accepts optional device-wrapped room secret", () => {
     decidedBy: "Host",
     decidedByUserId: "github:host",
     decidedAt: "2026-07-04T12:01:00.000Z",
+    recipientUserId: "github:maddie",
     recipientDeviceId: "device_12345678",
-    recipientPublicKeyFingerprint: "1111:2222:3333:4444:5555:6666:7777:8888",
+    recipientPublicKeyFingerprint: "sha256:" + "1111:".repeat(15) + "1111",
+    hostDeviceId: "device_host1234",
+    hostPublicKeyFingerprint: "sha256:" + "2222:".repeat(15) + "2222",
+    requestNonce: "abcdefghijklmnopqrstuv",
+    keyEpoch: 1,
+    capabilityMac: "C".repeat(43),
     wrappedRoomSecret: {
-      version: 1,
+      version: 2,
       algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
-      ephemeralPublicKeyJwk: {
+      senderPublicKeyJwk: {
         kty: "EC",
         crv: "P-256",
         x: "ephemeral-x",
@@ -507,8 +534,8 @@ test("invite status accepts optional device-wrapped room secret", () => {
   assert.equal(parsed.wrappedRoomSecret?.algorithm, "ECDH-P256-HKDF-SHA256-AES-GCM-256");
 });
 
-test("legacy invite status without wrapped key remains valid", () => {
-  const parsed = InviteJoinStatusPlaintextPayload.parse({
+test("legacy invite status without authenticated bindings is rejected", () => {
+  const parsed = InviteJoinStatusPlaintextPayload.safeParse({
     eventType: "invite.status",
     requestId: "device_12345678:request",
     status: "denied",
@@ -517,7 +544,7 @@ test("legacy invite status without wrapped key remains valid", () => {
     decidedAt: "2026-07-04T12:01:00.000Z"
   });
 
-  assert.equal(parsed.wrappedRoomSecret, undefined);
+  assert.equal(parsed.success, false);
 });
 
 test("relay envelope accepts device-sealed invite payloads", () => {
@@ -529,6 +556,7 @@ test("relay envelope accepts device-sealed invite payloads", () => {
     senderUserId: "github:maddie",
     createdAt: "2026-07-04T12:02:00.000Z",
     kind: "room.invite",
+    keyEpoch: 1,
     payload: {
       algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
       ephemeralPublicKeyJwk: {
@@ -598,21 +626,34 @@ test("device-sealed and wrapped room secret payloads reject private keys and ove
   );
 });
 
-test("room key rotation payload carries a new room secret", () => {
+test("room key rotation payload wraps the new epoch secret once per device", () => {
   const parsed = RoomKeyRotationPlaintextPayload.parse({
     eventType: "room.key.rotated",
     id: "rotation-1",
     rotatedBy: "Host",
     rotatedByUserId: "github:host",
     rotatedAt: "2026-07-04T12:03:00.000Z",
-    newSecret: {
-      algorithm: "AES-GCM-256",
-      rawKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-    },
+    previousEpoch: 1,
+    newEpoch: 2,
+    recipients: [
+      {
+        userId: "github:maddie",
+        deviceId: "device_12345678",
+        publicKeyFingerprint: "sha256:" + "abcd:".repeat(15) + "abcd",
+        wrappedRoomSecret: {
+          version: 2,
+          algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
+          senderPublicKeyJwk: { kty: "EC", crv: "P-256", x: "host-x", y: "host-y" },
+          nonce: "nonce",
+          ciphertext: "ciphertext"
+        }
+      }
+    ],
     note: "Future messages use this key."
   });
 
-  assert.equal(parsed.newSecret.algorithm, "AES-GCM-256");
+  assert.equal(parsed.newEpoch, 2);
+  assert.equal(parsed.recipients.length, 1);
 });
 
 test("relay envelope accepts encrypted room key rotation events", () => {
@@ -624,7 +665,9 @@ test("relay envelope accepts encrypted room key rotation events", () => {
     senderUserId: "github:maddie",
     createdAt: "2026-07-04T12:04:00.000Z",
     kind: "room.key",
+    keyEpoch: 1,
     payload: {
+      version: 2,
       algorithm: "AES-GCM-256",
       nonce: "nonce",
       ciphertext: "ciphertext"
@@ -665,7 +708,9 @@ test("local preview payloads and encrypted preview events are bounded", () => {
     senderUserId: "github:maddie",
     createdAt: "2026-07-06T12:01:00.000Z",
     kind: "preview.event",
+    keyEpoch: 1,
     payload: {
+      version: 2,
       algorithm: "AES-GCM-256",
       nonce: "nonce",
       ciphertext: "ciphertext"
@@ -705,7 +750,9 @@ test("workspace file save requests use encrypted workspace envelopes", () => {
       senderUserId: "github:maddie",
       createdAt: "2026-07-08T12:00:00.000Z",
       kind: "workspace.request",
+      keyEpoch: 1,
       payload: {
+        version: 2,
         algorithm: "AES-GCM-256",
         nonce: "nonce-file-save-request",
         ciphertext: "encrypted-file-save-request"
@@ -722,7 +769,9 @@ test("workspace file save requests use encrypted workspace envelopes", () => {
       senderUserId: "github:maddie",
       createdAt: "2026-07-08T12:01:00.000Z",
       kind: "workspace.event",
+      keyEpoch: 1,
       payload: {
+        version: 2,
         algorithm: "AES-GCM-256",
         nonce: "nonce-file-save-status",
         ciphertext: "encrypted-file-save-status"

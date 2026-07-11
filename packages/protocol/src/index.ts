@@ -46,9 +46,11 @@ export { isRecord } from "./type-guards.js";
 
 export {
   CiphertextPayload,
+  AuthenticatedWrappedRoomSecretPayload,
   DevicePublicKeyJwk,
   DeviceSealedPayload,
   EncryptedPayload,
+  PublicKeyFingerprint,
   RoomSecretPayload,
   WrappedRoomSecretPayload
 } from "./crypto-payloads.js";
@@ -122,6 +124,13 @@ export {
   TeamRole
 } from "./room-team-records.js";
 
-export { PresenceMessage, RelayClientMessage, RelayEnvelope, RelayServerMessage } from "./relay-messages.js";
+export {
+  PresenceMessage,
+  RelayClientMessage,
+  RelayEnvelope,
+  RelayEnvelopeKind,
+  RelayServerMessage,
+  RoomEnvelopeMetadata
+} from "./relay-messages.js";
 
 export type { CodexTurnSummary } from "./app-types.js";
