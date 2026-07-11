@@ -5,8 +5,8 @@
     "rootDir": "src",
     "noEmit": false,
     "module": "NodeNext",
-    "moduleResolution": "NodeNext"
+    "moduleResolution": "NodeNext",
+    "types": ["node"]
   },
   "include": ["src"]
 }
-
