@@ -25,7 +25,10 @@ test("summarizes statuses and computes the Stryker mutation score", () => {
         mutants: [
           mutant("a-3", "Survived", 9),
           mutant("a-2", "Timeout", 5),
-          mutant("a-1", "Killed", 5, { killedBy: ["test-z", "test-a"], coveredBy: ["test-z"] })
+          mutant("a-1", "Killed", 5, {
+            killedBy: ["test-z", "test-ä", "test-a"],
+            coveredBy: ["test-z"]
+          })
         ]
       }
     }
@@ -46,7 +49,7 @@ test("summarizes statuses and computes the Stryker mutation score", () => {
   assert.equal(summary.totals.invalid, 1);
   assert.equal(summary.totals.scored, 4);
   assert.equal(summary.totals.mutationScore, 50);
-  assert.deepEqual(summary.mutants[0].killedBy, ["test-a", "test-z"]);
+  assert.deepEqual(summary.mutants[0].killedBy, ["test-a", "test-z", "test-ä"]);
   assert.equal(summary.mutants[0].classification, null);
   assert.equal(summary.mutants[0].rationale, null);
 });

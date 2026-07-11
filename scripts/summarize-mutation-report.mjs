@@ -22,7 +22,7 @@ export function summarizeMutationReport(report) {
 
   const files = Object.entries(report.files)
     .map(([fileName, file]) => summarizeFile(fileName, file))
-    .sort((left, right) => left.path.localeCompare(right.path));
+    .sort((left, right) => compareStrings(left.path, right.path));
   const totals = sumCounts(files.map((file) => file.counts));
 
   return {
@@ -95,11 +95,15 @@ function normalizeLocation(id, location) {
 
 function sortedStrings(value) {
   if (!Array.isArray(value)) return [];
-  return value.filter((item) => typeof item === "string").sort((left, right) => left.localeCompare(right));
+  return value.filter((item) => typeof item === "string").sort(compareStrings);
 }
 
 function compareMutants(left, right) {
-  return left.line - right.line || left.column - right.column || left.id.localeCompare(right.id);
+  return left.line - right.line || left.column - right.column || compareStrings(left.id, right.id);
+}
+
+function compareStrings(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function emptyCounts() {
