@@ -7,6 +7,19 @@ import {
   type DeviceSealedPayload,
   type RoomEnvelopeMetadata as RoomEnvelopeMetadataType
 } from "@multaiplayer/protocol";
+import { canonicalAuthenticatedRecord } from "./canonical.js";
+import { base64ToBytes, bytesToBase64, toArrayBuffer } from "./encoding.js";
+export { canonicalAuthenticatedRecord, type CanonicalAuthenticatedValue } from "./canonical.js";
+export { base64ToBytes, bytesToBase64 } from "./encoding.js";
+export {
+  computeInviteCapabilityMac,
+  createInviteCapability,
+  parseInviteCapability,
+  verifyInviteCapabilityMac,
+  type InviteCapabilityBinding,
+  type InviteCapabilityRequestBinding,
+  type InviteCapabilityResponseBinding
+} from "./inviteCapability.js";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -122,140 +135,6 @@ export interface AttachmentCryptoContext {
   name: string;
   type: string;
   size: number;
-}
-
-export interface InviteCapabilityRequestBinding {
-  phase: "request";
-  inviteId: string;
-  teamId: string;
-  roomId: string;
-  keyEpoch: number;
-  requestId: string;
-  requestNonce: string;
-  requesterUserId: string;
-  requesterDeviceId: string;
-  requesterPublicKeyFingerprint: string;
-  hostUserId: string;
-  hostDeviceId: string;
-  hostPublicKeyFingerprint: string;
-}
-
-export interface InviteCapabilityResponseBinding extends Omit<InviteCapabilityRequestBinding, "phase"> {
-  phase: "response";
-  status: "approved" | "denied";
-  decidedAt: string;
-}
-
-export type InviteCapabilityBinding = InviteCapabilityRequestBinding | InviteCapabilityResponseBinding;
-
-type CanonicalAuthenticatedValue = string | number | boolean | null;
-
-/**
- * Deterministic canonical JSON subset for MAC and AEAD authentication data.
- *
- * The encoding is explicitly domain- and version-separated, sorts ASCII field names,
- * and accepts only scalar values. This intentionally avoids
- * JavaScript object insertion order and can be reproduced without a JS runtime.
- */
-export function canonicalAuthenticatedRecord(
-  domain: string,
-  version: number,
-  fields: Readonly<Record<string, CanonicalAuthenticatedValue>>
-): Uint8Array {
-  if (!/^[a-z0-9][a-z0-9:._-]*$/.test(domain) || !Number.isSafeInteger(version) || version < 1) {
-    throw new Error("Canonical authenticated records require a domain and positive integer version");
-  }
-  const normalized: Record<string, CanonicalAuthenticatedValue> = { domain, version };
-  for (const name of Object.keys(fields).sort()) {
-    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name)) throw new Error(`Invalid canonical authenticated field name: ${name}`);
-    if (name === "domain" || name === "version") throw new Error(`Reserved canonical authenticated field: ${name}`);
-    const value = fields[name];
-    if (value !== null && typeof value !== "string" && typeof value !== "boolean" && typeof value !== "number") {
-      throw new Error(`Unsupported canonical authenticated field: ${name}`);
-    }
-    if (typeof value === "number" && !Number.isSafeInteger(value)) {
-      throw new Error(`Unsupported canonical authenticated field: ${name}`);
-    }
-    if (typeof value === "string" && /[\uD800-\uDFFF]/u.test(value.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/gu, ""))) {
-      throw new Error(`Canonical authenticated strings must be valid Unicode: ${name}`);
-    }
-    normalized[name] = value;
-  }
-  const ordered = Object.keys(normalized)
-    .sort()
-    .map((name) => `${JSON.stringify(name)}:${JSON.stringify(normalized[name])}`);
-  return encoder.encode(`{${ordered.join(",")}}`);
-}
-
-function inviteCapabilityBindingData(binding: InviteCapabilityBinding): Uint8Array {
-  const common = {
-    phase: binding.phase,
-    inviteId: binding.inviteId,
-    teamId: binding.teamId,
-    roomId: binding.roomId,
-    keyEpoch: binding.keyEpoch,
-    requestId: binding.requestId,
-    requestNonce: binding.requestNonce,
-    requesterUserId: binding.requesterUserId,
-    requesterDeviceId: binding.requesterDeviceId,
-    requesterPublicKeyFingerprint: binding.requesterPublicKeyFingerprint,
-    hostUserId: binding.hostUserId,
-    hostDeviceId: binding.hostDeviceId,
-    hostPublicKeyFingerprint: binding.hostPublicKeyFingerprint
-  };
-  return canonicalAuthenticatedRecord(
-    "multaiplayer:invite-capability-mac",
-    1,
-    binding.phase === "response" ? { ...common, status: binding.status, decidedAt: binding.decidedAt } : common
-  );
-}
-
-export function createInviteCapability(): string {
-  return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
-}
-
-export function parseInviteCapability(capability: string): Uint8Array {
-  if (!/^[A-Za-z0-9_-]{43}$/.test(capability)) throw new Error("Invite capability must use canonical base64url");
-  const raw = base64UrlToBytes(capability);
-  if (raw.byteLength !== 32 || bytesToBase64Url(raw) !== capability) {
-    throw new Error("Invite capability must be canonical 256-bit base64url");
-  }
-  return raw;
-}
-
-export async function computeInviteCapabilityMac(
-  capability: string,
-  binding: InviteCapabilityBinding
-): Promise<string> {
-  const raw = parseInviteCapability(capability);
-  const key = await crypto.subtle.importKey("raw", toArrayBuffer(raw), { name: "HMAC", hash: "SHA-256" }, false, [
-    "sign"
-  ]);
-  const signature = await crypto.subtle.sign("HMAC", key, toArrayBuffer(inviteCapabilityBindingData(binding)));
-  return bytesToBase64Url(new Uint8Array(signature));
-}
-
-export async function verifyInviteCapabilityMac(
-  capability: string,
-  binding: InviteCapabilityBinding,
-  mac: string
-): Promise<boolean> {
-  try {
-    const raw = parseInviteCapability(capability);
-    const signature = base64UrlToBytes(mac);
-    if (raw.byteLength !== 32 || signature.byteLength !== 32) return false;
-    const key = await crypto.subtle.importKey("raw", toArrayBuffer(raw), { name: "HMAC", hash: "SHA-256" }, false, [
-      "verify"
-    ]);
-    return crypto.subtle.verify(
-      "HMAC",
-      key,
-      toArrayBuffer(signature),
-      toArrayBuffer(inviteCapabilityBindingData(binding))
-    );
-  } catch {
-    return false;
-  }
 }
 
 export async function createRoomSecret(): Promise<RoomSecret> {
@@ -815,43 +694,4 @@ export async function fingerprintPublicKey(publicKeyJwk: JsonWebKey): Promise<st
       .match(/.{1,4}/g)
       ?.join(":") ?? "")
   );
-}
-
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const copy = new Uint8Array(bytes.byteLength);
-  copy.set(bytes);
-  return copy.buffer;
-}
-
-export function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
-
-export function base64ToBytes(value: string): Uint8Array {
-  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4 === 1) {
-    throw new Error("Invalid base64 encoding");
-  }
-  let binary: string;
-  try {
-    binary = atob(value);
-  } catch {
-    throw new Error("Invalid base64 encoding");
-  }
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-}
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-  return bytesToBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function base64UrlToBytes(value: string): Uint8Array {
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
-  return base64ToBytes(padded);
 }

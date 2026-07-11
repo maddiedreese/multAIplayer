@@ -60,10 +60,27 @@ test("CI verifies each layer once before packaging prebuilt desktop assets", () 
 
 test("RustSec audit is pinned, scoped to the native lockfile, and scheduled", () => {
   const workflow = readFileSync(".github/workflows/rust-audit.yml", "utf8");
-  assert.match(workflow, /uses: rustsec\/audit-check@v2\.0\.0/);
+  assert.match(workflow, /uses: rustsec\/audit-check@[a-f0-9]{40} # v2\.0\.0/);
   assert.match(workflow, /working-directory: apps\/desktop\/src-tauri/);
   assert.match(workflow, /schedule:/);
   assert.match(workflow, /checks: write/);
+});
+
+test("third-party GitHub Actions are pinned to immutable commits", () => {
+  for (const path of [
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/rust-audit.yml"
+  ]) {
+    const workflow = readFileSync(path, "utf8");
+    const references = Array.from(workflow.matchAll(/^\s*uses:\s*([^\s#]+)(?:\s+#\s*(\S+))?$/gm));
+    assert.ok(references.length > 0, `${path} must use at least one action`);
+    for (const [, reference, versionComment] of references) {
+      if (reference.startsWith("./")) continue;
+      assert.match(reference, /@[a-f0-9]{40}$/, `${path}: ${reference}`);
+      assert.match(versionComment ?? "", /^v\d/, `${path}: ${reference} needs a readable version comment`);
+    }
+  }
 });
 
 test("desktop owns Monaco while the root enforces its DOMPurify security override", () => {

@@ -35,8 +35,8 @@ export function registerDebugRoutes({
   maxUserIdChars,
   maxDisplayNameChars
 }: RegisterDebugRoutesOptions) {
-  app.get("/debug/rooms", (_req, res) => {
-    if (!debugEndpointsEnabled) {
+  app.get("/debug/rooms", (req, res) => {
+    if (!debugEndpointsEnabled || !isLoopbackRequest(req.socket.remoteAddress)) {
       res.status(404).json({ error: "Debug endpoints are disabled." });
       return;
     }
@@ -60,7 +60,7 @@ export function registerDebugRoutes({
   });
 
   app.post("/debug/auth-session", (req, res) => {
-    if (!debugEndpointsEnabled) {
+    if (!debugEndpointsEnabled || !isLoopbackRequest(req.socket.remoteAddress)) {
       res.status(404).json({ error: "Debug endpoints are disabled." });
       return;
     }
@@ -86,4 +86,10 @@ export function registerDebugRoutes({
     res.cookie("multaiplayer_session", sessionId, authCookieOptions(ttlMs));
     res.status(201).json({ user: session.user });
   });
+}
+
+function isLoopbackRequest(remoteAddress: string | undefined): boolean {
+  if (!remoteAddress) return false;
+  const normalized = remoteAddress.toLowerCase().split("%")[0];
+  return normalized === "127.0.0.1" || normalized === "::1" || normalized === "::ffff:127.0.0.1";
 }

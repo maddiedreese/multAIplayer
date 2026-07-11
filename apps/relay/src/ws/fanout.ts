@@ -16,6 +16,7 @@ interface CreateRelayFanoutOptions {
   addTeamMember: (teamId: string, userId: string) => void;
   saveEncryptedEnvelope: (roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]) => Promise<void>;
   saveRoomKeyTransition: (roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]) => Promise<void>;
+  roomEpochEnvelopeLimit: number;
   teamRecordForUser: (
     team: TeamRecord,
     store: Pick<RelayStore, "getTeamMember">,
@@ -36,10 +37,11 @@ export function createRelayFanout({
   addTeamMember,
   saveEncryptedEnvelope,
   saveRoomKeyTransition,
+  roomEpochEnvelopeLimit,
   teamRecordForUser
 }: CreateRelayFanoutOptions) {
   const acceptedEpochByRoom = new Map<RoomKey, number>();
-  const rotatingRooms = new Set<RoomKey>();
+  const roomPublishQueues = new Map<RoomKey, Promise<void>>();
   function send(socket: WebSocket, message: RelayServerMessage) {
     if (socket.readyState === socket.OPEN) {
       socket.send(JSON.stringify(message));
@@ -73,9 +75,25 @@ export function createRelayFanout({
 
   async function publishEnvelope(envelope: RelayEnvelope): Promise<void> {
     const key = roomKey(envelope.teamId, envelope.roomId);
+    const previousPublish = roomPublishQueues.get(key) ?? Promise.resolve();
+    let releasePublish!: () => void;
+    const publishComplete = new Promise<void>((resolve) => {
+      releasePublish = resolve;
+    });
+    const queuedPublish = previousPublish.catch(() => undefined).then(() => publishComplete);
+    roomPublishQueues.set(key, queuedPublish);
+    await previousPublish.catch(() => undefined);
+    try {
+      await publishEnvelopeForRoom(key, envelope);
+    } finally {
+      releasePublish();
+      if (roomPublishQueues.get(key) === queuedPublish) roomPublishQueues.delete(key);
+    }
+  }
+
+  async function publishEnvelopeForRoom(key: RoomKey, envelope: RelayEnvelope): Promise<void> {
     const previousBacklog = store.getEncryptedBacklog(key) ?? [];
     if (previousBacklog.some((existing) => existing.id === envelope.id)) return;
-    if (rotatingRooms.has(key)) throw new Error("A room key transition is already being accepted. Retry this publish.");
     const room = store.getRoom(envelope.roomId);
     const acceptedEpoch = acceptedEpochByRoom.get(key) ?? room?.keyEpoch ?? deriveAcceptedEpoch(previousBacklog);
     acceptedEpochByRoom.set(key, acceptedEpoch);
@@ -83,10 +101,20 @@ export function createRelayFanout({
       throw new Error(`Room envelope epoch ${envelope.keyEpoch} does not match accepted epoch ${acceptedEpoch}.`);
     }
     const advancesEpoch = envelope.kind === "room.key";
+    const epochEnvelopeCount =
+      room?.keyEpoch === acceptedEpoch && room.epochEnvelopeCount !== undefined
+        ? room.epochEnvelopeCount
+        : previousBacklog.filter((item) => item.keyEpoch === acceptedEpoch && item.kind !== "room.key").length;
+    if (!advancesEpoch && epochEnvelopeCount >= roomEpochEnvelopeLimit) {
+      throw new Error(
+        `Room epoch ${acceptedEpoch} reached its ${roomEpochEnvelopeLimit}-envelope safety limit. The host must rotate the room key.`
+      );
+    }
     if (advancesEpoch) {
-      rotatingRooms.add(key);
       acceptedEpochByRoom.set(key, acceptedEpoch + 1);
-      if (room) store.setRoom({ ...room, keyEpoch: acceptedEpoch + 1 });
+      if (room) store.setRoom({ ...room, keyEpoch: acceptedEpoch + 1, epochEnvelopeCount: 0 });
+    } else if (room) {
+      store.setRoom({ ...room, keyEpoch: acceptedEpoch, epochEnvelopeCount: epochEnvelopeCount + 1 });
     }
     const backlog = [...previousBacklog, envelope];
     const prunedBacklog = pruneEncryptedBacklog(backlog);
@@ -103,13 +131,11 @@ export function createRelayFanout({
       }
     } catch (error) {
       store.setEncryptedBacklog(key, previousBacklog);
+      if (room) store.setRoom(room);
       if (advancesEpoch) {
         acceptedEpochByRoom.set(key, acceptedEpoch);
-        if (room) store.setRoom(room);
       }
       throw error;
-    } finally {
-      if (advancesEpoch) rotatingRooms.delete(key);
     }
     metrics.recordEnvelopePublished();
     broadcast(key, { type: "envelope", envelope });

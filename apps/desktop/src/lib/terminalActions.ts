@@ -274,7 +274,7 @@ export function createTerminalActions({
     if (reportRoomTerminalActionInFlight(roomId)) return;
     setTerminalErrorForRoom(roomId, null);
     try {
-      const snapshot = await writeTerminal(terminalId, input);
+      const snapshot = await writeTerminal(roomId, terminalId, input);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         upsertTerminalSnapshot(snapshot);
       }
@@ -331,7 +331,12 @@ export function createTerminalActions({
     ]);
     const startedAt = new Date().toISOString();
     try {
-      const result = await runShellCommand(approvedRequest.cwd, approvedRequest.command);
+      const result = await runShellCommand(
+        roomId,
+        approvedRequest.cwd,
+        approvedRequest.command,
+        approvedRequest.requester
+      );
       const output = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join("\n");
       appendTerminalLinesForRoom(roomId, [
         output || `Command exited with ${result.status ?? "unknown"} and no output.`

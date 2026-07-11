@@ -114,6 +114,7 @@ function checkProductionRelayEnv() {
   const seedDemo = envBoolean("MULTAIPLAYER_RELAY_SEED_DEMO", false);
   const rateLimits = envBoolean("MULTAIPLAYER_RELAY_RATE_LIMITS", true);
   const trustProxyHeaders = envBoolean("MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS", false);
+  const trustedProxyConfigured = envBoolean("MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED", false);
   const storage = envValue("MULTAIPLAYER_RELAY_STORAGE") || "json";
   const dataPath = envValue("MULTAIPLAYER_RELAY_DATA_PATH");
   const attachmentBlobMaxBytes = envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES", 5_000_000);
@@ -186,10 +187,12 @@ function checkProductionRelayEnv() {
       : "required: set a persistent relay store path or mounted volume"
   });
   checks.push({
-    ok: !trustProxyHeaders,
+    ok: !trustProxyHeaders || trustedProxyConfigured,
     label: "production MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS",
     detail: trustProxyHeaders
-      ? "only enable after configuring a trusted reverse proxy; leave false by default"
+      ? trustedProxyConfigured
+        ? "forwarded headers enabled with an explicitly configured trusted proxy boundary"
+        : "requires MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=true after the edge strips and rewrites forwarding headers"
       : "proxy headers not trusted by default"
   });
   checks.push({

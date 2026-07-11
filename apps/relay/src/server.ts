@@ -54,6 +54,7 @@ import {
   isApprovalPolicy,
   isJsonStringifiableWithin,
   isRoomMode,
+  createRelayLimits,
   maxCiphertextCharactersForBlob,
   normalizeBrowserAllowedOrigins,
   normalizeCodexModel as normalizeCodexModelWithLimit,
@@ -94,6 +95,7 @@ const {
   attachmentBlobUploadWindowMs,
   jsonBodyLimitBytes,
   encryptedEnvelopeMaxBytes,
+  roomEpochEnvelopeLimit,
   sessionPersistenceSecret,
   debugEndpointsEnabled,
   allowedCorsOrigins,
@@ -154,7 +156,17 @@ const {
   canAccessRoom
 } = relayAuthz;
 const maxEncryptedAccessTokenChars = Math.ceil((maxAccessTokenChars * 4) / 3) + 1024;
-const maxEnvelopeCiphertextChars = Math.ceil((encryptedEnvelopeMaxBytes * 4) / 3) + 1024;
+const relayLimits = createRelayLimits(encryptedEnvelopeMaxBytes, {
+  maxDisplayNameChars,
+  maxDeviceIdChars,
+  maxEnvelopeIdChars,
+  maxEnvelopeNonceChars,
+  maxPublicKeyFingerprintChars,
+  maxPublicKeyJwkChars,
+  maxRoomProjectPathChars,
+  maxUserIdChars
+});
+const { maxEnvelopeCiphertextChars } = relayLimits;
 const relayLifecycle = createRelayLifecycle({
   server,
   wss,
@@ -249,6 +261,7 @@ const { send, broadcast, broadcastRoomUpdated, broadcastWorkspaceUpdated, publis
       relayStorePersistence.saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds),
     saveRoomKeyTransition: (roomKey, envelope, prunedEnvelopeIds) =>
       relayStorePersistence.saveRoomKeyTransition(roomKey, envelope, prunedEnvelopeIds),
+    roomEpochEnvelopeLimit,
     teamRecordForUser
   });
 const {
@@ -428,50 +441,37 @@ registerRoomRoutes({
   maxUserIdChars
 });
 registerRelayWebSocketConnection({
-  wss,
-  store: relayStore,
-  sessions,
-  roomPresence,
-  encryptedEnvelopeMaxBytes,
-  maxDisplayNameChars,
-  maxDeviceIdChars,
-  maxEnvelopeCiphertextChars,
-  maxEnvelopeIdChars,
-  maxEnvelopeNonceChars,
-  maxPublicKeyFingerprintChars,
-  maxPublicKeyJwkChars,
-  maxRoomProjectPathChars,
-  maxUserIdChars,
-  getAuthSessionFromRequest,
-  clientIdentityFromIncomingMessage,
-  consumeRateLimit,
-  websocketConnectionCaps,
-  recordQuotaRejection: relayMetrics.recordQuotaRejection,
-  recordRateLimitRejection: relayMetrics.recordRateLimitRejection,
-  recordConnectionAttempt: relayMetrics.recordWebSocketConnectionAttempt,
-  recordConnectionAccepted: relayMetrics.recordWebSocketConnectionAccepted,
-  recordConnectionRejection: relayMetrics.recordWebSocketConnectionRejection,
-  isReady: relayLifecycle.isReady,
-  send,
-  roomKey,
-  isKnownRoom,
-  canJoinRoom,
-  joinRoom,
-  canSubscribeTeam,
-  subscribeTeam,
-  hasTeam: (teamId) => relayStore.hasTeam(teamId),
-  canSubscribeWorkspace,
-  subscribeWorkspace,
-  canPublishEnvelope,
-  isAllowedEnvelopePayload,
-  publishEnvelope,
-  publishPresence,
-  leaveRoom,
-  leaveTeams,
-  leaveWorkspace,
-  normalizeMetadataText,
-  isJsonStringifiableWithin,
-  isRecord
+  transport: { wss, send, isReady: relayLifecycle.isReady },
+  state: { store: relayStore, sessions, roomPresence },
+  limits: relayLimits,
+  authentication: { getAuthSessionFromRequest, clientIdentityFromIncomingMessage },
+  rateLimiting: { consume: consumeRateLimit, connectionCaps: websocketConnectionCaps },
+  metrics: {
+    recordQuotaRejection: relayMetrics.recordQuotaRejection,
+    recordRateLimitRejection: relayMetrics.recordRateLimitRejection,
+    recordConnectionAttempt: relayMetrics.recordWebSocketConnectionAttempt,
+    recordConnectionAccepted: relayMetrics.recordWebSocketConnectionAccepted,
+    recordConnectionRejection: relayMetrics.recordWebSocketConnectionRejection
+  },
+  rooms: {
+    roomKey,
+    isKnownRoom,
+    canJoinRoom,
+    joinRoom,
+    canSubscribeTeam,
+    subscribeTeam,
+    hasTeam: (teamId) => relayStore.hasTeam(teamId),
+    canSubscribeWorkspace,
+    subscribeWorkspace,
+    canPublishEnvelope,
+    isAllowedEnvelopePayload,
+    publishEnvelope,
+    publishPresence,
+    leaveRoom,
+    leaveTeams,
+    leaveWorkspace
+  },
+  validation: { normalizeMetadataText, isJsonStringifiableWithin, isRecord }
 });
 
 await relayStorePersistence.loadRelayStore();
@@ -573,7 +573,7 @@ function normalizeCodexModel(value: unknown): string | null {
 }
 
 function pruneEncryptedBacklog(envelopes: RelayEnvelope[]): RelayEnvelope[] {
-  return pruneEncryptedBacklogWithLimits(envelopes, {
+  const normallyPruned = pruneEncryptedBacklogWithLimits(envelopes, {
     encryptedBacklogLimit,
     encryptedBacklogRetentionDays,
     encryptedEnvelopeMaxBytes,
@@ -584,6 +584,7 @@ function pruneEncryptedBacklog(envelopes: RelayEnvelope[]): RelayEnvelope[] {
     maxPublicKeyJwkChars,
     maxUserIdChars
   });
+  return normallyPruned;
 }
 
 function scheduleStoreSave() {

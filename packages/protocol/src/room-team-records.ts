@@ -57,6 +57,7 @@ export const RoomRecord = z.object({
   id: RoomId,
   teamId: TeamId,
   keyEpoch: z.number().int().positive().optional(),
+  epochEnvelopeCount: z.number().int().nonnegative().optional(),
   name: z.string().min(1).max(maxRoomNameChars),
   projectPath: z.string().min(1).max(maxRoomProjectPathChars),
   host: z.string().min(1).max(maxDisplayNameChars),

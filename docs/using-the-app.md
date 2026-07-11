@@ -90,7 +90,7 @@ The file editor can open files, show diffs for changed files, expand into a larg
 
 The Terminals panel manages room-scoped host-local terminals. The active host can open, type into, restart, close, and copy terminal output as Markdown.
 
-Non-host members can request exact terminal commands. The active host sees the requester, command, working directory, and warnings before approving or denying. Approved requests run on the host account from the room's selected project folder; this is shell access on the host account, not a project sandbox.
+Non-host members can request exact terminal commands. The active host sees the requester, command, working directory, and warnings before approving or denying. The native app then presents an operating-system confirmation containing the exact command, room, and working directory immediately before execution. Starting or restarting an interactive terminal uses the same native confirmation boundary, and each subsequent input write requires native confirmation of its exact bytes; control characters such as Enter and Escape are shown in escaped form. Approved requests run on the host account from the room's selected project folder; this is shell access on the host account, not a project sandbox.
 
 Terminal output is visible to the room when shared through terminal request results, Codex events, copied Markdown, or approved context. Secret-looking commands and output get warnings, but hosts should review carefully.
 

@@ -8,10 +8,32 @@ export function isTauriRuntime(): boolean {
   return typeof internals?.invoke === "function";
 }
 
-export async function runShellCommand(cwd: string, command: string): Promise<CommandResult> {
+async function authorizeShellExecution(request: {
+  roomId: string;
+  cwd: string;
+  command: string;
+  kind: "remote_request" | "interactive_terminal";
+  requesterLabel: string;
+}): Promise<string> {
+  return invoke<string>("authorize_shell_execution", { request });
+}
+
+export async function runShellCommand(
+  roomId: string,
+  cwd: string,
+  command: string,
+  requesterLabel: string
+): Promise<CommandResult> {
   if (isTauriRuntime()) {
+    const authorizationToken = await authorizeShellExecution({
+      roomId,
+      cwd,
+      command,
+      kind: "remote_request",
+      requesterLabel
+    });
     return invoke<CommandResult>("run_shell_command", {
-      request: { cwd, command }
+      request: { roomId, cwd, command, authorizationToken }
     });
   }
 

@@ -1,3 +1,4 @@
+use crate::shell_authorization::{ShellAuthorizationState, ShellExecutionKind};
 use portable_pty::{native_pty_system, Child as PtyChild, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -57,24 +58,35 @@ pub(crate) struct TerminalStartRequest {
     name: String,
     cwd: String,
     command: String,
+    authorization_token: String,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TerminalWriteRequest {
     id: String,
+    room_id: String,
     input: String,
+    authorization_token: String,
 }
 
 #[tauri::command]
 pub(crate) fn terminal_start(
     state: State<'_, TerminalState>,
+    authorization_state: State<'_, ShellAuthorizationState>,
     request: TerminalStartRequest,
 ) -> Result<TerminalSnapshot, String> {
     ensure_room_id(&request.room_id)?;
     ensure_existing_dir(&request.cwd)?;
     ensure_terminal_name(&request.name)?;
     ensure_terminal_command(&request.command)?;
+    authorization_state.consume(
+        &request.authorization_token,
+        &request.room_id,
+        &request.cwd,
+        &request.command,
+        ShellExecutionKind::InteractiveTerminal,
+    )?;
 
     let id = terminal_id(&request.room_id, &request.name);
     let mut sessions = state
@@ -180,10 +192,18 @@ pub(crate) fn terminal_read(
 #[tauri::command]
 pub(crate) fn terminal_write(
     state: State<'_, TerminalState>,
+    authorization_state: State<'_, ShellAuthorizationState>,
     request: TerminalWriteRequest,
 ) -> Result<TerminalSnapshot, String> {
     ensure_terminal_id(&request.id)?;
+    ensure_room_id(&request.room_id)?;
     ensure_terminal_input(&request.input)?;
+    authorization_state.consume_terminal_input(
+        &request.authorization_token,
+        &request.room_id,
+        &request.id,
+        &request.input,
+    )?;
     let mut sessions = state
         .sessions
         .lock()
@@ -191,6 +211,9 @@ pub(crate) fn terminal_write(
     let session = sessions
         .get_mut(&request.id)
         .ok_or_else(|| format!("Terminal not found: {}", request.id))?;
+    if session.room_id != request.room_id {
+        return Err("Terminal does not belong to the confirmed room".to_string());
+    }
     if !existing_is_running(session) {
         return Err(format!("Terminal {} is not running", session.name));
     }

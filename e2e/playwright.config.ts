@@ -20,6 +20,7 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 120_000,
     env: {
+      MULTAIPLAYER_RELAY_DEBUG: "true",
       MULTAIPLAYER_RELAY_REQUIRE_AUTH: "false",
       MULTAIPLAYER_RELAY_DATA_PATH:
         process.env.MULTAIPLAYER_E2E_RELAY_DATA_PATH ?? "/tmp/multaiplayer-playwright-relay.json",

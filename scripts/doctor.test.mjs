@@ -12,6 +12,7 @@ const productionRelayEnv = {
   MULTAIPLAYER_RELAY_SEED_DEMO: "false",
   MULTAIPLAYER_RELAY_RATE_LIMITS: "true",
   MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS: "false",
+  MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED: "false",
   MULTAIPLAYER_RELAY_STORAGE: "sqlite",
   MULTAIPLAYER_RELAY_DATA_PATH: ".multaiplayer/relay-store.sqlite",
   MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "5000000",
@@ -85,6 +86,22 @@ test("production relay doctor rejects disabled rate limits and temporary storage
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /RATE_LIMITS|rate limits/i);
   assert.match(result.stdout, /must not point at \/tmp/);
+});
+
+test("production relay doctor requires explicit trusted-proxy pairing", () => {
+  const unsafe = runProductionDoctor({
+    ...productionRelayEnv,
+    MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS: "true"
+  });
+  assert.notEqual(unsafe.status, 0);
+  assert.match(unsafe.stdout, /requires MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=true/);
+
+  const paired = runProductionDoctor({
+    ...productionRelayEnv,
+    MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS: "true",
+    MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED: "true"
+  });
+  assert.equal(paired.status, 0, paired.stderr || paired.stdout);
 });
 
 test("production relay doctor rejects missing cost guardrail bounds", () => {

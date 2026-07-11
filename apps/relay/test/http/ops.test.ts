@@ -127,13 +127,21 @@ test("relay drains readiness, sockets, and pending store writes on graceful shut
   }
 });
 
-test("relay disables debug endpoints in production unless explicitly enabled", async () => {
+test("relay disables debug endpoints in every environment unless explicitly enabled", async () => {
   const productionRelay = await startRelay({ NODE_ENV: "production" });
   try {
     const disabled = await fetch(`${productionRelay.baseUrl}/debug/rooms`);
     assert.equal(disabled.status, 404);
   } finally {
     await productionRelay.close();
+  }
+
+  const developmentRelay = await startRelay({ MULTAIPLAYER_RELAY_DEBUG: "false" });
+  try {
+    const disabled = await fetch(`${developmentRelay.baseUrl}/debug/rooms`);
+    assert.equal(disabled.status, 404);
+  } finally {
+    await developmentRelay.close();
   }
 
   const debugRelay = await startRelay({

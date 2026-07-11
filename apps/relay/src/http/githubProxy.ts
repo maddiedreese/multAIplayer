@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { normalizeGitHubBranchName, normalizeGitHubRepoRef, normalizePullRequestDraft } from "@multaiplayer/github";
 import { isRecord } from "@multaiplayer/protocol";
 import type { AuthSession } from "../state.js";
+import { fetchUpstream } from "./upstream.js";
 
 export interface RegisterGitHubProxyRoutesOptions {
   app: Express;
@@ -43,7 +44,7 @@ export function registerGitHubProxyRoutes({
       return;
     }
 
-    const response = await fetch(
+    const response = await fetchUpstream(
       `https://api.github.com/repos/${encodeURIComponent(draft.owner)}/${encodeURIComponent(draft.repo)}/pulls`,
       {
         method: "POST",
@@ -96,7 +97,7 @@ export function registerGitHubProxyRoutes({
 
     const params = new URLSearchParams({ per_page: "6" });
     if (branch) params.set("branch", branch);
-    const response = await fetch(
+    const response = await fetchUpstream(
       `https://api.github.com/repos/${encodeURIComponent(repoRef.owner)}/${encodeURIComponent(repoRef.repo)}/actions/runs?${params}`,
       {
         headers: {

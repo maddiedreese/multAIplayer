@@ -161,3 +161,11 @@ Recommendation:
 - GitHub Issues for bugs, UX, dogfood reports, and relay deployment help;
 - GitHub Security Advisories or the `SECURITY.md` contact path for vulnerabilities and private-data exposure;
 - a short support expectation in the README saying alpha support is best-effort.
+
+## Dependency And Coverage Maintenance
+
+Dependabot checks the root npm workspace, the native Cargo workspace, and GitHub Actions each month. Review generated dependency pull requests as ordinary code changes: keep lockfiles synchronized, require the complete CI gate, and inspect release-tooling changes before merging them.
+
+Every third-party GitHub Action is referenced by an immutable commit SHA. The adjacent version comment is the human-readable release that the SHA represents; update the SHA and comment together. Do not replace these references with mutable major-version tags. Dependabot understands pinned Action references and proposes reviewed SHA updates.
+
+The web-and-relay CI job runs `npm run test:coverage` after the full workspace verification. This focused gate exercises relay authorization and input-limit policy directly, requires at least 90% line/function/statement coverage and 85% branch coverage across those modules, and uploads the HTML, LCOV, and JSON summary as the `relay-security-coverage` artifact. Treat a threshold reduction or removal of a covered security module as a security-sensitive review decision. Expand the focused module set as new authorization and boundary-validation modules are introduced; the coverage gate complements rather than replaces integration and end-to-end tests.

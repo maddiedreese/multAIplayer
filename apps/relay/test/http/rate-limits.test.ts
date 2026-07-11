@@ -63,7 +63,8 @@ test("relay ignores forwarded IP headers for rate limits unless explicitly trust
   const trustedProxyRelay = await startRelay({
     MULTAIPLAYER_RELAY_RATE_LIMIT_READ: "1",
     MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS: "60000",
-    MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS: "true"
+    MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS: "true",
+    MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED: "true"
   });
   try {
     const first = await fetch(`${trustedProxyRelay.baseUrl}/teams`, { headers: { "x-forwarded-for": "203.0.113.30" } });
