@@ -319,7 +319,8 @@ export async function sealJsonToDevice(
       name: "ECDH",
       namedCurve: "P-256"
     },
-    true,
+    // Stryker disable next-line BooleanLiteral: only the public half is exported; WebCrypto keeps it extractable independently
+    false,
     ["deriveKey"]
   );
   const sealingKey = await deriveWrappingKey(ephemeralKeyPair.privateKey, recipientPublicKey);
@@ -385,7 +386,8 @@ export async function wrapRoomSecretForDevice(
       name: "ECDH",
       namedCurve: "P-256"
     },
-    true,
+    // Stryker disable next-line BooleanLiteral: only the public half is exported; WebCrypto keeps it extractable independently
+    false,
     ["deriveKey"]
   );
   const wrappingKey = await deriveWrappingKey(ephemeralKeyPair.privateKey, recipientPublicKey);
@@ -446,7 +448,7 @@ async function importRoomKey(secret: RoomSecret): Promise<CryptoKey> {
 }
 
 export function validateRoomSecret(secret: unknown): asserts secret is RoomSecret {
-  if (!secret || typeof secret !== "object") {
+  if (secret === null || typeof secret !== "object" || Array.isArray(secret)) {
     throw new Error("Room secret must be an object");
   }
   const value = secret as Partial<RoomSecret>;

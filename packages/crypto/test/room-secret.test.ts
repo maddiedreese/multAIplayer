@@ -101,7 +101,7 @@ test("room-secret generation returns independent canonical 256-bit AES keys", as
 
 test("room-secret validation rejects invalid shapes, algorithms, encodings, and lengths", () => {
   for (const value of [null, undefined, false, 0, "secret", [], () => undefined]) {
-    assert.throws(() => validateRoomSecret(value));
+    assert.throws(() => validateRoomSecret(value), /^Error: Room secret must be an object$/);
   }
   for (const algorithm of [undefined, null, "", "AES-GCM", "AES-GCM-128"]) {
     assert.throws(() => validateRoomSecret({ algorithm, rawKey: Buffer.alloc(32).toString("base64") }), /algorithm/);
