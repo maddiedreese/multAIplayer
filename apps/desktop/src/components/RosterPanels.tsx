@@ -139,7 +139,7 @@ export function RoomMembersPanel({
               <small>{member.deviceLabel}</small>
             </div>
             <div className="member-badges">
-              {member.isHost && <b>host</b>}
+              {member.isHost && <b>Host</b>}
               <b className={member.publicKeyFingerprint ? (member.trusted ? "trusted" : "verified") : "warning"}>
                 {member.publicKeyFingerprint ? (member.trusted ? "local trust" : "keyed") : "pending"}
               </b>
