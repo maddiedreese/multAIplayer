@@ -18,7 +18,7 @@
     "test:coverage": "c8 --all --src src --include 'src/**/*.ts' --exclude 'src/app-types.ts' --report-dir coverage --reporter=text --reporter=json-summary --reporter=lcov --check-coverage --lines=95 --functions=80 --branches=75 --statements=95 tsx --test test/*.test.ts"
   },
   "dependencies": {
-    "zod": "^3.24.1"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "tsx": "^4.19.2",
