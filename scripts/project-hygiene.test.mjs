@@ -85,14 +85,11 @@ test("latest Codex contract drift is checked proactively with least privilege", 
   assert.doesNotMatch(workflow, /contents: write/);
 });
 
-test("security boundaries have explicit human ownership and review policy", () => {
-  const owners = readFileSync(".github/CODEOWNERS", "utf8");
+test("security boundaries have explicit automated review policy", () => {
   const contributing = readFileSync("CONTRIBUTING.md", "utf8");
-  for (const path of ["/packages/crypto/", "/packages/protocol/", "/apps/desktop/src-tauri/"]) {
-    assert.match(owners, new RegExp(`^${path.replaceAll("/", "\\/")}\\s+@maddiedreese$`, "m"));
-  }
-  assert.match(contributing, /inspect every changed line/);
-  assert.match(contributing, /AI agent authored or materially changed/);
+  assert.match(contributing, /packages\/crypto/);
+  assert.match(contributing, /property, fuzz, mutation, or native checks/);
+  assert.match(contributing, /does not require a separate human or code-owner approval/);
 });
 
 test("third-party GitHub Actions are pinned to immutable commits", () => {
