@@ -203,6 +203,7 @@ export async function decryptLocalJson<T>(
   );
 }
 
+// mutation-policy:start attachment-wrapper
 export async function encryptAttachmentJson(value: unknown, secret: RoomSecret, context: AttachmentCryptoContext) {
   return encryptJsonWithAdditionalData(value, secret, attachmentAdditionalData(context));
 }
@@ -220,6 +221,32 @@ export async function decryptAttachmentJson<T>(
   );
 }
 
+function attachmentAdditionalData(context: AttachmentCryptoContext): Uint8Array {
+  if (
+    !context.teamId ||
+    !context.roomId ||
+    !context.name ||
+    !context.type ||
+    !Number.isSafeInteger(context.size) ||
+    context.size < 0
+  ) {
+    throw new Error("Invalid attachment crypto context");
+  }
+  return canonicalAuthenticatedRecord("multaiplayer:attachment:v2", 1, {
+    teamId: context.teamId,
+    roomId: context.roomId,
+    name: context.name,
+    type: context.type,
+    size: context.size
+  });
+}
+
+function legacyAttachmentAdditionalData(context: AttachmentCryptoContext): Uint8Array {
+  return encoder.encode(JSON.stringify({ domain: "multaiplayer:attachment:v2", ...context }));
+}
+// mutation-policy:end attachment-wrapper
+
+// mutation-policy:start payload-core
 async function encryptJsonWithAdditionalData(
   value: unknown,
   secret: RoomSecret,
@@ -247,6 +274,7 @@ async function decryptJsonWithAdditionalData<T>(
   legacyAdditionalData?: Uint8Array
 ): Promise<T> {
   if (payload.version !== 2 && payload.version !== 3) throw new Error("Unsupported ciphertext version");
+  if (payload.algorithm !== "AES-GCM-256") throw new Error("Unsupported ciphertext algorithm");
   const key = await importRoomKey(secret);
   const plaintext = await decryptWithAdditionalData(
     key,
@@ -277,7 +305,9 @@ async function decryptWithAdditionalData(
     return decrypt(legacyAdditionalData);
   }
 }
+// mutation-policy:end payload-core
 
+// mutation-policy:start device-seal
 export async function sealJsonToDevice(
   value: unknown,
   recipientPublicKeyJwk: JsonWebKey,
@@ -322,10 +352,14 @@ export async function openDeviceSealedJson<T>(
   if (payload.algorithm !== "ECDH-P256-HKDF-SHA256-AES-GCM-256") {
     throw new Error("Unsupported device-sealed payload");
   }
+  const hasVersion = Object.hasOwn(payload, "version");
+  if (hasVersion && payload.version !== 3) {
+    throw new Error("Unsupported device-sealed payload version");
+  }
   const recipientPrivateKey = await importEcdhPrivateKey(recipientPrivateKeyJwk);
   const ephemeralPublicKey = await importEcdhPublicKey(payload.ephemeralPublicKeyJwk);
   const sealingKey = await deriveWrappingKey(recipientPrivateKey, ephemeralPublicKey);
-  const canonical = "version" in payload && payload.version === 3;
+  const canonical = hasVersion;
   const plaintext = await decryptWithAdditionalData(
     sealingKey,
     base64ToBytes(payload.nonce),
@@ -336,7 +370,9 @@ export async function openDeviceSealedJson<T>(
   );
   return JSON.parse(decoder.decode(plaintext)) as T;
 }
+// mutation-policy:end device-seal
 
+// mutation-policy:start room-secret-wrap
 export async function wrapRoomSecretForDevice(
   secret: RoomSecret,
   recipientPublicKeyJwk: JsonWebKey,
@@ -397,9 +433,12 @@ export async function unwrapRoomSecretForDevice(
   validateRoomSecret(secret);
   return secret;
 }
+// mutation-policy:end room-secret-wrap
 
+// mutation-policy:start room-secret-validation
 async function importRoomKey(secret: RoomSecret): Promise<CryptoKey> {
   validateRoomSecret(secret);
+  // Stryker disable next-line BooleanLiteral: internal key handle is never returned and extractability is unobservable
   return crypto.subtle.importKey("raw", toArrayBuffer(base64ToBytes(secret.rawKey)), { name: "AES-GCM" }, false, [
     "encrypt",
     "decrypt"
@@ -414,19 +453,20 @@ export function validateRoomSecret(secret: unknown): asserts secret is RoomSecre
   if (value.algorithm !== "AES-GCM-256") {
     throw new Error(`Unsupported room secret algorithm: ${String(value.algorithm)}`);
   }
-  let rawKeyBytes: Uint8Array | null = null;
-  if (typeof value.rawKey === "string") {
-    try {
-      rawKeyBytes = base64ToBytes(value.rawKey);
-    } catch {
-      rawKeyBytes = null;
-    }
-  }
-  if (rawKeyBytes?.byteLength !== 32) {
+  if (typeof value.rawKey !== "string") {
     throw new Error("Room key must be 256 bits");
   }
+  let rawKeyBytes: Uint8Array;
+  try {
+    rawKeyBytes = base64ToBytes(value.rawKey);
+  } catch {
+    throw new Error("Room key must be 256 bits");
+  }
+  if (rawKeyBytes.byteLength !== 32) throw new Error("Room key must be 256 bits");
 }
+// mutation-policy:end room-secret-validation
 
+// mutation-policy:start device-key-import
 async function importEcdhPublicKey(publicKeyJwk: JsonWebKey): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     "jwk",
@@ -435,6 +475,7 @@ async function importEcdhPublicKey(publicKeyJwk: JsonWebKey): Promise<CryptoKey>
       name: "ECDH",
       namedCurve: "P-256"
     },
+    // Stryker disable next-line BooleanLiteral: public input is already public and the internal handle is never returned
     false,
     []
   );
@@ -479,6 +520,7 @@ async function deriveAuthenticatedWrappingKey(privateKey: CryptoKey, publicKey: 
     { name: "HKDF", hash: "SHA-256", salt, info: encoder.encode("multaiplayer:authenticated-room-secret-wrap:v2") },
     material,
     { name: "AES-GCM", length: 256 },
+    // Stryker disable next-line BooleanLiteral: derived wrapping key is internal and never exportable through this API
     false,
     ["encrypt", "decrypt"]
   );
@@ -495,10 +537,12 @@ async function deriveWrappingKey(privateKey: CryptoKey, publicKey: CryptoKey): P
       name: "AES-GCM",
       length: 256
     },
+    // Stryker disable next-line BooleanLiteral: derived wrapping key is internal and never exportable through this API
     false,
     ["encrypt", "decrypt"]
   );
 }
+// mutation-policy:end device-key-import
 
 function wrapAdditionalData(context: DeviceCryptoContext): Uint8Array {
   return cryptoContextAdditionalData("multaiplayer:room-secret-wrap:v2", context);
@@ -612,30 +656,6 @@ function localAdditionalData(context: LocalCryptoContext): Uint8Array {
 
 function legacyLocalAdditionalData(context: LocalCryptoContext): Uint8Array {
   return encoder.encode(JSON.stringify({ domain: "multaiplayer:local-json:v2", ...context }));
-}
-
-function attachmentAdditionalData(context: AttachmentCryptoContext): Uint8Array {
-  if (
-    !context.teamId ||
-    !context.roomId ||
-    !context.name ||
-    !context.type ||
-    !Number.isSafeInteger(context.size) ||
-    context.size < 0
-  ) {
-    throw new Error("Invalid attachment crypto context");
-  }
-  return canonicalAuthenticatedRecord("multaiplayer:attachment:v2", 1, {
-    teamId: context.teamId,
-    roomId: context.roomId,
-    name: context.name,
-    type: context.type,
-    size: context.size
-  });
-}
-
-function legacyAttachmentAdditionalData(context: AttachmentCryptoContext): Uint8Array {
-  return encoder.encode(JSON.stringify({ domain: "multaiplayer:attachment:v2", ...context }));
 }
 
 function jsonWebKeyToDevicePublicKeyJwk(key: JsonWebKey): DevicePublicKeyJwkType {

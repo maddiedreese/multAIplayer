@@ -32,7 +32,8 @@ const policy = {
       replacement: "index -= 1",
       rationale: "A loop-counter reversal is expected to run until the mutation timeout."
     }
-  ]
+  ],
+  regions: []
 };
 
 test("accepts scores at their floors and a specifically explained timeout", () => {
@@ -106,14 +107,14 @@ test("accepts type-checker detections but rejects unexplained compile errors", (
 
 test("validates policy data instead of silently weakening the gate", () => {
   assert.throws(
-    () => checkMutationPolicy({ files: [], mutants: [] }, { files: {}, allowedTimeouts: [{}] }),
+    () => checkMutationPolicy({ files: [], mutants: [] }, { files: {}, allowedTimeouts: [{}], regions: [] }),
     /non-empty file/
   );
   assert.throws(
     () =>
       checkMutationPolicy(
         { files: [], mutants: [] },
-        { files: { "src/a.ts": { minimumScore: 101, maximumSurvived: 0 } }, allowedTimeouts: [] }
+        { files: { "src/a.ts": { minimumScore: 101, maximumSurvived: 0 } }, allowedTimeouts: [], regions: [] }
       ),
     /invalid minimumScore/
   );
@@ -121,8 +122,69 @@ test("validates policy data instead of silently weakening the gate", () => {
     () =>
       checkMutationPolicy(
         { files: [], mutants: [] },
-        { files: { "src/a.ts": { minimumScore: 90, maximumSurvived: -1 } }, allowedTimeouts: [] }
+        { files: { "src/a.ts": { minimumScore: 90, maximumSurvived: -1 } }, allowedTimeouts: [], regions: [] }
       ),
     /invalid maximumSurvived/
   );
+});
+
+const regionRule = {
+  file: "src/index.ts",
+  marker: "payload-core",
+  maximumSurvived: 0,
+  maximumNoCoverage: 0,
+  maximumRuntimeError: 0,
+  maximumPending: 0,
+  maximumTimeout: 0
+};
+
+test("enforces status limits only inside a marker-governed region", () => {
+  const summary = {
+    files: [file("src/canonical.ts", 100), file("src/encoding.ts", 100)],
+    mutants: [
+      mutant("Survived", { id: "inside", file: "src/index.ts", line: 2, endLine: 2 }),
+      mutant("Survived", { id: "outside", file: "src/index.ts", line: 5, endLine: 5 })
+    ]
+  };
+  const configured = { ...policy, regions: [regionRule] };
+  const failures = checkMutationPolicy(summary, configured, {
+    "src/index.ts":
+      "// mutation-policy:start payload-core\nfunction core() {}\n// mutation-policy:end payload-core\n\nfunction debt() {}"
+  });
+  assert.deepEqual(failures, ["src/index.ts [payload-core]: 1 Survived mutants exceeds maximum 0"]);
+});
+
+test("fails closed for mutants crossing a region boundary", () => {
+  const summary = {
+    files: [file("src/canonical.ts", 100), file("src/encoding.ts", 100)],
+    mutants: [mutant("Killed", { id: "crossing", file: "src/index.ts", line: 1, endLine: 2 })]
+  };
+  const configured = { ...policy, regions: [regionRule] };
+  const failures = checkMutationPolicy(summary, configured, {
+    "src/index.ts": "// mutation-policy:start payload-core\nfunction core() {}\n// mutation-policy:end payload-core"
+  });
+  assert.match(failures[0], /crosses mutation-policy region/);
+});
+
+test("rejects missing, duplicate, nested, reversed, and unclosed markers", () => {
+  const summary = { files: [file("src/canonical.ts", 100), file("src/encoding.ts", 100)], mutants: [] };
+  const configured = { ...policy, regions: [regionRule] };
+  const check = (source) => checkMutationPolicy(summary, configured, { "src/index.ts": source });
+  assert.throws(() => check("function core() {}"), /exactly one start and end/);
+  assert.throws(
+    () =>
+      check(
+        "// mutation-policy:start payload-core\n// mutation-policy:end payload-core\n// mutation-policy:start payload-core\n// mutation-policy:end payload-core"
+      ),
+    /exactly one start and end/
+  );
+  assert.throws(
+    () =>
+      check(
+        "// mutation-policy:start payload-core\n// mutation-policy:start nested\n// mutation-policy:end nested\n// mutation-policy:end payload-core"
+      ),
+    /may not be nested/
+  );
+  assert.throws(() => check("// mutation-policy:end payload-core"), /unmatched mutation-policy end/);
+  assert.throws(() => check("// mutation-policy:start payload-core"), /unclosed mutation-policy region/);
 });

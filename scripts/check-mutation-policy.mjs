@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 const alwaysRejectedStatuses = new Set(["NoCoverage", "RuntimeError", "Pending"]);
 
 /** Enforce repository-owned mutation quality gates against a deterministic summary. */
-export function checkMutationPolicy(summary, policy) {
+export function checkMutationPolicy(summary, policy, sources = {}) {
   requireObject(summary, "mutation summary");
   requireObject(policy, "mutation policy");
   if (!Array.isArray(summary.files) || !Array.isArray(summary.mutants)) {
@@ -16,9 +16,15 @@ export function checkMutationPolicy(summary, policy) {
   if (!Array.isArray(policy.allowedTimeouts)) {
     throw new TypeError("mutation policy must contain an allowedTimeouts array");
   }
+  if (!Array.isArray(policy.regions)) {
+    throw new TypeError("mutation policy must contain a regions array");
+  }
 
   const failures = [];
-  const governedFiles = new Set(Object.keys(policy.files));
+  const governedFiles = new Set([
+    ...Object.keys(policy.files),
+    ...policy.regions.map((region) => (region && typeof region === "object" ? region.file : undefined))
+  ]);
   const filesByPath = new Map(summary.files.map((file) => [file.path, file]));
   for (const [path, rule] of Object.entries(policy.files)) {
     requireObject(rule, `mutation policy rule for ${JSON.stringify(path)}`);
@@ -75,7 +81,87 @@ export function checkMutationPolicy(summary, policy) {
     }
   }
 
+  for (const [index, rule] of policy.regions.entries()) {
+    requireObject(rule, `mutation policy region ${index}`);
+    for (const field of ["file", "marker"]) {
+      if (typeof rule[field] !== "string" || rule[field].length === 0) {
+        throw new TypeError(`mutation policy region ${index} must have a non-empty ${field}`);
+      }
+    }
+    if (!/^[a-z0-9-]+$/.test(rule.marker)) {
+      throw new TypeError(`mutation policy region ${index} has an invalid marker`);
+    }
+    for (const field of [
+      "maximumSurvived",
+      "maximumNoCoverage",
+      "maximumRuntimeError",
+      "maximumPending",
+      "maximumTimeout"
+    ]) {
+      if (!Number.isInteger(rule[field]) || rule[field] < 0) {
+        throw new TypeError(`mutation policy region ${index} has an invalid ${field}`);
+      }
+    }
+    if (typeof sources[rule.file] !== "string") {
+      failures.push(`${rule.file} [${rule.marker}]: source is unavailable`);
+      continue;
+    }
+    const region = findRegion(sources[rule.file], rule.file, rule.marker);
+    const overlapping = summary.mutants.filter(
+      (mutant) => mutant.file === rule.file && mutant.endLine >= region.start && mutant.line <= region.end
+    );
+    const crossing = overlapping.filter((mutant) => mutant.line <= region.start || mutant.endLine >= region.end);
+    for (const mutant of crossing) {
+      failures.push(describeMutant(mutant, `crosses mutation-policy region ${JSON.stringify(rule.marker)}`));
+    }
+    const inside = overlapping.filter((mutant) => mutant.line > region.start && mutant.endLine < region.end);
+    const limits = {
+      Survived: rule.maximumSurvived,
+      NoCoverage: rule.maximumNoCoverage,
+      RuntimeError: rule.maximumRuntimeError,
+      Pending: rule.maximumPending,
+      Timeout: rule.maximumTimeout
+    };
+    for (const [status, maximum] of Object.entries(limits)) {
+      const count = inside.filter((mutant) => mutant.status === status).length;
+      if (count > maximum) {
+        failures.push(`${rule.file} [${rule.marker}]: ${count} ${status} mutants exceeds maximum ${maximum}`);
+      }
+    }
+  }
+
   return failures;
+}
+
+export function findRegion(source, file, marker) {
+  const starts = [];
+  const ends = [];
+  const stack = [];
+  for (const [offset, line] of source.split(/\r?\n/).entries()) {
+    const match = line.match(/^\s*\/\/ mutation-policy:(start|end) ([a-z0-9-]+)\s*$/);
+    if (!match) continue;
+    const [, kind, name] = match;
+    const lineNumber = offset + 1;
+    if (kind === "start") {
+      if (stack.length > 0) throw new Error(`${file}:${lineNumber}: mutation-policy regions may not be nested`);
+      stack.push({ name, line: lineNumber });
+      if (name === marker) starts.push(lineNumber);
+    } else {
+      const start = stack.pop();
+      if (!start || start.name !== name) {
+        throw new Error(`${file}:${lineNumber}: unmatched mutation-policy end marker ${JSON.stringify(name)}`);
+      }
+      if (name === marker) ends.push(lineNumber);
+    }
+  }
+  if (stack.length > 0)
+    throw new Error(`${file}:${stack[0].line}: unclosed mutation-policy region ${JSON.stringify(stack[0].name)}`);
+  if (starts.length !== 1 || ends.length !== 1) {
+    throw new Error(
+      `${file}: mutation-policy region ${JSON.stringify(marker)} must have exactly one start and end marker`
+    );
+  }
+  return { start: starts[0], end: ends[0] };
 }
 
 function requireObject(value, label) {
@@ -122,7 +208,15 @@ export async function runCli(args) {
     throw new Error("usage: node scripts/check-mutation-policy.mjs <summary.json> <policy.json>");
   }
   const [summary, policy] = await Promise.all(args.map(async (path) => JSON.parse(await readFile(path, "utf8"))));
-  const failures = checkMutationPolicy(summary, policy);
+  const sources = Object.fromEntries(
+    await Promise.all(
+      [...new Set(policy.regions.map((region) => region.file))].map(async (path) => [
+        path,
+        await readFile(path, "utf8")
+      ])
+    )
+  );
+  const failures = checkMutationPolicy(summary, policy, sources);
   if (failures.length > 0) throw new Error(`mutation policy failed:\n- ${failures.join("\n- ")}`);
   process.stdout.write("Mutation policy passed.\n");
 }
