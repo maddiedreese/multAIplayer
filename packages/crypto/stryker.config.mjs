@@ -15,11 +15,6 @@ export default {
     fileName: "reports/mutation/mutation.json"
   },
   coverageAnalysis: "off",
-  // Error-message wording and WebCrypto extractability flags do not change the
-  // package's authentication decisions. Keep the gate focused on logic mutants.
-  mutator: {
-    excludedMutations: ["StringLiteral", "BooleanLiteral"]
-  },
   thresholds: {
     high: 75,
     low: 55,
