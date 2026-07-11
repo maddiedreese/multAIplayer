@@ -90,10 +90,10 @@ export function RoomHeader({
     else setRoomNameDraft(roomName);
   };
   const toolTabs: Array<{ id: InspectorTab; label: string; icon: ReactNode }> = [
-    { id: "files", label: "files", icon: <FileText size={16} /> },
-    { id: "terminal", label: "terminal", icon: <Terminal size={16} /> },
-    { id: "browser", label: "browser", icon: <Globe2 size={16} /> },
-    { id: "room", label: "room", icon: <UsersRound size={16} /> }
+    { id: "files", label: "Files", icon: <FileText size={16} /> },
+    { id: "terminal", label: "Terminal", icon: <Terminal size={16} /> },
+    { id: "browser", label: "Browser", icon: <Globe2 size={16} /> },
+    { id: "room", label: "Room", icon: <UsersRound size={16} /> }
   ];
 
   return (
@@ -234,7 +234,7 @@ export function RoomHeader({
         </button>
         <button className="header-copy" onClick={onShareLocalPreview} disabled={!hasRoom || roomLocked}>
           <MonitorUp size={14} />
-          Share Local Preview
+          Share local preview
         </button>
         <button
           className={markdownSelectionMode ? "header-copy active" : "header-copy"}

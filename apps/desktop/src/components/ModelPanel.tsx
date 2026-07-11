@@ -91,7 +91,7 @@ export function ModelPanel({
         </select>
       </label>
       <label>
-        <span>Custom model id</span>
+        <span>Custom model ID</span>
         <div className="custom-model-row">
           <input
             value={customModel}

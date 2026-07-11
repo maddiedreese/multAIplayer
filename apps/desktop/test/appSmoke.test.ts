@@ -293,7 +293,7 @@ test("App smoke", { timeout: 25_000 }, async (t) => {
     resetAppSmokeDom();
     render(createElement(App));
 
-    fireEvent.click(await screen.findByRole("button", { name: "terminal" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Terminal" }));
     const terminalInput = await screen.findByLabelText("Terminal input");
     await waitFor(() => assert.equal(document.activeElement, terminalInput));
 

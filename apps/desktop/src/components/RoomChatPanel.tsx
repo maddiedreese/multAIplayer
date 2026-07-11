@@ -245,6 +245,7 @@ export function RoomChatPanel({
                     </button>
                   )}
                   <button
+                    className="message-reply-button"
                     onClick={() => onReplyToMessage(message.id)}
                     title="Reply to message"
                     aria-label={`Reply to message from ${message.author}`}
@@ -301,7 +302,7 @@ export function RoomChatPanel({
             <div className="avatar">P</div>
             <div className="bubble local-preview-card">
               <div className="message-meta">
-                <strong>Live Local Preview</strong>
+                <strong>Live local preview</strong>
                 <span>{preview.statusLabel}</span>
               </div>
               <dl>

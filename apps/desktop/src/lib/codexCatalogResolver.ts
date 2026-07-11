@@ -104,13 +104,16 @@ export function resolveCodexRunSettings(
 
 export function catalogModelOptions(probe: Pick<CodexProbe, "available" | "models"> | null) {
   if (!probe?.available || !probe.models.length) return codexModelOptions;
-  return probe.models
+  const hostModels = probe.models
     .filter((model) => !model.hidden)
     .map((model) => ({
       id: model.model || model.id,
       label: model.label || model.model || model.id,
       description: model.description
     }));
+  const hostModelIds = new Set(hostModels.map((model) => model.id));
+
+  return [...codexModelOptions.filter((model) => !hostModelIds.has(model.id)), ...hostModels];
 }
 
 export function catalogReasoningOptionsForModel(probe: Pick<CodexProbe, "available" | "models"> | null, model: string) {

@@ -18,7 +18,12 @@ export function RoomInspectorPanel({
   roomPanel
 }: RoomInspectorPanelProps) {
   const inspectorRef = useRef<HTMLElement | null>(null);
-  const activeLabel = activeTab === "room" ? "room" : activeTab;
+  const activeLabel = {
+    files: "Files",
+    terminal: "Terminal",
+    browser: "Browser",
+    room: "Room"
+  } satisfies Record<InspectorTab, string>;
   const panelByTab: Record<InspectorTab, ReactNode> = {
     files: filesPanel,
     terminal: terminalPanel,
@@ -41,7 +46,7 @@ export function RoomInspectorPanel({
     <aside className="inspector" ref={inspectorRef}>
       <div className="inspector-context">
         <span>Context</span>
-        <strong>{activeLabel}</strong>
+        <strong>{activeLabel[activeTab]}</strong>
       </div>
 
       <div key={activeTab} className={`inspector-panel-group inspector-panel-${activeTab}`} data-active-tab={activeTab}>

@@ -109,7 +109,7 @@ test("main-column container reads and mutates selected-room state at its compone
   fireEvent.click(view.getByText("Selected"));
   assert.equal(useAppStore.getState().roomChatByRoom[selectedRoom.id]?.markdownSelectionMode, true);
 
-  fireEvent.click(view.getByText("terminal"));
+  fireEvent.click(view.getByText("Terminal"));
   assert.equal(useAppStore.getState().historyPresenceByRoom[selectedRoom.id]?.inspectorTab, "terminal");
 });
 
