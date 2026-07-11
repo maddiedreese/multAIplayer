@@ -131,7 +131,7 @@ Invite metadata expires by default:
 MULTAIPLAYER_RELAY_INVITE_TTL_DAYS=7
 ```
 
-The relay stores invite metadata only. Gated invite links do not contain the room key; the desktop sends a device-sealed join request to the host, and host approval returns the room key wrapped to the joiner's device. Direct invite links can still carry the room key in the URL fragment for convenience, which is not sent to the relay by normal HTTP requests.
+The relay stores invite metadata and registered public device keys, not room keys. Invite links contain a capability and the active host's public binding. The desktop sends a capability-authenticated, device-sealed join request; host approval returns the current epoch key in an authenticated host-to-device wrap sealed to the validated requester. Legacy room-key-bearing links are scrubbed from browser history and rejected.
 
 Encrypted attachment blobs are also bounded and pruned:
 

@@ -1,4 +1,4 @@
-import type { TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { RoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
 import { formatTeamMemberName, formatTeamRole } from "./appFormatters";
 import { buildDeviceFingerprintMarkdown } from "./deviceTrust";
 import { removeTeamMember, transferTeamOwnership, updateTeamMemberRole } from "./workspaceClient";
@@ -12,6 +12,12 @@ interface MemberActionsOptions {
   untrustDeviceForRoom: (roomId: string, deviceId: string) => void;
   updateTeamRoleForTeam: (teamId: string, role: TeamRecord["role"] | undefined) => void;
   updateTeamMemberCountForTeam: (teamId: string, members: number) => void;
+  rotateRoomKeyForDevices: (
+    room: RoomRecord,
+    actor: { id: string; name: string },
+    deviceId: string,
+    excludedUserIds?: ReadonlySet<string>
+  ) => Promise<unknown>;
   copyMarkdownWithFallback: (
     title: string,
     markdown: string,
@@ -26,6 +32,7 @@ export function createMemberActions({
   untrustDeviceForRoom,
   updateTeamRoleForTeam,
   updateTeamMemberCountForTeam,
+  rotateRoomKeyForDevices,
   copyMarkdownWithFallback
 }: MemberActionsOptions) {
   const currentWorkspace = () => {
@@ -33,7 +40,8 @@ export function createMemberActions({
     return {
       selectedTeam,
       selectedTeamName: teams.find((team) => team.id === selectedTeam)?.name ?? "Selected team",
-      selectedRoom: rooms.find((room) => room.id === selectedRoomId)
+      selectedRoom: rooms.find((room) => room.id === selectedRoomId),
+      rooms
     };
   };
 
@@ -127,12 +135,45 @@ export function createMemberActions({
   }
 
   async function removeMemberFromTeam(member: TeamMemberRecord) {
-    const { selectedTeam, selectedTeamName } = currentWorkspace();
+    const { selectedTeam, selectedTeamName, rooms } = currentWorkspace();
     if (!selectedTeam || useAppStore.getState().teamRosterByTeam[selectedTeam]?.busy) return;
     useAppStore.getState().setTeamMembersBusyForTeam(selectedTeam, true);
     useAppStore.getState().setTeamMembersMessageForTeam(selectedTeam, null);
     try {
-      const members = await removeTeamMember(selectedTeam, member.userId);
+      const { localUser, deviceId } = currentLocalIdentity();
+      const activeRooms = rooms.filter((room) => room.teamId === selectedTeam && !room.archivedAt && !room.deletedAt);
+      const unavailableRooms = activeRooms.filter(
+        (room) => room.hostStatus !== "active" || room.hostUserId !== localUser.id
+      );
+      if (unavailableRooms.length > 0) {
+        const names = unavailableRooms.map((room) => room.name).join(", ");
+        throw new Error(
+          `Removal was not started. Transfer active host authority for ${names} to this device, then retry.`
+        );
+      }
+      let members: TeamMemberRecord[];
+      try {
+        members = await removeTeamMember(selectedTeam, member.userId);
+      } catch (error) {
+        if (!String(error).includes("Team member not found")) throw error;
+        members = (useAppStore.getState().teamRosterByTeam[selectedTeam]?.members ?? []).filter(
+          (item) => item.userId !== member.userId
+        );
+      }
+      const failures: Array<{ room: RoomRecord; error: unknown }> = [];
+      for (const room of activeRooms) {
+        try {
+          await rotateRoomKeyForDevices(room, localUser, deviceId, new Set([member.userId]));
+        } catch (error) {
+          failures.push({ room, error });
+        }
+      }
+      if (failures.length > 0) {
+        const details = failures.map(({ room, error }) => `${room.name}: ${String(error)}`).join("; ");
+        throw new Error(
+          `Member relay access was removed, but cryptographic access rotation is incomplete. Retry removal to finish: ${details}`
+        );
+      }
       useAppStore.getState().setTeamMembersForTeam(selectedTeam, members);
       updateTeamMemberCountForTeam(selectedTeam, members.length);
       useAppStore

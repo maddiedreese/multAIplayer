@@ -39,7 +39,6 @@ export function RoomSettingsDrawerPanel({
   defaultCodexModel,
   codexModelOptions,
   teamDefaultBrowserProfilePersistent,
-  teamDefaultInviteApprovalGate,
   message,
   onChooseProject,
   onRelayHttpDraftChange,
@@ -56,7 +55,6 @@ export function RoomSettingsDrawerPanel({
   onTeamDefaultApprovalPolicyChange,
   onTeamDefaultCodexModelChange,
   onTeamDefaultBrowserProfilePersistentChange,
-  onTeamDefaultInviteApprovalGateChange,
   onApplyTeamDefaultsToRoom
 }: {
   relaySummary: string;
@@ -259,15 +257,6 @@ export function RoomSettingsDrawerPanel({
             onChange={(event) => onTeamDefaultBrowserProfilePersistentChange(event.target.checked)}
           />
           <span>Persist browser profiles in new team rooms</span>
-        </label>
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={teamDefaultInviteApprovalGate}
-            disabled={!selectedTeam}
-            onChange={(event) => onTeamDefaultInviteApprovalGateChange(event.target.checked)}
-          />
-          <span>Require host approval for new room invites</span>
         </label>
         <button className="ghost-wide" onClick={onApplyTeamDefaultsToRoom} disabled={!hasSelectedRoom || settingsBusy}>
           <Check size={15} />

@@ -28,7 +28,7 @@ Teams and rooms can be archived or deleted from the sidebar. Archiving moves roo
 
 The Members panel shows live room presence, host status, device labels, and device key fingerprints.
 
-`keyed` means a member has a public device key. `local trust` means this device has locally marked that exact room/device/fingerprint as expected. Trust is local-only; the relay does not enforce it, and other members do not inherit it. Copying a fingerprint lets people compare keys out of band.
+`keyed` means a member has a registered public device key. Fingerprints are the full SHA-256 digest of the canonical P-256 public key. Invite enrollment recomputes and pins the exact authenticated user, device, key, and fingerprint; a changed known key fails closed and must be reviewed as a new device identity. Copying a fingerprint supports an additional out-of-band comparison.
 
 ## Chat
 
@@ -116,11 +116,11 @@ Git workflow progress and Actions refreshes are shared to the room as encrypted 
 
 ## Invites And Room Keys
 
-The Invites panel can copy a room invite, import an invite, enable host approval for joiners, approve or deny gated invite requests, and rotate the room key.
+The Invites panel can copy or import a capability-authenticated invite, approve or deny validated device requests, and rotate the room key epoch.
 
-Direct invite links include the room key in the URL fragment for convenience. Gated invites do not include the room key; the joiner sends a device-sealed request to the active host, and approval delivers the room key wrapped to the joiner's device key.
+Invite links never include the room key. They contain a 256-bit join capability, the current key epoch, and the active host's exact user, device, public key, and full fingerprint. The join request is capability-authenticated and sealed to the host; approval delivers the epoch key only to the validated requester device using an authenticated host-to-device wrap.
 
-Room-key rotation changes the key used for future room messages and invite links. It is useful after accidental invite sharing or routine hygiene, but it is not full cryptographic member removal in the alpha.
+Room-key rotation advances the explicit room epoch and wraps the new key independently to eligible registered devices. Removing a member performs the relay revocation and epoch transition so the removed devices cannot decrypt future events. It cannot erase content already delivered or copied.
 
 ## Local History, Notifications, And Forgetting A Room
 

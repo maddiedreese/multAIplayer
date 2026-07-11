@@ -39,7 +39,7 @@ interface UseRelaySubscriptionOptions {
   upsertTeam: (team: TeamRecord) => void;
   refreshTeamMembers: (teamId: string, quiet?: boolean) => Promise<void>;
   decryptInviteEnvelope: (envelope: RelayEnvelope) => Promise<unknown | null>;
-  handleInviteEnvelopePlaintext: (roomId: string, plaintext: unknown) => Promise<void>;
+  handleInviteEnvelopePlaintext: (roomId: string, plaintext: unknown, envelope: RelayEnvelope) => Promise<void>;
   handleCodexBrowserOpenCommand: (message: ChatMessage, room: RoomRecord) => boolean;
 }
 

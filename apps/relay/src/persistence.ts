@@ -13,6 +13,12 @@ export interface RelayPersistence {
   save(state: unknown): Promise<void>;
   saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): Promise<boolean>;
   saveEncryptedEnvelope(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]): Promise<boolean>;
+  saveRoomKeyTransition(
+    roomKey: RoomKey,
+    envelope: RelayEnvelope,
+    prunedEnvelopeIds: string[],
+    state: unknown
+  ): Promise<void>;
   quarantine(reason: string): Promise<void>;
   close(): void;
 }
@@ -51,6 +57,15 @@ class JsonFileRelayPersistence implements RelayPersistence {
 
   async saveEncryptedEnvelope(): Promise<boolean> {
     return false;
+  }
+
+  async saveRoomKeyTransition(
+    _roomKey: RoomKey,
+    _envelope: RelayEnvelope,
+    _prunedEnvelopeIds: string[],
+    state: unknown
+  ) {
+    await this.save(state);
   }
 
   async quarantine(reason: string): Promise<void> {
@@ -96,6 +111,14 @@ class SqliteRelayPersistence implements RelayPersistence {
     await mkdir(dirname(this.dataPath), { recursive: true });
     appendEncryptedBacklogRow(this.getDb(), roomKey, envelope, prunedEnvelopeIds);
     return true;
+  }
+
+  async saveRoomKeyTransition(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[], state: unknown) {
+    await mkdir(dirname(this.dataPath), { recursive: true });
+    this.getDb().transaction(() => {
+      appendEncryptedBacklogRow(this.getDb(), roomKey, envelope, prunedEnvelopeIds);
+      saveNormalizedRelayState(this.getDb(), state);
+    })();
   }
 
   async quarantine(reason: string): Promise<void> {

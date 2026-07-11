@@ -97,7 +97,6 @@ export function useAppWorkspaceFlow({
       },
       inviteUrl: {
         requestNoSecretInviteAccess: inviteActions.requestNoSecretInviteAccess,
-        acceptInvite: inviteActions.acceptInvite,
         setSelectedInviteMessage
       }
     },
@@ -107,7 +106,8 @@ export function useAppWorkspaceFlow({
         trustDeviceForRoom: storeAction("trustDeviceForRoom"),
         untrustDeviceForRoom: storeAction("untrustDeviceForRoom"),
         updateTeamRoleForTeam: storeAction("updateTeamRoleForTeam"),
-        updateTeamMemberCountForTeam: storeAction("updateTeamMemberCountForTeam")
+        updateTeamMemberCountForTeam: storeAction("updateTeamMemberCountForTeam"),
+        rotateRoomKeyForDevices: inviteActions.rotateRoomKeyForDevices
       },
       workspaceCreation: {
         setWorkspaceStatusError: storeAction("setWorkspaceStatusError"),

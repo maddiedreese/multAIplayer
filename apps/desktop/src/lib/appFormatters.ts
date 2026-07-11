@@ -158,8 +158,9 @@ export function formatMemberDeviceLabel(member: RoomPresence, localDeviceId: str
 }
 
 export function shortFingerprint(fingerprint: string): string {
-  if (fingerprint.length <= 18) return fingerprint;
-  return `${fingerprint.slice(0, 10)}...${fingerprint.slice(-6)}`;
+  const groups = fingerprint.replace(/^sha256:/, "").split(":");
+  if (groups.length !== 16) return fingerprint;
+  return `sha256:${groups.slice(0, 8).join(":")}:…:${groups.slice(-2).join(":")}`;
 }
 
 export function isRoomHostMember(member: RoomPresence, room: RoomRecord): boolean {

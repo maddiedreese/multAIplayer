@@ -247,6 +247,8 @@ const { send, broadcast, broadcastRoomUpdated, broadcastWorkspaceUpdated, publis
     addTeamMember,
     saveEncryptedEnvelope: (roomKey, envelope, prunedEnvelopeIds) =>
       relayStorePersistence.saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds),
+    saveRoomKeyTransition: (roomKey, envelope, prunedEnvelopeIds) =>
+      relayStorePersistence.saveRoomKeyTransition(roomKey, envelope, prunedEnvelopeIds),
     teamRecordForUser
   });
 const {
@@ -374,6 +376,7 @@ registerDeviceRoutes({
   app,
   store: relayStore,
   getAuthSession,
+  allowRead,
   allowMutation,
   scheduleStoreSave,
   normalizeMetadataText,
@@ -479,12 +482,15 @@ seedWorkspace({
 });
 
 function canPublishEnvelope(session: ClientSession, envelope: RelayEnvelope): boolean {
-  return (
+  const sessionMatches =
     session.teamId === envelope.teamId &&
     session.roomId === envelope.roomId &&
     session.userId === envelope.senderUserId &&
-    session.deviceId === envelope.senderDeviceId
-  );
+    session.deviceId === envelope.senderDeviceId;
+  if (!sessionMatches) return false;
+  if (envelope.kind !== "room.key") return true;
+  const room = relayStore.getRoom(envelope.roomId);
+  return room?.hostStatus === "active" && room.hostUserId === session.userId;
 }
 
 function isAllowedEnvelopePayload(envelope: RelayEnvelope): boolean {

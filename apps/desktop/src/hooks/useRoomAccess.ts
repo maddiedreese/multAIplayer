@@ -26,8 +26,7 @@ export function useRoomAccess({
   forgottenRoomIds,
   revokedRoomIds,
   revokedTeamIds,
-  historySettings,
-  inviteApprovalGate
+  historySettings
 }: UseRoomAccessOptions) {
   const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser);
   const isSelectedRoomForgotten = forgottenRoomIds.has(selectedRoom.id);
@@ -38,8 +37,7 @@ export function useRoomAccess({
   const canRequestWorkspace = hasSelectedRoom && canRequestWorkspaceAction(selectedRoom, isSelectedRoomLocked);
   const canRequestBrowser = hasSelectedRoom && canRequestBrowserAccess(selectedRoom, isSelectedRoomLocked);
   const canHostBrowser = hasSelectedRoom && canHostBrowserAction(selectedRoom, localUser, isSelectedRoomLocked);
-  const canCopyRoomInvite =
-    hasSelectedRoom && canCreateRoomInvite(selectedRoom, localUser, isSelectedRoomLocked, inviteApprovalGate);
+  const canCopyRoomInvite = hasSelectedRoom && canCreateRoomInvite(selectedRoom, localUser, isSelectedRoomLocked);
   const localWorkspaceMessage = localWorkspaceGateMessage(selectedRoom, isSelectedRoomLocked);
   const roomPosture = roomPostureSummary({
     locked: isSelectedRoomLocked,

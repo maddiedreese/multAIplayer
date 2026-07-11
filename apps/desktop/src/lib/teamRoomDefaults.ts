@@ -63,10 +63,7 @@ export function sanitizeTeamRoomDefaults(defaults: Partial<TeamRoomDefaults>): T
       typeof defaults.browserProfilePersistent === "boolean"
         ? defaults.browserProfilePersistent
         : defaultTeamRoomDefaults.browserProfilePersistent,
-    inviteApprovalGate:
-      typeof defaults.inviteApprovalGate === "boolean"
-        ? defaults.inviteApprovalGate
-        : defaultTeamRoomDefaults.inviteApprovalGate
+    inviteApprovalGate: true
   };
 }
 

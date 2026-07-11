@@ -19,9 +19,9 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 
 - Room chat and local history are encrypted, and the relay should not store plaintext transcripts or attachments.
 - The relay sees routing metadata such as team names, room names, host labels, project path labels, invite ids, encrypted envelope sizes, and encrypted blob metadata.
-- Direct invite links can include the room key in the URL fragment for convenience. Gated invite links avoid this by using host approval and device-wrapped room keys.
-- Member removal is relay-enforced for future reads and live sockets, but it is not full cryptographic forward secrecy. A removed member may keep content and keys they already received.
-- Post-alpha security roadmap items include MLS-style group keying, history epochs/backfill, stronger member-removal key epochs, identity verification, and multi-device recovery.
+- Invite links contain a capability and public host binding, never the room key. The active host validates the authenticated requester device before delivering the current epoch key.
+- Member removal revokes relay access and advances room key epochs for the remaining registered devices. A removed member may still keep content, exports, screenshots, and older epoch keys already received.
+- Multi-device recovery and history backfill remain limited; each device must enroll with its own key identity.
 
 ## Codex Hosting
 

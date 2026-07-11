@@ -9,12 +9,10 @@ export interface InviteRequestDisplay {
 }
 
 export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
-  inviteApprovalGate,
   copyDisabled,
   inviteSecretInput,
   inviteRequests,
   localDeviceId,
-  gateDisabled,
   importDisabled,
   rotateDisabled,
   approvalDisabled,
@@ -22,18 +20,15 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
   inviteLink,
   inviteMessage,
   onCopyInvite,
-  onInviteApprovalGateChange,
   onInviteSecretInputChange,
   onImportInvite,
   onRotateRoomKey,
   onDecideInviteRequest
 }: {
-  inviteApprovalGate: boolean;
   copyDisabled: boolean;
   inviteSecretInput: string;
   inviteRequests: T[];
   localDeviceId: string;
-  gateDisabled: boolean;
   importDisabled: boolean;
   rotateDisabled: boolean;
   approvalDisabled: boolean;
@@ -41,7 +36,6 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
   inviteLink: string | null;
   inviteMessage: string | null;
   onCopyInvite: () => void;
-  onInviteApprovalGateChange: (enabled: boolean) => void;
   onInviteSecretInputChange: (value: string) => void;
   onImportInvite: () => void;
   onRotateRoomKey: () => void;
@@ -51,26 +45,15 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
     <section className="panel invite-panel">
       <div className="panel-title">
         <span>Invites</span>
-        <small className="panel-state available">{inviteApprovalGate ? "Host approval" : "Invite link"}</small>
+        <small className="panel-state available">Host approval</small>
       </div>
       <button className="primary-wide" onClick={onCopyInvite} disabled={copyDisabled}>
         <Copy size={15} />
         Copy room invite
       </button>
-      <label className="checkbox-row">
-        <input
-          type="checkbox"
-          checked={inviteApprovalGate}
-          disabled={gateDisabled}
-          onChange={(event) => onInviteApprovalGateChange(event.target.checked)}
-        />
-        <span>Require host approval for joiners</span>
-      </label>
-      {!inviteApprovalGate && (
-        <div className="empty-state compact">
-          Direct invite links include the room key. Use them only when the sharing channel is trusted.
-        </div>
-      )}
+      <div className="empty-state compact">
+        Invite links do not contain the room key. The active host approves each device.
+      </div>
       <label>
         <span>Join from invite</span>
         <textarea

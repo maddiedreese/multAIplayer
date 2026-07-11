@@ -29,7 +29,7 @@ Browser access requests are routed as encrypted `browser.request` envelopes. Hos
 
 Non-host file-save requests are routed as encrypted `workspace.request` envelopes. Host decisions are routed as encrypted `workspace.event` envelopes. The relay sees that a workspace approval workflow happened in a room, but not the file path, previous content, proposed content, requester display name, decider, or decision state.
 
-Gated invite requests are routed as encrypted `room.invite` envelopes. The relay sees that an invite workflow event happened in a room, but not the requester name, device id, note, host decision, requester device public key, or wrapped room-key payload.
+Invite requests are routed as device-sealed `room.invite` envelopes. The relay sees routing metadata but not the requester name, note, host decision, requester public key, capability authentication fields, or wrapped room-key payload.
 
 Codex turn progress is routed as encrypted `codex.event` envelopes. Started-turn events can include encrypted `consumedMessageIds` so clients know which room messages have already entered Codex context. Those messages are no longer editable or deletable in the UI, while queued-but-not-started turns still refresh against current room text. The relay sees that a Codex event happened in a room, but not the model id, host name, thread id, consumed message ids, event label, or progress message.
 
@@ -53,17 +53,17 @@ When relay auth is required, workspace metadata is scoped to the signed-in GitHu
 
 Team and room records include optional `archivedAt` and `deletedAt` lifecycle timestamps. Archived records remain visible so clients can restore them, while deleted records are omitted from normal workspace listings. These flags are relay metadata only; they do not erase encrypted backlog, local history, exported Markdown, project files, or room keys already present on devices.
 
-When a team member is removed, the relay closes that user's live room/team/workspace sockets for the team and deletes outstanding invite metadata for that team. Removed users must receive a fresh invite before the relay will admit them again. This does not erase room keys or ciphertext already present on their device.
+When a team member is removed, the relay closes that user's live room/team/workspace sockets, blocks future reads, deletes outstanding invite metadata, and advances affected rooms to fresh key epochs delivered only to remaining eligible devices. Removed users need a fresh invite before admission. This does not erase room keys, ciphertext, or plaintext already present on their device.
 
 Desktop clients register a device public key with `POST /devices`. The relay stores the user id, device id, display name, public JWK, fingerprint, and timestamps. On authenticated relays, the device user id is bound to the signed-in GitHub session and a mismatched client-supplied user id is rejected. The private key stays on the device.
 
-Device fingerprint trust is local desktop state. The relay does not receive or store trusted/untrusted decisions. The local trust label means this device has locally marked the exact room id, device id, and fingerprint as expected after the user reviewed it. It is a local note, not identity verification or a relay-enforced trust decision.
+Device fingerprints are full SHA-256 digests of canonical P-256 public keys. During invite enrollment, the host binds the authenticated outer-envelope user/device identity to the exact request key, recomputes the fingerprint, verifies the invite capability MAC, and pins the binding before showing or approving the request. A changed key for a known binding is rejected.
 
-Device keys are P-256 ECDH key-agreement keys. The crypto package can wrap an AES-GCM room secret to a registered device public key using an ephemeral ECDH sender key and AES-GCM wrapping payload, then unwrap it only with the recipient device private key. Gated join requests include the requester device public key when available, and host approval statuses can include a room secret wrapped specifically for that requester device.
+Device keys are P-256 ECDH key-agreement keys. Invite and rotation deliveries derive an authenticated wrapping key from the pinned static host private key and the exact recipient public key, with canonical operation and epoch context as additional data. Only the intended recipient can unwrap the room secret, and the recipient verifies the sender against the pinned host public key.
 
-For gated invites, the desktop creates a no-secret `#multaiplayerJoin=...` fragment containing room metadata and the active host device public key, but not the room key. Because join requests are sealed to that host key, only the active host can generate approval-gated invite links. The joiner sends a `room.invite` request as a device-sealed payload encrypted to the host public key. When the host approves, the approval status is device-sealed to the requester and includes a wrapped room secret for that requester device. Non-gated direct invites still use the older room-key fragment flow.
+The desktop creates a version 2 `#multaiplayerJoin=...` fragment containing room metadata, current epoch, a random 256-bit capability, and the active host's exact user, device, public key, and full fingerprint—but not the room key. The join request is sealed to that host key and carries a capability MAC over canonical invite/team/room/epoch/request nonce and both device identities. The host verifies the outer sender, recomputed key fingerprints, issued capability, MAC, epoch, and pinned key before approval. The response repeats those bindings with its own MAC and delivers the epoch key through an authenticated static-host ECDH wrap inside a context-bound device seal.
 
-Room key rotations use encrypted `room.key` envelopes. The payload is encrypted with the current room key and contains a new AES-GCM room key plus rotation metadata. Clients that can decrypt the event replace their local room key and use the new key for future room messages and invite links.
+Room key rotations advance an explicit epoch. The host creates a fresh AES-GCM room key and authenticates it separately to each eligible registered device using the host's pinned static key. Removed devices are omitted. Every ordinary room envelope carries its epoch and authenticates canonical envelope metadata as AES-GCM additional data.
 
 Host handoff packages are encrypted `room.host` envelopes. An available handoff summarizes the outgoing host's project path, selected model, approval policy, recent-message count, attachment names, and terminal names. When another member accepts the handoff and claims host, the desktop sends a second encrypted `room.host` envelope with `status: "accepted"` so peers stop showing the stale handoff as available.
 
@@ -85,23 +85,14 @@ The relay receives and stores only invite metadata:
 - creation time;
 - expiry time.
 
-The invite id is carried in the normal query string as `?invite=...`, which lets a joining desktop fetch room and team metadata from the relay. Non-gated direct invites encode the room key into the URL fragment as `#multaiplayerInvite=...`. Gated invites encode only request metadata and the active host public key as `#multaiplayerJoin=...`; the room key is delivered later in the encrypted approval status. URL fragments are not sent to the relay by normal HTTP requests, so the official relay can route either invite type without receiving the room secret.
+The invite id is carried in the normal query string as `?invite=...`, which lets a joining desktop fetch room and team metadata from the relay. The `#multaiplayerJoin=...` fragment contains the capability and public host binding, never a room key. The room key is delivered only after the authenticated approval handshake. Legacy `#multaiplayerInvite=...` room-key fragments are removed from browser history before processing and rejected with guidance to request a current invite.
 
-When the desktop detects an invite in the current URL, it immediately replaces the history entry with the same path and no query or fragment before lookup/import work continues. This removes direct room-key fragments from the address bar even if import later fails.
+When the desktop detects an invite in the current URL, it immediately replaces the history entry with the same path and no query or fragment before lookup/import work continues. This also removes legacy room-key-bearing fragments from the address bar before they are rejected.
 
-The desktop also avoids retaining direct room-key invite links in visible app state after generation. Direct links are copied to the clipboard when possible and then hidden; gated no-secret links can remain visible because they carry metadata and the host public key, not the room key. Pasted invite text is cleared from the import box as soon as import begins.
+The desktop can display the generated capability invite because it contains no room key. Pasted invite text is cleared from the import box as soon as import begins.
 
-On accept, the desktop verifies that the relay invite metadata points to the same team and room named in the encrypted fragment before importing the room key. If the relay requires auth, the desktop also includes the invite id in its first room WebSocket join so the relay can admit the signed-in GitHub user as a team member.
+On accept, the desktop verifies that relay invite metadata matches the capability fragment, the link's host key matches its full fingerprint, the response outer sender matches that host, and the nonce, recipient, epoch, and capability MAC match the pending request before importing the room key. If relay auth is required, the desktop includes the invite id in its first room WebSocket join so the signed-in user can be admitted.
 
-The direct invite payload is versioned and contains:
-
-- team id;
-- room id;
-- room name;
-- AES-GCM-256 room secret.
-
-This alpha design prioritizes a simple join path. Production-grade member removal, history epochs/backfill, identity verification, and multi-device recovery are outside the alpha security contract.
-
-For stronger member removal, future room events should move from a single room-key broadcast model to key epochs. A removal would create a new room key epoch, wrap that key independently to each remaining trusted device public key, and mark removed devices ineligible for future relay reads and key delivery. Earlier epochs may remain readable by devices that legitimately received them before removal, subject to local retention. That provides forward protection after removal without pretending delivered content can be erased.
+Member removal revokes future relay reads and live sockets, invalidates outstanding invites, and advances affected rooms to a new key epoch delivered only to remaining eligible devices. Earlier epochs may remain readable by devices that legitimately received them, subject to local retention. Delivered content cannot be retroactively erased.
 
 Shared TypeScript schemas live in `packages/protocol`.

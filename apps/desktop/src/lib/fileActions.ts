@@ -7,9 +7,10 @@ import {
   type RequestStatusPlaintextPayload,
   type WorkspaceFileSaveRequestPlaintextPayload
 } from "@multaiplayer/protocol";
-import { decryptJson, encryptJson } from "@multaiplayer/crypto";
+import { decryptAttachmentJson, encryptAttachmentJson } from "@multaiplayer/crypto";
 import { createAttachmentBlob, loadAttachmentBlob } from "./workspaceClient";
 import { loadOrCreateRoomSecret } from "./localHistory";
+import { createEncryptedRoomEnvelope, roomKeyEpoch } from "./encryptedEnvelope";
 import {
   getGitDiff,
   readProjectFile,
@@ -191,7 +192,7 @@ export function createFileActions({
           name: fileToAttach.path,
           type: attachment.type,
           size: fileToAttach.size,
-          payload: await encryptJson(
+          payload: await encryptAttachmentJson(
             {
               name: fileToAttach.path,
               type: attachment.type,
@@ -199,7 +200,8 @@ export function createFileActions({
               content: fileToAttach.content,
               truncated: fileToAttach.truncated
             },
-            secret
+            secret,
+            { teamId, roomId, name: fileToAttach.path, type: attachment.type, size: fileToAttach.size }
           )
         });
         attachment.content = undefined;
@@ -294,16 +296,20 @@ export function createFileActions({
         nextContent: request.nextContent,
         requestedAt: request.requestedAt
       };
-      const envelope: RelayEnvelope = {
-        id: crypto.randomUUID(),
-        teamId: room.teamId,
-        roomId: room.id,
-        senderDeviceId: currentContext()?.deviceId ?? "local-device",
-        senderUserId: currentContext()?.localUser.id ?? "local",
-        createdAt: request.requestedAt,
-        kind: "workspace.request",
-        payload: await encryptJson(payload, secret)
-      };
+      const envelope: RelayEnvelope = await createEncryptedRoomEnvelope(
+        {
+          id: crypto.randomUUID(),
+          teamId: room.teamId,
+          roomId: room.id,
+          senderDeviceId: currentContext()?.deviceId ?? "local-device",
+          senderUserId: currentContext()?.localUser.id ?? "local",
+          createdAt: request.requestedAt,
+          kind: "workspace.request",
+          keyEpoch: roomKeyEpoch(room)
+        },
+        payload,
+        secret
+      );
       seenEnvelopeIds.current.add(envelope.id);
       client.publish({ type: "publish", envelope });
       appendFileSaveRequest(room.id, request);
@@ -358,16 +364,20 @@ export function createFileActions({
       decidedAt: new Date().toISOString()
     };
     const secret = await loadOrCreateRoomSecret(room.id);
-    const envelope: RelayEnvelope = {
-      id: crypto.randomUUID(),
-      teamId: room.teamId,
-      roomId: room.id,
-      senderDeviceId: currentContext()?.deviceId ?? "local-device",
-      senderUserId: currentContext()?.localUser.id ?? "local",
-      createdAt: payload.decidedAt,
-      kind: "workspace.event",
-      payload: await encryptJson(payload, secret)
-    };
+    const envelope: RelayEnvelope = await createEncryptedRoomEnvelope(
+      {
+        id: crypto.randomUUID(),
+        teamId: room.teamId,
+        roomId: room.id,
+        senderDeviceId: currentContext()?.deviceId ?? "local-device",
+        senderUserId: currentContext()?.localUser.id ?? "local",
+        createdAt: payload.decidedAt,
+        kind: "workspace.event",
+        keyEpoch: roomKeyEpoch(room)
+      },
+      payload,
+      secret
+    );
     seenEnvelopeIds.current.add(envelope.id);
     client.publish({ type: "publish", envelope });
   }
@@ -469,7 +479,13 @@ export function createFileActions({
       if (blob.roomId !== room.id || blob.teamId !== room.teamId) {
         throw new Error("Attachment blob belongs to a different room.");
       }
-      const decrypted = await decryptJson<unknown>(blob.payload, secret);
+      const decrypted = await decryptAttachmentJson<unknown>(blob.payload, secret, {
+        teamId: room.teamId,
+        roomId: room.id,
+        name: attachment.name,
+        type: attachment.type,
+        size: attachment.size
+      });
       if (!isAttachmentBlobContent(decrypted)) {
         throw new Error("Attachment blob payload was not a supported file preview.");
       }

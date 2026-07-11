@@ -327,6 +327,16 @@ test("relay bounds room project paths and Codex model metadata", async () => {
 test("relay bounds user-visible metadata strings", async () => {
   const relay = await startRelay();
   try {
+    const deviceCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    const postDeviceStatus = async (body: unknown) => {
+      const response = await fetch(`${relay.baseUrl}/devices`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: deviceCookie },
+        body: JSON.stringify(body)
+      });
+      await response.text();
+      return response.status;
+    };
     assert.equal(await postJsonStatus(relay.baseUrl, "/teams", { name: "x".repeat(121) }), 400);
     assert.equal(
       await postJsonStatus(relay.baseUrl, "/rooms", {
@@ -337,7 +347,7 @@ test("relay bounds user-visible metadata strings", async () => {
       400
     );
     assert.equal(
-      await postJsonStatus(relay.baseUrl, "/devices", {
+      await postDeviceStatus({
         userId: "github:maddiedreese",
         deviceId: "x".repeat(161),
         displayName: "Maddie",
@@ -347,7 +357,7 @@ test("relay bounds user-visible metadata strings", async () => {
       400
     );
     assert.equal(
-      await postJsonStatus(relay.baseUrl, "/devices", {
+      await postDeviceStatus({
         userId: "github:maddiedreese",
         deviceId: "device-ok",
         displayName: "Maddie",
@@ -357,7 +367,7 @@ test("relay bounds user-visible metadata strings", async () => {
       400
     );
     assert.equal(
-      await postJsonStatus(relay.baseUrl, "/devices", {
+      await postDeviceStatus({
         userId: "github:maddiedreese",
         deviceId: "device-private-key",
         displayName: "Maddie",
@@ -367,7 +377,7 @@ test("relay bounds user-visible metadata strings", async () => {
       400
     );
     assert.equal(
-      await postJsonStatus(relay.baseUrl, "/devices", {
+      await postDeviceStatus({
         userId: "github:maddiedreese",
         deviceId: "device-rsa-key",
         displayName: "Maddie",

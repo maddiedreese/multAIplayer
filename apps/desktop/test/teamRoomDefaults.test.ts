@@ -114,7 +114,7 @@ test("team room defaults sanitize Codex model", () => {
       codexModel: "gpt-5.4-mini",
       browserAllowedOrigins: ["https://github.com"],
       browserProfilePersistent: true,
-      inviteApprovalGate: false
+      inviteApprovalGate: true
     }
   );
 

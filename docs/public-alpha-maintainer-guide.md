@@ -117,7 +117,7 @@ After the first signed release succeeds, verify the GitHub Release says the arti
 
 Publish `https://multaiplayer.com/releases/latest.json` for every public alpha build. The desktop app reads this manifest and shows an update banner when `version` is newer than the installed app. Set `security: true` for security fixes so stale clients get a stronger in-app nudge. The alpha still uses manual downloads, not Tauri auto-update, so release announcements should tell users to install the new signed build.
 
-For ordinary bug reports, ask native-app testers to open Account settings, click `Save diagnostics`, choose a destination, review the JSON, and attach it to the GitHub issue. Rust validates and re-redacts the capture-redacted JSONL records, assembles the bundle, and writes it directly through the system save dialog. No command returns stored entries, bundle contents, or the selected path to the webview. Native diagnostics remain owner-only (`0600`) in the platform app log directory and are bounded to seven days, 256 KiB, and 500 entries. The web preview keeps only its in-memory ring and offers `Copy diagnostics`. The file is not encrypted at rest in this alpha, so do not expand collection beyond bounded warning/error metadata without revisiting that design. Do not ask users to paste terminal output, room transcripts, direct invite fragments, private repo files, or browser contents unless they explicitly choose to share that material.
+For ordinary bug reports, ask native-app testers to open Account settings, click `Save diagnostics`, choose a destination, review the JSON, and attach it to the GitHub issue. Rust validates and re-redacts the capture-redacted JSONL records, assembles the bundle, and writes it directly through the system save dialog. No command returns stored entries, bundle contents, or the selected path to the webview. Native diagnostics remain owner-only (`0600`) in the platform app log directory and are bounded to seven days, 256 KiB, and 500 entries. The web preview keeps only its in-memory ring and offers `Copy diagnostics`. The file is not encrypted at rest in this alpha, so do not expand collection beyond bounded warning/error metadata without revisiting that design. Do not ask users to paste terminal output, room transcripts, legacy room-key-bearing invite fragments, private repo files, or browser contents unless they explicitly choose to share that material.
 
 In code and review, require diagnostic calls to contain stable error codes and bounded ids, never payload objects. The sensitive-key omission and text redaction layers protect against mistakes but do not make arbitrary objects safe to log. Keeping diagnostics outside web storage narrows incidental exposure; it does not neutralize a compromised desktop shell or its other Tauri capabilities.
 
@@ -126,7 +126,7 @@ In code and review, require diagnostic calls to contain stable error codes and b
 Run at least one full test with two GitHub accounts on two macOS devices:
 
 - official relay sign-in;
-- invite join;
+- capability-authenticated invite join, including full key fingerprint and outer-sender binding;
 - encrypted chat and attachments;
 - local project attach;
 - Codex approval;
@@ -135,7 +135,8 @@ Run at least one full test with two GitHub accounts on two macOS devices:
 - browser opening from UI and Codex instruction;
 - Git branch/commit/push/draft PR/Actions;
 - host usage-limit handoff;
-- member removal/locked-room behavior;
+- member removal, epoch advancement, removed-device exclusion, and locked-room behavior;
+- malicious-relay metadata, requester-key substitution, replay, and cross-epoch rejection;
 - relay restart with durable encrypted sessions.
 - hosted-to-self-hosted relay migration using [relay-migration-runbook.md](relay-migration-runbook.md).
 
@@ -150,7 +151,7 @@ Before announcing, review public copy for these exact promises:
 - GitHub OAuth tokens are held by the relay for identity, PR creation, and Actions reads; durable sessions are encrypted at rest when the session secret is configured.
 - The alpha has known limitations and should not be described as production-ready.
 
-Avoid promising external audits, production-grade E2EE member removal, or enterprise compliance until those are actually true.
+Avoid promising external audits, retroactive erasure, synchronized identity recovery, or enterprise compliance until those are actually true.
 
 ## Release Cadence And Support
 

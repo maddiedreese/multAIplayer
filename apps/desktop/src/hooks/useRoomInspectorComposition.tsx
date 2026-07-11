@@ -194,7 +194,6 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
     selectBrowserTabForRoom,
     closeBrowserTabForRoom,
     setProjectPathDraftForRoom,
-    setInviteApprovalGateForRoom,
     setInviteSecretInputValue,
     setCustomCodexModelForRoom,
     setTeamDefaultBrowserProfilePersistent,
@@ -319,12 +318,10 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
       formatModel: formatCodexModel
     },
     encryptedInvite: {
-      inviteApprovalGate: invite.approvalGate ?? true,
       copyDisabled: !access.canCopyRoomInvite,
       inviteSecretInput,
       inviteRequests: invite.requests ?? [],
       localDeviceId: deviceId,
-      gateDisabled: !hasSelectedRoom || access.isSelectedRoomLocked,
       importDisabled: !inviteSecretInput.trim(),
       rotateDisabled:
         !hasSelectedRoom || access.isSelectedRoomLocked || !access.isActiveHost || Boolean(invite.keyRotationBusy),
@@ -333,7 +330,6 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
       inviteLink: invite.link ?? "",
       inviteMessage: invite.message ?? null,
       ...capabilities.invite,
-      onInviteApprovalGateChange: (enabled) => setInviteApprovalGateForRoom(selectedRoom.id, enabled),
       onInviteSecretInputChange: setInviteSecretInputValue
     },
     approvalPolicy: {

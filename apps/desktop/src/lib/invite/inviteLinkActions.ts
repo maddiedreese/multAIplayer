@@ -1,7 +1,4 @@
-import { encodeRoomInviteSecret } from "@multaiplayer/crypto";
-import { exportRoomSecret } from "../localHistory";
 import { createInvite } from "../workspaceClient";
-import { displayableInviteLink } from "../invitePrivacy";
 import { canCreateRoomInvite } from "../invitePolicy";
 import { shouldApplyRoomScopedUiUpdate } from "../roomScopedUi";
 import { roomLockMessage } from "../appRuntime";
@@ -9,6 +6,9 @@ import { useAppStore, type AppStoreState } from "../../store/appStore";
 import { encodeNoSecretRoomInvite, jsonWebKeyToDevicePublicKeyJwk } from "../noSecretRoomInvite";
 import type { UseInviteActionsOptions } from "./inviteActionTypes";
 import { currentLocalIdentity, currentSelectedRoom } from "../selectedWorkspace";
+import { loadOrCreateCurrentRoomKey } from "../localHistory";
+import { createInviteCapability } from "@multaiplayer/crypto";
+import { rememberIssuedInviteCapability } from "../inviteCapabilityStore";
 
 type InviteLinkActionOptions = Pick<UseInviteActionsOptions, "selectedRoomIdRef">;
 
@@ -36,13 +36,12 @@ export function createInviteLinkActions(
       appStore.revokedRoomIds.has(selectedRoom.id) || appStore.revokedTeamIds.has(selectedRoom.teamId);
     const isSelectedRoomLocked =
       selectedRoom.archivedAt != null || appStore.forgottenRoomIds.has(selectedRoom.id) || isSelectedRoomRevoked;
-    const inviteApprovalGate = appStore.inviteByRoom[selectedRoom.id]?.approvalGate ?? false;
     if (isSelectedRoomLocked) {
       setSelectedInviteMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;
     }
     const roomId = selectedRoom.id;
-    if (!canCreateRoomInvite(selectedRoom, localUser, false, inviteApprovalGate)) {
+    if (!canCreateRoomInvite(selectedRoom, localUser, false)) {
       setInviteMessageForRoom(roomId, "Only the active host can create approval-gated invite links.");
       return;
     }
@@ -51,70 +50,39 @@ export function createInviteLinkActions(
     try {
       const invite = await createInvite(selectedRoom.teamId, roomId);
       const inviteUrl = `${window.location.origin}${window.location.pathname}?invite=${invite.id}`;
-      if (inviteApprovalGate) {
-        if (!deviceIdentity) {
-          if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-            setInviteMessageForRoom(roomId, "Device identity is still being prepared. Try again in a moment.");
-          }
-          return;
-        }
-        const fragment = encodeNoSecretRoomInvite({
-          version: 1,
-          teamId: selectedRoom.teamId,
-          roomId,
-          roomName: selectedRoom.name,
-          hostDeviceId: deviceId,
-          hostPublicKeyJwk: jsonWebKeyToDevicePublicKeyJwk(deviceIdentity.publicKeyJwk),
-          hostPublicKeyFingerprint: deviceIdentity.publicKeyFingerprint
-        });
-        const link = `${inviteUrl}#multaiplayerJoin=${fragment}&approval=request`;
+      if (!deviceIdentity) {
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setInviteLinkForRoom(roomId, displayableInviteLink(link, false));
-        }
-        try {
-          await navigator.clipboard.writeText(link);
-          if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-            setInviteMessageForRoom(
-              roomId,
-              "Copied approval invite link. The host will approve access when someone joins."
-            );
-          }
-        } catch {
-          if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-            setInviteMessageForRoom(
-              roomId,
-              "Approval invite generated. Copying was blocked because the app was not focused."
-            );
-          }
+          setInviteMessageForRoom(roomId, "Device identity is still being prepared. Try again in a moment.");
         }
         return;
       }
-
-      const fragment = encodeRoomInviteSecret({
-        version: 1,
+      const { epoch: keyEpoch } = await loadOrCreateCurrentRoomKey(roomId);
+      const capabilityInvite = {
+        version: 2 as const,
         teamId: selectedRoom.teamId,
         roomId,
         roomName: selectedRoom.name,
-        secret: await exportRoomSecret(roomId)
-      });
-      const link = `${inviteUrl}#multaiplayerInvite=${fragment}`;
+        inviteCapability: createInviteCapability(),
+        keyEpoch,
+        hostUserId: localUser.id,
+        hostDeviceId: deviceId,
+        hostPublicKeyJwk: jsonWebKeyToDevicePublicKeyJwk(deviceIdentity.publicKeyJwk),
+        hostPublicKeyFingerprint: deviceIdentity.publicKeyFingerprint
+      };
+      await rememberIssuedInviteCapability(invite.id, capabilityInvite);
+      const fragment = encodeNoSecretRoomInvite(capabilityInvite);
+      const link = `${inviteUrl}#multaiplayerJoin=${fragment}&approval=request`;
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setInviteLinkForRoom(roomId, displayableInviteLink(link, true));
+        setInviteLinkForRoom(roomId, link);
       }
       try {
         await navigator.clipboard.writeText(link);
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setInviteMessageForRoom(
-            roomId,
-            "Copied direct invite link. It grants room access, so it is not displayed after copying."
-          );
+          setInviteMessageForRoom(roomId, "Copied invite link. The host will approve access when someone joins.");
         }
       } catch {
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-          setInviteMessageForRoom(
-            roomId,
-            "Direct invite generated, but copying was blocked. Focus the app and try again, or use host approval."
-          );
+          setInviteMessageForRoom(roomId, "Invite generated. Copying was blocked because the app was not focused.");
         }
       }
     } catch (error) {

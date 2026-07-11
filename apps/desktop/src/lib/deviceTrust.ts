@@ -122,11 +122,12 @@ function normalizeTrustKey(
   }
   const normalizedRoomId = roomId.trim();
   const normalizedDeviceId = deviceId.trim();
-  const normalizedFingerprint = fingerprint.trim();
-  if (!normalizedRoomId || !normalizedDeviceId || normalizedFingerprint.length < 16) return null;
+  const parsedFingerprint = PublicKeyFingerprint.safeParse(fingerprint.trim());
+  if (!normalizedRoomId || !normalizedDeviceId || !parsedFingerprint.success) return null;
   return {
     roomId: normalizedRoomId,
     deviceId: normalizedDeviceId,
-    fingerprint: normalizedFingerprint
+    fingerprint: parsedFingerprint.data
   };
 }
+import { PublicKeyFingerprint } from "@multaiplayer/protocol";

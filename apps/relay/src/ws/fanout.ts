@@ -14,7 +14,8 @@ interface CreateRelayFanoutOptions {
   roomKey: (teamId: string, roomId: string) => RoomKey;
   pruneEncryptedBacklog: (envelopes: RelayEnvelope[]) => RelayEnvelope[];
   addTeamMember: (teamId: string, userId: string) => void;
-  saveEncryptedEnvelope: (roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]) => void;
+  saveEncryptedEnvelope: (roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]) => Promise<void>;
+  saveRoomKeyTransition: (roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]) => Promise<void>;
   teamRecordForUser: (
     team: TeamRecord,
     store: Pick<RelayStore, "getTeamMember">,
@@ -34,8 +35,11 @@ export function createRelayFanout({
   pruneEncryptedBacklog,
   addTeamMember,
   saveEncryptedEnvelope,
+  saveRoomKeyTransition,
   teamRecordForUser
 }: CreateRelayFanoutOptions) {
+  const acceptedEpochByRoom = new Map<RoomKey, number>();
+  const rotatingRooms = new Set<RoomKey>();
   function send(socket: WebSocket, message: RelayServerMessage) {
     if (socket.readyState === socket.OPEN) {
       socket.send(JSON.stringify(message));
@@ -67,19 +71,47 @@ export function createRelayFanout({
     }
   }
 
-  function publishEnvelope(envelope: RelayEnvelope) {
+  async function publishEnvelope(envelope: RelayEnvelope): Promise<void> {
     const key = roomKey(envelope.teamId, envelope.roomId);
-    const backlog = store.getEncryptedBacklog(key) ?? [];
-    if (backlog.some((existing) => existing.id === envelope.id)) return;
-    backlog.push(envelope);
+    const previousBacklog = store.getEncryptedBacklog(key) ?? [];
+    if (previousBacklog.some((existing) => existing.id === envelope.id)) return;
+    if (rotatingRooms.has(key)) throw new Error("A room key transition is already being accepted. Retry this publish.");
+    const room = store.getRoom(envelope.roomId);
+    const acceptedEpoch = acceptedEpochByRoom.get(key) ?? room?.keyEpoch ?? deriveAcceptedEpoch(previousBacklog);
+    acceptedEpochByRoom.set(key, acceptedEpoch);
+    if (envelope.keyEpoch !== acceptedEpoch) {
+      throw new Error(`Room envelope epoch ${envelope.keyEpoch} does not match accepted epoch ${acceptedEpoch}.`);
+    }
+    const advancesEpoch = envelope.kind === "room.key";
+    if (advancesEpoch) {
+      rotatingRooms.add(key);
+      acceptedEpochByRoom.set(key, acceptedEpoch + 1);
+      if (room) store.setRoom({ ...room, keyEpoch: acceptedEpoch + 1 });
+    }
+    const backlog = [...previousBacklog, envelope];
     const prunedBacklog = pruneEncryptedBacklog(backlog);
     const retainedIds = new Set(prunedBacklog.map((item) => item.id));
     const prunedEnvelopeIds = backlog
       .filter((item) => item.id !== envelope.id && !retainedIds.has(item.id))
       .map((item) => item.id);
     store.setEncryptedBacklog(key, prunedBacklog);
+    try {
+      if (advancesEpoch && room) {
+        await saveRoomKeyTransition(key, envelope, prunedEnvelopeIds);
+      } else {
+        await saveEncryptedEnvelope(key, envelope, prunedEnvelopeIds);
+      }
+    } catch (error) {
+      store.setEncryptedBacklog(key, previousBacklog);
+      if (advancesEpoch) {
+        acceptedEpochByRoom.set(key, acceptedEpoch);
+        if (room) store.setRoom(room);
+      }
+      throw error;
+    } finally {
+      if (advancesEpoch) rotatingRooms.delete(key);
+    }
     metrics.recordEnvelopePublished();
-    saveEncryptedEnvelope(key, envelope, prunedEnvelopeIds);
     broadcast(key, { type: "envelope", envelope });
   }
 
@@ -107,4 +139,11 @@ export function createRelayFanout({
     publishEnvelope,
     publishPresence
   };
+}
+
+function deriveAcceptedEpoch(backlog: RelayEnvelope[]): number {
+  return backlog.reduce(
+    (epoch, envelope) => Math.max(epoch, envelope.kind === "room.key" ? envelope.keyEpoch + 1 : envelope.keyEpoch),
+    1
+  );
 }

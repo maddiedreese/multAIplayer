@@ -14,9 +14,9 @@ Initial trust boundaries:
 
 Production relays require auth by default. Self-hosters can explicitly set `MULTAIPLAYER_RELAY_REQUIRE_AUTH=false` for a private local/LAN relay, but that is an opt-out from the hosted privacy posture.
 
-When relay auth is enabled, team and room metadata reads are scoped to signed-in GitHub users who are known team members. Room mutations, attachment blob reads, and WebSocket room joins require membership, except that a valid room invite id can be presented once to admit an authenticated joiner. The invite id is server-visible metadata. Gated invite links do not include the room secret; direct invite links can include it in the URL fragment, which is not sent to the relay by normal HTTP requests.
+When relay auth is enabled, team and room metadata reads are scoped to signed-in GitHub users who are known team members. Room mutations, attachment blob reads, and WebSocket room joins require membership, except that a valid room invite id can be presented once to admit an authenticated joiner. The invite id is server-visible metadata. Invite links contain no room secret; they carry a single-use capability plus the active host's public device binding.
 
-Team member removal closes that user's live relay sockets for the team and invalidates outstanding team invite metadata, so stale invites cannot immediately re-admit the removed user. This limits casual cross-team metadata exposure on hosted/self-hosted relays. It is not full cryptographic membership enforcement: anyone with a valid room key can decrypt content they already received, and production-grade removal still needs key rotation and mediated key exchange.
+Team member removal closes that user's live relay sockets, blocks future room/backlog/blob reads, invalidates outstanding invites, and performs a key-rotation preflight for affected rooms. Each room advances to a fresh epoch whose key is authenticated by the host and wrapped independently to eligible registered devices; removed devices receive no new key. Removal cannot erase content, ciphertext, exports, screenshots, or older epoch keys already delivered.
 
 The relay also bounds stored and live routing metadata such as team names, room names, WebSocket user/device identities, live presence labels, avatar URLs, host labels, device identity fields, public key fingerprints, public key JWK blobs, project paths, and model ids. Oversized or control-character-bearing user-visible metadata is rejected at HTTP/WebSocket boundaries, and persisted records are normalized or discarded on startup.
 
@@ -85,26 +85,24 @@ Terminal output and received terminal command requests are scanned before sharin
 
 Desktop device identities use P-256 ECDH key-agreement keys. The relay receives only the public JWK and fingerprint. The private key remains on the device.
 
-The crypto package includes tested device-sealed JSON and room-secret wrapping primitives: a sender can encrypt an invite request, approval status, or AES-GCM room secret to a recipient device public key using an ephemeral ECDH key and AES-GCM. Only the recipient private key can unwrap it.
+The crypto package includes tested context-bound device seals and authenticated room-secret wrapping primitives. Invite and rotation key delivery derives from the pinned static host key and the exact recipient public key, and authenticates the operation, identities, room, and epoch. Only the intended recipient can unwrap it, and the recipient verifies the sender key.
 
-The desktop app lets a user locally trust a room member's device fingerprint. Trust is scoped to the room id, device id, and exact fingerprint. If the same device id later presents a different fingerprint, the UI falls back to an untrusted keyed state until the user reviews it again. This is a local verification aid only; it is not a relay-enforced role, member removal mechanism, or room-key rotation system.
+Device fingerprints display the full SHA-256 digest of the canonical P-256 public key. Capability-authenticated invite enrollment binds the outer authenticated user/device identity to the exact request key, recomputes its fingerprint, verifies the capability MAC, and pins that binding before the request is displayed or approved. A changed known key fails closed. Users can additionally compare the full fingerprint out of band.
 
-Gated invite links do not carry the room key. They carry room metadata and the host device public key in the URL fragment, then deliver the room key after host approval as a device-wrapped payload inside a device-sealed approval event. Non-gated direct invite links still carry the room key in the URL fragment for convenience.
+Invite links do not carry the room key. Version 2 links carry room metadata, the current epoch, a random 256-bit capability, and the exact active-host user, device, public key, and full fingerprint. Requests and responses authenticate canonical invite, room, epoch, nonce, host, requester, and recipient bindings with the capability. Room-key delivery uses an authenticated static-host ECDH wrap inside a context-bound device-sealed response. Legacy room-key links are scrubbed and rejected.
 
-Room key rotation is available as an alpha hygiene control. The active host publishes a new room key inside an encrypted `room.key` event using the current room key, then clients that can decrypt that event replace their local room key for future messages and invites. Local encrypted history ciphertext is cleared when the key is replaced so stale ciphertext is not left behind under the old key. This does not provide cryptographic member removal by itself: any device that still has the old key and receives the rotation event can learn the new key.
+Room key rotation advances an explicit key epoch. The host creates a fresh key and authenticates a separate delivery to every eligible registered device; the next key is never broadcast under the previous room key. Envelopes authenticate their epoch and canonical routing metadata with AES-GCM additional data. Clients retain older epoch keys only as needed for already-received local history.
 
-## Post-Alpha Stronger Member Removal Design
+## Member Removal And Key Epochs
 
-Production-grade member removal is post-alpha roadmap work. It should use explicit room key epochs and per-device key delivery instead of broadcasting the next room key under the current room key.
-
-The intended stronger design is:
+Member removal uses the following enforced sequence:
 
 - the relay keeps a membership-scoped device roster containing user ids, device ids, device public keys, and membership status;
 - every encrypted room envelope carries a key epoch id in authenticated metadata;
 - removing a member first closes their live relay sockets and blocks future room/backlog/blob reads at the relay boundary;
-- the active host or team owner creates a fresh room key epoch and wraps the new room key separately to each remaining trusted device public key;
+- the active host or team owner creates a fresh room key epoch and authenticates the new room key separately to each remaining registered device public key;
 - removed devices do not receive a wrapped copy of the new key and cannot decrypt future epochs through the relay;
 - invite links created before removal are revoked, and new invites use the new epoch;
 - clients keep old epoch keys only as long as local retention requires reading already-received history.
 
-This design still cannot erase plaintext or ciphertext a removed member already received, screenshots they took, copied Markdown, terminal output they saw, browser pages they viewed, or local history retained on their own device. The realistic security goal is forward secrecy for future room events after removal, not retroactive erasure.
+This cannot erase plaintext or ciphertext a removed member already received, screenshots they took, copied Markdown, terminal output they saw, browser pages they viewed, or local history retained on their own device. The security goal is exclusion from future room epochs, not retroactive erasure.

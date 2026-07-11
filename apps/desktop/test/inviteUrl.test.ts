@@ -19,7 +19,7 @@ test("readInviteUrlPayload parses gated no-secret invite URLs", () => {
   );
 });
 
-test("readInviteUrlPayload parses direct room-key invite URLs", () => {
+test("readInviteUrlPayload recognizes legacy room-key invites only so callers can scrub and reject them", () => {
   assert.deepEqual(
     readInviteUrlPayload({
       pathname: "/",
@@ -27,10 +27,7 @@ test("readInviteUrlPayload parses direct room-key invite URLs", () => {
       hash: "#multaiplayerInvite=encoded-secret"
     }),
     {
-      kind: "secret",
-      encoded: "encoded-secret",
-      inviteId: "invite_456",
-      approvalRequested: false,
+      kind: "legacy-secret",
       cleanupPath: "/"
     }
   );
