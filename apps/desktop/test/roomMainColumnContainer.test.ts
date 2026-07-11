@@ -43,7 +43,6 @@ const capabilities = {
   },
   chat: {
     onCopyMessageMarkdown: noop,
-    onCopyCodexOutputMarkdown: noop,
     onOpenAttachment: noop,
     onToggleReaction: noop,
     onEditMessage: noop,

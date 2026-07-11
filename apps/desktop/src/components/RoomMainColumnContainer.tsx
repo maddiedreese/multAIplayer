@@ -56,7 +56,6 @@ export interface RoomMainColumnCapabilities {
   chat: Pick<
     ChatProps,
     | "onCopyMessageMarkdown"
-    | "onCopyCodexOutputMarkdown"
     | "onOpenAttachment"
     | "onToggleReaction"
     | "onEditMessage"
@@ -130,7 +129,6 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
       },
       chat: {
         onCopyMessageMarkdown: sources.chatActions.onCopyMessageMarkdown,
-        onCopyCodexOutputMarkdown: sources.chatActions.onCopyCodexOutputMarkdown,
         onOpenAttachment: sources.chatActions.onOpenAttachment,
         onToggleReaction: sources.chatActions.onToggleReaction,
         onEditMessage: sources.chatActions.onEditMessage,
@@ -162,7 +160,6 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
     [
       sources.chatActions.onApproveApproval,
       sources.chatActions.onCancelQueuedCodexTurn,
-      sources.chatActions.onCopyCodexOutputMarkdown,
       sources.chatActions.onCopyLocalPreviewLink,
       sources.chatActions.onCopyMessageMarkdown,
       sources.chatActions.onDeleteGoal,

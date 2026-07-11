@@ -6122,7 +6122,7 @@ button svg {
 .browser-panel :where(.browser-viewport) {
   position: relative;
   z-index: 1;
-  margin-top: 6px;
+  margin-top: 16px;
 }
 
 /* Reply is one stable text control; icon actions remain compact squares. */
@@ -6138,4 +6138,25 @@ button svg {
 .app-shell .xterm,
 .app-shell .xterm * {
   font-family: var(--font-mono) !important;
+}
+
+/* Native room settings use the same fluid sizing as the drawer. */
+.inspector :where(.history-panel, .model-panel),
+.inspector :where(.history-panel, .model-panel) * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.inspector .history-retention {
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+}
+
+.inspector .history-retention :where(input, select),
+.inspector .model-panel :where(input, select) {
+  width: 100%;
+}
+
+.inspector .history-panel {
+  padding-bottom: 32px;
 }
