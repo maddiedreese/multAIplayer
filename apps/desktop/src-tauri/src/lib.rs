@@ -68,6 +68,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
+        .manage(DeviceIdentityAccessState::default())
         .invoke_handler(tauri::generate_handler![
             app_version,
             record_diagnostic,
@@ -83,6 +84,7 @@ pub fn run() {
             project_file_write,
             run_shell_command,
             authorize_shell_execution,
+            clear_shell_execution_grants,
             authorize_terminal_input,
             terminal_start,
             terminal_list,
@@ -99,7 +101,7 @@ pub fn run() {
             room_secret_get,
             room_secret_set,
             room_secret_delete,
-            device_identity_get,
+            device_identity_take_for_startup,
             device_identity_set,
             device_identity_delete,
             run_git_workflow,

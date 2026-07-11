@@ -52,7 +52,8 @@ export function createAppRoomPanelActions({
       denyTerminalRequest: roomRuntime.denyTerminalRequest,
       sendTerminalData: roomRuntime.sendTerminalData,
       restartSelectedTerminal: roomRuntime.restartSelectedTerminal,
-      stopSelectedTerminal: roomRuntime.stopSelectedTerminal
+      stopSelectedTerminal: roomRuntime.stopSelectedTerminal,
+      revokeExactCommandGrants: roomRuntime.revokeExactCommandGrants
     },
     workspaceFiles: {
       copyProjectMarkdown: workspaceFlow.copyProjectMarkdown,

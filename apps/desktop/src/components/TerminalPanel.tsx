@@ -56,7 +56,8 @@ export function TerminalPanel({
   onSelectTerminal,
   onSendTerminalData,
   onRestartTerminal,
-  onStopTerminal
+  onStopTerminal,
+  onRevokeExactCommandGrants
 }: {
   terminalBusy: boolean;
   terminalError: string | null;
@@ -79,6 +80,7 @@ export function TerminalPanel({
   onSendTerminalData: (input: string) => void;
   onRestartTerminal: () => void;
   onStopTerminal: () => void;
+  onRevokeExactCommandGrants: () => void;
 }) {
   const [terminalExpanded, setTerminalExpanded] = useState(false);
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
@@ -234,6 +236,14 @@ export function TerminalPanel({
           </button>
           <button className="ghost" onClick={onCopyMarkdown} disabled={!canReadLocalWorkspace}>
             <Copy size={14} /> Markdown
+          </button>
+          <button
+            className="ghost"
+            onClick={onRevokeExactCommandGrants}
+            disabled={!canApproveTerminal || terminalBusy}
+            title="Open a native confirmation to revoke remembered command text for this room"
+          >
+            <X size={14} /> Revoke repeats
           </button>
           <button
             className="ghost icon-only terminal-expand-button"

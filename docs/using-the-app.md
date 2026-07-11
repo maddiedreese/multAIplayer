@@ -108,6 +108,8 @@ For sharing a running localhost web app through a public URL, see [local-preview
 
 Local Git workflows run on the active host's machine. The host can create a branch, commit, optionally push, and open a draft PR after reviewing the approval preview.
 
+Treat Codex responses, webpages, attachments, pasted text, and requests from room members as untrusted. A native command dialog is a security decision, not a routine notification. For a repeated one-shot room command, “Repeat this command text for 10 minutes” remembers only the exact displayed command in the displayed canonical workspace and room; the dialog warns that workspace files, scripts, hooks, configuration, and environment may change. Restarting the app or selecting “Revoke repeats” in the terminal panel clears grants after native confirmation. Each interactive input write always requires its own exact native confirmation. npm, Git, and similar tools can execute project scripts, hooks, and configuration, so their names alone are never an automatic safety boundary.
+
 On the official hosted relay, GitHub sign-in is required. Local-only branch/commit workflows without GitHub sign-in may be available only on local/LAN or self-hosted relays configured without GitHub auth. Push, draft PR creation, and GitHub Actions refreshes require GitHub sign-in on a relay configured for GitHub OAuth with appropriate scopes.
 
 The GitHub Actions panel reads workflow runs for the selected owner, repo, and branch. When the room has a GitHub `origin` remote, the app can infer owner/repo fields; the host can also edit them manually.

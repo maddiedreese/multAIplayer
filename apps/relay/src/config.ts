@@ -9,6 +9,7 @@ export interface RelayConfig {
   githubOAuthScopes: string[];
   dataPath: string;
   storageBackend: RelayStorageBackend;
+  legacyJsonImportPath: string | null;
   encryptedBacklogLimit: number;
   encryptedBacklogRetentionDays: number;
   inviteTtlDays: number;
@@ -56,6 +57,10 @@ export function loadRelayConfig(): RelayConfig {
   loadRelayEnvFiles();
 
   const nodeEnv = process.env.NODE_ENV ?? "development";
+  const storageBackend = parseStorageBackend(process.env.MULTAIPLAYER_RELAY_STORAGE);
+  const storageWasExplicit = process.env.MULTAIPLAYER_RELAY_STORAGE !== undefined;
+  const dataPathWasExplicit = process.env.MULTAIPLAYER_RELAY_DATA_PATH !== undefined;
+  const defaultLegacyJsonPath = resolve(".multaiplayer/relay-store.json");
   const attachmentBlobMaxBytes = parseIntegerEnv(
     process.env.MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES,
     5_000_000,
@@ -69,8 +74,15 @@ export function loadRelayConfig(): RelayConfig {
     port: parseIntegerEnv(process.env.PORT, 4321, 1, 65_535),
     githubClientId: process.env.GITHUB_CLIENT_ID,
     githubOAuthScopes: parseGitHubScopes(process.env.GITHUB_OAUTH_SCOPES),
-    dataPath: resolve(process.env.MULTAIPLAYER_RELAY_DATA_PATH ?? ".multaiplayer/relay-store.json"),
-    storageBackend: parseStorageBackend(process.env.MULTAIPLAYER_RELAY_STORAGE),
+    dataPath: resolve(
+      process.env.MULTAIPLAYER_RELAY_DATA_PATH ??
+        `.multaiplayer/relay-store.${storageBackend === "sqlite" ? "sqlite" : "json"}`
+    ),
+    storageBackend,
+    legacyJsonImportPath:
+      storageBackend === "sqlite" && !storageWasExplicit && !dataPathWasExplicit && existsSync(defaultLegacyJsonPath)
+        ? defaultLegacyJsonPath
+        : null,
     encryptedBacklogLimit: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_LIMIT, 200, 1, 1000),
     encryptedBacklogRetentionDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS, 30, 1, 365),
     inviteTtlDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_INVITE_TTL_DAYS, 7, 1, 365),
@@ -148,10 +160,10 @@ function parseGitHubScopes(value: string | undefined): string[] {
 
 function parseStorageBackend(value: string | undefined): RelayStorageBackend {
   const normalized = value?.trim().toLowerCase();
-  if (!normalized || normalized === "json") return "json";
-  if (normalized === "sqlite") return "sqlite";
+  if (!normalized || normalized === "sqlite") return "sqlite";
+  if (normalized === "json") return "json";
   console.warn(`Ignoring invalid MULTAIPLAYER_RELAY_STORAGE value: ${value}`);
-  return "json";
+  return "sqlite";
 }
 
 function loadRelayEnvFiles() {

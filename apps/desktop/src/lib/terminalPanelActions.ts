@@ -8,7 +8,8 @@ export function createTerminalPanelActions({
   denyTerminalRequest,
   sendTerminalData,
   restartSelectedTerminal,
-  stopSelectedTerminal
+  stopSelectedTerminal,
+  revokeExactCommandGrants
 }: {
   copyTerminalMarkdown: () => void;
   openInteractiveTerminal: (options?: { reuseExisting?: boolean; quiet?: boolean }) => void;
@@ -17,6 +18,7 @@ export function createTerminalPanelActions({
   sendTerminalData: (input: string) => void;
   restartSelectedTerminal: () => void;
   stopSelectedTerminal: () => void;
+  revokeExactCommandGrants: () => void;
 }) {
   function onApproveTerminalRequest(requestId: string) {
     const state = useAppStore.getState();
@@ -37,6 +39,7 @@ export function createTerminalPanelActions({
     },
     onSendTerminalData: (input: string) => sendTerminalData(input),
     onRestartTerminal: () => restartSelectedTerminal(),
-    onStopTerminal: () => stopSelectedTerminal()
+    onStopTerminal: () => stopSelectedTerminal(),
+    onRevokeExactCommandGrants: () => revokeExactCommandGrants()
   };
 }

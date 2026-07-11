@@ -35,15 +35,17 @@ jobs:
       - name: Verify web, relay, and packages
         run: npm run verify:web
 
-      - name: Measure security-critical relay coverage
+      - name: Measure package and security-critical relay coverage
         run: npm run test:coverage
 
-      - name: Upload relay coverage report
+      - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: relay-security-coverage
-          path: apps/relay/coverage
+          name: package-and-relay-coverage
+          path: |
+            apps/relay/coverage
+            packages/*/coverage
           if-no-files-found: error
           retention-days: 14
 

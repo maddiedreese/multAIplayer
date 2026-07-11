@@ -64,6 +64,7 @@ type TerminalActions = Pick<
   | "onSendTerminalData"
   | "onRestartTerminal"
   | "onStopTerminal"
+  | "onRevokeExactCommandGrants"
 >;
 
 export interface RoomInspectorCapabilities {

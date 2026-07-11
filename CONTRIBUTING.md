@@ -2,6 +2,12 @@
 
 Thanks for helping with multAIplayer. This project is a macOS-first open-source alpha for private group chat with a local Codex host, an end-to-end encrypted relay, GitHub workflows, terminals, file viewing, and browser approvals.
 
+## Human review for security boundaries
+
+Changes under `packages/crypto`, `packages/protocol`, or `apps/desktop/src-tauri` require review by the human owner named in `.github/CODEOWNERS`. If an AI agent authored or materially changed any part of such a pull request, the human reviewer must inspect every changed line in those paths before approval. Test results, an agent review, or a generated summary do not replace that sign-off. Authors should identify agent-authored changes in the pull-request description and keep security-boundary changes small enough to review line by line.
+
+Dependency advisory handling and coverage gates are documented in [Dependency security](docs/dependency-security.md).
+
 ## Fast path
 
 ```sh

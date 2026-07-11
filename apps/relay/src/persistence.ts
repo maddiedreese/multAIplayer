@@ -11,6 +11,7 @@ export type RelayStorageBackend = "json" | "sqlite";
 export interface RelayPersistence {
   readonly flushMode: "debounced" | "immediate";
   load(): Promise<unknown | null>;
+  finalizeLoad?(state: unknown): Promise<void>;
   save(state: unknown): Promise<void>;
   saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): Promise<boolean>;
   saveEncryptedEnvelope(
@@ -29,9 +30,13 @@ export interface RelayPersistence {
   close(): void;
 }
 
-export function createRelayPersistence(options: { backend: RelayStorageBackend; dataPath: string }): RelayPersistence {
+export function createRelayPersistence(options: {
+  backend: RelayStorageBackend;
+  dataPath: string;
+  legacyJsonImportPath?: string | null;
+}): RelayPersistence {
   return options.backend === "sqlite"
-    ? new SqliteRelayPersistence(options.dataPath)
+    ? new SqliteRelayPersistence(options.dataPath, options.legacyJsonImportPath ?? null)
     : new JsonFileRelayPersistence(options.dataPath);
 }
 
@@ -58,6 +63,8 @@ class JsonFileRelayPersistence implements RelayPersistence {
     await rename(tempPath, this.dataPath);
     await chmod(this.dataPath, 0o600);
   }
+
+  async finalizeLoad(): Promise<void> {}
 
   async saveEncryptedBacklog(): Promise<boolean> {
     return false;
@@ -88,17 +95,65 @@ class SqliteRelayPersistence implements RelayPersistence {
   readonly flushMode = "debounced";
   private db: Database.Database | null = null;
 
-  constructor(private readonly dataPath: string) {}
+  private pendingLegacyImport = false;
+
+  constructor(
+    private readonly dataPath: string,
+    private readonly legacyJsonImportPath: string | null
+  ) {}
 
   async load(): Promise<unknown | null> {
     await ensureDataDirectory(dirname(this.dataPath));
     const db = this.getDb();
     const normalized = loadNormalizedRelayState(db);
-    if (normalized !== null) return normalized;
+    if (normalized !== null) {
+      await this.finishInterruptedLegacyBackup(db);
+      return normalized;
+    }
     const row = db.prepare("select state_json from relay_snapshots where id = ?").get("current") as
       { state_json?: unknown } | undefined;
-    if (typeof row?.state_json !== "string") return null;
+    if (typeof row?.state_json !== "string") {
+      if (this.legacyJsonImportPath && existsSync(this.legacyJsonImportPath)) {
+        try {
+          const legacyState = JSON.parse(await readFile(this.legacyJsonImportPath, "utf8")) as unknown;
+          if (!isRecord(legacyState) || legacyState.version !== 1) {
+            throw new Error("Legacy relay store has an unsupported version.");
+          }
+          this.pendingLegacyImport = true;
+          return legacyState;
+        } catch (error) {
+          throw new RelayPersistenceMigrationError(
+            `Could not import legacy relay store at ${this.legacyJsonImportPath}`,
+            { cause: error }
+          );
+        }
+      }
+      return null;
+    }
     return JSON.parse(row.state_json) as unknown;
+  }
+
+  async finalizeLoad(state: unknown): Promise<void> {
+    if (!this.pendingLegacyImport || !this.legacyJsonImportPath) return;
+    saveNormalizedRelayState(this.getDb(), state, this.legacyJsonImportPath);
+    const migratedPath = availableMigrationBackupPath(this.legacyJsonImportPath);
+    await rename(this.legacyJsonImportPath, migratedPath);
+    this.pendingLegacyImport = false;
+  }
+
+  private async finishInterruptedLegacyBackup(db: Database.Database): Promise<void> {
+    if (!this.legacyJsonImportPath || !existsSync(this.legacyJsonImportPath)) return;
+    const marker = db.prepare("select value from relay_meta where key = ?").get("legacyJsonImportedFrom") as
+      { value?: unknown } | undefined;
+    if (marker?.value !== this.legacyJsonImportPath) return;
+    try {
+      await rename(this.legacyJsonImportPath, availableMigrationBackupPath(this.legacyJsonImportPath));
+    } catch (error) {
+      throw new RelayPersistenceMigrationError(
+        `Could not preserve migrated legacy relay store at ${this.legacyJsonImportPath}`,
+        { cause: error }
+      );
+    }
   }
 
   async save(state: unknown): Promise<void> {
@@ -212,6 +267,18 @@ class SqliteRelayPersistence implements RelayPersistence {
   }
 }
 
+export class RelayPersistenceMigrationError extends Error {
+  override readonly name = "RelayPersistenceMigrationError";
+}
+
+function availableMigrationBackupPath(legacyPath: string): string {
+  const base = `${legacyPath}.migrated-to-sqlite`;
+  if (!existsSync(base)) return base;
+  let suffix = 1;
+  while (existsSync(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
 function saveRoomRecord(db: Database.Database, state: unknown, roomId: string) {
   if (!isRecord(state) || !Array.isArray(state.rooms)) return;
   const room = state.rooms.find((item) => isRecord(item) && item.id === roomId);
@@ -257,7 +324,7 @@ function loadNormalizedRelayState(db: Database.Database): unknown | null {
   };
 }
 
-function saveNormalizedRelayState(db: Database.Database, state: unknown) {
+function saveNormalizedRelayState(db: Database.Database, state: unknown, legacyJsonImportedFrom?: string) {
   if (!isRecord(state) || Array.isArray(state)) {
     throw new Error("Cannot persist malformed relay state.");
   }
@@ -266,6 +333,12 @@ function saveNormalizedRelayState(db: Database.Database, state: unknown) {
     clearNormalizedRelayTables(db);
     db.prepare("insert into relay_meta (key, value) values (?, ?)").run("version", String(state.version ?? 1));
     db.prepare("insert into relay_meta (key, value) values (?, ?)").run("savedAt", savedAt);
+    if (legacyJsonImportedFrom) {
+      db.prepare("insert into relay_meta (key, value) values (?, ?)").run(
+        "legacyJsonImportedFrom",
+        legacyJsonImportedFrom
+      );
+    }
     saveJsonRows(db, "relay_teams", "id", state.teams, (item) => relayId(item, "id"));
     saveJsonRows(db, "relay_rooms", "id", state.rooms, (item) => relayId(item, "id"));
     saveJsonRows(db, "relay_invites", "id", state.invites, (item) => relayId(item, "id"));

@@ -119,6 +119,7 @@ test("terminal panel actions resolve request ids before approval", () => {
     createdAt: "2026-07-09T12:00:00.000Z"
   });
   const approved: string[] = [];
+  let revokeCount = 0;
   const actions = createTerminalPanelActions({
     selectedRoomId: room.id,
     terminalRequests: [
@@ -138,13 +139,18 @@ test("terminal panel actions resolve request ids before approval", () => {
     denyTerminalRequest: noop,
     sendTerminalData: noop,
     restartSelectedTerminal: noop,
-    stopSelectedTerminal: noop
+    stopSelectedTerminal: noop,
+    revokeExactCommandGrants: () => {
+      revokeCount += 1;
+    }
   });
 
   actions.onApproveTerminalRequest("missing");
   actions.onApproveTerminalRequest("request-1");
+  actions.onRevokeExactCommandGrants();
 
   assert.deepEqual(approved, ["request-1"]);
+  assert.equal(revokeCount, 1);
 });
 
 test("workspace file panel close clears all viewer state", () => {

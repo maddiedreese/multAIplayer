@@ -5,7 +5,7 @@ import {
   type RoomRecord
 } from "@multaiplayer/protocol";
 import {
-  deriveNextRoomSecret,
+  createRoomSecret,
   encryptJson,
   fingerprintPublicKey,
   sameDevicePublicKey,
@@ -101,21 +101,34 @@ export function createRoomKeyRotationActions(
           recipientCount: pending.payload.recipients.length
         };
       };
-      const pending = await loadPendingRoomRotation(room.id);
-      if (pending) return await finishPendingRotation(pending);
-      const { epoch: previousEpoch, secret: oldSecret } = await loadOrCreateCurrentRoomKey(room.id);
-      const newEpoch = previousEpoch + 1;
-      const newSecret = await deriveNextRoomSecret(oldSecret, hostIdentity.privateKeyJwk, {
-        teamId: room.teamId,
-        roomId: room.id,
-        previousEpoch,
-        newEpoch
-      });
-      const rotatedAt = new Date().toISOString();
-      const rotationId = crypto.randomUUID();
       const devices = (await loadTeamDevices(room.teamId)).filter((device) => !excludedUserIds.has(device.userId));
       if (devices.length === 0)
         throw new Error("No remaining registered team devices are available for room-key rotation.");
+      const pending = await loadPendingRoomRotation(room.id);
+      if (pending) {
+        const currentRecipients = new Set(
+          devices.map((device) => `${device.userId}\u0000${device.deviceId}\u0000${device.publicKeyFingerprint}`)
+        );
+        const pendingRecipients = new Set(
+          pending.payload.recipients.map(
+            (recipient) => `${recipient.userId}\u0000${recipient.deviceId}\u0000${recipient.publicKeyFingerprint}`
+          )
+        );
+        const exactRecipientScope =
+          currentRecipients.size === pendingRecipients.size &&
+          [...currentRecipients].every((recipient) => pendingRecipients.has(recipient));
+        if (exactRecipientScope) return await finishPendingRotation(pending);
+        // A roster/removal intent change invalidates the unpublished retry record. Never deliver
+        // stale wrapped material to the broader set; build a fresh random key for the current set.
+        await clearPendingRoomRotation(room.id, pending.payload.id);
+      }
+      const { epoch: previousEpoch, secret: oldSecret } = await loadOrCreateCurrentRoomKey(room.id);
+      const newEpoch = previousEpoch + 1;
+      // Each epoch has independent CSPRNG material. Retry idempotency comes from the complete
+      // pending rotation persisted before publish, not from derivation using older secrets.
+      const newSecret = await createRoomSecret();
+      const rotatedAt = new Date().toISOString();
+      const rotationId = crypto.randomUUID();
       const verifiedDevices: typeof devices = [];
       const rejectedDevices: string[] = [];
       for (const device of devices) {

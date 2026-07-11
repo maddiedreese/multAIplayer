@@ -57,7 +57,7 @@ export const WrappedRoomSecretPayload = z.object({
 });
 
 export const AuthenticatedWrappedRoomSecretPayload = z.object({
-  version: z.union([z.literal(2), z.literal(3)]),
+  version: z.literal(3),
   algorithm: z.literal("ECDH-P256-HKDF-SHA256-AES-GCM-256"),
   senderPublicKeyJwk: DevicePublicKeyJwk,
   nonce: z.string().min(1).max(maxCiphertextNonceChars),
