@@ -1,4 +1,5 @@
-import { ClipboardList, ExternalLink, Github, X } from "lucide-react";
+import { ClipboardList, ExternalLink, X } from "lucide-react";
+import { GitHubIcon } from "./GitHubIcon";
 import { useState } from "react";
 import type { DeviceIdentity } from "../lib/deviceIdentity";
 import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
@@ -65,7 +66,7 @@ export function ProfileDrawerPanel({
           <img src={currentUser.avatarUrl} alt="" />
         ) : (
           <div className="drawer-avatar">
-            {currentUser ? currentUser.login.slice(0, 1).toUpperCase() : <Github size={24} />}
+            {currentUser ? currentUser.login.slice(0, 1).toUpperCase() : <GitHubIcon size={24} />}
           </div>
         )}
         <div>
@@ -106,7 +107,7 @@ export function ProfileDrawerPanel({
         </button>
       ) : (
         <button className="primary-wide" onClick={onSignIn} disabled={authBusy || authConfig?.configured === false}>
-          <Github size={15} />
+          <GitHubIcon size={15} />
           {authConfig?.configured === false
             ? "GitHub sign-in not configured"
             : authBusy

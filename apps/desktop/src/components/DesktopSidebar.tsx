@@ -5,7 +5,6 @@ import {
   Circle,
   ExternalLink,
   FolderGit2,
-  Github,
   Plus,
   RotateCcw,
   Search,
@@ -13,6 +12,7 @@ import {
   UsersRound,
   X
 } from "lucide-react";
+import { GitHubIcon } from "./GitHubIcon";
 import React, { useState } from "react";
 import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
 import { useThemeMode } from "../hooks/useThemeMode";
@@ -87,7 +87,7 @@ function SidebarAccountSection({
       </div>
       {currentUser ? (
         <div className="profile-card">
-          {currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" /> : <Github size={18} />}
+          {currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" /> : <GitHubIcon size={18} />}
           <div>
             <strong>{currentUser.name ?? currentUser.login}</strong>
             <span>@{currentUser.login}</span>
@@ -96,7 +96,7 @@ function SidebarAccountSection({
         </div>
       ) : (
         <button className="github-button" onClick={onSignIn} disabled={authBusy || authConfig?.configured === false}>
-          <Github size={16} />
+          <GitHubIcon size={16} />
           {authConfig?.configured === false
             ? "GitHub sign-in not configured"
             : authBusy

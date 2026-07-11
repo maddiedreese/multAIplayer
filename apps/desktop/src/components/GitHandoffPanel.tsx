@@ -1,4 +1,5 @@
-import { Copy, Github } from "lucide-react";
+import { Copy } from "lucide-react";
+import { GitHubIcon } from "./GitHubIcon";
 import type { GitWorkflowApprovalPreview } from "@multaiplayer/git";
 import type { GitHubWorkflowReadiness } from "../lib/githubWorkflowReadiness";
 import type { GitWorkflowDraft } from "../lib/gitWorkflowDraft";
@@ -107,7 +108,7 @@ export function GitHandoffPanel({
           (draft.pushEnabled && !readiness.ready)
         }
       >
-        <Github size={15} />
+        <GitHubIcon size={15} />
         {gitWorkflowBusy ? "Running approved git workflow" : "Approve git workflow"}
       </button>
       {message && <div className="workflow-message">{message}</div>}
