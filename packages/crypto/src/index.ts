@@ -546,6 +546,7 @@ async function deriveWrappingKey(privateKey: CryptoKey, publicKey: CryptoKey): P
 }
 // mutation-policy:end device-key-import
 
+// mutation-policy:start device-context-aad
 function wrapAdditionalData(context: DeviceCryptoContext): Uint8Array {
   return cryptoContextAdditionalData("multaiplayer:room-secret-wrap:v2", context);
 }
@@ -555,15 +556,23 @@ function deviceSealAdditionalData(context: DeviceCryptoContext): Uint8Array {
 }
 
 function cryptoContextAdditionalData(domain: string, context: DeviceCryptoContext): Uint8Array {
-  const values = [
-    context.purpose,
-    context.teamId,
-    context.roomId,
-    context.senderUserId,
-    context.senderDeviceId,
-    context.recipientDeviceId
-  ];
-  if (values.some((value) => !value)) throw new Error("Device crypto context fields must be non-empty");
+  if (!context.teamId) throw new Error("Device crypto context teamId must be non-empty");
+  if (!context.roomId) throw new Error("Device crypto context roomId must be non-empty");
+  if (!context.senderUserId) throw new Error("Device crypto context senderUserId must be non-empty");
+  if (!context.senderDeviceId) throw new Error("Device crypto context senderDeviceId must be non-empty");
+  if (!context.recipientDeviceId) throw new Error("Device crypto context recipientDeviceId must be non-empty");
+  if (!(["invite-request", "invite-response", "room-key-rotation"] as const).includes(context.purpose)) {
+    throw new Error("Unsupported device crypto context purpose");
+  }
+  for (const [name, epoch] of [
+    ["keyEpoch", context.keyEpoch],
+    ["previousEpoch", context.previousEpoch],
+    ["newEpoch", context.newEpoch]
+  ] as const) {
+    if (epoch != null && (!Number.isSafeInteger(epoch) || epoch < 1)) {
+      throw new Error(`Device crypto context ${name} must be a positive safe integer`);
+    }
+  }
   return canonicalAuthenticatedRecord(domain, 1, {
     purpose: context.purpose,
     teamId: context.teamId,
@@ -599,6 +608,7 @@ function legacyCryptoContextAdditionalData(domain: string, context: DeviceCrypto
     })
   );
 }
+// mutation-policy:end device-context-aad
 
 function authenticatedWrapAdditionalData(context: DeviceCryptoContext): Uint8Array {
   if (context.purpose === "invite-response") {
@@ -634,6 +644,7 @@ export function sameDevicePublicKey(left: JsonWebKey, right: JsonWebKey): boolea
 }
 
 /** Deterministic, versioned AES-GCM AAD. Keep field order stable as part of the wire protocol. */
+// mutation-policy:start room-envelope-aad
 export function roomEnvelopeAdditionalData(metadata: RoomEnvelopeMetadataType): Uint8Array {
   const value = RoomEnvelopeMetadata.parse(metadata);
   return canonicalAuthenticatedRecord("multaiplayer:room-envelope:v2", 1, value);
@@ -643,11 +654,16 @@ function legacyRoomEnvelopeAdditionalData(metadata: RoomEnvelopeMetadataType): U
   const value = RoomEnvelopeMetadata.parse(metadata);
   return encoder.encode(JSON.stringify({ domain: "multaiplayer:room-envelope:v2", ...value }));
 }
+// mutation-policy:end room-envelope-aad
 
+// mutation-policy:start local-aad
 function localAdditionalData(context: LocalCryptoContext): Uint8Array {
-  if (!context.roomId || !context.savedAt || !Number.isSafeInteger(context.keyEpoch) || context.keyEpoch < 1) {
-    throw new Error("Invalid local crypto context");
-  }
+  if (context.purpose !== "room-history" && context.purpose !== "room-secret-backup")
+    throw new Error("Unsupported local crypto context purpose");
+  if (!context.roomId) throw new Error("Local crypto context roomId must be non-empty");
+  if (!context.savedAt) throw new Error("Local crypto context savedAt must be non-empty");
+  if (!Number.isSafeInteger(context.keyEpoch) || context.keyEpoch < 1)
+    throw new Error("Local crypto context keyEpoch must be a positive safe integer");
   return canonicalAuthenticatedRecord("multaiplayer:local-json:v2", 1, {
     purpose: context.purpose,
     roomId: context.roomId,
@@ -659,6 +675,7 @@ function localAdditionalData(context: LocalCryptoContext): Uint8Array {
 function legacyLocalAdditionalData(context: LocalCryptoContext): Uint8Array {
   return encoder.encode(JSON.stringify({ domain: "multaiplayer:local-json:v2", ...context }));
 }
+// mutation-policy:end local-aad
 
 function jsonWebKeyToDevicePublicKeyJwk(key: JsonWebKey): DevicePublicKeyJwkType {
   const parsed = DevicePublicKeyJwk.safeParse(JSON.parse(JSON.stringify(key)));
