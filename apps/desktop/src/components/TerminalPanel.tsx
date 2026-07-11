@@ -110,10 +110,13 @@ export function TerminalPanel({
       window.cancelAnimationFrame = (handle) => window.clearTimeout(handle);
     }
     if (!XTerm) return;
+    const terminalFont =
+      window.getComputedStyle?.(document.documentElement).getPropertyValue("--font-mono").trim() ||
+      '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace';
     const xterm = new XTerm({
       cursorBlink: true,
       convertEol: true,
-      fontFamily: "var(--font-mono)",
+      fontFamily: terminalFont,
       fontSize: 13,
       lineHeight: 1.35,
       theme: readTerminalTheme()

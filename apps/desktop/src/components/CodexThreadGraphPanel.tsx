@@ -1,4 +1,5 @@
 import React from "react";
+import { Circle, CornerDownRight } from "lucide-react";
 import { forkCodexThread, getCodexGoal, listCodexThreads } from "../lib/localBackend";
 import { deriveCodexAgentTree } from "../lib/codexThreadGraph";
 import { codexGoalToRoomGoal } from "../lib/roomGoals";
@@ -105,7 +106,9 @@ export function CodexThreadGraphView({
           <ol>
             {nodes.map((node) => (
               <li key={node.id} data-active={node.id === graph.activeThreadId}>
-                <span>{node.parentThreadId ? "↳" : "●"}</span>
+                <span className="codex-tree-icon" aria-hidden="true">
+                  {node.parentThreadId ? <CornerDownRight size={14} /> : <Circle size={8} fill="currentColor" />}
+                </span>
                 <div>
                   <strong>{node.title}</strong>
                   <small>
@@ -141,7 +144,9 @@ export function CodexThreadGraphView({
           <ol>
             {agentTree.map((agent) => (
               <li key={agent.id}>
-                <span>{agent.parentId ? "↳" : "●"}</span>
+                <span className="codex-tree-icon" aria-hidden="true">
+                  {agent.parentId ? <CornerDownRight size={14} /> : <Circle size={8} fill="currentColor" />}
+                </span>
                 <div>
                   <strong>{shortId(agent.id)}</strong>
                   <small>
