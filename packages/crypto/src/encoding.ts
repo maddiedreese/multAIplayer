@@ -22,7 +22,7 @@ export function base64ToBytes(value: string): Uint8Array {
 }
 
 export function bytesToBase64Url(bytes: Uint8Array): string {
-  return bytesToBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return bytesToBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
 export function base64UrlToBytes(value: string): Uint8Array {
