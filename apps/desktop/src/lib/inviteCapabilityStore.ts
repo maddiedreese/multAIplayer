@@ -1,6 +1,8 @@
 import type { NoSecretRoomInvite } from "../types";
+import { canonicalAuthenticatedRecord, parseInviteCapability, sameDevicePublicKey } from "@multaiplayer/crypto";
+import { DevicePublicKeyJwk } from "@multaiplayer/protocol";
 
-const issuedKey = "multaiplayer:issued-invite-capabilities:v3";
+const issuedKey = "multaiplayer:issued-invite-capabilities:v4";
 const pinnedKey = "multaiplayer:pinned-invite-device-keys:v2";
 const pendingCapabilities = new Map<string, PendingInviteCapability>();
 let legacyStorageCleared = false;
@@ -73,7 +75,16 @@ export function pinInviteDeviceKey(
   const id = `${roomId}\n${userId}\n${deviceId}`;
   const existing = read<{ fingerprint: string; jwk: unknown }>(pinnedKey, id);
   const next = { fingerprint, jwk };
-  if (existing && JSON.stringify(existing) !== JSON.stringify(next)) return false;
+  const existingKey = DevicePublicKeyJwk.safeParse(existing?.jwk);
+  const nextKey = DevicePublicKeyJwk.safeParse(jwk);
+  if (
+    !nextKey.success ||
+    (existing &&
+      (existing.fingerprint !== fingerprint ||
+        !existingKey.success ||
+        !sameDevicePublicKey(existingKey.data, nextKey.data)))
+  )
+    return false;
   write(pinnedKey, id, next);
   return true;
 }
@@ -87,7 +98,11 @@ export function loadPinnedInviteDeviceKey(
 }
 
 async function capabilityVerifier(capability: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(capability));
+  const raw = parseInviteCapability(capability);
+  const context = canonicalAuthenticatedRecord("multaiplayer:invite-capability-verifier", 1, {
+    capabilityBytes: Array.from(raw, (byte) => byte.toString(16).padStart(2, "0")).join("")
+  });
+  const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(context).buffer);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -122,5 +137,6 @@ function clearLegacyPlaintextCapabilityStorage(): void {
   if (legacyStorageCleared || typeof localStorage === "undefined") return;
   legacyStorageCleared = true;
   localStorage.removeItem("multaiplayer:issued-invite-capabilities:v2");
+  localStorage.removeItem("multaiplayer:issued-invite-capabilities:v3");
   localStorage.removeItem("multaiplayer:pending-invite-capabilities:v2");
 }

@@ -33,7 +33,7 @@ const {
 test("pending invite capability decisions are consumed exactly once", async () => {
   const host = await createDeviceKeyAgreementIdentity();
   const pending = {
-    version: 2 as const,
+    version: 3 as const,
     inviteId: "invite-1",
     teamId: "team-1",
     roomId: "room-1",
@@ -61,7 +61,7 @@ test("issued capabilities persist only a one-way verifier", async () => {
   const host = await createDeviceKeyAgreementIdentity();
   const capability = createInviteCapability();
   const invite = {
-    version: 2 as const,
+    version: 3 as const,
     teamId: "team-1",
     roomId: "room-1",
     roomName: "Room",
@@ -73,7 +73,7 @@ test("issued capabilities persist only a one-way verifier", async () => {
     hostPublicKeyFingerprint: host.publicKeyFingerprint
   };
   await rememberIssuedInviteCapability("invite-1", invite);
-  const serialized = localStorage.getItem("multaiplayer:issued-invite-capabilities:v3") ?? "";
+  const serialized = localStorage.getItem("multaiplayer:issued-invite-capabilities:v4") ?? "";
   assert.equal(serialized.includes(capability), false);
   const issued = loadIssuedInviteCapability("invite-1");
   assert.ok(issued);
@@ -86,6 +86,16 @@ test("capability enrollment pins an exact device key", async () => {
   const changed = await createDeviceKeyAgreementIdentity();
   assert.equal(
     pinInviteDeviceKey("room-1", "github:peer", "device-peer", first.publicKeyFingerprint, first.publicKeyJwk),
+    true
+  );
+  assert.equal(
+    pinInviteDeviceKey("room-1", "github:peer", "device-peer", first.publicKeyFingerprint, {
+      y: first.publicKeyJwk.y,
+      x: first.publicKeyJwk.x,
+      crv: first.publicKeyJwk.crv,
+      kty: first.publicKeyJwk.kty,
+      ext: false
+    }),
     true
   );
   assert.equal(

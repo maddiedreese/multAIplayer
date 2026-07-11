@@ -58,7 +58,7 @@ export function createInviteLinkActions(
       }
       const { epoch: keyEpoch } = await loadOrCreateCurrentRoomKey(roomId);
       const capabilityInvite = {
-        version: 2 as const,
+        version: 3 as const,
         teamId: selectedRoom.teamId,
         roomId,
         roomName: selectedRoom.name,

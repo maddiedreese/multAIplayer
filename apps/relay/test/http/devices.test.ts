@@ -96,7 +96,7 @@ test("team device directory is membership scoped and excludes removed members", 
 });
 
 function fingerprint(key: typeof firstKey | typeof secondKey): string {
-  const canonical = JSON.stringify({ crv: key.crv, kty: key.kty, x: key.x, y: key.y });
+  const canonical = `{"crv":"${key.crv}","kty":"${key.kty}","x":"${key.x}","y":"${key.y}"}`;
   const hex = createHash("sha256").update(canonical, "utf8").digest("hex");
   return `sha256:${hex.match(/.{1,4}/g)?.join(":") ?? hex}`;
 }
