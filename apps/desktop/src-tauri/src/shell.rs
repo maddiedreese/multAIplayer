@@ -1,10 +1,9 @@
-use serde::{Deserialize, Serialize};
-use std::process::Command;
-
-use crate::output::bound_command_output;
+use crate::host_sandbox::sandboxed_shell_command;
+use crate::output::{bound_command_output, redact_known_secrets};
 use crate::shell_authorization::{ShellAuthorizationState, ShellExecutionKind};
 use crate::validation::ensure_terminal_command;
 use crate::workspace::ensure_existing_dir;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
 #[derive(Debug, Serialize)]
@@ -42,9 +41,7 @@ pub(crate) fn run_shell_command(
     )?;
 
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
-    let output = Command::new(shell)
-        .current_dir(&canonical_cwd)
-        .args(["-c", &request.command])
+    let output = sandboxed_shell_command(&shell, &canonical_cwd, &request.command)?
         .output()
         .map_err(|error| format!("Failed to run command: {error}"))?;
 
@@ -52,7 +49,7 @@ pub(crate) fn run_shell_command(
         command: request.command,
         cwd: canonical_cwd,
         status: output.status.code(),
-        stdout: bound_command_output(&output.stdout),
-        stderr: bound_command_output(&output.stderr),
+        stdout: redact_known_secrets(&bound_command_output(&output.stdout)),
+        stderr: redact_known_secrets(&bound_command_output(&output.stderr)),
     })
 }

@@ -3,6 +3,30 @@ use std::io::Read;
 use std::path::Path;
 
 use crate::validation::{MAX_COMMAND_OUTPUT_CHARS, MAX_GIT_DIFF_CHARS};
+use regex::Regex;
+use std::sync::OnceLock;
+
+pub(crate) fn redact_known_secrets(text: &str) -> String {
+    static PATTERNS: OnceLock<Vec<Regex>> = OnceLock::new();
+    let patterns = PATTERNS.get_or_init(|| vec![
+        Regex::new(r"ghp_[A-Za-z0-9_]{20,}").unwrap(),
+        Regex::new(r"github_pat_[A-Za-z0-9_]{20,}").unwrap(),
+        Regex::new(r"sk-[A-Za-z0-9_-]{20,}").unwrap(),
+        Regex::new(r"(?im)^([A-Z][A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*)\s*=\s*([^\r\n]+)").unwrap(),
+        Regex::new(r"(?s)-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----.*?-----END (?:RSA |OPENSSH |EC )?PRIVATE KEY-----").unwrap(),
+    ]);
+    patterns.iter().fold(text.to_string(), |value, pattern| {
+        pattern
+            .replace_all(&value, |captures: &regex::Captures<'_>| {
+                if captures.len() > 2 {
+                    format!("{}=[REDACTED BY MULTAIPLAYER]", &captures[1])
+                } else {
+                    "[REDACTED BY MULTAIPLAYER]".to_string()
+                }
+            })
+            .into_owned()
+    })
+}
 
 pub(crate) fn untracked_file_diff(path: &Path, display_path: &str) -> Result<String, String> {
     let mut file =

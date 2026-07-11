@@ -1,3 +1,5 @@
+use crate::host_sandbox::sandboxed_terminal_program;
+use crate::output::redact_known_secrets;
 use crate::shell_authorization::{ShellAuthorizationState, ShellExecutionKind};
 use portable_pty::{native_pty_system, Child as PtyChild, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
@@ -112,10 +114,13 @@ pub(crate) fn terminal_start(
             pixel_height: 0,
         })
         .map_err(|error| format!("Failed to open terminal pty: {error}"))?;
-    let mut command = CommandBuilder::new(shell);
+    let (program, arguments) =
+        sandboxed_terminal_program(&shell, &canonical_cwd, &request.command)?;
+    let mut command = CommandBuilder::new(program);
     command.cwd(&canonical_cwd);
-    command.arg("-c");
-    command.arg(&request.command);
+    for argument in arguments {
+        command.arg(argument);
+    }
     let child = pair
         .slave
         .spawn_command(command)
@@ -293,22 +298,102 @@ where
     thread::spawn(move || {
         let mut reader = BufReader::new(stream);
         let mut buffer = [0_u8; 4096];
+        let mut redactor = TerminalStreamRedactor::default();
         loop {
             let byte_count = match reader.read(&mut buffer) {
-                Ok(0) => break,
+                Ok(0) => {
+                    for text in redactor.push("", true) {
+                        push_terminal_line(
+                            &output,
+                            TerminalLine {
+                                stream: name.to_string(),
+                                text,
+                            },
+                        );
+                    }
+                    break;
+                }
                 Ok(byte_count) => byte_count,
                 Err(_) => break,
             };
-            let text = String::from_utf8_lossy(&buffer[..byte_count]).to_string();
-            push_terminal_line(
-                &output,
-                TerminalLine {
-                    stream: name.to_string(),
-                    text,
-                },
-            );
+            for text in redactor.push(&String::from_utf8_lossy(&buffer[..byte_count]), false) {
+                push_terminal_line(
+                    &output,
+                    TerminalLine {
+                        stream: name.to_string(),
+                        text,
+                    },
+                );
+            }
         }
     });
+}
+
+const MAX_TERMINAL_REDACTION_PENDING_BYTES: usize = 8 * 1024;
+const STREAM_REDACTION_MARKER: &str = "[REDACTED BY MULTAIPLAYER]\n";
+
+#[derive(Default)]
+pub(crate) struct TerminalStreamRedactor {
+    pending: String,
+    in_private_key: bool,
+    suppress_until_newline: bool,
+}
+
+impl TerminalStreamRedactor {
+    pub(crate) fn push(&mut self, chunk: &str, eof: bool) -> Vec<String> {
+        let mut safe = Vec::new();
+        let mut remainder = chunk;
+        if self.suppress_until_newline {
+            if let Some(newline) = remainder.find('\n') {
+                remainder = &remainder[newline + 1..];
+                self.suppress_until_newline = false;
+            } else {
+                if eof {
+                    self.suppress_until_newline = false;
+                }
+                return safe;
+            }
+        }
+        self.pending.push_str(remainder);
+        while let Some(newline) = self.pending.find('\n') {
+            let complete = self.pending.drain(..=newline).collect::<String>();
+            self.redact_complete_line(&complete, &mut safe);
+        }
+        if self.pending.len() > MAX_TERMINAL_REDACTION_PENDING_BYTES {
+            self.pending.clear();
+            self.suppress_until_newline = true;
+            safe.push(STREAM_REDACTION_MARKER.to_string());
+        }
+        if eof {
+            if !self.pending.is_empty() {
+                let complete = std::mem::take(&mut self.pending);
+                self.redact_complete_line(&complete, &mut safe);
+            }
+            self.suppress_until_newline = false;
+            self.in_private_key = false;
+        }
+        safe
+    }
+
+    fn redact_complete_line(&mut self, line: &str, safe: &mut Vec<String>) {
+        if self.in_private_key {
+            if line.contains("-----END ") && line.contains("PRIVATE KEY-----") {
+                self.in_private_key = false;
+            }
+            return;
+        }
+        if line.contains("-----BEGIN ") && line.contains("PRIVATE KEY-----") {
+            self.in_private_key = !line.contains("-----END ");
+            safe.push(STREAM_REDACTION_MARKER.to_string());
+            return;
+        }
+        safe.push(redact_known_secrets(line));
+    }
+
+    #[cfg(test)]
+    pub(crate) fn pending_bytes(&self) -> usize {
+        self.pending.len()
+    }
 }
 
 pub(crate) fn push_terminal_line(output: &Arc<Mutex<Vec<TerminalLine>>>, line: TerminalLine) {

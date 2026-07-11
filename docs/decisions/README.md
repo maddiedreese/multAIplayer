@@ -7,5 +7,6 @@ These records explain durable implementation constraints that are easy to miss w
 - [Host handoff and key authority](host-handoff.md)
 - [Metadata-only Codex activity](metadata-only-codex-activity.md)
 - [Multi-repository room evaluation](multi-repository-rooms.md)
+- [Epoch crypto and the MLS migration boundary](epoch-crypto-migration-boundary.md)
 
 Add a record when a change introduces a cross-cutting boundary, trust decision, or constraint that future contributors might otherwise “simplify” away. Prefer enduring rationale over implementation chronology.

@@ -52,7 +52,7 @@ Run the smallest relevant loop while iterating, then run `npm run verify` before
 
 | Changing | Fast checks while iterating |
 | --- | --- |
-| Relay HTTP, WebSocket, auth, persistence, or limits | `npm run check -w @multaiplayer/relay` and `npm run test -w @multaiplayer/relay` |
+| Relay HTTP, WebSocket, auth, persistence, or limits | `npm run check -w @multaiplayer/relay` and `npm run test -w @multaiplayer/relay`; run `npm run test:fuzz -w @multaiplayer/relay` after parser/schema changes |
 | Desktop React UI, hooks, stores, or adapters | `npm run check -w @multaiplayer/desktop` and `npm run test:smoke -w @multaiplayer/desktop`; run `npm run test -w @multaiplayer/desktop` before handoff |
 | One shared package | `npm run check -w @multaiplayer/protocol` and `npm run test -w @multaiplayer/protocol`, replacing `protocol` with `crypto`, `codex`, `git`, or `github` as needed |
 | Native Tauri/Rust code | `npm run fmt:rust:check` and `npm run test:native` |
@@ -61,6 +61,8 @@ Run the smallest relevant loop while iterating, then run `npm run verify` before
 | Repository scripts | `npm run test:scripts` |
 
 Use `npm run format` to apply the repository's Prettier baseline. `npm run verify` lints and checks formatting for TypeScript and JavaScript, type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the workspaces.
+
+The relay fuzz suite feeds seedable arbitrary bytes, recursive JSON values, and mutated valid envelopes/messages through the protocol schemas. It runs 100,000 cases by default; reproduce or tune a run with `MULTAIPLAYER_RELAY_FUZZ_SEED` and `MULTAIPLAYER_RELAY_FUZZ_ITERATIONS`.
 
 ### Engineering guidelines
 
