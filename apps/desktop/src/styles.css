@@ -4685,7 +4685,8 @@ select {
 }
 
 .file-viewer-open.expanded,
-.browser-panel.browser-open.expanded {
+.browser-panel.browser-open.expanded,
+.terminal-panel.expanded {
   position: fixed;
   inset: 36px 0 0;
   z-index: 80;
@@ -4701,6 +4702,20 @@ select {
 
 .browser-panel.browser-open.expanded {
   background: var(--surface);
+}
+
+.terminal-panel.expanded {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 16px;
+  background: var(--surface);
+}
+
+.terminal-panel.expanded .terminal-output.xterm-output {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
 }
 
 .browser-open .browser-viewport iframe {
@@ -4853,7 +4868,7 @@ select {
   flex-wrap: wrap;
   justify-content: flex-start;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr)) 36px;
   width: 100%;
   gap: 8px;
 }
@@ -4861,6 +4876,11 @@ select {
 .terminal-panel .panel-title-actions button {
   min-width: 0;
   width: 100%;
+}
+
+.terminal-panel .panel-title-actions .terminal-expand-button {
+  width: 36px;
+  padding: 0;
 }
 
 .terminal-command-line span,

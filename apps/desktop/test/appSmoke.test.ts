@@ -322,6 +322,18 @@ test("App smoke", { timeout: 25_000 }, async (t) => {
     await waitFor(() => assert.equal(document.activeElement, composer));
   });
 
+  await t.test("expands the terminal and returns it to the context column", { timeout: 5_000 }, async () => {
+    resetAppSmokeDom();
+    render(createElement(App));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Terminal" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Expand terminal" }));
+    await waitFor(() => assert.ok(document.querySelector(".terminal-panel.expanded")));
+
+    fireEvent.click(screen.getByRole("button", { name: "Return terminal to column" }));
+    await waitFor(() => assert.equal(document.querySelector(".terminal-panel.expanded"), null));
+  });
+
   await t.test("releases global resize handlers when the app unmounts mid-drag", { timeout: 5_000 }, async () => {
     resetAppSmokeDom();
     const view = render(createElement(App));
