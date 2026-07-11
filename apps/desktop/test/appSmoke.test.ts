@@ -293,7 +293,7 @@ test("App smoke", { timeout: 25_000 }, async (t) => {
     resetAppSmokeDom();
     render(createElement(App));
 
-    fireEvent.click(await screen.findByRole("button", { name: "terminal" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Terminal" }));
     const terminalInput = await screen.findByLabelText("Terminal input");
     await waitFor(() => assert.equal(document.activeElement, terminalInput));
 
@@ -320,6 +320,18 @@ test("App smoke", { timeout: 25_000 }, async (t) => {
 
     await screen.findByRole("button", { name: "remote-shell" });
     await waitFor(() => assert.equal(document.activeElement, composer));
+  });
+
+  await t.test("expands the terminal and returns it to the context column", { timeout: 5_000 }, async () => {
+    resetAppSmokeDom();
+    render(createElement(App));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Terminal" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Expand terminal" }));
+    await waitFor(() => assert.ok(document.querySelector(".terminal-panel.expanded")));
+
+    fireEvent.click(screen.getByRole("button", { name: "Return terminal to column" }));
+    await waitFor(() => assert.equal(document.querySelector(".terminal-panel.expanded"), null));
   });
 
   await t.test("releases global resize handlers when the app unmounts mid-drag", { timeout: 5_000 }, async () => {

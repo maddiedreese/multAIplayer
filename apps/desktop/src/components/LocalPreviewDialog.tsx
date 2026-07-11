@@ -46,12 +46,12 @@ export function LocalPreviewDialog({
         <div className="modal-header">
           <div>
             <span>Cloudflare Quick Tunnel</span>
-            <strong id="local-preview-title">Share Local Preview</strong>
+            <strong id="local-preview-title">Share local preview</strong>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close Share Local Preview"
+            aria-label="Close Share local preview"
             disabled={dialog.phase === "starting"}
           >
             <X size={16} />

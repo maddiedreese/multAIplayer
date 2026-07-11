@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import {
+  catalogModelOptions,
   catalogReasoningOptionsForModel,
   catalogSpeedOptionsForModel,
   resolveCodexRunSettings
@@ -82,6 +83,22 @@ test("model-specific UI choices include none and omit unsupported speed tiers", 
   assert.deepEqual(
     catalogSpeedOptionsForModel(probe, "gpt-next").map((option) => option.id),
     ["standard"]
+  );
+});
+
+test("host catalogs augment the current shared model list instead of hiding new models", () => {
+  assert.deepEqual(
+    catalogModelOptions(probe).map((option) => option.id),
+    [
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
+      "gpt-5.5",
+      "gpt-5.5-cyber",
+      "gpt-5.3-codex",
+      "gpt-5.3-codex-spark",
+      "gpt-next"
+    ]
   );
 });
 

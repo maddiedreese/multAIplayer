@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Bot,
   Copy,
@@ -99,7 +99,6 @@ export function RoomChatPanel({
   markdownSelectionMode,
   onToggleMessageSelection,
   onCopyMessageMarkdown,
-  onCopyCodexOutputMarkdown,
   onOpenAttachment,
   onToggleReaction,
   onEditMessage,
@@ -147,7 +146,6 @@ export function RoomChatPanel({
   markdownSelectionMode: boolean;
   onToggleMessageSelection: (messageId: string) => void;
   onCopyMessageMarkdown: (messageId: string) => void;
-  onCopyCodexOutputMarkdown: (messageId: string) => void;
   onOpenAttachment: (messageId: string, attachmentId: string) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
   onEditMessage: (messageId: string, nextBody: string) => void;
@@ -207,15 +205,6 @@ export function RoomChatPanel({
                   >
                     <Copy size={13} />
                   </button>
-                  {message.role === "codex" && (
-                    <button
-                      onClick={() => onCopyCodexOutputMarkdown(message.id)}
-                      title="Copy Codex turn output as Markdown"
-                      aria-label={`Copy Codex turn output from ${message.time} as Markdown`}
-                    >
-                      <Bot size={13} />
-                    </button>
-                  )}
                   {message.edited && <span>(edited)</span>}
                   {message.canEdit && (
                     <button
@@ -245,6 +234,7 @@ export function RoomChatPanel({
                     </button>
                   )}
                   <button
+                    className="message-reply-button"
                     onClick={() => onReplyToMessage(message.id)}
                     title="Reply to message"
                     aria-label={`Reply to message from ${message.author}`}
@@ -301,7 +291,7 @@ export function RoomChatPanel({
             <div className="avatar">P</div>
             <div className="bubble local-preview-card">
               <div className="message-meta">
-                <strong>Live Local Preview</strong>
+                <strong>Live local preview</strong>
                 <span>{preview.statusLabel}</span>
               </div>
               <dl>

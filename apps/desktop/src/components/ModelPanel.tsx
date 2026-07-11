@@ -91,7 +91,7 @@ export function ModelPanel({
         </select>
       </label>
       <label>
-        <span>Custom model id</span>
+        <span>Custom model ID</span>
         <div className="custom-model-row">
           <input
             value={customModel}
@@ -115,45 +115,6 @@ export function ModelPanel({
           </button>
         </div>
       </label>
-      <div className="model-options">
-        {modelOptions.map((option) => (
-          <button
-            key={option.id}
-            className={selectedModel === option.id ? "active" : ""}
-            disabled={disabled}
-            onClick={() => onSelectModel(option.id)}
-          >
-            <strong>{option.label}</strong>
-            <span>{option.description}</span>
-          </button>
-        ))}
-      </div>
-      <div className="model-options compact">
-        {reasoningOptions.map((option) => (
-          <button
-            key={option.id}
-            className={selectedReasoningEffort === option.id ? "active" : ""}
-            disabled={disabled}
-            onClick={() => onSelectReasoningEffort(option.id)}
-          >
-            <strong>{option.label}</strong>
-            <span>{option.description}</span>
-          </button>
-        ))}
-      </div>
-      <div className="model-options compact">
-        {speedOptions.map((option) => (
-          <button
-            key={option.id}
-            className={selectedSpeed === option.id ? "active" : ""}
-            disabled={disabled}
-            onClick={() => onSelectSpeed(option.id)}
-          >
-            <strong>{option.label}</strong>
-            <span>{option.description}</span>
-          </button>
-        ))}
-      </div>
     </section>
   );
 }

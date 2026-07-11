@@ -8,6 +8,15 @@ import type { BrowserTab } from "../store/slices/browserSlice";
 
 const browserWebviewLabel = "room_browser";
 
+function browserSurfaceTop(slot: HTMLElement) {
+  const rect = slot.getBoundingClientRect();
+  const panel = slot.parentElement;
+  const toolbarBottom =
+    panel?.querySelector<HTMLElement>(".browser-toolbar")?.getBoundingClientRect().bottom ?? rect.top;
+  const tabsBottom = panel?.querySelector<HTMLElement>(".browser-tabs")?.getBoundingClientRect().bottom ?? rect.top;
+  return Math.max(rect.top, toolbarBottom, tabsBottom) + 16;
+}
+
 export function BrowserAccessPanel({
   hidden,
   activeBrowserUrl,
@@ -117,9 +126,7 @@ export function BrowserAccessPanel({
       const slot = browserViewportRef.current;
       if (!slot) return;
       const rect = slot.getBoundingClientRect();
-      const toolbar = slot.parentElement?.querySelector<HTMLElement>(".browser-toolbar");
-      const toolbarRect = toolbar?.getBoundingClientRect();
-      const top = toolbarRect ? Math.max(rect.top, toolbarRect.bottom + 18) : rect.top;
+      const top = browserSurfaceTop(slot);
       const width = Math.max(1, Math.round(rect.width));
       const height = Math.max(1, Math.round(rect.bottom - top));
       await webview.setPosition(new LogicalPosition(Math.round(rect.left), Math.round(top)));
@@ -135,9 +142,7 @@ export function BrowserAccessPanel({
     void closeBrowserWebview().then(async () => {
       if (cancelled || !browserViewportRef.current) return;
       const rect = browserViewportRef.current.getBoundingClientRect();
-      const toolbar = browserViewportRef.current.parentElement?.querySelector<HTMLElement>(".browser-toolbar");
-      const toolbarRect = toolbar?.getBoundingClientRect();
-      const top = toolbarRect ? Math.max(rect.top, toolbarRect.bottom + 18) : rect.top;
+      const top = browserSurfaceTop(browserViewportRef.current);
       const webview = new Webview(getCurrentWindow(), browserWebviewLabel, {
         url: browserSurfaceUrl,
         x: Math.round(rect.left),
