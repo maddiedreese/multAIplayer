@@ -171,6 +171,8 @@ fn list_codex_models_once(
         session_id,
         stdin: stdin.clone(),
         cancelled: None,
+        proposed_by: None,
+        context_summary: None,
     };
     let result = (|| {
         send_json_shared(

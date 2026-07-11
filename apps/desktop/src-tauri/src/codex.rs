@@ -50,6 +50,8 @@ pub(crate) struct CodexTurnRequest {
     sandbox_level: Option<String>,
     previous_thread_id: Option<String>,
     timeout_seconds: Option<u64>,
+    proposed_by: Option<String>,
+    context_summary: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -144,6 +146,8 @@ pub(crate) fn run_codex_turn(
         &client_turn_id,
         timeout,
         cancellation,
+        request.proposed_by.as_deref(),
+        request.context_summary.as_deref(),
     );
     if result.as_ref().is_ok_and(CodexTurnResult::is_reusable) && session.is_alive() {
         let mut checked_out = Some(session);
@@ -298,6 +302,8 @@ impl CodexServerSession {
             session_id,
             stdin: stdin.clone(),
             cancelled: Some(cancelled),
+            proposed_by: None,
+            context_summary: None,
         };
         let mut pending_guard = PendingSessionGuard::new(rpc_state.clone(), session_id);
         cleanup_on_error(
@@ -356,6 +362,8 @@ impl CodexServerSession {
         client_turn_id: &str,
         timeout: Duration,
         cancelled: Arc<std::sync::atomic::AtomicBool>,
+        proposed_by: Option<&str>,
+        context_summary: Option<&str>,
     ) -> Result<CodexTurnResult, String> {
         let mut budget = ActiveTimeout::new(timeout);
         let stdin = self.stdin.clone();
@@ -369,6 +377,8 @@ impl CodexServerSession {
             session_id: self.session_id,
             stdin,
             cancelled: Some(cancelled.clone()),
+            proposed_by,
+            context_summary,
         };
         let thread_request_id = self.allocate_id();
         cleanup_on_error(

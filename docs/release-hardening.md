@@ -39,6 +39,8 @@ If any required Apple signing secret is missing, the release workflow fails befo
 
 Do not attach ad hoc local builds to public releases. Release artifacts should come from GitHub Actions so the source commit, workflow logs, and checksums are visible.
 
+Third parties can follow [Reproducing release builds](reproducible-builds.md) to rebuild a tag and compare the unsigned application payload. The signed/notarized DMG and ZIP are not currently claimed to be bit-for-bit reproducible because Apple services, signatures, archive metadata, hosted runner images, and incompletely pinned toolchain patch versions can affect output.
+
 ## Update Notices
 
 The alpha does not use the Tauri auto-updater. Instead, the desktop app checks `https://multaiplayer.com/releases/latest.json` and shows an in-app banner when the manifest advertises a newer version. Security updates should set `security: true` so the banner is labelled as a security update.
@@ -110,3 +112,5 @@ Before presenting multAIplayer as production-ready, release hardening should inc
 - external or shared-store rate limiting for multi-instance relays;
 - private security contact and disclosure process;
 - recurring end-to-end multi-device invite, removal, recovery, malicious-relay substitution, and key-epoch tests.
+- independently reviewed cryptography and a release claim vocabulary that distinguishes tested design intent from audited guarantees;
+- exact toolchain pinning, build provenance, and a deterministic unsigned comparison artifact if bit-for-bit reproducibility becomes a release claim.

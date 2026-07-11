@@ -5,7 +5,6 @@ import { assessCodexCompatibility } from "../lib/codexCompatibility";
 import { resolveCodexRunSettings } from "../lib/codexCatalogResolver";
 import { canApproveCodexTurn } from "../lib/codexApproval";
 import {
-  buildCodexApprovalSnapshot,
   buildCodexTurnInput,
   buildCodexTurnSummary,
   detectCodexTurnRiskFlags,
@@ -21,132 +20,75 @@ import { canUseLocalWorkspace } from "../lib/workspaceAccess";
 import { useAppStore } from "../store/appStore";
 import type { PendingCodexApproval } from "../types";
 import type { UseCodexTurnActionsOptions } from "./codexTurnActionTypes";
-import { isExpiredCodexInvocation, refreshApprovalMessagesFromRoom } from "./codexTurnQueue";
+import { promoteNextCodexApproval } from "./codexApprovalPromotion";
+import { refreshApprovalMessagesFromRoom } from "./codexTurnQueue";
 import { handleCodexUsageLimit as executeCodexUsageLimit } from "./codexUsageLimit";
 
 export function useCodexTurnActions({
-  selectedRoom,
-  codexProbe,
-  activeCodexApproval,
-  roomsRef,
-  selectedRoomIdRef,
-  forgottenRoomIds,
-  revokedRoomIds,
-  revokedTeamIds,
   localUser,
-  messagesByRoom,
-  terminals,
-  browserRequestsByRoom,
-  gitStatusByRoom,
-  codexContinuationByRoom,
-  codexThreadIdsByRoom,
-  queuedCodexApprovalsByRoom,
-  setHostMessageForRoom,
-  setPendingCodexApprovalForRoom,
-  setApprovalVisibleForRoom,
-  removeQueuedCodexApprovalForRoom,
-  setCodexRunningForRoom,
-  appendTerminalLinesForRoom,
+  maxTerminalActivityLines,
   replaceRoom,
   publishCodexEvent,
   publishChatMessage,
   publishHostHandoff
 }: UseCodexTurnActionsOptions) {
-  const setCodexThreadIdForRoom = useAppStore((state) => state.setCodexThreadIdForRoom);
-  const setCodexContinuationForRoom = useAppStore((state) => state.setCodexContinuationForRoom);
-  const setRoomGoalForRoom = useAppStore((state) => state.setRoomGoalForRoom);
   const codexUsageLimitContext = {
     localUserId: localUser.id,
-    selectedRoomId: () => selectedRoomIdRef.current,
+    selectedRoomId: () => useAppStore.getState().selectedRoomId,
     publishCodexEvent,
-    appendTerminalLines: appendTerminalLinesForRoom,
+    appendTerminalLines: (roomId: string, lines: string[]) =>
+      useAppStore.getState().appendTerminalLinesForRoom(roomId, lines, maxTerminalActivityLines),
     publishChatMessage,
     replaceRoom,
     publishHostHandoff,
-    setHostMessage: setHostMessageForRoom
+    setHostMessage: (roomId: string, message: string | null) =>
+      useAppStore.getState().setHostMessageForRoom(roomId, message)
   };
 
   function promoteNextCodexApprovalForRoom(roomId: string) {
-    const nextTurn = queuedCodexApprovalsByRoom[roomId]?.[0];
-    if (!nextTurn) return;
-    if (isExpiredCodexInvocation(nextTurn.queuedAt)) {
-      removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
-      setHostMessageForRoom(
-        roomId,
-        `Dropped ${nextTurn.requestedBy}'s Codex proposal because host approval timed out.`
-      );
-      promoteNextCodexApprovalForRoom(roomId);
-      return;
-    }
-    const room = roomsRef.current.find((item) => item.id === roomId);
-    if (!room) {
-      removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
-      return;
-    }
-    const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
-    const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
-    if (roomLocked || room.approvalPolicy === "never_host") {
-      removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
-      const cancellationMessage = roomLocked
-        ? roomLockMessage(room, roomRevoked)
-        : "Queued Codex turn was cancelled because Codex is unavailable in this room.";
-      void publishChatMessage(
-        {
-          id: crypto.randomUUID(),
-          author: "multAIplayer",
-          role: "system",
-          body: cancellationMessage,
-          time: formatMessageTime(),
-          createdAt: new Date().toISOString()
-        },
-        room
-      );
-      setHostMessageForRoom(roomId, cancellationMessage);
-      return;
-    }
-    const roomCanReadLocalWorkspace = canUseLocalWorkspace(room, localUser, roomLocked);
-    const approvalSnapshot = buildCodexApprovalSnapshot(
-      room,
-      messagesByRoom[roomId] ?? [],
-      undefined,
-      terminals.filter((terminal) => terminal.roomId === roomId),
-      browserRequestsByRoom[roomId] ?? [],
-      gitStatusByRoom[roomId] ?? null,
-      { includeWorkspaceContext: roomCanReadLocalWorkspace }
-    );
-    if (!hasActionableCodexTurnContext(approvalSnapshot.summary)) {
-      removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
-      void publishChatMessage(
-        {
-          id: crypto.randomUUID(),
-          author: "multAIplayer",
-          role: "system",
-          body: `Dropped ${nextTurn.requestedBy}'s queued Codex turn because there is no new room context to send.`,
-          time: formatMessageTime(),
-          createdAt: new Date().toISOString()
-        },
-        room
-      );
-      setHostMessageForRoom(roomId, "Dropped an empty queued Codex turn.");
-      promoteNextCodexApprovalForRoom(roomId);
-      return;
-    }
-    const approval = {
-      ...approvalSnapshot,
-      turnId: nextTurn.turnId,
-      requestedBy: nextTurn.requestedBy,
-      requestedByUserId: nextTurn.requestedByUserId,
-      queuedAt: nextTurn.queuedAt
-    };
-    removeQueuedCodexApprovalForRoom(roomId, nextTurn.turnId);
-    setPendingCodexApprovalForRoom(roomId, approval);
-    setApprovalVisibleForRoom(roomId, true);
-    setHostMessageForRoom(roomId, "Queued Codex turn is ready for host approval with current room context.");
+    promoteNextCodexApproval({
+      roomId,
+      localUser,
+      publishChatMessage,
+      promoteNext: promoteNextCodexApprovalForRoom
+    });
   }
 
-  async function approveCodexTurn(approval: PendingCodexApproval | null = activeCodexApproval) {
-    const roomId = approval?.roomId ?? selectedRoom.id;
-    const room = roomsRef.current.find((item) => item.id === roomId);
+  async function approveCodexTurn(approval: PendingCodexApproval | null = null) {
+    const state = useAppStore.getState();
+    const selectedRoom = state.rooms.find((item) => item.id === state.selectedRoomId);
+    const activeCodexApproval = selectedRoom
+      ? (state.codexRuntimeByRoom[selectedRoom.id]?.pendingApproval ?? null)
+      : null;
+    approval ??= activeCodexApproval;
+    const roomId = approval?.roomId ?? selectedRoom?.id ?? state.selectedRoomId;
+    const room = state.rooms.find((item) => item.id === roomId);
+    const {
+      codexProbe,
+      forgottenRoomIds,
+      revokedRoomIds,
+      revokedTeamIds,
+      messagesByRoom,
+      terminals,
+      setHostMessageForRoom,
+      setPendingCodexApprovalForRoom,
+      setApprovalVisibleForRoom,
+      removeQueuedCodexApprovalForRoom,
+      setCodexRunningForRoom,
+      appendTerminalLinesForRoom,
+      setCodexThreadIdForRoom,
+      setCodexContinuationForRoom,
+      setRoomGoalForRoom
+    } = state;
+    const browserRequestsByRoom = { [roomId]: state.browserByRoom[roomId]?.requests ?? [] };
+    const gitStatusByRoom = { [roomId]: state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.status ?? null };
+    const codexContinuationByRoom = { [roomId]: state.codexRuntimeByRoom[roomId]?.continuation ?? null };
+    const codexThreadIdsByRoom = {
+      [roomId]:
+        state.codexRuntimeByRoom[roomId]?.threadGraph?.activeThreadId ??
+        state.codexRuntimeByRoom[roomId]?.threadId ??
+        ""
+    };
     if (!room) {
       setHostMessageForRoom(roomId, "This Codex approval belongs to a room that is no longer available.");
       setPendingCodexApprovalForRoom(roomId, null);
@@ -212,11 +154,15 @@ export function useCodexTurnActions({
       removeQueuedCodexApprovalForRoom(roomId, approval.turnId);
     }
     setCodexRunningForRoom(roomId, true);
-    appendTerminalLinesForRoom(roomId, [
-      "$ codex app-server",
-      `Starting approved Codex turn with ${formatCodexModel(model)} from encrypted room context...`,
-      ...resolvedSettings.warnings.map((warning) => `Catalog fallback: ${warning}`)
-    ]);
+    appendTerminalLinesForRoom(
+      roomId,
+      [
+        "$ codex app-server",
+        `Starting approved Codex turn with ${formatCodexModel(model)} from encrypted room context...`,
+        ...resolvedSettings.warnings.map((warning) => `Catalog fallback: ${warning}`)
+      ],
+      maxTerminalActivityLines
+    );
 
     const turnId = approval?.turnId ?? crypto.randomUUID();
     const continuationHandoff = codexContinuationByRoom[roomId] ?? null;
@@ -258,7 +204,12 @@ export function useCodexTurnActions({
         speed,
         resolvedSettings.serviceTier,
         sandboxLevel,
-        previousThreadId
+        previousThreadId,
+        180,
+        {
+          proposedBy: approval?.requestedBy ?? localUser.name,
+          contextSummary: `${turnSummary.messagesSinceLastCodex} room message(s); ${turnSummary.attachments.length} attachment(s); ${turnSummary.browserAccess.length} approved browser origin(s); ${turnSummary.terminals.length} terminal label(s); ${turnSummary.git?.totalFiles ?? 0} Git change(s)`
+        }
       );
       if (classifyCodexFailure([result.status, result.stderr, result.transcript, ...result.events]) === "usage_limit") {
         await executeCodexUsageLimit(
@@ -323,12 +274,16 @@ export function useCodexTurnActions({
         },
         room
       );
-      appendTerminalLinesForRoom(roomId, [
-        `Codex status: ${result.status}`,
-        `Codex thread: ${result.threadId ?? "unknown"}`,
-        ...result.events.slice(-8).map((event) => `event: ${event}`),
-        ...(result.stderr ? [`stderr: ${result.stderr}`] : [])
-      ]);
+      appendTerminalLinesForRoom(
+        roomId,
+        [
+          `Codex status: ${result.status}`,
+          `Codex thread: ${result.threadId ?? "unknown"}`,
+          ...result.events.slice(-8).map((event) => `event: ${event}`),
+          ...(result.stderr ? [`stderr: ${result.stderr}`] : [])
+        ],
+        maxTerminalActivityLines
+      );
     } catch (error) {
       if (classifyCodexFailure([String(error)]) === "usage_limit") {
         await executeCodexUsageLimit(
@@ -362,7 +317,7 @@ export function useCodexTurnActions({
         },
         room
       );
-      appendTerminalLinesForRoom(roomId, [`Codex error: ${String(error)}`]);
+      appendTerminalLinesForRoom(roomId, [`Codex error: ${String(error)}`], maxTerminalActivityLines);
     } finally {
       if (continuationHandoff) {
         setCodexContinuationForRoom(roomId, null);

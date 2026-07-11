@@ -9,6 +9,7 @@ use tauri_plugin_dialog::{
 };
 use uuid::Uuid;
 
+use crate::command_safety::blocked_command_reason;
 use crate::validation::{
     ensure_room_id, ensure_terminal_command, ensure_terminal_id, ensure_terminal_input,
 };
@@ -246,6 +247,11 @@ pub(crate) async fn authorize_shell_execution(
     request: ShellAuthorizationRequest,
 ) -> Result<String, String> {
     validate_authorization_request(&request)?;
+    if request.kind == ShellExecutionKind::RemoteRequest {
+        if let Some(reason) = blocked_command_reason(&request.command) {
+            return Err(reason.to_string());
+        }
+    }
     let canonical_cwd = canonical_workspace(&request.cwd)?;
     let request_for_issue = ShellAuthorizationRequest {
         cwd: canonical_cwd.clone(),
