@@ -13,6 +13,7 @@ mod codex_turn_lifecycle;
 mod command_safety;
 mod diagnostics;
 mod git;
+mod host_sandbox;
 mod keychain;
 mod local_preview;
 mod output;

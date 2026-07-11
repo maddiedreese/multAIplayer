@@ -12,3 +12,5 @@ apps/desktop/src-tauri/target/
 playwright-report/
 test-results/
 coverage/
+**/.stryker-tmp/
+**/reports/mutation/

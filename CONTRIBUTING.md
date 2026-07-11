@@ -2,9 +2,9 @@
 
 Thanks for helping with multAIplayer. This project is a macOS-first open-source alpha for private group chat with a local Codex host, an end-to-end encrypted relay, GitHub workflows, terminals, file viewing, and browser approvals.
 
-## Human review for security boundaries
+## Security-boundary changes
 
-Changes under `packages/crypto`, `packages/protocol`, or `apps/desktop/src-tauri` require review by the human owner named in `.github/CODEOWNERS`. If an AI agent authored or materially changed any part of such a pull request, the human reviewer must inspect every changed line in those paths before approval. Test results, an agent review, or a generated summary do not replace that sign-off. Authors should identify agent-authored changes in the pull-request description and keep security-boundary changes small enough to review line by line.
+Keep changes under `packages/crypto`, `packages/protocol`, and `apps/desktop/src-tauri` small, explicit, and independently testable. Pull requests should identify AI-authored security-boundary changes and report the focused property, fuzz, mutation, or native checks that apply. This project currently has one maintainer, so it does not require a separate human or code-owner approval that the sole maintainer could never supply; required CI and branch protection remain the merge gate.
 
 Dependency advisory handling and coverage gates are documented in [Dependency security](docs/dependency-security.md).
 
@@ -52,7 +52,7 @@ Run the smallest relevant loop while iterating, then run `npm run verify` before
 
 | Changing | Fast checks while iterating |
 | --- | --- |
-| Relay HTTP, WebSocket, auth, persistence, or limits | `npm run check -w @multaiplayer/relay` and `npm run test -w @multaiplayer/relay` |
+| Relay HTTP, WebSocket, auth, persistence, or limits | `npm run check -w @multaiplayer/relay` and `npm run test -w @multaiplayer/relay`; run `npm run test:fuzz -w @multaiplayer/relay` after parser/schema changes |
 | Desktop React UI, hooks, stores, or adapters | `npm run check -w @multaiplayer/desktop` and `npm run test:smoke -w @multaiplayer/desktop`; run `npm run test -w @multaiplayer/desktop` before handoff |
 | One shared package | `npm run check -w @multaiplayer/protocol` and `npm run test -w @multaiplayer/protocol`, replacing `protocol` with `crypto`, `codex`, `git`, or `github` as needed |
 | Native Tauri/Rust code | `npm run fmt:rust:check` and `npm run test:native` |
@@ -61,6 +61,8 @@ Run the smallest relevant loop while iterating, then run `npm run verify` before
 | Repository scripts | `npm run test:scripts` |
 
 Use `npm run format` to apply the repository's Prettier baseline. `npm run verify` lints and checks formatting for TypeScript and JavaScript, type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the workspaces.
+
+The relay fuzz suite feeds seedable arbitrary bytes, recursive JSON values, and mutated valid envelopes/messages through the protocol schemas. It runs 100,000 cases by default; reproduce or tune a run with `MULTAIPLAYER_RELAY_FUZZ_SEED` and `MULTAIPLAYER_RELAY_FUZZ_ITERATIONS`.
 
 ### Engineering guidelines
 

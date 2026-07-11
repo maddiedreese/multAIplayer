@@ -58,3 +58,11 @@ Never paste:
 - decrypted room payloads from real teams;
 - real terminal output containing credentials;
 - private repository files.
+
+### Host command containment
+
+Native room commands and interactive terminals are launched through the operating system sandbox with the selected project as their only writable filesystem subtree. The native host fails closed on platforms where that confinement backend is unavailable. This is an enforcement boundary in addition to room and native approval policy, not a replacement for approvals.
+
+Before command or PTY output can be returned to the webview and encrypted into a room event, the native host redacts known GitHub/OpenAI token forms, secret-bearing environment assignments, and PEM private keys. Pattern redaction reduces accidental disclosure; it cannot recognize every possible secret encoding.
+
+Commands that appear to read `.env`, SSH/package-manager credentials, credential stores, or secret files use a separate high-risk native confirmation. They cannot use the ten-minute exact-command grant and must be approved once with an explicit credential-access warning.

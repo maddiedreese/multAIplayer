@@ -631,6 +631,116 @@ fn terminal_output_buffer_keeps_latest_lines() {
     );
 }
 
+#[test]
+fn terminal_secret_redaction_covers_tokens_env_and_private_keys() {
+    let raw = "ghp_abcdefghijklmnopqrstuvwxyz\nOPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwxyz\n-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----";
+    let redacted = redact_known_secrets(raw);
+    assert!(!redacted.contains("ghp_"));
+    assert!(!redacted.contains("sk-"));
+    assert!(!redacted.contains("abc"));
+    assert!(redacted.contains("[REDACTED BY MULTAIPLAYER]"));
+}
+
+#[test]
+fn credential_file_commands_are_a_distinct_approval_class() {
+    assert!(requests_credential_access("cat .env"));
+    assert!(requests_credential_access("rg token ~/.aws/credentials"));
+    assert!(requests_credential_access("cp .env /tmp/copy"));
+    assert!(requests_credential_access(
+        "python -c 'print(open(\".env\").read())'"
+    ));
+    assert!(!requests_credential_access("npm test"));
+    assert!(!requests_credential_access("touch .env.example"));
+}
+
+#[test]
+fn terminal_redaction_carries_partial_lines_across_pty_reads() {
+    let mut redactor = TerminalStreamRedactor::default();
+    assert!(redactor.push("token=ghp_abcdefghij", false).is_empty());
+    let output = redactor.push("klmnopqrstuvwxyz\n", false);
+    assert_eq!(output.len(), 1);
+    assert!(!output[0].contains("ghp_"));
+    assert!(output[0].contains("[REDACTED BY MULTAIPLAYER]"));
+}
+
+#[test]
+fn terminal_redaction_suppresses_split_multiline_private_keys() {
+    let mut redactor = TerminalStreamRedactor::default();
+    assert!(redactor.push("before\n-----BEGIN OPENSSH PRI", false)[0].contains("before"));
+    let mut output = redactor.push(
+        "VATE KEY-----\nsuper-secret-body\n-----END OPENSSH PRIVATE",
+        false,
+    );
+    output.extend(redactor.push(" KEY-----\nafter\n", true));
+    let joined = output.join("");
+    assert!(joined.contains("[REDACTED BY MULTAIPLAYER]"));
+    assert!(joined.contains("after"));
+    assert!(!joined.contains("super-secret-body"));
+    assert!(!joined.contains("BEGIN OPENSSH"));
+    assert!(!joined.contains("END OPENSSH"));
+}
+
+#[test]
+fn terminal_redaction_bounds_newline_free_output_and_flushes_safely() {
+    let mut redactor = TerminalStreamRedactor::default();
+    let output = redactor.push(&"x".repeat(20_000), false);
+    assert_eq!(output, vec!["[REDACTED BY MULTAIPLAYER]\n"]);
+    assert!(redactor.pending_bytes() <= 8 * 1024);
+    assert!(redactor.push("continued-secret", false).is_empty());
+    let resumed = redactor.push("\nsafe\n", true).join("");
+    assert_eq!(resumed, "safe\n");
+    assert_eq!(redactor.pending_bytes(), 0);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn host_sandbox_allows_project_work_and_blocks_outside_project_files() {
+    let workspace = test_temp_dir("sandbox-workspace");
+    let outside = test_temp_dir("sandbox-outside");
+    write(outside.join("secret.txt"), "outside").expect("write outside fixture");
+    let canonical_workspace = fs::canonicalize(&workspace).expect("canonical workspace");
+    let canonical_outside = fs::canonicalize(&outside).expect("canonical outside");
+    let workspace_path = canonical_workspace.to_str().expect("utf8 workspace");
+    let outside_path = canonical_outside.to_str().expect("utf8 outside");
+
+    let inside = crate::host_sandbox::sandboxed_shell_command(
+        "/bin/zsh",
+        workspace_path,
+        "printf inside > result.txt && /usr/bin/wc -c result.txt",
+    )
+    .expect("sandbox command")
+    .output()
+    .expect("run inside command");
+    assert!(
+        inside.status.success(),
+        "inside command failed: {}",
+        String::from_utf8_lossy(&inside.stderr)
+    );
+    assert_eq!(
+        fs::read_to_string(workspace.join("result.txt")).unwrap(),
+        "inside"
+    );
+
+    let escape = crate::host_sandbox::sandboxed_shell_command(
+        "/bin/zsh",
+        workspace_path,
+        &format!("cat '{outside_path}/secret.txt'; printf escaped > '{outside_path}/written.txt'"),
+    )
+    .expect("sandbox escape command")
+    .output()
+    .expect("run escape command");
+    assert!(!escape.status.success());
+    assert!(!String::from_utf8_lossy(&escape.stdout).contains("outside"));
+    assert!(!outside.join("written.txt").exists());
+
+    let profile = crate::host_sandbox::macos_profile(workspace_path);
+    assert!(profile.contains("/opt/homebrew"));
+    assert!(profile.contains("/Library/Developer"));
+    assert!(!profile.contains(&std::env::var("HOME").unwrap_or_default()));
+    let _ = fs::remove_dir_all(workspace);
+    let _ = fs::remove_dir_all(outside);
+}
+
 fn test_temp_dir(name: &str) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)

@@ -38,6 +38,12 @@ jobs:
       - name: Measure package and security-critical relay coverage
         run: npm run test:coverage
 
+      - name: Fuzz relay message and envelope parsing
+        run: npm run test:fuzz -w @multaiplayer/relay
+
+      - name: Mutation-test cryptographic authorization logic
+        run: npm run test:mutation -w @multaiplayer/crypto
+
       - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
