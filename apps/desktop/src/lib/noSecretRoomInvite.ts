@@ -12,7 +12,7 @@ export function encodeNoSecretRoomInvite(invite: NoSecretRoomInvite): string {
 export function decodeNoSecretRoomInvite(value: string): NoSecretRoomInvite {
   const decoded = JSON.parse(new TextDecoder().decode(base64UrlToBytes(value))) as Partial<NoSecretRoomInvite>;
   if (
-    decoded.version !== 2 ||
+    decoded.version !== 3 ||
     typeof decoded.teamId !== "string" ||
     typeof decoded.roomId !== "string" ||
     typeof decoded.roomName !== "string" ||

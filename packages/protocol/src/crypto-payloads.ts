@@ -22,24 +22,34 @@ export const DevicePublicKeyJwk = z
 /** Full SHA-256 device-key fingerprint: sixteen colon-delimited 16-bit groups. */
 export const PublicKeyFingerprint = z.string().regex(/^sha256:[a-f0-9]{4}(?::[a-f0-9]{4}){15}$/);
 
-export const CiphertextPayload = z.object({
-  version: z.literal(2),
+const CiphertextPayloadFields = {
   algorithm: z.literal("AES-GCM-256"),
   nonce: z.string().min(1).max(maxCiphertextNonceChars),
   ciphertext: z.string().min(1).max(maxCiphertextPayloadChars)
-});
+};
+export const CiphertextPayload = z.discriminatedUnion("version", [
+  z.object({ version: z.literal(2), ...CiphertextPayloadFields }),
+  z.object({ version: z.literal(3), ...CiphertextPayloadFields })
+]);
 
-export const DeviceSealedPayload = z.object({
+const DeviceSealedPayloadFields = {
   algorithm: z.literal("ECDH-P256-HKDF-SHA256-AES-GCM-256"),
   ephemeralPublicKeyJwk: DevicePublicKeyJwk,
   nonce: z.string().min(1).max(maxCiphertextNonceChars),
   ciphertext: z.string().min(1).max(maxWrappedCiphertextChars)
-});
+};
+export const DeviceSealedPayload = z.union([
+  z.object({ version: z.literal(3), ...DeviceSealedPayloadFields }),
+  z
+    .object(DeviceSealedPayloadFields)
+    .passthrough()
+    .refine((payload) => !("version" in payload), { message: "Legacy device-sealed payload must be unversioned" })
+]);
 
 export const EncryptedPayload = z.union([CiphertextPayload, DeviceSealedPayload]);
 
 export const WrappedRoomSecretPayload = z.object({
-  version: z.literal(1),
+  version: z.union([z.literal(1), z.literal(2)]),
   algorithm: z.literal("ECDH-P256-HKDF-SHA256-AES-GCM-256"),
   ephemeralPublicKeyJwk: DevicePublicKeyJwk,
   nonce: z.string().min(1).max(maxCiphertextNonceChars),
@@ -47,7 +57,7 @@ export const WrappedRoomSecretPayload = z.object({
 });
 
 export const AuthenticatedWrappedRoomSecretPayload = z.object({
-  version: z.literal(2),
+  version: z.union([z.literal(2), z.literal(3)]),
   algorithm: z.literal("ECDH-P256-HKDF-SHA256-AES-GCM-256"),
   senderPublicKeyJwk: DevicePublicKeyJwk,
   nonce: z.string().min(1).max(maxCiphertextNonceChars),

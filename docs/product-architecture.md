@@ -109,7 +109,7 @@ Users chat normally in a room. Messages, replies, reactions, edits, deletes, att
 
 People can edit or delete their own pre-Codex messages while those messages are still mutable. When a Codex turn starts, the desktop records the consumed room message ids in the encrypted turn event; those messages stop showing edit/delete actions because they may already be part of Codex context. Queued Codex turns that have not started yet continue to refresh against the current room text.
 
-Invite approval requests are capability-authenticated, device-sealed room events. An invite carries no room key; it binds a 256-bit capability and current epoch to the active host's exact identity, device key, and full fingerprint. The host verifies the authenticated requester identity, recomputed key fingerprint, capability MAC, epoch, and pinned key before approval. The response is bound to the same nonce and identities and delivers the epoch key through an authenticated host-to-device wrap.
+Invite approval requests are capability-authenticated, device-sealed room events. An invite carries no room key; it binds an independently CSPRNG-generated 256-bit bearer capability and current epoch to the active host's exact identity, device key, and full fingerprint. The capability is unrelated to room secrets. The raw value exists transiently in the generated URL fragment, endpoint UI/clipboard or private sharing channel, and requester process memory; it crosses the relay only inside host-key-sealed ciphertext and is persisted by the issuer only as a verifier. The host verifies the authenticated requester identity, recomputed key fingerprint, capability MAC, epoch, and pinned key before approval. The response is bound to the same nonce and identities and delivers the epoch key through an authenticated host-to-device wrap.
 
 Active hosts rotate room keys by advancing an explicit epoch and authenticating a separate delivery to every eligible registered device. The new key is never broadcast under the previous room key. Member removal revokes relay access, invalidates outstanding invites, and excludes removed devices from the next epoch; already-delivered content and older epoch keys cannot be erased.
 
@@ -287,9 +287,10 @@ E2EE model:
 - each room has a symmetric room key;
 - messages and attachments are encrypted locally before upload;
 - the crypto package seals invite workflow payloads and authenticates room-key delivery from the pinned host key to each registered device without exposing the room key to the relay;
-- invite links carry a 256-bit capability, epoch, and exact host public binding, never a room secret;
+- invite links carry an independent private 256-bit bearer capability, epoch, and exact host public binding, never a room secret; raw capabilities remain outside relay-visible metadata;
 - active hosts rotate room keys by advancing the epoch and delivering the next key independently to eligible devices;
-- AES-GCM additional data authenticates canonical envelope id, team, room, sender, timestamp, event kind, and key epoch;
+- MAC and AES-GCM additional-data records use explicit domain/version separation and deterministic canonical field encoding; normalized P-256 keys are compared structurally;
+- AES-GCM additional data authenticates envelope id, team, room, sender, timestamp, event kind, and key epoch;
 - room keys and the device ECDH identity are stored in macOS Keychain in the native app; the web preview keeps room keys in process memory and uses localStorage only for its development device identity;
 - encrypted local history is stored on device;
 - losing a device/key may make old local history unrecoverable until recovery is designed.
@@ -544,7 +545,7 @@ docs/
 
 ## 10. Alpha Scope And Limits
 
-- E2EE uses epoch-scoped symmetric room keys, authenticated envelope metadata, AES-GCM local history, P-256 device agreement, capability-authenticated invites, and authenticated per-device room-secret delivery.
+- E2EE uses epoch-scoped symmetric room keys, versioned deterministic authenticated metadata, AES-GCM local history, P-256 device agreement with structural key equality, confidential independently random capability invites, and authenticated per-device room-secret delivery.
 - Desktop coding surfaces use Monaco Editor for file editing, xterm.js with a Rust PTY layer for terminals, and Tauri/Wry WebViews for room browser tabs.
 - Invite links carry a random capability and exact host public binding, never the room key; authenticated approval delivers the current epoch key only to the validated requester device.
 - Member removal is relay-enforced for future reads and live sockets and cryptographically enforced for future room epochs through authenticated per-device delivery.

@@ -25,7 +25,7 @@ export interface DeviceKeyAgreementIdentity {
 }
 
 export interface WrappedRoomSecret {
-  version: 1;
+  version: 1 | 2;
   algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256";
   ephemeralPublicKeyJwk: DevicePublicKeyJwkType;
   nonce: string;
@@ -65,7 +65,7 @@ export async function wrapRoomSecretAuthenticatedForDevice(
     encoder.encode(JSON.stringify(secret))
   );
   return {
-    version: 2,
+    version: 3,
     algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
     senderPublicKeyJwk: jsonWebKeyToDevicePublicKeyJwk(senderIdentity.publicKeyJwk),
     nonce: bytesToBase64(nonce),
@@ -81,17 +81,21 @@ export async function unwrapRoomSecretAuthenticatedFromDevice(
 ): Promise<RoomSecret> {
   const actualSender = jsonWebKeyToDevicePublicKeyJwk(payload.senderPublicKeyJwk);
   const expectedSender = jsonWebKeyToDevicePublicKeyJwk(expectedSenderPublicKeyJwk);
-  if (canonicalPublicKey(actualSender) !== canonicalPublicKey(expectedSender)) {
+  if (!sameDevicePublicKey(actualSender, expectedSender)) {
     throw new Error("Authenticated room-secret sender key does not match the pinned host key");
   }
   const recipientPrivateKey = await importEcdhPrivateKey(recipientPrivateKeyJwk);
   const senderPublicKey = await importEcdhPublicKey(actualSender);
-  const aad = authenticatedWrapAdditionalData(context);
+  const canonical = payload.version === 3;
+  const aad = canonical
+    ? authenticatedWrapAdditionalData(context)
+    : legacyCryptoContextAdditionalData("multaiplayer:authenticated-room-secret-wrap:v2", context);
   const wrappingKey = await deriveAuthenticatedWrappingKey(recipientPrivateKey, senderPublicKey, aad);
-  const plaintext = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: toArrayBuffer(base64ToBytes(payload.nonce)), additionalData: toArrayBuffer(aad) },
+  const plaintext = await decryptWithAdditionalData(
     wrappingKey,
-    toArrayBuffer(base64ToBytes(payload.ciphertext))
+    base64ToBytes(payload.nonce),
+    base64ToBytes(payload.ciphertext),
+    aad
   );
   const secret = JSON.parse(decoder.decode(plaintext)) as RoomSecret;
   validateRoomSecret(secret);
@@ -144,20 +148,90 @@ export interface InviteCapabilityResponseBinding extends Omit<InviteCapabilityRe
 
 export type InviteCapabilityBinding = InviteCapabilityRequestBinding | InviteCapabilityResponseBinding;
 
+type CanonicalAuthenticatedValue = string | number | boolean | null;
+
+/**
+ * Deterministic canonical JSON subset for MAC and AEAD authentication data.
+ *
+ * The encoding is explicitly domain- and version-separated, sorts ASCII field names,
+ * and accepts only scalar values. This intentionally avoids
+ * JavaScript object insertion order and can be reproduced without a JS runtime.
+ */
+export function canonicalAuthenticatedRecord(
+  domain: string,
+  version: number,
+  fields: Readonly<Record<string, CanonicalAuthenticatedValue>>
+): Uint8Array {
+  if (!/^[a-z0-9][a-z0-9:._-]*$/.test(domain) || !Number.isSafeInteger(version) || version < 1) {
+    throw new Error("Canonical authenticated records require a domain and positive integer version");
+  }
+  const normalized: Record<string, CanonicalAuthenticatedValue> = { domain, version };
+  for (const name of Object.keys(fields).sort()) {
+    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name)) throw new Error(`Invalid canonical authenticated field name: ${name}`);
+    if (name === "domain" || name === "version") throw new Error(`Reserved canonical authenticated field: ${name}`);
+    const value = fields[name];
+    if (value !== null && typeof value !== "string" && typeof value !== "boolean" && typeof value !== "number") {
+      throw new Error(`Unsupported canonical authenticated field: ${name}`);
+    }
+    if (typeof value === "number" && !Number.isSafeInteger(value)) {
+      throw new Error(`Unsupported canonical authenticated field: ${name}`);
+    }
+    if (typeof value === "string" && /[\uD800-\uDFFF]/u.test(value.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/gu, ""))) {
+      throw new Error(`Canonical authenticated strings must be valid Unicode: ${name}`);
+    }
+    normalized[name] = value;
+  }
+  const ordered = Object.keys(normalized)
+    .sort()
+    .map((name) => `${JSON.stringify(name)}:${JSON.stringify(normalized[name])}`);
+  return encoder.encode(`{${ordered.join(",")}}`);
+}
+
+function inviteCapabilityBindingData(binding: InviteCapabilityBinding): Uint8Array {
+  const common = {
+    phase: binding.phase,
+    inviteId: binding.inviteId,
+    teamId: binding.teamId,
+    roomId: binding.roomId,
+    keyEpoch: binding.keyEpoch,
+    requestId: binding.requestId,
+    requestNonce: binding.requestNonce,
+    requesterUserId: binding.requesterUserId,
+    requesterDeviceId: binding.requesterDeviceId,
+    requesterPublicKeyFingerprint: binding.requesterPublicKeyFingerprint,
+    hostUserId: binding.hostUserId,
+    hostDeviceId: binding.hostDeviceId,
+    hostPublicKeyFingerprint: binding.hostPublicKeyFingerprint
+  };
+  return canonicalAuthenticatedRecord(
+    "multaiplayer:invite-capability-mac",
+    1,
+    binding.phase === "response" ? { ...common, status: binding.status, decidedAt: binding.decidedAt } : common
+  );
+}
+
 export function createInviteCapability(): string {
   return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+export function parseInviteCapability(capability: string): Uint8Array {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(capability)) throw new Error("Invite capability must use canonical base64url");
+  const raw = base64UrlToBytes(capability);
+  if (raw.byteLength !== 32 || bytesToBase64Url(raw) !== capability) {
+    throw new Error("Invite capability must be canonical 256-bit base64url");
+  }
+  return raw;
 }
 
 export async function computeInviteCapabilityMac(
   capability: string,
   binding: InviteCapabilityBinding
 ): Promise<string> {
-  const raw = base64UrlToBytes(capability);
-  if (raw.byteLength !== 32) throw new Error("Invite capability must be 256 bits");
+  const raw = parseInviteCapability(capability);
   const key = await crypto.subtle.importKey("raw", toArrayBuffer(raw), { name: "HMAC", hash: "SHA-256" }, false, [
     "sign"
   ]);
-  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(JSON.stringify(binding)));
+  const signature = await crypto.subtle.sign("HMAC", key, toArrayBuffer(inviteCapabilityBindingData(binding)));
   return bytesToBase64Url(new Uint8Array(signature));
 }
 
@@ -167,13 +241,18 @@ export async function verifyInviteCapabilityMac(
   mac: string
 ): Promise<boolean> {
   try {
-    const raw = base64UrlToBytes(capability);
+    const raw = parseInviteCapability(capability);
     const signature = base64UrlToBytes(mac);
     if (raw.byteLength !== 32 || signature.byteLength !== 32) return false;
     const key = await crypto.subtle.importKey("raw", toArrayBuffer(raw), { name: "HMAC", hash: "SHA-256" }, false, [
       "verify"
     ]);
-    return crypto.subtle.verify("HMAC", key, toArrayBuffer(signature), encoder.encode(JSON.stringify(binding)));
+    return crypto.subtle.verify(
+      "HMAC",
+      key,
+      toArrayBuffer(signature),
+      toArrayBuffer(inviteCapabilityBindingData(binding))
+    );
   } catch {
     return false;
   }
@@ -266,7 +345,12 @@ export async function decryptJson<T>(
   secret: RoomSecret,
   metadata: RoomEnvelopeMetadataType
 ): Promise<T> {
-  return decryptJsonWithAdditionalData(payload, secret, roomEnvelopeAdditionalData(metadata));
+  return decryptJsonWithAdditionalData(
+    payload,
+    secret,
+    roomEnvelopeAdditionalData(metadata),
+    legacyRoomEnvelopeAdditionalData(metadata)
+  );
 }
 
 export async function encryptLocalJson(
@@ -282,7 +366,12 @@ export async function decryptLocalJson<T>(
   secret: RoomSecret,
   context: LocalCryptoContext
 ): Promise<T> {
-  return decryptJsonWithAdditionalData(payload, secret, localAdditionalData(context));
+  return decryptJsonWithAdditionalData(
+    payload,
+    secret,
+    localAdditionalData(context),
+    legacyLocalAdditionalData(context)
+  );
 }
 
 export async function encryptAttachmentJson(value: unknown, secret: RoomSecret, context: AttachmentCryptoContext) {
@@ -294,7 +383,12 @@ export async function decryptAttachmentJson<T>(
   secret: RoomSecret,
   context: AttachmentCryptoContext
 ) {
-  return decryptJsonWithAdditionalData<T>(payload, secret, attachmentAdditionalData(context));
+  return decryptJsonWithAdditionalData<T>(
+    payload,
+    secret,
+    attachmentAdditionalData(context),
+    legacyAttachmentAdditionalData(context)
+  );
 }
 
 async function encryptJsonWithAdditionalData(
@@ -310,7 +404,7 @@ async function encryptJsonWithAdditionalData(
     encoder.encode(JSON.stringify(value))
   );
   return {
-    version: 2,
+    version: 3,
     algorithm: "AES-GCM-256",
     nonce: bytesToBase64(nonce),
     ciphertext: bytesToBase64(new Uint8Array(encrypted))
@@ -320,20 +414,39 @@ async function encryptJsonWithAdditionalData(
 async function decryptJsonWithAdditionalData<T>(
   payload: CiphertextPayload,
   secret: RoomSecret,
-  additionalData: Uint8Array
+  additionalData: Uint8Array,
+  legacyAdditionalData?: Uint8Array
 ): Promise<T> {
-  if (payload.version !== 2) throw new Error("Unsupported ciphertext version");
+  if (payload.version !== 2 && payload.version !== 3) throw new Error("Unsupported ciphertext version");
   const key = await importRoomKey(secret);
-  const plaintext = await crypto.subtle.decrypt(
-    {
-      name: "AES-GCM",
-      iv: toArrayBuffer(base64ToBytes(payload.nonce)),
-      additionalData: toArrayBuffer(additionalData)
-    },
+  const plaintext = await decryptWithAdditionalData(
     key,
-    toArrayBuffer(base64ToBytes(payload.ciphertext))
+    base64ToBytes(payload.nonce),
+    base64ToBytes(payload.ciphertext),
+    payload.version === 3 ? additionalData : (legacyAdditionalData ?? additionalData)
   );
   return JSON.parse(decoder.decode(plaintext)) as T;
+}
+
+async function decryptWithAdditionalData(
+  key: CryptoKey,
+  nonce: Uint8Array,
+  ciphertext: Uint8Array,
+  additionalData: Uint8Array,
+  legacyAdditionalData?: Uint8Array
+): Promise<ArrayBuffer> {
+  const decrypt = (aad: Uint8Array) =>
+    crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: toArrayBuffer(nonce), additionalData: toArrayBuffer(aad) },
+      key,
+      toArrayBuffer(ciphertext)
+    );
+  try {
+    return await decrypt(additionalData);
+  } catch (error) {
+    if (!legacyAdditionalData) throw error;
+    return decrypt(legacyAdditionalData);
+  }
 }
 
 export async function sealJsonToDevice(
@@ -362,6 +475,7 @@ export async function sealJsonToDevice(
     encoder.encode(JSON.stringify(value))
   );
   return {
+    version: 3,
     algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
     ephemeralPublicKeyJwk: jsonWebKeyToDevicePublicKeyJwk(
       await crypto.subtle.exportKey("jwk", ephemeralKeyPair.publicKey)
@@ -382,14 +496,14 @@ export async function openDeviceSealedJson<T>(
   const recipientPrivateKey = await importEcdhPrivateKey(recipientPrivateKeyJwk);
   const ephemeralPublicKey = await importEcdhPublicKey(payload.ephemeralPublicKeyJwk);
   const sealingKey = await deriveWrappingKey(recipientPrivateKey, ephemeralPublicKey);
-  const plaintext = await crypto.subtle.decrypt(
-    {
-      name: "AES-GCM",
-      iv: toArrayBuffer(base64ToBytes(payload.nonce)),
-      additionalData: toArrayBuffer(deviceSealAdditionalData(context))
-    },
+  const canonical = "version" in payload && payload.version === 3;
+  const plaintext = await decryptWithAdditionalData(
     sealingKey,
-    toArrayBuffer(base64ToBytes(payload.ciphertext))
+    base64ToBytes(payload.nonce),
+    base64ToBytes(payload.ciphertext),
+    canonical
+      ? deviceSealAdditionalData(context)
+      : legacyCryptoContextAdditionalData("multaiplayer:device-sealed-json:v2", context)
   );
   return JSON.parse(decoder.decode(plaintext)) as T;
 }
@@ -421,7 +535,7 @@ export async function wrapRoomSecretForDevice(
     encoder.encode(JSON.stringify(secret))
   );
   return {
-    version: 1,
+    version: 2,
     algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
     ephemeralPublicKeyJwk: jsonWebKeyToDevicePublicKeyJwk(
       await crypto.subtle.exportKey("jwk", ephemeralKeyPair.publicKey)
@@ -436,20 +550,19 @@ export async function unwrapRoomSecretForDevice(
   recipientPrivateKeyJwk: JsonWebKey,
   context: DeviceCryptoContext
 ): Promise<RoomSecret> {
-  if (payload.version !== 1 || payload.algorithm !== "ECDH-P256-HKDF-SHA256-AES-GCM-256") {
+  if ((payload.version !== 1 && payload.version !== 2) || payload.algorithm !== "ECDH-P256-HKDF-SHA256-AES-GCM-256") {
     throw new Error("Unsupported wrapped room secret");
   }
   const recipientPrivateKey = await importEcdhPrivateKey(recipientPrivateKeyJwk);
   const ephemeralPublicKey = await importEcdhPublicKey(payload.ephemeralPublicKeyJwk);
   const wrappingKey = await deriveWrappingKey(recipientPrivateKey, ephemeralPublicKey);
-  const plaintext = await crypto.subtle.decrypt(
-    {
-      name: "AES-GCM",
-      iv: toArrayBuffer(base64ToBytes(payload.nonce)),
-      additionalData: toArrayBuffer(wrapAdditionalData(context))
-    },
+  const plaintext = await decryptWithAdditionalData(
     wrappingKey,
-    toArrayBuffer(base64ToBytes(payload.ciphertext))
+    base64ToBytes(payload.nonce),
+    base64ToBytes(payload.ciphertext),
+    payload.version === 2
+      ? wrapAdditionalData(context)
+      : legacyCryptoContextAdditionalData("multaiplayer:room-secret-wrap:v2", context)
   );
   const secret = JSON.parse(decoder.decode(plaintext)) as RoomSecret;
   validateRoomSecret(secret);
@@ -561,6 +674,23 @@ function cryptoContextAdditionalData(domain: string, context: DeviceCryptoContex
     context.recipientDeviceId
   ];
   if (values.some((value) => !value)) throw new Error("Device crypto context fields must be non-empty");
+  return canonicalAuthenticatedRecord(domain, 1, {
+    purpose: context.purpose,
+    teamId: context.teamId,
+    roomId: context.roomId,
+    senderUserId: context.senderUserId,
+    senderDeviceId: context.senderDeviceId,
+    recipientDeviceId: context.recipientDeviceId,
+    operationId: context.operationId ?? null,
+    requestId: context.requestId ?? null,
+    requestNonce: context.requestNonce ?? null,
+    keyEpoch: context.keyEpoch ?? null,
+    previousEpoch: context.previousEpoch ?? null,
+    newEpoch: context.newEpoch ?? null
+  });
+}
+
+function legacyCryptoContextAdditionalData(domain: string, context: DeviceCryptoContext): Uint8Array {
   return encoder.encode(
     JSON.stringify({
       domain,
@@ -600,32 +730,43 @@ function authenticatedWrapAdditionalData(context: DeviceCryptoContext): Uint8Arr
   return cryptoContextAdditionalData("multaiplayer:authenticated-room-secret-wrap:v2", context);
 }
 
-function canonicalPublicKey(key: DevicePublicKeyJwkType): string {
-  return JSON.stringify({ kty: key.kty, crv: key.crv, x: key.x, y: key.y });
+export function sameDevicePublicKey(left: JsonWebKey, right: JsonWebKey): boolean {
+  const leftKey = DevicePublicKeyJwk.safeParse(left);
+  const rightKey = DevicePublicKeyJwk.safeParse(right);
+  return (
+    leftKey.success &&
+    rightKey.success &&
+    leftKey.data.kty === rightKey.data.kty &&
+    leftKey.data.crv === rightKey.data.crv &&
+    leftKey.data.x === rightKey.data.x &&
+    leftKey.data.y === rightKey.data.y
+  );
 }
 
 /** Deterministic, versioned AES-GCM AAD. Keep field order stable as part of the wire protocol. */
 export function roomEnvelopeAdditionalData(metadata: RoomEnvelopeMetadataType): Uint8Array {
   const value = RoomEnvelopeMetadata.parse(metadata);
-  return encoder.encode(
-    JSON.stringify({
-      domain: "multaiplayer:room-envelope:v2",
-      id: value.id,
-      teamId: value.teamId,
-      roomId: value.roomId,
-      senderDeviceId: value.senderDeviceId,
-      senderUserId: value.senderUserId,
-      createdAt: value.createdAt,
-      kind: value.kind,
-      keyEpoch: value.keyEpoch
-    })
-  );
+  return canonicalAuthenticatedRecord("multaiplayer:room-envelope:v2", 1, value);
+}
+
+function legacyRoomEnvelopeAdditionalData(metadata: RoomEnvelopeMetadataType): Uint8Array {
+  const value = RoomEnvelopeMetadata.parse(metadata);
+  return encoder.encode(JSON.stringify({ domain: "multaiplayer:room-envelope:v2", ...value }));
 }
 
 function localAdditionalData(context: LocalCryptoContext): Uint8Array {
   if (!context.roomId || !context.savedAt || !Number.isSafeInteger(context.keyEpoch) || context.keyEpoch < 1) {
     throw new Error("Invalid local crypto context");
   }
+  return canonicalAuthenticatedRecord("multaiplayer:local-json:v2", 1, {
+    purpose: context.purpose,
+    roomId: context.roomId,
+    keyEpoch: context.keyEpoch,
+    savedAt: context.savedAt
+  });
+}
+
+function legacyLocalAdditionalData(context: LocalCryptoContext): Uint8Array {
   return encoder.encode(JSON.stringify({ domain: "multaiplayer:local-json:v2", ...context }));
 }
 
@@ -640,6 +781,16 @@ function attachmentAdditionalData(context: AttachmentCryptoContext): Uint8Array 
   ) {
     throw new Error("Invalid attachment crypto context");
   }
+  return canonicalAuthenticatedRecord("multaiplayer:attachment:v2", 1, {
+    teamId: context.teamId,
+    roomId: context.roomId,
+    name: context.name,
+    type: context.type,
+    size: context.size
+  });
+}
+
+function legacyAttachmentAdditionalData(context: AttachmentCryptoContext): Uint8Array {
   return encoder.encode(JSON.stringify({ domain: "multaiplayer:attachment:v2", ...context }));
 }
 
@@ -652,13 +803,9 @@ function jsonWebKeyToDevicePublicKeyJwk(key: JsonWebKey): DevicePublicKeyJwkType
 }
 
 export async function fingerprintPublicKey(publicKeyJwk: JsonWebKey): Promise<string> {
-  const canonical = JSON.stringify({
-    crv: publicKeyJwk.crv,
-    kty: publicKeyJwk.kty,
-    x: publicKeyJwk.x,
-    y: publicKeyJwk.y
-  });
-  const bytes = encoder.encode(canonical);
+  const key = DevicePublicKeyJwk.parse(publicKeyJwk);
+  // Preserve the deployed fingerprint preimage exactly while avoiding object-order semantics.
+  const bytes = encoder.encode(`{"crv":"${key.crv}","kty":"${key.kty}","x":"${key.x}","y":"${key.y}"}`);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return (
     "sha256:" +

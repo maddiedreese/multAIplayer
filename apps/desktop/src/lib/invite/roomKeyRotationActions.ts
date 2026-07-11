@@ -8,6 +8,7 @@ import {
   deriveNextRoomSecret,
   encryptJson,
   fingerprintPublicKey,
+  sameDevicePublicKey,
   wrapRoomSecretAuthenticatedForDevice
 } from "@multaiplayer/crypto";
 import {
@@ -124,11 +125,11 @@ export function createRoomKeyRotationActions(
           device.userId === actor.id &&
           device.deviceId === deviceId &&
           computedFingerprint === hostIdentity.publicKeyFingerprint &&
-          samePublicKey(key, hostIdentity.publicKeyJwk);
+          sameDevicePublicKey(key, hostIdentity.publicKeyJwk);
         const pin = loadPinnedInviteDeviceKey(room.id, device.userId, device.deviceId);
         const pinnedKey = DevicePublicKeyJwk.safeParse(pin?.jwk);
         const capabilityVerified =
-          pin?.fingerprint === computedFingerprint && pinnedKey.success && samePublicKey(key, pinnedKey.data);
+          pin?.fingerprint === computedFingerprint && pinnedKey.success && sameDevicePublicKey(key, pinnedKey.data);
         const manuallyVerified = isDeviceKeyTrusted(
           appStore.trustedDeviceKeys,
           room.id,
@@ -236,8 +237,4 @@ export function createRoomKeyRotationActions(
   }
 
   return { rotateSelectedRoomKey, rotateRoomKeyForDevices };
-}
-
-function samePublicKey(left: JsonWebKey, right: JsonWebKey): boolean {
-  return left.kty === right.kty && left.crv === right.crv && left.x === right.x && left.y === right.y;
 }

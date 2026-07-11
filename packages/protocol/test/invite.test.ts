@@ -573,6 +573,29 @@ test("relay envelope accepts device-sealed invite payloads", () => {
   assert.equal(parsed.payload.algorithm, "ECDH-P256-HKDF-SHA256-AES-GCM-256");
 });
 
+test("device-sealed payload versions distinguish canonical and unversioned legacy formats", () => {
+  const payload = {
+    algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
+    ephemeralPublicKeyJwk: { kty: "EC", crv: "P-256", x: "ephemeral-x", y: "ephemeral-y" },
+    nonce: "nonce",
+    ciphertext: "ciphertext"
+  };
+  const envelope = {
+    id: "envelope-versioned-seal",
+    teamId: "team-1",
+    roomId: "room-1",
+    senderDeviceId: "device_12345678",
+    senderUserId: "github:maddie",
+    createdAt: "2026-07-04T12:02:00.000Z",
+    kind: "room.invite",
+    keyEpoch: 1
+  };
+  assert.equal(RelayEnvelope.safeParse({ ...envelope, payload }).success, true);
+  assert.equal(RelayEnvelope.safeParse({ ...envelope, payload: { ...payload, version: 3 } }).success, true);
+  assert.equal(RelayEnvelope.safeParse({ ...envelope, payload: { ...payload, version: 2 } }).success, false);
+  assert.equal(RelayEnvelope.safeParse({ ...envelope, payload: { ...payload, version: 4 } }).success, false);
+});
+
 test("device-sealed and wrapped room secret payloads reject private keys and oversized ciphertext", () => {
   assert.equal(
     RelayEnvelope.safeParse({

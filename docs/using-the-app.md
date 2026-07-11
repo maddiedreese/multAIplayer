@@ -120,6 +120,8 @@ The Invites panel can copy or import a capability-authenticated invite, approve 
 
 Invite links never include the room key. They contain a 256-bit join capability, the current key epoch, and the active host's exact user, device, public key, and full fingerprint. The join request is capability-authenticated and sealed to the host; approval delivers the epoch key only to the validated requester device using an authenticated host-to-device wrap.
 
+Share the complete invite link privately. Its capability is not a room key, but it is a single-use bearer secret: anyone holding the link can submit a device-bound request for host review. Import scrubs the fragment from browser history. The app validates and pins the requester's full device fingerprint before display; the host should review the requesting identity and device id before approval.
+
 Room-key rotation advances the explicit room epoch and wraps the new key independently to eligible registered devices. Removing a member performs the relay revocation and epoch transition so the removed devices cannot decrypt future events. It cannot erase content already delivered or copied.
 
 ## Local History, Notifications, And Forgetting A Room

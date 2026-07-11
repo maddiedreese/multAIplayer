@@ -3,9 +3,11 @@ import { test } from "node:test";
 import {
   createDeviceKeyAgreementIdentity,
   createInviteCapability,
+  canonicalAuthenticatedRecord,
   computeInviteCapabilityMac,
   createRoomSecret,
   deriveNextRoomSecret,
+  decryptAttachmentJson,
   decryptJson,
   decryptLocalJson,
   encryptJson,
@@ -13,6 +15,7 @@ import {
   fingerprintPublicKey,
   openDeviceSealedJson,
   sealJsonToDevice,
+  sameDevicePublicKey,
   unwrapRoomSecretForDevice,
   validateRoomSecret,
   wrapRoomSecretForDevice,
@@ -58,6 +61,59 @@ test("invite capabilities authenticate every canonical request binding", async (
   assert.equal(await verifyInviteCapabilityMac(capability, binding, mac), true);
   assert.equal(await verifyInviteCapabilityMac(capability, { ...binding, requesterDeviceId: "attacker" }, mac), false);
   assert.equal(await verifyInviteCapabilityMac(createInviteCapability(), binding, mac), false);
+
+  const reordered = Object.fromEntries(Object.entries(binding).reverse()) as typeof binding;
+  assert.equal(await computeInviteCapabilityMac(capability, reordered), mac);
+  assert.equal(await verifyInviteCapabilityMac(capability, reordered, mac), true);
+});
+
+test("invite capabilities are independent fresh 256-bit bearer secrets", async () => {
+  const beforeRoomSecret = createInviteCapability();
+  await createRoomSecret();
+  const afterRoomSecret = createInviteCapability();
+  const generated = new Set([beforeRoomSecret, afterRoomSecret]);
+  for (let index = 0; index < 64; index += 1) generated.add(createInviteCapability());
+  assert.equal(generated.size, 66);
+  for (const capability of generated) assert.match(capability, /^[A-Za-z0-9_-]{43}$/);
+});
+
+test("authenticated records are versioned, domain-separated, and property-order independent", () => {
+  const first = canonicalAuthenticatedRecord("multaiplayer:test", 1, { z: "tail", a: "head", count: 7 });
+  const reordered = canonicalAuthenticatedRecord("multaiplayer:test", 1, { count: 7, a: "head", z: "tail" });
+  assert.deepEqual(reordered, first);
+  assert.notDeepEqual(canonicalAuthenticatedRecord("multaiplayer:other", 1, { z: "tail", a: "head", count: 7 }), first);
+  assert.notDeepEqual(canonicalAuthenticatedRecord("multaiplayer:test", 2, { z: "tail", a: "head", count: 7 }), first);
+  assert.equal(
+    new TextDecoder().decode(first),
+    '{"a":"head","count":7,"domain":"multaiplayer:test","version":1,"z":"tail"}'
+  );
+  assert.throws(
+    () => canonicalAuthenticatedRecord("multaiplayer:test", 1, { invalid: 1.5 }),
+    /Unsupported canonical authenticated field/
+  );
+  assert.throws(
+    () => canonicalAuthenticatedRecord("multaiplayer:test", 1, { nested: { order: "unsafe" } } as never),
+    /Unsupported canonical authenticated field/
+  );
+  assert.throws(
+    () => canonicalAuthenticatedRecord("multaiplayer:test", 1, { "not-ascii!": "unsafe" }),
+    /Invalid canonical authenticated field name/
+  );
+});
+
+test("device public-key equality is structural and ignores JWK serialization metadata", async () => {
+  const identity = await createDeviceKeyAgreementIdentity();
+  const reordered = {
+    y: identity.publicKeyJwk.y,
+    key_ops: [],
+    x: identity.publicKeyJwk.x,
+    ext: false,
+    crv: identity.publicKeyJwk.crv,
+    kty: identity.publicKeyJwk.kty
+  };
+  assert.equal(sameDevicePublicKey(identity.publicKeyJwk, reordered), true);
+  assert.equal(sameDevicePublicKey(identity.publicKeyJwk, { ...reordered, x: "substituted" }), false);
+  assert.equal(sameDevicePublicKey(identity.publicKeyJwk, { ...reordered, d: "private" }), false);
 });
 const metadata = {
   id: "envelope-1",
@@ -85,6 +141,80 @@ const rotationContext = {
   previousEpoch: 3,
   newEpoch: 4
 };
+
+function legacyDeviceContextData(domain: string, context: typeof rotationContext): Uint8Array {
+  return new TextEncoder().encode(
+    JSON.stringify({
+      domain,
+      purpose: context.purpose,
+      teamId: context.teamId,
+      roomId: context.roomId,
+      senderUserId: context.senderUserId,
+      senderDeviceId: context.senderDeviceId,
+      recipientDeviceId: context.recipientDeviceId,
+      operationId: context.operationId ?? null,
+      requestId: "requestId" in context ? context.requestId : null,
+      requestNonce: "requestNonce" in context ? context.requestNonce : null,
+      keyEpoch: context.keyEpoch ?? null,
+      previousEpoch: context.previousEpoch ?? null,
+      newEpoch: context.newEpoch ?? null
+    })
+  );
+}
+
+async function legacyAuthenticatedWrap(
+  secret: Awaited<ReturnType<typeof createRoomSecret>>,
+  host: Awaited<ReturnType<typeof createDeviceKeyAgreementIdentity>>,
+  recipient: Awaited<ReturnType<typeof createDeviceKeyAgreementIdentity>>,
+  context: typeof rotationContext
+) {
+  const hostPrivateJwk = { ...host.privateKeyJwk };
+  delete hostPrivateJwk.key_ops;
+  delete hostPrivateJwk.use;
+  const privateKey = await crypto.subtle.importKey(
+    "jwk",
+    hostPrivateJwk,
+    { name: "ECDH", namedCurve: "P-256" },
+    false,
+    ["deriveBits"]
+  );
+  const publicKey = await crypto.subtle.importKey(
+    "jwk",
+    recipient.publicKeyJwk,
+    { name: "ECDH", namedCurve: "P-256" },
+    false,
+    []
+  );
+  const shared = await crypto.subtle.deriveBits({ name: "ECDH", public: publicKey }, privateKey, 256);
+  const material = await crypto.subtle.importKey("raw", shared, "HKDF", false, ["deriveKey"]);
+  const aad = legacyDeviceContextData("multaiplayer:authenticated-room-secret-wrap:v2", context);
+  const salt = await crypto.subtle.digest("SHA-256", aad);
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt,
+      info: new TextEncoder().encode("multaiplayer:authenticated-room-secret-wrap:v2")
+    },
+    material,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"]
+  );
+  const nonce = new Uint8Array(12);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: nonce, additionalData: aad },
+    key,
+    new TextEncoder().encode(JSON.stringify(secret))
+  );
+  return {
+    version: 2 as const,
+    algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256" as const,
+    senderPublicKeyJwk: host.publicKeyJwk,
+    nonce: Buffer.from(nonce).toString("base64"),
+    ciphertext: Buffer.from(ciphertext).toString("base64")
+  };
+}
 
 test("invite approval wraps round-trip with request identity, nonce, and epoch binding", async () => {
   const host = await createDeviceKeyAgreementIdentity();
@@ -130,6 +260,17 @@ test("rotation wraps authenticate the pinned static host key and epoch transitio
         operationId: "forged"
       }),
     decryptionFailure
+  );
+});
+
+test("version 2 authenticated room-secret wraps remain readable", async () => {
+  const host = await createDeviceKeyAgreementIdentity();
+  const recipient = await createDeviceKeyAgreementIdentity();
+  const secret = await createRoomSecret();
+  const wrapped = await legacyAuthenticatedWrap(secret, host, recipient, rotationContext);
+  assert.deepEqual(
+    await unwrapRoomSecretAuthenticatedFromDevice(wrapped, recipient.privateKeyJwk, host.publicKeyJwk, rotationContext),
+    secret
   );
 });
 
@@ -281,6 +422,60 @@ test("room ciphertext rejects tampering and the wrong room key", async () => {
       ),
     decryptionFailure
   );
+});
+
+async function legacyCiphertext(value: unknown, secret: Awaited<ReturnType<typeof createRoomSecret>>, aad: unknown) {
+  const key = await crypto.subtle.importKey("raw", Buffer.from(secret.rawKey, "base64"), { name: "AES-GCM" }, false, [
+    "encrypt"
+  ]);
+  const nonce = new Uint8Array(12);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: nonce, additionalData: new TextEncoder().encode(JSON.stringify(aad)) },
+    key,
+    new TextEncoder().encode(JSON.stringify(value))
+  );
+  return {
+    version: 2 as const,
+    algorithm: "AES-GCM-256" as const,
+    nonce: Buffer.from(nonce).toString("base64"),
+    ciphertext: Buffer.from(ciphertext).toString("base64")
+  };
+}
+
+test("version 2 room, local, and attachment ciphertext remains readable", async () => {
+  const secret = await createRoomSecret();
+  const roomPayload = await legacyCiphertext({ legacy: "room" }, secret, {
+    domain: "multaiplayer:room-envelope:v2",
+    ...metadata
+  });
+  assert.deepEqual(await decryptJson(roomPayload, secret, metadata), { legacy: "room" });
+
+  const localContext = {
+    purpose: "room-history" as const,
+    roomId: "room-legacy",
+    keyEpoch: 2,
+    savedAt: "2026-07-10T12:00:00.000Z"
+  };
+  const localPayload = await legacyCiphertext({ legacy: "local" }, secret, {
+    domain: "multaiplayer:local-json:v2",
+    ...localContext
+  });
+  assert.deepEqual(await decryptLocalJson(localPayload, secret, localContext), { legacy: "local" });
+
+  const attachmentContext = {
+    teamId: "team-1",
+    roomId: "room-1",
+    name: "legacy.txt",
+    type: "text/plain",
+    size: 6
+  };
+  const attachmentPayload = await legacyCiphertext({ legacy: "attachment" }, secret, {
+    domain: "multaiplayer:attachment:v2",
+    ...attachmentContext
+  });
+  assert.deepEqual(await decryptAttachmentJson(attachmentPayload, secret, attachmentContext), {
+    legacy: "attachment"
+  });
 });
 
 test("room ciphertext authenticates all envelope metadata", async () => {

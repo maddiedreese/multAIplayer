@@ -89,7 +89,7 @@ Release workflows and logs must not expose:
 - GitHub OAuth client secrets;
 - GitHub access tokens;
 - OpenAI or Codex credentials;
-- legacy room-key-bearing invite fragments;
+- current capability-bearing invite URLs/fragments and legacy room-key-bearing invite fragments;
 - decrypted room payloads;
 - private repo files, diffs, or terminal output.
 

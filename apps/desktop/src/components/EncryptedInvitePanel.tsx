@@ -52,7 +52,8 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
         Copy room invite
       </button>
       <div className="empty-state compact">
-        Invite links do not contain the room key. The active host approves each device.
+        Invite links do not contain the room key, but they do contain a private single-use capability. Share them
+        privately; the active host approves each device.
       </div>
       <label>
         <span>Join from invite</span>

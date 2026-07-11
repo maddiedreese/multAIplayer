@@ -87,7 +87,7 @@ For each member and device:
 4. Have the member open the invite, switch their Settings relay URLs to the self-hosted relay, and join.
 5. Confirm the member can send and receive an encrypted test message in the new room.
 
-Do not paste legacy room-key-bearing invite links into public issue trackers, chats, logs, or docs. Current invite links contain no room key; generate fresh capability-authenticated invites for the destination relay.
+Do not paste any complete invite URL or fragment into public issue trackers, chats, logs, or docs. Legacy links contain a room key; current links contain a private bearer capability. Generate fresh capability-authenticated invites for the destination relay and share them privately.
 
 ## 4. Verify Room Continuity
 

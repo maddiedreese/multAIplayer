@@ -165,7 +165,7 @@ export interface MarkdownCopyFallback {
 }
 
 export interface NoSecretRoomInvite {
-  version: 2;
+  version: 3;
   teamId: string;
   roomId: string;
   roomName: string;

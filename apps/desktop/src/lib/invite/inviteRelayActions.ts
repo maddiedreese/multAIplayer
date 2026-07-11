@@ -10,6 +10,7 @@ import {
   unwrapRoomSecretAuthenticatedFromDevice,
   wrapRoomSecretAuthenticatedForDevice,
   fingerprintPublicKey,
+  sameDevicePublicKey,
   verifyInviteCapabilityMac,
   computeInviteCapabilityMac,
   type DeviceCryptoContext,
@@ -142,7 +143,7 @@ export function createInviteRelayActions(
         request.data.hostDeviceId !== deviceId ||
         !deviceIdentity ||
         localHostFingerprint !== request.data.hostPublicKeyFingerprint ||
-        JSON.stringify(issued.hostPublicKeyJwk) !== JSON.stringify(deviceIdentity.publicKeyJwk) ||
+        !sameDevicePublicKey(issued.hostPublicKeyJwk, deviceIdentity.publicKeyJwk) ||
         fingerprint !== request.data.requesterPublicKeyFingerprint
       )
         return;

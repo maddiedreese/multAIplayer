@@ -7,7 +7,8 @@ import {
   computeInviteCapabilityMac,
   createDeviceKeyAgreementIdentity,
   createInviteCapability,
-  createRoomSecret
+  createRoomSecret,
+  openDeviceSealedJson
 } from "@multaiplayer/crypto";
 import { rememberIssuedInviteCapability } from "../src/lib/inviteCapabilityStore";
 import { useAppStore } from "../src/store/appStore";
@@ -92,7 +93,7 @@ async function validRequest() {
   const local = currentLocalIdentity();
   const capability = createInviteCapability();
   const invite = {
-    version: 2 as const,
+    version: 3 as const,
     teamId: room.teamId,
     roomId: room.id,
     roomName: room.name,
@@ -162,6 +163,37 @@ test("relay invite actions display only capability-authenticated requests", asyn
 
   assert.equal(appended.length, 1);
   assert.equal(appended[0]?.status, "pending");
+});
+
+test("relay-visible invite publication contains no usable capability or request plaintext", async () => {
+  const { request } = await validRequest();
+  const host = await createDeviceKeyAgreementIdentity();
+  let published: unknown = null;
+  useAppStore.setState({ relayStatus: "open" });
+  const { actions } = setup({
+    relayStatus: "open",
+    relayRef: { current: { publish: (message: unknown) => (published = message) } }
+  });
+  assert.equal(await actions.publishInviteJoinRequest(room.teamId, room.id, request, host.publicKeyJwk), true);
+  const relayVisible = JSON.stringify(published);
+  assert.equal(relayVisible.includes(request.capability), false);
+  assert.equal(relayVisible.includes(request.capabilityMac), false);
+  assert.equal(relayVisible.includes(request.requestNonce), false);
+  assert.equal(relayVisible.includes(request.requesterPublicKeyFingerprint), false);
+  assert.match(relayVisible, /ECDH-P256-HKDF-SHA256-AES-GCM-256/);
+  const envelope = (published as { envelope: { payload: Parameters<typeof openDeviceSealedJson>[0] } }).envelope;
+  const local = currentLocalIdentity();
+  assert.deepEqual(
+    await openDeviceSealedJson(envelope.payload, host.privateKeyJwk, {
+      purpose: "invite-request",
+      teamId: room.teamId,
+      roomId: room.id,
+      senderUserId: local.localUser.id,
+      senderDeviceId: local.deviceId,
+      recipientDeviceId: request.hostDeviceId
+    }),
+    request
+  );
 });
 
 test("relay invite actions reject outer-sender and public-key substitution", async () => {
