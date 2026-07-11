@@ -14,3 +14,9 @@ Run `npm test -w @multaiplayer/crypto` to verify the published vectors, hostile-
 4. Encrypt the exact listed plaintext with the fixed 96-bit nonce and canonical bytes as AAD. The published ciphertext includes the 128-bit GCM tag.
 
 The cryptography is unaudited. End-to-end encryption properties described by this package and the wider project are design intent, not independently verified guarantees.
+
+## Mutation reports
+
+Run `npm run test:mutation -w @multaiplayer/crypto` to generate HTML, mutation-testing-elements JSON, and a deterministic summary under `packages/crypto/reports/mutation/`. The generated reports are ignored locally and retained as CI artifacts for 14 days. The summary keeps every mutant status and source location while removing volatile run metadata so survivor classification and score changes can be compared reliably.
+
+The current mutation threshold is a baseline ratchet, not a security claim. Surviving authentication, validation, key-binding, version, algorithm, or context mutants must be eliminated or narrowly proven equivalent before the ratchet is raised; broad mutation-class exclusions are temporary migration debt.
