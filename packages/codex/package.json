@@ -18,7 +18,7 @@
     "test:coverage": "c8 --all --src src --include 'src/**/*.ts' --report-dir coverage --reporter=text --reporter=json-summary --reporter=lcov --check-coverage --lines=40 --functions=20 --branches=90 --statements=40 tsx --test test/*.test.ts"
   },
   "devDependencies": {
-    "@types/node": "^22.10.2",
-    "typescript": "^5.9.3"
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2"
   }
 }

@@ -36,12 +36,12 @@
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^6.0.3",
     "jsdom": "^29.1.1",
     "monaco-editor": "0.55.1",
     "postcss": "^8.5.6",
     "tsx": "^4.19.2",
-    "typescript": "^5.9.3",
-    "vite": "^6.0.0"
+    "typescript": "^7.0.2",
+    "vite": "^8.1.4"
   }
 }

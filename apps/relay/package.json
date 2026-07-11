@@ -29,9 +29,9 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
-    "@types/node": "^22.10.2",
+    "@types/node": "^26.1.1",
     "@types/ws": "^8.5.13",
     "tsx": "^4.19.2",
-    "typescript": "^5.9.3"
+    "typescript": "^7.0.2"
   }
 }
