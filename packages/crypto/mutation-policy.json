@@ -1,0 +1,13 @@
+{
+  "files": {
+    "src/canonical.ts": {
+      "minimumScore": 90,
+      "maximumSurvived": 0
+    },
+    "src/encoding.ts": {
+      "minimumScore": 85,
+      "maximumSurvived": 0
+    }
+  },
+  "allowedTimeouts": []
+}

@@ -1,5 +1,13 @@
 const encoder = new TextEncoder();
 
+function isWellFormedUnicode(value: string): boolean {
+  // Any non-surrogate replacement is observationally equivalent: only the
+  // remaining unmatched surrogate code units are inspected by the next test.
+  // Stryker disable next-line StringLiteral: replacement content cannot affect the surrogate-only predicate
+  const unmatchedSurrogates = value.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/gu, "");
+  return !/[\uD800-\uDFFF]/u.test(unmatchedSurrogates);
+}
+
 export type CanonicalAuthenticatedValue = string | number | boolean | null;
 
 /**
@@ -19,7 +27,7 @@ export function canonicalAuthenticatedRecord(
     throw new Error("Canonical authenticated records require a domain and positive integer version");
   }
   const normalized: Record<string, CanonicalAuthenticatedValue> = { domain, version };
-  for (const name of Object.keys(fields).sort()) {
+  for (const name of Object.keys(fields)) {
     if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name)) throw new Error(`Invalid canonical authenticated field name: ${name}`);
     if (name === "domain" || name === "version") throw new Error(`Reserved canonical authenticated field: ${name}`);
     const value = fields[name];
@@ -29,7 +37,7 @@ export function canonicalAuthenticatedRecord(
     if (typeof value === "number" && !Number.isSafeInteger(value)) {
       throw new Error(`Unsupported canonical authenticated field: ${name}`);
     }
-    if (typeof value === "string" && /[\uD800-\uDFFF]/u.test(value.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/gu, ""))) {
+    if (typeof value === "string" && !isWellFormedUnicode(value)) {
       throw new Error(`Canonical authenticated strings must be valid Unicode: ${name}`);
     }
     normalized[name] = value;

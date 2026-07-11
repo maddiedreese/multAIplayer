@@ -18,7 +18,8 @@
     "test:coverage": "c8 --all --src src --include 'src/**/*.ts' --report-dir coverage --reporter=text --reporter=json-summary --reporter=lcov --check-coverage --lines=90 --functions=90 --branches=80 --statements=90 tsx --test test/*.test.ts",
     "test:mutation:run": "stryker run",
     "test:mutation:summary": "node ../../scripts/summarize-mutation-report.mjs reports/mutation/mutation.json --output reports/mutation/summary.json",
-    "test:mutation": "npm run test:mutation:run && npm run test:mutation:summary"
+    "test:mutation:policy": "node ../../scripts/check-mutation-policy.mjs reports/mutation/summary.json mutation-policy.json",
+    "test:mutation": "npm run test:mutation:run && npm run test:mutation:summary && npm run test:mutation:policy"
   },
   "dependencies": {
     "@multaiplayer/protocol": "0.1.0-alpha.0"
