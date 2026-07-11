@@ -45,3 +45,8 @@ export async function runShellCommand(
     stderr: ""
   };
 }
+
+export async function clearShellExecutionGrants(roomId: string): Promise<number> {
+  if (!isTauriRuntime()) return 0;
+  return invoke<number>("clear_shell_execution_grants", { roomId });
+}

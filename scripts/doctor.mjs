@@ -115,7 +115,7 @@ function checkProductionRelayEnv() {
   const rateLimits = envBoolean("MULTAIPLAYER_RELAY_RATE_LIMITS", true);
   const trustProxyHeaders = envBoolean("MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS", false);
   const trustedProxyConfigured = envBoolean("MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED", false);
-  const storage = envValue("MULTAIPLAYER_RELAY_STORAGE") || "json";
+  const storage = envValue("MULTAIPLAYER_RELAY_STORAGE") || "sqlite";
   const dataPath = envValue("MULTAIPLAYER_RELAY_DATA_PATH");
   const attachmentBlobMaxBytes = envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES", 5_000_000);
   const attachmentBlobLiveQuotaBytes = envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES", 250_000_000);

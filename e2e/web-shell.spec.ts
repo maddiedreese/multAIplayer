@@ -1,80 +1,24 @@
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import {
+  appUrl,
+  approvePendingInvite,
+  attachPageDiagnostics,
+  authenticateContext,
+  copyApprovalInvite,
+  createRoom,
+  openApp,
+  requestInviteAccess
+} from "./helpers";
 
-const appUrl = "http://127.0.0.1:1421";
-const relayUrl = "http://127.0.0.1:4322";
-
-function attachPageDiagnostics(page: Page): void {
-  page.on("pageerror", (error) => console.error(`[browser page error] ${error.stack ?? error.message}`));
-  page.on("console", (message) => {
-    if (message.type() === "error") console.error(`[browser console] ${message.text()}`);
-  });
-  page.on("requestfailed", (request) =>
-    console.error(`[browser request failed] ${request.method()} ${request.url()} ${request.failure()?.errorText ?? ""}`)
-  );
-}
-
-test.beforeEach(({ page }) => attachPageDiagnostics(page));
-
-async function openApp(context: BrowserContext): Promise<Page> {
-  const page = await context.newPage();
+test.beforeEach(async ({ context, page }) => {
   attachPageDiagnostics(page);
-  await page.goto(appUrl);
-  await expect(page.getByText("Development web preview")).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Room title" })).toHaveValue("Desktop app");
-  return page;
-}
-
-async function authenticateContext(context: BrowserContext): Promise<void> {
-  const response = await fetch(`${relayUrl}/debug/auth-session`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ id: "github:maddiedreese", login: "maddiedreese", name: "Maddie" })
-  });
-  expect(response.status).toBe(201);
-  const sessionCookie = response.headers.get("set-cookie")?.match(/multaiplayer_session=([^;]+)/)?.[1];
-  expect(sessionCookie).toBeTruthy();
-  await context.addCookies([
-    { name: "multaiplayer_session", value: sessionCookie!, url: relayUrl, httpOnly: true, sameSite: "Lax" }
-  ]);
-}
-
-async function createRoom(page: Page, name: string): Promise<void> {
-  const newRoom = page.getByRole("button", { name: "New room", exact: true });
-  await newRoom.scrollIntoViewIfNeeded();
-  await newRoom.click({ force: true });
-  await page.getByPlaceholder("Room name").fill(name);
-  const projectPath = page.locator(".room-create-form input").nth(1);
-  if (!(await projectPath.inputValue())) await projectPath.fill("/tmp/multaiplayer-e2e");
-  await page.getByRole("button", { name: "Create room" }).click();
-  await expect(page.getByRole("textbox", { name: "Room title" })).toHaveValue(name);
-}
-
-async function copyApprovalInvite(page: Page): Promise<string> {
-  await page.getByRole("button", { name: "Room", exact: true }).click();
-  await page.getByRole("button", { name: "Copy room invite" }).click();
-  await expect(page.getByText(/Copied invite link/)).toBeVisible();
-  return page.evaluate(() => navigator.clipboard.readText());
-}
-
-async function requestInviteAccess(page: Page, invite: string): Promise<void> {
-  await page.getByRole("button", { name: "Room", exact: true }).click();
-  await page.locator('textarea[placeholder="Paste a multAIplayer invite..."]:visible').fill(invite);
-  await page.locator("button:visible", { hasText: "Import invite" }).click();
-  await expect(page.getByText(/Requested access to/)).toBeVisible();
-}
-
-async function approvePendingInvite(host: Page, guest: Page): Promise<void> {
-  const pendingRequest = host.locator(".terminal-request.pending").first();
-  await expect(pendingRequest).toBeVisible();
-  await pendingRequest.locator("button").first().click();
-  await expect(host.getByText(/Approved .+'s join request/)).toBeVisible();
-  await expect(guest.getByText(/approved your room join request.*unlocked/i)).toBeVisible();
-}
+  await authenticateContext(context);
+});
 
 test("loads the seeded workspace in the development web shell", async ({ page }) => {
   await page.goto(appUrl);
   await expect(page.getByText("Development web preview")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Core Team 4 members/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Core Team Owner · 4 members/ })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Room title" })).toHaveValue("Desktop app");
   await expect(page.getByRole("button", { name: /Relay ops MultAIplayer/ })).toBeVisible();
 });
@@ -93,6 +37,7 @@ test("revoking room invites invalidates a previously copied capability", async (
     await authenticateContext(hostContext);
     await authenticateContext(guestContext);
     const host = await openApp(hostContext);
+    await expect(host.getByRole("textbox", { name: "Room title" })).toHaveValue("Desktop app");
     const oldInvite = await copyApprovalInvite(host);
     const revoked = await host.evaluate(async () => {
       const response = await fetch("http://127.0.0.1:4322/teams/team-core/rooms/room-desktop/invites", {
@@ -121,6 +66,7 @@ test("an approved invite lets a second browser context receive encrypted chat", 
     await authenticateContext(hostContext);
     await authenticateContext(guestContext);
     const host = await openApp(hostContext);
+    await expect(host.getByRole("textbox", { name: "Room title" })).toHaveValue("Desktop app");
     const invite = await copyApprovalInvite(host);
 
     const guest = await openApp(guestContext);
@@ -143,6 +89,7 @@ test("an imported invite selects the shared room and records membership locally"
     await authenticateContext(hostContext);
     await authenticateContext(guestContext);
     const host = await openApp(hostContext);
+    await expect(host.getByRole("textbox", { name: "Room title" })).toHaveValue("Desktop app");
     const roomName = "Desktop app";
     const invite = await copyApprovalInvite(host);
     const guest = await openApp(guestContext);

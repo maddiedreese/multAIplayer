@@ -6,6 +6,6 @@ export * from "./localBackend/dialogBackend";
 export * from "./localBackend/gitBackend";
 export * from "./localBackend/localPreviewBackend";
 export * from "./localBackend/projectBackend";
-export { runShellCommand } from "./localBackend/runtime";
+export { clearShellExecutionGrants, runShellCommand } from "./localBackend/runtime";
 export * from "./localBackend/terminalBackend";
 export * from "./localBackend/types";

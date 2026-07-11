@@ -50,7 +50,8 @@ test("web preview device identity persists in localStorage fallback", async () =
   const second = await loadOrCreateDeviceIdentity();
 
   assert.equal(second.publicKeyFingerprint, first.publicKeyFingerprint);
-  assert.equal(second.privateKeyJwk.d, first.privateKeyJwk.d);
+  assert.equal(second.privateKeyJwk.type, "private");
+  assert.equal(second.privateKeyJwk.extractable, false);
   assert.ok(localStorage.getItem("multaiplayer:device-identity:v1"));
 });
 

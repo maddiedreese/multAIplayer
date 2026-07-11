@@ -518,7 +518,7 @@ test("invite status accepts capability-authenticated device-wrapped room secret"
     keyEpoch: 1,
     capabilityMac: "C".repeat(43),
     wrappedRoomSecret: {
-      version: 2,
+      version: 3,
       algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
       senderPublicKeyJwk: {
         kty: "EC",
@@ -664,7 +664,7 @@ test("room key rotation payload wraps the new epoch secret once per device", () 
         deviceId: "device_12345678",
         publicKeyFingerprint: "sha256:" + "abcd:".repeat(15) + "abcd",
         wrappedRoomSecret: {
-          version: 2,
+          version: 3,
           algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
           senderPublicKeyJwk: { kty: "EC", crv: "P-256", x: "host-x", y: "host-y" },
           nonce: "nonce",

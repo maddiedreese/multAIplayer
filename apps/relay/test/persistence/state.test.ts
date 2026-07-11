@@ -7,6 +7,7 @@ import {
   join,
   mkdtemp,
   onceOpen,
+  readFile,
   readdir,
   rm,
   startRelay,
@@ -17,6 +18,77 @@ import {
   waitForSqliteRows,
   writeFile
 } from "../support/relay.js";
+import { createRelayPersistence, RelayPersistenceMigrationError } from "../../src/persistence.js";
+
+test("SQLite imports the implicit legacy JSON store once and preserves a migration backup", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-default-migration-"));
+  const legacyPath = join(tempDir, "relay-store.json");
+  const sqlitePath = join(tempDir, "relay-store.sqlite");
+  const legacyState = {
+    version: 1,
+    savedAt: "2026-07-11T00:00:00.000Z",
+    teams: [{ id: "team-migrated", name: "Migrated team", members: 1 }],
+    rooms: [],
+    invites: [],
+    encryptedBacklog: []
+  };
+  await writeFile(legacyPath, JSON.stringify(legacyState), "utf8");
+  const persistence = createRelayPersistence({
+    backend: "sqlite",
+    dataPath: sqlitePath,
+    legacyJsonImportPath: legacyPath
+  });
+  try {
+    const loaded = await persistence.load();
+    assert.deepEqual(loaded, legacyState);
+    await persistence.finalizeLoad(legacyState);
+    const migratedFiles = await readdir(tempDir);
+    assert.ok(migratedFiles.includes("relay-store.json.migrated-to-sqlite"));
+    assert.ok(migratedFiles.includes("relay-store.sqlite"));
+    assert.equal(migratedFiles.includes("relay-store.json"), false);
+    persistence.close();
+
+    const restarted = createRelayPersistence({
+      backend: "sqlite",
+      dataPath: sqlitePath,
+      legacyJsonImportPath: legacyPath
+    });
+    try {
+      const reloaded = (await restarted.load()) as { teams?: Array<{ id?: string }> };
+      assert.equal(reloaded.teams?.[0]?.id, "team-migrated");
+      await restarted.finalizeLoad(reloaded);
+    } finally {
+      restarted.close();
+    }
+  } finally {
+    persistence.close();
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("SQLite legacy import fails closed and remains retryable", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-default-migration-failure-"));
+  const legacyPath = join(tempDir, "relay-store.json");
+  const sqlitePath = join(tempDir, "relay-store.sqlite");
+  await writeFile(legacyPath, "{ invalid", "utf8");
+  try {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const persistence = createRelayPersistence({
+        backend: "sqlite",
+        dataPath: sqlitePath,
+        legacyJsonImportPath: legacyPath
+      });
+      try {
+        await assert.rejects(() => persistence.load(), RelayPersistenceMigrationError);
+      } finally {
+        persistence.close();
+      }
+    }
+    assert.equal(await readFile(legacyPath, "utf8"), "{ invalid");
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
 
 test("relay restores persisted team member roles and legacy counts", async () => {
   const relay = await startRelay(
