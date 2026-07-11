@@ -1,17 +1,11 @@
 const encoder = new TextEncoder();
 
 function isWellFormedUnicode(value: string): boolean {
-  for (let index = 0; index < value.length; index += 1) {
-    const codeUnit = value.charCodeAt(index);
-    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
-      const trailing = value.charCodeAt(index + 1);
-      if (!(trailing >= 0xdc00 && trailing <= 0xdfff)) return false;
-      index += 1;
-    } else if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
-      return false;
-    }
-  }
-  return true;
+  // Any non-surrogate replacement is observationally equivalent: only the
+  // remaining unmatched surrogate code units are inspected by the next test.
+  // Stryker disable next-line StringLiteral: replacement content cannot affect the surrogate-only predicate
+  const unmatchedSurrogates = value.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/gu, "");
+  return !/[\uD800-\uDFFF]/u.test(unmatchedSurrogates);
 }
 
 export type CanonicalAuthenticatedValue = string | number | boolean | null;

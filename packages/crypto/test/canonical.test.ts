@@ -99,6 +99,7 @@ test("canonical strings accept valid surrogate pairs and reject lone surrogates"
     "🚀\ud800",
     "\udc00🚀",
     "\ud800x",
+    "\ud800\ue000",
     "x\udc00",
     "\ud800x\udc00"
   ]) {
