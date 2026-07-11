@@ -1,5 +1,5 @@
 import { isRecord, type RelayEnvelope } from "@multaiplayer/protocol";
-import type { RelayPersistence } from "./persistence.js";
+import { RelayPersistenceMigrationError, type RelayPersistence } from "./persistence.js";
 import type { RoomKey } from "./state.js";
 import type { RelayStoreCodec } from "./store-codec.js";
 
@@ -45,8 +45,10 @@ export function createRelayStorePersistenceCoordinator(options: {
         return;
       }
       options.storeCodec.applyStoredRelayState(stored);
+      await options.persistence.finalizeLoad?.(options.storeCodec.toStoredRelayState());
       console.log(`Loaded multAIplayer relay store from ${options.dataPath}`);
     } catch (error) {
+      if (error instanceof RelayPersistenceMigrationError) throw error;
       console.warn(`Could not load relay store at ${options.dataPath}:`, error);
       await options.persistence.quarantine("unreadable");
     }

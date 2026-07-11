@@ -66,9 +66,40 @@ test("RustSec audit is pinned, scoped to the native lockfile, and scheduled", ()
   assert.match(workflow, /checks: write/);
 });
 
+test("npm advisories are checked from the lockfile on changes and a schedule", () => {
+  const workflow = readFileSync(".github/workflows/npm-audit.yml", "utf8");
+  assert.match(workflow, /schedule:/);
+  assert.match(workflow, /run: npm ci/);
+  assert.match(workflow, /run: npm run audit:npm/);
+  assert.equal(rootPackage.scripts["audit:npm"], "npm audit --audit-level=high");
+});
+
+test("latest Codex contract drift is checked proactively with least privilege", () => {
+  const workflow = readFileSync(".github/workflows/codex-latest-contract.yml", "utf8");
+  assert.match(workflow, /schedule:/);
+  assert.match(workflow, /@openai\/codex@latest/);
+  assert.match(workflow, /check-latest-codex-runtime\.mjs/);
+  assert.match(workflow, /issues: write/);
+  assert.match(workflow, /codex-app-server-contract-drift/);
+  assert.match(workflow, /gh issue create/);
+  assert.doesNotMatch(workflow, /contents: write/);
+});
+
+test("security boundaries have explicit human ownership and review policy", () => {
+  const owners = readFileSync(".github/CODEOWNERS", "utf8");
+  const contributing = readFileSync("CONTRIBUTING.md", "utf8");
+  for (const path of ["/packages/crypto/", "/packages/protocol/", "/apps/desktop/src-tauri/"]) {
+    assert.match(owners, new RegExp(`^${path.replaceAll("/", "\\/")}\\s+@maddiedreese$`, "m"));
+  }
+  assert.match(contributing, /inspect every changed line/);
+  assert.match(contributing, /AI agent authored or materially changed/);
+});
+
 test("third-party GitHub Actions are pinned to immutable commits", () => {
   for (const path of [
     ".github/workflows/ci.yml",
+    ".github/workflows/codex-latest-contract.yml",
+    ".github/workflows/npm-audit.yml",
     ".github/workflows/release.yml",
     ".github/workflows/rust-audit.yml"
   ]) {

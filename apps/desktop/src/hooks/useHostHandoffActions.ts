@@ -5,14 +5,9 @@ import { loadOrCreateRoomSecret } from "../lib/localHistory";
 import { createEncryptedRoomEnvelope, roomKeyEpoch } from "../lib/encryptedEnvelope";
 import {
   applyGitPatch,
-  chooseProjectFolder,
-  cloneGitRepository,
   createGitPatch,
-  defaultProjectPath,
   getGitRemoteOrigin,
   shutdownCodexRoom,
-  type GitApplyPatchResult,
-  type GitCloneResult,
   type GitStatusSummary,
   type TerminalSnapshot
 } from "../lib/localBackend";
@@ -23,15 +18,12 @@ import {
   canAcceptRoomHostHandoff,
   createHandoffSettingsPatch,
   findRoomHostHandoff,
-  handoffRepoIdentity,
-  hostHandoffDetail,
-  roomHostHandoffMessage,
-  sameHandoffRepo
+  roomHostHandoffMessage
 } from "../lib/hostHandoff";
 import { parseGitHubRemoteUrl } from "../lib/gitWorkflowDraft";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
 import { roomLockMessage } from "../lib/appRuntime";
-import { formatCodexModel } from "../lib/appFormatters";
+import { buildAcceptedHandoffMessage, queueForHandoff, resolveHandoffProject } from "./hostHandoffHelpers";
 import { useAppStore } from "../store/appStore";
 import type { RelayClient } from "../lib/relayClient";
 import type { BrowserAccessRequest, ChatMessage, HostHandoffRecord, QueuedCodexTurn, RelayStatus } from "../types";
@@ -39,13 +31,6 @@ import type { BrowserAccessRequest, ChatMessage, HostHandoffRecord, QueuedCodexT
 interface LocalUser {
   id: string;
   name: string;
-}
-
-interface HandoffProject {
-  path: string;
-  source: "existing" | "cloned" | "selected";
-  cloneResult?: GitCloneResult;
-  patchResult?: GitApplyPatchResult;
 }
 
 interface UseHostHandoffActionsOptions {
@@ -237,62 +222,6 @@ export function useHostHandoffActions({
     }
   }
 
-  async function resolveHandoffProject(handoff: HostHandoffRecord, fallbackPath: string): Promise<HandoffProject> {
-    const expectedRepo = handoffRepoIdentity(handoff);
-
-    async function pathMatches(path: string): Promise<boolean> {
-      if (!expectedRepo) return true;
-      const remote = await getGitRemoteOrigin(path).catch(() => ({ originUrl: null }));
-      const actualRepo = remote.originUrl ? parseGitHubRemoteUrl(remote.originUrl) : null;
-      return sameHandoffRepo(expectedRepo, actualRepo);
-    }
-
-    if (await pathMatches(fallbackPath)) return { path: fallbackPath, source: "existing" };
-
-    if (handoff.gitRemoteUrl && expectedRepo) {
-      const parentDir = defaultProjectPath.slice(0, defaultProjectPath.lastIndexOf("/")) || defaultProjectPath;
-      const cloneResult = await cloneGitRepository(handoff.gitRemoteUrl, parentDir, handoff.gitBranch);
-      if (cloneResult.status === 0 && (await pathMatches(cloneResult.path))) {
-        return { path: cloneResult.path, source: "cloned", cloneResult };
-      }
-      throw new Error(
-        `Could not clone ${expectedRepo.owner}/${expectedRepo.repo}: ${cloneResult.stderr || cloneResult.stdout || "git clone failed"}`
-      );
-    }
-
-    const selected = await chooseProjectFolder(defaultProjectPath);
-    if (!selected) {
-      throw new Error(`${hostHandoffDetail(handoff)} No local project folder was selected.`);
-    }
-    if (!(await pathMatches(selected))) {
-      const repoLabel = expectedRepo ? `${expectedRepo.owner}/${expectedRepo.repo}` : "the handoff repository";
-      throw new Error(`Selected folder is not a clone of ${repoLabel}. Choose a local clone or continue from GitHub.`);
-    }
-    return { path: selected, source: "selected" };
-  }
-
-  function buildAcceptedHandoffMessage(
-    handoff: HostHandoffRecord,
-    project: { path: string; source: "existing" | "cloned" | "selected" },
-    codexModel: string
-  ): string {
-    const source =
-      project.source === "cloned"
-        ? "cloned from GitHub"
-        : project.source === "selected"
-          ? "selected locally"
-          : "matched locally";
-    const patchMessage =
-      handoff.gitPatch && !handoff.gitPatchTruncated
-        ? " Applied the previous host's local patch."
-        : handoff.gitPatchTruncated
-          ? " The previous host's patch was too large to apply automatically; ask them to push or share it."
-          : handoff.gitDirtyFiles?.length
-            ? " The previous host had local changes but no transferable patch was available."
-            : "";
-    return `Accepted handoff from ${handoff.fromHost}; ${source}, using ${formatCodexModel(codexModel)} at ${project.path}.${patchMessage}`;
-  }
-
   async function publishHostHandoff(
     room: RoomRecord,
     reason: HostHandoffRecord["reason"] = "manual",
@@ -451,19 +380,6 @@ export function useHostHandoffActions({
 
   function markHostHandoffAccepted(roomId: string, handoffId: string) {
     markHostHandoffAcceptedForRoom(roomId, handoffId);
-  }
-
-  function queueForHandoff(roomId: string, turns: QueuedCodexTurn[]): HostHandoffPlaintextPayload["queuedCodexTurns"] {
-    return turns
-      .filter((turn) => turn.roomId === roomId)
-      .slice(0, 5)
-      .map((turn) => ({
-        turnId: turn.turnId,
-        requestedBy: turn.requestedBy,
-        requestedByUserId: turn.requestedByUserId,
-        queuedAt: turn.queuedAt,
-        ...(turn.triggerMessageId ? { triggerMessageId: turn.triggerMessageId } : {})
-      }));
   }
 
   return {

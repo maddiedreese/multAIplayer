@@ -1,0 +1,98 @@
+name: Latest Codex contract
+
+on:
+  schedule:
+    - cron: "41 10 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Latest app-server compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Generate latest Codex app-server contract
+        id: contract
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/codex-schema"
+          set +e
+          set -o pipefail
+          {
+            npm install \
+              --prefix "$RUNNER_TEMP/latest-codex" \
+              --no-audit \
+              --no-fund \
+              @openai/codex@latest
+            codex="$RUNNER_TEMP/latest-codex/node_modules/.bin/codex"
+            version="$($codex --version | awk '{print $NF}')"
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+            "$codex" app-server generate-json-schema \
+              --out "$RUNNER_TEMP/codex-schema"
+            node scripts/generate-codex-schema-manifest.mjs \
+              --schema-dir "$RUNNER_TEMP/codex-schema" \
+              --codex-version "$version" \
+              --out "$RUNNER_TEMP/latest-codex-manifest.json"
+            node scripts/check-latest-codex-contract.mjs \
+              "$RUNNER_TEMP/latest-codex-manifest.json"
+            node scripts/check-latest-codex-runtime.mjs "$codex"
+          } 2>&1 | tee "$RUNNER_TEMP/codex-contract-result.txt"
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: File a deduplicated compatibility issue
+        if: steps.contract.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODEX_VERSION: ${{ steps.contract.outputs.version }}
+        shell: bash
+        run: |
+          marker="<!-- codex-app-server-contract-drift -->"
+          existing="$(gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --search 'Codex app-server contract drift in:title' \
+            --json body \
+            --jq ".[] | select(.body | contains(\"$marker\")) | .body" \
+            --limit 1)"
+          if [ -n "$existing" ]; then
+            echo "An open Codex contract-drift issue already exists."
+            exit 0
+          fi
+          {
+            echo "$marker"
+            echo "The scheduled contract check found that Codex $CODEX_VERSION no longer preserves the supported 0.144.0 app-server contract."
+            echo
+            echo '```text'
+            cat "$RUNNER_TEMP/codex-contract-result.txt"
+            echo '```'
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > "$RUNNER_TEMP/codex-contract-issue.md"
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Codex app-server contract drift: $CODEX_VERSION" \
+            --body-file "$RUNNER_TEMP/codex-contract-issue.md"
+
+      - name: Fail on contract drift
+        if: steps.contract.outputs.status != '0'
+        run: exit 1

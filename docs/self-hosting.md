@@ -59,14 +59,19 @@ The image sets `NODE_ENV=production`, `PORT=4321`, `MULTAIPLAYER_RELAY_STORAGE=s
 
 ## Relay Storage
 
-Local development can persist relay state to a JSON file. Set:
+SQLite is the default relay backend, including for local development. With no storage variables set, the relay uses `.multaiplayer/relay-store.sqlite`. Its transactional writes and WAL recovery make it the safer baseline:
+
+```bash
+MULTAIPLAYER_RELAY_STORAGE=sqlite
+MULTAIPLAYER_RELAY_DATA_PATH=.multaiplayer/relay-store.sqlite
+```
+
+The legacy JSON snapshot backend remains available only as an explicit local-development or migration choice. Set both variables so this choice is visible:
 
 ```bash
 MULTAIPLAYER_RELAY_STORAGE=json
 MULTAIPLAYER_RELAY_DATA_PATH=/var/lib/multaiplayer/relay-store.json
 ```
-
-If unset, local development uses `.multaiplayer/relay-store.json`.
 
 Hosted or internet-facing relays must use SQLite to pass the production relay doctor:
 
@@ -75,7 +80,9 @@ MULTAIPLAYER_RELAY_STORAGE=sqlite
 MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
 ```
 
-SQLite uses WAL mode and transactional writes to normalized relay tables for teams, rooms, invites, device keys, encrypted backlog, encrypted attachment blobs, team membership, and encrypted GitHub sessions. It is the required alpha storage backend for hosted relays because it is more crash-safe than replacing one JSON file and avoids keeping the hosted relay on the local-development snapshot format. JSON storage remains available for local/dev self-hosting.
+SQLite uses WAL mode and transactional writes to normalized relay tables for teams, rooms, invites, device keys, encrypted backlog, encrypted attachment blobs, team membership, and encrypted GitHub sessions. It is the required alpha storage backend for hosted relays because it is more crash-safe than replacing one JSON file. JSON storage remains an explicit compatibility option for local development and migration; it is never selected implicitly.
+
+For upgrade continuity, a relay started with neither storage variable set checks the former default path `.multaiplayer/relay-store.json` before initializing the default SQLite database. It imports a valid version-1 snapshot transactionally, then renames the JSON source to `relay-store.json.migrated-to-sqlite`. Restarts load only the committed SQLite state, so the import is idempotent. An unreadable or unsupported legacy snapshot aborts startup and remains in place for operator recovery; it never falls through to an empty store. Explicit storage or data-path settings are never auto-migrated. Back up the JSON file first and use the explicit migration runbook when operating outside these defaults.
 
 If the relay cannot parse the configured store, or the store version is unsupported, it moves the store aside next to the original path with a `.corrupt-...` suffix and starts from a clean in-memory state. Keep regular backups of `MULTAIPLAYER_RELAY_DATA_PATH` for production/self-hosted deployments; the quarantine file is a recovery aid, not a replacement for backups.
 

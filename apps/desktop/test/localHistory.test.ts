@@ -727,7 +727,7 @@ test("pending rotations survive restart-style reload and clear only after comple
           deviceId: "device-host",
           publicKeyFingerprint: `sha256:${Array(16).fill("0000").join(":")}`,
           wrappedRoomSecret: {
-            version: 2 as const,
+            version: 3 as const,
             algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256" as const,
             ephemeralPublicKeyJwk: { kty: "EC" as const, crv: "P-256" as const, x: "eA", y: "eQ" },
             nonce: "nonce",

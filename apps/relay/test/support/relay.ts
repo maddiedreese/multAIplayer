@@ -79,6 +79,10 @@ export async function startRelay(
           extraEnv.MULTAIPLAYER_RELAY_DEBUG ?? (extraEnv.NODE_ENV === "production" ? "false" : "true"),
         ...extraEnv,
         PORT: String(port),
+        // Most legacy persistence fixtures intentionally exercise the explicit
+        // development-only JSON backend. Production/default-backend tests opt
+        // into SQLite or omit this override directly.
+        MULTAIPLAYER_RELAY_STORAGE: extraEnv.MULTAIPLAYER_RELAY_STORAGE ?? "json",
         MULTAIPLAYER_RELAY_DATA_PATH: dataPath
       },
       stdio: ["ignore", "pipe", "pipe"]

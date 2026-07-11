@@ -15,6 +15,31 @@ test("relay validates PORT with the bounded integer parser", () => {
   }
 });
 
+test("relay defaults to SQLite and requires an explicit JSON compatibility choice", () => {
+  const previousStorage = process.env.MULTAIPLAYER_RELAY_STORAGE;
+  const previousDataPath = process.env.MULTAIPLAYER_RELAY_DATA_PATH;
+  try {
+    delete process.env.MULTAIPLAYER_RELAY_STORAGE;
+    delete process.env.MULTAIPLAYER_RELAY_DATA_PATH;
+    const defaultConfig = loadRelayConfig();
+    assert.equal(defaultConfig.storageBackend, "sqlite");
+    assert.match(defaultConfig.dataPath, /relay-store\.sqlite$/);
+
+    process.env.MULTAIPLAYER_RELAY_STORAGE = "json";
+    const jsonConfig = loadRelayConfig();
+    assert.equal(jsonConfig.storageBackend, "json");
+    assert.match(jsonConfig.dataPath, /relay-store\.json$/);
+
+    process.env.MULTAIPLAYER_RELAY_STORAGE = "invalid";
+    assert.equal(loadRelayConfig().storageBackend, "sqlite");
+  } finally {
+    if (previousStorage === undefined) delete process.env.MULTAIPLAYER_RELAY_STORAGE;
+    else process.env.MULTAIPLAYER_RELAY_STORAGE = previousStorage;
+    if (previousDataPath === undefined) delete process.env.MULTAIPLAYER_RELAY_DATA_PATH;
+    else process.env.MULTAIPLAYER_RELAY_DATA_PATH = previousDataPath;
+  }
+});
+
 test("relay loads configuration from env files without overriding process env", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-env-test-"));
   const envPath = join(tempDir, ".env");

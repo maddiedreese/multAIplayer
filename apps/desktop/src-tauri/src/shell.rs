@@ -33,7 +33,7 @@ pub(crate) fn run_shell_command(
 ) -> Result<CommandResult, String> {
     ensure_existing_dir(&request.cwd)?;
     ensure_terminal_command(&request.command)?;
-    state.consume(
+    let canonical_cwd = state.consume(
         &request.authorization_token,
         &request.room_id,
         &request.cwd,
@@ -43,14 +43,14 @@ pub(crate) fn run_shell_command(
 
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
     let output = Command::new(shell)
-        .current_dir(&request.cwd)
+        .current_dir(&canonical_cwd)
         .args(["-c", &request.command])
         .output()
         .map_err(|error| format!("Failed to run command: {error}"))?;
 
     Ok(CommandResult {
         command: request.command,
-        cwd: request.cwd,
+        cwd: canonical_cwd,
         status: output.status.code(),
         stdout: bound_command_output(&output.stdout),
         stderr: bound_command_output(&output.stderr),

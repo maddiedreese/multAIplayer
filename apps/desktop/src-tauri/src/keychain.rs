@@ -1,9 +1,32 @@
 use serde::Deserialize;
+use std::sync::Mutex;
 
 use crate::validation::{ensure_device_identity_payload, keychain_account};
 
 const KEYCHAIN_SERVICE: &str = "com.multaiplayer.desktop.room-secrets";
 const DEVICE_IDENTITY_ACCOUNT: &str = "device-identity:v1";
+
+#[derive(Default)]
+pub(crate) struct DeviceIdentityAccessState {
+    retrieved: Mutex<bool>,
+}
+
+impl DeviceIdentityAccessState {
+    fn claim_startup_read(&self) -> Result<(), String> {
+        let mut retrieved = self
+            .retrieved
+            .lock()
+            .map_err(|_| "Device identity access state is unavailable".to_string())?;
+        if *retrieved {
+            return Err(
+                "Device identity private material is available only once per app process"
+                    .to_string(),
+            );
+        }
+        *retrieved = true;
+        Ok(())
+    }
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,7 +77,10 @@ pub(crate) fn room_secret_delete(room_id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub(crate) fn device_identity_get() -> Result<Option<String>, String> {
+pub(crate) fn device_identity_take_for_startup(
+    access: tauri::State<'_, DeviceIdentityAccessState>,
+) -> Result<Option<String>, String> {
+    access.claim_startup_read()?;
     let entry = keyring::Entry::new(KEYCHAIN_SERVICE, DEVICE_IDENTITY_ACCOUNT)
         .map_err(|error| format!("Failed to open device identity keychain entry: {error}"))?;
     match entry.get_password() {
@@ -63,6 +89,18 @@ pub(crate) fn device_identity_get() -> Result<Option<String>, String> {
         Err(error) => Err(format!(
             "Failed to read device identity from keychain: {error}"
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DeviceIdentityAccessState;
+
+    #[test]
+    fn startup_identity_read_can_be_claimed_only_once() {
+        let state = DeviceIdentityAccessState::default();
+        assert!(state.claim_startup_read().is_ok());
+        assert!(state.claim_startup_read().is_err());
     }
 }
 

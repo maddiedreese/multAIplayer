@@ -31,14 +31,14 @@ struct TerminalSession {
 }
 
 #[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct TerminalLine {
     pub(crate) stream: String,
     pub(crate) text: String,
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct TerminalSnapshot {
     id: String,
     room_id: String,
@@ -52,7 +52,7 @@ pub(crate) struct TerminalSnapshot {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct TerminalStartRequest {
     room_id: String,
     name: String,
@@ -62,7 +62,7 @@ pub(crate) struct TerminalStartRequest {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct TerminalWriteRequest {
     id: String,
     room_id: String,
@@ -80,7 +80,7 @@ pub(crate) fn terminal_start(
     ensure_existing_dir(&request.cwd)?;
     ensure_terminal_name(&request.name)?;
     ensure_terminal_command(&request.command)?;
-    authorization_state.consume(
+    let canonical_cwd = authorization_state.consume(
         &request.authorization_token,
         &request.room_id,
         &request.cwd,
@@ -113,7 +113,7 @@ pub(crate) fn terminal_start(
         })
         .map_err(|error| format!("Failed to open terminal pty: {error}"))?;
     let mut command = CommandBuilder::new(shell);
-    command.cwd(&request.cwd);
+    command.cwd(&canonical_cwd);
     command.arg("-c");
     command.arg(&request.command);
     let child = pair
@@ -138,7 +138,7 @@ pub(crate) fn terminal_start(
     let session = TerminalSession {
         room_id: request.room_id,
         name: request.name,
-        cwd: request.cwd,
+        cwd: canonical_cwd,
         command: request.command,
         child,
         writer,
