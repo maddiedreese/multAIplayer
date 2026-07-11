@@ -14,7 +14,7 @@ function browserSurfaceTop(slot: HTMLElement) {
   const toolbarBottom =
     panel?.querySelector<HTMLElement>(".browser-toolbar")?.getBoundingClientRect().bottom ?? rect.top;
   const tabsBottom = panel?.querySelector<HTMLElement>(".browser-tabs")?.getBoundingClientRect().bottom ?? rect.top;
-  return Math.max(rect.top, toolbarBottom + 8, tabsBottom + 8);
+  return Math.max(rect.top, toolbarBottom, tabsBottom) + 16;
 }
 
 export function BrowserAccessPanel({
