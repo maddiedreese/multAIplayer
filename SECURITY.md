@@ -24,7 +24,7 @@ Release-specific checks and artifact trust notes are tracked in [docs/release-op
 
 ## Reporting
 
-Please use [GitHub private vulnerability reporting](https://github.com/maddiedreese/multAIplayer/security/advisories/new). Do not open a public issue for a suspected vulnerability. If private reporting is unavailable, open a minimal issue asking the maintainers for a private contact; do not include vulnerability details or sensitive data.
+Please use [GitHub private vulnerability reporting](https://github.com/maddiedreese/multAIplayer/security/advisories/new). If private reporting is unavailable, email [maddie@maddiedreese.com](mailto:maddie@maddiedreese.com). Do not open a public issue or include vulnerability details or sensitive data in a public channel.
 
 Good reports include:
 
