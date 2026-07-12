@@ -7,6 +7,12 @@
     "src/encoding.ts": {
       "minimumScore": 85,
       "maximumSurvived": 0
+    },
+    "src/index.ts": {
+      "maximumSurvived": 0
+    },
+    "src/inviteCapability.ts": {
+      "maximumSurvived": 0
     }
   },
   "allowedTimeouts": [],
@@ -86,6 +92,60 @@
     {
       "file": "src/index.ts",
       "marker": "local-aad",
+      "maximumSurvived": 0,
+      "maximumNoCoverage": 0,
+      "maximumRuntimeError": 0,
+      "maximumPending": 0,
+      "maximumTimeout": 0
+    },
+    {
+      "file": "src/index.ts",
+      "marker": "authenticated-room-secret-wrap",
+      "maximumSurvived": 0,
+      "maximumNoCoverage": 0,
+      "maximumRuntimeError": 0,
+      "maximumPending": 0,
+      "maximumTimeout": 0
+    },
+    {
+      "file": "src/index.ts",
+      "marker": "secret-and-identity-creation",
+      "maximumSurvived": 0,
+      "maximumNoCoverage": 0,
+      "maximumRuntimeError": 0,
+      "maximumPending": 0,
+      "maximumTimeout": 0
+    },
+    {
+      "file": "src/index.ts",
+      "marker": "envelope-wrappers",
+      "maximumSurvived": 0,
+      "maximumNoCoverage": 0,
+      "maximumRuntimeError": 0,
+      "maximumPending": 0,
+      "maximumTimeout": 0
+    },
+    {
+      "file": "src/index.ts",
+      "marker": "authenticated-wrap-authorization",
+      "maximumSurvived": 0,
+      "maximumNoCoverage": 0,
+      "maximumRuntimeError": 0,
+      "maximumPending": 0,
+      "maximumTimeout": 0
+    },
+    {
+      "file": "src/index.ts",
+      "marker": "device-key-equality",
+      "maximumSurvived": 0,
+      "maximumNoCoverage": 0,
+      "maximumRuntimeError": 0,
+      "maximumPending": 0,
+      "maximumTimeout": 0
+    },
+    {
+      "file": "src/index.ts",
+      "marker": "device-key-identity",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
       "maximumRuntimeError": 0,

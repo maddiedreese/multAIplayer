@@ -28,7 +28,10 @@ export function checkMutationPolicy(summary, policy, sources = {}) {
   const filesByPath = new Map(summary.files.map((file) => [file.path, file]));
   for (const [path, rule] of Object.entries(policy.files)) {
     requireObject(rule, `mutation policy rule for ${JSON.stringify(path)}`);
-    if (typeof rule.minimumScore !== "number" || rule.minimumScore < 0 || rule.minimumScore > 100) {
+    if (
+      rule.minimumScore !== undefined &&
+      (typeof rule.minimumScore !== "number" || rule.minimumScore < 0 || rule.minimumScore > 100)
+    ) {
       throw new TypeError(`mutation policy rule for ${JSON.stringify(path)} has an invalid minimumScore`);
     }
     if (!Number.isInteger(rule.maximumSurvived) || rule.maximumSurvived < 0) {
@@ -39,11 +42,13 @@ export function checkMutationPolicy(summary, policy, sources = {}) {
       failures.push(`${path}: missing from mutation summary`);
       continue;
     }
-    const score = file.counts?.mutationScore;
-    if (typeof score !== "number") {
-      failures.push(`${path}: has no mutation score`);
-    } else if (score < rule.minimumScore) {
-      failures.push(`${path}: mutation score ${score.toFixed(2)} is below ${rule.minimumScore.toFixed(2)}`);
+    if (rule.minimumScore !== undefined) {
+      const score = file.counts?.mutationScore;
+      if (typeof score !== "number") {
+        failures.push(`${path}: has no mutation score`);
+      } else if (score < rule.minimumScore) {
+        failures.push(`${path}: mutation score ${score.toFixed(2)} is below ${rule.minimumScore.toFixed(2)}`);
+      }
     }
     const survived = file.counts?.survived;
     if (!Number.isInteger(survived)) {
