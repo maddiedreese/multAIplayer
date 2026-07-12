@@ -252,7 +252,7 @@ MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS=0
 MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS=10000
 ```
 
-When shutdown starts, `/readyz` flips to not-ready immediately. `MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS` keeps the process alive briefly for load balancers to stop routing before sockets close; `MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS` bounds how long existing room WebSockets can take to close before they are terminated.
+When shutdown starts, `/readyz` flips to not-ready immediately. `MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS` is measured in milliseconds, defaults to `0`, and is bounded from `0` through `60000`; malformed values fall back to the default and out-of-range values are clamped to that range. It keeps the process alive briefly for load balancers to stop routing before sockets close. `MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS` bounds how long existing room WebSockets can take to close before they are terminated.
 
 Workspace mutations can require GitHub sign-in:
 
