@@ -25,7 +25,7 @@
     "cookie-parser": "1.4.7",
     "cors": "2.8.6",
     "express": "5.2.1",
-    "nanoid": "5.1.16",
+    "nanoid": "6.0.0",
     "ws": "8.21.0",
     "zod": "4.4.3"
   },
@@ -37,10 +37,10 @@
     "@types/cookie-parser": "1.4.10",
     "@types/cors": "2.8.19",
     "@types/express": "5.0.6",
-    "@types/node": "22.20.1",
+    "@types/node": "26.1.1",
     "@types/ws": "8.18.1",
     "fast-check": "4.9.0",
     "tsx": "4.23.0",
-    "typescript": "6.0.3"
+    "typescript": "7.0.2"
   }
 }
