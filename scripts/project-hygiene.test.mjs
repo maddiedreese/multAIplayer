@@ -54,6 +54,7 @@ test("CI verifies each layer once before packaging prebuilt desktop assets", () 
   assert.equal(workflow.match(/run: npm run verify:web$/gm)?.length, 1);
   assert.equal(workflow.match(/run: npm run verify:native$/gm)?.length, 1);
   assert.equal(workflow.match(/run: npm run test:mutation -w @multaiplayer\/crypto$/gm)?.length, 1);
+  assert.match(workflow, /name: Build package dependencies\n\s+run: npm run build:packages/);
   assert.match(
     workflow,
     /crypto-mutation:\n\s+name: Crypto mutation policy\n\s+runs-on: ubuntu-latest\n\s+timeout-minutes: 30/

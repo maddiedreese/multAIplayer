@@ -69,6 +69,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build package dependencies
+        run: npm run build:packages
+
       - name: Mutation-test cryptographic authorization logic
         run: npm run test:mutation -w @multaiplayer/crypto
 
