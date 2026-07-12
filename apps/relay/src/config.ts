@@ -25,7 +25,6 @@ export interface RelayConfig {
   sessionPersistenceSecret: string | null;
   debugEndpointsEnabled: boolean;
   allowedCorsOrigins: string[];
-  seedDemoWorkspace: boolean;
   mutationsRequireAuth: boolean;
   rateLimitsEnabled: boolean;
   trustProxyHeaders: boolean;
@@ -81,9 +80,13 @@ export function loadRelayConfig(): RelayConfig {
     ),
     storageBackend,
     legacyJsonImportPath:
-      storageBackend === "sqlite" && !storageWasExplicit && !dataPathWasExplicit && existsSync(defaultLegacyJsonPath)
-        ? defaultLegacyJsonPath
-        : null,
+      storageBackend !== "sqlite"
+        ? null
+        : process.env.MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH
+          ? resolve(process.env.MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH)
+          : !storageWasExplicit && !dataPathWasExplicit && existsSync(defaultLegacyJsonPath)
+            ? defaultLegacyJsonPath
+            : null,
     encryptedBacklogLimit: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_LIMIT, 200, 1, 1000),
     encryptedBacklogRetentionDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS, 30, 1, 365),
     inviteTtlDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_INVITE_TTL_DAYS, 7, 1, 365),
@@ -123,7 +126,6 @@ export function loadRelayConfig(): RelayConfig {
     sessionPersistenceSecret: normalizeSessionPersistenceSecret(process.env.MULTAIPLAYER_RELAY_SESSION_SECRET),
     debugEndpointsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_DEBUG, false),
     allowedCorsOrigins: parseAllowedOriginEnv(process.env.MULTAIPLAYER_RELAY_ALLOWED_ORIGINS),
-    seedDemoWorkspace: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_SEED_DEMO, nodeEnv !== "production"),
     mutationsRequireAuth: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_REQUIRE_AUTH, nodeEnv === "production"),
     rateLimitsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMITS, true),
     trustProxyHeaders:

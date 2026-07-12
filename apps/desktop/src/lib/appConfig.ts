@@ -9,8 +9,9 @@ const viteEnv = (
   }
 ).env;
 
-export const defaultRelayHttpUrl = (viteEnv?.VITE_RELAY_HTTP_URL ?? "http://127.0.0.1:4321").replace(/\/$/, "");
-export const defaultRelayWsUrl = viteEnv?.VITE_RELAY_URL ?? "ws://127.0.0.1:4321/rooms";
+export const defaultRelayHttpUrl = (viteEnv?.VITE_RELAY_HTTP_URL ?? "").replace(/\/$/, "");
+export const defaultRelayWsUrl = viteEnv?.VITE_RELAY_URL ?? "";
+export const allowRelayConfiguration = viteEnv?.VITE_ALLOW_RELAY_CONFIGURATION === "true";
 
 const configKey = "multaiplayer:app-config";
 
@@ -37,13 +38,15 @@ export function resetAppConfig(): AppConfig {
 }
 
 export function getRelayHttpUrl(): string {
-  return loadAppConfig().relayHttpUrl;
+  const relayHttpUrl = loadAppConfig().relayHttpUrl;
+  if (!relayHttpUrl) throw new Error("Relay is not configured for this build.");
+  return relayHttpUrl;
 }
 
 export function normalizeAppConfig(config: Partial<AppConfig>): AppConfig {
   return {
-    relayHttpUrl: normalizeHttpUrl(config.relayHttpUrl ?? defaultRelayHttpUrl),
-    relayWsUrl: normalizeWsUrl(config.relayWsUrl ?? defaultRelayWsUrl)
+    relayHttpUrl: normalizeOptionalHttpUrl(config.relayHttpUrl ?? defaultRelayHttpUrl),
+    relayWsUrl: normalizeOptionalWsUrl(config.relayWsUrl ?? defaultRelayWsUrl)
   };
 }
 
@@ -54,7 +57,8 @@ function defaultAppConfig(): AppConfig {
   };
 }
 
-function normalizeHttpUrl(value: string): string {
+function normalizeOptionalHttpUrl(value: string): string {
+  if (!value.trim()) return "";
   const url = new URL(value.trim());
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("Relay HTTP URL must start with http:// or https://");
@@ -62,7 +66,8 @@ function normalizeHttpUrl(value: string): string {
   return url.toString().replace(/\/$/, "");
 }
 
-function normalizeWsUrl(value: string): string {
+function normalizeOptionalWsUrl(value: string): string {
+  if (!value.trim()) return "";
   const url = new URL(value.trim());
   if (url.protocol !== "ws:" && url.protocol !== "wss:") {
     throw new Error("Relay WebSocket URL must start with ws:// or wss://");

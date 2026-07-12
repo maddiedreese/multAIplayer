@@ -9,7 +9,7 @@ import {
   type RoomMainColumnSources
 } from "../src/components/RoomMainColumnContainer";
 import { useAppStore } from "../src/store/appStore";
-import { seededRooms, seededTeams } from "../src/seedData";
+import { seededRooms, seededTeams } from "./support/workspaceFixtures";
 import type { ChatAttachment, ChatMessage, LocalPreviewRecord } from "../src/types";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {

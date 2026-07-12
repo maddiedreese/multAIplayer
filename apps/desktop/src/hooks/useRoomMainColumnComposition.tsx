@@ -7,7 +7,7 @@ import {
 import { RoomMainColumn } from "../components/RoomMainColumn";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
-import { fallbackUser } from "../seedData";
+import { loadOrCreateDeviceId } from "../lib/appRuntime";
 import { canApproveCodexTurn } from "../lib/codexApproval";
 import { formatApprovalAttachments, formatApprovalMessages } from "../lib/codexApprovalSummary";
 import {
@@ -137,9 +137,10 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
   } = useAppStore(useShallow(selectRoomMainColumnView));
   const roomId = selectedRoom.id;
 
+  const localDeviceId = React.useMemo(() => loadOrCreateDeviceId(), []);
   const localUser = {
-    id: currentUser?.id ?? fallbackUser.id,
-    name: currentUser?.name ?? currentUser?.login ?? fallbackUser.name
+    id: currentUser?.id ?? `local:${localDeviceId}`,
+    name: currentUser?.name ?? currentUser?.login ?? "Local user"
   };
   const roomLocked = forgotten || revoked || Boolean(selectedRoom.archivedAt);
   const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser);

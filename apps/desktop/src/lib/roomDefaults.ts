@@ -14,7 +14,6 @@ import { normalizeBrowserAllowedOrigins } from "./browserPolicy";
 export function ensureRoomDefaults(room: RoomRecord): RoomRecord {
   return {
     ...room,
-    name: normalizeRoomDisplayName(room.name),
     codexModel: room.codexModel || defaultCodexModel,
     codexModelPolicy: room.codexModelPolicy ?? legacyCodexCatalogSelectionPolicy,
     codexReasoningEffort: room.codexReasoningEffort ?? defaultCodexReasoningEffort,
@@ -32,10 +31,4 @@ export function ensureRoomDefaults(room: RoomRecord): RoomRecord {
         ? room.browserProfilePersistent
         : defaultBrowserProfilePersistent
   };
-}
-
-function normalizeRoomDisplayName(name: string): string {
-  if (name === "Relay + E2EE") return "Relay ops";
-  if (name === "Desktop client") return "Desktop app";
-  return name;
 }

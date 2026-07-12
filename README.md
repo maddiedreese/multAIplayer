@@ -38,7 +38,7 @@ npm run doctor
 npm run dev
 ```
 
-Node.js 22 or newer is required; `nvm use` selects the same Node major used in CI. `npm run doctor` checks the local Node/npm/Rust/Cargo setup and macOS packaging prerequisites where applicable. `npm run dev` starts the local relay on `http://127.0.0.1:4321` and the desktop web shell on `http://127.0.0.1:1420`.
+Node.js 22 or newer is required; `nvm use` selects the same Node major used in CI. `npm run doctor` checks the local Node/npm/Rust/Cargo setup and macOS packaging prerequisites where applicable. `npm run dev` starts the local relay and desktop web shell; see [the self-hosting guide](docs/self-hosting.md) for the local endpoints and relay configuration.
 
 To run the native Tauri app with the relay:
 
@@ -46,11 +46,11 @@ To run the native Tauri app with the relay:
 npm run tauri:dev
 ```
 
-Copy `.env.example` to `.env` and set `GITHUB_CLIENT_ID` to enable GitHub sign-in. The relay loads the repo root `.env`, a relay-local `apps/relay/.env`, or an explicit `MULTAIPLAYER_RELAY_ENV_FILE`; shell-exported variables take precedence. Set `MULTAIPLAYER_RELAY_SESSION_SECRET` to a stable high-entropy value if the relay should keep encrypted GitHub sessions across restarts. The default `GITHUB_OAUTH_SCOPES=read:user public_repo` supports public open-source PR creation; use `read:user repo` if your self-hosted relay needs private repo PRs. Without GitHub OAuth, local development can run with seeded rooms.
+Copy `.env.example` to `.env` and set `GITHUB_CLIENT_ID` to enable GitHub sign-in. The relay loads the repo root `.env`, a relay-local `apps/relay/.env`, or an explicit `MULTAIPLAYER_RELAY_ENV_FILE`; shell-exported variables take precedence. Set `MULTAIPLAYER_RELAY_SESSION_SECRET` to a stable high-entropy value if the relay should keep encrypted GitHub sessions across restarts. The default `GITHUB_OAUTH_SCOPES=read:user public_repo` supports public open-source PR creation; use `read:user repo` if your self-hosted relay needs private repo PRs.
 
-For `NODE_ENV=production`, the relay requires auth by default even if GitHub OAuth is not configured, and demo rooms are not seeded. Self-hosters who intentionally want an unauthenticated private LAN relay must set `MULTAIPLAYER_RELAY_REQUIRE_AUTH=false` explicitly.
+GitHub OAuth is required for signed-in workspace access. For `NODE_ENV=production`, the relay requires authentication by default even if GitHub OAuth is not configured. Self-hosters who intentionally want an unauthenticated private LAN relay must set `MULTAIPLAYER_RELAY_REQUIRE_AUTH=false` explicitly.
 
-Self-hosted relays can be selected from the in-app Settings drawer by changing the relay HTTP API URL and WebSocket rooms URL. The packaged public alpha app-shell CSP allows localhost development relays and the official hosted relay; custom HTTPS/WSS relay origins require a self-built desktop app whose CSP includes those origins.
+Self-hosted desktop builds can expose relay endpoint editing by setting `VITE_ALLOW_RELAY_CONFIGURATION=true`. Their app-shell CSP must include the chosen HTTP and WebSocket relay origins. Official packaged builds pin their hosted endpoints and do not expose relay editing or localhost relay access.
 
 For an internet-facing relay, configure exact allowed origins, durable encrypted session storage, auth-required mode, persistent relay storage, and rate limits, then run:
 

@@ -8,7 +8,7 @@ import {
   patchHostStatus,
   readFile,
   rm,
-  startRelay,
+  startRelayWithWorkspace,
   testEnvelope,
   waitForClose,
   waitForDebugBacklog,
@@ -26,7 +26,7 @@ import {
 } from "../support/relay.js";
 
 test("relay rejects non-host takeover and allows explicit handoff", async () => {
-  const relay = await startRelay();
+  const relay = await startRelayWithWorkspace();
   try {
     assert.equal(
       await patchHostStatus(relay.baseUrl, { host: "Peer", hostUserId: "github:peer", hostStatus: "active" }),
@@ -66,7 +66,7 @@ test("relay rejects non-host takeover and allows explicit handoff", async () => 
 });
 
 test("relay broadcasts room.updated after room settings change", async () => {
-  const relay = await startRelay();
+  const relay = await startRelayWithWorkspace();
   const socket = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(socket);
@@ -107,7 +107,7 @@ test("relay broadcasts room.updated after room settings change", async () => {
 });
 
 test("relay broadcasts newly created rooms to team subscribers", async () => {
-  const relay = await startRelay();
+  const relay = await startRelayWithWorkspace();
   const socket = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(socket);
@@ -148,7 +148,7 @@ test("relay broadcasts newly created rooms to team subscribers", async () => {
 });
 
 test("relay broadcasts newly created teams to workspace subscribers", async () => {
-  const relay = await startRelay();
+  const relay = await startRelayWithWorkspace();
   const socket = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(socket);
@@ -178,7 +178,7 @@ test("relay broadcasts newly created teams to workspace subscribers", async () =
 });
 
 test("relay updates team member count from room presence", async () => {
-  const relay = await startRelay(
+  const relay = await startRelayWithWorkspace(
     {},
     {
       version: 1,
@@ -250,7 +250,7 @@ test("relay updates team member count from room presence", async () => {
 });
 
 test("relay does not store plaintext room metadata events in encrypted backlog", async () => {
-  const relay = await startRelay();
+  const relay = await startRelayWithWorkspace();
   const sender = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(sender);
@@ -294,7 +294,7 @@ test("relay does not store plaintext room metadata events in encrypted backlog",
 });
 
 test("relay prunes encrypted backlog by retention window", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS: "1" });
+  const relay = await startRelayWithWorkspace({ MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS: "1" });
   const sender = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(sender);
@@ -335,7 +335,7 @@ test("relay prunes encrypted backlog by retention window", async () => {
 });
 
 test("relay rejects oversized encrypted room envelopes", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES: "4096" });
+  const relay = await startRelayWithWorkspace({ MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES: "4096" });
   const sender = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(sender);
@@ -382,7 +382,7 @@ test("relay rejects oversized encrypted room envelopes", async () => {
 });
 
 test("relay prunes oversized encrypted backlog loaded from store", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES: "4096" });
+  const relay = await startRelayWithWorkspace({ MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES: "4096" });
   try {
     await relay.close({ preserveData: true });
     const state = JSON.parse(await readFile(relay.dataPath, "utf8")) as StoredRelayStateFixture;
@@ -404,7 +404,7 @@ test("relay prunes oversized encrypted backlog loaded from store", async () => {
     ];
     await writeFile(relay.dataPath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 
-    const restarted = await startRelay(
+    const restarted = await startRelayWithWorkspace(
       {
         MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES: "4096"
       },
@@ -424,8 +424,8 @@ test("relay prunes oversized encrypted backlog loaded from store", async () => {
 });
 
 test("relay drops malformed and cross-room encrypted backlog loaded from store", async () => {
-  const relay = await startRelay(
-    { MULTAIPLAYER_RELAY_SEED_DEMO: "false" },
+  const relay = await startRelayWithWorkspace(
+    {},
     {
       version: 1,
       savedAt: new Date().toISOString(),
@@ -488,7 +488,7 @@ test("relay drops malformed and cross-room encrypted backlog loaded from store",
 });
 
 test("relay accepts and broadcasts encrypted browser status events", async () => {
-  const relay = await startRelay();
+  const relay = await startRelayWithWorkspace();
   const receiver = new WebSocket(relay.wsUrl);
   const sender = new WebSocket(relay.wsUrl);
   try {
@@ -522,7 +522,7 @@ test("relay accepts and broadcasts encrypted browser status events", async () =>
 });
 
 test("relay ignores duplicate encrypted envelopes by room id", async () => {
-  const relay = await startRelay();
+  const relay = await startRelayWithWorkspace();
   const receiver = new WebSocket(relay.wsUrl);
   const sender = new WebSocket(relay.wsUrl);
   try {
@@ -565,7 +565,7 @@ test("relay ignores duplicate encrypted envelopes by room id", async () => {
 });
 
 test("relay rejects non-host room key transitions before epoch CAS", async () => {
-  const relay = await startRelay();
+  const relay = await startRelayWithWorkspace();
   const member = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(member);
@@ -602,7 +602,7 @@ test("relay rejects non-host room key transitions before epoch CAS", async () =>
 });
 
 test("relay requires key rotation at the per-epoch envelope budget and permits the rotation at the ceiling", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_EPOCH_ENVELOPE_LIMIT: "1" });
+  const relay = await startRelayWithWorkspace({ MULTAIPLAYER_RELAY_EPOCH_ENVELOPE_LIMIT: "1" });
   let activeRelay: RelayHarness = relay;
   let host = new WebSocket(relay.wsUrl);
   try {
@@ -633,7 +633,7 @@ test("relay requires key rotation at the per-epoch envelope budget and permits t
     const backlogEntries = stored.encryptedBacklog as Array<{ envelopes: Array<{ createdAt: string }> }>;
     backlogEntries[0]!.envelopes[0]!.createdAt = "2000-01-01T00:00:00.000Z";
     await writeFile(relay.dataPath, `${JSON.stringify(stored, null, 2)}\n`, "utf8");
-    activeRelay = await startRelay(
+    activeRelay = await startRelayWithWorkspace(
       { MULTAIPLAYER_RELAY_EPOCH_ENVELOPE_LIMIT: "1", MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS: "1" },
       undefined,
       relay.dataPath
@@ -677,7 +677,7 @@ test("relay requires key rotation at the per-epoch envelope budget and permits t
 });
 
 test("relay serializes concurrent publishes at the epoch envelope boundary", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_EPOCH_ENVELOPE_LIMIT: "1" });
+  const relay = await startRelayWithWorkspace({ MULTAIPLAYER_RELAY_EPOCH_ENVELOPE_LIMIT: "1" });
   const firstHost = new WebSocket(relay.wsUrl);
   const secondHost = new WebSocket(relay.wsUrl);
   try {
@@ -736,7 +736,7 @@ test("relay serializes concurrent publishes at the epoch envelope boundary", asy
 });
 
 test("relay replays encrypted backlog after restart when a client rejoins", async () => {
-  const relay = await startRelay();
+  const relay = await startRelayWithWorkspace();
   const sender = new WebSocket(relay.wsUrl);
   let restarted: RelayHarness | null = null;
   try {
@@ -758,7 +758,7 @@ test("relay replays encrypted backlog after restart when a client rejoins", asyn
 
     sender.close();
     await relay.close({ preserveData: true });
-    restarted = await startRelay({}, undefined, relay.dataPath);
+    restarted = await startRelayWithWorkspace({}, undefined, relay.dataPath);
 
     const receiver = new WebSocket(restarted.wsUrl);
     try {
@@ -789,7 +789,7 @@ test("relay replays encrypted backlog after restart when a client rejoins", asyn
 });
 
 test("relay accepts and broadcasts encrypted terminal result events", async () => {
-  const relay = await startRelay();
+  const relay = await startRelayWithWorkspace();
   const receiver = new WebSocket(relay.wsUrl);
   const sender = new WebSocket(relay.wsUrl);
   try {
@@ -823,7 +823,7 @@ test("relay accepts and broadcasts encrypted terminal result events", async () =
 });
 
 test("relay accepts and broadcasts encrypted git workflow events", async () => {
-  const relay = await startRelay();
+  const relay = await startRelayWithWorkspace();
   const receiver = new WebSocket(relay.wsUrl);
   const sender = new WebSocket(relay.wsUrl);
   try {
@@ -857,7 +857,7 @@ test("relay accepts and broadcasts encrypted git workflow events", async () => {
 });
 
 test("relay accepts device-sealed invite events and rejects other sealed event kinds", async () => {
-  const relay = await startRelay();
+  const relay = await startRelayWithWorkspace();
   const receiver = new WebSocket(relay.wsUrl);
   const sender = new WebSocket(relay.wsUrl);
   try {
@@ -905,7 +905,7 @@ test("relay accepts device-sealed invite events and rejects other sealed event k
 });
 
 test("relay rejects websocket room and identity mismatches", async () => {
-  const relay = await startRelay();
+  const relay = await startRelayWithWorkspace();
   const socket = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(socket);
@@ -969,7 +969,7 @@ test("relay rejects websocket room and identity mismatches", async () => {
 });
 
 test("relay bounds websocket identity and presence metadata", async () => {
-  const relay = await startRelay();
+  const relay = await startRelayWithWorkspace();
   const socket = new WebSocket(relay.wsUrl);
   try {
     await onceOpen(socket);
@@ -1040,7 +1040,7 @@ test("relay bounds websocket identity and presence metadata", async () => {
 });
 
 test("relay enriches presence with registered device fingerprints", async () => {
-  const relay = await startRelay(
+  const relay = await startRelayWithWorkspace(
     {},
     {
       version: 1,
@@ -1160,7 +1160,7 @@ test("relay enriches presence with registered device fingerprints", async () => 
 });
 
 test("relay rate limits room WebSocket events per client", async () => {
-  const relay = await startRelay({
+  const relay = await startRelayWithWorkspace({
     MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET: "1",
     MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS: "60000"
   });
@@ -1193,7 +1193,7 @@ test("relay rate limits room WebSocket events per client", async () => {
 });
 
 test("relay rate limits WebSocket connection attempts per client", async () => {
-  const relay = await startRelay({
+  const relay = await startRelayWithWorkspace({
     MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT: "1",
     MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS: "60000"
   });
@@ -1230,7 +1230,7 @@ test("relay rate limits WebSocket connection attempts per client", async () => {
 });
 
 test("relay caps concurrent room WebSocket connections per device", async () => {
-  const relay = await startRelay({
+  const relay = await startRelayWithWorkspace({
     MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER: "10",
     MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE: "1"
   });
@@ -1280,7 +1280,7 @@ test("relay caps concurrent room WebSocket connections per device", async () => 
 });
 
 test("relay caps concurrent WebSocket connections per user identity", async () => {
-  const relay = await startRelay({
+  const relay = await startRelayWithWorkspace({
     MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER: "1",
     MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE: "5"
   });
@@ -1311,7 +1311,7 @@ test("relay caps concurrent WebSocket connections per user identity", async () =
 });
 
 test("relay applies configured WebSocket origin allowlist", async () => {
-  const relay = await startRelay({
+  const relay = await startRelayWithWorkspace({
     MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://multaiplayer.com/ http://127.0.0.1:1420"
   });
   const allowed = new WebSocket(relay.wsUrl, { headers: { origin: "https://multaiplayer.com" } });
@@ -1327,7 +1327,7 @@ test("relay applies configured WebSocket origin allowlist", async () => {
 });
 
 test("relay denies browser WebSocket origins by default in production", async () => {
-  const relay = await startRelay({ NODE_ENV: "production" });
+  const relay = await startRelayWithWorkspace({ NODE_ENV: "production" });
   const socket = new WebSocket(relay.wsUrl, { headers: { origin: "https://multaiplayer.com" } });
   try {
     assert.match(await waitForRejectedOpen(socket), /Unexpected server response: 403/);

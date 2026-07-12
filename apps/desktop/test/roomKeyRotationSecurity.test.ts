@@ -32,6 +32,15 @@ const localStorage = new MemoryStorage();
 Object.defineProperty(globalThis, "localStorage", { configurable: true, value: localStorage });
 Object.defineProperty(globalThis, "window", { configurable: true, value: { localStorage } });
 
+function resetTestState() {
+  localStorage.clear();
+  localStorage.setItem(
+    "multaiplayer:app-config",
+    JSON.stringify({ relayHttpUrl: "https://relay.test", relayWsUrl: "wss://relay.test/rooms" })
+  );
+  useAppStore.getState().resetAppStore();
+}
+
 const room: RoomRecord = {
   id: "room-rotation-security",
   teamId: "team-rotation-security",
@@ -51,8 +60,7 @@ const room: RoomRecord = {
 };
 
 test("rotation rejects relay-substituted and injected unpinned recipient keys before wrapping", async () => {
-  localStorage.clear();
-  useAppStore.getState().resetAppStore();
+  resetTestState();
   const host = await createDeviceKeyAgreementIdentity();
   const legitimate = await createDeviceKeyAgreementIdentity();
   const attacker = await createDeviceKeyAgreementIdentity();
@@ -109,8 +117,7 @@ test("rotation rejects relay-substituted and injected unpinned recipient keys be
 });
 
 test("failed rotation retry after removal rebuilds without wrapping to the removed device", async () => {
-  localStorage.clear();
-  useAppStore.getState().resetAppStore();
+  resetTestState();
   const host = await createDeviceKeyAgreementIdentity();
   const removed = await createDeviceKeyAgreementIdentity();
   useAppStore.setState({ deviceIdentity: host, relayStatus: "open", trustedDeviceKeys: [] });

@@ -63,7 +63,6 @@ import {
 } from "./limits.js";
 import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
 import { createRelayPersistence } from "./persistence.js";
-import { seedWorkspace } from "./seed.js";
 import { createRelayStore, type AuthSession, type ClientSession, type RoomKey } from "./state.js";
 import { createRelayStoreCodec } from "./store-codec.js";
 import { createRelayStorePersistenceCoordinator } from "./store-persistence.js";
@@ -96,7 +95,6 @@ export async function createRelayApp() {
     sessionPersistenceSecret,
     debugEndpointsEnabled,
     allowedCorsOrigins,
-    seedDemoWorkspace,
     mutationsRequireAuth,
     rateLimitsEnabled,
     trustProxyHeaders,
@@ -411,11 +409,6 @@ export async function createRelayApp() {
   });
 
   await relayStorePersistence.loadRelayStore();
-  seedWorkspace({
-    store: relayStore,
-    seedDemoWorkspace,
-    scheduleStoreSave
-  });
 
   function canPublishEnvelope(session: ClientSession, envelope: RelayEnvelope): boolean {
     const sessionMatches =

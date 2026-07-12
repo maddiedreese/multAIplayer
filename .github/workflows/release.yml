@@ -28,6 +28,8 @@ jobs:
       prerelease: ${{ steps.release.outputs.prerelease }}
     env:
       NODE_OPTIONS: --max-old-space-size=4096
+      VITE_RELAY_HTTP_URL: ${{ vars.OFFICIAL_RELAY_HTTP_URL }}
+      VITE_RELAY_URL: ${{ vars.OFFICIAL_RELAY_WS_URL }}
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -136,6 +138,11 @@ jobs:
             build.keychain
           security find-identity -v -p codesigning build.keychain
           rm -f certificate.p12
+
+      - name: Validate official relay endpoints
+        run: |
+          case "$VITE_RELAY_HTTP_URL" in https://*) ;; *) echo "OFFICIAL_RELAY_HTTP_URL must be a configured HTTPS URL." >&2; exit 1 ;; esac
+          case "$VITE_RELAY_URL" in wss://*) ;; *) echo "OFFICIAL_RELAY_WS_URL must be a configured WSS URL." >&2; exit 1 ;; esac
 
       - name: Run release preflight
         run: npm run release:preflight

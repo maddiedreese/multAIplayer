@@ -87,7 +87,7 @@ test("relay rejects expired invite metadata loaded from store", async () => {
 
 test("relay drops invalid persisted invite metadata", async () => {
   const relay = await startRelay(
-    { MULTAIPLAYER_RELAY_SEED_DEMO: "false" },
+    {},
     {
       version: 1,
       savedAt: new Date().toISOString(),

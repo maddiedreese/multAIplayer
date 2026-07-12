@@ -20,6 +20,7 @@ export function RoomSettingsDrawerPanel({
   roomKeysLabel,
   posture,
   chooseProjectDisabled,
+  allowRelayConfiguration,
   relayHttpDraft,
   relayWsDraft,
   defaultRelayHttpUrl,
@@ -66,6 +67,7 @@ export function RoomSettingsDrawerPanel({
   roomKeysLabel: string;
   posture: RoomPostureDisplay;
   chooseProjectDisabled: boolean;
+  allowRelayConfiguration: boolean;
   relayHttpDraft: string;
   relayWsDraft: string;
   defaultRelayHttpUrl: string;
@@ -124,39 +126,41 @@ export function RoomSettingsDrawerPanel({
         onChooseProject={onChooseProject}
       />
 
-      <section className="drawer-section relay-config-section">
-        <div className="drawer-section-title">App server / relay</div>
-        <p className="drawer-help-text">
-          Local alpha builds use the dev relay at 127.0.0.1. Packaged builds only connect to relay origins allowed by
-          the app shell CSP.
-        </p>
-        <label>
-          <span>HTTP API URL</span>
-          <input
-            value={relayHttpDraft}
-            onChange={(event) => onRelayHttpDraftChange(event.target.value)}
-            placeholder={defaultRelayHttpUrl}
-          />
-        </label>
-        <label>
-          <span>WebSocket rooms URL</span>
-          <input
-            value={relayWsDraft}
-            onChange={(event) => onRelayWsDraftChange(event.target.value)}
-            placeholder={defaultRelayWsUrl}
-          />
-        </label>
-        <div className="drawer-button-row">
-          <button className="ghost-wide" onClick={onResetRelay}>
-            <RefreshCw size={15} />
-            Defaults
-          </button>
-          <button className="primary-wide" onClick={onSaveRelay} disabled={saveRelayDisabled}>
-            <Check size={15} />
-            Save relay
-          </button>
-        </div>
-      </section>
+      {allowRelayConfiguration && (
+        <section className="drawer-section relay-config-section">
+          <div className="drawer-section-title">App server / relay</div>
+          <p className="drawer-help-text">
+            Self-hosted builds can override their relay endpoints here. The app can connect only to origins allowed by
+            its build-time content security policy.
+          </p>
+          <label>
+            <span>HTTP API URL</span>
+            <input
+              value={relayHttpDraft}
+              onChange={(event) => onRelayHttpDraftChange(event.target.value)}
+              placeholder={defaultRelayHttpUrl}
+            />
+          </label>
+          <label>
+            <span>WebSocket rooms URL</span>
+            <input
+              value={relayWsDraft}
+              onChange={(event) => onRelayWsDraftChange(event.target.value)}
+              placeholder={defaultRelayWsUrl}
+            />
+          </label>
+          <div className="drawer-button-row">
+            <button className="ghost-wide" onClick={onResetRelay}>
+              <RefreshCw size={15} />
+              Defaults
+            </button>
+            <button className="primary-wide" onClick={onSaveRelay} disabled={saveRelayDisabled}>
+              <Check size={15} />
+              Save relay
+            </button>
+          </div>
+        </section>
+      )}
 
       {showRoomSettingsGate && <div className="workflow-message">{roomSettingsGateMessage}</div>}
 

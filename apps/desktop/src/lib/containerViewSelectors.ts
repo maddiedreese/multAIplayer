@@ -1,4 +1,4 @@
-import { emptyRoom } from "../seedData";
+import { emptyRoom } from "../appDefaults";
 import type { AppStoreState } from "../store/appStore";
 import type { BrowserRoomState } from "../store/slices/browserSlice";
 import type { CodexRuntimeRoomState } from "../store/slices/codexHostHandoffSlice";

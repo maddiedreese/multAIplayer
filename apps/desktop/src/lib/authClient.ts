@@ -16,7 +16,13 @@ export interface GitHubDeviceStart {
   verification_uri: string;
   expires_in: number;
   interval: number;
+  expiresAt: number;
 }
+
+export type GitHubDevicePollResult =
+  | { status: "pending" }
+  | { status: "slow_down"; retryAfterSeconds: number }
+  | { status: "complete"; user: SignedInUser };
 
 export interface SignedInUser {
   id: string;
@@ -47,10 +53,11 @@ export async function startGitHubDeviceFlow(): Promise<GitHubDeviceStart> {
   if (!response.ok) {
     throw new Error(body.error ?? "Failed to start GitHub device flow");
   }
-  return body as GitHubDeviceStart;
+  const flow = body as Omit<GitHubDeviceStart, "expiresAt">;
+  return { ...flow, expiresAt: Date.now() + Math.max(0, flow.expires_in) * 1000 };
 }
 
-export async function pollGitHubDeviceFlow(deviceCode: string): Promise<SignedInUser | null> {
+export async function pollGitHubDeviceFlow(deviceCode: string): Promise<GitHubDevicePollResult> {
   const response = await fetch(`${getRelayHttpUrl()}/auth/github/device/poll`, {
     method: "POST",
     credentials: "include",
@@ -58,11 +65,25 @@ export async function pollGitHubDeviceFlow(deviceCode: string): Promise<SignedIn
     body: JSON.stringify({ device_code: deviceCode })
   });
   const body = await response.json();
-  if (response.status === 202) return null;
+  if (response.status === 202) {
+    if (body.status === "slow_down") {
+      return { status: "slow_down", retryAfterSeconds: Math.max(1, Number(body.retryAfterSeconds) || 5) };
+    }
+    return { status: "pending" };
+  }
   if (!response.ok) {
     throw new Error(body.error_description ?? body.error ?? "Failed to poll GitHub device flow");
   }
-  return (body as { user: SignedInUser }).user;
+  return { status: "complete", user: (body as { user: SignedInUser }).user };
+}
+
+export function nextGitHubDevicePollIntervalSeconds(currentInterval: number, result: GitHubDevicePollResult): number {
+  const normalized = Math.max(1, currentInterval);
+  return result.status === "slow_down" ? normalized + result.retryAfterSeconds : normalized;
+}
+
+export function githubDevicePollDelayMs(intervalSeconds: number, expiresAt: number, now = Date.now()): number {
+  return Math.max(0, Math.min(Math.max(1, intervalSeconds) * 1000, expiresAt - now));
 }
 
 export async function logout(): Promise<void> {

@@ -24,7 +24,7 @@ test("real relay process keeps create, invite, rotate, and remove lifecycle plai
   assert.ok(markers.length >= 3, "security corpus must retain several independent leak markers");
 
   const relay = await startRelay(
-    { MULTAIPLAYER_RELAY_STORAGE: "json", MULTAIPLAYER_RELAY_SEED_DEMO: "false" },
+    { MULTAIPLAYER_RELAY_STORAGE: "json" },
     {
       version: 1,
       savedAt: "2026-07-12T00:00:00.000Z",

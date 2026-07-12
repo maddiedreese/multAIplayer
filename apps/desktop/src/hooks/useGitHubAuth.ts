@@ -2,7 +2,9 @@ import { useCallback, useEffect } from "react";
 import {
   getAuthConfig,
   getCurrentUser,
+  githubDevicePollDelayMs,
   logout,
+  nextGitHubDevicePollIntervalSeconds,
   pollGitHubDeviceFlow,
   startGitHubDeviceFlow,
   type GitHubAuthConfig
@@ -32,6 +34,12 @@ export function useGitHubAuth(relayHttpUrl: string) {
 
   useEffect(() => {
     setAuthError(null);
+    if (!relayHttpUrl) {
+      setAuthConfig(fallbackAuthConfig);
+      setCurrentUser(null);
+      setAuthError("Relay is not configured for this build.");
+      return;
+    }
     getAuthConfig()
       .then(setAuthConfig)
       .catch((error) => {
@@ -46,15 +54,27 @@ export function useGitHubAuth(relayHttpUrl: string) {
   useEffect(() => {
     if (!deviceFlow || currentUser) return;
     let cancelled = false;
-    const intervalMs = Math.max(1, deviceFlow.interval) * 1000;
-    const timer = window.setInterval(() => {
+    let timer: number | undefined;
+    let intervalSeconds = Math.max(1, deviceFlow.interval);
+    const poll = () => {
+      if (Date.now() >= deviceFlow.expiresAt) {
+        setAuthBusy(false);
+        setAuthError("The GitHub sign-in code expired. Start sign-in again.");
+        setDeviceFlow(null);
+        return;
+      }
       pollGitHubDeviceFlow(deviceFlow.device_code)
-        .then((user) => {
-          if (cancelled || !user) return;
-          setCurrentUser(user);
-          setDeviceFlow(null);
-          setAuthBusy(false);
-          setAuthError(null);
+        .then((result) => {
+          if (cancelled) return;
+          if (result.status === "complete") {
+            setCurrentUser(result.user);
+            setDeviceFlow(null);
+            setAuthBusy(false);
+            setAuthError(null);
+            return;
+          }
+          intervalSeconds = nextGitHubDevicePollIntervalSeconds(intervalSeconds, result);
+          timer = window.setTimeout(poll, githubDevicePollDelayMs(intervalSeconds, deviceFlow.expiresAt));
         })
         .catch((error) => {
           if (cancelled) return;
@@ -62,10 +82,11 @@ export function useGitHubAuth(relayHttpUrl: string) {
           setAuthError(String(error));
           setDeviceFlow(null);
         });
-    }, intervalMs);
+    };
+    timer = window.setTimeout(poll, githubDevicePollDelayMs(intervalSeconds, deviceFlow.expiresAt));
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      if (timer !== undefined) window.clearTimeout(timer);
     };
   }, [currentUser, deviceFlow, setAuthBusy, setAuthError, setCurrentUser, setDeviceFlow]);
 

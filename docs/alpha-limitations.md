@@ -44,6 +44,6 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 ## Known Product Gaps
 
 - Real multi-device, multi-account dogfooding is required before a public alpha is promoted broadly.
-- Official relay hosting decisions, domains, secrets, and OAuth callback choices require maintainer input.
+- Official relay hosting decisions, domains, secrets, and GitHub device-code OAuth configuration require maintainer input.
 - The visual design should continue to be reviewed in the native app on real screens, especially resizable columns and embedded browser behavior.
 - A room intentionally has one primary repository binding. Multi-repository rooms are deferred until app-server exposes a stable multi-root execution and sandbox contract; use separate rooms meanwhile. See [the accepted ADR](decisions/multi-repository-rooms.md).

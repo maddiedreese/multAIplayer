@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { seededRooms } from "../src/seedData";
+import { seededRooms } from "./support/workspaceFixtures";
 import {
   buildRoomNotificationPreview,
   getRoomNotificationEligibility,

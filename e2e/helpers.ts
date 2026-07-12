@@ -85,6 +85,20 @@ export async function authenticateContext(
   await context.addCookies([
     { name: "multaiplayer_session", value: sessionCookie!, url: relayUrl, httpOnly: true, sameSite: "Lax" }
   ]);
+  if (identity.id === hostIdentity.id) {
+    const cookie = `multaiplayer_session=${sessionCookie}`;
+    const workspaceResponse = await fetch(`${relayUrl}/teams`, { headers: { cookie } });
+    expect(workspaceResponse.status).toBe(200);
+    const workspace = (await workspaceResponse.json()) as { teams: Array<{ name: string }> };
+    if (!workspace.teams.some((team) => team.name === "E2E Team")) {
+      const teamResponse = await fetch(`${relayUrl}/teams`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ name: "E2E Team" })
+      });
+      expect(teamResponse.status).toBe(201);
+    }
+  }
 }
 
 export async function openApp(context: BrowserContext): Promise<Page> {
@@ -104,10 +118,18 @@ export async function openAuthenticatedClient(
   return { context, page: await openApp(context) };
 }
 
-export async function createRoom(page: Page, name: string): Promise<void> {
+export async function createRoom(page: Page, name: string, teamName = "E2E Team"): Promise<void> {
+  const teamSelector = page.getByRole("combobox", { name: "Switch team" });
+  const targetTeamId = await teamSelector.locator("option", { hasText: teamName }).getAttribute("value");
+  expect(targetTeamId).toBeTruthy();
+  if ((await teamSelector.isEnabled()) && (await teamSelector.inputValue()) !== targetTeamId) {
+    await teamSelector.selectOption(targetTeamId!);
+    await expect(teamSelector).toHaveValue(targetTeamId!);
+  } else await expect(teamSelector).toHaveValue(targetTeamId!);
   const newRoom = page.getByRole("button", { name: "New room", exact: true });
   await newRoom.scrollIntoViewIfNeeded();
-  await newRoom.click({ force: true });
+  await expect(newRoom).toBeEnabled();
+  await newRoom.click();
   await page.getByPlaceholder("Room name").fill(name);
   const projectPath = page.locator(".room-create-form input").nth(1);
   if (!(await projectPath.inputValue())) await projectPath.fill("/tmp/multaiplayer-e2e");

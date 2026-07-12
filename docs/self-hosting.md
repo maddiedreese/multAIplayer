@@ -2,7 +2,7 @@
 
 The relay is intended to be self-hostable. In v1 it routes encrypted room events and manages presence; it does not call OpenAI or store plaintext chat transcripts.
 
-Teams moving from the hosted relay to their own relay should use the [hosted-to-self-hosted migration procedure](release-operations.md#hosted-to-self-hosted-migration). The short version is: deploy and verify a self-hosted relay, use a desktop build whose app-shell CSP allows the self-hosted HTTP and WebSocket origins, change each desktop app's Settings drawer to those relay URLs, recreate team/room membership with fresh invites, and rely on each device's local room keys and encrypted local history for continuity.
+Teams moving from the hosted relay to their own relay should use the [hosted-to-self-hosted migration procedure](release-operations.md#hosted-to-self-hosted-migration). The short version is: deploy and verify a self-hosted relay, build the desktop with its self-host relay origins allowed and relay editing enabled, change each desktop app's Settings drawer to those URLs, recreate team/room membership with fresh invites, and rely on each device's local room keys and encrypted local history for continuity.
 
 Supported alpha self-hosting requirements:
 
@@ -29,7 +29,7 @@ For a hosted or internet-facing relay, run the production relay doctor against t
 npm run doctor:production-relay
 ```
 
-This check fails if GitHub OAuth is missing, durable session encryption is weak or missing, credentialed browser origins are unset or not exact HTTP(S) origins, auth is explicitly disabled, debug endpoints are enabled, demo workspace seeding is enabled, in-process rate limits are disabled, relay storage points at `/tmp`, or untrusted proxy headers are accepted. It is a deployment sanity check, not a substitute for TLS, backups, log review, process supervision, or an external rate limiter in multi-instance deployments.
+This check fails if GitHub OAuth is missing, durable session encryption is weak or missing, credentialed browser origins are unset or not exact HTTP(S) origins, auth is explicitly disabled, debug endpoints are enabled, in-process rate limits are disabled, relay storage points at `/tmp`, or untrusted proxy headers are accepted. It is a deployment sanity check, not a substitute for TLS, backups, log review, process supervision, or an external rate limiter in multi-instance deployments.
 
 ## Docker Relay
 
@@ -50,10 +50,9 @@ docker run --rm -p 4321:4321 \
   -v multaiplayer-relay-data:/data \
   -e GITHUB_CLIENT_ID=your_client_id \
   -e MULTAIPLAYER_RELAY_SESSION_SECRET=replace_with_at_least_32_chars \
-  -e MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://multaiplayer.com \
+  -e MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://your-app.example \
   -e MULTAIPLAYER_RELAY_REQUIRE_AUTH=true \
   -e MULTAIPLAYER_RELAY_DEBUG=false \
-  -e MULTAIPLAYER_RELAY_SEED_DEMO=false \
   multaiplayer-relay:alpha
 ```
 
@@ -116,12 +115,6 @@ MULTAIPLAYER_RELAY_SESSION_SECRET=$(openssl rand -base64 32)
 With this set, the relay encrypts GitHub session access tokens with AES-GCM before writing them to the configured relay store and prunes expired sessions on load and save. The secret must be at least 32 characters; shorter values are ignored and durable sessions stay disabled. If the secret is missing, sessions are not persisted and restarting the relay signs users out. If the secret changes, previously stored sessions cannot be decrypted and users must sign in again. Plaintext access tokens in the relay store are ignored.
 
 The desktop Account drawer reads `/auth/config` and shows whether the connected relay is using encrypted-at-rest sessions or memory-only sessions.
-
-Local development seeds a small demo workspace by default. Production relays do not seed demo teams or rooms unless explicitly enabled:
-
-```bash
-MULTAIPLAYER_RELAY_SEED_DEMO=true
-```
 
 The encrypted reconnect backlog is pruned by both count and age:
 
@@ -239,7 +232,7 @@ When enabled, reading workspace metadata, creating teams, creating rooms, creati
 
 Authenticated workspace reads are membership-scoped. A signed-in user only receives teams and rooms where they are a known team member. Room-level mutations and attachment blob reads also require membership. Invite metadata remains readable by invite id so a joiner can verify that the relay metadata matches the invite fragment; the desktop then presents that invite id during WebSocket join to be admitted as a team member.
 
-Local development can leave auth off for seeded-room testing. Production relays default it on when `NODE_ENV=production`, even if GitHub OAuth has not been configured yet; self-hosters can still set the variable explicitly.
+A private local or LAN development relay can explicitly disable authentication. Production relays default it on when `NODE_ENV=production`, even if GitHub OAuth has not been configured yet; self-hosters can still set the variable explicitly.
 
 Credentialed browser origins and WebSocket room upgrades can be restricted:
 
@@ -255,7 +248,7 @@ Origin entries are normalized to bare origins by the relay. `https://multaiplaye
 
 The alpha relay supports GitHub device-code OAuth. This works well for the desktop app because users can sign in through a browser without the desktop app needing to receive an OAuth redirect.
 
-Create a GitHub OAuth app, then start the relay with:
+Create a GitHub OAuth app, enable its **Device Flow** setting, then start the relay with its client id. The device flow does not use a client secret or callback URL:
 
 ```bash
 GITHUB_CLIENT_ID=your_client_id npm run dev:relay
@@ -275,6 +268,8 @@ GITHUB_OAUTH_SCOPES="read:user repo"
 
 The app shows the relay-advertised scopes in the Account drawer so users can see what the self-hosted relay is asking GitHub to authorize.
 
+While authorization is pending, the desktop polls at GitHub's advertised interval. It increases that interval when GitHub asks it to slow down and stops when the device code expires, is denied, or GitHub returns another terminal error. Users must start sign-in again after a terminal error.
+
 GitHub access tokens stay on the relay and are used only for identity, draft pull request creation, and Actions run reads. The relay does not return tokens to desktop clients, does not persist plaintext tokens, and normalizes successful/error responses from GitHub before returning them so arbitrary upstream fields are not relayed into the app.
 
 For local development, the desktop app expects:
@@ -282,9 +277,10 @@ For local development, the desktop app expects:
 ```bash
 VITE_RELAY_HTTP_URL=http://127.0.0.1:4321
 VITE_RELAY_URL=ws://127.0.0.1:4321/rooms
+VITE_ALLOW_RELAY_CONFIGURATION=true
 ```
 
-These env vars define the packaged defaults. The official packaged alpha app-shell CSP allows localhost development relays and the hosted multAIplayer relay origin; it does not allow arbitrary HTTPS/WSS relay origins. A custom self-hosted relay origin therefore requires a self-built desktop app with `apps/desktop/src-tauri/tauri.conf.json` updated so `connect-src` includes both the relay HTTP origin and the matching WebSocket origin. After the build permits those origins, desktop users can open Settings and change the relay HTTP API URL and WebSocket rooms URL. The override is stored locally on that device.
+The first two env vars define the packaged defaults; `VITE_ALLOW_RELAY_CONFIGURATION=true` exposes the endpoint controls in Settings. Official packaged builds pin their hosted endpoints, hide these controls, and do not allow localhost relay access. A custom self-hosted relay origin requires a self-built desktop app with `apps/desktop/src-tauri/tauri.conf.json` updated so `connect-src` includes both the relay HTTP origin and the matching WebSocket origin. The override is stored locally on that device.
 
 The alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured. Hosted and internet-facing deployments should use SQLite and should add backup/restore drills, token-rotation operations, and shared/external rate limiting before making production or multi-instance claims.
 

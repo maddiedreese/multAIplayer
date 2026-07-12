@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -66,8 +66,17 @@ export async function startRelay(
     ? resolve(existingDataPath, "..")
     : await mkdtemp(join(tmpdir(), "multaiplayer-relay-test-"));
   const dataPath = existingDataPath ?? join(tempDir, "relay-store.json");
-  if (storedState) {
-    await writeFile(dataPath, `${JSON.stringify(storedState, null, 2)}\n`, "utf8");
+  const dataAlreadyExists = await access(dataPath).then(
+    () => true,
+    () => false
+  );
+  const initialState = storedState ?? (dataAlreadyExists ? undefined : defaultWorkspaceFixture());
+  const storageBackend = extraEnv.MULTAIPLAYER_RELAY_STORAGE ?? "json";
+  const initialStatePath = join(tempDir, "initial-relay-state.json");
+  if (initialState && storageBackend === "sqlite") {
+    await writeFile(initialStatePath, `${JSON.stringify(initialState, null, 2)}\n`, "utf8");
+  } else if (initialState) {
+    await writeFile(dataPath, `${JSON.stringify(initialState, null, 2)}\n`, "utf8");
   }
   let lastError: unknown = null;
 
@@ -86,8 +95,11 @@ export async function startRelay(
         // Most legacy persistence fixtures intentionally exercise the explicit
         // development-only JSON backend. Production/default-backend tests opt
         // into SQLite or omit this override directly.
-        MULTAIPLAYER_RELAY_STORAGE: extraEnv.MULTAIPLAYER_RELAY_STORAGE ?? "json",
-        MULTAIPLAYER_RELAY_DATA_PATH: dataPath
+        MULTAIPLAYER_RELAY_STORAGE: storageBackend,
+        MULTAIPLAYER_RELAY_DATA_PATH: dataPath,
+        ...(initialState && storageBackend === "sqlite"
+          ? { MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH: initialStatePath }
+          : {})
       },
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -125,6 +137,92 @@ export async function startRelay(
 
   await rm(tempDir, { recursive: true, force: true });
   throw lastError;
+}
+
+export function startRelayWithWorkspace(
+  extraEnv: NodeJS.ProcessEnv = {},
+  storedState?: StoredRelayStateFixture,
+  existingDataPath?: string
+): Promise<RelayHarness> {
+  return startRelay(
+    extraEnv,
+    storedState ?? (existingDataPath ? undefined : defaultWorkspaceFixture()),
+    existingDataPath
+  );
+}
+
+export function emptyWorkspaceFixture(): StoredRelayStateFixture {
+  return {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    teams: [],
+    rooms: [],
+    invites: [],
+    teamMembers: [],
+    encryptedBacklog: []
+  };
+}
+
+function defaultWorkspaceFixture(): StoredRelayStateFixture {
+  return {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    teams: [{ id: "team-core", name: "Core Team", members: 4 }],
+    rooms: [
+      {
+        id: "room-desktop",
+        teamId: "team-core",
+        name: "Desktop app",
+        projectPath: "/tmp/multaiplayer",
+        host: "Maddie",
+        hostUserId: "github:maddiedreese",
+        hostStatus: "active",
+        approvalPolicy: "ask_every_turn",
+        approvalDelegationPolicy: "host_only",
+        trustedApproverUserIds: [],
+        mode: { chat: true, code: true, workspace: true, browser: true },
+        codexModel: "gpt-5.4",
+        codexReasoningEffort: "medium",
+        codexSpeed: "standard",
+        browserAllowedOrigins: ["https://github.com"],
+        browserProfilePersistent: true,
+        unread: 0
+      },
+      {
+        id: "room-relay",
+        teamId: "team-core",
+        name: "Relay ops",
+        projectPath: "/tmp/multaiplayer",
+        host: "Alex",
+        hostUserId: "github:alex",
+        hostStatus: "active",
+        approvalPolicy: "ask_every_turn",
+        approvalDelegationPolicy: "host_only",
+        trustedApproverUserIds: [],
+        mode: { chat: true, code: true, workspace: true, browser: false },
+        codexModel: "gpt-5.4",
+        codexReasoningEffort: "medium",
+        codexSpeed: "standard",
+        browserAllowedOrigins: ["https://github.com"],
+        browserProfilePersistent: true,
+        unread: 0
+      }
+    ],
+    invites: [],
+    teamMembers: [
+      {
+        teamId: "team-core",
+        members: [
+          { userId: "github:maddiedreese", role: "owner", joinedAt: "2026-07-04T00:00:00.000Z" },
+          { userId: "github:alex", role: "admin", joinedAt: "2026-07-04T00:00:00.000Z" },
+          { userId: "github:tester", role: "member", joinedAt: "2026-07-04T00:00:00.000Z" },
+          { userId: "github:design", role: "member", joinedAt: "2026-07-04T00:00:00.000Z" }
+        ],
+        userIds: ["github:maddiedreese", "github:alex", "github:tester", "github:design"]
+      }
+    ],
+    encryptedBacklog: []
+  };
 }
 
 export async function patchHostStatus(

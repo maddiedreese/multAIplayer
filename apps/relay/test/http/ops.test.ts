@@ -2,6 +2,7 @@ import { test } from "node:test";
 import {
   WebSocket,
   assert,
+  emptyWorkspaceFixture,
   onceOpen,
   readFile,
   startRelay,
@@ -156,37 +157,20 @@ test("relay disables debug endpoints in every environment unless explicitly enab
   }
 });
 
-test("relay does not seed demo workspace in production by default when auth is explicitly disabled", async () => {
-  const relay = await startRelay({
-    NODE_ENV: "production",
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "false"
-  });
+test("relay starts with an empty workspace when auth is explicitly disabled", async () => {
+  const relay = await startRelay(
+    {
+      NODE_ENV: "production",
+      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "false"
+    },
+    emptyWorkspaceFixture()
+  );
   try {
     const response = await fetch(`${relay.baseUrl}/teams`);
     assert.equal(response.status, 200);
     const body = (await response.json()) as { teams: unknown[]; rooms: unknown[] };
     assert.deepEqual(body.teams, []);
     assert.deepEqual(body.rooms, []);
-  } finally {
-    await relay.close();
-  }
-});
-
-test("relay can explicitly seed demo workspace in production", async () => {
-  const relay = await startRelay({
-    NODE_ENV: "production",
-    MULTAIPLAYER_RELAY_SEED_DEMO: "true",
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "false"
-  });
-  try {
-    const response = await fetch(`${relay.baseUrl}/teams`);
-    assert.equal(response.status, 200);
-    const body = (await response.json()) as {
-      teams: Array<{ id: string }>;
-      rooms: Array<{ id: string }>;
-    };
-    assert.ok(body.teams.some((team) => team.id === "team-core"));
-    assert.ok(body.rooms.some((room) => room.id === "room-desktop"));
   } finally {
     await relay.close();
   }

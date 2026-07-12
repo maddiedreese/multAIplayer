@@ -111,7 +111,6 @@ function checkProductionRelayEnv() {
   const allowedOrigins = envValue("MULTAIPLAYER_RELAY_ALLOWED_ORIGINS");
   const requireAuth = envBoolean("MULTAIPLAYER_RELAY_REQUIRE_AUTH", true);
   const debug = envBoolean("MULTAIPLAYER_RELAY_DEBUG", false);
-  const seedDemo = envBoolean("MULTAIPLAYER_RELAY_SEED_DEMO", false);
   const rateLimits = envBoolean("MULTAIPLAYER_RELAY_RATE_LIMITS", true);
   const trustProxyHeaders = envBoolean("MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS", false);
   const trustedProxyConfigured = envBoolean("MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED", false);
@@ -156,11 +155,6 @@ function checkProductionRelayEnv() {
     ok: !debug,
     label: "production MULTAIPLAYER_RELAY_DEBUG",
     detail: debug ? "must not be true for a hosted production relay" : "debug endpoints disabled"
-  });
-  checks.push({
-    ok: !seedDemo,
-    label: "production MULTAIPLAYER_RELAY_SEED_DEMO",
-    detail: seedDemo ? "must not be true for a hosted production relay" : "demo workspace seeding disabled"
   });
   checks.push({
     ok: rateLimits,

@@ -41,11 +41,9 @@ body:
         MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://example.com
         MULTAIPLAYER_RELAY_REQUIRE_AUTH=true
         MULTAIPLAYER_RELAY_DEBUG=false
-        MULTAIPLAYER_RELAY_SEED_DEMO=false
         MULTAIPLAYER_RELAY_RATE_LIMITS=true
   - type: textarea
     id: logs
     attributes:
       label: Redacted logs or screenshots
       description: Remove tokens, cookies, private room ids, invite fragments, repo data, and user content.
-

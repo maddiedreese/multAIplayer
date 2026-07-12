@@ -1,4 +1,9 @@
-import { approvalDelegationPolicyLabels, approvalPolicyLabels, defaultBrowserUrl, roomModeLabels } from "../seedData";
+import {
+  approvalDelegationPolicyLabels,
+  approvalPolicyLabels,
+  defaultBrowserUrl,
+  roomModeLabels
+} from "../appDefaults";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { createAppRoomActions } from "../lib/appRoomActions";

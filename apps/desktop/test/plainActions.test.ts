@@ -64,6 +64,10 @@ const room: RoomRecord = {
 
 test.beforeEach(() => {
   localStorage.clear();
+  localStorage.setItem(
+    "multaiplayer:app-config",
+    JSON.stringify({ relayHttpUrl: "https://relay.test", relayWsUrl: "wss://relay.test/rooms" })
+  );
   useAppStore.getState().resetAppStore();
   useAppStore.setState({
     teams: [{ id: room.teamId, name: "Actions team", members: 1 }],
@@ -526,6 +530,7 @@ test("room settings actions report room locks through the current store without 
 });
 
 test("team default actions report missing selection without touching storage", () => {
+  const storageSizeBefore = localStorage.length;
   const messages: Array<string | null> = [];
   const actions = createTeamDefaultActions({
     approvalPolicyLabels: {},
@@ -542,7 +547,7 @@ test("team default actions report missing selection without touching storage", (
   actions.updateTeamDefaultCodexModel("gpt-5.4");
 
   assert.deepEqual(messages, ["Create or select a team before changing team defaults."]);
-  assert.equal(localStorage.length, 0);
+  assert.equal(localStorage.length, storageSizeBefore);
 });
 
 test("Markdown copy actions report validation failures through Zustand without React", async () => {

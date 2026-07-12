@@ -233,7 +233,7 @@ export function createRoomKeyRotationActions(
     }
     if (reportRoomKeyRotationInFlight(selectedRoom.id)) return;
     const confirmed = window.confirm(
-      `Refresh room access for ${selectedRoom.name}?\n\n` +
+      `Rotate the room key for ${selectedRoom.name}?\n\n` +
         "This updates future messages and invites for current members. " +
         "It is not full member removal in the alpha."
     );

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { approvalPolicyLabels } from "../seedData";
+import { approvalPolicyLabels } from "../appDefaults";
 import type { useAppHostHandoffActions } from "./useAppHostHandoffActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRelaySync } from "./useAppRelaySync";

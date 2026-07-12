@@ -91,7 +91,7 @@ test("real relay lifecycle preserves encrypted coordination across rotation, rem
     await host.page.getByPlaceholder("Team name").fill(teamName);
     await host.page.getByRole("button", { name: "Create team" }).click();
     await expect(host.page.locator(".team-select", { hasText: teamName })).toBeVisible();
-    await createRoom(host.page, roomName);
+    await createRoom(host.page, roomName, teamName);
     const roomId = await host.page.evaluate(async (name) => {
       const response = await fetch("http://127.0.0.1:4322/teams", { credentials: "include" });
       const workspace = (await response.json()) as { rooms: Array<{ id: string; name: string }> };
@@ -114,7 +114,7 @@ test("real relay lifecycle preserves encrypted coordination across rotation, rem
 
     await host.page.getByRole("button", { name: "Room", exact: true }).click();
     host.page.once("dialog", (dialog) => dialog.accept());
-    await host.page.getByRole("button", { name: "Refresh room access" }).click();
+    await host.page.getByRole("button", { name: "Rotate room key" }).click();
     await expect(host.page.getByText("Refreshed room access for future messages and invites.")).toBeVisible();
 
     const afterRotation = `after rotation ${suffix}`;
