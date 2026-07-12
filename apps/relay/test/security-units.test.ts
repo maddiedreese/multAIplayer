@@ -3,6 +3,7 @@ import test from "node:test";
 import type { RelayEnvelope, TeamMemberRecord } from "@multaiplayer/protocol";
 import { createRelayAuthz } from "../src/authz.js";
 import {
+  createRelayLimits,
   isAllowedEnvelopePayload,
   isApprovalDelegationPolicy,
   isApprovalPolicy,
@@ -48,6 +49,31 @@ function envelope(overrides: Partial<RelayEnvelope> = {}): RelayEnvelope {
     ...overrides
   };
 }
+
+test("relay limits derive the ciphertext allowance and remain immutable", () => {
+  const values = {
+    maxDisplayNameChars: 100,
+    maxDeviceIdChars: 128,
+    maxEnvelopeIdChars: 128,
+    maxEnvelopeNonceChars: 128,
+    maxPublicKeyFingerprintChars: 255,
+    maxPublicKeyJwkChars: 2_048,
+    maxRoomProjectPathChars: 4_096,
+    maxUserIdChars: 128
+  };
+  const limits = createRelayLimits(16_384, values);
+
+  assert.deepEqual(limits, {
+    ...values,
+    encryptedEnvelopeMaxBytes: 16_384,
+    maxEnvelopeCiphertextChars: Math.ceil((16_384 * 4) / 3) + 1_024
+  });
+  assert.equal(Object.isFrozen(limits), true);
+  assert.throws(
+    () => Object.assign(limits, { encryptedEnvelopeMaxBytes: 1 }),
+    /read only|not extensible|Cannot assign/
+  );
+});
 
 test("relay authorization rules cover every role transition and room membership boundary", () => {
   const store = new InMemoryRelayStore();
