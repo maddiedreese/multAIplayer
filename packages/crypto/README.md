@@ -6,7 +6,7 @@ This package contains multAIplayer's small Web Crypto-based cryptographic bounda
 
 [`test-vectors/v1.json`](test-vectors/v1.json) publishes stable UTF-8/hex canonical-encoding vectors and a deterministic authenticated room-secret wrapping vector. Private keys and the fixed nonce in that file exist only as public test fixtures and must never be used outside interoperability tests.
 
-Run `npm test -w @multaiplayer/crypto` to verify the published vectors, hostile-input properties, and cryptographic round trips. Implementations checking the wrapping vector must reproduce these steps:
+Run `npm test -w @multaiplayer/crypto` to verify the published vectors, hostile-input properties, and cryptographic round trips. The suite uses seeded `fast-check` properties for canonical-record ordering and round trips, Base64/Base64url canonicality, and exact buffer-view copying; failures include a replayable seed and shrunk counterexample. Implementations checking the wrapping vector must reproduce these steps:
 
 1. Encode the listed context with `canonicalAuthenticatedRecord`, using domain `multaiplayer:authenticated-room-secret-wrap:v2` and version `1`.
 2. Perform P-256 ECDH with the sender private key and recipient public key.
