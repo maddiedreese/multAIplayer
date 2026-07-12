@@ -1,0 +1,14 @@
+# Native dialogs require a live Tauri application and operating-system UI. Their security
+# decisions are factored into and mutation-tested through the state and pure helper functions;
+# exclude only the three thin dialog adapters from automated mutation generation.
+exclude_re = [
+  "authorize_shell_execution",
+  "clear_shell_execution_grants",
+  "authorize_terminal_input",
+  # `Instant::now()` is captured inside these functions after any test-created expiry;
+  # equality cannot be observed, so `>` and `>=` are behaviorally equivalent here.
+  "replace > with >= in ShellAuthorizationState::issue",
+  "replace > with >= in ShellAuthorizationState::issue_terminal_input",
+  "replace > with >= in ShellAuthorizationState::has_exact_command_grant",
+  "replace > with >= in ShellAuthorizationState::grant_exact_command",
+]

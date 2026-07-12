@@ -68,12 +68,21 @@ test("CI verifies each layer once before packaging prebuilt desktop assets", () 
   assert.doesNotMatch(workflow, /run: npm run (?:check|test|build)$/m);
 });
 
+test("relay authorization tests remain visible to the mutation runner", () => {
+  const config = readFileSync("apps/relay/stryker.config.mjs", "utf8");
+  const source = readFileSync("apps/relay/test/security-units.test.ts", "utf8");
+  assert.match(config, /mutate: \["src\/authz\.ts"\]/);
+  assert.match(config, /command: "tsx --test test\/security-units\.test\.ts"/);
+  assert.match(source, /from "\.\.\/src\/authz\.js"/);
+  assert.match(source, /createRelayAuthz\(/);
+});
+
 test("RustSec audit is pinned, scoped to the native lockfile, and scheduled", () => {
   const workflow = readFileSync(".github/workflows/rust-audit.yml", "utf8");
-  assert.match(workflow, /uses: rustsec\/audit-check@[a-f0-9]{40} # v2\.0\.0/);
-  assert.match(workflow, /working-directory: apps\/desktop\/src-tauri/);
+  assert.match(workflow, /working-directory: apps\/desktop\/src-tauri[\s\S]*run: cargo audit/);
+  assert.match(workflow, /cargo deny --manifest-path apps\/desktop\/src-tauri\/Cargo\.toml check advisories sources/);
   assert.match(workflow, /schedule:/);
-  assert.match(workflow, /checks: write/);
+  assert.doesNotMatch(workflow, /checks: write/);
 });
 
 test("npm advisories are checked from the lockfile on changes and a schedule", () => {
@@ -144,7 +153,9 @@ test("third-party GitHub Actions are pinned to immutable commits", () => {
     ".github/workflows/codex-latest-contract.yml",
     ".github/workflows/npm-audit.yml",
     ".github/workflows/release.yml",
-    ".github/workflows/rust-audit.yml"
+    ".github/workflows/rust-audit.yml",
+    ".github/workflows/codeql.yml",
+    ".github/workflows/supply-chain.yml"
   ]) {
     const workflow = readFileSync(path, "utf8");
     const references = Array.from(workflow.matchAll(/^\s*uses:\s*([^\s#]+)(?:\s+#\s*(\S+))?$/gm));

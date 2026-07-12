@@ -253,10 +253,9 @@ pub(crate) async fn authorize_shell_execution(
         }
     }
     let canonical_cwd = canonical_workspace(&request.cwd)?;
-    let request_for_issue = ShellAuthorizationRequest {
-        cwd: canonical_cwd.clone(),
-        ..request.clone()
-    };
+    // State methods independently canonicalize before matching or storing authority. Keep the
+    // original request here; rebuilding it with the same canonical path would be redundant.
+    let request_for_issue = request.clone();
     let credential_access = requests_credential_access(&request_for_issue.command);
     if !credential_access && state.has_exact_command_grant(&request_for_issue)? {
         return state.issue(&request_for_issue);
@@ -470,6 +469,7 @@ fn visible_terminal_input(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
     use std::env;
 
     fn request(command: &str) -> ShellAuthorizationRequest {
@@ -525,6 +525,88 @@ mod tests {
                 request.kind
             )
             .is_err());
+    }
+
+    #[test]
+    fn authorization_constants_keep_the_intended_security_windows() {
+        assert_eq!(AUTHORIZATION_LIFETIME, Duration::from_secs(120));
+        assert_eq!(EXACT_COMMAND_GRANT_LIFETIME, Duration::from_secs(600));
+    }
+
+    #[test]
+    fn issuing_authorization_prunes_expired_capabilities() {
+        let state = ShellAuthorizationState::default();
+        let approved = request("printf approved");
+        let active = AuthorizedShellExecution {
+            room_id: approved.room_id.clone(),
+            cwd: canonical_workspace(&approved.cwd).expect("canonical cwd"),
+            command: approved.command.clone(),
+            kind: approved.kind,
+            expires_at: Instant::now() + Duration::from_secs(60),
+        };
+        let mut authorizations = state.authorizations.lock().expect("authorization state");
+        authorizations.insert("active".to_string(), active);
+        authorizations.insert(
+            "expired".to_string(),
+            AuthorizedShellExecution {
+                room_id: approved.room_id.clone(),
+                cwd: canonical_workspace(&approved.cwd).expect("canonical cwd"),
+                command: approved.command.clone(),
+                kind: approved.kind,
+                expires_at: Instant::now(),
+            },
+        );
+        drop(authorizations);
+        state.issue(&approved).expect("issue authorization");
+        let authorizations = state.authorizations.lock().expect("authorization state");
+        assert!(!authorizations.contains_key("expired"));
+        assert!(authorizations.contains_key("active"));
+    }
+
+    #[test]
+    fn every_shell_authorization_binding_is_independently_enforced() {
+        let approved = request("printf approved");
+        let other_cwd = env::current_dir()
+            .expect("current dir")
+            .to_string_lossy()
+            .to_string();
+        let cases = [
+            (
+                "room-other",
+                approved.cwd.as_str(),
+                approved.command.as_str(),
+                approved.kind,
+            ),
+            (
+                approved.room_id.as_str(),
+                other_cwd.as_str(),
+                approved.command.as_str(),
+                approved.kind,
+            ),
+            (
+                approved.room_id.as_str(),
+                approved.cwd.as_str(),
+                "printf substituted",
+                approved.kind,
+            ),
+            (
+                approved.room_id.as_str(),
+                approved.cwd.as_str(),
+                approved.command.as_str(),
+                ShellExecutionKind::InteractiveTerminal,
+            ),
+        ];
+        for (room_id, cwd, command, kind) in cases {
+            if canonical_workspace(cwd).expect("canonical test cwd")
+                == canonical_workspace(&approved.cwd).expect("canonical approved cwd")
+                && cwd != approved.cwd
+            {
+                continue;
+            }
+            let state = ShellAuthorizationState::default();
+            let token = state.issue(&approved).expect("issue authorization");
+            assert!(state.consume(&token, room_id, cwd, command, kind).is_err());
+        }
     }
 
     #[test]
@@ -584,6 +666,84 @@ mod tests {
                 &request.input
             )
             .is_err());
+    }
+
+    #[test]
+    fn issuing_terminal_input_prunes_expired_capabilities() {
+        let state = ShellAuthorizationState::default();
+        let approved = TerminalInputAuthorizationRequest {
+            room_id: "room-native-auth".to_string(),
+            terminal_id: "room-native-auth:shell".to_string(),
+            input: "printf approved".to_string(),
+            requester_label: "Local host".to_string(),
+        };
+        let mut authorizations = state
+            .terminal_input_authorizations
+            .lock()
+            .expect("terminal input state");
+        authorizations.insert(
+            "active".to_string(),
+            AuthorizedTerminalInput {
+                room_id: approved.room_id.clone(),
+                terminal_id: approved.terminal_id.clone(),
+                input: approved.input.clone(),
+                expires_at: Instant::now() + Duration::from_secs(60),
+            },
+        );
+        authorizations.insert(
+            "expired".to_string(),
+            AuthorizedTerminalInput {
+                room_id: approved.room_id.clone(),
+                terminal_id: approved.terminal_id.clone(),
+                input: approved.input.clone(),
+                expires_at: Instant::now(),
+            },
+        );
+        drop(authorizations);
+        state
+            .issue_terminal_input(&approved)
+            .expect("issue terminal input");
+        let authorizations = state
+            .terminal_input_authorizations
+            .lock()
+            .expect("terminal input state");
+        assert!(!authorizations.contains_key("expired"));
+        assert!(authorizations.contains_key("active"));
+    }
+
+    #[test]
+    fn every_terminal_input_binding_is_independently_enforced() {
+        let approved = TerminalInputAuthorizationRequest {
+            room_id: "room-native-auth".to_string(),
+            terminal_id: "room-native-auth:shell".to_string(),
+            input: "printf approved".to_string(),
+            requester_label: "Local host".to_string(),
+        };
+        for (room_id, terminal_id, input) in [
+            (
+                "room-other",
+                approved.terminal_id.as_str(),
+                approved.input.as_str(),
+            ),
+            (
+                approved.room_id.as_str(),
+                "room-native-auth:other",
+                approved.input.as_str(),
+            ),
+            (
+                approved.room_id.as_str(),
+                approved.terminal_id.as_str(),
+                "printf substituted",
+            ),
+        ] {
+            let state = ShellAuthorizationState::default();
+            let token = state
+                .issue_terminal_input(&approved)
+                .expect("issue terminal input");
+            assert!(state
+                .consume_terminal_input(&token, room_id, terminal_id, input)
+                .is_err());
+        }
     }
 
     #[test]
@@ -659,6 +819,114 @@ mod tests {
     }
 
     #[test]
+    fn exact_command_grant_deduplication_preserves_every_distinct_binding() {
+        let state = ShellAuthorizationState::default();
+        let approved = request("npm test");
+        let mut other_room = approved.clone();
+        other_room.room_id = "room-other".to_string();
+        let mut other_command = approved.clone();
+        other_command.command = "npm run lint".to_string();
+        for grant in [&approved, &other_room, &other_command, &approved] {
+            state.grant_exact_command(grant).expect("grant command");
+        }
+        let grants = state.exact_command_grants.lock().expect("grant state");
+        assert_eq!(grants.len(), 3);
+        assert!(grants
+            .iter()
+            .any(|grant| grant.room_id == other_room.room_id));
+        assert!(grants
+            .iter()
+            .any(|grant| grant.command == other_command.command));
+    }
+
+    #[test]
+    fn clearing_grants_returns_only_the_removed_count() {
+        let state = ShellAuthorizationState::default();
+        let approved = request("npm test");
+        let mut other_room = approved.clone();
+        other_room.room_id = "room-other".to_string();
+        state.grant_exact_command(&approved).expect("grant command");
+        state
+            .grant_exact_command(&other_room)
+            .expect("grant other room");
+        assert_eq!(state.clear_exact_command_grants(&approved.room_id), Ok(1));
+        assert_eq!(
+            state
+                .exact_command_grants
+                .lock()
+                .expect("grant state")
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn authorization_request_validation_checks_each_boundary() {
+        let valid = request("printf approved");
+        assert!(validate_authorization_request(&valid).is_ok());
+        for invalid in [
+            ShellAuthorizationRequest {
+                room_id: "".to_string(),
+                ..valid.clone()
+            },
+            ShellAuthorizationRequest {
+                cwd: "/path/that/does/not/exist".to_string(),
+                ..valid.clone()
+            },
+            ShellAuthorizationRequest {
+                command: "".to_string(),
+                ..valid.clone()
+            },
+            ShellAuthorizationRequest {
+                requester_label: "\n".to_string(),
+                ..valid.clone()
+            },
+        ] {
+            assert!(validate_authorization_request(&invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn requester_label_validation_rejects_empty_long_and_control_text() {
+        assert!(validate_requester_label("Remote member").is_ok());
+        assert!(validate_requester_label(&"x".repeat(MAX_REQUESTER_LABEL_CHARS)).is_ok());
+        assert!(validate_requester_label(" ").is_err());
+        assert!(validate_requester_label(&"x".repeat(MAX_REQUESTER_LABEL_CHARS + 1)).is_err());
+        assert!(validate_requester_label("member\nlabel").is_err());
+    }
+
+    #[test]
+    fn terminal_input_request_validation_checks_each_boundary() {
+        let valid = TerminalInputAuthorizationRequest {
+            room_id: "room-native-auth".to_string(),
+            terminal_id: "room-native-auth:shell".to_string(),
+            input: "printf approved".to_string(),
+            requester_label: "Local host".to_string(),
+        };
+        assert!(validate_terminal_input_authorization_request(&valid).is_ok());
+        for invalid in [
+            TerminalInputAuthorizationRequest {
+                room_id: "".to_string(),
+                ..valid.clone()
+            },
+            TerminalInputAuthorizationRequest {
+                terminal_id: "".to_string(),
+                ..valid.clone()
+            },
+            TerminalInputAuthorizationRequest {
+                input: "".to_string(),
+                ..valid.clone()
+            },
+            TerminalInputAuthorizationRequest {
+                requester_label: "\n".to_string(),
+                ..valid.clone()
+            },
+        ] {
+            assert!(validate_terminal_input_authorization_request(&invalid).is_err());
+        }
+    }
+
+    #[test]
     fn authorization_returns_the_canonical_workspace() {
         let state = ShellAuthorizationState::default();
         let mut request = request("printf approved");
@@ -679,5 +947,43 @@ mod tests {
                 .expect("canonical temporary directory")
                 .to_string_lossy()
         );
+    }
+
+    proptest! {
+        #[test]
+        fn encoded_or_quoted_command_variants_cannot_reuse_authorization(
+            payload in "[A-Za-z0-9_./ -]{1,80}",
+            encoding in 0usize..4,
+        ) {
+            let approved_command = format!("printf -- '{payload}'");
+            let attempted_command = match encoding {
+                0 => format!("{approved_command} # %2f%2e%2e"),
+                1 => format!("{approved_command}\\x20"),
+                2 => format!("sh -c {}", serde_json::to_string(&approved_command).expect("encode command")),
+                _ => format!("{approved_command}\u{a0}"),
+            };
+            prop_assert_ne!(&attempted_command, &approved_command);
+
+            let state = ShellAuthorizationState::default();
+            let approved = request(&approved_command);
+            let token = state.issue(&approved).expect("issue authorization");
+            prop_assert!(state.consume(
+                &token,
+                &approved.room_id,
+                &approved.cwd,
+                &attempted_command,
+                approved.kind,
+            ).is_err());
+
+            // A mismatch consumes the capability, so retrying the originally approved bytes
+            // cannot turn a rejected encoding attempt into execution.
+            prop_assert!(state.consume(
+                &token,
+                &approved.room_id,
+                &approved.cwd,
+                &approved.command,
+                approved.kind,
+            ).is_err());
+        }
     }
 }

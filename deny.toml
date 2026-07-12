@@ -1,0 +1,37 @@
+[graph]
+all-features = true
+targets = []
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = [
+  # GTK3 bindings are Linux-only transitive Tauri/Wry dependencies. Linux is
+  # compatibility-only; macOS is the supported release. No safe Tauri upgrade
+  # removes them. Review by 2026-08-01 and on every Tauri/Wry update.
+  "RUSTSEC-2024-0411",
+  "RUSTSEC-2024-0412",
+  "RUSTSEC-2024-0413",
+  "RUSTSEC-2024-0414",
+  "RUSTSEC-2024-0415",
+  "RUSTSEC-2024-0416",
+  "RUSTSEC-2024-0417",
+  "RUSTSEC-2024-0418",
+  "RUSTSEC-2024-0419",
+  "RUSTSEC-2024-0420",
+  # Unmaintained build/transitive crates from Tauri's macro and URL-pattern
+  # graph; no safe compatible replacement is selectable by this application.
+  # These are maintenance signals, not known vulnerabilities. Review by
+  # 2026-08-01 and remove when Tauri updates its graph.
+  "RUSTSEC-2024-0370",
+  "RUSTSEC-2025-0075",
+  "RUSTSEC-2025-0080",
+  "RUSTSEC-2025-0081",
+  "RUSTSEC-2025-0098",
+  "RUSTSEC-2025-0100",
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

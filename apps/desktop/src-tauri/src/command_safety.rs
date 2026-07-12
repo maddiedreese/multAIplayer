@@ -123,7 +123,22 @@ fn permission_paths(value: &Value) -> impl Iterator<Item = &str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
     use serde_json::json;
+
+    fn vary_ascii_case(value: &str, uppercase: &[bool]) -> String {
+        value
+            .chars()
+            .enumerate()
+            .map(|(index, character)| {
+                if uppercase[index % uppercase.len()] {
+                    character.to_ascii_uppercase()
+                } else {
+                    character
+                }
+            })
+            .collect()
+    }
 
     #[test]
     fn blocks_network_tools_and_credential_files() {
@@ -134,6 +149,17 @@ mod tests {
         assert!(blocked_command_reason("npm test").is_none());
         assert!(blocked_command_reason("cargo fmt --check").is_none());
         assert!(blocked_command_reason("rg TODO src").is_none());
+        for command in [
+            "pip install unsafe-package",
+            "pip3 download unsafe-package",
+            "cargo search unsafe-package",
+            "go get example.invalid/package",
+        ] {
+            assert!(
+                blocked_command_reason(command).is_some(),
+                "allowed {command}"
+            );
+        }
     }
 
     #[test]
@@ -144,9 +170,65 @@ mod tests {
         )
         .is_some());
         assert!(blocked_server_request_reason(
+            "item/commandExecution/requestApproval",
+            &json!({"command": "curl example.invalid"})
+        )
+        .is_some());
+        assert!(blocked_server_request_reason(
+            "execCommandApproval",
+            &json!({"command": ["git", "push", "origin", "main"]})
+        )
+        .is_some());
+        assert!(blocked_server_request_reason(
             "item/permissions/requestApproval",
             &json!({"permissions": {"fileSystem": {"read": ["~/.ssh/id_ed25519"]}}})
         )
         .is_some());
+    }
+
+    proptest! {
+        #[test]
+        fn credential_markers_survive_command_normalization(
+            marker_index in 0usize..CREDENTIAL_MARKERS.len(),
+            uppercase in prop::collection::vec(any::<bool>(), 1..32),
+            use_windows_separator in any::<bool>(),
+        ) {
+            let marker = CREDENTIAL_MARKERS[marker_index];
+            let varied = vary_ascii_case(marker, &uppercase);
+            let varied = if use_windows_separator {
+                varied.replace('/', "\\")
+            } else {
+                varied
+            };
+            let command = format!("cat /tmp/prefix/{varied}/suffix");
+
+            prop_assert_eq!(
+                blocked_command_reason(&command),
+                Some("Commands that touch credential or secret files are denied by host policy")
+            );
+        }
+
+        #[test]
+        fn credential_markers_survive_permission_path_normalization(
+            marker_index in 0usize..CREDENTIAL_MARKERS.len(),
+            uppercase in prop::collection::vec(any::<bool>(), 1..32),
+            use_windows_separator in any::<bool>(),
+        ) {
+            let marker = CREDENTIAL_MARKERS[marker_index];
+            let varied = vary_ascii_case(marker, &uppercase);
+            let varied = if use_windows_separator {
+                varied.replace('/', "\\")
+            } else {
+                varied
+            };
+            let params = json!({"permissions": {"fileSystem": {"read": [
+                {"path": {"path": format!("/tmp/prefix/{varied}/suffix")}}
+            ]}}});
+
+            prop_assert_eq!(
+                blocked_server_request_reason("item/permissions/requestApproval", &params),
+                Some("Credential-file permission requests are denied by host policy")
+            );
+        }
     }
 }

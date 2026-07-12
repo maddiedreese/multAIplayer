@@ -149,7 +149,7 @@ export function createRelayAuthSessionPersistence({
   function encryptSessionAccessToken(accessToken: string): StoredAuthSession["encryptedAccessToken"] | null {
     if (!sessionPersistenceSecret) return null;
     const nonce = randomBytes(12);
-    const cipher = createCipheriv("aes-256-gcm", sessionPersistenceKey(), nonce);
+    const cipher = createCipheriv("aes-256-gcm", sessionPersistenceKey(), nonce, { authTagLength: 16 });
     const ciphertext = Buffer.concat([cipher.update(accessToken, "utf8"), cipher.final()]);
     const tag = cipher.getAuthTag();
     return {
@@ -175,7 +175,14 @@ export function createRelayAuthSessionPersistence({
       return null;
     }
     try {
-      const decipher = createDecipheriv("aes-256-gcm", sessionPersistenceKey(), Buffer.from(encrypted.nonce, "base64"));
+      const decipher = createDecipheriv(
+        "aes-256-gcm",
+        sessionPersistenceKey(),
+        Buffer.from(encrypted.nonce, "base64"),
+        {
+          authTagLength: 16
+        }
+      );
       decipher.setAuthTag(Buffer.from(encrypted.tag, "base64"));
       return Buffer.concat([decipher.update(Buffer.from(encrypted.ciphertext, "base64")), decipher.final()]).toString(
         "utf8"

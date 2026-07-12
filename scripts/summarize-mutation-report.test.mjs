@@ -48,6 +48,8 @@ test("summarizes statuses and computes the Stryker mutation score", () => {
   assert.equal(summary.totals.undetected, 2);
   assert.equal(summary.totals.invalid, 1);
   assert.equal(summary.totals.scored, 4);
+  assert.equal(summary.totals.behavioralMutants, 4);
+  assert.equal(summary.totals.compilerRejectedMutants, 1);
   assert.equal(summary.totals.mutationScore, 50);
   assert.deepEqual(summary.mutants[0].killedBy, ["test-a", "test-z", "test-ä"]);
   assert.equal(summary.mutants[0].classification, null);

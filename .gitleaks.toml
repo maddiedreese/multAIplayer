@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Versioned injection corpus uses one public synthetic credential marker"
+paths = ['''apps/desktop/test/fixtures/injection-red-team-v1\.json''']
+regexes = ['''JOURNEY_CREDENTIAL_TOKEN_31c4''']

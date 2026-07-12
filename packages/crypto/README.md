@@ -10,6 +10,8 @@ The public `index.ts` is intentionally a declaration-free barrel. Implementation
 
 Run `npm test -w @multaiplayer/crypto` to verify the published vectors, hostile-input properties, and cryptographic round trips. The suite uses seeded `fast-check` properties for canonical-record ordering and round trips, Base64/Base64url canonicality, and exact buffer-view copying; failures include a replayable seed and shrunk counterexample. Implementations checking the wrapping vector must reproduce these steps:
 
+CI also runs `npm run test:crypto-vectors:python`, an independent Python implementation that shares no production code with the TypeScript package. It reconstructs canonical bytes, P-256 ECDH, HKDF-SHA-256, and AES-GCM and requires byte-identical output. Install the Python `cryptography` package before running it locally.
+
 1. Encode the listed context with `canonicalAuthenticatedRecord`, using domain `multaiplayer:authenticated-room-secret-wrap:v2` and version `1`.
 2. Perform P-256 ECDH with the sender private key and recipient public key.
 3. Use HKDF-SHA-256 with `SHA-256(AAD)` as salt and the UTF-8 domain above as `info` to derive a 256-bit AES-GCM key.
