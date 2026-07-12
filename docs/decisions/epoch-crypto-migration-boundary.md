@@ -8,6 +8,8 @@ multAIplayer's current protocol is deliberately limited to a single active admin
 
 `packages/crypto` is the protocol migration seam. Keep it small, dependency-light, and isolated from relay transport, desktop UI, and product policy. A change to its authenticated encodings, key derivation, wrapping, envelope additional data, or key lifecycle is a protocol-level event: it requires focused package tests, updated public vectors when bytes change, an explicit compatibility decision, and a dated threat-model changelog entry.
 
+The package root is a compatibility-preserving export barrel, not an implementation module. Key material, authenticated data, payload AEAD, device/secret wrapping, canonical encoding, and invite capabilities remain in focused modules with an automated 250-line ceiling. Consumers import only `@multaiplayer/crypto`; this keeps later replacement by a maintained MLS implementation confined to the package boundary.
+
 The canonical AAD domains and field sets are specified in the [cryptography architecture](../cryptography.md#additional-data-wire-records). Frozen pre-canonical JSON encodings are decrypt-only compatibility paths; they must not become writer formats or downgrade paths for authenticated static-host key delivery.
 
 The following are mandatory architecture re-evaluation tripwires:

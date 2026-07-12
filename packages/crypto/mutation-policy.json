@@ -1,6 +1,14 @@
 {
   "files": {
+    "src/additional-data.ts": {
+      "minimumScore": 100,
+      "maximumSurvived": 0
+    },
     "src/canonical.ts": {
+      "minimumScore": 100,
+      "maximumSurvived": 0
+    },
+    "src/device-wrapping.ts": {
       "minimumScore": 100,
       "maximumSurvived": 0
     },
@@ -8,11 +16,15 @@
       "minimumScore": 100,
       "maximumSurvived": 0
     },
-    "src/index.ts": {
+    "src/inviteCapability.ts": {
       "minimumScore": 100,
       "maximumSurvived": 0
     },
-    "src/inviteCapability.ts": {
+    "src/key-material.ts": {
+      "minimumScore": 100,
+      "maximumSurvived": 0
+    },
+    "src/payload.ts": {
       "minimumScore": 100,
       "maximumSurvived": 0
     }
@@ -30,64 +42,24 @@
       "rationale": "replacement content cannot affect the surrogate-only predicate"
     },
     {
-      "file": "src/index.ts",
-      "line": 329,
+      "file": "src/device-wrapping.ts",
+      "line": 94,
       "column": 5,
-      "endLine": 329,
+      "endLine": 94,
       "endColumn": 10,
       "mutator": "BooleanLiteral",
       "replacement": "true",
       "rationale": "ephemeral private handle never leaves; WebCrypto public half stays exportable"
     },
     {
-      "file": "src/index.ts",
-      "line": 396,
+      "file": "src/device-wrapping.ts",
+      "line": 161,
       "column": 5,
-      "endLine": 396,
+      "endLine": 161,
       "endColumn": 10,
       "mutator": "BooleanLiteral",
       "replacement": "true",
       "rationale": "ephemeral private handle never leaves; WebCrypto public half stays exportable"
-    },
-    {
-      "file": "src/index.ts",
-      "line": 450,
-      "column": 107,
-      "endLine": 450,
-      "endColumn": 112,
-      "mutator": "BooleanLiteral",
-      "replacement": "true",
-      "rationale": "internal key handle is never returned and extractability is unobservable"
-    },
-    {
-      "file": "src/index.ts",
-      "line": 487,
-      "column": 5,
-      "endLine": 487,
-      "endColumn": 10,
-      "mutator": "BooleanLiteral",
-      "replacement": "true",
-      "rationale": "public input is already public and the internal handle is never returned"
-    },
-    {
-      "file": "src/index.ts",
-      "line": 532,
-      "column": 5,
-      "endLine": 532,
-      "endColumn": 10,
-      "mutator": "BooleanLiteral",
-      "replacement": "true",
-      "rationale": "derived wrapping key is internal and never exportable through this API"
-    },
-    {
-      "file": "src/index.ts",
-      "line": 549,
-      "column": 5,
-      "endLine": 549,
-      "endColumn": 10,
-      "mutator": "BooleanLiteral",
-      "replacement": "true",
-      "rationale": "derived wrapping key is internal and never exportable through this API"
     },
     {
       "file": "src/inviteCapability.ts",
@@ -108,11 +80,51 @@
       "mutator": "BooleanLiteral",
       "replacement": "true",
       "rationale": "internal HMAC handle never leaves this function"
+    },
+    {
+      "file": "src/key-material.ts",
+      "line": 42,
+      "column": 107,
+      "endLine": 42,
+      "endColumn": 112,
+      "mutator": "BooleanLiteral",
+      "replacement": "true",
+      "rationale": "internal key handle is never returned and extractability is unobservable"
+    },
+    {
+      "file": "src/key-material.ts",
+      "line": 79,
+      "column": 5,
+      "endLine": 79,
+      "endColumn": 10,
+      "mutator": "BooleanLiteral",
+      "replacement": "true",
+      "rationale": "public input is already public and the internal handle is never returned"
+    },
+    {
+      "file": "src/key-material.ts",
+      "line": 124,
+      "column": 5,
+      "endLine": 124,
+      "endColumn": 10,
+      "mutator": "BooleanLiteral",
+      "replacement": "true",
+      "rationale": "derived wrapping key is internal and never exportable through this API"
+    },
+    {
+      "file": "src/key-material.ts",
+      "line": 141,
+      "column": 5,
+      "endLine": 141,
+      "endColumn": 10,
+      "mutator": "BooleanLiteral",
+      "replacement": "true",
+      "rationale": "derived wrapping key is internal and never exportable through this API"
     }
   ],
   "regions": [
     {
-      "file": "src/index.ts",
+      "file": "src/payload.ts",
       "marker": "payload-core",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
@@ -121,7 +133,7 @@
       "maximumTimeout": 0
     },
     {
-      "file": "src/index.ts",
+      "file": "src/device-wrapping.ts",
       "marker": "device-seal",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
@@ -130,7 +142,7 @@
       "maximumTimeout": 0
     },
     {
-      "file": "src/index.ts",
+      "file": "src/device-wrapping.ts",
       "marker": "room-secret-wrap",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
@@ -139,7 +151,7 @@
       "maximumTimeout": 0
     },
     {
-      "file": "src/index.ts",
+      "file": "src/key-material.ts",
       "marker": "room-secret-validation",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
@@ -148,7 +160,7 @@
       "maximumTimeout": 0
     },
     {
-      "file": "src/index.ts",
+      "file": "src/key-material.ts",
       "marker": "device-key-import",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
@@ -157,7 +169,7 @@
       "maximumTimeout": 0
     },
     {
-      "file": "src/index.ts",
+      "file": "src/payload.ts",
       "marker": "attachment-wrapper",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
@@ -166,7 +178,7 @@
       "maximumTimeout": 0
     },
     {
-      "file": "src/index.ts",
+      "file": "src/additional-data.ts",
       "marker": "device-context-aad",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
@@ -175,7 +187,7 @@
       "maximumTimeout": 0
     },
     {
-      "file": "src/index.ts",
+      "file": "src/additional-data.ts",
       "marker": "room-envelope-aad",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
@@ -184,7 +196,7 @@
       "maximumTimeout": 0
     },
     {
-      "file": "src/index.ts",
+      "file": "src/additional-data.ts",
       "marker": "local-aad",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
@@ -193,7 +205,7 @@
       "maximumTimeout": 0
     },
     {
-      "file": "src/index.ts",
+      "file": "src/device-wrapping.ts",
       "marker": "authenticated-room-secret-wrap",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
@@ -202,7 +214,7 @@
       "maximumTimeout": 0
     },
     {
-      "file": "src/index.ts",
+      "file": "src/key-material.ts",
       "marker": "secret-and-identity-creation",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
@@ -211,7 +223,7 @@
       "maximumTimeout": 0
     },
     {
-      "file": "src/index.ts",
+      "file": "src/payload.ts",
       "marker": "envelope-wrappers",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
@@ -220,7 +232,7 @@
       "maximumTimeout": 0
     },
     {
-      "file": "src/index.ts",
+      "file": "src/additional-data.ts",
       "marker": "authenticated-wrap-authorization",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
@@ -229,7 +241,7 @@
       "maximumTimeout": 0
     },
     {
-      "file": "src/index.ts",
+      "file": "src/key-material.ts",
       "marker": "device-key-equality",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
@@ -238,8 +250,17 @@
       "maximumTimeout": 0
     },
     {
-      "file": "src/index.ts",
+      "file": "src/key-material.ts",
       "marker": "device-key-identity",
+      "maximumSurvived": 0,
+      "maximumNoCoverage": 0,
+      "maximumRuntimeError": 0,
+      "maximumPending": 0,
+      "maximumTimeout": 0
+    },
+    {
+      "file": "src/additional-data.ts",
+      "marker": "attachment-aad",
       "maximumSurvived": 0,
       "maximumNoCoverage": 0,
       "maximumRuntimeError": 0,

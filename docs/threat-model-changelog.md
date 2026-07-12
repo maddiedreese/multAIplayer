@@ -10,6 +10,7 @@ This public changelog records material changes to multAIplayer's security assump
 - Added public canonical-encoder and key-wrapping vectors as a stable review surface, with a repository check that regenerates or verifies the committed data.
 - Treat room-originated text, attachments, fetched pages, rendered content, model output, and peer-proposed actions as untrusted inputs to Codex and native approvals. Network-touching and credential-file-touching commands are denied even when broader approval defaults would otherwise permit execution, and approval displays identify proposal and context provenance.
 - Hardened the crypto receive boundary without changing valid emitted wire bytes or domain strings: noncanonical Base64 spellings, invalid payload discriminants, malformed device/local/attachment contexts, unpinned sender keys, and invalid invite/rotation transitions now fail closed. Ordinary room/local/attachment version 2 ciphertext, unversioned legacy device seals, and version 1 standalone room-secret wraps remain decrypt-only compatibility paths with the same validation as canonical routes; authenticated room-secret delivery remains version 3 only.
+- Split the crypto migration boundary into focused key-material, authenticated-data, payload, and device-wrapping modules without changing its package-root API, emitted bytes, algorithms, domains, or compatibility paths. The same 595-mutant policy baseline remains at 100%, and repository hygiene prevents implementation modules from growing beyond 250 lines.
 
 ## Maintenance rule
 

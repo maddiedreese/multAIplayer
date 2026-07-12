@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
 
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
@@ -96,6 +96,17 @@ test("security boundaries have explicit automated review policy", () => {
   assert.match(contributing, /packages\/crypto/);
   assert.match(contributing, /property, fuzz, mutation, or native checks/);
   assert.match(contributing, /does not require a separate human or code-owner approval/);
+});
+
+test("crypto stays split into bounded modules behind its public barrel", () => {
+  const sourceDirectory = "packages/crypto/src";
+  const sourceFiles = readdirSync(sourceDirectory).filter((name) => name.endsWith(".ts"));
+  for (const name of sourceFiles) {
+    const source = readFileSync(`${sourceDirectory}/${name}`, "utf8");
+    assert.ok(source.split("\n").length <= 250, `${name} exceeds the 250-line crypto module limit`);
+  }
+  const barrel = readFileSync(`${sourceDirectory}/index.ts`, "utf8");
+  assert.doesNotMatch(barrel, /\b(?:async\s+)?function\b|\bclass\b|\bconst\b|\blet\b/);
 });
 
 test("third-party GitHub Actions are pinned to immutable commits", () => {
