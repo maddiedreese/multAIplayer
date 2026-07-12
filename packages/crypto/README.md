@@ -2,6 +2,8 @@
 
 This package contains multAIplayer's small Web Crypto-based cryptographic boundary. Keep runtime dependencies and exported primitives deliberately limited so the code remains feasible for focused third-party review.
 
+The public `index.ts` is intentionally a declaration-free barrel. Implementation modules follow a one-way dependency graph: `types.ts` defines shared shapes; `key-material.ts` owns room/device keys and fingerprints; `additional-data.ts` owns canonical and legacy authenticated-data construction; `payload.ts` owns room/local/attachment AEAD; and `device-wrapping.ts` owns device sealing and room-secret delivery. Canonical encoding and invite capabilities remain isolated alongside them. Repository hygiene limits each crypto source module to 250 lines so the migration boundary cannot silently reconsolidate into another monolith. Internal helpers may be exported between modules but are not package-root API unless re-exported by `index.ts`.
+
 ## Interoperability vectors
 
 [`test-vectors/v1.json`](test-vectors/v1.json) publishes stable UTF-8/hex canonical-encoding vectors and a deterministic authenticated room-secret wrapping vector. Private keys and the fixed nonce in that file exist only as public test fixtures and must never be used outside interoperability tests.
@@ -31,4 +33,4 @@ Large modules are hardened incrementally with paired `// mutation-policy:start <
 
 The governed AAD regions are `device-context-aad`, `room-envelope-aad`, `local-aad`, and the attachment AAD inside `attachment-wrapper`. Their domains, canonical fields, and compatibility behavior are wire-protocol inputs documented in the [cryptography architecture](../../docs/cryptography.md); changing them requires the protocol-level process described there.
 
-Every crypto source file has a whole-file 100%/zero-survivor gate. Named regions remain as semantic audit zones inside the larger `index.ts` boundary.
+Every crypto implementation source file has a whole-file 100%/zero-survivor gate. Named regions remain as semantic audit zones in the focused module that owns the corresponding operation.

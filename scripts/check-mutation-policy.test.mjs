@@ -267,10 +267,13 @@ test("keeps repository mutation ratchets at 100 percent while allowing policy re
   assert.deepEqual(
     Object.fromEntries(Object.entries(configured.files).map(([path, rule]) => [path, rule.minimumScore])),
     {
+      "src/additional-data.ts": 100,
       "src/canonical.ts": 100,
+      "src/device-wrapping.ts": 100,
       "src/encoding.ts": 100,
-      "src/index.ts": 100,
-      "src/inviteCapability.ts": 100
+      "src/inviteCapability.ts": 100,
+      "src/key-material.ts": 100,
+      "src/payload.ts": 100
     }
   );
   assert.ok(Object.values(configured.files).every((rule) => rule.maximumSurvived === 0));
