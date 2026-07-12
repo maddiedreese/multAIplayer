@@ -73,6 +73,30 @@ test("sorts mutants by source position and then id for deterministic output", ()
   assert.equal(first.totals.mutationScore, null);
 });
 
+test("omits volatile killed logs while retaining policy-relevant reasons", () => {
+  const report = (killedReason) => ({
+    files: {
+      "src/a.ts": {
+        mutants: [
+          mutant("killed", "Killed", 1, { statusReason: killedReason, killedBy: ["test-1"] }),
+          mutant("compile", "CompileError", 2, {
+            statusReason: "src/a.ts(2,2): error TS2355: missing return"
+          }),
+          mutant("ignored", "Ignored", 3, { statusReason: "intentionally equivalent" })
+        ]
+      }
+    }
+  });
+
+  const first = summarizeMutationReport(report("sandbox-a/src/a.ts failed after 1.23ms in /tmp/stryker-a"));
+  const second = summarizeMutationReport(report("sandbox-b/src/a.ts failed after 98.76ms in /tmp/stryker-b"));
+
+  assert.deepEqual(first, second);
+  assert.equal(first.mutants[0].statusReason, null);
+  assert.equal(first.mutants[1].statusReason, "src/a.ts(2,2): error TS2355: missing return");
+  assert.equal(first.mutants[2].statusReason, "intentionally equivalent");
+});
+
 test("writes a stable JSON artifact through the CLI", async () => {
   const directory = await mkdtemp(join(tmpdir(), "mutation-summary-"));
   const input = join(directory, "mutation.json");

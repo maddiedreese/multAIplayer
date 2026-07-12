@@ -325,7 +325,7 @@ export async function sealJsonToDevice(
       name: "ECDH",
       namedCurve: "P-256"
     },
-    // Stryker disable next-line BooleanLiteral: only the public half is exported; WebCrypto keeps it extractable independently
+    // Stryker disable next-line BooleanLiteral: ephemeral private handle never leaves; WebCrypto public half stays exportable
     false,
     ["deriveKey"]
   );
@@ -392,7 +392,7 @@ export async function wrapRoomSecretForDevice(
       name: "ECDH",
       namedCurve: "P-256"
     },
-    // Stryker disable next-line BooleanLiteral: only the public half is exported; WebCrypto keeps it extractable independently
+    // Stryker disable next-line BooleanLiteral: ephemeral private handle never leaves; WebCrypto public half stays exportable
     false,
     ["deriveKey"]
   );
@@ -562,6 +562,24 @@ function deviceSealAdditionalData(context: DeviceCryptoContext): Uint8Array {
 }
 
 function cryptoContextAdditionalData(domain: string, context: DeviceCryptoContext): Uint8Array {
+  validateDeviceCryptoContext(context);
+  return canonicalAuthenticatedRecord(domain, 1, {
+    purpose: context.purpose,
+    teamId: context.teamId,
+    roomId: context.roomId,
+    senderUserId: context.senderUserId,
+    senderDeviceId: context.senderDeviceId,
+    recipientDeviceId: context.recipientDeviceId,
+    operationId: context.operationId ?? null,
+    requestId: context.requestId ?? null,
+    requestNonce: context.requestNonce ?? null,
+    keyEpoch: context.keyEpoch ?? null,
+    previousEpoch: context.previousEpoch ?? null,
+    newEpoch: context.newEpoch ?? null
+  });
+}
+
+function validateDeviceCryptoContext(context: DeviceCryptoContext): void {
   if (!context.teamId) throw new Error("Device crypto context teamId must be non-empty");
   if (!context.roomId) throw new Error("Device crypto context roomId must be non-empty");
   if (!context.senderUserId) throw new Error("Device crypto context senderUserId must be non-empty");
@@ -579,23 +597,10 @@ function cryptoContextAdditionalData(domain: string, context: DeviceCryptoContex
       throw new Error(`Device crypto context ${name} must be a positive safe integer`);
     }
   }
-  return canonicalAuthenticatedRecord(domain, 1, {
-    purpose: context.purpose,
-    teamId: context.teamId,
-    roomId: context.roomId,
-    senderUserId: context.senderUserId,
-    senderDeviceId: context.senderDeviceId,
-    recipientDeviceId: context.recipientDeviceId,
-    operationId: context.operationId ?? null,
-    requestId: context.requestId ?? null,
-    requestNonce: context.requestNonce ?? null,
-    keyEpoch: context.keyEpoch ?? null,
-    previousEpoch: context.previousEpoch ?? null,
-    newEpoch: context.newEpoch ?? null
-  });
 }
 
 function legacyCryptoContextAdditionalData(domain: string, context: DeviceCryptoContext): Uint8Array {
+  validateDeviceCryptoContext(context);
   return encoder.encode(
     JSON.stringify({
       domain,

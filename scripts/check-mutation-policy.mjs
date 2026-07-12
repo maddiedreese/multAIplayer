@@ -16,6 +16,9 @@ export function checkMutationPolicy(summary, policy, sources = {}) {
   if (!Array.isArray(policy.allowedTimeouts)) {
     throw new TypeError("mutation policy must contain an allowedTimeouts array");
   }
+  if (!Array.isArray(policy.allowedIgnored)) {
+    throw new TypeError("mutation policy must contain an allowedIgnored array");
+  }
   if (!Array.isArray(policy.regions)) {
     throw new TypeError("mutation policy must contain a regions array");
   }
@@ -59,6 +62,7 @@ export function checkMutationPolicy(summary, policy, sources = {}) {
   }
 
   const allowedTimeouts = policy.allowedTimeouts.map(validateTimeoutRule);
+  const allowedIgnored = policy.allowedIgnored.map((rule, index) => validateIgnoredRule(rule, index));
   for (const mutant of summary.mutants) {
     if (alwaysRejectedStatuses.has(mutant.status)) {
       failures.push(describeMutant(mutant, `${mutant.status} is not allowed`));
@@ -81,8 +85,15 @@ export function checkMutationPolicy(summary, policy, sources = {}) {
       mutant.statusReason.includes("excluded mutation")
     ) {
       failures.push(describeMutant(mutant, "broad mutator exclusions are not allowed in governed files"));
+    } else if (mutant.status === "Ignored" && !allowedIgnored.some((rule) => matchesIgnored(mutant, rule))) {
+      failures.push(describeMutant(mutant, "Ignored has no exact policy ledger entry"));
     } else if (!knownStatus(mutant.status)) {
       failures.push(describeMutant(mutant, `unknown status ${JSON.stringify(mutant.status)}`));
+    }
+  }
+  for (const rule of allowedIgnored) {
+    if (!summary.mutants.some((mutant) => mutant.status === "Ignored" && matchesIgnored(mutant, rule))) {
+      failures.push(`${rule.file}:${rule.line}:${rule.column}: stale allowedIgnored policy entry`);
     }
   }
 
@@ -186,6 +197,34 @@ function validateTimeoutRule(rule, index) {
     }
   }
   return rule;
+}
+
+function validateIgnoredRule(rule, index) {
+  requireObject(rule, `allowed ignored ${index}`);
+  for (const field of ["file", "mutator", "replacement", "rationale"]) {
+    if (typeof rule[field] !== "string" || rule[field].length === 0) {
+      throw new TypeError(`allowed ignored ${index} must have a non-empty ${field}`);
+    }
+  }
+  for (const field of ["line", "column", "endLine", "endColumn"]) {
+    if (!Number.isInteger(rule[field]) || rule[field] < 0) {
+      throw new TypeError(`allowed ignored ${index} must have a non-negative integer ${field}`);
+    }
+  }
+  return rule;
+}
+
+function matchesIgnored(mutant, rule) {
+  return (
+    mutant.file === rule.file &&
+    mutant.line === rule.line &&
+    mutant.column === rule.column &&
+    mutant.endLine === rule.endLine &&
+    mutant.endColumn === rule.endColumn &&
+    mutant.mutator === rule.mutator &&
+    mutant.replacement === rule.replacement &&
+    mutant.statusReason === rule.rationale
+  );
 }
 
 function matchesTimeout(mutant, rule) {

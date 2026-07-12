@@ -1,21 +1,115 @@
 {
   "files": {
     "src/canonical.ts": {
-      "minimumScore": 90,
+      "minimumScore": 100,
       "maximumSurvived": 0
     },
     "src/encoding.ts": {
-      "minimumScore": 85,
+      "minimumScore": 100,
       "maximumSurvived": 0
     },
     "src/index.ts": {
+      "minimumScore": 100,
       "maximumSurvived": 0
     },
     "src/inviteCapability.ts": {
+      "minimumScore": 100,
       "maximumSurvived": 0
     }
   },
   "allowedTimeouts": [],
+  "allowedIgnored": [
+    {
+      "file": "src/canonical.ts",
+      "line": 7,
+      "column": 81,
+      "endLine": 7,
+      "endColumn": 83,
+      "mutator": "StringLiteral",
+      "replacement": "\"Stryker was here!\"",
+      "rationale": "replacement content cannot affect the surrogate-only predicate"
+    },
+    {
+      "file": "src/index.ts",
+      "line": 329,
+      "column": 5,
+      "endLine": 329,
+      "endColumn": 10,
+      "mutator": "BooleanLiteral",
+      "replacement": "true",
+      "rationale": "only the public half is exported; WebCrypto keeps it extractable independently"
+    },
+    {
+      "file": "src/index.ts",
+      "line": 396,
+      "column": 5,
+      "endLine": 396,
+      "endColumn": 10,
+      "mutator": "BooleanLiteral",
+      "replacement": "true",
+      "rationale": "only the public half is exported; WebCrypto keeps it extractable independently"
+    },
+    {
+      "file": "src/index.ts",
+      "line": 450,
+      "column": 107,
+      "endLine": 450,
+      "endColumn": 112,
+      "mutator": "BooleanLiteral",
+      "replacement": "true",
+      "rationale": "internal key handle is never returned and extractability is unobservable"
+    },
+    {
+      "file": "src/index.ts",
+      "line": 487,
+      "column": 5,
+      "endLine": 487,
+      "endColumn": 10,
+      "mutator": "BooleanLiteral",
+      "replacement": "true",
+      "rationale": "public input is already public and the internal handle is never returned"
+    },
+    {
+      "file": "src/index.ts",
+      "line": 532,
+      "column": 5,
+      "endLine": 532,
+      "endColumn": 10,
+      "mutator": "BooleanLiteral",
+      "replacement": "true",
+      "rationale": "derived wrapping key is internal and never exportable through this API"
+    },
+    {
+      "file": "src/index.ts",
+      "line": 549,
+      "column": 5,
+      "endLine": 549,
+      "endColumn": 10,
+      "mutator": "BooleanLiteral",
+      "replacement": "true",
+      "rationale": "derived wrapping key is internal and never exportable through this API"
+    },
+    {
+      "file": "src/inviteCapability.ts",
+      "line": 72,
+      "column": 107,
+      "endLine": 72,
+      "endColumn": 112,
+      "mutator": "BooleanLiteral",
+      "replacement": "true",
+      "rationale": "internal HMAC handle never leaves this function"
+    },
+    {
+      "file": "src/inviteCapability.ts",
+      "line": 88,
+      "column": 109,
+      "endLine": 88,
+      "endColumn": 114,
+      "mutator": "BooleanLiteral",
+      "replacement": "true",
+      "rationale": "internal HMAC handle never leaves this function"
+    }
+  ],
   "regions": [
     {
       "file": "src/index.ts",

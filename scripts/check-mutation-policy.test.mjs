@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
 import { checkMutationPolicy } from "./check-mutation-policy.mjs";
+import strykerConfig from "../packages/crypto/stryker.config.mjs";
 
 const file = (path, mutationScore, survived = 0) => ({ path, counts: { mutationScore, survived } });
 const mutant = (status, extra = {}) => ({
@@ -33,6 +35,7 @@ const policy = {
       rationale: "A loop-counter reversal is expected to run until the mutation timeout."
     }
   ],
+  allowedIgnored: [],
   regions: []
 };
 
@@ -102,9 +105,36 @@ test("rejects broad or unexplained ignores in governed files", () => {
     ]
   };
   const failures = checkMutationPolicy(summary, policy);
-  assert.equal(failures.length, 2);
+  assert.equal(failures.length, 3);
   assert.match(failures[0], /Ignored has no rationale/);
   assert.match(failures[1], /broad mutator exclusions/);
+  assert.match(failures[2], /no exact policy ledger entry/);
+});
+
+test("requires every ignored mutant to match one exact, current ledger entry", () => {
+  const ignored = mutant("Ignored", {
+    id: "19",
+    file: "src/canonical.ts",
+    mutator: "StringLiteral",
+    replacement: '"Stryker was here!"',
+    statusReason: "equivalent replacement"
+  });
+  const ledger = {
+    file: ignored.file,
+    line: ignored.line,
+    column: ignored.column,
+    endLine: ignored.endLine,
+    endColumn: ignored.endColumn,
+    mutator: ignored.mutator,
+    replacement: ignored.replacement,
+    rationale: ignored.statusReason
+  };
+  const summary = { files: [file("src/canonical.ts", 100), file("src/encoding.ts", 100)], mutants: [ignored] };
+  assert.deepEqual(checkMutationPolicy(summary, { ...policy, allowedIgnored: [ledger] }), []);
+  assert.deepEqual(checkMutationPolicy(summary, { ...policy, allowedIgnored: [{ ...ledger, line: 25 }] }), [
+    "src/canonical.ts:24:46 [19] Ignored has no exact policy ledger entry",
+    "src/canonical.ts:25:46: stale allowedIgnored policy entry"
+  ]);
 });
 
 test("accepts type-checker detections but rejects unexplained compile errors", () => {
@@ -122,14 +152,23 @@ test("accepts type-checker detections but rejects unexplained compile errors", (
 
 test("validates policy data instead of silently weakening the gate", () => {
   assert.throws(
-    () => checkMutationPolicy({ files: [], mutants: [] }, { files: {}, allowedTimeouts: [{}], regions: [] }),
+    () =>
+      checkMutationPolicy(
+        { files: [], mutants: [] },
+        { files: {}, allowedTimeouts: [{}], allowedIgnored: [], regions: [] }
+      ),
     /non-empty file/
   );
   assert.throws(
     () =>
       checkMutationPolicy(
         { files: [], mutants: [] },
-        { files: { "src/a.ts": { minimumScore: 101, maximumSurvived: 0 } }, allowedTimeouts: [], regions: [] }
+        {
+          files: { "src/a.ts": { minimumScore: 101, maximumSurvived: 0 } },
+          allowedTimeouts: [],
+          allowedIgnored: [],
+          regions: []
+        }
       ),
     /invalid minimumScore/
   );
@@ -137,7 +176,12 @@ test("validates policy data instead of silently weakening the gate", () => {
     () =>
       checkMutationPolicy(
         { files: [], mutants: [] },
-        { files: { "src/a.ts": { minimumScore: 90, maximumSurvived: -1 } }, allowedTimeouts: [], regions: [] }
+        {
+          files: { "src/a.ts": { minimumScore: 90, maximumSurvived: -1 } },
+          allowedTimeouts: [],
+          allowedIgnored: [],
+          regions: []
+        }
       ),
     /invalid maximumSurvived/
   );
@@ -202,4 +246,31 @@ test("rejects missing, duplicate, nested, reversed, and unclosed markers", () =>
   );
   assert.throws(() => check("// mutation-policy:end payload-core"), /unmatched mutation-policy end/);
   assert.throws(() => check("// mutation-policy:start payload-core"), /unclosed mutation-policy region/);
+});
+
+test("keeps repository mutation ratchets at 100 percent while allowing policy reporting", async () => {
+  const configured = JSON.parse(
+    await readFile(new URL("../packages/crypto/mutation-policy.json", import.meta.url), "utf8")
+  );
+  assert.deepEqual(strykerConfig.thresholds, { high: 100, low: 100, break: 50 });
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(configured.files).map(([path, rule]) => [path, rule.minimumScore])),
+    {
+      "src/canonical.ts": 100,
+      "src/encoding.ts": 100,
+      "src/index.ts": 100,
+      "src/inviteCapability.ts": 100
+    }
+  );
+  assert.ok(Object.values(configured.files).every((rule) => rule.maximumSurvived === 0));
+  assert.ok(
+    configured.regions.every(
+      (region) =>
+        region.maximumSurvived === 0 &&
+        region.maximumNoCoverage === 0 &&
+        region.maximumRuntimeError === 0 &&
+        region.maximumPending === 0 &&
+        region.maximumTimeout === 0
+    )
+  );
 });

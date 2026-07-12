@@ -69,7 +69,10 @@ function summarizeMutant(fileName, mutant) {
     mutator: typeof mutant.mutatorName === "string" ? mutant.mutatorName : "Unknown",
     replacement: typeof mutant.replacement === "string" ? mutant.replacement : null,
     status: mutant.status,
-    statusReason: typeof mutant.statusReason === "string" ? mutant.statusReason : null,
+    // Killed reasons contain the command runner's full test output, including
+    // sandbox paths and timings. The status and killedBy ids preserve the useful
+    // result; policy-relevant diagnostics and ignore rationales remain intact.
+    statusReason: mutant.status !== "Killed" && typeof mutant.statusReason === "string" ? mutant.statusReason : null,
     killedBy: sortedStrings(mutant.killedBy),
     coveredBy: sortedStrings(mutant.coveredBy),
     // These fields intentionally start empty. The generated artifact can be

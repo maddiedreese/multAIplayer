@@ -19,10 +19,10 @@ export default {
   // Timeouts still fail repository policy; this only prevents false detections.
   timeoutMS: 15000,
   thresholds: {
-    high: 75,
-    low: 55,
-    // Establish the measured baseline as a ratchet. Raising this threshold now
-    // would make the new check permanently red instead of guarding regressions.
+    high: 100,
+    low: 100,
+    // Keep the engine threshold below the repository ratchet so JSON summary
+    // generation and the stricter per-file/ignore-ledger policy always run.
     break: 50
   },
   tempDirName: ".stryker-tmp"

@@ -9,6 +9,7 @@ This public changelog records material changes to multAIplayer's security assump
 - Documented third-party release reproduction and comparison. Signed/notarized macOS containers are not currently bit-for-bit reproducible because Apple signing, notarization, stapling, and packaging add environment-dependent data.
 - Added public canonical-encoder and key-wrapping vectors as a stable review surface, with a repository check that regenerates or verifies the committed data.
 - Treat room-originated text, attachments, fetched pages, rendered content, model output, and peer-proposed actions as untrusted inputs to Codex and native approvals. Network-touching and credential-file-touching commands are denied even when broader approval defaults would otherwise permit execution, and approval displays identify proposal and context provenance.
+- Hardened the crypto receive boundary without changing valid emitted wire bytes or domain strings: noncanonical Base64 spellings, invalid payload discriminants, malformed device/local/attachment contexts, unpinned sender keys, and invalid invite/rotation transitions now fail closed. Ordinary room/local/attachment version 2 ciphertext, unversioned legacy device seals, and version 1 standalone room-secret wraps remain decrypt-only compatibility paths with the same validation as canonical routes; authenticated room-secret delivery remains version 3 only.
 
 ## Maintenance rule
 
