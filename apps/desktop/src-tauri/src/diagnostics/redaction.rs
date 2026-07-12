@@ -136,12 +136,15 @@ pub(super) fn redact_text(value: &str) -> String {
 
 pub(super) fn url_regex() -> &'static Regex {
     static REGEX: OnceLock<Regex> = OnceLock::new();
-    REGEX.get_or_init(|| Regex::new(r#"https?://[^\s"')]+"#).expect("valid diagnostic URL regex"))
+    REGEX.get_or_init(|| compile_diagnostic_pattern(r#"https?://[^\s"')]+"#))
 }
 
 pub(super) fn token_regex() -> &'static Regex {
     static REGEX: OnceLock<Regex> = OnceLock::new();
-    REGEX.get_or_init(|| {
-        Regex::new(r"\b[A-Za-z0-9_-]{32,}\b").expect("valid diagnostic token regex")
-    })
+    REGEX.get_or_init(|| compile_diagnostic_pattern(r"\b[A-Za-z0-9_-]{32,}\b"))
+}
+
+#[allow(clippy::expect_used)]
+fn compile_diagnostic_pattern(pattern: &'static str) -> Regex {
+    Regex::new(pattern).expect("repository-owned diagnostic redaction regex must compile")
 }

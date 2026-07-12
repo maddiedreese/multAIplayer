@@ -13,6 +13,7 @@ Every commit must include a `Signed-off-by` trailer certifying the [Developer Ce
 Keep changes under `packages/crypto`, `packages/protocol`, and `apps/desktop/src-tauri` small, explicit, and independently testable. Pull requests should identify AI-authored security-boundary changes and report the focused property, fuzz, mutation, or native checks that apply. This project currently has one maintainer, so it does not require a separate human or code-owner approval that the sole maintainer could never supply; required CI and branch protection remain the merge gate.
 
 Dependency advisory handling and coverage gates are documented in [Dependency security](docs/dependency-security.md). Workflow purpose and merge impact are in [CI policy](docs/ci-policy.md). Accessibility expectations and the honest localization status are in [Accessibility and localization](docs/accessibility-and-localization.md).
+Native failure-handling rules and the two narrowly pinned redaction-regex exceptions are documented in [Rust panic policy](docs/rust-panic-policy.md).
 
 ## Fast path
 

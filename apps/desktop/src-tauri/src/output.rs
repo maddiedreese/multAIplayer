@@ -9,11 +9,11 @@ use std::sync::OnceLock;
 pub(crate) fn redact_known_secrets(text: &str) -> String {
     static PATTERNS: OnceLock<Vec<Regex>> = OnceLock::new();
     let patterns = PATTERNS.get_or_init(|| vec![
-        Regex::new(r"ghp_[A-Za-z0-9_]{20,}").unwrap(),
-        Regex::new(r"github_pat_[A-Za-z0-9_]{20,}").unwrap(),
-        Regex::new(r"sk-[A-Za-z0-9_-]{20,}").unwrap(),
-        Regex::new(r"(?im)^([A-Z][A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*)\s*=\s*([^\r\n]+)").unwrap(),
-        Regex::new(r"(?s)-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----.*?-----END (?:RSA |OPENSSH |EC )?PRIVATE KEY-----").unwrap(),
+        compile_secret_pattern(r"ghp_[A-Za-z0-9_]{20,}"),
+        compile_secret_pattern(r"github_pat_[A-Za-z0-9_]{20,}"),
+        compile_secret_pattern(r"sk-[A-Za-z0-9_-]{20,}"),
+        compile_secret_pattern(r"(?im)^([A-Z][A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*)\s*=\s*([^\r\n]+)"),
+        compile_secret_pattern(r"(?s)-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----.*?-----END (?:RSA |OPENSSH |EC )?PRIVATE KEY-----"),
     ]);
     patterns.iter().fold(text.to_string(), |value, pattern| {
         pattern
@@ -26,6 +26,11 @@ pub(crate) fn redact_known_secrets(text: &str) -> String {
             })
             .into_owned()
     })
+}
+
+#[allow(clippy::expect_used)]
+fn compile_secret_pattern(pattern: &'static str) -> Regex {
+    Regex::new(pattern).expect("repository-owned secret redaction regex must compile")
 }
 
 pub(crate) fn untracked_file_diff(path: &Path, display_path: &str) -> Result<String, String> {

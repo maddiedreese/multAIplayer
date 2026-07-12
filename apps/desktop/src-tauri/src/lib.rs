@@ -1,3 +1,5 @@
+#![cfg_attr(not(test), deny(clippy::expect_used, clippy::unwrap_used))]
+
 mod browser;
 mod codex;
 mod codex_account;
@@ -48,7 +50,7 @@ fn app_version() -> &'static str {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    if let Err(error) = tauri::Builder::default()
         .manage(TerminalState::default())
         .manage(ShellAuthorizationState::default())
         .manage(LocalPreviewState::default())
@@ -125,7 +127,10 @@ pub fn run() {
             fork_codex_thread
         ])
         .run(tauri::generate_context!())
-        .expect("error while running multAIplayer");
+    {
+        eprintln!("error while running multAIplayer: {error}");
+        std::process::exit(1);
+    }
 }
 
 #[cfg(test)]

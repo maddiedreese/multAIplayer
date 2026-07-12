@@ -13,6 +13,7 @@ test("Codex server request display produces schema-specific approval decisions",
   assert.deepEqual(current.accept({}), { result: { decision: "accept" } });
   assert.deepEqual(current.decline, { result: { decision: "decline" } });
   assert.doesNotMatch(current.detail ?? "", /undefined/);
+  assert.match(current.warning ?? "", /checks are incomplete/);
 
   const legacy = describeCodexServerRequest({
     requestKey: "rpc-2",
@@ -23,6 +24,18 @@ test("Codex server request display produces schema-specific approval decisions",
   });
   assert.deepEqual(legacy.accept({}), { result: { decision: "approved" } });
   assert.deepEqual(legacy.decline, { result: { decision: "denied" } });
+});
+
+test("Codex command approval never claims interpreter text is safe", () => {
+  const display = describeCodexServerRequest({
+    requestKey: "rpc-interpreter",
+    roomId: "room-1",
+    expiresAtMs: Date.now() + 60_000,
+    method: "item/commandExecution/requestApproval",
+    params: { command: ["python", "-c", "import socket"] }
+  });
+
+  assert.match(display.warning ?? "", /cannot rule out interpreter, script, indirect network, or credential access/);
 });
 
 test("Codex user input stays local and maps only bounded question ids", () => {

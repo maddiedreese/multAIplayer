@@ -5,7 +5,7 @@ use crate::codex_rpc::{
     wait_for_response_message as wait_for_rpc_response_message, ActiveTimeout, RpcId, RpcInbox,
     SharedStdin,
 };
-use crate::command_safety::blocked_server_request_reason;
+use crate::command_safety::enforced_permission_denial;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -283,7 +283,7 @@ impl CodexRpcState {
                 "Unsupported app-server request",
             );
         }
-        if let Some(reason) = blocked_server_request_reason(&method, &params) {
+        if let Some(reason) = enforced_permission_denial(&method, &params) {
             return send_rpc_error(&context.stdin, &id, -32001, reason);
         }
         let projected = match project_server_request(&method, &params) {

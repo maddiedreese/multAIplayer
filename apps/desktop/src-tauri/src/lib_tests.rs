@@ -642,18 +642,6 @@ fn terminal_secret_redaction_covers_tokens_env_and_private_keys() {
 }
 
 #[test]
-fn credential_file_commands_are_a_distinct_approval_class() {
-    assert!(requests_credential_access("cat .env"));
-    assert!(requests_credential_access("rg token ~/.aws/credentials"));
-    assert!(requests_credential_access("cp .env /tmp/copy"));
-    assert!(requests_credential_access(
-        "python -c 'print(open(\".env\").read())'"
-    ));
-    assert!(!requests_credential_access("npm test"));
-    assert!(!requests_credential_access("touch .env.example"));
-}
-
-#[test]
 fn terminal_redaction_carries_partial_lines_across_pty_reads() {
     let mut redactor = TerminalStreamRedactor::default();
     assert!(redactor.push("token=ghp_abcdefghij", false).is_empty());
