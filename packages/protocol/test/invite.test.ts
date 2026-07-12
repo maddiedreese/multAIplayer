@@ -650,7 +650,7 @@ test("device-sealed and wrapped room secret payloads reject private keys and ove
 });
 
 test("room key rotation payload wraps the new epoch secret once per device", () => {
-  const parsed = RoomKeyRotationPlaintextPayload.parse({
+  const payload = {
     eventType: "room.key.rotated",
     id: "rotation-1",
     rotatedBy: "Host",
@@ -673,10 +673,30 @@ test("room key rotation payload wraps the new epoch secret once per device", () 
       }
     ],
     note: "Future messages use this key."
-  });
+  };
+  const parsed = RoomKeyRotationPlaintextPayload.parse(payload);
 
   assert.equal(parsed.newEpoch, 2);
   assert.equal(parsed.recipients.length, 1);
+
+  for (const newEpoch of [1, 3]) {
+    const result = RoomKeyRotationPlaintextPayload.safeParse({ ...payload, newEpoch });
+    assert.equal(result.success, false);
+    if (!result.success) {
+      assert.deepEqual(result.error.issues[0]?.path, ["newEpoch"]);
+      assert.equal(result.error.issues[0]?.message, "newEpoch must immediately follow previousEpoch");
+    }
+  }
+
+  const duplicateRecipient = RoomKeyRotationPlaintextPayload.safeParse({
+    ...payload,
+    recipients: [payload.recipients[0], payload.recipients[0]]
+  });
+  assert.equal(duplicateRecipient.success, false);
+  if (!duplicateRecipient.success) {
+    assert.deepEqual(duplicateRecipient.error.issues[0]?.path, ["recipients", 1, "deviceId"]);
+    assert.equal(duplicateRecipient.error.issues[0]?.message, "Each device may appear only once");
+  }
 });
 
 test("relay envelope accepts encrypted room key rotation events", () => {
