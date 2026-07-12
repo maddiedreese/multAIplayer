@@ -23,7 +23,7 @@ The cryptography is unaudited. End-to-end encryption properties described by thi
 
 Run `npm run test:mutation -w @multaiplayer/crypto` to generate HTML, mutation-testing-elements JSON, and a deterministic summary under `packages/crypto/reports/mutation/`. The generated reports are ignored locally and retained as CI artifacts for 14 days. The summary keeps every mutant status and source location while removing volatile run metadata so survivor classification and score changes can be compared reliably.
 
-The mutation gate requires a 100% score overall and in every source file, with zero surviving mutants. The measured ratchet covers 377 scored mutants. TypeScript-checker compile errors are retained in the report as detected invalid programs, and nine narrowly annotated ignores cover one equivalent surrogate-predicate replacement plus non-extractability flags that the public API cannot observe. A perfect mutation score is evidence about this test suite, not a security audit or a cryptographic guarantee.
+The mutation gate requires a 100% score overall and in every source file, with zero surviving mutants; any new source file fails until it receives a whole-file policy rule. The measured ratchet covers 378 scored mutants. TypeScript-checker compile errors are retained in the report as detected invalid programs, and nine narrowly annotated ignores cover one equivalent surrogate-predicate replacement plus non-extractability flags that the public API cannot observe. A perfect mutation score is evidence about this test suite, not a security audit or a cryptographic guarantee.
 
 Repository-owned gates live in [`mutation-policy.json`](mutation-policy.json). They enforce the per-file 100% ratchet and zero surviving mutants, reject uncovered or incomplete mutants and unexplained mutation-run errors, disallow broad mutator exclusions in governed files, and require every accepted timeout to match an exact source signature with a written rationale. Do not lower a floor or widen an ignore to make CI pass.
 
@@ -31,4 +31,4 @@ Large modules are hardened incrementally with paired `// mutation-policy:start <
 
 The governed AAD regions are `device-context-aad`, `room-envelope-aad`, `local-aad`, and the attachment AAD inside `attachment-wrapper`. Their domains, canonical fields, and compatibility behavior are wire-protocol inputs documented in the [cryptography architecture](../../docs/cryptography.md); changing them requires the protocol-level process described there.
 
-`src/index.ts` and `src/inviteCapability.ts` additionally have whole-file zero-survivor gates so new code cannot land between marker regions without mutation coverage.
+Every crypto source file has a whole-file 100%/zero-survivor gate. Named regions remain as semantic audit zones inside the larger `index.ts` boundary.

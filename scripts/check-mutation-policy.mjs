@@ -29,6 +29,11 @@ export function checkMutationPolicy(summary, policy, sources = {}) {
     ...policy.regions.map((region) => (region && typeof region === "object" ? region.file : undefined))
   ]);
   const filesByPath = new Map(summary.files.map((file) => [file.path, file]));
+  for (const file of summary.files) {
+    if (!Object.hasOwn(policy.files, file.path)) {
+      failures.push(`${file.path}: missing a whole-file mutation policy rule`);
+    }
+  }
   for (const [path, rule] of Object.entries(policy.files)) {
     requireObject(rule, `mutation policy rule for ${JSON.stringify(path)}`);
     if (

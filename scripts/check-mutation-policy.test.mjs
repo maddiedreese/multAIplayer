@@ -56,6 +56,17 @@ test("reports every missing or regressed per-file score", () => {
   ]);
 });
 
+test("rejects source files that are not covered by a whole-file rule", () => {
+  const failures = checkMutationPolicy(
+    {
+      files: [file("src/canonical.ts", 100), file("src/encoding.ts", 100), file("src/new-crypto-boundary.ts", 100)],
+      mutants: []
+    },
+    policy
+  );
+  assert.deepEqual(failures, ["src/new-crypto-boundary.ts: missing a whole-file mutation policy rule"]);
+});
+
 test("supports a zero-survivor whole-file gate before a measured score floor is recorded", () => {
   const configured = {
     ...policy,
