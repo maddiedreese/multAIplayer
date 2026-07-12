@@ -18,7 +18,7 @@ Encrypted whole-room export/import is planned but does not exist in the alpha. U
 
 Fork or archive a known-good repository revision, including its lockfile and release artifacts. Follow [Self-hosting](self-hosting.md) to build the relay and desktop, configure durable storage, HTTPS/WSS, exact origins, auth, a stable session secret, quotas, and backups. A custom relay origin requires a self-built desktop whose Tauri CSP permits that HTTPS/WSS origin.
 
-Use the [relay migration runbook](relay-migration-runbook.md) while the old relay is reachable. Migration recreates teams, rooms, membership, sessions, and invites; it does not transfer plaintext history or server-side room keys. Keep the original devices intact until the replacement rooms and retained history have been verified.
+Use the [hosted-to-self-hosted migration procedure](release-operations.md#hosted-to-self-hosted-migration) while the old relay is reachable. Migration recreates teams, rooms, membership, sessions, and invites; it does not transfer plaintext history or server-side room keys. Keep the original devices intact until the replacement rooms and retained history have been verified.
 
 Pin and mirror all dependencies needed for rebuilding. Maintain your own GitHub OAuth app and Apple signing/notarization setup if distributing macOS builds. If upstream GitHub, Codex, Tauri, WebKit, Node, or Rust behavior changes, a frozen build may eventually require maintenance even when the relay continues to run.
 

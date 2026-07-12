@@ -2,7 +2,7 @@
 
 The relay is intended to be self-hostable. In v1 it routes encrypted room events and manages presence; it does not call OpenAI or store plaintext chat transcripts.
 
-Teams moving from the hosted relay to their own relay should use the [hosted-to-self-hosted relay migration runbook](relay-migration-runbook.md). The short version is: deploy and verify a self-hosted relay, use a desktop build whose app-shell CSP allows the self-hosted HTTP and WebSocket origins, change each desktop app's Settings drawer to those relay URLs, recreate team/room membership with fresh invites, and rely on each device's local room keys and encrypted local history for continuity.
+Teams moving from the hosted relay to their own relay should use the [hosted-to-self-hosted migration procedure](release-operations.md#hosted-to-self-hosted-migration). The short version is: deploy and verify a self-hosted relay, use a desktop build whose app-shell CSP allows the self-hosted HTTP and WebSocket origins, change each desktop app's Settings drawer to those relay URLs, recreate team/room membership with fresh invites, and rely on each device's local room keys and encrypted local history for continuity.
 
 Supported alpha self-hosting requirements:
 
@@ -292,7 +292,7 @@ The alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER
 
 The relay does not hold plaintext room history or room keys. Migrating from the hosted relay to a self-hosted relay is therefore a membership and routing cutover, not a server-side transcript export.
 
-Use [relay-migration-runbook.md](relay-migration-runbook.md) for the full procedure and verification checklist. Plan to:
+Use the [release operations migration procedure](release-operations.md#hosted-to-self-hosted-migration) for the full procedure and verification checklist. Plan to:
 
 - stand up the self-hosted relay and pass `NODE_ENV=production npm run doctor:production-relay`;
 - use a desktop build whose app-shell CSP allows the self-hosted HTTP and WebSocket relay origins;

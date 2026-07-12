@@ -1,14 +1,11 @@
-import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import type { RelayEnvelope } from "@multaiplayer/protocol";
 import {
-  approvePendingInvite,
-  authenticateContext,
-  copyApprovalInvite,
+  admitClient,
   createRoom,
   nextRelayEnvelope,
-  openApp,
-  requestInviteAccess,
+  openAuthenticatedClient,
   sendRoomMessage,
   type TestIdentity
 } from "./helpers";
@@ -23,23 +20,6 @@ const successorIdentity: TestIdentity = {
   login: "e2e-successor",
   name: "Successor"
 };
-
-interface Client {
-  context: BrowserContext;
-  page: Page;
-}
-
-async function openAuthenticatedClient(browser: Browser, identity?: TestIdentity): Promise<Client> {
-  const context = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
-  await authenticateContext(context, identity);
-  return { context, page: await openApp(context) };
-}
-
-async function admitClient(host: Page, guest: Page): Promise<void> {
-  const invite = await copyApprovalInvite(host);
-  await requestInviteAccess(guest, invite);
-  await approvePendingInvite(host, guest);
-}
 
 async function expectRelayPersistenceExcludes(markers: string[]): Promise<void> {
   const dataPath = process.env.MULTAIPLAYER_E2E_RELAY_DATA_PATH;
@@ -96,7 +76,7 @@ test("real relay lifecycle preserves encrypted coordination across rotation, rem
   browser
 }) => {
   test.setTimeout(120_000);
-  const clients: Client[] = [];
+  const clients: Array<Awaited<ReturnType<typeof openAuthenticatedClient>>> = [];
   try {
     const host = await openAuthenticatedClient(browser);
     const removed = await openAuthenticatedClient(browser, removedIdentity);

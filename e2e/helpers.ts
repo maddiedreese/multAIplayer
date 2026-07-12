@@ -1,4 +1,4 @@
-import { expect, type BrowserContext, type Page } from "@playwright/test";
+import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import type { RelayEnvelope } from "@multaiplayer/protocol";
 
 export const appUrl = "http://127.0.0.1:1421";
@@ -8,6 +8,11 @@ export interface TestIdentity {
   id: string;
   login: string;
   name: string;
+}
+
+export interface AuthenticatedClient {
+  context: BrowserContext;
+  page: Page;
 }
 
 export const hostIdentity: TestIdentity = {
@@ -90,6 +95,15 @@ export async function openApp(context: BrowserContext): Promise<Page> {
   return page;
 }
 
+export async function openAuthenticatedClient(
+  browser: Browser,
+  identity: TestIdentity = hostIdentity
+): Promise<AuthenticatedClient> {
+  const context = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+  await authenticateContext(context, identity);
+  return { context, page: await openApp(context) };
+}
+
 export async function createRoom(page: Page, name: string): Promise<void> {
   const newRoom = page.getByRole("button", { name: "New room", exact: true });
   await newRoom.scrollIntoViewIfNeeded();
@@ -120,6 +134,12 @@ export async function approvePendingInvite(host: Page, guest: Page): Promise<voi
   await pendingRequest.locator("button").first().click();
   await expect(host.getByText(/Approved .+'s join request/)).toBeVisible();
   await expect(guest.getByRole("textbox", { name: "Room title" })).not.toHaveValue("No room selected");
+}
+
+export async function admitClient(host: Page, guest: Page): Promise<void> {
+  const invite = await copyApprovalInvite(host);
+  await requestInviteAccess(guest, invite);
+  await approvePendingInvite(host, guest);
 }
 
 export async function sendRoomMessage(page: Page, message: string): Promise<void> {

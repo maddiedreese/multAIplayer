@@ -12,6 +12,21 @@ Run it locally with:
 npm run test:security-journey
 ```
 
+## Desktop browser journeys
+
+Playwright runs the actual desktop web shell against the real relay. The focused
+`desktop-security-journeys.spec.ts` cases independently cover three user-facing authorization boundaries:
+
+- an approval-gated invite selects the room but cannot send until the host explicitly admits the device;
+- removing a member advances the local room-key epoch, revokes the removed relay session, and withholds later messages;
+- accepting a host handoff transfers both the handoff action and Codex model controls to the successor.
+
+These focused cases make UI regressions attributable to one journey. The longer
+`room-lifecycle.spec.ts` remains the cryptographic composition proof: it carries one room through rotation, removal,
+handoff, old-key decryption rejection, and relay persistence scanning. Run the complete browser suite with
+`npm run test:e2e`, or only the focused desktop cases with
+`npm run test:e2e -- e2e/desktop-security-journeys.spec.ts`.
+
 ## Host execution limits
 
 Native Codex turns use a validated 10–900 second timeout and bounded input. Codex JSON-RPC requests also have request deadlines. Terminal sessions are intentionally interactive rather than wall-clock limited, but retain at most 1,000 redacted output lines and bound an unterminated redaction buffer to 8 KiB; every initial command and later input requires a short-lived native authorization token. Local preview tunnels have a 20-second startup deadline, retain bounded startup logs, and terminate their child process when stopped or dropped. CI jobs and desktop test subprocesses have independent hard timeouts.

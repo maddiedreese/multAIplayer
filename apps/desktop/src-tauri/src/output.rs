@@ -4,17 +4,31 @@ use std::path::Path;
 
 use crate::validation::{MAX_COMMAND_OUTPUT_CHARS, MAX_GIT_DIFF_CHARS};
 use regex::Regex;
-use std::sync::OnceLock;
+use std::sync::LazyLock;
+
+const REDACTION_FAILURE: &str = "[REDACTED BY MULTAIPLAYER: redaction unavailable]";
+
+static SECRET_PATTERNS: LazyLock<Result<Vec<Regex>, regex::Error>> = LazyLock::new(|| {
+    [
+        r"ghp_[A-Za-z0-9_]{20,}",
+        r"github_pat_[A-Za-z0-9_]{20,}",
+        r"sk-[A-Za-z0-9_-]{20,}",
+        r"(?im)^([A-Z][A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*)\s*=\s*([^\r\n]+)",
+        r"(?s)-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----.*?-----END (?:RSA |OPENSSH |EC )?PRIVATE KEY-----",
+    ]
+    .into_iter()
+    .map(Regex::new)
+    .collect()
+});
 
 pub(crate) fn redact_known_secrets(text: &str) -> String {
-    static PATTERNS: OnceLock<Vec<Regex>> = OnceLock::new();
-    let patterns = PATTERNS.get_or_init(|| vec![
-        compile_secret_pattern(r"ghp_[A-Za-z0-9_]{20,}"),
-        compile_secret_pattern(r"github_pat_[A-Za-z0-9_]{20,}"),
-        compile_secret_pattern(r"sk-[A-Za-z0-9_-]{20,}"),
-        compile_secret_pattern(r"(?im)^([A-Z][A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*)\s*=\s*([^\r\n]+)"),
-        compile_secret_pattern(r"(?s)-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----.*?-----END (?:RSA |OPENSSH |EC )?PRIVATE KEY-----"),
-    ]);
+    redact_with_patterns(text, SECRET_PATTERNS.as_ref().map(Vec::as_slice))
+}
+
+fn redact_with_patterns(text: &str, patterns: Result<&[Regex], &regex::Error>) -> String {
+    let Ok(patterns) = patterns else {
+        return REDACTION_FAILURE.to_string();
+    };
     patterns.iter().fold(text.to_string(), |value, pattern| {
         pattern
             .replace_all(&value, |captures: &regex::Captures<'_>| {
@@ -26,11 +40,6 @@ pub(crate) fn redact_known_secrets(text: &str) -> String {
             })
             .into_owned()
     })
-}
-
-#[allow(clippy::expect_used)]
-fn compile_secret_pattern(pattern: &'static str) -> Regex {
-    Regex::new(pattern).expect("repository-owned secret redaction regex must compile")
 }
 
 pub(crate) fn untracked_file_diff(path: &Path, display_path: &str) -> Result<String, String> {
@@ -116,5 +125,23 @@ pub(crate) fn git_status_label(code: &str) -> String {
         "renamed".to_string()
     } else {
         "modified".to_string()
+    }
+}
+
+#[cfg(test)]
+mod redaction_failure_tests {
+    use super::*;
+
+    #[test]
+    fn regex_compilation_failure_redacts_the_entire_value() {
+        let invalid_pattern = String::from("(");
+        let invalid = Regex::new(&invalid_pattern);
+        assert_eq!(
+            redact_with_patterns(
+                "ghp_this-must-never-be-reflected",
+                invalid.as_ref().map(|_| &[][..])
+            ),
+            REDACTION_FAILURE
+        );
     }
 }

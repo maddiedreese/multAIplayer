@@ -13,7 +13,7 @@ Every commit must include a `Signed-off-by` trailer certifying the [Developer Ce
 Keep changes under `packages/crypto`, `packages/protocol`, and `apps/desktop/src-tauri` small, explicit, and independently testable. Pull requests should identify AI-authored security-boundary changes and report the focused property, fuzz, mutation, or native checks that apply. This project currently has one maintainer, so it does not require a separate human or code-owner approval that the sole maintainer could never supply; required CI and branch protection remain the merge gate.
 
 Dependency advisory handling and coverage gates are documented in [Dependency security](docs/dependency-security.md). Workflow purpose and merge impact are in [CI policy](docs/ci-policy.md). Accessibility expectations and the honest localization status are in [Accessibility and localization](docs/accessibility-and-localization.md).
-Native failure-handling rules and the two narrowly pinned redaction-regex exceptions are documented in [Rust panic policy](docs/rust-panic-policy.md).
+Native failure-handling rules and fail-closed redaction initialization are documented in [Rust panic policy](docs/rust-panic-policy.md).
 
 ## Fast path
 
@@ -25,7 +25,7 @@ npm run doctor
 npm run dev
 ```
 
-The first-contribution target is `npm run verify:web`; it does not require native macOS packaging. Maintainers label bounded, documented work `good first issue` and pair it with an area label. Each such issue should name expected files, acceptance criteria, and the fast check. Comment before starting to avoid duplicated work.
+The first-contribution target is `npm run verify:web`; it does not require native macOS packaging. Start with the [architecture walkthrough](docs/architecture-walkthrough.md), then choose one of the live `good first issue` tickets linked from `.github/good-first-issues/`. Each ticket names its starting files, acceptance criteria, and focused checks. Comment before starting to avoid duplicated work.
 
 Use `npm run tauri:dev` instead of `npm run dev` when you need the native Tauri app. The web shell can run in local seeded-room mode without GitHub OAuth; copy `.env.example` to `.env` only when you need OAuth or self-hosted relay settings.
 
@@ -63,15 +63,15 @@ Run the relay or desktop web shell separately with `npm run dev:relay` or `npm r
 
 Run the smallest relevant loop while iterating, then run `npm run verify` before opening a PR. Workspace commands are run from the repository root.
 
-| Changing | Fast checks while iterating |
-| --- | --- |
-| Relay HTTP, WebSocket, auth, persistence, or limits | `npm run check -w @multaiplayer/relay` and `npm run test -w @multaiplayer/relay`; run `npm run test:fuzz -w @multaiplayer/relay` after parser/schema changes and `npm run test:mutation -w @multaiplayer/relay` after authorization changes |
-| Desktop React UI, hooks, stores, or adapters | `npm run check -w @multaiplayer/desktop` and `npm run test:smoke -w @multaiplayer/desktop`; run `npm run test -w @multaiplayer/desktop` before handoff |
-| One shared package | `npm run check -w @multaiplayer/protocol` and `npm run test -w @multaiplayer/protocol`, replacing `protocol` with `crypto`, `codex`, `git`, or `github` as needed; crypto authorization or validation changes require `npm run test:mutation -w @multaiplayer/crypto`, and protocol type-guard changes require `npm run test:mutation -w @multaiplayer/protocol` |
-| Native Tauri/Rust code | `npm run fmt:rust:check` and `npm run test:native` |
-| Native packaging, Tauri config, browser windows, Keychain, terminals, or Codex app-server integration | Native checks above, then `npm run tauri:build -w @multaiplayer/desktop` |
-| Cross-cutting TypeScript or workspace configuration | `npm run verify:web` |
-| Repository scripts | `npm run test:scripts` |
+| Changing                                                                                              | Fast checks while iterating                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Relay HTTP, WebSocket, auth, persistence, or limits                                                   | `npm run check -w @multaiplayer/relay` and `npm run test -w @multaiplayer/relay`; run `npm run test:fuzz -w @multaiplayer/relay` after parser/schema changes and `npm run test:mutation -w @multaiplayer/relay` after authorization changes                                                                                                                      |
+| Desktop React UI, hooks, stores, or adapters                                                          | `npm run check -w @multaiplayer/desktop` and `npm run test:smoke -w @multaiplayer/desktop`; run `npm run test -w @multaiplayer/desktop` before handoff                                                                                                                                                                                                           |
+| One shared package                                                                                    | `npm run check -w @multaiplayer/protocol` and `npm run test -w @multaiplayer/protocol`, replacing `protocol` with `crypto`, `codex`, `git`, or `github` as needed; crypto authorization or validation changes require `npm run test:mutation -w @multaiplayer/crypto`, and protocol type-guard changes require `npm run test:mutation -w @multaiplayer/protocol` |
+| Native Tauri/Rust code                                                                                | `npm run fmt:rust:check` and `npm run test:native`                                                                                                                                                                                                                                                                                                               |
+| Native packaging, Tauri config, browser windows, Keychain, terminals, or Codex app-server integration | Native checks above, then `npm run tauri:build -w @multaiplayer/desktop`                                                                                                                                                                                                                                                                                         |
+| Cross-cutting TypeScript or workspace configuration                                                   | `npm run verify:web`                                                                                                                                                                                                                                                                                                                                             |
+| Repository scripts                                                                                    | `npm run test:scripts`                                                                                                                                                                                                                                                                                                                                           |
 
 Use `npm run format` to apply the repository's Prettier baseline. `npm run verify` lints and checks formatting for TypeScript and JavaScript, type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the workspaces.
 

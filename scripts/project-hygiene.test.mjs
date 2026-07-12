@@ -15,16 +15,20 @@ const workspaceManifestPaths = [
   "packages/github/package.json",
   "packages/protocol/package.json"
 ];
-
-test("tracked Markdown links resolve to repository files", () => {
-  const markdownFiles = execFileSync("git", ["ls-files", "*.md"], { encoding: "utf8" })
+const trackedFiles = () =>
+  execFileSync("git", ["ls-files"], { encoding: "utf8" })
     .trim()
     .split("\n")
-    .filter(Boolean);
+    .filter((path) => path && existsSync(path));
+const trackedMarkdownFiles = () => trackedFiles().filter((path) => path.endsWith(".md"));
+
+const withoutFencedCode = (source) => source.replace(/^\s*(```|~~~)[\s\S]*?^\s*\1.*$/gm, "");
+
+test("tracked Markdown links resolve to repository files", () => {
   const repositoryRoot = resolve(".");
 
-  for (const sourcePath of markdownFiles) {
-    const source = readFileSync(sourcePath, "utf8").replace(/^\s*(```|~~~)[\s\S]*?^\s*\1.*$/gm, "");
+  for (const sourcePath of trackedMarkdownFiles()) {
+    const source = withoutFencedCode(readFileSync(sourcePath, "utf8"));
     for (const match of source.matchAll(/!?\[[^\]]*\]\((<?[^\s)>]+>?)(?:\s+[^)]*)?\)/g)) {
       const destination = match[1].replace(/^<|>$/g, "");
       if (
@@ -50,6 +54,51 @@ test("tracked Markdown links resolve to repository files", () => {
       );
       assert.ok(existsSync(targetPath), `${sourcePath}: missing local link target ${destination}`);
     }
+  }
+});
+
+test("documented npm scripts and project environment names stay implemented", () => {
+  const scriptNames = new Set(
+    ["package.json", ...workspaceManifestPaths].flatMap((path) => Object.keys(readJson(path).scripts ?? {}))
+  );
+  const implementation = trackedFiles()
+    .filter((path) => !path.endsWith(".md"))
+    .map((path) => {
+      try {
+        return readFileSync(path, "utf8");
+      } catch {
+        return "";
+      }
+    })
+    .join("\n");
+  const implementedEnvironmentNames = new Set(
+    Array.from(implementation.matchAll(/\b(?:MULTAIPLAYER|GITHUB)_[A-Z0-9_]+\b/g), ([name]) => name)
+  );
+
+  for (const sourcePath of trackedMarkdownFiles()) {
+    const source = readFileSync(sourcePath, "utf8");
+    for (const [, scriptName] of source.matchAll(/\bnpm run ([a-zA-Z0-9:_-]+)/g)) {
+      assert.ok(scriptNames.has(scriptName), `${sourcePath}: unknown npm script ${scriptName}`);
+    }
+    for (const [environmentName] of source.matchAll(/\b(?:MULTAIPLAYER|GITHUB)_[A-Z0-9_]+\b/g)) {
+      assert.ok(
+        implementedEnvironmentNames.has(environmentName),
+        `${sourcePath}: undocumented implementation for ${environmentName}`
+      );
+    }
+  }
+});
+
+test("release operations remain consolidated in one living runbook", () => {
+  assert.ok(existsSync("docs/release-operations.md"));
+  for (const retiredPath of [
+    "docs/alpha-release-readiness.md",
+    "docs/official-relay-deployment-checklist.md",
+    "docs/public-alpha-maintainer-guide.md",
+    "docs/relay-migration-runbook.md",
+    "docs/release-hardening.md"
+  ]) {
+    assert.ok(!existsSync(retiredPath), `${retiredPath} should stay consolidated`);
   }
 });
 
@@ -179,7 +228,7 @@ test("Rust mutation exclusions and their CI gate stay narrowly pinned", () => {
   );
 });
 
-test("production Rust panic exceptions stay compiler-enforced and narrowly pinned", () => {
+test("production Rust panic policy has no unwrap or expect exceptions", () => {
   const crateRoot = readFileSync("apps/desktop/src-tauri/src/lib.rs", "utf8");
   assert.match(crateRoot, /#!\[cfg_attr\(not\(test\), deny\(clippy::expect_used, clippy::unwrap_used\)\)\]/);
 
@@ -195,10 +244,7 @@ test("production Rust panic exceptions stay compiler-enforced and narrowly pinne
     const source = readFileSync(path, "utf8");
     return Array.from(source.matchAll(/#\[allow\(clippy::expect_used\)\]\s*fn\s+(\w+)/g), ([, name]) => [path, name]);
   });
-  assert.deepEqual(exceptions, [
-    ["apps/desktop/src-tauri/src/diagnostics/redaction.rs", "compile_diagnostic_pattern"],
-    ["apps/desktop/src-tauri/src/output.rs", "compile_secret_pattern"]
-  ]);
+  assert.deepEqual(exceptions, []);
 });
 
 test("relay reproducibility proof stays deterministic and release-triggered", () => {
@@ -216,7 +262,7 @@ test("relay reproducibility proof stays deterministic and release-triggered", ()
 
 test("release SBOM, provenance, and keyless signatures remain gated", () => {
   const workflow = readFileSync(".github/workflows/release.yml", "utf8");
-  const documentation = readFileSync("docs/release-hardening.md", "utf8");
+  const documentation = readFileSync("docs/release-operations.md", "utf8");
   assert.match(workflow, /name: Generate SPDX SBOM[\s\S]*anchore\/sbom-action@[a-f0-9]{40}/);
   assert.match(workflow, /artifact-name: multaiplayer\.spdx\.json/);
   assert.match(workflow, /attestations: write/);
@@ -274,6 +320,20 @@ test("npm advisories are checked from the lockfile on the deep-verification tier
   assert.match(workflow, /run: npm ci/);
   assert.match(workflow, /run: npm run audit:npm/);
   assert.equal(rootPackage.scripts["audit:npm"], "npm audit --audit-level=high");
+});
+
+test("the independent crypto verifier is exact-pinned with an expiring review gate", () => {
+  const policy = readJson(".github/crypto-vector-dependency.json");
+  const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+  assert.equal(policy.package, "cryptography");
+  assert.equal(policy.version, "45.0.5");
+  assert.equal(policy.maximumReviewDays, 90);
+  assert.match(workflow, /run: npm run check:crypto-vector-dependency/);
+  assert.match(workflow, /cryptography==45\.0\.5/);
+  assert.equal(
+    rootPackage.scripts["check:crypto-vector-dependency"],
+    "node scripts/check-crypto-vector-dependency.mjs"
+  );
 });
 
 test("alpha dependencies are exact-pinned and major updates remain separately batched", () => {
