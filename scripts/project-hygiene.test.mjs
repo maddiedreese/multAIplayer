@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 import { test } from "node:test";
 
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
@@ -13,6 +15,43 @@ const workspaceManifestPaths = [
   "packages/github/package.json",
   "packages/protocol/package.json"
 ];
+
+test("tracked Markdown links resolve to repository files", () => {
+  const markdownFiles = execFileSync("git", ["ls-files", "*.md"], { encoding: "utf8" })
+    .trim()
+    .split("\n")
+    .filter(Boolean);
+  const repositoryRoot = resolve(".");
+
+  for (const sourcePath of markdownFiles) {
+    const source = readFileSync(sourcePath, "utf8").replace(/^\s*(```|~~~)[\s\S]*?^\s*\1.*$/gm, "");
+    for (const match of source.matchAll(/!?\[[^\]]*\]\((<?[^\s)>]+>?)(?:\s+[^)]*)?\)/g)) {
+      const destination = match[1].replace(/^<|>$/g, "");
+      if (
+        destination.startsWith("#") ||
+        destination.startsWith("//") ||
+        /^[a-z][a-z\d+.-]*:/i.test(destination) ||
+        /[{}]/.test(destination)
+      ) {
+        continue;
+      }
+
+      const encodedPath = destination.split(/[?#]/, 1)[0];
+      let localPath;
+      try {
+        localPath = decodeURIComponent(encodedPath);
+      } catch {
+        assert.fail(`${sourcePath}: malformed local link ${destination}`);
+      }
+      const targetPath = resolve(dirname(resolve(sourcePath)), localPath);
+      assert.ok(
+        targetPath === repositoryRoot || targetPath.startsWith(`${repositoryRoot}/`),
+        `${sourcePath}: local link escapes the repository: ${destination}`
+      );
+      assert.ok(existsSync(targetPath), `${sourcePath}: missing local link target ${destination}`);
+    }
+  }
+});
 
 test("release-facing version metadata stays synchronized", () => {
   for (const path of workspaceManifestPaths) {
@@ -138,6 +177,28 @@ test("Rust mutation exclusions and their CI gate stay narrowly pinned", () => {
     workflow,
     /cargo mutants[\s\S]*--file src\/shell_authorization\.rs[\s\S]*--file src\/command_safety\.rs[\s\S]*--timeout 120/
   );
+});
+
+test("production Rust panic exceptions stay compiler-enforced and narrowly pinned", () => {
+  const crateRoot = readFileSync("apps/desktop/src-tauri/src/lib.rs", "utf8");
+  assert.match(crateRoot, /#!\[cfg_attr\(not\(test\), deny\(clippy::expect_used, clippy::unwrap_used\)\)\]/);
+
+  const rustSources = execFileSync("git", ["ls-files", "apps/desktop/src-tauri/src"], {
+    encoding: "utf8"
+  })
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .filter((path) => path.endsWith(".rs"))
+    .filter((path) => !path.endsWith("/tests.rs") && !path.endsWith("/lib_tests.rs"));
+  const exceptions = rustSources.flatMap((path) => {
+    const source = readFileSync(path, "utf8");
+    return Array.from(source.matchAll(/#\[allow\(clippy::expect_used\)\]\s*fn\s+(\w+)/g), ([, name]) => [path, name]);
+  });
+  assert.deepEqual(exceptions, [
+    ["apps/desktop/src-tauri/src/diagnostics/redaction.rs", "compile_diagnostic_pattern"],
+    ["apps/desktop/src-tauri/src/output.rs", "compile_secret_pattern"]
+  ]);
 });
 
 test("relay reproducibility proof stays deterministic and release-triggered", () => {

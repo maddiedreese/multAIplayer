@@ -120,6 +120,11 @@ export function CodexServerRequestDialog({
           </div>
         </div>
         {display.detail && <pre className="codex-request-detail">{display.detail}</pre>}
+        {display.warning && (
+          <div className="approval-risk-item">
+            <AlertTriangle size={14} /> {display.warning}
+          </div>
+        )}
         {display.url && (
           <a className="codex-request-url" href={display.url} target="_blank" rel="noreferrer noopener">
             Open authentication page
@@ -202,6 +207,7 @@ export interface CodexServerRequestDisplay {
   title: string;
   message: string;
   detail: string | null;
+  warning?: string | null;
   url: string | null;
   questions: CodexRequestQuestion[];
   decline: CodexServerResponse;
@@ -228,6 +234,7 @@ export function describeCodexServerRequest(request: CodexServerRequest): CodexSe
   const reason = text(params.reason) ?? text(params.message);
   const base = {
     url: null,
+    warning: null,
     questions: [],
     canAccept: () => true
   };
@@ -238,6 +245,8 @@ export function describeCodexServerRequest(request: CodexServerRequest): CodexSe
       title: "Approve Codex command",
       message: reason ?? "Codex is requesting permission to run a command on this host.",
       detail: formatCommand(params.command, params.cwd),
+      warning:
+        "Approval grants this command the host account's shell authority. Command-text checks are incomplete and cannot rule out interpreter, script, indirect network, or credential access.",
       decline: { result: { decision: legacy ? "denied" : "decline" } },
       accept: () => ({ result: { decision: legacy ? "approved" : "accept" } })
     };

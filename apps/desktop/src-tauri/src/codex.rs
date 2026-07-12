@@ -152,7 +152,12 @@ pub(crate) fn run_codex_turn(
     if result.as_ref().is_ok_and(CodexTurnResult::is_reusable) && session.is_alive() {
         let mut checked_out = Some(session);
         turn_lease.run_if_active(|| {
-            checkin_codex_session(key, checked_out.take().expect("checked-out Codex session"));
+            // `run_if_active` invokes this closure at most once. Keep that
+            // invariant non-panicking anyway: if ownership has already moved,
+            // dropping through is safer than taking down the Tauri command.
+            if let Some(session) = checked_out.take() {
+                checkin_codex_session(key, session);
+            }
         });
     }
     result

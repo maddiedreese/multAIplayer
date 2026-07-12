@@ -25,13 +25,22 @@ const CREDENTIAL_MARKERS: &[&str] = &[
     "secrets.",
 ];
 
-pub(crate) fn blocked_command_reason(command: &str) -> Option<&'static str> {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CommandReviewRisk {
+    CredentialAccess,
+    NetworkAccess,
+}
+
+/// Classifies command text for the approval UI. This is deliberately not an
+/// authorization decision: arbitrary programs and interpreters make it
+/// impossible to prove capabilities from a shell string.
+pub(crate) fn command_review_risk(command: &str) -> Option<CommandReviewRisk> {
     let normalized = command.to_ascii_lowercase().replace('\\', "/");
     if CREDENTIAL_MARKERS
         .iter()
         .any(|marker| normalized.contains(marker))
     {
-        return Some("Commands that touch credential or secret files are denied by host policy");
+        return Some(CommandReviewRisk::CredentialAccess);
     }
     let words = normalized
         .split(|character: char| {
@@ -61,27 +70,12 @@ pub(crate) fn blocked_command_reason(command: &str) -> Option<&'static str> {
         _ => false,
     });
     if explicit_network_tool || network_subcommand {
-        return Some("Commands that may touch the network are denied by host policy");
+        return Some(CommandReviewRisk::NetworkAccess);
     }
     None
 }
 
-pub(crate) fn blocked_server_request_reason(method: &str, params: &Value) -> Option<&'static str> {
-    if matches!(
-        method,
-        "item/commandExecution/requestApproval" | "execCommandApproval"
-    ) {
-        let command = match params.get("command") {
-            Some(Value::String(command)) => command.clone(),
-            Some(Value::Array(parts)) => parts
-                .iter()
-                .filter_map(Value::as_str)
-                .collect::<Vec<_>>()
-                .join(" "),
-            _ => String::new(),
-        };
-        return blocked_command_reason(&command);
-    }
+pub(crate) fn enforced_permission_denial(method: &str, params: &Value) -> Option<&'static str> {
     if method == "item/permissions/requestApproval" {
         let permissions = params.get("permissions")?;
         if permissions
@@ -141,14 +135,30 @@ mod tests {
     }
 
     #[test]
-    fn blocks_network_tools_and_credential_files() {
-        assert!(blocked_command_reason("curl https://example.com").is_some());
-        assert!(blocked_command_reason("git push origin main").is_some());
-        assert!(blocked_command_reason("cat ~/.aws/credentials").is_some());
-        assert!(blocked_command_reason("npm install").is_some());
-        assert!(blocked_command_reason("npm test").is_none());
-        assert!(blocked_command_reason("cargo fmt --check").is_none());
-        assert!(blocked_command_reason("rg TODO src").is_none());
+    fn classifies_command_text_as_review_signals_not_authority() {
+        assert_eq!(
+            command_review_risk("curl https://example.com"),
+            Some(CommandReviewRisk::NetworkAccess)
+        );
+        assert_eq!(
+            command_review_risk("git push origin main"),
+            Some(CommandReviewRisk::NetworkAccess)
+        );
+        assert_eq!(
+            command_review_risk("cat ~/.aws/credentials"),
+            Some(CommandReviewRisk::CredentialAccess)
+        );
+        assert_eq!(
+            command_review_risk("npm install"),
+            Some(CommandReviewRisk::NetworkAccess)
+        );
+        assert_eq!(command_review_risk("npm test"), None);
+        assert_eq!(command_review_risk("cargo fmt --check"), None);
+        assert_eq!(command_review_risk("rg TODO src"), None);
+        // No completeness claim: interpreters and arbitrary programs can acquire capabilities
+        // without naming them in command text.
+        assert_eq!(command_review_risk("python -c 'import socket'"), None);
+        assert_eq!(command_review_risk("./opaque-script"), None);
         for command in [
             "pip install unsafe-package",
             "pip3 download unsafe-package",
@@ -156,34 +166,40 @@ mod tests {
             "go get example.invalid/package",
         ] {
             assert!(
-                blocked_command_reason(command).is_some(),
-                "allowed {command}"
+                command_review_risk(command).is_some(),
+                "did not flag {command}"
             );
         }
     }
 
     #[test]
-    fn blocks_network_and_credential_permission_requests() {
-        assert!(blocked_server_request_reason(
+    fn denies_explicit_network_and_credential_permission_requests() {
+        assert!(enforced_permission_denial(
             "item/permissions/requestApproval",
             &json!({"permissions": {"network": {"enabled": true}}})
         )
         .is_some());
-        assert!(blocked_server_request_reason(
-            "item/commandExecution/requestApproval",
-            &json!({"command": "curl example.invalid"})
-        )
-        .is_some());
-        assert!(blocked_server_request_reason(
-            "execCommandApproval",
-            &json!({"command": ["git", "push", "origin", "main"]})
-        )
-        .is_some());
-        assert!(blocked_server_request_reason(
+        assert!(enforced_permission_denial(
             "item/permissions/requestApproval",
             &json!({"permissions": {"fileSystem": {"read": ["~/.ssh/id_ed25519"]}}})
         )
         .is_some());
+        // Shell strings remain proposals for human review, never authorization facts. Even an
+        // obvious match and an interpreter bypass are outside this structural permission gate.
+        assert_eq!(
+            enforced_permission_denial(
+                "item/commandExecution/requestApproval",
+                &json!({"command": "curl example.invalid"})
+            ),
+            None
+        );
+        assert_eq!(
+            enforced_permission_denial(
+                "item/commandExecution/requestApproval",
+                &json!({"command": "python -c 'import socket'"})
+            ),
+            None
+        );
     }
 
     proptest! {
@@ -203,8 +219,8 @@ mod tests {
             let command = format!("cat /tmp/prefix/{varied}/suffix");
 
             prop_assert_eq!(
-                blocked_command_reason(&command),
-                Some("Commands that touch credential or secret files are denied by host policy")
+                command_review_risk(&command),
+                Some(CommandReviewRisk::CredentialAccess)
             );
         }
 
@@ -226,7 +242,7 @@ mod tests {
             ]}}});
 
             prop_assert_eq!(
-                blocked_server_request_reason("item/permissions/requestApproval", &params),
+                enforced_permission_denial("item/permissions/requestApproval", &params),
                 Some("Credential-file permission requests are denied by host policy")
             );
         }

@@ -9,7 +9,7 @@ use tauri_plugin_dialog::{
 };
 use uuid::Uuid;
 
-use crate::command_safety::blocked_command_reason;
+use crate::command_safety::{command_review_risk, CommandReviewRisk};
 use crate::validation::{
     ensure_room_id, ensure_terminal_command, ensure_terminal_id, ensure_terminal_input,
 };
@@ -247,17 +247,12 @@ pub(crate) async fn authorize_shell_execution(
     request: ShellAuthorizationRequest,
 ) -> Result<String, String> {
     validate_authorization_request(&request)?;
-    if request.kind == ShellExecutionKind::RemoteRequest {
-        if let Some(reason) = blocked_command_reason(&request.command) {
-            return Err(reason.to_string());
-        }
-    }
     let canonical_cwd = canonical_workspace(&request.cwd)?;
     // State methods independently canonicalize before matching or storing authority. Keep the
     // original request here; rebuilding it with the same canonical path would be redundant.
     let request_for_issue = request.clone();
-    let credential_access = requests_credential_access(&request_for_issue.command);
-    if !credential_access && state.has_exact_command_grant(&request_for_issue)? {
+    let review_risk = command_review_risk(&request_for_issue.command);
+    if review_risk.is_none() && state.has_exact_command_grant(&request_for_issue)? {
         return state.issue(&request_for_issue);
     }
     state.begin_confirmation()?;
@@ -272,13 +267,13 @@ pub(crate) async fn authorize_shell_execution(
         ShellExecutionKind::RemoteRequest => "\n\nRemembering repeats only this command text. Workspace files, scripts, hooks, configuration, and environment may change between runs.",
         ShellExecutionKind::InteractiveTerminal => "",
     };
-    let credential_warning = if credential_access {
-        "\n\nHIGH-RISK CREDENTIAL ACCESS: this command appears to read a .env or credential file. It can only be approved once and may expose host secrets."
-    } else {
-        ""
+    let risk_warning = match review_risk {
+        Some(CommandReviewRisk::CredentialAccess) => "\n\nHIGH-RISK REVIEW SIGNAL: this command text mentions a credential or secret path. This heuristic is incomplete. Approval grants the command the host account's full shell authority and can only be used once.",
+        Some(CommandReviewRisk::NetworkAccess) => "\n\nHIGH-RISK REVIEW SIGNAL: this command text names a network-capable operation. This heuristic is incomplete. Approval grants the command the host account's full shell authority and can only be used once.",
+        None => "",
     };
     let message = format!(
-        "{source}\n\nRoom: {}\nWorking directory: {}\n\nCommand:\n{}{credential_warning}{mutable_state_warning}",
+        "{source}\n\nRoom: {}\nWorking directory: {}\n\nCommand:\n{}{risk_warning}{mutable_state_warning}",
         request.room_id, canonical_cwd, request.command
     );
     let dialog_kind = request.kind;
@@ -286,14 +281,14 @@ pub(crate) async fn authorize_shell_execution(
         let dialog = app
             .dialog()
             .message(message)
-            .title(if credential_access {
-                "HIGH RISK: allow credential-file access?"
+            .title(if review_risk.is_some() {
+                "HIGH RISK: allow shell command?"
             } else {
                 "Allow command execution?"
             })
             .kind(MessageDialogKind::Warning);
         match dialog_kind {
-            ShellExecutionKind::RemoteRequest if !credential_access => dialog
+            ShellExecutionKind::RemoteRequest if review_risk.is_none() => dialog
                 .buttons(MessageDialogButtons::YesNoCancelCustom(
                     "Run once".to_string(),
                     "Repeat this command text for 10 minutes".to_string(),
@@ -302,7 +297,7 @@ pub(crate) async fn authorize_shell_execution(
                 .blocking_show_with_result(),
             _ => dialog
                 .buttons(MessageDialogButtons::OkCancelCustom(
-                    if credential_access {
+                    if review_risk.is_some() {
                         "Allow once".to_string()
                     } else {
                         "Start terminal".to_string()
@@ -323,7 +318,7 @@ pub(crate) async fn authorize_shell_execution(
     };
     let approved = matches!(decision, MessageDialogResult::Yes | MessageDialogResult::Ok)
         || matches!(decision, MessageDialogResult::Custom(ref value) if value == "Run once" || value == "Start terminal" || value == "Allow once")
-        || (reusable && !credential_access);
+        || (reusable && review_risk.is_none());
     if !approved {
         return Err("Command execution was denied in the native confirmation dialog".to_string());
     }
@@ -331,31 +326,6 @@ pub(crate) async fn authorize_shell_execution(
         state.grant_exact_command(&request_for_issue)?;
     }
     state.issue(&request_for_issue)
-}
-
-pub(crate) fn requests_credential_access(command: &str) -> bool {
-    let lower = command.to_ascii_lowercase();
-    let references_sensitive_path = [
-        ".env",
-        "id_rsa",
-        "id_ed25519",
-        ".npmrc",
-        ".pypirc",
-        "/credentials",
-        "credentials",
-        "secrets",
-    ]
-    .iter()
-    .any(|name| lower.contains(name));
-    if !references_sensitive_path {
-        return false;
-    }
-
-    // Explicitly write/delete-only commands do not disclose the existing file. Everything
-    // else (including cp, interpreters, and scripts) receives the louder approval because
-    // reliably proving that arbitrary command text cannot read an operand is not possible.
-    let first = lower.split_whitespace().next().unwrap_or("");
-    !matches!(first, "touch" | "mkdir" | "rm" | "unlink" | "truncate")
 }
 
 #[tauri::command]
