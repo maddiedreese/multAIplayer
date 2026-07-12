@@ -621,17 +621,13 @@ function authenticatedWrapAdditionalData(context: DeviceCryptoContext): Uint8Arr
   if (context.purpose === "invite-response") {
     if (!context.requestId) throw new Error("Invite response wrap requires a requestId");
     if (!context.requestNonce) throw new Error("Invite response wrap requires a requestNonce");
-    if (!Number.isSafeInteger(context.keyEpoch) || context.keyEpoch == null || context.keyEpoch < 1)
-      throw new Error("Invite response wrap requires a positive safe-integer keyEpoch");
+    if (context.keyEpoch == null) throw new Error("Invite response wrap requires a keyEpoch");
   } else if (context.purpose === "room-key-rotation") {
     if (!context.operationId) throw new Error("Rotation wrap requires an operationId");
-    if (!Number.isSafeInteger(context.previousEpoch) || context.previousEpoch == null || context.previousEpoch < 1)
-      throw new Error("Rotation wrap requires a positive safe-integer previousEpoch");
-    if (!Number.isSafeInteger(context.newEpoch) || context.newEpoch == null || context.newEpoch < 1)
-      throw new Error("Rotation wrap requires a positive safe-integer newEpoch");
-    if (!Number.isSafeInteger(context.keyEpoch) || context.keyEpoch == null || context.keyEpoch < 1)
-      throw new Error("Rotation wrap requires a positive safe-integer keyEpoch");
-    if (context.previousEpoch >= Number.MAX_SAFE_INTEGER || context.newEpoch !== context.previousEpoch + 1)
+    if (context.previousEpoch == null) throw new Error("Rotation wrap requires a previousEpoch");
+    if (context.newEpoch == null) throw new Error("Rotation wrap requires a newEpoch");
+    if (context.keyEpoch == null) throw new Error("Rotation wrap requires a keyEpoch");
+    if (context.newEpoch !== context.previousEpoch + 1)
       throw new Error("Rotation wrap requires newEpoch to immediately follow previousEpoch");
     if (context.keyEpoch !== context.previousEpoch)
       throw new Error("Rotation wrap requires keyEpoch to equal previousEpoch");
