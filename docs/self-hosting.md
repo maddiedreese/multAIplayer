@@ -216,6 +216,8 @@ MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
 
 Each response includes an `x-request-id` header. The relay accepts a bounded incoming `x-request-id` or generates one. Logs include request method, path, status code, duration, and request id; they do not include room plaintext, encrypted payload bodies, attachment contents, GitHub tokens, Codex credentials, terminal output, browser pages, or repo files.
 
+Startup, shutdown, configuration rejection, persistence, and quarantine events use the same structured JSON envelope even when request logging is disabled. Those operational events use stable event names and bounded scalar fields; invalid environment values, local store paths, and raw error objects are deliberately omitted.
+
 The relay also exposes content-free operational counters at `/metrics`, including active sockets, live encrypted blob count and bytes, published envelope count, accepted attachment upload count and bytes, upload rejection counts by reason, rate-limit rejection counts by bucket, quota rejection counts by quota type, WebSocket connection attempt/accept/rejection counts, start time, and uptime.
 
 Graceful shutdown timing is configurable:

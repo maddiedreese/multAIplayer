@@ -38,7 +38,7 @@ npm run doctor
 npm run dev
 ```
 
-`npm run doctor` checks the local Node/npm/Rust/Cargo setup and macOS packaging prerequisites where applicable. `npm run dev` starts the local relay on `http://127.0.0.1:4321` and the desktop web shell on `http://127.0.0.1:1420`.
+Node.js 22 or newer is required; `nvm use` selects the same Node major used in CI. `npm run doctor` checks the local Node/npm/Rust/Cargo setup and macOS packaging prerequisites where applicable. `npm run dev` starts the local relay on `http://127.0.0.1:4321` and the desktop web shell on `http://127.0.0.1:1420`.
 
 To run the native Tauri app with the relay:
 
@@ -71,6 +71,6 @@ npm run verify
 npm run tauri:build -w @multaiplayer/desktop
 ```
 
-`npm run verify` type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the relay/desktop web artifacts. The macOS CI job runs on the pinned `macos-15` runner, then builds an unsigned Tauri app and uploads both the `.app` bundle and `.dmg` as workflow artifacts for inspection only.
+`npm run verify` type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the relay/desktop web artifacts. The macOS CI job runs on the pinned `macos-15` runner, then builds an unsigned Tauri app and uploads both the `.app` bundle and `.dmg` as workflow artifacts for inspection only. Those are the only configured desktop bundle targets: Windows and Linux packages are not supported or published during the macOS-first alpha.
 
 Tagged versions matching `v*` run the release workflow. It verifies the repo on the pinned `macos-15` runner, requires Apple Developer ID signing/notarization secrets, builds the signed and notarized macOS app, validates the stapled app and DMG tickets, packages the `.app` bundle and `.dmg`, writes `SHA256SUMS.txt`, and creates a GitHub Release. Tags containing `alpha`, `beta`, or `rc` are published as prereleases.

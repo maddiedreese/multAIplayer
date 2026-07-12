@@ -43,6 +43,8 @@ If any required Apple signing secret is missing, the release workflow fails befo
 
 Do not attach ad hoc local builds to public releases. Release artifacts should come from GitHub Actions so the source commit, workflow logs, and checksums are visible.
 
+The publishing job also emits an SPDX SBOM, records GitHub build-provenance attestations for every trusted release asset, and keyless-signs both the checksum manifest and SBOM with Sigstore/cosign bundles. Repository hygiene tests pin all three controls to the release workflow so they cannot silently disappear during workflow maintenance.
+
 Third parties can follow [Reproducing release builds](reproducible-builds.md) to rebuild a tag and compare the unsigned application payload. The signed/notarized DMG and ZIP are not currently claimed to be bit-for-bit reproducible because Apple services, signatures, archive metadata, hosted runner images, and incompletely pinned toolchain patch versions can affect output.
 
 ## Update Notices

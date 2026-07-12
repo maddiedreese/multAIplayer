@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { checkMutationPolicy } from "./check-mutation-policy.mjs";
 import strykerConfig from "../packages/crypto/stryker.config.mjs";
@@ -56,6 +60,35 @@ test("reports every missing or regressed per-file score", () => {
     "src/canonical.ts: 1 survived mutants exceeds maximum 0",
     "src/encoding.ts: missing from mutation summary"
   ]);
+});
+
+test("fails the policy CLI process when a synthetic report drops to 60 percent", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "mutation-ratchet-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const summaryPath = join(directory, "summary.json");
+  const policyPath = join(directory, "policy.json");
+  await writeFile(summaryPath, JSON.stringify({ files: [file("src/security-boundary.ts", 60, 2)], mutants: [] }));
+  await writeFile(
+    policyPath,
+    JSON.stringify({
+      files: { "src/security-boundary.ts": { minimumScore: 100, maximumSurvived: 0 } },
+      allowedTimeouts: [],
+      allowedIgnored: [],
+      regions: []
+    })
+  );
+
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL("./check-mutation-policy.mjs", import.meta.url)), summaryPath, policyPath],
+    { encoding: "utf8" }
+  );
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, "");
+  assert.match(
+    result.stderr,
+    /^mutation policy failed:\n- src\/security-boundary\.ts: mutation score 60\.00 is below 100\.00\n- src\/security-boundary\.ts: 2 survived mutants exceeds maximum 0\n$/
+  );
 });
 
 test("rejects source files that are not covered by a whole-file rule", () => {

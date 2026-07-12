@@ -1,4 +1,5 @@
 import { isRecord, type RelayEnvelope } from "@multaiplayer/protocol";
+import { logRelayEvent } from "./observability.js";
 import { RelayPersistenceMigrationError, type RelayPersistence } from "./persistence.js";
 import type { RoomKey } from "./state.js";
 import type { RelayStoreCodec } from "./store-codec.js";
@@ -40,32 +41,32 @@ export function createRelayStorePersistenceCoordinator(options: {
       const stored = await options.persistence.load();
       if (stored === null) return;
       if (!isRecord(stored) || stored.version !== 1) {
-        console.warn(`Ignoring unsupported relay store version at ${options.dataPath}`);
+        logRelayEvent("warn", "unsupported_store_version_quarantined");
         await options.persistence.quarantine("unsupported-version");
         return;
       }
       options.storeCodec.applyStoredRelayState(stored);
       await options.persistence.finalizeLoad?.(options.storeCodec.toStoredRelayState());
-      console.log(`Loaded multAIplayer relay store from ${options.dataPath}`);
+      logRelayEvent("info", "relay_store_loaded");
     } catch (error) {
       if (error instanceof RelayPersistenceMigrationError) throw error;
-      console.warn(`Could not load relay store at ${options.dataPath}:`, error);
+      logRelayEvent("warn", "relay_store_load_failed");
       await options.persistence.quarantine("unreadable");
     }
   }
 
   function scheduleStoreSave() {
     if (options.persistence.flushMode === "immediate") {
-      saveRelayStore().catch((error) => {
-        console.error("Failed to save relay store:", error);
+      saveRelayStore().catch(() => {
+        logRelayEvent("error", "relay_store_save_failed");
       });
       return;
     }
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveTimer = null;
-      saveRelayStore().catch((error) => {
-        console.error("Failed to save relay store:", error);
+      saveRelayStore().catch(() => {
+        logRelayEvent("error", "relay_store_save_failed");
       });
     }, 100);
   }
@@ -77,8 +78,8 @@ export function createRelayStorePersistenceCoordinator(options: {
         .then((handled) => {
           if (!handled) scheduleStoreSave();
         })
-        .catch((error) => {
-          console.error("Failed to save encrypted relay backlog:", error);
+        .catch(() => {
+          logRelayEvent("error", "encrypted_backlog_save_failed");
           scheduleStoreSave();
         })
     );

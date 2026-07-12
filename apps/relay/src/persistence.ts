@@ -4,6 +4,7 @@ import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promise
 import { dirname } from "node:path";
 import { nanoid } from "nanoid";
 import { isRecord, type RelayEnvelope } from "@multaiplayer/protocol";
+import { logRelayEvent } from "./observability.js";
 import type { RoomKey } from "./state.js";
 
 export type RelayStorageBackend = "json" | "sqlite";
@@ -550,10 +551,10 @@ async function quarantinePath(path: string, reason: string) {
   const backupPath = `${path}.corrupt-${reason}-${timestamp}`;
   try {
     await rename(path, backupPath);
-    console.warn(`Moved unreadable relay store to ${backupPath}`);
+    logRelayEvent("warn", "unreadable_store_quarantined");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      console.warn(`Failed to move unreadable relay store at ${path}:`, error);
+      logRelayEvent("error", "store_quarantine_failed");
     }
   }
 }

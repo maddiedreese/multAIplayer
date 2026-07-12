@@ -49,8 +49,49 @@ test("release-facing version metadata stays synchronized", () => {
   assert.match(codexRequests, new RegExp(`version: "${rootPackage.version.replaceAll(".", "\\.")}"`));
 });
 
+test("local runtime and desktop bundle targets match supported CI", () => {
+  assert.equal(rootPackage.engines?.node, ">=22", "the package contract must require the CI Node baseline");
+  assert.equal(readFileSync(".nvmrc", "utf8").trim(), "22", ".nvmrc must select the CI Node major");
+  assert.equal(
+    readFileSync(".npmrc", "utf8").trim(),
+    "engine-strict=true",
+    "npm installs must reject unsupported Node runtimes"
+  );
+
+  const tauriConfig = readJson("apps/desktop/src-tauri/tauri.conf.json");
+  assert.deepEqual(
+    tauriConfig.bundle.targets,
+    ["app", "dmg"],
+    "the macOS-first alpha must not advertise unbuilt Windows or Linux bundles"
+  );
+
+  const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+  const release = readFileSync(".github/workflows/release.yml", "utf8");
+  for (const [name, source] of [
+    ["CI", workflow],
+    ["release", release]
+  ]) {
+    assert.match(source, /node-version: 22/, `${name} must use the documented Node baseline`);
+    assert.match(source, /runs-on: macos-15/, `${name} must build the supported desktop platform`);
+    assert.match(source, /bundle\/macos\/multAIplayer\.app/, `${name} must handle the configured app bundle`);
+    assert.match(source, /bundle\/dmg/, `${name} must handle the configured DMG bundle`);
+  }
+});
+
 test("CI verifies each layer once before packaging prebuilt desktop assets", () => {
   const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+  for (const packagePath of [
+    "packages/crypto/package.json",
+    "apps/relay/package.json",
+    "packages/protocol/package.json"
+  ]) {
+    const scripts = readJson(packagePath).scripts;
+    assert.equal(
+      scripts["test:mutation"],
+      "npm run test:mutation:run && npm run test:mutation:summary && npm run test:mutation:policy",
+      `${packagePath} must enforce the repository policy after producing its mutation report`
+    );
+  }
   assert.equal(workflow.match(/run: npm run verify:web$/gm)?.length, 1);
   assert.equal(workflow.match(/run: npm run verify:native$/gm)?.length, 1);
   assert.equal(workflow.match(/run: npm run test:mutation -w @multaiplayer\/crypto$/gm)?.length, 1);
@@ -111,6 +152,48 @@ test("relay reproducibility proof stays deterministic and release-triggered", ()
   assert.match(workflow, /release:\n\s+types: \[published\]/);
   assert.match(workflow, /run: node scripts\/verify-relay-container-reproducibility\.mjs/);
 });
+
+test("release SBOM, provenance, and keyless signatures remain gated", () => {
+  const workflow = readFileSync(".github/workflows/release.yml", "utf8");
+  const documentation = readFileSync("docs/release-hardening.md", "utf8");
+  assert.match(workflow, /name: Generate SPDX SBOM[\s\S]*anchore\/sbom-action@[a-f0-9]{40}/);
+  assert.match(workflow, /artifact-name: multaiplayer\.spdx\.json/);
+  assert.match(workflow, /attestations: write/);
+  assert.match(workflow, /actions\/attest-build-provenance@[a-f0-9]{40}[\s\S]*subject-path: release-assets\/\*/);
+  assert.match(workflow, /sigstore\/cosign-installer@[a-f0-9]{40}/);
+  assert.match(workflow, /cosign sign-blob --yes --bundle release-assets\/SHA256SUMS\.txt\.sigstore\.json/);
+  assert.match(workflow, /cosign sign-blob --yes --bundle release-assets\/multaiplayer\.spdx\.json\.sigstore\.json/);
+  assert.match(workflow, /gh release create[\s\S]*release-assets\/\*/);
+  assert.match(documentation, /SPDX SBOM/);
+  assert.match(documentation, /build-provenance/i);
+  assert.match(documentation, /Sigstore/i);
+});
+
+test("relay operational messages use the structured observability sink", () => {
+  const config = readFileSync("apps/relay/src/config.ts", "utf8");
+  const observability = readFileSync("apps/relay/src/observability.ts", "utf8");
+  const relaySources = relaySourceFiles("apps/relay/src");
+  for (const path of relaySources) {
+    assert.doesNotMatch(
+      readFileSync(path, "utf8"),
+      /console\.(?:log|warn|error)/,
+      `${path} bypasses structured logging`
+    );
+  }
+  assert.match(config, /logRelayEvent\("warn", "invalid_storage_backend_ignored"\)/);
+  assert.match(config, /logRelayEvent\("warn", "invalid_allowed_origin_ignored"\)/);
+  assert.match(config, /logRelayEvent\("warn", "weak_session_secret_disables_persistence"/);
+  assert.match(observability, /service: "multaiplayer-relay"/);
+  assert.match(observability, /defaultRelayLogSink/);
+});
+
+function relaySourceFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) return relaySourceFiles(path);
+    return entry.isFile() && entry.name.endsWith(".ts") ? [path] : [];
+  });
+}
 
 test("RustSec audit is pinned, scoped to the native lockfile, and scheduled", () => {
   const workflow = readFileSync(".github/workflows/rust-audit.yml", "utf8");

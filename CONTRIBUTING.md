@@ -16,7 +16,7 @@ Dependency advisory handling and coverage gates are documented in [Dependency se
 
 ## Fast path
 
-For the shortest reproducible on-ramp, open the repository in a Dev Container. Its Node 22 image plus Rust and Python features install the workspace and run the environment doctor automatically. Then run:
+For the shortest reproducible on-ramp, open the repository in a Dev Container. Its Node 22 image plus Rust and Python features install the workspace and run the environment doctor automatically. For a local checkout, install Node.js 22 or newer and run `nvm use` when using nvm; the root `engines` field and `.nvmrc` match CI, and npm rejects unsupported runtimes through `engine-strict`. Then run:
 
 ```sh
 npm install
@@ -27,6 +27,8 @@ npm run dev
 The first-contribution target is `npm run verify:web`; it does not require native macOS packaging. Maintainers label bounded, documented work `good first issue` and pair it with an area label. Each such issue should name expected files, acceptance criteria, and the fast check. Comment before starting to avoid duplicated work.
 
 Use `npm run tauri:dev` instead of `npm run dev` when you need the native Tauri app. The web shell can run in local seeded-room mode without GitHub OAuth; copy `.env.example` to `.env` only when you need OAuth or self-hosted relay settings.
+
+The supported alpha desktop release target is macOS. Tauri produces only `.app` and `.dmg` bundles, matching CI and the release workflow; Windows and Linux bundles are not currently tested or published.
 
 Make a focused change, use the [fast development loop](#fast-development-loop) for the area you touched, then run the full gate:
 
