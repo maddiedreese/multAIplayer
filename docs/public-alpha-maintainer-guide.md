@@ -164,7 +164,7 @@ Recommendation:
 
 ## Dependency And Coverage Maintenance
 
-Dependabot checks the root npm workspace, the native Cargo workspace, and GitHub Actions each month. Review generated dependency pull requests as ordinary code changes: keep lockfiles synchronized, require the complete CI gate, and inspect release-tooling changes before merging them.
+Dependabot checks the root npm workspace, the native Cargo workspace, and GitHub Actions each month. Direct npm and Cargo dependencies remain exact-pinned during alpha. Compatible patch/minor updates and majors arrive in separate batches; treat a major batch as an explicit owner migration decision with upstream migration-note and transitive-change review, updated compatibility fixtures/docs where relevant, and the complete CI gate. This does not require a second reviewer. Keep lockfiles synchronized and inspect release-tooling changes before merging any dependency batch.
 
 Every third-party GitHub Action is referenced by an immutable commit SHA. The adjacent version comment is the human-readable release that the SHA represents; update the SHA and comment together. Do not replace these references with mutable major-version tags. Dependabot understands pinned Action references and proposes reviewed SHA updates.
 

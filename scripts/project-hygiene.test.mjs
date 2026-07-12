@@ -84,6 +84,31 @@ test("npm advisories are checked from the lockfile on changes and a schedule", (
   assert.equal(rootPackage.scripts["audit:npm"], "npm audit --audit-level=high");
 });
 
+test("alpha dependencies are exact-pinned and major updates remain separately batched", () => {
+  for (const path of ["package.json", ...workspaceManifestPaths]) {
+    const manifest = readJson(path);
+    for (const dependencyGroup of ["dependencies", "devDependencies"]) {
+      for (const [name, version] of Object.entries(manifest[dependencyGroup] ?? {})) {
+        if (name.startsWith("@multaiplayer/")) continue;
+        assert.match(version, /^\d+\.\d+\.\d+(?:[-+].*)?$/, `${path} ${dependencyGroup}.${name}`);
+      }
+    }
+  }
+
+  const cargoManifest = readFileSync("apps/desktop/src-tauri/Cargo.toml", "utf8");
+  const cargoDependencies = cargoManifest.slice(cargoManifest.indexOf("[build-dependencies]"));
+  assert.doesNotMatch(cargoDependencies, /version\s*=\s*"(?!=)/);
+  for (const requirement of cargoDependencies.matchAll(/^[-a-z0-9]+\s*=\s*"([^"]+)"$/gm)) {
+    assert.match(requirement[1], /^=\d+\.\d+\.\d+$/, `Cargo dependency ${requirement[1]}`);
+  }
+
+  const dependabot = readFileSync(".github/dependabot.yml", "utf8");
+  assert.match(dependabot, /npm-major-update-batch:/);
+  assert.match(dependabot, /cargo-major-update-batch:/);
+  assert.equal(dependabot.match(/- major/g)?.length, 2);
+  assert.match(dependabot, /github-actions-update-batch:/);
+});
+
 test("latest Codex contract drift is checked proactively with least privilege", () => {
   const workflow = readFileSync(".github/workflows/codex-latest-contract.yml", "utf8");
   assert.match(workflow, /schedule:/);
