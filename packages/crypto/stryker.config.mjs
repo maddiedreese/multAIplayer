@@ -1,9 +1,20 @@
+import { readdirSync } from "node:fs";
+
+const mutationTestFiles = readdirSync("test")
+  .filter((name) => name.endsWith(".test.ts") && name !== "properties.test.ts")
+  .sort()
+  .map((name) => `test/${name}`)
+  .join(" ");
+
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 export default {
   mutate: ["src/**/*.ts"],
   testRunner: "command",
   commandRunner: {
-    command: "npm test"
+    // Property tests remain mandatory in ordinary/full CI. The deterministic
+    // focused suite independently kills the complete mutation baseline and
+    // avoids replaying thousands of generated cases in every mutant sandbox.
+    command: `tsx --test ${mutationTestFiles}`
   },
   checkers: ["typescript"],
   tsconfigFile: "tsconfig.json",
