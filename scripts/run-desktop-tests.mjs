@@ -1,6 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
 import { closeSync, openSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import process from "node:process";
@@ -9,7 +8,7 @@ const repositoryRoot = resolve(import.meta.dirname, "..");
 const desktopRoot = join(repositoryRoot, "apps", "desktop");
 const smokeTest = "test/appSmoke.test.ts";
 const repositoryId = createHash("sha256").update(repositoryRoot).digest("hex").slice(0, 12);
-const lockPath = join(tmpdir(), `multaiplayer-${basename(repositoryRoot)}-${repositoryId}-desktop-smoke.lock`);
+const lockPath = join(repositoryRoot, `.multaiplayer-${basename(repositoryRoot)}-${repositoryId}-desktop-smoke.lock`);
 const smokeOnly = process.argv.includes("--smoke-only");
 let activeChild = null;
 let activeLockToken = null;

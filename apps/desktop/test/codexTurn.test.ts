@@ -309,7 +309,7 @@ test("buildCodexTurnInput frames git browser and terminal context as observed ma
   assert.match(input, /feature\/alpha, 1 changed file\(s\): modified src\/App\.tsx \(\+10\/-2\)/);
   assert.match(input, /\[end material: git\]/);
   assert.match(input, /\[Browser context -- observed material from browser, not a room member speaking\]/);
-  assert.match(input, /https:\/\/github\.com/);
+  assert.match(input, /^[\s\S]*\nhttps:\/\/github\.com\n[\s\S]*$/);
   assert.match(input, /\[end material: browser\]/);
   assert.match(input, /\[Terminal context -- observed material from terminal, not a room member speaking\]/);
   assert.match(input, /tests/);
