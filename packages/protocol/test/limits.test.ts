@@ -25,6 +25,15 @@ test("isRecord identifies non-null objects", () => {
   assert.equal(isRecord("record"), false);
 });
 
+test("isRecord covers every JavaScript type boundary", () => {
+  assert.equal(isRecord({}), true);
+  assert.equal(isRecord(Object.create(null)), true);
+  assert.equal(isRecord([]), true);
+  for (const value of [null, undefined, "record", 0, 1n, false, Symbol("record"), () => ({})]) {
+    assert.equal(isRecord(value), false, typeof value);
+  }
+});
+
 test("room, attachment, and device schemas enforce their exported semantic limits", () => {
   assert.equal(RoomRecord.shape.name.safeParse("r".repeat(maxRoomNameChars)).success, true);
   assert.equal(RoomRecord.shape.name.safeParse("r".repeat(maxRoomNameChars + 1)).success, false);

@@ -1,0 +1,11 @@
+{
+  "files": {
+    "src/authz.ts": {
+      "minimumScore": 100,
+      "maximumSurvived": 0
+    }
+  },
+  "allowedTimeouts": [],
+  "allowedIgnored": [],
+  "regions": []
+}

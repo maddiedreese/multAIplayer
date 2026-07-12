@@ -114,6 +114,70 @@ test("relay authorization rules cover every role transition and room membership 
   assert.equal(transferred.get("admin")?.role, "admin");
 });
 
+test("relay authorization exhaustively enforces every role combination", () => {
+  const store = new InMemoryRelayStore();
+  const authz = createRelayAuthz(store);
+  const roles = ["owner", "admin", "member"] as const;
+  const requesters = [undefined, ...roles] as const;
+
+  for (const requester of requesters) {
+    for (const target of roles) {
+      const expectedRemove =
+        target !== "owner" && (requester === "owner" || (requester === "admin" && target === "member"));
+      assert.equal(
+        authz.canRemoveTeamMember(requester, target),
+        expectedRemove,
+        `${requester ?? "missing"} removes ${target}`
+      );
+      for (const next of roles) {
+        const expectedSet =
+          target !== "owner" &&
+          next !== "owner" &&
+          (requester === "owner" || (requester === "admin" && target === "member" && next === "member"));
+        assert.equal(
+          authz.canSetTeamMemberRole(requester, target, next),
+          expectedSet,
+          `${requester ?? "missing"} changes ${target} to ${next}`
+        );
+      }
+    }
+  }
+
+  const original = new Map([
+    ["owner", member("owner", "owner")],
+    ["admin", member("admin", "admin")],
+    ["member", member("member", "member")],
+    ["other-member", member("other-member", "member")]
+  ]);
+  const transferred = authz.transferTeamOwnership(new Map(original), "member");
+  assert.deepEqual(
+    Array.from(transferred, ([userId, record]) => [userId, record.role]),
+    [
+      ["owner", "admin"],
+      ["admin", "admin"],
+      ["member", "owner"],
+      ["other-member", "member"]
+    ]
+  );
+  const selfTransfer = authz.transferTeamOwnership(new Map(original), "owner");
+  assert.equal(selfTransfer.get("owner")?.role, "owner");
+  const absentTransfer = authz.transferTeamOwnership(new Map(original), "missing");
+  assert.equal(absentTransfer.get("owner")?.role, "admin");
+  assert.equal(absentTransfer.has("missing"), false);
+});
+
+test("room authorization independently requires a matching room and membership", () => {
+  const store = new InMemoryRelayStore();
+  store.rooms.set("room_1", { id: "room_1", teamId: "team_1" } as never);
+  store.teamMembers.set("team_1", new Map([["member", member("member", "member")]]));
+  const authz = createRelayAuthz(store);
+
+  assert.equal(authz.canAccessRoom("team_1", "room_1", "member"), true);
+  assert.equal(authz.canAccessRoom("team_1", "missing", "member"), false);
+  assert.equal(authz.canAccessRoom("other", "room_1", "member"), false);
+  assert.equal(authz.canAccessRoom("team_1", "room_1", "missing"), false);
+});
+
 test("relay scalar and room-setting normalizers reject ambiguous or oversized input", () => {
   assert.equal(normalizeMetadataText(" value ", 10), "value");
   assert.equal(normalizeMetadataText("\u0000", 10), null);
