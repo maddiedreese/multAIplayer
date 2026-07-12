@@ -37,7 +37,7 @@
       "endColumn": 10,
       "mutator": "BooleanLiteral",
       "replacement": "true",
-      "rationale": "only the public half is exported; WebCrypto keeps it extractable independently"
+      "rationale": "ephemeral private handle never leaves; WebCrypto public half stays exportable"
     },
     {
       "file": "src/index.ts",
@@ -47,7 +47,7 @@
       "endColumn": 10,
       "mutator": "BooleanLiteral",
       "replacement": "true",
-      "rationale": "only the public half is exported; WebCrypto keeps it extractable independently"
+      "rationale": "ephemeral private handle never leaves; WebCrypto public half stays exportable"
     },
     {
       "file": "src/index.ts",
