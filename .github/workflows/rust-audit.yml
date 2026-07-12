@@ -24,7 +24,7 @@ jobs:
       - name: Install locked audit tools
         run: |
           cargo install cargo-audit --version 0.22.0 --locked
-          cargo install cargo-deny --version 0.18.4 --locked
+          cargo install cargo-deny --version 0.19.7 --locked
       - name: Audit locked dependencies
         working-directory: apps/desktop/src-tauri
         run: cargo audit
