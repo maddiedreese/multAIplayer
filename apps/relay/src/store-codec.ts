@@ -94,8 +94,10 @@ export function createRelayStoreCodec(options: {
   normalizeStoredAuthSession: (stored: unknown) => NormalizedStoredAuthSession | null;
   pruneEncryptedBacklog: (envelopes: RelayEnvelope[]) => RelayEnvelope[];
   storedAuthSessions: (authSessions: Map<string, AuthSession>) => StoredAuthSession[];
+  now?: () => number;
 }): RelayStoreCodec {
   const { store } = options;
+  const now = options.now ?? Date.now;
 
   function deviceKey(userId: string, deviceId: string): string {
     return `${userId}:${deviceId}`;
@@ -191,11 +193,11 @@ export function createRelayStoreCodec(options: {
   }
 
   function isExpiredInvite(invite: InviteRecordType): boolean {
-    return Boolean(invite.expiresAt && Date.parse(invite.expiresAt) < Date.now());
+    return Boolean(invite.expiresAt && Date.parse(invite.expiresAt) < now());
   }
 
   function isExpiredAttachmentBlob(blob: AttachmentBlobRecordType): boolean {
-    return Boolean(blob.expiresAt && Date.parse(blob.expiresAt) < Date.now());
+    return Boolean(blob.expiresAt && Date.parse(blob.expiresAt) < now());
   }
 
   function normalizeStoredBacklog(item: unknown): { key: RoomKey; envelopes: RelayEnvelope[] } | null {
@@ -320,7 +322,7 @@ export function createRelayStoreCodec(options: {
         joinedAt:
           typeof member.joinedAt === "string" && !Number.isNaN(Date.parse(member.joinedAt))
             ? member.joinedAt
-            : new Date().toISOString()
+            : new Date(now()).toISOString()
       });
     }
     for (const userId of storedArray(item.userIds)) {
@@ -330,7 +332,7 @@ export function createRelayStoreCodec(options: {
           teamId,
           userId: normalizedUserId,
           role: "member",
-          joinedAt: new Date().toISOString()
+          joinedAt: new Date(now()).toISOString()
         });
       }
     }
@@ -378,7 +380,7 @@ export function createRelayStoreCodec(options: {
     },
     pruneExpiredRelayState() {
       for (const [id, session] of store.authSessions.entries()) {
-        if (session.expiresAt <= Date.now()) store.authSessions.delete(id);
+        if (session.expiresAt <= now()) store.authSessions.delete(id);
       }
       for (const [id, invite] of store.invites.entries()) {
         if (isExpiredInvite(invite)) store.invites.delete(id);
@@ -398,7 +400,7 @@ export function createRelayStoreCodec(options: {
     toStoredRelayState() {
       return {
         version: 1,
-        savedAt: new Date().toISOString(),
+        savedAt: new Date(now()).toISOString(),
         teams: Array.from(store.teams.values()),
         rooms: Array.from(store.rooms.values()),
         invites: Array.from(store.invites.values()).filter((invite) => !isExpiredInvite(invite)),
