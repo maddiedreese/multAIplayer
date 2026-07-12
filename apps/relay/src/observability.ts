@@ -37,6 +37,26 @@ export interface RelayMetricsSnapshotGauges {
   liveAttachmentBlobBytes?: number;
 }
 
+export type RelayLogLevel = "info" | "warn" | "error";
+export type RelayLogSink = (line: string) => void;
+
+export function logRelayEvent(
+  level: RelayLogLevel,
+  event: string,
+  fields: Record<string, string | number | boolean> = {},
+  sink: RelayLogSink = defaultRelayLogSink(level)
+) {
+  sink(
+    JSON.stringify({
+      ...fields,
+      service: "multaiplayer-relay",
+      at: new Date().toISOString(),
+      level,
+      event
+    })
+  );
+}
+
 export function createRelayMetrics(now = () => Date.now()): RelayMetrics {
   const startedAtMs = now();
   let envelopesPublishedTotal = 0;
@@ -146,11 +166,18 @@ function requestIdFromHeader(value: string | string[] | undefined): string | nul
 }
 
 function logJson(record: Record<string, unknown>) {
-  console.log(
-    JSON.stringify({
-      service: "multaiplayer-relay",
-      at: new Date().toISOString(),
-      ...record
-    })
+  logRelayEvent(
+    "info",
+    String(record.event ?? "relay_event"),
+    Object.fromEntries(
+      Object.entries(record).filter(
+        ([key, value]) => key !== "event" && ["string", "number", "boolean"].includes(typeof value)
+      )
+    ) as Record<string, string | number | boolean>
   );
+}
+
+function defaultRelayLogSink(level: RelayLogLevel): RelayLogSink {
+  const stream = level === "info" ? process.stdout : process.stderr;
+  return (line) => stream.write(`${line}\n`);
 }

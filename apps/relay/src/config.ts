@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { logRelayEvent } from "./observability.js";
 import { resolve } from "node:path";
 import type { RelayStorageBackend } from "./persistence.js";
 
@@ -162,7 +163,7 @@ function parseStorageBackend(value: string | undefined): RelayStorageBackend {
   const normalized = value?.trim().toLowerCase();
   if (!normalized || normalized === "sqlite") return "sqlite";
   if (normalized === "json") return "json";
-  console.warn(`Ignoring invalid MULTAIPLAYER_RELAY_STORAGE value: ${value}`);
+  logRelayEvent("warn", "invalid_storage_backend_ignored");
   return "sqlite";
 }
 
@@ -217,7 +218,7 @@ function parseAllowedOriginEnv(value: string | undefined): string[] {
     if (normalized) {
       origins.add(normalized);
     } else {
-      console.warn(`Ignoring invalid MULTAIPLAYER_RELAY_ALLOWED_ORIGINS entry: ${item}`);
+      logRelayEvent("warn", "invalid_allowed_origin_ignored");
     }
   }
   return Array.from(origins);
@@ -260,9 +261,7 @@ function normalizeSessionPersistenceSecret(value: string | undefined): string | 
   const secret = value?.trim();
   if (!secret) return null;
   if (secret.length < 32) {
-    console.warn(
-      "MULTAIPLAYER_RELAY_SESSION_SECRET must be at least 32 characters; durable auth sessions are disabled."
-    );
+    logRelayEvent("warn", "weak_session_secret_disables_persistence", { minimumCharacters: 32 });
     return null;
   }
   return secret;

@@ -1,4 +1,5 @@
 import type { Server } from "node:http";
+import { logRelayEvent } from "./observability.js";
 
 export function createRelayRuntimeControl({
   server,
@@ -18,7 +19,7 @@ export function createRelayRuntimeControl({
   return {
     listen() {
       server.listen(port, () => {
-        console.log(`multAIplayer relay listening on http://127.0.0.1:${port}`);
+        logRelayEvent("info", "relay_listening", { port });
       });
       return server;
     },
