@@ -7,17 +7,42 @@ updates:
       interval: monthly
     open-pull-requests-limit: 10
     groups:
-      npm-development-dependencies:
-        dependency-type: development
+      npm-compatible-updates:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+      npm-major-update-batch:
+        patterns:
+          - "*"
+        update-types:
+          - major
 
   - package-ecosystem: cargo
     directory: /apps/desktop/src-tauri
     schedule:
       interval: monthly
     open-pull-requests-limit: 10
+    groups:
+      cargo-compatible-updates:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+      cargo-major-update-batch:
+        patterns:
+          - "*"
+        update-types:
+          - major
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
     open-pull-requests-limit: 10
+    groups:
+      github-actions-update-batch:
+        patterns:
+          - "*"
