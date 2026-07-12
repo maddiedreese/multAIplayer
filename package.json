@@ -22,6 +22,7 @@
     "format:check": "prettier --check eslint.config.mjs \"{apps,packages,scripts,e2e}/**/*.{ts,tsx,mjs}\"",
     "test:scripts": "node --test scripts/*.test.mjs",
     "test:crypto-vectors:python": "python3 scripts/verify-crypto-vectors.py",
+    "check:crypto-vector-dependency": "node scripts/check-crypto-vector-dependency.mjs",
     "mutation:summary": "node scripts/summarize-mutation-report.mjs",
     "test:workspaces": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage:packages && npm run test:coverage -w @multaiplayer/relay",

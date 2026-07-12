@@ -20,7 +20,7 @@ The intended security properties are:
 
 Remaining alpha limitations are documented in [docs/threat-model.md](docs/threat-model.md), especially retroactive erasure, recovery, and local-machine risk.
 
-Release-specific checks and unsigned macOS artifact notes are tracked in [docs/release-hardening.md](docs/release-hardening.md).
+Release-specific checks and artifact trust notes are tracked in [docs/release-operations.md](docs/release-operations.md).
 
 ## Reporting
 

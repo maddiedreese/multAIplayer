@@ -16,4 +16,4 @@ Routine changes are decided in pull requests. Security-boundary or architectural
 
 ## Releases, conduct, and changes
 
-The maintainer verifies release gates and follows `docs/release-hardening.md`. Vulnerabilities follow `SECURITY.md`. Participation follows `CODE_OF_CONDUCT.md`; reports involving the maintainer may use GitHub's private abuse-reporting channel. Governance changes use the normal pull-request process and require an explicit maintainer decision; repository history is the audit trail.
+The maintainer verifies release gates and follows `docs/release-operations.md`. Vulnerabilities follow `SECURITY.md`. Participation follows `CODE_OF_CONDUCT.md`; reports involving the maintainer may use GitHub's private abuse-reporting channel. Governance changes use the normal pull-request process and require an explicit maintainer decision; repository history is the audit trail.

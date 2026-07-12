@@ -57,6 +57,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Enforce independent verifier dependency review window
+        run: npm run check:crypto-vector-dependency
+
       - name: Install independent crypto-vector verifier
         run: python3 -m pip install --disable-pip-version-check cryptography==45.0.5
 

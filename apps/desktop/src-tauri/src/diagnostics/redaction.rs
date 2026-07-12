@@ -120,7 +120,18 @@ pub(super) fn validate_and_redact(
 }
 
 pub(super) fn redact_text(value: &str) -> String {
-    let without_url_secrets = url_regex()
+    redact_with_patterns(value, URL_REGEX.as_ref(), TOKEN_REGEX.as_ref())
+}
+
+fn redact_with_patterns(
+    value: &str,
+    url_regex: Result<&Regex, &regex::Error>,
+    token_regex: Result<&Regex, &regex::Error>,
+) -> String {
+    let (Ok(url_regex), Ok(token_regex)) = (url_regex, token_regex) else {
+        return "[redacted: diagnostic redaction unavailable]".to_string();
+    };
+    let without_url_secrets = url_regex
         .replace_all(value, |captures: &regex::Captures<'_>| {
             let matched = captures.get(0).map_or("", |capture| capture.as_str());
             match tauri::Url::parse(matched) {
@@ -129,22 +140,30 @@ pub(super) fn redact_text(value: &str) -> String {
             }
         })
         .into_owned();
-    token_regex()
+    token_regex
         .replace_all(&without_url_secrets, "[redacted-token]")
         .into_owned()
 }
 
-pub(super) fn url_regex() -> &'static Regex {
-    static REGEX: OnceLock<Regex> = OnceLock::new();
-    REGEX.get_or_init(|| compile_diagnostic_pattern(r#"https?://[^\s"')]+"#))
-}
+static URL_REGEX: LazyLock<Result<Regex, regex::Error>> =
+    LazyLock::new(|| Regex::new(r#"https?://[^\s"')]+"#));
+static TOKEN_REGEX: LazyLock<Result<Regex, regex::Error>> =
+    LazyLock::new(|| Regex::new(r"\b[A-Za-z0-9_-]{32,}\b"));
 
-pub(super) fn token_regex() -> &'static Regex {
-    static REGEX: OnceLock<Regex> = OnceLock::new();
-    REGEX.get_or_init(|| compile_diagnostic_pattern(r"\b[A-Za-z0-9_-]{32,}\b"))
-}
+#[cfg(test)]
+mod redaction_failure_tests {
+    use super::*;
 
-#[allow(clippy::expect_used)]
-fn compile_diagnostic_pattern(pattern: &'static str) -> Regex {
-    Regex::new(pattern).expect("repository-owned diagnostic redaction regex must compile")
+    #[test]
+    fn regex_compilation_failure_redacts_the_entire_value() {
+        let valid = Regex::new("token");
+        let invalid_pattern = String::from("(");
+        let invalid = Regex::new(&invalid_pattern);
+        let redacted = redact_with_patterns(
+            "https://example.invalid/?token=secret",
+            valid.as_ref(),
+            invalid.as_ref(),
+        );
+        assert_eq!(redacted, "[redacted: diagnostic redaction unavailable]");
+    }
 }

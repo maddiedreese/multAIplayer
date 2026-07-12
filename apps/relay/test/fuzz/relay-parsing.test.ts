@@ -26,7 +26,26 @@ test(`relay message and envelope schemas survive ${iterations} fuzz cases (seed 
     validEnvelope,
     { ...validEnvelope, payload: null },
     { ...validEnvelope, keyEpoch: -1 },
-    { type: "publish", envelope: { ...validEnvelope, kind: "unknown" } }
+    { type: "publish", envelope: { ...validEnvelope, kind: "unknown" } },
+    { type: "join", teamId: "team", roomId: "room", userId: "user\u0000", deviceId: "device" },
+    { type: "presence", displayName: "x".repeat(1_000_000) },
+    { type: "publish", envelope: { ...validEnvelope, payload: { __proto__: { polluted: true } } } },
+    deeplyNestedObject(256)
+  ];
+
+  const validMessages = [
+    { type: "join", teamId: "team-fuzz", roomId: "room-fuzz", userId: "user-fuzz", deviceId: "device-fuzz" },
+    { type: "subscribe.team", teamId: "team-fuzz", userId: "user-fuzz", deviceId: "device-fuzz" },
+    { type: "subscribe.workspace", userId: "user-fuzz", deviceId: "device-fuzz" },
+    { type: "publish", envelope: validEnvelope },
+    {
+      type: "presence",
+      teamId: "team-fuzz",
+      roomId: "room-fuzz",
+      userId: "user-fuzz",
+      deviceId: "device-fuzz",
+      displayName: "Fuzz User"
+    }
   ];
 
   assert.equal(RelayEnvelope.safeParse(validEnvelope).success, true, "fuzz seed envelope must remain valid");
@@ -35,11 +54,26 @@ test(`relay message and envelope schemas survive ${iterations} fuzz cases (seed 
     true,
     "fuzz seed publish message must remain valid"
   );
+  for (const message of validMessages) {
+    const decoded: unknown = JSON.parse(Buffer.from(JSON.stringify(message), "utf8").toString("utf8"));
+    const parsed = RelayClientMessage.safeParse(decoded);
+    assert.equal(parsed.success, true, `valid ${message.type} transport round trip must remain accepted`);
+    if (parsed.success) assert.deepEqual(parsed.data, message);
+  }
 
   for (let index = 0; index < iterations; index += 1) {
     const candidate = index < corpus.length ? corpus[index] : fuzzCandidate(random, validEnvelope);
     assert.doesNotThrow(() => RelayClientMessage.safeParse(candidate));
     assert.doesNotThrow(() => RelayEnvelope.safeParse(candidate));
+
+    const encoded = Buffer.from(JSON.stringify(candidate), "utf8");
+    for (const transportBytes of [
+      encoded,
+      encoded.subarray(0, Math.max(0, encoded.length - 1)),
+      mutateByte(encoded, random)
+    ]) {
+      assert.doesNotThrow(() => parseTransportCandidate(transportBytes));
+    }
 
     const bytes = randomBytes(random, random() % 4097);
     let decoded: unknown;
@@ -74,6 +108,29 @@ function fuzzCandidate(random: () => number, validEnvelope: Record<string, unkno
     else envelope[field] = randomJson(random, 0);
   }
   return random() % 2 === 0 ? envelope : { type: random() % 3 === 0 ? "publish" : randomJson(random, 0), envelope };
+}
+
+function parseTransportCandidate(bytes: Buffer): void {
+  try {
+    const transportValue: unknown = JSON.parse(bytes.toString("utf8"));
+    RelayClientMessage.safeParse(transportValue);
+    RelayEnvelope.safeParse(transportValue);
+  } catch {
+    // Malformed JSON is an expected transport rejection; the live handler reports it as an error frame.
+  }
+}
+
+function deeplyNestedObject(depth: number): unknown {
+  let value: unknown = "leaf";
+  for (let index = 0; index < depth; index += 1) value = { value };
+  return value;
+}
+
+function mutateByte(bytes: Buffer, random: () => number): Buffer {
+  if (bytes.length === 0) return bytes;
+  const mutated = Buffer.from(bytes);
+  mutated[random() % mutated.length] ^= 1 << (random() % 8);
+  return mutated;
 }
 
 function randomJson(random: () => number, depth: number): unknown {
