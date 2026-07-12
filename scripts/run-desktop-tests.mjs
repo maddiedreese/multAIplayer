@@ -36,6 +36,16 @@ function processIsAlive(pid) {
   }
 }
 
+function readLockOwner() {
+  let descriptor;
+  try {
+    descriptor = openSync(lockPath, "r");
+    return JSON.parse(readFileSync(descriptor, "utf8"));
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+}
+
 function acquireSmokeLock(token) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     let descriptor;
@@ -54,7 +64,7 @@ function acquireSmokeLock(token) {
 
       let owner;
       try {
-        owner = JSON.parse(readFileSync(lockPath, "utf8"));
+        owner = readLockOwner();
       } catch {
         owner = null;
       }
@@ -78,7 +88,7 @@ function acquireSmokeLock(token) {
 
 function releaseSmokeLock(token) {
   try {
-    const owner = JSON.parse(readFileSync(lockPath, "utf8"));
+    const owner = readLockOwner();
     if (owner?.runnerPid === process.pid && owner?.token === token) unlinkSync(lockPath);
   } catch (error) {
     if (error?.code !== "ENOENT") console.error(`Failed to release ${lockPath}:`, error);
@@ -86,7 +96,7 @@ function releaseSmokeLock(token) {
 }
 
 function updateSmokeLockOwner(token, childPid) {
-  const owner = JSON.parse(readFileSync(lockPath, "utf8"));
+  const owner = readLockOwner();
   if (owner?.runnerPid !== process.pid || owner?.token !== token) {
     throw new Error("Desktop smoke-test lock ownership changed before the worker started");
   }

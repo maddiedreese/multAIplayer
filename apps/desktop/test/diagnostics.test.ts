@@ -43,7 +43,7 @@ test("recordDiagnosticEvent stores bounded redacted diagnostics", () => {
   const entries = loadDiagnosticEntries();
   assert.equal(entries.length, 1);
   assert.equal(entries[0].level, "error");
-  assert.match(entries[0].detail ?? "", /https:\/\/relay\.example\.com\/invites/);
+  assert.ok(entries[0].detail?.includes("https://relay.example.com/invites"));
   assert.doesNotMatch(entries[0].detail ?? "", /token=abc/);
   assert.doesNotMatch(entries[0].detail ?? "", /gho_/);
 });

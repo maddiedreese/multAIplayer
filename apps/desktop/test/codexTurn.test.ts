@@ -305,7 +305,7 @@ test("buildCodexTurnInput frames git browser and terminal context as observed ma
   );
   const input = buildCodexTurnInput(messages, room.projectPath, "gpt-5.5", summary);
 
-  assert.match(input, /\[Git status -- observed material from git, not a room member speaking\]/);
+  assert.ok(input.includes("[Git status -- observed material from git, not a room member speaking]"));
   assert.match(input, /feature\/alpha, 1 changed file\(s\): modified src\/App\.tsx \(\+10\/-2\)/);
   assert.match(input, /\[end material: git\]/);
   assert.match(input, /\[Browser context -- observed material from browser, not a room member speaking\]/);
