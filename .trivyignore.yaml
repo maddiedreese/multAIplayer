@@ -1,0 +1,43 @@
+vulnerabilities:
+  # Current node:24-bookworm-slim has no newer digest. The Node-bundled Undici
+  # client is not used for WebSocket connections by the relay; recheck at every
+  # Node digest update and remove as soon as Node 24 bundles Undici >= 6.27.0.
+  - id: CVE-2026-12151
+    statement: Node-bundled Undici; fixed upstream but not yet available in the current Node 24 image.
+    expired_at: 2026-08-01
+
+  # Debian 12 marks these runtime-package findings affected, fix-deferred, or
+  # will-not-fix. The relay does not invoke Perl, archive extraction, blkid, or
+  # minizip; the container runs only the non-root Node entry point. Keep them
+  # visible here rather than using ignore-unfixed, and review on every digest
+  # update or by the shared expiry below.
+  - id: CVE-2023-45853
+    statement: Debian zlib/minizip code path is not invoked by the relay runtime.
+    expired_at: 2026-08-01
+  - id: CVE-2025-69720
+    statement: Debian base-image maintenance advisory; affected utility is not invoked by the relay.
+    expired_at: 2026-08-01
+  - id: CVE-2026-41992
+    statement: Debian base-image maintenance advisory; affected utility is not invoked by the relay.
+    expired_at: 2026-08-01
+  - id: CVE-2026-42496
+    statement: Debian Perl archive path is not invoked by the relay runtime.
+    expired_at: 2026-08-01
+  - id: CVE-2026-42497
+    statement: Debian Perl archive path is not invoked by the relay runtime.
+    expired_at: 2026-08-01
+  - id: CVE-2026-48962
+    statement: Debian Perl compression path is not invoked by the relay runtime.
+    expired_at: 2026-08-01
+  - id: CVE-2026-53615
+    statement: Debian blkid partition parser is not invoked by the relay runtime.
+    expired_at: 2026-08-01
+  - id: CVE-2026-54369
+    statement: Debian base-image maintenance advisory; affected utility is not invoked by the relay.
+    expired_at: 2026-08-01
+  - id: CVE-2026-8376
+    statement: The affected 32-bit Perl regex path is absent from the 64-bit relay runtime.
+    expired_at: 2026-08-01
+  - id: CVE-2026-9538
+    statement: Debian Perl archive path is not invoked by the relay runtime.
+    expired_at: 2026-08-01
