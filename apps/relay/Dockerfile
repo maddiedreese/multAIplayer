@@ -27,7 +27,9 @@ COPY --from=build /app/packages ./packages
 COPY --from=build /app/apps/relay/package.json ./apps/relay/package.json
 COPY --from=build /app/apps/relay/dist ./apps/relay/dist
 
-RUN mkdir -p /data
+RUN mkdir -p /data && chown node:node /data
+
+USER node
 
 EXPOSE 4321
 
