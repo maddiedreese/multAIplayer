@@ -6,6 +6,14 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 10
+    ignore:
+      # Keep compiler and platform types aligned with typescript-eslint and the Node 22 runtime.
+      - dependency-name: typescript
+        versions:
+          - ">= 6.1"
+      - dependency-name: "@types/node"
+        versions:
+          - ">= 23"
     groups:
       npm-compatible-updates:
         patterns:
