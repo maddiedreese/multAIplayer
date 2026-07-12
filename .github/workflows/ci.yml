@@ -41,6 +41,34 @@ jobs:
       - name: Fuzz relay message and envelope parsing
         run: npm run test:fuzz -w @multaiplayer/relay
 
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-and-relay-coverage
+          path: |
+            apps/relay/coverage
+            packages/*/coverage
+          if-no-files-found: error
+          retention-days: 14
+
+  crypto-mutation:
+    name: Crypto mutation policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Mutation-test cryptographic authorization logic
         run: npm run test:mutation -w @multaiplayer/crypto
 
@@ -50,17 +78,6 @@ jobs:
         with:
           name: crypto-mutation-report
           path: packages/crypto/reports/mutation
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload coverage reports
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: package-and-relay-coverage
-          path: |
-            apps/relay/coverage
-            packages/*/coverage
           if-no-files-found: error
           retention-days: 14
 
