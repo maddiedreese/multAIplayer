@@ -68,11 +68,11 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
       </button>
       <button className="ghost-wide danger" onClick={onRotateRoomKey} disabled={rotateDisabled}>
         <RefreshCw size={15} />
-        {keyRotationBusy ? "Refreshing room access" : "Refresh room access"}
+        {keyRotationBusy ? "Rotating room key" : "Rotate room key"}
       </button>
       <div className="empty-state compact">
-        Refreshing access updates future messages and invites for current members. It is not member removal in this
-        alpha.
+        Rotation advances the room key epoch for current members and invalidates outstanding invites. It is not member
+        removal.
       </div>
       <div className="terminal-requests">
         {inviteRequests

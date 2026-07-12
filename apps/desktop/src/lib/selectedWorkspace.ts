@@ -1,5 +1,4 @@
 import { useAppStore } from "../store/appStore";
-import { fallbackUser } from "../seedData";
 import { loadOrCreateDeviceId } from "./appRuntime";
 import { browserAccessGateMessage, canHostBrowserAction, canRequestBrowserAccess } from "./browserPolicy";
 import { canUseLocalWorkspace, localWorkspaceGateMessage } from "./workspaceAccess";
@@ -19,9 +18,10 @@ export function currentSelectedRoomContext() {
   const state = useAppStore.getState();
   const room = state.rooms.find((candidate) => candidate.id === state.selectedRoomId);
   if (!room) return null;
+  const deviceId = typeof localStorage === "undefined" ? "nonbrowser" : loadOrCreateDeviceId();
   const localUser = {
-    id: state.currentUser?.id ?? fallbackUser.id,
-    name: state.currentUser?.name ?? state.currentUser?.login ?? fallbackUser.name
+    id: state.currentUser?.id ?? `local:${deviceId}`,
+    name: state.currentUser?.name ?? state.currentUser?.login ?? "Local user"
   };
   const revoked = state.revokedRoomIds.has(room.id) || state.revokedTeamIds.has(room.teamId);
   const locked = room.archivedAt != null || state.forgottenRoomIds.has(room.id) || revoked;
@@ -29,7 +29,7 @@ export function currentSelectedRoomContext() {
   return {
     room,
     localUser,
-    deviceId: typeof localStorage === "undefined" ? "local-device" : loadOrCreateDeviceId(),
+    deviceId,
     revoked,
     locked,
     isActiveHost,
@@ -51,11 +51,12 @@ export function currentSelectedRoomContext() {
 
 export function currentLocalIdentity() {
   const currentUser = useAppStore.getState().currentUser;
+  const deviceId = typeof localStorage === "undefined" ? "nonbrowser" : loadOrCreateDeviceId();
   return {
     localUser: {
-      id: currentUser?.id ?? fallbackUser.id,
-      name: currentUser?.name ?? currentUser?.login ?? fallbackUser.name
+      id: currentUser?.id ?? `local:${deviceId}`,
+      name: currentUser?.name ?? currentUser?.login ?? "Local user"
     },
-    deviceId: typeof localStorage === "undefined" ? "local-device" : loadOrCreateDeviceId()
+    deviceId
   };
 }

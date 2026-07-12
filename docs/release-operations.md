@@ -25,18 +25,18 @@ Do not present the alpha as externally audited, production-ready, enterprise com
 
 ## Maintainer-owned launch decisions
 
-Decide and record the official website, relay HTTP origin, relay WebSocket URL, GitHub OAuth owner/scopes, hosting provider, release cadence, support expectation, disclosure contact, and Apple signing identity. A reasonable alpha topology is:
+Decide and record the official website, relay HTTP origin, relay WebSocket URL, GitHub OAuth owner/scopes, hosting provider, release cadence, support expectation, disclosure contact, and Apple signing identity. Do not ship a desktop build until these operator-owned values are configured. Use this shape when recording the final values:
 
 ```text
-Website: https://multaiplayer.com
-Relay API: https://relay.multaiplayer.com
-Relay rooms: wss://relay.multaiplayer.com/rooms
+Website: https://<official-site>
+Relay API: https://<relay-host>
+Relay rooms: wss://<relay-host>/rooms
 GitHub scopes: read:user public_repo
 ```
 
 Use `read:user repo` only after making private-repository access an explicit product and trust decision. Codex/OpenAI credentials never belong in the relay: Codex uses the active host's local app-server.
 
-The desktop release build should set `VITE_RELAY_HTTP_URL` and `VITE_RELAY_URL` to the final hosted endpoints, and its CSP must allow exactly those origins. Publish `https://multaiplayer.com/releases/latest.json` for each release; set `security: true` for security fixes.
+The desktop release build should set `VITE_RELAY_HTTP_URL` and `VITE_RELAY_URL` to the final hosted endpoints, and its CSP must allow exactly those origins. Publish `https://<official-site>/releases/latest.json` for each release; set `security: true` for security fixes.
 
 ## Official relay deployment
 
@@ -51,11 +51,10 @@ GITHUB_OAUTH_SCOPES="read:user public_repo"
 MULTAIPLAYER_RELAY_SESSION_SECRET=...
 MULTAIPLAYER_RELAY_STORAGE=sqlite
 MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
-MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://multaiplayer.com
+MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://<official-site>
 MULTAIPLAYER_RELAY_REQUIRE_AUTH=true
 MULTAIPLAYER_RELAY_DEBUG=false
 MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
-MULTAIPLAYER_RELAY_SEED_DEMO=false
 MULTAIPLAYER_RELAY_RATE_LIMITS=true
 MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
 MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=false

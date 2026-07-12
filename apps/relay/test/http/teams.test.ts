@@ -174,8 +174,7 @@ test("relay revokes live room access and stale invites when a team member is rem
 
 test("relay assigns team creators owner role", async () => {
   const relay = await startRelay({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-    MULTAIPLAYER_RELAY_SEED_DEMO: "false"
+    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true"
   });
   const cookie = await createDebugSession(relay.baseUrl, "github:owner", "owner");
   try {

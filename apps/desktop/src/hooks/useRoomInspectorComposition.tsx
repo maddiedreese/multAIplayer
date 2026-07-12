@@ -35,7 +35,7 @@ import { useFileTerminalDisplay } from "../hooks/useFileTerminalDisplay";
 import { useGitHubWorkflowState } from "../hooks/useGitHubWorkflowState";
 import { useLocalIdentity } from "../hooks/useLocalIdentity";
 import { useRoomAccess } from "../hooks/useRoomAccess";
-import { approvalDelegationPolicyLabels, approvalPolicyLabels, defaultBrowserUrl } from "../seedData";
+import { approvalDelegationPolicyLabels, approvalPolicyLabels, defaultBrowserUrl } from "../appDefaults";
 import { useAppStore } from "../store/appStore";
 import type { createAppRoomPanelActions } from "../lib/appRoomPanelActions";
 import type { useAppHostHandoffActions } from "../hooks/useAppHostHandoffActions";

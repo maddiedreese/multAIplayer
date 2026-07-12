@@ -130,8 +130,7 @@ test("relay restores persisted team member roles and legacy counts", async () =>
 test("relay drops unsafe persisted team member ids before granting access", async () => {
   const relay = await startRelay(
     {
-      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-      MULTAIPLAYER_RELAY_SEED_DEMO: "false"
+      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true"
     },
     {
       version: 1,
@@ -188,7 +187,7 @@ test("relay drops unsafe persisted team member ids before granting access", asyn
 
 test("relay drops invalid persisted team and room identifiers", async () => {
   const relay = await startRelay(
-    { MULTAIPLAYER_RELAY_SEED_DEMO: "false" },
+    {},
     {
       version: 1,
       savedAt: new Date().toISOString(),
@@ -283,8 +282,7 @@ test("relay drops invalid persisted team and room identifiers", async () => {
 test("relay salvages valid persisted records from malformed collection fields", async () => {
   const relay = await startRelay(
     {
-      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-      MULTAIPLAYER_RELAY_SEED_DEMO: "false"
+      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true"
     },
     {
       version: 1,
@@ -339,7 +337,7 @@ test("relay quarantines unreadable persisted stores", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-relay-corrupt-store-"));
   const dataPath = join(tempDir, "relay-store.json");
   await writeFile(dataPath, "{ not json", "utf8");
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_SEED_DEMO: "false" }, undefined, dataPath);
+  const relay = await startRelay({}, undefined, dataPath);
   try {
     const response = await fetch(`${relay.baseUrl}/teams`);
     assert.equal(response.status, 200);
@@ -361,7 +359,7 @@ test("relay quarantines unsupported persisted store versions", async () => {
     `${JSON.stringify({ version: 99, teams: [], rooms: [], invites: [], encryptedBacklog: [] })}\n`,
     "utf8"
   );
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_SEED_DEMO: "false" }, undefined, dataPath);
+  const relay = await startRelay({}, undefined, dataPath);
   try {
     const response = await fetch(`${relay.baseUrl}/teams`);
     assert.equal(response.status, 200);
@@ -380,8 +378,7 @@ test("relay persists workspace state through SQLite storage", async () => {
   const dataPath = join(tempDir, "relay-store.sqlite");
   const relay = await startRelay(
     {
-      MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-      MULTAIPLAYER_RELAY_SEED_DEMO: "false"
+      MULTAIPLAYER_RELAY_STORAGE: "sqlite"
     },
     undefined,
     dataPath
@@ -420,8 +417,7 @@ test("relay persists workspace state through SQLite storage", async () => {
 
     restarted = await startRelay(
       {
-        MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-        MULTAIPLAYER_RELAY_SEED_DEMO: "false"
+        MULTAIPLAYER_RELAY_STORAGE: "sqlite"
       },
       undefined,
       dataPath

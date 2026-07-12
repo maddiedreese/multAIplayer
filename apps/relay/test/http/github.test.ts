@@ -54,6 +54,60 @@ test("relay bounds GitHub device-code polling input", async () => {
   }
 });
 
+test("relay distinguishes pending and slowdown device states from terminal GitHub errors", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-github-device-test-"));
+  const mockPath = join(tempDir, "mock-github-device-fetch.mjs");
+  await writeFile(
+    mockPath,
+    `
+const nativeFetch = globalThis.fetch;
+globalThis.fetch = async (input, init = {}) => {
+  if (String(input) === "https://github.com/login/oauth/access_token") {
+    const deviceCode = JSON.parse(String(init.body)).device_code;
+    return Response.json({ error: deviceCode });
+  }
+  return nativeFetch(input, init);
+};
+`,
+    "utf8"
+  );
+  const relay = await startRelay({
+    GITHUB_CLIENT_ID: "test-client-id",
+    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --import=${mockPath}`.trim()
+  });
+  try {
+    const poll = (deviceCode: string) =>
+      fetch(`${relay.baseUrl}/auth/github/device/poll`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ device_code: deviceCode })
+      });
+
+    const pending = await poll("authorization_pending");
+    assert.equal(pending.status, 202);
+    assert.deepEqual(await pending.json(), { status: "pending" });
+
+    const slowDown = await poll("slow_down");
+    assert.equal(slowDown.status, 202);
+    assert.deepEqual(await slowDown.json(), { status: "slow_down", retryAfterSeconds: 5 });
+
+    const denied = await poll("access_denied");
+    assert.equal(denied.status, 400);
+    assert.deepEqual(await denied.json(), { error: "GitHub sign-in was denied." });
+
+    const expired = await poll("expired_token");
+    assert.equal(expired.status, 400);
+    assert.deepEqual(await expired.json(), { error: "The GitHub sign-in code expired. Start sign-in again." });
+
+    const unknown = await poll("unexpected_error");
+    assert.equal(unknown.status, 502);
+    assert.deepEqual(await unknown.json(), { error: "GitHub did not complete sign-in." });
+  } finally {
+    await relay.close();
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("relay validates GitHub PR and Actions inputs before proxying", async () => {
   const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
   try {

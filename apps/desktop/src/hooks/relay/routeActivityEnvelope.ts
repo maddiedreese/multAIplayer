@@ -20,7 +20,7 @@ import {
   buildTerminalResultLines
 } from "../../lib/activityLines";
 import { plaintextUserMatchesEnvelope } from "../../lib/encryptedEnvelope";
-import { maxTerminalActivityLines } from "../../seedData";
+import { maxTerminalActivityLines } from "../../appDefaults";
 import type { QueuedCodexTurn } from "../../types";
 import type { RelayEnvelopeStoreActions } from "./relayEnvelopeRouteTypes";
 

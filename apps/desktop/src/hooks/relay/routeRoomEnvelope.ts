@@ -18,7 +18,7 @@ import {
 } from "../../lib/roomHost";
 import { buildRoomSettingsSystemMessage } from "../../lib/roomSettingsMessages";
 import { loadTeamDevices } from "../../lib/workspaceClient";
-import { approvalDelegationPolicyLabels, approvalPolicyLabels, roomModeLabels } from "../../seedData";
+import { approvalDelegationPolicyLabels, approvalPolicyLabels, roomModeLabels } from "../../appDefaults";
 import type { AppStoreState } from "../../store/appStore";
 import type { RelayEnvelopeRouteContext, RelayEnvelopeStoreActions } from "./relayEnvelopeRouteTypes";
 

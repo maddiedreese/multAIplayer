@@ -1,4 +1,4 @@
-import { approvalPolicyLabels } from "../seedData";
+import { approvalPolicyLabels } from "../appDefaults";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";

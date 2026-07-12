@@ -11,11 +11,11 @@ export interface GitWorkflowDraft {
 }
 
 export const defaultGitWorkflowDraft: GitWorkflowDraft = {
-  branchName: "multaiplayer/alpha-codex-room",
-  commitMessage: "Build multAIplayer alpha room workflow",
+  branchName: "",
+  commitMessage: "",
   pushEnabled: false,
-  prOwner: "maddiedreese",
-  prRepo: "multAIplayer",
+  prOwner: "",
+  prRepo: "",
   prBase: "main"
 };
 

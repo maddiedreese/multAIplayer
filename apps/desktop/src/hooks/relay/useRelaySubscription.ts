@@ -62,6 +62,11 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
   useEffect(() => {
     let cancelled = false;
     useAppStore.getState().clearPresenceByRoom();
+    if (!relayWsUrl) {
+      useAppStore.getState().replaceRelayStatus("closed");
+      relayRef.current = null;
+      return;
+    }
     const client = connectRelay(
       relayWsUrl,
       async (message) => {

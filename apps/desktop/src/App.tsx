@@ -5,7 +5,6 @@ import { defaultProjectPath, type CodexActivityEvent } from "./lib/localBackend"
 import { isTauriRuntime } from "./lib/localBackend/runtime";
 import { registerRoomNotificationClickFocus } from "./lib/roomNotifications";
 import { createWorkspaceRecordActions } from "./lib/workspaceRecordActions";
-import { useInitializeAppState } from "./hooks/useInitializeAppState";
 import { useAppStore } from "./store/appStore";
 import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
@@ -24,30 +23,10 @@ import { useAppRoomRuntime } from "./hooks/useAppRoomRuntime";
 import { createAppRoomPanelActions } from "./lib/appRoomPanelActions";
 import { AppShellView } from "./components/AppShellView";
 import { CodexServerRequestDialog } from "./components/CodexServerRequestDialog";
-import {
-  defaultBrowserReason,
-  defaultBrowserUrl,
-  emptyRoom,
-  initialMessagesByRoom,
-  initialTerminalLinesByRoom,
-  maxTerminalActivityLines,
-  seededRooms,
-  seededTeamMembers,
-  seededTeams
-} from "./seedData";
+import { defaultBrowserReason, defaultBrowserUrl, emptyRoom, maxTerminalActivityLines } from "./appDefaults";
 
 export function App() {
-  useInitializeAppState({
-    workspace: {
-      initialTeams: seededTeams,
-      initialRooms: seededRooms,
-      initialTeamMembersByTeam: seededTeamMembers,
-      initialProjectPath: defaultProjectPath,
-      initialRoomId: "room-desktop",
-      initialMessagesByRoom
-    },
-    initialTerminalLinesByRoom
-  });
+  React.useEffect(() => useAppStore.getState().loadTrustedDeviceKeysOnce(), []);
   const relayHttpUrl = useAppStore((state) => state.appConfig.relayHttpUrl);
   const selectedRoomId = useAppStore((state) => state.selectedRoomId);
   const appRefs = useAppRefs();

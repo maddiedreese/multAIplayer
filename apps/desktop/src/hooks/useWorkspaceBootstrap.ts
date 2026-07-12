@@ -31,7 +31,7 @@ export function useWorkspaceBootstrap({
         setWorkspaceStatusError(null);
       })
       .catch((error) => {
-        setWorkspaceStatusError(`Using local starter rooms: ${String(error)}`);
+        setWorkspaceStatusError(`Could not load the relay workspace: ${String(error)}`);
       });
   }, [
     relayHttpUrl,

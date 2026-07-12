@@ -2,7 +2,7 @@ import React, { useMemo, type ComponentProps } from "react";
 import { codexModelOptions, defaultCodexModel } from "@multaiplayer/protocol";
 import { AppSidebarDrawer } from "./AppSidebarDrawer";
 import { DesktopSidebar } from "./DesktopSidebar";
-import { defaultRelayHttpUrl, defaultRelayWsUrl } from "../lib/appConfig";
+import { allowRelayConfiguration, defaultRelayHttpUrl, defaultRelayWsUrl } from "../lib/appConfig";
 import { formatCodexModel, formatSessionPersistence } from "../lib/appFormatters";
 import { formatCodexCompatibilitySummary } from "../lib/codexCompatibility";
 import { defaultProjectPath } from "../lib/localBackend";
@@ -14,7 +14,7 @@ import { hideUnreadForLockedRooms } from "../lib/roomUnread";
 import { useLocalIdentity } from "../hooks/useLocalIdentity";
 import { useRoomAccess } from "../hooks/useRoomAccess";
 import { useSidebarNavigation } from "../hooks/useSidebarNavigation";
-import { approvalPolicyLabels } from "../seedData";
+import { approvalPolicyLabels } from "../appDefaults";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
 import { projectBrowserPanelMaps } from "../store/slices/browserSlice";
@@ -266,8 +266,8 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         onSignOut: capabilities.signOut
       }}
       settings={{
-        relaySummary: `${relayStatus} · ${appConfig.relayWsUrl}`,
-        relayApi: appConfig.relayHttpUrl,
+        relaySummary: appConfig.relayWsUrl ? `${relayStatus} · ${appConfig.relayWsUrl}` : "Not configured",
+        relayApi: appConfig.relayHttpUrl || "Not configured",
         codexSummary: codexProbe?.available
           ? formatCodexCompatibilitySummary(codexProbe.version)
           : (codexProbe?.error ?? "Not connected"),
@@ -278,6 +278,7 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         posture: access.roomPosture,
         chooseProjectDisabled:
           !hasSelectedRoom || access.isSelectedRoomLocked || Boolean(roomSettings.settingsBusy) || !access.isActiveHost,
+        allowRelayConfiguration,
         relayHttpDraft,
         relayWsDraft,
         defaultRelayHttpUrl,

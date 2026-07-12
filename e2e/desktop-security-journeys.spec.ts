@@ -20,7 +20,7 @@ async function createIsolatedRoom(
   await page.getByRole("button", { name: "New team" }).click();
   await page.getByPlaceholder("Team name").fill(teamName);
   await page.getByRole("button", { name: "Create team" }).click();
-  await createRoom(page, name);
+  await createRoom(page, name, teamName);
   await page.getByRole("button", { name: "Host", exact: true }).click();
   await expect(page.getByRole("button", { name: "Handoff", exact: true })).toBeEnabled();
   const roomId = await page.evaluate(async (roomName) => {

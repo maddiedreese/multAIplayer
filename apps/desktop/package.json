@@ -12,7 +12,7 @@
     "test:security-journey": "tsx --test --test-reporter=junit test/scriptedSecurityJourney.test.ts",
     "test:smoke": "node ../../scripts/run-desktop-tests.mjs --smoke-only",
     "preview": "vite preview",
-    "tauri:dev": "tauri dev",
+    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "tauri:build": "tauri build",
     "tauri:build:prebuilt": "tauri build --config src-tauri/tauri.prebuilt.conf.json"
   },

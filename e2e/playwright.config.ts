@@ -24,7 +24,6 @@ export default defineConfig({
       MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
       MULTAIPLAYER_RELAY_DATA_PATH:
         process.env.MULTAIPLAYER_E2E_RELAY_DATA_PATH ?? "/tmp/multaiplayer-playwright-relay.json",
-      MULTAIPLAYER_RELAY_SEED_DEMO: "true",
       PORT: "4322",
       VITE_DESKTOP_PORT: "1421",
       VITE_RELAY_HTTP_URL: "http://127.0.0.1:4322",

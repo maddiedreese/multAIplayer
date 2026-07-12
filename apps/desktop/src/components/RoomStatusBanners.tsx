@@ -38,7 +38,8 @@ export function RoomStatusBanners({
         <div className="warning-banner">
           <ShieldAlert size={18} />
           <span>
-            Everyone in this room can see Codex events, terminal output, diffs, and tool logs. Secrets may be exposed.
+            Everyone in this room can see Codex activity, approved terminal output, diffs, and explicitly shared tool
+            results. Secrets may be exposed.
           </span>
           <button
             type="button"

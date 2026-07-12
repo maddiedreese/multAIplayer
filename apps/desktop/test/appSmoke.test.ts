@@ -3,7 +3,7 @@ import { after, afterEach, test } from "node:test";
 import { JSDOM } from "jsdom";
 import React, { createElement } from "react";
 import { useAppStore } from "../src/store/appStore";
-import { initialMessagesByRoom, seededRooms } from "../src/seedData";
+import { initialMessagesByRoom, seededRooms, seededTeams } from "./support/workspaceFixtures";
 
 if (!process.env.MULTAIPLAYER_SMOKE_WATCHDOG) {
   throw new Error(
@@ -153,7 +153,12 @@ Object.defineProperty(globalThis, "fetch", {
       });
     }
     if (url.endsWith("/auth/me")) {
-      return jsonResponse({ error: "Not signed in" }, { status: 401 });
+      return jsonResponse({
+        user: { id: "github:test-user", login: "test-user", name: "Test User" }
+      });
+    }
+    if (url.endsWith("/teams") && (!init?.method || init.method === "GET")) {
+      return jsonResponse({ teams: seededTeams, rooms: seededRooms });
     }
     const settingsMatch = url.match(/\/rooms\/([^/]+)\/settings$/);
     if (settingsMatch && init?.method === "PATCH") {
@@ -169,12 +174,22 @@ Object.defineProperty(globalThis, "fetch", {
 
 function resetAppSmokeDom() {
   cleanup();
+  localStorage.clear();
+  localStorage.setItem(
+    "multaiplayer:app-config",
+    JSON.stringify({ relayHttpUrl: "https://relay.test", relayWsUrl: "wss://relay.test/rooms" })
+  );
   useAppStore.getState().resetAppStore();
+  useAppStore.getState().initializeWorkspaceUi({
+    teams: seededTeams,
+    rooms: seededRooms,
+    projectPath: seededRooms[0]?.projectPath ?? "",
+    roomId: seededRooms[0]?.id ?? ""
+  });
   useAppStore.getState().seedWorkspaceInitialDataIfEmpty({
     teamMembersByTeam: {},
     messagesByRoom: structuredClone(initialMessagesByRoom)
   });
-  localStorage.clear();
   document.body.innerHTML = "";
 }
 
@@ -214,7 +229,6 @@ test("App smoke", { timeout: 25_000 }, async (t) => {
     await waitFor(() => {
       assert.ok(screen.getAllByText("Relay ops").length > 0);
     });
-    assert.equal(screen.getByText("No visible rooms.").textContent, "No visible rooms.");
   });
 
   await t.test("invoking Codex shows host approval context", { timeout: 5_000 }, async () => {
@@ -228,7 +242,11 @@ test("App smoke", { timeout: 25_000 }, async (t) => {
     const approvalCard = approval.closest(".approval-card");
     assert.ok(approvalCard);
     assert.ok(within(approvalCard as HTMLElement).getByText("Messages"));
-    assert.ok(within(approvalCard as HTMLElement).getByText("No new messages."));
+    assert.ok(
+      within(approvalCard as HTMLElement).getByText(
+        "Test User: We need to capture onboarding progress and improve the stepper."
+      )
+    );
   });
 
   await t.test("sends a normal room message", { timeout: 5_000 }, async () => {

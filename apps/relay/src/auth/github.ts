@@ -105,11 +105,26 @@ export function registerGitHubAuthRoutes({
     const tokenBody = (await tokenResponse.json()) as {
       access_token?: string;
       error?: string;
-      error_description?: string;
     };
 
     if (!tokenBody.access_token) {
-      res.status(202).json(tokenBody);
+      if (tokenBody.error === "authorization_pending") {
+        res.status(202).json({ status: "pending" });
+        return;
+      }
+      if (tokenBody.error === "slow_down") {
+        res.status(202).json({ status: "slow_down", retryAfterSeconds: 5 });
+        return;
+      }
+      if (tokenBody.error === "access_denied") {
+        res.status(400).json({ error: "GitHub sign-in was denied." });
+        return;
+      }
+      if (tokenBody.error === "expired_token") {
+        res.status(400).json({ error: "The GitHub sign-in code expired. Start sign-in again." });
+        return;
+      }
+      res.status(502).json({ error: "GitHub did not complete sign-in." });
       return;
     }
 
