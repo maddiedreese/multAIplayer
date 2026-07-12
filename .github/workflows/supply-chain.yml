@@ -36,7 +36,7 @@ jobs:
       - name: Install Semgrep
         run: |
           pipx install semgrep==1.127.1
-          pipx inject semgrep setuptools==80.9.0
+          pipx runpip semgrep install --force-reinstall setuptools==80.9.0
       - name: Scan TypeScript and JavaScript
         run: semgrep scan --error --config p/typescript --config p/nodejs --config p/owasp-top-ten apps packages scripts
 
