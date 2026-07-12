@@ -6,6 +6,7 @@ target/
 .env.*
 !.env.example
 *.log
+.multaiplayer-*-desktop-smoke.lock
 .multaiplayer/
 apps/desktop/src-tauri/gen/
 apps/desktop/src-tauri/target/
