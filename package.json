@@ -36,6 +36,7 @@
     "release:preflight": "npm run doctor && npm run license:check && npm run sqlite:backup-restore-drill && npm run verify",
     "license:check": "node scripts/license-check.mjs",
     "sqlite:backup-restore-drill": "node scripts/sqlite-backup-restore-drill.mjs --fixture",
+    "verify:relay-container-reproducibility": "node scripts/verify-relay-container-reproducibility.mjs",
     "doctor": "node scripts/doctor.mjs",
     "doctor:production-relay": "node scripts/doctor.mjs --production-relay",
     "dev": "concurrently -k --names relay,desktop --prefix-colors cyan,green \"npm:dev:relay\" \"npm:dev:desktop\"",

@@ -35,6 +35,8 @@ This check fails if GitHub OAuth is missing, durable session encryption is weak 
 
 The relay includes a production Dockerfile at `apps/relay/Dockerfile`.
 
+The runtime entry point is intentionally only a bootstrap: `createRelayApp()` composes configuration, HTTP routes, WebSocket handling, persistence, and lifecycle ownership, while `src/index.ts` starts that composition and installs signal handlers. Embedders and tests can construct the same production application without triggering a listener as an import side effect.
+
 Build it from the repository root:
 
 ```bash

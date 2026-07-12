@@ -103,6 +103,36 @@ test("an imported invite selects the shared room and records membership locally"
   }
 });
 
+test("only the active host can approve a pending Codex turn", async ({ browser }) => {
+  const hostContext = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+  const guestContext = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+  try {
+    await authenticateContext(hostContext);
+    await authenticateContext(guestContext, {
+      id: "github:e2e-codex-contributor",
+      login: "e2e-codex-contributor",
+      name: "Codex Contributor"
+    });
+    const host = await openApp(hostContext);
+    const guest = await openApp(guestContext);
+    await requestInviteAccess(guest, await copyApprovalInvite(host));
+    await approvePendingInvite(host, guest);
+
+    await host.getByRole("button", { name: "Invoke Codex" }).click();
+
+    const hostApproval = host.locator(".approval-card");
+    await expect(hostApproval.getByText("host-side approval")).toBeVisible();
+    await expect(hostApproval.getByRole("button", { name: "Approve" })).toBeEnabled();
+
+    await guest.getByRole("button", { name: "Invoke Codex" }).click();
+    await expect(guest.getByText("Host will approve")).toBeVisible();
+    await expect(guest.locator(".approval-card")).toHaveCount(0);
+  } finally {
+    await hostContext.close();
+    await guestContext.close();
+  }
+});
+
 test("room model and reasoning settings persist across reload", async ({ page }) => {
   await page.goto(appUrl);
   await page.getByRole("button", { name: /Desktop app MultAIplayer/ }).click();

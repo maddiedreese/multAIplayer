@@ -5,9 +5,12 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { WebSocket } from "ws";
 import { codexReasoningEffortIds, maxEnvelopeNonceChars, maxRoomProjectPathChars } from "@multaiplayer/protocol";
+
+const relayPackageRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 export interface RelayHarness {
   baseUrl: string;
@@ -66,13 +69,14 @@ export async function startRelay(
   if (storedState) {
     await writeFile(dataPath, `${JSON.stringify(storedState, null, 2)}\n`, "utf8");
   }
-  const bin = resolve("../../node_modules/.bin/tsx");
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const port = await getFreePort();
-    const child = spawn(bin, ["src/index.ts"], {
-      cwd: resolve("."),
+    // Launch the relay as the direct child so shutdown cannot orphan the
+    // secondary Node process created by the `tsx` CLI wrapper.
+    const child = spawn(process.execPath, ["--import", "tsx", "src/index.ts"], {
+      cwd: relayPackageRoot,
       env: {
         ...process.env,
         MULTAIPLAYER_RELAY_DEBUG:

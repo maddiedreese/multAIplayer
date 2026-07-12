@@ -37,6 +37,10 @@ test("applications keep their distinct dependency boundaries", async () => {
   const relayToCrypto = await boundaryMessages("apps/relay/src/boundary-probe.ts", 'import "@multaiplayer/crypto";');
   assert.equal(relayToCrypto.length, 1);
   assert.match(relayToCrypto[0].message, /@multaiplayer\/relay does not depend on @multaiplayer\/crypto/);
+  assert.deepEqual(
+    await boundaryMessages("apps/relay/test/process-security-journey.test.ts", 'import "@multaiplayer/crypto";'),
+    []
+  );
 
   const desktopToRelay = await boundaryMessages("apps/desktop/src/boundary-probe.ts", 'import "@multaiplayer/relay";');
   assert.equal(desktopToRelay.length, 1);

@@ -1,5 +1,9 @@
 # Cryptography architecture
 
+## Algorithm agility policy
+
+Wire records carry explicit protocol and key epochs, but the alpha intentionally supports one reviewed cipher suite rather than runtime algorithm negotiation. Accepting an attacker-selected algorithm identifier would create downgrade risk. A suite change requires a versioned protocol migration, independent test vectors, cross-version compatibility tests, a documented rollback window, and an explicit minimum accepted version. Deprecated suites must be rejected after migration; unknown suites fail closed. The relay continues treating encrypted payloads as opaque and never chooses algorithms for clients.
+
 This cryptography is custom and unaudited. It has not received an independent professional security audit. References to end-to-end encryption describe the intended protocol boundary and properties exercised by tests; they are not verified guarantees. Public [canonical-encoding and key-wrapping vectors](../packages/crypto/test-vectors/v1.json) let independent reviewers check exact bytes and interoperability without reading the desktop application; the [crypto package review guide](../packages/crypto/README.md) specifies the construction and verification command.
 
 multAIplayer uses epoch-scoped symmetric room keys and authenticated per-device delivery. The active host is the sole rotation authority. For every new epoch it generates an independent 256-bit AES-GCM key with the platform CSPRNG, persists the complete pending rotation before publishing it, and wraps the same key separately to each eligible pinned device. Retrying a rotation reuses that persisted pending record. Epoch keys are never derived from an earlier room key or a device identity key, so compromise of either does not determine later epoch material.

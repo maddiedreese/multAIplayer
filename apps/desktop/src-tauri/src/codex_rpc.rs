@@ -216,6 +216,8 @@ pub(crate) fn wait_for_response_message(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+    use serde_json::{json, Map};
 
     #[test]
     fn classifier_accepts_both_id_types_and_prefers_server_requests() {
@@ -248,5 +250,69 @@ mod tests {
         let error = classify_rpc_line(r#"{"secret":"do-not-log"}"#).unwrap_err();
         assert!(!error.contains("do-not-log"));
         assert!(classify_rpc_line(r#"{"id":1,"result":{},"error":{}}"#).is_err());
+    }
+
+    proptest! {
+        #[test]
+        fn classifier_never_panics_or_reflects_secret_bearing_input(
+            prefix in any::<String>(),
+            suffix in any::<String>(),
+        ) {
+            const SECRET_SENTINEL: &str = "sk-proptest-do-not-reflect-credential";
+            let line = format!("{prefix}{SECRET_SENTINEL}{suffix}");
+            if let Err(error) = classify_rpc_line(&line) {
+                prop_assert!(!error.contains(SECRET_SENTINEL), "parser error reflected credential-bearing input");
+            }
+        }
+
+        #[test]
+        fn classifier_preserves_valid_response_ids(
+            id in any::<i64>(),
+            result in prop::collection::vec(any::<u8>(), 0..128),
+        ) {
+            let line = json!({"id": id, "result": result}).to_string();
+            let message = classify_rpc_line(&line).expect("generated response must parse");
+            prop_assert!(matches!(
+                message,
+                RpcMessage::Response { id: RpcId::Number(value), .. }
+                    if value.as_i64() == Some(id)
+            ), "generated response changed its id or direction");
+        }
+
+        #[test]
+        fn method_direction_always_wins_over_colliding_ids(
+            id in any::<i64>(),
+            method in "[A-Za-z][A-Za-z0-9/_-]{0,63}",
+            params in prop::collection::btree_map("[A-Za-z]{1,12}", any::<i64>(), 0..12),
+        ) {
+            let params = params.into_iter()
+                .map(|(key, value)| (key, Value::from(value)))
+                .collect::<Map<_, _>>();
+            let line = json!({"id": id, "method": method, "params": params}).to_string();
+            let message = classify_rpc_line(&line).expect("generated request must parse");
+            prop_assert!(matches!(
+                message,
+                RpcMessage::ServerRequest {
+                    id: RpcId::Number(value),
+                    method: parsed_method,
+                    ..
+                } if value.as_i64() == Some(id) && parsed_method == method
+            ), "generated server request changed its id, method, or direction");
+        }
+
+        #[test]
+        fn ambiguous_response_envelopes_are_rejected(
+            id in any::<i64>(),
+            include_result in any::<bool>(),
+        ) {
+            let mut envelope = Map::new();
+            envelope.insert("id".into(), Value::from(id));
+            if include_result {
+                envelope.insert("result".into(), Value::Null);
+                envelope.insert("error".into(), Value::Null);
+            }
+            let line = Value::Object(envelope).to_string();
+            prop_assert!(classify_rpc_line(&line).is_err());
+        }
     }
 }

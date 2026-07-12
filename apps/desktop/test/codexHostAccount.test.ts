@@ -10,14 +10,15 @@ async function source(path: string) {
 }
 
 test("Codex account controls stay in a host-local backend and out of relay/history paths", async () => {
-  const [native, backend, panel] = await Promise.all([
+  const [native, projection, backend, panel] = await Promise.all([
     source("apps/desktop/src-tauri/src/codex_account.rs"),
+    source("apps/desktop/src-tauri/src/codex_request_projection.rs"),
     source("apps/desktop/src/lib/localBackend/codexHostBackend.ts"),
     source("apps/desktop/src/components/CodexAccountPanel.tsx")
   ]);
 
   assert.match(native, /stderr\(Stdio::null\(\)\)/);
-  assert.match(native, /account\/chatgptAuthTokens\/refresh/);
+  assert.match(projection, /account\/chatgptAuthTokens\/refresh/);
   assert.match(native, /Unsupported in host-control session/);
   assert.match(native, /sanitize_notification/);
   assert.doesNotMatch(backend, /relay|appendRoom|localStorage|sessionStorage|diagnostic/i);
