@@ -1,5 +1,9 @@
 # Release Hardening
 
+## Signed release tags
+
+Release tags should be cryptographically signed by the maintainer (`git tag -s`) and verified before publication (`git tag -v`). CI cannot honestly prove signer identity from GitHub's generic token alone, so verification remains a release-operator control until a dedicated keyless signing identity and trusted-issuer policy exist. Release notes must identify the tag and artifact digests; an unsigned tag must not be described as verified.
+
 multAIplayer alpha releases are security-sensitive because the desktop app can coordinate local project files, terminals, browser state, GitHub access, and a local Codex host. This checklist is for maintainers preparing public alpha artifacts or a hosted relay.
 
 ## Required Local Gates

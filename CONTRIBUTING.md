@@ -2,19 +2,29 @@
 
 Thanks for helping with multAIplayer. This project is a macOS-first open-source alpha for private group chat with a local Codex host, an end-to-end encrypted relay, GitHub workflows, terminals, file viewing, and browser approvals.
 
+Participation is governed by [the Code of Conduct](CODE_OF_CONDUCT.md) and [project governance](GOVERNANCE.md).
+
+## Contribution attestation (DCO)
+
+Every commit must include a `Signed-off-by` trailer certifying the [Developer Certificate of Origin 1.1](https://developercertificate.org/). Add it with `git commit -s`. By signing off, you certify that you wrote the contribution or otherwise have the right to submit it under this project's license. This lightweight DCO is used instead of a CLA; contributors retain copyright and need no separate legal agreement.
+
 ## Security-boundary changes
 
 Keep changes under `packages/crypto`, `packages/protocol`, and `apps/desktop/src-tauri` small, explicit, and independently testable. Pull requests should identify AI-authored security-boundary changes and report the focused property, fuzz, mutation, or native checks that apply. This project currently has one maintainer, so it does not require a separate human or code-owner approval that the sole maintainer could never supply; required CI and branch protection remain the merge gate.
 
-Dependency advisory handling and coverage gates are documented in [Dependency security](docs/dependency-security.md).
+Dependency advisory handling and coverage gates are documented in [Dependency security](docs/dependency-security.md). Workflow purpose and merge impact are in [CI policy](docs/ci-policy.md). Accessibility expectations and the honest localization status are in [Accessibility and localization](docs/accessibility-and-localization.md).
 
 ## Fast path
+
+For the shortest reproducible on-ramp, open the repository in a Dev Container. Its Node 22 image plus Rust and Python features install the workspace and run the environment doctor automatically. Then run:
 
 ```sh
 npm install
 npm run doctor
 npm run dev
 ```
+
+The first-contribution target is `npm run verify:web`; it does not require native macOS packaging. Maintainers label bounded, documented work `good first issue` and pair it with an area label. Each such issue should name expected files, acceptance criteria, and the fast check. Comment before starting to avoid duplicated work.
 
 Use `npm run tauri:dev` instead of `npm run dev` when you need the native Tauri app. The web shell can run in local seeded-room mode without GitHub OAuth; copy `.env.example` to `.env` only when you need OAuth or self-hosted relay settings.
 

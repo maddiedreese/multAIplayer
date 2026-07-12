@@ -1,24 +1,10 @@
 name: npm advisory audit
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "package.json"
-      - "package-lock.json"
-      - "apps/*/package.json"
-      - "packages/*/package.json"
-      - ".github/workflows/npm-audit.yml"
-  pull_request:
-    paths:
-      - "package.json"
-      - "package-lock.json"
-      - "apps/*/package.json"
-      - "packages/*/package.json"
-      - ".github/workflows/npm-audit.yml"
   schedule:
     - cron: "23 9 * * 1"
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:

@@ -5,6 +5,8 @@ on:
     branches:
       - main
   pull_request:
+  schedule:
+    - cron: "23 7 * * 2"
   workflow_dispatch:
 
 concurrency:
@@ -15,6 +17,29 @@ permissions:
   contents: read
 
 jobs:
+  contribution-attestation:
+    name: DCO sign-off
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+      - name: Require a Signed-off-by trailer on every pull-request commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          missing="$(git log --format='%H%x09%(trailers:key=Signed-off-by,valueonly)' "$BASE_SHA..$HEAD_SHA" | awk -F '\t' 'NF < 2 || $2 == "" { print $1 }')"
+          if [ -n "$missing" ]; then
+            echo "Commits missing a Signed-off-by trailer:"
+            echo "$missing"
+            echo "Amend each commit with git commit -s and update the pull request."
+            exit 1
+          fi
+
   web-and-relay:
     name: Web, relay, and packages
     runs-on: ubuntu-latest
@@ -62,6 +87,7 @@ jobs:
     name: Crypto mutation policy
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -94,6 +120,7 @@ jobs:
     name: Relay authorization mutation policy
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -121,6 +148,7 @@ jobs:
     name: Protocol type-guard mutation policy
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -148,6 +176,7 @@ jobs:
     name: Rust shell boundary mutation policy
     runs-on: macos-15
     timeout-minutes: 30
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7

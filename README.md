@@ -10,7 +10,7 @@ Short version: build with Codex together. Private by default. Open source.
 
 Room traffic authenticates ciphertext together with its sender, room, event kind, timestamp, and key epoch. Invite links contain no room key but do contain a private single-use bearer capability: the active host validates its device-bound request before delivering the current epoch key, and member removal excludes removed devices from future epochs without claiming to erase content already delivered.
 
-Start with [docs/using-the-app.md](docs/using-the-app.md) for the desktop features, [docs/product-architecture.md](docs/product-architecture.md) for the product model, [docs/cryptography.md](docs/cryptography.md) for key architecture and the MLS decision, [docs/codex-hosting.md](docs/codex-hosting.md) for how host-side Codex works, [docs/local-preview-sharing.md](docs/local-preview-sharing.md) for localhost preview tunnels, [docs/threat-model.md](docs/threat-model.md) and its [public changelog](docs/threat-model-changelog.md) for privacy boundaries, [docs/self-hosting.md](docs/self-hosting.md) for relay deployment, and [docs/if-unmaintained.md](docs/if-unmaintained.md) for the project exit path. Contributors and maintainers can use [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [docs/release-hardening.md](docs/release-hardening.md), [docs/reproducible-builds.md](docs/reproducible-builds.md), [docs/alpha-release-readiness.md](docs/alpha-release-readiness.md), and [docs/alpha-limitations.md](docs/alpha-limitations.md).
+Start with [docs/using-the-app.md](docs/using-the-app.md) for the desktop features, [docs/product-architecture.md](docs/product-architecture.md) for the product model, [docs/cryptography.md](docs/cryptography.md) for key architecture and the MLS decision, [docs/codex-hosting.md](docs/codex-hosting.md) for how host-side Codex works, [docs/local-preview-sharing.md](docs/local-preview-sharing.md) for localhost preview tunnels, [docs/threat-model.md](docs/threat-model.md) and its [public changelog](docs/threat-model-changelog.md) for privacy boundaries, [docs/self-hosting.md](docs/self-hosting.md) for relay deployment, and [docs/if-unmaintained.md](docs/if-unmaintained.md) for the project exit path. Contributors and maintainers can use [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [CONTRIBUTING.md](CONTRIBUTING.md), [GOVERNANCE.md](GOVERNANCE.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md), [docs/ci-policy.md](docs/ci-policy.md), [docs/release-hardening.md](docs/release-hardening.md), [docs/reproducible-builds.md](docs/reproducible-builds.md), [docs/alpha-release-readiness.md](docs/alpha-release-readiness.md), and [docs/alpha-limitations.md](docs/alpha-limitations.md).
 
 ## Maintenance reality
 
@@ -64,7 +64,7 @@ Production deploys should wire `/readyz` to platform readiness: shutdown makes i
 
 ## CI
 
-The GitHub Actions workflow runs on pushes, pull requests, and manual dispatch:
+Core GitHub Actions run on pushes and pull requests; mutation and heavyweight security/reproducibility checks run on schedules, releases, or manual dispatch as documented in [the CI policy](docs/ci-policy.md):
 
 ```sh
 npm run verify

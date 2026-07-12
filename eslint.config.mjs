@@ -170,6 +170,16 @@ export default tseslint.config(
     }
   },
   {
+    files: ["apps/relay/test/process-security-journey.test.ts"],
+    rules: {
+      "no-restricted-imports": packageBoundaryRule("@multaiplayer/relay process security journey", [
+        "@multaiplayer/crypto",
+        "@multaiplayer/github",
+        "@multaiplayer/protocol"
+      ])
+    }
+  },
+  {
     files: ["packages/crypto/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": packageBoundaryRule("@multaiplayer/crypto", ["@multaiplayer/protocol"])

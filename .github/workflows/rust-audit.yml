@@ -1,13 +1,10 @@
 name: Rust dependency policy
 
 on:
-  push:
-    branches: [main]
-    paths: ["apps/desktop/src-tauri/Cargo.toml", "apps/desktop/src-tauri/Cargo.lock", "deny.toml", ".github/workflows/rust-audit.yml"]
-  pull_request:
-    paths: ["apps/desktop/src-tauri/Cargo.toml", "apps/desktop/src-tauri/Cargo.lock", "deny.toml", ".github/workflows/rust-audit.yml"]
   schedule:
     - cron: "17 9 * * 1"
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:

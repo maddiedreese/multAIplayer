@@ -1,10 +1,12 @@
-import { listenRelayServer, shutdownRelay } from "./server.js";
+import { createRelayApp } from "./server.js";
 
-listenRelayServer();
+const relay = await createRelayApp();
+relay.listen();
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
-    shutdownRelay()
+    relay
+      .shutdown()
       .catch((error) => {
         console.error("Failed to gracefully shut down relay:", error);
         process.exitCode = 1;

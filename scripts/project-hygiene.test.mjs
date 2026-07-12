@@ -77,17 +77,56 @@ test("relay authorization tests remain visible to the mutation runner", () => {
   assert.match(source, /createRelayAuthz\(/);
 });
 
+test("Rust mutation exclusions and their CI gate stay narrowly pinned", () => {
+  const config = readFileSync("apps/desktop/src-tauri/.cargo/mutants.toml", "utf8");
+  const exclusions = Array.from(config.matchAll(/^\s*"([^"]+)",$/gm), ([, value]) => value);
+  assert.deepEqual(exclusions, [
+    "authorize_shell_execution",
+    "clear_shell_execution_grants",
+    "authorize_terminal_input",
+    "replace > with >= in ShellAuthorizationState::issue",
+    "replace > with >= in ShellAuthorizationState::issue_terminal_input",
+    "replace > with >= in ShellAuthorizationState::has_exact_command_grant",
+    "replace > with >= in ShellAuthorizationState::grant_exact_command"
+  ]);
+
+  const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+  assert.match(workflow, /rust-shell-boundary-mutation:\n\s+name: Rust shell boundary mutation policy/);
+  assert.match(workflow, /cargo install cargo-mutants --version 27\.1\.0 --locked/);
+  assert.match(
+    workflow,
+    /cargo mutants[\s\S]*--file src\/shell_authorization\.rs[\s\S]*--file src\/command_safety\.rs[\s\S]*--timeout 120/
+  );
+});
+
+test("relay reproducibility proof stays deterministic and release-triggered", () => {
+  const dockerfile = readFileSync("apps/relay/Dockerfile", "utf8");
+  const verifier = readFileSync("scripts/verify-relay-container-reproducibility.mjs", "utf8");
+  const workflow = readFileSync(".github/workflows/supply-chain.yml", "utf8");
+  assert.match(dockerfile, /ARG NODE_IMAGE=.*@sha256:[a-f0-9]{64}/);
+  assert.match(dockerfile, /FROM \$\{NODE_IMAGE\} AS build/);
+  assert.match(dockerfile, /ARG SOURCE_DATE_EPOCH=0/);
+  assert.equal(verifier.match(/"--no-cache"/g)?.length, 1);
+  assert.match(verifier, /assert\.deepEqual\(second, first/);
+  assert.match(workflow, /release:\n\s+types: \[published\]/);
+  assert.match(workflow, /run: node scripts\/verify-relay-container-reproducibility\.mjs/);
+});
+
 test("RustSec audit is pinned, scoped to the native lockfile, and scheduled", () => {
   const workflow = readFileSync(".github/workflows/rust-audit.yml", "utf8");
   assert.match(workflow, /working-directory: apps\/desktop\/src-tauri[\s\S]*run: cargo audit/);
   assert.match(workflow, /cargo deny --manifest-path apps\/desktop\/src-tauri\/Cargo\.toml check advisories sources/);
   assert.match(workflow, /schedule:/);
+  assert.match(workflow, /release:\n\s+types: \[published\]/);
+  assert.doesNotMatch(workflow, /pull_request:/);
   assert.doesNotMatch(workflow, /checks: write/);
 });
 
-test("npm advisories are checked from the lockfile on changes and a schedule", () => {
+test("npm advisories are checked from the lockfile on the deep-verification tier", () => {
   const workflow = readFileSync(".github/workflows/npm-audit.yml", "utf8");
   assert.match(workflow, /schedule:/);
+  assert.match(workflow, /release:\n\s+types: \[published\]/);
+  assert.doesNotMatch(workflow, /pull_request:/);
   assert.match(workflow, /run: npm ci/);
   assert.match(workflow, /run: npm run audit:npm/);
   assert.equal(rootPackage.scripts["audit:npm"], "npm audit --audit-level=high");
