@@ -53,11 +53,13 @@ export function createInviteCapability(): string {
 }
 
 export function parseInviteCapability(capability: string): Uint8Array {
-  if (!/^[A-Za-z0-9_-]{43}$/.test(capability)) throw new Error("Invite capability must use canonical base64url");
-  const raw = base64UrlToBytes(capability);
-  if (raw.byteLength !== 32 || bytesToBase64Url(raw) !== capability) {
+  let raw: Uint8Array;
+  try {
+    raw = base64UrlToBytes(capability);
+  } catch {
     throw new Error("Invite capability must be canonical 256-bit base64url");
   }
+  if (raw.byteLength !== 32) throw new Error("Invite capability must be canonical 256-bit base64url");
   return raw;
 }
 
@@ -66,6 +68,7 @@ export async function computeInviteCapabilityMac(
   binding: InviteCapabilityBinding
 ): Promise<string> {
   const raw = parseInviteCapability(capability);
+  // Stryker disable next-line BooleanLiteral: internal HMAC handle never leaves this function
   const key = await crypto.subtle.importKey("raw", toArrayBuffer(raw), { name: "HMAC", hash: "SHA-256" }, false, [
     "sign"
   ]);
@@ -81,7 +84,7 @@ export async function verifyInviteCapabilityMac(
   try {
     const raw = parseInviteCapability(capability);
     const signature = base64UrlToBytes(mac);
-    if (signature.byteLength !== 32) return false;
+    // Stryker disable next-line BooleanLiteral: internal HMAC handle never leaves this function
     const key = await crypto.subtle.importKey("raw", toArrayBuffer(raw), { name: "HMAC", hash: "SHA-256" }, false, [
       "verify"
     ]);

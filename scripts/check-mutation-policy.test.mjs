@@ -53,6 +53,21 @@ test("reports every missing or regressed per-file score", () => {
   ]);
 });
 
+test("supports a zero-survivor whole-file gate before a measured score floor is recorded", () => {
+  const configured = {
+    ...policy,
+    files: { ...policy.files, "src/index.ts": { maximumSurvived: 0 } }
+  };
+  const failures = checkMutationPolicy(
+    {
+      files: [...Object.keys(policy.files).map((path) => file(path, 100)), file("src/index.ts", 75, 1)],
+      mutants: []
+    },
+    configured
+  );
+  assert.deepEqual(failures, ["src/index.ts: 1 survived mutants exceeds maximum 0"]);
+});
+
 test("rejects unexplained timeouts and bad execution or coverage outcomes", () => {
   const summary = {
     files: [file("src/canonical.ts", 100), file("src/encoding.ts", 100)],

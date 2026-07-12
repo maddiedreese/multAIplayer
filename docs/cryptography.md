@@ -14,6 +14,14 @@ Ordinary room envelopes use `multaiplayer:room-envelope:v2` and bind `id`, `team
 
 Frozen JSON AAD encodings exist only on compatible read paths: version 2 ordinary, local, and attachment ciphertext; unversioned legacy device-sealed payloads; and version 1 standalone ephemeral room-secret wraps. Current writers never emit those encodings. Authenticated static-host room-secret deliveries have no legacy read path and reject every version other than 3.
 
+## Invite capability authentication
+
+An invite capability is exactly 32 bytes from the platform CSPRNG, encoded as canonical unpadded base64url (43 characters). The capability is the HMAC-SHA-256 key; it is independent of room and device keys. Verification rejects malformed capabilities and MACs and returns false on parsing or Web Crypto errors.
+
+The MAC input is canonical encoding version 1 under `multaiplayer:invite-capability-mac`. Both request and response records bind `phase`, `inviteId`, `teamId`, `roomId`, `keyEpoch`, `requestId`, `requestNonce`, `requesterUserId`, `requesterDeviceId`, `requesterPublicKeyFingerprint`, `hostUserId`, `hostDeviceId`, and `hostPublicKeyFingerprint`. Response records additionally bind `status` and `decidedAt`. Phase separation prevents a valid request MAC from being reused as a response MAC.
+
+Authenticated static-host room-secret wrapping accepts only `invite-response` and `room-key-rotation` contexts. An invite response requires a non-empty request id and nonce plus a positive key epoch. A rotation requires a non-empty operation id and the exact transition `newEpoch = previousEpoch + 1` with `keyEpoch = previousEpoch`. Other purposes and incomplete or inconsistent transitions are rejected. On unwrap, the normalized P-256 sender key's `kty`, `crv`, `x`, and `y` must equal the pinned host key and the payload version must be 3.
+
 ## Device private keys
 
 The native desktop stores the serialized P-256 device identity under the fixed `device-identity:v1` account in the operating-system credential store, using the `com.multaiplayer.desktop.room-secrets` service namespace. A native process permits the startup identity command to retrieve that record only once; reset and later webview calls do not reopen retrieval. On load, the serialized private JWK exists transiently while crossing that Tauri command boundary and is immediately imported into a non-extractable Web Crypto `CryptoKey`; normal cryptographic operations receive that handle rather than the JWK. A webview compromised before or during the single startup retrieval remains inside the trust boundary. JavaScript memory is not a hardware security boundary, and this design does not claim Secure Enclave or hardware-backed key isolation.

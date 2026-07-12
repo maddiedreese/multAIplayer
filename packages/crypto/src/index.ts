@@ -62,6 +62,7 @@ export interface DeviceCryptoContext {
   newEpoch?: number;
 }
 
+// mutation-policy:start authenticated-room-secret-wrap
 export async function wrapRoomSecretAuthenticatedForDevice(
   secret: RoomSecret,
   senderIdentity: { publicKeyJwk: JsonWebKey; privateKeyJwk: DevicePrivateKey },
@@ -94,6 +95,9 @@ export async function unwrapRoomSecretAuthenticatedFromDevice(
   expectedSenderPublicKeyJwk: JsonWebKey,
   context: DeviceCryptoContext
 ): Promise<RoomSecret> {
+  if (payload.version !== 3) throw new Error("Unsupported authenticated room-secret wrap version");
+  if (payload.algorithm !== "ECDH-P256-HKDF-SHA256-AES-GCM-256")
+    throw new Error("Unsupported authenticated room-secret wrap algorithm");
   const actualSender = jsonWebKeyToDevicePublicKeyJwk(payload.senderPublicKeyJwk);
   const expectedSender = jsonWebKeyToDevicePublicKeyJwk(expectedSenderPublicKeyJwk);
   if (!sameDevicePublicKey(actualSender, expectedSender)) {
@@ -101,9 +105,6 @@ export async function unwrapRoomSecretAuthenticatedFromDevice(
   }
   const recipientPrivateKey = await importEcdhPrivateKey(recipientPrivateKeyJwk);
   const senderPublicKey = await importEcdhPublicKey(actualSender);
-  // There is no authenticated room-generation marker that could safely scope a v2 migration.
-  // Fail closed instead of letting received ciphertext select the legacy AAD representation.
-  if (payload.version !== 3) throw new Error("Unsupported authenticated room-secret wrap version");
   const aad = authenticatedWrapAdditionalData(context);
   const wrappingKey = await deriveAuthenticatedWrappingKey(recipientPrivateKey, senderPublicKey, aad);
   const plaintext = await decryptWithAdditionalData(
@@ -116,6 +117,7 @@ export async function unwrapRoomSecretAuthenticatedFromDevice(
   validateRoomSecret(secret);
   return secret;
 }
+// mutation-policy:end authenticated-room-secret-wrap
 
 export interface LocalCryptoContext {
   purpose: "room-history" | "room-secret-backup";
@@ -132,6 +134,7 @@ export interface AttachmentCryptoContext {
   size: number;
 }
 
+// mutation-policy:start secret-and-identity-creation
 export async function createRoomSecret(): Promise<RoomSecret> {
   const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
   const raw = await crypto.subtle.exportKey("raw", key);
@@ -160,7 +163,9 @@ export async function createDeviceKeyAgreementIdentity(): Promise<DeviceKeyAgree
     createdAt: new Date().toISOString()
   };
 }
+// mutation-policy:end secret-and-identity-creation
 
+// mutation-policy:start envelope-wrappers
 export async function encryptJson(
   value: unknown,
   secret: RoomSecret,
@@ -202,6 +207,7 @@ export async function decryptLocalJson<T>(
     legacyLocalAdditionalData(context)
   );
 }
+// mutation-policy:end envelope-wrappers
 
 // mutation-policy:start attachment-wrapper
 export async function encryptAttachmentJson(value: unknown, secret: RoomSecret, context: AttachmentCryptoContext) {
@@ -610,38 +616,41 @@ function legacyCryptoContextAdditionalData(domain: string, context: DeviceCrypto
 }
 // mutation-policy:end device-context-aad
 
+// mutation-policy:start authenticated-wrap-authorization
 function authenticatedWrapAdditionalData(context: DeviceCryptoContext): Uint8Array {
   if (context.purpose === "invite-response") {
-    if (!context.requestId || !context.requestNonce || context.keyEpoch == null || context.keyEpoch < 1) {
-      throw new Error("Invite response wrap requires a request id, nonce, and key epoch");
-    }
+    if (!context.requestId) throw new Error("Invite response wrap requires a requestId");
+    if (!context.requestNonce) throw new Error("Invite response wrap requires a requestNonce");
+    if (!Number.isSafeInteger(context.keyEpoch) || context.keyEpoch == null || context.keyEpoch < 1)
+      throw new Error("Invite response wrap requires a positive safe-integer keyEpoch");
   } else if (context.purpose === "room-key-rotation") {
     if (!context.operationId) throw new Error("Rotation wrap requires an operationId");
-    if (
-      context.previousEpoch == null ||
-      context.newEpoch !== context.previousEpoch + 1 ||
-      context.keyEpoch !== context.previousEpoch
-    ) {
-      throw new Error("Rotation wrap requires a valid bound epoch transition");
-    }
+    if (!Number.isSafeInteger(context.previousEpoch) || context.previousEpoch == null || context.previousEpoch < 1)
+      throw new Error("Rotation wrap requires a positive safe-integer previousEpoch");
+    if (!Number.isSafeInteger(context.newEpoch) || context.newEpoch == null || context.newEpoch < 1)
+      throw new Error("Rotation wrap requires a positive safe-integer newEpoch");
+    if (!Number.isSafeInteger(context.keyEpoch) || context.keyEpoch == null || context.keyEpoch < 1)
+      throw new Error("Rotation wrap requires a positive safe-integer keyEpoch");
+    if (context.previousEpoch >= Number.MAX_SAFE_INTEGER || context.newEpoch !== context.previousEpoch + 1)
+      throw new Error("Rotation wrap requires newEpoch to immediately follow previousEpoch");
+    if (context.keyEpoch !== context.previousEpoch)
+      throw new Error("Rotation wrap requires keyEpoch to equal previousEpoch");
   } else {
     throw new Error("Authenticated room-secret wraps require an invite response or room-key rotation context");
   }
   return cryptoContextAdditionalData("multaiplayer:authenticated-room-secret-wrap:v2", context);
 }
+// mutation-policy:end authenticated-wrap-authorization
 
+// mutation-policy:start device-key-equality
 export function sameDevicePublicKey(left: JsonWebKey, right: JsonWebKey): boolean {
   const leftKey = DevicePublicKeyJwk.safeParse(left);
   const rightKey = DevicePublicKeyJwk.safeParse(right);
   return (
-    leftKey.success &&
-    rightKey.success &&
-    leftKey.data.kty === rightKey.data.kty &&
-    leftKey.data.crv === rightKey.data.crv &&
-    leftKey.data.x === rightKey.data.x &&
-    leftKey.data.y === rightKey.data.y
+    leftKey.success && rightKey.success && leftKey.data.x === rightKey.data.x && leftKey.data.y === rightKey.data.y
   );
 }
+// mutation-policy:end device-key-equality
 
 /** Deterministic, versioned AES-GCM AAD. Keep field order stable as part of the wire protocol. */
 // mutation-policy:start room-envelope-aad
@@ -677,6 +686,7 @@ function legacyLocalAdditionalData(context: LocalCryptoContext): Uint8Array {
 }
 // mutation-policy:end local-aad
 
+// mutation-policy:start device-key-identity
 function jsonWebKeyToDevicePublicKeyJwk(key: JsonWebKey): DevicePublicKeyJwkType {
   const parsed = DevicePublicKeyJwk.safeParse(JSON.parse(JSON.stringify(key)));
   if (!parsed.success) {
@@ -690,12 +700,9 @@ export async function fingerprintPublicKey(publicKeyJwk: JsonWebKey): Promise<st
   // Preserve the deployed fingerprint preimage exactly while avoiding object-order semantics.
   const bytes = encoder.encode(`{"crv":"${key.crv}","kty":"${key.kty}","x":"${key.x}","y":"${key.y}"}`);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return (
-    "sha256:" +
-    (Array.from(new Uint8Array(digest))
-      .map((byte) => byte.toString(16).padStart(2, "0"))
-      .join("")
-      .match(/.{1,4}/g)
-      ?.join(":") ?? "")
-  );
+  const hex = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  return `sha256:${hex.match(/.{4}/g)!.join(":")}`;
 }
+// mutation-policy:end device-key-identity
