@@ -625,8 +625,6 @@ function authenticatedWrapAdditionalData(context: DeviceCryptoContext): Uint8Arr
   } else if (context.purpose === "room-key-rotation") {
     if (!context.operationId) throw new Error("Rotation wrap requires an operationId");
     if (context.previousEpoch == null) throw new Error("Rotation wrap requires a previousEpoch");
-    if (context.newEpoch == null) throw new Error("Rotation wrap requires a newEpoch");
-    if (context.keyEpoch == null) throw new Error("Rotation wrap requires a keyEpoch");
     if (context.newEpoch !== context.previousEpoch + 1)
       throw new Error("Rotation wrap requires newEpoch to immediately follow previousEpoch");
     if (context.keyEpoch !== context.previousEpoch)
