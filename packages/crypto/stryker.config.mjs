@@ -1,6 +1,6 @@
 import { readdirSync } from "node:fs";
 
-const mutationTestFiles = readdirSync("test")
+const mutationTestFiles = readdirSync(new URL("./test", import.meta.url))
   .filter((name) => name.endsWith(".test.ts") && name !== "properties.test.ts")
   .sort()
   .map((name) => `test/${name}`)
