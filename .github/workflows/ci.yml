@@ -84,6 +84,60 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  relay-authorization-mutation:
+    name: Relay authorization mutation policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build package dependencies
+        run: npm run build:packages
+      - name: Mutation-test relay authorization
+        run: npm run test:mutation -w @multaiplayer/relay
+      - name: Upload relay authorization mutation reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: relay-authorization-mutation-report
+          path: apps/relay/reports/mutation
+          if-no-files-found: error
+          retention-days: 14
+
+  protocol-type-guard-mutation:
+    name: Protocol type-guard mutation policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build package dependencies
+        run: npm run build:packages
+      - name: Mutation-test protocol type guards
+        run: npm run test:mutation -w @multaiplayer/protocol
+      - name: Upload protocol type-guard mutation reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: protocol-type-guard-mutation-report
+          path: packages/protocol/reports/mutation
+          if-no-files-found: error
+          retention-days: 14
+
   web-shell-e2e:
     name: Web shell journeys
     runs-on: ubuntu-latest

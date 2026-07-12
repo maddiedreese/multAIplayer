@@ -4,6 +4,8 @@ import { test } from "node:test";
 
 import { checkMutationPolicy } from "./check-mutation-policy.mjs";
 import strykerConfig from "../packages/crypto/stryker.config.mjs";
+import protocolStrykerConfig from "../packages/protocol/stryker.config.mjs";
+import relayStrykerConfig from "../apps/relay/stryker.config.mjs";
 
 const file = (path, mutationScore, survived = 0) => ({ path, counts: { mutationScore, survived } });
 const mutant = (status, extra = {}) => ({
@@ -287,4 +289,19 @@ test("keeps repository mutation ratchets at 100 percent while allowing policy re
         region.maximumTimeout === 0
     )
   );
+
+  for (const [path, config, expectedFiles] of [
+    ["../apps/relay/mutation-policy.json", relayStrykerConfig, { "src/authz.ts": 100 }],
+    ["../packages/protocol/mutation-policy.json", protocolStrykerConfig, { "src/type-guards.ts": 100 }]
+  ]) {
+    const packagePolicy = JSON.parse(await readFile(new URL(path, import.meta.url), "utf8"));
+    assert.deepEqual(config.thresholds, { high: 100, low: 100, break: 50 });
+    assert.deepEqual(
+      Object.fromEntries(Object.entries(packagePolicy.files).map(([filePath, rule]) => [filePath, rule.minimumScore])),
+      expectedFiles
+    );
+    assert.ok(Object.values(packagePolicy.files).every((rule) => rule.maximumSurvived === 0));
+    assert.deepEqual(packagePolicy.allowedTimeouts, []);
+    assert.deepEqual(packagePolicy.allowedIgnored, []);
+  }
 });
