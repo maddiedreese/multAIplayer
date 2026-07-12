@@ -156,7 +156,7 @@ test("MAC verification fails closed for malformed capabilities and signatures", 
   await assert.rejects(() => computeInviteCapabilityMac("invalid", request), /Invite capability/);
 });
 
-test("request MAC matches the published deterministic vector", async () => {
+test("request MAC matches a fixed deterministic regression vector", async () => {
   assert.equal(
     await computeInviteCapabilityMac(zeroCapability, request),
     "thamyX76Bs3YPvFD_pTJbh2IDz2wiulj9iO0wnPvDtg"
