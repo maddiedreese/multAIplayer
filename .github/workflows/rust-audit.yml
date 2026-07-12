@@ -1,18 +1,11 @@
-name: Rust advisory audit
+name: Rust dependency policy
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - "apps/desktop/src-tauri/Cargo.toml"
-      - "apps/desktop/src-tauri/Cargo.lock"
-      - ".github/workflows/rust-audit.yml"
+    branches: [main]
+    paths: ["apps/desktop/src-tauri/Cargo.toml", "apps/desktop/src-tauri/Cargo.lock", "deny.toml", ".github/workflows/rust-audit.yml"]
   pull_request:
-    paths:
-      - "apps/desktop/src-tauri/Cargo.toml"
-      - "apps/desktop/src-tauri/Cargo.lock"
-      - ".github/workflows/rust-audit.yml"
+    paths: ["apps/desktop/src-tauri/Cargo.toml", "apps/desktop/src-tauri/Cargo.lock", "deny.toml", ".github/workflows/rust-audit.yml"]
   schedule:
     - cron: "17 9 * * 1"
   workflow_dispatch:
@@ -22,17 +15,18 @@ permissions:
 
 jobs:
   audit:
-    name: RustSec advisories
+    name: RustSec and dependency policy
     runs-on: ubuntu-latest
-    permissions:
-      checks: write
-      contents: read
+    timeout-minutes: 20
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-
-      - name: Audit Cargo.lock
-        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: apps/desktop/src-tauri
+      - name: Install locked audit tools
+        run: |
+          cargo install cargo-audit --version 0.22.0 --locked
+          cargo install cargo-deny --version 0.18.4 --locked
+      - name: Audit locked dependencies
+        working-directory: apps/desktop/src-tauri
+        run: cargo audit --locked
+      - name: Enforce advisories and sources
+        run: cargo deny --manifest-path apps/desktop/src-tauri/Cargo.toml check advisories sources

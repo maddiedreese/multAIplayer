@@ -1,5 +1,7 @@
 # Architecture decisions
 
+The [retrospective hardening ledger](retro-hardening-decisions.md) records ADR-007 through ADR-026, recovering twenty security, architecture, verification, dependency, and release decisions from the project history.
+
 These records explain durable implementation constraints that are easy to miss when reading one feature at a time. Each record states the accepted decision, its consequences, and the conditions that would justify revisiting it.
 
 - [Zustand store boundaries](zustand-store-boundaries.md)

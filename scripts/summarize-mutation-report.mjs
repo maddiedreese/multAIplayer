@@ -168,6 +168,8 @@ function withScore(counts) {
     undetected,
     invalid,
     scored,
+    behavioralMutants: counts.total - counts.compileError,
+    compilerRejectedMutants: counts.compileError,
     mutationScore: scored === 0 ? null : Number(((detected / scored) * 100).toFixed(2))
   };
 }

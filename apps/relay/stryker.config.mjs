@@ -1,5 +1,6 @@
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 export default {
+  // project-hygiene.test.mjs ensures authz tests remain in this visible suite.
   mutate: ["src/authz.ts"],
   testRunner: "command",
   commandRunner: { command: "tsx --test test/security-units.test.ts" },

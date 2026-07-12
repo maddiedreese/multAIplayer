@@ -149,6 +149,18 @@ export default tseslint.config(
     }
   },
   {
+    files: ["apps/desktop/test/scriptedSecurityJourney.test.ts"],
+    rules: {
+      "no-restricted-imports": packageBoundaryRule("@multaiplayer/desktop security journey", [
+        "@multaiplayer/codex",
+        "@multaiplayer/crypto",
+        "@multaiplayer/git",
+        "@multaiplayer/github",
+        "@multaiplayer/protocol"
+      ])
+    }
+  },
+  {
     files: ["apps/relay/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": packageBoundaryRule("@multaiplayer/relay", [

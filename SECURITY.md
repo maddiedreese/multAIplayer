@@ -4,7 +4,7 @@ multAIplayer is an honest alpha. Please treat it as security-sensitive software 
 
 ## Supported Scope
 
-Security reports are welcome for the current `main` branch and the latest published alpha artifacts.
+Security reports are welcome for the current `main` branch and latest published alpha release. Older alphas and unreleased branches are unsupported; upgrade or reproduce on `main` when possible.
 
 The intended security properties are:
 
@@ -24,7 +24,7 @@ Release-specific checks and unsigned macOS artifact notes are tracked in [docs/r
 
 ## Reporting
 
-Please report suspected vulnerabilities through GitHub's private vulnerability reporting feature by selecting **Report a vulnerability** on the repository's Security page. Do not open a public issue for a suspected vulnerability. If private reporting is unavailable, open a minimal issue asking the maintainers for a preferred private contact; do not include vulnerability details, live secrets, access tokens, private repo contents, real chat transcripts, or exploit payloads that would expose another user's data.
+Please use [GitHub private vulnerability reporting](https://github.com/maddiedreese/multAIplayer/security/advisories/new). Do not open a public issue for a suspected vulnerability. If private reporting is unavailable, open a minimal issue asking the maintainers for a private contact; do not include vulnerability details or sensitive data.
 
 Good reports include:
 
@@ -33,6 +33,8 @@ Good reports include:
 - local reproduction steps using dummy secrets;
 - expected vs actual behavior;
 - whether the issue affects the relay, native desktop app, web preview, or documentation.
+
+Expect an initial acknowledgement within 3 business days and a status update at least every 7 days while a report remains open. We coordinate fixes and release timing privately, aim to publish a patched release before technical disclosure, and credit reporters who want attribution. Please allow 90 days for coordinated disclosure unless active exploitation or another urgent risk requires a shorter timeline.
 
 ## Local Verification
 

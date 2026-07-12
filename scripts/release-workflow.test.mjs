@@ -31,8 +31,8 @@ test("release workflow validates signed and notarized macOS artifacts", () => {
   assert.match(releaseWorkflow, /shasum -a 256 \* > SHA256SUMS\.txt/);
 });
 
-test("release workflow packages the frontend already produced by verification", () => {
-  assert.match(releaseWorkflow, /run: npm run verify/);
+test("release workflow packages the frontend already produced by preflight", () => {
+  assert.match(releaseWorkflow, /run: npm run release:preflight/);
   assert.match(releaseWorkflow, /run: npm run tauri:build:prebuilt -w @multaiplayer\/desktop/);
   assert.doesNotMatch(releaseWorkflow, /run: npm run tauri:build -w @multaiplayer\/desktop/);
 });

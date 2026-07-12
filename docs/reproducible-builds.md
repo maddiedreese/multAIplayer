@@ -47,6 +47,6 @@ A difference is a starting point for investigation, not automatic evidence of ta
 
 ## Current reproducibility boundary
 
-The official GitHub release workflow builds from a detached validated tag on `macos-15`, runs `npm ci` and the full verification suite, signs and notarizes with maintainer-held Apple credentials, verifies the resulting app and DMG, and publishes SHA-256 checksums. GitHub Actions are pinned by commit, but the hosted runner image, Node 22 patch release, Rust toolchain, Apple services, and packaging output are not yet frozen enough for a bit-for-bit reproducibility claim.
+The official GitHub release workflow builds from a detached validated tag on `macos-15` in a read-only build job, runs `npm ci` and the full release preflight, signs and notarizes with maintainer-held Apple credentials, verifies the app and DMG, and hands only the resulting artifact bundle to a separate publishing job. Publishing emits SHA-256 checksums, an SPDX SBOM, GitHub build-provenance attestations, and keyless Sigstore bundles for the checksum manifest and SBOM. GitHub Actions and Docker base images are pinned by digest, but the hosted runner image, Node 22 patch release, Rust toolchain, Apple services, and packaging output are not yet frozen enough for a bit-for-bit reproducibility claim.
 
 Improving this boundary means pinning exact toolchains, emitting build-environment provenance, normalizing archive timestamps and paths, and publishing an unsigned deterministic comparison artifact separately from the signed user-facing artifact.

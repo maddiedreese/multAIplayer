@@ -46,3 +46,9 @@ updates:
       github-actions-update-batch:
         patterns:
           - "*"
+
+  - package-ecosystem: docker
+    directory: /apps/relay
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
