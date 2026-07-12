@@ -27,6 +27,6 @@ jobs:
           cargo install cargo-deny --version 0.18.4 --locked
       - name: Audit locked dependencies
         working-directory: apps/desktop/src-tauri
-        run: cargo audit --locked
+        run: cargo audit
       - name: Enforce advisories and sources
         run: cargo deny --manifest-path apps/desktop/src-tauri/Cargo.toml check advisories sources

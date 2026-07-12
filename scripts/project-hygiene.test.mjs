@@ -79,7 +79,7 @@ test("relay authorization tests remain visible to the mutation runner", () => {
 
 test("RustSec audit is pinned, scoped to the native lockfile, and scheduled", () => {
   const workflow = readFileSync(".github/workflows/rust-audit.yml", "utf8");
-  assert.match(workflow, /cargo audit --locked/);
+  assert.match(workflow, /working-directory: apps\/desktop\/src-tauri[\s\S]*run: cargo audit/);
   assert.match(workflow, /cargo deny --manifest-path apps\/desktop\/src-tauri\/Cargo\.toml check advisories sources/);
   assert.match(workflow, /schedule:/);
   assert.doesNotMatch(workflow, /checks: write/);
