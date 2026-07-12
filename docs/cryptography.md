@@ -42,6 +42,8 @@ The [epoch crypto ADR](decisions/epoch-crypto-migration-boundary.md) makes re-ev
 
 ## Review surface
 
+External reviewers should begin with the curated [cryptographic protocol review packet](external-review-packet.md), which pins the code snapshot it describes and consolidates the review questions and implementation map.
+
 Keep `packages/crypto` small, dependency-light, and isolated from UI, relay transport, and product policy. This boundary is the future migration path to a maintained group-messaging implementation. Treat changes to canonical authenticated encoding, key derivation, wrapping, envelope additional data, or key lifecycle as protocol-level events: they require focused crypto-package tests, updated public vectors when bytes change, a protocol compatibility decision, and a dated [threat-model changelog](threat-model-changelog.md) entry. Avoid convenience dependencies in this package when the equivalent code can remain short and directly reviewable.
 
 The committed vector file is normative only for the exact encoded bytes and deterministic test inputs it contains. Random production keys and nonces must still come from the platform CSPRNG. A vector match demonstrates interoperability with that fixture; it does not audit the construction or establish real-world security. Run `npm test -w @multaiplayer/crypto` to verify the committed vectors and related properties.
