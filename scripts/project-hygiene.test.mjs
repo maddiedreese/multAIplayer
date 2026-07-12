@@ -45,8 +45,8 @@ test("release-facing version metadata stays synchronized", () => {
     assert.equal(packageLock.packages[workspacePath].version, rootPackage.version, `${path} lockfile version`);
   }
 
-  const codexClient = readFileSync("packages/codex/src/index.ts", "utf8");
-  assert.match(codexClient, new RegExp(`version: "${rootPackage.version.replaceAll(".", "\\.")}"`));
+  const codexRequests = readFileSync("packages/codex/src/json-rpc.ts", "utf8");
+  assert.match(codexRequests, new RegExp(`version: "${rootPackage.version.replaceAll(".", "\\.")}"`));
 });
 
 test("CI verifies each layer once before packaging prebuilt desktop assets", () => {
