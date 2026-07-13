@@ -93,6 +93,33 @@ async function run(command: string, args: string[], options: { cwd?: string; env
   if (code !== 0) throw new Error(`${command} exited with code ${code}`);
 }
 
+async function stopProcess(child: ChildProcess) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const exited = new Promise<void>((resolveExit) => child.once("exit", () => resolveExit()));
+  child.kill("SIGTERM");
+  await Promise.race([
+    exited,
+    delay(2_000).then(() => {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+    })
+  ]);
+}
+
+async function unmountRuntimeDocumentPortal(path: string) {
+  for (const [command, args] of [
+    ["fusermount3", ["-uz", path]],
+    ["fusermount", ["-uz", path]],
+    ["umount", ["-l", path]]
+  ] as const) {
+    const child = spawn(command, args, { stdio: "ignore" });
+    const code = await new Promise<number>((resolveCode) => {
+      child.once("error", () => resolveCode(1));
+      child.once("exit", (exitCode) => resolveCode(exitCode ?? 1));
+    });
+    if (code === 0) return;
+  }
+}
+
 async function waitForUrl(url: string, timeoutMs = 120_000) {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -155,11 +182,18 @@ async function authenticate(browser: Browser, relayBaseUrl: string, identity: Id
   );
   assert.deepEqual(result, { status: 201 }, `debug authentication failed for ${identity.id}`);
   await browser.refresh();
-  const profileName = await visible(browser, ".profile-card strong");
-  await profileName.waitUntil(async () => (await profileName.getText()) === identity.name, {
-    timeout: 30_000,
-    timeoutMsg: `authenticated profile did not resolve for ${identity.id}`
-  });
+  await visible(browser, ".profile-card strong");
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        (expectedName) => document.querySelector(".profile-card strong")?.textContent?.trim() === expectedName,
+        identity.name
+      ),
+    {
+      timeout: 30_000,
+      timeoutMsg: `authenticated profile did not resolve for ${identity.id}`
+    }
+  );
 }
 
 async function visible(browser: Browser, selector: string, timeout = 30_000) {
@@ -200,7 +234,8 @@ async function openRoomInspector(browser: Browser) {
 async function inviteAndApprove(host: Browser, guest: Browser) {
   await openRoomInspector(host);
   await (await visible(host, "button=Copy room invite")).click();
-  const invite = await (await visible(host, ".invite-link")).getText();
+  await visible(host, ".invite-link");
+  const invite = await host.execute(() => document.querySelector(".invite-link")?.textContent?.trim() ?? "");
   assert.match(invite, /^http:\/\/127\.0\.0\.1:1420\/?\?invite=/);
   assert.match(invite, /#multaiplayerJoin=/);
 
@@ -210,24 +245,37 @@ async function inviteAndApprove(host: Browser, guest: Browser) {
   await (await visible(guest, "button=Import invite")).click();
 
   const request = await visible(host, ".invite-panel .terminal-request.pending", 60_000);
-  assert.match(await request.getText(), /Native Guest/);
+  const requestText = await host.execute(
+    () => document.querySelector(".invite-panel .terminal-request.pending")?.textContent ?? ""
+  );
+  assert.match(requestText, /Native Guest/);
   await (await request.$("button")).click();
-  const result = await visible(guest, ".invite-panel .workflow-message", 60_000);
-  await result.waitUntil(async () => /approved|unlocked|joined/i.test(await result.getText()), {
-    timeout: 60_000,
-    timeoutMsg: "guest did not process the real MLS Welcome"
-  });
+  await visible(guest, ".invite-panel .workflow-message", 60_000);
+  await guest.waitUntil(
+    () =>
+      guest.execute(() =>
+        /approved|unlocked|joined/i.test(document.querySelector(".invite-panel .workflow-message")?.textContent ?? "")
+      ),
+    { timeout: 60_000, timeoutMsg: "guest did not process the real MLS Welcome" }
+  );
 }
 
 async function sendAndReceive(sender: Browser, receiver: Browser, text: string) {
   const composer = await visible(sender, 'textarea[placeholder^="Message the room"]');
   await composer.setValue(text);
   await (await visible(sender, 'button[aria-label="Send message"]')).click();
-  const transcript = await visible(receiver, ".chat-scroll", 60_000);
-  await transcript.waitUntil(async () => (await transcript.getText()).includes(text), {
-    timeout: 60_000,
-    timeoutMsg: `receiver did not display the encrypted message: ${text}`
-  });
+  await visible(receiver, ".chat-scroll", 60_000);
+  await receiver.waitUntil(
+    () =>
+      receiver.execute(
+        (expectedText) =>
+          [...document.querySelectorAll(".chat-scroll article.message .bubble > p")].some(
+            (element) => element.textContent === expectedText
+          ),
+        text
+      ),
+    { timeout: 60_000, timeoutMsg: `receiver did not display the encrypted message: ${text}` }
+  );
 }
 
 async function handoff(host: Browser, guest: Browser) {
@@ -367,11 +415,12 @@ async function main() {
     throw error;
   } finally {
     await browser?.deleteSession().catch(() => undefined);
-    for (const child of processes.reverse()) {
-      if (child.exitCode === null && child.signalCode === null) child.kill("SIGTERM");
-    }
+    await Promise.all(processes.reverse().map((child) => stopProcess(child)));
     await relay.close();
-    await delay(500);
+    await Promise.all([
+      unmountRuntimeDocumentPortal(join(tempRoot, "host/runtime/doc")),
+      unmountRuntimeDocumentPortal(join(tempRoot, "guest/runtime/doc"))
+    ]);
     await rm(tempRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 }).catch((error) => {
       console.warn(`[native-e2e] isolated profile cleanup deferred: ${String(error)}`);
     });
