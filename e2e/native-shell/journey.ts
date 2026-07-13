@@ -269,7 +269,10 @@ async function inviteAndApprove(host: Browser, guest: Browser) {
   );
   assert.ok(requestText.includes(guestIdentity.id), "host did not receive the guest's authenticated identity");
   assert.match(requestText, /Capability-authenticated MLS KeyPackage request/);
-  await (await request.$("button")).click();
+  const approve = await request.$("button");
+  await approve.waitForEnabled({ timeout: 60_000, timeoutMsg: "host invite approval did not become available" });
+  await approve.click();
+  await visible(host, ".invite-panel .terminal-request.approved", 60_000);
   await visible(guest, ".invite-panel .workflow-message", 60_000);
   await guest.waitUntil(
     () =>
