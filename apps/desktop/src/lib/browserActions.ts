@@ -1,13 +1,12 @@
 import type { MutableRefObject } from "react";
-import type { BrowserRequestPlaintextPayload, RelayEnvelope, RoomRecord } from "@multaiplayer/protocol";
+import type { BrowserRequestPlaintextPayload, MlsRelayMessage, RoomRecord } from "@multaiplayer/protocol";
 import { resetBrowserProfile } from "./localBackend";
-import { loadOrCreateRoomSecret } from "./localHistory";
 import type { RelayClient } from "./relayClient";
 import { canActOnRoomBrowserRequest, findRoomBrowserRequest, roomBrowserRequestMessage } from "./browserPolicy";
 import { formatBrowserAccessLabel, normalizeBrowserLocationInput } from "./browserUi";
 import { shouldApplyRoomScopedUiUpdate } from "./roomScopedUi";
 import type { BrowserAccessRequest } from "../types";
-import { createEncryptedRoomEnvelope, roomKeyEpoch } from "./encryptedEnvelope";
+import { createMlsApplicationMessage, publishMlsApplicationMessage } from "./mlsApplicationMessage";
 import { useAppStore } from "../store/appStore";
 import { currentSelectedRoom, currentSelectedRoomContext } from "./selectedWorkspace";
 
@@ -95,8 +94,7 @@ export function createBrowserActions({
         reason: request.reason,
         requestedAt: request.requestedAt
       };
-      const secret = await loadOrCreateRoomSecret(room.id);
-      const envelope: RelayEnvelope = await createEncryptedRoomEnvelope(
+      const envelope: MlsRelayMessage = await createMlsApplicationMessage(
         {
           id: crypto.randomUUID(),
           teamId: room.teamId,
@@ -104,14 +102,12 @@ export function createBrowserActions({
           senderDeviceId: currentContext()?.deviceId ?? "local-device",
           senderUserId: currentContext()?.localUser.id ?? "local",
           createdAt: new Date().toISOString(),
-          kind: "browser.request",
-          keyEpoch: roomKeyEpoch(room)
+          kind: "browser.request"
         },
-        payload,
-        secret
+        payload
       );
       seenEnvelopeIds.current.add(envelope.id);
-      client.publish({ type: "publish", envelope });
+      await publishMlsApplicationMessage(client, envelope);
       useAppStore.getState().appendBrowserRequest(roomId, request);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         useAppStore

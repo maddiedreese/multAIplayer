@@ -1,45 +1,44 @@
-import {
-  DeviceSealedPayload,
-  InviteJoinRequestPlaintextPayload,
-  InviteJoinStatusPlaintextPayload,
-  type RelayEnvelope
-} from "@multaiplayer/protocol";
-import {
-  openDeviceSealedJson,
-  sealJsonToDevice,
-  unwrapRoomSecretAuthenticatedFromDevice,
-  wrapRoomSecretAuthenticatedForDevice,
-  fingerprintPublicKey,
-  sameDevicePublicKey,
-  verifyInviteCapabilityMac,
-  computeInviteCapabilityMac,
-  type DeviceCryptoContext,
-  type InviteCapabilityRequestBinding,
-  type InviteCapabilityResponseBinding
-} from "@multaiplayer/crypto";
-import { importRoomSecret, loadOrCreateCurrentRoomKey } from "../localHistory";
+import type { MlsRelayMessage } from "@multaiplayer/protocol";
 import { canActOnRoomInviteRequest, findRoomInviteRequest, roomInviteRequestMessage } from "../inviteApproval";
-import { shouldApplyRoomScopedUiUpdate } from "../roomScopedUi";
 import { roomLockMessage } from "../appRuntime";
 import { useAppStore, type AppStoreState } from "../../store/appStore";
 import type { InviteJoinRequest } from "../../types";
 import type { UseInviteActionsOptions } from "./inviteActionTypes";
 import { currentLocalIdentity, currentSelectedRoomContext } from "../selectedWorkspace";
 import {
-  consumeIssuedInviteCapability,
-  consumePendingInviteCapability,
-  loadIssuedInviteCapability,
-  loadPendingInviteCapability,
-  pinInviteDeviceKey,
-  verifyIssuedInviteCapability
-} from "../inviteCapabilityStore";
+  consumeKeyPackage,
+  loadDirectedInviteRequests,
+  loadTeamDevices,
+  lookupInvite,
+  publishDirectedInviteResponse,
+  type DirectedInviteRequest
+} from "../workspaceClient";
+import {
+  approveMlsInvite,
+  currentMlsEpoch,
+  denyMlsInvite,
+  listMlsOutbox,
+  markMlsPublishSucceeded,
+  openMlsInviteRequest
+} from "../mlsClient";
+import { isStaleMlsPublish } from "../relayClient";
+import { clearAndRebaseStaleMlsCommit } from "../mlsCommitRebase";
+import { parseDirectedMlsInviteCiphertext } from "./mlsInviteProtocol";
 
 type InviteRelayActionOptions = Pick<UseInviteActionsOptions, "relayRef" | "seenEnvelopeIds" | "selectedRoomIdRef">;
 const inviteDecisionsInFlight = new Set<string>();
+const validatedRequests = new Map<
+  string,
+  {
+    record: DirectedInviteRequest;
+    protected: Awaited<ReturnType<typeof openMlsInviteRequest>>;
+  }
+>();
+const approvedInviteOutboxes = new Map<string, Awaited<ReturnType<typeof approveMlsInvite>>>();
 
 type InviteRelayStore = Pick<
   AppStoreState,
-  "appendInviteRequest" | "restoreForgottenRoom" | "setInviteMessageForRoom" | "updateInviteRequestStatus"
+  "appendInviteRequest" | "setInviteMessageForRoom" | "updateInviteRequestStatus"
 >;
 
 export function createInviteRelayActions(
@@ -47,409 +46,232 @@ export function createInviteRelayActions(
   store: InviteRelayStore = useAppStore.getState()
 ) {
   const { relayRef, seenEnvelopeIds, selectedRoomIdRef } = options;
-  const { appendInviteRequest, restoreForgottenRoom, setInviteMessageForRoom, updateInviteRequestStatus } = store;
-  const setSelectedInviteMessage = (message: string | null) =>
-    setInviteMessageForRoom(selectedRoomIdRef.current, message);
 
-  async function publishInviteJoinRequest(
-    teamId: string,
-    roomId: string,
-    request: InviteJoinRequestPlaintextPayload,
-    recipientPublicKeyJwk?: Record<string, unknown>
-  ) {
+  async function handleInviteRequested(inviteId: string): Promise<void> {
     const { localUser, deviceId } = currentLocalIdentity();
-    const client = relayRef.current;
-    const { relayStatus } = useAppStore.getState();
-    if (!client || relayStatus === "closed" || relayStatus === "error") return false;
-    if (!recipientPublicKeyJwk) return false;
-    const cryptoContext: DeviceCryptoContext = {
-      purpose: "invite-request",
-      teamId,
-      roomId,
-      senderUserId: localUser.id,
-      senderDeviceId: deviceId,
-      recipientDeviceId: request.hostDeviceId
-    };
-    const payload = await sealJsonToDevice(request, recipientPublicKeyJwk, cryptoContext);
-    const envelope: RelayEnvelope = {
-      id: crypto.randomUUID(),
-      teamId,
-      roomId,
-      senderDeviceId: deviceId,
-      senderUserId: localUser.id,
-      createdAt: request.requestedAt,
-      kind: "room.invite",
-      keyEpoch: request.keyEpoch,
-      payload
-    };
-    seenEnvelopeIds.current.add(envelope.id);
-    client.publish({ type: "publish", envelope });
-    return true;
-  }
-
-  async function decryptInviteEnvelope(envelope: RelayEnvelope): Promise<unknown | null> {
-    const { deviceIdentity } = useAppStore.getState();
-    const sealedPayload = DeviceSealedPayload.safeParse(envelope.payload);
-    if (deviceIdentity && sealedPayload.success) {
+    const metadata = await lookupInvite(inviteId);
+    if (metadata.room.hostUserId !== localUser.id || metadata.room.activeHostDeviceId !== deviceId) return;
+    const records = await loadDirectedInviteRequests(inviteId, deviceId);
+    for (const record of records) {
+      if (validatedRequests.has(record.requestId)) continue;
       try {
-        const { deviceId } = currentLocalIdentity();
-        for (const purpose of ["invite-request", "invite-response"] as const) {
-          try {
-            return await openDeviceSealedJson<unknown>(sealedPayload.data, deviceIdentity.privateKeyJwk, {
-              purpose,
-              teamId: envelope.teamId,
-              roomId: envelope.roomId,
-              senderUserId: envelope.senderUserId,
-              senderDeviceId: envelope.senderDeviceId,
-              recipientDeviceId: deviceId
-            });
-          } catch {
-            /* try the other authenticated invite purpose */
-          }
-        }
-        return null;
+        const ciphertext = parseDirectedMlsInviteCiphertext(record.sealedRequest);
+        const binding = ciphertext.binding;
+        if (
+          binding.inviteId !== inviteId ||
+          binding.teamId !== metadata.room.teamId ||
+          binding.roomId !== metadata.room.id ||
+          binding.keyEpoch !== (metadata.room.acceptedMlsEpoch ?? 0) ||
+          binding.keyPackageHash !== record.keyPackageHash ||
+          binding.requestId !== record.requestId ||
+          binding.requesterUserId !== record.requesterUserId ||
+          binding.requesterDeviceId !== record.requesterDeviceId ||
+          binding.hostUserId !== localUser.id ||
+          binding.hostDeviceId !== deviceId ||
+          Date.parse(binding.expiresAt) <= Date.now()
+        )
+          continue;
+        const value = await openMlsInviteRequest(binding, ciphertext.sealedPayload);
+        if (value.binding.keyPackageHash !== record.keyPackageHash) continue;
+        const requesterDevice = (await loadTeamDevices(metadata.room.teamId)).find(
+          (device) => device.userId === record.requesterUserId && device.deviceId === record.requesterDeviceId
+        );
+        if (
+          !requesterDevice ||
+          requesterDevice.signaturePublicKey !== value.requesterSignaturePublicKey ||
+          requesterDevice.signatureKeyFingerprint !== value.requesterSignatureKeyFingerprint
+        )
+          continue;
+        validatedRequests.set(record.requestId, { record, protected: value });
+        store.appendInviteRequest(metadata.room.id, {
+          id: record.requestId,
+          inviteId,
+          requester: record.requesterUserId,
+          requesterUserId: record.requesterUserId,
+          requesterDeviceId: record.requesterDeviceId,
+          keyPackageId: record.keyPackageId,
+          keyPackageHash: record.keyPackageHash,
+          requesterSignatureKeyFingerprint: value.requesterSignatureKeyFingerprint,
+          requestedAt: record.createdAt,
+          note: "Capability-authenticated MLS KeyPackage request.",
+          status: "pending"
+        });
       } catch {
-        return null;
+        // Invalid HPKE payloads and capability bindings are intentionally ignored.
       }
-    }
-    return null;
-  }
-
-  async function handleInviteEnvelopePlaintext(roomId: string, plaintext: unknown, envelope?: RelayEnvelope) {
-    const { deviceIdentity } = useAppStore.getState();
-    const { deviceId, localUser } = currentLocalIdentity();
-    const request = InviteJoinRequestPlaintextPayload.safeParse(plaintext);
-    if (request.success) {
-      if (
-        !envelope ||
-        envelope.roomId !== roomId ||
-        envelope.senderUserId !== request.data.requesterUserId ||
-        envelope.senderDeviceId !== request.data.requesterDeviceId ||
-        envelope.keyEpoch !== request.data.keyEpoch
-      )
-        return;
-      const issued = request.data.inviteId ? loadIssuedInviteCapability(request.data.inviteId) : null;
-      const fingerprint = await fingerprintPublicKey(request.data.requesterPublicKeyJwk);
-      const localHostFingerprint = deviceIdentity ? await fingerprintPublicKey(deviceIdentity.publicKeyJwk) : null;
-      if (
-        !issued ||
-        issued.teamId !== envelope.teamId ||
-        issued.roomId !== roomId ||
-        issued.keyEpoch !== request.data.keyEpoch ||
-        issued.hostUserId !== request.data.hostUserId ||
-        issued.hostDeviceId !== request.data.hostDeviceId ||
-        issued.hostPublicKeyFingerprint !== request.data.hostPublicKeyFingerprint ||
-        request.data.hostUserId !== localUser.id ||
-        request.data.hostDeviceId !== deviceId ||
-        !deviceIdentity ||
-        localHostFingerprint !== request.data.hostPublicKeyFingerprint ||
-        !sameDevicePublicKey(issued.hostPublicKeyJwk, deviceIdentity.publicKeyJwk) ||
-        fingerprint !== request.data.requesterPublicKeyFingerprint
-      )
-        return;
-      const binding: InviteCapabilityRequestBinding = {
-        phase: "request",
-        inviteId: request.data.inviteId!,
-        teamId: envelope.teamId,
-        roomId,
-        keyEpoch: request.data.keyEpoch,
-        requestId: request.data.id,
-        requestNonce: request.data.requestNonce,
-        requesterUserId: request.data.requesterUserId,
-        requesterDeviceId: request.data.requesterDeviceId,
-        requesterPublicKeyFingerprint: request.data.requesterPublicKeyFingerprint,
-        hostUserId: request.data.hostUserId,
-        hostDeviceId: request.data.hostDeviceId,
-        hostPublicKeyFingerprint: request.data.hostPublicKeyFingerprint
-      };
-      if (
-        !(await verifyIssuedInviteCapability(issued, request.data.capability)) ||
-        !(await verifyInviteCapabilityMac(request.data.capability, binding, request.data.capabilityMac))
-      )
-        return;
-      if (
-        !pinInviteDeviceKey(
-          roomId,
-          request.data.requesterUserId,
-          request.data.requesterDeviceId,
-          fingerprint,
-          request.data.requesterPublicKeyJwk
-        )
-      )
-        return;
-      appendInviteRequest(roomId, { ...request.data, status: "pending" });
-      return;
-    }
-    const status = InviteJoinStatusPlaintextPayload.safeParse(plaintext);
-    if (!status.success) return;
-    const statusPayload = status.data;
-    if (!envelope) return;
-    const pending = loadPendingInviteCapability(statusPayload.requestId);
-    if (
-      !pending ||
-      envelope.senderUserId !== pending.hostUserId ||
-      envelope.senderDeviceId !== pending.hostDeviceId ||
-      envelope.keyEpoch !== pending.keyEpoch ||
-      statusPayload.decidedByUserId !== pending.hostUserId ||
-      statusPayload.hostDeviceId !== pending.hostDeviceId ||
-      statusPayload.hostPublicKeyFingerprint !== pending.hostPublicKeyFingerprint ||
-      statusPayload.recipientUserId !== pending.requesterUserId ||
-      statusPayload.recipientDeviceId !== pending.requesterDeviceId ||
-      statusPayload.recipientPublicKeyFingerprint !== pending.requesterPublicKeyFingerprint ||
-      statusPayload.requestNonce !== pending.requestNonce ||
-      statusPayload.keyEpoch !== pending.keyEpoch ||
-      (await fingerprintPublicKey(pending.hostPublicKeyJwk)) !== pending.hostPublicKeyFingerprint
-    )
-      return;
-    const responseBinding: InviteCapabilityResponseBinding = {
-      phase: "response",
-      inviteId: pending.inviteId,
-      teamId: pending.teamId,
-      roomId: pending.roomId,
-      keyEpoch: pending.keyEpoch,
-      requestId: pending.requestId,
-      requestNonce: pending.requestNonce,
-      requesterUserId: pending.requesterUserId,
-      requesterDeviceId: pending.requesterDeviceId,
-      requesterPublicKeyFingerprint: pending.requesterPublicKeyFingerprint,
-      hostUserId: pending.hostUserId,
-      hostDeviceId: pending.hostDeviceId,
-      hostPublicKeyFingerprint: pending.hostPublicKeyFingerprint,
-      status: statusPayload.status,
-      decidedAt: statusPayload.decidedAt
-    };
-    if (!(await verifyInviteCapabilityMac(pending.inviteCapability, responseBinding, statusPayload.capabilityMac)))
-      return;
-    if (!statusPayload.requestId.startsWith(`${deviceId}:`)) return;
-    if (statusPayload.status === "approved") {
-      if (!statusPayload.wrappedRoomSecret || statusPayload.recipientDeviceId !== deviceId || !deviceIdentity) return;
-      if (
-        !pinInviteDeviceKey(
-          roomId,
-          pending.hostUserId,
-          pending.hostDeviceId,
-          pending.hostPublicKeyFingerprint,
-          pending.hostPublicKeyJwk
-        )
-      )
-        return;
-      const secret = await unwrapRoomSecretAuthenticatedFromDevice(
-        statusPayload.wrappedRoomSecret,
-        deviceIdentity.privateKeyJwk,
-        pending.hostPublicKeyJwk,
-        {
-          purpose: "invite-response",
-          teamId: envelope.teamId,
-          roomId,
-          senderUserId: envelope.senderUserId,
-          senderDeviceId: envelope.senderDeviceId,
-          recipientDeviceId: deviceId,
-          requestId: pending.requestId,
-          requestNonce: pending.requestNonce,
-          keyEpoch: pending.keyEpoch
-        }
-      );
-      await importRoomSecret(roomId, secret, statusPayload.keyEpoch);
-      restoreForgottenRoom(roomId);
-    }
-    consumePendingInviteCapability(statusPayload.requestId);
-    updateInviteRequestStatus(roomId, statusPayload.requestId, statusPayload.status);
-    if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-      setInviteMessageForRoom(
-        roomId,
-        statusPayload.status === "approved"
-          ? statusPayload.wrappedRoomSecret
-            ? `${statusPayload.decidedBy} approved your room join request. This room is unlocked on this device.`
-            : `${statusPayload.decidedBy} approved your room join request.`
-          : `${statusPayload.decidedBy} denied your room join request.`
-      );
     }
   }
 
   async function decideInviteJoinRequest(request: InviteJoinRequest, status: InviteJoinRequest["status"]) {
     const context = currentSelectedRoomContext();
-    if (!context) {
-      setSelectedInviteMessage("Create or join a room before deciding invite requests.");
-      return;
-    }
-    const { room: selectedRoom, isActiveHost, hostGateMessage, localUser, deviceId } = context;
+    if (!context) return;
+    const { room, isActiveHost, hostGateMessage, deviceId } = context;
     const appStore = useAppStore.getState();
-    const isSelectedRoomRevoked =
-      appStore.revokedRoomIds.has(selectedRoom.id) || appStore.revokedTeamIds.has(selectedRoom.teamId);
-    const isSelectedRoomLocked =
-      selectedRoom.archivedAt != null || appStore.forgottenRoomIds.has(selectedRoom.id) || isSelectedRoomRevoked;
-    const inviteRequests = appStore.inviteByRoom[selectedRoom.id]?.requests ?? [];
-    if (isSelectedRoomLocked) {
-      setSelectedInviteMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
+    const revoked = appStore.revokedRoomIds.has(room.id) || appStore.revokedTeamIds.has(room.teamId);
+    if (room.archivedAt || appStore.forgottenRoomIds.has(room.id) || revoked) {
+      store.setInviteMessageForRoom(room.id, roomLockMessage(room, revoked));
       return;
     }
     if (!isActiveHost) {
-      setSelectedInviteMessage(hostGateMessage);
+      store.setInviteMessageForRoom(room.id, hostGateMessage);
       return;
     }
     if (status === "pending") return;
-    const roomRequest = findRoomInviteRequest(inviteRequests, request.id);
-    if (!roomRequest || !canActOnRoomInviteRequest(inviteRequests, request.id)) {
-      setInviteMessageForRoom(selectedRoom.id, roomInviteRequestMessage(inviteRequests, request.id));
+    const requests = appStore.inviteByRoom[room.id]?.requests ?? [];
+    const roomRequest = findRoomInviteRequest(requests, request.id);
+    if (!roomRequest || !canActOnRoomInviteRequest(requests, request.id)) {
+      store.setInviteMessageForRoom(room.id, roomInviteRequestMessage(requests, request.id));
       return;
     }
-    const client = relayRef.current;
-    const { relayStatus } = useAppStore.getState();
-    if (!client || relayStatus === "closed" || relayStatus === "error") return;
-    const decisionKey = roomRequest.inviteId ?? roomRequest.id;
-    if (inviteDecisionsInFlight.has(decisionKey)) {
-      setInviteMessageForRoom(selectedRoom.id, "This invite decision is already in progress.");
-      return;
-    }
-    inviteDecisionsInFlight.add(decisionKey);
+    if (inviteDecisionsInFlight.has(request.id)) return;
+    inviteDecisionsInFlight.add(request.id);
     try {
-      if (!roomRequest.inviteId || !roomRequest.requesterPublicKeyJwk || !roomRequest.requesterPublicKeyFingerprint)
-        throw new Error("Invite request is not capability authenticated");
-      const issued = loadIssuedInviteCapability(roomRequest.inviteId);
-      if (
-        !issued ||
-        !(await verifyIssuedInviteCapability(issued, roomRequest.capability)) ||
-        issued.keyEpoch !== roomRequest.keyEpoch
-      )
-        throw new Error("Invite capability is no longer valid");
-      const requestBinding: InviteCapabilityRequestBinding = {
-        phase: "request",
-        inviteId: roomRequest.inviteId,
-        teamId: selectedRoom.teamId,
-        roomId: selectedRoom.id,
-        keyEpoch: roomRequest.keyEpoch,
-        requestId: roomRequest.id,
-        requestNonce: roomRequest.requestNonce,
-        requesterUserId: roomRequest.requesterUserId,
-        requesterDeviceId: roomRequest.requesterDeviceId,
-        requesterPublicKeyFingerprint: roomRequest.requesterPublicKeyFingerprint,
-        hostUserId: roomRequest.hostUserId,
-        hostDeviceId: roomRequest.hostDeviceId,
-        hostPublicKeyFingerprint: roomRequest.hostPublicKeyFingerprint
-      };
-      if (!(await verifyInviteCapabilityMac(roomRequest.capability, requestBinding, roomRequest.capabilityMac))) {
-        throw new Error("Invite request capability authentication failed");
+      let validated = validatedRequests.get(request.id);
+      if (!validated) {
+        await handleInviteRequested(request.inviteId);
+        validated = validatedRequests.get(request.id);
       }
-      if (
-        (await fingerprintPublicKey(roomRequest.requesterPublicKeyJwk)) !== roomRequest.requesterPublicKeyFingerprint ||
-        !pinInviteDeviceKey(
-          selectedRoom.id,
-          roomRequest.requesterUserId,
-          roomRequest.requesterDeviceId,
-          roomRequest.requesterPublicKeyFingerprint,
-          roomRequest.requesterPublicKeyJwk
-        )
-      ) {
-        throw new Error("Invite requester device key is not the validated pinned key");
+      if (!validated) throw new Error("Invite request is no longer capability-authenticated.");
+      if (status === "denied") {
+        const denial = await denyMlsInvite(
+          validated.protected.capabilityHandle,
+          validated.protected.binding,
+          validated.protected.mac
+        );
+        await publishDirectedInviteResponse(request.inviteId, {
+          hostDeviceId: deviceId,
+          requestId: request.id,
+          status: "denied",
+          responseBinding: denial.responseBinding as never,
+          responseMac: denial.responseMac
+        });
+        await markMlsPublishSucceeded(room.id, denial.outboxId);
+        validatedRequests.delete(request.id);
+        store.updateInviteRequestStatus(room.id, request.id, "denied");
+        store.setInviteMessageForRoom(room.id, `Denied ${request.requester}'s join request.`);
+        return;
       }
-      if (
-        !canActOnRoomInviteRequest(useAppStore.getState().inviteByRoom[selectedRoom.id]?.requests ?? [], roomRequest.id)
-      ) {
-        throw new Error("Invite request was already decided");
+      const epoch = await currentMlsEpoch(room.id);
+      if (epoch !== validated.protected.binding.keyEpoch)
+        throw new Error("Invite expired after the MLS epoch changed.");
+      let approval = approvedInviteOutboxes.get(request.id);
+      if (!approval) {
+        const priorOutbox = await listMlsOutbox();
+        const retriedWelcome = priorOutbox.find(
+          (item) =>
+            item.kind === "welcome" && item.metadata?.type === "welcome" && item.metadata.requestId === request.id
+        );
+        if (retriedWelcome && retriedWelcome.metadata?.type === "welcome") {
+          const retriedCommit = priorOutbox.find(
+            (item) => item.roomId === room.id && item.epoch === retriedWelcome.epoch && item.metadata?.type === "commit"
+          );
+          approval = {
+            epoch: retriedWelcome.epoch,
+            commitOutboxId: retriedCommit?.id ?? "",
+            welcomeOutboxId: retriedWelcome.id,
+            responseBinding: retriedWelcome.metadata.responseBinding as never,
+            responseMac: String(retriedWelcome.metadata.responseMac),
+            requesterSignaturePublicKey: validated.protected.requesterSignaturePublicKey,
+            requesterSignatureKeyFingerprint: validated.protected.requesterSignatureKeyFingerprint
+          };
+          approvedInviteOutboxes.set(request.id, approval);
+        }
       }
-      const currentKey = await loadOrCreateCurrentRoomKey(selectedRoom.id);
-      if (currentKey.epoch !== issued.keyEpoch || currentKey.epoch !== roomRequest.keyEpoch) {
-        throw new Error("Invite capability expired after room access changed");
+      if (!approval) {
+        const consumed = await consumeKeyPackage(
+          room.id,
+          request.requesterUserId,
+          request.requesterDeviceId,
+          deviceId,
+          request.inviteId,
+          request.keyPackageId,
+          request.keyPackageHash
+        );
+        if ("keyPackage" in consumed) {
+          const keyPackage = consumed.keyPackage;
+          if (
+            keyPackage.id !== request.keyPackageId ||
+            keyPackage.keyPackageHash !== request.keyPackageHash ||
+            keyPackage.keyPackage !== validated.protected.keyPackage
+          )
+            throw new Error("Relay returned a KeyPackage different from the protected request.");
+        } else if (
+          consumed.keyPackageId !== request.keyPackageId ||
+          consumed.keyPackageHash !== request.keyPackageHash ||
+          consumed.userId !== request.requesterUserId ||
+          consumed.deviceId !== request.requesterDeviceId
+        ) {
+          throw new Error("Relay returned a KeyPackage receipt different from the protected request.");
+        }
+        approval = await approveMlsInvite(
+          validated.protected.capabilityHandle,
+          validated.protected.binding,
+          validated.protected.mac,
+          validated.protected.keyPackage,
+          request.keyPackageId
+        );
+        approvedInviteOutboxes.set(request.id, approval);
       }
-      const cryptoContext: DeviceCryptoContext = {
-        purpose: "invite-response",
-        teamId: selectedRoom.teamId,
-        roomId: selectedRoom.id,
-        senderUserId: localUser.id,
-        senderDeviceId: deviceId,
-        recipientDeviceId: roomRequest.requesterDeviceId,
-        requestId: roomRequest.id,
-        requestNonce: roomRequest.requestNonce,
-        keyEpoch: roomRequest.keyEpoch
-      };
-      const hostIdentity = useAppStore.getState().deviceIdentity;
-      if (!hostIdentity) throw new Error("Host device identity is unavailable");
-      const wrappedRoomSecret =
-        status === "approved" && roomRequest.requesterPublicKeyJwk
-          ? await wrapRoomSecretAuthenticatedForDevice(
-              currentKey.secret,
-              hostIdentity,
-              roomRequest.requesterPublicKeyJwk,
-              cryptoContext
-            )
-          : undefined;
-      const decidedAt = new Date().toISOString();
-      const responseBinding: InviteCapabilityResponseBinding = {
-        phase: "response",
-        inviteId: roomRequest.inviteId,
-        teamId: selectedRoom.teamId,
-        roomId: selectedRoom.id,
-        keyEpoch: roomRequest.keyEpoch,
-        requestId: roomRequest.id,
-        requestNonce: roomRequest.requestNonce,
-        requesterUserId: roomRequest.requesterUserId,
-        requesterDeviceId: roomRequest.requesterDeviceId,
-        requesterPublicKeyFingerprint: roomRequest.requesterPublicKeyFingerprint,
-        hostUserId: localUser.id,
-        hostDeviceId: deviceId,
-        hostPublicKeyFingerprint: issued.hostPublicKeyFingerprint,
-        status,
-        decidedAt
-      };
-      const payload: InviteJoinStatusPlaintextPayload = {
-        eventType: "invite.status",
-        requestId: roomRequest.id,
-        status,
-        decidedBy: localUser.name,
-        decidedByUserId: localUser.id,
-        decidedAt,
-        recipientUserId: roomRequest.requesterUserId,
-        recipientDeviceId: roomRequest.requesterDeviceId,
-        recipientPublicKeyFingerprint: roomRequest.requesterPublicKeyFingerprint,
-        hostDeviceId: deviceId,
-        hostPublicKeyFingerprint: issued.hostPublicKeyFingerprint,
-        requestNonce: roomRequest.requestNonce,
-        keyEpoch: roomRequest.keyEpoch,
-        capabilityMac: await computeInviteCapabilityMac(roomRequest.capability, responseBinding),
-        wrappedRoomSecret
-      };
-      const envelope: RelayEnvelope = {
-        id: crypto.randomUUID(),
-        teamId: selectedRoom.teamId,
-        roomId: selectedRoom.id,
-        senderDeviceId: deviceId,
-        senderUserId: localUser.id,
-        createdAt: payload.decidedAt,
-        kind: "room.invite",
-        keyEpoch: roomRequest.keyEpoch,
-        // The outer seal authenticates routing metadata that is available before
-        // decryption. Request-specific fields remain authenticated by the
-        // capability MAC and by the inner wrapped-secret context.
-        payload: await sealJsonToDevice(payload, roomRequest.requesterPublicKeyJwk, {
-          purpose: "invite-response",
-          teamId: selectedRoom.teamId,
-          roomId: selectedRoom.id,
-          senderUserId: localUser.id,
+      const outbox = await listMlsOutbox();
+      const commit = outbox.find((item) => item.id === approval!.commitOutboxId);
+      const welcome = outbox.find((item) => item.id === approval!.welcomeOutboxId);
+      if (!welcome) throw new Error("Native MLS Welcome outbox is incomplete.");
+      if (commit) {
+        const message: MlsRelayMessage = {
+          id: commit.id,
+          teamId: room.teamId,
+          roomId: room.id,
+          senderUserId: context.localUser.id,
           senderDeviceId: deviceId,
-          recipientDeviceId: roomRequest.requesterDeviceId
-        })
-      };
-      await client.publishAndWaitForAck({ type: "publish", envelope });
-      seenEnvelopeIds.current.add(envelope.id);
-      consumeIssuedInviteCapability(roomRequest.inviteId);
-      updateInviteRequestStatus(selectedRoom.id, roomRequest.id, status);
-      setInviteMessageForRoom(
-        selectedRoom.id,
-        `${status === "approved" ? "Approved" : "Denied"} ${roomRequest.requester}'s join request.`
-      );
-    } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, selectedRoom.id)) {
-        setInviteMessageForRoom(selectedRoom.id, String(error));
+          createdAt: new Date().toISOString(),
+          messageType: "commit",
+          epochHint: commit.metadata?.type === "commit" ? commit.metadata.parentEpoch : epoch,
+          mlsMessage: commit.payload
+        };
+        const relay = relayRef.current;
+        if (!relay) throw new Error("Relay is unavailable.");
+        seenEnvelopeIds.current.add(message.id);
+        try {
+          await relay.publishAndWaitForAck({ type: "publish", message });
+        } catch (error) {
+          seenEnvelopeIds.current.delete(message.id);
+          if (isStaleMlsPublish(error)) {
+            approvedInviteOutboxes.delete(request.id);
+            const token = useAppStore.getState().deviceSessionToken;
+            if (!token) throw new Error("Device session expired before MLS stale-epoch rebase.");
+            await clearAndRebaseStaleMlsCommit(
+              relay,
+              room,
+              { userId: context.localUser.id, deviceId, deviceSessionToken: token },
+              commit.id,
+              commit.metadata?.type === "commit" ? commit.metadata.parentEpoch : epoch
+            );
+          }
+          throw error;
+        }
+        await markMlsPublishSucceeded(room.id, commit.id);
+      } else if ((await currentMlsEpoch(room.id)) < approval.epoch) {
+        throw new Error("Native MLS invite commit is missing before its Welcome was delivered.");
       }
+      await publishDirectedInviteResponse(request.inviteId, {
+        hostDeviceId: deviceId,
+        requestId: request.id,
+        status: "approved",
+        responseBinding: approval.responseBinding as never,
+        responseMac: approval.responseMac,
+        welcome: welcome.payload
+      });
+      await markMlsPublishSucceeded(room.id, welcome.id);
+      approvedInviteOutboxes.delete(request.id);
+      validatedRequests.delete(request.id);
+      store.updateInviteRequestStatus(room.id, request.id, "approved");
+      store.setInviteMessageForRoom(room.id, `Approved ${request.requester}'s MLS KeyPackage.`);
+    } catch (error) {
+      if (selectedRoomIdRef.current === room.id) store.setInviteMessageForRoom(room.id, String(error));
     } finally {
-      inviteDecisionsInFlight.delete(decisionKey);
+      inviteDecisionsInFlight.delete(request.id);
     }
   }
 
-  return {
-    decideInviteJoinRequest,
-    decryptInviteEnvelope,
-    handleInviteEnvelopePlaintext,
-    publishInviteJoinRequest
-  };
+  return { decideInviteJoinRequest, handleInviteRequested };
 }

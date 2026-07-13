@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { connectRelay } from "../src/lib/relayClient";
+import { connectRelay, RelayPublishRejectedError } from "../src/lib/relayClient";
 
 class FakeWebSocket extends EventTarget {
   static readonly OPEN = 1;
@@ -36,20 +36,20 @@ Object.defineProperty(globalThis, "window", {
 
 const publishMessage = {
   type: "publish" as const,
-  envelope: {
-    id: "envelope-ack-test",
+  message: {
+    id: "message-ack-test",
     teamId: "team-test",
     roomId: "room-test",
     senderDeviceId: "device-test",
     senderUserId: "user-test",
     createdAt: "2026-07-10T12:00:00.000Z",
-    kind: "room.key" as const,
-    keyEpoch: 1,
-    payload: { version: 2 as const, algorithm: "AES-GCM-256" as const, nonce: "nonce", ciphertext: "ciphertext" }
+    messageType: "application" as const,
+    epochHint: 1,
+    mlsMessage: "AA=="
   }
 };
 
-test("publishAndWaitForAck resolves only for the matching persisted-envelope acknowledgement", async () => {
+test("publishAndWaitForAck resolves only for the matching persisted MLS acknowledgement", async () => {
   const received: string[] = [];
   const client = connectRelay(
     "ws://relay",
@@ -59,7 +59,7 @@ test("publishAndWaitForAck resolves only for the matching persisted-envelope ack
   FakeWebSocket.latest.open();
   const acknowledged = client.publishAndWaitForAck(publishMessage, 100);
   assert.equal(FakeWebSocket.latest.sent.length, 1);
-  FakeWebSocket.latest.receive({ type: "published", envelopeId: publishMessage.envelope.id });
+  FakeWebSocket.latest.receive({ type: "published", messageId: publishMessage.message.id });
   await acknowledged;
   assert.deepEqual(received, ["published"]);
   client.close();
@@ -82,8 +82,13 @@ test("publishAndWaitForAck rejects on timeout and relay error", async () => {
   );
   FakeWebSocket.latest.open();
   const rejected = errorClient.publishAndWaitForAck(publishMessage, 100);
-  FakeWebSocket.latest.receive({ type: "error", message: "publish rejected" });
-  await assert.rejects(rejected, /publish rejected/);
+  FakeWebSocket.latest.receive({
+    type: "error",
+    message: "publish rejected",
+    code: "stale_epoch",
+    messageId: publishMessage.message.id
+  });
+  await assert.rejects(rejected, (error) => error instanceof RelayPublishRejectedError && error.code === "stale_epoch");
   errorClient.close();
 
   const closedClient = connectRelay(
@@ -96,4 +101,32 @@ test("publishAndWaitForAck rejects on timeout and relay error", async () => {
   FakeWebSocket.latest.close();
   await assert.rejects(closed, /closed before publish acknowledgement/);
   closedClient.close();
+});
+
+test("joinAndWaitForAck resolves only after exact relay room admission", async () => {
+  const client = connectRelay(
+    "ws://relay",
+    () => undefined,
+    () => undefined
+  );
+  FakeWebSocket.latest.open();
+  const joined = client.joinAndWaitForAck(
+    {
+      type: "join",
+      teamId: "team-test",
+      roomId: "room-test",
+      userId: "user-test",
+      deviceId: "device-test",
+      deviceSessionToken: "session-test"
+    },
+    100
+  );
+  FakeWebSocket.latest.receive({ type: "joined", teamId: "team-other", roomId: "room-other" });
+  let settled = false;
+  void joined.then(() => (settled = true));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(settled, false);
+  FakeWebSocket.latest.receive({ type: "joined", teamId: "team-test", roomId: "room-test" });
+  await joined;
+  client.close();
 });

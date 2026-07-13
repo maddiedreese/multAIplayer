@@ -8,15 +8,13 @@ export {
   maxAttachmentBlobNameChars,
   maxAttachmentBlobTypeChars,
   maxAuthSessionIdChars,
-  maxCiphertextNonceChars,
-  maxCiphertextPayloadChars,
   maxCodexModelChars,
   maxCodexQueueSize,
   maxCodexThreadIdChars,
   maxDeviceIdChars,
   maxDisplayNameChars,
   maxEnvelopeIdChars,
-  maxEnvelopeNonceChars,
+  maxSessionCiphertextNonceChars,
   maxGitHubActionRuns,
   maxGitHubDeviceCodeChars,
   maxGitWorkflowResults,
@@ -30,30 +28,19 @@ export {
   maxRoomIdChars,
   maxRoomNameChars,
   maxRoomProjectPathChars,
-  maxRoomSecretRawKeyChars,
   maxShortTextChars,
   maxTeamIdChars,
   maxTeamNameChars,
   maxTerminalSnapshots,
   maxUrlChars,
   maxUserIdChars,
-  maxWrappedCiphertextChars,
-  publicKeyCoordinatePattern,
   relayIdPattern
 } from "./limits-ids.js";
 
 export { isRecord } from "./type-guards.js";
+export { PublicKeyFingerprint } from "./identity.js";
 
-export {
-  CiphertextPayload,
-  AuthenticatedWrappedRoomSecretPayload,
-  DevicePublicKeyJwk,
-  DeviceSealedPayload,
-  EncryptedPayload,
-  PublicKeyFingerprint,
-  RoomSecretPayload,
-  WrappedRoomSecretPayload
-} from "./crypto-payloads.js";
+export { SessionAccessTokenCiphertext } from "./session-crypto.js";
 
 export {
   BrowserRequestPlaintextPayload,
@@ -69,11 +56,10 @@ export {
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
   HostHandoffPlaintextPayload,
-  InviteJoinRequestPlaintextPayload,
-  InviteJoinStatusPlaintextPayload,
+  HostHandoffRequestPlaintextPayload,
+  HostHandoffAcceptedPlaintextPayload,
   LocalPreviewPlaintextPayload,
   RequestStatusPlaintextPayload,
-  RoomKeyRotationPlaintextPayload,
   RoomSettingsPlaintextPayload,
   TerminalRequestPlaintextPayload,
   TerminalResultPlaintextPayload,
@@ -117,6 +103,8 @@ export {
   AttachmentBlobRecord,
   DeviceRecord,
   InviteRecord,
+  InviteJoinRequestRecord,
+  InviteResponseRecord,
   RoomModeSchema,
   RoomRecord,
   TeamMemberRecord,
@@ -125,12 +113,14 @@ export {
 } from "./room-team-records.js";
 
 export {
+  KeyPackageRecord,
+  KeyPackageUpload,
+  MlsMessageType,
+  MlsRelayMessage,
   PresenceMessage,
   RelayClientMessage,
-  RelayEnvelope,
-  RelayEnvelopeKind,
   RelayServerMessage,
-  RoomEnvelopeMetadata
+  pinnedMlsCiphersuite
 } from "./relay-messages.js";
 
 export type { CodexTurnSummary } from "./app-types.js";

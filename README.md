@@ -8,7 +8,7 @@ Treat room membership as controlled access to the active host's machine: admitte
 
 Short version: build with Codex together. Private by default. Open source.
 
-Room traffic authenticates ciphertext together with its sender, room, event kind, timestamp, and key epoch. Invite links contain no room key but do contain a private single-use bearer capability: the active host validates its device-bound request before delivering the current epoch key, and member removal excludes removed devices from future epochs without claiming to erase content already delivered.
+Native room traffic uses RFC 9420 MLS through a Rust-owned cryptographic boundary. Invite links contain no group secret but do contain a private single-use bearer capability: the active host validates an HPKE-sealed request bound to the joiner's exact KeyPackage before creating an MLS Add and Welcome. Member removal uses MLS Remove without claiming to erase content already delivered. The browser preview is a seeded local demo only.
 
 Start with [docs/using-the-app.md](docs/using-the-app.md) for the desktop features, [docs/product-architecture.md](docs/product-architecture.md) for the product model, [docs/cryptography.md](docs/cryptography.md) for key architecture and the MLS decision, [docs/codex-hosting.md](docs/codex-hosting.md) for how host-side Codex works, [docs/local-preview-sharing.md](docs/local-preview-sharing.md) for localhost preview tunnels, [docs/threat-model.md](docs/threat-model.md) and its [public changelog](docs/threat-model-changelog.md) for privacy boundaries, [docs/self-hosting.md](docs/self-hosting.md) for relay deployment, and [docs/if-unmaintained.md](docs/if-unmaintained.md) for the project exit path. Contributors and maintainers can use [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [CONTRIBUTING.md](CONTRIBUTING.md), [GOVERNANCE.md](GOVERNANCE.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md), [docs/architecture-walkthrough.md](docs/architecture-walkthrough.md), [docs/ci-policy.md](docs/ci-policy.md), [docs/release-operations.md](docs/release-operations.md), [docs/reproducible-builds.md](docs/reproducible-builds.md), [docs/initial-alpha-release-notes.md](docs/initial-alpha-release-notes.md), and [docs/alpha-limitations.md](docs/alpha-limitations.md).
 
@@ -30,7 +30,7 @@ Public macOS alpha downloads are published through [GitHub Releases](https://git
 
 Public macOS alpha artifacts are Developer ID signed and notarized. Treat every build as security-sensitive alpha software and prefer test/self-hosted rooms before using private projects.
 
-The custom cryptographic protocol is unaudited. End-to-end encryption is the intended, tested design boundary, not an independently verified guarantee.
+Protocol v2 uses RFC 9420 MLS through `mls-rs`; the application integration, host-authority policy, HPKE invite flow, and storage boundary have not received an independent professional audit. End-to-end encryption is the intended, tested design boundary, not an independently verified guarantee.
 
 ## Run Locally
 

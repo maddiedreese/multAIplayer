@@ -5,7 +5,7 @@ Use this index to find the React lifecycle or composition point for a desktop be
 ## Relay sync and encrypted routing
 
 - `relay/useRelaySubscription.ts` subscribes to relay events and dispatches decrypted envelopes.
-- `relay/routeRelayEnvelope.ts` routes decrypted envelope types into store actions (support code, not a hook).
+- `relay/routeMlsMessage.ts` routes decrypted envelope types into store actions (support code, not a hook).
 - `useAppRelaySync.ts` composes application-level relay synchronization.
 - `useRelayPublishers.ts` exposes encrypted relay publishers for room activity.
 - `useRelayRoomSync.ts` synchronizes the active room with relay state.

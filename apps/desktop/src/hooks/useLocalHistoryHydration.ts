@@ -45,11 +45,14 @@ export function useLocalHistoryHydration({
     const settings = hasHistorySettings(selectedRoomId)
       ? loadHistorySettings(selectedRoomId)
       : loadTeamHistorySettings(selectedRoomTeamId);
-    if (!hasHistorySettings(selectedRoomId)) {
-      saveHistorySettings(selectedRoomId, settings);
-    }
-    replaceHistorySettings(settings);
-    loadEncryptedHistory<ChatMessage[] | LocalRoomHistoryPayload>(selectedRoomId)
+    const initializeSettings = hasHistorySettings(selectedRoomId)
+      ? Promise.resolve(settings)
+      : saveHistorySettings(selectedRoomId, settings);
+    initializeSettings
+      .then((savedSettings) => {
+        if (!cancelled) replaceHistorySettings(savedSettings);
+        return loadEncryptedHistory<ChatMessage[] | LocalRoomHistoryPayload>(selectedRoomId);
+      })
       .then((storedHistory) => {
         if (cancelled || !storedHistory) return;
         const payload = pruneLocalRoomHistory(normalizeLocalRoomHistory(storedHistory), settings.retentionDays);

@@ -118,9 +118,9 @@ Git workflow progress and Actions refreshes are shared to the room as encrypted 
 
 ## Invites And Room Keys
 
-The Invites panel can copy or import a capability-authenticated invite, approve or deny validated device requests, and rotate the room key epoch.
+The Invites panel can copy or import a capability-authenticated invite and approve or deny validated device/KeyPackage requests. MLS epoch changes happen through active-host Commits rather than manual room-key rotation.
 
-Invite links never include the room key. They contain a 256-bit join capability, the current key epoch, and the active host's exact user, device, public key, and full fingerprint. The join request is capability-authenticated and sealed to the host; approval delivers the epoch key only to the validated requester device using an authenticated host-to-device wrap.
+Invite links never include an MLS group secret. They contain a 256-bit join capability, the current epoch, and the active host's exact user/device public binding and full signature-key fingerprint. The join request is capability-authenticated, RFC 9180 HPKE-sealed to the host, and bound to the joiner's exact KeyPackage. Approval publishes an MLS Add Commit and delivers a one-shot Welcome to that authenticated device.
 
 Share the complete invite link privately. Its capability is not a room key, but it is a single-use bearer secret: anyone holding the link can submit a device-bound request for host review. Import scrubs the fragment from browser history. The app validates and pins the requester's full device fingerprint before display; the host should review the requesting identity and device id before approval.
 

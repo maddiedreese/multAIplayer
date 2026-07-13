@@ -12,7 +12,7 @@ interface MemberActionsOptions {
   untrustDeviceForRoom: (roomId: string, deviceId: string) => void;
   updateTeamRoleForTeam: (teamId: string, role: TeamRecord["role"] | undefined) => void;
   updateTeamMemberCountForTeam: (teamId: string, members: number) => void;
-  rotateRoomKeyForDevices: (
+  removeMembersFromMlsGroup: (
     room: RoomRecord,
     actor: { id: string; name: string },
     deviceId: string,
@@ -32,7 +32,7 @@ export function createMemberActions({
   untrustDeviceForRoom,
   updateTeamRoleForTeam,
   updateTeamMemberCountForTeam,
-  rotateRoomKeyForDevices,
+  removeMembersFromMlsGroup,
   copyMarkdownWithFallback
 }: MemberActionsOptions) {
   const currentWorkspace = () => {
@@ -163,7 +163,7 @@ export function createMemberActions({
       const failures: Array<{ room: RoomRecord; error: unknown }> = [];
       for (const room of activeRooms) {
         try {
-          await rotateRoomKeyForDevices(room, localUser, deviceId, new Set([member.userId]));
+          await removeMembersFromMlsGroup(room, localUser, deviceId, new Set([member.userId]));
         } catch (error) {
           failures.push({ room, error });
         }
@@ -171,7 +171,7 @@ export function createMemberActions({
       if (failures.length > 0) {
         const details = failures.map(({ room, error }) => `${room.name}: ${String(error)}`).join("; ");
         throw new Error(
-          `Member relay access was removed, but cryptographic access rotation is incomplete. Retry removal to finish: ${details}`
+          `Member relay access was removed, but MLS Remove commits are incomplete. Retry removal to finish: ${details}`
         );
       }
       useAppStore.getState().setTeamMembersForTeam(selectedTeam, members);

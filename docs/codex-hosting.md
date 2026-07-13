@@ -58,7 +58,7 @@ The relay does see operational metadata needed to route the room:
 - host labels and status;
 - device public keys and fingerprints;
 - invite ids and expiry metadata;
-- encrypted envelope sizes, ids, timestamps, and sender/device labels;
+- opaque MLS message sizes, ids, timestamps, epoch hints, and sender/device routing labels;
 - encrypted attachment blob metadata such as filename, MIME type, declared size, room id, and expiry;
 - GitHub OAuth session identity metadata when sign-in is enabled.
 

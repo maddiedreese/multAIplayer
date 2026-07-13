@@ -13,16 +13,19 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 - GitHub sign-in requires a GitHub OAuth app configured on the relay.
 - A hosted production relay requires real domain, TLS, secrets, persistent storage, and operator monitoring.
 - The relay Dockerfile and SQLite storage are available. Multi-instance production hosting needs external/shared rate limiting, backup/restore drills, and operational monitoring.
-- SQLite encrypted room envelopes use an incremental append/delete path, but the normalized non-envelope relay state rewrites all teams, rooms, invites, devices, members, and sessions on each debounced flush. That is acceptable for alpha-scale trusted teams, but larger hosted relays should plan an incremental or shared-store rewrite before rooms and membership counts grow enough for whole-store rewrites to become a scaling ceiling.
+- SQLite opaque MLS messages use an incremental append/delete path, but the normalized non-message relay state rewrites teams, rooms, invites, devices, members, and sessions on each debounced flush. That is acceptable for alpha-scale trusted teams, but larger hosted relays should plan an incremental or shared-store rewrite before rooms and membership counts grow enough for whole-store rewrites to become a scaling ceiling.
 
 ## Privacy And Encryption
 
-- The custom cryptographic protocol and implementation are unaudited. End-to-end encryption is design intent backed by tests, not an independently verified guarantee.
+- Protocol v2 uses RFC 9420 MLS through `mls-rs`; the application integration, host-authority policy, HPKE invite flow, and storage boundary remain unaudited. End-to-end encryption is design intent backed by tests, not an independently verified guarantee.
 - Room chat and local history are encrypted, and the relay should not store plaintext transcripts or attachments.
-- The relay sees routing metadata such as team names, room names, host labels, project path labels, invite ids, encrypted envelope sizes, and encrypted blob metadata.
-- Invite links contain a private single-use bearer capability and public host binding, never the room key. Anyone who obtains a complete link can submit a device-bound request, so links must be shared privately; the active host validates the requester before delivering the current epoch key.
-- Member removal revokes relay access and advances room key epochs for the remaining registered devices. A removed member may still keep content, exports, screenshots, and older epoch keys already received.
-- Multi-device recovery and history backfill remain limited; each device must enroll with its own key identity.
+- The relay sees routing metadata such as team names, room names, host labels, device ids, invite ids, epoch hints, opaque MLS-message sizes, and encrypted blob metadata.
+- Invite links contain a private single-use bearer capability and public host HPKE binding, never an MLS group secret. Anyone who obtains a complete link can submit a device-bound KeyPackage request, so links must be shared privately; the active host validates the requester before creating an Add and Welcome.
+- Member removal revokes relay access and advances the group through an MLS Remove commit. A removed member may still keep content, exports, screenshots, and retained history secrets already received.
+- Exporter-derived history secrets are deliberately retained in encrypted native storage. Forward secrecy applies to live traffic, not retained local history.
+- Multi-device recovery and history backfill remain limited; each device enrolls with its own MLS credential and KeyPackages. State loss requires a clean rejoin and loses pre-rejoin history access.
+- Pre-v2 rooms and invite links are intentionally incompatible and are not migrated.
+- The web preview is a seeded local demonstration only; E2EE room workflows require the native app.
 
 ## Codex Hosting
 

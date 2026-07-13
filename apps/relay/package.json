@@ -5,6 +5,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
+    "test:security-journey": "tsx --test --test-reporter=junit test/process-security-journey.test.ts",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "build": "tsc -p tsconfig.json",
@@ -30,7 +31,6 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@multaiplayer/crypto": "0.1.0-alpha.0",
     "@stryker-mutator/core": "9.6.1",
     "@stryker-mutator/typescript-checker": "9.6.1",
     "@types/better-sqlite3": "7.6.13",

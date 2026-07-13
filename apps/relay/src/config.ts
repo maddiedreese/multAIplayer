@@ -11,8 +11,8 @@ export interface RelayConfig {
   dataPath: string;
   storageBackend: RelayStorageBackend;
   legacyJsonImportPath: string | null;
-  encryptedBacklogLimit: number;
-  encryptedBacklogRetentionDays: number;
+  mlsBacklogLimit: number;
+  mlsBacklogRetentionDays: number;
   inviteTtlDays: number;
   attachmentBlobTtlDays: number;
   attachmentBlobMaxBytes: number;
@@ -20,8 +20,7 @@ export interface RelayConfig {
   attachmentBlobUploadBytesPerWindow: number;
   attachmentBlobUploadWindowMs: number;
   jsonBodyLimitBytes: number;
-  encryptedEnvelopeMaxBytes: number;
-  roomEpochEnvelopeLimit: number;
+  mlsMessageMaxBytes: number;
   sessionPersistenceSecret: string | null;
   debugEndpointsEnabled: boolean;
   allowedCorsOrigins: string[];
@@ -87,8 +86,8 @@ export function loadRelayConfig(): RelayConfig {
           : !storageWasExplicit && !dataPathWasExplicit && existsSync(defaultLegacyJsonPath)
             ? defaultLegacyJsonPath
             : null,
-    encryptedBacklogLimit: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_LIMIT, 200, 1, 1000),
-    encryptedBacklogRetentionDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS, 30, 1, 365),
+    mlsBacklogLimit: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_LIMIT, 200, 1, 1000),
+    mlsBacklogRetentionDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS, 30, 1, 365),
     inviteTtlDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_INVITE_TTL_DAYS, 7, 1, 365),
     attachmentBlobTtlDays: parseIntegerEnv(process.env.MULTAIPLAYER_ATTACHMENT_BLOB_TTL_DAYS, 30, 1, 365),
     attachmentBlobMaxBytes,
@@ -111,17 +110,11 @@ export function loadRelayConfig(): RelayConfig {
       86_400_000
     ),
     jsonBodyLimitBytes,
-    encryptedEnvelopeMaxBytes: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES,
+    mlsMessageMaxBytes: parseIntegerEnv(
+      process.env.MULTAIPLAYER_RELAY_MLS_MESSAGE_MAX_BYTES,
       1_000_000,
       4096,
       5_000_000
-    ),
-    roomEpochEnvelopeLimit: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_EPOCH_ENVELOPE_LIMIT,
-      1_000_000,
-      1,
-      100_000_000
     ),
     sessionPersistenceSecret: normalizeSessionPersistenceSecret(process.env.MULTAIPLAYER_RELAY_SESSION_SECRET),
     debugEndpointsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_DEBUG, false),

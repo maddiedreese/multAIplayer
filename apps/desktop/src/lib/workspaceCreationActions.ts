@@ -73,7 +73,7 @@ export function createWorkspaceCreationActions({
       store.restoreTeamAccess(room.teamId);
       store.restoreForgottenRoom(room.id);
       store.setInviteApprovalGateForRoom(room.id, teamDefaults.inviteApprovalGate);
-      saveHistorySettings(room.id, loadTeamHistorySettings(plan.teamId));
+      await saveHistorySettings(room.id, loadTeamHistorySettings(plan.teamId));
       store.initializeMessagesForRoom(room.id);
       setSelectedRoomId(room.id);
       setNewRoomName("");

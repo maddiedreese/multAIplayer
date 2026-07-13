@@ -316,25 +316,6 @@ fn room_browser_guard_script_blocks_clipboard_and_file_inputs() {
 }
 
 #[test]
-fn keychain_account_rejects_room_ids_with_unsupported_characters() {
-    assert!(keychain_account("room-alpha_123").is_ok());
-    assert!(keychain_account("").is_err());
-    assert!(keychain_account(" room-alpha").is_err());
-    assert!(keychain_account("room alpha").is_err());
-    assert!(keychain_account("room.alpha").is_err());
-    assert!(keychain_account("room:../../secret").is_err());
-    assert!(keychain_account(&"x".repeat(MAX_ROOM_ID_CHARS + 1)).is_err());
-}
-
-#[test]
-fn device_identity_payload_validation_bounds_native_storage() {
-    assert!(ensure_device_identity_payload(r#"{"algorithm":"ECDH"}"#).is_ok());
-    assert!(ensure_device_identity_payload("").is_err());
-    assert!(ensure_device_identity_payload("not-json").is_err());
-    assert!(ensure_device_identity_payload(&"{".repeat(MAX_DEVICE_IDENTITY_CHARS + 1)).is_err());
-}
-
-#[test]
 fn terminal_validation_rejects_bad_names_and_oversized_text() {
     assert!(ensure_room_id("room-alpha_123").is_ok());
     assert!(ensure_room_id("room.alpha").is_err());

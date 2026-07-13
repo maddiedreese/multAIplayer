@@ -28,7 +28,7 @@ export function AppShellView({
     <div className="web-preview-banner" role="status">
       <strong>Development web preview</strong>
       <span>
-        Do not use this fallback for private projects; room secrets are memory-only and room access is lost on reload.
+        Private MLS rooms are unavailable in this browser-only preview. Use the native desktop app for E2EE rooms.
       </span>
     </div>
   ) : null;

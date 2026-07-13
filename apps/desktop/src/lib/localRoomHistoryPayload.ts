@@ -1,12 +1,10 @@
 import {
-  DevicePublicKeyJwk,
   isRecord,
   maxCodexActivitiesPerRoom,
   CodexApprovalPlaintextPayload as CodexApprovalPlaintextPayloadSchema,
   CodexActivityPlaintextPayload as CodexActivityPlaintextPayloadSchema,
   CodexQueuePlaintextPayload as CodexQueuePlaintextPayloadSchema,
   LocalPreviewPlaintextPayload as LocalPreviewPlaintextPayloadSchema,
-  RoomKeyRotationPlaintextPayload as RoomKeyRotationPlaintextPayloadSchema,
   WorkspaceFileSaveRequestPlaintextPayload as WorkspaceFileSaveRequestPlaintextPayloadSchema,
   ChatDeletePlaintextPayload as ChatDeletePlaintextPayloadSchema,
   ChatEditPlaintextPayload as ChatEditPlaintextPayloadSchema,
@@ -18,9 +16,7 @@ import {
   type CodexQueuePlaintextPayload,
   type GitHubActionsEventPlaintextPayload,
   type GitWorkflowEventPlaintextPayload,
-  type InviteJoinRequestPlaintextPayload,
   type LocalPreviewPlaintextPayload,
-  type RoomKeyRotationPlaintextPayload,
   type WorkspaceFileSaveRequestPlaintextPayload
 } from "@multaiplayer/protocol";
 import type { GitHubActionRun } from "./authClient";
@@ -217,28 +213,6 @@ export function isWorkspaceFileSaveRequest(value: unknown): value is WorkspaceFi
   );
 }
 
-// History decode accepts records that predate current protocol limits.
-// The live network paths validate strictly in routeRelayEnvelope and inviteRelayActions.
-function isInviteJoinRequestPlaintextPayloadLenient(value: unknown): value is InviteJoinRequestPlaintextPayload {
-  if (!isRecord(value)) return false;
-  return (
-    value.eventType === "invite.request" &&
-    typeof value.id === "string" &&
-    (value.inviteId === undefined || typeof value.inviteId === "string") &&
-    typeof value.requester === "string" &&
-    typeof value.requesterUserId === "string" &&
-    typeof value.requesterDeviceId === "string" &&
-    (value.requesterPublicKeyJwk === undefined || DevicePublicKeyJwk.safeParse(value.requesterPublicKeyJwk).success) &&
-    (value.requesterPublicKeyFingerprint === undefined || typeof value.requesterPublicKeyFingerprint === "string") &&
-    typeof value.requestedAt === "string" &&
-    (value.note === undefined || typeof value.note === "string")
-  );
-}
-
-export function isRoomKeyRotationPlaintextPayload(value: unknown): value is RoomKeyRotationPlaintextPayload {
-  return RoomKeyRotationPlaintextPayloadSchema.safeParse(value).success;
-}
-
 export function isLocalPreviewPlaintextPayload(value: unknown): value is LocalPreviewPlaintextPayload {
   return LocalPreviewPlaintextPayloadSchema.safeParse(value).success;
 }
@@ -409,8 +383,18 @@ function isTerminalLine(value: unknown): value is { stream: string; text: string
 
 function isInviteJoinRequest(value: unknown): value is InviteJoinRequest {
   if (!isRecord(value)) return false;
-  const status = value.status;
-  return isInviteJoinRequestPlaintextPayloadLenient(value) && isWorkflowStatus(status);
+  return (
+    typeof value.id === "string" &&
+    typeof value.inviteId === "string" &&
+    typeof value.requester === "string" &&
+    typeof value.requesterUserId === "string" &&
+    typeof value.requesterDeviceId === "string" &&
+    typeof value.keyPackageId === "string" &&
+    typeof value.keyPackageHash === "string" &&
+    typeof value.requestedAt === "string" &&
+    (value.note === undefined || typeof value.note === "string") &&
+    isWorkflowStatus(value.status)
+  );
 }
 
 function isGitWorkflowResult(value: unknown): value is GitWorkflowResult {

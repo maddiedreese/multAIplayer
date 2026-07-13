@@ -1,91 +1,37 @@
-import {
-  createDeviceKeyAgreementIdentity,
-  importDevicePrivateKey,
-  type DeviceKeyAgreementIdentity
-} from "@multaiplayer/crypto";
-import { invoke } from "@tauri-apps/api/core";
+import { initializeMlsIdentity, type MlsIdentityPublic } from "./mlsClient";
 
-const deviceIdentityKey = "multaiplayer:device-identity:v1";
-let nativeIdentityPromise: Promise<DeviceIdentity> | null = null;
-let nativeStartupReadAttempted = false;
-
-export type DeviceIdentity = Omit<DeviceKeyAgreementIdentity, "privateKeyJwk"> & { privateKeyJwk: CryptoKey };
-
-export async function loadOrCreateDeviceIdentity(): Promise<DeviceIdentity> {
-  if (isTauriRuntime()) {
-    nativeIdentityPromise ??= loadOrCreateDeviceIdentityFromStorage();
-    return nativeIdentityPromise;
-  }
-  return loadOrCreateDeviceIdentityFromStorage();
+export interface DeviceIdentity extends MlsIdentityPublic {
+  publicKeyFingerprint: string;
+  signatureKeyFingerprint: string;
+  hpkeKeyFingerprint: string;
 }
 
-async function loadOrCreateDeviceIdentityFromStorage(): Promise<DeviceIdentity> {
-  const nativeIdentity = await readNativeDeviceIdentity();
-  if (nativeIdentity) return hydrateDeviceIdentity(nativeIdentity);
+let nativeIdentityPromise: Promise<DeviceIdentity> | null = null;
 
-  const stored = localStorage.getItem(deviceIdentityKey);
-  if (stored) {
-    try {
-      const parsed = normalizeDeviceIdentity(JSON.parse(stored) as Partial<DeviceKeyAgreementIdentity>);
-      await writeNativeDeviceIdentity(parsed);
-      if (isTauriRuntime()) localStorage.removeItem(deviceIdentityKey);
-      return hydrateDeviceIdentity(parsed);
-    } catch {
-      localStorage.removeItem(deviceIdentityKey);
-    }
-  }
-
-  const identity = await createDeviceKeyAgreementIdentity();
-  await writeNativeDeviceIdentity(identity);
-  return hydrateDeviceIdentity(identity);
+export async function loadOrCreateDeviceIdentity(githubUserId: string, deviceId: string): Promise<DeviceIdentity> {
+  if (!isTauriRuntime()) throw new Error("Device identities are available only in the native desktop app");
+  nativeIdentityPromise ??= initializeMlsIdentity(githubUserId, deviceId).then(normalizeIdentity);
+  return nativeIdentityPromise;
 }
 
 export async function resetDeviceIdentity(): Promise<void> {
-  if (isTauriRuntime()) {
-    await invoke("device_identity_delete");
-    nativeIdentityPromise = null;
-  }
-  localStorage.removeItem(deviceIdentityKey);
+  if (!isTauriRuntime()) throw new Error("Device identities are available only in the native desktop app");
+  throw new Error("MLS identity reset requires leaving and rejoining every room and is not available in this alpha.");
 }
 
-function normalizeDeviceIdentity(value: Partial<DeviceKeyAgreementIdentity>): DeviceKeyAgreementIdentity {
+function normalizeIdentity(identity: MlsIdentityPublic): DeviceIdentity {
   if (
-    value.algorithm !== "ECDH-P256-HKDF-SHA256-AES-GCM-256" ||
-    !value.publicKeyJwk ||
-    !value.privateKeyJwk ||
-    typeof value.publicKeyFingerprint !== "string" ||
-    typeof value.createdAt !== "string"
-  ) {
-    throw new Error("Stored device identity is invalid");
-  }
+    identity.ciphersuite !== 2 ||
+    !identity.signaturePublicKey ||
+    !identity.signatureKeyFingerprint ||
+    !identity.hpkePublicKey ||
+    !identity.hpkeKeyFingerprint
+  )
+    throw new Error("Native MLS identity response is incomplete");
   return {
-    algorithm: value.algorithm,
-    publicKeyJwk: value.publicKeyJwk,
-    privateKeyJwk: value.privateKeyJwk,
-    publicKeyFingerprint: value.publicKeyFingerprint,
-    createdAt: value.createdAt
+    ...identity,
+    publicKeyFingerprint: identity.signatureKeyFingerprint
   };
-}
-
-async function readNativeDeviceIdentity(): Promise<DeviceKeyAgreementIdentity | null> {
-  if (!isTauriRuntime()) return null;
-  if (nativeStartupReadAttempted) return null;
-  nativeStartupReadAttempted = true;
-  const stored = await invoke<string | null>("device_identity_take_for_startup");
-  return stored ? normalizeDeviceIdentity(JSON.parse(stored) as Partial<DeviceKeyAgreementIdentity>) : null;
-}
-
-async function writeNativeDeviceIdentity(identity: DeviceKeyAgreementIdentity): Promise<void> {
-  if (!isTauriRuntime()) {
-    localStorage.setItem(deviceIdentityKey, JSON.stringify(identity));
-    return;
-  }
-  await invoke("device_identity_set", { identity: JSON.stringify(identity) });
-}
-
-async function hydrateDeviceIdentity(identity: DeviceKeyAgreementIdentity): Promise<DeviceIdentity> {
-  const privateKeyJwk = await importDevicePrivateKey(identity.privateKeyJwk);
-  return { ...identity, privateKeyJwk };
 }
 
 function isTauriRuntime(): boolean {

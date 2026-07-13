@@ -56,14 +56,20 @@ export function createLocalHistoryActions({
     useAppStore.getState().setSettingsBusyForRoom(roomId, busy);
   };
 
-  function updateLocalHistorySettings(next: LocalHistorySettings) {
+  async function updateLocalHistorySettings(next: LocalHistorySettings) {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) {
       setSelectedHistoryMessage("Create or join a room before changing encrypted history settings.");
       return;
     }
     const roomId = selectedRoom.id;
-    const saved = saveHistorySettings(roomId, next);
+    let saved: LocalHistorySettings;
+    try {
+      saved = await saveHistorySettings(roomId, next);
+    } catch (error) {
+      setHistoryMessageForRoom(roomId, `Encrypted local history settings were not changed: ${String(error)}`);
+      return;
+    }
     replaceHistorySettings(saved);
     if (saved.enabled) {
       const store = useAppStore.getState();
@@ -112,7 +118,7 @@ export function createLocalHistoryActions({
     const teamId = selectedRoom.teamId;
     const historyDefaults = loadTeamHistorySettings(teamId);
     const roomDefaults = loadTeamRoomDefaults(teamId);
-    updateLocalHistorySettings(historyDefaults);
+    await updateLocalHistorySettings(historyDefaults);
     useAppStore.getState().setInviteApprovalGateForRoom(roomId, roomDefaults.inviteApprovalGate);
     const { forgottenRoomIds, revokedRoomIds, revokedTeamIds } = useAppStore.getState();
     const isSelectedRoomRevoked = revokedRoomIds.has(roomId) || revokedTeamIds.has(selectedRoom.teamId);

@@ -8,9 +8,14 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { WebSocket } from "ws";
-import { codexReasoningEffortIds, maxEnvelopeNonceChars, maxRoomProjectPathChars } from "@multaiplayer/protocol";
+import {
+  codexReasoningEffortIds,
+  maxSessionCiphertextNonceChars,
+  maxRoomProjectPathChars
+} from "@multaiplayer/protocol";
 
 const relayPackageRoot = fileURLToPath(new URL("../..", import.meta.url));
+const mockValidatorPath = fileURLToPath(new URL("../fixtures/mock-keypackage-validator.mjs", import.meta.url));
 
 export interface RelayHarness {
   baseUrl: string;
@@ -31,6 +36,9 @@ export interface StoredRelayStateFixture {
   devices?: unknown[];
   authSessions?: unknown[];
   attachmentBlobs?: unknown[];
+  inviteRequests?: unknown[];
+  inviteResponses?: unknown[];
+  mlsBacklog?: unknown[];
   encryptedBacklog: unknown;
 }
 
@@ -56,7 +64,7 @@ export {
   tmpdir,
   writeFile
 };
-export { codexReasoningEffortIds, maxEnvelopeNonceChars, maxRoomProjectPathChars };
+export { codexReasoningEffortIds, maxSessionCiphertextNonceChars, maxRoomProjectPathChars };
 export async function startRelay(
   extraEnv: NodeJS.ProcessEnv = {},
   storedState?: StoredRelayStateFixture,
@@ -91,6 +99,9 @@ export async function startRelay(
         MULTAIPLAYER_RELAY_DEBUG:
           extraEnv.MULTAIPLAYER_RELAY_DEBUG ?? (extraEnv.NODE_ENV === "production" ? "false" : "true"),
         ...extraEnv,
+        ...(extraEnv.NODE_ENV === "production" && !extraEnv.MULTAIPLAYER_MLS_VALIDATOR_PATH
+          ? { MULTAIPLAYER_MLS_VALIDATOR_PATH: mockValidatorPath }
+          : {}),
         PORT: String(port),
         // Most legacy persistence fixtures intentionally exercise the explicit
         // development-only JSON backend. Production/default-backend tests opt
@@ -176,6 +187,7 @@ function defaultWorkspaceFixture(): StoredRelayStateFixture {
         projectPath: "/tmp/multaiplayer",
         host: "Maddie",
         hostUserId: "github:maddiedreese",
+        activeHostDeviceId: "host-device-1",
         hostStatus: "active",
         approvalPolicy: "ask_every_turn",
         approvalDelegationPolicy: "host_only",
@@ -195,6 +207,7 @@ function defaultWorkspaceFixture(): StoredRelayStateFixture {
         projectPath: "/tmp/multaiplayer",
         host: "Alex",
         hostUserId: "github:alex",
+        activeHostDeviceId: "alex-device-1",
         hostStatus: "active",
         approvalPolicy: "ask_every_turn",
         approvalDelegationPolicy: "host_only",

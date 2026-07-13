@@ -8,7 +8,7 @@ export interface InviteRoomState {
   link?: string;
   approvalGate?: boolean;
   message?: string;
-  keyRotationBusy?: boolean;
+  membershipCommitBusy?: boolean;
   admission?: string;
 }
 
@@ -19,7 +19,7 @@ export interface InvitePanelMaps {
   inviteLinksByRoom: Record<string, string>;
   inviteApprovalGatesByRoom: Record<string, boolean>;
   inviteMessagesByRoom: Record<string, string | null>;
-  keyRotationBusyByRoom: Record<string, boolean>;
+  membershipCommitBusyByRoom: Record<string, boolean>;
   inviteAdmissionsByRoom: Record<string, string | undefined>;
 }
 
@@ -62,9 +62,9 @@ export function projectInvitePanelMaps(inviteByRoom: InviteByRoom): InvitePanelM
         .filter(([, invite]) => invite.message)
         .map(([roomId, invite]) => [roomId, invite.message ?? null])
     ),
-    keyRotationBusyByRoom: Object.fromEntries(
+    membershipCommitBusyByRoom: Object.fromEntries(
       Object.entries(inviteByRoom)
-        .filter(([, invite]) => invite.keyRotationBusy)
+        .filter(([, invite]) => invite.membershipCommitBusy)
         .map(([roomId]) => [roomId, true])
     ),
     inviteAdmissionsByRoom: Object.fromEntries(
@@ -83,7 +83,7 @@ export interface InviteSlice {
   clearInviteSecretInput: () => void;
   setInviteAdmissionForRoom: (roomId: string, inviteId: string | null) => void;
   clearInviteAdmissionForRoom: (roomId: string) => void;
-  setKeyRotationBusyForRoom: (roomId: string, busy: boolean) => void;
+  setMembershipCommitBusyForRoom: (roomId: string, busy: boolean) => void;
   updateInviteRequestStatus: (roomId: string, requestId: string, status: InviteJoinRequest["status"]) => void;
   appendInviteRequest: (roomId: string, request: InviteJoinRequest) => void;
   setInviteLinkForRoom: (roomId: string, link: string) => void;
@@ -128,11 +128,11 @@ export const createInviteSlice: StateCreator<AppStoreState, [], [], InviteSlice>
       })
     }));
   },
-  setKeyRotationBusyForRoom: (roomId, busy) => {
+  setMembershipCommitBusyForRoom: (roomId, busy) => {
     set((state) => ({
       inviteByRoom: updateInviteForRoom(state.inviteByRoom, roomId, (invite) => {
-        const { keyRotationBusy, ...rest } = invite;
-        return busy ? { ...invite, keyRotationBusy: true } : rest;
+        const { membershipCommitBusy, ...rest } = invite;
+        return busy ? { ...invite, membershipCommitBusy: true } : rest;
       })
     }));
   },

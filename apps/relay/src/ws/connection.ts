@@ -1,8 +1,10 @@
 import type { IncomingMessage } from "node:http";
 import type { WebSocketServer } from "ws";
-import { RelayClientMessage, type RelayEnvelope, type RelayServerMessage } from "@multaiplayer/protocol";
+import { RelayClientMessage, type MlsRelayMessage, type RelayServerMessage } from "@multaiplayer/protocol";
+import { RelayPublishError } from "./fanout.js";
 import type { AuthSession, ClientSession, PresenceRecord, RelayStore, RoomKey } from "../state.js";
 import type { RelayLimits } from "../limits.js";
+import { isCanonicalPaddedBase64 } from "../opaque.js";
 
 type RateLimitResult = { allowed: boolean };
 type WebSocketRateLimitBucket = "websocket" | "websocketConnect";
@@ -14,7 +16,7 @@ interface RegisterRelayWebSocketConnectionOptions {
     isReady?: () => boolean;
   };
   state: {
-    store: Pick<RelayStore, "getEncryptedBacklog">;
+    store: Pick<RelayStore, "getMlsBacklog">;
     sessions: Map<ClientSession["socket"], ClientSession>;
     roomPresence: Map<RoomKey, Map<string, PresenceRecord>>;
   };
@@ -40,16 +42,23 @@ interface RegisterRelayWebSocketConnectionOptions {
   rooms: {
     roomKey: (teamId: string, roomId: string) => RoomKey;
     isKnownRoom: (teamId: string, roomId: string) => boolean;
-    canJoinRoom: (session: ClientSession, teamId: string, roomId: string, userId: string, inviteId?: string) => boolean;
+    canJoinRoom: (
+      session: ClientSession,
+      teamId: string,
+      roomId: string,
+      userId: string,
+      deviceId: string,
+      inviteId?: string
+    ) => boolean;
+    hasDeviceSession: (token: string, userId: string, deviceId: string) => boolean;
     joinRoom: (session: ClientSession, teamId: string, roomId: string, userId: string, deviceId: string) => void;
     canSubscribeTeam: (session: ClientSession, teamId: string, userId: string) => boolean;
     subscribeTeam: (session: ClientSession, teamId: string) => void;
     hasTeam: (teamId: string) => boolean;
     canSubscribeWorkspace: (session: ClientSession, userId: string) => boolean;
     subscribeWorkspace: (session: ClientSession) => void;
-    canPublishEnvelope: (session: ClientSession, envelope: RelayEnvelope) => boolean;
-    isAllowedEnvelopePayload: (envelope: RelayEnvelope) => boolean;
-    publishEnvelope: (envelope: RelayEnvelope) => Promise<void>;
+    canPublishMlsMessage: (session: ClientSession, message: MlsRelayMessage) => boolean;
+    publishMlsMessage: (message: MlsRelayMessage) => Promise<void>;
     publishPresence: (session: ClientSession, teamId: string, roomId: string, presence: PresenceRecord) => void;
     leaveRoom: (session: ClientSession) => void;
     leaveTeams: (session: ClientSession) => void;
@@ -66,14 +75,12 @@ export function registerRelayWebSocketConnection(options: RegisterRelayWebSocket
   const { wss, send, isReady = () => true } = options.transport;
   const { store, sessions, roomPresence } = options.state;
   const {
-    encryptedEnvelopeMaxBytes,
+    mlsMessageMaxBytes,
     maxDisplayNameChars,
     maxDeviceIdChars,
-    maxEnvelopeCiphertextChars,
+    maxMlsMessageChars,
     maxEnvelopeIdChars,
-    maxEnvelopeNonceChars,
     maxPublicKeyFingerprintChars,
-    maxPublicKeyJwkChars,
     maxRoomProjectPathChars,
     maxUserIdChars
   } = options.limits;
@@ -90,21 +97,21 @@ export function registerRelayWebSocketConnection(options: RegisterRelayWebSocket
     roomKey,
     isKnownRoom,
     canJoinRoom,
+    hasDeviceSession,
     joinRoom,
     canSubscribeTeam,
     subscribeTeam,
     hasTeam,
     canSubscribeWorkspace,
     subscribeWorkspace,
-    canPublishEnvelope,
-    isAllowedEnvelopePayload,
-    publishEnvelope,
+    canPublishMlsMessage,
+    publishMlsMessage,
     publishPresence,
     leaveRoom,
     leaveTeams,
     leaveWorkspace
   } = options.rooms;
-  const { normalizeMetadataText, isJsonStringifiableWithin, isRecord } = options.validation;
+  const { normalizeMetadataText, isRecord } = options.validation;
   function socketConnectionQuotaError(session: ClientSession): string | null {
     const userConnectionId = session.authSession?.user.id ?? session.rateClientId;
     const deviceConnectionId = session.deviceId ? `${userConnectionId}:${session.deviceId}` : null;
@@ -136,16 +143,12 @@ export function registerRelayWebSocketConnection(options: RegisterRelayWebSocket
     return null;
   }
 
-  function isRelayEnvelopeWithinLimits(envelope: RelayEnvelope): boolean {
-    if (!normalizeMetadataText(envelope.id, maxEnvelopeIdChars)) return false;
-    if (!normalizeMetadataText(envelope.senderUserId, maxUserIdChars)) return false;
-    if (!normalizeMetadataText(envelope.senderDeviceId, maxDeviceIdChars)) return false;
-    if (!normalizeMetadataText(envelope.payload.nonce, maxEnvelopeNonceChars)) return false;
-    if (!envelope.payload.ciphertext || envelope.payload.ciphertext.length > maxEnvelopeCiphertextChars) return false;
-    if (envelope.payload.algorithm === "ECDH-P256-HKDF-SHA256-AES-GCM-256") {
-      if (!isJsonStringifiableWithin(envelope.payload.ephemeralPublicKeyJwk, maxPublicKeyJwkChars)) return false;
-    }
-    return Buffer.byteLength(JSON.stringify(envelope), "utf8") <= encryptedEnvelopeMaxBytes;
+  function isMlsMessageWithinLimits(message: MlsRelayMessage): boolean {
+    if (!normalizeMetadataText(message.id, maxEnvelopeIdChars)) return false;
+    if (!normalizeMetadataText(message.senderUserId, maxUserIdChars)) return false;
+    if (!normalizeMetadataText(message.senderDeviceId, maxDeviceIdChars)) return false;
+    if (!isCanonicalPaddedBase64(message.mlsMessage, maxMlsMessageChars)) return false;
+    return Buffer.byteLength(JSON.stringify(message), "utf8") <= mlsMessageMaxBytes;
   }
 
   function isBoundedSocketIdentity(userId: string, deviceId: string): boolean {
@@ -189,24 +192,21 @@ export function registerRelayWebSocketConnection(options: RegisterRelayWebSocket
       }
       return null;
     }
-    if (message.type === "publish" && isRecord(message.envelope)) {
-      const envelope = message.envelope;
+    if (message.type === "publish" && isRecord(message.message)) {
+      const envelope = message.message;
       if (
         typeof envelope.id === "string" &&
         typeof envelope.senderUserId === "string" &&
         typeof envelope.senderDeviceId === "string" &&
-        isRecord(envelope.payload) &&
-        typeof envelope.payload.nonce === "string" &&
-        typeof envelope.payload.ciphertext === "string" &&
+        typeof envelope.mlsMessage === "string" &&
         (!normalizeMetadataText(envelope.id, maxEnvelopeIdChars) ||
           !normalizeMetadataText(envelope.senderUserId, maxUserIdChars) ||
           !normalizeMetadataText(envelope.senderDeviceId, maxDeviceIdChars) ||
-          !normalizeMetadataText(envelope.payload.nonce, maxEnvelopeNonceChars) ||
-          !envelope.payload.ciphertext ||
-          envelope.payload.ciphertext.length > maxEnvelopeCiphertextChars ||
-          Buffer.byteLength(JSON.stringify(envelope), "utf8") > encryptedEnvelopeMaxBytes)
+          !envelope.mlsMessage ||
+          envelope.mlsMessage.length > maxMlsMessageChars ||
+          Buffer.byteLength(JSON.stringify(envelope), "utf8") > mlsMessageMaxBytes)
       ) {
-        return `Encrypted room envelope exceeds relay limits (${encryptedEnvelopeMaxBytes} bytes max).`;
+        return `MLS message exceeds relay limits (${mlsMessageMaxBytes} bytes max).`;
       }
     }
     if (message.type === "presence") {
@@ -270,6 +270,7 @@ export function registerRelayWebSocketConnection(options: RegisterRelayWebSocket
     let messageChain = Promise.resolve();
     socket.on("message", (raw) => {
       messageChain = messageChain.then(async () => {
+        let publishMessageId: string | undefined;
         try {
           if (!consumeRateLimit("websocket", session.rateClientId).allowed) {
             recordRateLimitRejection?.("websocket");
@@ -283,6 +284,7 @@ export function registerRelayWebSocketConnection(options: RegisterRelayWebSocket
             return;
           }
           const parsed = RelayClientMessage.parse(rawMessage);
+          publishMessageId = parsed.type === "publish" ? parsed.message.id : undefined;
           if (parsed.type === "join") {
             if (!isBoundedSocketIdentity(parsed.userId, parsed.deviceId)) {
               send(socket, {
@@ -302,12 +304,21 @@ export function registerRelayWebSocketConnection(options: RegisterRelayWebSocket
               send(socket, { type: "error", message: "Room not found" });
               return;
             }
-            if (!canJoinRoom(session, parsed.teamId, parsed.roomId, parsed.userId, parsed.inviteId)) {
+            if (!canJoinRoom(session, parsed.teamId, parsed.roomId, parsed.userId, parsed.deviceId, parsed.inviteId)) {
               send(socket, { type: "error", message: "Sign in and use a valid invite before joining this room." });
+              return;
+            }
+            if (!hasDeviceSession(parsed.deviceSessionToken ?? "", parsed.userId, parsed.deviceId)) {
+              send(socket, {
+                type: "error",
+                message: "A device-authenticated session is required.",
+                code: "not_joined"
+              });
               return;
             }
             session.userId = parsed.userId;
             session.deviceId = parsed.deviceId;
+            session.deviceSessionToken = parsed.deviceSessionToken ?? "development-auth-disabled";
             const quotaError = socketConnectionQuotaError(session);
             if (quotaError) {
               recordConnectionRejection?.("quota_after_join");
@@ -317,8 +328,8 @@ export function registerRelayWebSocketConnection(options: RegisterRelayWebSocket
             }
             joinRoom(session, parsed.teamId, parsed.roomId, parsed.userId, parsed.deviceId);
             send(socket, { type: "joined", teamId: parsed.teamId, roomId: parsed.roomId });
-            for (const envelope of store.getEncryptedBacklog(roomKey(parsed.teamId, parsed.roomId)) ?? []) {
-              send(socket, { type: "envelope", envelope });
+            for (const message of store.getMlsBacklog(roomKey(parsed.teamId, parsed.roomId)) ?? []) {
+              send(socket, { type: "mls.message", message });
             }
             for (const presence of roomPresence.get(roomKey(parsed.teamId, parsed.roomId))?.values() ?? []) {
               send(socket, { type: "presence", ...presence, status: "online" });
@@ -365,23 +376,39 @@ export function registerRelayWebSocketConnection(options: RegisterRelayWebSocket
           }
 
           if (parsed.type === "publish") {
-            if (!canPublishEnvelope(session, parsed.envelope)) {
-              send(socket, { type: "error", message: "Join the room before publishing with this user and device." });
-              return;
-            }
-            if (!isAllowedEnvelopePayload(parsed.envelope)) {
-              send(socket, { type: "error", message: "Device-sealed envelopes are only supported for room invites." });
-              return;
-            }
-            if (!isRelayEnvelopeWithinLimits(parsed.envelope)) {
+            if (
+              !session.userId ||
+              !session.deviceId ||
+              !session.deviceSessionToken ||
+              !hasDeviceSession(session.deviceSessionToken, session.userId, session.deviceId)
+            ) {
               send(socket, {
                 type: "error",
-                message: `Encrypted room envelope exceeds relay limits (${encryptedEnvelopeMaxBytes} bytes max).`
+                message: "Device session expired.",
+                code: "not_joined",
+                messageId: publishMessageId
               });
               return;
             }
-            await publishEnvelope(parsed.envelope);
-            send(socket, { type: "published", envelopeId: parsed.envelope.id });
+            if (!canPublishMlsMessage(session, parsed.message)) {
+              send(socket, {
+                type: "error",
+                message: "Join the room before publishing with this user and device.",
+                messageId: publishMessageId
+              });
+              return;
+            }
+            if (!isMlsMessageWithinLimits(parsed.message)) {
+              send(socket, {
+                type: "error",
+                message: `MLS message exceeds relay limits (${mlsMessageMaxBytes} bytes max).`,
+                code: "message_too_large",
+                messageId: publishMessageId
+              });
+              return;
+            }
+            await publishMlsMessage(parsed.message);
+            send(socket, { type: "published", messageId: parsed.message.id });
             return;
           }
 
@@ -412,7 +439,9 @@ export function registerRelayWebSocketConnection(options: RegisterRelayWebSocket
         } catch (error) {
           send(socket, {
             type: "error",
-            message: error instanceof Error ? error.message : "Invalid relay message"
+            message: error instanceof Error ? error.message : "Invalid relay message",
+            code: error instanceof RelayPublishError ? error.code : undefined,
+            messageId: publishMessageId
           });
         }
       });

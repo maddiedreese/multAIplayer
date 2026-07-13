@@ -25,7 +25,7 @@ export function useAppRefs() {
   );
   const hostBusyRef = useRef(projectRoomSettingsPanelMaps(initial.roomSettingsByRoom).hostBusyByRoom);
   const settingsBusyRef = useRef(projectRoomSettingsPanelMaps(initial.roomSettingsByRoom).settingsBusyByRoom);
-  const keyRotationBusyRef = useRef(projectInvitePanelMaps(initial.inviteByRoom).keyRotationBusyByRoom);
+  const membershipCommitBusyRef = useRef(projectInvitePanelMaps(initial.inviteByRoom).membershipCommitBusyByRoom);
   const gitWorkflowBusyRef = useRef(
     projectGitHubWorkflowPanelMaps(initial.gitWorkflowRuntimeByRoom).gitWorkflowBusyByRoom
   );
@@ -45,7 +45,7 @@ export function useAppRefs() {
       gitWorkflowDraftsRef.current = gitWorkflow.gitWorkflowDraftsByRoom;
       hostBusyRef.current = roomSettings.hostBusyByRoom;
       settingsBusyRef.current = roomSettings.settingsBusyByRoom;
-      keyRotationBusyRef.current = projectInvitePanelMaps(state.inviteByRoom).keyRotationBusyByRoom;
+      membershipCommitBusyRef.current = projectInvitePanelMaps(state.inviteByRoom).membershipCommitBusyByRoom;
       gitWorkflowBusyRef.current = gitWorkflow.gitWorkflowBusyByRoom;
       actionsBusyRef.current = gitWorkflow.actionsBusyByRoom;
       terminalBusyRef.current = projectTerminalRuntimeBusyByRoom(state.terminalRuntimeByRoom);
@@ -68,7 +68,7 @@ export function useAppRefs() {
     gitWorkflowDraftsRef,
     hostBusyRef,
     settingsBusyRef,
-    keyRotationBusyRef,
+    membershipCommitBusyRef,
     gitWorkflowBusyRef,
     actionsBusyRef,
     terminalBusyRef,

@@ -1,5 +1,4 @@
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import type { RelayEnvelope } from "@multaiplayer/protocol";
 
 export const appUrl = "http://127.0.0.1:1421";
 export const relayUrl = "http://127.0.0.1:4322";
@@ -21,26 +20,7 @@ export const hostIdentity: TestIdentity = {
   name: "Maddie"
 };
 
-const relayEnvelopeQueues = new WeakMap<Page, RelayEnvelope[]>();
-const relayEnvelopeWaiters = new WeakMap<Page, Array<(envelope: RelayEnvelope) => void>>();
-
 export function attachPageDiagnostics(page: Page): void {
-  relayEnvelopeQueues.set(page, []);
-  relayEnvelopeWaiters.set(page, []);
-  page.on("websocket", (socket) => {
-    socket.on("framereceived", ({ payload }) => {
-      if (typeof payload !== "string") return;
-      try {
-        const message = JSON.parse(payload) as { type?: string; envelope?: RelayEnvelope };
-        if (message.type !== "envelope" || !message.envelope) return;
-        const waiter = relayEnvelopeWaiters.get(page)?.shift();
-        if (waiter) waiter(message.envelope);
-        else relayEnvelopeQueues.get(page)?.push(message.envelope);
-      } catch {
-        // Ignore non-JSON frames; only production relay envelopes are retained.
-      }
-    });
-  });
   page.on("pageerror", (error) => console.error(`[browser page error] ${error.stack ?? error.message}`));
   page.on("console", (message) => {
     if (message.type() === "error") console.error(`[browser console] ${message.text()}`);
@@ -48,26 +28,6 @@ export function attachPageDiagnostics(page: Page): void {
   page.on("requestfailed", (request) =>
     console.error(`[browser request failed] ${request.method()} ${request.url()} ${request.failure()?.errorText ?? ""}`)
   );
-}
-
-export async function nextRelayEnvelope(
-  page: Page,
-  kind: RelayEnvelope["kind"],
-  predicate: (envelope: RelayEnvelope) => boolean = () => true
-): Promise<RelayEnvelope> {
-  const queue = relayEnvelopeQueues.get(page) ?? [];
-  const queuedIndex = queue.findIndex((envelope) => envelope.kind === kind && predicate(envelope));
-  if (queuedIndex >= 0) return queue.splice(queuedIndex, 1)[0]!;
-  return new Promise((resolve) => {
-    const waitForKind = (envelope: RelayEnvelope) => {
-      if (envelope.kind === kind && predicate(envelope)) resolve(envelope);
-      else {
-        relayEnvelopeQueues.get(page)?.push(envelope);
-        relayEnvelopeWaiters.get(page)?.push(waitForKind);
-      }
-    };
-    relayEnvelopeWaiters.get(page)?.push(waitForKind);
-  });
 }
 
 export async function authenticateContext(

@@ -3,7 +3,8 @@ import { hostHandoffDetail, hostHandoffTitle } from "../lib/hostHandoff";
 
 export interface HostHandoffDisplay {
   id: string;
-  status: "available" | "accepted";
+  status: "available" | "requested" | "accepted";
+  candidateDeviceId?: string;
   fromHost: string;
   reason?: "manual" | "usage_limit";
   messagesSinceLastCodex: number;
@@ -79,14 +80,18 @@ export function HostHandoffPanel<T extends HostHandoffDisplay>({
                   </small>
                 ) : null}
               </div>
-              {handoff.status === "available" ? (
+              {handoff.status !== "accepted" ? (
                 <button
                   className="handoff-continue-button"
                   onClick={() => onAcceptHandoff(handoff)}
                   disabled={acceptDisabled}
                 >
                   <Check size={13} />
-                  {handoff.reason === "usage_limit" && handoff.gitRepoOwner ? "Continue from GitHub" : "Accept"}
+                  {handoff.status === "requested"
+                    ? "Approve candidate"
+                    : handoff.reason === "usage_limit" && handoff.gitRepoOwner
+                      ? "Request from GitHub"
+                      : "Request handoff"}
                 </button>
               ) : (
                 <b>{handoff.status}</b>

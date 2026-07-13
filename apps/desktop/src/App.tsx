@@ -24,8 +24,14 @@ import { createAppRoomPanelActions } from "./lib/appRoomPanelActions";
 import { AppShellView } from "./components/AppShellView";
 import { CodexServerRequestDialog } from "./components/CodexServerRequestDialog";
 import { defaultBrowserReason, defaultBrowserUrl, emptyRoom, maxTerminalActivityLines } from "./appDefaults";
+import { WebPreviewDemo } from "./components/WebPreviewDemo";
 
 export function App() {
+  if (!isTauriRuntime()) return <WebPreviewDemo />;
+  return <NativeApp />;
+}
+
+function NativeApp() {
   React.useEffect(() => useAppStore.getState().loadTrustedDeviceKeysOnce(), []);
   const relayHttpUrl = useAppStore((state) => state.appConfig.relayHttpUrl);
   const selectedRoomId = useAppStore((state) => state.selectedRoomId);

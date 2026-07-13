@@ -21,7 +21,7 @@ export interface RelayMetricsSnapshot {
 }
 
 export interface RelayMetrics {
-  recordEnvelopePublished(): void;
+  recordMlsMessagePublished(): void;
   recordAttachmentBlobUpload(bytes: number): void;
   recordAttachmentBlobUploadRejection(reason: string): void;
   recordQuotaRejection(type: string): void;
@@ -72,7 +72,7 @@ export function createRelayMetrics(now = () => Date.now()): RelayMetrics {
   const webSocketConnectionRejectionsByReason = new Map<string, number>();
 
   return {
-    recordEnvelopePublished() {
+    recordMlsMessagePublished() {
       envelopesPublishedTotal += 1;
     },
     recordAttachmentBlobUpload(bytes) {

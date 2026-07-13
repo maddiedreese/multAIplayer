@@ -25,7 +25,7 @@ export function createAppRoomActions({
       localPreviewBusyRef: appRefs.localPreviewBusyRef,
       hostBusyRef: appRefs.hostBusyRef,
       settingsBusyRef: appRefs.settingsBusyRef,
-      keyRotationBusyRef: appRefs.keyRotationBusyRef,
+      membershipCommitBusyRef: appRefs.membershipCommitBusyRef,
       fileBusyRef: appRefs.fileBusyRef,
       terminalBusyRef: appRefs.terminalBusyRef
     },

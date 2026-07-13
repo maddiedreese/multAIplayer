@@ -77,8 +77,8 @@ export const createRelayRuntimeSlice: StateCreator<AppStoreState, [], [], RelayR
     })),
   restoreWorkspaceAccess: (teamId, roomId) =>
     set((state) => ({
-      // Restoring relay authorization does not restore the local room secret. Keep the
-      // room forgotten until an invite import or key rotation supplies that secret.
+      // Restoring relay authorization does not restore native MLS group state. Keep the
+      // room forgotten until this device completes a new Welcome join.
       revokedRoomIds: withoutValue(state.revokedRoomIds, roomId),
       revokedTeamIds: withoutValue(state.revokedTeamIds, teamId)
     }))

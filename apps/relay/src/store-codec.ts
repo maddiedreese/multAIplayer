@@ -1,7 +1,10 @@
 import {
   AttachmentBlobRecord,
   InviteRecord,
-  RelayEnvelope,
+  InviteJoinRequestRecord,
+  InviteResponseRecord,
+  KeyPackageRecord,
+  MlsRelayMessage,
   isRecord,
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
@@ -14,6 +17,7 @@ import {
   type AttachmentBlobRecord as AttachmentBlobRecordType,
   type DeviceRecord,
   type InviteRecord as InviteRecordType,
+  type KeyPackageRecord as KeyPackageRecordType,
   type RoomRecord,
   type TeamMemberRecord,
   type TeamRecord
@@ -29,14 +33,19 @@ import {
   normalizeCodexCatalogSelectionPolicy,
   normalizeCodexReasoningEffortOrDefault,
   normalizeCodexSpeedOrDefault,
-  normalizeDevicePublicKeyJwk,
   normalizeMetadataText,
   normalizeOptionalMetadataText,
   normalizeRelayId,
   normalizeRoomProjectPath,
   normalizeTeamRole
 } from "./limits.js";
-import type { AuthSession, RelayStore, RoomKey } from "./state.js";
+import {
+  isCanonicalPaddedBase64,
+  isStrictExporterCiphertextJson,
+  parseStrictDirectedInviteRequestJson
+} from "./opaque.js";
+import type { AcceptedMessageReceipt, AuthSession, InviteAckReceipt, RelayStore, RoomKey } from "./state.js";
+import { fingerprintPublicKey, validP256HpkeKey, validP256Spki } from "./http/devices.js";
 
 export interface StoredRelayState {
   version: 1;
@@ -45,6 +54,11 @@ export interface StoredRelayState {
   rooms: RoomRecord[];
   invites: InviteRecordType[];
   devices?: DeviceRecord[];
+  keyPackages?: KeyPackageRecordType[];
+  inviteRequests?: unknown[];
+  inviteResponses?: unknown[];
+  inviteAckReceipts?: unknown[];
+  acceptedMessageReceipts?: unknown[];
   teamMembers?: Array<{
     teamId: string;
     members?: Array<{
@@ -56,9 +70,9 @@ export interface StoredRelayState {
   }>;
   authSessions?: StoredAuthSession[];
   attachmentBlobs?: AttachmentBlobRecordType[];
-  encryptedBacklog: Array<{
+  mlsBacklog: Array<{
     key: RoomKey;
-    envelopes: RelayEnvelope[];
+    messages: MlsRelayMessage[];
   }>;
 }
 
@@ -80,8 +94,8 @@ export function createRelayStoreCodec(options: {
   maxDeviceIdChars: number;
   maxDisplayNameChars: number;
   maxEnvelopeIdChars: number;
-  maxEnvelopeNonceChars: number;
   maxHostNameChars: number;
+  maxMlsMessageChars: number;
   maxPublicKeyFingerprintChars: number;
   maxPublicKeyJwkChars: number;
   maxRoomIdChars: number;
@@ -90,9 +104,8 @@ export function createRelayStoreCodec(options: {
   maxTeamIdChars: number;
   maxTeamNameChars: number;
   maxUserIdChars: number;
-  isAllowedEnvelopePayload: (envelope: RelayEnvelope) => boolean;
   normalizeStoredAuthSession: (stored: unknown) => NormalizedStoredAuthSession | null;
-  pruneEncryptedBacklog: (envelopes: RelayEnvelope[]) => RelayEnvelope[];
+  pruneMlsBacklog: (messages: MlsRelayMessage[]) => MlsRelayMessage[];
   storedAuthSessions: (authSessions: Map<string, AuthSession>) => StoredAuthSession[];
   now?: () => number;
 }): RelayStoreCodec {
@@ -109,10 +122,6 @@ export function createRelayStoreCodec(options: {
 
   function isKnownRoom(teamId: string, roomId: string): boolean {
     return store.rooms.get(roomId)?.teamId === teamId;
-  }
-
-  function normalizeDevicePublicKey(value: unknown) {
-    return normalizeDevicePublicKeyJwk(value, options.maxPublicKeyJwkChars);
   }
 
   function normalizeProjectPath(value: unknown): string | null {
@@ -139,22 +148,42 @@ export function createRelayStoreCodec(options: {
 
   function normalizeDevice(device: unknown): DeviceRecord | null {
     if (!isRecord(device)) return null;
-    const publicKeyJwk = normalizeDevicePublicKey(device.publicKeyJwk);
     const userId = normalizeMetadataText(device.userId, options.maxUserIdChars);
     const deviceId = normalizeMetadataText(device.deviceId, options.maxDeviceIdChars);
     const displayName = normalizeMetadataText(device.displayName, options.maxDisplayNameChars);
-    const publicKeyFingerprint = normalizeMetadataText(
-      device.publicKeyFingerprint,
+    const signaturePublicKey = normalizeMetadataText(device.signaturePublicKey, options.maxPublicKeyJwkChars);
+    const hpkePublicKey = normalizeMetadataText(device.hpkePublicKey, options.maxPublicKeyJwkChars);
+    const signatureKeyFingerprint = normalizeMetadataText(
+      device.signatureKeyFingerprint,
       options.maxPublicKeyFingerprintChars
     );
-    if (!userId || !deviceId || !displayName || !publicKeyFingerprint || !publicKeyJwk) return null;
+    const hpkeKeyFingerprint = normalizeMetadataText(device.hpkeKeyFingerprint, options.maxPublicKeyFingerprintChars);
+    if (
+      !userId ||
+      !deviceId ||
+      !displayName ||
+      !signaturePublicKey ||
+      !hpkePublicKey ||
+      !signatureKeyFingerprint ||
+      !hpkeKeyFingerprint
+    )
+      return null;
+    if (
+      !validP256Spki(signaturePublicKey, options.maxPublicKeyJwkChars) ||
+      !validP256HpkeKey(hpkePublicKey, options.maxPublicKeyJwkChars) ||
+      signatureKeyFingerprint !== fingerprintPublicKey(signaturePublicKey) ||
+      hpkeKeyFingerprint !== fingerprintPublicKey(hpkePublicKey)
+    )
+      return null;
     if (typeof device.registeredAt !== "string" || typeof device.lastSeenAt !== "string") return null;
     return {
       userId,
       deviceId,
       displayName,
-      publicKeyJwk,
-      publicKeyFingerprint,
+      signaturePublicKey,
+      signatureKeyFingerprint,
+      hpkePublicKey,
+      hpkeKeyFingerprint,
       registeredAt: device.registeredAt,
       lastSeenAt: device.lastSeenAt
     };
@@ -173,6 +202,139 @@ export function createRelayStoreCodec(options: {
     return { ...parsed.data, id };
   }
 
+  function normalizeKeyPackage(value: unknown): KeyPackageRecordType | null {
+    const parsed = KeyPackageRecord.safeParse(value);
+    if (!parsed.success || !isCanonicalPaddedBase64(parsed.data.keyPackage, 32_768)) return null;
+    return store.getDevice(parsed.data.userId, parsed.data.deviceId) ? parsed.data : null;
+  }
+
+  function normalizeRequest(value: unknown) {
+    const parsed = InviteJoinRequestRecord.safeParse(value);
+    if (!parsed.success) return null;
+    const directed = parseStrictDirectedInviteRequestJson(parsed.data.sealedRequest, 1_400_000);
+    const invite = store.getInvite(parsed.data.inviteId);
+    const room = invite && store.getRoom(invite.roomId);
+    return directed &&
+      invite &&
+      room &&
+      directed.binding.inviteId === invite.id &&
+      directed.binding.teamId === invite.teamId &&
+      directed.binding.roomId === invite.roomId &&
+      directed.binding.keyEpoch === (room.acceptedMlsEpoch ?? 0) &&
+      directed.binding.keyPackageHash === parsed.data.keyPackageHash &&
+      directed.binding.requestId === parsed.data.requestId &&
+      directed.binding.requesterUserId === parsed.data.requesterUserId &&
+      directed.binding.requesterDeviceId === parsed.data.requesterDeviceId &&
+      directed.binding.hostUserId === room.hostUserId &&
+      directed.binding.hostDeviceId === room.activeHostDeviceId &&
+      directed.binding.expiresAt === invite.expiresAt
+      ? parsed.data
+      : null;
+  }
+  function normalizeWelcome(value: unknown) {
+    const parsed = InviteResponseRecord.safeParse(value);
+    if (!parsed.success) return null;
+    const response = parsed.data;
+    const binding = response.responseBinding;
+    const invite = store.getInvite(response.inviteId);
+    const linked =
+      binding.inviteId === response.inviteId &&
+      binding.requestId === response.requestId &&
+      binding.requesterUserId === response.requesterUserId &&
+      binding.requesterDeviceId === response.requesterDeviceId &&
+      binding.keyPackageHash === response.keyPackageHash &&
+      binding.status === response.status &&
+      invite?.teamId === binding.teamId &&
+      invite.roomId === binding.roomId &&
+      (response.status !== "approved" ||
+        (invite.approvedUserId === response.requesterUserId &&
+          invite.approvedDeviceId === response.requesterDeviceId &&
+          invite.keyPackageHash === response.keyPackageHash));
+    return linked &&
+      isCanonicalPaddedBase64(parsed.data.responseMac, 128) &&
+      (parsed.data.welcome === undefined || isCanonicalPaddedBase64(parsed.data.welcome, 1_400_000))
+      ? parsed.data
+      : null;
+  }
+
+  function normalizeInviteAckReceipt(value: unknown): InviteAckReceipt | null {
+    if (!isRecord(value)) return null;
+    const fields = [
+      normalizeRelayId(value.inviteId, options.maxEnvelopeIdChars),
+      normalizeRelayId(value.requestId, options.maxEnvelopeIdChars),
+      normalizeRelayId(value.teamId, options.maxTeamIdChars),
+      normalizeMetadataText(value.requesterUserId, options.maxUserIdChars),
+      normalizeMetadataText(value.requesterDeviceId, options.maxDeviceIdChars)
+    ];
+    if (
+      fields.some((field) => !field) ||
+      typeof value.keyPackageHash !== "string" ||
+      !/^sha256:[0-9a-f]{64}$/.test(value.keyPackageHash)
+    )
+      return null;
+    if (
+      typeof value.acknowledgedAt !== "string" ||
+      typeof value.expiresAt !== "string" ||
+      Number.isNaN(Date.parse(value.acknowledgedAt)) ||
+      Date.parse(value.expiresAt) <= now()
+    )
+      return null;
+    const [inviteId, requestId, teamId, requesterUserId, requesterDeviceId] = fields as string[];
+    if (value.status !== "approved" && value.status !== "denied") return null;
+    const status = value.status;
+    if (!store.hasTeam(teamId) || (status === "approved" && !store.hasTeamMember(teamId, requesterUserId))) return null;
+    return {
+      inviteId,
+      requestId,
+      teamId,
+      requesterUserId,
+      requesterDeviceId,
+      keyPackageHash: value.keyPackageHash,
+      status,
+      acknowledgedAt: value.acknowledgedAt,
+      expiresAt: value.expiresAt
+    };
+  }
+
+  function normalizeAcceptedMessageReceipt(value: unknown): AcceptedMessageReceipt | null {
+    if (!isRecord(value) || typeof value.roomKey !== "string" || typeof value.digest !== "string") return null;
+    const [teamId, roomId, extra] = value.roomKey.split(":");
+    const messageId = normalizeRelayId(value.messageId, options.maxEnvelopeIdChars);
+    if (
+      extra !== undefined ||
+      !teamId ||
+      !roomId ||
+      !isKnownRoom(teamId, roomId) ||
+      !messageId ||
+      !/^[0-9a-f]{64}$/.test(value.digest)
+    )
+      return null;
+    if (
+      typeof value.parentEpoch !== "number" ||
+      !Number.isSafeInteger(value.parentEpoch) ||
+      value.parentEpoch < 0 ||
+      typeof value.acceptedAt !== "string"
+    )
+      return null;
+    const acceptedAt = Date.parse(value.acceptedAt);
+    if (!Number.isFinite(acceptedAt) || acceptedAt < now() - 180 * 24 * 60 * 60 * 1000) return null;
+    if (value.messageType !== "application" && value.messageType !== "commit") return null;
+    const messageType = value.messageType;
+    const senderUserId = normalizeMetadataText(value.senderUserId, options.maxUserIdChars);
+    const senderDeviceId = normalizeMetadataText(value.senderDeviceId, options.maxDeviceIdChars);
+    if (!senderUserId || !senderDeviceId) return null;
+    return {
+      roomKey: value.roomKey as RoomKey,
+      messageId,
+      messageType,
+      senderUserId,
+      senderDeviceId,
+      parentEpoch: value.parentEpoch,
+      digest: value.digest,
+      acceptedAt: value.acceptedAt
+    };
+  }
+
   function normalizeAttachmentBlob(blob: unknown): AttachmentBlobRecordType | null {
     const parsed = AttachmentBlobRecord.safeParse(blob);
     if (!parsed.success) return null;
@@ -184,8 +346,13 @@ export function createRelayStoreCodec(options: {
     if (!store.rooms.has(parsed.data.roomId) || store.rooms.get(parsed.data.roomId)?.teamId !== parsed.data.teamId)
       return null;
     if (parsed.data.size > options.attachmentBlobMaxBytes) return null;
-    if (parsed.data.payload.nonce.length > options.maxEnvelopeNonceChars) return null;
-    if (parsed.data.payload.ciphertext.length > maxCiphertextCharactersForBlob(options.attachmentBlobMaxBytes))
+    if (parsed.data.sealedBlob.length > maxCiphertextCharactersForBlob(options.attachmentBlobMaxBytes)) return null;
+    if (
+      !isStrictExporterCiphertextJson(
+        parsed.data.sealedBlob,
+        maxCiphertextCharactersForBlob(options.attachmentBlobMaxBytes)
+      )
+    )
       return null;
     if (Number.isNaN(Date.parse(parsed.data.createdAt))) return null;
     if (parsed.data.expiresAt && Number.isNaN(Date.parse(parsed.data.expiresAt))) return null;
@@ -200,22 +367,28 @@ export function createRelayStoreCodec(options: {
     return Boolean(blob.expiresAt && Date.parse(blob.expiresAt) < now());
   }
 
-  function normalizeStoredBacklog(item: unknown): { key: RoomKey; envelopes: RelayEnvelope[] } | null {
-    if (!isRecord(item) || typeof item.key !== "string" || !Array.isArray(item.envelopes)) return null;
+  function normalizeStoredBacklog(item: unknown): { key: RoomKey; messages: MlsRelayMessage[] } | null {
+    if (!isRecord(item) || typeof item.key !== "string" || !Array.isArray(item.messages)) return null;
     const [teamId, roomId, extra] = item.key.split(":");
     if (extra !== undefined || !teamId || !roomId || !isKnownRoom(teamId, roomId)) return null;
 
-    const envelopes: RelayEnvelope[] = [];
-    for (const candidate of item.envelopes) {
-      const parsed = RelayEnvelope.safeParse(candidate);
+    const messages: MlsRelayMessage[] = [];
+    for (const candidate of item.messages) {
+      const parsed = MlsRelayMessage.safeParse(candidate);
       if (!parsed.success) continue;
       if (parsed.data.teamId !== teamId || parsed.data.roomId !== roomId) continue;
-      if (!options.isAllowedEnvelopePayload(parsed.data)) continue;
-      envelopes.push(parsed.data);
+      if (!isCanonicalPaddedBase64(parsed.data.mlsMessage, options.maxMlsMessageChars)) continue;
+      if (
+        parsed.data.hostTransferAuthorization &&
+        (!isCanonicalPaddedBase64(parsed.data.hostTransferAuthorization.signatureDer, 1_400_000) ||
+          !isCanonicalPaddedBase64(parsed.data.hostTransferAuthorization.publicKeySpkiDer, 1_400_000))
+      )
+        continue;
+      messages.push(parsed.data);
     }
 
-    const pruned = options.pruneEncryptedBacklog(envelopes);
-    return pruned.length ? { key: roomKey(teamId, roomId), envelopes: pruned } : null;
+    const pruned = options.pruneMlsBacklog(messages);
+    return pruned.length ? { key: roomKey(teamId, roomId), messages: pruned } : null;
   }
 
   function normalizeRoom(room: unknown): RoomRecord | null {
@@ -228,12 +401,11 @@ export function createRelayStoreCodec(options: {
         ? room.hostStatus
         : "offline";
     const name = normalizeMetadataText(room.name, options.maxRoomNameChars) ?? "Untitled room";
-    const host =
-      hostStatus === "offline" ? "No host" : (normalizeMetadataText(room.host, options.maxHostNameChars) ?? "No host");
-    const hostUserId =
-      hostStatus === "offline"
-        ? undefined
-        : normalizeOptionalMetadataText(room.hostUserId, options.maxUserIdChars) || undefined;
+    const normalizedHostUserId = normalizeOptionalMetadataText(room.hostUserId, options.maxUserIdChars) || undefined;
+    const hostUserId = normalizedHostUserId;
+    const host = hostUserId
+      ? (normalizeMetadataText(room.host, options.maxHostNameChars) ?? "Reserved host")
+      : "No host";
     const approvalPolicy =
       typeof room.approvalPolicy === "string" && isApprovalPolicy(room.approvalPolicy)
         ? room.approvalPolicy
@@ -259,20 +431,22 @@ export function createRelayStoreCodec(options: {
     return {
       id,
       teamId,
-      keyEpoch:
-        typeof room.keyEpoch === "number" && Number.isSafeInteger(room.keyEpoch) && room.keyEpoch > 0
-          ? room.keyEpoch
-          : 1,
-      epochEnvelopeCount:
-        typeof room.epochEnvelopeCount === "number" &&
-        Number.isSafeInteger(room.epochEnvelopeCount) &&
-        room.epochEnvelopeCount >= 0
-          ? room.epochEnvelopeCount
-          : 0,
+      acceptedMlsEpoch:
+        typeof room.acceptedMlsEpoch === "number" &&
+        Number.isSafeInteger(room.acceptedMlsEpoch) &&
+        room.acceptedMlsEpoch >= 0
+          ? room.acceptedMlsEpoch
+          : hostStatus === "active"
+            ? 0
+            : undefined,
       name,
       projectPath: normalizeProjectPath(room.projectPath) ?? "/",
       host,
       hostUserId,
+      activeHostDeviceId:
+        hostStatus === "offline"
+          ? undefined
+          : normalizeOptionalMetadataText(room.activeHostDeviceId, options.maxDeviceIdChars) || undefined,
       hostStatus,
       approvalPolicy,
       approvalDelegationPolicy,
@@ -362,8 +536,28 @@ export function createRelayStoreCodec(options: {
         const normalized = normalizeDevice(device);
         if (normalized) store.devices.set(deviceKey(normalized.userId, normalized.deviceId), normalized);
       }
+      for (const keyPackage of storedArray(stored.keyPackages)) {
+        const normalized = normalizeKeyPackage(keyPackage);
+        if (normalized && !store.keyPackages.has(normalized.id)) store.setKeyPackage(normalized);
+      }
+      for (const request of storedArray(stored.inviteRequests)) {
+        const parsed = normalizeRequest(request);
+        if (parsed && !store.inviteRequests.has(parsed.requestId)) store.inviteRequests.set(parsed.requestId, parsed);
+      }
+      for (const response of storedArray(stored.inviteResponses)) {
+        const parsed = normalizeWelcome(response);
+        if (parsed && !store.inviteResponses.has(parsed.requestId)) store.inviteResponses.set(parsed.requestId, parsed);
+      }
       for (const item of storedArray(stored.teamMembers)) {
         applyStoredTeamMembers(item);
+      }
+      for (const receipt of storedArray(stored.inviteAckReceipts)) {
+        const normalized = normalizeInviteAckReceipt(receipt);
+        if (normalized) store.inviteAckReceipts.set(normalized.requestId, normalized);
+      }
+      for (const receipt of storedArray(stored.acceptedMessageReceipts)) {
+        const normalized = normalizeAcceptedMessageReceipt(receipt);
+        if (normalized) store.acceptedMessageReceipts.set(`${normalized.roomKey}\0${normalized.messageId}`, normalized);
       }
       for (const blob of storedArray(stored.attachmentBlobs)) {
         const normalized = normalizeAttachmentBlob(blob);
@@ -373,9 +567,9 @@ export function createRelayStoreCodec(options: {
         const normalized = options.normalizeStoredAuthSession(storedSession);
         if (normalized) store.authSessions.set(normalized.sessionId, normalized.session);
       }
-      for (const item of storedArray(stored.encryptedBacklog)) {
+      for (const item of storedArray(stored.mlsBacklog)) {
         const normalized = normalizeStoredBacklog(item);
-        if (normalized) store.encryptedBacklog.set(normalized.key, normalized.envelopes);
+        if (normalized) store.mlsBacklog.set(normalized.key, normalized.messages);
       }
     },
     pruneExpiredRelayState() {
@@ -383,17 +577,53 @@ export function createRelayStoreCodec(options: {
         if (session.expiresAt <= now()) store.authSessions.delete(id);
       }
       for (const [id, invite] of store.invites.entries()) {
-        if (isExpiredInvite(invite)) store.invites.delete(id);
+        if (isExpiredInvite(invite)) {
+          store.invites.delete(id);
+          for (const [requestId, request] of store.inviteRequests) {
+            if (request.inviteId === id) store.inviteRequests.delete(requestId);
+          }
+          for (const [requestId, response] of store.inviteResponses) {
+            if (response.inviteId === id) store.inviteResponses.delete(requestId);
+          }
+        }
+      }
+      for (const [id, receipt] of store.inviteAckReceipts) {
+        if (Date.parse(receipt.expiresAt) <= now()) store.inviteAckReceipts.delete(id);
+      }
+      const ackReceipts = Array.from(store.inviteAckReceipts.entries()).sort(
+        (left, right) => Date.parse(left[1].acknowledgedAt) - Date.parse(right[1].acknowledgedAt)
+      );
+      for (const [id] of ackReceipts.slice(0, Math.max(0, ackReceipts.length - 4096)))
+        store.inviteAckReceipts.delete(id);
+      for (const [id, receipt] of store.acceptedMessageReceipts) {
+        if (Date.parse(receipt.acceptedAt) < now() - 180 * 24 * 60 * 60 * 1000)
+          store.acceptedMessageReceipts.delete(id);
+      }
+      const receiptPools = new Map<string, Array<[string, AcceptedMessageReceipt]>>();
+      for (const entry of store.acceptedMessageReceipts) {
+        const [, receipt] = entry;
+        const pool =
+          receipt.messageType === "commit"
+            ? `${receipt.roomKey}\0commit`
+            : `${receipt.roomKey}\0application\0${receipt.senderUserId}`;
+        const receipts = receiptPools.get(pool) ?? [];
+        receipts.push(entry);
+        receiptPools.set(pool, receipts);
+      }
+      for (const receipts of receiptPools.values()) {
+        receipts.sort((left, right) => Date.parse(left[1].acceptedAt) - Date.parse(right[1].acceptedAt));
+        for (const [id] of receipts.slice(0, Math.max(0, receipts.length - 4096)))
+          store.acceptedMessageReceipts.delete(id);
       }
       for (const [id, blob] of store.attachmentBlobs.entries()) {
         if (isExpiredAttachmentBlob(blob)) store.attachmentBlobs.delete(id);
       }
-      for (const [key, envelopes] of store.encryptedBacklog.entries()) {
-        const pruned = options.pruneEncryptedBacklog(envelopes);
+      for (const [key, messages] of store.mlsBacklog.entries()) {
+        const pruned = options.pruneMlsBacklog(messages);
         if (pruned.length) {
-          store.encryptedBacklog.set(key, pruned);
+          store.mlsBacklog.set(key, pruned);
         } else {
-          store.encryptedBacklog.delete(key);
+          store.mlsBacklog.delete(key);
         }
       }
     },
@@ -405,6 +635,11 @@ export function createRelayStoreCodec(options: {
         rooms: Array.from(store.rooms.values()),
         invites: Array.from(store.invites.values()).filter((invite) => !isExpiredInvite(invite)),
         devices: Array.from(store.devices.values()),
+        keyPackages: Array.from(store.keyPackages.values()),
+        inviteRequests: Array.from(store.inviteRequests.values()),
+        inviteResponses: Array.from(store.inviteResponses.values()),
+        inviteAckReceipts: Array.from(store.inviteAckReceipts.values()),
+        acceptedMessageReceipts: Array.from(store.acceptedMessageReceipts.values()),
         teamMembers: Array.from(store.teamMembers.entries()).map(([teamId, members]) => ({
           teamId,
           members: Array.from(members.values()),
@@ -412,12 +647,12 @@ export function createRelayStoreCodec(options: {
         })),
         authSessions: options.storedAuthSessions(store.authSessions),
         attachmentBlobs: Array.from(store.attachmentBlobs.values()).filter((blob) => !isExpiredAttachmentBlob(blob)),
-        encryptedBacklog: Array.from(store.encryptedBacklog.entries())
-          .map(([key, envelopes]) => ({
+        mlsBacklog: Array.from(store.mlsBacklog.entries())
+          .map(([key, messages]) => ({
             key,
-            envelopes: options.pruneEncryptedBacklog(envelopes)
+            messages: options.pruneMlsBacklog(messages)
           }))
-          .filter((item) => item.envelopes.length > 0)
+          .filter((item) => item.messages.length > 0)
       };
     }
   };

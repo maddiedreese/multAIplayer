@@ -107,7 +107,7 @@ export function useAppWorkspaceFlow({
         untrustDeviceForRoom: storeAction("untrustDeviceForRoom"),
         updateTeamRoleForTeam: storeAction("updateTeamRoleForTeam"),
         updateTeamMemberCountForTeam: storeAction("updateTeamMemberCountForTeam"),
-        rotateRoomKeyForDevices: inviteActions.rotateRoomKeyForDevices
+        removeMembersFromMlsGroup: inviteActions.removeMembersFromMlsGroup
       },
       workspaceCreation: {
         setWorkspaceStatusError: storeAction("setWorkspaceStatusError"),

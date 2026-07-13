@@ -16,7 +16,7 @@ Project Codex activity through a bounded allowlist before it can enter room stat
 
 Discard raw commands, output, arguments, results, prompt previews, upstream JSON, environment data, secret-bearing fields, account/authentication state, token refreshes, token deltas, and output deltas. Unknown item types or fields do not become shared merely because they arrive from a supported app-server.
 
-The canonical activity is then carried in encrypted room envelopes and encrypted local history. This boundary is separate from explicit sharing flows for chat, attachments, approved terminal results, diffs, and other artifacts that have their own review and size controls.
+The canonical activity is then carried in MLS application messages and encrypted local history. This boundary is separate from explicit sharing flows for chat, attachments, approved terminal results, diffs, and other artifacts that have their own review and size controls.
 
 ## Consequences
 

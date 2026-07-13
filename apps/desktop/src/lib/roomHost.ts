@@ -1,4 +1,4 @@
-import type { RelayEnvelope, RoomRecord } from "@multaiplayer/protocol";
+import type { MlsRelayMessage, RoomRecord } from "@multaiplayer/protocol";
 
 export interface LocalHostUser {
   id: string;
@@ -15,7 +15,7 @@ export function findEnvelopeRoom(rooms: RoomRecord[], roomId: string): RoomRecor
 
 export function isEnvelopeFromActiveRoomHost(
   room: RoomRecord | null,
-  envelope: Pick<RelayEnvelope, "senderUserId">
+  envelope: Pick<MlsRelayMessage, "senderUserId">
 ): boolean {
   return Boolean(room?.hostStatus === "active" && room.hostUserId && room.hostUserId === envelope.senderUserId);
 }
@@ -26,7 +26,7 @@ export function isEnvelopeFromActiveRoomHost(
  */
 export function isEnvelopeFromHandoffInitiator(
   room: RoomRecord | null,
-  envelope: Pick<RelayEnvelope, "senderUserId">
+  envelope: Pick<MlsRelayMessage, "senderUserId">
 ): boolean {
   return Boolean(
     room &&

@@ -7,7 +7,6 @@ pub(crate) const MAX_TERMINAL_COMMAND_CHARS: usize = 4_000;
 pub(crate) const MAX_TERMINAL_INPUT_CHARS: usize = 4_000;
 pub(crate) const MAX_CODEX_INPUT_CHARS: usize = 240_000;
 pub(crate) const MAX_CODEX_THREAD_ID_CHARS: usize = 200;
-pub(crate) const MAX_DEVICE_IDENTITY_CHARS: usize = 16_384;
 pub(crate) const MAX_GIT_DIFF_CHARS: usize = 200_000;
 pub(crate) const MAX_GIT_PATCH_CHARS: usize = 120_000;
 pub(crate) const MAX_COMMAND_OUTPUT_CHARS: usize = 120_000;
@@ -326,11 +325,6 @@ pub(crate) fn ensure_preview_id(id: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn keychain_account(room_id: &str) -> Result<String, String> {
-    ensure_room_id(room_id)?;
-    Ok(format!("room:{room_id}"))
-}
-
 pub(crate) fn ensure_room_id(room_id: &str) -> Result<(), String> {
     if room_id.is_empty() || room_id.len() > MAX_ROOM_ID_CHARS {
         return Err("room id is invalid".to_string());
@@ -353,17 +347,6 @@ pub(crate) fn ensure_terminal_id(id: &str) -> Result<(), String> {
     }
     ensure_room_id(room_id)?;
     ensure_terminal_name(terminal_name)
-}
-
-pub(crate) fn ensure_device_identity_payload(identity: &str) -> Result<(), String> {
-    let trimmed = identity.trim();
-    if trimmed.is_empty() || trimmed.len() > MAX_DEVICE_IDENTITY_CHARS {
-        return Err("device identity is invalid".to_string());
-    }
-    if !trimmed.starts_with('{') || !trimmed.ends_with('}') {
-        return Err("device identity must be a JSON object".to_string());
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -454,12 +437,6 @@ mod tests {
         assert_eq!(preview_at_limit.len(), MAX_PREVIEW_URL_CHARS);
         assert!(validate_local_preview_url(&preview_at_limit).is_ok());
         assert!(validate_local_preview_url(&format!("{preview_at_limit}a")).is_err());
-
-        let identity_at_limit = format!("{{{}}}", "a".repeat(MAX_DEVICE_IDENTITY_CHARS - 2));
-        assert_eq!(identity_at_limit.len(), MAX_DEVICE_IDENTITY_CHARS);
-        assert!(ensure_device_identity_payload(&identity_at_limit).is_ok());
-        let identity_over_limit = format!("{{{}}}", "a".repeat(MAX_DEVICE_IDENTITY_CHARS - 1));
-        assert!(ensure_device_identity_payload(&identity_over_limit).is_err());
     }
 
     #[test]

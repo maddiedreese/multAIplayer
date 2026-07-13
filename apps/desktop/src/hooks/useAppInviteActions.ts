@@ -21,7 +21,7 @@ export function useAppInviteActions({
     relayRef: appRefs.relayRef,
     seenEnvelopeIds: appRefs.seenEnvelopeIds,
     historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
-    reportRoomKeyRotationInFlight: roomInteraction.reportRoomKeyRotationInFlight,
+    reportMembershipCommitInFlight: roomInteraction.reportMembershipCommitInFlight,
     upsertTeam: workspaceRecords.upsertTeam,
     upsertRoom: workspaceRecords.upsertRoom,
     clearInviteSecretInput: () => useAppStore.getState().clearInviteSecretInput(),

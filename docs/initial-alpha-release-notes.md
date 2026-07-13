@@ -20,7 +20,10 @@ These notes describe the public alpha release. Copy the final version into the G
 
 ## Security And Privacy Notes
 
+- Protocol v2 replaces the custom room-key and envelope design with RFC 9420 MLS through `mls-rs`. The native Rust core owns credentials, group state, commits, encryption, exporters, and retained history secrets; no raw group secret crosses into the webview.
+- Exactly one ciphersuite is accepted: `MLS_128_DHKEMP256_AES128GCM_SHA256_P256`. Both clients and the relay enforce active-host-only commits, and the relay atomically serializes one commit per expected epoch.
 - The relay routes encrypted room traffic and must not receive plaintext room transcripts, attachments, Codex credentials, OpenAI credentials, repo contents, terminal output, or browser contents.
+- Local history remains readable across MLS epochs by deliberate policy: per-epoch exporter-derived history secrets are retained in encrypted native storage. Live traffic gains MLS forward secrecy and recovery properties, but retained local history does not.
 - GitHub OAuth tokens stay on the relay. When `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured, durable GitHub sessions are encrypted before being written to the alpha relay store.
 - The active Codex host controls local project, terminal, browser, Git, GitHub, and Codex access for a room.
 - Browser, terminal, private repo, signed-in web page, `.env`, credential, and secret-output warnings remain part of the alpha trust model. Users should assume host-visible local tool context can be sensitive.
@@ -28,7 +31,10 @@ These notes describe the public alpha release. Copy the final version into the G
 ## Known Alpha Limitations
 
 - Public macOS alpha artifacts are Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
-- Member removal revokes relay access, invalidates outstanding invites, and advances affected rooms to a new key epoch delivered only to eligible registered devices. Content already delivered cannot be erased.
+- This is a clean protocol-v2 break. Rooms, ciphertext, local cryptographic state, and invite links created before v2 are not migrated and are unreadable or invalid. Create a new room and invite instead.
+- The browser/web preview is now a seeded local UI demonstration. Creating, joining, or exercising E2EE rooms requires the native desktop app.
+- Member removal revokes relay access and outstanding invites before the host issues MLS Remove commits. Content and retained history already delivered cannot be erased.
+- A device that loses or corrupts its MLS state must rejoin and cannot recover pre-rejoin backlog or history secrets.
 - The official/self-host relay uses SQLite table storage in this alpha. It needs backup/restore drills and external/shared rate limiting before production claims.
 - Release preflight includes a fixture SQLite backup/restore drill and dependency license scan; maintainers should also run the SQLite drill against a staged copy of the real relay store before tagging.
 - Rate limiting is process-local.
@@ -54,9 +60,11 @@ Recommended manual smoke test:
 
 - Sign in with GitHub.
 - Join through an invite link on a second machine/account.
-- Send encrypted messages and attachments.
+- Approve the KeyPackage-based invite and verify Welcome join.
+- Send MLS-encrypted messages and exporter-keyed attachments.
 - Invoke Codex, approve a turn, and inspect the file/diff output.
 - Open a browser preview from the browser tab and from a Codex instruction.
 - Type in a terminal, copy Markdown, and restart the terminal.
 - Create a branch, commit, push, open a draft PR, and refresh Actions.
-- Simulate or trigger usage exhaustion and accept host handoff on the second device.
+- Remove a member and verify they cannot decrypt the next epoch.
+- Simulate or trigger usage exhaustion, request host handoff on the second device, approve it on the outgoing host, and verify messaging continues.

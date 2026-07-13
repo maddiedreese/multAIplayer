@@ -1,74 +1,35 @@
-import type { MutableRefObject } from "react";
-import type { CodexSandboxLevel, HostHandoffPlaintextPayload, RelayEnvelope, RoomRecord } from "@multaiplayer/protocol";
+import type {
+  CodexSandboxLevel,
+  HostHandoffAcceptedPlaintextPayload,
+  HostHandoffPlaintextPayload,
+  HostHandoffRequestPlaintextPayload,
+  MlsRelayMessage,
+  RoomRecord
+} from "@multaiplayer/protocol";
 import { defaultCodexSandboxLevel } from "@multaiplayer/protocol";
-import { loadOrCreateRoomSecret } from "../lib/localHistory";
-import { createEncryptedRoomEnvelope, roomKeyEpoch } from "../lib/encryptedEnvelope";
+import { createMlsApplicationMessage, publishMlsApplicationMessage } from "../lib/mlsApplicationMessage";
 import {
-  applyGitPatch,
-  createGitPatch,
-  getGitRemoteOrigin,
-  shutdownCodexRoom,
-  type GitStatusSummary,
-  type TerminalSnapshot
-} from "../lib/localBackend";
-import { updateRoomHost, updateRoomSettings } from "../lib/workspaceClient";
+  authorizeMlsHostTransfer,
+  createMlsGroup,
+  markMlsPublishSucceeded,
+  mlsGroupState,
+  transferMlsHost
+} from "../lib/mlsClient";
+import { isStaleMlsPublish } from "../lib/relayClient";
+import { clearAndRebaseStaleMlsCommit } from "../lib/mlsCommitRebase";
+import { createGitPatch, getGitRemoteOrigin } from "../lib/localBackend";
+import { updateRoomHost } from "../lib/workspaceClient";
 import { buildCodexTurnSummary } from "../lib/codexTurn";
 import { codexUsageLimitMessage } from "../lib/codexFailure";
-import {
-  canAcceptRoomHostHandoff,
-  createHandoffSettingsPatch,
-  findRoomHostHandoff,
-  roomHostHandoffMessage
-} from "../lib/hostHandoff";
+import { createHandoffSettingsPatch, findRoomHostHandoff, roomHostHandoffMessage } from "../lib/hostHandoff";
 import { parseGitHubRemoteUrl } from "../lib/gitWorkflowDraft";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
 import { roomLockMessage } from "../lib/appRuntime";
-import { buildAcceptedHandoffMessage, queueForHandoff, resolveHandoffProject } from "./hostHandoffHelpers";
+import { queueForHandoff, resolveHandoffProject } from "./hostHandoffHelpers";
 import { useAppStore } from "../store/appStore";
-import type { RelayClient } from "../lib/relayClient";
-import type { BrowserAccessRequest, ChatMessage, HostHandoffRecord, QueuedCodexTurn, RelayStatus } from "../types";
-
-interface LocalUser {
-  id: string;
-  name: string;
-}
-
-interface UseHostHandoffActionsOptions {
-  hasSelectedRoom: boolean;
-  selectedRoom: RoomRecord;
-  selectedRoomIdRef: MutableRefObject<string>;
-  isSelectedRoomLocked: boolean;
-  isSelectedRoomRevoked: boolean;
-  isActiveHost: boolean;
-  hostGateMessage: string;
-  hostHandoffs: HostHandoffRecord[];
-  queuedCodexTurns: QueuedCodexTurn[];
-  localUser: LocalUser;
-  deviceId: string;
-  relayStatus: RelayStatus;
-  relayRef: MutableRefObject<RelayClient | null>;
-  seenEnvelopeIds: MutableRefObject<Set<string>>;
-  messages: ChatMessage[];
-  terminals: TerminalSnapshot[];
-  browserRequestsByRoom: Record<string, BrowserAccessRequest[]>;
-  gitStatus: GitStatusSummary | null;
-  gitStatusByRoom: Record<string, GitStatusSummary | null>;
-  reportRoomHostMutationInFlight: (roomId: string) => boolean;
-  roomSettingsActor: () => {
-    requesterName: string;
-    requesterUserId: string;
-  };
-  replaceRoom: (room: RoomRecord) => void;
-  setHostBusyForRoom: (roomId: string, busy: boolean) => void;
-  setHostMessageForRoom: (roomId: string, message: string | null) => void;
-  setSelectedHostMessage: (message: string | null) => void;
-  setSettingsMessageForRoom: (roomId: string, message: string | null) => void;
-  setProjectPathDraftForRoom: (roomId: string, projectPath: string) => void;
-  setCustomCodexModelForRoom: (roomId: string, codexModel: string) => void;
-  resetFileContextForRoom: (roomId: string) => void;
-  resetCodexApprovalForRoom: (roomId: string) => void;
-  appendHostHandoff: (roomId: string, handoff: HostHandoffRecord) => void;
-}
+import type { ChatMessage, HostHandoffRecord } from "../types";
+import type { UseHostHandoffActionsOptions } from "./hostHandoffActionTypes";
+import { useFinalizeIncomingHostHandoff } from "./useFinalizeIncomingHostHandoff";
 
 export function useHostHandoffActions({
   hasSelectedRoom,
@@ -106,6 +67,20 @@ export function useHostHandoffActions({
   const markHostHandoffAcceptedForRoom = useAppStore((state) => state.markHostHandoffAcceptedForRoom);
   const markLatestHostHandoffAcceptedForRoom = useAppStore((state) => state.markLatestHostHandoffAcceptedForRoom);
   const setCodexContinuationForRoom = useAppStore((state) => state.setCodexContinuationForRoom);
+  useFinalizeIncomingHostHandoff({
+    room: selectedRoom,
+    handoffs: hostHandoffs,
+    localUserId: localUser.id,
+    deviceId,
+    roomSettingsActor,
+    replaceRoom,
+    setHostMessage: setHostMessageForRoom,
+    setSettingsMessage: setSettingsMessageForRoom,
+    setProjectPathDraft: setProjectPathDraftForRoom,
+    setCustomCodexModel: setCustomCodexModelForRoom,
+    resetFileContext: resetFileContextForRoom,
+    resetCodexApproval: resetCodexApprovalForRoom
+  });
 
   async function setRoomHost(hostStatus: RoomRecord["hostStatus"]) {
     if (!hasSelectedRoom) {
@@ -125,28 +100,23 @@ export function useHostHandoffActions({
     setHostBusyForRoom(roomId, true);
     setHostMessageForRoom(roomId, null);
     try {
-      const host = hostStatus === "active" ? localUser.name : hostStatus === "handoff" ? selectedRoom.host : "No host";
-      const hostUserId = hostStatus === "active" ? localUser.id : (selectedRoom.hostUserId ?? localUser.id);
-      const room = await updateRoomHost(roomId, host, hostUserId, hostStatus);
-      if (hostStatus !== "active") void shutdownCodexRoom(roomId);
+      if (hostStatus === "handoff") {
+        await publishHostHandoff(selectedRoom);
+        setHostMessageForRoom(roomId, `${selectedRoom.name} is accepting verified host candidates.`);
+        return;
+      }
+      if (hostStatus !== "active")
+        throw new Error("MLS host authority can only change through a signed host-transfer Commit.");
+      const host = localUser.name;
+      const hostUserId = localUser.id;
+      if (selectedRoom.acceptedMlsEpoch === undefined) await createMlsGroup(roomId);
+      const room = await updateRoomHost(roomId, host, hostUserId, "active", deviceId);
       replaceRoom(room);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setHostMessageForRoom(
-          roomId,
-          hostStatus === "active"
-            ? `You are hosting ${room.name}.`
-            : hostStatus === "handoff"
-              ? `${room.name} is ready for host handoff.`
-              : `${room.name} no longer has an active host.`
-        );
+        setHostMessageForRoom(roomId, `You are hosting ${room.name}.`);
       }
-      if (hostStatus === "handoff") {
-        await publishHostHandoff(room);
-      }
-      if (hostStatus === "active") {
-        markLatestHostHandoffAcceptedForRoom(room.id);
-        setCodexContinuationForRoom(room.id, null);
-      }
+      markLatestHostHandoffAcceptedForRoom(room.id);
+      setCodexContinuationForRoom(room.id, null);
       resetCodexApprovalForRoom(roomId);
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
@@ -167,53 +137,21 @@ export function useHostHandoffActions({
     }
     const roomId = selectedRoom.id;
     if (reportRoomHostMutationInFlight(roomId)) return;
-    if (handoff.status !== "available") {
-      setSelectedHostMessage("This host handoff has already been accepted.");
+    if (handoff.status === "accepted") {
+      setSelectedHostMessage("This host handoff has already been completed.");
       return;
     }
     const roomHandoff = findRoomHostHandoff(hostHandoffs, handoff.id);
-    if (!roomHandoff || !canAcceptRoomHostHandoff(hostHandoffs, handoff.id)) {
+    if (!roomHandoff || (roomHandoff.status !== "available" && !(isActiveHost && roomHandoff.status === "requested"))) {
       setHostMessageForRoom(roomId, roomHostHandoffMessage(hostHandoffs, handoff.id));
       return;
     }
     setHostBusyForRoom(roomId, true);
     setHostMessageForRoom(roomId, null);
     try {
-      const patch = createHandoffSettingsPatch(roomHandoff);
-      const handoffProject = await resolveHandoffProject(roomHandoff, patch.projectPath);
-      if (roomHandoff.gitPatch && !roomHandoff.gitPatchTruncated) {
-        const patchResult = await applyGitPatch(handoffProject.path, roomHandoff.gitPatch);
-        if (patchResult.status !== 0) {
-          throw new Error(
-            `Cloned or selected the repository, but could not apply ${roomHandoff.fromHost}'s local patch: ${patchResult.stderr || patchResult.stdout || "git apply failed"}`
-          );
-        }
-      }
-      const handoffProjectPath = handoffProject.path;
-      const updatedSettings = await updateRoomSettings(roomId, {
-        ...roomSettingsActor(),
-        ...patch,
-        projectPath: handoffProjectPath
-      });
-      const claimed = await updateRoomHost(updatedSettings.id, localUser.name, localUser.id, "active");
-      void shutdownCodexRoom(roomId);
-      replaceRoom(claimed);
-      markHostHandoffAccepted(roomId, roomHandoff.id);
-      await publishHostHandoffAccepted(selectedRoom, roomHandoff);
-      setCodexContinuationForRoom(roomId, roomHandoff.reason === "usage_limit" ? roomHandoff : null);
-      resetFileContextForRoom(roomId);
-      resetCodexApprovalForRoom(roomId);
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setProjectPathDraftForRoom(roomId, handoffProjectPath);
-        setCustomCodexModelForRoom(roomId, patch.codexModel);
-        setSettingsMessageForRoom(roomId, buildAcceptedHandoffMessage(roomHandoff, handoffProject, patch.codexModel));
-        setHostMessageForRoom(
-          roomId,
-          roomHandoff.reason === "usage_limit"
-            ? `You are now hosting ${claimed.name}. Codex will continue with the full room context on the next approved turn.`
-            : `You are now hosting ${claimed.name} from ${roomHandoff.fromHost}'s handoff.`
-        );
-      }
+      if (isActiveHost && roomHandoff.status === "requested") await approveHostCandidate(roomHandoff);
+      else if (!isActiveHost && roomHandoff.status === "available") await requestHostAuthority(roomHandoff);
+      else throw new Error(isActiveHost ? "Wait for a candidate request before approving handoff." : hostGateMessage);
     } catch (error) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
         setHostMessageForRoom(roomId, String(error));
@@ -304,8 +242,7 @@ export function useHostHandoffActions({
       continuationSummary: handoff.continuationSummary,
       createdAt: handoff.createdAt
     };
-    const secret = await loadOrCreateRoomSecret(room.id);
-    const envelope: RelayEnvelope = await createEncryptedRoomEnvelope(
+    const envelope: MlsRelayMessage = await createMlsApplicationMessage(
       {
         id: crypto.randomUUID(),
         teamId: room.teamId,
@@ -313,54 +250,122 @@ export function useHostHandoffActions({
         senderDeviceId: deviceId,
         senderUserId: localUser.id,
         createdAt: new Date().toISOString(),
-        kind: "room.host",
-        keyEpoch: roomKeyEpoch(selectedRoom)
+        kind: "room.host"
       },
-      payload,
-      secret
+      payload
     );
     seenEnvelopeIds.current.add(envelope.id);
-    client.publish({ type: "publish", envelope });
+    await publishMlsApplicationMessage(client, envelope);
   }
 
-  async function publishHostHandoffAccepted(room: RoomRecord, handoff: HostHandoffRecord) {
+  async function requestHostAuthority(handoff: HostHandoffRecord) {
+    const patch = createHandoffSettingsPatch(handoff);
+    await resolveHandoffProject(handoff, patch.projectPath);
+    const group = await mlsGroupState(selectedRoom.id);
+    const self = group.roster.find((member) => member.leaf === group.selfLeaf);
+    if (!self || self.githubUserId !== localUser.id || self.deviceId !== deviceId)
+      throw new Error("Local MLS membership does not match this candidate device.");
+    const payload: HostHandoffRequestPlaintextPayload = {
+      phase: "candidate_request",
+      offerId: handoff.id,
+      candidateUserId: localUser.id,
+      candidateDeviceId: deviceId,
+      candidateLeaf: self.leaf
+    };
+    const message = await createMlsApplicationMessage(
+      {
+        id: crypto.randomUUID(),
+        teamId: selectedRoom.teamId,
+        roomId: selectedRoom.id,
+        senderDeviceId: deviceId,
+        senderUserId: localUser.id,
+        createdAt: new Date().toISOString(),
+        kind: "room.host.request"
+      },
+      payload
+    );
+    const relay = relayRef.current;
+    if (!relay) throw new Error("Relay is unavailable.");
+    seenEnvelopeIds.current.add(message.id);
+    await publishMlsApplicationMessage(relay, message);
+    setHostMessageForRoom(selectedRoom.id, "Host authority request sent. The active host must explicitly approve it.");
+  }
+
+  async function approveHostCandidate(handoff: HostHandoffRecord) {
+    if (!handoff.candidateUserId || !handoff.candidateDeviceId || handoff.candidateLeaf === undefined)
+      throw new Error("Host candidate identity is incomplete.");
+    const group = await mlsGroupState(selectedRoom.id);
+    const candidate = group.roster.find((member) => member.leaf === handoff.candidateLeaf);
+    if (
+      !candidate ||
+      candidate.githubUserId !== handoff.candidateUserId ||
+      candidate.deviceId !== handoff.candidateDeviceId
+    )
+      throw new Error("Host candidate no longer matches the authenticated MLS roster leaf.");
+    const commit = await transferMlsHost(selectedRoom.id, candidate.leaf, candidate.deviceId);
+    const signed = await authorizeMlsHostTransfer(selectedRoom.id, commit.outboxId);
+    const message: MlsRelayMessage = {
+      id: commit.outboxId,
+      teamId: selectedRoom.teamId,
+      roomId: selectedRoom.id,
+      senderDeviceId: deviceId,
+      senderUserId: localUser.id,
+      createdAt: new Date().toISOString(),
+      messageType: "commit",
+      epochHint: commit.parentEpoch,
+      mlsMessage: commit.message,
+      commitEffect: "host_handoff",
+      nextHostUserId: candidate.githubUserId,
+      nextHostDeviceId: candidate.deviceId,
+      hostTransferAuthorization: {
+        ...signed.authorization,
+        signatureDer: signed.signatureDer,
+        publicKeySpkiDer: signed.publicKeySpkiDer
+      }
+    };
+    const relay = relayRef.current;
+    if (!relay) throw new Error("Relay is unavailable.");
+    seenEnvelopeIds.current.add(message.id);
+    try {
+      await relay.publishAndWaitForAck({ type: "publish", message });
+    } catch (error) {
+      seenEnvelopeIds.current.delete(message.id);
+      if (isStaleMlsPublish(error)) {
+        const token = useAppStore.getState().deviceSessionToken;
+        if (!token) throw new Error("Device session expired before MLS stale-epoch rebase.");
+        await clearAndRebaseStaleMlsCommit(
+          relay,
+          selectedRoom,
+          { userId: localUser.id, deviceId, deviceSessionToken: token },
+          commit.outboxId,
+          commit.parentEpoch
+        );
+      }
+      throw error;
+    }
+    const committedEpoch = await markMlsPublishSucceeded(selectedRoom.id, commit.outboxId);
+    await publishHostHandoffAccepted(selectedRoom, handoff, candidate.leaf, committedEpoch);
+    markHostHandoffAccepted(selectedRoom.id, handoff.id);
+  }
+
+  async function publishHostHandoffAccepted(
+    room: RoomRecord,
+    handoff: HostHandoffRecord,
+    hostLeaf: number,
+    committedEpoch: number
+  ) {
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
     const acceptedAt = new Date().toISOString();
-    const payload: HostHandoffPlaintextPayload = {
-      id: handoff.id,
-      fromHost: handoff.fromHost,
-      fromUserId: handoff.fromUserId,
-      reason: handoff.reason,
-      projectPath: handoff.projectPath,
-      gitRemoteUrl: handoff.gitRemoteUrl,
-      gitRepoOwner: handoff.gitRepoOwner,
-      gitRepoName: handoff.gitRepoName,
-      gitBranch: handoff.gitBranch,
-      gitDirtyFiles: handoff.gitDirtyFiles,
-      gitPatch: handoff.gitPatch,
-      gitPatchTruncated: handoff.gitPatchTruncated,
-      codexModel: handoff.codexModel,
-      codexModelPolicy: handoff.codexModelPolicy,
-      codexReasoningEffort: handoff.codexReasoningEffort,
-      codexReasoningEffortPolicy: handoff.codexReasoningEffortPolicy,
-      codexSpeed: handoff.codexSpeed,
-      codexServiceTierPolicy: handoff.codexServiceTierPolicy,
-      codexSandboxLevel: handoff.codexSandboxLevel,
-      approvalPolicy: handoff.approvalPolicy,
-      messagesSinceLastCodex: handoff.messagesSinceLastCodex,
-      queuedCodexTurns: handoff.queuedCodexTurns,
-      attachmentNames: handoff.attachmentNames,
-      terminals: handoff.terminals,
-      continuationSummary: handoff.continuationSummary,
-      createdAt: handoff.createdAt,
-      status: "accepted",
-      acceptedBy: localUser.name,
-      acceptedByUserId: localUser.id,
-      acceptedAt
+    const payload: HostHandoffAcceptedPlaintextPayload = {
+      phase: "accepted",
+      offerId: handoff.id,
+      hostUserId: handoff.candidateUserId!,
+      hostDeviceId: handoff.candidateDeviceId!,
+      hostLeaf,
+      committedEpoch
     };
-    const secret = await loadOrCreateRoomSecret(room.id);
-    const envelope: RelayEnvelope = await createEncryptedRoomEnvelope(
+    const envelope: MlsRelayMessage = await createMlsApplicationMessage(
       {
         id: crypto.randomUUID(),
         teamId: room.teamId,
@@ -368,14 +373,12 @@ export function useHostHandoffActions({
         senderDeviceId: deviceId,
         senderUserId: localUser.id,
         createdAt: acceptedAt,
-        kind: "room.host",
-        keyEpoch: roomKeyEpoch(selectedRoom)
+        kind: "room.host.accepted"
       },
-      payload,
-      secret
+      payload
     );
     seenEnvelopeIds.current.add(envelope.id);
-    client.publish({ type: "publish", envelope });
+    await publishMlsApplicationMessage(client, envelope);
   }
 
   function markHostHandoffAccepted(roomId: string, handoffId: string) {

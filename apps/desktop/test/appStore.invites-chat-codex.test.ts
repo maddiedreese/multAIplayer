@@ -30,7 +30,7 @@ test("desktop store keeps invite panel state room scoped", () => {
   store.setInviteApprovalGateForRoom("room-b", false);
   store.setInviteMessageForRoom("room-a", "Invite created");
   store.setInviteMessageForRoom("room-b", null);
-  store.setKeyRotationBusyForRoom("room-a", true);
+  store.setMembershipCommitBusyForRoom("room-a", true);
   store.setInviteAdmissionForRoom("room-a", "Admitted Jordan");
   store.setInviteAdmissionForRoom("room-b", "Admitted Avery");
   store.setInviteAdmissionForRoom("room-a", null);
@@ -44,7 +44,7 @@ test("desktop store keeps invite panel state room scoped", () => {
   assert.equal(projectInvitePanelMaps(state.inviteByRoom).inviteApprovalGatesByRoom["room-b"], false);
   assert.equal(state.inviteByRoom["room-a"]?.message, "Invite created");
   assert.equal(state.inviteByRoom["room-b"]?.message, undefined);
-  assert.equal(state.inviteByRoom["room-a"]?.keyRotationBusy, true);
+  assert.equal(state.inviteByRoom["room-a"]?.membershipCommitBusy, true);
   assert.equal(state.inviteByRoom["room-a"]?.admission, undefined);
   assert.equal(state.inviteByRoom["room-b"]?.admission, "Admitted Avery");
 });

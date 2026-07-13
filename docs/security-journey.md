@@ -1,10 +1,10 @@
 # Deterministic security journey
 
-The `security-journey` CI job exercises the encrypted multi-client lifecycle without a real Codex binary or network relay. It creates host, invited-member, and removed-member device identities; wraps the initial room key for both members; exchanges an encrypted message; rotates to a new epoch after removal; and proves the remaining member can recover the new key while the removed device cannot unwrap it or decrypt subsequent traffic.
+The `security-journey` CI job runs the relay as a real child process and exercises the protocol-v2 delivery boundary with native-generated MLS fixtures. It covers device registration, KeyPackage publication and consumption, active-host Commit ordering, opaque MLS backlog delivery, removal, handoff, and plaintext scans of relay persistence artifacts.
 
 The same gate scans every serialized wire artifact for the stable canary strings in `apps/desktop/test/fixtures/injection-red-team-v1.json`. Add a new versioned fixture when the corpus meaning changes; append cases without changing the version when only coverage expands.
 
-The injection half sends adversarial room messages, attachment names, and simulated Codex server approval requests through the production context framing and injectable Codex transport. It verifies that room material retains explicit untrusted framing, a non-host cannot approve a turn, and model-originated approval requests receive no automatic response. CI publishes the JUnit result as the `security-journey-results` artifact.
+The journey verifies that non-host and stale-epoch Commits fail closed and that relay SQLite, WAL, and SHM files do not contain application plaintext, private KeyPackage material, Welcome secrets, or exporter-derived values. CI publishes the JUnit result as the `security-journey-results` artifact.
 
 Run it locally with:
 
@@ -18,11 +18,11 @@ Playwright runs the actual desktop web shell against the real relay. The focused
 `desktop-security-journeys.spec.ts` cases independently cover three user-facing authorization boundaries:
 
 - an approval-gated invite selects the room but cannot send until the host explicitly admits the device;
-- removing a member advances the local room-key epoch, revokes the removed relay session, and withholds later messages;
+- removing a member revokes relay sessions, commits an MLS Remove, and prevents the removed leaf from processing later epochs;
 - accepting a host handoff transfers both the handoff action and Codex model controls to the successor.
 
 These focused cases make UI regressions attributable to one journey. The longer
-`room-lifecycle.spec.ts` remains the cryptographic composition proof: it carries one room through rotation, removal,
+`room-lifecycle.spec.ts` remains the cryptographic composition proof: it carries one room through MLS epoch updates, removal,
 handoff, old-key decryption rejection, and relay persistence scanning. Run the complete browser suite with
 `npm run test:e2e`, or only the focused desktop cases with
 `npm run test:e2e -- e2e/desktop-security-journeys.spec.ts`.

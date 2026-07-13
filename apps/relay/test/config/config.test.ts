@@ -1,6 +1,18 @@
 import { test } from "node:test";
 import { assert, join, mkdtemp, rm, startRelay, tmpdir, writeFile } from "../support/relay.js";
 import { loadRelayConfig } from "../../src/config.js";
+import { configuredKeyPackageValidator } from "../../src/relay-app.js";
+
+test("production requires a configured MLS KeyPackage validator", () => {
+  const previous = process.env.MULTAIPLAYER_MLS_VALIDATOR_PATH;
+  try {
+    delete process.env.MULTAIPLAYER_MLS_VALIDATOR_PATH;
+    assert.throws(() => configuredKeyPackageValidator("production"), /MLS_VALIDATOR_PATH/);
+  } finally {
+    if (previous === undefined) delete process.env.MULTAIPLAYER_MLS_VALIDATOR_PATH;
+    else process.env.MULTAIPLAYER_MLS_VALIDATOR_PATH = previous;
+  }
+});
 
 test("relay validates PORT with the bounded integer parser", () => {
   const previous = process.env.PORT;

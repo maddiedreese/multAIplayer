@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { createRelayAuthSessionManager, createRelayAuthSessionPersistence } from "./auth/session.js";
 import {
-  RelayEnvelope,
+  MlsRelayMessage,
   isRecord,
   maxAccessTokenChars,
   maxAttachmentBlobIdChars,
@@ -16,7 +16,6 @@ import {
   maxDeviceIdChars,
   maxDisplayNameChars,
   maxEnvelopeIdChars,
-  maxEnvelopeNonceChars,
   maxGitHubDeviceCodeChars,
   maxHostNameChars,
   maxMediumTextChars,
@@ -43,7 +42,6 @@ import { registerRelayRoutes } from "./http/register-routes.js";
 import { teamRecordForUser } from "./http/teams.js";
 import { createRelayLifecycle } from "./lifecycle.js";
 import {
-  isAllowedEnvelopePayload as isAllowedEnvelopePayloadWithLimits,
   isApprovalDelegationPolicy,
   isApprovalPolicy,
   isJsonStringifiableWithin,
@@ -59,7 +57,7 @@ import {
   normalizeRelayId,
   normalizeRoomProjectPath as normalizeRoomProjectPathWithLimit,
   parseIntegerValue,
-  pruneEncryptedBacklog as pruneEncryptedBacklogWithLimits
+  pruneMlsBacklog as pruneMlsBacklogWithLimits
 } from "./limits.js";
 import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
 import { createRelayPersistence } from "./persistence.js";
@@ -70,9 +68,16 @@ import { registerRelayWebSocketConnection } from "./ws/connection.js";
 import { createRelayFanout } from "./ws/fanout.js";
 import { createRelayRoomSocketManager } from "./ws/rooms.js";
 import { createRelayRuntimeControl } from "./runtime-control.js";
+import { hasDeviceSession } from "./http/device-auth.js";
+import {
+  executableKeyPackageValidator,
+  rejectUnvalidatedKeyPackages,
+  type KeyPackageValidator
+} from "./mls/key-package-validator.js";
 
-export async function createRelayApp() {
+export async function createRelayApp(options: { keyPackageValidator?: KeyPackageValidator } = {}) {
   const relayConfig = loadRelayConfig();
+  const keyPackageValidator = options.keyPackageValidator ?? configuredKeyPackageValidator(relayConfig.nodeEnv);
   const {
     nodeEnv,
     port,
@@ -81,8 +86,8 @@ export async function createRelayApp() {
     dataPath,
     storageBackend,
     legacyJsonImportPath,
-    encryptedBacklogLimit,
-    encryptedBacklogRetentionDays,
+    mlsBacklogLimit,
+    mlsBacklogRetentionDays,
     inviteTtlDays,
     attachmentBlobTtlDays,
     attachmentBlobMaxBytes,
@@ -90,8 +95,7 @@ export async function createRelayApp() {
     attachmentBlobUploadBytesPerWindow,
     attachmentBlobUploadWindowMs,
     jsonBodyLimitBytes,
-    encryptedEnvelopeMaxBytes,
-    roomEpochEnvelopeLimit,
+    mlsMessageMaxBytes,
     sessionPersistenceSecret,
     debugEndpointsEnabled,
     allowedCorsOrigins,
@@ -118,7 +122,7 @@ export async function createRelayApp() {
   const wss = new WebSocketServer({
     server,
     path: "/rooms",
-    maxPayload: encryptedEnvelopeMaxBytes * 2,
+    maxPayload: mlsMessageMaxBytes * 2,
     verifyClient(info, done) {
       if (originPolicy.isAllowedOrigin(info.origin)) {
         done(true);
@@ -151,17 +155,15 @@ export async function createRelayApp() {
     canAccessRoom
   } = relayAuthz;
   const maxEncryptedAccessTokenChars = Math.ceil((maxAccessTokenChars * 4) / 3) + 1024;
-  const relayLimits = createRelayLimits(encryptedEnvelopeMaxBytes, {
+  const relayLimits = createRelayLimits(mlsMessageMaxBytes, {
     maxDisplayNameChars,
     maxDeviceIdChars,
     maxEnvelopeIdChars,
-    maxEnvelopeNonceChars,
     maxPublicKeyFingerprintChars,
     maxPublicKeyJwkChars,
     maxRoomProjectPathChars,
     maxUserIdChars
   });
-  const { maxEnvelopeCiphertextChars } = relayLimits;
   const relayLifecycle = createRelayLifecycle({
     server,
     wss,
@@ -200,7 +202,6 @@ export async function createRelayApp() {
     maxAuthSessionIdChars,
     maxDisplayNameChars,
     maxEncryptedAccessTokenChars,
-    maxEnvelopeNonceChars,
     maxRoomProjectPathChars,
     maxUserIdChars,
     sessionPersistenceSecret
@@ -216,8 +217,8 @@ export async function createRelayApp() {
     maxDeviceIdChars,
     maxDisplayNameChars,
     maxEnvelopeIdChars,
-    maxEnvelopeNonceChars,
     maxHostNameChars,
+    maxMlsMessageChars: relayLimits.maxMlsMessageChars,
     maxPublicKeyFingerprintChars,
     maxPublicKeyJwkChars,
     maxRoomIdChars,
@@ -226,9 +227,8 @@ export async function createRelayApp() {
     maxTeamIdChars,
     maxTeamNameChars,
     maxUserIdChars,
-    isAllowedEnvelopePayload,
     normalizeStoredAuthSession,
-    pruneEncryptedBacklog,
+    pruneMlsBacklog,
     storedAuthSessions
   });
   const { isExpiredAttachmentBlob, pruneExpiredRelayState } = relayStoreCodec;
@@ -246,7 +246,7 @@ export async function createRelayApp() {
     metrics: relayMetrics,
     normalizeSessionId: normalizeAuthSessionId
   });
-  const { send, broadcast, broadcastRoomUpdated, broadcastWorkspaceUpdated, publishEnvelope, publishPresence } =
+  const { send, broadcast, broadcastRoomUpdated, broadcastWorkspaceUpdated, publishMlsMessage, publishPresence } =
     createRelayFanout({
       store: relayStore,
       roomSockets,
@@ -256,13 +256,11 @@ export async function createRelayApp() {
       roomPresence,
       metrics: relayMetrics,
       roomKey,
-      pruneEncryptedBacklog,
+      pruneMlsBacklog,
       addTeamMember,
-      saveEncryptedEnvelope: (roomKey, envelope, prunedEnvelopeIds) =>
-        relayStorePersistence.saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds),
-      saveRoomKeyTransition: (roomKey, envelope, prunedEnvelopeIds) =>
-        relayStorePersistence.saveRoomKeyTransition(roomKey, envelope, prunedEnvelopeIds),
-      roomEpochEnvelopeLimit,
+      saveMlsMessage: (roomKey, message, prunedIds) =>
+        relayStorePersistence.saveMlsMessage(roomKey, message, prunedIds),
+      saveMlsCommit: (roomKey, message, prunedIds) => relayStorePersistence.saveMlsCommit(roomKey, message, prunedIds),
       teamRecordForUser
     });
   const {
@@ -301,6 +299,7 @@ export async function createRelayApp() {
     githubClientId,
     githubOAuthScopes,
     mutationsRequireAuth,
+    deviceAuthRequired: mutationsRequireAuth,
     allowedCorsOrigins,
     sessionPersistenceSecret,
     authSessions,
@@ -308,6 +307,21 @@ export async function createRelayApp() {
     authCookieOptions,
     getAuthSession,
     scheduleStoreSave,
+    saveRelayStore: () => relayStorePersistence.saveRelayStore(),
+    notifyInviteRequested: (inviteId: string, requestId: string) => {
+      const invite = relayStore.getInvite(inviteId);
+      const room = invite ? relayStore.getRoom(invite.roomId) : undefined;
+      if (!room?.hostUserId || !room.activeHostDeviceId) return;
+      for (const session of relayStore.sessions.values()) {
+        if (
+          session.roomId === room.id &&
+          session.userId === room.hostUserId &&
+          session.deviceId === room.activeHostDeviceId
+        ) {
+          send(session.socket, { type: "invite.requested", inviteId, requestId });
+        }
+      }
+    },
     normalizeMetadataText,
     maxGitHubDeviceCodeChars,
     maxUserIdChars,
@@ -353,10 +367,12 @@ export async function createRelayApp() {
     normalizeOptionalMetadataText,
     displayNameForUser,
     maxDeviceIdChars,
+    maxEnvelopeIdChars,
     maxPublicKeyFingerprintChars,
     maxPublicKeyJwkChars,
     dataPath,
     metrics: relayMetrics,
+    validator: keyPackageValidator,
     sessions,
     opsAttachmentBlobs: relayStore.attachmentBlobs.values(),
     isReady: relayLifecycle.isReady,
@@ -391,15 +407,18 @@ export async function createRelayApp() {
       roomKey,
       isKnownRoom,
       canJoinRoom,
+      hasDeviceSession: (token, userId, deviceId) =>
+        !mutationsRequireAuth ||
+        (debugEndpointsEnabled && token === "debug-device-session-token-000000") ||
+        hasDeviceSession(relayStore, token, userId, deviceId),
       joinRoom,
       canSubscribeTeam,
       subscribeTeam,
       hasTeam: (teamId) => relayStore.hasTeam(teamId),
       canSubscribeWorkspace,
       subscribeWorkspace,
-      canPublishEnvelope,
-      isAllowedEnvelopePayload,
-      publishEnvelope,
+      canPublishMlsMessage,
+      publishMlsMessage,
       publishPresence,
       leaveRoom,
       leaveTeams,
@@ -410,20 +429,13 @@ export async function createRelayApp() {
 
   await relayStorePersistence.loadRelayStore();
 
-  function canPublishEnvelope(session: ClientSession, envelope: RelayEnvelope): boolean {
+  function canPublishMlsMessage(session: ClientSession, message: MlsRelayMessage): boolean {
     const sessionMatches =
-      session.teamId === envelope.teamId &&
-      session.roomId === envelope.roomId &&
-      session.userId === envelope.senderUserId &&
-      session.deviceId === envelope.senderDeviceId;
-    if (!sessionMatches) return false;
-    if (envelope.kind !== "room.key") return true;
-    const room = relayStore.getRoom(envelope.roomId);
-    return room?.hostStatus === "active" && room.hostUserId === session.userId;
-  }
-
-  function isAllowedEnvelopePayload(envelope: RelayEnvelope): boolean {
-    return isAllowedEnvelopePayloadWithLimits(envelope);
+      session.teamId === message.teamId &&
+      session.roomId === message.roomId &&
+      session.userId === message.senderUserId &&
+      session.deviceId === message.senderDeviceId;
+    return sessionMatches;
   }
 
   function revokeTeamInvites(teamId: string) {
@@ -431,6 +443,12 @@ export async function createRelayApp() {
     for (const [inviteId, invite] of invites.entries()) {
       if (invite.teamId === teamId) {
         invites.delete(inviteId);
+        for (const [requestId, request] of relayStore.inviteRequests) {
+          if (request.inviteId === inviteId) relayStore.inviteRequests.delete(requestId);
+        }
+        for (const [requestId, response] of relayStore.inviteResponses) {
+          if (response.inviteId === inviteId) relayStore.inviteResponses.delete(requestId);
+        }
         revoked = true;
       }
     }
@@ -501,15 +519,14 @@ export async function createRelayApp() {
     return normalizeCodexModelWithLimit(value, maxCodexModelChars);
   }
 
-  function pruneEncryptedBacklog(envelopes: RelayEnvelope[]): RelayEnvelope[] {
-    const normallyPruned = pruneEncryptedBacklogWithLimits(envelopes, {
-      encryptedBacklogLimit,
-      encryptedBacklogRetentionDays,
-      encryptedEnvelopeMaxBytes,
-      maxEnvelopeCiphertextChars,
+  function pruneMlsBacklog(messages: MlsRelayMessage[]): MlsRelayMessage[] {
+    const normallyPruned = pruneMlsBacklogWithLimits(messages, {
+      mlsBacklogLimit,
+      mlsBacklogRetentionDays,
+      mlsMessageMaxBytes,
+      maxMlsMessageChars: relayLimits.maxMlsMessageChars,
       maxDeviceIdChars,
       maxEnvelopeIdChars,
-      maxEnvelopeNonceChars,
       maxPublicKeyJwkChars,
       maxUserIdChars
     });
@@ -536,4 +553,11 @@ export async function createRelayApp() {
     config: relayConfig,
     ...runtime
   };
+}
+
+export function configuredKeyPackageValidator(nodeEnv: string): KeyPackageValidator {
+  const executable = process.env.MULTAIPLAYER_MLS_VALIDATOR_PATH?.trim();
+  if (executable) return executableKeyPackageValidator(executable);
+  if (nodeEnv === "production") throw new Error("MULTAIPLAYER_MLS_VALIDATOR_PATH is required in production.");
+  return rejectUnvalidatedKeyPackages;
 }

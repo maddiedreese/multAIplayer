@@ -29,7 +29,7 @@ export interface HandoffSettingsPatch {
 
 export interface HostHandoffCandidate {
   id: string;
-  status: "available" | "accepted";
+  status: "available" | "requested" | "accepted";
 }
 
 export interface HandoffRepoIdentity {

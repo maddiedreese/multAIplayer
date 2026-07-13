@@ -1,0 +1,39 @@
+import type { MutableRefObject } from "react";
+import type { RoomRecord } from "@multaiplayer/protocol";
+import type { RelayClient } from "../lib/relayClient";
+import type { BrowserAccessRequest, ChatMessage, HostHandoffRecord, QueuedCodexTurn, RelayStatus } from "../types";
+import type { GitStatusSummary, TerminalSnapshot } from "../lib/localBackend";
+
+export interface UseHostHandoffActionsOptions {
+  hasSelectedRoom: boolean;
+  selectedRoom: RoomRecord;
+  selectedRoomIdRef: MutableRefObject<string>;
+  isSelectedRoomLocked: boolean;
+  isSelectedRoomRevoked: boolean;
+  isActiveHost: boolean;
+  hostGateMessage: string;
+  hostHandoffs: HostHandoffRecord[];
+  queuedCodexTurns: QueuedCodexTurn[];
+  localUser: { id: string; name: string };
+  deviceId: string;
+  relayStatus: RelayStatus;
+  relayRef: MutableRefObject<RelayClient | null>;
+  seenEnvelopeIds: MutableRefObject<Set<string>>;
+  messages: ChatMessage[];
+  terminals: TerminalSnapshot[];
+  browserRequestsByRoom: Record<string, BrowserAccessRequest[]>;
+  gitStatus: GitStatusSummary | null;
+  gitStatusByRoom: Record<string, GitStatusSummary | null>;
+  reportRoomHostMutationInFlight: (roomId: string) => boolean;
+  roomSettingsActor: () => { requesterName: string; requesterUserId: string };
+  replaceRoom: (room: RoomRecord) => void;
+  setHostBusyForRoom: (roomId: string, busy: boolean) => void;
+  setHostMessageForRoom: (roomId: string, message: string | null) => void;
+  setSelectedHostMessage: (message: string | null) => void;
+  setSettingsMessageForRoom: (roomId: string, message: string | null) => void;
+  setProjectPathDraftForRoom: (roomId: string, projectPath: string) => void;
+  setCustomCodexModelForRoom: (roomId: string, codexModel: string) => void;
+  resetFileContextForRoom: (roomId: string) => void;
+  resetCodexApprovalForRoom: (roomId: string) => void;
+  appendHostHandoff: (roomId: string, handoff: HostHandoffRecord) => void;
+}

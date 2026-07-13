@@ -57,15 +57,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Enforce independent verifier dependency review window
-        run: npm run check:crypto-vector-dependency
-
-      - name: Install independent crypto-vector verifier
-        run: python3 -m pip install --disable-pip-version-check cryptography==45.0.5
-
-      - name: Verify crypto vectors with independent Python implementation
-        run: npm run test:crypto-vectors:python
-
       - name: Verify web, relay, and packages
         run: npm run verify:web
 
@@ -83,39 +74,6 @@ jobs:
           path: |
             apps/relay/coverage
             packages/*/coverage
-          if-no-files-found: error
-          retention-days: 14
-
-  crypto-mutation:
-    name: Crypto mutation policy
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    steps:
-      - name: Check out repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-
-      - name: Set up Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build package dependencies
-        run: npm run build:packages
-
-      - name: Mutation-test cryptographic authorization logic
-        run: npm run test:mutation -w @multaiplayer/crypto
-
-      - name: Upload crypto mutation reports
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: crypto-mutation-report
-          path: packages/crypto/reports/mutation
           if-no-files-found: error
           retention-days: 14
 
@@ -239,7 +197,7 @@ jobs:
   security-journey:
     name: Multi-client security journey and injection red-team
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -250,12 +208,16 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup default 1.88.0
       - name: Build package dependencies
         run: npm run build:packages
       - name: Run deterministic lifecycle and adversarial corpus
         run: |
           mkdir -p reports/security-journey
-          npm run test:security-journey -w @multaiplayer/desktop > reports/security-journey/junit.xml
+          npm run test:security-journey -w @multaiplayer/relay > reports/security-journey/junit.xml
       - name: Upload security journey results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

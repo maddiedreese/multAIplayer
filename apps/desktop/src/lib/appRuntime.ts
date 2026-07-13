@@ -24,8 +24,8 @@ export function roomLockMessage(room: RoomRecord, revoked: boolean): string {
   return "This room was forgotten on this device. Rejoin from an invite or get host approval to unlock messages again.";
 }
 
-export function roomSecretStorageLabel(): string {
-  return isTauriRuntime() ? "macOS Keychain" : "web preview process memory";
+export function mlsStateStorageLabel(): string {
+  return isTauriRuntime() ? "encrypted native MLS store" : "unavailable in web preview";
 }
 
 export function isWebPreviewRuntime(): boolean {

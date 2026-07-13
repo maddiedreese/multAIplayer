@@ -116,6 +116,7 @@ function checkProductionRelayEnv() {
   const trustedProxyConfigured = envBoolean("MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED", false);
   const storage = envValue("MULTAIPLAYER_RELAY_STORAGE") || "sqlite";
   const dataPath = envValue("MULTAIPLAYER_RELAY_DATA_PATH");
+  const mlsValidatorPath = envValue("MULTAIPLAYER_MLS_VALIDATOR_PATH");
   const attachmentBlobMaxBytes = envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES", 5_000_000);
   const attachmentBlobLiveQuotaBytes = envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES", 250_000_000);
   const attachmentBlobUploadBytes = envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW", 100_000_000);
@@ -179,6 +180,16 @@ function checkProductionRelayEnv() {
         ? "must not point at /tmp for a hosted production relay"
         : "configured"
       : "required: set a persistent relay store path or mounted volume"
+  });
+  const validatorProbe = mlsValidatorPath ? spawnSync(mlsValidatorPath, [], { input: "", timeout: 2_000 }) : null;
+  checks.push({
+    ok: Boolean(mlsValidatorPath) && !validatorProbe?.error,
+    label: "production MULTAIPLAYER_MLS_VALIDATOR_PATH",
+    detail: !mlsValidatorPath
+      ? "required: build and configure mls-keypackage-validator"
+      : validatorProbe?.error
+        ? "must point to an executable validator"
+        : "configured executable"
   });
   checks.push({
     ok: !trustProxyHeaders || trustedProxyConfigured,

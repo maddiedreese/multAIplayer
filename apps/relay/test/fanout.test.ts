@@ -1,83 +1,223 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import type { MlsRelayMessage } from "@multaiplayer/protocol";
 import { createRelayMetrics } from "../src/observability.js";
 import { createRelayStore, type RoomKey } from "../src/state.js";
 import { createRelayFanout } from "../src/ws/fanout.js";
-import { testEnvelope } from "./support/relay.js";
 
-test("failed envelope persistence restores the exact prior backlog and does not count publication", async () => {
-  const store = createRelayStore();
-  const key = "team-core\nroom-desktop" as RoomKey;
-  const retained = testEnvelope({ id: "envelope-retained" });
-  const rejected = testEnvelope({ id: "envelope-persistence-failed" });
-  store.setEncryptedBacklog(key, [retained]);
-  const metrics = createRelayMetrics();
-  const fanout = createRelayFanout({
-    store,
-    roomSockets: store.roomSockets,
-    teamSockets: store.teamSockets,
-    workspaceSockets: store.workspaceSockets,
-    sessions: store.sessions,
-    roomPresence: store.roomPresence,
-    metrics,
-    roomKey: () => key,
-    pruneEncryptedBacklog: (envelopes) => envelopes,
-    addTeamMember: () => undefined,
-    saveEncryptedEnvelope: async () => {
-      throw new Error("disk unavailable");
-    },
-    saveRoomKeyTransition: async () => {
-      throw new Error("disk unavailable");
-    },
-    roomEpochEnvelopeLimit: 1_000_000,
-    teamRecordForUser: (team) => team
+test("failed MLS persistence restores backlog and epoch", async () => {
+  const { store, fanout, key } = setup(async () => {
+    throw new Error("disk unavailable");
   });
-
-  await assert.rejects(fanout.publishEnvelope(rejected), /disk unavailable/);
-  assert.deepEqual(store.getEncryptedBacklog(key), [retained]);
-  assert.equal(metrics.snapshot(0).envelopesPublishedTotal, 0);
+  const retained = message("retained", "application", 0);
+  store.setMlsBacklog(key, [retained]);
+  await assert.rejects(fanout.publishMlsMessage(message("failed", "commit", 0)), /disk unavailable/);
+  assert.deepEqual(store.getMlsBacklog(key), [retained]);
+  assert.equal(store.getRoom("room-desktop")?.acceptedMlsEpoch, 0);
 });
 
-test("room epoch compare-and-swap rejects competing transitions from the same epoch", async () => {
-  const store = createRelayStore();
-  const key = "team-core\nroom-desktop" as RoomKey;
-  store.setRoom({ id: "room-desktop", teamId: "team-core" } as never);
-  const first = { ...testEnvelope({ id: "rotation-first" }), kind: "room.key" as const, keyEpoch: 1 };
-  const competing = { ...testEnvelope({ id: "rotation-competing" }), kind: "room.key" as const, keyEpoch: 1 };
-  let releasePersistence!: () => void;
-  const persistenceBarrier = new Promise<void>((resolve) => {
-    releasePersistence = resolve;
-  });
-  const fanout = createRelayFanout({
-    store,
-    roomSockets: store.roomSockets,
-    teamSockets: store.teamSockets,
-    workspaceSockets: store.workspaceSockets,
-    sessions: store.sessions,
-    roomPresence: store.roomPresence,
-    metrics: createRelayMetrics(),
-    roomKey: () => key,
-    pruneEncryptedBacklog: (envelopes) => envelopes,
-    addTeamMember: () => undefined,
-    saveEncryptedEnvelope: async () => persistenceBarrier,
-    saveRoomKeyTransition: async () => persistenceBarrier,
-    teamRecordForUser: (team) => team
-  });
-
-  const accepted = fanout.publishEnvelope(first);
-  const rejectedCompeting = fanout.publishEnvelope(competing);
-  releasePersistence();
-  await accepted;
-  await assert.rejects(rejectedCompeting, /does not match accepted epoch 2/);
+test("only the active host device may commit and stale commits rebase", async () => {
+  const { store, fanout, key } = setup(async () => undefined);
+  await assert.rejects(
+    fanout.publishMlsMessage({ ...message("wrong", "commit", 0), senderDeviceId: "device-other" }),
+    /active host device/
+  );
+  await fanout.publishMlsMessage(message("first", "commit", 0));
+  await assert.rejects(fanout.publishMlsMessage(message("stale", "commit", 0)), /accepted epoch is 1/);
   assert.deepEqual(
-    store.getEncryptedBacklog(key)?.map((envelope) => envelope.id),
-    [first.id]
+    store.getMlsBacklog(key)?.map((item) => item.id),
+    ["first"]
   );
-  assert.equal(store.getRoom("room-desktop")?.keyEpoch, 2);
+});
 
-  // Simulate retention pruning followed by process restart: authoritative room metadata, not backlog, drives epoch CAS.
-  store.setEncryptedBacklog(key, []);
-  const restarted = createRelayFanout({
+test("identical retries acknowledge without rebroadcast while conflicting ids fail", async () => {
+  let writes = 0;
+  const { store, fanout, key } = setup(async () => {
+    writes += 1;
+  });
+  const first = message("retry", "commit", 0);
+  await fanout.publishMlsMessage(first);
+  store.setMlsBacklog(key, []);
+  const restarted = fanoutFor(store, key, async () => {
+    writes += 1;
+  });
+  await restarted.publishMlsMessage({ ...first, createdAt: new Date(Date.now() + 1_000).toISOString() });
+  assert.equal(writes, 1);
+  await assert.rejects(restarted.publishMlsMessage({ ...first, mlsMessage: "AQ==" }), /already bound/);
+});
+
+test("application receipt acknowledges after epoch advance and backlog pruning", async () => {
+  let applicationWrites = 0;
+  const { store, fanout, key } = setup(
+    async () => undefined,
+    async () => {
+      applicationWrites += 1;
+    }
+  );
+  const application = message("application-retry", "application", 0);
+  await fanout.publishMlsMessage(application);
+  await fanout.publishMlsMessage(message("advance", "commit", 0));
+  const { store: restartedStore } = setup(async () => undefined);
+  restartedStore.setRoom(store.getRoom("room-desktop")!);
+  for (const [id, receipt] of store.acceptedMessageReceipts) restartedStore.acceptedMessageReceipts.set(id, receipt);
+  const restarted = fanoutFor(
+    restartedStore,
+    key,
+    async () => undefined,
+    async () => {
+      applicationWrites += 1;
+    }
+  );
+  await restarted.publishMlsMessage(application);
+  assert.equal(applicationWrites, 1);
+});
+
+test("applications may arrive from the three retained epochs but fail distinctly after expiry", async () => {
+  const { fanout } = setup(async () => undefined);
+  await fanout.publishMlsMessage(message("advance-1", "commit", 0));
+  await fanout.publishMlsMessage(message("late-at-one", "application", 0));
+  await fanout.publishMlsMessage(message("advance-2", "commit", 1));
+  await fanout.publishMlsMessage(message("late-at-two", "application", 0));
+  await fanout.publishMlsMessage(message("advance-3", "commit", 2));
+  await assert.rejects(
+    fanout.publishMlsMessage(message("expired-at-three", "application", 0)),
+    (error: unknown) => error instanceof Error && "code" in error && error.code === "application_epoch_expired"
+  );
+  await assert.rejects(fanout.publishMlsMessage(message("future", "application", 4)), /ahead of accepted epoch 3/);
+  await assert.rejects(fanout.publishMlsMessage(message("old-commit", "commit", 2)), /stale/);
+});
+
+test("application floods cannot evict Commit or another sender's durable retry receipt", async () => {
+  const { store, fanout, key } = setup(async () => undefined);
+  const commit = message("durable-commit", "commit", 0);
+  const otherSender = {
+    ...message("other-sender", "application", 1),
+    senderUserId: "github:other",
+    senderDeviceId: "device-other"
+  };
+  await fanout.publishMlsMessage(commit);
+  await fanout.publishMlsMessage(otherSender);
+  for (let index = 0; index < 4_097; index += 1) {
+    await fanout.publishMlsMessage({
+      ...message(`flood-${index}`, "application", 1),
+      createdAt: new Date(index).toISOString()
+    });
+  }
+  const { store: restartedStore } = setup(async () => undefined);
+  restartedStore.setRoom(store.getRoom("room-desktop")!);
+  for (const [id, receipt] of store.acceptedMessageReceipts) restartedStore.acceptedMessageReceipts.set(id, receipt);
+  const restarted = fanoutFor(restartedStore, key, async () => {
+    throw new Error("exact retries must not persist again");
+  });
+  await restarted.publishMlsMessage({ ...commit, createdAt: new Date(Date.now() + 1_000).toISOString() });
+  await restarted.publishMlsMessage(otherSender);
+  assert.equal(
+    Array.from(restartedStore.acceptedMessageReceipts.values()).filter(
+      (receipt) => receipt.messageType === "application" && receipt.senderUserId === "github:host"
+    ).length,
+    4_096
+  );
+});
+
+test("host transfer requires an outgoing-host signature bound to exact commit and next leaf", async () => {
+  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const { store, fanout } = setup(async () => undefined);
+  const spki = publicKey.export({ format: "der", type: "spki" }).toString("base64");
+  store.setDevice({
+    userId: "github:host",
+    deviceId: "device-host",
+    displayName: "Host",
+    signaturePublicKey: spki,
+    signatureKeyFingerprint: fingerprint(spki),
+    hpkePublicKey: spki,
+    hpkeKeyFingerprint: fingerprint(spki),
+    registeredAt: new Date().toISOString(),
+    lastSeenAt: new Date().toISOString()
+  });
+  store.setDevice({
+    userId: "github:next",
+    deviceId: "device-next",
+    displayName: "Next",
+    signaturePublicKey: spki,
+    signatureKeyFingerprint: fingerprint(spki),
+    hpkePublicKey: spki,
+    hpkeKeyFingerprint: fingerprint(spki),
+    registeredAt: new Date().toISOString(),
+    lastSeenAt: new Date().toISOString()
+  });
+  store.setTeamMembers(
+    "team-core",
+    new Map([["github:next", { userId: "github:next", role: "member", joinedAt: new Date().toISOString() }]])
+  );
+  const commit = message("outer", "commit", 0);
+  const authorization = {
+    version: 1 as const,
+    roomId: commit.roomId,
+    commitMessageId: createHash("sha256").update(Buffer.from(commit.mlsMessage, "base64")).digest("hex"),
+    parentEpoch: 0,
+    outgoingHostUserId: commit.senderUserId,
+    outgoingHostDeviceId: commit.senderDeviceId,
+    nextHostUserId: "github:next",
+    nextHostDeviceId: "device-next",
+    nextHostLeaf: 1
+  };
+  const signatureDer = sign(
+    "sha256",
+    Buffer.concat([
+      Buffer.from("multaiplayer:host-transfer-authorization:v2\0"),
+      Buffer.from(JSON.stringify(authorization))
+    ]),
+    privateKey
+  ).toString("base64");
+  const handoff = {
+    ...commit,
+    commitEffect: "host_handoff" as const,
+    nextHostUserId: "github:next",
+    nextHostDeviceId: "device-next",
+    hostTransferAuthorization: { ...authorization, signatureDer, publicKeySpkiDer: spki }
+  };
+  await fanout.publishMlsMessage(handoff);
+  assert.equal(store.getRoom("room-desktop")?.hostUserId, "github:next");
+  const { store: retryStore } = setup(async () => undefined);
+  retryStore.setRoom(store.getRoom("room-desktop")!);
+  for (const [id, receipt] of store.acceptedMessageReceipts) retryStore.acceptedMessageReceipts.set(id, receipt);
+  await fanoutFor(retryStore, "team-core:room-desktop", async () => undefined).publishMlsMessage({
+    ...handoff,
+    createdAt: new Date(Date.now() + 1_000).toISOString()
+  });
+  const { store: rejectedStore, fanout: rejected } = setup(async () => undefined);
+  rejectedStore.setDevice(store.getDevice("github:host", "device-host")!);
+  rejectedStore.setDevice(store.getDevice("github:next", "device-next")!);
+  rejectedStore.setTeamMembers("team-core", store.getTeamMembers("team-core")!);
+  await assert.rejects(
+    rejected.publishMlsMessage({ ...handoff, nextHostDeviceId: "different-device" }),
+    /authorization/
+  );
+});
+
+function setup(saveMlsCommit: () => Promise<void>, saveMlsMessage: () => Promise<void> = async () => undefined) {
+  const store = createRelayStore(),
+    key = "team-core:room-desktop" as RoomKey;
+  store.setRoom({
+    id: "room-desktop",
+    teamId: "team-core",
+    acceptedMlsEpoch: 0,
+    host: "Host",
+    hostUserId: "github:host",
+    activeHostDeviceId: "device-host",
+    hostStatus: "active"
+  } as never);
+  const fanout = fanoutFor(store, key, saveMlsCommit, saveMlsMessage);
+  return { store, fanout, key };
+}
+function fanoutFor(
+  store: ReturnType<typeof createRelayStore>,
+  key: RoomKey,
+  saveMlsCommit: () => Promise<void>,
+  saveMlsMessage: () => Promise<void> = async () => undefined
+) {
+  return createRelayFanout({
     store,
     roomSockets: store.roomSockets,
     teamSockets: store.teamSockets,
@@ -86,14 +226,27 @@ test("room epoch compare-and-swap rejects competing transitions from the same ep
     roomPresence: store.roomPresence,
     metrics: createRelayMetrics(),
     roomKey: () => key,
-    pruneEncryptedBacklog: (envelopes) => envelopes,
+    pruneMlsBacklog: (items) => items,
     addTeamMember: () => undefined,
-    saveEncryptedEnvelope: async () => undefined,
-    saveRoomKeyTransition: async () => undefined,
-    roomEpochEnvelopeLimit: 1_000_000,
+    saveMlsMessage,
+    saveMlsCommit,
     teamRecordForUser: (team) => team
   });
-  await assert.doesNotReject(
-    restarted.publishEnvelope({ ...testEnvelope({ id: "epoch-two-after-restart" }), keyEpoch: 2 })
-  );
-});
+}
+function message(id: string, messageType: MlsRelayMessage["messageType"], epochHint: number): MlsRelayMessage {
+  return {
+    id,
+    teamId: "team-core",
+    roomId: "room-desktop",
+    senderUserId: "github:host",
+    senderDeviceId: "device-host",
+    createdAt: new Date().toISOString(),
+    messageType,
+    epochHint,
+    mlsMessage: "AA=="
+  };
+}
+function fingerprint(encoded: string): string {
+  const hex = createHash("sha256").update(Buffer.from(encoded, "base64")).digest("hex");
+  return `sha256:${hex.match(/.{4}/g)!.join(":")}`;
+}

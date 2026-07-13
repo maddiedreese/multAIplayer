@@ -27,7 +27,8 @@ export function createAccountActions({
     setDeviceIdentityStatusMessage("Resetting local device identity...");
     try {
       await resetDeviceIdentity();
-      const identity = await loadOrCreateDeviceIdentity();
+      const { localUser, deviceId } = currentLocalIdentity();
+      const identity = await loadOrCreateDeviceIdentity(localUser.id, deviceId);
       replaceDeviceIdentity(identity);
       untrustDeviceForRoom(useAppStore.getState().selectedRoomId, currentLocalIdentity().deviceId);
       setDeviceIdentityStatusMessage(

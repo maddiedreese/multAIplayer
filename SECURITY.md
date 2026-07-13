@@ -9,12 +9,13 @@ Security reports are welcome for the current `main` branch and latest published 
 The intended security properties are:
 
 - the relay does not store plaintext chat transcripts, plaintext attachments, Codex credentials, OpenAI credentials, repo contents, terminal output, file diffs, or plaintext GitHub access tokens;
-- room messages, attachments, terminal requests, browser requests, Codex events, Git events, and invite approval workflows are routed as encrypted envelopes;
-- AES-GCM authenticates versioned, domain-separated deterministic envelope metadata, including room, sender, event kind, timestamp, and key epoch;
-- invite approval binds an independent random single-use bearer capability to the authenticated requester and host device keys before any room key is delivered; raw capabilities remain outside relay-visible metadata, cross relay transport only inside host-key-sealed requests, and are persisted by issuers only as verifiers;
-- membership changes advance the room key epoch and deliver the new key only to eligible registered devices;
-- native desktop room secrets and device identities are stored in the macOS Keychain;
-- the browser/web preview is a development fallback that keeps room secrets in process memory and loses room access on reload;
+- room events are RFC 9420 MLS PrivateMessages, while attachments are encrypted with per-blob keys derived by the native MLS core;
+- MLS authenticated data binds canonical room, sender, event-kind, timestamp, message-id, and epoch routing fields;
+- invite approval binds an independent random single-use bearer capability to an authenticated requester, exact KeyPackage hash, and pinned host HPKE key before an MLS Add and Welcome are created;
+- membership changes use MLS Add and Remove commits, and both native clients and the relay enforce that only the active host can commit;
+- MLS signature and HPKE private keys, group state, exporter output, history secrets, and per-blob keys remain behind the Rust IPC boundary and are stored with the operating-system credential store plus SQLCipher;
+- retained exporter-derived history secrets intentionally preserve local history readability across epochs, so forward secrecy applies to live traffic rather than retained device-local history;
+- the browser/web preview contains seeded local demo rooms only and cannot create or join E2EE rooms;
 - GitHub session persistence is memory-only unless a strong `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured, in which case access tokens are encrypted at rest.
 - production relays require authentication by default; unauthenticated relay mode is an explicit self-host opt-out.
 
@@ -47,7 +48,7 @@ cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 npm run build
 ```
 
-For native app issues, also include whether the behavior appears in `npm run tauri:dev` or only in the browser preview.
+For native encryption issues, reproduce with `npm run tauri:dev`; the browser preview intentionally has no MLS or E2EE room support.
 
 ## Secret Handling
 
@@ -61,9 +62,9 @@ Never paste:
 - real terminal output containing credentials;
 - private repository files.
 
-### Host command containment
+### Host command authorization
 
-Native room commands and interactive terminals are launched through the operating system sandbox with the selected project as their only writable filesystem subtree. The native host fails closed on platforms where that confinement backend is unavailable. This is an enforcement boundary in addition to room and native approval policy, not a replacement for approvals.
+Native room commands and interactive terminals require an operating-system approval dialog bound to the exact room, canonical working directory, command or input, and execution kind. The selected project is the process working directory, not a filesystem sandbox; an approved command runs with the host account's ambient access. Native authorization is an enforcement boundary, but users must review commands as granting host-account shell authority.
 
 Before command or PTY output can be returned to the webview and encrypted into a room event, the native host redacts known GitHub/OpenAI token forms, secret-bearing environment assignments, and PEM private keys. Pattern redaction reduces accidental disclosure; it cannot recognize every possible secret encoding.
 

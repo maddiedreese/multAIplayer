@@ -1,9 +1,10 @@
-import { Check, Copy, RefreshCw, X } from "lucide-react";
+import { Check, Copy, X } from "lucide-react";
 
 export interface InviteRequestDisplay {
   id: string;
   requester: string;
   requesterDeviceId: string;
+  requesterSignatureKeyFingerprint?: string;
   note?: string;
   status: "pending" | "approved" | "denied";
 }
@@ -14,15 +15,12 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
   inviteRequests,
   localDeviceId,
   importDisabled,
-  rotateDisabled,
   approvalDisabled,
-  keyRotationBusy,
   inviteLink,
   inviteMessage,
   onCopyInvite,
   onInviteSecretInputChange,
   onImportInvite,
-  onRotateRoomKey,
   onDecideInviteRequest
 }: {
   copyDisabled: boolean;
@@ -30,15 +28,12 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
   inviteRequests: T[];
   localDeviceId: string;
   importDisabled: boolean;
-  rotateDisabled: boolean;
   approvalDisabled: boolean;
-  keyRotationBusy: boolean;
   inviteLink: string | null;
   inviteMessage: string | null;
   onCopyInvite: () => void;
   onInviteSecretInputChange: (value: string) => void;
   onImportInvite: () => void;
-  onRotateRoomKey: () => void;
   onDecideInviteRequest: (request: T, status: "approved" | "denied") => void;
 }) {
   return (
@@ -66,14 +61,6 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
       <button className="ghost-wide" onClick={onImportInvite} disabled={importDisabled}>
         Import invite
       </button>
-      <button className="ghost-wide danger" onClick={onRotateRoomKey} disabled={rotateDisabled}>
-        <RefreshCw size={15} />
-        {keyRotationBusy ? "Rotating room key" : "Rotate room key"}
-      </button>
-      <div className="empty-state compact">
-        Rotation advances the room key epoch for current members and invalidates outstanding invites. It is not member
-        removal.
-      </div>
       <div className="terminal-requests">
         {inviteRequests
           .slice(-4)
@@ -84,6 +71,9 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
                 <strong>{request.requester}</strong>
                 <span>{request.note ?? "Requesting room access."}</span>
                 <small>{request.requesterDeviceId === localDeviceId ? "This device" : request.requesterDeviceId}</small>
+                {request.requesterSignatureKeyFingerprint && (
+                  <small>MLS signature key: {request.requesterSignatureKeyFingerprint}</small>
+                )}
               </div>
               <small>{request.status}</small>
               {request.status === "pending" && (

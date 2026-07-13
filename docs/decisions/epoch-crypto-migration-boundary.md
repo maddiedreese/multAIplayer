@@ -1,16 +1,12 @@
 # Epoch crypto and the MLS migration boundary
 
-Status: accepted
+Status: superseded by [MLS protocol v2](mls-protocol-v2.md)
+
+Superseded: 2026-07-12
 
 ## Decision
 
-multAIplayer's current protocol is deliberately limited to a single active administration authority and small rooms. Epoch keys are independently random, delivered separately to pinned devices, and rotated on bounded time/message policies. This provides coarse forward secrecy between epochs; it is not MLS and does not provide forward secrecy within an epoch.
-
-`packages/crypto` is the protocol migration seam. Keep it small, dependency-light, and isolated from relay transport, desktop UI, and product policy. A change to its authenticated encodings, key derivation, wrapping, envelope additional data, or key lifecycle is a protocol-level event: it requires focused package tests, updated public vectors when bytes change, an explicit compatibility decision, and a dated threat-model changelog entry.
-
-The package root is a compatibility-preserving export barrel, not an implementation module. Key material, authenticated data, payload AEAD, device/secret wrapping, canonical encoding, and invite capabilities remain in focused modules with an automated 250-line ceiling. Consumers import only `@multaiplayer/crypto`; this keeps later replacement by a maintained MLS implementation confined to the package boundary.
-
-The canonical AAD domains and field sets are specified in the [cryptography architecture](../cryptography.md#additional-data-wire-records). Frozen pre-canonical JSON encodings are decrypt-only compatibility paths; they must not become writer formats or downgrade paths for authenticated static-host key delivery.
+This record describes the removed protocol v1 boundary and remains only as historical rationale. Protocol v2 crossed the MLS-adoption tripwire and locked its implementation, ciphersuite, history-retention, and native-runtime decisions in the [MLS protocol v2 ADR](mls-protocol-v2.md). The former TypeScript crypto package, compatibility readers, public vectors, and custom epoch-key machinery were deleted rather than deprecated.
 
 The following are mandatory architecture re-evaluation tripwires:
 
@@ -20,11 +16,10 @@ The following are mandatory architecture re-evaluation tripwires:
 
 Thirty-two devices is the concrete alpha boundary because the current host performs linear per-device key delivery and the relay/store are explicitly designed for small trusted teams. It is a protocol limit and review trigger, not evidence that 32-device rooms have been load- or security-audited.
 
-If any tripwire fires, work on extensions to the custom construction stops until the architecture is re-evaluated. If the required properties call for MLS, adopt a maintained, independently reviewed MLS implementation wholesale. OpenMLS is the preferred candidate for the Rust/Tauri boundary. Do not add proposals, tree state, ratchets, multi-committer logic, or other MLS-like pieces to `packages/crypto`; partial imitation would add state-machine risk without inheriting MLS security or interoperability.
+Protocol v2 crossed these tripwires. The project evaluated OpenMLS and `mls-rs`, selected `mls-rs` for its native storage and rule integration, and records the audit tradeoff explicitly in the successor ADR. No v1 compatibility or custom MLS-like state machine remains in the runtime.
 
 ## Consequences
 
-- Ordinary maintenance may improve the existing bounded epoch scheme without expanding its claims.
-- Changes crossing the crypto boundary receive protocol review even when their diff is small.
-- Product and capacity planning must count registered devices, not just human members.
-- Crossing a tripwire creates migration work and may require a wire-format break; avoiding that work is not justification for extending the custom scheme.
+- This ADR must not be used as current implementation guidance.
+- Future protocol work follows the MLS v2 ADR and current cryptography documentation.
+- The v1 design remains available in Git history for audit context, without retaining dead cryptographic code.
