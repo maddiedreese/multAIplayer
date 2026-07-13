@@ -293,7 +293,7 @@ test("release automation preserves alpha, CI, and DCO gates", () => {
   assert.equal(config.prerelease, true);
   assert.equal(config.packages["."]["prerelease-type"], "alpha");
   assert.match(config.signoff, /github-actions\[bot\].+@users\.noreply\.github\.com/);
-  assert.equal(manifest["."], "0.1.0-alpha.0");
+  assert.equal(manifest["."], rootPackage.version);
 });
 
 test("release automation covers every synchronized version source", () => {
@@ -349,20 +349,15 @@ test("release automation covers every synchronized version source", () => {
     ),
     "release automation must update the native Cargo package version"
   );
-  assert.ok(
-    extraFiles.some(
-      (entry) =>
-        entry.type === "toml" &&
-        entry.path === "apps/desktop/src-tauri/Cargo.lock" &&
-        entry.jsonpath === "$.package[?(@.name=='multaiplayer')].version"
-    ),
-    "release automation must update the native Cargo lock package version"
-  );
   assert.match(
     readFileSync("apps/desktop/src-tauri/Cargo.lock", "utf8"),
-    /name = "multaiplayer"\nversion = "0\.1\.0-alpha\.0"/,
+    new RegExp(`name = "multaiplayer"\\nversion = "${rootPackage.version.replaceAll(".", "\\.")}"`),
     "Cargo.lock must contain the synchronized native package version"
   );
+  const workflow = readFileSync(".github/workflows/release-please.yml", "utf8");
+  assert.match(workflow, /npm install --package-lock-only --ignore-scripts/);
+  assert.match(workflow, /node scripts\/sync-release-metadata\.mjs/);
+  assert.match(workflow, /git commit --signoff/);
   assert.ok(
     extraFiles.some((entry) => entry.type === "generic" && entry.path === "packages/codex/src/json-rpc.ts"),
     "release automation must include packages/codex/src/json-rpc.ts"
