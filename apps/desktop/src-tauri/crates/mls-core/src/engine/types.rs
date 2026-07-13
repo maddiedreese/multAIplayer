@@ -64,7 +64,11 @@ pub struct JoinAdmissionMetadata {
     pub requester_device_id: String,
 }
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum OutboxMetadata {
     Application {
         #[serde(alias = "authenticated_data")]

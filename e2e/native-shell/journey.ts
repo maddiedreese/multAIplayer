@@ -274,6 +274,9 @@ async function inviteAndApprove(host: Browser, guest: Browser) {
   const previousHostMessage = await host.execute(
     () => document.querySelector(".invite-panel .workflow-message")?.textContent ?? ""
   );
+  const previousGuestMessage = await guest.execute(
+    () => document.querySelector(".invite-panel .workflow-message")?.textContent ?? ""
+  );
   await approve.click();
   await host.waitUntil(
     () =>
@@ -289,14 +292,18 @@ async function inviteAndApprove(host: Browser, guest: Browser) {
     message: document.querySelector(".invite-panel .workflow-message")?.textContent ?? ""
   }));
   assert.equal(hostDecision.approved, true, `host invite approval failed: ${hostDecision.message}`);
-  await visible(guest, ".invite-panel .workflow-message", 60_000);
   await guest.waitUntil(
     () =>
-      guest.execute(() =>
-        /approved|unlocked|joined/i.test(document.querySelector(".invite-panel .workflow-message")?.textContent ?? "")
-      ),
-    { timeout: 60_000, timeoutMsg: "guest did not process the real MLS Welcome" }
+      guest.execute((previousMessage) => {
+        const message = document.querySelector(".invite-panel .workflow-message")?.textContent ?? "";
+        return message.length > 0 && message !== previousMessage;
+      }, previousGuestMessage),
+    { timeout: 60_000, timeoutMsg: "guest received neither an invite decision nor a Welcome-processing error" }
   );
+  const guestDecision = await guest.execute(
+    () => document.querySelector(".invite-panel .workflow-message")?.textContent ?? ""
+  );
+  assert.match(guestDecision, /approved|unlocked|joined/i, `guest MLS Welcome processing failed: ${guestDecision}`);
 }
 
 async function sendAndReceive(sender: Browser, receiver: Browser, text: string) {
