@@ -7,6 +7,7 @@ import { generateMlsKeyPackage } from "../lib/mlsClient";
 
 interface UseDeviceIdentityLifecycleOptions {
   relayHttpUrl: string;
+  identityResolved: boolean;
   deviceId: string;
   userId: string;
   displayName: string;
@@ -17,6 +18,7 @@ interface UseDeviceIdentityLifecycleOptions {
 
 export function useDeviceIdentityLifecycle({
   relayHttpUrl,
+  identityResolved,
   deviceId,
   userId,
   displayName,
@@ -25,6 +27,7 @@ export function useDeviceIdentityLifecycle({
   setDeviceIdentityStatusMessage
 }: UseDeviceIdentityLifecycleOptions) {
   useEffect(() => {
+    if (!identityResolved) return;
     loadOrCreateDeviceIdentity(userId, deviceId)
       .then((identity) => {
         replaceDeviceIdentity(identity);
@@ -41,10 +44,10 @@ export function useDeviceIdentityLifecycle({
       .catch((error) => {
         setDeviceIdentityStatusMessage(`Device identity unavailable: ${String(error)}`);
       });
-  }, [deviceId, replaceDeviceIdentity, setDeviceIdentityStatusMessage, userId]);
+  }, [deviceId, identityResolved, replaceDeviceIdentity, setDeviceIdentityStatusMessage, userId]);
 
   useEffect(() => {
-    if (!deviceIdentity) return;
+    if (!identityResolved || !deviceIdentity) return;
     registerDevice({
       userId,
       deviceId,
@@ -64,7 +67,7 @@ export function useDeviceIdentityLifecycle({
           setDeviceIdentityStatusMessage("Device identity registered and authenticated with relay.");
       })
       .catch((error) => setDeviceIdentityStatusMessage(`Device identity registration pending: ${String(error)}`));
-  }, [relayHttpUrl, deviceId, deviceIdentity, displayName, setDeviceIdentityStatusMessage, userId]);
+  }, [relayHttpUrl, deviceId, deviceIdentity, displayName, identityResolved, setDeviceIdentityStatusMessage, userId]);
 
   useEffect(() => {
     if (!deviceIdentity?.requiresRejoin) return;

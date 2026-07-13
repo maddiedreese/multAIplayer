@@ -1,6 +1,16 @@
-# Deterministic security journey
+# Security journeys
 
-The `security-journey` CI job runs the relay as a real child process and exercises the protocol-v2 delivery boundary with native-generated MLS fixtures. It covers device registration, KeyPackage publication and consumption, active-host Commit ordering, opaque MLS backlog delivery, removal, handoff, and plaintext scans of relay persistence artifacts.
+The repository keeps three composition levels separate:
+
+1. Chromium UI-contract specs render production components but visibly simulate relay, MLS, persistence, and native execution.
+2. A stateful process test connects two independent live `mls-core` clients to a real relay and validator.
+3. A Linux native-shell job drives two isolated real Tauri processes through the production desktop, Tauri command, MLS, relay, validator, SQLite, and credential-store paths.
+
+The native-shell journey's only mocked external boundary is GitHub identity establishment: it calls the relay's test-only debug-auth endpoint instead of GitHub OAuth. Both GitHub users are already members of the fixture team. The test covers admission of the guest device into the MLS group through the real KeyPackage, HPKE request, host approval, Add Commit, and Welcome flow; it does not cover GitHub OAuth or inviting a GitHub user to a team.
+
+## Deterministic relay confidentiality journey
+
+The `security-journey` CI job runs the relay as a real child process and exercises the protocol-v2 delivery boundary with native-generated MLS fixtures. It covers device registration, KeyPackage publication and consumption, active-host Commit ordering, opaque MLS backlog delivery, removal, handoff, and plaintext scans of relay persistence artifacts. The native artifacts are generated before relay delivery, so this test is not evidence that two desktop processes react correctly to live relay events.
 
 The same gate scans every serialized wire artifact for the stable canary strings in `apps/desktop/test/fixtures/injection-red-team-v1.json`. Add a new versioned fixture when the corpus meaning changes; append cases without changing the version when only coverage expands.
 
@@ -14,6 +24,24 @@ npm run test:security-journey
 
 The process journey needs Cargo because it builds the validator and generates its MLS fixture from the native core. When Cargo is not installed, the test exits successfully with the explicit result `skipped: Rust toolchain required`; this local convenience does not weaken CI, where the job installs pinned Rust 1.88.0 before running and a skipped result is unexpected. `MULTAIPLAYER_CARGO_BIN` may select a non-default Cargo executable.
 
+## Stateful native-core and relay journey
+
+`apps/relay/test/live-native-relay-journey.test.ts` starts two separate, long-lived `mls-integration-client` processes. Each owns a distinct real `MlsEngine` and device signer. The test uploads the guest's real KeyPackage through the actual validator, publishes MLS bytes through a real relay and SQLite store, and passes the relay-delivered bytes—not a side-channel copy—into the receiving engine. It checks application decryption, signed host handoff, rejection of a former host's next Commit attempt, and post-handoff successor traffic.
+
+This fixture intentionally exposes only direct `mls-core` operations. Its state is ephemeral, and it does not call Tauri commands, use Keychain-backed admission receipts, or exercise the desktop UI. It is sequencing and process-composition evidence, not production invite-command or durable-state evidence. It runs in both the ordinary relay suite and the focused `security-journey` gate.
+
+## Two real Tauri shells
+
+`e2e/native-shell/journey.ts` launches two Tauri application binaries with isolated Linux homes, XDG directories, and Secret Service stores. WebKitWebDriver controls the actual host and guest windows. Through production UI and Tauri commands, the host creates a room; the guest imports an invite; the host approves the requesting device; the guest processes the real Welcome; the peers exchange an encrypted message; and authority transfers before the successor sends another message. The test also checks the relay's recorded active host.
+
+The job uses the real relay process, SQLite persistence, WebSocket transport, `mls-keypackage-validator`, native MLS/HPKE processing, and application credential storage. Relay debug authentication is the one intentional mock. The two fixture identities begin as team members, so “invite” in this test means device MLS admission to the encrypted room and not GitHub OAuth or team-membership invitation. Linux is used because WebKitWebDriver provides CI automation there; this does not change the supported macOS release target.
+
+Run it in a matching Linux environment with:
+
+```sh
+xvfb-run -a npm run test:e2e:native
+```
+
 ## Desktop browser journeys
 
 Playwright runs the actual web preview alongside an isolated, test-only UI-contract harness. The harness renders production React components and pure invite/Codex helpers, but it does not emulate Tauri or restore the retired browser cryptography. Every scenario lists its simulated boundaries in the page. Focused specs cover three user-facing authorization boundaries:
@@ -22,7 +50,7 @@ Playwright runs the actual web preview alongside an isolated, test-only UI-contr
 - `e2e/host-handoff.spec.ts` keeps host and model controls with the outgoing host through offer and candidate request, then transfers them only after that host approves; and
 - `e2e/codex-turn-approval.spec.ts` checks bounded context previews, member lockout, host approval and denial, input bounds, and execution-state transitions.
 
-These browser cases are UI-contract evidence, not MLS, relay-confidentiality, native-authorization, or Codex app-server evidence. The process journey above remains the composition proof for native KeyPackage consumption, Welcome admission, host transfer, epoch exclusion, and relay persistence scanning. Run the complete browser suite with `npm run test:e2e`, or a single focused case such as `npm run test:e2e -- e2e/host-handoff.spec.ts`.
+These browser cases are UI-contract evidence, not MLS, relay-confidentiality, native-authorization, or Codex app-server evidence. The stateful process and two-shell journeys above provide their separately stated native/relay evidence; the deterministic process journey retains relay persistence scanning and removed-member exclusion. Run the complete browser suite with `npm run test:e2e`, or a single focused case such as `npm run test:e2e -- e2e/host-handoff.spec.ts`.
 
 ## Host execution limits
 

@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "test:security-journey": "tsx --test --test-reporter=junit test/process-security-journey.test.ts",
+    "test:security-journey": "tsx --test --test-reporter=junit test/process-security-journey.test.ts test/live-native-relay-journey.test.ts",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "build": "tsc -p tsconfig.json",

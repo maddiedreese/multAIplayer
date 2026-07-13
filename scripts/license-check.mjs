@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { isDeniedLicenseExpression } from "./license-policy.mjs";
 
 const expectedProjectLicense = "Apache-2.0";
 const projectPackagePaths = [
@@ -12,7 +13,10 @@ const projectPackagePaths = [
   "packages/github/package.json"
 ];
 const internalPackagePrefix = "@multaiplayer/";
-const deniedLicensePattern = /\b(AGPL|GPL|LGPL|SSPL|BUSL|Elastic)\b/i;
+// npm omits license metadata for this exact legacy package even though its
+// packaged README contains the complete MIT license text. Keep overrides
+// version-specific so an upgrade requires a fresh review.
+const verifiedLicenseMetadata = new Map([["css-value@0.0.1", "MIT"]]);
 
 const failures = [];
 
@@ -28,12 +32,15 @@ for (const [packagePath, pkg] of Object.entries(lock.packages ?? {})) {
   if (!packagePath.startsWith("node_modules/")) continue;
   const name = packagePath.replace(/^node_modules\//, "");
   if (name.startsWith(internalPackagePrefix)) continue;
-  const license = typeof pkg.license === "string" ? pkg.license : "";
+  const license =
+    typeof pkg.license === "string"
+      ? pkg.license
+      : (verifiedLicenseMetadata.get(`${name}@${String(pkg.version ?? "")}`) ?? "");
   if (!license) {
     failures.push(`${name} is missing license metadata in package-lock.json`);
     continue;
   }
-  if (deniedLicensePattern.test(license)) {
+  if (isDeniedLicenseExpression(license)) {
     failures.push(`${name} has denied license expression: ${license}`);
   }
 }

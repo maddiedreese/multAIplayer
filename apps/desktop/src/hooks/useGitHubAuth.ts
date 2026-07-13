@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getAuthConfig,
   getCurrentUser,
@@ -21,6 +21,8 @@ const fallbackAuthConfig: GitHubAuthConfig = {
 };
 
 export function useGitHubAuth(relayHttpUrl: string) {
+  const [authConfigResolved, setAuthConfigResolved] = useState(false);
+  const [currentUserResolved, setCurrentUserResolved] = useState(false);
   const authConfig = useAppStore((state) => state.authConfig);
   const currentUser = useAppStore((state) => state.currentUser);
   const deviceFlow = useAppStore((state) => state.deviceFlow);
@@ -31,24 +33,48 @@ export function useGitHubAuth(relayHttpUrl: string) {
   const setDeviceFlow = useAppStore((state) => state.replaceDeviceFlow);
   const setAuthError = useAppStore((state) => state.setAuthError);
   const setAuthBusy = useAppStore((state) => state.setAuthBusy);
+  const identityResolved =
+    authConfigResolved && currentUserResolved && (currentUser !== null || authConfig?.mutationsRequireAuth === false);
 
   useEffect(() => {
+    let cancelled = false;
+    setAuthConfigResolved(false);
+    setCurrentUserResolved(false);
     setAuthError(null);
     if (!relayHttpUrl) {
       setAuthConfig(fallbackAuthConfig);
       setCurrentUser(null);
       setAuthError("Relay is not configured for this build.");
-      return;
+      setAuthConfigResolved(true);
+      setCurrentUserResolved(true);
+      return () => {
+        cancelled = true;
+      };
     }
     getAuthConfig()
-      .then(setAuthConfig)
+      .then((config) => {
+        if (cancelled) return;
+        setAuthConfig(config);
+        setAuthConfigResolved(true);
+      })
       .catch((error) => {
+        if (cancelled) return;
         setAuthConfig(fallbackAuthConfig);
         setAuthError(String(error));
       });
     getCurrentUser()
-      .then(setCurrentUser)
-      .catch(() => setCurrentUser(null));
+      .then((user) => {
+        if (!cancelled) setCurrentUser(user);
+      })
+      .catch(() => {
+        if (!cancelled) setCurrentUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCurrentUserResolved(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [relayHttpUrl, setAuthConfig, setAuthError, setCurrentUser]);
 
   useEffect(() => {
@@ -116,6 +142,7 @@ export function useGitHubAuth(relayHttpUrl: string) {
     deviceFlow,
     authError,
     authBusy,
+    identityResolved,
     beginGitHubSignIn,
     signOutGitHub
   };
