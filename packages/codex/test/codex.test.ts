@@ -6,6 +6,7 @@ import {
   createThreadStartRequest,
   createTurnStartRequest
 } from "../src/index";
+import codexPackage from "../package.json";
 
 test("initialize request identifies multAIplayer to codex app-server", () => {
   assert.deepEqual(createInitializeRequest(7), {
@@ -15,7 +16,7 @@ test("initialize request identifies multAIplayer to codex app-server", () => {
       clientInfo: {
         name: "multaiplayer",
         title: "multAIplayer",
-        version: "0.1.0-alpha.0"
+        version: codexPackage.version
       },
       capabilities: {
         experimentalApi: true
