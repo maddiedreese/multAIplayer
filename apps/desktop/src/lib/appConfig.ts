@@ -1,3 +1,5 @@
+import { reportNonFatal } from "./nonFatalReporting";
+
 export interface AppConfig {
   relayHttpUrl: string;
   relayWsUrl: string;
@@ -21,6 +23,7 @@ export function loadAppConfig(): AppConfig {
   try {
     return normalizeAppConfig(JSON.parse(stored) as Partial<AppConfig>);
   } catch {
+    reportNonFatal("discard corrupt desktop app configuration");
     localStorage.removeItem(configKey);
     return defaultAppConfig();
   }

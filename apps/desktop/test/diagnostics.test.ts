@@ -9,6 +9,7 @@ import {
   recordDiagnosticEvent,
   saveNativeDiagnosticBundle
 } from "../src/lib/diagnostics";
+import { reportExpectedFailure, reportNonFatal } from "../src/lib/nonFatalReporting";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://127.0.0.1:5173/"
@@ -49,6 +50,26 @@ test("recordDiagnosticEvent stores bounded redacted diagnostics", () => {
   assert.equal(redactedUrl.search, "");
   assert.doesNotMatch(entries[0].detail ?? "", /token=abc/);
   assert.doesNotMatch(entries[0].detail ?? "", /gho_/);
+});
+
+test("recoverable failures are countable without including rejected input", () => {
+  reportNonFatal("discard corrupt security settings");
+  const entries = loadDiagnosticEntries();
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].message, "Non-fatal failure: discard corrupt security settings");
+  assert.equal(entries[0].detail, undefined);
+});
+
+test("expected failures emit a static debug breadcrumb", () => {
+  const originalDebug = console.debug;
+  const calls: unknown[][] = [];
+  console.debug = (...args: unknown[]) => calls.push(args);
+  try {
+    reportExpectedFailure("URL validation rejected malformed input");
+  } finally {
+    console.debug = originalDebug;
+  }
+  assert.deepEqual(calls, [["[expected failure] URL validation rejected malformed input"]]);
 });
 
 test("web-preview diagnostics remain memory-only", () => {

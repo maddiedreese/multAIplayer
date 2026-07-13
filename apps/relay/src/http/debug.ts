@@ -1,3 +1,4 @@
+import { sendRelayError } from "./errors.js";
 import type { CookieOptions, Express } from "express";
 import { nanoid } from "nanoid";
 import type { AuthSession, RelayStore } from "../state.js";
@@ -37,7 +38,7 @@ export function registerDebugRoutes({
 }: RegisterDebugRoutesOptions) {
   app.get("/debug/rooms", (req, res) => {
     if (!debugEndpointsEnabled || !isLoopbackRequest(req.socket.remoteAddress)) {
-      res.status(404).json({ error: "Debug endpoints are disabled." });
+      sendRelayError(res, 404, "not_found", "Debug endpoints are disabled.");
       return;
     }
     pruneExpiredRelayState();
@@ -60,7 +61,7 @@ export function registerDebugRoutes({
 
   app.post("/debug/auth-session", (req, res) => {
     if (!debugEndpointsEnabled || !isLoopbackRequest(req.socket.remoteAddress)) {
-      res.status(404).json({ error: "Debug endpoints are disabled." });
+      sendRelayError(res, 404, "not_found", "Debug endpoints are disabled.");
       return;
     }
     const id = String(req.body?.id ?? "").trim();
@@ -71,7 +72,12 @@ export function registerDebugRoutes({
     const normalizedLogin = normalizeMetadataText(login, maxDisplayNameChars);
     const normalizedName = normalizeMetadataText(name, maxDisplayNameChars);
     if (!userId || !normalizedLogin || !normalizedName) {
-      res.status(400).json({ error: "id, login, and name must be bounded strings without control characters" });
+      sendRelayError(
+        res,
+        400,
+        "invalid_request",
+        "id, login, and name must be bounded strings without control characters"
+      );
       return;
     }
     const sessionId = nanoid(32);

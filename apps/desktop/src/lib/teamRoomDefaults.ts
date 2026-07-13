@@ -6,6 +6,7 @@ import {
 } from "@multaiplayer/protocol";
 import { normalizeBrowserAllowedOrigins } from "./browserPolicy";
 import { normalizeCodexModel } from "./workspaceCreation";
+import { reportNonFatal } from "./nonFatalReporting";
 
 export interface TeamRoomDefaults {
   approvalPolicy: ApprovalPolicy;
@@ -39,6 +40,7 @@ export function loadTeamRoomDefaults(teamId: string): TeamRoomDefaults {
   try {
     return sanitizeTeamRoomDefaults(JSON.parse(stored) as Partial<TeamRoomDefaults>);
   } catch {
+    reportNonFatal("discard corrupt team room defaults");
     localStorage.removeItem(teamRoomDefaultsKey(teamId));
     return copyTeamRoomDefaults(defaultTeamRoomDefaults);
   }

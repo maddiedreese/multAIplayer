@@ -24,6 +24,7 @@ import {
 import { isStaleMlsPublish } from "../relayClient";
 import { clearAndRebaseStaleMlsCommit } from "../mlsCommitRebase";
 import { parseDirectedMlsInviteCiphertext } from "./mlsInviteProtocol";
+import { reportExpectedFailure } from "../nonFatalReporting";
 
 type InviteRelayActionOptions = Pick<UseInviteActionsOptions, "relayRef" | "seenEnvelopeIds" | "selectedRoomIdRef">;
 const inviteDecisionsInFlight = new Set<string>();
@@ -98,6 +99,7 @@ export function createInviteRelayActions(
         });
       } catch {
         // Invalid HPKE payloads and capability bindings are intentionally ignored.
+        reportExpectedFailure("invite HPKE payload or capability binding validation failed");
       }
     }
   }

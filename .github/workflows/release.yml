@@ -235,27 +235,21 @@ jobs:
           cosign sign-blob --yes --bundle release-assets/SHA256SUMS.txt.sigstore.json release-assets/SHA256SUMS.txt
           cosign sign-blob --yes --bundle release-assets/multaiplayer.spdx.json.sigstore.json release-assets/multaiplayer.spdx.json
 
-      - name: Create GitHub release
+      - name: Attach assets to the generated GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_PRERELEASE: ${{ needs.build.outputs.prerelease }}
           RELEASE_TAG: ${{ needs.build.outputs.tag }}
         run: |
-          args=()
-          if [ "$RELEASE_PRERELEASE" = "true" ]; then
-            args+=(--prerelease)
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release-assets/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            release_args=(--generate-notes)
+            if [ "$RELEASE_PRERELEASE" = "true" ]; then
+              release_args+=(--prerelease)
+            fi
+            gh release create "$RELEASE_TAG" release-assets/* --repo "$GITHUB_REPOSITORY" "${release_args[@]}"
           fi
-          signing_notes="$(cat <<'EOF'
-          Important alpha notes:
-          - This macOS app is Developer ID signed and notarized.
-          - Treat it as security-sensitive alpha software and prefer test/self-hosted rooms before using private projects.
-          - See `SHA256SUMS.txt` for release asset checksums.
-          EOF
-          )"
-          gh release create "$RELEASE_TAG" release-assets/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "multAIplayer $RELEASE_TAG" \
-            --notes "Automated macOS release build.
-
-          $signing_notes" \
-            "${args[@]}"
+          if [ "$RELEASE_PRERELEASE" = "true" ]; then
+            gh release edit "$RELEASE_TAG" --prerelease --repo "$GITHUB_REPOSITORY"
+          fi

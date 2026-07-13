@@ -2,6 +2,7 @@ import type { StateCreator } from "zustand";
 import { omitRecordKey } from "../../lib/setUtils";
 import type { BrowserAccessRequest, BrowserStatus } from "../../types";
 import type { AppStoreState } from "../appStore";
+import { reportExpectedFailure } from "../../lib/nonFatalReporting";
 
 export interface BrowserRoomState {
   requests?: BrowserAccessRequest[];
@@ -318,6 +319,7 @@ function browserTabTitle(url: string): string {
     const parsed = new URL(url);
     return parsed.host || parsed.toString();
   } catch {
+    reportExpectedFailure("browser tab title parser rejected malformed input");
     return url;
   }
 }

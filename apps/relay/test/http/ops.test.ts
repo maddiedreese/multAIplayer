@@ -13,45 +13,25 @@ import {
 } from "../support/relay.js";
 
 test("relay exposes content-free operational metrics", async () => {
-  const relay = await startRelay();
+  const metricsToken = "test-metrics-token-that-is-at-least-32-characters";
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_METRICS_TOKEN: metricsToken });
   try {
-    const response = await fetch(`${relay.baseUrl}/metrics`);
-    assert.equal(response.status, 200);
-    const body = (await response.json()) as {
-      activeSockets?: unknown;
-      liveAttachmentBlobCount?: unknown;
-      liveAttachmentBlobBytes?: unknown;
-      envelopesPublishedTotal?: unknown;
-      attachmentBlobUploadsTotal?: unknown;
-      attachmentBlobUploadBytesTotal?: unknown;
-      attachmentBlobUploadRejectionsByReason?: unknown;
-      quotaRejectionsTotal?: unknown;
-      quotaRejectionsByType?: unknown;
-      rateLimitRejectionsTotal?: unknown;
-      rateLimitRejectionsByBucket?: unknown;
-      webSocketConnectionAttemptsTotal?: unknown;
-      webSocketConnectionsAcceptedTotal?: unknown;
-      webSocketConnectionRejectionsByReason?: unknown;
-      startedAt?: unknown;
-      uptimeSeconds?: unknown;
-    };
+    const unauthorized = await fetch(`${relay.baseUrl}/metrics`);
+    assert.equal(unauthorized.status, 401);
+    assert.match(unauthorized.headers.get("www-authenticate") ?? "", /^Bearer /);
 
-    assert.equal(body.activeSockets, 0);
-    assert.equal(body.liveAttachmentBlobCount, 0);
-    assert.equal(body.liveAttachmentBlobBytes, 0);
-    assert.equal(body.envelopesPublishedTotal, 0);
-    assert.equal(body.attachmentBlobUploadsTotal, 0);
-    assert.equal(body.attachmentBlobUploadBytesTotal, 0);
-    assert.deepEqual(body.attachmentBlobUploadRejectionsByReason, {});
-    assert.equal(body.quotaRejectionsTotal, 0);
-    assert.deepEqual(body.quotaRejectionsByType, {});
-    assert.equal(body.rateLimitRejectionsTotal, 0);
-    assert.deepEqual(body.rateLimitRejectionsByBucket, {});
-    assert.equal(body.webSocketConnectionAttemptsTotal, 0);
-    assert.equal(body.webSocketConnectionsAcceptedTotal, 0);
-    assert.deepEqual(body.webSocketConnectionRejectionsByReason, {});
-    assert.equal(typeof body.startedAt, "string");
-    assert.equal(typeof body.uptimeSeconds, "number");
+    const response = await fetch(`${relay.baseUrl}/metrics`, {
+      headers: { authorization: `Bearer ${metricsToken}` }
+    });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type") ?? "", /text\/plain/);
+    const body = await response.text();
+    assert.match(body, /# TYPE multaiplayer_relay_active_sockets gauge/);
+    assert.match(body, /multaiplayer_relay_active_sockets 0/);
+    assert.match(body, /multaiplayer_relay_live_attachment_blobs 0/);
+    assert.match(body, /multaiplayer_relay_envelopes_published_total 0/);
+    assert.match(body, /multaiplayer_relay_websocket_connection_attempts_total 0/);
+    assert.match(body, /multaiplayer_relay_start_time_seconds \d+/);
   } finally {
     await relay.close();
   }
@@ -124,6 +104,19 @@ test("relay drains readiness, sockets, and pending store writes on graceful shut
     );
   } finally {
     socket.close();
+    await relay.close();
+  }
+});
+
+test("relay error responses always include a typed code", async () => {
+  const relay = await startRelay();
+  try {
+    const response = await fetch(`${relay.baseUrl}/teams/missing/members`);
+    assert.equal(response.status, 404);
+    const body = (await response.json()) as { error?: unknown; code?: unknown };
+    assert.equal(typeof body.error, "string");
+    assert.equal(body.code, "team_not_found");
+  } finally {
     await relay.close();
   }
 });

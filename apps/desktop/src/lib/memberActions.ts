@@ -5,6 +5,7 @@ import { removeTeamMember, transferTeamOwnership, updateTeamMemberRole } from ".
 import { useAppStore } from "../store/appStore";
 import type { RoomPresence } from "../types";
 import { currentLocalIdentity } from "./selectedWorkspace";
+import { isRelayHttpErrorCode } from "./httpResponse";
 
 interface MemberActionsOptions {
   setDeviceIdentityMessage: (message: string | null) => void;
@@ -155,7 +156,7 @@ export function createMemberActions({
       try {
         members = await removeTeamMember(selectedTeam, member.userId);
       } catch (error) {
-        if (!String(error).includes("Team member not found")) throw error;
+        if (!isRelayHttpErrorCode(error, "team_member_not_found")) throw error;
         members = (useAppStore.getState().teamRosterByTeam[selectedTeam]?.members ?? []).filter(
           (item) => item.userId !== member.userId
         );

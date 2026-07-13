@@ -1,0 +1,23 @@
+[package]
+name = "mls-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+base64 = "=0.22.1"
+libfuzzer-sys = "=0.4.13"
+mls-core = { path = ".." }
+
+[[bin]]
+name = "key_package_deserialization"
+path = "fuzz_targets/key_package_deserialization.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = ["."]

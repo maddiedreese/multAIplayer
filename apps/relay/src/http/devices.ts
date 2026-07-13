@@ -1,3 +1,4 @@
+import { sendRelayError } from "./errors.js";
 import type { Express, Response } from "express";
 import { ECDH, createHash, createPublicKey, timingSafeEqual } from "node:crypto";
 import { type DeviceRecord } from "@multaiplayer/protocol";
@@ -41,17 +42,22 @@ export function registerDeviceRoutes({
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
     if (!session) {
-      res.status(401).json({ error: "Sign in before registering a device identity." });
+      sendRelayError(res, 401, "authentication_required", "Sign in before registering a device identity.");
       return;
     }
 
     const requestedUserId = normalizeOptionalMetadataText(req.body?.userId, maxUserIdChars);
     if (requestedUserId === null) {
-      res.status(400).json({ error: `userId must be up to ${maxUserIdChars} characters without control characters` });
+      sendRelayError(
+        res,
+        400,
+        "invalid_request",
+        `userId must be up to ${maxUserIdChars} characters without control characters`
+      );
       return;
     }
     if (session && requestedUserId && requestedUserId !== session.user.id) {
-      res.status(403).json({ error: "Device user id must match the signed-in GitHub user." });
+      sendRelayError(res, 403, "forbidden", "Device user id must match the signed-in GitHub user.");
       return;
     }
     const userId = session.user.id;
@@ -67,18 +73,18 @@ export function registerDeviceRoutes({
     );
     const hpkeKeyFingerprint = normalizeMetadataText(req.body?.hpkeKeyFingerprint, maxPublicKeyFingerprintChars);
     if (!userId || !deviceId || !displayName) {
-      res.status(400).json({ error: "userId, deviceId, and displayName are required" });
+      sendRelayError(res, 400, "invalid_request", "userId, deviceId, and displayName are required");
       return;
     }
     if (!signaturePublicKey || !hpkePublicKey || !signatureKeyFingerprint || !hpkeKeyFingerprint) {
-      res.status(400).json({ error: "MLS signature and HPKE public keys and fingerprints are required" });
+      sendRelayError(res, 400, "invalid_request", "MLS signature and HPKE public keys and fingerprints are required");
       return;
     }
     if (
       !validP256Spki(signaturePublicKey, maxPublicKeyJwkChars) ||
       !validP256HpkeKey(hpkePublicKey, maxPublicKeyJwkChars)
     ) {
-      res.status(400).json({ error: "MLS signature and HPKE keys must be canonical P-256 public keys." });
+      sendRelayError(res, 400, "invalid_request", "MLS signature and HPKE keys must be canonical P-256 public keys.");
       return;
     }
 
@@ -86,17 +92,19 @@ export function registerDeviceRoutes({
       !constantTimeTextEqual(signatureKeyFingerprint, fingerprintPublicKey(signaturePublicKey)) ||
       !constantTimeTextEqual(hpkeKeyFingerprint, fingerprintPublicKey(hpkePublicKey))
     ) {
-      res.status(400).json({ error: "Public key fingerprint does not match the registered key." });
+      sendRelayError(res, 400, "invalid_request", "Public key fingerprint does not match the registered key.");
       return;
     }
 
     const now = new Date().toISOString();
     const existing = store.getDevice(userId, deviceId);
     if (existing && (existing.signaturePublicKey !== signaturePublicKey || existing.hpkePublicKey !== hpkePublicKey)) {
-      res.status(409).json({
-        error:
-          "This device id is already bound to a different public key. Reset the device explicitly before replacing it."
-      });
+      sendRelayError(
+        res,
+        409,
+        "conflict",
+        "This device id is already bound to a different public key. Reset the device explicitly before replacing it."
+      );
       return;
     }
     const device: DeviceRecord = {
@@ -119,18 +127,18 @@ export function registerDeviceRoutes({
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowRead(session, res)) return;
     if (!session) {
-      res.status(401).json({ error: "Sign in before reading team device identities." });
+      sendRelayError(res, 401, "authentication_required", "Sign in before reading team device identities.");
       return;
     }
 
     const teamId = String(req.params.teamId ?? "");
     if (!store.hasTeam(teamId)) {
-      res.status(404).json({ error: "Team not found" });
+      sendRelayError(res, 404, "team_not_found", "Team not found");
       return;
     }
     const members = store.getTeamMembers(teamId);
     if (!members?.has(session.user.id)) {
-      res.status(403).json({ error: "Join this team before reading its device identities." });
+      sendRelayError(res, 403, "forbidden", "Join this team before reading its device identities.");
       return;
     }
     const memberUserIds = new Set(members.keys());

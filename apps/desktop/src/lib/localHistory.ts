@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { setMlsHistoryRetention } from "./mlsClient";
+import { reportNonFatal } from "./nonFatalReporting";
 
 const defaultRetentionDays = 30;
 
@@ -70,6 +71,7 @@ function readSettings(key: string): LocalHistorySettings {
     const stored = JSON.parse(localStorage.getItem(key) ?? "null") as Partial<LocalHistorySettings> | null;
     return sanitizeHistorySettings(stored ?? {});
   } catch {
+    reportNonFatal("discard corrupt local-history settings");
     localStorage.removeItem(key);
     return sanitizeHistorySettings({});
   }

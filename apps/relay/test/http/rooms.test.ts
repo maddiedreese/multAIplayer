@@ -100,7 +100,7 @@ test("relay reasoning-effort errors list every current protocol option", async (
       })
     });
     assert.equal(createResponse.status, 400);
-    assert.deepEqual(await createResponse.json(), { error: expectedError });
+    assert.deepEqual(await createResponse.json(), { error: expectedError, code: "invalid_request" });
 
     const updateResponse = await fetch(`${relay.baseUrl}/rooms/room-desktop/settings`, {
       method: "PATCH",
@@ -112,16 +112,18 @@ test("relay reasoning-effort errors list every current protocol option", async (
       })
     });
     assert.equal(updateResponse.status, 400);
-    assert.deepEqual(await updateResponse.json(), { error: expectedError });
+    assert.deepEqual(await updateResponse.json(), { error: expectedError, code: "invalid_request" });
   } finally {
     await relay.close();
   }
 });
 
 test("relay enforces authenticated user daily team and room creation quotas", async () => {
+  const metricsToken = "room-quota-metrics-token-with-at-least-32-chars";
   const relay = await startRelay({
     MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP: "1",
-    MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP: "1"
+    MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP: "1",
+    MULTAIPLAYER_RELAY_METRICS_TOKEN: metricsToken
   });
   try {
     const firstUserCookie = await createDebugSession(relay.baseUrl, "github:quota-user", "quota-user");
@@ -200,23 +202,24 @@ test("relay enforces authenticated user daily team and room creation quotas", as
     assert.equal(limitedRoomBody.retryAfterSeconds, Number(limitedRoom.headers.get("retry-after")));
     assert.ok(Number.isFinite(Date.parse(limitedRoomBody.quota.resetsAt)));
 
-    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    const metrics = await fetch(`${relay.baseUrl}/metrics`, {
+      headers: { authorization: `Bearer ${metricsToken}` }
+    });
     assert.equal(metrics.status, 200);
-    const metricsBody = (await metrics.json()) as {
-      quotaRejectionsTotal?: unknown;
-      quotaRejectionsByType?: Record<string, unknown>;
-    };
-    assert.equal(metricsBody.quotaRejectionsTotal, 2);
-    assert.equal(metricsBody.quotaRejectionsByType?.daily_user_team_creations, 1);
-    assert.equal(metricsBody.quotaRejectionsByType?.daily_user_room_creations, 1);
+    const metricsBody = await metrics.text();
+    assert.match(metricsBody, /multaiplayer_relay_quota_rejections_total 2/);
+    assert.match(metricsBody, /type="daily_user_team_creations"} 1/);
+    assert.match(metricsBody, /type="daily_user_room_creations"} 1/);
   } finally {
     await relay.close();
   }
 });
 
 test("relay enforces authenticated total room ceiling", async () => {
+  const metricsToken = "total-room-metrics-token-with-at-least-32-chars";
   const relay = await startRelay({
-    MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER: "2"
+    MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER: "2",
+    MULTAIPLAYER_RELAY_METRICS_TOKEN: metricsToken
   });
   try {
     const maddieCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
@@ -246,14 +249,13 @@ test("relay enforces authenticated total room ceiling", async () => {
       }
     });
 
-    const metrics = await fetch(`${relay.baseUrl}/metrics`);
+    const metrics = await fetch(`${relay.baseUrl}/metrics`, {
+      headers: { authorization: `Bearer ${metricsToken}` }
+    });
     assert.equal(metrics.status, 200);
-    const metricsBody = (await metrics.json()) as {
-      quotaRejectionsTotal?: unknown;
-      quotaRejectionsByType?: Record<string, unknown>;
-    };
-    assert.equal(metricsBody.quotaRejectionsTotal, 1);
-    assert.equal(metricsBody.quotaRejectionsByType?.total_user_rooms, 1);
+    const metricsBody = await metrics.text();
+    assert.match(metricsBody, /multaiplayer_relay_quota_rejections_total 1/);
+    assert.match(metricsBody, /type="total_user_rooms"} 1/);
   } finally {
     await relay.close();
   }

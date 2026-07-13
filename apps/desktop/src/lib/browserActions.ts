@@ -9,6 +9,7 @@ import type { BrowserAccessRequest } from "../types";
 import { createMlsApplicationMessage, publishMlsApplicationMessage } from "./mlsApplicationMessage";
 import { useAppStore } from "../store/appStore";
 import { currentSelectedRoom, currentSelectedRoomContext } from "./selectedWorkspace";
+import { reportExpectedFailure } from "./nonFatalReporting";
 
 interface BrowserActionsOptions {
   selectedRoomIdRef: MutableRefObject<string>;
@@ -59,6 +60,7 @@ export function createBrowserActions({
     try {
       parsedUrl = new URL(rawUrl);
     } catch {
+      reportExpectedFailure("browser request URL validation rejected malformed input");
       useAppStore.getState().setBrowserMessageForRoom(roomId, "Enter a valid browser URL.");
       return;
     }

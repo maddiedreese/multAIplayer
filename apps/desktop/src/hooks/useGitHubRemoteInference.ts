@@ -3,6 +3,7 @@ import { getGitRemoteOrigin } from "../lib/localBackend";
 import { parseGitHubRemoteUrl } from "../lib/gitWorkflowDraft";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
 import { useAppStore } from "../store/appStore";
+import { reportExpectedFailure } from "../lib/nonFatalReporting";
 
 interface LatestRef<T> {
   current: T;
@@ -45,6 +46,7 @@ export function useGitHubRemoteInference({
       })
       .catch(() => {
         // Remote inference is best-effort; manual owner/repo fields remain available.
+        reportExpectedFailure("GitHub remote inference was unavailable");
       });
     return () => {
       cancelled = true;

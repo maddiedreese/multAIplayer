@@ -2,15 +2,19 @@
 
 GitHub branch protection is the enforcement source; keep required checks aligned with this table.
 
-| Workflow | Runs | Failure means | PR blocking |
-| --- | --- | --- | --- |
-| CI | pull requests and `main` | DCO sign-off, lint, formatting, types, tests, builds, security journeys, or packaging failed | Yes for configured core checks |
-| CodeQL | schedule, release, manual | candidate vulnerability or analysis failure | No for ordinary PRs; a release-triggered failure requires immediate triage and possible withdrawal |
-| npm advisory audit | schedule, release, manual | high-severity advisory or integration failure needs triage | No for ordinary PRs; a release-triggered failure requires immediate triage and possible withdrawal |
-| Rust dependency policy | schedule, release, manual | advisory, ban, source, or license policy failed | No for ordinary PRs; a release-triggered failure requires immediate triage and possible withdrawal |
-| Supply-chain security | schedule, release, manual | heavyweight SBOM/container scan or provenance control failed | No for ordinary PRs; a release-triggered failure requires immediate triage and possible withdrawal |
-| Latest Codex contract | schedule, manual | supported-latest integration drifted | No; triage compatibility work |
-| Release | version tags, manual | preflight, reproducibility, signing, packaging, or publication failed | Not a PR check; blocks release |
+| Workflow               | Runs                      | Failure means                                                                                | PR blocking                                                                                        |
+| ---------------------- | ------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| CI                     | pull requests and `main`  | DCO sign-off, lint, formatting, types, tests, builds, security journeys, or packaging failed | Yes for configured core checks                                                                     |
+| CodeQL                 | schedule, release, manual | candidate vulnerability or analysis failure                                                  | No for ordinary PRs; a release-triggered failure requires immediate triage and possible withdrawal |
+| npm advisory audit     | schedule, release, manual | high-severity advisory or integration failure needs triage                                   | No for ordinary PRs; a release-triggered failure requires immediate triage and possible withdrawal |
+| Rust dependency policy | schedule, release, manual | advisory, ban, source, or license policy failed                                              | No for ordinary PRs; a release-triggered failure requires immediate triage and possible withdrawal |
+| Supply-chain security  | schedule, release, manual | heavyweight SBOM/container scan or provenance control failed                                 | No for ordinary PRs; a release-triggered failure requires immediate triage and possible withdrawal |
+| Latest Codex contract  | schedule, manual          | supported-latest integration drifted                                                         | No; triage compatibility work                                                                      |
+| Release                | version tags, manual      | preflight, reproducibility, signing, packaging, or publication failed                        | Not a PR check; blocks release                                                                     |
+
+The `Prepare release` workflow runs on `main` and opens or updates the Release Please pull request. It works with the built-in Actions token; GitHub places checks created for that automation pull request in an approval-required state, so a maintainer must approve them before merge. An optional `RELEASE_PLEASE_TOKEN` with Contents and Pull requests read/write permissions removes that approval step. When the built-in token creates a version tag, the workflow explicitly dispatches the signed `Release` workflow because tag events created by that token do not implicitly start another workflow.
+
+Playwright covers the protocol-v2 web preview boundary only. Invite/Welcome join and signed host handoff use the real native MLS fixture and relay process journey; Codex approval composition runs in the desktop integration suite. The [end-to-end coverage matrix](../e2e/README.md) maps each journey to its blocking CI job and explains why browser-side Tauri mocks would weaken these tests.
 
 Mutation jobs in `CI` are gated to scheduled or manual execution, not ordinary pull requests. A surviving in-scope security-boundary mutant blocks a release-quality claim and must be fixed or explicitly reviewed. Scanner findings are not dismissed solely to make checks green: record evidence and the narrowest time-bounded suppression. Scheduled failures should create or update a maintenance issue and do not retroactively invalidate unrelated merges.
 

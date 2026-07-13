@@ -96,6 +96,9 @@ jobs:
         run: npm run build:packages
       - name: Mutation-test relay authorization
         run: npm run test:mutation -w @multaiplayer/relay
+      - name: Publish relay mutation score
+        if: always() && hashFiles('apps/relay/reports/mutation/summary.json') != ''
+        run: node scripts/write-mutation-step-summary.mjs "Relay authorization mutation score" apps/relay/reports/mutation/summary.json
       - name: Upload relay authorization mutation reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -124,6 +127,9 @@ jobs:
         run: npm run build:packages
       - name: Mutation-test protocol type guards
         run: npm run test:mutation -w @multaiplayer/protocol
+      - name: Publish protocol mutation score
+        if: always() && hashFiles('packages/protocol/reports/mutation/summary.json') != ''
+        run: node scripts/write-mutation-step-summary.mjs "Protocol type-guard mutation score" packages/protocol/reports/mutation/summary.json
       - name: Upload protocol type-guard mutation reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -160,6 +166,30 @@ jobs:
           name: rust-shell-boundary-mutation-report
           path: apps/desktop/src-tauri/mutants.out
           if-no-files-found: error
+          retention-days: 14
+
+  mls-deserialization-fuzz:
+    name: MLS deserialization fuzz smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Install nightly Rust
+        run: rustup toolchain install nightly --profile minimal
+      - name: Install pinned cargo-fuzz
+        run: cargo +nightly install cargo-fuzz --version 0.12.0 --locked
+      - name: Fuzz MLS KeyPackage and credential deserialization
+        working-directory: apps/desktop/src-tauri/crates/mls-core
+        run: cargo +nightly fuzz run key_package_deserialization -- -max_total_time=120
+      - name: Upload minimized fuzz artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mls-deserialization-fuzz-artifacts
+          path: apps/desktop/src-tauri/crates/mls-core/fuzz/artifacts
+          if-no-files-found: ignore
           retention-days: 14
 
   web-shell-e2e:

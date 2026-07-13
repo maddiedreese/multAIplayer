@@ -27,6 +27,21 @@ test("relay validates PORT with the bounded integer parser", () => {
   }
 });
 
+test("relay only enables metrics with a strong bearer token", () => {
+  const previous = process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN;
+  try {
+    delete process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN;
+    assert.equal(loadRelayConfig().metricsToken, null);
+    process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN = "too-short";
+    assert.equal(loadRelayConfig().metricsToken, null);
+    process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN = "a-strong-metrics-token-with-32-characters";
+    assert.equal(loadRelayConfig().metricsToken, "a-strong-metrics-token-with-32-characters");
+  } finally {
+    if (previous === undefined) delete process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN;
+    else process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN = previous;
+  }
+});
+
 test("relay defaults to SQLite and requires an explicit JSON compatibility choice", () => {
   const previousStorage = process.env.MULTAIPLAYER_RELAY_STORAGE;
   const previousDataPath = process.env.MULTAIPLAYER_RELAY_DATA_PATH;

@@ -22,6 +22,7 @@ export interface RelayConfig {
   jsonBodyLimitBytes: number;
   mlsMessageMaxBytes: number;
   sessionPersistenceSecret: string | null;
+  metricsToken: string | null;
   debugEndpointsEnabled: boolean;
   allowedCorsOrigins: string[];
   mutationsRequireAuth: boolean;
@@ -117,6 +118,7 @@ export function loadRelayConfig(): RelayConfig {
       5_000_000
     ),
     sessionPersistenceSecret: normalizeSessionPersistenceSecret(process.env.MULTAIPLAYER_RELAY_SESSION_SECRET),
+    metricsToken: normalizeMetricsToken(process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN),
     debugEndpointsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_DEBUG, false),
     allowedCorsOrigins: parseAllowedOriginEnv(process.env.MULTAIPLAYER_RELAY_ALLOWED_ORIGINS),
     mutationsRequireAuth: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_REQUIRE_AUTH, nodeEnv === "production"),
@@ -260,4 +262,14 @@ function normalizeSessionPersistenceSecret(value: string | undefined): string | 
     return null;
   }
   return secret;
+}
+
+function normalizeMetricsToken(value: string | undefined): string | null {
+  const token = value?.trim();
+  if (!token) return null;
+  if (token.length < 32) {
+    logRelayEvent("warn", "weak_metrics_token_disables_endpoint", { minimumCharacters: 32 });
+    return null;
+  }
+  return token;
 }

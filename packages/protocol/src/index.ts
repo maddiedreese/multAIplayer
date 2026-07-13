@@ -40,6 +40,12 @@ export {
 export { isRecord } from "./type-guards.js";
 export { PublicKeyFingerprint } from "./identity.js";
 
+export { RelayHttpErrorCode, RelayHttpErrorResponse } from "./http-errors.js";
+export type {
+  RelayHttpErrorCode as RelayHttpErrorCodeType,
+  RelayHttpErrorResponse as RelayHttpErrorResponseType
+} from "./http-errors.js";
+
 export { SessionAccessTokenCiphertext } from "./session-crypto.js";
 
 export {

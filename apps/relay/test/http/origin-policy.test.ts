@@ -32,7 +32,7 @@ test("relay rejects disallowed browser origins before handling requests", async 
       headers: { origin: "https://attacker.example" }
     });
     assert.equal(disallowed.status, 403);
-    assert.deepEqual(await disallowed.json(), { error: "Origin not allowed" });
+    assert.deepEqual(await disallowed.json(), { error: "Origin not allowed", code: "forbidden" });
     assert.equal(disallowed.headers.get("access-control-allow-origin"), null);
 
     const nonBrowserClient = await fetch(`${relay.baseUrl}/auth/config`);
@@ -58,7 +58,7 @@ test("relay applies configured CORS origin allowlist", async () => {
       headers: { origin: "https://example.com" }
     });
     assert.equal(denied.status, 403);
-    assert.deepEqual(await denied.json(), { error: "Origin not allowed" });
+    assert.deepEqual(await denied.json(), { error: "Origin not allowed", code: "forbidden" });
     assert.equal(denied.headers.get("access-control-allow-origin"), null);
     assert.equal(denied.headers.get("access-control-allow-credentials"), null);
   } finally {
@@ -73,7 +73,7 @@ test("relay denies browser CORS origins by default in production", async () => {
       headers: { origin: "https://multaiplayer.com" }
     });
     assert.equal(response.status, 403);
-    assert.deepEqual(await response.json(), { error: "Origin not allowed" });
+    assert.deepEqual(await response.json(), { error: "Origin not allowed", code: "forbidden" });
     assert.equal(response.headers.get("access-control-allow-origin"), null);
   } finally {
     await relay.close();

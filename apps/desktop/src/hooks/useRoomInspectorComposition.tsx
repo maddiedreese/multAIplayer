@@ -1,24 +1,11 @@
-import React, { useMemo, type ComponentProps } from "react";
+import React, { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import {
-  codexModelOptions,
-  codexSandboxLevelOptions,
-  defaultCodexModel,
-  defaultCodexReasoningEffort,
-  defaultCodexSandboxLevel,
-  defaultCodexSpeed
-} from "@multaiplayer/protocol";
+import { codexModelOptions, codexSandboxLevelOptions, defaultCodexModel } from "@multaiplayer/protocol";
 import { BrowserAccessPanel } from "../components/BrowserAccessPanel";
 import { RoomInspectorPanel } from "../components/RoomInspectorPanel";
 import { RoomInspectorWorkPanel } from "../components/RoomInspectorWorkPanel";
 import { canStageRoomChatAttachment } from "../lib/chatPolicy";
 import { formatBytes, formatCodexModel, formatTimestamp } from "../lib/appFormatters";
-import {
-  catalogModelOptions,
-  catalogReasoningOptionsForModel,
-  catalogSpeedOptionsForModel,
-  resolveCodexRunSettings
-} from "../lib/codexCatalogResolver";
 import { resolveFilePreviewTab } from "../lib/filePreview";
 import { resolveGitWorkflowDraft } from "../lib/gitWorkflowDraft";
 import { selectRoomInspectorView } from "../lib/containerViewSelectors";
@@ -31,119 +18,15 @@ import {
 import { defaultProjectPath } from "../lib/localBackend";
 import { buildRoomMemberRows, buildTeamMemberRows } from "../lib/rosterDisplayRows";
 import { canControlRoomTerminal } from "../lib/terminalAccess";
+import { buildRoomInspectorModelProjection } from "../lib/roomInspectorModelProjection";
 import { useFileTerminalDisplay } from "../hooks/useFileTerminalDisplay";
 import { useGitHubWorkflowState } from "../hooks/useGitHubWorkflowState";
 import { useLocalIdentity } from "../hooks/useLocalIdentity";
 import { useRoomAccess } from "../hooks/useRoomAccess";
 import { approvalDelegationPolicyLabels, approvalPolicyLabels, defaultBrowserUrl } from "../appDefaults";
 import { useAppStore } from "../store/appStore";
-import type { createAppRoomPanelActions } from "../lib/appRoomPanelActions";
-import type { useAppHostHandoffActions } from "../hooks/useAppHostHandoffActions";
-import type { useAppInviteActions } from "../hooks/useAppInviteActions";
-import type { useRoomRuntimeContext } from "../hooks/useRoomRuntimeContext";
-import type { useWorkspaceFlowContext } from "../hooks/useWorkspaceFlowContext";
-
-type WorkProps = ComponentProps<typeof RoomInspectorWorkPanel>;
-type WorkspaceFileActions = Pick<
-  WorkProps["workspaceFiles"],
-  | "onCopyProjectMarkdown"
-  | "onOpenProjectFile"
-  | "onCopyDiffSummaryMarkdown"
-  | "onAttachSelectedFileToMessage"
-  | "onSaveSelectedFileContent"
-  | "onApproveFileSaveRequest"
-  | "onDenyFileSaveRequest"
-  | "onCloseFileViewer"
->;
-type TerminalActions = Pick<
-  WorkProps["terminal"],
-  | "onCopyMarkdown"
-  | "onOpenInteractiveTerminal"
-  | "onApproveTerminalRequest"
-  | "onDenyTerminalRequest"
-  | "onSendTerminalData"
-  | "onRestartTerminal"
-  | "onStopTerminal"
-  | "onRevokeExactCommandGrants"
->;
-
-export interface RoomInspectorCapabilities {
-  browser: { openNow: () => void };
-  project: { choosePath: () => void; updatePath: () => void };
-  teamRoster: Pick<WorkProps["teamRoster"], "onPromote" | "onDemote" | "onTransferOwnership" | "onRemove">;
-  roomMembers: Pick<WorkProps["roomMembers"], "onCopyFingerprint" | "onTrust" | "onUntrust">;
-  hostHandoff: { accept: WorkProps["hostHandoff"]["onAcceptHandoff"] };
-  invite: Pick<WorkProps["encryptedInvite"], "onCopyInvite" | "onImportInvite" | "onDecideInviteRequest">;
-  settings: {
-    selectApprovalPolicy: WorkProps["approvalPolicy"]["onSelectPolicy"];
-    selectApprovalDelegationPolicy: WorkProps["approvalPolicy"]["onSelectDelegationPolicy"];
-    selectSandboxLevel: WorkProps["approvalPolicy"]["onSelectSandboxLevel"];
-    selectModel: WorkProps["model"]["onSelectModel"];
-    selectReasoningEffort: WorkProps["model"]["onSelectReasoningEffort"];
-    selectSpeed: WorkProps["model"]["onSelectSpeed"];
-  };
-  history: Pick<
-    WorkProps["localHistory"],
-    | "onHistoryEnabledChange"
-    | "onHistoryRetentionDaysChange"
-    | "onClearRoomHistory"
-    | "onForgetRoomLocalData"
-    | "onApplyTeamDefaultsToRoom"
-    | "onTeamHistoryEnabledChange"
-    | "onTeamHistoryRetentionDaysChange"
-    | "onTeamDefaultApprovalPolicyChange"
-    | "onTeamDefaultCodexModelChange"
-    | "onTeamDefaultInviteApprovalGateChange"
-  >;
-  workspaceFiles: WorkspaceFileActions;
-  git: Pick<WorkProps["gitHandoff"], "onCopyPullRequestDraftMarkdown" | "onApproveGitWorkflow">;
-  github: { refresh: () => void };
-  terminal: TerminalActions;
-}
-
-type RoomRuntime = ReturnType<typeof useRoomRuntimeContext>;
-type WorkspaceFlow = ReturnType<typeof useWorkspaceFlowContext>;
-type HostHandoffActions = ReturnType<typeof useAppHostHandoffActions>;
-type InviteActions = ReturnType<typeof useAppInviteActions>;
-type RoomPanels = ReturnType<typeof createAppRoomPanelActions>;
-
-export interface RoomInspectorSources {
-  roomRuntime: Pick<
-    RoomRuntime,
-    | "openRoomBrowserNow"
-    | "chooseProjectPath"
-    | "updateProjectPath"
-    | "setApprovalPolicy"
-    | "setApprovalDelegationPolicy"
-    | "setCodexSandboxLevel"
-    | "setCodexModel"
-    | "setCodexReasoningEffort"
-    | "setCodexSpeed"
-    | "approveGitWorkflow"
-    | "refreshGitHubActions"
-  >;
-  workspaceFlow: Pick<
-    WorkspaceFlow,
-    | "changeTeamMemberRole"
-    | "transferOwnershipToTeamMember"
-    | "removeMemberFromTeam"
-    | "copyRoomMemberDeviceFingerprint"
-    | "trustRoomMemberDevice"
-    | "untrustRoomMemberDevice"
-    | "updateLocalHistorySettings"
-    | "clearRoomHistory"
-    | "forgetSelectedRoomLocalData"
-    | "applyTeamDefaultsToRoom"
-    | "updateTeamHistoryDefaults"
-    | "updateTeamDefaultApprovalPolicy"
-    | "updateTeamDefaultCodexModel"
-    | "updateTeamDefaultInviteApprovalGate"
-    | "copyPullRequestDraftMarkdown"
-  >;
-  hostHandoff: Pick<HostHandoffActions, "acceptHostHandoff">;
-  inviteActions: Pick<InviteActions, "copyInviteLink" | "joinInviteSecret" | "decideInviteJoinRequest">;
-  roomPanels: Pick<RoomPanels, "workspaceFilesPanelActions" | "terminalPanelActions">;
-}
+import type { RoomInspectorSources } from "./roomInspectorCompositionTypes";
+export type { RoomInspectorCapabilities, RoomInspectorSources } from "./roomInspectorCompositionTypes";
 
 export function useRoomInspectorComposition({ sources }: { sources: RoomInspectorSources }) {
   const capabilities = useMemo(() => buildRoomInspectorCapabilities(sources), [sources]);
@@ -209,11 +92,7 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
     historySettings,
     inviteApprovalGate: invite.approvalGate ?? true
   });
-  const selectedCodexModel = selectedRoom.codexModel ?? defaultCodexModel;
-  const selectedCodexReasoningEffort = selectedRoom.codexReasoningEffort ?? defaultCodexReasoningEffort;
-  const selectedCodexSpeed = selectedRoom.codexSpeed ?? defaultCodexSpeed;
-  const selectedCodexSandboxLevel = selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel;
-  const customCodexModel = roomSettings.customCodexModel ?? selectedCodexModel;
+  const model = buildRoomInspectorModelProjection(selectedRoom, codexProbe, roomSettings.customCodexModel);
   const projectPathDraft = roomSettings.projectPathDraft ?? selectedRoom.projectPath;
   const selectedTerminalId = terminal.selectedTerminalId ?? null;
   const roomTerminals = useMemo(
@@ -243,7 +122,6 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
     gitWorkflowDraft,
     projectPath: selectedRoom.projectPath
   });
-  const resolvedSettings = resolveCodexRunSettings(selectedRoom, codexProbe);
   const teamMemberRows = useMemo(
     () =>
       buildTeamMemberRows({
@@ -331,28 +209,28 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
       message: roomSettings.settingsMessage ?? null,
       selectedPolicy: selectedRoom.approvalPolicy,
       selectedDelegationPolicy: selectedRoom.approvalDelegationPolicy,
-      selectedSandboxLevel: selectedCodexSandboxLevel,
+      selectedSandboxLevel: model.selectedSandboxLevel,
       disabled: !hasSelectedRoom || access.isSelectedRoomLocked || settingsBusy || !access.isActiveHost,
       onSelectPolicy: capabilities.settings.selectApprovalPolicy,
       onSelectDelegationPolicy: capabilities.settings.selectApprovalDelegationPolicy,
       onSelectSandboxLevel: capabilities.settings.selectSandboxLevel
     },
     model: {
-      customModel: customCodexModel,
-      modelOptions: catalogModelOptions(codexProbe),
-      reasoningOptions: catalogReasoningOptionsForModel(codexProbe, resolvedSettings.model),
-      speedOptions: catalogSpeedOptionsForModel(codexProbe, resolvedSettings.model),
-      selectedModel: selectedCodexModel,
-      selectedModelLabel: formatCodexModel(selectedCodexModel),
-      selectedReasoningEffort: selectedCodexReasoningEffort,
-      selectedSpeed: selectedCodexSpeed,
+      customModel: model.customModel,
+      modelOptions: model.modelOptions,
+      reasoningOptions: model.reasoningOptions,
+      speedOptions: model.speedOptions,
+      selectedModel: model.selectedModel,
+      selectedModelLabel: formatCodexModel(model.selectedModel),
+      selectedReasoningEffort: model.selectedReasoningEffort,
+      selectedSpeed: model.selectedSpeed,
       disabled: !hasSelectedRoom || access.isSelectedRoomLocked || settingsBusy || !access.isActiveHost,
-      canApplyCustomModel: Boolean(customCodexModel.trim()) && customCodexModel.trim() !== selectedCodexModel,
+      canApplyCustomModel: Boolean(model.customModel.trim()) && model.customModel.trim() !== model.selectedModel,
       onSelectModel: capabilities.settings.selectModel,
       onSelectReasoningEffort: capabilities.settings.selectReasoningEffort,
       onSelectSpeed: capabilities.settings.selectSpeed,
-      onCustomModelChange: (model) => setCustomCodexModelForRoom(selectedRoom.id, model, selectedCodexModel),
-      onApplyCustomModel: () => capabilities.settings.selectModel(customCodexModel)
+      onCustomModelChange: (value) => setCustomCodexModelForRoom(selectedRoom.id, value, model.selectedModel),
+      onApplyCustomModel: () => capabilities.settings.selectModel(model.customModel)
     },
     codexRuntime: { roomId: selectedRoom.id, projectPath: selectedRoom.projectPath },
     localHistory: {

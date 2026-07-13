@@ -1,3 +1,4 @@
+import { sendRelayError } from "./errors.js";
 import type { Express, Response } from "express";
 import {
   InviteResponseRecord,
@@ -38,7 +39,7 @@ export function registerInviteDeliveryRoutes({
   app.post("/invites/:inviteId/requests", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
-    if (!session) return void res.status(401).json({ error: "Sign in before requesting to join." });
+    if (!session) return void sendRelayError(res, 401, "authentication_required", "Sign in before requesting to join.");
     const invite = store.getInvite(String(req.params.inviteId ?? ""));
     const requestId = normalizeMetadataText(req.body?.requestId, maxEnvelopeIdChars);
     const requesterDeviceId = normalizeMetadataText(req.body?.requesterDeviceId, maxDeviceIdChars);
@@ -46,13 +47,13 @@ export function registerInviteDeliveryRoutes({
     const keyPackageHash = String(req.body?.keyPackageHash ?? "");
     const sealedRequest = String(req.body?.sealedRequest ?? "");
     if (!hasExactKeys(req.body, ["requestId", "requesterDeviceId", "keyPackageId", "keyPackageHash", "sealedRequest"]))
-      return void res.status(400).json({ error: "Invite request contains unsupported fields." });
+      return void sendRelayError(res, 400, "invalid_request", "Invite request contains unsupported fields.");
     if (!requestId || !requesterDeviceId || !keyPackageId)
-      return void res.status(400).json({ error: "Invalid invite request identifiers." });
+      return void sendRelayError(res, 400, "invalid_request", "Invalid invite request identifiers.");
     const kp = store.keyPackages.get(keyPackageId);
     if (!hasDeviceSession(store, req.get("x-device-session"), session.user.id, requesterDeviceId))
-      return void res.status(403).json({ error: "A device-authenticated session is required." });
-    if (!invite) return void res.status(404).json({ error: "Invite not found." });
+      return void sendRelayError(res, 403, "device_auth_required", "A device-authenticated session is required.");
+    if (!invite) return void sendRelayError(res, 404, "invite_not_found", "Invite not found.");
     const existingRequest = store.inviteRequests.get(requestId);
     if (existingRequest) {
       if (
@@ -65,13 +66,13 @@ export function registerInviteDeliveryRoutes({
       ) {
         const pendingSave = requestSaves.get(requestId);
         if (pendingSave && !(await pendingSave))
-          return void res.status(503).json({ error: "Could not persist invite request." });
+          return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist invite request.");
         return void res.status(200).json({ requestId, status: "pending" });
       }
-      return void res.status(409).json({ error: "requestId is already bound to another request." });
+      return void sendRelayError(res, 409, "conflict", "requestId is already bound to another request.");
     }
     if (Array.from(store.inviteRequests.values()).some((pending) => pending.inviteId === invite.id)) {
-      return void res.status(409).json({ error: "This invite already has a pending request." });
+      return void sendRelayError(res, 409, "conflict", "This invite already has a pending request.");
     }
     if (
       Array.from(store.inviteResponses.values()).some((response) => response.inviteId === invite.id) ||
@@ -79,7 +80,7 @@ export function registerInviteDeliveryRoutes({
       invite.approvedDeviceId !== undefined ||
       invite.keyPackageHash !== undefined
     ) {
-      return void res.status(409).json({ error: "This invite already has a pending decision." });
+      return void sendRelayError(res, 409, "conflict", "This invite already has a pending decision.");
     }
     const directed = parseStrictDirectedInviteRequestJson(sealedRequest, maxOpaqueChars);
     const room = store.getRoom(invite.roomId);
@@ -101,7 +102,7 @@ export function registerInviteDeliveryRoutes({
       directed.binding.hostDeviceId !== room?.activeHostDeviceId ||
       directed.binding.expiresAt !== invite.expiresAt
     ) {
-      return void res.status(400).json({ error: "Invalid invite request." });
+      return void sendRelayError(res, 400, "invalid_request", "Invalid invite request.");
     }
     const record: InviteJoinRequestRecord = {
       requestId,
@@ -123,7 +124,7 @@ export function registerInviteDeliveryRoutes({
     if (requestSaves.get(requestId) === saveResult) requestSaves.delete(requestId);
     if (!persisted) {
       store.inviteRequests.delete(requestId);
-      return void res.status(503).json({ error: "Could not persist invite request." });
+      return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist invite request.");
     }
     notifyInviteRequested(invite.id, requestId);
     res.status(201).json({ requestId, status: "pending" });
@@ -140,9 +141,9 @@ export function registerInviteDeliveryRoutes({
       room.hostUserId !== session.user.id ||
       room.activeHostDeviceId !== String(req.query.hostDeviceId ?? "")
     )
-      return void res.status(403).json({ error: "Only the active host device may read invite requests." });
+      return void sendRelayError(res, 403, "forbidden", "Only the active host device may read invite requests.");
     if (!hasDeviceSession(store, req.get("x-device-session"), session.user.id, room.activeHostDeviceId!))
-      return void res.status(403).json({ error: "A device-authenticated session is required." });
+      return void sendRelayError(res, 403, "device_auth_required", "A device-authenticated session is required.");
     res.json({ requests: Array.from(store.inviteRequests.values()).filter((item) => item.inviteId === invite.id) });
   });
 
@@ -159,16 +160,16 @@ export function registerInviteDeliveryRoutes({
         ? ["hostDeviceId", "requestId", "status", "responseBinding", "responseMac", "welcome"]
         : ["hostDeviceId", "requestId", "status", "responseBinding", "responseMac"];
     if (!hasExactKeys(req.body, expectedKeys))
-      return void res.status(400).json({ error: "Invite response contains unsupported fields." });
+      return void sendRelayError(res, 400, "invalid_request", "Invite response contains unsupported fields.");
     if (
       !session ||
       !room ||
       room.hostUserId !== session.user.id ||
       room.activeHostDeviceId !== String(req.body?.hostDeviceId ?? "")
     )
-      return void res.status(403).json({ error: "Only the active host device may publish an invite response." });
+      return void sendRelayError(res, 403, "forbidden", "Only the active host device may publish an invite response.");
     if (!hasDeviceSession(store, req.get("x-device-session"), session.user.id, room.activeHostDeviceId!))
-      return void res.status(403).json({ error: "A device-authenticated session is required." });
+      return void sendRelayError(res, 403, "device_auth_required", "A device-authenticated session is required.");
     const existingWelcome = store.inviteResponses.get(String(req.body?.requestId ?? ""));
     if (existingWelcome) {
       if (
@@ -179,20 +180,20 @@ export function registerInviteDeliveryRoutes({
         existingWelcome.welcome === welcome
       )
         return void res.status(200).json({ requestId: existingWelcome.requestId, status: "ready" });
-      return void res.status(409).json({ error: "requestId is already bound to another invite response." });
+      return void sendRelayError(res, 409, "conflict", "requestId is already bound to another invite response.");
     }
     if (!request || request.inviteId !== invite?.id)
-      return void res.status(400).json({ error: "Invalid invite response." });
+      return void sendRelayError(res, 400, "invalid_request", "Invalid invite response.");
     const approved =
       invite?.approvedUserId === request.requesterUserId &&
       invite.approvedDeviceId === request.requesterDeviceId &&
       invite.keyPackageHash === request.keyPackageHash;
     if (status === "approved" && !approved)
-      return void res.status(409).json({ error: "The exact invite request has not been approved." });
+      return void sendRelayError(res, 409, "conflict", "The exact invite request has not been approved.");
     if (status === "approved" && (!welcome || !isCanonicalPaddedBase64(welcome, maxOpaqueChars)))
-      return void res.status(400).json({ error: "Approved invite response requires a canonical Welcome." });
+      return void sendRelayError(res, 400, "invalid_request", "Approved invite response requires a canonical Welcome.");
     if (status === "denied" && welcome !== undefined)
-      return void res.status(400).json({ error: "Denied invite response cannot include a Welcome." });
+      return void sendRelayError(res, 400, "invalid_request", "Denied invite response cannot include a Welcome.");
     const candidate = {
       requestId: request.requestId,
       inviteId: request.inviteId,
@@ -206,10 +207,11 @@ export function registerInviteDeliveryRoutes({
       createdAt: new Date().toISOString()
     };
     const parsedRecord = InviteResponseRecord.safeParse(candidate);
-    if (!parsedRecord.success) return void res.status(400).json({ error: "Invalid invite response binding or MAC." });
+    if (!parsedRecord.success)
+      return void sendRelayError(res, 400, "invalid_request", "Invalid invite response binding or MAC.");
     const record = parsedRecord.data;
     if (!isCanonicalPaddedBase64(record.responseMac, 128))
-      return void res.status(400).json({ error: "Invalid invite response binding or MAC." });
+      return void sendRelayError(res, 400, "invalid_request", "Invalid invite response binding or MAC.");
     const binding = record.responseBinding;
     if (
       binding.inviteId !== invite.id ||
@@ -223,7 +225,7 @@ export function registerInviteDeliveryRoutes({
       binding.hostDeviceId !== room.activeHostDeviceId ||
       binding.status !== record.status
     )
-      return void res.status(400).json({ error: "Invite response binding does not match its request." });
+      return void sendRelayError(res, 400, "invalid_request", "Invite response binding does not match its request.");
     store.inviteRequests.delete(request.requestId);
     store.inviteResponses.set(record.requestId, record);
     try {
@@ -231,7 +233,7 @@ export function registerInviteDeliveryRoutes({
     } catch {
       store.inviteResponses.delete(record.requestId);
       store.inviteRequests.set(request.requestId, request);
-      return void res.status(503).json({ error: "Could not persist invite response." });
+      return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist invite response.");
     }
     res.status(201).json({ requestId: record.requestId, status: "ready" });
   });
@@ -245,7 +247,7 @@ export function registerInviteDeliveryRoutes({
       record &&
       !hasDeviceSession(store, req.get("x-device-session"), session.user.id, record.requesterDeviceId)
     )
-      return void res.status(403).json({ error: "A device-authenticated session is required." });
+      return void sendRelayError(res, 403, "device_auth_required", "A device-authenticated session is required.");
     if (
       !session ||
       !record ||
@@ -253,7 +255,7 @@ export function registerInviteDeliveryRoutes({
       record.requesterUserId !== session.user.id ||
       record.requesterDeviceId !== String(req.query.requesterDeviceId ?? "")
     )
-      return void res.status(404).json({ error: "Welcome not found." });
+      return void sendRelayError(res, 404, "not_found", "Welcome not found.");
     res.json({
       status: record.status,
       responseBinding: record.responseBinding,
@@ -266,10 +268,10 @@ export function registerInviteDeliveryRoutes({
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
     if (!hasExactKeys(req.body, ["requesterDeviceId"]))
-      return void res.status(400).json({ error: "Invite response ACK contains unsupported fields." });
+      return void sendRelayError(res, 400, "invalid_request", "Invite response ACK contains unsupported fields.");
     const requesterDeviceId = String(req.body.requesterDeviceId ?? "");
     const record = store.inviteResponses.get(String(req.params.requestId ?? ""));
-    if (!session) return void res.status(404).json({ error: "Invite response not found." });
+    if (!session) return void sendRelayError(res, 404, "invite_not_found", "Invite response not found.");
     if (!record) {
       if (
         isExactInviteAckReceipt(
@@ -282,7 +284,7 @@ export function registerInviteDeliveryRoutes({
         hasDeviceSession(store, req.get("x-device-session"), session.user.id, requesterDeviceId)
       )
         return void res.status(204).end();
-      return void res.status(404).json({ error: "Invite response not found." });
+      return void sendRelayError(res, 404, "invite_not_found", "Invite response not found.");
     }
     if (
       record.inviteId !== String(req.params.inviteId) ||
@@ -290,12 +292,14 @@ export function registerInviteDeliveryRoutes({
       record.requesterDeviceId !== requesterDeviceId ||
       !hasDeviceSession(store, req.get("x-device-session"), session.user.id, record.requesterDeviceId)
     )
-      return void res.status(404).json({ error: "Invite response not found." });
+      return void sendRelayError(res, 404, "invite_not_found", "Invite response not found.");
     const result = await ackInviteResponseAtomically(store, record, saveRelayStore);
-    if (result === "missing_team") return void res.status(404).json({ error: "Invite response team not found." });
-    if (result === "revoked") return void res.status(409).json({ error: "Invite approval was revoked before ACK." });
+    if (result === "missing_team")
+      return void sendRelayError(res, 404, "invite_not_found", "Invite response team not found.");
+    if (result === "revoked")
+      return void sendRelayError(res, 409, "conflict", "Invite approval was revoked before ACK.");
     if (result === "persistence_failed") {
-      return void res.status(503).json({ error: "Could not acknowledge invite response durably." });
+      return void sendRelayError(res, 503, "persistence_unavailable", "Could not acknowledge invite response durably.");
     }
     res.status(204).end();
   });

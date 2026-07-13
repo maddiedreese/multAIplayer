@@ -1,5 +1,6 @@
 import { createGitWorkflowApprovalPlan, formatGitWorkflowApprovalPreview } from "@multaiplayer/git";
 import { normalizeGitHubBranchName } from "@multaiplayer/github";
+import { reportExpectedFailure } from "./nonFatalReporting";
 
 export interface GitWorkflowDraft {
   branchName: string;
@@ -92,6 +93,7 @@ export function parseGitHubRemoteUrl(remoteUrl: string): GitRemoteRepoRef | null
     if (rest.length > 0) return null;
     return normalizeRemoteRef(owner, repo?.replace(/\.git$/i, ""));
   } catch {
+    reportExpectedFailure("GitHub remote URL validation rejected malformed input");
     return null;
   }
 }

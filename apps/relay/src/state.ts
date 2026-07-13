@@ -14,6 +14,26 @@ import type {
 
 export type RoomKey = `${string}:${string}`;
 
+export type RelayStoreMutationEntity =
+  | "authSessions"
+  | "teams"
+  | "rooms"
+  | "invites"
+  | "inviteRequests"
+  | "inviteResponses"
+  | "inviteAckReceipts"
+  | "acceptedMessageReceipts"
+  | "devices"
+  | "keyPackages"
+  | "attachmentBlobs"
+  | "teamMembers"
+  | "mlsBacklog";
+
+export interface RelayStoreMutation {
+  entity: RelayStoreMutationEntity;
+  key: string;
+}
+
 export interface AuthSession {
   accessToken: string;
   user: {
@@ -129,27 +149,32 @@ export interface RelayStore {
   getMlsBacklog(roomKey: RoomKey): MlsRelayMessage[] | undefined;
   setMlsBacklog(roomKey: RoomKey, messages: MlsRelayMessage[]): void;
   allMlsBacklogEntries(): Array<[RoomKey, MlsRelayMessage[]]>;
+  drainDurableMutations(): RelayStoreMutation[];
+  discardDurableMutations(): void;
 }
 
 export class InMemoryRelayStore implements RelayStore {
+  private durableMutations: RelayStoreMutation[] = [];
   readonly sessions = new Map<WebSocket, ClientSession>();
   readonly roomSockets = new Map<RoomKey, Set<WebSocket>>();
   readonly teamSockets = new Map<string, Set<WebSocket>>();
   readonly workspaceSockets = new Set<WebSocket>();
   readonly roomPresence = new Map<RoomKey, Map<string, PresenceRecord>>();
-  readonly mlsBacklog = new Map<RoomKey, MlsRelayMessage[]>();
-  readonly authSessions = new Map<string, AuthSession>();
-  readonly teams = new Map<string, TeamRecord>();
-  readonly rooms = new Map<string, RoomRecord>();
-  readonly invites = new Map<string, InviteRecord>();
-  readonly inviteRequests = new Map<string, InviteJoinRequestRecord>();
-  readonly inviteResponses = new Map<string, InviteResponseRecord>();
-  readonly inviteAckReceipts = new Map<string, InviteAckReceipt>();
-  readonly acceptedMessageReceipts = new Map<string, AcceptedMessageReceipt>();
-  readonly devices = new Map<string, DeviceRecord>();
-  readonly keyPackages = new Map<string, KeyPackageRecord>();
-  readonly attachmentBlobs = new Map<string, AttachmentBlobRecord>();
-  readonly teamMembers = new Map<string, Map<string, TeamMemberRecord>>();
+  readonly mlsBacklog = this.trackedMap<RoomKey, MlsRelayMessage[]>("mlsBacklog");
+  readonly authSessions = this.trackedMap<string, AuthSession>("authSessions");
+  readonly teams = this.trackedMap<string, TeamRecord>("teams");
+  readonly rooms = this.trackedMap<string, RoomRecord>("rooms");
+  readonly invites = this.trackedMap<string, InviteRecord>("invites");
+  readonly inviteRequests = this.trackedMap<string, InviteJoinRequestRecord>("inviteRequests");
+  readonly inviteResponses = this.trackedMap<string, InviteResponseRecord>("inviteResponses");
+  readonly inviteAckReceipts = this.trackedMap<string, InviteAckReceipt>("inviteAckReceipts");
+  readonly acceptedMessageReceipts = this.trackedMap<string, AcceptedMessageReceipt>("acceptedMessageReceipts");
+  readonly devices = this.trackedMap<string, DeviceRecord>("devices");
+  readonly keyPackages = this.trackedMap<string, KeyPackageRecord>("keyPackages");
+  readonly attachmentBlobs = this.trackedMap<string, AttachmentBlobRecord>("attachmentBlobs");
+  readonly teamMembers = new TeamMemberCollectionMap((key) =>
+    this.durableMutations.push({ entity: "teamMembers", key })
+  );
   readonly rateLimitStore = new Map<string, RateLimitRecord>();
   readonly deviceSessions = new Map<string, DeviceSessionRecord>();
 
@@ -260,6 +285,20 @@ export class InMemoryRelayStore implements RelayStore {
   allMlsBacklogEntries(): Array<[RoomKey, MlsRelayMessage[]]> {
     return Array.from(this.mlsBacklog.entries());
   }
+
+  drainDurableMutations(): RelayStoreMutation[] {
+    const mutations = this.durableMutations;
+    this.durableMutations = [];
+    return mutations;
+  }
+
+  discardDurableMutations(): void {
+    this.durableMutations = [];
+  }
+
+  private trackedMap<Key extends string, Value>(entity: RelayStoreMutationEntity): Map<Key, Value> {
+    return new DurableMutationMap<Key, Value>((key) => this.durableMutations.push({ entity, key }));
+  }
 }
 
 export function createRelayStore(): RelayStore {
@@ -268,4 +307,40 @@ export function createRelayStore(): RelayStore {
 
 function deviceKey(userId: string, deviceId: string): string {
   return `${userId}:${deviceId}`;
+}
+
+class DurableMutationMap<Key extends string, Value> extends Map<Key, Value> {
+  constructor(private readonly onMutation: (key: string) => void) {
+    super();
+  }
+
+  override set(key: Key, value: Value): this {
+    super.set(key, value);
+    this.onMutation(key);
+    return this;
+  }
+
+  override delete(key: Key): boolean {
+    const deleted = super.delete(key);
+    if (deleted) this.onMutation(key);
+    return deleted;
+  }
+
+  override clear(): void {
+    const keys = Array.from(this.keys());
+    super.clear();
+    for (const key of keys) this.onMutation(key);
+  }
+}
+
+class TeamMemberCollectionMap extends DurableMutationMap<string, Map<string, TeamMemberRecord>> {
+  constructor(private readonly onTeamMutation: (teamId: string) => void) {
+    super(onTeamMutation);
+  }
+
+  override set(teamId: string, members: Map<string, TeamMemberRecord>): this {
+    const trackedMembers = new DurableMutationMap<string, TeamMemberRecord>(() => this.onTeamMutation(teamId));
+    for (const [userId, member] of members) Map.prototype.set.call(trackedMembers, userId, member);
+    return super.set(teamId, trackedMembers);
+  }
 }

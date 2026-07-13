@@ -1,12 +1,14 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { Express } from "express";
 import type { AttachmentBlobRecord } from "@multaiplayer/protocol";
 import type { ClientSession } from "../state.js";
-import type { RelayMetrics } from "../observability.js";
+import { relayMetricsToPrometheus, type RelayMetrics } from "../observability.js";
 
 interface RegisterOpsRoutesOptions {
   app: Express;
   dataPath: string;
   metrics: RelayMetrics;
+  metricsToken: string | null;
   sessions: Pick<ReadonlyMap<unknown, ClientSession>, "size">;
   attachmentBlobs?: Iterable<AttachmentBlobRecord>;
   isExpiredAttachmentBlob?: (blob: AttachmentBlobRecord) => boolean;
@@ -17,6 +19,7 @@ export function registerOpsRoutes({
   app,
   dataPath,
   metrics,
+  metricsToken,
   sessions,
   attachmentBlobs = [],
   isExpiredAttachmentBlob = () => false,
@@ -34,9 +37,25 @@ export function registerOpsRoutes({
     res.json({ ok: true, dataPath });
   });
 
-  app.get("/metrics", (_req, res) => {
-    res.json(metrics.snapshot(sessions.size, liveAttachmentBlobGauges(attachmentBlobs, isExpiredAttachmentBlob)));
+  app.get("/metrics", (req, res) => {
+    if (!metricsToken || !authorizedMetricsRequest(req.headers.authorization, metricsToken)) {
+      res.setHeader("WWW-Authenticate", 'Bearer realm="multaiplayer-relay-metrics"');
+      res.status(401).type("text/plain").send("Unauthorized\n");
+      return;
+    }
+    const snapshot = metrics.snapshot(
+      sessions.size,
+      liveAttachmentBlobGauges(attachmentBlobs, isExpiredAttachmentBlob)
+    );
+    res.type("text/plain; version=0.0.4; charset=utf-8").send(relayMetricsToPrometheus(snapshot));
   });
+}
+
+function authorizedMetricsRequest(authorization: string | undefined, expectedToken: string): boolean {
+  if (!authorization?.startsWith("Bearer ")) return false;
+  const suppliedDigest = createHash("sha256").update(authorization.slice("Bearer ".length)).digest();
+  const expectedDigest = createHash("sha256").update(expectedToken).digest();
+  return timingSafeEqual(suppliedDigest, expectedDigest);
 }
 
 function liveAttachmentBlobGauges(

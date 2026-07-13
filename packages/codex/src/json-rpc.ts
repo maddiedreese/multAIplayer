@@ -35,7 +35,7 @@ export function createInitializeRequest(id: JsonRpcId): JsonRpcRequest {
     method: "initialize",
     id,
     params: {
-      clientInfo: { name: "multaiplayer", title: "multAIplayer", version: "0.1.0-alpha.0" },
+      clientInfo: { name: "multaiplayer", title: "multAIplayer", version: "0.1.0-alpha.0" }, // x-release-please-version
       capabilities: { experimentalApi: true }
     }
   };

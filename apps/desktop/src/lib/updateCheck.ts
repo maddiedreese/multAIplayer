@@ -1,4 +1,5 @@
 import { appVersion, updateManifestUrl } from "./appVersion";
+import { reportExpectedFailure } from "./nonFatalReporting";
 
 export interface UpdateManifest {
   version: string;
@@ -75,6 +76,7 @@ function normalizeUpdateUrl(value: string): string | null {
     if (parsed.protocol !== "https:") return null;
     return parsed.toString();
   } catch {
+    reportExpectedFailure("update URL validation rejected malformed input");
     return null;
   }
 }

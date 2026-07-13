@@ -1,3 +1,5 @@
+import { reportExpectedFailure } from "./nonFatalReporting";
+
 const secretTextLimit = 120_000;
 
 export function detectSecretRisks(text: string, path = ""): string[] {
@@ -48,6 +50,7 @@ export function detectBrowserSecretRisks(url: string): string[] {
       risks.add("Account or credential page");
     }
   } catch {
+    reportExpectedFailure("browser secret-risk URL validation rejected malformed input");
     return [];
   }
 

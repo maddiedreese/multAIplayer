@@ -1,3 +1,4 @@
+import { sendRelayError } from "./errors.js";
 import type { Express, Response } from "express";
 import {
   maxAttachmentBlobIdChars,
@@ -63,28 +64,28 @@ export function registerAttachmentRoutes({
     if (!allowMutation(session, res)) return;
 
     if (!hasExactKeys(req.body, ["blobId", "teamId", "roomId", "name", "type", "size", "epoch", "sealedBlob"]))
-      return void res.status(400).json({ error: "Attachment blob contains unsupported fields." });
+      return void sendRelayError(res, 400, "invalid_request", "Attachment blob contains unsupported fields.");
     const teamId = String(req.body?.teamId ?? "");
     const roomId = String(req.body?.roomId ?? "");
     const blobId = normalizeMetadataText(req.body?.blobId, maxAttachmentBlobIdChars);
     if (!store.hasTeam(teamId)) {
-      res.status(404).json({ error: "Team not found" });
+      sendRelayError(res, 404, "team_not_found", "Team not found");
       return;
     }
     if (store.getRoom(roomId)?.teamId !== teamId) {
-      res.status(404).json({ error: "Room not found" });
+      sendRelayError(res, 404, "room_not_found", "Room not found");
       return;
     }
     if (!blobId) {
-      res.status(400).json({ error: "blobId is required and must be bounded." });
+      sendRelayError(res, 400, "invalid_request", "blobId is required and must be bounded.");
       return;
     }
     if (store.getAttachmentBlob(blobId)) {
-      res.status(409).json({ error: "blobId already exists." });
+      sendRelayError(res, 409, "conflict", "blobId already exists.");
       return;
     }
     if (session && !canAccessRoom(teamId, roomId, session.user.id)) {
-      res.status(403).json({ error: "Join this room before uploading attachment blobs." });
+      sendRelayError(res, 403, "forbidden", "Join this room before uploading attachment blobs.");
       return;
     }
 
@@ -95,36 +96,44 @@ export function registerAttachmentRoutes({
     const epoch = Number(req.body?.epoch);
     const sealedBlob = typeof req.body?.sealedBlob === "string" ? req.body.sealedBlob : "";
     if (!name) {
-      res.status(400).json({ error: "name must be a non-empty string up to 512 characters" });
+      sendRelayError(res, 400, "invalid_request", "name must be a non-empty string up to 512 characters");
       return;
     }
     if (!type) {
-      res
-        .status(400)
-        .json({ error: "type must be a non-empty string up to 160 characters without control characters" });
+      sendRelayError(
+        res,
+        400,
+        "invalid_request",
+        "type must be a non-empty string up to 160 characters without control characters"
+      );
       return;
     }
     if (!Number.isSafeInteger(size) || size < 0) {
-      res.status(400).json({ error: "size must be a non-negative integer" });
+      sendRelayError(res, 400, "invalid_request", "size must be a non-negative integer");
       return;
     }
     if (size > attachmentBlobMaxBytes) {
       recordUploadRejection?.("max_size");
-      res.status(413).json({ error: `Attachment blob size exceeds ${attachmentBlobMaxBytes} bytes` });
+      sendRelayError(res, 413, "payload_too_large", `Attachment blob size exceeds ${attachmentBlobMaxBytes} bytes`);
       return;
     }
     if (!Number.isSafeInteger(epoch) || epoch < 0 || !sealedBlob) {
-      res.status(400).json({ error: "epoch and sealedBlob are required" });
+      sendRelayError(res, 400, "invalid_request", "epoch and sealedBlob are required");
       return;
     }
     if (sealedBlob.length > maxCiphertextCharactersForBlob(attachmentBlobMaxBytes)) {
       recordUploadRejection?.("ciphertext_size");
-      res.status(413).json({ error: `Attachment blob ciphertext exceeds ${attachmentBlobMaxBytes} bytes` });
+      sendRelayError(
+        res,
+        413,
+        "payload_too_large",
+        `Attachment blob ciphertext exceeds ${attachmentBlobMaxBytes} bytes`
+      );
       return;
     }
     if (!isStrictExporterCiphertextJson(sealedBlob, maxCiphertextCharactersForBlob(attachmentBlobMaxBytes))) {
       recordUploadRejection?.("ciphertext_encoding");
-      res.status(400).json({ error: "sealedBlob must be a canonical exporter ciphertext record" });
+      sendRelayError(res, 400, "invalid_request", "sealedBlob must be a canonical exporter ciphertext record");
       return;
     }
     if (session) {
@@ -132,9 +141,7 @@ export function registerAttachmentRoutes({
       if (usedBytes + size > attachmentBlobLiveQuotaBytes) {
         recordQuotaRejection?.("live_attachment_blob_bytes");
         recordUploadRejection?.("live_quota");
-        res.status(413).json({
-          error: "Live encrypted attachment blob storage quota exceeded.",
-          code: "quota_exceeded",
+        sendRelayError(res, 413, "quota_exceeded", "Live encrypted attachment blob storage quota exceeded.", {
           quota: {
             type: "live_attachment_blob_bytes",
             limit: attachmentBlobLiveQuotaBytes,
@@ -181,29 +188,29 @@ export function registerAttachmentRoutes({
   app.get("/attachment-blobs/:blobId", (req, res) => {
     const blob = store.getAttachmentBlob(req.params.blobId);
     if (!blob) {
-      res.status(404).json({ error: "Attachment blob not found" });
+      sendRelayError(res, 404, "not_found", "Attachment blob not found");
       return;
     }
     const teamId = String(req.query.teamId ?? "");
     const roomId = String(req.query.roomId ?? "");
     if (!teamId || !roomId) {
-      res.status(400).json({ error: "teamId and roomId are required" });
+      sendRelayError(res, 400, "invalid_request", "teamId and roomId are required");
       return;
     }
     if (blob.teamId !== teamId || blob.roomId !== roomId) {
-      res.status(404).json({ error: "Attachment blob not found" });
+      sendRelayError(res, 404, "not_found", "Attachment blob not found");
       return;
     }
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowRead(session, res)) return;
     if (session && !canAccessRoom(teamId, roomId, session.user.id)) {
-      res.status(403).json({ error: "Join this room before reading attachment blobs." });
+      sendRelayError(res, 403, "forbidden", "Join this room before reading attachment blobs.");
       return;
     }
     if (isExpiredAttachmentBlob(blob)) {
       store.deleteAttachmentBlob(blob.id);
       scheduleStoreSave();
-      res.status(410).json({ error: "Attachment blob expired" });
+      sendRelayError(res, 410, "invite_expired", "Attachment blob expired");
       return;
     }
     res.json({ blob });
@@ -243,9 +250,7 @@ function consumeAttachmentUploadByteQuota({
     recordQuotaRejection?.(quota);
     recordUploadRejection?.("upload_byte_quota");
     res.setHeader("Retry-After", String(retryAfterSeconds));
-    res.status(429).json({
-      error: "Encrypted attachment blob upload byte quota exceeded.",
-      code: "quota_exceeded",
+    sendRelayError(res, 429, "quota_exceeded", "Encrypted attachment blob upload byte quota exceeded.", {
       retryAfterSeconds,
       quota: {
         type: quota,

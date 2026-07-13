@@ -1,3 +1,4 @@
+import { sendRelayError } from "./errors.js";
 import type { RequestHandler } from "express";
 import type { CorsOptions } from "cors";
 
@@ -27,7 +28,7 @@ export function createRelayOriginPolicy({
         next();
         return;
       }
-      res.status(403).json({ error: "Origin not allowed" });
+      sendRelayError(res, 403, "forbidden", "Origin not allowed");
     },
     corsOptions: {
       credentials: true,

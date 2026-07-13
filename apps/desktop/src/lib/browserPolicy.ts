@@ -1,6 +1,7 @@
 import { defaultBrowserAllowedOrigins, type RoomRecord } from "@multaiplayer/protocol";
 import { isLocalUserActiveHostForRoom, type LocalHostUser } from "./roomHost";
 import { detectBrowserSecretRisks } from "./secretRisks";
+import { reportExpectedFailure } from "./nonFatalReporting";
 
 export function normalizeBrowserAllowedOrigins(value: string[] | string): string[] | null {
   const rawOrigins = Array.isArray(value) ? value : value.split(/\r?\n|,/);
@@ -16,6 +17,7 @@ export function normalizeBrowserAllowedOrigins(value: string[] | string): string
       if (parsed.pathname !== "/" || parsed.search || parsed.hash) return null;
       origins.add(parsed.origin);
     } catch {
+      reportExpectedFailure("browser origin validation rejected malformed input");
       return null;
     }
   }
@@ -27,6 +29,7 @@ export function isBrowserUrlAllowed(url: string, allowedOrigins: string[]): bool
     const origin = new URL(url).origin;
     return allowedOrigins.includes(origin);
   } catch {
+    reportExpectedFailure("browser allowlist check rejected malformed input");
     return false;
   }
 }

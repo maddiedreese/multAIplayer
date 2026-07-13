@@ -1,3 +1,5 @@
+import { reportExpectedFailure } from "./nonFatalReporting";
+
 const githubAvatarHosts = new Set(["avatars.githubusercontent.com", "github.com", "githubusercontent.com"]);
 
 export function trustedAvatarUrl(value: string | undefined): string | undefined {
@@ -10,6 +12,7 @@ export function trustedAvatarUrl(value: string | undefined): string | undefined 
       return parsed.toString();
     }
   } catch {
+    reportExpectedFailure("avatar URL validation rejected malformed input");
     return undefined;
   }
   return undefined;

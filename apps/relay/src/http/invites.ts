@@ -1,3 +1,4 @@
+import { sendRelayError } from "./errors.js";
 import type { Express, Response } from "express";
 import { nanoid } from "nanoid";
 import type { InviteRecord as InviteRecordType } from "@multaiplayer/protocol";
@@ -29,15 +30,15 @@ export function registerInviteRoutes({
     const teamId = String(req.body?.teamId ?? "");
     const roomId = String(req.body?.roomId ?? "");
     if (!store.hasTeam(teamId)) {
-      res.status(404).json({ error: "Team not found" });
+      sendRelayError(res, 404, "team_not_found", "Team not found");
       return;
     }
     if (store.getRoom(roomId)?.teamId !== teamId) {
-      res.status(404).json({ error: "Room not found" });
+      sendRelayError(res, 404, "room_not_found", "Room not found");
       return;
     }
     if (session && !canAccessRoom(teamId, roomId, session.user.id)) {
-      res.status(403).json({ error: "Join this room before creating invites." });
+      sendRelayError(res, 403, "forbidden", "Join this room before creating invites.");
       return;
     }
 
@@ -56,21 +57,21 @@ export function registerInviteRoutes({
   app.get("/invites/:inviteId", (req, res) => {
     const invite = store.getInvite(req.params.inviteId);
     if (!invite) {
-      res.status(404).json({ error: "Invite not found" });
+      sendRelayError(res, 404, "invite_not_found", "Invite not found");
       return;
     }
     if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
       store.deleteInvite(invite.id);
       deleteInviteArtifacts(store, invite.id);
       scheduleStoreSave();
-      res.status(410).json({ error: "Invite expired" });
+      sendRelayError(res, 410, "invite_expired", "Invite expired");
       return;
     }
 
     const team = store.getTeam(invite.teamId);
     const room = store.getRoom(invite.roomId);
     if (!team || !room) {
-      res.status(404).json({ error: "Invite target no longer exists" });
+      sendRelayError(res, 404, "invite_not_found", "Invite target no longer exists");
       return;
     }
 
@@ -83,11 +84,11 @@ export function registerInviteRoutes({
     const { teamId, roomId } = req.params;
     const room = store.getRoom(roomId);
     if (!room || room.teamId !== teamId) {
-      res.status(404).json({ error: "Room not found" });
+      sendRelayError(res, 404, "room_not_found", "Room not found");
       return;
     }
     if (session && room.hostUserId !== session.user.id) {
-      res.status(403).json({ error: "Only the active host can revoke room invites." });
+      sendRelayError(res, 403, "forbidden", "Only the active host can revoke room invites.");
       return;
     }
 

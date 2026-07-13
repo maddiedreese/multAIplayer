@@ -8,6 +8,7 @@ import {
   type CodexServerResponse
 } from "../lib/localBackend";
 import { isTauriRuntime } from "../lib/localBackend/runtime";
+import { reportExpectedFailure, reportNonFatal } from "../lib/nonFatalReporting";
 
 interface ResolvedRequestEvent {
   requestKey: string;
@@ -64,7 +65,7 @@ export function CodexServerRequestDialog({
       .then((pending) => {
         if (active) pending.forEach(addRequest);
       })
-      .catch(() => undefined);
+      .catch(() => reportNonFatal("list pending Codex server requests"));
     return () => {
       active = false;
       void subscriptions.then((unlisten) => unlisten.forEach((stop) => stop()));
@@ -466,6 +467,7 @@ function safeWebUrl(value: unknown): string | null {
     const parsed = new URL(url);
     return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.toString() : null;
   } catch {
+    reportExpectedFailure("Codex server request URL validation rejected malformed input");
     return null;
   }
 }

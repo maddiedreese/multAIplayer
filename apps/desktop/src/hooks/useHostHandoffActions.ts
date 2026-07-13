@@ -16,6 +16,7 @@ import {
   transferMlsHost
 } from "../lib/mlsClient";
 import { isStaleMlsPublish } from "../lib/relayClient";
+import { reportExpectedFailure } from "../lib/nonFatalReporting";
 import { clearAndRebaseStaleMlsCommit } from "../lib/mlsCommitRebase";
 import { createGitPatch, getGitRemoteOrigin } from "../lib/localBackend";
 import { updateRoomHost } from "../lib/workspaceClient";
@@ -165,10 +166,18 @@ export function useHostHandoffActions({
     reason: HostHandoffRecord["reason"] = "manual",
     contextMessages: ChatMessage[] = messages
   ) {
-    const remoteInfo = await getGitRemoteOrigin(room.projectPath).catch(() => ({ originUrl: null }));
+    const remoteInfo = await getGitRemoteOrigin(room.projectPath).catch(() => {
+      reportExpectedFailure("Git remote was unavailable for host handoff context");
+      return { originUrl: null };
+    });
     const repoRef = remoteInfo.originUrl ? parseGitHubRemoteUrl(remoteInfo.originUrl) : null;
     const roomGitStatus = room.id === selectedRoom.id ? gitStatus : (gitStatusByRoom[room.id] ?? null);
-    const patchResult = roomGitStatus?.files.length ? await createGitPatch(room.projectPath).catch(() => null) : null;
+    const patchResult = roomGitStatus?.files.length
+      ? await createGitPatch(room.projectPath).catch(() => {
+          reportExpectedFailure("Git patch was unavailable for host handoff context");
+          return null;
+        })
+      : null;
     const summary = buildCodexTurnSummary(
       contextMessages,
       room,

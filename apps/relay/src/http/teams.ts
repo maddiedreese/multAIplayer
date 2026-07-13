@@ -1,3 +1,4 @@
+import { sendRelayError } from "./errors.js";
 import type { Express, Response } from "express";
 import { nanoid } from "nanoid";
 import type { RoomRecord, TeamMemberRecord, TeamRecord, TeamRole } from "@multaiplayer/protocol";
@@ -75,11 +76,11 @@ export function registerTeamRoutes({
 
     const teamId = String(req.params.teamId ?? "");
     if (!store.hasTeam(teamId)) {
-      res.status(404).json({ error: "Team not found" });
+      sendRelayError(res, 404, "team_not_found", "Team not found");
       return;
     }
     if (session && !isTeamMember(teamId, session.user.id)) {
-      res.status(403).json({ error: "Join this team before reading its member list." });
+      sendRelayError(res, 403, "forbidden", "Join this team before reading its member list.");
       return;
     }
     res.json({ members: listTeamMembers(teamId, store, teamRoleRank) });
@@ -93,22 +94,22 @@ export function registerTeamRoutes({
     const userId = String(req.params.userId ?? "");
     const role = parseRequestedTeamRole(req.body?.role);
     if (!store.hasTeam(teamId)) {
-      res.status(404).json({ error: "Team not found" });
+      sendRelayError(res, 404, "team_not_found", "Team not found");
       return;
     }
     if (!role || role === "owner") {
-      res.status(400).json({ error: "role must be admin or member" });
+      sendRelayError(res, 400, "invalid_request", "role must be admin or member");
       return;
     }
     const members = store.getTeamMembers(teamId);
     const target = store.getTeamMember(teamId, userId);
     if (!members || !target) {
-      res.status(404).json({ error: "Team member not found" });
+      sendRelayError(res, 404, "team_member_not_found", "Team member not found");
       return;
     }
     const requesterRole = session ? store.getTeamMember(teamId, session.user.id)?.role : "owner";
     if (!canSetTeamMemberRole(requesterRole, target.role, role)) {
-      res.status(403).json({ error: "Only team owners can change admin roles." });
+      sendRelayError(res, 403, "forbidden", "Only team owners can change admin roles.");
       return;
     }
 
@@ -125,22 +126,22 @@ export function registerTeamRoutes({
     const teamId = String(req.params.teamId ?? "");
     const userId = String(req.params.userId ?? "");
     if (!store.hasTeam(teamId)) {
-      res.status(404).json({ error: "Team not found" });
+      sendRelayError(res, 404, "team_not_found", "Team not found");
       return;
     }
     const members = store.getTeamMembers(teamId);
     const target = store.getTeamMember(teamId, userId);
     if (!members || !target) {
-      res.status(404).json({ error: "Team member not found" });
+      sendRelayError(res, 404, "team_member_not_found", "Team member not found");
       return;
     }
     const requesterRole = session ? store.getTeamMember(teamId, session.user.id)?.role : "owner";
     if (requesterRole !== "owner") {
-      res.status(403).json({ error: "Only the current team owner can transfer ownership." });
+      sendRelayError(res, 403, "forbidden", "Only the current team owner can transfer ownership.");
       return;
     }
     if (session?.user.id && session.user.id === userId) {
-      res.status(400).json({ error: "Choose a different team member before transferring ownership." });
+      sendRelayError(res, 400, "invalid_request", "Choose a different team member before transferring ownership.");
       return;
     }
 
@@ -158,18 +159,18 @@ export function registerTeamRoutes({
     const teamId = String(req.params.teamId ?? "");
     const userId = String(req.params.userId ?? "");
     if (!store.hasTeam(teamId)) {
-      res.status(404).json({ error: "Team not found" });
+      sendRelayError(res, 404, "team_not_found", "Team not found");
       return;
     }
     const members = store.getTeamMembers(teamId);
     const target = store.getTeamMember(teamId, userId);
     if (!members || !target) {
-      res.status(404).json({ error: "Team member not found" });
+      sendRelayError(res, 404, "team_member_not_found", "Team member not found");
       return;
     }
     const requesterRole = session ? store.getTeamMember(teamId, session.user.id)?.role : "owner";
     if (!canRemoveTeamMember(requesterRole, target.role)) {
-      res.status(403).json({ error: "Only team owners can remove admins, and owners cannot be removed." });
+      sendRelayError(res, 403, "forbidden", "Only team owners can remove admins, and owners cannot be removed.");
       return;
     }
 
@@ -194,24 +195,24 @@ export function registerTeamRoutes({
     const action = String(req.body?.action ?? "");
     const team = store.getTeam(teamId);
     if (!team || team.deletedAt) {
-      res.status(404).json({ error: "Team not found" });
+      sendRelayError(res, 404, "team_not_found", "Team not found");
       return;
     }
     const requesterRole = session ? store.getTeamMember(teamId, session.user.id)?.role : "owner";
     if (session && !requesterRole) {
-      res.status(403).json({ error: "Join this team before changing its archive state." });
+      sendRelayError(res, 403, "forbidden", "Join this team before changing its archive state.");
       return;
     }
     if (!["archive", "restore", "delete"].includes(action)) {
-      res.status(400).json({ error: "action must be archive, restore, or delete" });
+      sendRelayError(res, 400, "invalid_request", "action must be archive, restore, or delete");
       return;
     }
     if ((action === "archive" || action === "restore") && requesterRole !== "owner" && requesterRole !== "admin") {
-      res.status(403).json({ error: "Only team owners and admins can archive or restore teams." });
+      sendRelayError(res, 403, "forbidden", "Only team owners and admins can archive or restore teams.");
       return;
     }
     if (action === "delete" && requesterRole !== "owner") {
-      res.status(403).json({ error: "Only the team owner can delete a team." });
+      sendRelayError(res, 403, "forbidden", "Only the team owner can delete a team.");
       return;
     }
 
@@ -249,7 +250,12 @@ export function registerTeamRoutes({
 
     const name = normalizeMetadataText(req.body?.name, maxTeamNameChars);
     if (!name) {
-      res.status(400).json({ error: `Team name is required and must be up to ${maxTeamNameChars} characters` });
+      sendRelayError(
+        res,
+        400,
+        "invalid_request",
+        `Team name is required and must be up to ${maxTeamNameChars} characters`
+      );
       return;
     }
     if (
@@ -359,9 +365,7 @@ function sendDailyCreationQuotaExceeded(
 ) {
   const retryAfterSeconds = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
   res.setHeader("Retry-After", retryAfterSeconds);
-  res.status(429).json({
-    error: "Daily team creation quota exceeded.",
-    code: "quota_exceeded",
+  sendRelayError(res, 429, "quota_exceeded", "Daily team creation quota exceeded.", {
     retryAfterSeconds,
     quota: {
       type: quota,

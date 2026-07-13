@@ -13,7 +13,10 @@ export async function fetchUpstream(
   } catch {
     const timedOut = timeoutSignal.aborted;
     return Response.json(
-      { error: timedOut ? "Upstream request timed out." : "Upstream request failed." },
+      {
+        error: timedOut ? "Upstream request timed out." : "Upstream request failed.",
+        code: "upstream_unavailable"
+      },
       { status: timedOut ? 504 : 502 }
     );
   }
