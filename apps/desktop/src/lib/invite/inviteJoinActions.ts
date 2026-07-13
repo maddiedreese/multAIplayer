@@ -78,7 +78,7 @@ export function createInviteJoinActions(
     await publishKeyPackages(deviceId, [keyPackage]);
     const requestId = crypto.randomUUID();
     const binding: MlsInviteCapabilityBinding = {
-      version: 2,
+      version: 3,
       phase: "request",
       inviteId: inviteId,
       teamId: invite.teamId,
@@ -109,7 +109,7 @@ export function createInviteJoinActions(
       requesterDeviceId: deviceId,
       keyPackageId: keyPackage.id,
       keyPackageHash: keyPackage.keyPackageHash,
-      sealedRequest: JSON.stringify({ version: 2, binding, sealedPayload: protectedRequest.sealedPayload })
+      sealedRequest: JSON.stringify({ version: 3, binding, sealedPayload: protectedRequest.sealedPayload })
     });
     const localRequest: InviteJoinRequest = {
       id: requestId,

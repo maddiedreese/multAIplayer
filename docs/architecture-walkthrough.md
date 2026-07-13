@@ -21,7 +21,7 @@ Open `docs/product-architecture.md`, then `docs/threat-model.md`. Explain that t
 Show the root workspaces:
 
 - `packages/protocol`: shared records and runtime guards;
-- `apps/desktop/src-tauri/crates/mls-core`: MLS groups, credentials, HPKE invite sealing, encrypted state, and exporter use;
+- `apps/desktop/src-tauri/crates/mls-core`: MLS lifecycle orchestration in `engine.rs` and its focused child modules, automatic staged-write cleanup and encrypted persistence in `storage.rs` and `storage/`, invite-v3 authentication, HPKE sealing, credentials, and exporter use;
 - `packages/codex`, `packages/git`, and `packages/github`: host-side adapters;
 - `apps/relay`: HTTP/WebSocket transport, authorization, persistence, and limits;
 - `apps/desktop`: React state/UI plus the Tauri Rust boundary;
@@ -29,6 +29,7 @@ Show the root workspaces:
 - `scripts`: repository policy and verification gates.
 
 Point out that imports are intentionally directional and `scripts/eslint-boundaries.test.mjs` guards those boundaries.
+For the native boundary, also show `apps/desktop/src-tauri/src/mls_native.rs`: its `types`, `invites`, and test child modules preserve one Tauri command API while keeping IPC records and invite policy independently reviewable. Repository hygiene caps every production Rust source file at 1,000 physical lines.
 
 ## 6:00 — One encrypted message
 

@@ -13,13 +13,14 @@ mod validator;
 pub use device_auth::{generate_device_signing_secret, DeviceAuthSignature, DeviceAuthSigner};
 pub use engine::{
     AddMemberOutput, ApplicationAuthenticatedData, ApplicationAuthenticatedDataInput,
-    ApplicationOutput, EngineError, ExporterCiphertext, HostTransferAuthorizationPayload,
-    JoinAdmissionMetadata, MlsEngine, OutboundApplication, OutboundCommit, OutboxMetadata,
-    RosterMember, WelcomeRetryMetadata,
+    ApplicationOutput, EngineError, EngineErrorCategory, ExporterCiphertext,
+    HostTransferAuthorizationPayload, JoinAdmissionMetadata, MlsEngine, OutboundApplication,
+    OutboundCommit, OutboxMetadata, RosterMember, WelcomeRetryMetadata,
 };
 pub use hpke_seal::{generate_hpke_key_pair, open, seal, HpkeKeyPair, SealedPayload};
 pub use invite_capability::{
-    issue_capability, mac_binding, mac_response_binding, verify_binding, CapabilityBinding,
+    derive_capability_verifier, encode_capability_binding, issue_capability, mac_binding,
+    mac_response_binding, verify_request_binding, verify_response_binding, CapabilityBinding,
     IssuedCapability,
 };
 pub use policy::{

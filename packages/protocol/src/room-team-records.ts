@@ -120,7 +120,7 @@ export const InviteResponseRecord = z
     status: z.enum(["approved", "denied"]),
     responseBinding: z
       .object({
-        version: z.literal(2),
+        version: z.literal(3),
         phase: z.literal("response"),
         inviteId: z.string().min(1).max(maxEnvelopeIdChars),
         teamId: TeamId,

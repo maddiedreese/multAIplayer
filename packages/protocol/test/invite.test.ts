@@ -40,7 +40,7 @@ test("invite responses bind decisions and Welcome presence", () => {
     requesterDeviceId: "device-1",
     keyPackageHash: `sha256:${"b".repeat(64)}`,
     responseBinding: {
-      version: 2,
+      version: 3,
       phase: "response",
       inviteId: "invite",
       teamId: "team",

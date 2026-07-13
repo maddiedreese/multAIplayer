@@ -324,7 +324,7 @@ test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
     });
     const decidedAt = new Date().toISOString();
     const responseBinding = {
-      version: 2,
+      version: 3,
       phase: "response",
       inviteId: invite.id,
       teamId: "team-core",
@@ -648,9 +648,9 @@ function directedSealedRequest(input: {
   expiresAt: string;
 }) {
   return JSON.stringify({
-    version: 2,
+    version: 3,
     binding: {
-      version: 2,
+      version: 3,
       phase: "request",
       inviteId: input.inviteId,
       teamId: "team-core",

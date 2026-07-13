@@ -116,7 +116,7 @@ The GitHub Actions panel reads workflow runs for the selected owner, repo, and b
 
 Git workflow progress and Actions refreshes are shared to the room as encrypted events so other members can follow branch, commit, push, PR, and CI status without the relay reading plaintext Git output.
 
-## Invites And Room Keys
+## Invites And MLS Membership
 
 The Invites panel can copy or import a capability-authenticated invite and approve or deny validated device/KeyPackage requests. MLS epoch changes happen through active-host Commits rather than manual room-key rotation.
 
@@ -124,13 +124,13 @@ Invite links never include an MLS group secret. They contain a 256-bit join capa
 
 Share the complete invite link privately. Its capability is not a room key, but it is a single-use bearer secret: anyone holding the link can submit a device-bound request for host review. Import scrubs the fragment from browser history. The app validates and pins the requester's full device fingerprint before display; the host should review the requesting identity and device id before approval.
 
-Room-key rotation advances the explicit room epoch and wraps the new key independently to eligible registered devices. Removing a member performs the relay revocation and epoch transition so the removed devices cannot decrypt future events. It cannot erase content already delivered or copied.
+Removing a member first revokes relay access and then advances the group through an active-host MLS Remove Commit. The removed leaf receives no new epoch secret and cannot decrypt future events. Removal cannot erase content, exports, screenshots, or retained history already delivered or copied.
 
 ## Local History, Notifications, And Forgetting A Room
 
 Local history is encrypted on the device and has a configurable retention window. It can include chat, workflow events, terminal snapshots, browser approvals, Codex turn events, bounded metadata-only Codex activities, Git events, GitHub Actions refreshes, host handoff packages, local previews, and the normalized Codex thread graph/active selection.
 
-Clearing local history removes saved local room history while keeping the room key. Forgetting a room on one device removes local history, local room settings, the saved Codex thread graph/active selection, the local room key, and warning acknowledgements. The room becomes locked on that device until a fresh invite or key is imported.
+Clearing local history removes saved local room history while keeping the device's native MLS state. Forgetting a room on one device removes local history, local room settings, the saved Codex thread graph/active selection, native MLS state and retained history secrets, and warning acknowledgements. The room becomes locked on that device until it completes a fresh KeyPackage/Welcome rejoin; rejoining does not restore pre-rejoin history secrets.
 
 Room notifications can be muted per room. Muting affects local notifications/unread attention on that device; it does not mute the room for other members.
 

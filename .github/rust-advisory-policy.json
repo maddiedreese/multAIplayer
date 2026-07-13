@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "owner": "@maddiedreese",
+  "reviewBy": "2026-08-01",
+  "advisoryGroups": [
+    {
+      "name": "glib VariantStrIter soundness",
+      "advisoryIds": ["RUSTSEC-2024-0429"],
+      "packages": ["glib 0.18.5"],
+      "dependencyPath": "glib 0.18.5 -> GTK 0.18 / WebKitGTK -> Wry / Tauri 2.11",
+      "platformScope": "Linux compatibility builds only; absent from both macOS release target graphs",
+      "reachability": "Neither application source nor the downloaded transitive dependency sources call Variant::array_iter_str or VariantStrIter; only glib's own implementation and tests reference it",
+      "disposition": "Retain as a visible cargo-audit warning until Tauri's Linux GUI graph can use glib >=0.20"
+    },
+    {
+      "name": "GTK3 binding maintenance",
+      "advisoryIds": [
+        "RUSTSEC-2024-0411",
+        "RUSTSEC-2024-0412",
+        "RUSTSEC-2024-0413",
+        "RUSTSEC-2024-0414",
+        "RUSTSEC-2024-0415",
+        "RUSTSEC-2024-0416",
+        "RUSTSEC-2024-0417",
+        "RUSTSEC-2024-0418",
+        "RUSTSEC-2024-0419",
+        "RUSTSEC-2024-0420"
+      ],
+      "packages": [
+        "gdkwayland-sys 0.18.2",
+        "gdk 0.18.2",
+        "atk 0.18.2",
+        "gdkx11-sys 0.18.2",
+        "gtk 0.18.2",
+        "atk-sys 0.18.2",
+        "gdkx11 0.18.2",
+        "gdk-sys 0.18.2",
+        "gtk3-macros 0.18.2",
+        "gtk-sys 0.18.2"
+      ],
+      "dependencyPath": "GTK3 bindings -> GTK / WebKitGTK / Tao / Wry -> Tauri 2.11",
+      "platformScope": "Linux compatibility builds only; absent from both macOS release target graphs",
+      "reachability": "Compiled and reachable on Linux compatibility builds, but not included in supported macOS release artifacts",
+      "disposition": "Time-bounded cargo-deny exceptions; remove when Tauri no longer selects the unmaintained GTK3 graph"
+    },
+    {
+      "name": "proc-macro-error maintenance",
+      "advisoryIds": ["RUSTSEC-2024-0370"],
+      "packages": ["proc-macro-error 1.0.4"],
+      "dependencyPath": "proc-macro-error 1.0.4 -> glib-macros 0.18.5 -> glib / GTK3 -> Tauri 2.11",
+      "platformScope": "Transitive build dependency of the Linux GTK3 graph",
+      "reachability": "Build-time procedural macro only; no runtime application code",
+      "disposition": "Time-bounded cargo-deny exception; remove with the GTK3 dependency graph"
+    },
+    {
+      "name": "rust-unic maintenance",
+      "advisoryIds": [
+        "RUSTSEC-2025-0075",
+        "RUSTSEC-2025-0080",
+        "RUSTSEC-2025-0081",
+        "RUSTSEC-2025-0098",
+        "RUSTSEC-2025-0100"
+      ],
+      "packages": [
+        "unic-char-range 0.9.0",
+        "unic-common 0.9.0",
+        "unic-char-property 0.9.0",
+        "unic-ucd-version 0.9.0",
+        "unic-ucd-ident 0.9.0"
+      ],
+      "dependencyPath": "rust-unic 0.9 crates -> unic-ucd-ident -> urlpattern 0.3.0 -> tauri-utils 2.9.3 -> Tauri 2.11",
+      "platformScope": "Transitive Tauri build and URL-pattern graph on supported and compatibility targets",
+      "reachability": "Used transitively for generated Tauri URL-pattern validation; no direct application dependency",
+      "disposition": "Time-bounded cargo-deny exceptions; remove when Tauri replaces urlpattern's rust-unic graph"
+    }
+  ]
+}

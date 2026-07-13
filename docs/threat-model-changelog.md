@@ -2,6 +2,13 @@
 
 This public changelog records material changes to multAIplayer's security assumptions, trust boundaries, guarantees, and known limitations. It complements the current [threat model](threat-model.md), which remains the normative description of the present design. Implementation-only fixes that do not change a boundary may stay in ordinary release notes.
 
+## 2026-07-13
+
+- Versioned invite capability authentication to v3. Request and response MACs now use independently derived HMAC keys and labels, phase-specific verification APIs, and a fixed binary binding encoding shared with HPKE AAD and receipt hashing. This removes dependence on Rust/Serde JSON field order and invalidates pre-v3 invite links and pending responses rather than ambiguously reinterpreting them. See [Cryptography architecture](cryptography.md#invites-and-device-directed-hpke).
+- Replaced hand-written staged-write rollback sequences with a `StagedWriteGuard` whose `Drop` implementation clears every application-owned buffer if an MLS operation returns before the group-state transaction commits. Raw staging methods are private, and regression tests cover multi-stage failure sequences that previously depended on callers remembering cleanup.
+- Replaced coarse MLS failure collapsing with categorized native errors that retain operation and underlying cause details inside Rust while exposing only category and operation through the Tauri IPC display path. The stable clean-rejoin sentinel remains explicit; dependency, storage, serialization, and cryptographic cause strings do not cross into the webview.
+- Split the MLS engine, storage, and Tauri command boundaries into focused modules and added a repository-enforced 1,000-physical-line ceiling for every production Rust source file. This changes reviewability, not protocol bytes or security guarantees.
+
 ## 2026-07-12
 
 - Accepted a clean protocol v2 migration to RFC 9420 MLS using mls-rs, with ciphersuite `MLS_128_DHKEMP256_AES128GCM_SHA256_P256` pinned exclusively and no negotiation or legacy-room compatibility. MLS operations and secret state move to the native Rust boundary; the browser preview becomes seeded local demo rooms only. Per-epoch exporter-derived history secrets are deliberately retained in encrypted device storage, providing forward secrecy for live traffic while preserving device-local history readability. Host-only commit authority remains an application invariant enforced independently by clients and the relay, and residual pairwise invite sealing moves to standard HPKE. See the [MLS protocol v2 ADR](decisions/mls-protocol-v2.md).

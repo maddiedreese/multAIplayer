@@ -195,7 +195,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hpke = generate_hpke_key_pair();
     let next_hpke = generate_hpke_key_pair();
     let binding = CapabilityBinding {
-        version: 2,
+        version: 3,
         phase: "request".to_owned(),
         invite_id: "invite-fixture".to_owned(),
         team_id: "team-core".to_owned(),

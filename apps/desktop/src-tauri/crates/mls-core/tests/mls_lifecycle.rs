@@ -321,7 +321,7 @@ fn invite_approval_receipt_and_welcome_routing_survive_crash_before_cleanup() {
         key_package_id: "kp-1".into(),
         key_package_hash: "sha256:bound-package".into(),
         response_binding: CapabilityBinding {
-            version: 2,
+            version: 3,
             phase: "response".into(),
             invite_id: "invite-1".into(),
             team_id: "team-1".into(),
@@ -472,7 +472,7 @@ fn denial_decision_is_one_shot_and_retryable_after_outbox_ack() {
     let joiner = engine("2", "bob-mac");
     host.create_group("denial-room").unwrap();
     let response_binding = CapabilityBinding {
-        version: 2,
+        version: 3,
         phase: "response".into(),
         invite_id: "invite-denied".into(),
         team_id: "team-1".into(),

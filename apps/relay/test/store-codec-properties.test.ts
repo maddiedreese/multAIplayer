@@ -269,7 +269,7 @@ test("startup normalization rejects corrupt invite anchors and retains bounded r
     keyPackageHash: `sha256:${"a".repeat(64)}`,
     status: "approved",
     responseBinding: {
-      version: 2,
+      version: 3,
       phase: "response",
       inviteId: "invite-one",
       teamId: "team-core",

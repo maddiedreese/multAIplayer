@@ -395,14 +395,87 @@ function relaySourceFiles(directory) {
   });
 }
 
-test("RustSec audit is pinned, scoped to the native lockfile, and scheduled", () => {
+test("RustSec audit is pinned, covers every native lockfile, and is scheduled", () => {
   const workflow = readFileSync(".github/workflows/rust-audit.yml", "utf8");
-  assert.match(workflow, /working-directory: apps\/desktop\/src-tauri[\s\S]*run: cargo audit/);
+  assert.match(workflow, /working-directory: apps\/desktop\/src-tauri[\s\S]*run: \|\n\s+cargo audit/);
+  assert.match(workflow, /cargo audit --file crates\/mls-core\/fuzz\/Cargo\.lock/);
   assert.match(workflow, /cargo deny --manifest-path apps\/desktop\/src-tauri\/Cargo\.toml check advisories sources/);
+  assert.match(
+    workflow,
+    /cargo deny --manifest-path apps\/desktop\/src-tauri\/crates\/mls-core\/fuzz\/Cargo\.toml check advisories sources/
+  );
   assert.match(workflow, /schedule:/);
   assert.match(workflow, /release:\n\s+types: \[published\]/);
   assert.doesNotMatch(workflow, /pull_request:/);
   assert.doesNotMatch(workflow, /checks: write/);
+});
+
+test("Rust advisory exceptions have complete ownership and an unexpired review date", () => {
+  const policy = readJson(".github/rust-advisory-policy.json");
+  assert.equal(policy.version, 1);
+  assert.ok(policy.owner.trim().length > 0);
+  assert.match(policy.reviewBy, /^\d{4}-\d{2}-\d{2}$/);
+  assert.ok(
+    Date.parse(`${policy.reviewBy}T23:59:59Z`) >= Date.now(),
+    `Rust advisory policy review expired on ${policy.reviewBy}`
+  );
+
+  const groups = policy.advisoryGroups;
+  assert.ok(Array.isArray(groups) && groups.length > 0);
+  for (const group of groups) {
+    assert.ok(group.name.trim().length > 0);
+    assert.ok(group.advisoryIds.length > 0);
+    assert.ok(group.packages.length > 0);
+    for (const field of ["dependencyPath", "platformScope", "reachability", "disposition"]) {
+      assert.ok(group[field].trim().length > 0, `${group.name} needs ${field}`);
+    }
+  }
+
+  const trackedIds = new Set(groups.flatMap((group) => group.advisoryIds));
+  const requiredIds = new Set([
+    "RUSTSEC-2024-0370",
+    "RUSTSEC-2024-0411",
+    "RUSTSEC-2024-0412",
+    "RUSTSEC-2024-0413",
+    "RUSTSEC-2024-0414",
+    "RUSTSEC-2024-0415",
+    "RUSTSEC-2024-0416",
+    "RUSTSEC-2024-0417",
+    "RUSTSEC-2024-0418",
+    "RUSTSEC-2024-0419",
+    "RUSTSEC-2024-0420",
+    "RUSTSEC-2024-0429",
+    "RUSTSEC-2025-0075",
+    "RUSTSEC-2025-0080",
+    "RUSTSEC-2025-0081",
+    "RUSTSEC-2025-0098",
+    "RUSTSEC-2025-0100"
+  ]);
+  assert.deepEqual([...trackedIds].sort(), [...requiredIds].sort(), "all inherited advisories must stay tracked");
+  const denySource = readFileSync("deny.toml", "utf8");
+  const ignoredIds = new Set(Array.from(denySource.matchAll(/"(RUSTSEC-\d{4}-\d{4})"/g), ([, id]) => id));
+  assert.deepEqual(
+    [...ignoredIds].sort(),
+    [...trackedIds].filter((id) => id !== "RUSTSEC-2024-0429").sort(),
+    "the structured ledger must exactly cover cargo-deny's advisory exceptions"
+  );
+});
+
+test("production Rust source files stay within the external-review line budget", () => {
+  const rustSources = trackedFiles().filter(
+    (path) =>
+      path.startsWith("apps/desktop/src-tauri/") &&
+      path.includes("/src/") &&
+      path.endsWith(".rs") &&
+      !path.includes("/fuzz/") &&
+      !path.endsWith("/tests.rs") &&
+      !path.endsWith("/lib_tests.rs")
+  );
+  for (const path of rustSources) {
+    const source = readFileSync(path, "utf8");
+    const physicalLines = source.length === 0 ? 0 : source.split("\n").length - (source.endsWith("\n") ? 1 : 0);
+    assert.ok(physicalLines <= 1000, `${path} has ${physicalLines} physical lines; maximum is 1000`);
+  }
 });
 
 test("npm advisories are checked from the lockfile on the deep-verification tier", () => {
