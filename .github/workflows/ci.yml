@@ -168,8 +168,39 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  mls-invite-authenticator-mutation:
+    name: MLS invite authenticator mutation policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Install pinned cargo-mutants
+        run: cargo install cargo-mutants --version 27.1.0 --locked
+      - name: Mutation-test MLS invite authentication
+        working-directory: apps/desktop/src-tauri
+        run: >-
+          cargo mutants
+          --cargo-arg=--locked
+          --package mls-core
+          --file crates/mls-core/src/invite_capability.rs
+          --re 'invite_capability.rs.*(encode_capability_binding|mac_binding|verify_request_binding|mac_response_binding|verify_response_binding|authenticate|verify|derive_mac_key|validate)'
+          --in-place
+          --no-shuffle
+          --jobs 2
+          --timeout 120
+      - name: Upload MLS invite authenticator mutation report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mls-invite-authenticator-mutation-report
+          path: apps/desktop/src-tauri/mutants.out
+          if-no-files-found: error
+          retention-days: 14
+
   mls-deserialization-fuzz:
-    name: MLS deserialization fuzz smoke test
+    name: MLS validator boundary fuzz smoke test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -180,7 +211,7 @@ jobs:
         run: rustup toolchain install nightly --profile minimal
       - name: Install pinned cargo-fuzz
         run: cargo +nightly install cargo-fuzz --version 0.12.0 --locked
-      - name: Fuzz MLS KeyPackage and credential deserialization
+      - name: Fuzz bounded validator JSON, MLS KeyPackage, and credential parsing
         working-directory: apps/desktop/src-tauri/crates/mls-core
         run: cargo +nightly fuzz run key_package_deserialization -- -max_total_time=120
       - name: Upload minimized fuzz artifacts

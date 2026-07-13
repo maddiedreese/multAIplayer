@@ -3,6 +3,9 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const supportedVersions = ["0.133.0", "0.143.0", "0.144.0"];
+const supportPolicy = JSON.parse(
+  await readFile(new URL("../contracts/codex-app-server/support-policy.json", import.meta.url), "utf8")
+);
 const manifests = new Map(
   await Promise.all(
     supportedVersions.map(async (version) => [
@@ -21,6 +24,11 @@ const requiredServerRequests = [
   "item/tool/requestUserInput",
   "mcpServer/elicitation/request"
 ];
+
+test("Codex support policy remains bounded by the checked-in contract fixtures", () => {
+  assert.equal(supportPolicy.minimumSupportedVersion, supportedVersions[0]);
+  assert.equal(supportPolicy.latestContractTestedVersion, supportedVersions.at(-1));
+});
 
 test("supported Codex manifests preserve the app-server transport contract", () => {
   for (const [version, manifest] of manifests) {

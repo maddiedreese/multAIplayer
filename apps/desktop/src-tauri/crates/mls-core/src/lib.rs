@@ -31,7 +31,10 @@ pub use storage::{
     AtomicGroupStateStorage, ConsumedInviteReceipt, ConsumedJoinReceipt, DeniedInviteReceipt,
     EncryptedStore, OutboxItem, StoreError,
 };
-pub use validator::{validate_key_package_upload, KeyPackageUpload, ValidatedKeyPackage};
+pub use validator::{
+    validate_key_package_document, validate_key_package_upload, KeyPackageUpload,
+    ValidatedKeyPackage, MAX_KEY_PACKAGE_UPLOAD_BYTES,
+};
 
 use mls_rs_crypto_awslc::AwsLcCryptoProvider;
 

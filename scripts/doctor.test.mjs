@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
+import {
+  assessCodexVersion,
+  latestContractTestedCodexVersion,
+  minimumSupportedCodexVersion
+} from "./codex-compatibility.mjs";
 
 const productionRelayEnv = {
   ...process.env,
@@ -22,6 +27,27 @@ const productionRelayEnv = {
   MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT: "120",
   MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER: "500"
 };
+
+test("Codex compatibility policy classifies the supported range and its boundaries", () => {
+  assert.equal(minimumSupportedCodexVersion, "0.133.0");
+  assert.equal(latestContractTestedCodexVersion, "0.144.0");
+  assert.equal(assessCodexVersion("codex-cli 0.132.9").status, "unsupported_older");
+  assert.equal(assessCodexVersion("codex-cli 0.133.0").status, "supported");
+  assert.equal(assessCodexVersion("codex-cli 0.144.0").status, "supported");
+  assert.equal(assessCodexVersion("codex-cli 0.145.0-alpha.1").status, "unverified_newer");
+  assert.equal(assessCodexVersion("development build").status, "unknown");
+});
+
+test("development doctor always reports Codex compatibility and the tested range", () => {
+  const result = spawnSync(process.execPath, ["scripts/doctor.mjs"], {
+    cwd: process.cwd(),
+    env: process.env,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+
+  assert.match(result.stdout, /\[ok\] codex compatibility: .*tested app-server range 0\.133\.0–0\.144\.0/);
+});
 
 test("production relay doctor accepts a hardened representative environment", () => {
   const result = runProductionDoctor(productionRelayEnv);

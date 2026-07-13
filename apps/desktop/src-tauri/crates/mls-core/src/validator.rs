@@ -6,8 +6,9 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 const MAX_KEY_PACKAGE_B64: usize = 256 * 1024;
+pub const MAX_KEY_PACKAGE_UPLOAD_BYTES: usize = 384 * 1024;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct KeyPackageUpload {
     pub key_package: String,
@@ -32,6 +33,19 @@ pub enum KeyPackageValidationError {
     InvalidKeyPackage,
     #[error("KeyPackage credential does not match authenticated uploader")]
     CredentialMismatch,
+}
+
+/// Parse and validate the exact bounded JSON document accepted by the
+/// `mls-keypackage-validator` process boundary.
+pub fn validate_key_package_document(
+    bytes: &[u8],
+) -> Result<ValidatedKeyPackage, KeyPackageValidationError> {
+    if bytes.len() > MAX_KEY_PACKAGE_UPLOAD_BYTES {
+        return Err(KeyPackageValidationError::InvalidInput);
+    }
+    let upload: KeyPackageUpload =
+        serde_json::from_slice(bytes).map_err(|_| KeyPackageValidationError::InvalidInput)?;
+    validate_key_package_upload(&upload)
 }
 
 pub fn validate_key_package_upload(
@@ -169,5 +183,31 @@ mod tests {
             first.signature_key_fingerprint,
             second.signature_key_fingerprint
         );
+    }
+
+    #[test]
+    fn document_boundary_rejects_malformed_oversized_and_unknown_fields() {
+        assert!(matches!(
+            validate_key_package_document(b"{"),
+            Err(KeyPackageValidationError::InvalidInput)
+        ));
+        assert!(matches!(
+            validate_key_package_document(&vec![b' '; MAX_KEY_PACKAGE_UPLOAD_BYTES + 1]),
+            Err(KeyPackageValidationError::InvalidInput)
+        ));
+        let mut value = serde_json::to_value(upload()).unwrap();
+        value["unexpected"] = serde_json::json!(true);
+        assert!(matches!(
+            validate_key_package_document(&serde_json::to_vec(&value).unwrap()),
+            Err(KeyPackageValidationError::InvalidInput)
+        ));
+    }
+
+    #[test]
+    fn document_boundary_accepts_the_same_valid_upload_as_struct_validation() {
+        let input = upload();
+        let expected = validate_key_package_upload(&input).unwrap();
+        let actual = validate_key_package_document(&serde_json::to_vec(&input).unwrap()).unwrap();
+        assert_eq!(actual, expected);
     }
 }

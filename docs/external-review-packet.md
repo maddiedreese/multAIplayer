@@ -18,6 +18,8 @@ The application still owns security-sensitive policy and integration code. The m
 6. Is invite authenticator v3 unambiguous and sufficiently domain-separated between requests and responses?
 7. Are retained exporter-derived history secrets described and protected consistently with the narrower live-traffic forward-secrecy claim?
 8. Does native error handling retain enough diagnostic cause information without disclosing library, storage, or cryptographic details through webview IPC?
+9. Do generated membership transitions and malformed, reordered, or replayed Commit inputs preserve host authority and epoch exclusion without poisoning later valid progress?
+10. Do both untrusted parsing chokepoints reject malformed transport documents without bypassing the exact production validation path?
 
 ## Locked protocol choices
 
@@ -117,19 +119,33 @@ The current ledger keeps the `glib 0.18.5` `VariantStrIter` soundness advisory v
 
 Repository hygiene also caps every production Rust source file at 1,000 physical lines. This is a reviewability guard, not evidence that a module is correct.
 
+Scheduled/manual CI runs pinned `cargo-mutants` against the invite authenticator v3 binding encoder, request/response MAC paths, verification, key derivation, and validation. The target is intentionally narrow enough to remain an actionable gate; it is not whole-core mutation coverage. The initial local run exposed eight missing negative-test cases in binding validation; version/phase, text-boundary, and request/response decision-field tests were added without narrowing the target, after which all 32 selected mutants were caught. Future surviving and timed-out in-scope mutants fail the job, and `mutants.out` is retained for review.
+
+## Untrusted parser boundaries and validator process model
+
+The Rust validator CLI reads at most 384 KiB and calls the same exported `validate_key_package_document(&[u8])` function as its cargo-fuzz target. That function parses strict JSON with unknown fields denied, enforces the bounded base64 upload, reaches the real RFC 9420 `MlsMessage::from_bytes` and KeyPackage validation path, pins the ciphersuite, and binds the embedded credential to the authenticated uploader. The checked-in fuzz corpus includes a JSON document with a structurally valid upload shape and invalid KeyPackage bytes so mutation starts beyond the outer JSON parser.
+
+The relay's seeded fast-check target calls `parseRelayClientMessage`, the real WebSocket connection preflight/schema boundary, rather than testing only the shared schema in isolation. It combines structure-aware generators for every client-message variant with recursive JSON, arbitrary transport bytes, truncation, frame-half reordering, bit flips, and a checked-in accepted/rejected corpus. `MULTAIPLAYER_RELAY_FUZZ_SEED` and `MULTAIPLAYER_RELAY_FUZZ_PATH` replay a minimized failure exactly.
+
+KeyPackage validation intentionally remains one child process per upload. On the 2026-07-13 assessment machine (Apple M3, arm64 macOS 24.6, Node 24.6), 50 measured release-binary invocations after five warmups had 4.04 ms mean, 3.02 ms p50, 10.81 ms p95, 12.6 ms maximum latency, and 247.18 validations/second at concurrency one. KeyPackage upload is a low-frequency admission operation, not a per-message path, so this does not justify the state, framing, restart, and response-correlation complexity of a long-lived validator. Re-run `npm run bench:mls-validator` after material validator, runtime, or deployment changes; it is an informational benchmark without a flaky performance threshold.
+
 ## Honest non-goals
 
 The protocol does not claim endpoint-compromise protection, retroactive deletion, anonymous metadata, availability against a malicious relay, browser MLS security, history forward secrecy for retained local history, or independent professional audit. Live MLS traffic receives RFC 9420 forward-secrecy and post-compromise mechanisms subject to the single active-host authority policy.
 
 ## Verification evidence
 
-- Native tests cover suite pinning, Welcome targeting, v3 capability encoding and domain separation, HPKE context binding, removal, handoff, history across epochs, staging-guard cleanup, categorized failures, and transactional recovery.
+- Native tests cover suite pinning, Welcome targeting, v3 capability encoding and domain separation, HPKE context binding, removal, handoff, history across epochs, staging-guard cleanup, categorized failures, and transactional recovery. A generated model runs shrinkable random add/remove/handoff/rejoin sequences and checks after every transition that all non-hosts fail every host-only Commit constructor and removed or retired engines cannot decrypt the current epoch.
+- Adversarial native cases reject every truncated prefix of a valid Commit, reject out-of-order and replayed Commits, and then prove that rejected input did not poison correctly ordered progress. The selected P-256/HKDF-SHA-256/AES-128-GCM HPKE suite is checked against the published RFC 9180 Appendix A.3 encapsulation and ciphertext bytes and opened through the public wrapper.
 - Relay tests cover non-host and stale Commit rejection, exact KeyPackage consumption, one-shot Welcome delivery, validation failure modes, durable receipts, and SQLite epoch compare-and-swap.
 - The process security journey scans relay SQLite, WAL, SHM, and wire artifacts for plaintext and secret markers.
-- Protocol and relay schemas have fuzz/property coverage and strict size limits.
-- The MLS core fuzz target reaches the real RFC 9420 KeyPackage deserializer.
+- The relay parser target runs 100,000 seeded structure-aware and raw-transport cases through the real connection parser in ordinary CI; the implementation run completed all four properties without a finding.
+- The MLS core cargo-fuzz target covers the exact bounded CLI document boundary plus the inner credential and RFC 9420 KeyPackage paths. The implementation smoke run completed 915,917 executions in 30 seconds without a finding; scheduled/manual CI runs a 120-second sanitizer job and retains failures.
+- Focused invite-authenticator mutation testing catches all 32 selected encoder, MAC, verification, derivation, and validation mutants.
 
 These tests are implementation evidence, not a cryptographic proof or audit.
+
+The process journey requires Cargo to build its validator and native MLS fixture. A local machine without Cargo receives the explicit successful skip `skipped: Rust toolchain required` instead of a subprocess `ENOENT`; the CI job installs pinned Rust first, so a skipped CI result is not expected evidence.
 
 ## Review map
 
@@ -143,8 +159,10 @@ These tests are implementation evidence, not a cryptographic proof or audit.
 | Transaction adapter and rollback guard | `apps/desktop/src-tauri/crates/mls-core/src/storage.rs`, `storage/atomic_group.rs`               |
 | Encrypted history/blob/receipt store   | `apps/desktop/src-tauri/crates/mls-core/src/storage/encrypted_store.rs`                          |
 | Invite v3 and HPKE                     | `apps/desktop/src-tauri/crates/mls-core/src/invite_capability.rs`, `hpke_seal.rs`                |
+| Generated/adversarial MLS evidence     | `apps/desktop/src-tauri/crates/mls-core/tests/security_state_machine.rs`                         |
 | Native Tauri command boundary          | `apps/desktop/src-tauri/src/mls_native.rs`, `mls_native/types.rs`, `mls_native/invites.rs`       |
 | Credential and KeyPackage validation   | `apps/desktop/src-tauri/crates/mls-core/src/policy.rs`, `validator.rs`                           |
+| Parser fuzzing and validator benchmark | `apps/desktop/src-tauri/crates/mls-core/fuzz/`, `apps/relay/test/fuzz/`, `scripts/benchmark-mls-validator.mjs` |
 | KeyPackage and Welcome delivery        | `apps/relay/src/http/key-packages.ts`, `apps/relay/src/http/invite-delivery.ts`                  |
 | Commit authorization and ordering      | `apps/relay/src/ws/fanout.ts`, `apps/relay/src/persistence.ts`                                   |
 | Origin, cookie, and deployment policy  | `apps/relay/src/http/origin-policy.ts`, `apps/relay/src/auth/session.ts`, `docs/self-hosting.md` |
