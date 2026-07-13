@@ -271,8 +271,8 @@ jobs:
 
       - name: Install pinned Rust toolchain
         run: |
-          rustup toolchain install 1.88.0 --profile minimal
-          rustup default 1.88.0
+          rustup toolchain install 1.89.0 --profile minimal
+          rustup default 1.89.0
 
       - name: Install Tauri, WebDriver, display, and Secret Service dependencies
         run: >-
