@@ -251,7 +251,18 @@ async function inviteAndApprove(host: Browser, guest: Browser) {
   await openRoomInspector(guest);
   await (await visible(guest, 'textarea[placeholder="Paste a multAIplayer invite..."]')).setValue(invite);
   await (await visible(guest, "button=Import invite")).click();
+  await guest.waitUntil(
+    () =>
+      guest.execute(() =>
+        (document.querySelector(".invite-panel .workflow-message")?.textContent ?? "").includes("Requested access")
+      ),
+    { timeout: 60_000, timeoutMsg: "guest did not persist the protected invite request" }
+  );
 
+  await host.refresh();
+  await visible(host, ".profile-card strong");
+  await selectRoom(host);
+  await openRoomInspector(host);
   const request = await visible(host, ".invite-panel .terminal-request.pending", 60_000);
   const requestText = await host.execute(
     () => document.querySelector(".invite-panel .terminal-request.pending")?.textContent ?? ""

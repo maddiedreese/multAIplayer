@@ -13,7 +13,7 @@ export interface RelayWebSocketConnectionOptions {
     isReady?: () => boolean;
   };
   state: {
-    store: Pick<RelayStore, "getMlsBacklog">;
+    store: Pick<RelayStore, "getInvite" | "getMlsBacklog" | "getRoom" | "inviteRequests" | "inviteResponses">;
     sessions: Map<ClientSession["socket"], ClientSession>;
     roomPresence: Map<RoomKey, Map<string, PresenceRecord>>;
   };
