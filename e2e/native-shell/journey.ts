@@ -17,6 +17,7 @@ const frontendUrl = "http://127.0.0.1:1420";
 const roomName = `Native integration ${Date.now()}`;
 const messageText = `real MLS message ${Date.now()}`;
 const processes: ChildProcess[] = [];
+const webdriverOperationTimeoutMs = 15_000;
 
 interface Identity {
   id: string;
@@ -67,10 +68,15 @@ async function freePorts(count: number) {
   return [...ports];
 }
 
-function spawnProcess(command: string, args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}) {
+function spawnProcess(
+  command: string,
+  args: string[],
+  options: { cwd?: string; env?: NodeJS.ProcessEnv; detached?: boolean } = {}
+) {
   const child = spawn(command, args, {
     cwd: options.cwd ?? root,
     env: { ...process.env, ...options.env },
+    detached: options.detached,
     stdio: ["ignore", "pipe", "pipe"]
   });
   const label = `${command} ${args.join(" ")}`;
@@ -81,16 +87,69 @@ function spawnProcess(command: string, args: string[], options: { cwd?: string; 
   return child;
 }
 
-async function run(command: string, args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}) {
-  const child = spawnProcess(command, args, options);
+function stage(message: string) {
+  console.log(`[native-e2e] ${new Date().toISOString()} ${message}`);
+}
+
+async function run(
+  command: string,
+  args: string[],
+  options: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}
+) {
+  const { timeoutMs = 8 * 60_000, ...spawnOptions } = options;
+  const detached = process.platform !== "win32";
+  const child = spawnProcess(command, args, { ...spawnOptions, detached });
+  const terminate = (signal: NodeJS.Signals) => {
+    try {
+      if (detached && child.pid) process.kill(-child.pid, signal);
+      else child.kill(signal);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ESRCH")
+        console.warn(`[native-e2e] failed to send ${signal} to ${command}: ${String(error)}`);
+    }
+  };
   const code = await new Promise<number>((resolveCode, reject) => {
-    child.once("error", reject);
+    let timedOut = false;
+    let forceKillTimer: NodeJS.Timeout | undefined;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      terminate("SIGTERM");
+      forceKillTimer = setTimeout(() => terminate("SIGKILL"), 2_000);
+    }, timeoutMs);
+    child.once("error", (error) => {
+      clearTimeout(timeout);
+      if (forceKillTimer) clearTimeout(forceKillTimer);
+      reject(error);
+    });
     child.once("exit", (exitCode, signal) => {
-      if (signal) reject(new Error(`${command} exited from ${signal}`));
+      clearTimeout(timeout);
+      if (forceKillTimer) clearTimeout(forceKillTimer);
+      if (timedOut) reject(new Error(`${command} exceeded its ${timeoutMs}ms timeout`));
+      else if (signal) reject(new Error(`${command} exited from ${signal}`));
       else resolveCode(exitCode ?? 1);
     });
   });
   if (code !== 0) throw new Error(`${command} exited with code ${code}`);
+}
+
+async function withTimeout<T>(operation: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} exceeded its ${timeoutMs}ms timeout`)), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function bestEffort(label: string, operation: Promise<unknown>, timeoutMs = webdriverOperationTimeoutMs) {
+  await withTimeout(operation, timeoutMs, label).catch((error) => {
+    console.warn(`[native-e2e] ${label} failed: ${String(error)}`);
+  });
 }
 
 async function stopProcess(child: ChildProcess) {
@@ -113,8 +172,15 @@ async function unmountRuntimeDocumentPortal(path: string) {
   ] as const) {
     const child = spawn(command, args, { stdio: "ignore" });
     const code = await new Promise<number>((resolveCode) => {
-      child.once("error", () => resolveCode(1));
-      child.once("exit", (exitCode) => resolveCode(exitCode ?? 1));
+      const timeout = setTimeout(() => child.kill("SIGKILL"), 3_000);
+      child.once("error", () => {
+        clearTimeout(timeout);
+        resolveCode(1);
+      });
+      child.once("exit", (exitCode) => {
+        clearTimeout(timeout);
+        resolveCode(exitCode ?? 1);
+      });
     });
     if (code === 0) return;
   }
@@ -125,7 +191,8 @@ async function waitForUrl(url: string, timeoutMs = 120_000) {
   let lastError: unknown;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(url);
+      const remainingMs = Math.max(1, deadline - Date.now());
+      const response = await fetch(url, { signal: AbortSignal.timeout(Math.min(2_000, remainingMs)) });
       if (response.ok) return;
     } catch (error) {
       lastError = error;
@@ -343,11 +410,20 @@ async function handoff(host: Browser, guest: Browser) {
       }
     );
   } catch (error) {
-    const diagnostics = await Promise.all([handoffDiagnostics(host), handoffDiagnostics(guest)]);
+    const diagnostics = await Promise.all([
+      boundedHandoffDiagnostics(host, "host"),
+      boundedHandoffDiagnostics(guest, "guest")
+    ]);
     throw new Error(
       `${String(error)}\nHost UI: ${JSON.stringify(diagnostics[0])}\nGuest UI: ${JSON.stringify(diagnostics[1])}`
     );
   }
+}
+
+async function boundedHandoffDiagnostics(browser: Browser, client: string) {
+  return withTimeout(handoffDiagnostics(browser), webdriverOperationTimeoutMs, `${client} handoff diagnostics`).catch(
+    (error) => ({ error: String(error) })
+  );
 }
 
 async function handoffDiagnostics(browser: Browser) {
@@ -403,6 +479,7 @@ async function main() {
   );
   let browser: Awaited<ReturnType<typeof multiremote>> | undefined;
   try {
+    stage("starting desktop frontend");
     const vite = spawnProcess("npm", ["run", "dev", "-w", "@multaiplayer/desktop"], {
       env: {
         VITE_DESKTOP_PORT: "1420",
@@ -413,6 +490,7 @@ async function main() {
     void vite;
     await waitForUrl(frontendUrl);
 
+    stage("building native desktop shell");
     const mergedConfig = JSON.stringify({ build: { beforeDevCommand: null } });
     await run(
       "npm",
@@ -431,21 +509,26 @@ async function main() {
         cargoBuildOnly,
         "--no-watch"
       ],
-      { env: { VITE_RELAY_HTTP_URL: relay.baseUrl, VITE_RELAY_URL: relay.wsUrl } }
+      { env: { VITE_RELAY_HTTP_URL: relay.baseUrl, VITE_RELAY_URL: relay.wsUrl }, timeoutMs: 8 * 60_000 }
     );
     await access(appBinary);
+    stage("native desktop shell build completed");
 
     const hostLauncher = await makeIsolatedLauncher(tempRoot, "host");
     const guestLauncher = await makeIsolatedLauncher(tempRoot, "guest");
     const [hostPort, hostNativePort, guestPort, guestNativePort] = await freePorts(4);
+    stage("starting native WebDriver bridges");
     spawnProcess("tauri-driver", ["--port", String(hostPort), "--native-port", String(hostNativePort)]);
     spawnProcess("tauri-driver", ["--port", String(guestPort), "--native-port", String(guestNativePort)]);
     await Promise.all([waitForDriver(hostPort), waitForDriver(guestPort)]);
 
+    stage("creating isolated native WebDriver sessions");
     browser = await multiremote({
       host: {
         hostname: "127.0.0.1",
         port: hostPort,
+        connectionRetryTimeout: webdriverOperationTimeoutMs,
+        connectionRetryCount: 1,
         capabilities: {
           browserName: "wry",
           "wdio:enforceWebDriverClassic": true,
@@ -455,6 +538,8 @@ async function main() {
       guest: {
         hostname: "127.0.0.1",
         port: guestPort,
+        connectionRetryTimeout: webdriverOperationTimeoutMs,
+        connectionRetryCount: 1,
         capabilities: {
           browserName: "wry",
           "wdio:enforceWebDriverClassic": true,
@@ -462,17 +547,25 @@ async function main() {
         } as never
       }
     });
+    stage("native WebDriver sessions ready");
     const host = browser.getInstance("host");
     const guest = browser.getInstance("guest");
+    stage("authenticating both native clients");
     await Promise.all([
       authenticate(host, relay.baseUrl, hostIdentity),
       authenticate(guest, relay.baseUrl, guestIdentity)
     ]);
+    stage("creating and bootstrapping MLS room");
     await createRoom(host);
+    stage("running invite approval and Welcome processing");
     await inviteAndApprove(host, guest);
+    stage("sending pre-handoff encrypted message");
     await sendAndReceive(host, guest, messageText);
+    stage("transferring MLS host authority");
     await handoff(host, guest);
+    stage("verifying relay host authority");
     await assertRelayHost(guest, relay.baseUrl);
+    stage("sending post-handoff encrypted message");
     await sendAndReceive(guest, host, `post-handoff ${messageText}`);
     console.log("[native-e2e] real invite -> approve -> MLS message -> host handoff journey passed");
   } catch (error) {
@@ -480,29 +573,33 @@ async function main() {
     await mkdir(reportDir, { recursive: true });
     await writeFile(join(reportDir, "failure.txt"), `${String(error)}\n`, "utf8");
     if (browser) {
+      stage("capturing bounded failure diagnostics");
       await Promise.all([
-        browser
-          .getInstance("host")
-          .saveScreenshot(join(reportDir, "host.png"))
-          .catch(() => undefined),
-        browser
-          .getInstance("guest")
-          .saveScreenshot(join(reportDir, "guest.png"))
-          .catch(() => undefined)
+        bestEffort("host failure screenshot", browser.getInstance("host").saveScreenshot(join(reportDir, "host.png"))),
+        bestEffort(
+          "guest failure screenshot",
+          browser.getInstance("guest").saveScreenshot(join(reportDir, "guest.png"))
+        )
       ]);
     }
     throw error;
   } finally {
-    await browser?.deleteSession().catch(() => undefined);
+    stage("cleaning up native journey resources");
+    if (browser) await bestEffort("WebDriver session cleanup", browser.deleteSession());
     await Promise.all(processes.reverse().map((child) => stopProcess(child)));
     await relay.close();
     await Promise.all([
       unmountRuntimeDocumentPortal(join(tempRoot, "host/runtime/doc")),
       unmountRuntimeDocumentPortal(join(tempRoot, "guest/runtime/doc"))
     ]);
-    await rm(tempRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 }).catch((error) => {
+    await withTimeout(
+      rm(tempRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 }),
+      10_000,
+      "isolated profile cleanup"
+    ).catch((error) => {
       console.warn(`[native-e2e] isolated profile cleanup deferred: ${String(error)}`);
     });
+    stage("native journey cleanup completed");
   }
 }
 
