@@ -64,12 +64,14 @@ pub struct JoinAdmissionMetadata {
     pub requester_device_id: String,
 }
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum OutboxMetadata {
     Application {
+        #[serde(alias = "authenticated_data")]
         authenticated_data: Vec<u8>,
     },
     Commit {
+        #[serde(alias = "parent_epoch")]
         parent_epoch: u64,
     },
     Welcome(WelcomeRetryMetadata),
