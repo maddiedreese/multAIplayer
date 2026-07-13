@@ -328,11 +328,44 @@ async function handoff(host: Browser, guest: Browser) {
   await (await visible(host, "button=Handoff")).click();
   const available = await visible(guest, ".handoff-row.available", 60_000);
   await (await available.$("button=Request handoff")).click();
+  await visible(guest, ".handoff-row.requested", 60_000);
   const requested = await visible(host, ".handoff-row.requested", 60_000);
   await (await requested.$("button=Approve candidate")).click();
-  await (await visible(guest, ".handoff-row.accepted", 60_000)).waitForDisplayed({ timeout: 60_000 });
-  assert.equal(await (await guest.$("button=Handoff")).isEnabled(), true, "successor did not receive host controls");
-  assert.equal(await (await host.$("button=Handoff")).isEnabled(), false, "former host retained host controls");
+  try {
+    await visible(guest, ".handoff-row.accepted", 60_000);
+    await guest.waitUntil(
+      async () =>
+        (await (await guest.$("button=Handoff")).isEnabled()) && !(await (await host.$("button=Handoff")).isEnabled()),
+      {
+        timeout: 60_000,
+        interval: 250,
+        timeoutMsg: "accepted handoff did not converge on successor-only host controls"
+      }
+    );
+  } catch (error) {
+    const diagnostics = await Promise.all([handoffDiagnostics(host), handoffDiagnostics(guest)]);
+    throw new Error(
+      `${String(error)}\nHost UI: ${JSON.stringify(diagnostics[0])}\nGuest UI: ${JSON.stringify(diagnostics[1])}`
+    );
+  }
+}
+
+async function handoffDiagnostics(browser: Browser) {
+  return browser.execute(() => {
+    const handoffButton = [...document.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "Handoff"
+    );
+    return {
+      handoffEnabled: handoffButton ? !handoffButton.disabled : null,
+      handoffRows: [...document.querySelectorAll(".handoff-row")].map((row) => ({
+        className: row.className,
+        text: row.textContent?.trim() ?? ""
+      })),
+      workflowMessages: [...document.querySelectorAll(".workflow-message")].map((message) =>
+        message.textContent?.trim()
+      )
+    };
+  });
 }
 
 async function assertRelayHost(guest: Browser, relayBaseUrl: string) {

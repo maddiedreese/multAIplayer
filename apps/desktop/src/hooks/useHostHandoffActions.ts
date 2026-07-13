@@ -296,7 +296,15 @@ export function useHostHandoffActions({
     const relay = relayRef.current;
     if (!relay) throw new Error("Relay is unavailable.");
     seenEnvelopeIds.current.add(message.id);
-    await publishMlsApplicationMessage(relay, message);
+    await publishMlsApplicationMessage(relay, message).catch((error) => {
+      seenEnvelopeIds.current.delete(message.id);
+      throw error;
+    });
+    useAppStore.getState().markHostHandoffRequestedForRoom(selectedRoom.id, handoff.id, {
+      candidateUserId: localUser.id,
+      candidateDeviceId: deviceId,
+      candidateLeaf: self.leaf
+    });
     setHostMessageForRoom(selectedRoom.id, "Host authority request sent. The active host must explicitly approve it.");
   }
 
