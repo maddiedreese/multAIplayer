@@ -12,6 +12,8 @@ Run it locally with:
 npm run test:security-journey
 ```
 
+The process journey needs Cargo because it builds the validator and generates its MLS fixture from the native core. When Cargo is not installed, the test exits successfully with the explicit result `skipped: Rust toolchain required`; this local convenience does not weaken CI, where the job installs pinned Rust 1.88.0 before running and a skipped result is unexpected. `MULTAIPLAYER_CARGO_BIN` may select a non-default Cargo executable.
+
 ## Desktop browser journeys
 
 Playwright runs the actual desktop web shell against the real relay. The focused

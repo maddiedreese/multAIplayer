@@ -2,6 +2,11 @@ import { existsSync } from "node:fs";
 import { platform } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import {
+  assessCodexVersion,
+  latestContractTestedCodexVersion,
+  minimumSupportedCodexVersion
+} from "./codex-compatibility.mjs";
 
 const checks = [];
 const productionRelay = process.argv.includes("--production-relay");
@@ -16,6 +21,7 @@ checkOptionalFile(join("apps", "relay", ".env"), "optional: relay-local env file
 if (!productionRelay) {
   checkCommand("cargo", ["--version"], "Cargo is required for the Tauri desktop shell.");
   checkCommand("rustc", ["--version"], "rustc is required for native Tauri tests and builds.");
+  checkCodexCompatibility();
   checkLocalFile(
     join("apps", "desktop", "src-tauri", "Cargo.lock"),
     "Cargo.lock is present for reproducible native builds."
@@ -78,6 +84,51 @@ function checkCommand(command, args, failureDetail) {
     label: command,
     detail: result.status === 0 ? output || "available" : failureDetail
   });
+}
+
+function checkCodexCompatibility() {
+  const range = `${minimumSupportedCodexVersion}–${latestContractTestedCodexVersion}`;
+  const result = spawnSync("codex", ["--version"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  if (result.error?.code === "ENOENT") {
+    checks.push({
+      ok: true,
+      label: "codex compatibility",
+      detail: `optional: Codex CLI not found; tested app-server range ${range}`
+    });
+    return;
+  }
+
+  const output = [result.stdout, result.stderr].filter(Boolean).join(" ").trim();
+  const compatibility = assessCodexVersion(output);
+  const found = compatibility.version ? `found ${compatibility.version}` : output || "version unavailable";
+  if (result.status !== 0 || compatibility.status === "unknown") {
+    checks.push({
+      ok: false,
+      label: "codex compatibility",
+      detail: `${found}; could not verify against tested app-server range ${range}`
+    });
+  } else if (compatibility.status === "unsupported_older") {
+    checks.push({
+      ok: false,
+      label: "codex compatibility",
+      detail: `${found}; update to ${minimumSupportedCodexVersion} or newer (tested range ${range})`
+    });
+  } else if (compatibility.status === "unverified_newer") {
+    checks.push({
+      ok: true,
+      label: "codex compatibility",
+      detail: `${found}; newer than tested app-server range ${range}`
+    });
+  } else {
+    checks.push({
+      ok: true,
+      label: "codex compatibility",
+      detail: `${found}; supported in tested app-server range ${range}`
+    });
+  }
 }
 
 function checkLocalFile(path, detail) {

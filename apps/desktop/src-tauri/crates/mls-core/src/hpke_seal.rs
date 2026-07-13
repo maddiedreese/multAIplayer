@@ -140,6 +140,92 @@ mod tests {
     use super::*;
 
     #[test]
+    fn rfc_9180_p256_invite_sealing_known_answer() {
+        use core::convert::Infallible;
+        use hpke::setup_sender_with_rng;
+        use rand_core::{TryCryptoRng, TryRng};
+
+        struct FixedRng(Vec<u8>);
+
+        impl TryRng for FixedRng {
+            type Error = Infallible;
+
+            fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+                panic!("HPKE KAT unexpectedly requested a word")
+            }
+
+            fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+                panic!("HPKE KAT unexpectedly requested a word")
+            }
+
+            fn try_fill_bytes(&mut self, destination: &mut [u8]) -> Result<(), Self::Error> {
+                assert_eq!(destination.len(), self.0.len());
+                destination.copy_from_slice(&self.0);
+                Ok(())
+            }
+        }
+
+        impl TryCryptoRng for FixedRng {}
+
+        fn hex(value: &str) -> Vec<u8> {
+            assert_eq!(value.len() % 2, 0);
+            value
+                .as_bytes()
+                .chunks_exact(2)
+                .map(|pair| {
+                    let text = std::str::from_utf8(pair).unwrap();
+                    u8::from_str_radix(text, 16).unwrap()
+                })
+                .collect()
+        }
+
+        // RFC 9180 A.3, mode 0, first encryption. These bytes are copied from
+        // the published vector rather than produced by this implementation.
+        let private_key = hex("f3ce7fdae57e1a310d87f1ebbde6f328be0a99cdbcadf4d6589cf29de4b8ffd2");
+        let public_key = hex(concat!(
+            "04fe8c19ce0905191ebc298a9245792531f26f0cece2460639e8bc39cb7f706a82",
+            "6a779b4cf969b8a0e539c7f62fb3d30ad6aa8f80e30f1d128aafd68a2ce72ea0"
+        ));
+        let expected_enc = hex(concat!(
+            "04a92719c6195d5085104f469a8b9814d5838ff72b60501e2c4466e5e67b325ac9",
+            "8536d7b61a1af4b78e5b7f951c0900be863c403ce65c9bfcb9382657222d18c4"
+        ));
+        let expected_ciphertext = hex(concat!(
+            "5ad590bb8baa577f8619db35a36311226a896e7342a6d836d8b7bcd2f20b6c7f",
+            "9076ac232e3ab2523f39513434"
+        ));
+        let info = hex("4f6465206f6e2061204772656369616e2055726e");
+        let aad = hex("436f756e742d30");
+        let plaintext = hex("4265617574792069732074727574682c20747275746820626561757479");
+        let recipient = <Kem as KemTrait>::PublicKey::from_bytes(&public_key).unwrap();
+        let mut rng = FixedRng(hex(
+            "4270e54ffd08d79d5928020af4686d8f6b7d35dbe470265f1f5aa22816ce860e",
+        ));
+        let (enc, mut sender) = setup_sender_with_rng::<AesGcm128, HkdfSha256, Kem>(
+            &OpModeS::Base,
+            &recipient,
+            &info,
+            &mut rng,
+        )
+        .unwrap();
+        let ciphertext = sender.seal(&plaintext, &aad).unwrap();
+
+        assert_eq!(enc.to_bytes().as_slice(), expected_enc);
+        assert_eq!(ciphertext, expected_ciphertext);
+
+        let keys = HpkeKeyPair::from_bytes(private_key, public_key).unwrap();
+        let payload = SealedPayload {
+            version: 1,
+            kem_id: 0x0010,
+            kdf_id: 0x0001,
+            aead_id: 0x0001,
+            encapsulated_key: expected_enc,
+            ciphertext: expected_ciphertext,
+        };
+        assert_eq!(open(&keys, &info, &aad, &payload).unwrap(), plaintext);
+    }
+
+    #[test]
     fn round_trip_and_context_binding() {
         let keys = generate_hpke_key_pair();
         let sealed = seal(

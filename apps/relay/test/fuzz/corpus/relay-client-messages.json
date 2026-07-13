@@ -1,0 +1,17 @@
+[
+  {
+    "expected": "accepted",
+    "frame": "{\"type\":\"join\",\"teamId\":\"team-1\",\"roomId\":\"room-1\",\"userId\":\"user-1\",\"deviceId\":\"device-1\"}"
+  },
+  {
+    "expected": "accepted",
+    "frame": "{\"type\":\"publish\",\"message\":{\"id\":\"message-1\",\"teamId\":\"team-1\",\"roomId\":\"room-1\",\"senderUserId\":\"user-1\",\"senderDeviceId\":\"device-1\",\"createdAt\":\"2026-07-13T00:00:00.000Z\",\"messageType\":\"application\",\"epochHint\":0,\"mlsMessage\":\"AA==\"}}"
+  },
+  {
+    "expected": "rejected",
+    "frame": "{\"type\":\"publish\",\"message\":{\"id\":\"message-1\",\"teamId\":\"team-1\",\"roomId\":\"room-1\",\"senderUserId\":\"user-1\",\"senderDeviceId\":\"device-1\",\"createdAt\":\"2026-07-13T00:00:00.000Z\",\"messageType\":\"application\",\"epochHint\":0,\"mlsMessage\":\"not base64\"}}"
+  },
+  { "expected": "rejected", "frame": "{\"type\":\"join\",\"teamId\":" },
+  { "expected": "rejected", "frame": "{\"type\":\"unknown\",\"payload\":{}}" },
+  { "expected": "rejected", "frame": "[]" }
+]

@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { probeRustToolchain } from "./support/rust-toolchain.js";
 import {
   WebSocket,
   createDebugSession,
@@ -20,6 +21,7 @@ const validatorPath = fileURLToPath(
   new URL("../../desktop/src-tauri/target/debug/mls-keypackage-validator", import.meta.url)
 );
 const marker = "MLS-PLAINTEXT-MUST-NEVER-REACH-RELAY";
+const rustToolchain = probeRustToolchain(process.env.MULTAIPLAYER_CARGO_BIN ?? "cargo");
 
 interface NativeFixture {
   host: DeviceFixture;
@@ -60,7 +62,7 @@ interface DeviceFixture {
 
 async function nativeFixture(): Promise<{ fixture: NativeFixture; stdout: string; stderr: string }> {
   await execFileAsync(
-    "cargo",
+    rustToolchain.command,
     [
       "build",
       "--quiet",
@@ -75,7 +77,7 @@ async function nativeFixture(): Promise<{ fixture: NativeFixture; stdout: string
     { cwd: workspaceRoot, timeout: 120_000, maxBuffer: 2_000_000 }
   );
   const result = await execFileAsync(
-    "cargo",
+    rustToolchain.command,
     [
       "run",
       "--quiet",
@@ -307,7 +309,13 @@ async function scanRelay(relay: { dataPath: string }, wire: string[], forbidden:
   for (const needle of needles) assert.equal(wireBytes.includes(needle), false, "secret marker leaked onto relay wire");
 }
 
-test("native MLS, HPKE, Welcome, and exporter ciphertexts never persist relay plaintext", async () => {
+if (rustToolchain.missing) {
+  test("skipped: Rust toolchain required", { skip: "Rust toolchain required" }, () => undefined);
+} else {
+  test("native MLS, HPKE, Welcome, and exporter ciphertexts never persist relay plaintext", runSecurityJourney);
+}
+
+async function runSecurityJourney() {
   const generated = await nativeFixture();
   assert.equal(generated.stdout.includes(marker), false);
   assert.equal(generated.stderr.includes(marker), false);
@@ -459,4 +467,4 @@ test("native MLS, HPKE, Welcome, and exporter ciphertexts never persist relay pl
     nextSocket.close();
     await relay.close();
   }
-});
+}

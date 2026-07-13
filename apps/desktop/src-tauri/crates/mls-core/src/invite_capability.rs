@@ -354,4 +354,73 @@ mod tests {
             "94367566d936e2c1e49387a2501a374e6a37430ed0452fe8d6dc13a179aa8262"
         );
     }
+
+    #[test]
+    fn rejects_unsupported_versions_and_phases() {
+        let mut invalid = binding();
+        invalid.version = 2;
+        assert_eq!(
+            encode_capability_binding(&invalid),
+            Err(CapabilityError::InvalidBinding)
+        );
+
+        invalid = binding();
+        invalid.phase = "approval".into();
+        assert_eq!(
+            encode_capability_binding(&invalid),
+            Err(CapabilityError::InvalidBinding)
+        );
+    }
+
+    #[test]
+    fn enforces_authenticated_text_boundaries() {
+        for invalid_text in [String::new(), "a".repeat(257), "line\nbreak".into()] {
+            let mut invalid = binding();
+            invalid.invite_id = invalid_text;
+            assert_eq!(
+                encode_capability_binding(&invalid),
+                Err(CapabilityError::InvalidBinding)
+            );
+        }
+
+        let mut maximum = binding();
+        maximum.invite_id = "a".repeat(256);
+        assert!(encode_capability_binding(&maximum).is_ok());
+    }
+
+    #[test]
+    fn requires_phase_specific_decision_fields() {
+        let mut request_with_status = binding();
+        request_with_status.status = Some("approved".into());
+        assert_eq!(
+            encode_capability_binding(&request_with_status),
+            Err(CapabilityError::InvalidBinding)
+        );
+
+        let mut request_with_decision_time = binding();
+        request_with_decision_time.decided_at = Some("2030-01-01T00:00:01Z".into());
+        assert_eq!(
+            encode_capability_binding(&request_with_decision_time),
+            Err(CapabilityError::InvalidBinding)
+        );
+
+        let mut response = binding();
+        response.phase = "response".into();
+        response.status = Some("approved".into());
+        response.decided_at = Some("2030-01-01T00:00:01Z".into());
+        assert!(encode_capability_binding(&response).is_ok());
+
+        let mut response_without_status = response.clone();
+        response_without_status.status = None;
+        assert_eq!(
+            encode_capability_binding(&response_without_status),
+            Err(CapabilityError::InvalidBinding)
+        );
+
+        response.decided_at = None;
+        assert_eq!(
+            encode_capability_binding(&response),
+            Err(CapabilityError::InvalidBinding)
+        );
+    }
 }

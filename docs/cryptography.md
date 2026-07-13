@@ -38,6 +38,12 @@ MLS erases superseded epoch secrets as its key schedule advances. multAIplayer d
 
 This creates a precise tradeoff: live MLS traffic gains forward secrecy and post-compromise recovery properties, while locally retained history does not gain forward secrecy against later compromise of that device's encrypted store and credential-store wrapping key. New members receive no pre-join history. A device that loses MLS state can rejoin, but cannot recover old backlog or local history secrets from the relay.
 
+## Verification strategy
+
+The native suite includes a shrinkable generated model of add, remove, host-handoff, and rejoin transitions. After every generated transition, it proves that every active non-host is rejected by the add, remove, and handoff Commit constructors and that removed or retired engine instances cannot decrypt the current epoch. Separate adversarial cases feed every truncated prefix of a valid Commit, deliver later Commits before their parents, and replay already-applied Commits; rejected inputs must not prevent the later valid ordered transition.
+
+The invite HPKE suite is checked against the published RFC 9180 Appendix A.3 P-256/HKDF-SHA-256/AES-128-GCM encapsulation and ciphertext bytes, including decryption through the public native wrapper. This supplements context-binding and wrong-recipient tests; it does not make the application integration independently audited. The exact tests and parser-fuzz evidence are indexed in the [external review packet](external-review-packet.md).
+
 ## Protocol boundary and review
 
 Protocol v2 intentionally has no compatibility reader for custom room envelopes, room-secret wraps, rotation messages, legacy invite key delivery, or localStorage room secrets. Pre-v2 rooms and pre-v3 invite authenticators are unreadable and invalid. Git history preserves the removed design; runtime compatibility code would only enlarge the attack surface.

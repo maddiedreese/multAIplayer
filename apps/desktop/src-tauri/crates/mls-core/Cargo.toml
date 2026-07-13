@@ -32,4 +32,6 @@ thiserror = "=2.0.18"
 zeroize = { version = "=1.8.2", features = ["derive"] }
 
 [dev-dependencies]
+proptest = "=1.11.0"
+rand_core = "=0.10.1"
 tempfile = "=3.24.0"

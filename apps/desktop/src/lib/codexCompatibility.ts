@@ -1,5 +1,7 @@
-export const minimumSupportedCodexVersion = "0.133.0";
-export const latestContractTestedCodexVersion = "0.144.0";
+import supportPolicy from "../../../../contracts/codex-app-server/support-policy.json";
+
+export const minimumSupportedCodexVersion = supportPolicy.minimumSupportedVersion;
+export const latestContractTestedCodexVersion = supportPolicy.latestContractTestedVersion;
 
 export type CodexCompatibilityStatus = "supported" | "unsupported_older" | "unverified_newer" | "unknown";
 
