@@ -311,12 +311,20 @@ async function main() {
       host: {
         hostname: "127.0.0.1",
         port: hostPort,
-        capabilities: { browserName: "wry", "tauri:options": { application: hostLauncher } } as never
+        capabilities: {
+          browserName: "wry",
+          "wdio:enforceWebDriverClassic": true,
+          "tauri:options": { application: hostLauncher }
+        } as never
       },
       guest: {
         hostname: "127.0.0.1",
         port: guestPort,
-        capabilities: { browserName: "wry", "tauri:options": { application: guestLauncher } } as never
+        capabilities: {
+          browserName: "wry",
+          "wdio:enforceWebDriverClassic": true,
+          "tauri:options": { application: guestLauncher }
+        } as never
       }
     });
     const host = browser.getInstance("host");
