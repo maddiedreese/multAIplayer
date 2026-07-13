@@ -9,6 +9,7 @@ import {
   recordDiagnosticEvent,
   saveNativeDiagnosticBundle
 } from "../src/lib/diagnostics";
+import { appVersion } from "../src/lib/appVersion";
 import { reportExpectedFailure, reportNonFatal } from "../src/lib/nonFatalReporting";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
@@ -290,7 +291,8 @@ test("web-preview bundle includes app metadata and relay origins only", () => {
   );
   recordDiagnosticEvent("warn", "Something happened");
   const bundle = buildWebPreviewDiagnosticBundle(new Date("2026-07-08T00:00:00.000Z"));
-  assert.match(bundle, /"version": "0\.1\.0-alpha\.0"/);
+  const parsedBundle = JSON.parse(bundle) as { app: { version: string } };
+  assert.equal(parsedBundle.app.version, appVersion);
   assert.match(bundle, /"httpOrigin": "https:\/\/relay\.example\.com"/);
   assert.match(bundle, /"wsOrigin": "wss:\/\/relay\.example\.com"/);
   assert.doesNotMatch(bundle, /secret=1/);
