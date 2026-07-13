@@ -346,7 +346,7 @@ mod tests {
         storage.stage_join_receipt(receipt.clone()).unwrap();
         assert_eq!(
             storage.staged_join_receipts.lock().unwrap().as_slice(),
-            &[receipt.clone()]
+            std::slice::from_ref(&receipt)
         );
         storage.clear_staged_join_receipts();
 
