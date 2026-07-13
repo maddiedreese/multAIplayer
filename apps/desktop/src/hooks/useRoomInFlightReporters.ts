@@ -1,7 +1,6 @@
 import type { RefObject } from "react";
 import { isRoomHostMutationInFlight, roomHostMutationInFlightMessage } from "../lib/hostHandoff";
 import { isRoomSettingsMutationInFlight, roomSettingsMutationInFlightMessage } from "../lib/teamRoomDefaults";
-import { isRoomKeyRotationInFlight, roomKeyRotationInFlightMessage } from "../lib/roomKeyRotation";
 import { isRoomFileActionInFlight, roomFileActionInFlightMessage } from "../lib/workspaceAccess";
 import { isRoomTerminalActionInFlight, roomTerminalActionInFlightMessage } from "../lib/terminalApproval";
 
@@ -11,7 +10,7 @@ type RoomMessageSetter = (roomId: string, message: string | null) => void;
 interface UseRoomInFlightReportersOptions {
   hostBusyRef: RoomBusyRef;
   settingsBusyRef: RoomBusyRef;
-  keyRotationBusyRef: RoomBusyRef;
+  membershipCommitBusyRef: RoomBusyRef;
   fileBusyRef: RoomBusyRef;
   terminalBusyRef: RoomBusyRef;
   setHostMessageForRoom: RoomMessageSetter;
@@ -24,7 +23,7 @@ interface UseRoomInFlightReportersOptions {
 export function useRoomInFlightReporters({
   hostBusyRef,
   settingsBusyRef,
-  keyRotationBusyRef,
+  membershipCommitBusyRef,
   fileBusyRef,
   terminalBusyRef,
   setHostMessageForRoom,
@@ -48,9 +47,9 @@ export function useRoomInFlightReporters({
     return true;
   }
 
-  function reportRoomKeyRotationInFlight(roomId: string): boolean {
-    if (!isRoomKeyRotationInFlight(keyRotationBusyRef.current, roomId)) return false;
-    setInviteMessageForRoom(roomId, roomKeyRotationInFlightMessage());
+  function reportMembershipCommitInFlight(roomId: string): boolean {
+    if (!membershipCommitBusyRef.current[roomId]) return false;
+    setInviteMessageForRoom(roomId, "An MLS membership commit is already in progress.");
     return true;
   }
 
@@ -69,7 +68,7 @@ export function useRoomInFlightReporters({
   return {
     reportRoomHostMutationInFlight,
     reportRoomSettingsMutationInFlight,
-    reportRoomKeyRotationInFlight,
+    reportMembershipCommitInFlight,
     reportRoomFileActionInFlight,
     reportRoomTerminalActionInFlight
   };

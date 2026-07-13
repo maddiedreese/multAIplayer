@@ -26,6 +26,7 @@ import {
   normalizeTrustedApproverUserIds,
   type DailyCreationQuotaRecord
 } from "./room-validation.js";
+import { hasDeviceSession } from "./device-auth.js";
 
 interface RegisterRoomRoutesOptions {
   app: Express;
@@ -52,10 +53,12 @@ interface RegisterRoomRoutesOptions {
   normalizeBrowserAllowedOrigins: (value: unknown) => string[] | null;
   displayNameForUser: (user: AuthSession["user"]) => string;
   maxCodexModelChars: number;
+  maxDeviceIdChars: number;
   maxHostNameChars: number;
   maxRoomNameChars: number;
   maxRoomProjectPathChars: number;
   maxUserIdChars: number;
+  deviceAuthRequired: boolean;
 }
 
 const dailyRoomCreationCounts = new Map<string, DailyCreationQuotaRecord>();
@@ -78,7 +81,6 @@ export function registerRoomRoutes({
   isApprovalDelegationPolicy,
   isRoomMode,
   normalizeMetadataText,
-  normalizeOptionalMetadataText,
   normalizeRoomProjectPath,
   normalizeCodexModel,
   normalizeCodexReasoningEffort,
@@ -86,6 +88,7 @@ export function registerRoomRoutes({
   normalizeBrowserAllowedOrigins,
   displayNameForUser,
   maxCodexModelChars,
+  maxDeviceIdChars,
   maxHostNameChars,
   maxRoomNameChars,
   maxRoomProjectPathChars,
@@ -233,7 +236,10 @@ export function registerRoomRoutes({
       teamId,
       name,
       projectPath,
-      host: "No host",
+      host: session
+        ? (normalizeMetadataText(displayNameForUser(session.user), maxHostNameChars) ?? "Reserved host")
+        : "No host",
+      hostUserId: session?.user.id,
       hostStatus: "offline",
       approvalPolicy,
       approvalDelegationPolicy,
@@ -258,20 +264,12 @@ export function registerRoomRoutes({
 
   app.patch("/rooms/:roomId/host", (req, res) => {
     const roomId = String(req.params.roomId ?? "");
-    const host = normalizeOptionalMetadataText(req.body?.host, maxHostNameChars);
-    const requestedHostUserId = normalizeOptionalMetadataText(req.body?.hostUserId, maxUserIdChars);
-    const hostStatus = String(req.body?.hostStatus ?? "");
+    const requestedHost = normalizeMetadataText(req.body?.host, maxHostNameChars);
+    const requestedHostUserId = normalizeMetadataText(req.body?.hostUserId, maxUserIdChars);
+    const requestedHostDeviceId = normalizeMetadataText(req.body?.hostDeviceId, maxDeviceIdChars);
+    const requestedStatus = req.body?.hostStatus;
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
-    if (host === null || requestedHostUserId === null) {
-      res.status(400).json({ error: "Host name and user id must be bounded strings without control characters" });
-      return;
-    }
-
-    const requester = {
-      id: session?.user.id ?? requestedHostUserId,
-      name: session ? (normalizeMetadataText(displayNameForUser(session.user), maxHostNameChars) ?? "") : host
-    };
     const room = store.getRoom(roomId);
     if (!room) {
       res.status(404).json({ error: "Room not found" });
@@ -290,32 +288,33 @@ export function registerRoomRoutes({
       res.status(403).json({ error: "Join this room before changing host state." });
       return;
     }
-    if (!["active", "offline", "handoff"].includes(hostStatus)) {
-      res.status(400).json({ error: "hostStatus must be active, offline, or handoff" });
+    if (!requestedHost || !requestedHostUserId || (req.body?.hostDeviceId !== undefined && !requestedHostDeviceId)) {
+      res.status(400).json({ error: "Host identity metadata is invalid or exceeds its protocol limit." });
       return;
     }
-    if (!requester.name || !requester.id) {
-      res.status(400).json({ error: "Host name and user id are required" });
+    if (requestedStatus !== "active" && requestedStatus !== "handoff" && requestedStatus !== "offline") {
+      res.status(400).json({ error: "Host status is invalid." });
       return;
     }
-
-    if (hostStatus === "active" && room.hostStatus === "active" && !isRoomHost(room, requester)) {
-      res
-        .status(409)
-        .json({ error: `${room.host} is already the active host. Ask them to hand off or release the room first.` });
+    const isInitialBootstrap =
+      session &&
+      hasExactHostBootstrapBody(req.body) &&
+      room.hostStatus === "offline" &&
+      room.acceptedMlsEpoch === undefined &&
+      room.hostUserId === session.user.id &&
+      requestedHostUserId === session.user.id &&
+      requestedHost === room.host &&
+      requestedHostDeviceId &&
+      hasDeviceSession(store, req.get("x-device-session"), session.user.id, requestedHostDeviceId);
+    if (!isInitialBootstrap) {
+      res.status(409).json({ error: "Protocol v2 host authority changes require a signed MLS handoff Commit." });
       return;
     }
-
-    if (hostStatus !== "active" && !isRoomHost(room, requester)) {
-      res.status(403).json({ error: "Only the active host can hand off or release this room." });
-      return;
-    }
-
     const updated: RoomRecord = {
       ...room,
-      host: hostStatus === "offline" ? "No host" : hostStatus === "active" ? requester.name : room.host,
-      hostUserId: hostStatus === "offline" ? undefined : hostStatus === "active" ? requester.id : room.hostUserId,
-      hostStatus: hostStatus as RoomRecord["hostStatus"]
+      activeHostDeviceId: requestedHostDeviceId,
+      hostStatus: "active",
+      acceptedMlsEpoch: 0
     };
     store.setRoom(updated);
     scheduleStoreSave();
@@ -515,4 +514,11 @@ export function registerRoomRoutes({
     broadcastRoomUpdated(updated);
     res.json({ room: updated });
   });
+}
+
+function hasExactHostBootstrapBody(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  const expected = ["host", "hostUserId", "hostDeviceId", "hostStatus"];
+  return keys.length === expected.length && keys.every((key) => expected.includes(key));
 }

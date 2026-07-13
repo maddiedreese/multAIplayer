@@ -61,6 +61,7 @@ export function registerInviteRoutes({
     }
     if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
       store.deleteInvite(invite.id);
+      deleteInviteArtifacts(store, invite.id);
       scheduleStoreSave();
       res.status(410).json({ error: "Invite expired" });
       return;
@@ -92,9 +93,21 @@ export function registerInviteRoutes({
 
     let revoked = 0;
     for (const [inviteId, invite] of store.invites.entries()) {
-      if (invite.teamId === teamId && invite.roomId === roomId && store.deleteInvite(inviteId)) revoked += 1;
+      if (invite.teamId === teamId && invite.roomId === roomId && store.deleteInvite(inviteId)) {
+        deleteInviteArtifacts(store, inviteId);
+        revoked += 1;
+      }
     }
     if (revoked > 0) scheduleStoreSave();
     res.json({ revoked });
   });
+}
+
+function deleteInviteArtifacts(store: RelayStore, inviteId: string) {
+  for (const [requestId, request] of store.inviteRequests) {
+    if (request.inviteId === inviteId) store.inviteRequests.delete(requestId);
+  }
+  for (const [requestId, response] of store.inviteResponses) {
+    if (response.inviteId === inviteId) store.inviteResponses.delete(requestId);
+  }
 }

@@ -122,6 +122,11 @@ export interface CodexHostHandoffSlice {
   codexRuntimeByRoom: CodexRuntimeByRoom;
   appendHostHandoff: (roomId: string, handoff: HostHandoffRecord) => void;
   applyAcceptedHostHandoffForRoom: (roomId: string, handoff: HostHandoffRecord) => void;
+  markHostHandoffRequestedForRoom: (
+    roomId: string,
+    handoffId: string,
+    candidate: { candidateUserId: string; candidateDeviceId: string; candidateLeaf: number }
+  ) => void;
   markHostHandoffAcceptedForRoom: (roomId: string, handoffId: string) => void;
   markLatestHostHandoffAcceptedForRoom: (roomId: string) => void;
   setCodexContinuationForRoom: (roomId: string, handoff: HostHandoffRecord | null) => void;
@@ -179,6 +184,20 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
         codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => ({
           ...roomRuntime,
           hostHandoffs: nextHandoffs
+        }))
+      };
+    });
+  },
+  markHostHandoffRequestedForRoom: (roomId, handoffId, candidate) => {
+    set((state) => {
+      const roomHandoffs = state.codexRuntimeByRoom[roomId]?.hostHandoffs ?? [];
+      if (!roomHandoffs.some((handoff) => handoff.id === handoffId && handoff.status === "available")) return state;
+      return {
+        codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => ({
+          ...roomRuntime,
+          hostHandoffs: roomHandoffs.map((handoff) =>
+            handoff.id === handoffId ? { ...handoff, ...candidate, status: "requested" } : handoff
+          )
         }))
       };
     });

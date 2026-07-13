@@ -6,8 +6,7 @@ import {
   RoomRecord,
   isRecord,
   maxAttachmentBlobTypeChars,
-  maxCiphertextNonceChars,
-  maxEnvelopeNonceChars,
+  maxSessionCiphertextNonceChars,
   maxProjectPathChars,
   maxRoomNameChars,
   maxRoomProjectPathChars
@@ -15,7 +14,7 @@ import {
 
 test("semantic protocol limits share their canonical values", () => {
   assert.equal(maxRoomProjectPathChars, maxProjectPathChars);
-  assert.equal(maxEnvelopeNonceChars, maxCiphertextNonceChars);
+  assert.equal(maxSessionCiphertextNonceChars, 4_096);
 });
 
 test("isRecord identifies non-null objects", () => {
@@ -40,8 +39,8 @@ test("room, attachment, and device schemas enforce their exported semantic limit
   assert.equal(AttachmentBlobRecord.shape.type.safeParse("t".repeat(maxAttachmentBlobTypeChars)).success, true);
   assert.equal(AttachmentBlobRecord.shape.type.safeParse("t".repeat(maxAttachmentBlobTypeChars + 1)).success, false);
   assert.equal(
-    DeviceRecord.shape.publicKeyFingerprint.safeParse("sha256:" + "ffff:".repeat(15) + "ffff").success,
+    DeviceRecord.shape.signatureKeyFingerprint.safeParse("sha256:" + "ffff:".repeat(15) + "ffff").success,
     true
   );
-  assert.equal(DeviceRecord.shape.publicKeyFingerprint.safeParse("ffff:ffff").success, false);
+  assert.equal(DeviceRecord.shape.signatureKeyFingerprint.safeParse("ffff:ffff").success, false);
 });

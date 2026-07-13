@@ -3,12 +3,11 @@ import { canCreateRoomInvite } from "../invitePolicy";
 import { shouldApplyRoomScopedUiUpdate } from "../roomScopedUi";
 import { roomLockMessage } from "../appRuntime";
 import { useAppStore, type AppStoreState } from "../../store/appStore";
-import { encodeNoSecretRoomInvite, jsonWebKeyToDevicePublicKeyJwk } from "../noSecretRoomInvite";
+import { encodeNoSecretRoomInvite } from "../noSecretRoomInvite";
 import type { UseInviteActionsOptions } from "./inviteActionTypes";
 import { currentLocalIdentity, currentSelectedRoom } from "../selectedWorkspace";
-import { loadOrCreateCurrentRoomKey } from "../localHistory";
-import { createInviteCapability } from "@multaiplayer/crypto";
-import { rememberIssuedInviteCapability } from "../inviteCapabilityStore";
+import { issueMlsInviteCapability } from "../mlsClient";
+import { rememberIssuedMlsInvite } from "./inviteCapabilityMemory";
 
 type InviteLinkActionOptions = Pick<UseInviteActionsOptions, "selectedRoomIdRef">;
 
@@ -56,20 +55,20 @@ export function createInviteLinkActions(
         }
         return;
       }
-      const { epoch: keyEpoch } = await loadOrCreateCurrentRoomKey(roomId);
+      const capability = await issueMlsInviteCapability();
       const capabilityInvite = {
-        version: 3 as const,
+        version: 4 as const,
         teamId: selectedRoom.teamId,
         roomId,
         roomName: selectedRoom.name,
-        inviteCapability: createInviteCapability(),
-        keyEpoch,
+        ...capability,
+        expiresAt: invite.expiresAt ?? new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString(),
         hostUserId: localUser.id,
         hostDeviceId: deviceId,
-        hostPublicKeyJwk: jsonWebKeyToDevicePublicKeyJwk(deviceIdentity.publicKeyJwk),
-        hostPublicKeyFingerprint: deviceIdentity.publicKeyFingerprint
+        hostHpkePublicKey: deviceIdentity.hpkePublicKey!,
+        hostHpkeKeyFingerprint: deviceIdentity.hpkeKeyFingerprint
       };
-      await rememberIssuedInviteCapability(invite.id, capabilityInvite);
+      rememberIssuedMlsInvite(invite.id, capability);
       const fragment = encodeNoSecretRoomInvite(capabilityInvite);
       const link = `${inviteUrl}#multaiplayerJoin=${fragment}&approval=request`;
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {

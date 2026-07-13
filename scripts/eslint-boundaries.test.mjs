@@ -11,34 +11,19 @@ async function boundaryMessages(filePath, source) {
 }
 
 test("workspace packages may import only their declared internal dependencies", async () => {
-  assert.deepEqual(
-    await boundaryMessages("packages/crypto/src/boundary-probe.ts", 'import "@multaiplayer/protocol";'),
-    []
-  );
-
-  const cryptoToGitHub = await boundaryMessages(
-    "packages/crypto/src/boundary-probe.ts",
+  const protocolToGitHub = await boundaryMessages(
+    "packages/protocol/src/boundary-probe.ts",
     'import "@multaiplayer/github";'
   );
-  assert.equal(cryptoToGitHub.length, 1);
-  assert.match(cryptoToGitHub[0].message, /does not depend on @multaiplayer\/github/);
-
-  const leafToCrypto = await boundaryMessages(
-    "packages/protocol/src/boundary-probe.ts",
-    'import "@multaiplayer/crypto";'
-  );
-  assert.equal(leafToCrypto.length, 1);
-  assert.match(leafToCrypto[0].message, /@multaiplayer\/protocol does not depend on @multaiplayer\/crypto/);
+  assert.equal(protocolToGitHub.length, 1);
+  assert.match(protocolToGitHub[0].message, /@multaiplayer\/protocol does not depend on @multaiplayer\/github/);
 });
 
 test("applications keep their distinct dependency boundaries", async () => {
   assert.deepEqual(await boundaryMessages("apps/relay/src/boundary-probe.ts", 'import "@multaiplayer/github";'), []);
 
-  const relayToCrypto = await boundaryMessages("apps/relay/src/boundary-probe.ts", 'import "@multaiplayer/crypto";');
-  assert.equal(relayToCrypto.length, 1);
-  assert.match(relayToCrypto[0].message, /@multaiplayer\/relay does not depend on @multaiplayer\/crypto/);
   assert.deepEqual(
-    await boundaryMessages("apps/relay/test/process-security-journey.test.ts", 'import "@multaiplayer/crypto";'),
+    await boundaryMessages("apps/relay/test/process-security-journey.test.ts", 'import "@multaiplayer/protocol";'),
     []
   );
 
@@ -56,7 +41,7 @@ test("workspace consumers cannot bypass public package entry points", async () =
   assert.match(deepImport[0].message, /public entry point/);
 
   const relativeImport = await boundaryMessages(
-    "packages/crypto/src/boundary-probe.ts",
+    "packages/github/src/boundary-probe.ts",
     'import "../../protocol/src/relay-messages.js";'
   );
   assert.equal(relativeImport.length, 1);

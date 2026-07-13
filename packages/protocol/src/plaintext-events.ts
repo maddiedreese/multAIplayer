@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { AuthenticatedWrappedRoomSecretPayload, DevicePublicKeyJwk, PublicKeyFingerprint } from "./crypto-payloads.js";
 import { codexReasoningEffortIds } from "./defaults-options.js";
 import {
   DeviceId,
@@ -127,88 +126,6 @@ export const RequestStatusPlaintextPayload = z.object({
   decidedByUserId: z.string().min(1).max(maxUserIdChars),
   decidedAt: z.string().datetime()
 });
-
-export const InviteJoinRequestPlaintextPayload = z.object({
-  eventType: z.literal("invite.request"),
-  id: z.string().min(1).max(maxEnvelopeIdChars),
-  inviteId: z.string().min(1).max(maxEnvelopeIdChars).optional(),
-  requester: z.string().min(1).max(maxDisplayNameChars),
-  requesterUserId: z.string().min(1).max(maxUserIdChars),
-  requesterDeviceId: DeviceId,
-  requesterPublicKeyJwk: DevicePublicKeyJwk,
-  requesterPublicKeyFingerprint: PublicKeyFingerprint,
-  hostUserId: UserId,
-  hostDeviceId: DeviceId,
-  hostPublicKeyFingerprint: PublicKeyFingerprint,
-  keyEpoch: z.number().int().positive(),
-  requestNonce: z.string().regex(/^[A-Za-z0-9_-]{22,128}$/),
-  capability: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-  capabilityMac: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-  requestedAt: z.string().datetime(),
-  note: z.string().max(maxMediumTextChars).optional()
-});
-
-export const InviteJoinStatusPlaintextPayload = z.object({
-  eventType: z.literal("invite.status"),
-  requestId: z.string().min(1).max(maxEnvelopeIdChars),
-  status: z.enum(["approved", "denied"]),
-  decidedBy: z.string().min(1).max(maxDisplayNameChars),
-  decidedByUserId: z.string().min(1).max(maxUserIdChars),
-  decidedAt: z.string().datetime(),
-  recipientUserId: UserId,
-  recipientDeviceId: DeviceId,
-  recipientPublicKeyFingerprint: PublicKeyFingerprint,
-  hostDeviceId: DeviceId,
-  hostPublicKeyFingerprint: PublicKeyFingerprint,
-  requestNonce: z.string().regex(/^[A-Za-z0-9_-]{22,128}$/),
-  keyEpoch: z.number().int().positive(),
-  capabilityMac: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-  wrappedRoomSecret: AuthenticatedWrappedRoomSecretPayload.optional()
-});
-
-export const RoomKeyRotationPlaintextPayload = z
-  .object({
-    eventType: z.literal("room.key.rotated"),
-    id: z.string().min(1).max(maxEnvelopeIdChars),
-    rotatedBy: z.string().min(1).max(maxDisplayNameChars),
-    rotatedByUserId: z.string().min(1).max(maxUserIdChars),
-    rotatedAt: z.string().datetime(),
-    previousEpoch: z.number().int().positive(),
-    newEpoch: z.number().int().positive(),
-    recipients: z
-      .array(
-        z.object({
-          userId: UserId,
-          deviceId: DeviceId,
-          publicKeyFingerprint: PublicKeyFingerprint,
-          wrappedRoomSecret: AuthenticatedWrappedRoomSecretPayload
-        })
-      )
-      .min(1)
-      .max(1024),
-    note: z.string().max(maxMediumTextChars).optional()
-  })
-  .superRefine((value, context) => {
-    if (value.newEpoch !== value.previousEpoch + 1) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["newEpoch"],
-        message: "newEpoch must immediately follow previousEpoch"
-      });
-    }
-    const devices = new Set<string>();
-    value.recipients.forEach((recipient, index) => {
-      const identity = `${recipient.userId}\u0000${recipient.deviceId}`;
-      if (devices.has(identity)) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["recipients", index, "deviceId"],
-          message: "Each device may appear only once"
-        });
-      }
-      devices.add(identity);
-    });
-  });
 
 export const CodexTurnRiskFlagPayload = z.object({
   id: z.string().min(1).max(maxEnvelopeIdChars),
@@ -425,10 +342,30 @@ export const HostHandoffPlaintextPayload = z.object({
   terminals: z.array(z.string().min(1).max(maxShortTextChars)).max(maxTerminalSnapshots),
   continuationSummary: z.string().max(maxMediumTextChars).optional(),
   createdAt: z.string().datetime(),
-  status: z.enum(["available", "accepted"]).optional(),
+  status: z.enum(["available", "requested", "accepted"]).optional(),
+  candidateUserId: UserId.optional(),
+  candidateDeviceId: DeviceId.optional(),
+  candidateLeaf: z.number().int().nonnegative().optional(),
   acceptedBy: z.string().min(1).max(maxDisplayNameChars).optional(),
   acceptedByUserId: z.string().min(1).max(maxUserIdChars).optional(),
   acceptedAt: z.string().datetime().optional()
+});
+
+export const HostHandoffRequestPlaintextPayload = z.object({
+  phase: z.literal("candidate_request"),
+  offerId: z.string().min(1).max(maxEnvelopeIdChars),
+  candidateUserId: UserId,
+  candidateDeviceId: DeviceId,
+  candidateLeaf: z.number().int().nonnegative()
+});
+
+export const HostHandoffAcceptedPlaintextPayload = z.object({
+  phase: z.literal("accepted"),
+  offerId: z.string().min(1).max(maxEnvelopeIdChars),
+  hostUserId: UserId,
+  hostDeviceId: DeviceId,
+  hostLeaf: z.number().int().nonnegative(),
+  committedEpoch: z.number().int().nonnegative()
 });
 
 export const RoomSettingsPlaintextPayload = z.object({
@@ -464,9 +401,6 @@ export type TerminalRequestPlaintextPayload = z.infer<typeof TerminalRequestPlai
 export type BrowserRequestPlaintextPayload = z.infer<typeof BrowserRequestPlaintextPayload>;
 export type WorkspaceFileSaveRequestPlaintextPayload = z.infer<typeof WorkspaceFileSaveRequestPlaintextPayload>;
 export type RequestStatusPlaintextPayload = z.infer<typeof RequestStatusPlaintextPayload>;
-export type InviteJoinRequestPlaintextPayload = z.infer<typeof InviteJoinRequestPlaintextPayload>;
-export type InviteJoinStatusPlaintextPayload = z.infer<typeof InviteJoinStatusPlaintextPayload>;
-export type RoomKeyRotationPlaintextPayload = z.infer<typeof RoomKeyRotationPlaintextPayload>;
 export type CodexTurnRiskFlagPayload = z.infer<typeof CodexTurnRiskFlagPayload>;
 export type CodexEventPlaintextPayload = z.infer<typeof CodexEventPlaintextPayload>;
 export type CodexActivityPlaintextPayload = z.infer<typeof CodexActivityPlaintextPayload>;
@@ -476,4 +410,6 @@ export type TerminalResultPlaintextPayload = z.infer<typeof TerminalResultPlaint
 export type GitWorkflowEventPlaintextPayload = z.infer<typeof GitWorkflowEventPlaintextPayload>;
 export type GitHubActionsEventPlaintextPayload = z.infer<typeof GitHubActionsEventPlaintextPayload>;
 export type HostHandoffPlaintextPayload = z.infer<typeof HostHandoffPlaintextPayload>;
+export type HostHandoffRequestPlaintextPayload = z.infer<typeof HostHandoffRequestPlaintextPayload>;
+export type HostHandoffAcceptedPlaintextPayload = z.infer<typeof HostHandoffAcceptedPlaintextPayload>;
 export type RoomSettingsPlaintextPayload = z.infer<typeof RoomSettingsPlaintextPayload>;

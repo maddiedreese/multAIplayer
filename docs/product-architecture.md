@@ -41,7 +41,7 @@ Teams can contain many project rooms. Membership is invite-based, with capabilit
 
 Owners can promote members, demote admins, remove non-owner members, and transfer ownership to another team member. Ownership transfer is explicit and leaves a single owner; the previous owner becomes an admin.
 
-Removing a member immediately closes that user's live relay sockets, blocks future reads, invalidates outstanding invites, and advances affected rooms to a fresh key epoch that excludes the removed devices. Re-entry requires a fresh capability-authenticated invite. Previously delivered content cannot be erased.
+Removing a member immediately closes that user's live relay sockets, blocks future reads, invalidates outstanding invites, and has the active host issue an MLS Remove Commit. Re-entry requires a fresh capability-authenticated KeyPackage invite. Previously delivered content cannot be erased.
 
 Team-level settings include:
 
@@ -59,7 +59,7 @@ A room is a chat space associated with one active project at a time.
 
 Rooms are spawned from teams and usually correspond to a project/local folder. A room has many human members and at most one active Codex host at a time.
 
-Rooms and teams support relay-backed archive, restore, and soft-delete lifecycle actions. Archived rooms move out of the normal sidebar into an archived view and can be restored, but clients treat them as locked for chat, file, terminal, browser, Git, and Codex actions. Deleting a room or team removes it from workspace listings and prevents future normal use. Delete is not retroactive erasure: devices may already hold room keys, local history, copied exports, screenshots, or project data.
+Rooms and teams support relay-backed archive, restore, and soft-delete lifecycle actions. Archived rooms move out of the normal sidebar into an archived view and can be restored, but clients treat them as locked for chat, file, terminal, browser, Git, and Codex actions. Deleting a room or team removes it from workspace listings and prevents future normal use. Delete is not retroactive erasure: devices may already hold MLS/history state, copied exports, screenshots, or project data.
 
 Room-level settings include:
 
@@ -109,13 +109,13 @@ Users chat normally in a room. Messages, replies, reactions, edits, deletes, att
 
 People can edit or delete their own pre-Codex messages while those messages are still mutable. When a Codex turn starts, the desktop records the consumed room message ids in the encrypted turn event; those messages stop showing edit/delete actions because they may already be part of Codex context. Queued Codex turns that have not started yet continue to refresh against the current room text.
 
-Invite approval requests are capability-authenticated, device-sealed room events. An invite carries no room key; it binds an independently CSPRNG-generated 256-bit bearer capability and current epoch to the active host's exact identity, device key, and full fingerprint. The capability is unrelated to room secrets. The raw value exists transiently in the generated URL fragment, endpoint UI/clipboard or private sharing channel, and requester process memory; it crosses the relay only inside host-key-sealed ciphertext and is persisted by the issuer only as a verifier. The host verifies the authenticated requester identity, recomputed key fingerprint, capability MAC, epoch, and pinned key before approval. The response is bound to the same nonce and identities and delivers the epoch key through an authenticated host-to-device wrap.
+Invite approval requests are capability-authenticated RFC 9180 HPKE payloads directed to the pinned host. An invite carries no group secret; it binds an independently generated 256-bit bearer capability and current epoch to the active host's exact identity, HPKE key, and signature-key fingerprint. The raw value exists transiently in the URL fragment and requester process memory, crosses the relay only inside HPKE ciphertext, and is persisted by the issuer only as a verifier. The request binds the exact single-use KeyPackage id/hash. After approval, the host publishes an MLS Add Commit and a one-shot Welcome usable only by that KeyPackage.
 
-Active hosts rotate room keys by advancing an explicit epoch, generating independent CSPRNG key material, and authenticating a separate delivery to every eligible registered device. New epoch keys are not derived from previous keys or host identity keys. Persisted pending rotations make publish retries idempotent. Canonical version 3 authenticated wraps are mandatory. Member removal revokes relay access, invalidates outstanding invites, and excludes removed devices from the next epoch; already-delivered content and older epoch keys cannot be erased. The protocol is intentionally not MLS; [the cryptography architecture](cryptography.md) defines that decision and its limits.
+The Rust MLS state machine advances epochs through transactionally persisted Commits. Clients and relay accept Commits only from the active host, and the relay serializes one Commit per expected epoch. Member removal revokes relay access, invalidates outstanding invites, and excludes the removed leaf through MLS Remove; already-delivered content and retained history secrets cannot be erased. [The cryptography architecture](cryptography.md) defines the remaining policy and retention limits.
 
-If a room is forgotten on the device or relay membership is revoked, the desktop treats it as locally locked. While locked, the app blocks chat sends and reactions, host claiming, host handoff acceptance, invite generation, invite approval decisions, terminal request decisions, room-key rotation, project inspection, and host-controlled room settings such as model, approval policy, project folder, and browser policy until the room is unlocked with a fresh invite or key.
+If a room is forgotten on the device, relay membership is revoked, or native MLS state is corrupt, the desktop treats it as locally locked. While locked, the app blocks room and host actions until a clean KeyPackage/Welcome rejoin. Rejoining restores future participation but not pre-rejoin history secrets.
 
-Small text/code attachment previews can be embedded directly in encrypted chat payloads: up to 5 files per message, 80 KB per file, and 200 KB total preview content per message. Larger previews are encrypted locally, uploaded to relay blob storage as ciphertext, referenced from the encrypted chat message by blob id, and decrypted locally into the file preview pane when a room member opens them. Serialized encrypted room envelopes are also bounded by the relay before WebSocket fanout and backlog storage, so large file previews must use encrypted blob storage rather than oversized room events.
+Small text/code attachment previews can be embedded directly in MLS application payloads: up to 5 files per message, 80 KB per file, and 200 KB total preview content per message. Larger previews are exporter-sealed in Rust, uploaded as opaque blobs, and referenced from the MLS message by blob id. MLS messages are bounded before WebSocket fanout and backlog storage, so large previews use blob storage.
 
 Codex approval distinguishes inline attachment content from encrypted blob references. Inline text previews are included in the Codex turn package after host approval. Encrypted blob attachments are listed by name and blob reference only in the alpha Codex turn package, so approving a turn does not silently decrypt and inject large files into Codex context.
 
@@ -186,7 +186,7 @@ Rooms have persistent named terminal sessions per project room, such as:
 
 The terminal surface uses xterm.js as the emulator and a Rust PTY layer through `portable-pty` in the Tauri host. Before Rust starts either a one-shot command or an interactive PTY, the native app displays the exact command, room, and canonical working directory in an operating-system dialog. For a one-shot room request, the host can run once or choose “Repeat this command text for 10 minutes.” This in-memory grant binds those exact command bytes to that exact room and canonical workspace. The dialog warns that workspace files, scripts, hooks, configuration, and environment may change between runs. Rust performs matching and expiry; grants do not survive app restart and the terminal panel provides native-confirmed room revocation. They are never executable-name or command-family patterns. Every PTY input write still has its own native confirmation bound to the exact room, terminal session, and input bytes, with control characters escaped for review. Each confirmation issues a short-lived, one-use authorization that Rust atomically consumes before spawning or writing. The webview cannot authorize shell execution or inject input into an approved session by itself. New terminal creation, live terminal listing, terminal selection, restart, stop, and interactive input are active-host local workspace actions. The alpha does not present a separate command-composer UI beside xterm; users type directly into the terminal surface.
 
-Terminal request envelopes from existing room protocol flows are still encrypted room events. The relay can route the request but cannot read the command. If such a request is received, the active host sees the requester and command before approving or denying it locally. Approved terminal requests always execute from the active room's selected project folder on the host machine; the host app does not trust a requester-provided working directory. Approval grants shell access on the host account, not a project sandbox.
+Terminal requests are MLS application events. The relay routes the opaque message but cannot read the command or event kind. The active host sees the requester and command before approving or denying it locally. Approved terminal requests always execute from the active room's selected project folder on the host machine; the host app does not trust a requester-provided working directory. Approval grants shell access on the host account, not a project sandbox.
 
 The macOS alpha bounds approved one-shot terminal commands and interactive terminal input to 4,000 characters each, caps one-shot command output at 120,000 characters with an explicit truncation marker, and keeps the latest 1,000 output chunks per terminal session in memory. Terminal snapshots are saved in encrypted local room history as stopped/restartable sessions, so a room can remember its named terminal roster and recent output after reload without claiming the underlying OS process survived. The desktop room activity feed for terminal, Codex, Git, and Actions events is also scoped per room and capped to the latest 1,000 lines per room.
 
@@ -196,7 +196,7 @@ Browser mode is room-scoped. The active host can open a normal in-app browser co
 
 Browser access requests require an unlocked room. Browser approvals, denials, isolated browser opens, and browser profile resets require the current device to be the active host for that unlocked room.
 
-The relay can see that a `browser.request` or `browser.event` envelope exists, but not the requested URL, reason, or decision details. Browser approval and denial decisions render as local system transcript messages after decryption, so room members can see the host-side browser audit trail without exposing it to the relay. Approved URLs can be opened as tabs in a room/project-scoped Tauri/Wry WebView surface on the host machine. Browser profile persistence is a host-controlled room setting: profiles persist by default, hosts can reset them manually, and refresh mode closes and clears the room/project browser profile before each approved open. The alpha keeps this as an explicit host action; deeper browser automation can be added behind the same approval boundary.
+Browser requests and decisions are MLS application events. The relay sees only an opaque MLS message, not the event kind, requested URL, reason, or decision details. Browser approval and denial decisions render as local system transcript messages after decryption, so room members can see the host-side browser audit trail without exposing it to the relay. Approved URLs can be opened as tabs in a room/project-scoped Tauri/Wry WebView surface on the host machine. Browser profile persistence is a host-controlled room setting: profiles persist by default, hosts can reset them manually, and refresh mode closes and clears the room/project browser profile before each approved open. The alpha keeps this as an explicit host action; deeper browser automation can be added behind the same approval boundary.
 
 Codex Browser Use is not offered in multAIplayer because the Codex app-server API surface this app uses does not support it.
 
@@ -216,7 +216,7 @@ Git operations in v1:
 - local Git branch names are capped at 200 characters, and commit messages are normalized to single-space text capped at 500 characters before approval previews or native git execution;
 - local Git workflow stdout/stderr is capped at 120,000 characters per command with an explicit truncation marker;
 - every commit, push, and PR action requires explicit host approval;
-- Git workflow progress, results, and GitHub Actions refreshes are shared to the room as encrypted `git.event` envelopes, so peers can see branch, commit, push, PR, and CI outcomes without the relay seeing plaintext output.
+- Git workflow progress, results, and GitHub Actions refreshes are shared as MLS application events, so peers can see branch, commit, push, PR, and CI outcomes without the relay seeing plaintext output or event kind.
 
 GitHub Actions are a room-visible branch status surface. After GitHub sign-in, workflow runs can be refreshed for the selected owner, repo, and branch while the room is unlocked. The desktop validates the owner, repo, and branch target before calling the relay-side GitHub proxy or publishing a room-visible Actions event. The loaded runs, last-checked timestamp, and status message are scoped to the current room so switching projects does not show another room's CI state. The UI summarizes whether the loaded runs are passing, failing, running, or unknown, and links directly to each run on GitHub.
 
@@ -248,9 +248,9 @@ The relay may store:
 
 - GitHub user id, username, avatar URL;
 - AES-GCM encrypted GitHub session access tokens when relay session persistence is configured;
-- device ECDH public keys and fingerprints;
-- encrypted room metadata;
-- encrypted message blobs until delivered;
+- device MLS signature and HPKE public keys and fingerprints;
+- public single-use KeyPackages and invite metadata;
+- opaque MLS messages, sealed requests, and Welcome blobs until pruned;
 - presence and routing metadata;
 - invite state;
 - abuse-prevention metadata.
@@ -272,35 +272,28 @@ E2EE is required from day one.
 
 This means cryptography, not cryptocurrency. No blockchain, tokens, wallets, or coins are involved.
 
-Likely primitives/libraries:
-
-- libsodium or a compatible audited crypto library;
-- device ECDH identity keypairs;
-- symmetric room keys;
-- room-secret wrapping for member/device room-key distribution;
-- authenticated encryption for messages and attachments.
+The native implementation uses RFC 9420 MLS through `mls-rs`, the pinned P-256/AES-128-GCM/SHA-256 suite, and RFC 9180 HPKE for pairwise invite requests.
 
 E2EE model:
 
-- each desktop install creates a device ECDH identity key;
-- the relay stores only the device public key and fingerprint for future mediated key exchange;
-- each room has a symmetric room key;
-- messages and attachments are encrypted locally before upload;
-- the crypto package seals invite workflow payloads and authenticates room-key delivery from the pinned host key to each registered device without exposing the room key to the relay;
-- invite links carry an independent private 256-bit bearer capability, epoch, and exact host public binding, never a room secret; raw capabilities remain outside relay-visible metadata;
-- active hosts rotate room keys by advancing the epoch and delivering the next key independently to eligible devices;
-- MAC and AES-GCM additional-data records use explicit domain/version separation and deterministic canonical field encoding; normalized P-256 keys are compared structurally;
-- AES-GCM additional data authenticates envelope id, team, room, sender, timestamp, event kind, and key epoch;
-- room keys and the device ECDH identity are stored in macOS Keychain in the native app; the web preview keeps room keys in process memory and uses localStorage only for its development device identity;
+- each desktop install creates MLS signature and HPKE identity keys in Rust;
+- the relay stores only public identity records and public single-use KeyPackages;
+- messages use MLS PrivateMessage sender authentication, epoch binding, and confidentiality;
+- large attachments are exporter-sealed locally before upload;
+- invite links carry an independent private bearer capability and exact host public binding, never an MLS group secret;
+- the active host produces transactionally persisted Add, Remove, Update, and handoff Commits; clients and relay reject other committers;
+- authenticated application metadata uses canonical serialization in MLS `authenticated_data`;
+- MLS state and exporter-derived history secrets stay in encrypted native SQLite with Keychain-held wrapping material;
+- the web preview is a seeded local demonstration and cannot participate in E2EE rooms;
 - encrypted local history is stored on device;
 - losing a device/key may make old local history unrecoverable until recovery is designed.
 
-Member removal immediately revokes live sockets, future room joins, encrypted backlog reads, and encrypted blob reads. A remaining owner or active host creates a new room key epoch and authenticates that key independently to each remaining registered device public key. Removed devices do not receive it and cannot decrypt future room events through normal relay delivery. Content already received remains outside retroactive control.
+Member removal immediately revokes live sockets, future room joins, backlog reads, and blob reads. The active host then issues an MLS Remove Commit; the removed leaf has no later epoch secret. Content already received remains outside retroactive control.
 
 Hard parts to design carefully:
 
 - member removal;
-- key rotation;
+- MLS state continuity and Commit ordering;
 - multi-device support;
 - identity verification;
 - history recovery;
@@ -319,9 +312,9 @@ Defaults:
 - sidebar chat search includes decrypted-on-device local history for rooms whose keys are still available, without creating a relay-readable search index;
 - archived teams and rooms stay restorable; deleted teams and rooms are removed from workspace listings without claiming to erase content already received by devices;
 - attachment cache encrypted;
-- room keys in macOS Keychain in the native app;
+- exporter-derived per-epoch history secrets in encrypted native storage;
 - user can clear local room history, including local room messages, workflow records, canonical Codex activity, and the saved Codex thread graph;
-- user can forget a room on one device, deleting local history, room history settings, the saved Codex thread graph/active selection, the local room key, and the local visibility-warning acknowledgement; the room becomes locally locked until a fresh invite or room key is imported;
+- user can forget a room on one device, deleting local history, MLS state, saved Codex continuity, retained history secrets, and local warning acknowledgement; the room remains locked until a clean KeyPackage/Welcome rejoin, which does not recover old history;
 - user can disable local history for sensitive rooms.
 
 ### Secrets Visibility
@@ -545,13 +538,13 @@ docs/
 
 ## 10. Alpha Scope And Limits
 
-- E2EE uses epoch-scoped symmetric room keys, versioned deterministic authenticated metadata, AES-GCM local history, P-256 device agreement with structural key equality, confidential independently random capability invites, and authenticated per-device room-secret delivery.
+- E2EE uses RFC 9420 MLS through the native Rust core, one pinned ciphersuite, canonical authenticated application metadata, exporter-derived encrypted history, and RFC 9180 HPKE capability requests.
 - Desktop coding surfaces use Monaco Editor for file editing, xterm.js with a Rust PTY layer for terminals, and Tauri/Wry WebViews for room browser tabs.
-- Invite links carry a random capability and exact host public binding, never the room key; authenticated approval delivers the current epoch key only to the validated requester device.
+- Invite links carry a random capability and exact host public binding, never a group secret; approval consumes the requester's exact KeyPackage and returns an MLS Welcome.
 - Member removal is relay-enforced for future reads and live sockets and cryptographically enforced for future room epochs through authenticated per-device delivery.
 - Multi-device support is device-oriented: each device has its own registered and pinned key identity. Recovery and synchronized multi-device identity remain outside the alpha scope.
 - Official relay federation is not part of the alpha scope.
-- Relay SQLite storage is alpha-scale. Encrypted room envelopes append and prune incrementally, but normalized non-envelope state is saved by clearing and reinserting the full set of teams, rooms, invites, devices, members, and sessions on each debounced flush. Larger hosted relays should move those tables to incremental writes or a shared production store before whole-store rewrites become an operational limit.
+- Relay SQLite storage is alpha-scale. Opaque MLS messages append and prune incrementally, but normalized non-message state is saved by clearing and reinserting teams, rooms, invites, devices, members, and sessions on each debounced flush. Larger hosted relays should move those tables to incremental writes or a shared production store before whole-store rewrites become an operational limit.
 - GitHub OAuth is the public alpha GitHub integration. GitHub App support is a future option for tighter repo-level permissions and enterprise setups.
 - The desktop discovers and runs the local `codex app-server`; multAIplayer does not proxy Codex credentials through the hosted relay.
 - Secret detection is a review aid for files, terminal output, received terminal command requests, browser pages, and copied Markdown. The alpha warns and gates risky sharing without claiming automatic redaction.

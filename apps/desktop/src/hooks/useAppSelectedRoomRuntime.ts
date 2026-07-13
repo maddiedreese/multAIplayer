@@ -70,7 +70,7 @@ export function useAppSelectedRoomRuntime({
     codexRunningByRoom: activeMap(roomId, codexRuntime?.running),
     hostBusyByRoom: activeMap(roomId, roomSettings?.hostBusy),
     settingsBusyByRoom: activeMap(roomId, roomSettings?.settingsBusy),
-    keyRotationBusyByRoom: activeMap(roomId, invite?.keyRotationBusy)
+    membershipCommitBusyByRoom: activeMap(roomId, invite?.membershipCommitBusy)
   });
 }
 

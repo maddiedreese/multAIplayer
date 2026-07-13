@@ -73,10 +73,7 @@ export interface RoomInspectorCapabilities {
   teamRoster: Pick<WorkProps["teamRoster"], "onPromote" | "onDemote" | "onTransferOwnership" | "onRemove">;
   roomMembers: Pick<WorkProps["roomMembers"], "onCopyFingerprint" | "onTrust" | "onUntrust">;
   hostHandoff: { accept: WorkProps["hostHandoff"]["onAcceptHandoff"] };
-  invite: Pick<
-    WorkProps["encryptedInvite"],
-    "onCopyInvite" | "onImportInvite" | "onRotateRoomKey" | "onDecideInviteRequest"
-  >;
+  invite: Pick<WorkProps["encryptedInvite"], "onCopyInvite" | "onImportInvite" | "onDecideInviteRequest">;
   settings: {
     selectApprovalPolicy: WorkProps["approvalPolicy"]["onSelectPolicy"];
     selectApprovalDelegationPolicy: WorkProps["approvalPolicy"]["onSelectDelegationPolicy"];
@@ -144,10 +141,7 @@ export interface RoomInspectorSources {
     | "copyPullRequestDraftMarkdown"
   >;
   hostHandoff: Pick<HostHandoffActions, "acceptHostHandoff">;
-  inviteActions: Pick<
-    InviteActions,
-    "copyInviteLink" | "joinInviteSecret" | "rotateSelectedRoomKey" | "decideInviteJoinRequest"
-  >;
+  inviteActions: Pick<InviteActions, "copyInviteLink" | "joinInviteSecret" | "decideInviteJoinRequest">;
   roomPanels: Pick<RoomPanels, "workspaceFilesPanelActions" | "terminalPanelActions">;
 }
 
@@ -324,10 +318,7 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
       inviteRequests: invite.requests ?? [],
       localDeviceId: deviceId,
       importDisabled: !inviteSecretInput.trim(),
-      rotateDisabled:
-        !hasSelectedRoom || access.isSelectedRoomLocked || !access.isActiveHost || Boolean(invite.keyRotationBusy),
       approvalDisabled: !hasSelectedRoom || access.isSelectedRoomLocked || !access.isActiveHost,
-      keyRotationBusy: Boolean(invite.keyRotationBusy),
       inviteLink: invite.link ?? "",
       inviteMessage: invite.message ?? null,
       ...capabilities.invite,

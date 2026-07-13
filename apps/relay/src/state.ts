@@ -3,7 +3,10 @@ import type {
   AttachmentBlobRecord,
   DeviceRecord,
   InviteRecord,
-  RelayEnvelope,
+  InviteJoinRequestRecord,
+  InviteResponseRecord,
+  KeyPackageRecord,
+  MlsRelayMessage,
   RoomRecord,
   TeamMemberRecord,
   TeamRecord
@@ -30,6 +33,7 @@ export interface ClientSession {
   roomId?: string;
   userId?: string;
   deviceId?: string;
+  deviceSessionToken?: string;
   subscribedTeamIds: Set<string>;
   workspaceSubscribed: boolean;
   displayName?: string;
@@ -50,6 +54,33 @@ export interface RateLimitRecord {
   count: number;
   resetAt: number;
 }
+export interface DeviceSessionRecord {
+  token: string;
+  userId: string;
+  deviceId: string;
+  expiresAt: number;
+}
+export interface AcceptedMessageReceipt {
+  roomKey: RoomKey;
+  messageId: string;
+  messageType: "application" | "commit";
+  senderUserId: string;
+  senderDeviceId: string;
+  parentEpoch: number;
+  digest: string;
+  acceptedAt: string;
+}
+export interface InviteAckReceipt {
+  inviteId: string;
+  requestId: string;
+  teamId: string;
+  requesterUserId: string;
+  requesterDeviceId: string;
+  keyPackageHash: string;
+  status: "approved" | "denied";
+  acknowledgedAt: string;
+  expiresAt: string;
+}
 
 export interface RelayStore {
   sessions: Map<WebSocket, ClientSession>;
@@ -57,15 +88,21 @@ export interface RelayStore {
   teamSockets: Map<string, Set<WebSocket>>;
   workspaceSockets: Set<WebSocket>;
   roomPresence: Map<RoomKey, Map<string, PresenceRecord>>;
-  encryptedBacklog: Map<RoomKey, RelayEnvelope[]>;
+  mlsBacklog: Map<RoomKey, MlsRelayMessage[]>;
   authSessions: Map<string, AuthSession>;
   teams: Map<string, TeamRecord>;
   rooms: Map<string, RoomRecord>;
   invites: Map<string, InviteRecord>;
+  inviteRequests: Map<string, InviteJoinRequestRecord>;
+  inviteResponses: Map<string, InviteResponseRecord>;
+  inviteAckReceipts: Map<string, InviteAckReceipt>;
+  acceptedMessageReceipts: Map<string, AcceptedMessageReceipt>;
   devices: Map<string, DeviceRecord>;
+  keyPackages: Map<string, KeyPackageRecord>;
   attachmentBlobs: Map<string, AttachmentBlobRecord>;
   teamMembers: Map<string, Map<string, TeamMemberRecord>>;
   rateLimitStore: Map<string, RateLimitRecord>;
+  deviceSessions: Map<string, DeviceSessionRecord>;
   allTeams(): TeamRecord[];
   getTeam(teamId: string): TeamRecord | undefined;
   hasTeam(teamId: string): boolean;
@@ -86,9 +123,12 @@ export interface RelayStore {
   deleteAttachmentBlob(blobId: string): boolean;
   getDevice(userId: string, deviceId: string): DeviceRecord | undefined;
   setDevice(device: DeviceRecord): void;
-  getEncryptedBacklog(roomKey: RoomKey): RelayEnvelope[] | undefined;
-  setEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): void;
-  allEncryptedBacklogEntries(): Array<[RoomKey, RelayEnvelope[]]>;
+  keyPackagesForDevice(userId: string, deviceId: string): KeyPackageRecord[];
+  setKeyPackage(keyPackage: KeyPackageRecord): void;
+  deleteKeyPackage(id: string): boolean;
+  getMlsBacklog(roomKey: RoomKey): MlsRelayMessage[] | undefined;
+  setMlsBacklog(roomKey: RoomKey, messages: MlsRelayMessage[]): void;
+  allMlsBacklogEntries(): Array<[RoomKey, MlsRelayMessage[]]>;
 }
 
 export class InMemoryRelayStore implements RelayStore {
@@ -97,15 +137,21 @@ export class InMemoryRelayStore implements RelayStore {
   readonly teamSockets = new Map<string, Set<WebSocket>>();
   readonly workspaceSockets = new Set<WebSocket>();
   readonly roomPresence = new Map<RoomKey, Map<string, PresenceRecord>>();
-  readonly encryptedBacklog = new Map<RoomKey, RelayEnvelope[]>();
+  readonly mlsBacklog = new Map<RoomKey, MlsRelayMessage[]>();
   readonly authSessions = new Map<string, AuthSession>();
   readonly teams = new Map<string, TeamRecord>();
   readonly rooms = new Map<string, RoomRecord>();
   readonly invites = new Map<string, InviteRecord>();
+  readonly inviteRequests = new Map<string, InviteJoinRequestRecord>();
+  readonly inviteResponses = new Map<string, InviteResponseRecord>();
+  readonly inviteAckReceipts = new Map<string, InviteAckReceipt>();
+  readonly acceptedMessageReceipts = new Map<string, AcceptedMessageReceipt>();
   readonly devices = new Map<string, DeviceRecord>();
+  readonly keyPackages = new Map<string, KeyPackageRecord>();
   readonly attachmentBlobs = new Map<string, AttachmentBlobRecord>();
   readonly teamMembers = new Map<string, Map<string, TeamMemberRecord>>();
   readonly rateLimitStore = new Map<string, RateLimitRecord>();
+  readonly deviceSessions = new Map<string, DeviceSessionRecord>();
 
   allTeams(): TeamRecord[] {
     return Array.from(this.teams.values());
@@ -191,16 +237,28 @@ export class InMemoryRelayStore implements RelayStore {
     this.devices.set(deviceKey(device.userId, device.deviceId), device);
   }
 
-  getEncryptedBacklog(roomKey: RoomKey): RelayEnvelope[] | undefined {
-    return this.encryptedBacklog.get(roomKey);
+  keyPackagesForDevice(userId: string, deviceId: string): KeyPackageRecord[] {
+    return Array.from(this.keyPackages.values()).filter((item) => item.userId === userId && item.deviceId === deviceId);
   }
 
-  setEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): void {
-    this.encryptedBacklog.set(roomKey, envelopes);
+  setKeyPackage(keyPackage: KeyPackageRecord): void {
+    this.keyPackages.set(keyPackage.id, keyPackage);
   }
 
-  allEncryptedBacklogEntries(): Array<[RoomKey, RelayEnvelope[]]> {
-    return Array.from(this.encryptedBacklog.entries());
+  deleteKeyPackage(id: string): boolean {
+    return this.keyPackages.delete(id);
+  }
+
+  getMlsBacklog(roomKey: RoomKey): MlsRelayMessage[] | undefined {
+    return this.mlsBacklog.get(roomKey);
+  }
+
+  setMlsBacklog(roomKey: RoomKey, messages: MlsRelayMessage[]): void {
+    this.mlsBacklog.set(roomKey, messages);
+  }
+
+  allMlsBacklogEntries(): Array<[RoomKey, MlsRelayMessage[]]> {
+    return Array.from(this.mlsBacklog.entries());
   }
 }
 

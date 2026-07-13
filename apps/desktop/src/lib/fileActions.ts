@@ -3,14 +3,13 @@ import type { RoomRecord } from "@multaiplayer/protocol";
 import {
   maxEmbeddedAttachmentBytes,
   maxEmbeddedAttachmentBytesPerMessage,
-  type RelayEnvelope,
+  type MlsRelayMessage,
   type RequestStatusPlaintextPayload,
   type WorkspaceFileSaveRequestPlaintextPayload
 } from "@multaiplayer/protocol";
-import { decryptAttachmentJson, encryptAttachmentJson } from "@multaiplayer/crypto";
 import { createAttachmentBlob, loadAttachmentBlob } from "./workspaceClient";
-import { loadOrCreateRoomSecret } from "./localHistory";
-import { createEncryptedRoomEnvelope, roomKeyEpoch } from "./encryptedEnvelope";
+import { decryptMlsBlob, encryptMlsBlob, type MlsBlobCiphertext } from "./mlsClient";
+import { createMlsApplicationMessage, publishMlsApplicationMessage } from "./mlsApplicationMessage";
 import {
   getGitDiff,
   readProjectFile,
@@ -185,24 +184,23 @@ export function createFileActions({
       if (reportRoomFileActionInFlight(roomId)) return;
       try {
         setFileBusyForRoom(roomId, true);
-        const secret = await loadOrCreateRoomSecret(roomId);
+        const blobId = `blob_${crypto.randomUUID()}`;
+        const sealed = await encryptMlsBlob(roomId, blobId, {
+          name: fileToAttach.path,
+          type: attachment.type,
+          size: fileToAttach.size,
+          content: fileToAttach.content,
+          truncated: fileToAttach.truncated
+        });
         const blob = await createAttachmentBlob({
+          blobId,
           teamId,
           roomId,
           name: fileToAttach.path,
           type: attachment.type,
           size: fileToAttach.size,
-          payload: await encryptAttachmentJson(
-            {
-              name: fileToAttach.path,
-              type: attachment.type,
-              size: fileToAttach.size,
-              content: fileToAttach.content,
-              truncated: fileToAttach.truncated
-            },
-            secret,
-            { teamId, roomId, name: fileToAttach.path, type: attachment.type, size: fileToAttach.size }
-          )
+          epoch: sealed.epoch,
+          sealedBlob: JSON.stringify(sealed)
         });
         attachment.content = undefined;
         attachment.blobId = blob.id;
@@ -285,7 +283,6 @@ export function createFileActions({
       return;
     }
     try {
-      const secret = await loadOrCreateRoomSecret(room.id);
       const payload: WorkspaceFileSaveRequestPlaintextPayload = {
         eventType: request.eventType,
         id: request.id,
@@ -296,7 +293,7 @@ export function createFileActions({
         nextContent: request.nextContent,
         requestedAt: request.requestedAt
       };
-      const envelope: RelayEnvelope = await createEncryptedRoomEnvelope(
+      const envelope: MlsRelayMessage = await createMlsApplicationMessage(
         {
           id: crypto.randomUUID(),
           teamId: room.teamId,
@@ -304,14 +301,12 @@ export function createFileActions({
           senderDeviceId: currentContext()?.deviceId ?? "local-device",
           senderUserId: currentContext()?.localUser.id ?? "local",
           createdAt: request.requestedAt,
-          kind: "workspace.request",
-          keyEpoch: roomKeyEpoch(room)
+          kind: "workspace.request"
         },
-        payload,
-        secret
+        payload
       );
       seenEnvelopeIds.current.add(envelope.id);
-      client.publish({ type: "publish", envelope });
+      await publishMlsApplicationMessage(client, envelope);
       appendFileSaveRequest(room.id, request);
       setFileMessageForRoom(room.id, `Requested host approval to save ${file.path}.`);
     } catch (error) {
@@ -363,8 +358,7 @@ export function createFileActions({
       decidedByUserId: currentContext()?.localUser.id ?? "local",
       decidedAt: new Date().toISOString()
     };
-    const secret = await loadOrCreateRoomSecret(room.id);
-    const envelope: RelayEnvelope = await createEncryptedRoomEnvelope(
+    const envelope: MlsRelayMessage = await createMlsApplicationMessage(
       {
         id: crypto.randomUUID(),
         teamId: room.teamId,
@@ -372,14 +366,12 @@ export function createFileActions({
         senderDeviceId: currentContext()?.deviceId ?? "local-device",
         senderUserId: currentContext()?.localUser.id ?? "local",
         createdAt: payload.decidedAt,
-        kind: "workspace.event",
-        keyEpoch: roomKeyEpoch(room)
+        kind: "workspace.event"
       },
-      payload,
-      secret
+      payload
     );
     seenEnvelopeIds.current.add(envelope.id);
-    client.publish({ type: "publish", envelope });
+    await publishMlsApplicationMessage(client, envelope);
   }
 
   async function approveFileSaveRequest(request: WorkspaceFileSaveRequest) {
@@ -472,20 +464,13 @@ export function createFileActions({
     setFileBusyForRoom(room.id, true);
     setFileMessageForRoom(room.id, null);
     try {
-      const [blob, secret] = await Promise.all([
-        loadAttachmentBlob(attachment.blobId, room.teamId, room.id),
-        loadOrCreateRoomSecret(room.id)
-      ]);
+      const blob = await loadAttachmentBlob(attachment.blobId, room.teamId, room.id);
       if (blob.roomId !== room.id || blob.teamId !== room.teamId) {
         throw new Error("Attachment blob belongs to a different room.");
       }
-      const decrypted = await decryptAttachmentJson<unknown>(blob.payload, secret, {
-        teamId: room.teamId,
-        roomId: room.id,
-        name: attachment.name,
-        type: attachment.type,
-        size: attachment.size
-      });
+      const sealed = JSON.parse(blob.sealedBlob) as MlsBlobCiphertext;
+      if (sealed.epoch !== blob.epoch) throw new Error("Attachment blob epoch metadata is inconsistent.");
+      const decrypted = await decryptMlsBlob(room.id, blob.id, sealed);
       if (!isAttachmentBlobContent(decrypted)) {
         throw new Error("Attachment blob payload was not a supported file preview.");
       }

@@ -1,9 +1,4 @@
-import { DevicePublicKeyJwk, type DevicePublicKeyJwk as DevicePublicKeyJwkType } from "@multaiplayer/protocol";
 import type { NoSecretRoomInvite } from "../types";
-
-export function jsonWebKeyToDevicePublicKeyJwk(key: JsonWebKey): DevicePublicKeyJwkType {
-  return DevicePublicKeyJwk.parse(JSON.parse(JSON.stringify(key)));
-}
 
 export function encodeNoSecretRoomInvite(invite: NoSecretRoomInvite): string {
   return bytesToBase64Url(new TextEncoder().encode(JSON.stringify(invite)));
@@ -12,33 +7,36 @@ export function encodeNoSecretRoomInvite(invite: NoSecretRoomInvite): string {
 export function decodeNoSecretRoomInvite(value: string): NoSecretRoomInvite {
   const decoded = JSON.parse(new TextDecoder().decode(base64UrlToBytes(value))) as Partial<NoSecretRoomInvite>;
   if (
-    decoded.version !== 3 ||
+    decoded.version !== 4 ||
     typeof decoded.teamId !== "string" ||
     typeof decoded.roomId !== "string" ||
     typeof decoded.roomName !== "string" ||
-    typeof decoded.inviteCapability !== "string" ||
-    !/^[A-Za-z0-9_-]{43}$/.test(decoded.inviteCapability) ||
-    !Number.isSafeInteger(decoded.keyEpoch) ||
-    (decoded.keyEpoch ?? 0) < 1 ||
+    typeof decoded.capabilityHandle !== "string" ||
+    !decoded.capabilityHandle ||
+    typeof decoded.capabilityUrlValue !== "string" ||
+    !/^[A-Za-z0-9_-]{43}$/.test(decoded.capabilityUrlValue) ||
+    typeof decoded.expiresAt !== "string" ||
+    Number.isNaN(Date.parse(decoded.expiresAt)) ||
     typeof decoded.hostUserId !== "string" ||
     typeof decoded.hostDeviceId !== "string" ||
-    !DevicePublicKeyJwk.safeParse(decoded.hostPublicKeyJwk).success ||
-    typeof decoded.hostPublicKeyFingerprint !== "string"
+    typeof decoded.hostHpkePublicKey !== "string" ||
+    !decoded.hostHpkePublicKey ||
+    typeof decoded.hostHpkeKeyFingerprint !== "string"
   ) {
     throw new Error("No-secret invite is missing required metadata");
   }
-  const hostPublicKeyJwk = DevicePublicKeyJwk.parse(decoded.hostPublicKeyJwk);
   return {
     version: decoded.version,
     teamId: decoded.teamId,
     roomId: decoded.roomId,
     roomName: decoded.roomName,
-    inviteCapability: decoded.inviteCapability,
-    keyEpoch: decoded.keyEpoch!,
+    capabilityHandle: decoded.capabilityHandle,
+    capabilityUrlValue: decoded.capabilityUrlValue,
+    expiresAt: decoded.expiresAt,
     hostUserId: decoded.hostUserId,
     hostDeviceId: decoded.hostDeviceId,
-    hostPublicKeyJwk,
-    hostPublicKeyFingerprint: decoded.hostPublicKeyFingerprint
+    hostHpkePublicKey: decoded.hostHpkePublicKey,
+    hostHpkeKeyFingerprint: decoded.hostHpkeKeyFingerprint
   };
 }
 

@@ -33,7 +33,7 @@ function createOptions() {
         localPreviewBusyRef: busyRef(),
         hostBusyRef: busyRef(),
         settingsBusyRef: busyRef(),
-        keyRotationBusyRef: busyRef(),
+        membershipCommitBusyRef: busyRef(),
         fileBusyRef: busyRef(),
         terminalBusyRef: busyRef()
       },

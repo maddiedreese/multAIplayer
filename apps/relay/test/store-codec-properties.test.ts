@@ -19,8 +19,8 @@ function codec(store = new InMemoryRelayStore()) {
       maxDeviceIdChars: 128,
       maxDisplayNameChars: 128,
       maxEnvelopeIdChars: 128,
-      maxEnvelopeNonceChars: 128,
       maxHostNameChars: 128,
+      maxMlsMessageChars: 1_400_000,
       maxPublicKeyFingerprintChars: 255,
       maxPublicKeyJwkChars: 2_048,
       maxRoomIdChars: 128,
@@ -29,9 +29,8 @@ function codec(store = new InMemoryRelayStore()) {
       maxTeamIdChars: 128,
       maxTeamNameChars: 128,
       maxUserIdChars: 128,
-      isAllowedEnvelopePayload: () => true,
       normalizeStoredAuthSession: () => null,
-      pruneEncryptedBacklog: (envelopes) => envelopes,
+      pruneMlsBacklog: (messages) => messages,
       storedAuthSessions: () => [],
       now: () => fixedNow
     })
@@ -138,4 +137,245 @@ test("expiry and pruning use the injected clock", () => {
   storeCodec.pruneExpiredRelayState();
   assert.equal(store.authSessions.has("expired"), false);
   assert.equal(store.authSessions.has("active"), true);
+});
+
+test("startup normalization discards non-canonical opaque encodings", () => {
+  const { store, codec: storeCodec } = codec();
+  const createdAt = "2026-07-11T11:00:00.000Z";
+  storeCodec.applyStoredRelayState({
+    version: 1,
+    savedAt: createdAt,
+    teams: [{ id: "team-core", name: "Core", members: 1 }],
+    rooms: [
+      {
+        id: "room-desktop",
+        teamId: "team-core",
+        name: "Desktop",
+        projectPath: "/repo",
+        host: "No host",
+        hostStatus: "offline",
+        unread: 0
+      }
+    ],
+    invites: [],
+    teamMembers: [],
+    devices: [
+      {
+        userId: "github:test",
+        deviceId: "device-test",
+        displayName: "Test",
+        signaturePublicKey: "AQ==",
+        signatureKeyFingerprint: "AA",
+        hpkePublicKey: "AQ==",
+        hpkeKeyFingerprint: "BB",
+        registeredAt: createdAt,
+        lastSeenAt: createdAt
+      }
+    ],
+    keyPackages: [
+      {
+        id: "kp-bad",
+        keyPackage: "AB==",
+        keyPackageHash: `sha256:${"0".repeat(64)}`,
+        ciphersuite: 2,
+        userId: "github:test",
+        deviceId: "device-test",
+        credentialIdentity: "identity",
+        createdAt
+      }
+    ],
+    inviteRequests: [
+      {
+        requestId: "request-bad",
+        inviteId: "invite-bad",
+        requesterUserId: "github:test",
+        requesterDeviceId: "device-test",
+        keyPackageId: "kp-bad",
+        keyPackageHash: `sha256:${"0".repeat(64)}`,
+        sealedRequest: '{"version":1,"kem_id":16,"kdf_id":1,"aead_id":1,"encapsulated_key":[1],"ciphertext":[2]}\n',
+        createdAt
+      }
+    ],
+    inviteResponses: [
+      {
+        requestId: "request-bad",
+        inviteId: "invite-bad",
+        requesterUserId: "github:test",
+        requesterDeviceId: "device-test",
+        welcome: "AB==",
+        createdAt
+      }
+    ],
+    attachmentBlobs: [
+      {
+        id: "blob-bad",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "bad.bin",
+        type: "application/octet-stream",
+        size: 1,
+        epoch: 0,
+        sealedBlob: '{"version":1,"epoch":0,"nonce":"AB==","ciphertext":"AQ=="}',
+        createdAt
+      }
+    ],
+    mlsBacklog: [
+      {
+        key: "team-core:room-desktop",
+        messages: [
+          {
+            id: "message-bad",
+            teamId: "team-core",
+            roomId: "room-desktop",
+            senderUserId: "github:test",
+            senderDeviceId: "device-test",
+            createdAt,
+            messageType: "application",
+            epochHint: 0,
+            mlsMessage: "AB=="
+          }
+        ]
+      }
+    ]
+  });
+  assert.equal(store.keyPackages.size, 0);
+  assert.equal(store.inviteRequests.size, 0);
+  assert.equal(store.inviteResponses.size, 0);
+  assert.equal(store.attachmentBlobs.size, 0);
+  assert.equal(store.mlsBacklog.size, 0);
+});
+
+test("startup normalization rejects corrupt invite anchors and retains bounded receipts", () => {
+  const createdAt = "2026-07-11T11:00:00.000Z";
+  const response = {
+    requestId: "request-one",
+    inviteId: "invite-one",
+    requesterUserId: "github:joiner",
+    requesterDeviceId: "device-joiner",
+    keyPackageHash: `sha256:${"a".repeat(64)}`,
+    status: "approved",
+    responseBinding: {
+      version: 2,
+      phase: "response",
+      inviteId: "invite-one",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      keyEpoch: 1,
+      keyPackageHash: `sha256:${"a".repeat(64)}`,
+      requestId: "request-one",
+      requestNonce: "nonce-one",
+      requesterUserId: "github:joiner",
+      requesterDeviceId: "device-joiner",
+      hostUserId: "github:host",
+      hostDeviceId: "device-host",
+      expiresAt: "2026-07-13T12:00:00.000Z",
+      status: "approved",
+      decidedAt: createdAt
+    },
+    responseMac: "AA==",
+    welcome: "AA==",
+    createdAt
+  };
+  const state = {
+    version: 1,
+    savedAt: createdAt,
+    teams: [{ id: "team-core", name: "Core", members: 2 }],
+    rooms: [
+      {
+        id: "room-desktop",
+        teamId: "team-core",
+        name: "Room",
+        projectPath: "/",
+        host: "Host",
+        hostStatus: "active",
+        unread: 0
+      }
+    ],
+    invites: [
+      {
+        id: "invite-one",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        approvedUserId: "github:joiner",
+        approvedDeviceId: "device-joiner",
+        keyPackageHash: `sha256:${"a".repeat(64)}`,
+        createdAt
+      }
+    ],
+    teamMembers: [
+      {
+        teamId: "team-core",
+        members: [
+          { userId: "github:host", role: "owner", joinedAt: createdAt },
+          { userId: "github:joiner", role: "member", joinedAt: createdAt }
+        ]
+      }
+    ],
+    inviteResponses: [response],
+    inviteAckReceipts: [
+      {
+        inviteId: "invite-old",
+        requestId: "request-old",
+        teamId: "team-core",
+        requesterUserId: "github:joiner",
+        requesterDeviceId: "device-joiner",
+        keyPackageHash: `sha256:${"b".repeat(64)}`,
+        status: "approved",
+        acknowledgedAt: createdAt,
+        expiresAt: "2026-07-13T12:00:00.000Z"
+      }
+    ],
+    acceptedMessageReceipts: [
+      {
+        roomKey: "team-core:room-desktop",
+        messageId: "message-one",
+        messageType: "commit",
+        senderUserId: "github:host",
+        senderDeviceId: "device-host",
+        parentEpoch: 1,
+        digest: "c".repeat(64),
+        acceptedAt: createdAt
+      }
+    ],
+    mlsBacklog: []
+  };
+  const valid = codec();
+  valid.codec.applyStoredRelayState(state);
+  assert.equal(valid.store.inviteResponses.size, 1);
+  assert.equal(valid.store.inviteAckReceipts.size, 1);
+  assert.equal(valid.store.acceptedMessageReceipts.size, 1);
+
+  const corrupt = codec();
+  corrupt.codec.applyStoredRelayState({
+    ...state,
+    inviteResponses: [{ ...response, requesterDeviceId: "device-mismatch" }]
+  });
+  assert.equal(corrupt.store.inviteResponses.size, 0);
+});
+
+test("startup normalization preserves an offline room's reserved bootstrap host", () => {
+  const { codec: relayCodec, store } = codec();
+  relayCodec.applyStoredRelayState({
+    version: 1,
+    savedAt: "2026-07-12T12:00:00.000Z",
+    teams: [{ id: "team-core", name: "Core", members: 1 }],
+    rooms: [
+      {
+        id: "room-bootstrap",
+        teamId: "team-core",
+        name: "Bootstrap",
+        projectPath: "/tmp/bootstrap",
+        host: "Creator",
+        hostUserId: "github:creator",
+        hostStatus: "offline",
+        unread: 0
+      }
+    ]
+  });
+  const room = store.getRoom("room-bootstrap");
+  assert.equal(room?.host, "Creator");
+  assert.equal(room?.hostUserId, "github:creator");
+  assert.equal(room?.hostStatus, "offline");
+  assert.equal(room?.activeHostDeviceId, undefined);
+  assert.equal(room?.acceptedMlsEpoch, undefined);
 });

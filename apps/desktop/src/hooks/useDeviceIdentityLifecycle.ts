@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { loadOrCreateDeviceIdentity, type DeviceIdentity } from "../lib/deviceIdentity";
-import { registerDevice } from "../lib/workspaceClient";
+import { keyPackageCount, publishKeyPackages, registerDevice } from "../lib/workspaceClient";
+import { establishDeviceSession } from "../lib/deviceSession";
+import { useAppStore } from "../store/appStore";
+import { generateMlsKeyPackage } from "../lib/mlsClient";
 
 interface UseDeviceIdentityLifecycleOptions {
   relayHttpUrl: string;
@@ -22,15 +25,23 @@ export function useDeviceIdentityLifecycle({
   setDeviceIdentityStatusMessage
 }: UseDeviceIdentityLifecycleOptions) {
   useEffect(() => {
-    loadOrCreateDeviceIdentity()
+    loadOrCreateDeviceIdentity(userId, deviceId)
       .then((identity) => {
         replaceDeviceIdentity(identity);
-        setDeviceIdentityStatusMessage(null);
+        if (identity.requiresRejoin) {
+          const store = useAppStore.getState();
+          for (const room of store.rooms) store.rememberForgottenRoom(room.id);
+          setDeviceIdentityStatusMessage(
+            "Encrypted MLS state was quarantined because it was corrupt. This device must rejoin every private room from a new Protocol v2 invite; old local history cannot be recovered."
+          );
+        } else {
+          setDeviceIdentityStatusMessage(null);
+        }
       })
       .catch((error) => {
         setDeviceIdentityStatusMessage(`Device identity unavailable: ${String(error)}`);
       });
-  }, [replaceDeviceIdentity, setDeviceIdentityStatusMessage]);
+  }, [deviceId, replaceDeviceIdentity, setDeviceIdentityStatusMessage, userId]);
 
   useEffect(() => {
     if (!deviceIdentity) return;
@@ -38,10 +49,44 @@ export function useDeviceIdentityLifecycle({
       userId,
       deviceId,
       displayName,
-      publicKeyJwk: deviceIdentity.publicKeyJwk,
-      publicKeyFingerprint: deviceIdentity.publicKeyFingerprint
+      signaturePublicKey: deviceIdentity.signaturePublicKey,
+      signatureKeyFingerprint: deviceIdentity.signatureKeyFingerprint!,
+      hpkePublicKey: deviceIdentity.hpkePublicKey!,
+      hpkeKeyFingerprint: deviceIdentity.hpkeKeyFingerprint!
     })
-      .then(() => setDeviceIdentityStatusMessage("Device identity registered with relay."))
+      .then(() => establishDeviceSession(relayHttpUrl, deviceId))
+      .then((session) => {
+        useAppStore.getState().replaceDeviceSessionToken(session.token);
+        return replenishKeyPackages(deviceId);
+      })
+      .then(() => {
+        if (!deviceIdentity.requiresRejoin)
+          setDeviceIdentityStatusMessage("Device identity registered and authenticated with relay.");
+      })
       .catch((error) => setDeviceIdentityStatusMessage(`Device identity registration pending: ${String(error)}`));
   }, [relayHttpUrl, deviceId, deviceIdentity, displayName, setDeviceIdentityStatusMessage, userId]);
+
+  useEffect(() => {
+    if (!deviceIdentity?.requiresRejoin) return;
+    const quarantineRooms = () => {
+      const store = useAppStore.getState();
+      for (const room of store.rooms) store.rememberForgottenRoom(room.id);
+    };
+    quarantineRooms();
+    return useAppStore.subscribe((state, previous) => {
+      if (state.rooms !== previous.rooms) quarantineRooms();
+    });
+  }, [deviceIdentity?.requiresRejoin]);
+}
+
+async function replenishKeyPackages(deviceId: string): Promise<void> {
+  const count = await keyPackageCount(deviceId);
+  const needed = Math.max(0, 5 - count);
+  if (needed === 0) return;
+  const keyPackages = await Promise.all(
+    Array.from({ length: needed }, async () => {
+      return generateMlsKeyPackage();
+    })
+  );
+  await publishKeyPackages(deviceId, keyPackages);
 }

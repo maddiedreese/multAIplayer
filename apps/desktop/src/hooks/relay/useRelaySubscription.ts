@@ -1,12 +1,21 @@
 import { useEffect, type MutableRefObject } from "react";
-import type { RelayEnvelope, RoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { connectRelay, type RelayClient } from "../../lib/relayClient";
 import { trustedAvatarUrl } from "../../lib/avatarUrl";
 import { ensureRoomDefaults } from "../../lib/roomDefaults";
 import { useAppStore } from "../../store/appStore";
 import type { ChatMessage } from "../../types";
 import { useLatestRef } from "../useLatestRef";
-import { routeRelayEnvelope } from "./routeRelayEnvelope";
+import { routeMlsMessage } from "./routeMlsMessage";
+import {
+  currentMlsEpoch,
+  listMlsJoinAdmissions,
+  isMlsRequiresRejoin,
+  forgetCorruptMlsGroup,
+  openMlsGroup
+} from "../../lib/mlsClient";
+import { drainMlsOutboxForRoom, pendingMlsOutboxRoomIds } from "../../lib/mlsOutboxDrain";
+import { completeMlsRelayAdmission } from "../../lib/mlsJoinAdmission";
 
 interface LocalUser {
   id: string;
@@ -19,6 +28,7 @@ interface UseRelaySubscriptionOptions {
   deviceId: string;
   localUser: LocalUser;
   devicePublicKeyFingerprint?: string;
+  deviceSessionToken: string;
   selectedTeam: string;
   selectedRoom: RoomRecord;
   hasSelectedRoom: boolean;
@@ -38,8 +48,7 @@ interface UseRelaySubscriptionOptions {
   upsertRoom: (room: RoomRecord) => void;
   upsertTeam: (team: TeamRecord) => void;
   refreshTeamMembers: (teamId: string, quiet?: boolean) => Promise<void>;
-  decryptInviteEnvelope: (envelope: RelayEnvelope) => Promise<unknown | null>;
-  handleInviteEnvelopePlaintext: (roomId: string, plaintext: unknown, envelope: RelayEnvelope) => Promise<void>;
+  handleInviteRequested: (inviteId: string) => Promise<void>;
   handleCodexBrowserOpenCommand: (message: ChatMessage, room: RoomRecord) => boolean;
 }
 
@@ -49,6 +58,7 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
     deviceId,
     localUser,
     devicePublicKeyFingerprint,
+    deviceSessionToken,
     selectedTeam,
     selectedRoom,
     hasSelectedRoom,
@@ -61,8 +71,9 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
 
   useEffect(() => {
     let cancelled = false;
+    const roomReceiveQueues = new Map<string, Promise<void>>();
     useAppStore.getState().clearPresenceByRoom();
-    if (!relayWsUrl) {
+    if (!relayWsUrl || !deviceSessionToken) {
       useAppStore.getState().replaceRelayStatus("closed");
       relayRef.current = null;
       return;
@@ -75,9 +86,70 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
         const store = useAppStore.getState();
         if (message.type === "joined" || message.type === "workspace.subscribed") {
           store.replaceRelayStatus("open");
+          if (message.type === "workspace.subscribed") {
+            void listMlsJoinAdmissions()
+              .then(async (admissions) => {
+                for (const admission of admissions) {
+                  if (
+                    admission.requesterUserId !== current.localUser.id ||
+                    admission.requesterDeviceId !== current.deviceId
+                  )
+                    continue;
+                  await completeMlsRelayAdmission(client, admission, current.deviceSessionToken, () => {
+                    store.restoreWorkspaceAccess(admission.teamId, admission.roomId);
+                    store.restoreForgottenRoom(admission.roomId);
+                    store.setInviteAdmissionForRoom(admission.roomId, null);
+                  });
+                }
+                if (admissions.length > 0 && current.hasSelectedRoom) {
+                  await client.joinAndWaitForAck({
+                    type: "join",
+                    teamId: current.selectedRoom.teamId,
+                    roomId: current.selectedRoom.id,
+                    userId: current.localUser.id,
+                    deviceId: current.deviceId,
+                    deviceSessionToken: current.deviceSessionToken
+                  });
+                }
+              })
+              .catch(() => {
+                store.setInviteMessageForRoom(
+                  current.selectedRoom.id,
+                  "A persisted MLS admission is awaiting relay confirmation and will retry after reconnecting."
+                );
+              });
+            void pendingMlsOutboxRoomIds().then((roomIds) => {
+              for (const roomId of roomIds) {
+                if (roomId === current.selectedRoom.id) continue;
+                store.setHostMessageForRoom(
+                  roomId,
+                  "This room has a durable MLS message awaiting delivery. Select the room while connected to retry it."
+                );
+              }
+            });
+          }
+          if (message.type === "joined") {
+            const room = current.roomsRef.current.find((candidate) => candidate.id === message.roomId);
+            if (room) {
+              void drainMlsOutboxForRoom(client, room, {
+                userId: current.localUser.id,
+                deviceId: current.deviceId,
+                deviceSessionToken: current.deviceSessionToken
+              }).catch(() => {
+                store.setHostMessageForRoom(
+                  room.id,
+                  "A durable MLS message is still pending relay delivery and will retry after reconnecting."
+                );
+              });
+            }
+          }
           return;
         }
         if (message.type === "team.subscribed") return;
+        if (message.type === "invite.requested") {
+          await current.handleInviteRequested(message.inviteId);
+          return;
+        }
         if (message.type === "error") {
           current.handleRelayError(message.message);
           return;
@@ -108,23 +180,43 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
           void current.refreshTeamMembers(message.team.id, false);
           return;
         }
-        if (message.type !== "envelope" || seenEnvelopeIds.current.has(message.envelope.id)) return;
-        seenEnvelopeIds.current.add(message.envelope.id);
-        try {
-          await routeRelayEnvelope(message.envelope, {
-            deviceId: current.deviceId,
-            localUser: current.localUser,
-            roomsRef: current.roomsRef,
-            selectedRoomIdRef: current.selectedRoomIdRef,
-            historyLoadedRoomIds: current.historyLoadedRoomIds,
-            markIncomingChatUnread: current.markIncomingChatUnread,
-            decryptInviteEnvelope: current.decryptInviteEnvelope,
-            handleInviteEnvelopePlaintext: current.handleInviteEnvelopePlaintext,
-            handleCodexBrowserOpenCommand: current.handleCodexBrowserOpenCommand
+        if (message.type !== "mls.message" || seenEnvelopeIds.current.has(message.message.id)) return;
+        const roomId = message.message.roomId;
+        const previous = roomReceiveQueues.get(roomId) ?? Promise.resolve();
+        const queued = previous
+          .catch(() => undefined)
+          .then(async () => {
+            if (cancelled || seenEnvelopeIds.current.has(message.message.id)) return;
+            try {
+              const epoch = await currentMlsEpoch(roomId);
+              if (message.message.messageType === "commit" && message.message.epochHint < epoch) {
+                seenEnvelopeIds.current.add(message.message.id);
+                return;
+              }
+              if (message.message.epochHint > epoch) {
+                throw new Error("A prior MLS epoch transition is missing on this device.");
+              }
+              await routeMlsMessage(message.message, {
+                deviceId: current.deviceId,
+                localUser: current.localUser,
+                roomsRef: current.roomsRef,
+                selectedRoomIdRef: current.selectedRoomIdRef,
+                historyLoadedRoomIds: current.historyLoadedRoomIds,
+                markIncomingChatUnread: current.markIncomingChatUnread,
+                handleCodexBrowserOpenCommand: current.handleCodexBrowserOpenCommand
+              });
+              seenEnvelopeIds.current.add(message.message.id);
+            } catch {
+              store.setHostMessageForRoom(
+                roomId,
+                "Security warning: an MLS message could not be authenticated or applied in epoch order. Rejoin this room if the warning persists."
+              );
+            }
           });
-        } catch {
-          console.warn("Failed to decrypt relay envelope");
-        }
+        roomReceiveQueues.set(roomId, queued);
+        void queued.finally(() => {
+          if (roomReceiveQueues.get(roomId) === queued) roomReceiveQueues.delete(roomId);
+        });
       },
       (status) => useAppStore.getState().replaceRelayStatus(status),
       (openClient) => {
@@ -148,24 +240,51 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
           access.revokedTeamIds.has(selectedRoom.teamId)
         )
           return;
-        openClient.publish({
-          type: "join",
-          teamId: selectedRoom.teamId,
-          roomId: selectedRoom.id,
-          userId: localUser.id,
-          deviceId,
-          inviteId: selectedRoomInviteAdmission
-        });
-        openClient.publish({
-          type: "presence",
-          teamId: selectedRoom.teamId,
-          roomId: selectedRoom.id,
-          userId: localUser.id,
-          deviceId,
-          displayName: localUser.name,
-          avatarUrl: localUser.avatarUrl,
-          publicKeyFingerprint: devicePublicKeyFingerprint
-        });
+        void openMlsGroup(selectedRoom.id)
+          .then(() => {
+            openClient.publish({
+              type: "join",
+              teamId: selectedRoom.teamId,
+              roomId: selectedRoom.id,
+              userId: localUser.id,
+              deviceId,
+              deviceSessionToken,
+              inviteId: selectedRoomInviteAdmission
+            });
+            openClient.publish({
+              type: "presence",
+              teamId: selectedRoom.teamId,
+              roomId: selectedRoom.id,
+              userId: localUser.id,
+              deviceId,
+              displayName: localUser.name,
+              avatarUrl: localUser.avatarUrl,
+              publicKeyFingerprint: devicePublicKeyFingerprint
+            });
+          })
+          .catch((error) => {
+            if (isMlsRequiresRejoin(error)) {
+              void forgetCorruptMlsGroup(selectedRoom.id)
+                .then(() => {
+                  useAppStore.getState().rememberForgottenRoom(selectedRoom.id);
+                  useAppStore
+                    .getState()
+                    .setHostMessageForRoom(
+                      selectedRoom.id,
+                      "Local MLS state was corrupt and has been removed. Ask the host to remove this device's old leaf and issue a fresh invite."
+                    );
+                })
+                .catch((cleanupError) => {
+                  useAppStore
+                    .getState()
+                    .setHostMessageForRoom(
+                      selectedRoom.id,
+                      `Local MLS state is corrupt, but its rejoin cleanup failed: ${String(cleanupError)}`
+                    );
+                });
+            }
+            // Missing group state belongs to a pending invite; transient failures retry on reconnect.
+          });
       }
     );
 
@@ -178,6 +297,7 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
   }, [
     relayWsUrl,
     deviceId,
+    deviceSessionToken,
     devicePublicKeyFingerprint,
     hasSelectedRoom,
     latest,

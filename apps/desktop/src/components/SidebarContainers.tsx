@@ -6,7 +6,7 @@ import { allowRelayConfiguration, defaultRelayHttpUrl, defaultRelayWsUrl } from 
 import { formatCodexModel, formatSessionPersistence } from "../lib/appFormatters";
 import { formatCodexCompatibilitySummary } from "../lib/codexCompatibility";
 import { defaultProjectPath } from "../lib/localBackend";
-import { roomSecretStorageLabel } from "../lib/appRuntime";
+import { mlsStateStorageLabel } from "../lib/appRuntime";
 import { selectSidebarDrawerView, selectSidebarNavigationView } from "../lib/containerViewSelectors";
 import { buildSidebarDrawerCapabilities, buildSidebarNavigationCapabilities } from "../lib/containerCapabilities";
 import { resolveSidebarSettingsMessage } from "../lib/containerPropBuilders";
@@ -274,7 +274,7 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         projectPath: selectedRoom.projectPath,
         modelLabel: formatCodexModel(selectedCodexModel),
         approvalLabel: approvalPolicyLabels[selectedRoom.approvalPolicy],
-        roomKeysLabel: roomSecretStorageLabel(),
+        roomKeysLabel: mlsStateStorageLabel(),
         posture: access.roomPosture,
         chooseProjectDisabled:
           !hasSelectedRoom || access.isSelectedRoomLocked || Boolean(roomSettings.settingsBusy) || !access.isActiveHost,

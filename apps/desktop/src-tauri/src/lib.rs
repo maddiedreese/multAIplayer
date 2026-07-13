@@ -16,8 +16,8 @@ mod command_safety;
 mod diagnostics;
 mod git;
 mod host_sandbox;
-mod keychain;
 mod local_preview;
+mod mls_native;
 mod output;
 mod process;
 mod project;
@@ -35,8 +35,8 @@ use codex_requests::CodexRpcState;
 use codex_threads::*;
 use diagnostics::*;
 use git::*;
-use keychain::*;
 use local_preview::*;
+use mls_native::*;
 use project::*;
 use shell::*;
 use shell_authorization::*;
@@ -56,6 +56,7 @@ pub fn run() {
         .manage(LocalPreviewState::default())
         .manage(CodexRpcState::default())
         .manage(CodexHostState::default())
+        .manage(MlsNativeState::default())
         .setup(|app| {
             let state = match app.path().app_log_dir() {
                 Ok(log_dir) => DiagnosticState::initialize(log_dir.join("diagnostics.jsonl")),
@@ -72,7 +73,6 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
-        .manage(DeviceIdentityAccessState::default())
         .invoke_handler(tauri::generate_handler![
             app_version,
             record_diagnostic,
@@ -102,12 +102,41 @@ pub fn run() {
             local_preview_stop,
             open_browser_view,
             reset_browser_profile,
-            room_secret_get,
-            room_secret_set,
-            room_secret_delete,
-            device_identity_take_for_startup,
-            device_identity_set,
-            device_identity_delete,
+            mls_identity_initialize,
+            mls_device_auth_sign,
+            mls_group_state,
+            mls_invite_capability_issue,
+            mls_invite_request_seal,
+            mls_invite_request_open,
+            mls_invite_approve,
+            mls_invite_deny,
+            mls_invite_response_accept,
+            mls_join_admissions_list,
+            mls_join_admission_complete,
+            mls_blob_encrypt,
+            mls_blob_decrypt,
+            mls_blob_prepare,
+            mls_history_save,
+            mls_history_retention_set,
+            mls_history_load,
+            mls_history_delete,
+            mls_history_load_latest,
+            mls_history_delete_all,
+            mls_generate_key_package,
+            mls_create_group,
+            mls_join_welcome,
+            mls_encrypt_application,
+            mls_process_incoming,
+            mls_remove_member,
+            mls_transfer_host,
+            mls_host_transfer_authorization,
+            mls_current_epoch,
+            mls_group_open,
+            mls_forget_corrupt_group,
+            mls_publish_succeeded,
+            mls_outbox_list,
+            mls_clear_pending_commit,
+            mls_retire_stale_application,
             run_git_workflow,
             probe_codex,
             run_codex_turn,

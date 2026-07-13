@@ -14,12 +14,13 @@ This covers the TypeScript and Rust verification suites, package/application bui
 
 Before a wider alpha, manually verify on two macOS devices and two GitHub accounts:
 
-- invite acceptance, encrypted chat, attachments, member removal, epoch advancement, and removed-device exclusion;
+- KeyPackage publication, capability invite approval, Welcome join, encrypted chat, attachments, MLS removal, epoch advancement, and removed-device exclusion;
 - project selection, file/diff inspection, Codex approval, terminal and browser approval;
 - Git branch, commit, push, draft PR, and Actions status;
 - active-host handoff, including a simulated Codex usage limit;
 - a relay restart with durable encrypted sessions; and
-- the limitations in [alpha-limitations.md](alpha-limitations.md) against the release notes.
+- the limitations in [alpha-limitations.md](alpha-limitations.md) against the release notes; and
+- the bundled Rust KeyPackage validator path and fail-closed production startup.
 
 Do not present the alpha as externally audited, production-ready, enterprise compliant, or capable of retroactive erasure or synchronized identity recovery.
 
@@ -51,6 +52,7 @@ GITHUB_OAUTH_SCOPES="read:user public_repo"
 MULTAIPLAYER_RELAY_SESSION_SECRET=...
 MULTAIPLAYER_RELAY_STORAGE=sqlite
 MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
+MULTAIPLAYER_MLS_VALIDATOR_PATH=/app/bin/mls-keypackage-validator
 MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://<official-site>
 MULTAIPLAYER_RELAY_REQUIRE_AUTH=true
 MULTAIPLAYER_RELAY_DEBUG=false
@@ -108,7 +110,7 @@ Before announcement, verify the update manifest, release notes, artifact digests
 
 Give at least 30 days' public notice before a planned official hosted relay shutdown. During the notice window, keep sign-in, relay connectivity, and these instructions available unless an emergency security, legal, provider, or private-data incident makes that unsafe. Emergency notice may be shorter only for those reasons and should preserve the minimum safe migration path.
 
-The relay is not the source of truth for project folders, Git history, room keys, or device-local encrypted history. Migration recreates relay-side teams, rooms, memberships, sessions, invites, backlog, and blobs.
+The relay is not the source of truth for project folders, Git history, MLS private state, or device-local encrypted history. Migration recreates relay-side teams, rooms, memberships, sessions, invites, backlog, and blobs.
 
 ## Hosted-to-self-hosted migration
 
@@ -128,9 +130,9 @@ For every member/device:
 4. Send and receive an encrypted test message and attachment.
 5. Confirm retained local history remains readable.
 
-With two members, verify the active host, Codex approval, session persistence, member removal, and future-traffic exclusion. After all members join, advance the room key epoch and deliver the new key only to eligible registered devices.
+With two members, verify the active host, Codex approval, session persistence, member removal, and future-traffic exclusion. After all members join, issue an MLS Update Commit and verify every eligible device advances while removed or stale devices do not.
 
-If a device cannot read retained history, stop before clearing rooms or reinstalling: the relay cannot reconstruct device-local keys/history. Until encrypted export/import ships, preserved devices are the continuity mechanism.
+If a device cannot read retained history, stop before clearing rooms or reinstalling: the relay cannot reconstruct MLS state or exporter-derived history secrets. Until encrypted export/import ships, preserved devices are the continuity mechanism.
 
 ### Migration rollback
 

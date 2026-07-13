@@ -45,20 +45,11 @@ test.beforeEach(() => {
   localStorage.clear();
 });
 
-test("web preview device identity persists in localStorage fallback", async () => {
-  const first = await loadOrCreateDeviceIdentity();
-  const second = await loadOrCreateDeviceIdentity();
-
-  assert.equal(second.publicKeyFingerprint, first.publicKeyFingerprint);
-  assert.equal(second.privateKeyJwk.type, "private");
-  assert.equal(second.privateKeyJwk.extractable, false);
-  assert.ok(localStorage.getItem("multaiplayer:device-identity:v1"));
+test("web preview cannot create or load a device identity", async () => {
+  await assert.rejects(loadOrCreateDeviceIdentity(), /only in the native desktop app/);
+  assert.equal(localStorage.getItem("multaiplayer:device-identity:v1"), null);
 });
 
-test("resetDeviceIdentity clears web preview fallback identity", async () => {
-  const first = await loadOrCreateDeviceIdentity();
-  await resetDeviceIdentity();
-  const second = await loadOrCreateDeviceIdentity();
-
-  assert.notEqual(second.publicKeyFingerprint, first.publicKeyFingerprint);
+test("web preview cannot reset a native device identity", async () => {
+  await assert.rejects(resetDeviceIdentity(), /only in the native desktop app/);
 });

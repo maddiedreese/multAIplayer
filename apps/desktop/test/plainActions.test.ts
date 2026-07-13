@@ -43,6 +43,16 @@ class MemoryStorage {
 
 const localStorage = new MemoryStorage();
 Object.defineProperty(globalThis, "localStorage", { configurable: true, value: localStorage });
+Object.defineProperty(globalThis, "window", { configurable: true, value: globalThis });
+Object.defineProperty(globalThis, "__TAURI_INTERNALS__", {
+  configurable: true,
+  value: {
+    invoke: async (command: string) => {
+      if (command === "mls_history_delete_all" || command === "mls_history_retention_set") return null;
+      throw new Error(`Unexpected native command: ${command}`);
+    }
+  }
+});
 
 const room: RoomRecord = {
   id: "room-actions",
@@ -109,7 +119,7 @@ test("visibility warning actions update persistence and the current Zustand stor
   assert.equal(useAppStore.getState().codexRuntimeByRoom[room.id]?.secretWarningVisible ?? false, false);
 });
 
-test("local history actions resolve Zustand mutations when invoked without React", () => {
+test("local history actions resolve Zustand mutations when invoked without React", async () => {
   const replacedSettings: Array<{ enabled: boolean; retentionDays: number }> = [];
   const actions = createLocalHistoryActions({
     hasSelectedRoom: true,
@@ -145,7 +155,7 @@ test("local history actions resolve Zustand mutations when invoked without React
     setHistoryMessageForRoom: (roomId, message) => messages.push([roomId, message])
   });
 
-  actions.updateLocalHistorySettings({ enabled: false, retentionDays: 14 });
+  await actions.updateLocalHistorySettings({ enabled: false, retentionDays: 14 });
 
   assert.deepEqual(replacedSettings, [{ enabled: false, retentionDays: 14 }]);
   assert.deepEqual(messages, [[room.id, "Encrypted local history is disabled for this room."]]);
@@ -253,30 +263,30 @@ test("member removal reports relay-revoked but incomplete cryptographic transiti
       joinedAt: "2026-07-09T12:00:00.000Z"
     };
     useAppStore.getState().setTeamMembersForTeam(room.teamId, [target]);
-    let rotationAttempts = 0;
+    let commitAttempts = 0;
     const actions = createMemberActions({
       setDeviceIdentityMessage: () => undefined,
       trustDeviceForRoom: () => undefined,
       untrustDeviceForRoom: () => undefined,
       updateTeamRoleForTeam: () => undefined,
       updateTeamMemberCountForTeam: () => undefined,
-      rotateRoomKeyForDevices: async () => {
-        rotationAttempts += 1;
-        if (rotationAttempts === 1) throw new Error("distribution failed");
+      removeMembersFromMlsGroup: async () => {
+        commitAttempts += 1;
+        if (commitAttempts === 1) throw new Error("commit failed");
       },
       copyMarkdownWithFallback: async () => undefined
     });
     await actions.removeMemberFromTeam(target);
     const message = useAppStore.getState().teamRosterByTeam[room.teamId]?.message ?? "";
     assert.match(message, /relay access was removed/);
-    assert.match(message, /cryptographic access rotation is incomplete/);
-    assert.match(message, /Actions: Error: distribution failed/);
+    assert.match(message, /MLS Remove commits are incomplete/);
+    assert.match(message, /Actions: Error: commit failed/);
     assert.doesNotMatch(message, /^Removed /);
     assert.equal(useAppStore.getState().teamRosterByTeam[room.teamId]?.members?.[0]?.userId, target.userId);
 
     await actions.removeMemberFromTeam(target);
     assert.equal(removalCalls, 2);
-    assert.equal(rotationAttempts, 2);
+    assert.equal(commitAttempts, 2);
     assert.deepEqual(useAppStore.getState().teamRosterByTeam[room.teamId]?.members, []);
     assert.match(useAppStore.getState().teamRosterByTeam[room.teamId]?.message ?? "", /^Removed /);
   } finally {

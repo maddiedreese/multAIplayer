@@ -57,7 +57,7 @@ interface UseSelectedRoomRuntimeOptions {
   codexRunningByRoom: Record<string, boolean>;
   hostBusyByRoom: Record<string, boolean>;
   settingsBusyByRoom: Record<string, boolean>;
-  keyRotationBusyByRoom: Record<string, boolean>;
+  membershipCommitBusyByRoom: Record<string, boolean>;
 }
 
 export function useSelectedRoomRuntime({
@@ -89,7 +89,7 @@ export function useSelectedRoomRuntime({
   codexRunningByRoom,
   hostBusyByRoom,
   settingsBusyByRoom,
-  keyRotationBusyByRoom
+  membershipCommitBusyByRoom
 }: UseSelectedRoomRuntimeOptions) {
   const roomId = selectedRoom.id ?? selectedRoomId;
   const activeCodexApproval = pendingCodexApprovalsByRoom[roomId] ?? null;
@@ -157,7 +157,7 @@ export function useSelectedRoomRuntime({
     `${formatBytes(pendingAttachmentBytes)}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`;
   const hostBusy = hostBusyByRoom[roomId] ?? false;
   const settingsBusy = settingsBusyByRoom[roomId] ?? false;
-  const keyRotationBusy = keyRotationBusyByRoom[roomId] ?? false;
+  const membershipCommitBusy = membershipCommitBusyByRoom[roomId] ?? false;
   const hostStatusLabel = formatHostStatus(selectedRoom);
   const roomCanUseChat = canUseRoomChat(selectedRoom, isSelectedRoomLocked);
 
@@ -188,7 +188,7 @@ export function useSelectedRoomRuntime({
     pendingAttachmentSummary,
     hostBusy,
     settingsBusy,
-    keyRotationBusy,
+    membershipCommitBusy,
     hostStatusLabel,
     roomCanUseChat
   };

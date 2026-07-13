@@ -7,7 +7,6 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { checkMutationPolicy } from "./check-mutation-policy.mjs";
-import strykerConfig from "../packages/crypto/stryker.config.mjs";
 import protocolStrykerConfig from "../packages/protocol/stryker.config.mjs";
 import relayStrykerConfig from "../apps/relay/stryker.config.mjs";
 
@@ -295,34 +294,6 @@ test("rejects missing, duplicate, nested, reversed, and unclosed markers", () =>
 });
 
 test("keeps repository mutation ratchets at 100 percent while allowing policy reporting", async () => {
-  const configured = JSON.parse(
-    await readFile(new URL("../packages/crypto/mutation-policy.json", import.meta.url), "utf8")
-  );
-  assert.deepEqual(strykerConfig.thresholds, { high: 100, low: 100, break: 50 });
-  assert.deepEqual(
-    Object.fromEntries(Object.entries(configured.files).map(([path, rule]) => [path, rule.minimumScore])),
-    {
-      "src/additional-data.ts": 100,
-      "src/canonical.ts": 100,
-      "src/device-wrapping.ts": 100,
-      "src/encoding.ts": 100,
-      "src/inviteCapability.ts": 100,
-      "src/key-material.ts": 100,
-      "src/payload.ts": 100
-    }
-  );
-  assert.ok(Object.values(configured.files).every((rule) => rule.maximumSurvived === 0));
-  assert.ok(
-    configured.regions.every(
-      (region) =>
-        region.maximumSurvived === 0 &&
-        region.maximumNoCoverage === 0 &&
-        region.maximumRuntimeError === 0 &&
-        region.maximumPending === 0 &&
-        region.maximumTimeout === 0
-    )
-  );
-
   for (const [path, config, expectedFiles] of [
     ["../apps/relay/mutation-policy.json", relayStrykerConfig, { "src/authz.ts": 100 }],
     ["../packages/protocol/mutation-policy.json", protocolStrykerConfig, { "src/type-guards.ts": 100 }]

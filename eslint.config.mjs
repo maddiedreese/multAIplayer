@@ -6,7 +6,6 @@ import tseslint from "typescript-eslint";
 const typescriptFiles = ["**/*.{ts,tsx}"];
 const workspacePackages = [
   "@multaiplayer/codex",
-  "@multaiplayer/crypto",
   "@multaiplayer/desktop",
   "@multaiplayer/git",
   "@multaiplayer/github",
@@ -14,7 +13,7 @@ const workspacePackages = [
   "@multaiplayer/relay"
 ];
 const relativeWorkspaceSourcePattern =
-  "^(?:\\.\\./)+(?:apps/(?:desktop|relay)|packages/(?:codex|crypto|git|github|protocol)|(?:desktop|relay|codex|crypto|git|github|protocol))(?:/|$)";
+  "^(?:\\.\\./)+(?:apps/(?:desktop|relay)|packages/(?:codex|git|github|protocol)|(?:desktop|relay|codex|git|github|protocol))(?:/|$)";
 
 function packageBoundaryRule(workspaceName, dependencies = []) {
   const dependencySet = new Set(dependencies);
@@ -110,16 +109,16 @@ export default tseslint.config(
     }
   },
   {
-    files: ["apps/desktop/src/hooks/relay/routeRelayEnvelope.ts"],
+    files: ["apps/desktop/src/hooks/relay/routeMlsMessage.ts"],
     rules: {
       "max-lines": ["error", { max: 100, skipBlankLines: true, skipComments: true }]
     }
   },
   {
     files: [
-      "apps/desktop/src/hooks/relay/routeActivityEnvelope.ts",
-      "apps/desktop/src/hooks/relay/routeChatEnvelope.ts",
-      "apps/desktop/src/hooks/relay/routeRoomEnvelope.ts"
+      "apps/desktop/src/hooks/relay/routeActivityMessage.ts",
+      "apps/desktop/src/hooks/relay/routeChatMessage.ts",
+      "apps/desktop/src/hooks/relay/routeRoomMessage.ts"
     ],
     rules: {
       "max-lines": ["error", { max: 200, skipBlankLines: true, skipComments: true }]
@@ -141,19 +140,6 @@ export default tseslint.config(
     files: ["apps/desktop/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": packageBoundaryRule("@multaiplayer/desktop", [
-        "@multaiplayer/crypto",
-        "@multaiplayer/git",
-        "@multaiplayer/github",
-        "@multaiplayer/protocol"
-      ])
-    }
-  },
-  {
-    files: ["apps/desktop/test/scriptedSecurityJourney.test.ts"],
-    rules: {
-      "no-restricted-imports": packageBoundaryRule("@multaiplayer/desktop security journey", [
-        "@multaiplayer/codex",
-        "@multaiplayer/crypto",
         "@multaiplayer/git",
         "@multaiplayer/github",
         "@multaiplayer/protocol"
@@ -173,16 +159,9 @@ export default tseslint.config(
     files: ["apps/relay/test/process-security-journey.test.ts"],
     rules: {
       "no-restricted-imports": packageBoundaryRule("@multaiplayer/relay process security journey", [
-        "@multaiplayer/crypto",
         "@multaiplayer/github",
         "@multaiplayer/protocol"
       ])
-    }
-  },
-  {
-    files: ["packages/crypto/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-imports": packageBoundaryRule("@multaiplayer/crypto", ["@multaiplayer/protocol"])
     }
   },
   ...["codex", "git", "github", "protocol"].map((packageName) => ({

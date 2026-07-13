@@ -1,26 +1,24 @@
 import {
-  DevicePublicKeyJwk,
   defaultApprovalDelegationPolicy,
   defaultCodexReasoningEffort,
   defaultCodexSpeed,
   codexReasoningEffortOptions,
   codexSpeedOptions,
-  type RelayEnvelope,
+  type MlsRelayMessage,
   codexModelOptions,
-  type DevicePublicKeyJwk as DevicePublicKeyJwkType,
   type ApprovalDelegationPolicy,
   type CodexCatalogSelectionPolicy,
   type RoomRecord,
   type TeamRole
 } from "@multaiplayer/protocol";
+import { isCanonicalPaddedBase64 } from "./opaque.js";
 
 export interface RelayLimits {
-  readonly encryptedEnvelopeMaxBytes: number;
-  readonly maxEnvelopeCiphertextChars: number;
+  readonly mlsMessageMaxBytes: number;
+  readonly maxMlsMessageChars: number;
   readonly maxDisplayNameChars: number;
   readonly maxDeviceIdChars: number;
   readonly maxEnvelopeIdChars: number;
-  readonly maxEnvelopeNonceChars: number;
   readonly maxPublicKeyFingerprintChars: number;
   readonly maxPublicKeyJwkChars: number;
   readonly maxRoomProjectPathChars: number;
@@ -29,29 +27,28 @@ export interface RelayLimits {
 
 /** Build the immutable set of limits shared by relay request boundaries. */
 export function createRelayLimits(
-  encryptedEnvelopeMaxBytes: number,
-  values: Omit<RelayLimits, "encryptedEnvelopeMaxBytes" | "maxEnvelopeCiphertextChars">
+  mlsMessageMaxBytes: number,
+  values: Omit<RelayLimits, "mlsMessageMaxBytes" | "maxMlsMessageChars">
 ): Readonly<RelayLimits> {
   return Object.freeze({
     ...values,
-    encryptedEnvelopeMaxBytes,
-    maxEnvelopeCiphertextChars: Math.ceil((encryptedEnvelopeMaxBytes * 4) / 3) + 1024
+    mlsMessageMaxBytes,
+    maxMlsMessageChars: Math.ceil((mlsMessageMaxBytes * 4) / 3) + 1024
   });
 }
 
-export interface RelayEnvelopeLimitOptions {
-  encryptedEnvelopeMaxBytes: number;
-  maxEnvelopeCiphertextChars: number;
+export interface MlsMessageLimitOptions {
+  mlsMessageMaxBytes: number;
+  maxMlsMessageChars: number;
   maxEnvelopeIdChars: number;
-  maxEnvelopeNonceChars: number;
   maxDeviceIdChars: number;
   maxPublicKeyJwkChars: number;
   maxUserIdChars: number;
 }
 
-export interface EncryptedBacklogLimitOptions extends RelayEnvelopeLimitOptions {
-  encryptedBacklogLimit: number;
-  encryptedBacklogRetentionDays: number;
+export interface MlsBacklogLimitOptions extends MlsMessageLimitOptions {
+  mlsBacklogLimit: number;
+  mlsBacklogRetentionDays: number;
   now?: () => number;
 }
 
@@ -109,15 +106,6 @@ export function isRoomMode(value: unknown): value is RoomRecord["mode"] {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
   return ["chat", "code", "workspace", "browser"].every((key) => typeof candidate[key] === "boolean");
-}
-
-export function normalizeDevicePublicKeyJwk(
-  value: unknown,
-  maxPublicKeyJwkChars: number
-): DevicePublicKeyJwkType | null {
-  if (!isJsonStringifiableWithin(value, maxPublicKeyJwkChars)) return null;
-  const parsed = DevicePublicKeyJwk.safeParse(value);
-  return parsed.success ? parsed.data : null;
 }
 
 export function normalizeRoomProjectPath(value: unknown, maxRoomProjectPathChars: number): string | null {
@@ -182,34 +170,21 @@ export function normalizeBrowserAllowedOrigins(value: unknown): string[] | null 
   return Array.from(origins);
 }
 
-export function isAllowedEnvelopePayload(envelope: RelayEnvelope): boolean {
-  if (envelope.payload.algorithm === "AES-GCM-256") return true;
-  return envelope.kind === "room.invite";
-}
-
-export function isRelayEnvelopeWithinLimits(envelope: RelayEnvelope, options: RelayEnvelopeLimitOptions): boolean {
+export function isMlsMessageWithinLimits(envelope: MlsRelayMessage, options: MlsMessageLimitOptions): boolean {
   if (!normalizeMetadataText(envelope.id, options.maxEnvelopeIdChars)) return false;
   if (!normalizeMetadataText(envelope.senderUserId, options.maxUserIdChars)) return false;
   if (!normalizeMetadataText(envelope.senderDeviceId, options.maxDeviceIdChars)) return false;
-  if (!normalizeMetadataText(envelope.payload.nonce, options.maxEnvelopeNonceChars)) return false;
-  if (!envelope.payload.ciphertext || envelope.payload.ciphertext.length > options.maxEnvelopeCiphertextChars)
-    return false;
-  if (envelope.payload.algorithm === "ECDH-P256-HKDF-SHA256-AES-GCM-256") {
-    if (!isJsonStringifiableWithin(envelope.payload.ephemeralPublicKeyJwk, options.maxPublicKeyJwkChars)) return false;
-  }
-  return Buffer.byteLength(JSON.stringify(envelope), "utf8") <= options.encryptedEnvelopeMaxBytes;
+  if (!isCanonicalPaddedBase64(envelope.mlsMessage, options.maxMlsMessageChars)) return false;
+  return Buffer.byteLength(JSON.stringify(envelope), "utf8") <= options.mlsMessageMaxBytes;
 }
 
-export function pruneEncryptedBacklog(
-  envelopes: RelayEnvelope[],
-  options: EncryptedBacklogLimitOptions
-): RelayEnvelope[] {
+export function pruneMlsBacklog(envelopes: MlsRelayMessage[], options: MlsBacklogLimitOptions): MlsRelayMessage[] {
   const now = options.now ?? Date.now;
-  const cutoffMs = now() - options.encryptedBacklogRetentionDays * 24 * 60 * 60 * 1000;
+  const cutoffMs = now() - options.mlsBacklogRetentionDays * 24 * 60 * 60 * 1000;
   return envelopes
     .filter((envelope) => {
       const createdAtMs = Date.parse(envelope.createdAt);
-      return Number.isFinite(createdAtMs) && createdAtMs >= cutoffMs && isRelayEnvelopeWithinLimits(envelope, options);
+      return Number.isFinite(createdAtMs) && createdAtMs >= cutoffMs && isMlsMessageWithinLimits(envelope, options);
     })
-    .slice(-options.encryptedBacklogLimit);
+    .slice(-options.mlsBacklogLimit);
 }

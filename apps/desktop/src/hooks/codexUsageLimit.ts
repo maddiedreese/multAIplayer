@@ -1,9 +1,7 @@
 import type { RoomRecord } from "@multaiplayer/protocol";
-import { shutdownCodexRoom } from "../lib/localBackend";
 import { codexUsageLimitMessage } from "../lib/codexFailure";
 import { formatMessageTime } from "../lib/appFormatters";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
-import { updateRoomHost } from "../lib/workspaceClient";
 import type { ChatMessage, HostHandoffRecord } from "../types";
 
 interface CodexUsageLimitContext {
@@ -48,17 +46,6 @@ export async function handleCodexUsageLimit(
     },
     room
   );
-  try {
-    const handedOff = await updateRoomHost(roomId, room.host, room.hostUserId ?? context.localUserId, "handoff");
-    void shutdownCodexRoom(roomId);
-    context.replaceRoom(handedOff);
-  } catch (error) {
-    if (shouldApplyRoomScopedUiUpdate(context.selectedRoomId(), roomId))
-      context.setHostMessage(
-        roomId,
-        `Codex usage is unavailable, but host handoff could not update room host status: ${String(error)}`
-      );
-  }
   await context.publishHostHandoff(room, "usage_limit", turnMessages);
   if (shouldApplyRoomScopedUiUpdate(context.selectedRoomId(), roomId)) context.setHostMessage(roomId, message);
 }

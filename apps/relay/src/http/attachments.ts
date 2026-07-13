@@ -1,7 +1,10 @@
 import type { Express, Response } from "express";
-import { nanoid } from "nanoid";
-import { CiphertextPayload, type AttachmentBlobRecord as AttachmentBlobRecordType } from "@multaiplayer/protocol";
+import {
+  maxAttachmentBlobIdChars,
+  type AttachmentBlobRecord as AttachmentBlobRecordType
+} from "@multaiplayer/protocol";
 import type { AuthSession, RelayStore } from "../state.js";
+import { isStrictExporterCiphertextJson } from "../opaque.js";
 
 interface RegisterAttachmentRoutesOptions {
   app: Express;
@@ -59,14 +62,25 @@ export function registerAttachmentRoutes({
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
 
+    if (!hasExactKeys(req.body, ["blobId", "teamId", "roomId", "name", "type", "size", "epoch", "sealedBlob"]))
+      return void res.status(400).json({ error: "Attachment blob contains unsupported fields." });
     const teamId = String(req.body?.teamId ?? "");
     const roomId = String(req.body?.roomId ?? "");
+    const blobId = normalizeMetadataText(req.body?.blobId, maxAttachmentBlobIdChars);
     if (!store.hasTeam(teamId)) {
       res.status(404).json({ error: "Team not found" });
       return;
     }
     if (store.getRoom(roomId)?.teamId !== teamId) {
       res.status(404).json({ error: "Room not found" });
+      return;
+    }
+    if (!blobId) {
+      res.status(400).json({ error: "blobId is required and must be bounded." });
+      return;
+    }
+    if (store.getAttachmentBlob(blobId)) {
+      res.status(409).json({ error: "blobId already exists." });
       return;
     }
     if (session && !canAccessRoom(teamId, roomId, session.user.id)) {
@@ -78,7 +92,8 @@ export function registerAttachmentRoutes({
     const requestedType = String(req.body?.type ?? "file").trim() || "file";
     const type = normalizeMetadataText(requestedType, maxAttachmentBlobTypeChars);
     const size = Number(req.body?.size);
-    const payload = CiphertextPayload.safeParse(req.body?.payload);
+    const epoch = Number(req.body?.epoch);
+    const sealedBlob = typeof req.body?.sealedBlob === "string" ? req.body.sealedBlob : "";
     if (!name) {
       res.status(400).json({ error: "name must be a non-empty string up to 512 characters" });
       return;
@@ -98,13 +113,18 @@ export function registerAttachmentRoutes({
       res.status(413).json({ error: `Attachment blob size exceeds ${attachmentBlobMaxBytes} bytes` });
       return;
     }
-    if (!payload.success) {
-      res.status(400).json({ error: "payload must be a valid ciphertext payload" });
+    if (!Number.isSafeInteger(epoch) || epoch < 0 || !sealedBlob) {
+      res.status(400).json({ error: "epoch and sealedBlob are required" });
       return;
     }
-    if (payload.data.ciphertext.length > maxCiphertextCharactersForBlob(attachmentBlobMaxBytes)) {
+    if (sealedBlob.length > maxCiphertextCharactersForBlob(attachmentBlobMaxBytes)) {
       recordUploadRejection?.("ciphertext_size");
       res.status(413).json({ error: `Attachment blob ciphertext exceeds ${attachmentBlobMaxBytes} bytes` });
+      return;
+    }
+    if (!isStrictExporterCiphertextJson(sealedBlob, maxCiphertextCharactersForBlob(attachmentBlobMaxBytes))) {
+      recordUploadRejection?.("ciphertext_encoding");
+      res.status(400).json({ error: "sealedBlob must be a canonical exporter ciphertext record" });
       return;
     }
     if (session) {
@@ -140,14 +160,15 @@ export function registerAttachmentRoutes({
     }
 
     const blob: AttachmentBlobRecordType = {
-      id: `blob_${nanoid(16)}`,
+      id: blobId,
       teamId,
       roomId,
       name,
       type,
       size,
       ...(session ? { uploadedByUserId: session.user.id } : {}),
-      payload: payload.data,
+      epoch,
+      sealedBlob,
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + attachmentBlobTtlDays * 24 * 60 * 60 * 1000).toISOString()
     };
@@ -187,6 +208,12 @@ export function registerAttachmentRoutes({
     }
     res.json({ blob });
   });
+}
+
+function hasExactKeys(value: unknown, allowed: string[]): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  return keys.length === allowed.length && keys.every((key) => allowed.includes(key));
 }
 
 function consumeAttachmentUploadByteQuota({

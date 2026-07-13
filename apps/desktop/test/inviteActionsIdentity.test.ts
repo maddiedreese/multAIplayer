@@ -73,7 +73,7 @@ const inviteOptions: UseInviteActionsOptions = {
   relayRef: { current: null },
   seenEnvelopeIds: { current: new Set<string>() },
   historyLoadedRoomIds: { current: new Set<string>() },
-  reportRoomKeyRotationInFlight: () => false,
+  reportMembershipCommitInFlight: () => false,
   upsertTeam: noop,
   upsertRoom: noop,
   clearInviteSecretInput: noop,

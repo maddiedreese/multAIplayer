@@ -1,11 +1,8 @@
 import type { Express, Response } from "express";
-import { createHash, timingSafeEqual } from "node:crypto";
-import {
-  DevicePublicKeyJwk,
-  type DeviceRecord,
-  type DevicePublicKeyJwk as DevicePublicKeyJwkType
-} from "@multaiplayer/protocol";
+import { ECDH, createHash, createPublicKey, timingSafeEqual } from "node:crypto";
+import { type DeviceRecord } from "@multaiplayer/protocol";
 import type { AuthSession, RelayStore } from "../state.js";
+import { isCanonicalPaddedBase64 } from "../opaque.js";
 
 interface RegisterDeviceRoutesOptions {
   app: Express;
@@ -62,26 +59,40 @@ export function registerDeviceRoutes({
     const displayName = session
       ? normalizeMetadataText(displayNameForUser(session.user), maxDisplayNameChars)
       : normalizeMetadataText(req.body?.displayName, maxDisplayNameChars);
-    const publicKeyJwk = normalizeDevicePublicKeyJwk(req.body?.publicKeyJwk, maxPublicKeyJwkChars);
-    const publicKeyFingerprint = normalizeMetadataText(req.body?.publicKeyFingerprint, maxPublicKeyFingerprintChars);
+    const signaturePublicKey = normalizeMetadataText(req.body?.signaturePublicKey, maxPublicKeyJwkChars);
+    const hpkePublicKey = normalizeMetadataText(req.body?.hpkePublicKey, maxPublicKeyJwkChars);
+    const signatureKeyFingerprint = normalizeMetadataText(
+      req.body?.signatureKeyFingerprint,
+      maxPublicKeyFingerprintChars
+    );
+    const hpkeKeyFingerprint = normalizeMetadataText(req.body?.hpkeKeyFingerprint, maxPublicKeyFingerprintChars);
     if (!userId || !deviceId || !displayName) {
       res.status(400).json({ error: "userId, deviceId, and displayName are required" });
       return;
     }
-    if (!publicKeyJwk || !publicKeyFingerprint) {
-      res.status(400).json({ error: "A public key JWK and fingerprint are required" });
+    if (!signaturePublicKey || !hpkePublicKey || !signatureKeyFingerprint || !hpkeKeyFingerprint) {
+      res.status(400).json({ error: "MLS signature and HPKE public keys and fingerprints are required" });
+      return;
+    }
+    if (
+      !validP256Spki(signaturePublicKey, maxPublicKeyJwkChars) ||
+      !validP256HpkeKey(hpkePublicKey, maxPublicKeyJwkChars)
+    ) {
+      res.status(400).json({ error: "MLS signature and HPKE keys must be canonical P-256 public keys." });
       return;
     }
 
-    const canonicalFingerprint = fingerprintDevicePublicKey(publicKeyJwk);
-    if (!constantTimeTextEqual(publicKeyFingerprint, canonicalFingerprint)) {
-      res.status(400).json({ error: "Public key fingerprint does not match the registered public key." });
+    if (
+      !constantTimeTextEqual(signatureKeyFingerprint, fingerprintPublicKey(signaturePublicKey)) ||
+      !constantTimeTextEqual(hpkeKeyFingerprint, fingerprintPublicKey(hpkePublicKey))
+    ) {
+      res.status(400).json({ error: "Public key fingerprint does not match the registered key." });
       return;
     }
 
     const now = new Date().toISOString();
     const existing = store.getDevice(userId, deviceId);
-    if (existing && !sameDevicePublicKey(existing.publicKeyJwk, publicKeyJwk)) {
+    if (existing && (existing.signaturePublicKey !== signaturePublicKey || existing.hpkePublicKey !== hpkePublicKey)) {
       res.status(409).json({
         error:
           "This device id is already bound to a different public key. Reset the device explicitly before replacing it."
@@ -92,8 +103,10 @@ export function registerDeviceRoutes({
       userId,
       deviceId,
       displayName,
-      publicKeyJwk,
-      publicKeyFingerprint: canonicalFingerprint,
+      signaturePublicKey,
+      signatureKeyFingerprint,
+      hpkePublicKey,
+      hpkeKeyFingerprint,
       registeredAt: existing?.registeredAt ?? now,
       lastSeenAt: now
     };
@@ -128,9 +141,29 @@ export function registerDeviceRoutes({
   });
 }
 
-function fingerprintDevicePublicKey(publicKeyJwk: DevicePublicKeyJwkType): string {
-  const canonical = `{"crv":"${publicKeyJwk.crv}","kty":"${publicKeyJwk.kty}","x":"${publicKeyJwk.x}","y":"${publicKeyJwk.y}"}`;
-  const hex = createHash("sha256").update(canonical, "utf8").digest("hex");
+export function validP256Spki(value: string, maxChars: number): boolean {
+  if (!isCanonicalPaddedBase64(value, maxChars)) return false;
+  try {
+    const key = createPublicKey({ key: Buffer.from(value, "base64"), format: "der", type: "spki" });
+    return key.asymmetricKeyType === "ec" && key.asymmetricKeyDetails?.namedCurve === "prime256v1";
+  } catch {
+    return false;
+  }
+}
+
+export function validP256HpkeKey(value: string, maxChars: number): boolean {
+  if (!isCanonicalPaddedBase64(value, maxChars)) return false;
+  try {
+    const decoded = Buffer.from(value, "base64");
+    if (decoded.length !== 65 || decoded[0] !== 4) return false;
+    return ECDH.convertKey(decoded, "prime256v1", undefined, undefined, "uncompressed").length === 65;
+  } catch {
+    return false;
+  }
+}
+
+export function fingerprintPublicKey(publicKey: string): string {
+  const hex = createHash("sha256").update(Buffer.from(publicKey, "base64")).digest("hex");
   return `sha256:${hex.match(/.{1,4}/g)?.join(":") ?? hex}`;
 }
 
@@ -138,22 +171,4 @@ function constantTimeTextEqual(left: string, right: string): boolean {
   const leftBytes = Buffer.from(left, "utf8");
   const rightBytes = Buffer.from(right, "utf8");
   return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes);
-}
-
-function sameDevicePublicKey(left: DevicePublicKeyJwkType, right: DevicePublicKeyJwkType): boolean {
-  return left.kty === right.kty && left.crv === right.crv && left.x === right.x && left.y === right.y;
-}
-
-function isJsonStringifiableWithin(value: unknown, maxChars: number): boolean {
-  try {
-    return JSON.stringify(value).length <= maxChars;
-  } catch {
-    return false;
-  }
-}
-
-function normalizeDevicePublicKeyJwk(value: unknown, maxPublicKeyJwkChars: number): DevicePublicKeyJwkType | null {
-  if (!isJsonStringifiableWithin(value, maxPublicKeyJwkChars)) return null;
-  const parsed = DevicePublicKeyJwk.safeParse(value);
-  return parsed.success ? parsed.data : null;
 }

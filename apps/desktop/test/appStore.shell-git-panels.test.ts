@@ -164,7 +164,7 @@ test("desktop store exposes room busy actions", () => {
   store.setLocalPreviewBusyForRoom("room-a", true);
   store.setHostBusyForRoom("room-a", true);
   store.setSettingsBusyForRoom("room-a", true);
-  store.setKeyRotationBusyForRoom("room-a", true);
+  store.setMembershipCommitBusyForRoom("room-a", true);
   store.setFileBusyForRoom("room-a", true);
   store.setTerminalBusyForRoom("room-a", true);
   store.setGitWorkflowBusyForRoom("room-b", true);
@@ -177,7 +177,7 @@ test("desktop store exposes room busy actions", () => {
   assert.equal(state.localPreviewByRoom["room-a"]?.busy, true);
   assert.equal(state.roomSettingsByRoom["room-a"]?.hostBusy, true);
   assert.equal(state.roomSettingsByRoom["room-a"]?.settingsBusy, true);
-  assert.equal(state.inviteByRoom["room-a"]?.keyRotationBusy, true);
+  assert.equal(state.inviteByRoom["room-a"]?.membershipCommitBusy, true);
   assert.equal(state.filePanelByRoom["room-a"]?.busy, true);
   assert.equal(state.terminalRuntimeByRoom["room-a"]?.busy, true);
 });

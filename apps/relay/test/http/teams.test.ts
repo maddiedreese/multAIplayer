@@ -13,7 +13,7 @@ import {
 } from "../support/relay.js";
 
 test("relay scopes authenticated workspace access to team members and admits invitees", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" }, approvedInviteFixture("device-peer-123"));
   const maddieCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
   const peerCookie = await createDebugSession(relay.baseUrl, "github:peer", "peer");
   let peerSocket: WebSocket | null = null;
@@ -54,13 +54,7 @@ test("relay scopes authenticated workspace access to team members and admits inv
     assert.ok(memberBody.rooms.some((room) => room.id === "room-desktop"));
     assert.ok(!memberBody.rooms.some((room) => room.id === "room-github"));
 
-    const inviteResponse = await fetch(`${relay.baseUrl}/invites`, {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie: maddieCookie },
-      body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
-    });
-    assert.equal(inviteResponse.status, 201);
-    const inviteBody = (await inviteResponse.json()) as { invite: { id: string } };
+    const inviteBody = { invite: { id: "invite-approved" } };
 
     peerSocket = new WebSocket(relay.wsUrl, { headers: { cookie: peerCookie } });
     await onceOpen(peerSocket);
@@ -71,7 +65,8 @@ test("relay scopes authenticated workspace access to team members and admits inv
         roomId: "room-desktop",
         userId: "github:peer",
         deviceId: "device-peer-123",
-        inviteId: inviteBody.invite.id
+        inviteId: inviteBody.invite.id,
+        deviceSessionToken: "debug-device-session-token-000000"
       })
     );
     await waitForJoined(peerSocket);
@@ -107,19 +102,16 @@ test("relay scopes authenticated workspace access to team members and admits inv
 });
 
 test("relay revokes live room access and stale invites when a team member is removed", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const relay = await startRelay(
+    { MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" },
+    approvedInviteFixture("device-peer-removed")
+  );
   const ownerCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
   const peerCookie = await createDebugSession(relay.baseUrl, "github:peer", "peer");
   let peerSocket: WebSocket | null = null;
   let staleInviteSocket: WebSocket | null = null;
   try {
-    const inviteResponse = await fetch(`${relay.baseUrl}/invites`, {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie: ownerCookie },
-      body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
-    });
-    assert.equal(inviteResponse.status, 201);
-    const inviteBody = (await inviteResponse.json()) as { invite: { id: string } };
+    const inviteBody = { invite: { id: "invite-approved" } };
 
     peerSocket = new WebSocket(relay.wsUrl, { headers: { cookie: peerCookie } });
     await onceOpen(peerSocket);
@@ -130,7 +122,8 @@ test("relay revokes live room access and stale invites when a team member is rem
         roomId: "room-desktop",
         userId: "github:peer",
         deviceId: "device-peer-removed",
-        inviteId: inviteBody.invite.id
+        inviteId: inviteBody.invite.id,
+        deviceSessionToken: "debug-device-session-token-000000"
       })
     );
     await waitForJoined(peerSocket);
@@ -161,7 +154,8 @@ test("relay revokes live room access and stale invites when a team member is rem
         roomId: "room-desktop",
         userId: "github:peer",
         deviceId: "device-peer-stale-invite",
-        inviteId: inviteBody.invite.id
+        inviteId: inviteBody.invite.id,
+        deviceSessionToken: "debug-device-session-token-000000"
       })
     );
     assert.match(await staleInviteError, /valid invite/);
@@ -171,6 +165,44 @@ test("relay revokes live room access and stale invites when a team member is rem
     await relay.close();
   }
 });
+
+function approvedInviteFixture(deviceId: string) {
+  const createdAt = new Date().toISOString();
+  return {
+    version: 1 as const,
+    savedAt: createdAt,
+    teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+    rooms: [
+      {
+        id: "room-desktop",
+        teamId: "team-core",
+        name: "Desktop app",
+        projectPath: "/tmp/multaiplayer",
+        host: "Maddie",
+        hostUserId: "github:maddiedreese",
+        hostStatus: "active",
+        unread: 0
+      }
+    ],
+    invites: [
+      {
+        id: "invite-approved",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        approvedUserId: "github:peer",
+        approvedDeviceId: deviceId,
+        createdAt
+      }
+    ],
+    teamMembers: [
+      {
+        teamId: "team-core",
+        members: [{ userId: "github:maddiedreese", role: "owner", joinedAt: createdAt }]
+      }
+    ],
+    encryptedBacklog: []
+  };
+}
 
 test("relay assigns team creators owner role", async () => {
   const relay = await startRelay({

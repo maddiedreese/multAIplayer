@@ -5,14 +5,13 @@ import type {
   CodexQueuePlaintextPayload,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
-  RelayEnvelope,
+  MlsRelayMessage,
   RequestStatusPlaintextPayload,
   RoomRecord,
   RoomSettingsPlaintextPayload,
   TerminalResultPlaintextPayload
 } from "@multaiplayer/protocol";
-import { loadOrCreateRoomSecret } from "../lib/localHistory";
-import { createEncryptedRoomEnvelope, roomKeyEpoch } from "../lib/encryptedEnvelope";
+import { createMlsApplicationMessage, publishMlsApplicationMessage } from "../lib/mlsApplicationMessage";
 import type { RelayClient } from "../lib/relayClient";
 import { buildRoomSettingsSystemMessage } from "../lib/roomSettingsMessages";
 import { buildCodexEventLine } from "../lib/activityLines";
@@ -80,17 +79,16 @@ export function useRelayPublishers({
     };
   }
 
-  async function publishEnvelope(envelope: RelayEnvelope) {
+  async function publishMlsMessage(envelope: MlsRelayMessage) {
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
     seenEnvelopeIds.current.add(envelope.id);
-    client.publish({ type: "publish", envelope });
+    await publishMlsApplicationMessage(client, envelope);
   }
 
-  async function publishPlaintext(room: RoomRecord, kind: RelayEnvelope["kind"], createdAt: string, payload: unknown) {
-    const secret = await loadOrCreateRoomSecret(room.id);
-    await publishEnvelope(
-      await createEncryptedRoomEnvelope(
+  async function publishPlaintext(room: RoomRecord, kind: string, createdAt: string, payload: unknown) {
+    await publishMlsMessage(
+      await createMlsApplicationMessage(
         {
           id: crypto.randomUUID(),
           teamId: room.teamId,
@@ -98,11 +96,9 @@ export function useRelayPublishers({
           senderDeviceId: deviceId,
           senderUserId: localUser.id,
           createdAt,
-          kind,
-          keyEpoch: roomKeyEpoch(room)
+          kind
         },
-        payload,
-        secret
+        payload
       )
     );
   }

@@ -21,7 +21,7 @@ Open `docs/product-architecture.md`, then `docs/threat-model.md`. Explain that t
 Show the root workspaces:
 
 - `packages/protocol`: shared records and runtime guards;
-- `packages/crypto`: room encryption, key epochs, invites, and device wrapping;
+- `apps/desktop/src-tauri/crates/mls-core`: MLS groups, credentials, HPKE invite sealing, encrypted state, and exporter use;
 - `packages/codex`, `packages/git`, and `packages/github`: host-side adapters;
 - `apps/relay`: HTTP/WebSocket transport, authorization, persistence, and limits;
 - `apps/desktop`: React state/UI plus the Tauri Rust boundary;
@@ -32,7 +32,7 @@ Point out that imports are intentionally directional and `scripts/eslint-boundar
 
 ## 6:00 — One encrypted message
 
-Follow `docs/message-lifecycles.md` from a desktop action through protocol encoding, client encryption, relay persistence/broadcast, and recipient decryption. Show that the relay stores an envelope rather than chat plaintext. Mention that cryptographic behavior belongs in `packages/crypto`, not React components or relay handlers.
+Follow `docs/message-lifecycles.md` from a desktop intent through Rust MLS encryption, opaque relay persistence/broadcast, and Rust MLS decryption. Show that the relay stores an opaque MLS message rather than chat plaintext. Mention that group cryptography belongs in the Rust MLS core, not React components or relay handlers.
 
 ## 9:00 — One privileged host action
 

@@ -2,7 +2,7 @@
 
 The relay is intended to be self-hostable. In v1 it routes encrypted room events and manages presence; it does not call OpenAI or store plaintext chat transcripts.
 
-Teams moving from the hosted relay to their own relay should use the [hosted-to-self-hosted migration procedure](release-operations.md#hosted-to-self-hosted-migration). The short version is: deploy and verify a self-hosted relay, build the desktop with its self-host relay origins allowed and relay editing enabled, change each desktop app's Settings drawer to those URLs, recreate team/room membership with fresh invites, and rely on each device's local room keys and encrypted local history for continuity.
+Teams moving from the hosted relay to their own relay should use the [hosted-to-self-hosted migration procedure](release-operations.md#hosted-to-self-hosted-migration). The short version is: deploy and verify a self-hosted relay, build the desktop with its self-host relay origins allowed and relay editing enabled, change each desktop app's Settings drawer to those URLs, recreate team/room membership with fresh KeyPackage invites, and preserve each device's native MLS state and encrypted local history for continuity.
 
 Supported alpha self-hosting requirements:
 
@@ -56,7 +56,17 @@ docker run --rm -p 4321:4321 \
   multaiplayer-relay:alpha
 ```
 
-The image sets `NODE_ENV=production`, `PORT=4321`, `MULTAIPLAYER_RELAY_STORAGE=sqlite`, and `MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite` by default. The container healthcheck reads `/healthz`; point platform readiness at `/readyz`. During shutdown, `/readyz` reports not-ready, new HTTP requests and WebSocket upgrades are rejected, existing room WebSockets close with code `1012` (`Service Restart`), and the relay store is flushed before exit. Give the process a termination grace period long enough for the flush to complete.
+The image sets `NODE_ENV=production`, `PORT=4321`, `MULTAIPLAYER_RELAY_STORAGE=sqlite`, `MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite`, and the bundled `MULTAIPLAYER_MLS_VALIDATOR_PATH` by default. The container healthcheck reads `/healthz`; point platform readiness at `/readyz`. During shutdown, `/readyz` reports not-ready, new HTTP requests and WebSocket upgrades are rejected, existing room WebSockets close with code `1012` (`Service Restart`), and the relay store is flushed before exit. Give the process a termination grace period long enough for the flush to complete.
+
+For a source checkout, build the fail-closed public KeyPackage validator before starting the relay:
+
+```bash
+cd apps/desktop/src-tauri
+cargo build --locked --release -p mls-core --bin mls-keypackage-validator
+export MULTAIPLAYER_MLS_VALIDATOR_PATH="$PWD/target/release/mls-keypackage-validator"
+```
+
+Production startup and `doctor:production-relay` reject a missing validator path; the relay never substitutes a TypeScript MLS parser.
 
 ## Relay Storage
 
@@ -81,7 +91,7 @@ MULTAIPLAYER_RELAY_STORAGE=sqlite
 MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
 ```
 
-SQLite uses WAL mode and transactional writes to normalized relay tables for teams, rooms, invites, device keys, encrypted backlog, encrypted attachment blobs, team membership, and encrypted GitHub sessions. It is the required alpha storage backend for hosted relays because it is more crash-safe than replacing one JSON file. JSON storage remains an explicit compatibility option for local development and migration; it is never selected implicitly.
+SQLite uses WAL mode and transactional writes to normalized relay tables for teams, rooms, invites, device public keys, KeyPackages, opaque MLS backlog, sealed attachment blobs, team membership, and encrypted GitHub sessions. It also provides the compare-and-swap transition that accepts only one Commit for an expected room epoch. It is the required alpha storage backend for hosted relays because it is more crash-safe than replacing one JSON file. JSON storage remains an explicit compatibility option for local development and migration; it is never selected implicitly.
 
 For upgrade continuity, a relay started with neither storage variable set checks the former default path `.multaiplayer/relay-store.json` before initializing the default SQLite database. It imports a valid version-1 snapshot transactionally, then renames the JSON source to `relay-store.json.migrated-to-sqlite`. Restarts load only the committed SQLite state, so the import is idempotent. An unreadable or unsupported legacy snapshot aborts startup and remains in place for operator recovery; it never falls through to an empty store. Explicit storage or data-path settings are never auto-migrated. Back up the JSON file first and use the explicit migration runbook when operating outside these defaults.
 
@@ -91,10 +101,11 @@ The alpha store contains:
 
 - teams and room records;
 - known team member ids used for metadata counts;
-- device ECDH public keys and fingerprints;
+- device MLS signature and HPKE public keys and fingerprints;
 - invite metadata;
-- encrypted WebSocket message envelopes and ciphertext payloads;
-- encrypted attachment blob ciphertext and metadata.
+- public single-use MLS KeyPackages;
+- opaque MLS messages, sealed invite requests, and Welcome blobs;
+- exporter-sealed attachment blobs and metadata;
 - encrypted GitHub session access tokens, only when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured.
 
 It does not contain:
@@ -123,7 +134,7 @@ MULTAIPLAYER_RELAY_BACKLOG_LIMIT=200
 MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS=30
 ```
 
-These limits apply to ciphertext envelopes only. Plaintext live metadata such as presence and `room.updated` broadcasts is not stored in the encrypted backlog.
+These limits apply to opaque MLS messages only. Plaintext live metadata such as presence and `room.updated` broadcasts is not stored in the MLS backlog.
 
 Expired reconnect backlog entries are pruned on load, publish, debug inspection, and relay store save.
 
@@ -133,7 +144,7 @@ Invite metadata expires by default:
 MULTAIPLAYER_RELAY_INVITE_TTL_DAYS=7
 ```
 
-The relay stores invite metadata and registered public device keys, not room keys. Current invite links contain a private bearer capability and the active host's public binding. The capability fragment is not sent in HTTP requests and crosses relay transport only inside a request sealed to the host key; the issuer's capability verifier is desktop-local. Operators should redact complete invite URLs and fragments from logs and support artifacts. Host approval returns the current epoch key in an authenticated host-to-device wrap sealed to the validated requester. Legacy room-key-bearing links are scrubbed from browser history and rejected.
+The relay stores invite metadata, registered public device keys, and public single-use KeyPackages, not MLS private state or group secrets. Current invite links contain a private bearer capability and the active host's public HPKE binding. The capability fragment is not sent in HTTP requests and crosses relay transport only inside an RFC 9180 HPKE request sealed to the host; the issuer's capability verifier is desktop-local. Operators should redact complete invite URLs and fragments from logs and support artifacts. Approval consumes the exact request-bound KeyPackage, publishes an Add Commit, and delivers a one-shot MLS Welcome to the authenticated requester. Pre-v2 links are rejected.
 
 Encrypted attachment blobs are also bounded and pruned:
 
@@ -145,15 +156,15 @@ MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW=100000000
 MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_WINDOW_MS=3600000
 ```
 
-The max-bytes setting limits both the declared plaintext attachment size and the ciphertext field size accepted by the relay. The live quota limits the total unexpired encrypted attachment blob volume per signed-in user. The upload bytes quota limits burst upload volume in the configured window. Blob payloads are still ciphertext; these limits are for relay storage and request-size control, not content inspection.
+The max-bytes setting limits both the declared attachment size and the exporter-sealed blob size accepted by the relay. The live quota limits the total unexpired sealed attachment volume per signed-in user. The upload bytes quota limits burst upload volume in the configured window. Blob payloads remain opaque; these limits are for relay storage and request-size control, not content inspection.
 
-Encrypted room events are also bounded before they enter WebSocket fanout or backlog:
+Opaque MLS messages are also bounded before they enter WebSocket fanout or backlog:
 
 ```bash
-MULTAIPLAYER_RELAY_ENVELOPE_MAX_BYTES=1000000
+MULTAIPLAYER_RELAY_MLS_MESSAGE_MAX_BYTES=1000000
 ```
 
-This caps the serialized encrypted envelope, including ids, sender fields, nonce, ciphertext, and device-sealed invite key material. Larger file previews should use encrypted attachment blobs instead of oversized room events.
+This legacy-named configuration variable caps the serialized MLS routing record and opaque MLS blob. Invite requests, Welcomes, and KeyPackages have their own independent bounds. Larger file previews should use exporter-sealed attachment storage instead of oversized MLS application messages.
 
 Expired invites and encrypted attachment blobs are pruned when loaded from disk, when the relay store is saved, and when debug state is inspected. Direct reads of an expired invite or blob return an expired response and remove the record.
 
@@ -172,12 +183,11 @@ MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER=20
 MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE=5
 MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
 MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=false
-MULTAIPLAYER_RELAY_EPOCH_ENVELOPE_LIMIT=1000000
 ```
 
 These limits are keyed by signed-in session when available, otherwise by client IP. By default, the relay uses the direct socket address and ignores `X-Forwarded-For`, because direct internet clients can spoof that header. Forwarded addresses are used only when both proxy variables are true. Set them only when a trusted reverse proxy removes client-supplied forwarding headers and writes its own; the production doctor rejects the unsafe one-sided configuration. HTTP requests over the limit receive `429` with `Retry-After`; room WebSocket clients receive an encrypted-room-safe error message and remain connected. The alpha limiter is process-local, so multi-instance deployments should add an edge or shared-store limiter in front of the relay.
 
-The relay also enforces a durable envelope budget for each room-key epoch. A monotonic count is stored with the room independently of backlog retention and survives restarts. At the ceiling, ordinary publishes stop and the active host must publish a `room.key` transition; that transition remains permitted and atomically resets the counter for the next epoch, so the room cannot deadlock. The one-million-envelope default keeps random 96-bit AES-GCM nonce use far below its birthday bound without disrupting realistic rooms.
+MLS derives per-message keys and nonces from its key schedule, so protocol v2 has no cryptographic nonce budget or per-epoch envelope counter. Generic rate, size, backlog, and socket limits remain abuse controls. Commits are instead serialized by expected epoch and active-host identity.
 
 Concurrent WebSocket connection caps are also enforced per signed-in user when available, otherwise per client identity, and per room device id after join. These caps are intentionally above normal use; they exist to prevent a runaway client from holding unbounded sockets.
 
@@ -209,9 +219,9 @@ MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
 
 Each response includes an `x-request-id` header. The relay accepts a bounded incoming `x-request-id` or generates one. Logs include request method, path, status code, duration, and request id; they do not include room plaintext, encrypted payload bodies, attachment contents, GitHub tokens, Codex credentials, terminal output, browser pages, or repo files.
 
-Startup, shutdown, configuration rejection, persistence, and quarantine events use the same structured JSON envelope even when request logging is disabled. Those operational events use stable event names and bounded scalar fields; invalid environment values, local store paths, and raw error objects are deliberately omitted.
+Startup, shutdown, configuration rejection, persistence, and quarantine events use the same structured JSON log record even when request logging is disabled. Those operational events use stable event names and bounded scalar fields; invalid environment values, local store paths, and raw error objects are deliberately omitted.
 
-The relay also exposes content-free operational counters at `/metrics`, including active sockets, live encrypted blob count and bytes, published envelope count, accepted attachment upload count and bytes, upload rejection counts by reason, rate-limit rejection counts by bucket, quota rejection counts by quota type, WebSocket connection attempt/accept/rejection counts, start time, and uptime.
+The relay also exposes content-free operational counters at `/metrics`, including active sockets, live sealed-blob count and bytes, published opaque-message count, accepted attachment upload count and bytes, upload rejection counts by reason, rate-limit rejection counts by bucket, quota rejection counts by quota type, WebSocket connection attempt/accept/rejection counts, start time, and uptime.
 
 Graceful shutdown timing is configurable:
 
@@ -286,7 +296,7 @@ The alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER
 
 ## Migrating From The Hosted Relay
 
-The relay does not hold plaintext room history or room keys. Migrating from the hosted relay to a self-hosted relay is therefore a membership and routing cutover, not a server-side transcript export.
+The relay does not hold plaintext room history, MLS private state, or exporter-derived history secrets. Migrating from the hosted relay to a self-hosted relay is therefore a membership and routing cutover, not a server-side transcript export.
 
 Use the [release operations migration procedure](release-operations.md#hosted-to-self-hosted-migration) for the full procedure and verification checklist. Plan to:
 

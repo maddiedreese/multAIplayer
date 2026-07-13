@@ -5,7 +5,7 @@ import type { AuthSession, RelayStore } from "../state.js";
 interface RegisterDebugRoutesOptions {
   app: Express;
   debugEndpointsEnabled: boolean;
-  store: Pick<RelayStore, "allEncryptedBacklogEntries">;
+  store: Pick<RelayStore, "allMlsBacklogEntries">;
   invites: Map<string, unknown>;
   attachmentBlobs: Map<string, unknown>;
   authSessions: Map<string, AuthSession>;
@@ -44,15 +44,14 @@ export function registerDebugRoutes({
     res.json({
       invites: invites.size,
       attachmentBlobs: attachmentBlobs.size,
-      rooms: store.allEncryptedBacklogEntries().map(([key, envelopes]) => ({
+      rooms: store.allMlsBacklogEntries().map(([key, messages]) => ({
         key,
-        envelopes: envelopes.length,
-        sample: envelopes.at(-1)
+        messages: messages.length,
+        sample: messages.at(-1)
           ? {
-              id: envelopes.at(-1)?.id,
-              kind: envelopes.at(-1)?.kind,
-              payloadAlgorithm: envelopes.at(-1)?.payload.algorithm,
-              ciphertextBytes: envelopes.at(-1)?.payload.ciphertext.length
+              id: messages.at(-1)?.id,
+              messageType: messages.at(-1)?.messageType,
+              encodedBytes: messages.at(-1)?.mlsMessage.length
             }
           : null
       }))

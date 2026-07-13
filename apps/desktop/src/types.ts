@@ -5,11 +5,9 @@ import type {
   CodexEventPlaintextPayload,
   CodexActivityPlaintextPayload,
   CodexTurnSummary,
-  DevicePublicKeyJwk as DevicePublicKeyJwkType,
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload,
   HostHandoffPlaintextPayload,
-  InviteJoinRequestPlaintextPayload,
   LocalPreviewPlaintextPayload,
   TerminalRequestPlaintextPayload,
   WorkspaceFileSaveRequestPlaintextPayload
@@ -112,7 +110,17 @@ export interface BrowserStatus {
   fileUploadsBlocked: boolean;
 }
 
-export interface InviteJoinRequest extends InviteJoinRequestPlaintextPayload {
+export interface InviteJoinRequest {
+  id: string;
+  inviteId: string;
+  requester: string;
+  requesterUserId: string;
+  requesterDeviceId: string;
+  keyPackageId: string;
+  keyPackageHash: string;
+  requesterSignatureKeyFingerprint?: string;
+  requestedAt: string;
+  note?: string;
   status: "pending" | "approved" | "denied";
 }
 
@@ -143,7 +151,10 @@ export interface CodexAgentTreeNode {
 }
 
 export interface HostHandoffRecord extends HostHandoffPlaintextPayload {
-  status: "available" | "accepted";
+  status: "available" | "requested" | "accepted";
+  candidateUserId?: string;
+  candidateDeviceId?: string;
+  candidateLeaf?: number;
 }
 
 export type LocalPreviewRecord = LocalPreviewPlaintextPayload;
@@ -165,16 +176,17 @@ export interface MarkdownCopyFallback {
 }
 
 export interface NoSecretRoomInvite {
-  version: 3;
+  version: 4;
   teamId: string;
   roomId: string;
   roomName: string;
-  inviteCapability: string;
-  keyEpoch: number;
+  capabilityHandle: string;
+  capabilityUrlValue: string;
+  expiresAt: string;
   hostUserId: string;
   hostDeviceId: string;
-  hostPublicKeyJwk: DevicePublicKeyJwkType;
-  hostPublicKeyFingerprint: string;
+  hostHpkePublicKey: string;
+  hostHpkeKeyFingerprint: string;
 }
 
 export interface LocalRoomHistoryPayload {

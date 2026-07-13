@@ -14,6 +14,7 @@ const productionRelayEnv = {
   MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED: "false",
   MULTAIPLAYER_RELAY_STORAGE: "sqlite",
   MULTAIPLAYER_RELAY_DATA_PATH: ".multaiplayer/relay-store.sqlite",
+  MULTAIPLAYER_MLS_VALIDATOR_PATH: process.execPath,
   MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "5000000",
   MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES: "250000000",
   MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW: "100000000",
@@ -30,11 +31,21 @@ test("production relay doctor accepts a hardened representative environment", ()
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_RATE_LIMITS: rate limits enabled/);
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_STORAGE: sqlite storage configured/);
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_DATA_PATH: configured/);
+  assert.match(result.stdout, /production MULTAIPLAYER_MLS_VALIDATOR_PATH: configured executable/);
   assert.match(result.stdout, /production MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW: configured/);
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT: configured/);
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER: configured/);
   assert.doesNotMatch(result.stdout, /\bcargo:/);
   assert.doesNotMatch(result.stdout, /\brustc:/);
+});
+
+test("production relay doctor rejects a missing MLS validator executable", () => {
+  const result = runProductionDoctor({
+    ...productionRelayEnv,
+    MULTAIPLAYER_MLS_VALIDATOR_PATH: "/definitely/missing/mls-validator"
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /MLS_VALIDATOR_PATH: must point to an executable validator/);
 });
 
 test("production relay doctor rejects unsupported storage backends", () => {

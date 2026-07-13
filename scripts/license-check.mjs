@@ -7,7 +7,6 @@ const projectPackagePaths = [
   "apps/desktop/package.json",
   "apps/relay/package.json",
   "packages/protocol/package.json",
-  "packages/crypto/package.json",
   "packages/codex/package.json",
   "packages/git/package.json",
   "packages/github/package.json"

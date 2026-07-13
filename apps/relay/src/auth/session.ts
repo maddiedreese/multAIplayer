@@ -2,7 +2,7 @@ import type { CookieOptions, Response } from "express";
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import { parseCookie } from "cookie";
-import { isRecord } from "@multaiplayer/protocol";
+import { SessionAccessTokenCiphertext, isRecord } from "@multaiplayer/protocol";
 import { normalizeMetadataText, normalizeRelayId } from "../limits.js";
 import type { AuthSession } from "../state.js";
 
@@ -28,12 +28,7 @@ export interface StoredAuthSession {
   user: AuthSession["user"];
   expiresAt: number;
   accessToken?: string;
-  encryptedAccessToken?: {
-    algorithm: "AES-GCM-256";
-    nonce: string;
-    ciphertext: string;
-    tag: string;
-  };
+  encryptedAccessToken?: SessionAccessTokenCiphertext;
 }
 
 export interface NormalizedStoredAuthSession {
@@ -47,7 +42,6 @@ interface RelayAuthSessionPersistenceOptions {
   maxAuthSessionIdChars: number;
   maxDisplayNameChars: number;
   maxEncryptedAccessTokenChars: number;
-  maxEnvelopeNonceChars: number;
   maxRoomProjectPathChars: number;
   maxUserIdChars: number;
   sessionPersistenceSecret?: string | null;
@@ -129,7 +123,6 @@ export function createRelayAuthSessionPersistence({
   maxAuthSessionIdChars,
   maxDisplayNameChars,
   maxEncryptedAccessTokenChars,
-  maxEnvelopeNonceChars,
   maxRoomProjectPathChars,
   maxUserIdChars,
   sessionPersistenceSecret
@@ -162,16 +155,10 @@ export function createRelayAuthSessionPersistence({
 
   function decryptStoredAccessToken(stored: Record<string, unknown>): string | null {
     if (!sessionPersistenceSecret || !isRecord(stored.encryptedAccessToken)) return null;
-    const encrypted = stored.encryptedAccessToken;
-    if (
-      encrypted.algorithm !== "AES-GCM-256" ||
-      typeof encrypted.nonce !== "string" ||
-      typeof encrypted.ciphertext !== "string" ||
-      typeof encrypted.tag !== "string" ||
-      encrypted.nonce.length > maxEnvelopeNonceChars ||
-      encrypted.ciphertext.length > maxEncryptedAccessTokenChars ||
-      encrypted.tag.length > maxEnvelopeNonceChars
-    ) {
+    const parsed = SessionAccessTokenCiphertext.safeParse(stored.encryptedAccessToken);
+    if (!parsed.success) return null;
+    const encrypted = parsed.data;
+    if (encrypted.ciphertext.length > maxEncryptedAccessTokenChars || encrypted.ciphertext.length < 1) {
       return null;
     }
     try {

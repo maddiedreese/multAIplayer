@@ -26,7 +26,6 @@ export function buildRoomInspectorCapabilities(sources: RoomInspectorSources): R
     invite: {
       onCopyInvite: sources.inviteActions.copyInviteLink,
       onImportInvite: sources.inviteActions.joinInviteSecret,
-      onRotateRoomKey: sources.inviteActions.rotateSelectedRoomKey,
       onDecideInviteRequest: sources.inviteActions.decideInviteJoinRequest
     },
     settings: {

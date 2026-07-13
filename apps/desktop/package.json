@@ -9,7 +9,6 @@
     "build": "tsc --noEmit && vite build && node ../../scripts/verify-desktop-security-deps.mjs",
     "check": "tsc --noEmit",
     "test": "node ../../scripts/run-desktop-tests.mjs",
-    "test:security-journey": "tsx --test --test-reporter=junit test/scriptedSecurityJourney.test.ts",
     "test:smoke": "node ../../scripts/run-desktop-tests.mjs --smoke-only",
     "preview": "vite preview",
     "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
@@ -17,7 +16,6 @@
     "tauri:build:prebuilt": "tauri build --config src-tauri/tauri.prebuilt.conf.json"
   },
   "dependencies": {
-    "@multaiplayer/crypto": "0.1.0-alpha.0",
     "@multaiplayer/git": "0.1.0-alpha.0",
     "@multaiplayer/github": "0.1.0-alpha.0",
     "@multaiplayer/protocol": "0.1.0-alpha.0",

@@ -48,17 +48,34 @@ class MemoryStorage {
 }
 
 const localStorage = new MemoryStorage();
+let nativeHistory: string | null = null;
+(globalThis as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {
+  invoke: async (command: string, args: { request?: { plaintext?: string } }) => {
+    if (command === "mls_history_save") {
+      nativeHistory = args.request?.plaintext ?? null;
+      return 1;
+    }
+    if (command === "mls_history_load_latest") return nativeHistory;
+    if (command === "mls_history_retention_set") return 1;
+    if (command === "mls_history_delete_all") {
+      nativeHistory = null;
+      return null;
+    }
+    throw new Error(`Unexpected native command: ${command}`);
+  }
+};
 Object.defineProperty(globalThis, "localStorage", {
   configurable: true,
   value: localStorage
 });
 Object.defineProperty(globalThis, "window", {
   configurable: true,
-  value: {}
+  value: globalThis
 });
 
 test.beforeEach(() => {
   localStorage.clear();
+  nativeHistory = null;
 });
 
 test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, browser, GitHub, handoff, history, and locks", async () => {
@@ -214,7 +231,7 @@ test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, brow
   });
   assert.match(hostHandoffDetail(handoff), /out of Codex usage/);
 
-  saveHistorySettings(room.id, { enabled: true, retentionDays: 30 });
+  await saveHistorySettings(room.id, { enabled: true, retentionDays: 30 });
   await saveEncryptedHistory(room.id, { messages, handoffs: [handoff] });
   assert.doesNotMatch(localStorage.dump(), /onboarding progress|docs\/checklists\/run-18\.md|Codex usage/);
   const restored = await loadEncryptedHistory<{ messages: CodexChatMessage[]; handoffs: unknown[] }>(room.id);

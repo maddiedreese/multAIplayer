@@ -10,7 +10,7 @@ Every commit must include a `Signed-off-by` trailer certifying the [Developer Ce
 
 ## Security-boundary changes
 
-Keep changes under `packages/crypto`, `packages/protocol`, and `apps/desktop/src-tauri` small, explicit, and independently testable. Pull requests should identify AI-authored security-boundary changes and report the focused property, fuzz, mutation, or native checks that apply. This project currently has one maintainer, so it does not require a separate human or code-owner approval that the sole maintainer could never supply; required CI and branch protection remain the merge gate.
+Keep changes to the Rust MLS core, `packages/protocol`, and `apps/desktop/src-tauri` small, explicit, and independently testable. Pull requests should identify AI-authored security-boundary changes and report the focused property, fuzz, mutation, or native checks that apply. This project currently has one maintainer, so it does not require a separate human or code-owner approval that the sole maintainer could never supply; required CI and branch protection remain the merge gate.
 
 Dependency advisory handling and coverage gates are documented in [Dependency security](docs/dependency-security.md). Workflow purpose and merge impact are in [CI policy](docs/ci-policy.md). Accessibility expectations and the honest localization status are in [Accessibility and localization](docs/accessibility-and-localization.md).
 Native failure-handling rules and fail-closed redaction initialization are documented in [Rust panic policy](docs/rust-panic-policy.md).
@@ -52,7 +52,7 @@ Run the relay or desktop web shell separately with `npm run dev:relay` or `npm r
 - `apps/desktop/src` contains the React desktop UI, hooks, stores, and local backend adapters.
 - `apps/desktop/src-tauri/src` contains native Rust commands, split by capability; `lib.rs` wires those modules into Tauri.
 - `apps/relay/src/server.ts` composes the relay from focused `http`, `ws`, and `auth` handlers plus state, persistence, limits, and lifecycle modules.
-- `packages/protocol` defines shared wire records and defaults; `packages/crypto` owns encrypted payload primitives.
+- `packages/protocol` defines shared public wire records and defaults; the Rust MLS core owns group and pairwise cryptographic operations.
 - `packages/codex`, `packages/git`, and `packages/github` isolate integrations used by the desktop and relay applications.
 - `docs/message-lifecycles.md` traces chat messages and Codex turns vertically through the files they touch.
 - `docs/decisions` records cross-cutting architecture and trust decisions that contributors must preserve or explicitly supersede.
@@ -67,7 +67,7 @@ Run the smallest relevant loop while iterating, then run `npm run verify` before
 | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Relay HTTP, WebSocket, auth, persistence, or limits                                                   | `npm run check -w @multaiplayer/relay` and `npm run test -w @multaiplayer/relay`; run `npm run test:fuzz -w @multaiplayer/relay` after parser/schema changes and `npm run test:mutation -w @multaiplayer/relay` after authorization changes                                                                                                                      |
 | Desktop React UI, hooks, stores, or adapters                                                          | `npm run check -w @multaiplayer/desktop` and `npm run test:smoke -w @multaiplayer/desktop`; run `npm run test -w @multaiplayer/desktop` before handoff                                                                                                                                                                                                           |
-| One shared package                                                                                    | `npm run check -w @multaiplayer/protocol` and `npm run test -w @multaiplayer/protocol`, replacing `protocol` with `crypto`, `codex`, `git`, or `github` as needed; crypto authorization or validation changes require `npm run test:mutation -w @multaiplayer/crypto`, and protocol type-guard changes require `npm run test:mutation -w @multaiplayer/protocol` |
+| One shared package                                                                                    | `npm run check -w @multaiplayer/protocol` and `npm run test -w @multaiplayer/protocol`, replacing `protocol` with `codex`, `git`, or `github` as needed; protocol type-guard changes require `npm run test:mutation -w @multaiplayer/protocol` |
 | Native Tauri/Rust code                                                                                | `npm run fmt:rust:check` and `npm run test:native`                                                                                                                                                                                                                                                                                                               |
 | Native packaging, Tauri config, browser windows, Keychain, terminals, or Codex app-server integration | Native checks above, then `npm run tauri:build -w @multaiplayer/desktop`                                                                                                                                                                                                                                                                                         |
 | Cross-cutting TypeScript or workspace configuration                                                   | `npm run verify:web`                                                                                                                                                                                                                                                                                                                                             |
@@ -75,11 +75,11 @@ Run the smallest relevant loop while iterating, then run `npm run verify` before
 
 Use `npm run format` to apply the repository's Prettier baseline. `npm run verify` lints and checks formatting for TypeScript and JavaScript, type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the workspaces.
 
-The relay fuzz suite feeds seedable arbitrary bytes, recursive JSON values, and mutated valid envelopes/messages through the protocol schemas. It runs 100,000 cases by default; reproduce or tune a run with `MULTAIPLAYER_RELAY_FUZZ_SEED` and `MULTAIPLAYER_RELAY_FUZZ_ITERATIONS`.
+The relay fuzz suite feeds seedable arbitrary bytes, recursive JSON values, and mutated valid MLS routing records/messages through the protocol schemas. It runs 100,000 cases by default; reproduce or tune a run with `MULTAIPLAYER_RELAY_FUZZ_SEED` and `MULTAIPLAYER_RELAY_FUZZ_ITERATIONS`.
 
 ### Engineering guidelines
 
-- Keep relay plaintext minimal. The relay may route metadata, but chat bodies, attachments, terminal output, Codex events, Git events, browser requests, and invite approval content should remain encrypted envelopes.
+- Keep relay plaintext minimal. The relay may route bounded metadata and public KeyPackages, but chat bodies, attachment contents, terminal output, Codex events, Git events, browser requests, and invite approval content must remain inside opaque MLS, HPKE, Welcome, or exporter-sealed payloads.
 - Prefer small, testable security boundaries over broad trust assumptions.
 - Keep native project file access confined to the selected project root.
 - Treat browser pages, terminal output, `.env` files, credentials, and signed-in sessions as sensitive by default.

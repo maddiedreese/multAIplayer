@@ -1,14 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RelayEnvelope, TeamMemberRecord } from "@multaiplayer/protocol";
-import { createRelayAuthz } from "../src/authz.js";
 import {
   createRelayLimits,
-  isAllowedEnvelopePayload,
   isApprovalDelegationPolicy,
   isApprovalPolicy,
   isJsonStringifiableWithin,
-  isRelayEnvelopeWithinLimits,
+  isMlsMessageWithinLimits,
   isRoomMode,
   maxCiphertextCharactersForBlob,
   normalizeBrowserAllowedOrigins,
@@ -18,273 +15,173 @@ import {
   normalizeCodexReasoningEffortOrDefault,
   normalizeCodexSpeed,
   normalizeCodexSpeedOrDefault,
-  normalizeDevicePublicKeyJwk,
   normalizeMetadataText,
   normalizeOptionalMetadataText,
   normalizeRelayId,
   normalizeRoomProjectPath,
   normalizeTeamRole,
   parseIntegerValue,
-  pruneEncryptedBacklog
+  pruneMlsBacklog
 } from "../src/limits.js";
-import { InMemoryRelayStore } from "../src/state.js";
-
-const joinedAt = "2026-07-11T00:00:00.000Z";
-
-function member(userId: string, role: TeamMemberRecord["role"]): TeamMemberRecord {
-  return { userId, role, joinedAt };
-}
-
-function envelope(overrides: Partial<RelayEnvelope> = {}): RelayEnvelope {
-  return {
-    id: "event_1",
-    teamId: "team_1",
-    roomId: "room_1",
-    senderDeviceId: "device_1",
-    senderUserId: "user_1",
-    createdAt: joinedAt,
-    kind: "chat.message",
-    keyEpoch: 1,
-    payload: { version: 3, algorithm: "AES-GCM-256", nonce: "nonce", ciphertext: "ciphertext" },
-    ...overrides
-  };
-}
-
-test("relay limits derive the ciphertext allowance and remain immutable", () => {
+import { createRelayAuthz } from "../src/authz.js";
+import { createRelayStore } from "../src/state.js";
+const message = {
+  id: "m",
+  teamId: "team",
+  roomId: "room",
+  senderUserId: "user",
+  senderDeviceId: "device-1",
+  createdAt: new Date().toISOString(),
+  messageType: "application" as const,
+  epochHint: 0,
+  mlsMessage: "AA=="
+};
+test("MLS routing boundaries reject control text and oversize blobs", () => {
+  assert.equal(normalizeMetadataText("bad\0id", 32), null);
+  assert.equal(
+    isMlsMessageWithinLimits(message, {
+      mlsMessageMaxBytes: 1024,
+      maxMlsMessageChars: 32,
+      maxEnvelopeIdChars: 32,
+      maxDeviceIdChars: 32,
+      maxPublicKeyJwkChars: 4096,
+      maxUserIdChars: 128
+    }),
+    true
+  );
+  assert.equal(
+    isMlsMessageWithinLimits(
+      { ...message, mlsMessage: "x".repeat(33) },
+      {
+        mlsMessageMaxBytes: 1024,
+        maxMlsMessageChars: 32,
+        maxEnvelopeIdChars: 32,
+        maxDeviceIdChars: 32,
+        maxPublicKeyJwkChars: 4096,
+        maxUserIdChars: 128
+      }
+    ),
+    false
+  );
+});
+test("MLS backlog retention is bounded", () =>
+  assert.equal(
+    pruneMlsBacklog([message], {
+      mlsMessageMaxBytes: 1024,
+      maxMlsMessageChars: 32,
+      maxEnvelopeIdChars: 32,
+      maxDeviceIdChars: 32,
+      maxPublicKeyJwkChars: 4096,
+      maxUserIdChars: 128,
+      mlsBacklogLimit: 1,
+      mlsBacklogRetentionDays: 30
+    }).length,
+    1
+  ));
+test("relay authorization remains membership scoped", () => {
+  const store = createRelayStore();
+  store.setTeam({ id: "team", name: "Team", members: 1 });
+  store.setTeamMembers(
+    "team",
+    new Map([["user", { teamId: "team", userId: "user", role: "member", joinedAt: new Date().toISOString() }]])
+  );
+  store.setRoom({ id: "room", teamId: "team" } as never);
+  const authz = createRelayAuthz(store);
+  assert.equal(authz.canAccessRoom("team", "room", "user"), true);
+  assert.equal(authz.canAccessRoom("team", "missing", "user"), false);
+  assert.equal(authz.canAccessRoom("other", "room", "user"), false);
+  assert.equal(authz.canAccessRoom("team", "room", "outsider"), false);
+  assert.deepEqual(authz.teamIdsForUser("user"), new Set(["team"]));
+  assert.equal(authz.isTeamMember("team", "missing"), false);
+});
+test("authorization exhaustively covers roles and transfers", () => {
+  const authz = createRelayAuthz(createRelayStore()),
+    roles = ["owner", "admin", "member"] as const;
+  for (const requester of [undefined, ...roles])
+    for (const target of roles) {
+      assert.equal(
+        authz.canRemoveTeamMember(requester, target),
+        target !== "owner" && (requester === "owner" || (requester === "admin" && target === "member"))
+      );
+      for (const next of roles)
+        assert.equal(
+          authz.canSetTeamMemberRole(requester, target, next),
+          target !== "owner" &&
+            next !== "owner" &&
+            (requester === "owner" || (requester === "admin" && target === "member" && next === "member"))
+        );
+    }
+  assert.deepEqual(
+    roles.map((x) => authz.teamRoleRank(x)),
+    [0, 1, 2]
+  );
+  const records = new Map(
+    roles.map((role) => [role, { teamId: "team", userId: role, role, joinedAt: new Date().toISOString() }])
+  );
+  records.set("observer", {
+    teamId: "team",
+    userId: "observer",
+    role: "member",
+    joinedAt: new Date().toISOString()
+  });
+  const moved = authz.transferTeamOwnership(records, "member");
+  assert.equal(moved.get("member")?.role, "owner");
+  assert.equal(moved.get("owner")?.role, "admin");
+  assert.equal(moved.get("admin")?.role, "admin");
+  assert.equal(moved.get("observer")?.role, "member");
+});
+test("scalar and policy normalizers fail closed", () => {
   const values = {
     maxDisplayNameChars: 100,
     maxDeviceIdChars: 128,
     maxEnvelopeIdChars: 128,
-    maxEnvelopeNonceChars: 128,
     maxPublicKeyFingerprintChars: 255,
-    maxPublicKeyJwkChars: 2_048,
-    maxRoomProjectPathChars: 4_096,
+    maxPublicKeyJwkChars: 2048,
+    maxRoomProjectPathChars: 4096,
     maxUserIdChars: 128
   };
-  const limits = createRelayLimits(16_384, values);
-
-  assert.deepEqual(limits, {
-    ...values,
-    encryptedEnvelopeMaxBytes: 16_384,
-    maxEnvelopeCiphertextChars: Math.ceil((16_384 * 4) / 3) + 1_024
-  });
-  assert.equal(Object.isFrozen(limits), true);
-  assert.throws(
-    () => Object.assign(limits, { encryptedEnvelopeMaxBytes: 1 }),
-    /read only|not extensible|Cannot assign/
-  );
-});
-
-test("relay authorization rules cover every role transition and room membership boundary", () => {
-  const store = new InMemoryRelayStore();
-  store.teamMembers.set(
-    "team_1",
-    new Map([
-      ["owner", member("owner", "owner")],
-      ["admin", member("admin", "admin")],
-      ["member", member("member", "member")]
-    ])
-  );
-  store.rooms.set("room_1", { id: "room_1", teamId: "team_1" } as never);
-  const authz = createRelayAuthz(store);
-
-  assert.deepEqual(authz.teamIdsForUser("member"), new Set(["team_1"]));
-  assert.equal(authz.isTeamMember("team_1", "missing"), false);
-  assert.deepEqual(
-    ["owner", "admin", "member"].map((role) => authz.teamRoleRank(role as never)),
-    [0, 1, 2]
-  );
-  assert.equal(authz.canSetTeamMemberRole("owner", "member", "admin"), true);
-  assert.equal(authz.canSetTeamMemberRole("admin", "member", "member"), true);
-  assert.equal(authz.canSetTeamMemberRole("admin", "admin", "member"), false);
-  assert.equal(authz.canSetTeamMemberRole("member", "member", "member"), false);
-  assert.equal(authz.canSetTeamMemberRole("owner", "owner", "member"), false);
-  assert.equal(authz.canSetTeamMemberRole("owner", "member", "owner"), false);
-  assert.equal(authz.canRemoveTeamMember("owner", "admin"), true);
-  assert.equal(authz.canRemoveTeamMember("admin", "member"), true);
-  assert.equal(authz.canRemoveTeamMember("admin", "admin"), false);
-  assert.equal(authz.canRemoveTeamMember(undefined, "owner"), false);
-  assert.equal(authz.canAccessRoom("team_1", "room_1", "member"), true);
-  assert.equal(authz.canAccessRoom("team_1", "room_1", "missing"), false);
-  assert.equal(authz.canAccessRoom("other", "room_1", "member"), false);
-
-  const transferred = authz.transferTeamOwnership(store.teamMembers.get("team_1")!, "member");
-  assert.equal(transferred.get("member")?.role, "owner");
-  assert.equal(transferred.get("owner")?.role, "admin");
-  assert.equal(transferred.get("admin")?.role, "admin");
-});
-
-test("relay authorization exhaustively enforces every role combination", () => {
-  const store = new InMemoryRelayStore();
-  const authz = createRelayAuthz(store);
-  const roles = ["owner", "admin", "member"] as const;
-  const requesters = [undefined, ...roles] as const;
-
-  for (const requester of requesters) {
-    for (const target of roles) {
-      const expectedRemove =
-        target !== "owner" && (requester === "owner" || (requester === "admin" && target === "member"));
-      assert.equal(
-        authz.canRemoveTeamMember(requester, target),
-        expectedRemove,
-        `${requester ?? "missing"} removes ${target}`
-      );
-      for (const next of roles) {
-        const expectedSet =
-          target !== "owner" &&
-          next !== "owner" &&
-          (requester === "owner" || (requester === "admin" && target === "member" && next === "member"));
-        assert.equal(
-          authz.canSetTeamMemberRole(requester, target, next),
-          expectedSet,
-          `${requester ?? "missing"} changes ${target} to ${next}`
-        );
-      }
-    }
-  }
-
-  const original = new Map([
-    ["owner", member("owner", "owner")],
-    ["admin", member("admin", "admin")],
-    ["member", member("member", "member")],
-    ["other-member", member("other-member", "member")]
-  ]);
-  const transferred = authz.transferTeamOwnership(new Map(original), "member");
-  assert.deepEqual(
-    Array.from(transferred, ([userId, record]) => [userId, record.role]),
-    [
-      ["owner", "admin"],
-      ["admin", "admin"],
-      ["member", "owner"],
-      ["other-member", "member"]
-    ]
-  );
-  const selfTransfer = authz.transferTeamOwnership(new Map(original), "owner");
-  assert.equal(selfTransfer.get("owner")?.role, "owner");
-  const absentTransfer = authz.transferTeamOwnership(new Map(original), "missing");
-  assert.equal(absentTransfer.get("owner")?.role, "admin");
-  assert.equal(absentTransfer.has("missing"), false);
-});
-
-test("room authorization independently requires a matching room and membership", () => {
-  const store = new InMemoryRelayStore();
-  store.rooms.set("room_1", { id: "room_1", teamId: "team_1" } as never);
-  store.teamMembers.set("team_1", new Map([["member", member("member", "member")]]));
-  const authz = createRelayAuthz(store);
-
-  assert.equal(authz.canAccessRoom("team_1", "room_1", "member"), true);
-  assert.equal(authz.canAccessRoom("team_1", "missing", "member"), false);
-  assert.equal(authz.canAccessRoom("other", "room_1", "member"), false);
-  assert.equal(authz.canAccessRoom("team_1", "room_1", "missing"), false);
-});
-
-test("relay scalar and room-setting normalizers reject ambiguous or oversized input", () => {
-  assert.equal(normalizeMetadataText(" value ", 10), "value");
-  assert.equal(normalizeMetadataText("\u0000", 10), null);
-  assert.equal(normalizeMetadataText("long", 3), null);
+  assert.equal(Object.isFrozen(createRelayLimits(16384, values)), true);
+  assert.equal(normalizeMetadataText(" ok ", 10), "ok");
+  assert.equal(normalizeMetadataText("\0", 10), null);
+  assert.equal(normalizeMetadataText("long", 2), null);
   assert.equal(normalizeRelayId("id_1", 10), "id_1");
-  for (const value of [" id", "bad id", "", 3]) assert.equal(normalizeRelayId(value, 10), null);
+  for (const x of [" bad", "bad id", "", 3]) assert.equal(normalizeRelayId(x, 10), null);
   assert.equal(normalizeOptionalMetadataText(undefined, 10), "");
   assert.equal(normalizeOptionalMetadataText(" ok ", 10), "ok");
   assert.equal(isJsonStringifiableWithin({ ok: true }, 20), true);
-  assert.equal(isJsonStringifiableWithin({ long: "value" }, 2), false);
-  const circular: Record<string, unknown> = {};
+  const circular: { self?: unknown } = {};
   circular.self = circular;
   assert.equal(isJsonStringifiableWithin(circular, 20), false);
+  assert.equal(isJsonStringifiableWithin({ long: "x" }, 2), false);
   assert.equal(parseIntegerValue("4.6", 1, 2, 4), 4);
   assert.equal(parseIntegerValue({}, 3, 1, 5), 3);
   assert.equal(parseIntegerValue(-2, 3, 1, 5), 1);
   assert.equal(maxCiphertextCharactersForBlob(0), 1430);
   assert.equal(isApprovalPolicy("ask_every_turn"), true);
-  assert.equal(isApprovalPolicy("invalid"), false);
+  assert.equal(isApprovalPolicy("bad"), false);
   assert.equal(isApprovalDelegationPolicy("trusted_members_only"), true);
-  assert.equal(isApprovalDelegationPolicy("invalid"), false);
+  assert.equal(isApprovalDelegationPolicy("bad"), false);
   assert.equal(isRoomMode({ chat: true, code: false, workspace: true, browser: false }), true);
   assert.equal(isRoomMode(null), false);
   assert.equal(isRoomMode({ chat: true }), false);
   assert.equal(normalizeRoomProjectPath(" /repo ", 20), "/repo");
   assert.equal(normalizeRoomProjectPath("\n", 20), null);
   assert.equal(normalizeCodexModel("gpt-custom/1", 30), "gpt-custom/1");
-  assert.equal(normalizeCodexModel(" bad model ", 30), null);
+  assert.equal(normalizeCodexModel("bad model", 30), null);
   assert.equal(normalizeCodexReasoningEffort("medium"), "medium");
-  assert.equal(normalizeCodexReasoningEffort("invalid"), null);
+  assert.equal(normalizeCodexReasoningEffort("bad"), null);
   assert.equal(normalizeCodexSpeed("standard"), "standard");
-  assert.equal(normalizeCodexSpeed("invalid"), null);
+  assert.equal(normalizeCodexSpeed("bad"), null);
   assert.equal(normalizeCodexCatalogSelectionPolicy("pinned"), "pinned");
-  assert.equal(normalizeCodexCatalogSelectionPolicy("invalid"), null);
-  assert.equal(normalizeCodexReasoningEffortOrDefault("invalid"), "medium");
-  assert.equal(normalizeCodexSpeedOrDefault("invalid"), "standard");
+  assert.equal(normalizeCodexCatalogSelectionPolicy("bad"), null);
+  assert.equal(normalizeCodexReasoningEffortOrDefault("bad"), "medium");
+  assert.equal(normalizeCodexSpeedOrDefault("bad"), "standard");
   assert.equal(normalizeTeamRole("admin"), "admin");
-  assert.equal(normalizeTeamRole("invalid"), "member");
-});
-
-test("public-key, browser-origin, envelope, and retention limits fail closed", () => {
-  const jwk = { kty: "EC", crv: "P-256", x: "AQ", y: "Ag" };
-  assert.deepEqual(normalizeDevicePublicKeyJwk(jwk, 200), jwk);
-  assert.equal(normalizeDevicePublicKeyJwk({ ...jwk, d: "private" }, 200), null);
-  assert.equal(normalizeDevicePublicKeyJwk(jwk, 2), null);
+  assert.equal(normalizeTeamRole("bad"), "member");
   assert.deepEqual(normalizeBrowserAllowedOrigins(["https://example.com", "https://example.com/"]), [
     "https://example.com"
   ]);
-  for (const value of [
-    "not-an-array",
-    Array(21).fill("https://example.com"),
-    [3],
-    ["ftp://example.com"],
-    ["https://example.com/path"],
-    ["not a url"]
-  ]) {
-    assert.equal(normalizeBrowserAllowedOrigins(value), null);
-  }
+  for (const x of ["bad", Array(21).fill("https://x.com"), [3], ["ftp://x.com"], ["https://x.com/path"], ["bad url"]])
+    assert.equal(normalizeBrowserAllowedOrigins(x), null);
   assert.deepEqual(normalizeBrowserAllowedOrigins([" "]), []);
-
-  const limits = {
-    encryptedEnvelopeMaxBytes: 2_000,
-    maxEnvelopeCiphertextChars: 100,
-    maxEnvelopeIdChars: 30,
-    maxEnvelopeNonceChars: 30,
-    maxDeviceIdChars: 30,
-    maxPublicKeyJwkChars: 200,
-    maxUserIdChars: 30
-  };
-  const valid = envelope();
-  assert.equal(isAllowedEnvelopePayload(valid), true);
-  assert.equal(isRelayEnvelopeWithinLimits(valid, limits), true);
-  for (const invalid of [
-    envelope({ id: " ".repeat(2) }),
-    envelope({ senderUserId: "x".repeat(31) }),
-    envelope({ senderDeviceId: "x".repeat(31) }),
-    envelope({ payload: { ...valid.payload, nonce: "x".repeat(31) } }),
-    envelope({ payload: { ...valid.payload, ciphertext: "x".repeat(101) } })
-  ])
-    assert.equal(isRelayEnvelopeWithinLimits(invalid, limits), false);
-  const sealed = envelope({
-    kind: "room.invite",
-    payload: {
-      version: 3,
-      algorithm: "ECDH-P256-HKDF-SHA256-AES-GCM-256",
-      ephemeralPublicKeyJwk: jwk,
-      nonce: "n",
-      ciphertext: "c"
-    }
-  });
-  assert.equal(isAllowedEnvelopePayload(sealed), true);
-  assert.equal(isRelayEnvelopeWithinLimits(sealed, limits), true);
-  assert.equal(isRelayEnvelopeWithinLimits(sealed, { ...limits, maxPublicKeyJwkChars: 2 }), false);
-  assert.equal(isAllowedEnvelopePayload({ ...sealed, kind: "chat.message" }), false);
-  assert.equal(isRelayEnvelopeWithinLimits(valid, { ...limits, encryptedEnvelopeMaxBytes: 2 }), false);
-
-  const old = envelope({ id: "old", createdAt: "2026-07-01T00:00:00.000Z" });
-  const recent = envelope({ id: "recent", createdAt: "2026-07-10T00:00:00.000Z" });
-  const newest = envelope({ id: "newest", createdAt: "2026-07-11T00:00:00.000Z" });
-  const pruned = pruneEncryptedBacklog([old, recent, newest], {
-    ...limits,
-    encryptedBacklogLimit: 1,
-    encryptedBacklogRetentionDays: 2,
-    now: () => Date.parse("2026-07-11T12:00:00.000Z")
-  });
-  assert.deepEqual(
-    pruned.map(({ id }) => id),
-    ["newest"]
-  );
 });

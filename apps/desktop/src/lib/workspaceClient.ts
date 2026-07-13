@@ -1,9 +1,11 @@
 import type {
   ApprovalPolicy,
   AttachmentBlobRecord,
-  CiphertextPayload,
   DeviceRecord,
   InviteRecord,
+  InviteResponseRecord,
+  KeyPackageRecord,
+  KeyPackageUpload,
   RoomRecord,
   TeamMemberRecord,
   TeamRecord,
@@ -11,6 +13,7 @@ import type {
 } from "@multaiplayer/protocol";
 import { getRelayHttpUrl } from "./appConfig";
 import { readJsonResponse } from "./httpResponse";
+import { deviceSessionHeaders } from "./deviceSession";
 
 export interface WorkspaceSnapshot {
   teams: TeamRecord[];
@@ -27,17 +30,31 @@ export interface DeviceRegistrationRequest {
   userId: string;
   deviceId: string;
   displayName: string;
-  publicKeyJwk: JsonWebKey;
-  publicKeyFingerprint: string;
+  signaturePublicKey: string;
+  signatureKeyFingerprint: string;
+  hpkePublicKey: string;
+  hpkeKeyFingerprint: string;
 }
 
 export interface AttachmentBlobUploadRequest {
+  blobId: string;
   teamId: string;
   roomId: string;
   name: string;
   type: string;
   size: number;
-  payload: CiphertextPayload;
+  epoch: number;
+  sealedBlob: string;
+}
+
+export interface DirectedInviteRequest {
+  requestId: string;
+  requesterUserId: string;
+  requesterDeviceId: string;
+  keyPackageId: string;
+  keyPackageHash: string;
+  sealedRequest: string;
+  createdAt: string;
 }
 
 export async function loadWorkspace(): Promise<WorkspaceSnapshot> {
@@ -130,6 +147,51 @@ export async function registerDevice(request: DeviceRegistrationRequest): Promis
   return body.device as DeviceRecord;
 }
 
+export async function publishKeyPackages(deviceId: string, keyPackages: KeyPackageUpload[]): Promise<void> {
+  const response = await fetch(`${getRelayHttpUrl()}/devices/${encodeURIComponent(deviceId)}/key-packages`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json", ...deviceSessionHeaders() },
+    body: JSON.stringify({ keyPackages })
+  });
+  await readJsonResponse<unknown>(response, "Failed to publish MLS KeyPackages");
+}
+
+export async function keyPackageCount(deviceId: string): Promise<number> {
+  const response = await fetch(`${getRelayHttpUrl()}/devices/${encodeURIComponent(deviceId)}/key-packages/count`, {
+    credentials: "include"
+  });
+  const body = await readJsonResponse<{ count: number }>(response, "Failed to count MLS KeyPackages");
+  return body.count;
+}
+
+export async function consumeKeyPackage(
+  roomId: string,
+  userId: string,
+  deviceId: string,
+  hostDeviceId: string,
+  inviteId: string,
+  keyPackageId: string,
+  keyPackageHash: string
+): Promise<
+  | { keyPackage: KeyPackageRecord; alreadyConsumed?: false }
+  | { alreadyConsumed: true; keyPackageId: string; keyPackageHash: string; userId: string; deviceId: string }
+> {
+  const response = await fetch(
+    `${getRelayHttpUrl()}/rooms/${encodeURIComponent(roomId)}/key-packages/${encodeURIComponent(userId)}/${encodeURIComponent(deviceId)}/consume`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json", ...deviceSessionHeaders() },
+      body: JSON.stringify({ hostDeviceId, inviteId, keyPackageId, keyPackageHash })
+    }
+  );
+  return readJsonResponse<
+    | { keyPackage: KeyPackageRecord; alreadyConsumed?: false }
+    | { alreadyConsumed: true; keyPackageId: string; keyPackageHash: string; userId: string; deviceId: string }
+  >(response, "Failed to consume MLS KeyPackage");
+}
+
 export async function loadTeamDevices(teamId: string): Promise<DeviceRecord[]> {
   const response = await fetch(`${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/devices`, {
     credentials: "include"
@@ -171,13 +233,14 @@ export async function updateRoomHost(
   roomId: string,
   host: string,
   hostUserId: string,
-  hostStatus: RoomRecord["hostStatus"]
+  hostStatus: RoomRecord["hostStatus"],
+  hostDeviceId?: string
 ): Promise<RoomRecord> {
   const response = await fetch(`${getRelayHttpUrl()}/rooms/${encodeURIComponent(roomId)}/host`, {
     method: "PATCH",
     credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ host, hostUserId, hostStatus })
+    headers: { "content-type": "application/json", ...(hostStatus === "active" ? deviceSessionHeaders() : {}) },
+    body: JSON.stringify({ host, hostUserId, hostStatus, ...(hostStatus === "active" ? { hostDeviceId } : {}) })
   });
   const body = await readJsonResponse<{ room: RoomRecord }>(response, "Failed to update room host");
   return body.room as RoomRecord;
@@ -255,6 +318,89 @@ export async function revokeRoomInvites(teamId: string, roomId: string): Promise
   );
   const body = await readJsonResponse<{ revoked: number }>(response, "Failed to revoke room invites");
   return body.revoked;
+}
+
+export async function publishDirectedInviteRequest(
+  inviteId: string,
+  request: Omit<DirectedInviteRequest, "requesterUserId" | "createdAt">
+): Promise<void> {
+  const response = await fetch(`${getRelayHttpUrl()}/invites/${encodeURIComponent(inviteId)}/requests`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json", ...deviceSessionHeaders() },
+    body: JSON.stringify(request)
+  });
+  await readJsonResponse<unknown>(response, "Failed to publish invite request");
+}
+
+export async function loadDirectedInviteRequests(
+  inviteId: string,
+  hostDeviceId: string
+): Promise<DirectedInviteRequest[]> {
+  const params = new URLSearchParams({ hostDeviceId });
+  const response = await fetch(
+    `${getRelayHttpUrl()}/invites/${encodeURIComponent(inviteId)}/requests?${params.toString()}`,
+    { credentials: "include", headers: deviceSessionHeaders() }
+  );
+  const body = await readJsonResponse<{ requests: DirectedInviteRequest[] }>(
+    response,
+    "Failed to load invite requests"
+  );
+  return body.requests;
+}
+
+export async function publishDirectedInviteResponse(
+  inviteId: string,
+  request: {
+    hostDeviceId: string;
+    requestId: string;
+    status: "approved" | "denied";
+    responseBinding: InviteResponseRecord["responseBinding"];
+    responseMac: string;
+    welcome?: string;
+  }
+): Promise<void> {
+  const response = await fetch(`${getRelayHttpUrl()}/invites/${encodeURIComponent(inviteId)}/response`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json", ...deviceSessionHeaders() },
+    body: JSON.stringify(request)
+  });
+  await readJsonResponse<unknown>(response, "Failed to publish invite response");
+}
+
+export async function loadDirectedInviteResponse(
+  inviteId: string,
+  requestId: string,
+  requesterDeviceId: string
+): Promise<Pick<InviteResponseRecord, "status" | "responseBinding" | "responseMac" | "welcome"> | null> {
+  const params = new URLSearchParams({ requesterDeviceId });
+  const response = await fetch(
+    `${getRelayHttpUrl()}/invites/${encodeURIComponent(inviteId)}/response/${encodeURIComponent(requestId)}?${params.toString()}`,
+    { credentials: "include", headers: deviceSessionHeaders() }
+  );
+  if (response.status === 404) return null;
+  return readJsonResponse<Pick<InviteResponseRecord, "status" | "responseBinding" | "responseMac" | "welcome">>(
+    response,
+    "Failed to load invite response"
+  );
+}
+
+export async function acknowledgeDirectedInviteResponse(
+  inviteId: string,
+  requestId: string,
+  requesterDeviceId: string
+): Promise<void> {
+  const response = await fetch(
+    `${getRelayHttpUrl()}/invites/${encodeURIComponent(inviteId)}/response/${encodeURIComponent(requestId)}/ack`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json", ...deviceSessionHeaders() },
+      body: JSON.stringify({ requesterDeviceId })
+    }
+  );
+  if (!response.ok) await readJsonResponse<unknown>(response, "Failed to acknowledge invite response");
 }
 
 export async function createAttachmentBlob(request: AttachmentBlobUploadRequest): Promise<AttachmentBlobRecord> {

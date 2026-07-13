@@ -3,18 +3,18 @@ import type {
   ChatEditPlaintextPayload,
   ChatPlaintextPayload,
   ChatReactionPlaintextPayload,
-  RelayEnvelope,
+  MlsRelayMessage,
   RoomRecord
 } from "@multaiplayer/protocol";
 import { useAppStore } from "../store/appStore";
-import { loadOrCreateRoomSecret } from "./localHistory";
 import { canUseRoomChat, roomChatGateMessage } from "./chatPolicy";
 import { roomLockMessage } from "./appRuntime";
 import { messageIsBeforeCodexWatermark } from "./codexMessageWatermark";
 import type { RelayClient } from "./relayClient";
 import type { ChatMessage } from "../types";
+import { publishMlsApplicationMessage } from "./mlsApplicationMessage";
 import { currentLocalIdentity } from "./selectedWorkspace";
-import { createEncryptedRoomEnvelope, roomKeyEpoch } from "./encryptedEnvelope";
+import { createMlsApplicationMessage } from "./mlsApplicationMessage";
 
 interface MutableRef<T> {
   current: T;
@@ -48,9 +48,8 @@ export function createChatActions({ relayRef, seenEnvelopeIds }: ChatActionsOpti
       return;
     }
 
-    const secret = await loadOrCreateRoomSecret(room.id);
     const liveMessage: ChatPlaintextPayload = { ...message, authorUserId: identity().localUser.id };
-    const envelope: RelayEnvelope = await createEncryptedRoomEnvelope(
+    const envelope: MlsRelayMessage = await createMlsApplicationMessage(
       {
         id: crypto.randomUUID(),
         teamId: room.teamId,
@@ -58,14 +57,12 @@ export function createChatActions({ relayRef, seenEnvelopeIds }: ChatActionsOpti
         senderDeviceId: identity().deviceId,
         senderUserId: identity().localUser.id,
         createdAt: new Date().toISOString(),
-        kind: "chat.message",
-        keyEpoch: roomKeyEpoch(room)
+        kind: "chat.message"
       },
-      liveMessage,
-      secret
+      liveMessage
     );
     seenEnvelopeIds.current.add(envelope.id);
-    client.publish({ type: "publish", envelope });
+    await publishMlsApplicationMessage(client, envelope);
     useAppStore.getState().appendRoomMessage(room.id, message);
   }
 
@@ -116,8 +113,7 @@ export function createChatActions({ relayRef, seenEnvelopeIds }: ChatActionsOpti
         .setChatMessageForRoom(roomId, "Saved reaction locally because the relay is not connected.");
       return;
     }
-    const secret = await loadOrCreateRoomSecret(roomId);
-    const envelope: RelayEnvelope = await createEncryptedRoomEnvelope(
+    const envelope: MlsRelayMessage = await createMlsApplicationMessage(
       {
         id: crypto.randomUUID(),
         teamId: selectedRoom.teamId,
@@ -125,14 +121,12 @@ export function createChatActions({ relayRef, seenEnvelopeIds }: ChatActionsOpti
         senderDeviceId: identity().deviceId,
         senderUserId: identity().localUser.id,
         createdAt: payload.createdAt,
-        kind: "chat.reaction",
-        keyEpoch: roomKeyEpoch(selectedRoom)
+        kind: "chat.reaction"
       },
-      payload,
-      secret
+      payload
     );
     seenEnvelopeIds.current.add(envelope.id);
-    client.publish({ type: "publish", envelope });
+    await publishMlsApplicationMessage(client, envelope);
   }
 
   async function publishChatMessageEdit(message: ChatMessage, body: string) {
@@ -179,8 +173,7 @@ export function createChatActions({ relayRef, seenEnvelopeIds }: ChatActionsOpti
         .setChatMessageForRoom(selectedRoom.id, "Saved message change locally because the relay is not connected.");
       return;
     }
-    const secret = await loadOrCreateRoomSecret(selectedRoom.id);
-    const envelope: RelayEnvelope = await createEncryptedRoomEnvelope(
+    const envelope: MlsRelayMessage = await createMlsApplicationMessage(
       {
         id: crypto.randomUUID(),
         teamId: selectedRoom.teamId,
@@ -188,14 +181,12 @@ export function createChatActions({ relayRef, seenEnvelopeIds }: ChatActionsOpti
         senderDeviceId: identity().deviceId,
         senderUserId: identity().localUser.id,
         createdAt,
-        kind,
-        keyEpoch: roomKeyEpoch(selectedRoom)
+        kind
       },
-      payload,
-      secret
+      payload
     );
     seenEnvelopeIds.current.add(envelope.id);
-    client.publish({ type: "publish", envelope });
+    await publishMlsApplicationMessage(client, envelope);
   }
 
   function canMutateSelectedMessage(message: ChatMessage, selectedRoom: RoomRecord) {

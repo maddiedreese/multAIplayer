@@ -1,4 +1,4 @@
-import { isRecord, type RelayEnvelope } from "@multaiplayer/protocol";
+import { isRecord, type MlsRelayMessage } from "@multaiplayer/protocol";
 import { logRelayEvent } from "./observability.js";
 import { RelayPersistenceMigrationError, type RelayPersistence } from "./persistence.js";
 import type { RoomKey } from "./state.js";
@@ -7,9 +7,10 @@ import type { RelayStoreCodec } from "./store-codec.js";
 export interface RelayStorePersistenceCoordinator {
   loadRelayStore(): Promise<void>;
   scheduleStoreSave(): void;
-  saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]): void;
-  saveEncryptedEnvelope(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]): Promise<void>;
-  saveRoomKeyTransition(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]): Promise<void>;
+  saveMlsBacklog(roomKey: RoomKey, messages: MlsRelayMessage[]): void;
+  saveKeyPackages(): Promise<void>;
+  saveMlsMessage(roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]): Promise<void>;
+  saveMlsCommit(roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]): Promise<void>;
   saveRelayStore(): Promise<void>;
   flushRelayStore(): Promise<void>;
   closeRelayStore(): Promise<void>;
@@ -21,18 +22,18 @@ export function createRelayStorePersistenceCoordinator(options: {
   storeCodec: RelayStoreCodec;
 }): RelayStorePersistenceCoordinator {
   let saveTimer: NodeJS.Timeout | null = null;
-  const pendingEncryptedSaves = new Set<Promise<void>>();
+  const pendingMlsSaves = new Set<Promise<void>>();
 
-  function trackEncryptedSave(save: Promise<void>) {
+  function trackMlsSave(save: Promise<void>) {
     const tracked = save.finally(() => {
-      pendingEncryptedSaves.delete(tracked);
+      pendingMlsSaves.delete(tracked);
     });
-    pendingEncryptedSaves.add(tracked);
+    pendingMlsSaves.add(tracked);
   }
 
-  async function waitForPendingEncryptedSaves() {
-    while (pendingEncryptedSaves.size > 0) {
-      await Promise.allSettled([...pendingEncryptedSaves]);
+  async function waitForPendingMlsSaves() {
+    while (pendingMlsSaves.size > 0) {
+      await Promise.allSettled([...pendingMlsSaves]);
     }
   }
 
@@ -71,40 +72,44 @@ export function createRelayStorePersistenceCoordinator(options: {
     }, 100);
   }
 
-  function saveEncryptedBacklog(roomKey: RoomKey, envelopes: RelayEnvelope[]) {
-    trackEncryptedSave(
+  function saveMlsBacklog(roomKey: RoomKey, messages: MlsRelayMessage[]) {
+    trackMlsSave(
       options.persistence
-        .saveEncryptedBacklog(roomKey, envelopes)
+        .saveMlsBacklog(roomKey, messages)
         .then((handled) => {
           if (!handled) scheduleStoreSave();
         })
         .catch(() => {
-          logRelayEvent("error", "encrypted_backlog_save_failed");
+          logRelayEvent("error", "mls_backlog_save_failed");
           scheduleStoreSave();
         })
     );
   }
 
-  function saveEncryptedEnvelope(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]) {
+  function saveKeyPackages() {
+    return options.persistence.saveKeyPackages(options.storeCodec.toStoredRelayState());
+  }
+
+  function saveMlsMessage(roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]) {
     options.storeCodec.pruneExpiredRelayState();
     const save = options.persistence
-      .saveEncryptedEnvelope(roomKey, envelope, prunedEnvelopeIds, options.storeCodec.toStoredRelayState())
+      .saveMlsMessage(roomKey, message, prunedIds, options.storeCodec.toStoredRelayState())
       .then(async (handled) => {
         if (!handled) await saveRelayStore();
       });
-    trackEncryptedSave(save);
+    trackMlsSave(save);
     return save;
   }
 
-  function saveRoomKeyTransition(roomKey: RoomKey, envelope: RelayEnvelope, prunedEnvelopeIds: string[]) {
+  function saveMlsCommit(roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]) {
     options.storeCodec.pruneExpiredRelayState();
-    const save = options.persistence.saveRoomKeyTransition(
+    const save = options.persistence.saveMlsCommit(
       roomKey,
-      envelope,
-      prunedEnvelopeIds,
+      message,
+      prunedIds,
       options.storeCodec.toStoredRelayState()
     );
-    trackEncryptedSave(save);
+    trackMlsSave(save);
     return save;
   }
 
@@ -118,7 +123,7 @@ export function createRelayStorePersistenceCoordinator(options: {
       clearTimeout(saveTimer);
       saveTimer = null;
     }
-    await waitForPendingEncryptedSaves();
+    await waitForPendingMlsSaves();
     if (saveTimer) {
       clearTimeout(saveTimer);
       saveTimer = null;
@@ -134,9 +139,10 @@ export function createRelayStorePersistenceCoordinator(options: {
   return {
     loadRelayStore,
     scheduleStoreSave,
-    saveEncryptedBacklog,
-    saveEncryptedEnvelope,
-    saveRoomKeyTransition,
+    saveMlsBacklog,
+    saveKeyPackages,
+    saveMlsMessage,
+    saveMlsCommit,
     saveRelayStore,
     flushRelayStore,
     closeRelayStore

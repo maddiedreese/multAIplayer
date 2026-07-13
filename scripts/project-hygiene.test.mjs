@@ -10,7 +10,6 @@ const workspaceManifestPaths = [
   "apps/desktop/package.json",
   "apps/relay/package.json",
   "packages/codex/package.json",
-  "packages/crypto/package.json",
   "packages/git/package.json",
   "packages/github/package.json",
   "packages/protocol/package.json"
@@ -168,11 +167,7 @@ test("local runtime and desktop bundle targets match supported CI", () => {
 
 test("CI verifies each layer once before packaging prebuilt desktop assets", () => {
   const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
-  for (const packagePath of [
-    "packages/crypto/package.json",
-    "apps/relay/package.json",
-    "packages/protocol/package.json"
-  ]) {
+  for (const packagePath of ["apps/relay/package.json", "packages/protocol/package.json"]) {
     const scripts = readJson(packagePath).scripts;
     assert.equal(
       scripts["test:mutation"],
@@ -182,14 +177,9 @@ test("CI verifies each layer once before packaging prebuilt desktop assets", () 
   }
   assert.equal(workflow.match(/run: npm run verify:web$/gm)?.length, 1);
   assert.equal(workflow.match(/run: npm run verify:native$/gm)?.length, 1);
-  assert.equal(workflow.match(/run: npm run test:mutation -w @multaiplayer\/crypto$/gm)?.length, 1);
   assert.equal(workflow.match(/run: npm run test:mutation -w @multaiplayer\/relay$/gm)?.length, 1);
   assert.equal(workflow.match(/run: npm run test:mutation -w @multaiplayer\/protocol$/gm)?.length, 1);
   assert.match(workflow, /name: Build package dependencies\n\s+run: npm run build:packages/);
-  assert.match(
-    workflow,
-    /crypto-mutation:\n\s+name: Crypto mutation policy\n\s+runs-on: ubuntu-latest\n\s+timeout-minutes: 30/
-  );
   assert.match(workflow, /relay-authorization-mutation:\n\s+name: Relay authorization mutation policy/);
   assert.match(workflow, /protocol-type-guard-mutation:\n\s+name: Protocol type-guard mutation policy/);
   assert.equal(workflow.match(/run: npm run build:packages && npm run build -w @multaiplayer\/desktop$/gm)?.length, 1);
@@ -229,16 +219,19 @@ test("Rust mutation exclusions and their CI gate stay narrowly pinned", () => {
 });
 
 test("production Rust panic policy has no unwrap or expect exceptions", () => {
-  const crateRoot = readFileSync("apps/desktop/src-tauri/src/lib.rs", "utf8");
-  assert.match(crateRoot, /#!\[cfg_attr\(not\(test\), deny\(clippy::expect_used, clippy::unwrap_used\)\)\]/);
+  const roots = ["apps/desktop/src-tauri/src", "apps/desktop/src-tauri/crates/mls-core/src"];
+  for (const path of roots.map((root) => `${root}/lib.rs`)) {
+    const crateRoot = readFileSync(path, "utf8");
+    assert.match(crateRoot, /#!\[cfg_attr\(not\(test\), deny\(clippy::expect_used, clippy::unwrap_used\)\)\]/);
+  }
 
-  const rustSources = execFileSync("git", ["ls-files", "apps/desktop/src-tauri/src"], {
-    encoding: "utf8"
-  })
-    .trim()
-    .split("\n")
-    .filter(Boolean)
-    .filter((path) => path.endsWith(".rs"))
+  const collectRustSources = (root) =>
+    readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+      const path = `${root}/${entry.name}`;
+      return entry.isDirectory() ? collectRustSources(path) : path.endsWith(".rs") ? [path] : [];
+    });
+  const rustSources = roots
+    .flatMap(collectRustSources)
     .filter((path) => !path.endsWith("/tests.rs") && !path.endsWith("/lib_tests.rs"));
   const exceptions = rustSources.flatMap((path) => {
     const source = readFileSync(path, "utf8");
@@ -252,6 +245,8 @@ test("relay reproducibility proof stays deterministic and release-triggered", ()
   const verifier = readFileSync("scripts/verify-relay-container-reproducibility.mjs", "utf8");
   const workflow = readFileSync(".github/workflows/supply-chain.yml", "utf8");
   assert.match(dockerfile, /ARG NODE_IMAGE=.*@sha256:[a-f0-9]{64}/);
+  assert.match(dockerfile, /ARG RUST_IMAGE=.*@sha256:[a-f0-9]{64}/);
+  assert.match(dockerfile, /MULTAIPLAYER_MLS_VALIDATOR_PATH=\/app\/bin\/mls-keypackage-validator/);
   assert.match(dockerfile, /FROM \$\{NODE_IMAGE\} AS build/);
   assert.match(dockerfile, /ARG SOURCE_DATE_EPOCH=0/);
   assert.equal(verifier.match(/"--no-cache"/g)?.length, 1);
@@ -322,20 +317,6 @@ test("npm advisories are checked from the lockfile on the deep-verification tier
   assert.equal(rootPackage.scripts["audit:npm"], "npm audit --audit-level=high");
 });
 
-test("the independent crypto verifier is exact-pinned with an expiring review gate", () => {
-  const policy = readJson(".github/crypto-vector-dependency.json");
-  const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
-  assert.equal(policy.package, "cryptography");
-  assert.equal(policy.version, "45.0.5");
-  assert.equal(policy.maximumReviewDays, 90);
-  assert.match(workflow, /run: npm run check:crypto-vector-dependency/);
-  assert.match(workflow, /cryptography==45\.0\.5/);
-  assert.equal(
-    rootPackage.scripts["check:crypto-vector-dependency"],
-    "node scripts/check-crypto-vector-dependency.mjs"
-  );
-});
-
 test("alpha dependencies are exact-pinned and major updates remain separately batched", () => {
   for (const path of ["package.json", ...workspaceManifestPaths]) {
     const manifest = readJson(path);
@@ -374,20 +355,9 @@ test("latest Codex contract drift is checked proactively with least privilege", 
 
 test("security boundaries have explicit automated review policy", () => {
   const contributing = readFileSync("CONTRIBUTING.md", "utf8");
-  assert.match(contributing, /packages\/crypto/);
+  assert.match(contributing, /Rust MLS core/);
   assert.match(contributing, /property, fuzz, mutation, or native checks/);
   assert.match(contributing, /does not require a separate human or code-owner approval/);
-});
-
-test("crypto stays split into bounded modules behind its public barrel", () => {
-  const sourceDirectory = "packages/crypto/src";
-  const sourceFiles = readdirSync(sourceDirectory).filter((name) => name.endsWith(".ts"));
-  for (const name of sourceFiles) {
-    const source = readFileSync(`${sourceDirectory}/${name}`, "utf8");
-    assert.ok(source.split("\n").length <= 250, `${name} exceeds the 250-line crypto module limit`);
-  }
-  const barrel = readFileSync(`${sourceDirectory}/index.ts`, "utf8");
-  assert.doesNotMatch(barrel, /\b(?:async\s+)?function\b|\bclass\b|\bconst\b|\blet\b/);
 });
 
 test("third-party GitHub Actions are pinned to immutable commits", () => {

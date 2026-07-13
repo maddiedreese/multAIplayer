@@ -52,6 +52,7 @@ export function useAppRelaySync({
     relayWsUrl,
     selectedTeam,
     devicePublicKeyFingerprint,
+    deviceSessionToken,
     relayStatus,
     forgottenRoomIds,
     revokedRoomIds,
@@ -62,6 +63,7 @@ export function useAppRelaySync({
       relayWsUrl: state.appConfig.relayWsUrl,
       selectedTeam: state.selectedTeam,
       devicePublicKeyFingerprint: state.deviceIdentity?.publicKeyFingerprint,
+      deviceSessionToken: state.deviceSessionToken,
       relayStatus: state.relayStatus,
       forgottenRoomIds: state.forgottenRoomIds,
       revokedRoomIds: state.revokedRoomIds,
@@ -86,6 +88,7 @@ export function useAppRelaySync({
         deviceId: localIdentity.deviceId,
         localUser: localIdentity.localUser,
         devicePublicKeyFingerprint,
+        deviceSessionToken: deviceSessionToken ?? "",
         selectedTeam,
         selectedRoom,
         hasSelectedRoom,
@@ -100,8 +103,7 @@ export function useAppRelaySync({
         upsertRoom: workspaceRecords.upsertRoom,
         upsertTeam: workspaceRecords.upsertTeam,
         refreshTeamMembers,
-        decryptInviteEnvelope: inviteActions.decryptInviteEnvelope,
-        handleInviteEnvelopePlaintext: inviteActions.handleInviteEnvelopePlaintext
+        handleInviteRequested: inviteActions.handleInviteRequested
       },
       publishers: {
         relayRef: appRefs.relayRef,

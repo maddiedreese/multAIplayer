@@ -3,7 +3,7 @@ import {
   WebSocket,
   assert,
   createDebugSession,
-  maxEnvelopeNonceChars,
+  maxSessionCiphertextNonceChars,
   onceOpen,
   patchHostStatus,
   patchRoomSettings,
@@ -321,9 +321,9 @@ test("relay drops malformed encrypted auth sessions loaded from disk", async () 
         user: { id: "github:huge-token", login: "huge-token" },
         encryptedAccessToken: {
           algorithm: "AES-GCM-256",
-          nonce: "x".repeat(maxEnvelopeNonceChars + 1),
+          nonce: "x".repeat(maxSessionCiphertextNonceChars + 1),
           ciphertext: "x".repeat(20_000),
-          tag: "x".repeat(maxEnvelopeNonceChars + 1)
+          tag: "x".repeat(maxSessionCiphertextNonceChars + 1)
         },
         expiresAt: Date.now() + 60_000
       }

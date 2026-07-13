@@ -1,39 +1,73 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CodexActivityPlaintextPayload, RelayEnvelope } from "../src/index.js";
-
-test("canonical Codex activity is bounded and strips undeclared upstream data", () => {
-  const parsed = CodexActivityPlaintextPayload.parse({
-    eventType: "codex.activity",
-    activityId: "turn-1-item-1",
-    turnId: "turn-1",
-    itemId: "item-1",
-    kind: "command",
-    status: "running",
-    title: "Command execution",
-    startedAt: "2026-07-09T12:00:00.000Z",
-    updatedAt: "2026-07-09T12:00:01.000Z",
-    host: "Host",
-    hostUserId: "user-host",
-    command: "echo secret",
-    raw: { environment: { TOKEN: "secret" } }
+import { CodexQueuePlaintextPayload, MlsRelayMessage } from "../src/index.js";
+test("relay framing carries opaque MLS bytes without plaintext event fields", () => {
+  const parsed = MlsRelayMessage.parse({
+    id: "m1",
+    teamId: "team",
+    roomId: "room",
+    senderUserId: "user",
+    senderDeviceId: "device-1",
+    createdAt: new Date().toISOString(),
+    messageType: "application",
+    epochHint: 0,
+    mlsMessage: "AA=="
   });
-  assert.equal("command" in parsed, false);
-  assert.equal("raw" in parsed, false);
-  assert.throws(() => CodexActivityPlaintextPayload.parse({ ...parsed, title: "x".repeat(1_000) }));
+  assert.equal(parsed.mlsMessage, "AA==");
+  assert.equal("payload" in parsed, false);
 });
 
-test("encrypted relay envelopes accept the canonical activity kind", () => {
-  const result = RelayEnvelope.safeParse({
-    id: "envelope-1",
-    teamId: "team-1",
-    roomId: "room-1",
+test("host-handoff routing metadata is complete and commit-bound", () => {
+  const base = {
+    id: "m1",
+    teamId: "team",
+    roomId: "room",
+    senderUserId: "user",
     senderDeviceId: "device-1",
-    senderUserId: "user-1",
-    createdAt: "2026-07-09T12:00:01.000Z",
-    kind: "codex.activity",
-    keyEpoch: 1,
-    payload: { version: 2, algorithm: "AES-GCM-256", nonce: "a".repeat(16), ciphertext: "a".repeat(16) }
-  });
-  assert.equal(result.success, true);
+    createdAt: new Date().toISOString(),
+    epochHint: 0,
+    mlsMessage: "AA=="
+  };
+  assert.equal(
+    MlsRelayMessage.safeParse({
+      ...base,
+      messageType: "commit",
+      commitEffect: "host_handoff",
+      nextHostUserId: "next-user",
+      nextHostDeviceId: "next-device",
+      hostTransferAuthorization: {
+        version: 1,
+        roomId: "room",
+        commitMessageId: "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+        parentEpoch: 0,
+        outgoingHostUserId: "user",
+        outgoingHostDeviceId: "device-1",
+        nextHostUserId: "next-user",
+        nextHostDeviceId: "next-device",
+        nextHostLeaf: 1,
+        signatureDer: "AA==",
+        publicKeySpkiDer: "AA=="
+      }
+    }).success,
+    true
+  );
+  assert.equal(
+    MlsRelayMessage.safeParse({ ...base, messageType: "application", commitEffect: "host_handoff" }).success,
+    false
+  );
+});
+
+test("queued Codex events require a queue position", () => {
+  const base = {
+    eventType: "codex.queue",
+    queueEventId: "queue-1",
+    turnId: "turn-1",
+    requestedBy: "User",
+    requestedByUserId: "user",
+    queueSize: 1,
+    createdAt: new Date().toISOString()
+  };
+  assert.equal(CodexQueuePlaintextPayload.safeParse({ ...base, action: "queued", queuePosition: 1 }).success, true);
+  assert.equal(CodexQueuePlaintextPayload.safeParse({ ...base, action: "promoted" }).success, false);
+  assert.equal(CodexQueuePlaintextPayload.safeParse({ ...base, action: "cancelled" }).success, true);
 });

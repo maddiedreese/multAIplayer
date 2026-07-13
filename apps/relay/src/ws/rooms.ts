@@ -68,12 +68,13 @@ export function createRelayRoomSocketManager({
     teamId: string,
     roomId: string,
     userId: string,
+    deviceId: string,
     inviteId?: string
   ): boolean {
     if (!mutationsRequireAuth) return true;
     if (!session.authSession || session.authSession.user.id !== userId) return false;
     if (canAccessRoom(teamId, roomId, userId)) return true;
-    if (!inviteId || !isValidInviteForRoom(inviteId, teamId, roomId)) return false;
+    if (!inviteId || !consumeApprovedInvite(inviteId, teamId, roomId, userId, deviceId)) return false;
     addTeamMember(teamId, userId);
     return true;
   }
@@ -140,7 +141,13 @@ export function createRelayRoomSocketManager({
     }
   }
 
-  function isValidInviteForRoom(inviteId: string, teamId: string, roomId: string): boolean {
+  function consumeApprovedInvite(
+    inviteId: string,
+    teamId: string,
+    roomId: string,
+    userId: string,
+    deviceId: string
+  ): boolean {
     const invite = store.getInvite(inviteId);
     if (!invite || invite.teamId !== teamId || invite.roomId !== roomId) return false;
     if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
@@ -148,6 +155,9 @@ export function createRelayRoomSocketManager({
       scheduleStoreSave();
       return false;
     }
+    if (invite.approvedUserId !== userId || invite.approvedDeviceId !== deviceId) return false;
+    store.deleteInvite(invite.id);
+    scheduleStoreSave();
     return true;
   }
 

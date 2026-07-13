@@ -10,7 +10,7 @@ interface RoomBusyActionsOptions {
   localPreviewBusyRef: MutableRefObject<BusyMap>;
   hostBusyRef: MutableRefObject<BusyMap>;
   settingsBusyRef: MutableRefObject<BusyMap>;
-  keyRotationBusyRef: MutableRefObject<BusyMap>;
+  membershipCommitBusyRef: MutableRefObject<BusyMap>;
   fileBusyRef: MutableRefObject<BusyMap>;
   terminalBusyRef: MutableRefObject<BusyMap>;
 }
@@ -93,7 +93,7 @@ export function createRoomActions({
   const setLocalPreviewBusyForRoom = storeAction("setLocalPreviewBusyForRoom");
   const setHostBusyForRoom = storeAction("setHostBusyForRoom");
   const setSettingsBusyForRoom = storeAction("setSettingsBusyForRoom");
-  const setKeyRotationBusyForRoom = storeAction("setKeyRotationBusyForRoom");
+  const setMembershipCommitBusyForRoom = storeAction("setMembershipCommitBusyForRoom");
   const setFileBusyForRoom = storeAction("setFileBusyForRoom");
   const setTerminalBusyForRoom = storeAction("setTerminalBusyForRoom");
   const updateInviteRequestStatus = storeAction("updateInviteRequestStatus");
@@ -211,8 +211,8 @@ export function createRoomActions({
       applyBusyForRoom(busy.hostBusyRef, setHostBusyForRoom, roomId, isBusy),
     setSettingsBusyForRoom: (roomId: string, isBusy: boolean) =>
       applyBusyForRoom(busy.settingsBusyRef, setSettingsBusyForRoom, roomId, isBusy),
-    setKeyRotationBusyForRoom: (roomId: string, isBusy: boolean) =>
-      applyBusyForRoom(busy.keyRotationBusyRef, setKeyRotationBusyForRoom, roomId, isBusy),
+    setMembershipCommitBusyForRoom: (roomId: string, isBusy: boolean) =>
+      applyBusyForRoom(busy.membershipCommitBusyRef, setMembershipCommitBusyForRoom, roomId, isBusy),
     setFileBusyForRoom: (roomId: string, isBusy: boolean) =>
       applyBusyForRoom(busy.fileBusyRef, setFileBusyForRoom, roomId, isBusy),
     setTerminalBusyForRoom: (roomId: string, isBusy: boolean) =>

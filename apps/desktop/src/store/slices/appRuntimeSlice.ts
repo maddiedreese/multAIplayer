@@ -8,12 +8,14 @@ export interface AppRuntimeSlice {
   codexProbe: CodexProbe | null;
   deviceIdentity: DeviceIdentity | null;
   deviceIdentityMessage: string | null;
+  deviceSessionToken: string | null;
   trustedDeviceKeys: TrustedDeviceKey[];
   trustedDeviceKeysLoaded: boolean;
   historySearchBusy: boolean;
   replaceCodexProbe: (probe: CodexProbe | null) => void;
   replaceDeviceIdentity: (identity: DeviceIdentity | null) => void;
   setDeviceIdentityStatusMessage: (message: string | null) => void;
+  replaceDeviceSessionToken: (token: string | null) => void;
   loadTrustedDeviceKeysOnce: () => void;
   trustDeviceForRoom: (roomId: string, deviceId: string, fingerprint: string) => void;
   untrustDeviceForRoom: (roomId: string, deviceId: string) => void;
@@ -25,6 +27,7 @@ export const emptyAppRuntimeState = {
   codexProbe: null,
   deviceIdentity: null,
   deviceIdentityMessage: null,
+  deviceSessionToken: null,
   trustedDeviceKeys: [] as TrustedDeviceKey[],
   trustedDeviceKeysLoaded: false,
   historySearchBusy: false
@@ -35,6 +38,7 @@ export const createAppRuntimeSlice: StateCreator<AppStoreState, [], [], AppRunti
   replaceCodexProbe: (codexProbe) => set({ codexProbe }),
   replaceDeviceIdentity: (deviceIdentity) => set({ deviceIdentity }),
   setDeviceIdentityStatusMessage: (deviceIdentityMessage) => set({ deviceIdentityMessage }),
+  replaceDeviceSessionToken: (deviceSessionToken) => set({ deviceSessionToken }),
   loadTrustedDeviceKeysOnce: () => {
     if (get().trustedDeviceKeysLoaded) return;
     set({ trustedDeviceKeys: loadTrustedDeviceKeys(), trustedDeviceKeysLoaded: true });

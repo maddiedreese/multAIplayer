@@ -161,14 +161,6 @@ export function RoomHeader({
           <button onClick={() => onSetHost("handoff")} disabled={!hasRoom || roomLocked || hostBusy || !isActiveHost}>
             Handoff
           </button>
-          <button
-            onClick={() => onSetHost("offline")}
-            disabled={!hasRoom || roomLocked || hostBusy || hostStatus === "offline" || !isActiveHost}
-            title="Stop hosting this room"
-            aria-label="Stop hosting this room"
-          >
-            <X size={14} />
-          </button>
         </div>
         <label
           className="header-model-switcher"
