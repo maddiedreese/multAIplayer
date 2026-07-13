@@ -1,0 +1,63 @@
+.codex-approval-scenario {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.codex-approval-scenario > header,
+.codex-approval-scenario .actor-switch,
+.codex-approval-scenario .scenario-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.codex-approval-scenario > header {
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.codex-approval-scenario h1,
+.codex-approval-scenario p {
+  margin: 0;
+}
+
+.codex-approval-scenario .eyebrow {
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.codex-approval-scenario .scenario-status {
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  color: var(--text-secondary);
+}
+
+.codex-approval-scenario .scenario-status strong {
+  color: var(--text-primary);
+  text-transform: capitalize;
+}
+
+.codex-approval-scenario .propose-turn,
+.codex-approval-scenario .execution-state,
+.codex-approval-scenario [data-testid="proposal-notice"] {
+  margin-bottom: 18px;
+}
+
+.codex-approval-scenario .execution-state {
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.codex-approval-scenario .execution-state.success {
+  color: var(--success);
+}
+
+.codex-approval-scenario .execution-state.denied {
+  color: var(--danger);
+}

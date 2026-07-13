@@ -2,6 +2,11 @@ import { expect, type Browser, type BrowserContext, type Page } from "@playwrigh
 
 export const appUrl = "http://127.0.0.1:1421";
 export const relayUrl = "http://127.0.0.1:4322";
+export const uiContractHarnessUrl = "http://127.0.0.1:1422/e2e/harness/index.html";
+
+export function uiContractScenarioUrl(scenario: string): string {
+  return `${uiContractHarnessUrl}?scenario=${encodeURIComponent(scenario)}`;
+}
 
 export interface TestIdentity {
   id: string;

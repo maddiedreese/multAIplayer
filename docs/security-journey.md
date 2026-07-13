@@ -16,18 +16,13 @@ The process journey needs Cargo because it builds the validator and generates it
 
 ## Desktop browser journeys
 
-Playwright runs the actual desktop web shell against the real relay. The focused
-`desktop-security-journeys.spec.ts` cases independently cover three user-facing authorization boundaries:
+Playwright runs the actual web preview alongside an isolated, test-only UI-contract harness. The harness renders production React components and pure invite/Codex helpers, but it does not emulate Tauri or restore the retired browser cryptography. Every scenario lists its simulated boundaries in the page. Focused specs cover three user-facing authorization boundaries:
 
-- an approval-gated invite selects the room but cannot send until the host explicitly admits the device;
-- removing a member revokes relay sessions, commits an MLS Remove, and prevents the removed leaf from processing later epochs;
-- accepting a host handoff transfers both the handoff action and Codex model controls to the successor.
+- `e2e/invite-join.spec.ts` keeps the guest composer locked through request creation and denial, and unlocks it only after explicit host approval;
+- `e2e/host-handoff.spec.ts` keeps host and model controls with the outgoing host through offer and candidate request, then transfers them only after that host approves; and
+- `e2e/codex-turn-approval.spec.ts` checks bounded context previews, member lockout, host approval and denial, input bounds, and execution-state transitions.
 
-These focused cases make UI regressions attributable to one journey. The longer
-`room-lifecycle.spec.ts` remains the cryptographic composition proof: it carries one room through MLS epoch updates, removal,
-handoff, old-key decryption rejection, and relay persistence scanning. Run the complete browser suite with
-`npm run test:e2e`, or only the focused desktop cases with
-`npm run test:e2e -- e2e/desktop-security-journeys.spec.ts`.
+These browser cases are UI-contract evidence, not MLS, relay-confidentiality, native-authorization, or Codex app-server evidence. The process journey above remains the composition proof for native KeyPackage consumption, Welcome admission, host transfer, epoch exclusion, and relay persistence scanning. Run the complete browser suite with `npm run test:e2e`, or a single focused case such as `npm run test:e2e -- e2e/host-handoff.spec.ts`.
 
 ## Host execution limits
 
