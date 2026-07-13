@@ -1,3 +1,4 @@
+import { sendRelayError } from "./errors.js";
 import type { Response } from "express";
 import { codexSandboxLevelOptions, type CodexCatalogSelectionPolicy, type RoomRecord } from "@multaiplayer/protocol";
 import type { RelayStore } from "../state.js";
@@ -47,9 +48,7 @@ export function allowTotalRoomQuota({
   const used = store.allRooms().filter((room) => teamIds.has(room.teamId) && !room.deletedAt).length;
   if (used < cap) return true;
   recordQuotaRejection?.(quota);
-  res.status(429).json({
-    error: "Total room quota exceeded.",
-    code: "quota_exceeded",
+  sendRelayError(res, 429, "quota_exceeded", "Total room quota exceeded.", {
     quota: { type: quota, limit: cap, used, remaining: 0 }
   });
   return false;
@@ -96,9 +95,7 @@ function sendDailyCreationQuotaExceeded(
   const { quota, limit, used, resetAt } = options;
   const retryAfterSeconds = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
   res.setHeader("Retry-After", retryAfterSeconds);
-  res.status(429).json({
-    error: "Daily room creation quota exceeded.",
-    code: "quota_exceeded",
+  sendRelayError(res, 429, "quota_exceeded", "Daily room creation quota exceeded.", {
     retryAfterSeconds,
     quota: { type: quota, limit, used, remaining: 0, resetsAt: new Date(resetAt).toISOString() }
   });

@@ -11,6 +11,7 @@ test("relay persistence flushes and closes", async () => {
     save: async () => {
       saves++;
     },
+    saveChanges: async () => false,
     saveKeyPackages: async () => {},
     saveMlsBacklog: async () => true,
     saveMlsMessage: async () => true,
@@ -25,6 +26,8 @@ test("relay persistence flushes and closes", async () => {
     isExpiredAttachmentBlob: () => false,
     applyStoredRelayState: () => {},
     pruneExpiredRelayState: () => {},
+    drainStoredRelayMutations: () => [],
+    discardStoredRelayMutations: () => {},
     toStoredRelayState: () =>
       ({
         version: 1,
@@ -40,4 +43,63 @@ test("relay persistence flushes and closes", async () => {
   await coordinator.closeRelayStore();
   assert.ok(saves >= 1);
   assert.equal(closed, true);
+});
+
+test("immediate row persistence never serializes the whole relay store", async () => {
+  let mutationDrains = 0;
+  let globalPrunes = 0;
+  const persisted: unknown[] = [];
+  const persistence = {
+    flushMode: "immediate" as const,
+    load: async () => null,
+    save: async () => assert.fail("whole-state save must not run for immediate persistence"),
+    saveChanges: async (changes: unknown[]) => {
+      persisted.push(...changes);
+      return true;
+    },
+    saveKeyPackages: async () => {},
+    saveMlsBacklog: async () => true,
+    saveMlsMessage: async () => true,
+    saveMlsCommit: async () => {},
+    quarantine: async () => {},
+    close: () => {}
+  };
+  const codec = {
+    isExpiredInvite: () => false,
+    isExpiredAttachmentBlob: () => false,
+    applyStoredRelayState: () => {},
+    pruneExpiredRelayState: () => {
+      globalPrunes++;
+    },
+    drainStoredRelayMutations: () =>
+      mutationDrains++ === 0
+        ? [{ entity: "rooms" as const, key: "room", operation: "upsert" as const, value: { id: "room" } }]
+        : [],
+    discardStoredRelayMutations: () => {},
+    toStoredRelayState: () => assert.fail("immediate persistence must not encode the world")
+  };
+  const coordinator = createRelayStorePersistenceCoordinator({ dataPath: "unused", persistence, storeCodec: codec });
+  coordinator.scheduleStoreSave();
+  assert.equal(globalPrunes, 0);
+  assert.equal(persisted.length, 1);
+  await coordinator.saveKeyPackages();
+  await coordinator.saveMlsMessage(
+    "team:room",
+    {
+      id: "message",
+      teamId: "team",
+      roomId: "room",
+      senderUserId: "user",
+      senderDeviceId: "device",
+      createdAt: new Date().toISOString(),
+      messageType: "application",
+      epochHint: 0,
+      mlsMessage: "AA=="
+    },
+    []
+  );
+  await coordinator.saveRelayStore();
+  assert.equal(globalPrunes, 0);
+  await coordinator.closeRelayStore();
+  assert.equal(globalPrunes, 1);
 });

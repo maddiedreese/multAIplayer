@@ -1,3 +1,5 @@
+import { reportExpectedFailure } from "./nonFatalReporting";
+
 const codexMentionPattern = /(^|[^\w@])@codex\b|^codex[,:-]\s*/i;
 const codexAddressPattern = /(^|[^\w@])@codex\b[\s,:-]*|^codex[,:-]\s*/i;
 const openBrowserPattern = /\bopen\s+([^\s]+)(?:\s|$)/i;
@@ -25,6 +27,7 @@ export function normalizeBrowserCommandUrl(value: string): string | null {
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
     return url.toString();
   } catch {
+    reportExpectedFailure("Codex browser command URL validation rejected malformed input");
     return null;
   }
 }

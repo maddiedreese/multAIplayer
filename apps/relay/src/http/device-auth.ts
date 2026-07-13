@@ -1,3 +1,4 @@
+import { sendRelayError } from "./errors.js";
 import { createPublicKey, randomBytes, verify } from "node:crypto";
 import type { Express, Response } from "express";
 import type { AuthSession, RelayStore } from "../state.js";
@@ -12,10 +13,11 @@ export function registerDeviceAuthRoutes(options: {
     const s = options.getAuthSession(req.cookies?.multaiplayer_session);
     if (!options.allowMutation(s, res)) return;
     const d = String(req.params.deviceId);
-    if (!s || !options.store.getDevice(s.user.id, d)) return void res.status(404).json({ error: "Device not found." });
+    if (!s || !options.store.getDevice(s.user.id, d))
+      return void sendRelayError(res, 404, "not_found", "Device not found.");
     pruneExpired(options.store);
     if (challenges.size >= 10_000 || pendingChallengeCount(s.user.id, d) >= 5) {
-      return void res.status(429).json({ error: "Device challenge limit exceeded." });
+      return void sendRelayError(res, 429, "rate_limited", "Device challenge limit exceeded.");
     }
     const challenge = randomBytes(32).toString("base64");
     challenges.set(challenge, { userId: s.user.id, deviceId: d, expiresAt: Date.now() + 60_000 });
@@ -28,7 +30,7 @@ export function registerDeviceAuthRoutes(options: {
     const challenge = String(req.body?.challenge ?? "");
     const signature = String(req.body?.signature ?? "");
     if (!isCanonicalBase64(challenge, 32) || !isCanonicalBase64(signature, undefined, 256)) {
-      return void res.status(403).json({ error: "Invalid device proof encoding." });
+      return void sendRelayError(res, 403, "device_auth_required", "Invalid device proof encoding.");
     }
     const pending = challenges.get(challenge);
     challenges.delete(challenge);
@@ -41,7 +43,7 @@ export function registerDeviceAuthRoutes(options: {
       pending.userId !== s.user.id ||
       pending.deviceId !== d
     )
-      return void res.status(403).json({ error: "Invalid or expired device challenge." });
+      return void sendRelayError(res, 403, "device_auth_required", "Invalid or expired device challenge.");
     try {
       const challengeBytes = Buffer.from(challenge, "base64");
       if (challengeBytes.length !== 32) throw new Error();
@@ -51,9 +53,9 @@ export function registerDeviceAuthRoutes(options: {
         type: "spki"
       });
       if (!verify("sha256", deviceAuthPayload(s.user.id, d, challengeBytes), key, Buffer.from(signature, "base64")))
-        return void res.status(403).json({ error: "Invalid device signature." });
+        return void sendRelayError(res, 403, "device_auth_required", "Invalid device signature.");
     } catch {
-      return void res.status(403).json({ error: "Invalid device signature." });
+      return void sendRelayError(res, 403, "device_auth_required", "Invalid device signature.");
     }
     pruneExpired(options.store);
     for (const [token, existing] of options.store.deviceSessions) {

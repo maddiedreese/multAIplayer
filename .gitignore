@@ -1,6 +1,7 @@
 node_modules/
 dist/
 target/
+**/fuzz/target/
 .DS_Store
 .env
 .env.*

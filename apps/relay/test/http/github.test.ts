@@ -93,15 +93,21 @@ globalThis.fetch = async (input, init = {}) => {
 
     const denied = await poll("access_denied");
     assert.equal(denied.status, 400);
-    assert.deepEqual(await denied.json(), { error: "GitHub sign-in was denied." });
+    assert.deepEqual(await denied.json(), { error: "GitHub sign-in was denied.", code: "invalid_request" });
 
     const expired = await poll("expired_token");
     assert.equal(expired.status, 400);
-    assert.deepEqual(await expired.json(), { error: "The GitHub sign-in code expired. Start sign-in again." });
+    assert.deepEqual(await expired.json(), {
+      error: "The GitHub sign-in code expired. Start sign-in again.",
+      code: "invalid_request"
+    });
 
     const unknown = await poll("unexpected_error");
     assert.equal(unknown.status, 502);
-    assert.deepEqual(await unknown.json(), { error: "GitHub did not complete sign-in." });
+    assert.deepEqual(await unknown.json(), {
+      error: "GitHub did not complete sign-in.",
+      code: "upstream_unavailable"
+    });
   } finally {
     await relay.close();
     await rm(tempDir, { recursive: true, force: true });
@@ -247,7 +253,7 @@ globalThis.fetch = async (input, init = {}) => {
       })
     });
     assert.equal(errorResponse.status, 422);
-    assert.deepEqual(await errorResponse.json(), { error: "GitHub request failed." });
+    assert.deepEqual(await errorResponse.json(), { error: "GitHub request failed.", code: "upstream_unavailable" });
 
     const actionsResponse = await fetch(
       `${relay.baseUrl}/github/actions/runs?owner=maddiedreese&repo=multAIplayer&branch=codex%2Fbranch`,

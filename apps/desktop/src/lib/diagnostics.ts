@@ -1,5 +1,6 @@
 import { loadAppConfig } from "./appConfig";
 import { appVersion } from "./appVersion";
+import { configureNonFatalReporter } from "./nonFatalReporting";
 import {
   recordPersistedDiagnostic,
   savePersistedDiagnosticBundle,
@@ -57,6 +58,14 @@ export function recordDiagnosticEvent(level: DiagnosticLevel, message: string, .
   appendDiagnosticEntry(nextEntry);
 }
 
+/**
+ * Records an unexpected, recoverable failure without exposing application data.
+ * Callers should pass a stable operation name and omit attacker-controlled values.
+ */
+configureNonFatalReporter((operation, error) => {
+  recordDiagnosticEvent("warn", `Non-fatal failure: ${operation}`, ...(error === undefined ? [] : [error]));
+});
+
 export function buildWebPreviewDiagnosticBundle(now = new Date()): string {
   const config = safeLoadAppConfig();
   const bundle = {
@@ -112,11 +121,13 @@ function formatDiagnosticValue(value: unknown): string {
       return message ? `${name}: ${message}` : name;
     }
   } catch {
+    console.debug("[expected failure] diagnostic Error fields were not safely readable");
     return "[unserializable]";
   }
   try {
     return JSON.stringify(sanitizeDiagnosticValue(value, 0, new WeakSet<object>()));
   } catch {
+    console.debug("[expected failure] diagnostic value was not serializable");
     return "[unserializable]";
   }
 }
@@ -137,6 +148,7 @@ function sanitizeDiagnosticValue(value: unknown, depth: number, seen: WeakSet<ob
   try {
     descriptors = Object.getOwnPropertyDescriptors(value);
   } catch {
+    console.debug("[expected failure] diagnostic object descriptors were not readable");
     return "[unserializable]";
   }
 
@@ -202,6 +214,7 @@ function redactText(value: string): string {
         const parsed = new URL(match);
         return `${parsed.origin}${parsed.pathname}`;
       } catch {
+        console.debug("[expected failure] diagnostic URL redaction rejected malformed input");
         return "[url]";
       }
     })
@@ -216,6 +229,7 @@ function safeLoadAppConfig(): ReturnType<typeof loadAppConfig> | null {
   try {
     return loadAppConfig();
   } catch {
+    console.debug("[expected failure] diagnostic app configuration was unavailable");
     return null;
   }
 }
@@ -224,6 +238,7 @@ function safeOrigin(value: string): string {
   try {
     return new URL(value).origin;
   } catch {
+    console.debug("[expected failure] diagnostic relay origin was unavailable");
     return "unavailable";
   }
 }

@@ -1,3 +1,4 @@
+import { sendRelayError } from "./errors.js";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { Express, Response } from "express";
 import { KeyPackageUpload, pinnedMlsCiphersuite, type KeyPackageRecord } from "@multaiplayer/protocol";
@@ -32,25 +33,31 @@ export function registerKeyPackageRoutes({
   app.post("/devices/:deviceId/key-packages", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
-    if (!session) return void res.status(401).json({ error: "Sign in before publishing KeyPackages." });
+    if (!session)
+      return void sendRelayError(res, 401, "authentication_required", "Sign in before publishing KeyPackages.");
     const deviceId = String(req.params.deviceId ?? "");
     if (!hasDeviceSession(store, req.get("x-device-session"), session.user.id, deviceId))
-      return void res.status(403).json({ error: "A device-authenticated session is required." });
+      return void sendRelayError(res, 403, "device_auth_required", "A device-authenticated session is required.");
     if (!store.getDevice(session.user.id, deviceId)) {
-      return void res.status(403).json({ error: "Register this device before publishing KeyPackages." });
+      return void sendRelayError(
+        res,
+        403,
+        "device_auth_required",
+        "Register this device before publishing KeyPackages."
+      );
     }
     if (
       !Array.isArray(req.body?.keyPackages) ||
       req.body.keyPackages.length < 1 ||
       req.body.keyPackages.length > maxBatchSize
     ) {
-      return void res.status(400).json({ error: `keyPackages must contain 1-${maxBatchSize} items.` });
+      return void sendRelayError(res, 400, "invalid_request", `keyPackages must contain 1-${maxBatchSize} items.`);
     }
     if (
       store.keyPackagesForDevice(session.user.id, deviceId).length + req.body.keyPackages.length >
       maxLivePackagesPerDevice
     ) {
-      return void res.status(409).json({ error: "KeyPackage live limit exceeded." });
+      return void sendRelayError(res, 409, "conflict", "KeyPackage live limit exceeded.");
     }
     const accepted: KeyPackageRecord[] = [];
     const seen = new Set<string>();
@@ -61,28 +68,24 @@ export function registerKeyPackageRoutes({
         parsed.data.keyPackage.length > maxEncodedKeyPackageChars ||
         seen.has(parsed.success ? parsed.data.id : "")
       ) {
-        return void res.status(400).json({ error: "Invalid or duplicate KeyPackage.", code: "key_package_invalid" });
+        return void sendRelayError(res, 400, "key_package_invalid", "Invalid or duplicate KeyPackage.");
       }
       seen.add(parsed.data.id);
       if (
         parsed.data.ciphersuite !== pinnedMlsCiphersuite ||
         !isCanonicalPaddedBase64(parsed.data.keyPackage, maxEncodedKeyPackageChars)
       ) {
-        return void res
-          .status(400)
-          .json({ error: "Invalid KeyPackage encoding or ciphersuite.", code: "key_package_invalid" });
+        return void sendRelayError(res, 400, "key_package_invalid", "Invalid KeyPackage encoding or ciphersuite.");
       }
       if (!constantTimeEqual(parsed.data.keyPackageHash, hashKeyPackage(parsed.data.keyPackage))) {
-        return void res.status(400).json({ error: "KeyPackage hash mismatch.", code: "key_package_invalid" });
+        return void sendRelayError(res, 400, "key_package_invalid", "KeyPackage hash mismatch.");
       }
       if (store.keyPackages.has(parsed.data.id)) {
-        return void res.status(409).json({ error: "KeyPackage id already exists." });
+        return void sendRelayError(res, 409, "conflict", "KeyPackage id already exists.");
       }
       const registeredDevice = store.getDevice(session.user.id, deviceId);
       if (!registeredDevice)
-        return void res
-          .status(400)
-          .json({ error: "Registered device identity is required.", code: "key_package_invalid" });
+        return void sendRelayError(res, 400, "key_package_invalid", "Registered device identity is required.");
       const validated = await validator.validate(parsed.data, {
         userId: session.user.id,
         deviceId,
@@ -97,9 +100,12 @@ export function registerKeyPackageRoutes({
         !constantTimeEqual(validated.signaturePublicKey, registeredDevice.signaturePublicKey) ||
         !constantTimeEqual(validated.signatureKeyFingerprint, registeredDevice.signatureKeyFingerprint)
       ) {
-        return void res
-          .status(400)
-          .json({ error: "KeyPackage credential does not match its uploader.", code: "key_package_invalid" });
+        return void sendRelayError(
+          res,
+          400,
+          "key_package_invalid",
+          "KeyPackage credential does not match its uploader."
+        );
       }
       accepted.push({
         ...parsed.data,
@@ -114,7 +120,7 @@ export function registerKeyPackageRoutes({
       await saveRelayStore();
     } catch {
       for (const item of accepted) store.deleteKeyPackage(item.id);
-      return void res.status(503).json({ error: "Could not persist KeyPackages." });
+      return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist KeyPackages.");
     }
     res.status(201).json({ count: store.keyPackagesForDevice(session.user.id, deviceId).length });
   });
@@ -122,31 +128,34 @@ export function registerKeyPackageRoutes({
   app.get("/devices/:deviceId/key-packages/count", (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowRead(session, res)) return;
-    if (!session) return void res.status(401).json({ error: "Sign in before reading KeyPackage counts." });
+    if (!session)
+      return void sendRelayError(res, 401, "authentication_required", "Sign in before reading KeyPackage counts.");
     const deviceId = String(req.params.deviceId ?? "");
-    if (!store.getDevice(session.user.id, deviceId)) return void res.status(404).json({ error: "Device not found." });
+    if (!store.getDevice(session.user.id, deviceId))
+      return void sendRelayError(res, 404, "not_found", "Device not found.");
     res.json({ count: store.keyPackagesForDevice(session.user.id, deviceId).length });
   });
 
   app.post("/rooms/:roomId/key-packages/:userId/:deviceId/consume", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
-    if (!session) return void res.status(401).json({ error: "Sign in before consuming a KeyPackage." });
+    if (!session)
+      return void sendRelayError(res, 401, "authentication_required", "Sign in before consuming a KeyPackage.");
     const room = store.getRoom(String(req.params.roomId ?? ""));
     const hostDeviceId = String(req.body?.hostDeviceId ?? "");
     if (!hasDeviceSession(store, req.get("x-device-session"), session.user.id, hostDeviceId))
-      return void res.status(403).json({ error: "A device-authenticated session is required." });
-    if (!room) return void res.status(404).json({ error: "Room not found." });
+      return void sendRelayError(res, 403, "device_auth_required", "A device-authenticated session is required.");
+    if (!room) return void sendRelayError(res, 404, "room_not_found", "Room not found.");
     if (
       room.hostStatus !== "active" ||
       room.hostUserId !== session.user.id ||
       room.activeHostDeviceId !== hostDeviceId
     ) {
-      return void res.status(403).json({ error: "Only the active host device may consume KeyPackages." });
+      return void sendRelayError(res, 403, "forbidden", "Only the active host device may consume KeyPackages.");
     }
     const invite = store.getInvite(String(req.body?.inviteId ?? ""));
     if (!invite || invite.roomId !== room.id || invite.teamId !== room.teamId) {
-      return void res.status(403).json({ error: "A valid room invite approval is required." });
+      return void sendRelayError(res, 403, "forbidden", "A valid room invite approval is required.");
     }
     const keyPackageId = String(req.body?.keyPackageId ?? "");
     const keyPackageHash = String(req.body?.keyPackageHash ?? "");
@@ -158,7 +167,8 @@ export function registerKeyPackageRoutes({
         candidate.keyPackageId === keyPackageId &&
         candidate.keyPackageHash === keyPackageHash
     );
-    if (!request) return void res.status(409).json({ error: "KeyPackage does not match the pending invite request." });
+    if (!request)
+      return void sendRelayError(res, 409, "conflict", "KeyPackage does not match the pending invite request.");
     const item = store.keyPackages.get(keyPackageId);
     if (!item) {
       if (
@@ -174,14 +184,14 @@ export function registerKeyPackageRoutes({
           deviceId: String(req.params.deviceId)
         });
       }
-      return void res.status(404).json({ error: "No KeyPackage is available.", code: "key_package_unavailable" });
+      return void sendRelayError(res, 404, "key_package_unavailable", "No KeyPackage is available.");
     }
     if (
       item.userId !== String(req.params.userId) ||
       item.deviceId !== String(req.params.deviceId) ||
       item.keyPackageHash !== keyPackageHash
     )
-      return void res.status(409).json({ error: "KeyPackage does not match the pending invite request." });
+      return void sendRelayError(res, 409, "conflict", "KeyPackage does not match the pending invite request.");
     // In-memory deletion is serialized by the JS event loop. SQLite persistence
     // receives the deletion in the same immediate save cycle.
     store.deleteKeyPackage(item.id);
@@ -196,7 +206,7 @@ export function registerKeyPackageRoutes({
     } catch {
       store.setKeyPackage(item);
       store.setInvite(invite);
-      return void res.status(503).json({ error: "Could not consume KeyPackage durably." });
+      return void sendRelayError(res, 503, "persistence_unavailable", "Could not consume KeyPackage durably.");
     }
     res.json({ keyPackage: item });
   });

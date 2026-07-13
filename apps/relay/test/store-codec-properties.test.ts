@@ -122,6 +122,20 @@ test("malformed generated records are isolated from valid store records", () => 
   );
 });
 
+test("arbitrary decoded store documents never escape codec normalization", () => {
+  fc.assert(
+    fc.property(fc.dictionary(fc.string(), fc.jsonValue({ maxDepth: 10 })), (document) => {
+      const first = codec();
+      assert.doesNotThrow(() => first.codec.applyStoredRelayState(document));
+      const normalized = first.codec.toStoredRelayState();
+      const second = codec();
+      assert.doesNotThrow(() => second.codec.applyStoredRelayState(normalized));
+      assert.deepEqual(semantic(second.codec.toStoredRelayState()), semantic(normalized));
+    }),
+    { numRuns: 2_000 }
+  );
+});
+
 test("expiry and pruning use the injected clock", () => {
   const { store, codec: storeCodec } = codec();
   store.authSessions.set("expired", {

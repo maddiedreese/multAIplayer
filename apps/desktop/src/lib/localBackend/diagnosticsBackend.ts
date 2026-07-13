@@ -26,7 +26,7 @@ export function recordPersistedDiagnostic(entry: PersistedDiagnosticEntry): void
   const persistedEntry = { ...entry };
   diagnosticWriteQueue = diagnosticWriteQueue
     .then(() => invoke<void>("record_diagnostic", { entry: persistedEntry }))
-    .catch(() => undefined);
+    .catch(() => console.debug("[expected failure] native diagnostic persistence was unavailable"));
 }
 
 export async function savePersistedDiagnosticBundle(
@@ -38,6 +38,7 @@ export async function savePersistedDiagnosticBundle(
     const outcome = await invoke<"saved" | "cancelled">("save_diagnostic_bundle", { context });
     return outcome === "saved" || outcome === "cancelled" ? outcome : "failed";
   } catch {
+    console.debug("[expected failure] native diagnostic bundle could not be saved");
     return "failed";
   }
 }

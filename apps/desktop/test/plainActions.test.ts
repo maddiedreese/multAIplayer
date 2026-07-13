@@ -250,7 +250,7 @@ test("member removal reports relay-revoked but incomplete cryptographic transiti
     removalCalls += 1;
     return removalCalls === 1
       ? new Response(JSON.stringify({ members: [] }), { status: 200, headers: { "content-type": "application/json" } })
-      : new Response(JSON.stringify({ error: "Team member not found" }), {
+      : new Response(JSON.stringify({ error: "Team member not found", code: "team_member_not_found" }), {
           status: 404,
           headers: { "content-type": "application/json" }
         });

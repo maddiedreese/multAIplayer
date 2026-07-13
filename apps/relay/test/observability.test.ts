@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { logRelayEvent } from "../src/observability.js";
+import { logRelayEvent, relayMetricsToPrometheus } from "../src/observability.js";
 
 test("relay operational logs are structured and contain only explicit safe fields", () => {
   const lines: string[] = [];
@@ -19,4 +19,31 @@ test("relay operational logs are structured and contain only explicit safe field
   assert.equal(record.minimumCharacters, 32);
   assert.match(String(record.at), /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(JSON.stringify(record).includes("credential"), false);
+});
+
+test("Prometheus metrics are stable, typed, and escape labels", () => {
+  const output = relayMetricsToPrometheus({
+    activeSockets: 2,
+    liveAttachmentBlobCount: 1,
+    liveAttachmentBlobBytes: 12,
+    envelopesPublishedTotal: 3,
+    attachmentBlobUploadsTotal: 1,
+    attachmentBlobUploadBytesTotal: 12,
+    attachmentBlobUploadRejectionsByReason: { 'bad"reason\\line\n': 4 },
+    quotaRejectionsTotal: 5,
+    quotaRejectionsByType: { rooms: 5 },
+    rateLimitRejectionsTotal: 6,
+    rateLimitRejectionsByBucket: { mutation: 6 },
+    webSocketConnectionAttemptsTotal: 7,
+    webSocketConnectionsAcceptedTotal: 2,
+    webSocketConnectionRejectionsByReason: { quota: 5 },
+    startedAt: "2026-01-01T00:00:00.000Z",
+    uptimeSeconds: 8
+  });
+
+  assert.match(output, /# TYPE multaiplayer_relay_envelopes_published_total counter/);
+  assert.match(output, /multaiplayer_relay_active_sockets 2/);
+  assert.match(output, /reason="bad\\"reason\\\\line\\n"} 4/);
+  assert.match(output, /multaiplayer_relay_start_time_seconds 1767225600/);
+  assert.ok(output.endsWith("\n"));
 });

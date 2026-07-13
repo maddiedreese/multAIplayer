@@ -1,3 +1,5 @@
+import { reportExpectedFailure } from "./nonFatalReporting";
+
 export const localPreviewPorts = [3000, 3001, 5173, 5174, 8000, 8080, 4200, 5000, 8888] as const;
 
 export const localPreviewHosts = ["localhost", "127.0.0.1"] as const;
@@ -34,6 +36,7 @@ export function normalizeLocalPreviewUrl(value: string): string {
   try {
     parsed = new URL(trimmed);
   } catch {
+    reportExpectedFailure("local preview URL validation rejected malformed input");
     throw new Error("Enter a valid local HTTP or HTTPS URL.");
   }
 
@@ -67,6 +70,7 @@ export function localPreviewLabel(url: string): string {
     const parsed = new URL(url);
     return `${parsed.hostname}:${parsed.port}`;
   } catch {
+    reportExpectedFailure("local preview label parser rejected malformed input");
     return url;
   }
 }
@@ -76,6 +80,7 @@ export function isTryCloudflareUrl(value: string): boolean {
     const parsed = new URL(value);
     return parsed.protocol === "https:" && /^[a-zA-Z0-9.-]+\.trycloudflare\.com$/.test(parsed.hostname);
   } catch {
+    reportExpectedFailure("quick-tunnel URL validation rejected malformed input");
     return false;
   }
 }

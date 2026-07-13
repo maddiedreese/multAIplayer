@@ -10,6 +10,7 @@ import { roomLockMessage } from "./appRuntime";
 import { useAppStore } from "../store/appStore";
 import type { LocalPreviewRecord } from "../types";
 import { currentLocalIdentity } from "./selectedWorkspace";
+import { reportExpectedFailure } from "./nonFatalReporting";
 
 interface LocalPreviewActionsOptions {
   publishLocalPreviewEvent: (payload: LocalPreviewRecord, room?: RoomRecord) => Promise<void>;
@@ -173,6 +174,7 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
           await stopLocalPreviewTunnel(preview.id);
         } catch {
           // The app may already be exiting or the tunnel may have already stopped.
+          reportExpectedFailure("local preview tunnel was already stopped during shutdown");
         }
         await publishLocalPreviewEvent(
           {

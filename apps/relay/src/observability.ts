@@ -37,6 +37,120 @@ export interface RelayMetricsSnapshotGauges {
   liveAttachmentBlobBytes?: number;
 }
 
+export function relayMetricsToPrometheus(snapshot: RelayMetricsSnapshot): string {
+  const lines: string[] = [];
+  const metric = (name: string, type: "counter" | "gauge", help: string, value: number) => {
+    lines.push(`# HELP ${name} ${help}`, `# TYPE ${name} ${type}`, `${name} ${finiteMetricValue(value)}`);
+  };
+  const labeled = (name: string, help: string, label: string, values: Record<string, number>) => {
+    lines.push(`# HELP ${name} ${help}`, `# TYPE ${name} counter`);
+    for (const [key, value] of Object.entries(values).sort(([left], [right]) => left.localeCompare(right))) {
+      lines.push(`${name}{${label}="${escapePrometheusLabel(key)}"} ${finiteMetricValue(value)}`);
+    }
+  };
+
+  metric(
+    "multaiplayer_relay_active_sockets",
+    "gauge",
+    "Currently active relay WebSocket sessions.",
+    snapshot.activeSockets
+  );
+  metric(
+    "multaiplayer_relay_live_attachment_blobs",
+    "gauge",
+    "Currently retained, non-expired attachment blobs.",
+    snapshot.liveAttachmentBlobCount ?? 0
+  );
+  metric(
+    "multaiplayer_relay_live_attachment_blob_bytes",
+    "gauge",
+    "Bytes currently retained by non-expired attachment blobs.",
+    snapshot.liveAttachmentBlobBytes ?? 0
+  );
+  metric(
+    "multaiplayer_relay_envelopes_published_total",
+    "counter",
+    "Accepted MLS envelopes.",
+    snapshot.envelopesPublishedTotal
+  );
+  metric(
+    "multaiplayer_relay_attachment_blob_uploads_total",
+    "counter",
+    "Accepted attachment blob uploads.",
+    snapshot.attachmentBlobUploadsTotal
+  );
+  metric(
+    "multaiplayer_relay_attachment_blob_upload_bytes_total",
+    "counter",
+    "Accepted attachment blob upload bytes.",
+    snapshot.attachmentBlobUploadBytesTotal
+  );
+  labeled(
+    "multaiplayer_relay_attachment_blob_upload_rejections_total",
+    "Rejected attachment blob uploads by reason.",
+    "reason",
+    snapshot.attachmentBlobUploadRejectionsByReason
+  );
+  metric(
+    "multaiplayer_relay_quota_rejections_total",
+    "counter",
+    "Requests rejected by creation or storage quotas.",
+    snapshot.quotaRejectionsTotal
+  );
+  labeled(
+    "multaiplayer_relay_quota_rejections_by_type_total",
+    "Quota rejections by quota type.",
+    "type",
+    snapshot.quotaRejectionsByType
+  );
+  metric(
+    "multaiplayer_relay_rate_limit_rejections_total",
+    "counter",
+    "Requests rejected by rate limits.",
+    snapshot.rateLimitRejectionsTotal
+  );
+  labeled(
+    "multaiplayer_relay_rate_limit_rejections_by_bucket_total",
+    "Rate-limit rejections by bucket.",
+    "bucket",
+    snapshot.rateLimitRejectionsByBucket
+  );
+  metric(
+    "multaiplayer_relay_websocket_connection_attempts_total",
+    "counter",
+    "WebSocket connection attempts.",
+    snapshot.webSocketConnectionAttemptsTotal
+  );
+  metric(
+    "multaiplayer_relay_websocket_connections_accepted_total",
+    "counter",
+    "Accepted WebSocket connections.",
+    snapshot.webSocketConnectionsAcceptedTotal
+  );
+  labeled(
+    "multaiplayer_relay_websocket_connection_rejections_total",
+    "Rejected WebSocket connections by reason.",
+    "reason",
+    snapshot.webSocketConnectionRejectionsByReason
+  );
+  metric("multaiplayer_relay_uptime_seconds", "gauge", "Relay process uptime in seconds.", snapshot.uptimeSeconds);
+  metric(
+    "multaiplayer_relay_start_time_seconds",
+    "gauge",
+    "Relay process start time as Unix seconds.",
+    Date.parse(snapshot.startedAt) / 1000
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+function finiteMetricValue(value: number): number {
+  return Number.isFinite(value) ? value : 0;
+}
+
+function escapePrometheusLabel(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/"/g, '\\"');
+}
+
 export type RelayLogLevel = "info" | "warn" | "error";
 export type RelayLogSink = (line: string) => void;
 

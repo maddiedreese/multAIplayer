@@ -5,6 +5,7 @@ import { deriveCodexAgentTree } from "../lib/codexThreadGraph";
 import { codexGoalToRoomGoal } from "../lib/roomGoals";
 import { useAppStore } from "../store/appStore";
 import type { CodexAgentTreeNode, CodexThreadGraph } from "../types";
+import { reportNonFatal } from "../lib/nonFatalReporting";
 
 export function CodexThreadGraphPanel({ roomId, projectPath }: { roomId: string; projectPath: string }) {
   const runtime = useAppStore((state) => state.codexRuntimeByRoom[roomId]);
@@ -51,7 +52,8 @@ export function CodexThreadGraphPanel({ roomId, projectPath }: { roomId: string;
     try {
       const goal = await getCodexGoal(roomId, threadId);
       setRoomGoal(roomId, goal ? codexGoalToRoomGoal(goal) : null);
-    } catch {
+    } catch (error) {
+      reportNonFatal("load Codex goal while switching threads", error);
       setRoomGoal(roomId, null);
     }
   }

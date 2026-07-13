@@ -18,6 +18,28 @@ React hooks own subscriptions, effects, refs, and component-tree composition. Im
 
 Effectful capabilities that cannot safely live in serializable store state—native backends, relay connections, and current refs—are passed explicitly at composition boundaries.
 
+## Enforced dependency graph
+
+Each slice owns its state fields. ESLint rejects a slice that accesses another slice's fields unless the edge is listed in the architecture rule. The two intentional coordinators are shown below; all unshown slices have no cross-slice state dependency.
+
+```mermaid
+flowchart LR
+  lifecycle["roomLifecycleSlice"] --> browser["browserSlice"]
+  lifecycle --> codex["codexHostHandoffSlice"]
+  lifecycle --> files["filePanelSlice"]
+  lifecycle --> git["gitWorkflowSlice"]
+  lifecycle --> presence["historyPresenceSlice"]
+  lifecycle --> invite["inviteSlice"]
+  lifecycle --> preview["localPreviewSlice"]
+  lifecycle --> chat["roomChatSlice"]
+  lifecycle --> settings["roomSettingsSlice"]
+  lifecycle --> terminal["terminalSlice"]
+  lifecycle --> workspace["workspaceDataSlice"]
+  workspace --> codex
+```
+
+`roomLifecycleSlice` is the atomic hydrate/clear coordinator for room-scoped state. `workspaceDataSlice` updates Codex pending and queued approvals atomically when their source chat messages are edited or deleted. New edges require an ADR update, an explicit ESLint allowlist entry, and focused atomicity tests.
+
 ## Consequences
 
 - Room-scoped state must not leak through a global “selected room” cache.

@@ -1,3 +1,4 @@
+import { sendRelayError } from "../http/errors.js";
 import type { CookieOptions, Express } from "express";
 import { nanoid } from "nanoid";
 import type { AuthSession } from "../state.js";
@@ -55,9 +56,12 @@ export function registerGitHubAuthRoutes({
 
   app.post("/auth/github/device/start", async (_req, res) => {
     if (!githubClientId) {
-      res.status(503).json({
-        error: "GitHub OAuth is not configured. Set GITHUB_CLIENT_ID on the relay."
-      });
+      sendRelayError(
+        res,
+        503,
+        "upstream_unavailable",
+        "GitHub OAuth is not configured. Set GITHUB_CLIENT_ID on the relay."
+      );
       return;
     }
 
@@ -73,20 +77,28 @@ export function registerGitHubAuthRoutes({
       })
     });
 
-    res.status(response.status).json(await response.json());
+    const responseBody = await response.json();
+    if (!response.ok) {
+      sendRelayError(res, response.status, "upstream_unavailable", "GitHub did not start sign-in.");
+      return;
+    }
+    res.status(response.status).json(responseBody);
   });
 
   app.post("/auth/github/device/poll", async (req, res) => {
     if (!githubClientId) {
-      res.status(503).json({
-        error: "GitHub OAuth is not configured. Set GITHUB_CLIENT_ID on the relay."
-      });
+      sendRelayError(
+        res,
+        503,
+        "upstream_unavailable",
+        "GitHub OAuth is not configured. Set GITHUB_CLIENT_ID on the relay."
+      );
       return;
     }
 
     const deviceCode = normalizeMetadataText(req.body?.device_code, maxGitHubDeviceCodeChars);
     if (!deviceCode) {
-      res.status(400).json({ error: "device_code must be a bounded non-empty string" });
+      sendRelayError(res, 400, "invalid_request", "device_code must be a bounded non-empty string");
       return;
     }
 
@@ -117,14 +129,14 @@ export function registerGitHubAuthRoutes({
         return;
       }
       if (tokenBody.error === "access_denied") {
-        res.status(400).json({ error: "GitHub sign-in was denied." });
+        sendRelayError(res, 400, "invalid_request", "GitHub sign-in was denied.");
         return;
       }
       if (tokenBody.error === "expired_token") {
-        res.status(400).json({ error: "The GitHub sign-in code expired. Start sign-in again." });
+        sendRelayError(res, 400, "invalid_request", "The GitHub sign-in code expired. Start sign-in again.");
         return;
       }
-      res.status(502).json({ error: "GitHub did not complete sign-in." });
+      sendRelayError(res, 502, "upstream_unavailable", "GitHub did not complete sign-in.");
       return;
     }
 
@@ -136,7 +148,7 @@ export function registerGitHubAuthRoutes({
       }
     });
     if (!userResponse.ok) {
-      res.status(userResponse.status).json({ error: "Failed to load GitHub user" });
+      sendRelayError(res, userResponse.status, "upstream_unavailable", "Failed to load GitHub user");
       return;
     }
     const githubUser = (await userResponse.json()) as {
@@ -153,11 +165,11 @@ export function registerGitHubAuthRoutes({
       ? normalizeMetadataText(githubUser.avatar_url, maxRoomProjectPathChars)
       : null;
     if (!normalizedUserId || !login || (githubUser.name && !name) || (githubUser.avatar_url && !avatarUrl)) {
-      res.status(502).json({ error: "GitHub returned unsupported user metadata" });
+      sendRelayError(res, 502, "upstream_unavailable", "GitHub returned unsupported user metadata");
       return;
     }
     if (tokenBody.access_token.length > maxAccessTokenChars) {
-      res.status(502).json({ error: "GitHub returned an oversized access token" });
+      sendRelayError(res, 502, "upstream_unavailable", "GitHub returned an oversized access token");
       return;
     }
 
@@ -181,7 +193,7 @@ export function registerGitHubAuthRoutes({
   app.get("/auth/me", (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!session) {
-      res.status(401).json({ error: "Not signed in" });
+      sendRelayError(res, 401, "authentication_required", "Not signed in");
       return;
     }
     res.json({ user: session.user });

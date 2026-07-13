@@ -1,3 +1,4 @@
+import { sendRelayError } from "../http/errors.js";
 import type { CookieOptions, Response } from "express";
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 import type { IncomingMessage } from "node:http";
@@ -91,13 +92,13 @@ export function createRelayAuthSessionManager({
 
   function allowRead(session: AuthSession | null, res: Response): boolean {
     if (!mutationsRequireAuth || session) return true;
-    res.status(401).json({ error: "Sign in with GitHub before reading workspace state." });
+    sendRelayError(res, 401, "authentication_required", "Sign in with GitHub before reading workspace state.");
     return false;
   }
 
   function allowMutation(session: AuthSession | null, res: Response): boolean {
     if (!mutationsRequireAuth || session) return true;
-    res.status(401).json({ error: "Sign in with GitHub before changing workspace state." });
+    sendRelayError(res, 401, "authentication_required", "Sign in with GitHub before changing workspace state.");
     return false;
   }
 

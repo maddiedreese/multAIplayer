@@ -21,6 +21,19 @@ const trackedFiles = () =>
     .filter((path) => path && existsSync(path));
 const trackedMarkdownFiles = () => trackedFiles().filter((path) => path.endsWith(".md"));
 
+function readJsonPathValue(value, jsonpath) {
+  const segments = [];
+  assert.ok(jsonpath.startsWith("$"), `release JSONPath must start at the document root: ${jsonpath}`);
+  const matcher = /(?:\.([A-Za-z][A-Za-z0-9]*)|\['([^']*)'\])/g;
+  let consumed = "$";
+  for (const match of jsonpath.matchAll(matcher)) {
+    consumed += match[0];
+    segments.push(match[1] ?? match[2]);
+  }
+  assert.equal(consumed, jsonpath, `unsupported release JSONPath ${jsonpath}`);
+  return segments.reduce((current, segment) => current?.[segment], value);
+}
+
 const withoutFencedCode = (source) => source.replace(/^\s*(```|~~~)[\s\S]*?^\s*\1.*$/gm, "");
 
 test("tracked Markdown links resolve to repository files", () => {
@@ -265,10 +278,100 @@ test("release SBOM, provenance, and keyless signatures remain gated", () => {
   assert.match(workflow, /sigstore\/cosign-installer@[a-f0-9]{40}/);
   assert.match(workflow, /cosign sign-blob --yes --bundle release-assets\/SHA256SUMS\.txt\.sigstore\.json/);
   assert.match(workflow, /cosign sign-blob --yes --bundle release-assets\/multaiplayer\.spdx\.json\.sigstore\.json/);
-  assert.match(workflow, /gh release create[\s\S]*release-assets\/\*/);
+  assert.match(workflow, /gh release view[\s\S]*gh release upload[\s\S]*gh release create[\s\S]*release-assets\/\*/);
   assert.match(documentation, /SPDX SBOM/);
   assert.match(documentation, /build-provenance/i);
   assert.match(documentation, /Sigstore/i);
+});
+
+test("release automation preserves alpha, CI, and DCO gates", () => {
+  const workflow = readFileSync(".github/workflows/release-please.yml", "utf8");
+  const config = JSON.parse(readFileSync("release-please-config.json", "utf8"));
+  const manifest = JSON.parse(readFileSync(".release-please-manifest.json", "utf8"));
+  assert.match(workflow, /googleapis\/release-please-action@[a-f0-9]{40}/);
+  assert.match(workflow, /secrets\.RELEASE_PLEASE_TOKEN/);
+  assert.equal(config.prerelease, true);
+  assert.equal(config.packages["."]["prerelease-type"], "alpha");
+  assert.match(config.signoff, /github-actions\[bot\].+@users\.noreply\.github\.com/);
+  assert.equal(manifest["."], "0.1.0-alpha.0");
+});
+
+test("release automation covers every synchronized version source", () => {
+  const config = readJson("release-please-config.json");
+  const extraFiles = config.packages?.["."]?.["extra-files"] ?? [];
+  const configuredTargets = new Set(
+    extraFiles
+      .filter((entry) => typeof entry === "object" && entry.type === "json")
+      .map((entry) => `${entry.path}\0${entry.jsonpath}`)
+  );
+  const requireJsonTarget = (path, jsonpath) => {
+    assert.ok(configuredTargets.has(`${path}\0${jsonpath}`), `release automation must update ${path} ${jsonpath}`);
+    assert.equal(readJsonPathValue(readJson(path), jsonpath), rootPackage.version, `${path} ${jsonpath}`);
+  };
+
+  for (const path of workspaceManifestPaths) {
+    requireJsonTarget(path, "$.version");
+    const manifest = readJson(path);
+    for (const dependencyGroup of ["dependencies", "devDependencies", "peerDependencies"]) {
+      for (const dependencyName of Object.keys(manifest[dependencyGroup] ?? {}).filter((name) =>
+        name.startsWith("@multaiplayer/")
+      )) {
+        requireJsonTarget(path, `$['${dependencyGroup}']['${dependencyName}']`);
+      }
+    }
+  }
+
+  requireJsonTarget("package-lock.json", "$.version");
+  requireJsonTarget("package-lock.json", "$['packages'][''].version");
+  const packageLock = readJson("package-lock.json");
+  for (const manifestPath of workspaceManifestPaths) {
+    const workspacePath = manifestPath.replace(/\/package\.json$/, "");
+    requireJsonTarget("package-lock.json", `$['packages']['${workspacePath}'].version`);
+    const lockedPackage = packageLock.packages[workspacePath];
+    for (const dependencyGroup of ["dependencies", "devDependencies", "peerDependencies"]) {
+      for (const dependencyName of Object.keys(lockedPackage[dependencyGroup] ?? {}).filter((name) =>
+        name.startsWith("@multaiplayer/")
+      )) {
+        requireJsonTarget(
+          "package-lock.json",
+          `$['packages']['${workspacePath}']['${dependencyGroup}']['${dependencyName}']`
+        );
+      }
+    }
+  }
+
+  assert.ok(
+    extraFiles.some(
+      (entry) =>
+        entry.type === "toml" &&
+        entry.path === "apps/desktop/src-tauri/Cargo.toml" &&
+        entry.jsonpath === "$.package.version"
+    ),
+    "release automation must update the native Cargo package version"
+  );
+  assert.ok(
+    extraFiles.some(
+      (entry) =>
+        entry.type === "toml" &&
+        entry.path === "apps/desktop/src-tauri/Cargo.lock" &&
+        entry.jsonpath === "$.package[?(@.name=='multaiplayer')].version"
+    ),
+    "release automation must update the native Cargo lock package version"
+  );
+  assert.match(
+    readFileSync("apps/desktop/src-tauri/Cargo.lock", "utf8"),
+    /name = "multaiplayer"\nversion = "0\.1\.0-alpha\.0"/,
+    "Cargo.lock must contain the synchronized native package version"
+  );
+  assert.ok(
+    extraFiles.some((entry) => entry.type === "generic" && entry.path === "packages/codex/src/json-rpc.ts"),
+    "release automation must include packages/codex/src/json-rpc.ts"
+  );
+  assert.match(
+    readFileSync("packages/codex/src/json-rpc.ts", "utf8"),
+    /x-release-please-version/,
+    "packages/codex/src/json-rpc.ts needs a version annotation"
+  );
 });
 
 test("relay operational messages use the structured observability sink", () => {
@@ -402,6 +505,23 @@ test("TypeScript quality gates stay enforced", () => {
   assert.match(rootPackage.scripts["verify:web"], /^npm run lint && npm run format:check && /);
   assert.equal(rootPackage.devDependencies.eslint, "10.7.0");
   assert.equal(rootPackage.devDependencies.prettier, "3.9.5");
+});
+
+test("relay HTTP handlers use the structured error taxonomy", () => {
+  const handlerFiles = ["apps/relay/src/auth", "apps/relay/src/http"].flatMap((directory) =>
+    readdirSync(directory, { recursive: true })
+      .filter((path) => typeof path === "string" && path.endsWith(".ts"))
+      .map((path) => `${directory}/${path}`)
+  );
+  for (const path of handlerFiles) {
+    if (path.endsWith("/errors.ts") || path.endsWith("/upstream.ts")) continue;
+    const source = readFileSync(path, "utf8");
+    assert.doesNotMatch(
+      source,
+      /\.status\([^)]*\)\s*\.json\(\s*\{\s*error\s*:/,
+      `${path} must call sendRelayError for error responses`
+    );
+  }
 });
 
 test("contributor architecture decisions stay indexed and structured", () => {

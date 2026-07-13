@@ -10,6 +10,7 @@ import {
 import { formatCodexModel } from "../lib/appFormatters";
 import { handoffRepoIdentity, hostHandoffDetail, sameHandoffRepo } from "../lib/hostHandoff";
 import { parseGitHubRemoteUrl } from "../lib/gitWorkflowDraft";
+import { reportExpectedFailure } from "../lib/nonFatalReporting";
 import type { HostHandoffRecord, QueuedCodexTurn } from "../types";
 
 export interface HandoffProject {
@@ -23,7 +24,10 @@ export async function resolveHandoffProject(handoff: HostHandoffRecord, fallback
   const expectedRepo = handoffRepoIdentity(handoff);
   async function pathMatches(path: string): Promise<boolean> {
     if (!expectedRepo) return true;
-    const remote = await getGitRemoteOrigin(path).catch(() => ({ originUrl: null }));
+    const remote = await getGitRemoteOrigin(path).catch(() => {
+      reportExpectedFailure("Git remote was unavailable while resolving a host handoff project");
+      return { originUrl: null };
+    });
     const actualRepo = remote.originUrl ? parseGitHubRemoteUrl(remote.originUrl) : null;
     return sameHandoffRepo(expectedRepo, actualRepo);
   }

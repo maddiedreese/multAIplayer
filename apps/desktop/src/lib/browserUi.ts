@@ -1,9 +1,11 @@
 import { normalizeBrowserCommandUrl } from "./codexInvoke";
+import { reportExpectedFailure } from "./nonFatalReporting";
 
 export function formatBrowserAccessLabel(url: string): string {
   try {
     return new URL(url).origin;
   } catch {
+    reportExpectedFailure("browser access label parser rejected malformed input");
     return url;
   }
 }

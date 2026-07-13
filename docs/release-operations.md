@@ -12,6 +12,8 @@ npm run release:preflight
 
 This covers the TypeScript and Rust verification suites, package/application builds, license checks, environment/toolchain checks, and a fixture SQLite backup/restore drill. For the exact blocking and scheduled jobs, see [ci-policy.md](ci-policy.md).
 
+Release Please maintains [the project changelog](../CHANGELOG.md), workspace versions, release pull request, version tag, and GitHub Release from Conventional Commit subjects. Its `extra-files` configuration updates every exact internal npm pin and lockfile entry together with the Tauri Cargo version and Codex app-server client version. The project-hygiene suite checks that every synchronized version source remains covered by that configuration; review its diff on every generated release pull request. Release Please works with the built-in Actions token; approve the resulting pull-request checks when GitHub requests it. An optional fine-grained `RELEASE_PLEASE_TOKEN` with repository Contents and Pull requests read/write access removes that approval step. When the built-in token creates the tag, the preparation workflow explicitly dispatches the signed-artifact workflow. Merging the generated pull request attaches the notarized app, checksums, SBOM, and attestations to the generated release. Do not maintain point-in-time release-note drafts in `docs/`.
+
 Before a wider alpha, manually verify on two macOS devices and two GitHub accounts:
 
 - KeyPackage publication, capability invite approval, Welcome join, encrypted chat, attachments, MLS removal, epoch advancement, and removed-device exclusion;

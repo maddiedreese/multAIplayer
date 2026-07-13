@@ -1,5 +1,6 @@
 import { ExternalLink, LogIn, LogOut, RefreshCw, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { reportExpectedFailure } from "../lib/nonFatalReporting";
 
 import {
   cancelCodexLogin,
@@ -44,7 +45,7 @@ export function CodexAccountPanel() {
   const refreshTask = useMemo(() => createCoalescedAsyncTask(performRefresh), [performRefresh]);
 
   useEffect(() => {
-    void refreshTask.request().catch(() => undefined);
+    void refreshTask.request().catch(() => reportExpectedFailure("coalesced Codex account refresh was cancelled"));
     let disposed = false;
     let unlisten: () => void = () => undefined;
     void listenForCodexHostNotifications((notification) => {
@@ -63,7 +64,7 @@ export function CodexAccountPanel() {
         );
       }
       if (shouldRefreshCodexHostSnapshot(notification.method, Date.now() - refreshStartedAt.current)) {
-        void refreshTask.request().catch(() => undefined);
+        void refreshTask.request().catch(() => reportExpectedFailure("coalesced Codex account refresh was cancelled"));
       }
     }).then((stop) => {
       if (disposed) stop();

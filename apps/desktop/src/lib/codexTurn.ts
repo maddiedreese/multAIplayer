@@ -1,5 +1,6 @@
 import type { CodexTurnSummary, RoomRecord } from "@multaiplayer/protocol";
 import { detectSecretRisks } from "./secretRisks";
+import { reportExpectedFailure } from "./nonFatalReporting";
 
 export interface CodexChatAttachment {
   id: string;
@@ -433,6 +434,7 @@ function formatBrowserAccessLabel(url: string): string {
   try {
     return new URL(url).origin;
   } catch {
+    reportExpectedFailure("browser access label parser rejected malformed input");
     return url;
   }
 }

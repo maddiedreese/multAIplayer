@@ -4,6 +4,7 @@ import { Check, Copy, Maximize2, Minimize2, Plus, Play, Square, Terminal, X } fr
 import { useEffect, useRef, useState } from "react";
 import type { TerminalLine, TerminalSnapshot } from "../lib/localBackend";
 import { InlineSecretWarning } from "./common";
+import { reportExpectedFailure } from "../lib/nonFatalReporting";
 
 type XTermConstructor = typeof import("@xterm/xterm").Terminal;
 const xtermCompat = xtermModule as unknown as {
@@ -144,6 +145,7 @@ export function TerminalPanel({
           fitAddon.fit();
         } catch {
           // The addon can throw while the panel is hidden or has no measurable width.
+          reportExpectedFailure("terminal fit skipped for a hidden or unmeasurable panel");
         }
       });
     };
@@ -198,6 +200,7 @@ export function TerminalPanel({
       fitAddonRef.current?.fit();
     } catch {
       // Hidden panels are fitted again when visible.
+      reportExpectedFailure("terminal fit deferred until the panel is visible");
     }
   }, [selectedTerminal, selectedTerminal?.lines.length, selectedTerminalIdForEffect]);
 
@@ -208,6 +211,7 @@ export function TerminalPanel({
         fitAddonRef.current?.fit();
       } catch {
         // Hidden panels are fitted again when visible.
+        reportExpectedFailure("terminal focus fit deferred until the panel is visible");
       }
       const activeElement = document.activeElement;
       if (

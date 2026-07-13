@@ -50,6 +50,7 @@ docker run --rm -p 4321:4321 \
   -v multaiplayer-relay-data:/data \
   -e GITHUB_CLIENT_ID=your_client_id \
   -e MULTAIPLAYER_RELAY_SESSION_SECRET=replace_with_at_least_32_chars \
+  -e MULTAIPLAYER_RELAY_METRICS_TOKEN=replace_with_a_different_32_char_token \
   -e MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://your-app.example \
   -e MULTAIPLAYER_RELAY_REQUIRE_AUTH=true \
   -e MULTAIPLAYER_RELAY_DEBUG=false \
@@ -91,7 +92,9 @@ MULTAIPLAYER_RELAY_STORAGE=sqlite
 MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
 ```
 
-SQLite uses WAL mode and transactional writes to normalized relay tables for teams, rooms, invites, device public keys, KeyPackages, opaque MLS backlog, sealed attachment blobs, team membership, and encrypted GitHub sessions. It also provides the compare-and-swap transition that accepts only one Commit for an expected room epoch. It is the required alpha storage backend for hosted relays because it is more crash-safe than replacing one JSON file. JSON storage remains an explicit compatibility option for local development and migration; it is never selected implicitly.
+SQLite uses WAL mode and immediate, incremental transactions against normalized relay tables for teams, rooms, invites, device public keys, KeyPackages, opaque MLS backlog, sealed attachment blobs, team membership, and encrypted GitHub sessions. Each in-memory entity mutation is tracked as an explicit row upsert or delete; steady-state writes do not encode, clear, or rewrite the full relay store. MLS message, receipt, room-epoch, and related entity changes share one transaction, including the compare-and-swap transition that accepts only one Commit for an expected room epoch. Full-state encoding remains only at the JSON compatibility and one-time JSON-to-SQLite migration boundaries. SQLite is the required alpha storage backend for hosted relays because it removes the debounced whole-file crash window and scales writes with the changed entities. JSON storage remains an explicit compatibility option for local development and migration; it is never selected implicitly.
+
+The relay still hydrates durable state into one process-local store at startup. Run one relay writer per SQLite database; general multi-instance coordination is not claimed until reads and all compare-and-swap mutations move behind a shared database service. Horizontal deployments also require shared rate limiting and attachment-storage coordination.
 
 For upgrade continuity, a relay started with neither storage variable set checks the former default path `.multaiplayer/relay-store.json` before initializing the default SQLite database. It imports a valid version-1 snapshot transactionally, then renames the JSON source to `relay-store.json.migrated-to-sqlite`. Restarts load only the committed SQLite state, so the import is idempotent. An unreadable or unsupported legacy snapshot aborts startup and remains in place for operator recovery; it never falls through to an empty store. Explicit storage or data-path settings are never auto-migrated. Back up the JSON file first and use the explicit migration runbook when operating outside these defaults.
 
@@ -221,7 +224,16 @@ Each response includes an `x-request-id` header. The relay accepts a bounded inc
 
 Startup, shutdown, configuration rejection, persistence, and quarantine events use the same structured JSON log record even when request logging is disabled. Those operational events use stable event names and bounded scalar fields; invalid environment values, local store paths, and raw error objects are deliberately omitted.
 
-The relay also exposes content-free operational counters at `/metrics`, including active sockets, live sealed-blob count and bytes, published opaque-message count, accepted attachment upload count and bytes, upload rejection counts by reason, rate-limit rejection counts by bucket, quota rejection counts by quota type, WebSocket connection attempt/accept/rejection counts, start time, and uptime.
+The relay exposes content-free operational counters in Prometheus text format at `/metrics`, including active sockets, live sealed-blob count and bytes, published opaque-message count, accepted attachment upload count and bytes, upload rejection counts by reason, rate-limit rejection counts by bucket, quota rejection counts by quota type, WebSocket connection attempt/accept/rejection counts, start time, and uptime. The endpoint is always bearer-authenticated and remains disabled until a token of at least 32 characters is configured:
+
+```bash
+MULTAIPLAYER_RELAY_METRICS_TOKEN=$(openssl rand -base64 32)
+curl -H "Authorization: Bearer $MULTAIPLAYER_RELAY_METRICS_TOKEN" https://relay.example/metrics
+```
+
+Store this token in the scraper's secret manager. Do not reuse the session-persistence secret, put the token in a URL query, or expose `/metrics` through an unauthenticated reverse-proxy exception.
+
+Every relay HTTP error has a stable `code` alongside its bounded human-readable `error` message. Clients should branch on the code rather than matching prose; unknown future codes should fall back to status-class handling and the human-readable message.
 
 Graceful shutdown timing is configurable:
 

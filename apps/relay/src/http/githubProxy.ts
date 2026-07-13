@@ -1,3 +1,4 @@
+import { sendRelayError } from "./errors.js";
 import type { Express } from "express";
 import { normalizeGitHubBranchName, normalizeGitHubRepoRef, normalizePullRequestDraft } from "@multaiplayer/github";
 import { isRecord } from "@multaiplayer/protocol";
@@ -24,7 +25,7 @@ export function registerGitHubProxyRoutes({
   app.post("/github/pulls", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!session) {
-      res.status(401).json({ error: "Sign in with GitHub before creating a PR." });
+      sendRelayError(res, 401, "authentication_required", "Sign in with GitHub before creating a PR.");
       return;
     }
 
@@ -40,7 +41,7 @@ export function registerGitHubProxyRoutes({
         draft: Boolean(req.body?.draft ?? true)
       });
     } catch (error) {
-      res.status(400).json({ error: String(error instanceof Error ? error.message : error) });
+      sendRelayError(res, 400, "invalid_request", String(error instanceof Error ? error.message : error));
       return;
     }
 
@@ -59,9 +60,10 @@ export function registerGitHubProxyRoutes({
     );
     const responseBody = await response.json();
     if (!response.ok) {
-      res
-        .status(response.status)
-        .json(normalizeGitHubErrorResponse(responseBody, normalizeMetadataText, maxMediumTextChars));
+      const upstreamError = normalizeGitHubErrorResponse(responseBody, normalizeMetadataText, maxMediumTextChars);
+      sendRelayError(res, response.status, "upstream_unavailable", upstreamError.error, {
+        ...(upstreamError.message ? { message: upstreamError.message } : {})
+      });
       return;
     }
     const pullRequest = normalizeGitHubPullResponse(
@@ -71,7 +73,7 @@ export function registerGitHubProxyRoutes({
       maxShortTextChars
     );
     if (!pullRequest) {
-      res.status(502).json({ error: "GitHub returned an invalid pull request response." });
+      sendRelayError(res, 502, "upstream_unavailable", "GitHub returned an invalid pull request response.");
       return;
     }
     res.status(201).json(pullRequest);
@@ -80,7 +82,7 @@ export function registerGitHubProxyRoutes({
   app.get("/github/actions/runs", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!session) {
-      res.status(401).json({ error: "Sign in with GitHub before checking Actions." });
+      sendRelayError(res, 401, "authentication_required", "Sign in with GitHub before checking Actions.");
       return;
     }
 
@@ -91,7 +93,7 @@ export function registerGitHubProxyRoutes({
       const requestedBranch = String(req.query.branch ?? "");
       branch = requestedBranch.trim() ? normalizeGitHubBranchName(requestedBranch) : null;
     } catch (error) {
-      res.status(400).json({ error: String(error instanceof Error ? error.message : error) });
+      sendRelayError(res, 400, "invalid_request", String(error instanceof Error ? error.message : error));
       return;
     }
 
@@ -110,9 +112,10 @@ export function registerGitHubProxyRoutes({
     );
     const responseBody = await response.json();
     if (!response.ok) {
-      res
-        .status(response.status)
-        .json(normalizeGitHubErrorResponse(responseBody, normalizeMetadataText, maxMediumTextChars));
+      const upstreamError = normalizeGitHubErrorResponse(responseBody, normalizeMetadataText, maxMediumTextChars);
+      sendRelayError(res, response.status, "upstream_unavailable", upstreamError.error, {
+        ...(upstreamError.message ? { message: upstreamError.message } : {})
+      });
       return;
     }
 

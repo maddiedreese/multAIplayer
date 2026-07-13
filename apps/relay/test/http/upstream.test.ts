@@ -11,7 +11,10 @@ test("upstream fetches fail closed on timeout", async () => {
     assert.ok(address && typeof address !== "string");
     const response = await fetchUpstream(`http://127.0.0.1:${address.port}`, {}, 5);
     assert.equal(response.status, 504);
-    assert.deepEqual(await response.json(), { error: "Upstream request timed out." });
+    assert.deepEqual(await response.json(), {
+      error: "Upstream request timed out.",
+      code: "upstream_unavailable"
+    });
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));

@@ -16,6 +16,7 @@ import {
 } from "../../lib/mlsClient";
 import { drainMlsOutboxForRoom, pendingMlsOutboxRoomIds } from "../../lib/mlsOutboxDrain";
 import { completeMlsRelayAdmission } from "../../lib/mlsJoinAdmission";
+import { reportNonFatal } from "../../lib/nonFatalReporting";
 
 interface LocalUser {
   id: string;
@@ -184,7 +185,7 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
         const roomId = message.message.roomId;
         const previous = roomReceiveQueues.get(roomId) ?? Promise.resolve();
         const queued = previous
-          .catch(() => undefined)
+          .catch(() => reportNonFatal("complete the previous MLS room receive task"))
           .then(async () => {
             if (cancelled || seenEnvelopeIds.current.has(message.message.id)) return;
             try {
@@ -207,6 +208,7 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
               });
               seenEnvelopeIds.current.add(message.message.id);
             } catch {
+              reportNonFatal("authenticate or apply an incoming MLS message");
               store.setHostMessageForRoom(
                 roomId,
                 "Security warning: an MLS message could not be authenticated or applied in epoch order. Rejoin this room if the warning persists."

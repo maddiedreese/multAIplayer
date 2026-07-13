@@ -5,6 +5,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { closeRoomBrowserSurfaceEvent } from "../lib/browserSurfaceEvents";
 import type { BrowserTab } from "../store/slices/browserSlice";
+import { reportExpectedFailure } from "../lib/nonFatalReporting";
 
 const browserWebviewLabel = "room_browser";
 
@@ -63,11 +64,16 @@ export function BrowserAccessPanel({
     const webview = browserWebviewRef.current;
     browserWebviewRef.current = null;
     if (webview) {
-      await webview.close().catch(() => undefined);
+      await webview.close().catch(() => reportExpectedFailure("room browser WebView was already closed"));
     }
     if (tauriRuntime) {
-      const labeledWebview = await Webview.getByLabel(browserWebviewLabel).catch(() => null);
-      await labeledWebview?.close().catch(() => undefined);
+      const labeledWebview = await Webview.getByLabel(browserWebviewLabel).catch(() => {
+        reportExpectedFailure("room browser WebView label was unavailable");
+        return null;
+      });
+      await labeledWebview
+        ?.close()
+        .catch(() => reportExpectedFailure("labeled room browser WebView was already closed"));
     }
   }, [tauriRuntime]);
 

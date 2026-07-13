@@ -1,3 +1,4 @@
+import { sendRelayError } from "./errors.js";
 import type { NextFunction, Request, Response } from "express";
 import type { IncomingMessage } from "node:http";
 import type { createRelayMetrics } from "../observability.js";
@@ -45,8 +46,7 @@ export function createRelayRequestGuards({
     }
     metrics.recordRateLimitRejection(bucket);
     res.setHeader("Retry-After", String(Math.ceil(Math.max(0, result.resetAt - Date.now()) / 1000)));
-    res.status(429).json({
-      error: "Rate limit exceeded. Slow down before retrying.",
+    sendRelayError(res, 429, "rate_limited", "Rate limit exceeded. Slow down before retrying.", {
       bucket,
       retryAfterSeconds: Math.ceil(Math.max(0, result.resetAt - Date.now()) / 1000)
     });

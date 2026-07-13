@@ -10,6 +10,7 @@ import {
 import { createAttachmentBlob, loadAttachmentBlob } from "./workspaceClient";
 import { decryptMlsBlob, encryptMlsBlob, type MlsBlobCiphertext } from "./mlsClient";
 import { createMlsApplicationMessage, publishMlsApplicationMessage } from "./mlsApplicationMessage";
+import { reportExpectedFailure } from "./nonFatalReporting";
 import {
   getGitDiff,
   readProjectFile,
@@ -107,7 +108,10 @@ export function createFileActions({
         readProjectFile(room.projectPath, path)
           .then((file) => ({ file, error: null }))
           .catch((error) => ({ file: null, error })),
-        getGitDiff(room.projectPath, path).catch(() => null)
+        getGitDiff(room.projectPath, path).catch(() => {
+          reportExpectedFailure("Git diff was unavailable while opening a workspace file");
+          return null;
+        })
       ]);
       if (selectedRoomIdRef.current !== room.id) return;
       if (!fileResult.file && !(preferredPreview === "diff" && diff?.diff.trim())) {
@@ -322,7 +326,10 @@ export function createFileActions({
       const saved = await writeProjectFile(room.projectPath, path, content);
       const [file, diff] = await Promise.all([
         readProjectFile(room.projectPath, path),
-        getGitDiff(room.projectPath, path).catch(() => null)
+        getGitDiff(room.projectPath, path).catch(() => {
+          reportExpectedFailure("Git diff was unavailable after saving a workspace file");
+          return null;
+        })
       ]);
       if (selectedRoomIdRef.current === room.id) {
         setSelectedFileForRoom(room.id, {

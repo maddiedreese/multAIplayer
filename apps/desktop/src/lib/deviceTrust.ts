@@ -1,3 +1,5 @@
+import { reportNonFatal } from "./nonFatalReporting";
+
 export interface TrustedDeviceKey {
   roomId: string;
   deviceId: string;
@@ -24,6 +26,7 @@ export function loadTrustedDeviceKeys(): TrustedDeviceKey[] {
     if (!Array.isArray(parsed)) throw new Error("trusted keys must be an array");
     return dedupeTrustedDeviceKeys(parsed.map(normalizeTrustedDeviceKey).filter(Boolean) as TrustedDeviceKey[]);
   } catch {
+    reportNonFatal("discard corrupt trusted-device storage");
     localStorage.removeItem(trustedDeviceKeysStorageKey);
     return [];
   }

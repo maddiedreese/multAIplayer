@@ -503,6 +503,8 @@ Responsibilities:
 - self-host configuration;
 - abuse/rate protections.
 
+The relay keeps its composition and domain boundaries explicit. `relay-app.ts` wires configuration, lifecycle, route, WebSocket, and persistence adapters; HTTP room creation/settings/host/lifecycle handlers live in separate route modules; WebSocket admission, validation, and dispatch are independent; and persistence exposes a small facade over JSON compatibility and SQLite schema/entity/MLS repositories. HTTP failures carry a stable protocol error code in addition to bounded prose. Authenticated `/metrics` output uses the Prometheus text exposition format.
+
 Non-responsibilities:
 
 - OpenAI calls;
@@ -544,7 +546,13 @@ docs/
 - Member removal is relay-enforced for future reads and live sockets and cryptographically enforced for future room epochs through authenticated per-device delivery.
 - Multi-device support is device-oriented: each device has its own registered and pinned key identity. Recovery and synchronized multi-device identity remain outside the alpha scope.
 - Official relay federation is not part of the alpha scope.
-- Relay SQLite storage is alpha-scale. Opaque MLS messages append and prune incrementally, but normalized non-message state is saved by clearing and reinserting teams, rooms, invites, devices, members, and sessions on each debounced flush. Larger hosted relays should move those tables to incremental writes or a shared production store before whole-store rewrites become an operational limit.
+- Relay SQLite storage applies immediate, incremental row upserts/deletes for durable entities and transactionally groups MLS messages, receipts, room epochs, and related state. It does not serialize or rewrite the whole store during steady-state operation. State is still hydrated into one process at startup, so one relay writer per SQLite database remains the alpha deployment boundary; multi-instance operation requires shared coordination and rate limiting.
 - GitHub OAuth is the public alpha GitHub integration. GitHub App support is a future option for tighter repo-level permissions and enterprise setups.
 - The desktop discovers and runs the local `codex app-server`; multAIplayer does not proxy Codex credentials through the hosted relay.
 - Secret detection is a review aid for files, terminal output, received terminal command requests, browser pages, and copied Markdown. The alpha warns and gates risky sharing without claiming automatic redaction.
+
+## 11. Recoverable Failure Policy
+
+Desktop code must not silently discard a caught failure. Unexpected recoverable failures route through `reportNonFatal()` so the bounded, redacted diagnostics ring can count them. Expected control-flow failures, such as rejecting a malformed URL or fitting a hidden terminal, use `reportExpectedFailure()` with a static operation name. Attacker-controlled payloads, URLs, tokens, and plaintext are never passed as operation names or diagnostic details.
+
+Bare catches are lint-enforced. Diagnostics serialization and persistence use static debug messages directly to avoid recursive reporting. A catch that intentionally presents an actionable error to the user may bind the error and handle it in the relevant UI state; it must not leave an empty fallback.

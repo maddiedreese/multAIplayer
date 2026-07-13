@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { reportExpectedFailure } from "./nonFatalReporting";
 
 export interface MlsIdentityPublic {
   githubUserId: string;
@@ -397,6 +398,7 @@ export function parseMlsAuthenticatedData(value: string): MlsAuthenticatedData |
       createdAt: parsed.createdAt
     };
   } catch {
+    reportExpectedFailure("MLS authenticated-data parser rejected malformed input");
     return null;
   }
 }

@@ -8,6 +8,7 @@ import type { UseInviteActionsOptions } from "./inviteActionTypes";
 import { currentLocalIdentity, currentSelectedRoom } from "../selectedWorkspace";
 import { issueMlsInviteCapability } from "../mlsClient";
 import { rememberIssuedMlsInvite } from "./inviteCapabilityMemory";
+import { reportExpectedFailure } from "../nonFatalReporting";
 
 type InviteLinkActionOptions = Pick<UseInviteActionsOptions, "selectedRoomIdRef">;
 
@@ -80,6 +81,7 @@ export function createInviteLinkActions(
           setInviteMessageForRoom(roomId, "Copied invite link. The host will approve access when someone joins.");
         }
       } catch {
+        reportExpectedFailure("clipboard write was blocked while generating an invite");
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
           setInviteMessageForRoom(roomId, "Invite generated. Copying was blocked because the app was not focused.");
         }

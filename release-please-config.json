@@ -1,0 +1,90 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "node",
+  "include-v-in-tag": true,
+  "prerelease": true,
+  "signoff": "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+  "plugins": ["node-workspace"],
+  "packages": {
+    ".": {
+      "package-name": "multAIplayer",
+      "changelog-path": "CHANGELOG.md",
+      "prerelease-type": "alpha",
+      "extra-files": [
+        { "type": "json", "path": "apps/desktop/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "apps/desktop/package.json", "jsonpath": "$['dependencies']['@multaiplayer/git']" },
+        {
+          "type": "json",
+          "path": "apps/desktop/package.json",
+          "jsonpath": "$['dependencies']['@multaiplayer/github']"
+        },
+        {
+          "type": "json",
+          "path": "apps/desktop/package.json",
+          "jsonpath": "$['dependencies']['@multaiplayer/protocol']"
+        },
+        {
+          "type": "json",
+          "path": "apps/desktop/package.json",
+          "jsonpath": "$['devDependencies']['@multaiplayer/codex']"
+        },
+        { "type": "json", "path": "apps/relay/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "apps/relay/package.json", "jsonpath": "$['dependencies']['@multaiplayer/github']" },
+        {
+          "type": "json",
+          "path": "apps/relay/package.json",
+          "jsonpath": "$['dependencies']['@multaiplayer/protocol']"
+        },
+        { "type": "json", "path": "packages/codex/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "packages/git/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "packages/github/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "packages/protocol/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "package-lock.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "package-lock.json", "jsonpath": "$['packages'][''].version" },
+        { "type": "json", "path": "package-lock.json", "jsonpath": "$['packages']['apps/desktop'].version" },
+        {
+          "type": "json",
+          "path": "package-lock.json",
+          "jsonpath": "$['packages']['apps/desktop']['dependencies']['@multaiplayer/git']"
+        },
+        {
+          "type": "json",
+          "path": "package-lock.json",
+          "jsonpath": "$['packages']['apps/desktop']['dependencies']['@multaiplayer/github']"
+        },
+        {
+          "type": "json",
+          "path": "package-lock.json",
+          "jsonpath": "$['packages']['apps/desktop']['dependencies']['@multaiplayer/protocol']"
+        },
+        {
+          "type": "json",
+          "path": "package-lock.json",
+          "jsonpath": "$['packages']['apps/desktop']['devDependencies']['@multaiplayer/codex']"
+        },
+        { "type": "json", "path": "package-lock.json", "jsonpath": "$['packages']['apps/relay'].version" },
+        {
+          "type": "json",
+          "path": "package-lock.json",
+          "jsonpath": "$['packages']['apps/relay']['dependencies']['@multaiplayer/github']"
+        },
+        {
+          "type": "json",
+          "path": "package-lock.json",
+          "jsonpath": "$['packages']['apps/relay']['dependencies']['@multaiplayer/protocol']"
+        },
+        { "type": "json", "path": "package-lock.json", "jsonpath": "$['packages']['packages/codex'].version" },
+        { "type": "json", "path": "package-lock.json", "jsonpath": "$['packages']['packages/git'].version" },
+        { "type": "json", "path": "package-lock.json", "jsonpath": "$['packages']['packages/github'].version" },
+        { "type": "json", "path": "package-lock.json", "jsonpath": "$['packages']['packages/protocol'].version" },
+        { "type": "toml", "path": "apps/desktop/src-tauri/Cargo.toml", "jsonpath": "$.package.version" },
+        {
+          "type": "toml",
+          "path": "apps/desktop/src-tauri/Cargo.lock",
+          "jsonpath": "$.package[?(@.name=='multaiplayer')].version"
+        },
+        { "type": "generic", "path": "packages/codex/src/json-rpc.ts" }
+      ]
+    }
+  }
+}

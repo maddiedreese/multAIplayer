@@ -22,19 +22,37 @@ export function createRelayStorePersistenceCoordinator(options: {
   storeCodec: RelayStoreCodec;
 }): RelayStorePersistenceCoordinator {
   let saveTimer: NodeJS.Timeout | null = null;
-  const pendingMlsSaves = new Set<Promise<void>>();
+  const pendingSaves = new Set<Promise<void>>();
+  let pendingChanges: ReturnType<RelayStoreCodec["drainStoredRelayMutations"]> = [];
 
-  function trackMlsSave(save: Promise<void>) {
+  function trackSave(save: Promise<void>) {
     const tracked = save.finally(() => {
-      pendingMlsSaves.delete(tracked);
+      pendingSaves.delete(tracked);
     });
-    pendingMlsSaves.add(tracked);
+    pendingSaves.add(tracked);
   }
 
-  async function waitForPendingMlsSaves() {
-    while (pendingMlsSaves.size > 0) {
-      await Promise.allSettled([...pendingMlsSaves]);
+  async function waitForPendingSaves() {
+    while (pendingSaves.size > 0) {
+      await Promise.allSettled([...pendingSaves]);
     }
+  }
+
+  function collectPendingChanges() {
+    const latest = new Map<string, (typeof pendingChanges)[number]>();
+    for (const change of [...pendingChanges, ...options.storeCodec.drainStoredRelayMutations()]) {
+      latest.set(`${change.entity}\0${change.key}`, change);
+    }
+    pendingChanges = Array.from(latest.values());
+  }
+
+  async function savePendingChanges(): Promise<boolean> {
+    collectPendingChanges();
+    if (pendingChanges.length === 0) return options.persistence.flushMode === "immediate";
+    const changes = pendingChanges;
+    const handled = await options.persistence.saveChanges(changes);
+    if (handled) pendingChanges = pendingChanges === changes ? [] : pendingChanges;
+    return handled;
   }
 
   async function loadRelayStore() {
@@ -47,7 +65,9 @@ export function createRelayStorePersistenceCoordinator(options: {
         return;
       }
       options.storeCodec.applyStoredRelayState(stored);
-      await options.persistence.finalizeLoad?.(options.storeCodec.toStoredRelayState());
+      await options.persistence.finalizeLoad?.(() => options.storeCodec.toStoredRelayState());
+      options.storeCodec.discardStoredRelayMutations();
+      pendingChanges = [];
       logRelayEvent("info", "relay_store_loaded");
     } catch (error) {
       if (error instanceof RelayPersistenceMigrationError) throw error;
@@ -58,9 +78,12 @@ export function createRelayStorePersistenceCoordinator(options: {
 
   function scheduleStoreSave() {
     if (options.persistence.flushMode === "immediate") {
-      saveRelayStore().catch(() => {
-        logRelayEvent("error", "relay_store_save_failed");
-      });
+      const save = savePendingChanges()
+        .then(() => undefined)
+        .catch(() => {
+          logRelayEvent("error", "relay_store_save_failed");
+        });
+      trackSave(save);
       return;
     }
     if (saveTimer) clearTimeout(saveTimer);
@@ -73,11 +96,12 @@ export function createRelayStorePersistenceCoordinator(options: {
   }
 
   function saveMlsBacklog(roomKey: RoomKey, messages: MlsRelayMessage[]) {
-    trackMlsSave(
+    trackSave(
       options.persistence
         .saveMlsBacklog(roomKey, messages)
-        .then((handled) => {
+        .then(async (handled) => {
           if (!handled) scheduleStoreSave();
+          else await savePendingChanges();
         })
         .catch(() => {
           logRelayEvent("error", "mls_backlog_save_failed");
@@ -87,35 +111,55 @@ export function createRelayStorePersistenceCoordinator(options: {
   }
 
   function saveKeyPackages() {
-    return options.persistence.saveKeyPackages(options.storeCodec.toStoredRelayState());
+    if (options.persistence.flushMode === "debounced") options.storeCodec.pruneExpiredRelayState();
+    collectPendingChanges();
+    const changes = pendingChanges;
+    const save = options.persistence
+      .saveKeyPackages(changes, () => options.storeCodec.toStoredRelayState())
+      .then(() => {
+        if (pendingChanges === changes) pendingChanges = [];
+      });
+    trackSave(save);
+    return save;
   }
 
   function saveMlsMessage(roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]) {
-    options.storeCodec.pruneExpiredRelayState();
+    if (options.persistence.flushMode === "debounced") options.storeCodec.pruneExpiredRelayState();
+    collectPendingChanges();
+    const changes = pendingChanges;
     const save = options.persistence
-      .saveMlsMessage(roomKey, message, prunedIds, options.storeCodec.toStoredRelayState())
+      .saveMlsMessage(roomKey, message, prunedIds, changes, () => options.storeCodec.toStoredRelayState())
       .then(async (handled) => {
+        if (pendingChanges === changes) pendingChanges = [];
         if (!handled) await saveRelayStore();
       });
-    trackMlsSave(save);
+    trackSave(save);
     return save;
   }
 
   function saveMlsCommit(roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]) {
-    options.storeCodec.pruneExpiredRelayState();
-    const save = options.persistence.saveMlsCommit(
-      roomKey,
-      message,
-      prunedIds,
-      options.storeCodec.toStoredRelayState()
-    );
-    trackMlsSave(save);
+    if (options.persistence.flushMode === "debounced") options.storeCodec.pruneExpiredRelayState();
+    collectPendingChanges();
+    const changes = pendingChanges;
+    const save = options.persistence
+      .saveMlsCommit(roomKey, message, prunedIds, changes, () => options.storeCodec.toStoredRelayState())
+      .then(() => {
+        if (pendingChanges === changes) pendingChanges = [];
+      });
+    trackSave(save);
     return save;
   }
 
   async function saveRelayStore() {
+    if (options.persistence.flushMode === "immediate") {
+      await savePendingChanges();
+      return;
+    }
     options.storeCodec.pruneExpiredRelayState();
+    if (await savePendingChanges()) return;
     await options.persistence.save(options.storeCodec.toStoredRelayState());
+    options.storeCodec.discardStoredRelayMutations();
+    pendingChanges = [];
   }
 
   async function flushRelayStore() {
@@ -123,11 +167,12 @@ export function createRelayStorePersistenceCoordinator(options: {
       clearTimeout(saveTimer);
       saveTimer = null;
     }
-    await waitForPendingMlsSaves();
+    await waitForPendingSaves();
     if (saveTimer) {
       clearTimeout(saveTimer);
       saveTimer = null;
     }
+    if (options.persistence.flushMode === "immediate") options.storeCodec.pruneExpiredRelayState();
     await saveRelayStore();
   }
 

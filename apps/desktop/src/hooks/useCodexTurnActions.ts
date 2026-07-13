@@ -18,6 +18,7 @@ import { formatCodexModel, formatMessageTime } from "../lib/appFormatters";
 import { roomLockMessage } from "../lib/appRuntime";
 import { canUseLocalWorkspace } from "../lib/workspaceAccess";
 import { useAppStore } from "../store/appStore";
+import { reportNonFatal } from "../lib/nonFatalReporting";
 import type { PendingCodexApproval } from "../types";
 import type { UseCodexTurnActionsOptions } from "./codexTurnActionTypes";
 import { promoteNextCodexApproval } from "./codexApprovalPromotion";
@@ -230,7 +231,7 @@ export function useCodexTurnActions({
           .then((goal) => {
             setRoomGoalForRoom(roomId, goal ? codexGoalToRoomGoal(goal) : null);
           })
-          .catch(() => undefined);
+          .catch(() => reportNonFatal("load a Codex goal after completing a turn"));
       }
       const roomEvents = result.events
         .map(projectCodexRoomEvent)

@@ -1,5 +1,6 @@
 import { normalizeGitHubBranchName, normalizeGitHubRepoRef, normalizePullRequestDraft } from "@multaiplayer/github";
 import { getRelayHttpUrl } from "./appConfig";
+import { readJsonResponse } from "./httpResponse";
 
 export interface GitHubAuthConfig {
   provider: "github";
@@ -33,14 +34,13 @@ export interface SignedInUser {
 
 export async function getAuthConfig(): Promise<GitHubAuthConfig> {
   const response = await fetch(`${getRelayHttpUrl()}/auth/config`, { credentials: "include" });
-  return response.json();
+  return readJsonResponse(response, "Failed to load relay authentication configuration");
 }
 
 export async function getCurrentUser(): Promise<SignedInUser | null> {
   const response = await fetch(`${getRelayHttpUrl()}/auth/me`, { credentials: "include" });
   if (response.status === 401) return null;
-  if (!response.ok) throw new Error(`Failed to load current user: ${response.status}`);
-  const body = (await response.json()) as { user: SignedInUser };
+  const body = await readJsonResponse<{ user: SignedInUser }>(response, "Failed to load current user");
   return body.user;
 }
 
@@ -49,11 +49,10 @@ export async function startGitHubDeviceFlow(): Promise<GitHubDeviceStart> {
     method: "POST",
     credentials: "include"
   });
-  const body = await response.json();
-  if (!response.ok) {
-    throw new Error(body.error ?? "Failed to start GitHub device flow");
-  }
-  const flow = body as Omit<GitHubDeviceStart, "expiresAt">;
+  const flow = await readJsonResponse<Omit<GitHubDeviceStart, "expiresAt">>(
+    response,
+    "Failed to start GitHub device flow"
+  );
   return { ...flow, expiresAt: Date.now() + Math.max(0, flow.expires_in) * 1000 };
 }
 
@@ -64,16 +63,14 @@ export async function pollGitHubDeviceFlow(deviceCode: string): Promise<GitHubDe
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ device_code: deviceCode })
   });
-  const body = await response.json();
   if (response.status === 202) {
+    const body = (await response.json()) as { status?: string; retryAfterSeconds?: unknown };
     if (body.status === "slow_down") {
       return { status: "slow_down", retryAfterSeconds: Math.max(1, Number(body.retryAfterSeconds) || 5) };
     }
     return { status: "pending" };
   }
-  if (!response.ok) {
-    throw new Error(body.error_description ?? body.error ?? "Failed to poll GitHub device flow");
-  }
+  const body = await readJsonResponse<{ user: SignedInUser }>(response, "Failed to poll GitHub device flow");
   return { status: "complete", user: (body as { user: SignedInUser }).user };
 }
 
@@ -87,10 +84,11 @@ export function githubDevicePollDelayMs(intervalSeconds: number, expiresAt: numb
 }
 
 export async function logout(): Promise<void> {
-  await fetch(`${getRelayHttpUrl()}/auth/logout`, {
+  const response = await fetch(`${getRelayHttpUrl()}/auth/logout`, {
     method: "POST",
     credentials: "include"
   });
+  await readJsonResponse(response, "Failed to sign out");
 }
 
 export interface PullRequestRequest {
@@ -139,11 +137,7 @@ export async function createPullRequest(request: PullRequestRequest): Promise<Pu
     headers: { "content-type": "application/json" },
     body: JSON.stringify(normalized)
   });
-  const body = await response.json();
-  if (!response.ok) {
-    throw new Error(body.message ?? body.error ?? "Failed to create pull request");
-  }
-  return body as PullRequestResult;
+  return readJsonResponse<PullRequestResult>(response, "Failed to create pull request");
 }
 
 export async function listGitHubActionRuns(
@@ -157,9 +151,5 @@ export async function listGitHubActionRuns(
   const response = await fetch(`${getRelayHttpUrl()}/github/actions/runs?${params}`, {
     credentials: "include"
   });
-  const body = await response.json();
-  if (!response.ok) {
-    throw new Error(body.message ?? body.error ?? "Failed to load GitHub Actions");
-  }
-  return body as GitHubActionRunsResult;
+  return readJsonResponse<GitHubActionRunsResult>(response, "Failed to load GitHub Actions");
 }
