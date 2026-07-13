@@ -1,0 +1,63 @@
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+.e2e-harness-shell {
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.e2e-harness-boundary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 auto 20px;
+  max-width: 1120px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.e2e-harness-boundary strong {
+  color: var(--text-primary);
+}
+
+.e2e-harness-loading,
+.e2e-harness-error {
+  padding: 32px;
+}
+
+.e2e-harness-error {
+  color: var(--danger);
+}
+
+.e2e-invite-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.e2e-invite-grid > section {
+  min-width: 0;
+}
+
+.e2e-invite-grid h1 {
+  font-size: 16px;
+}
+
+@media (max-width: 800px) {
+  .e2e-invite-grid {
+    grid-template-columns: 1fr;
+  }
+}

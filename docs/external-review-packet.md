@@ -140,6 +140,7 @@ The protocol does not claim endpoint-compromise protection, retroactive deletion
 - Relay tests cover non-host and stale Commit rejection, exact KeyPackage consumption, one-shot Welcome delivery, validation failure modes, durable receipts, and SQLite epoch compare-and-swap.
 - The process security journey scans relay SQLite, WAL, SHM, and wire artifacts for plaintext and secret markers.
 - The relay parser target runs 100,000 seeded structure-aware and raw-transport cases through the real connection parser in ordinary CI; the implementation run completed all four properties without a finding.
+- Isolated Playwright UI-contract scenarios render production invite, chat-composer, handoff, room-header, and Codex-approval components. They cover invite approval and denial, the two-party handoff decision and exclusive control transfer, active-host-only Codex execution, bounded context previews, approval and denial, and running/completed transitions. The invite codec/parser and Codex context builders are real; each page discloses that relay delivery, native MLS, and native Codex execution are simulated. These are UI-composition tests, not native authorization or cryptographic evidence.
 - The MLS core cargo-fuzz target covers the exact bounded CLI document boundary plus the inner credential and RFC 9420 KeyPackage paths. The implementation smoke run completed 915,917 executions in 30 seconds without a finding; scheduled/manual CI runs a 120-second sanitizer job and retains failures.
 - Focused invite-authenticator mutation testing catches all 32 selected encoder, MAC, verification, derivation, and validation mutants.
 
@@ -149,24 +150,26 @@ The process journey requires Cargo to build its validator and native MLS fixture
 
 ## Review map
 
-| Topic                                  | Location                                                                                         |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Protocol decision and claims           | `docs/decisions/mls-protocol-v2.md`, `docs/cryptography.md`, `docs/protocol.md`                  |
-| MLS lifecycle orchestration            | `apps/desktop/src-tauri/crates/mls-core/src/engine.rs`, `engine/invite_admission.rs`              |
-| Engine output and error types          | `apps/desktop/src-tauri/crates/mls-core/src/engine/types.rs`, `engine/error.rs`                  |
-| Outbound staging and host transfer     | `apps/desktop/src-tauri/crates/mls-core/src/engine/outbound.rs`, `engine/host_transfer.rs`       |
-| Exporter use and input validation      | `apps/desktop/src-tauri/crates/mls-core/src/engine/exporter.rs`, `engine/validation.rs`          |
-| Transaction adapter and rollback guard | `apps/desktop/src-tauri/crates/mls-core/src/storage.rs`, `storage/atomic_group.rs`               |
-| Encrypted history/blob/receipt store   | `apps/desktop/src-tauri/crates/mls-core/src/storage/encrypted_store.rs`                          |
-| Invite v3 and HPKE                     | `apps/desktop/src-tauri/crates/mls-core/src/invite_capability.rs`, `hpke_seal.rs`                |
-| Generated/adversarial MLS evidence     | `apps/desktop/src-tauri/crates/mls-core/tests/security_state_machine.rs`                         |
-| Native Tauri command boundary          | `apps/desktop/src-tauri/src/mls_native.rs`, `mls_native/types.rs`, `mls_native/invites.rs`       |
-| Credential and KeyPackage validation   | `apps/desktop/src-tauri/crates/mls-core/src/policy.rs`, `validator.rs`                           |
+| Topic                                  | Location                                                                                                       |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Protocol decision and claims           | `docs/decisions/mls-protocol-v2.md`, `docs/cryptography.md`, `docs/protocol.md`                                |
+| MLS lifecycle orchestration            | `apps/desktop/src-tauri/crates/mls-core/src/engine.rs`, `engine/invite_admission.rs`                           |
+| Engine output and error types          | `apps/desktop/src-tauri/crates/mls-core/src/engine/types.rs`, `engine/error.rs`                                |
+| Outbound staging and host transfer     | `apps/desktop/src-tauri/crates/mls-core/src/engine/outbound.rs`, `engine/host_transfer.rs`                     |
+| Exporter use and input validation      | `apps/desktop/src-tauri/crates/mls-core/src/engine/exporter.rs`, `engine/validation.rs`                        |
+| Transaction adapter and rollback guard | `apps/desktop/src-tauri/crates/mls-core/src/storage.rs`, `storage/atomic_group.rs`                             |
+| Encrypted history/blob/receipt store   | `apps/desktop/src-tauri/crates/mls-core/src/storage/encrypted_store.rs`                                        |
+| Invite v3 and HPKE                     | `apps/desktop/src-tauri/crates/mls-core/src/invite_capability.rs`, `hpke_seal.rs`                              |
+| Generated/adversarial MLS evidence     | `apps/desktop/src-tauri/crates/mls-core/tests/security_state_machine.rs`                                       |
+| Native Tauri command boundary          | `apps/desktop/src-tauri/src/mls_native.rs`, `mls_native/types.rs`, `mls_native/invites.rs`                     |
+| Credential and KeyPackage validation   | `apps/desktop/src-tauri/crates/mls-core/src/policy.rs`, `validator.rs`                                         |
 | Parser fuzzing and validator benchmark | `apps/desktop/src-tauri/crates/mls-core/fuzz/`, `apps/relay/test/fuzz/`, `scripts/benchmark-mls-validator.mjs` |
-| KeyPackage and Welcome delivery        | `apps/relay/src/http/key-packages.ts`, `apps/relay/src/http/invite-delivery.ts`                  |
-| Commit authorization and ordering      | `apps/relay/src/ws/fanout.ts`, `apps/relay/src/persistence.ts`                                   |
-| Origin, cookie, and deployment policy  | `apps/relay/src/http/origin-policy.ts`, `apps/relay/src/auth/session.ts`, `docs/self-hosting.md` |
-| Advisory ledger and CI audit           | `.github/rust-advisory-policy.json`, `deny.toml`, `.github/workflows/rust-audit.yml`             |
-| Threat claims and changelog            | `docs/threat-model.md`, `docs/threat-model-changelog.md`                                         |
+| Invite and handoff UI contracts        | `e2e/invite-join.spec.ts`, `e2e/host-handoff.spec.ts`, `e2e/harness/scenarios/`                                |
+| Codex approval UI contract             | `e2e/codex-turn-approval.spec.ts`, `e2e/harness/scenarios/codex-turn-approval.tsx`                             |
+| KeyPackage and Welcome delivery        | `apps/relay/src/http/key-packages.ts`, `apps/relay/src/http/invite-delivery.ts`                                |
+| Commit authorization and ordering      | `apps/relay/src/ws/fanout.ts`, `apps/relay/src/persistence.ts`                                                 |
+| Origin, cookie, and deployment policy  | `apps/relay/src/http/origin-policy.ts`, `apps/relay/src/auth/session.ts`, `docs/self-hosting.md`               |
+| Advisory ledger and CI audit           | `.github/rust-advisory-policy.json`, `deny.toml`, `.github/workflows/rust-audit.yml`                           |
+| Threat claims and changelog            | `docs/threat-model.md`, `docs/threat-model-changelog.md`                                                       |
 
 Findings, partial reviews, and questions are welcome. State the exact reviewed commit or tag and preferred attribution.

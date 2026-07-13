@@ -178,6 +178,36 @@ test("local runtime and desktop bundle targets match supported CI", () => {
   }
 });
 
+test("the UI-contract E2E harness cannot enter the production desktop bundle", () => {
+  for (const path of [
+    "e2e/harness/main.tsx",
+    "e2e/invite-join.spec.ts",
+    "e2e/host-handoff.spec.ts",
+    "e2e/codex-turn-approval.spec.ts",
+    "e2e/web-shell.spec.ts"
+  ]) {
+    assert.ok(existsSync(path), `${path} must remain part of the blocking browser journey suite`);
+  }
+  const playwrightConfig = readFileSync("e2e/playwright.config.ts", "utf8");
+  assert.match(
+    playwrightConfig,
+    /command: "vite --config e2e\/harness\/vite\.config\.ts",\s+cwd: "\.\."/,
+    "the harness server must run from the repository root"
+  );
+  assert.doesNotMatch(
+    readFileSync("apps/desktop/vite.config.ts", "utf8"),
+    /e2e\/harness|UiContractScenario/,
+    "the production Vite graph must not reference the test harness"
+  );
+  for (const path of trackedFiles().filter((candidate) => candidate.startsWith("apps/desktop/src/"))) {
+    assert.doesNotMatch(
+      readFileSync(path, "utf8"),
+      /e2e\/harness|UiContractScenario/,
+      `${path} must not import or activate the test harness`
+    );
+  }
+});
+
 test("CI verifies each layer once before packaging prebuilt desktop assets", () => {
   const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
   for (const packagePath of ["apps/relay/package.json", "packages/protocol/package.json"]) {
