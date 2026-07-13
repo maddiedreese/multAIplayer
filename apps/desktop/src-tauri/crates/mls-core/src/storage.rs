@@ -20,7 +20,8 @@ mod atomic_group;
 mod encrypted_store;
 
 use encrypted_store::{
-    blob_key_name, escape_like, outbox_key, unix_seconds, validate_component, validate_outbox,
+    blob_key_name, escape_like, outbox_key, unix_seconds, validate_component,
+    validate_identity_component, validate_outbox,
 };
 pub use encrypted_store::{
     ConsumedInviteReceipt, ConsumedJoinReceipt, DeniedInviteReceipt, OutboxItem, StoreError,
@@ -419,8 +420,8 @@ impl AtomicGroupStateStorage {
         validate_component(&receipt.team_id)?;
         validate_component(&receipt.room_id)?;
         validate_component(&receipt.request_id)?;
-        validate_component(&receipt.requester_user_id)?;
-        validate_component(&receipt.requester_device_id)?;
+        validate_identity_component(&receipt.requester_user_id)?;
+        validate_identity_component(&receipt.requester_device_id)?;
         if receipt.response_hash.len() != 64
             || !receipt
                 .response_hash
