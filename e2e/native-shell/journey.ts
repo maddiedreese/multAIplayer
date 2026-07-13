@@ -267,7 +267,8 @@ async function inviteAndApprove(host: Browser, guest: Browser) {
   const requestText = await host.execute(
     () => document.querySelector(".invite-panel .terminal-request.pending")?.textContent ?? ""
   );
-  assert.match(requestText, /Native Guest/);
+  assert.ok(requestText.includes(guestIdentity.id), "host did not receive the guest's authenticated identity");
+  assert.match(requestText, /Capability-authenticated MLS KeyPackage request/);
   await (await request.$("button")).click();
   await visible(guest, ".invite-panel .workflow-message", 60_000);
   await guest.waitUntil(
