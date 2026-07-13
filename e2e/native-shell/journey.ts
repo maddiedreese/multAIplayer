@@ -155,7 +155,11 @@ async function authenticate(browser: Browser, relayBaseUrl: string, identity: Id
   );
   assert.deepEqual(result, { status: 201 }, `debug authentication failed for ${identity.id}`);
   await browser.refresh();
-  await browser.$(`*=${identity.name}`).waitForDisplayed({ timeout: 30_000 });
+  const profileName = await visible(browser, ".profile-card strong");
+  await profileName.waitUntil(async () => (await profileName.getText()) === identity.name, {
+    timeout: 30_000,
+    timeoutMsg: `authenticated profile did not resolve for ${identity.id}`
+  });
 }
 
 async function visible(browser: Browser, selector: string, timeout = 30_000) {
@@ -219,7 +223,11 @@ async function sendAndReceive(sender: Browser, receiver: Browser, text: string) 
   const composer = await visible(sender, 'textarea[placeholder^="Message the room"]');
   await composer.setValue(text);
   await (await visible(sender, 'button[aria-label="Send message"]')).click();
-  await (await visible(receiver, `*=${text}`, 60_000)).waitForDisplayed({ timeout: 60_000 });
+  const transcript = await visible(receiver, ".chat-scroll", 60_000);
+  await transcript.waitUntil(async () => (await transcript.getText()).includes(text), {
+    timeout: 60_000,
+    timeoutMsg: `receiver did not display the encrypted message: ${text}`
+  });
 }
 
 async function handoff(host: Browser, guest: Browser) {
@@ -363,7 +371,10 @@ async function main() {
       if (child.exitCode === null && child.signalCode === null) child.kill("SIGTERM");
     }
     await relay.close();
-    await rm(tempRoot, { recursive: true, force: true });
+    await delay(500);
+    await rm(tempRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 }).catch((error) => {
+      console.warn(`[native-e2e] isolated profile cleanup deferred: ${String(error)}`);
+    });
   }
 }
 
