@@ -271,8 +271,24 @@ async function inviteAndApprove(host: Browser, guest: Browser) {
   assert.match(requestText, /Capability-authenticated MLS KeyPackage request/);
   const approve = await request.$("button");
   await approve.waitForEnabled({ timeout: 60_000, timeoutMsg: "host invite approval did not become available" });
+  const previousHostMessage = await host.execute(
+    () => document.querySelector(".invite-panel .workflow-message")?.textContent ?? ""
+  );
   await approve.click();
-  await visible(host, ".invite-panel .terminal-request.approved", 60_000);
+  await host.waitUntil(
+    () =>
+      host.execute((previousMessage) => {
+        const approved = Boolean(document.querySelector(".invite-panel .terminal-request.approved"));
+        const message = document.querySelector(".invite-panel .workflow-message")?.textContent ?? "";
+        return approved || (message.length > 0 && message !== previousMessage);
+      }, previousHostMessage),
+    { timeout: 60_000, timeoutMsg: "host invite approval produced neither a decision nor an error" }
+  );
+  const hostDecision = await host.execute(() => ({
+    approved: Boolean(document.querySelector(".invite-panel .terminal-request.approved")),
+    message: document.querySelector(".invite-panel .workflow-message")?.textContent ?? ""
+  }));
+  assert.equal(hostDecision.approved, true, `host invite approval failed: ${hostDecision.message}`);
   await visible(guest, ".invite-panel .workflow-message", 60_000);
   await guest.waitUntil(
     () =>
