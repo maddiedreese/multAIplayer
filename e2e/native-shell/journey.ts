@@ -213,6 +213,14 @@ async function createRoom(host: Browser) {
     timeout: 60_000,
     timeoutMsg: "native host did not create the MLS room"
   });
+  const hostButton = await visible(host, "button=Host");
+  assert.equal(await hostButton.isEnabled(), true, "new room did not enter offline host-bootstrap state");
+  await hostButton.click();
+  const handoffButton = await visible(host, "button=Handoff");
+  await handoffButton.waitUntil(() => handoffButton.isEnabled(), {
+    timeout: 60_000,
+    timeoutMsg: "host did not create the native MLS group and bootstrap relay authority"
+  });
 }
 
 async function selectRoom(browser: Browser) {
