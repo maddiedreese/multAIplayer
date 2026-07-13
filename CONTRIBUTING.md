@@ -50,7 +50,8 @@ Run the relay or desktop web shell separately with `npm run dev:relay` or `npm r
 ### Code map
 
 - `apps/desktop/src` contains the React desktop UI, hooks, stores, and local backend adapters.
-- `apps/desktop/src-tauri/src` contains native Rust commands, split by capability; `lib.rs` wires those modules into Tauri.
+- `apps/desktop/src-tauri/src` contains native Rust commands, split by capability; `lib.rs` wires those modules into Tauri. The MLS IPC boundary keeps command orchestration in `mls_native.rs`, serde records in `mls_native/types.rs`, and invite commands in `mls_native/invites.rs`.
+- `apps/desktop/src-tauri/crates/mls-core` owns MLS and residual cryptography. `engine.rs` composes focused output/error, outbound, host-transfer, exporter, and validation modules; `storage.rs` composes the MLS transaction adapter, automatic staged-write rollback guard, and encrypted application store.
 - `apps/relay/src/server.ts` composes the relay from focused `http`, `ws`, and `auth` handlers plus state, persistence, limits, and lifecycle modules.
 - `packages/protocol` defines shared public wire records and defaults; the Rust MLS core owns group and pairwise cryptographic operations.
 - `packages/codex`, `packages/git`, and `packages/github` isolate integrations used by the desktop and relay applications.

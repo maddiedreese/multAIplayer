@@ -24,6 +24,10 @@ jobs:
           cargo install cargo-deny --version 0.19.7 --locked
       - name: Audit locked dependencies
         working-directory: apps/desktop/src-tauri
-        run: cargo audit
+        run: |
+          cargo audit
+          cargo audit --file crates/mls-core/fuzz/Cargo.lock
       - name: Enforce advisories and sources
-        run: cargo deny --manifest-path apps/desktop/src-tauri/Cargo.toml check advisories sources
+        run: |
+          cargo deny --manifest-path apps/desktop/src-tauri/Cargo.toml check advisories sources
+          cargo deny --manifest-path apps/desktop/src-tauri/crates/mls-core/fuzz/Cargo.toml check advisories sources

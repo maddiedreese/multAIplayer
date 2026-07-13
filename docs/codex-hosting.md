@@ -59,7 +59,7 @@ The relay does see operational metadata needed to route the room:
 - device public keys and fingerprints;
 - invite ids and expiry metadata;
 - opaque MLS message sizes, ids, timestamps, epoch hints, and sender/device routing labels;
-- encrypted attachment blob metadata such as filename, MIME type, declared size, room id, and expiry;
+- plaintext attachment routing and descriptive metadata such as filename, MIME type, declared size, room id, epoch, and expiry; attachment contents remain exporter-encrypted;
 - GitHub OAuth session identity metadata when sign-in is enabled.
 
 GitHub access tokens are used server-side only for identity, draft PR creation, and Actions reads. With `MULTAIPLAYER_RELAY_SESSION_SECRET` configured, stored tokens are encrypted at rest in the relay store. Without that secret, sessions are memory-only.

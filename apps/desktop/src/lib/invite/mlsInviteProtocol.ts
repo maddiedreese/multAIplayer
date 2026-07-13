@@ -1,7 +1,7 @@
 import type { MlsInviteCapabilityBinding, MlsInviteSealedPayload } from "../mlsClient";
 
 export interface DirectedMlsInviteCiphertext {
-  version: 2;
+  version: 3;
   binding: MlsInviteCapabilityBinding;
   sealedPayload: MlsInviteSealedPayload;
 }
@@ -9,8 +9,8 @@ export interface DirectedMlsInviteCiphertext {
 export function parseDirectedMlsInviteCiphertext(value: string): DirectedMlsInviteCiphertext {
   const parsed = JSON.parse(value) as Partial<DirectedMlsInviteCiphertext>;
   if (
-    parsed.version !== 2 ||
-    parsed.binding?.version !== 2 ||
+    parsed.version !== 3 ||
+    parsed.binding?.version !== 3 ||
     parsed.binding.phase !== "request" ||
     !parsed.sealedPayload ||
     parsed.sealedPayload.version !== 1 ||

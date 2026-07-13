@@ -151,9 +151,9 @@ function deviceAuthPayload(user: string, device: string, challenge: Buffer): Buf
 
 function workspace(fixture: NativeFixture): StoredRelayStateFixture {
   const createdAt = "2026-07-12T12:00:00.000Z";
-  const inviteExpiresAt = "2026-07-13T12:00:00.000Z";
+  const inviteExpiresAt = "2099-07-13T12:00:00.000Z";
   const requestBinding = {
-    version: 2,
+    version: 3,
     phase: "request",
     inviteId: "invite-fixture",
     teamId: "team-core",
@@ -221,7 +221,7 @@ function workspace(fixture: NativeFixture): StoredRelayStateFixture {
         keyPackageId: fixture.keyPackageId,
         keyPackageHash: fixture.keyPackageHash,
         sealedRequest: JSON.stringify({
-          version: 2,
+          version: 3,
           binding: requestBinding,
           sealedPayload: JSON.parse(fixture.sealedRequest) as unknown
         }),
@@ -237,20 +237,20 @@ function workspace(fixture: NativeFixture): StoredRelayStateFixture {
         keyPackageHash: fixture.keyPackageHash,
         status: "approved",
         responseBinding: {
-          version: 2,
+          version: 3,
           phase: "response",
           inviteId: "invite-fixture",
           teamId: "team-core",
           roomId: "room-desktop",
-          keyEpoch: 1,
+          keyEpoch: 0,
           keyPackageHash: fixture.keyPackageHash,
           requestId: "request-fixture",
-          requestNonce: "fixture-nonce",
+          requestNonce: "fixture-nonce-0001",
           requesterUserId: fixture.nextHost.userId,
           requesterDeviceId: fixture.nextHost.deviceId,
           hostUserId: fixture.host.userId,
           hostDeviceId: fixture.host.deviceId,
-          expiresAt: "2026-07-13T12:00:00.000Z",
+          expiresAt: inviteExpiresAt,
           status: "approved",
           decidedAt: createdAt
         },

@@ -162,7 +162,7 @@ function seededStore() {
     keyPackageHash: invite.keyPackageHash!,
     status: "approved",
     responseBinding: {
-      version: 2,
+      version: 3,
       phase: "response",
       inviteId: invite.id,
       teamId: team.id,

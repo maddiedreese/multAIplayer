@@ -6,6 +6,8 @@ targets = []
 version = 2
 yanked = "deny"
 ignore = [
+  # Structured ownership, dependency paths, reachability, platform scope, and
+  # the enforced review date live in .github/rust-advisory-policy.json.
   # GTK3 bindings are Linux-only transitive Tauri/Wry dependencies. Linux is
   # compatibility-only; macOS is the supported release. No safe Tauri upgrade
   # removes them. Review by 2026-08-01 and on every Tauri/Wry update.

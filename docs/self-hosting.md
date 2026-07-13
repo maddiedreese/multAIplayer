@@ -256,6 +256,8 @@ Authenticated workspace reads are membership-scoped. A signed-in user only recei
 
 A private local or LAN development relay can explicitly disable authentication. Production relays default it on when `NODE_ENV=production`, even if GitHub OAuth has not been configured yet; self-hosters can still set the variable explicitly.
 
+Session cookies are `HttpOnly`, `SameSite=Lax`, and marked `Secure` whenever `NODE_ENV=production`. An authenticated production deployment therefore requires HTTPS/WSS; browsers and compliant clients will not return that cookie over plain HTTP. For a deliberately unauthenticated private LAN development relay, set `MULTAIPLAYER_RELAY_REQUIRE_AUTH=false` explicitly and treat it as development-only. That opt-out does not make production GitHub sign-in work over HTTP, and the production-relay doctor intentionally rejects auth-disabled deployments.
+
 Credentialed browser origins and WebSocket room upgrades can be restricted:
 
 ```bash
@@ -263,6 +265,8 @@ MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://multaiplayer.com,https://app.multaipl
 ```
 
 If set, the relay only emits CORS credential headers and accepts browser-origin WebSocket upgrades for those exact origins. If unset, local development is permissive, while production denies browser origins by default. Requests without a browser `Origin` header are still allowed so native clients and server-side health checks continue to work.
+
+The allowlist is therefore a browser CORS and WebSocket-origin control, not a client-authentication boundary. Native and server-side clients can omit `Origin`; authentication, device-session signatures, membership authorization, and TLS provide the corresponding identity and transport controls.
 
 Origin entries are normalized to bare origins by the relay. `https://multaiplayer.com/` becomes `https://multaiplayer.com`. Entries with paths, queries, fragments, credentials, wildcards, or non-HTTP(S) schemes are invalid for production doctor because CORS and WebSocket `Origin` checks cannot be path-scoped. Native desktop requests without an `Origin` header are still allowed.
 

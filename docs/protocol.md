@@ -29,7 +29,7 @@ Devices publish bounded batches of single-use public KeyPackages. The relay veri
 
 Invite links retain the authorization design: an independently random single-use capability remains in the URL fragment, the host identity/fingerprint is pinned, and only a verifier is persisted by the issuer. The fragment contains no group secret.
 
-The joiner sends an RFC 9180 HPKE-sealed request to the pinned host. Its info/AAD binds operation, identities, room, epoch, capability record, and the exact published KeyPackage id/hash. The relay exposes only a content-free pending notification. Approval consumes that exact KeyPackage once; the host creates an MLS Add Commit and Welcome. The Welcome is delivered only to the authenticated requesting device and is usable only with the intended KeyPackage private key. The requester's acknowledgement atomically removes the response and invite; approval also admits the exact user, while denial never does. A bounded 30-day receipt makes a lost approval or denial acknowledgement safely retryable after restart. Once a decision is pending, the invite rejects new requests so deletion of the issuer's verifier cannot leave a reusable dead link.
+The joiner sends an RFC 9180 HPKE-sealed request to the pinned host. Its info/AAD binds operation, identities, room, epoch, capability record, and the exact published KeyPackage id/hash. Invite authenticator v3 uses a fixed binary framing rather than JSON serialization, plus independently derived request/response HMAC keys and labels; phase-specific verifiers cannot accept the other domain. The relay exposes only a content-free pending notification. Approval consumes that exact KeyPackage once; the host creates an MLS Add Commit and Welcome. The Welcome is delivered only to the authenticated requesting device and is usable only with the intended KeyPackage private key. The requester's acknowledgement atomically removes the response and invite; approval also admits the exact user, while denial never does. A bounded 30-day receipt makes a lost approval or denial acknowledgement safely retryable after restart. Once a decision is pending, the invite rejects new requests so deletion of the issuer's verifier cannot leave a reusable dead link.
 
 ## Commit ordering and host authority
 
@@ -55,13 +55,13 @@ On every epoch transition, Rust derives a history secret with exporter label `mu
 
 ## Device and local state
 
-MLS signature and HPKE identity keys are generated in Rust. Keychain-held wrapping material protects the encrypted native SQLite store, and identity private material is retrieved under the native process boundary. Corrupt state is quarantined and the UI offers a clean rejoin; the host cannot resend a room key to reconstruct lost MLS state.
+MLS signature and HPKE identity keys are generated in Rust. Keychain-held wrapping material protects the encrypted native SQLite store, and identity private material is retrieved under the native process boundary. Corrupt state is quarantined and the UI offers a clean KeyPackage/Welcome rejoin; neither the host nor relay can reconstruct the device's lost MLS state or older exporter-derived history secrets.
 
 Device authentication to the relay uses a signed, domain-separated, one-use challenge and a bounded session token. Public signature and HPKE keys are registered as metadata; private keys never reach the relay.
 
 ## Relay-visible data
 
-The relay sees team/room names and ids, membership, host labels, device public identity material, invite metadata, public KeyPackages, opaque request/Welcome blobs, opaque MLS message sizes and routing metadata, encrypted blob metadata, and operational counters. Presence and `team.updated`/`room.updated` broadcasts remain plaintext metadata and are not stored in the MLS backlog.
+The relay sees team/room names and ids, membership, host labels, device public identity material, invite metadata, public KeyPackages, opaque request/Welcome blobs, opaque MLS message sizes and routing metadata, attachment filename/MIME/declared-size/epoch/expiry metadata, and operational counters. Attachment contents are exporter-encrypted; their routing and descriptive metadata are not. Presence and `team.updated`/`room.updated` broadcasts remain plaintext metadata and are not stored in the MLS backlog.
 
 The relay can deny service, withhold or replay retained opaque messages within application limits, and lie about unauthenticated metadata. MLS validation, authenticated application data, exact host-leaf checks, idempotency, and monotonic epochs make unauthorized mutation fail closed; they do not make the relay available.
 

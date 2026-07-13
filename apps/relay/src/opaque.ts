@@ -6,9 +6,9 @@ export function isCanonicalPaddedBase64(value: unknown, maxChars: number): value
 }
 
 export interface StrictDirectedInviteRequest {
-  version: 2;
+  version: 3;
   binding: {
-    version: 2;
+    version: 3;
     phase: "request";
     inviteId: string;
     teamId: string;
@@ -37,7 +37,7 @@ export function parseStrictDirectedInviteRequestJson(
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    if (!sameKeys(parsed, ["version", "binding", "sealedPayload"]) || parsed.version !== 2) return null;
+    if (!sameKeys(parsed, ["version", "binding", "sealedPayload"]) || parsed.version !== 3) return null;
     const binding = parsed.binding;
     const sealedPayload = parsed.sealedPayload;
     if (!binding || typeof binding !== "object" || Array.isArray(binding)) return null;
@@ -62,7 +62,7 @@ export function parseStrictDirectedInviteRequestJson(
         "status",
         "decidedAt"
       ]) ||
-      bindingRecord.version !== 2 ||
+      bindingRecord.version !== 3 ||
       bindingRecord.phase !== "request" ||
       !boundedText(bindingRecord.inviteId, 160) ||
       !boundedRelayId(bindingRecord.teamId) ||

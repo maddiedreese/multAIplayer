@@ -86,7 +86,7 @@ export interface MlsOutboxItem {
 }
 
 export interface MlsInviteCapabilityBinding {
-  version: 2;
+  version: 3;
   phase: "request" | "response";
   inviteId: string;
   teamId: string;
