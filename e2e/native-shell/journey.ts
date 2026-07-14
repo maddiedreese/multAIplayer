@@ -102,8 +102,17 @@ async function visible(browser: Browser, selector: string, timeout = 30_000) {
 }
 
 async function passFirstRunWelcome(browser: Browser) {
-  const welcome = await browser.$("h1=Work with Codex together");
-  if (!(await welcome.isDisplayed())) return;
+  const onboardingVisible = await browser.waitUntil(
+    () =>
+      browser.execute(() => {
+        if (document.querySelector(".onboarding-assistant")) return true;
+        return [...document.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Profile");
+      }),
+    { timeout: 30_000, timeoutMsg: "native shell did not settle on onboarding or the workspace" }
+  );
+  assert.equal(onboardingVisible, true);
+  if (!(await browser.$(".onboarding-assistant")).isDisplayed()) return;
+  const welcome = await visible(browser, "h1=Work with Codex together");
   assert.equal(await welcome.isFocused(), true, "first-run onboarding did not focus its welcome heading");
   await (await visible(browser, "button=Explore the interface")).click();
   await visible(browser, "button=Profile");
