@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Browser } from "webdriverio";
 
 interface NativeKeyPackageUpload {
@@ -25,16 +25,45 @@ async function generateNativeKeyPackage(browser: Browser): Promise<NativeKeyPack
 }
 
 async function publishNativeKeyPackage(browser: Browser, deviceId: string, keyPackage: NativeKeyPackageUpload) {
-  return browser.executeAsync(
-    (targetDeviceId, upload, done) => {
-      import("/src/lib/workspaceClient.ts")
+  const resultKey = randomUUID();
+  await browser.execute(
+    (targetDeviceId, upload, key) => {
+      const page = globalThis as typeof globalThis & {
+        __multaiplayerKeyPackageResults?: Record<string, { accepted: boolean; error?: string } | undefined>;
+      };
+      const results = (page.__multaiplayerKeyPackageResults ??= {});
+      results[key] = undefined;
+      void import("/src/lib/workspaceClient.ts")
         .then(({ publishKeyPackages }) => publishKeyPackages(targetDeviceId, [upload]))
-        .then(() => done({ accepted: true }))
-        .catch((error) => done({ accepted: false, error: String(error) }));
+        .then(() => {
+          results[key] = { accepted: true };
+        })
+        .catch((error) => {
+          results[key] = { accepted: false, error: String(error) };
+        });
     },
     deviceId,
-    keyPackage
-  ) as Promise<{ accepted: boolean; error?: string }>;
+    keyPackage,
+    resultKey
+  );
+  await browser.waitUntil(
+    () =>
+      browser.execute((key) => {
+        const page = globalThis as typeof globalThis & {
+          __multaiplayerKeyPackageResults?: Record<string, { accepted: boolean; error?: string } | undefined>;
+        };
+        return page.__multaiplayerKeyPackageResults?.[key] !== undefined;
+      }, resultKey),
+    { timeout: 30_000, timeoutMsg: "native KeyPackage publication did not settle" }
+  );
+  return browser.execute((key) => {
+    const page = globalThis as typeof globalThis & {
+      __multaiplayerKeyPackageResults?: Record<string, { accepted: boolean; error?: string } | undefined>;
+    };
+    const result = page.__multaiplayerKeyPackageResults?.[key];
+    if (page.__multaiplayerKeyPackageResults) delete page.__multaiplayerKeyPackageResults[key];
+    return result;
+  }, resultKey) as Promise<{ accepted: boolean; error?: string }>;
 }
 
 export async function keyPackageCount(browser: Browser, relayBaseUrl: string, deviceId: string) {
