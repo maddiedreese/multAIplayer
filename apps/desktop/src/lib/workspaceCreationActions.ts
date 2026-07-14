@@ -1,6 +1,6 @@
 import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { chooseProjectFolder, defaultProjectPath } from "./localBackend";
-import { loadTeamHistorySettings, saveHistorySettings } from "./localHistory";
+import { loadTeamHistorySettings, seedNewRoomHistorySettings } from "./localHistory";
 import {
   createFirstWorkspaceCreator,
   createWorkspaceRoom,
@@ -50,7 +50,7 @@ export function createWorkspaceCreationActions({
     restoreForgottenRoom: (roomId) => useAppStore.getState().restoreForgottenRoom(roomId),
     setInviteApprovalGate: (roomId, enabled) => useAppStore.getState().setInviteApprovalGateForRoom(roomId, enabled),
     loadTeamHistorySettings,
-    saveHistorySettings,
+    seedNewRoomHistorySettings,
     initializeMessages: (roomId) => useAppStore.getState().initializeMessagesForRoom(roomId)
   };
   const createFirstWorkspace = createFirstWorkspaceCreator(creationRuntime);

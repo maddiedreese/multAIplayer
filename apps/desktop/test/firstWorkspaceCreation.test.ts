@@ -57,7 +57,7 @@ function runtimeFixture(options: { failFirstRoom?: Error } = {}) {
     restoreForgottenRoom: (roomId) => localEffects.push(`restore-forgotten:${roomId}`),
     setInviteApprovalGate: (roomId, enabled) => localEffects.push(`invite-gate:${roomId}:${enabled}`),
     loadTeamHistorySettings: () => ({ enabled: true, retentionDays: 30 }),
-    saveHistorySettings: async (roomId, settings) => {
+    seedNewRoomHistorySettings: (roomId, settings) => {
       localEffects.push(`history:${roomId}:${settings.enabled}:${settings.retentionDays}`);
       return settings;
     },

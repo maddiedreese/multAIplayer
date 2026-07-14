@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { setMlsHistoryRetention } from "./mlsClient";
+import { createMlsGroup, setMlsHistoryRetention } from "./mlsClient";
 import { reportNonFatal } from "./nonFatalReporting";
 
 const defaultRetentionDays = 30;
@@ -52,6 +52,26 @@ export async function saveHistorySettings(
   const normalized = sanitizeHistorySettings(settings);
   if (!normalized.enabled) await clearEncryptedHistory(roomId);
   else await setMlsHistoryRetention(roomId, normalized.retentionDays);
+  return persistHistorySettings(roomId, normalized);
+}
+
+export function seedNewRoomHistorySettings(roomId: string, settings: LocalHistorySettings): LocalHistorySettings {
+  // A relay room exists before its native MLS group. Persist only the
+  // non-secret preference here; applying retention before group creation is
+  // both unnecessary for a new room and rejected by the native core.
+  return persistHistorySettings(roomId, sanitizeHistorySettings(settings));
+}
+
+export async function applyHistorySettingsToMlsGroup(roomId: string): Promise<LocalHistorySettings> {
+  return saveHistorySettings(roomId, loadHistorySettings(roomId));
+}
+
+export async function createMlsGroupWithHistorySettings(roomId: string): Promise<void> {
+  await createMlsGroup(roomId);
+  await applyHistorySettingsToMlsGroup(roomId);
+}
+
+function persistHistorySettings(roomId: string, normalized: LocalHistorySettings): LocalHistorySettings {
   localStorage.setItem(settingsKey(roomId), JSON.stringify(normalized));
   return normalized;
 }

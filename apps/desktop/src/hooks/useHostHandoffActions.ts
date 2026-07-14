@@ -8,13 +8,7 @@ import type {
 } from "@multaiplayer/protocol";
 import { defaultCodexSandboxLevel } from "@multaiplayer/protocol";
 import { createMlsApplicationMessage, publishMlsApplicationMessage } from "../lib/mlsApplicationMessage";
-import {
-  authorizeMlsHostTransfer,
-  createMlsGroup,
-  markMlsPublishSucceeded,
-  mlsGroupState,
-  transferMlsHost
-} from "../lib/mlsClient";
+import { authorizeMlsHostTransfer, markMlsPublishSucceeded, mlsGroupState, transferMlsHost } from "../lib/mlsClient";
 import { isStaleMlsPublish } from "../lib/relayClient";
 import { reportExpectedFailure } from "../lib/nonFatalReporting";
 import { clearAndRebaseStaleMlsCommit } from "../lib/mlsCommitRebase";
@@ -26,6 +20,7 @@ import { createHandoffSettingsPatch, findRoomHostHandoff, roomHostHandoffMessage
 import { parseGitHubRemoteUrl } from "../lib/gitWorkflowDraft";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
 import { roomLockMessage } from "../lib/appRuntime";
+import { createMlsGroupWithHistorySettings } from "../lib/localHistory";
 import { queueForHandoff, resolveHandoffProject } from "./hostHandoffHelpers";
 import { useAppStore } from "../store/appStore";
 import type { ChatMessage, HostHandoffRecord } from "../types";
@@ -110,7 +105,7 @@ export function useHostHandoffActions({
         throw new Error("MLS host authority can only change through a signed host-transfer Commit.");
       const host = localUser.name;
       const hostUserId = localUser.id;
-      if (selectedRoom.acceptedMlsEpoch === undefined) await createMlsGroup(roomId);
+      if (selectedRoom.acceptedMlsEpoch === undefined) await createMlsGroupWithHistorySettings(roomId);
       const room = await updateRoomHost(roomId, host, hostUserId, "active", deviceId);
       replaceRoom(room);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {

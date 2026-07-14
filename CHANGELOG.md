@@ -17,6 +17,10 @@ All notable user-visible and security-relevant changes are recorded here. Releas
 - The relay transports opaque MLS, Welcome, HPKE, and exporter-sealed payloads; project files, transcripts, terminal/browser content, and Codex credentials remain host-local.
 - Device removal revokes relay access and invites before an MLS Remove commit excludes future traffic.
 
+### Fixed
+
+- New-room onboarding now persists the local-history preference before native MLS setup and applies retention only after the group exists, preventing false room-creation failures and duplicate-room retries.
+
 ### Known limitations
 
 - This protocol-v2 alpha does not migrate pre-v2 rooms, ciphertext, cryptographic state, or invite links.
