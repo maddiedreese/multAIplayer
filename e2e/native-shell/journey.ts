@@ -163,7 +163,7 @@ async function waitForReadinessText(browser: Browser, label: string, expected: R
 }
 
 async function createRoomThroughOnboarding(host: Browser) {
-  await (await visible(host, "button=Create a workspace")).click();
+  await (await visible(host, '//button[.//strong[normalize-space(.)="Create a workspace"]]')).click();
   await visible(host, "h1=Check this device");
   await waitForReadinessText(host, "Relay", /connected/i);
   await waitForReadinessText(host, "GitHub", /signed in/i);
@@ -203,7 +203,7 @@ async function createRoomThroughOnboarding(host: Browser) {
 }
 
 async function prepareJoinOnboarding(guest: Browser) {
-  await (await visible(guest, "button=Join with an invite")).click();
+  await (await visible(guest, '//button[.//strong[normalize-space(.)="Join with an invite"]]')).click();
   await visible(guest, "h1=Check this device");
   await waitForReadinessText(guest, "Relay", /connected/i);
   await waitForReadinessText(guest, "GitHub", /signed in/i);

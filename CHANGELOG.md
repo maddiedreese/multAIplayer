@@ -30,7 +30,7 @@ All notable user-visible and security-relevant changes are recorded here. Releas
 
 - First public macOS-first Tauri desktop and self-hosted relay scaffold.
 - Encrypted room messages and history, invite delivery, local Codex app-server approval, browser, terminal, file/diff, Git, pull-request, and Actions surfaces.
-- TypeScript, relay, Rust, and unsigned macOS packaging CI.
+- TypeScript, relay, Rust, and ad-hoc-signed macOS packaging CI.
 
 ### Known limitations
 

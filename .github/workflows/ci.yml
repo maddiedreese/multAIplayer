@@ -418,7 +418,9 @@ jobs:
       - name: Run macOS native-core and relay composition journey
         run: npx tsx --test apps/relay/test/live-native-relay-journey.test.ts
 
-      - name: Build unsigned Tauri app
+      - name: Build ad-hoc signed Tauri app
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
         run: npm run tauri:build:prebuilt -w @multaiplayer/desktop
 
       - name: Verify packaged associated-domain entitlements

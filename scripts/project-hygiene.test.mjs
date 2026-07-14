@@ -164,9 +164,19 @@ test("local runtime and desktop bundle targets match supported CI", () => {
     ["app", "dmg"],
     "the macOS-first alpha must not advertise unbuilt Windows or Linux bundles"
   );
+  assert.equal(
+    tauriConfig.bundle.macOS.signingIdentity,
+    null,
+    "ordinary local builds must not silently select a signing identity"
+  );
 
   const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
   const release = readFileSync(".github/workflows/release.yml", "utf8");
+  assert.match(
+    workflow,
+    /Build ad-hoc signed Tauri app[\s\S]{0,160}APPLE_SIGNING_IDENTITY: "-"[\s\S]{0,160}tauri:build:prebuilt/,
+    "macOS CI must explicitly ad-hoc sign the inspection bundle before verifying entitlements"
+  );
   for (const [name, source] of [
     ["CI", workflow],
     ["release", release]

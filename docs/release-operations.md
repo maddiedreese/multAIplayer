@@ -108,7 +108,7 @@ KEYCHAIN_PASSWORD
 
 It builds the macOS app/DMG, verifies Developer ID signing and stapled notarization, runs Gatekeeper checks, writes checksums, emits an SPDX SBOM, records build-provenance attestations, and keyless-signs the checksum manifest and SBOM with Sigstore. Missing signing secrets fail the release; do not publish ad hoc or unsigned local builds as public artifacts.
 
-The release lane validates the live AASA documents before the signed build and verifies the packaged associated-domain entitlement afterward. Keep `APPLE_TEAM_ID` synchronized across signing, the AASA application identifier, and the ten-character Team ID validation. An unsigned CI package can prove that the entitlement was assembled, but only a signed, installed application against the live domains can prove macOS universal-link routing.
+The release lane validates the live AASA documents before the Developer ID build and verifies the packaged associated-domain entitlement afterward. Keep `APPLE_TEAM_ID` synchronized across signing, the AASA application identifier, and the ten-character Team ID validation. The ordinary macOS CI package uses Tauri's ad-hoc (`-`) identity, which requires no Apple account or personal certificate and proves that the entitlement was assembled into the code signature. Only a Developer ID-signed, installed application whose Team ID matches the live domains can prove macOS universal-link routing.
 
 Use [reproducible-builds.md](reproducible-builds.md) to compare the unsigned application payload. Signed/notarized archives are not claimed to be bit-for-bit reproducible.
 
