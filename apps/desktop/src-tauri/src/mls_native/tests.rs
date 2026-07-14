@@ -2,7 +2,8 @@ use super::invites::{decision_timestamp, fixed32, fixed32_url, validate_invite_r
 use super::{
     decode_stored_signing_secret, delete_all_history_native, engine_error, fingerprint,
     is_corruption_error_message, quarantine_store, BasicAppCredential, CapabilityBinding,
-    EncryptRequest, EncryptedStore, MlsEngine, PendingJoinAdmissionPublic, StoredMlsIdentity,
+    EncryptRequest, EncryptedStore, MlsEngine, PendingInviteRequestPublic,
+    PendingJoinAdmissionPublic, StoredMlsIdentity,
 };
 
 fn request_binding() -> CapabilityBinding {
@@ -147,6 +148,30 @@ fn pending_admission_ipc_contains_only_public_routing_fields() {
     assert!(value.get("capabilityUrlValue").is_none());
     assert!(value.get("welcome").is_none());
     assert!(value.get("responseMac").is_none());
+}
+
+#[test]
+fn pending_invite_recovery_ipc_keeps_the_bearer_capability_native_only() {
+    let value = serde_json::to_value(PendingInviteRequestPublic {
+        invite_id: "invite".into(),
+        team_id: "team".into(),
+        room_id: "room".into(),
+        request_id: "request".into(),
+        requester_user_id: "user".into(),
+        requester_device_id: "device".into(),
+        key_package_id: "package".into(),
+        key_package_hash: "hash".into(),
+        expires_at: "2030-01-01T00:00:00.000Z".into(),
+        sealed_request: "opaque".into(),
+    })
+    .unwrap();
+    assert_eq!(value.as_object().unwrap().len(), 10);
+    assert!(value.get("capabilityUrlValue").is_none());
+    assert!(value.get("originalBinding").is_none());
+    assert_eq!(
+        value.get("sealedRequest").and_then(|value| value.as_str()),
+        Some("opaque")
+    );
 }
 
 #[test]

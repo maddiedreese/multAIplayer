@@ -221,10 +221,11 @@ export async function sealMlsInviteRequest(
   capabilityHandle: string,
   capabilityUrlValue: string,
   binding: MlsInviteCapabilityBinding,
-  keyPackage: string
-): Promise<{ keyPackageHash: string; sealedPayload: MlsInviteSealedPayload }> {
+  keyPackage: string,
+  keyPackageId: string
+): Promise<{ keyPackageHash: string; sealedRequest: string }> {
   return invoke("mls_invite_request_seal", {
-    request: { recipientHpkePublicKey, capabilityHandle, capabilityUrlValue, binding, keyPackage }
+    request: { recipientHpkePublicKey, capabilityHandle, capabilityUrlValue, binding, keyPackage, keyPackageId }
   });
 }
 
@@ -280,6 +281,38 @@ export async function acceptMlsInviteResponse(
   return invoke("mls_invite_response_accept", {
     request: { capabilityUrlValue, originalBinding, responseBinding, responseMac, ...(welcome ? { welcome } : {}) }
   });
+}
+
+export interface PendingMlsInviteRequest {
+  inviteId: string;
+  teamId: string;
+  roomId: string;
+  requestId: string;
+  requesterUserId: string;
+  requesterDeviceId: string;
+  keyPackageId: string;
+  keyPackageHash: string;
+  expiresAt: string;
+  sealedRequest: string;
+}
+
+export async function listPendingMlsInviteRequests(): Promise<PendingMlsInviteRequest[]> {
+  return invoke("mls_pending_invite_requests_list");
+}
+
+export async function acceptPendingMlsInviteResponse(
+  requestId: string,
+  responseBinding: MlsInviteCapabilityBinding,
+  responseMac: string,
+  welcome?: string
+): Promise<{ status: "approved" | "denied"; epoch?: number }> {
+  return invoke("mls_pending_invite_response_accept", {
+    request: { requestId, responseBinding, responseMac, ...(welcome ? { welcome } : {}) }
+  });
+}
+
+export async function completePendingMlsInviteRequest(requestId: string, roomId: string): Promise<void> {
+  return invoke("mls_pending_invite_complete", { request: { requestId, roomId } });
 }
 
 export async function listMlsOutbox(): Promise<MlsOutboxItem[]> {

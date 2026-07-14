@@ -30,7 +30,7 @@ The relay cannot decrypt the MLS message and does not parse its application even
 2. The capability request is HPKE-sealed to the pinned host and binds the exact KeyPackage id/hash plus identities, room, operation, and epoch context.
 3. The relay stores only the opaque request and content-free notification metadata.
 4. After host approval, the relay consumes the exact requested KeyPackage once. Rust creates the Add Commit and Welcome.
-5. The Commit follows the membership lifecycle above. The Welcome is delivered once to the authenticated requesting device and can be processed only by its intended KeyPackage private key.
+5. The Commit follows the membership lifecycle above. The Welcome is delivered once to the authenticated requesting device and can be processed only by its intended KeyPackage private key. If the requester exits after sealing, its encrypted native pending record republishes the exact request on restart; after Welcome processing, a separate durable join-admission receipt carries relay acknowledgement to completion.
 
 ## Life of a Codex turn
 

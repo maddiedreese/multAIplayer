@@ -24,7 +24,8 @@ use encrypted_store::{
     validate_identity_component, validate_outbox,
 };
 pub use encrypted_store::{
-    ConsumedInviteReceipt, ConsumedJoinReceipt, DeniedInviteReceipt, OutboxItem, StoreError,
+    ConsumedInviteReceipt, ConsumedJoinReceipt, DeniedInviteReceipt, OutboxItem,
+    PendingInviteRequest, StoreError,
 };
 
 const MAX_OUTBOX_PAYLOAD: usize = 1024 * 1024;

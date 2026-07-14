@@ -71,12 +71,28 @@ pub(crate) struct InviteRequestSealRequest {
     pub(super) capability_url_value: String,
     pub(super) binding: CapabilityBinding,
     pub(super) key_package: String,
+    pub(super) key_package_id: String,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct InviteRequestSealResponse {
     pub(super) key_package_hash: String,
-    pub(super) sealed_payload: SealedPayload,
+    pub(super) sealed_request: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PendingInviteRequestPublic {
+    pub(super) invite_id: String,
+    pub(super) team_id: String,
+    pub(super) room_id: String,
+    pub(super) request_id: String,
+    pub(super) requester_user_id: String,
+    pub(super) requester_device_id: String,
+    pub(super) key_package_id: String,
+    pub(super) key_package_hash: String,
+    pub(super) expires_at: String,
+    pub(super) sealed_request: String,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -133,6 +149,22 @@ pub(crate) struct InviteResponseAcceptRequest {
     pub(super) response_binding: CapabilityBinding,
     pub(super) response_mac: String,
     pub(super) welcome: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct PendingInviteResponseAcceptRequest {
+    pub(super) request_id: String,
+    pub(super) response_binding: CapabilityBinding,
+    pub(super) response_mac: String,
+    pub(super) welcome: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct PendingInviteCompleteRequest {
+    pub(super) request_id: String,
+    pub(super) room_id: String,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

@@ -101,7 +101,13 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
                   await completeMlsRelayAdmission(client, admission, current.deviceSessionToken, () => {
                     store.restoreWorkspaceAccess(admission.teamId, admission.roomId);
                     store.restoreForgottenRoom(admission.roomId);
+                    store.updateInviteRequestStatus(admission.roomId, admission.requestId, "approved");
                     store.setInviteAdmissionForRoom(admission.roomId, null);
+                    const roomName = current.roomsRef.current.find((room) => room.id === admission.roomId)?.name;
+                    store.setInviteMessageForRoom(
+                      admission.roomId,
+                      `The host approved this device.${roomName ? ` ${roomName}` : " This room"} is now unlocked.`
+                    );
                   });
                 }
                 if (admissions.length > 0 && current.hasSelectedRoom) {

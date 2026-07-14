@@ -22,6 +22,7 @@ pub(crate) fn mls_invite_capability_issue() -> Result<CapabilityIssueResponse, S
 #[tauri::command]
 pub(crate) fn mls_invite_request_seal(
     request: InviteRequestSealRequest,
+    state: tauri::State<'_, MlsNativeState>,
 ) -> Result<InviteRequestSealResponse, String> {
     if request.binding.phase != "request" {
         return Err("Invite request binding is invalid".into());
@@ -41,6 +42,19 @@ pub(crate) fn mls_invite_request_seal(
     if !valid_capability_handle(&request.capability_handle) {
         return Err("Invite capability handle is invalid".into());
     }
+    if request.key_package_id.is_empty()
+        || request.key_package_id.len() > 128
+        || !request
+            .key_package_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+    {
+        return Err("Invite KeyPackage id is invalid".into());
+    }
+    let capability_url_value = request.capability_url_value.clone();
+    let key_package_id = request.key_package_id.clone();
+    let original_binding = request.binding.clone();
+    ensure_pending_invite_identity(&state, &original_binding)?;
     let payload = InviteRequestPayload {
         capability_handle: request.capability_handle,
         mac: STANDARD.encode(mac_binding(&capability, &request.binding).map_err(safe_error)?),
@@ -56,9 +70,23 @@ pub(crate) fn mls_invite_request_seal(
             .map_err(|_| "Invite request payload is invalid".to_string())?,
     )
     .map_err(safe_error)?;
+    let sealed_request = serde_json::to_string(&serde_json::json!({
+        "version": 3,
+        "binding": &original_binding,
+        "sealedPayload": &sealed_payload,
+    }))
+    .map_err(|_| "Invite request recovery is invalid".to_string())?;
+    with_store(&state, |store| {
+        store.put_pending_invite_request(&PendingInviteRequest {
+            capability_url_value,
+            original_binding,
+            key_package_id,
+            sealed_request: sealed_request.clone(),
+        })
+    })?;
     Ok(InviteRequestSealResponse {
         key_package_hash,
-        sealed_payload,
+        sealed_request,
     })
 }
 
@@ -285,6 +313,13 @@ pub(crate) fn mls_invite_response_accept(
     request: InviteResponseAcceptRequest,
     state: tauri::State<'_, MlsNativeState>,
 ) -> Result<InviteResponseAcceptResponse, String> {
+    accept_invite_response(request, &state)
+}
+
+fn accept_invite_response(
+    request: InviteResponseAcceptRequest,
+    state: &tauri::State<'_, MlsNativeState>,
+) -> Result<InviteResponseAcceptResponse, String> {
     let raw = fixed32_url(&request.capability_url_value)?;
     validate_invite_response_pair(&request.original_binding, &request.response_binding)?;
     verify_response_binding(
@@ -318,7 +353,7 @@ pub(crate) fn mls_invite_response_accept(
                     .map_err(|_| "Invite response is invalid".to_string())?
                 )
             );
-            Some(with_engine(&state, |engine| {
+            Some(with_engine(state, |engine| {
                 engine.join_welcome_for_invite(
                     &welcome,
                     JoinAdmissionMetadata {
@@ -340,6 +375,96 @@ pub(crate) fn mls_invite_response_accept(
         status: status.to_owned(),
         epoch,
     })
+}
+
+#[tauri::command]
+pub(crate) fn mls_pending_invite_requests_list(
+    state: tauri::State<'_, MlsNativeState>,
+) -> Result<Vec<PendingInviteRequestPublic>, String> {
+    with_store(&state, |store| store.pending_invite_requests())
+        .map(|requests| {
+            requests
+                .into_iter()
+                .map(|request| {
+                    ensure_pending_invite_identity(&state, &request.original_binding)?;
+                    Ok(PendingInviteRequestPublic {
+                        invite_id: request.original_binding.invite_id,
+                        team_id: request.original_binding.team_id,
+                        room_id: request.original_binding.room_id,
+                        request_id: request.original_binding.request_id,
+                        requester_user_id: request.original_binding.requester_user_id,
+                        requester_device_id: request.original_binding.requester_device_id,
+                        key_package_id: request.key_package_id,
+                        key_package_hash: request.original_binding.key_package_hash,
+                        expires_at: request.original_binding.expires_at,
+                        sealed_request: request.sealed_request,
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()
+        })
+        .and_then(|requests| requests)
+}
+
+#[tauri::command]
+pub(crate) fn mls_pending_invite_response_accept(
+    request: PendingInviteResponseAcceptRequest,
+    state: tauri::State<'_, MlsNativeState>,
+) -> Result<InviteResponseAcceptResponse, String> {
+    let pending = with_store(&state, |store| {
+        store.pending_invite_request(&request.request_id)
+    })?
+    .ok_or_else(|| "Pending invite request is unavailable".to_string())?;
+    if pending.original_binding.request_id != request.request_id {
+        return Err("Pending invite request does not match recovery metadata".into());
+    }
+    ensure_pending_invite_identity(&state, &pending.original_binding)?;
+    accept_invite_response(
+        InviteResponseAcceptRequest {
+            capability_url_value: pending.capability_url_value,
+            original_binding: pending.original_binding,
+            response_binding: request.response_binding,
+            response_mac: request.response_mac,
+            welcome: request.welcome,
+        },
+        &state,
+    )
+}
+
+#[tauri::command]
+pub(crate) fn mls_pending_invite_complete(
+    request: PendingInviteCompleteRequest,
+    state: tauri::State<'_, MlsNativeState>,
+) -> Result<(), String> {
+    let Some(pending) = with_store(&state, |store| {
+        store.pending_invite_request(&request.request_id)
+    })?
+    else {
+        return Ok(());
+    };
+    if pending.original_binding.room_id != request.room_id {
+        return Err("Pending invite request does not match its room".into());
+    }
+    ensure_pending_invite_identity(&state, &pending.original_binding)?;
+    with_store(&state, |store| {
+        store.delete_pending_invite_request(&request.request_id)
+    })
+}
+
+fn ensure_pending_invite_identity(
+    state: &tauri::State<'_, MlsNativeState>,
+    binding: &CapabilityBinding,
+) -> Result<(), String> {
+    let identity = state
+        .identity
+        .lock()
+        .map_err(|_| "MLS identity state is unavailable".to_string())?;
+    let (user_id, device_id, _) = identity
+        .as_ref()
+        .ok_or_else(|| "MLS identity is not initialized".to_string())?;
+    if user_id != &binding.requester_user_id || device_id != &binding.requester_device_id {
+        return Err("Pending invite request does not belong to this MLS identity".into());
+    }
+    Ok(())
 }
 
 #[tauri::command]

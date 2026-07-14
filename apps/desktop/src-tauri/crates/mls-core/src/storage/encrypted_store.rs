@@ -49,6 +49,15 @@ pub struct DeniedInviteReceipt {
     pub response_mac: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PendingInviteRequest {
+    pub capability_url_value: String,
+    pub original_binding: crate::CapabilityBinding,
+    pub key_package_id: String,
+    pub sealed_request: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct StoredHistoryCiphertext {
@@ -111,6 +120,70 @@ impl EncryptedStore {
     pub fn acknowledge(&self, id: &str) -> Result<(), StoreError> {
         validate_component(id)?;
         self.application.delete(&outbox_key(id))?;
+        Ok(())
+    }
+
+    pub fn put_pending_invite_request(
+        &self,
+        request: &PendingInviteRequest,
+    ) -> Result<(), StoreError> {
+        validate_pending_invite_request(request)?;
+        let key = format!("pending-invite:{}", request.original_binding.request_id);
+        if let Some(existing) = self.application.get(&key)? {
+            let existing: PendingInviteRequest =
+                serde_json::from_slice(&existing).map_err(|_| StoreError::CorruptValue)?;
+            return if &existing == request {
+                Ok(())
+            } else {
+                Err(StoreError::InvalidValue)
+            };
+        }
+        if self.application.get_by_prefix("pending-invite:")?.len() >= 16 {
+            return Err(StoreError::InvalidValue);
+        }
+        self.application.insert(
+            &key,
+            &serde_json::to_vec(request).map_err(|_| StoreError::InvalidValue)?,
+        )?;
+        Ok(())
+    }
+
+    pub fn pending_invite_requests(&self) -> Result<Vec<PendingInviteRequest>, StoreError> {
+        self.application
+            .get_by_prefix("pending-invite:")?
+            .into_iter()
+            .map(|item| {
+                let request: PendingInviteRequest =
+                    serde_json::from_slice(&item.value).map_err(|_| StoreError::CorruptValue)?;
+                validate_pending_invite_request(&request)?;
+                if item.key != format!("pending-invite:{}", request.original_binding.request_id) {
+                    return Err(StoreError::CorruptValue);
+                }
+                Ok(request)
+            })
+            .collect()
+    }
+
+    pub fn pending_invite_request(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<PendingInviteRequest>, StoreError> {
+        validate_component(request_id)?;
+        let Some(value) = self
+            .application
+            .get(&format!("pending-invite:{request_id}"))?
+        else {
+            return Ok(None);
+        };
+        let request = serde_json::from_slice(&value).map_err(|_| StoreError::CorruptValue)?;
+        validate_pending_invite_request(&request)?;
+        Ok(Some(request))
+    }
+
+    pub fn delete_pending_invite_request(&self, request_id: &str) -> Result<(), StoreError> {
+        validate_component(request_id)?;
+        self.application
+            .delete(&format!("pending-invite:{request_id}"))?;
         Ok(())
     }
 
@@ -221,6 +294,26 @@ impl EncryptedStore {
     }
 }
 
+fn validate_pending_invite_request(request: &PendingInviteRequest) -> Result<(), StoreError> {
+    validate_component(&request.original_binding.request_id)?;
+    validate_component(&request.key_package_id)?;
+    if request.original_binding.phase != "request"
+        || request.original_binding.status.is_some()
+        || request.original_binding.decided_at.is_some()
+        || crate::encode_capability_binding(&request.original_binding).is_err()
+        || request.capability_url_value.len() != 43
+        || !request
+            .capability_url_value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        || request.sealed_request.is_empty()
+        || request.sealed_request.len() > MAX_OUTBOX_PAYLOAD
+    {
+        return Err(StoreError::InvalidValue);
+    }
+    Ok(())
+}
+
 pub(super) fn validate_outbox(item: &OutboxItem) -> Result<(), StoreError> {
     validate_component(&item.id)?;
     validate_component(&item.room_id)?;
@@ -302,6 +395,32 @@ mod tests {
             .is_empty());
     }
 
+    fn pending_invite_fixture(request_id: &str) -> PendingInviteRequest {
+        PendingInviteRequest {
+            capability_url_value: "A".repeat(43),
+            original_binding: crate::CapabilityBinding {
+                version: 3,
+                phase: "request".into(),
+                invite_id: "invite-1".into(),
+                team_id: "team-1".into(),
+                room_id: "room-1".into(),
+                key_epoch: 2,
+                key_package_hash: "sha256:hash".into(),
+                request_id: request_id.into(),
+                request_nonce: "nonce-1".into(),
+                requester_user_id: "github:guest".into(),
+                requester_device_id: "device-1".into(),
+                host_user_id: "github:host".into(),
+                host_device_id: "device-host".into(),
+                expires_at: "2030-01-01T00:00:00.000Z".into(),
+                status: None,
+                decided_at: None,
+            },
+            key_package_id: format!("package-{request_id}"),
+            sealed_request: "{\"version\":3}".into(),
+        }
+    }
+
     #[test]
     fn staging_guard_clears_history_when_a_later_outbox_delete_fails() {
         let storage = AtomicGroupStateStorage::new(Connection::open_in_memory().unwrap());
@@ -381,6 +500,77 @@ mod tests {
         reopened.acknowledge("msg-1").unwrap();
         assert!(reopened.pending_outbox().unwrap().is_empty());
         assert!(EncryptedStore::open(&path, [8; 32]).is_err());
+    }
+
+    #[test]
+    fn pending_invite_request_is_durable_exact_and_deletable() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mls.db");
+        let key = [9; 32];
+        let request = pending_invite_fixture("request-1");
+        EncryptedStore::open(&path, key)
+            .unwrap()
+            .put_pending_invite_request(&request)
+            .unwrap();
+        let reopened = EncryptedStore::open(&path, key).unwrap();
+        reopened.put_pending_invite_request(&request).unwrap();
+        let mut conflicting = request.clone();
+        conflicting.sealed_request = "{\"version\":3,\"different\":true}".into();
+        assert!(matches!(
+            reopened.put_pending_invite_request(&conflicting),
+            Err(StoreError::InvalidValue)
+        ));
+        assert_eq!(
+            reopened.pending_invite_request("request-1").unwrap(),
+            Some(request.clone())
+        );
+        assert_eq!(
+            reopened.pending_invite_requests().unwrap(),
+            vec![request.clone()]
+        );
+        reopened.delete_pending_invite_request("request-1").unwrap();
+        assert!(reopened.pending_invite_requests().unwrap().is_empty());
+        reopened
+            .application
+            .insert(
+                "pending-invite:wrong-request",
+                &serde_json::to_vec(&request).unwrap(),
+            )
+            .unwrap();
+        assert!(matches!(
+            reopened.pending_invite_requests(),
+            Err(StoreError::CorruptValue)
+        ));
+    }
+
+    #[test]
+    fn pending_invite_request_count_and_payloads_are_bounded() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = EncryptedStore::open(&dir.path().join("mls.db"), [10; 32]).unwrap();
+        for index in 0..16 {
+            store
+                .put_pending_invite_request(&pending_invite_fixture(&format!("request-{index}")))
+                .unwrap();
+        }
+        assert!(matches!(
+            store.put_pending_invite_request(&pending_invite_fixture("request-overflow")),
+            Err(StoreError::InvalidValue)
+        ));
+
+        let mut invalid = pending_invite_fixture("request-invalid");
+        invalid.sealed_request = "x".repeat(MAX_OUTBOX_PAYLOAD + 1);
+        assert!(matches!(
+            validate_pending_invite_request(&invalid),
+            Err(StoreError::InvalidValue)
+        ));
+        store
+            .application
+            .insert("pending-invite:request-0", b"{")
+            .unwrap();
+        assert!(matches!(
+            store.pending_invite_requests(),
+            Err(StoreError::CorruptValue)
+        ));
     }
 
     #[test]

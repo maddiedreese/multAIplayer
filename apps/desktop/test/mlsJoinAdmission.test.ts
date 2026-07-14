@@ -73,3 +73,40 @@ test("failed local restore retains the native admission receipt", async () => {
   );
   assert.deepEqual(calls, ["ack", "joined", "restore"]);
 });
+
+test("concurrent recovery coalesces by durable admission and only the winner updates UI", async () => {
+  const calls: string[] = [];
+  let releaseAcknowledgement!: () => void;
+  const acknowledgementBlocked = new Promise<void>((resolve) => {
+    releaseAcknowledgement = resolve;
+  });
+  const client = {
+    publish() {},
+    publishAndWaitForAck: async () => undefined,
+    joinAndWaitForAck: async () => void calls.push("joined"),
+    close() {}
+  };
+  const first = completeMlsRelayAdmission(client, admission, "session-1", () => void calls.push("winner-ui"), {
+    acknowledge: async () => {
+      calls.push("ack");
+      await acknowledgementBlocked;
+    },
+    complete: async () => void calls.push("clear")
+  });
+  const second = completeMlsRelayAdmission(client, admission, "session-1", () => void calls.push("loser-ui"), {
+    acknowledge: async () => void calls.push("duplicate-ack"),
+    complete: async () => void calls.push("duplicate-clear")
+  });
+
+  assert.equal(second, first);
+  assert.deepEqual(calls, ["ack"]);
+  releaseAcknowledgement();
+  await Promise.all([first, second]);
+  assert.deepEqual(calls, ["ack", "joined", "winner-ui", "clear"]);
+
+  await completeMlsRelayAdmission(client, admission, "session-1", () => void calls.push("retry-ui"), {
+    acknowledge: async () => void calls.push("retry-ack"),
+    complete: async () => void calls.push("retry-clear")
+  });
+  assert.deepEqual(calls.slice(-4), ["retry-ack", "joined", "retry-ui", "retry-clear"]);
+});
