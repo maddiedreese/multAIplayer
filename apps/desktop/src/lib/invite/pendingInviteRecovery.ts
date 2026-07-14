@@ -8,6 +8,8 @@ interface DirectedResponse {
   welcome?: string;
 }
 
+type PublishPendingInviteRequest = PendingInviteRecoveryDependencies["publishRequest"];
+
 interface PendingInviteRecoveryDependencies {
   loadResponse: (inviteId: string, requestId: string, requesterDeviceId: string) => Promise<DirectedResponse | null>;
   publishRequest: (
@@ -82,6 +84,19 @@ export async function clearPendingInviteIfMissing(
   return true;
 }
 
+export async function publishPendingInviteRequest(
+  pending: PendingMlsInviteRequest,
+  publish: PublishPendingInviteRequest
+): Promise<void> {
+  await publish(pending.inviteId, {
+    requestId: pending.requestId,
+    requesterDeviceId: pending.requesterDeviceId,
+    keyPackageId: pending.keyPackageId,
+    keyPackageHash: pending.keyPackageHash,
+    sealedRequest: pending.sealedRequest
+  });
+}
+
 export async function processPendingInviteRecoveryAttempt(
   pending: PendingMlsInviteRequest,
   dependencies: PendingInviteRecoveryDependencies,
@@ -93,13 +108,7 @@ export async function processPendingInviteRecoveryAttempt(
       await dependencies.clear(pending.requestId, pending.roomId);
       return "expired";
     }
-    await dependencies.publishRequest(pending.inviteId, {
-      requestId: pending.requestId,
-      requesterDeviceId: pending.requesterDeviceId,
-      keyPackageId: pending.keyPackageId,
-      keyPackageHash: pending.keyPackageHash,
-      sealedRequest: pending.sealedRequest
-    });
+    await publishPendingInviteRequest(pending, dependencies.publishRequest);
     return "pending";
   }
 

@@ -24,7 +24,11 @@ import {
 import { randomInviteNonce } from "./mlsInviteProtocol";
 import type { InviteJoinRequest } from "../../types";
 import { completeMlsRelayAdmission } from "../mlsJoinAdmission";
-import { clearPendingInviteIfMissing, runPendingInviteRecoveryLoop } from "./pendingInviteRecovery";
+import {
+  clearPendingInviteIfMissing,
+  publishPendingInviteRequest,
+  runPendingInviteRecoveryLoop
+} from "./pendingInviteRecovery";
 
 type InviteJoinActionOptions = Pick<
   UseInviteActionsOptions,
@@ -129,6 +133,26 @@ export function createInviteJoinActions(
     );
     if (protectedRequest.keyPackageHash !== keyPackage.keyPackageHash)
       throw new Error("Native invite protection returned an unexpected KeyPackage hash.");
+    const pendingRequest: PendingMlsInviteRequest = {
+      inviteId,
+      teamId: invite.teamId,
+      roomId: invite.roomId,
+      requestId,
+      requesterUserId: localUser.id,
+      requesterDeviceId: deviceId,
+      keyPackageId: keyPackage.id,
+      keyPackageHash: keyPackage.keyPackageHash,
+      expiresAt: invite.expiresAt,
+      sealedRequest: protectedRequest.sealedRequest
+    };
+    try {
+      await publishPendingInviteRequest(pendingRequest, publishDirectedInviteRequest);
+    } catch (error) {
+      // The native record already committed. Keep transient publication recovery alive even
+      // though the import action reports the immediate relay failure to the user.
+      void waitForResponse(pendingRequest, metadata.room.name);
+      throw error;
+    }
     const localRequest: InviteJoinRequest = {
       id: requestId,
       inviteId,
@@ -146,21 +170,7 @@ export function createInviteJoinActions(
       invite.roomId,
       `Requested access to ${metadata.room.name}. The active host must approve this KeyPackage.`
     );
-    void waitForResponse(
-      {
-        inviteId,
-        teamId: invite.teamId,
-        roomId: invite.roomId,
-        requestId,
-        requesterUserId: localUser.id,
-        requesterDeviceId: deviceId,
-        keyPackageId: keyPackage.id,
-        keyPackageHash: keyPackage.keyPackageHash,
-        expiresAt: invite.expiresAt,
-        sealedRequest: protectedRequest.sealedRequest
-      },
-      metadata.room.name
-    );
+    void waitForResponse(pendingRequest, metadata.room.name);
   }
 
   async function waitForResponse(pending: PendingMlsInviteRequest, roomName: string) {
