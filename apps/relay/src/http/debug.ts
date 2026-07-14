@@ -6,7 +6,7 @@ import type { AuthSession, RelayStore } from "../state.js";
 interface RegisterDebugRoutesOptions {
   app: Express;
   debugEndpointsEnabled: boolean;
-  store: Pick<RelayStore, "allMlsBacklogEntries">;
+  store: Pick<RelayStore, "allMlsBacklogEntries" | "getInvite" | "setInvite">;
   invites: Map<string, unknown>;
   attachmentBlobs: Map<string, unknown>;
   authSessions: Map<string, AuthSession>;
@@ -90,6 +90,21 @@ export function registerDebugRoutes({
     scheduleStoreSave();
     res.cookie("multaiplayer_session", sessionId, authCookieOptions(ttlMs));
     res.status(201).json({ user: session.user });
+  });
+
+  app.post("/debug/invites/:inviteId/expire", (req, res) => {
+    if (!debugEndpointsEnabled || !isLoopbackRequest(req.socket.remoteAddress)) {
+      sendRelayError(res, 404, "not_found", "Debug endpoints are disabled.");
+      return;
+    }
+    const invite = store.getInvite(req.params.inviteId);
+    if (!invite) {
+      sendRelayError(res, 404, "invite_not_found", "Invite not found");
+      return;
+    }
+    store.setInvite({ ...invite, expiresAt: new Date(Date.now() - 1_000).toISOString() });
+    scheduleStoreSave();
+    res.status(204).end();
   });
 }
 

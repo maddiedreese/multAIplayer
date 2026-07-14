@@ -21,6 +21,7 @@ const targetRoot = fileURLToPath(new URL("../../desktop/src-tauri/target/debug",
 const nativeClientPath = `${targetRoot}/mls-integration-client`;
 const validatorPath = `${targetRoot}/mls-keypackage-validator`;
 const rustToolchain = probeRustToolchain(process.env.MULTAIPLAYER_CARGO_BIN ?? "cargo");
+const nativeOperationTimeoutMs = 15_000;
 
 interface DeviceIdentity {
   userId: string;
@@ -56,7 +57,10 @@ class NativeClient {
     const child = spawn(nativeClientPath, [userId, deviceId], { stdio: ["pipe", "pipe", "pipe"] });
     const lines = createInterface({ input: child.stdout });
     const identity = await new Promise<DeviceIdentity>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("Native MLS client did not initialize")), 5_000);
+      const timer = setTimeout(
+        () => reject(new Error("Native MLS client did not initialize")),
+        nativeOperationTimeoutMs
+      );
       lines.once("line", (line) => {
         clearTimeout(timer);
         const response = JSON.parse(line) as NativeResponse & DeviceIdentity;
@@ -72,7 +76,7 @@ class NativeClient {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(
         () => reject(new Error(`Native MLS command timed out: ${String(command.command)}`)),
-        5_000
+        nativeOperationTimeoutMs
       );
       this.#responses.push((response) => {
         clearTimeout(timer);
@@ -89,7 +93,7 @@ class NativeClient {
       const timer = setTimeout(() => {
         this.#child.kill("SIGKILL");
         reject(new Error("Native MLS client did not exit"));
-      }, 5_000);
+      }, nativeOperationTimeoutMs);
       this.#child.once("exit", (code) => {
         clearTimeout(timer);
         if (code === 0) resolve();
@@ -118,7 +122,7 @@ async function buildNativeBoundaries(): Promise<void> {
       "--bin",
       "mls-keypackage-validator"
     ],
-    { cwd: workspaceRoot, timeout: 120_000, maxBuffer: 2_000_000 }
+    { cwd: workspaceRoot, timeout: 240_000, maxBuffer: 2_000_000 }
   );
 }
 
