@@ -60,7 +60,12 @@ function stage(message: string) {
   console.log(`[native-e2e] ${new Date().toISOString()} ${message}`);
 }
 
-async function authenticate(browser: Browser, relayBaseUrl: string, identity: Identity) {
+async function authenticate(
+  browser: Browser,
+  relayBaseUrl: string,
+  identity: Identity,
+  { keepOnboarding = false }: { keepOnboarding?: boolean } = {}
+) {
   const result = await browser.executeAsync(
     (baseUrl, user, done) => {
       fetch(`${baseUrl}/debug/auth-session`, {
@@ -77,6 +82,11 @@ async function authenticate(browser: Browser, relayBaseUrl: string, identity: Id
   );
   assert.deepEqual(result, { status: 201 }, `debug authentication failed for ${identity.id}`);
   await browser.refresh();
+  if (keepOnboarding) {
+    await visible(browser, ".onboarding-assistant");
+    await visible(browser, "h1=Work with Codex together");
+    return;
+  }
   // The debug-auth refresh can recreate the isolated WebKitGTK test page.
   // Keep the setup bypass idempotent so this relay-auth fixture does not
   // mistake a second first-run surface for an authentication failure.
@@ -101,12 +111,11 @@ async function visible(browser: Browser, selector: string, timeout = 30_000) {
   return element;
 }
 
-async function passFirstRunWelcome(browser: Browser) {
+async function assertFirstRunWelcome(browser: Browser) {
+  // WebKitWebDriver supports parallel clients, but concurrent commands within
+  // one session can wedge the GTK bridge. Keep each client's probes ordered.
   await visible(browser, ".onboarding-assistant");
-  const welcome = await visible(browser, "h1=Work with Codex together");
-  assert.equal(await welcome.isFocused(), true, "first-run onboarding did not focus its welcome heading");
-  await (await visible(browser, "button=Explore the interface")).click();
-  await visible(browser, "button=Profile");
+  await visible(browser, "h1=Work with Codex together");
 }
 
 async function dismissFirstRunAfterRefresh(browser: Browser) {
@@ -135,12 +144,49 @@ async function dismissFirstRunAfterRefresh(browser: Browser) {
   );
 }
 
-async function createRoom(host: Browser) {
-  await (await visible(host, 'button[aria-label="New room"]')).click();
-  await (await visible(host, 'input[placeholder="Room name"]')).setValue(roomName);
-  const projectPath = await host.$(".room-create-form .path-create-row input");
-  await projectPath.setValue(root);
-  await (await visible(host, "button=Create room")).click();
+async function waitForReadinessText(browser: Browser, label: string, expected: RegExp) {
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        (targetLabel, source, flags) => {
+          const row = [...document.querySelectorAll(".onboarding-readiness-row")].find(
+            (candidate) => candidate.querySelector("strong")?.textContent?.trim() === targetLabel
+          );
+          return new RegExp(source, flags).test(row?.textContent ?? "");
+        },
+        label,
+        expected.source,
+        expected.flags
+      ),
+    { timeout: 30_000, timeoutMsg: `${label} readiness did not settle to ${expected}` }
+  );
+}
+
+async function createRoomThroughOnboarding(host: Browser) {
+  await (await visible(host, '//button[.//strong[normalize-space(.)="Create a workspace"]]')).click();
+  await visible(host, "h1=Check this device");
+  await waitForReadinessText(host, "Relay", /connected/i);
+  await waitForReadinessText(host, "GitHub", /signed in/i);
+
+  // GitHub authentication is supplied by the loopback-only relay fixture. A
+  // real third-party ChatGPT authorization cannot run in ordinary CI, so this
+  // moves only from readiness to the production create form. The form and all
+  // relay/native workspace handlers below are unmodified production paths.
+  await host.execute(() => {
+    const storeModule = "/src/store/appStore.ts";
+    return import(/* @vite-ignore */ storeModule).then(({ useAppStore }) =>
+      useAppStore.getState().applyOnboardingEvent({ type: "show_surface", surface: "workspace" })
+    );
+  });
+
+  await visible(host, "h1=Create your workspace");
+  await (await visible(host, 'input[id$="-workspace"]')).setValue("Native Onboarding Team");
+  await (await visible(host, 'input[id$="-room"]')).setValue(roomName);
+  await (await visible(host, 'input[id$="-project"]')).setValue(root);
+  await (await visible(host, "button=Create workspace")).click();
+  await visible(host, "h1=Start with safe defaults", 60_000);
+  await (await visible(host, "button=Enter room")).click();
+
   const title = await visible(host, 'input[aria-label="Room title"]', 60_000);
   await title.waitUntil(async () => (await title.getValue()) === roomName, {
     timeout: 60_000,
@@ -154,6 +200,27 @@ async function createRoom(host: Browser) {
     timeout: 60_000,
     timeoutMsg: "host did not create the native MLS group and bootstrap relay authority"
   });
+}
+
+async function prepareJoinOnboarding(guest: Browser) {
+  await (await visible(guest, '//button[.//strong[normalize-space(.)="Join with an invite"]]')).click();
+  await visible(guest, "h1=Check this device");
+  await waitForReadinessText(guest, "Relay", /connected/i);
+  await waitForReadinessText(guest, "GitHub", /signed in/i);
+  const codexStatus = await guest.execute(() => {
+    const row = [...document.querySelectorAll(".onboarding-readiness-row")].find(
+      (candidate) => candidate.querySelector("strong")?.textContent?.trim() === "Codex"
+    );
+    return row?.getAttribute("data-status") ?? null;
+  });
+  assert.notEqual(codexStatus, "blocked", "join onboarding treated local Codex hosting as a membership prerequisite");
+  const continueButton = await visible(guest, "button=Continue");
+  await continueButton.waitForEnabled({
+    timeout: 30_000,
+    timeoutMsg: "join onboarding stayed blocked on host-only Codex readiness"
+  });
+  await continueButton.click();
+  await visible(guest, "h1=Join a workspace");
 }
 
 async function sendAndReceive(sender: Browser, receiver: Browser, text: string) {
@@ -364,14 +431,21 @@ async function main() {
     stage("native WebDriver sessions ready");
     const host = browser.getInstance("host");
     let guest = browser.getInstance("guest");
-    await Promise.all([passFirstRunWelcome(host), passFirstRunWelcome(guest)]);
+    await Promise.all([assertFirstRunWelcome(host), assertFirstRunWelcome(guest)]);
+    assert.equal(
+      await (await host.$("h1=Work with Codex together")).isFocused(),
+      true,
+      "first-run onboarding did not focus its welcome heading"
+    );
     stage("authenticating both native clients");
     await Promise.all([
-      authenticate(host, stableRelayProxy.baseUrl, hostIdentity),
-      authenticate(guest, stableRelayProxy.baseUrl, guestIdentity)
+      authenticate(host, stableRelayProxy.baseUrl, hostIdentity, { keepOnboarding: true }),
+      authenticate(guest, stableRelayProxy.baseUrl, guestIdentity, { keepOnboarding: true })
     ]);
-    stage("creating and bootstrapping MLS room");
-    await createRoom(host);
+    stage("creating a workspace and room through native onboarding");
+    await createRoomThroughOnboarding(host);
+    stage("proving join readiness does not require local Codex hosting");
+    await prepareJoinOnboarding(guest);
     stage("proving the real validator rejects a tampered native KeyPackage");
     const guestDeviceId = await assertTamperedKeyPackageRejected(
       guest,

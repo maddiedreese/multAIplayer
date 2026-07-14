@@ -87,6 +87,26 @@ test("history settings remain non-secret and sanitized", async () => {
   assert.deepEqual(history.loadHistorySettings("room-a"), { enabled: true, retentionDays: 365 });
 });
 
+test("new-room history preferences persist without opening native MLS storage", () => {
+  assert.deepEqual(history.seedNewRoomHistorySettings("room-new", { enabled: true, retentionDays: 900 }), {
+    enabled: true,
+    retentionDays: 365
+  });
+  assert.deepEqual(history.loadHistorySettings("room-new"), { enabled: true, retentionDays: 365 });
+  assert.deepEqual(calls, []);
+});
+
+test("new-room history preferences apply after its MLS group exists", async () => {
+  history.seedNewRoomHistorySettings("room-new", { enabled: true, retentionDays: 45 });
+  await history.applyHistorySettingsToMlsGroup("room-new");
+  assert.deepEqual(calls, [
+    {
+      command: "mls_history_retention_set",
+      args: { request: { roomId: "room-new", retentionDays: 45 } }
+    }
+  ]);
+});
+
 test("history retention failure does not publish a false local setting", async () => {
   await history.saveHistorySettings("room-a", { enabled: true, retentionDays: 30 });
   retentionFailure = new Error("native store unavailable");

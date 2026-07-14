@@ -17,6 +17,11 @@ All notable user-visible and security-relevant changes are recorded here. Releas
 - The relay transports opaque MLS, Welcome, HPKE, and exporter-sealed payloads; project files, transcripts, terminal/browser content, and Codex credentials remain host-local.
 - Device removal revokes relay access and invites before an MLS Remove commit excludes future traffic.
 
+### Fixed
+
+- New-room onboarding now persists the local-history preference before native MLS setup and applies retention only after the group exists, preventing false room-creation failures and duplicate-room retries.
+- Invitation lookups now project only the exact host and requester public identities required for pre-membership verification, allowing genuine new members and hosts to verify each other without opening the team device directory.
+
 ### Known limitations
 
 - This protocol-v2 alpha does not migrate pre-v2 rooms, ciphertext, cryptographic state, or invite links.
@@ -30,7 +35,7 @@ All notable user-visible and security-relevant changes are recorded here. Releas
 
 - First public macOS-first Tauri desktop and self-hosted relay scaffold.
 - Encrypted room messages and history, invite delivery, local Codex app-server approval, browser, terminal, file/diff, Git, pull-request, and Actions surfaces.
-- TypeScript, relay, Rust, and unsigned macOS packaging CI.
+- TypeScript, relay, Rust, and ad-hoc-signed macOS packaging CI.
 
 ### Known limitations
 

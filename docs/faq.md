@@ -20,11 +20,25 @@ It is not designed as an anonymous public chat service, a large enterprise colla
 
 ### What happens the first time I open the app?
 
-The setup guide asks whether you want to create an encrypted workspace and first room or join one with an invite. It then checks relay connectivity, GitHub identity requirements, the local Codex installation, ChatGPT authorization for Codex, and project-folder readiness. GitHub identifies collaborators and enables repository workflows; ChatGPT authorizes Codex on the local host device. They are separate accounts, and the guide explains when GitHub is optional or required.
+The setup guide asks whether you want to create an encrypted workspace and first room or join one with an invite. It then checks relay connectivity, GitHub identity requirements, the local Codex installation, ChatGPT authorization for Codex, and project-folder readiness. GitHub identifies collaborators and enables repository workflows; ChatGPT authorizes Codex on the local host device. They are separate accounts. Creating requires the device to be ready to host Codex; joining blocks only on relay and GitHub identity, so an invitee can install or authorize Codex later.
 
 You can explore without finishing, save and close, or reopen/restart setup from Help. A five-item sidebar checklist remains available until its milestones are complete or you dismiss it. The first-turn guide runs inside the real room and does not automatically send a starter prompt or approve Codex.
 
 Onboarding progress stays on the device. It stores bounded identifiers and completion flags, not invite links, project paths, form values, prompts, project content, account details, or secrets. There is no tutorial telemetry. If a step fails, the guide stays at a recoverable state: it can retry relay or Codex checks, reopen account sign-in, retry folder selection, resume room creation without duplicating an already-created team, or wait for host device approval on an invite.
+
+### What happens when I click an invitation link?
+
+Official invites are HTTPS universal links, not a custom app scheme. All invitation material is in the fragment after `#`, so neither `open.multaiplayer.com` nor `multaiplayer.com` receives it in the landing-page request. A correctly signed, installed macOS release can receive the link through Apple's associated-domain mechanism. The native app validates the host, path, absence of query/credentials/port, exact fragment fields, bounds, and base64url alphabets before showing a content-free **Invitation received securely** status.
+
+If the app is not installed, the same static page offers the official signed DMG. It keeps a valid original link only in page memory long enough for an explicit cross-host retry; it never stores or renders the capability. Install into Applications, select **Open multAIplayer**, and if the browser still does not hand off, return to the original private message after installation and click the link again. Refresh or navigation deliberately loses the in-memory link. The project does not use cookies, local/session storage, analytics, automatic clipboard access, or a `multaiplayer:` fallback for this journey.
+
+Universal-link routing is an operating-system and signed-release boundary. Parser, AASA-shape, entitlement-presence, static-page, cold-start intake, and already-running intake code have automated tests, but each release still needs a manual signed-app cold/warm click check against the live AASA files and real Apple Team ID.
+
+### How do GitHub and ChatGPT sign-in differ?
+
+GitHub Device Flow identifies the workspace member. The app shows a short code and opens GitHub in the system browser while the relay polls for completion; GitHub's access token remains relay-side. ChatGPT authorizes the local Codex app-server and can use a browser or device-code flow; its credentials remain under Codex's local credential management. The assistant displays both flows in place, but does not persist their codes, URLs, login ids, or account details.
+
+Provider URLs are checked twice before native navigation: TypeScript accepts only the expected HTTPS GitHub or OpenAI hosts, and Rust independently repeats the provider-specific validation before using the operating system's default-browser opener. A browser-open failure leaves an explicit copy-link fallback rather than silently stranding setup.
 
 ## Trust and security
 

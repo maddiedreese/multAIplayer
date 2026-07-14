@@ -226,7 +226,14 @@ export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], Workspa
   setSelectedRoomId: (selectedRoomId) => set({ selectedRoomId }),
   selectExistingRoomOrFirst: (rooms) => {
     const nextRooms = activeRecords(rooms);
-    set((state) => ({ selectedRoomId: existingIdOrFirst(nextRooms, state.selectedRoomId) }));
+    set((state) => {
+      const selectedRoomId = existingIdOrFirst(nextRooms, state.selectedRoomId);
+      const selectedRoom = nextRooms.find((room) => room.id === selectedRoomId);
+      return {
+        selectedRoomId,
+        ...(selectedRoom ? { selectedTeam: selectedRoom.teamId } : {})
+      };
+    });
   },
   selectWorkspaceRoom: (selectedTeam, selectedRoomId) => set({ selectedTeam, selectedRoomId }),
   selectTeamRoom: (selectedTeam, fallbackRoomId) => {

@@ -75,7 +75,25 @@ export function registerInviteRoutes({
       return;
     }
 
-    res.json({ invite, team, room });
+    const registeredHostDevice =
+      room.hostUserId && room.activeHostDeviceId
+        ? store.getDevice(room.hostUserId, room.activeHostDeviceId)
+        : undefined;
+    const hostDevice = registeredHostDevice
+      ? {
+          userId: registeredHostDevice.userId,
+          deviceId: registeredHostDevice.deviceId,
+          signaturePublicKey: registeredHostDevice.signaturePublicKey,
+          signatureKeyFingerprint: registeredHostDevice.signatureKeyFingerprint,
+          hpkePublicKey: registeredHostDevice.hpkePublicKey,
+          hpkeKeyFingerprint: registeredHostDevice.hpkeKeyFingerprint
+        }
+      : null;
+
+    // An invitee is not a team member yet, so the protected invite lookup must
+    // carry the exact active-host public identity needed to verify the fragment.
+    // Do not expose the rest of the team device directory or device activity.
+    res.json({ invite, team, room, hostDevice });
   });
 
   app.delete("/teams/:teamId/rooms/:roomId/invites", (req, res) => {

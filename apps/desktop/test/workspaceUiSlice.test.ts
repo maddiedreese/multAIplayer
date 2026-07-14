@@ -187,3 +187,33 @@ test("workspace selection helpers preserve explicit and team-relative navigation
   store.selectExistingRoomOrFirst([{ ...roomA, deletedAt: new Date().toISOString() }, roomB]);
   assert.equal(useAppStore.getState().selectedRoomId, roomB.id);
 });
+
+test("room fallback synchronizes the selected team when the first team has no rooms", () => {
+  const store = useAppStore.getState();
+  store.initializeWorkspaceUi({ teams: [teamA, teamB], rooms: [], projectPath: "/tmp", roomId: "" });
+
+  store.selectExistingTeamOrFirst([teamA, teamB]);
+  store.selectExistingRoomOrFirst([roomB]);
+
+  const state = useAppStore.getState();
+  assert.equal(state.selectedTeam, teamB.id);
+  assert.equal(state.selectedRoomId, roomB.id);
+});
+
+test("room fallback preserves an existing valid room and team selection", () => {
+  const store = useAppStore.getState();
+  store.initializeWorkspaceUi({
+    teams: [teamA, teamB],
+    rooms: [roomA, roomB],
+    projectPath: "/tmp",
+    roomId: roomA.id
+  });
+  store.selectWorkspaceRoom(teamB.id, roomB.id);
+
+  store.selectExistingTeamOrFirst([teamA, teamB]);
+  store.selectExistingRoomOrFirst([roomA, roomB]);
+
+  const state = useAppStore.getState();
+  assert.equal(state.selectedTeam, teamB.id);
+  assert.equal(state.selectedRoomId, roomB.id);
+});

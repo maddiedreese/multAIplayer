@@ -8,7 +8,6 @@ import { currentLocalIdentity, currentSelectedRoomContext } from "../selectedWor
 import {
   consumeKeyPackage,
   loadDirectedInviteRequests,
-  loadTeamDevices,
   lookupInvite,
   publishDirectedInviteResponse,
   type DirectedInviteRequest
@@ -39,6 +38,20 @@ const validatedRequests = new Map<
   }
 >();
 const approvedInviteOutboxes = new Map<string, PendingInviteApproval>();
+
+export function inviteRequesterDeviceMatches(
+  record: Pick<DirectedInviteRequest, "requesterUserId" | "requesterDeviceId" | "requesterDevice">,
+  protectedRequest: { requesterSignaturePublicKey: string; requesterSignatureKeyFingerprint: string }
+): boolean {
+  const requesterDevice = record.requesterDevice;
+  return Boolean(
+    requesterDevice &&
+    requesterDevice.userId === record.requesterUserId &&
+    requesterDevice.deviceId === record.requesterDeviceId &&
+    requesterDevice.signaturePublicKey === protectedRequest.requesterSignaturePublicKey &&
+    requesterDevice.signatureKeyFingerprint === protectedRequest.requesterSignatureKeyFingerprint
+  );
+}
 
 type InviteRelayStore = Pick<
   AppStoreState,
@@ -77,15 +90,7 @@ export function createInviteRelayActions(
           continue;
         const value = await openMlsInviteRequest(binding, ciphertext.sealedPayload);
         if (value.binding.keyPackageHash !== record.keyPackageHash) continue;
-        const requesterDevice = (await loadTeamDevices(metadata.room.teamId)).find(
-          (device) => device.userId === record.requesterUserId && device.deviceId === record.requesterDeviceId
-        );
-        if (
-          !requesterDevice ||
-          requesterDevice.signaturePublicKey !== value.requesterSignaturePublicKey ||
-          requesterDevice.signatureKeyFingerprint !== value.requesterSignatureKeyFingerprint
-        )
-          continue;
+        if (!inviteRequesterDeviceMatches(record, value)) continue;
         validatedRequests.set(record.requestId, { record, protected: value });
         store.appendInviteRequest(metadata.room.id, {
           id: record.requestId,

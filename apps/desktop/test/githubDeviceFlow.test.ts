@@ -49,6 +49,29 @@ test("GitHub device start preserves typed relay error codes", async () => {
   }
 });
 
+test("GitHub device start rejects an untrusted verification address before exposing the flow", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        device_code: "must-stay-private",
+        user_code: "VISIBLE-CODE",
+        verification_uri: "https://github.com.evil.test/login/device",
+        expires_in: 900,
+        interval: 5
+      }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    );
+  try {
+    const error = await startGitHubDeviceFlow().catch((caught: unknown) => caught);
+    assert.ok(error instanceof Error);
+    assert.equal(error.message, "GitHub returned an unsupported verification address.");
+    assert.doesNotMatch(error.message, /must-stay-private|VISIBLE-CODE/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("GitHub device polling keeps 202 pending semantics and propagates terminal codes", async () => {
   const originalFetch = globalThis.fetch;
   try {

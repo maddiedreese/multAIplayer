@@ -17,10 +17,27 @@ async function visible(browser: Browser, selector: string, timeout = 30_000) {
 }
 
 export async function selectRoom(browser: Browser, roomName: string) {
+  const selectionState = async () =>
+    browser.execute((expected) => {
+      if (document.querySelector<HTMLInputElement>('input[aria-label="Room title"]')?.value === expected) {
+        return "selected";
+      }
+      return [...document.querySelectorAll<HTMLButtonElement>("button.room-button")].some((candidate) =>
+        candidate.textContent?.includes(expected)
+      )
+        ? "available"
+        : null;
+    }, roomName);
+
+  await browser.waitUntil(async () => (await selectionState()) !== null, {
+    timeout: 60_000,
+    timeoutMsg: `room ${roomName} was neither selected nor available after native startup`
+  });
+  if ((await selectionState()) === "selected") return;
   const room = await visible(
     browser,
     `//button[contains(concat(" ", normalize-space(@class), " "), " room-button ") and contains(., "${roomName}")]`,
-    60_000
+    30_000
   );
   await room.click();
   const title = await visible(browser, 'input[aria-label="Room title"]');
@@ -45,8 +62,8 @@ export async function createInviteLink(host: Browser) {
     { timeout: 30_000, timeoutMsg: "host did not issue a fresh protected invite capability" }
   );
   const invite = await host.execute(() => document.querySelector(".invite-link")?.textContent?.trim() ?? "");
-  assert.match(invite, /^http:\/\/127\.0\.0\.1:1420\/?\?invite=/);
-  assert.match(invite, /#multaiplayerJoin=/);
+  assert.match(invite, /^https:\/\/open\.multaiplayer\.com\/invite#invite=/);
+  assert.match(invite, /&multaiplayerJoin=/);
   return invite;
 }
 
@@ -55,6 +72,12 @@ export async function importInvite(guest: Browser, invite: string, roomName: str
   await openRoomInspector(guest);
   await (await visible(guest, 'textarea[placeholder="Paste a multAIplayer invite..."]')).setValue(invite);
   await (await visible(guest, "button=Import invite")).click();
+}
+
+export async function submitInviteThroughOnboarding(guest: Browser, invite: string) {
+  const input = await visible(guest, ".onboarding-field input");
+  await input.setValue(invite);
+  await (await visible(guest, "button=Accept invite")).click();
 }
 
 export async function waitForGuestInviteRequest(guest: Browser) {
@@ -153,7 +176,7 @@ async function assertGuestMlsGroupLocked(guest: Browser, roomName: string, asser
 
 export async function inviteAndDeny(host: Browser, guest: Browser, context: InviteScenarioContext) {
   const invite = await createInviteLink(host);
-  await importInvite(guest, invite, context.roomName);
+  await submitInviteThroughOnboarding(guest, invite);
   await passDeviceVerificationGuidance(guest, context.roomName);
   await waitForGuestInviteRequest(guest);
   const request = await loadPendingInviteRequest(host, context);
@@ -179,7 +202,8 @@ export async function rejectExpiredInvite(host: Browser, guest: Browser, context
   const keyPackagesBefore = await keyPackageCount(guest, context.relayBaseUrl, context.guestDeviceId);
   assert.equal(keyPackagesBefore.status, 200, "could not count guest KeyPackages before expiry rejection");
   const invite = await createInviteLink(host);
-  const inviteId = new URL(invite).searchParams.get("invite");
+  const inviteUrl = new URL(invite);
+  const inviteId = new URLSearchParams(inviteUrl.hash.slice(1)).get("invite");
   assert.ok(inviteId, "generated invite did not contain a relay invite id");
   const expired = await guest.executeAsync(
     (baseUrl, targetInviteId, done) => {

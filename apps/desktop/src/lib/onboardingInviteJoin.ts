@@ -22,6 +22,7 @@ export interface OnboardingInviteJoinResult {
 
 export interface OnboardingInviteJoinAdapter {
   joinManualInput: (input: string) => Promise<OnboardingInviteJoinResult>;
+  joinProtectedPayload: (encodedInvite: string, inviteId: string) => Promise<OnboardingInviteJoinResult>;
   joinFromUrl: (
     location: InviteUrlParts,
     scrubUrl: (cleanupPath: string) => void
@@ -56,6 +57,13 @@ export function createOnboardingInviteJoinAdapter({
   }
 
   return {
+    async joinProtectedPayload(encodedInvite, inviteId) {
+      if (!encodedInvite || !inviteId) {
+        return result("invalid_invite", "Paste a complete multAIplayer invite link to continue.", true, false);
+      }
+      return request(encodedInvite, inviteId);
+    },
+
     async joinManualInput(input) {
       const normalized = input.trim();
       if (!normalized) {

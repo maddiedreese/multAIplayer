@@ -13,6 +13,16 @@ Supported alpha self-hosting requirements:
 - persistent SQLite storage for hosted or internet-facing relays;
 - relay-managed encrypted attachment blob storage in SQLite for hosted or internet-facing relays, or JSON storage for local/dev self-hosting.
 
+## Desktop onboarding, authentication, and invite links
+
+The self-hosted relay must configure GitHub Device Flow for authenticated create/join onboarding. GitHub identifies the relay member; ChatGPT authorizes only the local Codex process and is never configured on the relay. Invitees may join after relay/GitHub readiness without Codex, ChatGPT authorization, or a project folder. A creator must complete the local host-readiness checks before creating the first room.
+
+Provider verification URLs are not general self-host configuration. The desktop accepts the exact GitHub device page and a small allowlist of official OpenAI HTTPS hosts, and Rust repeats those checks before opening the system browser. GitHub Enterprise or another identity provider therefore requires an explicit reviewed code/configuration change rather than passing an arbitrary OAuth URL through the relay.
+
+Official builds generate `https://open.multaiplayer.com/invite#…` and register `applinks:open.multaiplayer.com` plus `applinks:multaiplayer.com`. All invite material is in the fragment; the website does not learn the self-hosted relay or invite. The recipient's app must already be configured for the same relay before admission can succeed.
+
+A differently branded or independently distributed desktop cannot inherit the official universal-link association. It must use its own HTTPS hosts, serve no-redirect AASA files whose `appID` exactly matches its Apple Team ID and bundle identifier, update the native/TypeScript host allowlists and CSP, add the associated-domain entitlement, sign the app with that team, and provide its own privacy-preserving install landing. Do not add a custom scheme as a shortcut. Until that work is reviewed and manually tested, distribute the complete link privately and have recipients paste it into the configured app.
+
 ## Relay Configuration
 
 The relay reads configuration from shell-exported environment variables first. For local and single-process deployments, it also loads `.env` files before reading relay settings:

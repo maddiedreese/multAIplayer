@@ -184,7 +184,12 @@ test("version zero migrates to the bounded version one shape without retaining e
         teammateInvited: true,
         prompt: "private prompt"
       },
-      accessToken: "secret"
+      accessToken: "secret",
+      githubDeviceCode: "github-device-secret",
+      githubUserCode: "github-user-code",
+      codexLoginId: "codex-login-secret",
+      codexAuthorizationUrl: "https://auth.openai.com/secret-flow",
+      inviteFragment: "protected-invite-fragment"
     })
   );
 
@@ -194,7 +199,10 @@ test("version zero migrates to the bounded version one shape without retaining e
   assert.deepEqual(migrated.markers.membership, { teamId: "team_alpha", roomId: "room_alpha" });
   assert.equal(migrated.markers.teammateJoined, false);
   const persisted = storage.getItem(onboardingStorageKey) ?? "";
-  assert.doesNotMatch(persisted, /private prompt|accessToken|secret/);
+  assert.doesNotMatch(
+    persisted,
+    /private prompt|accessToken|secret|github-user-code|auth\.openai\.com|protected-invite-fragment/
+  );
 });
 
 test("unsupported, malformed, and internally inconsistent persisted state fails closed", () => {
@@ -239,6 +247,27 @@ test("saving serializes the normalized allowlisted state and tolerates unavailab
   };
   assert.deepEqual(loadOnboardingState(unavailable), createInitialOnboardingState());
   assert.doesNotThrow(() => saveOnboardingState(state, unavailable));
+});
+
+test("saving onboarding state cannot retain ephemeral authentication or invitation material", () => {
+  const storage = new MemoryStorage();
+  const contaminated = {
+    ...createInitialOnboardingState(),
+    githubDeviceCode: "github-device-code",
+    githubUserCode: "github-user-code",
+    githubVerificationUrl: "https://github.com/login/device?secret=one",
+    codexLoginId: "codex-login-id",
+    codexLoginUrl: "https://auth.openai.com/oauth?secret=two",
+    codexUserCode: "codex-user-code",
+    invite: "https://multaiplayer.com/?invite=three#protected-four"
+  };
+
+  saveOnboardingState(contaminated, storage);
+  const persisted = storage.getItem(onboardingStorageKey) ?? "";
+  assert.doesNotMatch(
+    persisted,
+    /github-device-code|github-user-code|github\.com|codex-login-id|auth\.openai\.com|codex-user-code|invite=three|protected-four/
+  );
 });
 
 test("the app store persists events and can reload an interrupted journey", async () => {

@@ -1,5 +1,57 @@
+import { createECDH, createHash, generateKeyPairSync } from "node:crypto";
 import { test } from "node:test";
-import { assert, debugRelayState, startRelay } from "../support/relay.js";
+import { assert, createDebugSession, debugRelayState, startRelay } from "../support/relay.js";
+
+test("invite lookup exposes only the pinned active-host public identity to non-members", async () => {
+  const relay = await startRelay();
+  try {
+    const cookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    const signaturePublicKey = generateKeyPairSync("ec", { namedCurve: "prime256v1" })
+      .publicKey.export({ format: "der", type: "spki" })
+      .toString("base64");
+    const hpke = createECDH("prime256v1");
+    hpke.generateKeys();
+    const hpkePublicKey = hpke.getPublicKey(undefined, "uncompressed").toString("base64");
+    const register = await fetch(`${relay.baseUrl}/devices`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({
+        deviceId: "host-device-1",
+        signaturePublicKey,
+        signatureKeyFingerprint: fingerprint(signaturePublicKey),
+        hpkePublicKey,
+        hpkeKeyFingerprint: fingerprint(hpkePublicKey)
+      })
+    });
+    assert.equal(register.status, 201);
+
+    const created = await fetch(`${relay.baseUrl}/invites`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
+    });
+    assert.equal(created.status, 201);
+    const { invite } = (await created.json()) as { invite: { id: string } };
+
+    // No member cookie: possession of the relay invite id reveals only the
+    // exact public identity needed to verify the protected invite fragment.
+    const lookup = await fetch(`${relay.baseUrl}/invites/${invite.id}`);
+    assert.equal(lookup.status, 200);
+    const body = (await lookup.json()) as { hostDevice: Record<string, unknown> };
+    assert.deepEqual(body.hostDevice, {
+      userId: "github:maddiedreese",
+      deviceId: "host-device-1",
+      signaturePublicKey,
+      signatureKeyFingerprint: fingerprint(signaturePublicKey),
+      hpkePublicKey,
+      hpkeKeyFingerprint: fingerprint(hpkePublicKey)
+    });
+    assert.equal("displayName" in body.hostDevice, false);
+    assert.equal("lastSeenAt" in body.hostDevice, false);
+  } finally {
+    await relay.close();
+  }
+});
 
 test("relay creates invite metadata with expiry", async () => {
   const relay = await startRelay({ MULTAIPLAYER_RELAY_INVITE_TTL_DAYS: "3" });
@@ -218,3 +270,8 @@ test("relay prunes expired in-memory invites and attachment blobs", async () => 
     await relay.close();
   }
 });
+
+function fingerprint(encoded: string) {
+  const hex = createHash("sha256").update(Buffer.from(encoded, "base64")).digest("hex");
+  return `sha256:${hex.match(/.{1,4}/g)!.join(":")}`;
+}

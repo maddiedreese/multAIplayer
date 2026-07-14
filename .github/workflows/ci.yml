@@ -418,8 +418,13 @@ jobs:
       - name: Run macOS native-core and relay composition journey
         run: npx tsx --test apps/relay/test/live-native-relay-journey.test.ts
 
-      - name: Build unsigned Tauri app
+      - name: Build ad-hoc signed Tauri app
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
         run: npm run tauri:build:prebuilt -w @multaiplayer/desktop
+
+      - name: Verify packaged associated-domain entitlements
+        run: npm run verify:macos-associated-domains -- apps/desktop/src-tauri/target/release/bundle/macos/multAIplayer.app
 
       - name: Upload macOS app bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

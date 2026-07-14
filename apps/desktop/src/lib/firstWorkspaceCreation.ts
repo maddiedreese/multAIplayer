@@ -36,7 +36,7 @@ export interface WorkspaceCreationRuntime {
   restoreForgottenRoom: (roomId: string) => void;
   setInviteApprovalGate: (roomId: string, enabled: boolean) => void;
   loadTeamHistorySettings: (teamId: string) => LocalHistorySettings;
-  saveHistorySettings: (roomId: string, settings: LocalHistorySettings) => Promise<LocalHistorySettings>;
+  seedNewRoomHistorySettings: (roomId: string, settings: LocalHistorySettings) => LocalHistorySettings;
   initializeMessages: (roomId: string) => void;
 }
 
@@ -106,7 +106,7 @@ export async function createWorkspaceRoom(
   runtime.restoreTeamAccess(room.teamId);
   runtime.restoreForgottenRoom(room.id);
   runtime.setInviteApprovalGate(room.id, localDefaults.inviteApprovalGate);
-  await runtime.saveHistorySettings(room.id, localDefaults.historySettings);
+  runtime.seedNewRoomHistorySettings(room.id, localDefaults.historySettings);
   runtime.initializeMessages(room.id);
   runtime.selectRoom(room.id);
   return room;

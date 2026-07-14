@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertPendingInviteRecoveryContext } from "../src/lib/invite/inviteJoinActions";
+import { assertInviteHostDevice, assertPendingInviteRecoveryContext } from "../src/lib/invite/inviteJoinActions";
+import { inviteRequesterDeviceMatches } from "../src/lib/invite/inviteRelayActions";
 import type { PendingMlsInviteRequest } from "../src/lib/mlsClient";
 
 const pending: PendingMlsInviteRequest = {
@@ -45,4 +46,62 @@ test("fails closed when pending recovery identity or relay metadata differs", ()
       } as never),
     /does not match this device or relay invite metadata/
   );
+});
+
+const protectedHost = {
+  hostUserId: "host-user",
+  hostDeviceId: "host-device",
+  hostHpkePublicKey: "host-hpke-key",
+  hostHpkeKeyFingerprint: "sha256:host-hpke"
+};
+const inviteHostDevice = {
+  userId: "host-user",
+  deviceId: "host-device",
+  signaturePublicKey: "host-signature-key",
+  signatureKeyFingerprint: "sha256:host-signature",
+  hpkePublicKey: "host-hpke-key",
+  hpkeKeyFingerprint: "sha256:host-hpke"
+};
+
+test("accepts only the invite-scoped active-host device pinned by the protected fragment", () => {
+  assert.doesNotThrow(() => assertInviteHostDevice(protectedHost, { hostDevice: inviteHostDevice }));
+  for (const hostDevice of [
+    null,
+    { ...inviteHostDevice, userId: "other-host" },
+    { ...inviteHostDevice, deviceId: "other-device" },
+    { ...inviteHostDevice, hpkePublicKey: "other-key" },
+    { ...inviteHostDevice, hpkeKeyFingerprint: "sha256:other" }
+  ]) {
+    assert.throws(
+      () => assertInviteHostDevice(protectedHost, { hostDevice }),
+      /host HPKE key does not match the registered device/
+    );
+  }
+});
+
+test("host accepts only the request-scoped registered device pinned by the HPKE payload", () => {
+  const protectedRequest = {
+    requesterSignaturePublicKey: "requester-signature-key",
+    requesterSignatureKeyFingerprint: "sha256:requester-signature"
+  };
+  const record = {
+    requesterUserId: "requester-user",
+    requesterDeviceId: "requester-device",
+    requesterDevice: {
+      userId: "requester-user",
+      deviceId: "requester-device",
+      signaturePublicKey: "requester-signature-key",
+      signatureKeyFingerprint: "sha256:requester-signature"
+    }
+  };
+  assert.equal(inviteRequesterDeviceMatches(record, protectedRequest), true);
+  for (const requesterDevice of [
+    null,
+    { ...record.requesterDevice, userId: "other-user" },
+    { ...record.requesterDevice, deviceId: "other-device" },
+    { ...record.requesterDevice, signaturePublicKey: "other-key" },
+    { ...record.requesterDevice, signatureKeyFingerprint: "sha256:other" }
+  ]) {
+    assert.equal(inviteRequesterDeviceMatches({ ...record, requesterDevice }, protectedRequest), false);
+  }
 });

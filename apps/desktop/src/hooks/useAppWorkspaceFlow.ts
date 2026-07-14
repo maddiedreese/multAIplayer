@@ -22,6 +22,7 @@ type RoomSettingsActor = ReturnType<typeof useRoomSettingsActor>;
 export function useAppWorkspaceFlow({
   appRefs,
   identityResolved,
+  authenticatedUserId,
   localIdentity,
   selected,
   roomInteraction,
@@ -32,6 +33,7 @@ export function useAppWorkspaceFlow({
 }: {
   appRefs: AppRefs;
   identityResolved: boolean;
+  authenticatedUserId: string | null;
   localIdentity: LocalIdentity;
   selected: SelectedRoomContext;
   roomInteraction: RoomInteraction;
@@ -66,17 +68,13 @@ export function useAppWorkspaceFlow({
     }))
   );
   const { hasSelectedRoom, selectedRoom } = selected;
-  const {
-    setSelectedInviteMessage,
-    setSelectedTeamHistoryMessage,
-    setTeamHistoryMessageForTeam,
-    hydrateLocalRoomHistoryForRoom
-  } = roomActions;
+  const { setSelectedTeamHistoryMessage, setTeamHistoryMessageForTeam, hydrateLocalRoomHistoryForRoom } = roomActions;
 
   return useWorkspaceFlowContext({
     bootstrap: {
       workspace: {
         relayHttpUrl,
+        authenticatedUserId,
         bootstrapAttempt: workspaceBootstrapAttempt,
         replaceTeams: storeAction("replaceTeams"),
         replaceRooms: storeAction("replaceRooms"),
@@ -103,10 +101,6 @@ export function useAppWorkspaceFlow({
       },
       selectedTeamDefaults: {
         selectedTeam
-      },
-      inviteUrl: {
-        requestNoSecretInviteAccess: inviteActions.requestNoSecretInviteAccess,
-        setSelectedInviteMessage
       }
     },
     workspaceRoomActions: {

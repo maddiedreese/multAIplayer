@@ -117,7 +117,13 @@ test("rejects missing, reordered, unexpected, and malformed duration stages", ()
   report.stages.push({ name: "unreviewed future stage", durationMs: 1 });
 
   const violations = evaluateNativeJourneyDurationPolicy(report);
-  assert.ok(violations.some((violation) => /expected 19 duration stages, received 20/.test(violation)));
+  assert.ok(
+    violations.some((violation) =>
+      new RegExp(
+        `expected ${nativeJourneyDurationPolicy.stages.length} duration stages, received ${nativeJourneyDurationPolicy.stages.length + 1}`
+      ).test(violation)
+    )
+  );
   assert.ok(violations.some((violation) => /duration stage 1 must be/.test(violation)));
   assert.ok(violations.some((violation) => /finite non-negative/.test(violation)));
   assert.ok(violations.some((violation) => /unexpected duration stage/.test(violation)));

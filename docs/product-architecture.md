@@ -119,7 +119,7 @@ Users chat normally in a room. Messages, replies, reactions, edits, deletes, att
 
 People can edit or delete their own pre-Codex messages while those messages are still mutable. When a Codex turn starts, the desktop records the consumed room message ids in the encrypted turn event; those messages stop showing edit/delete actions because they may already be part of Codex context. Queued Codex turns that have not started yet continue to refresh against the current room text.
 
-Invite approval requests are capability-authenticated RFC 9180 HPKE payloads directed to the pinned host. An invite carries no group secret; it binds an independently generated 256-bit bearer capability and current epoch to the active host's exact identity, HPKE key, and signature-key fingerprint. The raw value enters through the URL fragment, crosses the relay only inside HPKE ciphertext, and is persisted by the requester only in SQLCipher for crash recovery; startup IPC never returns it to the webview. The issuer persists only a verifier. The request binds the exact single-use KeyPackage id/hash. After approval, the host publishes an MLS Add Commit and a one-shot Welcome usable only by that KeyPackage.
+Invite approval requests are capability-authenticated RFC 9180 HPKE payloads directed to the pinned host. An invite carries no group secret; it binds an independently generated 256-bit bearer capability and current epoch to the active host's exact identity, HPKE key, and signature-key fingerprint. A pre-membership invite lookup projects only that exact active-host public identity for comparison with the protected fragment. The host-only, device-authenticated request lookup projects only the exact requester's registered signature identity for comparison with the HPKE payload. Neither enumerates the membership-scoped team device directory nor includes device activity fields. The raw capability value enters through the URL fragment, crosses the relay only inside HPKE ciphertext, and is persisted by the requester only in SQLCipher for crash recovery; startup IPC never returns it to the webview. The issuer persists only a verifier. The request binds the exact single-use KeyPackage id/hash. After approval, the host publishes an MLS Add Commit and a one-shot Welcome usable only by that KeyPackage.
 
 The Rust MLS state machine advances epochs through transactionally persisted Commits. Clients and relay accept Commits only from the active host, and the relay serializes one Commit per expected epoch. Member removal revokes relay access, invalidates outstanding invites, and excludes the removed leaf through MLS Remove; already-delivered content and retained history secrets cannot be erased. [The cryptography architecture](cryptography.md) defines the remaining policy and retention limits.
 
@@ -216,6 +216,10 @@ Local preview sharing uses `cloudflared` on the active host's machine to create 
 
 GitHub is used for identity in v1.
 
+GitHub authentication uses OAuth Device Flow. The relay owns the polling device code and eventual access token; the desktop receives only the short user code, verification URL, expiry, and completion state needed for presentation. The blocking onboarding assistant renders those controls directly. ChatGPT authentication is unrelated: the desktop asks the local Codex app-server to start its supported browser or device flow, and Codex retains the resulting credentials. Join readiness requires relay access and GitHub identity, but Codex installation, ChatGPT authorization, and a project folder are deferrable until that device hosts Codex. Create readiness keeps those host prerequisites blocking.
+
+Authentication navigation crosses a deliberately narrow native boundary. TypeScript allowlists exact HTTPS provider hosts and the GitHub device path; Rust independently revalidates provider, scheme, authority, path, bounds, and credential/port restrictions before the native opener launches the system default browser. Browser preview uses `window.open` only after the same TypeScript validation. Login ids, polling device codes, user codes, verification URLs, invite values, and account details are not onboarding persistence fields.
+
 GitHub OAuth is configurable through `GITHUB_OAUTH_SCOPES`, and the app displays the active scopes in Account settings. The default is `read:user public_repo` for open-source PR creation; self-hosters can use `read:user repo` when private repository PRs are required.
 
 Git operations in v1:
@@ -234,7 +238,7 @@ When a room has an attached local project with a GitHub `origin` remote, the des
 
 Before a host can approve a workflow that pushes and opens a draft PR, the desktop performs a GitHub readiness check. On the official hosted relay, GitHub sign-in is required for identity and GitHub workflows. Local-only branch and commit workflows without GitHub sign-in may exist only for local/LAN or self-hosted relays configured without GitHub auth. Push/PR workflows require a signed-in GitHub session, a relay with GitHub OAuth configured, PR-capable OAuth scopes (`public_repo` for public repos or `repo` for private repos), and normalized owner/repo/base/head values. The app shows any blocker before approval so a host does not run local git steps and only then discover that the PR cannot be created.
 
-The open-source repo includes a GitHub Actions CI workflow. It checks, tests, and builds all TypeScript workspaces on Ubuntu; on the pinned `macos-15` runner it runs native formatting, lints, and tests, builds the desktop prerequisites, executes the real two-process native-core/relay/validator composition journey, then builds the unsigned desktop app and uploads the `.app` and `.dmg` artifacts for inspection. Tauri is configured for those two macOS bundle formats only; Windows and Linux desktop bundles are outside the supported alpha surface until corresponding CI and release verification exist. The repo requires Node.js 22 or newer through package metadata, provides `.nvmrc` for the CI major, and provides `npm run doctor` as a read-only local setup check for Node/npm/Rust/Cargo and macOS packaging prerequisites.
+The open-source repo includes a GitHub Actions CI workflow. It checks, tests, and builds all TypeScript workspaces on Ubuntu; on the pinned `macos-15` runner it runs native formatting, lints, and tests, builds the desktop prerequisites, executes the real two-process native-core/relay/validator composition journey, then builds an ad-hoc-signed desktop app and uploads the `.app` and `.dmg` artifacts for inspection. The ad-hoc (`-`) identity uses no Apple account or Developer ID certificate and exists so CI can inspect the assembled entitlement; these artifacts are not trusted distribution builds and do not prove universal-link dispatch. Tauri is configured for those two macOS bundle formats only; Windows and Linux desktop bundles are outside the supported alpha surface until corresponding CI and release verification exist. The repo requires Node.js 22 or newer through package metadata, provides `.nvmrc` for the CI major, and provides `npm run doctor` as a read-only local setup check for Node/npm/Rust/Cargo and macOS packaging prerequisites.
 
 Example approval:
 
@@ -275,6 +279,14 @@ The relay must not store:
 - repo contents;
 - plaintext attachments;
 - terminal output in plaintext.
+
+### Invitation delivery and onboarding intake
+
+The active host emits `https://open.multaiplayer.com/invite#…`; there is no custom URL scheme. The fragment contains the relay invite id, the capability/host binding, and approval mode, so website HTTP requests contain none of those fields. Both `open.multaiplayer.com` and the apex host publish no-redirect AASA documents for the exact `/invite` and `/invite/` paths, bound to the release Team ID and `com.multaiplayer.desktop` bundle identifier.
+
+The static landing scrubs every fragment synchronously before hydration. Only a fully bounded candidate is temporarily retained in a page-global memory slot, then hydration revalidates it and deletes the slot. It never renders, persists, logs, copies, or sends the capability. A user-initiated retry reconstructs the URL only from memory and navigates to the alternate associated host. The missing-app path links directly to the official release DMG and instructs the user to retry or return to the original private message after installation.
+
+The macOS application registers only the associated HTTPS domains. Native intake accepts one canonical URL at a time, stores the parsed invite in one bounded replacement slot, emits a content-free availability event, and exposes a one-shot take command. Frontend subscription happens before the cold-start drain. React holds the payload only until it delegates to the existing capability-bound join adapter; cancellation, completion, error, denial, supersession, or process exit clears it. Neither this transport nor onboarding can unlock a room; authenticated host approval, MLS Add/Commit/Welcome, and relay admission remain authoritative.
 
 ### End-To-End Encryption
 
@@ -553,11 +565,13 @@ docs/
 - E2EE uses RFC 9420 MLS through the native Rust core, one pinned ciphersuite, canonical authenticated application metadata, exporter-derived encrypted history, and RFC 9180 HPKE capability requests.
 - Desktop coding surfaces use Monaco Editor for file editing, xterm.js with a Rust PTY layer for terminals, and Tauri/Wry WebViews for room browser tabs.
 - Invite links carry a random capability and exact host public binding, never a group secret; approval consumes the requester's exact KeyPackage and returns an MLS Welcome.
+- Official invite transport is an HTTPS universal link with all invite material in the fragment. Live AASA association and a correctly signed app are required for OS dispatch; there is no custom-scheme or persisted browser handoff fallback.
 - Member removal is relay-enforced for future reads and live sockets and cryptographically enforced for future room epochs through authenticated per-device delivery.
 - Multi-device support is device-oriented: each device has its own registered and pinned key identity. Recovery and synchronized multi-device identity remain outside the alpha scope.
 - Official relay federation is not part of the alpha scope.
 - Relay SQLite storage applies immediate, incremental row upserts/deletes for durable entities and transactionally groups MLS messages, receipts, room epochs, and related state. It does not serialize or rewrite the whole store during steady-state operation. State is still hydrated into one process at startup, so one relay writer per SQLite database remains the alpha deployment boundary; multi-instance operation requires shared coordination and rate limiting.
 - GitHub OAuth is the public alpha GitHub integration. GitHub App support is a future option for tighter repo-level permissions and enterprise setups.
+- An invitee does not need Codex or ChatGPT authorization to join. Those become prerequisites only before that device hosts Codex.
 - The desktop discovers and runs the local `codex app-server`; multAIplayer does not proxy Codex credentials through the hosted relay.
 - Secret detection is a review aid for files, terminal output, received terminal command requests, browser pages, and copied Markdown. The alpha warns and gates risky sharing without claiming automatic redaction.
 

@@ -144,7 +144,26 @@ export function registerInviteDeliveryRoutes({
       return void sendRelayError(res, 403, "forbidden", "Only the active host device may read invite requests.");
     if (!hasDeviceSession(store, req.get("x-device-session"), session.user.id, room.activeHostDeviceId!))
       return void sendRelayError(res, 403, "device_auth_required", "A device-authenticated session is required.");
-    res.json({ requests: Array.from(store.inviteRequests.values()).filter((item) => item.inviteId === invite.id) });
+    const requests = Array.from(store.inviteRequests.values())
+      .filter((item) => item.inviteId === invite.id)
+      .map((item) => {
+        const registeredRequesterDevice = store.getDevice(item.requesterUserId, item.requesterDeviceId);
+        return {
+          ...item,
+          requesterDevice: registeredRequesterDevice
+            ? {
+                userId: registeredRequesterDevice.userId,
+                deviceId: registeredRequesterDevice.deviceId,
+                signaturePublicKey: registeredRequesterDevice.signaturePublicKey,
+                signatureKeyFingerprint: registeredRequesterDevice.signatureKeyFingerprint
+              }
+            : null
+        };
+      });
+    // This host-only, device-authenticated response projects only the public
+    // identity bound to each request. A pending invitee is not in the team
+    // directory until admission, so directory enumeration cannot verify it.
+    res.json({ requests });
   });
 
   app.post("/invites/:inviteId/response", async (req, res) => {

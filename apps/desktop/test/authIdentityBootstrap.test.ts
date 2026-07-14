@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
-import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { JSDOM } from "jsdom";
 import { useDeviceIdentityLifecycle } from "../src/hooks/useDeviceIdentityLifecycle";
 import { useGitHubAuth } from "../src/hooks/useGitHubAuth";
@@ -90,6 +90,51 @@ test("unauthenticated LAN mode enables a local identity only after auth policy a
   await waitFor(() => assert.equal(auth.result.current.authConfig?.mutationsRequireAuth, false));
   await waitFor(() => assert.equal(auth.result.current.identityResolved, true));
   assert.equal(auth.result.current.currentUser, null);
+});
+
+test("failed auth configuration settles fail closed and retries config plus current-user resolution once", async () => {
+  let configRequests = 0;
+  let userRequests = 0;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.endsWith("/auth/config")) {
+      configRequests += 1;
+      return configRequests === 1
+        ? Response.json({ error: "temporary relay failure" }, { status: 503 })
+        : Response.json({
+            provider: "github",
+            configured: true,
+            scopes: ["read:user"],
+            mutationsRequireAuth: true,
+            allowedOrigins: ["http://127.0.0.1:1420"],
+            sessionPersistence: "memory_only"
+          });
+    }
+    if (url.endsWith("/auth/me")) {
+      userRequests += 1;
+      return userRequests === 1
+        ? Response.json({ error: "authentication required" }, { status: 401 })
+        : Response.json({ user: { id: "github:recovered", login: "recovered" } });
+    }
+    throw new Error(`Unexpected auth recovery request: ${url}`);
+  };
+
+  const auth = renderHook(() => useGitHubAuth("http://127.0.0.1:4322"));
+  await waitFor(() => assert.equal(auth.result.current.authConfigResolved, true));
+  await waitFor(() => assert.equal(auth.result.current.currentUserResolved, true));
+  assert.equal(auth.result.current.authConfig, null, "unknown policy must not fall back to anonymous LAN mode");
+  assert.equal(auth.result.current.identityResolved, false);
+  assert.match(auth.result.current.authError ?? "", /temporary relay failure/);
+
+  act(() => auth.result.current.retryAuthBootstrap());
+  await waitFor(() => assert.equal(auth.result.current.currentUser?.id, "github:recovered"));
+  await waitFor(() => assert.equal(auth.result.current.identityResolved, true));
+  assert.equal(configRequests, 2);
+  assert.equal(userRequests, 2);
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(configRequests, 2, "stable resolved auth must not create a retry loop");
+  assert.equal(userRequests, 2, "stable resolved user state must not create a retry loop");
 });
 
 test("device identity lifecycle never invokes native MLS before identity resolution", async () => {

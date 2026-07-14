@@ -2,6 +2,12 @@
 
 This public changelog records material changes to multAIplayer's security assumptions, trust boundaries, guarantees, and known limitations. It complements the current [threat model](threat-model.md), which remains the normative description of the present design. Implementation-only fixes that do not change a boundary may stay in ordinary release notes.
 
+## 2026-07-14
+
+- Added HTTPS universal-link delivery for approval-gated invitations. The canonical `open.multaiplayer.com/invite` link keeps every invite field in the fragment, both associated hosts publish no-redirect AASA data, and there is no custom scheme. The static fallback scrubs fragments before hydration and keeps a validated retry only in memory; native intake independently validates one URL, stores it in a one-shot replacement slot, and emits only content-free availability. This changes delivery, not MLS admission authority. Signed-app/live-AASA dispatch remains a manual release boundary.
+- Split onboarding readiness by intent. Join now requires only relay access and GitHub identity; Codex installation, ChatGPT authorization, and project access are deferrable until the device hosts Codex. Create continues to require host readiness. GitHub Device Flow and Codex/ChatGPT browser or device login are now presented inside onboarding without adding their polling codes, login ids, URLs, or account data to persisted onboarding state.
+- Added a native system-browser authorization boundary. TypeScript validates provider-specific GitHub/OpenAI HTTPS URLs, and a separate Rust command repeats validation before the operating-system opener runs. Invalid URLs and native failures use fixed messages and never reflect the submitted URL.
+
 ## 2026-07-13
 
 - Added a versioned, non-secret localStorage boundary for resumable first-run presentation state. Its strict allowlist is limited to bounded team/room identifiers, intent and surface state, and boolean milestones; it excludes invite capabilities, project paths, account data, prompts, reasoning, and room content, and no authentication, membership, host, project-access, or MLS decision trusts it. Create and join still delegate to the existing relay and capability-bound MLS paths. See [Threat model](threat-model.md) and [Cryptography architecture](cryptography.md#onboarding-state-is-not-cryptographic-state).

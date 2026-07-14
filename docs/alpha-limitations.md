@@ -7,10 +7,13 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 - Public macOS alpha artifacts are Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
 - Release checksums help verify artifact integrity, but they do not replace signing.
 - Public releases should come from GitHub Actions, not ad hoc local builds.
+- Official invitations use signed macOS universal links on `open.multaiplayer.com` and `multaiplayer.com`; there is no custom-scheme fallback. Automated parser, AASA-shape, and entitlement checks do not prove operating-system dispatch, so every release still requires cold-start and warm-app testing with a signed installed build.
+- The missing-app landing keeps the complete invitation only in page memory after removing it from the address bar. Refreshing, closing, or navigating away deliberately loses that retry state; the recipient must return to the original private message and click the link again.
 
 ## Accounts And Hosting
 
 - GitHub sign-in requires a GitHub OAuth app configured on the relay.
+- GitHub Device Flow identifies workspace members and authorizes relay/repository workflows. ChatGPT login separately authorizes the local Codex process. Joining requires relay and GitHub readiness but does not require Codex, a ChatGPT login, or a project folder until that device hosts Codex work.
 - A hosted production relay requires real domain, TLS, secrets, persistent storage, and operator monitoring.
 - The relay Dockerfile and SQLite storage are available. Multi-instance production hosting needs external/shared rate limiting, backup/restore drills, and operational monitoring.
 - SQLite opaque MLS messages use an incremental append/delete path, but the normalized non-message relay state rewrites teams, rooms, invites, devices, members, and sessions on each debounced flush. That is acceptable for alpha-scale trusted teams, but larger hosted relays should plan an incremental or shared-store rewrite before rooms and membership counts grow enough for whole-store rewrites to become a scaling ceiling.
@@ -48,5 +51,6 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 
 - Real multi-device, multi-account dogfooding is required before a public alpha is promoted broadly.
 - Official relay hosting decisions, domains, secrets, and GitHub device-code OAuth configuration require maintainer input.
+- Independently branded or self-hosted builds cannot inherit the official universal-link association. They need their own HTTPS domains, AASA files, Apple Team ID, bundle id, associated-domain entitlement, signing, and matching native allowlists; otherwise recipients can paste the complete private invitation into the app.
 - The visual design should continue to be reviewed in the native app on real screens, especially resizable columns and embedded browser behavior.
 - A room intentionally has one primary repository binding. Multi-repository rooms are deferred until app-server exposes a stable multi-root execution and sandbox contract; use separate rooms meanwhile. See [the accepted ADR](decisions/multi-repository-rooms.md).

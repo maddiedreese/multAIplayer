@@ -15,16 +15,11 @@ export function useInviteActions(options: UseInviteActionsOptions) {
   const joinInviteSecret = useStableEvent(joinActions.joinInviteSecret);
   const requestNoSecretInviteAccess = useStableEvent(joinActions.requestNoSecretInviteAccess);
   const resumePendingInviteRequests = useStableEvent(joinActions.resumePendingInviteRequests);
-  const deviceSessionToken = useAppStore((state) => state.deviceSessionToken);
-  const relayStatus = useAppStore((state) => state.relayStatus);
+  usePendingInviteRecovery(resumePendingInviteRequests);
   const copyInviteLink = useStableEvent(linkActions.copyInviteLink);
   const decideInviteJoinRequest = useStableEvent(relayActions.decideInviteJoinRequest);
   const handleInviteRequested = useStableEvent(relayActions.handleInviteRequested);
   const removeMembersFromMlsGroup = useStableEvent(membershipActions.removeMembersFromMlsGroup);
-  useEffect(() => {
-    if (!deviceSessionToken || relayStatus !== "open") return;
-    void resumePendingInviteRequests();
-  }, [deviceSessionToken, relayStatus, resumePendingInviteRequests]);
   return useMemo(
     () => ({
       joinInviteSecret,
@@ -43,6 +38,24 @@ export function useInviteActions(options: UseInviteActionsOptions) {
       removeMembersFromMlsGroup
     ]
   );
+}
+
+export function usePendingInviteRecovery(resumePendingInviteRequests: () => Promise<void>) {
+  const deviceSessionToken = useAppStore((state) => state.deviceSessionToken);
+  const relayStatus = useAppStore((state) => state.relayStatus);
+  const workspaceBootstrapStatus = useAppStore((state) => state.workspaceBootstrapStatus);
+  const lastStartedScope = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!deviceSessionToken || relayStatus !== "open" || workspaceBootstrapStatus !== "ready") {
+      lastStartedScope.current = null;
+      return;
+    }
+    const scope = deviceSessionToken;
+    if (lastStartedScope.current === scope) return;
+    lastStartedScope.current = scope;
+    void resumePendingInviteRequests();
+  }, [deviceSessionToken, relayStatus, resumePendingInviteRequests, workspaceBootstrapStatus]);
 }
 
 /** Keeps effect-facing invite handlers stable while reading each render's action factory output. */

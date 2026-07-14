@@ -7,10 +7,10 @@ import { currentLocalIdentity } from "../selectedWorkspace";
 import {
   acknowledgeDirectedInviteResponse,
   loadDirectedInviteResponse,
-  loadTeamDevices,
   lookupInvite,
   publishDirectedInviteRequest,
-  publishKeyPackages
+  publishKeyPackages,
+  type InviteLookupResult
 } from "../workspaceClient";
 import {
   generateMlsKeyPackage,
@@ -22,7 +22,7 @@ import {
   type PendingMlsInviteRequest
 } from "../mlsClient";
 import { randomInviteNonce } from "./mlsInviteProtocol";
-import type { InviteJoinRequest } from "../../types";
+import type { InviteJoinRequest, NoSecretRoomInvite } from "../../types";
 import { completeMlsRelayAdmission } from "../mlsJoinAdmission";
 import {
   clearPendingInviteIfMissing,
@@ -66,6 +66,22 @@ export function assertPendingInviteRecoveryContext(
   }
 }
 
+export function assertInviteHostDevice(
+  invite: Pick<NoSecretRoomInvite, "hostUserId" | "hostDeviceId" | "hostHpkePublicKey" | "hostHpkeKeyFingerprint">,
+  metadata: Pick<InviteLookupResult, "hostDevice">
+): void {
+  const hostDevice = metadata.hostDevice;
+  if (
+    !hostDevice ||
+    hostDevice.userId !== invite.hostUserId ||
+    hostDevice.deviceId !== invite.hostDeviceId ||
+    hostDevice.hpkePublicKey !== invite.hostHpkePublicKey ||
+    hostDevice.hpkeKeyFingerprint !== invite.hostHpkeKeyFingerprint
+  ) {
+    throw new Error("The invite host HPKE key does not match the registered device.");
+  }
+}
+
 export function createInviteJoinActions(
   options: InviteJoinActionOptions,
   store: InviteJoinStore = useAppStore.getState()
@@ -84,15 +100,7 @@ export function createInviteJoinActions(
       throw new Error("Invite metadata does not match the protected URL fragment.");
     if (metadata.room.hostUserId !== invite.hostUserId || metadata.room.activeHostDeviceId !== invite.hostDeviceId)
       throw new Error("The invite is not issued by the active host device.");
-    const hostDevice = (await loadTeamDevices(invite.teamId)).find(
-      (device) => device.userId === invite.hostUserId && device.deviceId === invite.hostDeviceId
-    );
-    if (
-      !hostDevice ||
-      hostDevice.hpkePublicKey !== invite.hostHpkePublicKey ||
-      hostDevice.hpkeKeyFingerprint !== invite.hostHpkeKeyFingerprint
-    )
-      throw new Error("The invite host HPKE key does not match the registered device.");
+    assertInviteHostDevice(invite, metadata);
 
     upsertTeam(metadata.team);
     upsertRoom(ensureRoomDefaults(metadata.room));

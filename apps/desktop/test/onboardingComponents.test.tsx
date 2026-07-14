@@ -183,6 +183,100 @@ test("join verification is announced and cannot be submitted again while pending
   assert.equal(submissions, 0);
 });
 
+test("join submission clears the protected invite from the visible input immediately", () => {
+  let submitted = "";
+  const state = reduceOnboardingState(createInitialOnboardingState(), { type: "choose_intent", intent: "join" });
+  const view = render(
+    <OnboardingAssistant
+      {...assistantProps({
+        state: { ...state, surface: "workspace" },
+        onSubmitJoin: ({ invite }) => {
+          submitted = invite;
+        }
+      })}
+    />
+  );
+  const input = view.getByLabelText("Invite link or code") as HTMLInputElement;
+  fireEvent.change(input, { target: { value: "https://multaiplayer.com/?invite=one#protected" } });
+  fireEvent.submit(input.closest("form")!);
+  assert.equal(submitted, "https://multaiplayer.com/?invite=one#protected");
+  assert.equal(input.value, "");
+  assert.doesNotMatch(view.container.textContent ?? "", /#protected/);
+});
+
+test("native invitation receipt exposes only a secure action and never renders the protected payload", () => {
+  let submissions = 0;
+  const state = reduceOnboardingState(createInitialOnboardingState(), { type: "choose_intent", intent: "join" });
+  const view = render(
+    <OnboardingAssistant
+      {...assistantProps({
+        state: { ...state, surface: "workspace" },
+        receivedInvite: true,
+        onSubmitReceivedInvite: () => {
+          submissions += 1;
+        }
+      })}
+    />
+  );
+  assert.equal(view.queryByLabelText("Invite link or code"), null);
+  assert.match(view.getByRole("status").textContent ?? "", /Invitation received securely/);
+  assert.doesNotMatch(view.container.textContent ?? "", /capability|multaiplayerJoin|invite_123/);
+  fireEvent.click(view.getByRole("button", { name: /Accept invite/ }));
+  assert.equal(submissions, 1);
+});
+
+test("readiness surfaces ephemeral GitHub and ChatGPT authorization controls without a global busy lock", () => {
+  const state = reduceOnboardingState(createInitialOnboardingState(), { type: "choose_intent", intent: "create" });
+  let githubCancelled = 0;
+  let codexCancelled = 0;
+  const view = render(
+    <OnboardingAssistant
+      {...assistantProps({
+        state,
+        githubAuthentication: {
+          provider: "github",
+          flow: "device",
+          url: "https://github.com/login/device",
+          userCode: "GH-CODE",
+          expiresAt: Date.now() + 5 * 60_000,
+          browserOpenFailed: true
+        },
+        codexAuthentication: {
+          provider: "chatgpt",
+          flow: "device",
+          url: "https://auth.openai.com/activate",
+          userCode: "OPENAI-CODE",
+          expiresAt: null,
+          browserOpenFailed: true
+        },
+        onCancelGitHubAuthentication: () => {
+          githubCancelled += 1;
+        },
+        onCancelCodexAuthentication: () => {
+          codexCancelled += 1;
+        }
+      })}
+    />
+  );
+  assert.equal(view.getByLabelText("GitHub device code").textContent, "GH-CODE");
+  assert.match(view.getByText(/This code expires in about/).textContent ?? "", /5 minutes/);
+  assert.equal(view.getByLabelText("ChatGPT device code").textContent, "OPENAI-CODE");
+  assert.equal(view.getAllByRole("alert").length, 2);
+  assert.ok(
+    view.getAllByRole("alert").every((alert) => alert.textContent?.includes("system browser could not be opened"))
+  );
+  assert.equal(view.getAllByRole("button", { name: /Copy sign-in link/ }).length, 2);
+  const cancelButtons = view.getAllByRole("button", { name: "Cancel sign-in" });
+  assert.ok(cancelButtons.every((button) => !(button as HTMLButtonElement).disabled));
+  fireEvent.click(cancelButtons[0]);
+  fireEvent.click(cancelButtons[1]);
+  assert.deepEqual([githubCancelled, codexCancelled], [1, 1]);
+  assert.equal(
+    (view.getByRole("button", { name: /Open GitHub in your browser/ }) as HTMLButtonElement).disabled,
+    false
+  );
+});
+
 test("safety step states the fixed defaults and requires an explicit continue action", () => {
   const state = reduceOnboardingState(createInitialOnboardingState(), {
     type: "room_ready",

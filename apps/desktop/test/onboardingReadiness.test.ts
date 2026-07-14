@@ -101,13 +101,27 @@ test("unconfigured GitHub blocks join and only warns for create", () => {
   assert.equal(join.action, null);
 });
 
-test("workspace failure blocks with retry while loading remains nonblocking", () => {
+test("failed GitHub policy discovery is explicit, fail closed, and directly retryable", () => {
+  const github = {
+    ...readyInput().github,
+    config: null,
+    user: null,
+    error: "relay token=must-not-render"
+  };
+  const row = byId(projectOnboardingReadiness(readyInput({ github })), "github");
+  assert.equal(row.status, "blocked");
+  assert.equal(row.blocking, true);
+  assert.equal(row.action, "retry_workspace_bootstrap");
+  assert.doesNotMatch(row.text, /token|must-not-render/i);
+});
+
+test("workspace failure and unresolved relay state both block progress", () => {
   const loading = byId(
     projectOnboardingReadiness(readyInput({ workspace: { status: "loading", error: null } })),
     "relay"
   );
   assert.equal(loading.status, "checking");
-  assert.equal(loading.blocking, false);
+  assert.equal(loading.blocking, true);
 
   const failed = byId(
     projectOnboardingReadiness(readyInput({ workspace: { status: "error", error: "secret=do-not-render" } })),
@@ -183,4 +197,35 @@ test("project folder selection is explicitly deferrable and never returns a path
   assert.equal(project.blocking, false);
   assert.equal(project.action, "select_project_folder");
   assert.doesNotMatch(JSON.stringify(project), /\/Users\/person|\/tmp\/secret/);
+});
+
+test("invite join blocks only on relay and GitHub identity readiness", () => {
+  const rows = projectOnboardingReadiness(
+    readyInput({
+      intent: "join",
+      codexProbe: null,
+      codexAccount: { status: "checking", ready: false, message: "Checking" },
+      projectFolderSelected: false
+    })
+  );
+  assert.equal(byId(rows, "relay").blocking, false);
+  assert.equal(byId(rows, "github").blocking, false);
+  assert.equal(byId(rows, "codex").status, "checking");
+  assert.equal(byId(rows, "codex").blocking, false);
+  assert.equal(byId(rows, "chatgpt").status, "checking");
+  assert.equal(byId(rows, "chatgpt").blocking, false);
+  assert.equal(byId(rows, "project").blocking, false);
+  assert.equal(byId(rows, "project").action, null);
+});
+
+test("creator readiness keeps local Codex and required ChatGPT authorization blocking", () => {
+  const rows = projectOnboardingReadiness(
+    readyInput({
+      intent: "create",
+      codexProbe: null,
+      codexAccount: { status: "checking", ready: false, message: "Checking" }
+    })
+  );
+  assert.equal(byId(rows, "codex").blocking, true);
+  assert.equal(byId(rows, "chatgpt").blocking, true);
 });
