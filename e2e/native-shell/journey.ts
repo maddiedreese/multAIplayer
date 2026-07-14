@@ -71,19 +71,20 @@ async function freePorts(count: number) {
 function spawnProcess(
   command: string,
   args: string[],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv; detached?: boolean } = {}
+  options: { cwd?: string; env?: NodeJS.ProcessEnv; detached?: boolean; persistent?: boolean } = {}
 ) {
+  const persistent = options.persistent ?? true;
   const child = spawn(command, args, {
     cwd: options.cwd ?? root,
     env: { ...process.env, ...options.env },
-    detached: options.detached,
+    detached: options.detached ?? (persistent && process.platform !== "win32"),
     stdio: ["ignore", "pipe", "pipe"]
   });
   const label = `${command} ${args.join(" ")}`;
   child.stdout?.on("data", (chunk) => process.stdout.write(`[native-e2e] ${chunk}`));
   child.stderr?.on("data", (chunk) => process.stderr.write(`[native-e2e] ${chunk}`));
   child.once("error", (error) => console.error(`[native-e2e] ${label}: ${error.message}`));
-  processes.push(child);
+  if (persistent) processes.push(child);
   return child;
 }
 
@@ -98,7 +99,7 @@ async function run(
 ) {
   const { timeoutMs = 8 * 60_000, ...spawnOptions } = options;
   const detached = process.platform !== "win32";
-  const child = spawnProcess(command, args, { ...spawnOptions, detached });
+  const child = spawnProcess(command, args, { ...spawnOptions, detached, persistent: false });
   const terminate = (signal: NodeJS.Signals) => {
     try {
       if (detached && child.pid) process.kill(-child.pid, signal);
@@ -153,6 +154,36 @@ async function bestEffort(label: string, operation: Promise<unknown>, timeoutMs 
 }
 
 async function stopProcess(child: ChildProcess) {
+  child.stdout?.removeAllListeners("data");
+  child.stderr?.removeAllListeners("data");
+  child.stdout?.destroy();
+  child.stderr?.destroy();
+
+  if (process.platform !== "win32" && child.pid) {
+    const signalGroup = (signal: NodeJS.Signals) => {
+      try {
+        process.kill(-child.pid!, signal);
+        return true;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
+        console.warn(`[native-e2e] failed to send ${signal} to process group ${child.pid}: ${String(error)}`);
+        return false;
+      }
+    };
+    if (!signalGroup("SIGTERM")) return;
+    const deadline = Date.now() + 2_000;
+    while (Date.now() < deadline) {
+      await delay(100);
+      try {
+        process.kill(-child.pid, 0);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ESRCH") return;
+      }
+    }
+    signalGroup("SIGKILL");
+    return;
+  }
+
   if (child.exitCode !== null || child.signalCode !== null) return;
   const exited = new Promise<void>((resolveExit) => child.once("exit", () => resolveExit()));
   child.kill("SIGTERM");
