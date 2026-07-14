@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { createInitialOnboardingState, loadOnboardingState } from "../lib/onboardingState";
 import {
   createAppConfigSlice,
   emptyAppConfigState,
@@ -27,6 +28,7 @@ import {
 } from "./slices/historyDefaultsSlice";
 import { createInviteSlice, emptyInviteState, type InviteSlice } from "./slices/inviteSlice";
 import { createLocalPreviewSlice, emptyLocalPreviewState, type LocalPreviewSlice } from "./slices/localPreviewSlice";
+import { createOnboardingSlice, emptyOnboardingState, type OnboardingSlice } from "./slices/onboardingSlice";
 import { createRoomSettingsSlice, emptyRoomSettingsState, type RoomSettingsSlice } from "./slices/roomSettingsSlice";
 import { createRoomChatSlice, emptyRoomChatState, type RoomChatSlice } from "./slices/roomChatSlice";
 import { createRoomLifecycleSlice, type RoomLifecycleSlice } from "./slices/roomLifecycleSlice";
@@ -49,6 +51,7 @@ const emptyAppStoreState = {
   ...emptyHistoryDefaultsState,
   ...emptyRoomSettingsState,
   ...emptyLocalPreviewState,
+  ...emptyOnboardingState,
   ...emptyInviteState,
   ...emptyRoomChatState,
   ...emptyCodexHostHandoffState,
@@ -74,6 +77,7 @@ export interface AppStoreState
     HistoryPresenceSlice,
     InviteSlice,
     LocalPreviewSlice,
+    OnboardingSlice,
     RoomSettingsSlice,
     RoomChatSlice,
     RoomLifecycleSlice,
@@ -98,6 +102,7 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   ...createHistoryPresenceSlice(set, get, api),
   ...createInviteSlice(set, get, api),
   ...createLocalPreviewSlice(set, get, api),
+  ...createOnboardingSlice(set, get, api),
   ...createRoomSettingsSlice(set, get, api),
   ...createRoomChatSlice(set, get, api),
   ...createRoomLifecycleSlice(set, get, api),
@@ -109,6 +114,11 @@ export const useAppStore = create<AppStoreState>((set, get, api) => ({
   resetAppStore: () =>
     set({
       ...emptyAppStoreState,
-      ...loadAppConfigState()
+      ...loadAppConfigState(),
+      onboarding: loadOnboardingStateForReset()
     })
 }));
+
+function loadOnboardingStateForReset() {
+  return typeof localStorage === "undefined" ? createInitialOnboardingState() : loadOnboardingState();
+}

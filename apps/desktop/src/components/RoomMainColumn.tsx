@@ -14,7 +14,9 @@ interface RoomMainColumnProps {
 export function RoomMainColumn({ headerProps, statusProps, markdownFallbackProps, chatProps }: RoomMainColumnProps) {
   return (
     <main className="room">
-      <RoomHeader {...headerProps} />
+      <div data-onboarding-anchor="host-controls">
+        <RoomHeader {...headerProps} />
+      </div>
       <RoomStatusBanners {...statusProps} />
       {markdownFallbackProps && <MarkdownFallbackPanel {...markdownFallbackProps} />}
       <RoomChatPanel {...chatProps} />

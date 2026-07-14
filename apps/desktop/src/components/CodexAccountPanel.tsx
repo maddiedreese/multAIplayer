@@ -1,154 +1,24 @@
 import { ExternalLink, LogIn, LogOut, RefreshCw, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { reportExpectedFailure } from "../lib/nonFatalReporting";
-
-import {
-  cancelCodexLogin,
-  createCoalescedAsyncTask,
-  listenForCodexHostNotifications,
-  logoutCodexAccount,
-  readCodexHostSnapshot,
-  setCodexAppApprovalMode,
-  shouldRefreshCodexHostSnapshot,
-  startCodexLogin,
-  startCodexMcpLogin,
-  type CodexAppApprovalMode,
-  type CodexHostSnapshot,
-  type CodexLoginStartResult
-} from "../lib/localBackend";
-import { isTauriRuntime } from "../lib/localBackend/runtime";
+import type { CodexAppApprovalMode } from "../lib/localBackend";
+import { useCodexAccount } from "../hooks/useCodexAccount";
 import { InfoRow } from "./common";
 
 export function CodexAccountPanel() {
-  const native = isTauriRuntime();
-  const [snapshot, setSnapshot] = useState<CodexHostSnapshot | null>(null);
-  const [login, setLogin] = useState<CodexLoginStartResult | null>(null);
-  const [mcpLogin, setMcpLogin] = useState<{ name: string; url: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [approvalMode, setApprovalMode] = useState<CodexAppApprovalMode | "">("");
-  const refreshStartedAt = useRef(0);
-
-  const performRefresh = useCallback(async () => {
-    if (!native) return;
-    refreshStartedAt.current = Date.now();
-    setBusy(true);
-    try {
-      setSnapshot(await readCodexHostSnapshot());
-      setMessage(null);
-    } catch (error) {
-      setMessage(String(error));
-    } finally {
-      setBusy(false);
-    }
-  }, [native]);
-  const refreshTask = useMemo(() => createCoalescedAsyncTask(performRefresh), [performRefresh]);
-
-  useEffect(() => {
-    void refreshTask.request().catch(() => reportExpectedFailure("coalesced Codex account refresh was cancelled"));
-    let disposed = false;
-    let unlisten: () => void = () => undefined;
-    void listenForCodexHostNotifications((notification) => {
-      if (notification.method === "account/login/completed") {
-        setMessage(
-          notification.params.success === true
-            ? "Codex sign-in completed."
-            : String(notification.params.error ?? "Codex sign-in failed.")
-        );
-        setLogin(null);
-      } else if (notification.method === "mcpServer/oauthLogin/completed") {
-        setMessage(
-          notification.params.success === true
-            ? `${String(notification.params.name ?? "MCP server")} connected.`
-            : String(notification.params.error ?? "MCP sign-in failed.")
-        );
-      }
-      if (shouldRefreshCodexHostSnapshot(notification.method, Date.now() - refreshStartedAt.current)) {
-        void refreshTask.request().catch(() => reportExpectedFailure("coalesced Codex account refresh was cancelled"));
-      }
-    }).then((stop) => {
-      if (disposed) stop();
-      else unlisten = stop;
-    });
-    return () => {
-      disposed = true;
-      unlisten();
-      refreshTask.cancelPending();
-    };
-  }, [refreshTask]);
-
-  async function beginLogin(flow: "browser" | "device") {
-    setBusy(true);
-    try {
-      const next = await startCodexLogin(flow, {
-        useHostedLoginSuccessPage: flow === "browser" && snapshot?.capabilities.supportsHostedLoginSuccess,
-        appBrand: "chatgpt"
-      });
-      setLogin(next);
-      setMessage("Complete sign-in in the link below. Credentials remain in Codex on this device.");
-    } catch (error) {
-      setMessage(String(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function cancelLogin() {
-    if (!login) return;
-    setBusy(true);
-    try {
-      await cancelCodexLogin(login.loginId);
-      setLogin(null);
-      setMessage("Codex sign-in cancelled.");
-    } catch (error) {
-      setMessage(String(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function signOut() {
-    setBusy(true);
-    try {
-      await logoutCodexAccount();
-      setLogin(null);
-      await refreshTask.request();
-    } catch (error) {
-      setMessage(String(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function connectMcp(name: string) {
-    setBusy(true);
-    try {
-      const result = await startCodexMcpLogin(name);
-      setMcpLogin({ name, url: result.authorizationUrl });
-      setMessage(`Open the authorization link to connect ${name}.`);
-    } catch (error) {
-      setMessage(String(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function updateApprovalMode(mode: CodexAppApprovalMode) {
-    setBusy(true);
-    try {
-      await setCodexAppApprovalMode(mode);
-      setApprovalMode(mode);
-      setMessage(
-        mode === "writes"
-          ? "Apps now prompt for writes while declared read-only tools proceed."
-          : `Default app approval mode set to ${mode}.`
-      );
-    } catch (error) {
-      setMessage(String(error));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const {
+    native,
+    snapshot,
+    login,
+    mcpLogin,
+    busy,
+    message,
+    approvalMode,
+    refresh,
+    beginLogin,
+    cancelLogin,
+    signOut,
+    connectMcp,
+    updateApprovalMode
+  } = useCodexAccount();
 
   if (!native) {
     return (
@@ -168,7 +38,7 @@ export function CodexAccountPanel() {
         </div>
         <button
           className="icon-button"
-          onClick={() => void refreshTask.request()}
+          onClick={() => void refresh()}
           disabled={busy}
           aria-label="Refresh Codex account"
         >

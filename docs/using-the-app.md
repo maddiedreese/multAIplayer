@@ -2,6 +2,23 @@
 
 This guide explains the main desktop app surfaces and what each feature means in the public alpha.
 
+## First-Time Setup
+
+On a fresh install, the setup guide opens before the normal workspace shell. Choose **Create a workspace** to create a team and its first project room, or **Join with an invite** to request access with a capability invite. **Explore the interface** closes the guide without claiming that setup is complete. Progress is resumable: **Save and close** pauses at the current step, and the Help drawer can reopen or restart the guide and restore the setup checklist.
+
+The readiness screen checks the relay, GitHub identity, the local Codex installation, the ChatGPT account used by Codex, and project-folder selection. Blocking rows keep Continue disabled and provide a direct repair action. Warnings describe optional or deferrable work. GitHub and ChatGPT are separate:
+
+- GitHub identifies workspace members and enables repository workflows. Whether it is optional depends on the relay and the selected create/join path.
+- ChatGPT authorizes the local Codex process that performs work on the active host device.
+
+The create path asks for a workspace name, first room name, and project folder. If team creation succeeds but room creation fails, the guide remembers only the bounded team identifier and retries the room instead of creating a duplicate team. Teammates are invited after the room is ready through the normal capability-invite flow; the create form does not collect usernames. The join path validates the invite locally, publishes the device-bound access request, and explains when the active host must verify and approve the device. An invite is not accepted merely because it was pasted into the guide.
+
+New rooms begin with the normal conservative defaults: ask before every Codex turn, workspace-write sandboxing, raw-reasoning sharing off, restricted browser access, and the displayed local-history policy. The advanced room settings remain available after setup.
+
+Inside the room, the first-turn guide identifies the active host, offers starter prompts that populate rather than send the composer, explains the approval card, and points out live thinking, command/output, edit, tool, and subagent activity. It never sends a prompt or approves a turn automatically. The sidebar checklist tracks five milestones: connect Codex, create or join a room, attach a project, finish the first Codex turn, and add a teammate. “Not now” explicitly defers the teammate step without claiming that someone joined; actual completion is observed from room membership.
+
+Setup state is local to this app installation. It contains a version, bounded team/room identifiers needed for resume and duplicate-prevention, and boolean progress markers. Invite links, project paths, form drafts, prompts, account details, secrets, and project content are not stored in onboarding state, and the app sends no tutorial telemetry. Project and invite fields stay in memory while the guide is open. If relay loading, authentication, Codex detection, folder access, room creation, or invite approval fails, the current screen keeps a bounded explanation and a direct retry or repair path.
+
 ## Account And Device
 
 Use the profile drawer to sign in with GitHub, sign out, inspect relay auth settings, and save diagnostics for bug reports.

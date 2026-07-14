@@ -49,7 +49,8 @@ export function useAppWorkspaceFlow({
     revokedRoomIds,
     revokedTeamIds,
     rooms,
-    searchActive
+    searchActive,
+    workspaceBootstrapAttempt
   } = useAppStore(
     useShallow((state) => ({
       relayHttpUrl: state.appConfig.relayHttpUrl,
@@ -60,7 +61,8 @@ export function useAppWorkspaceFlow({
       revokedRoomIds: state.revokedRoomIds,
       revokedTeamIds: state.revokedTeamIds,
       rooms: state.rooms,
-      searchActive: Boolean(state.sidebarQuery.trim())
+      searchActive: Boolean(state.sidebarQuery.trim()),
+      workspaceBootstrapAttempt: state.workspaceBootstrapAttempt
     }))
   );
   const { hasSelectedRoom, selectedRoom } = selected;
@@ -75,11 +77,15 @@ export function useAppWorkspaceFlow({
     bootstrap: {
       workspace: {
         relayHttpUrl,
+        bootstrapAttempt: workspaceBootstrapAttempt,
         replaceTeams: storeAction("replaceTeams"),
         replaceRooms: storeAction("replaceRooms"),
         selectExistingTeamOrFirst: storeAction("selectExistingTeamOrFirst"),
         selectExistingRoomOrFirst: storeAction("selectExistingRoomOrFirst"),
-        setWorkspaceStatusError: storeAction("setWorkspaceStatusError")
+        setWorkspaceStatusError: storeAction("setWorkspaceStatusError"),
+        beginWorkspaceBootstrap: storeAction("beginWorkspaceBootstrap"),
+        completeWorkspaceBootstrap: storeAction("completeWorkspaceBootstrap"),
+        failWorkspaceBootstrap: storeAction("failWorkspaceBootstrap")
       },
       selectedRoomReadReceipt: {
         selectedRoomId,

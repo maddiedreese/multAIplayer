@@ -1,4 +1,4 @@
-import React from "react";
+import React, { type ReactNode } from "react";
 import type { CodexApprovalSummaryDisplay } from "./CodexApprovalCard";
 import { RoomChatContent } from "./RoomChatContent";
 import { RoomChatComposer } from "./RoomChatComposer";
@@ -113,7 +113,8 @@ export function RoomChatPanel({
   onCancelReply,
   onCancelQueuedCodexTurn,
   onDraftChange,
-  onSendMessage
+  onSendMessage,
+  guidedFirstTurn
 }: {
   messages: RoomChatMessageDisplay[];
   codexActivities?: readonly CodexActivity[];
@@ -162,60 +163,66 @@ export function RoomChatPanel({
   onCancelQueuedCodexTurn: (turnId: string) => void;
   onDraftChange: (draft: string) => void;
   onSendMessage: () => void;
+  guidedFirstTurn?: ReactNode;
 }) {
   useRoomGoalTicker(roomGoal, onTickGoalElapsed);
 
   return (
     <>
-      <RoomChatContent
-        messages={messages}
-        codexActivities={codexActivities}
-        localPreviewCards={localPreviewCards}
-        approvalVisible={approvalVisible}
-        approvalSummary={approvalSummary}
-        isActiveHost={isActiveHost}
-        codexRunning={codexRunning}
-        canApproveCodex={canApproveCodex}
-        canUseChat={canUseChat}
-        roomLocked={roomLocked}
-        queuedCodexTurns={queuedCodexTurns}
-        markdownSelectionMode={markdownSelectionMode}
-        onToggleMessageSelection={onToggleMessageSelection}
-        onCopyMessageMarkdown={onCopyMessageMarkdown}
-        onOpenAttachment={onOpenAttachment}
-        onToggleReaction={onToggleReaction}
-        onEditMessage={onEditMessage}
-        onDeleteMessage={onDeleteMessage}
-        onReplyToMessage={onReplyToMessage}
-        onOpenLocalPreview={onOpenLocalPreview}
-        onCopyLocalPreviewLink={onCopyLocalPreviewLink}
-        onStopLocalPreview={onStopLocalPreview}
-        onDenyApproval={onDenyApproval}
-        onApproveApproval={onApproveApproval}
-        onCancelQueuedCodexTurn={onCancelQueuedCodexTurn}
-      />
-      <RoomChatComposer
-        roomGoal={roomGoal}
-        pendingAttachments={pendingAttachments}
-        pendingAttachmentSummary={pendingAttachmentSummary}
-        replyTarget={replyTarget}
-        roomLocked={roomLocked}
-        lockedPlaceholder={lockedPlaceholder}
-        chatEnabled={chatEnabled}
-        canUseChat={canUseChat}
-        canSendMessage={canSendMessage}
-        draft={draft}
-        onPauseGoal={onPauseGoal}
-        onResumeGoal={onResumeGoal}
-        onEditGoal={onEditGoal}
-        onDeleteGoal={onDeleteGoal}
-        onInvokeCodex={onInvokeCodex}
-        onOpenFileSelector={onOpenFileSelector}
-        onRemovePendingAttachment={onRemovePendingAttachment}
-        onCancelReply={onCancelReply}
-        onDraftChange={onDraftChange}
-        onSendMessage={onSendMessage}
-      />
+      <div data-onboarding-anchor="activity-feed">
+        <RoomChatContent
+          messages={messages}
+          codexActivities={codexActivities}
+          localPreviewCards={localPreviewCards}
+          approvalVisible={approvalVisible}
+          approvalSummary={approvalSummary}
+          isActiveHost={isActiveHost}
+          codexRunning={codexRunning}
+          canApproveCodex={canApproveCodex}
+          canUseChat={canUseChat}
+          roomLocked={roomLocked}
+          queuedCodexTurns={queuedCodexTurns}
+          markdownSelectionMode={markdownSelectionMode}
+          onToggleMessageSelection={onToggleMessageSelection}
+          onCopyMessageMarkdown={onCopyMessageMarkdown}
+          onOpenAttachment={onOpenAttachment}
+          onToggleReaction={onToggleReaction}
+          onEditMessage={onEditMessage}
+          onDeleteMessage={onDeleteMessage}
+          onReplyToMessage={onReplyToMessage}
+          onOpenLocalPreview={onOpenLocalPreview}
+          onCopyLocalPreviewLink={onCopyLocalPreviewLink}
+          onStopLocalPreview={onStopLocalPreview}
+          onDenyApproval={onDenyApproval}
+          onApproveApproval={onApproveApproval}
+          onCancelQueuedCodexTurn={onCancelQueuedCodexTurn}
+        />
+      </div>
+      {guidedFirstTurn}
+      <div data-onboarding-anchor="composer">
+        <RoomChatComposer
+          roomGoal={roomGoal}
+          pendingAttachments={pendingAttachments}
+          pendingAttachmentSummary={pendingAttachmentSummary}
+          replyTarget={replyTarget}
+          roomLocked={roomLocked}
+          lockedPlaceholder={lockedPlaceholder}
+          chatEnabled={chatEnabled}
+          canUseChat={canUseChat}
+          canSendMessage={canSendMessage}
+          draft={draft}
+          onPauseGoal={onPauseGoal}
+          onResumeGoal={onResumeGoal}
+          onEditGoal={onEditGoal}
+          onDeleteGoal={onDeleteGoal}
+          onInvokeCodex={onInvokeCodex}
+          onOpenFileSelector={onOpenFileSelector}
+          onRemovePendingAttachment={onRemovePendingAttachment}
+          onCancelReply={onCancelReply}
+          onDraftChange={onDraftChange}
+          onSendMessage={onSendMessage}
+        />
+      </div>
     </>
   );
 }

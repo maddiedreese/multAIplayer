@@ -1,6 +1,13 @@
 import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { chooseProjectFolder, defaultProjectPath } from "./localBackend";
 import { loadTeamHistorySettings, saveHistorySettings } from "./localHistory";
+import {
+  createFirstWorkspaceCreator,
+  createWorkspaceRoom,
+  createWorkspaceTeam,
+  type FirstWorkspaceCreationInput,
+  type WorkspaceCreationRuntime
+} from "./firstWorkspaceCreation";
 import { ensureRoomDefaults } from "./roomDefaults";
 import { loadTeamRoomDefaults } from "./teamRoomDefaults";
 import { planRoomCreation, planTeamCreation } from "./workspaceCreation";
@@ -30,6 +37,24 @@ export function createWorkspaceCreationActions({
   upsertRoom,
   roomSettingsActor
 }: WorkspaceCreationActionsOptions) {
+  const creationRuntime: WorkspaceCreationRuntime = {
+    createTeam,
+    createRoom,
+    findTeam: (teamId) => useAppStore.getState().teams.find((team) => team.id === teamId),
+    upsertTeam,
+    upsertRoom,
+    selectTeam: setSelectedTeam,
+    selectRoom: setSelectedRoomId,
+    restoreRoomAccess: (roomId) => useAppStore.getState().restoreRoomAccess(roomId),
+    restoreTeamAccess: (teamId) => useAppStore.getState().restoreTeamAccess(teamId),
+    restoreForgottenRoom: (roomId) => useAppStore.getState().restoreForgottenRoom(roomId),
+    setInviteApprovalGate: (roomId, enabled) => useAppStore.getState().setInviteApprovalGateForRoom(roomId, enabled),
+    loadTeamHistorySettings,
+    saveHistorySettings,
+    initializeMessages: (roomId) => useAppStore.getState().initializeMessagesForRoom(roomId)
+  };
+  const createFirstWorkspace = createFirstWorkspaceCreator(creationRuntime);
+
   async function addTeam() {
     const { newTeamName } = useAppStore.getState();
     let plan: ReturnType<typeof planTeamCreation>;
@@ -40,9 +65,7 @@ export function createWorkspaceCreationActions({
       return;
     }
     try {
-      const team = await createTeam(plan.name);
-      upsertTeam(team);
-      setSelectedTeam(team.id);
+      await createWorkspaceTeam(plan, creationRuntime);
       setNewTeamName("");
       setWorkspaceStatusError(null);
     } catch (error) {
@@ -61,24 +84,34 @@ export function createWorkspaceCreationActions({
     }
     try {
       const teamDefaults = loadTeamRoomDefaults(plan.teamId);
-      const room = await createRoom(plan.teamId, plan.name, plan.projectPath, {
-        approvalPolicy: teamDefaults.approvalPolicy,
-        codexModel: teamDefaults.codexModel,
-        browserAllowedOrigins: teamDefaults.browserAllowedOrigins,
-        browserProfilePersistent: teamDefaults.browserProfilePersistent
-      });
-      upsertRoom(ensureRoomDefaults(room));
-      const store = useAppStore.getState();
-      store.restoreRoomAccess(room.id);
-      store.restoreTeamAccess(room.teamId);
-      store.restoreForgottenRoom(room.id);
-      store.setInviteApprovalGateForRoom(room.id, teamDefaults.inviteApprovalGate);
-      await saveHistorySettings(room.id, loadTeamHistorySettings(plan.teamId));
-      store.initializeMessagesForRoom(room.id);
-      setSelectedRoomId(room.id);
+      const room = await createWorkspaceRoom(
+        plan,
+        {
+          approvalPolicy: teamDefaults.approvalPolicy,
+          codexModel: teamDefaults.codexModel,
+          browserAllowedOrigins: teamDefaults.browserAllowedOrigins,
+          browserProfilePersistent: teamDefaults.browserProfilePersistent
+        },
+        {
+          inviteApprovalGate: teamDefaults.inviteApprovalGate,
+          historySettings: loadTeamHistorySettings(plan.teamId)
+        },
+        creationRuntime
+      );
       setNewRoomName("");
       setNewRoomProjectPath(plan.projectPath);
       setWorkspaceStatusError(null);
+      const onboarding = useAppStore.getState().onboarding;
+      if (!onboarding.markers.membership) {
+        useAppStore.getState().applyOnboardingEvent({
+          type: "room_ready",
+          intent: "create",
+          teamId: room.teamId,
+          roomId: room.id
+        });
+        useAppStore.getState().applyOnboardingEvent({ type: "project_attached", roomId: room.id });
+        useAppStore.getState().applyOnboardingEvent({ type: "dismiss_assistant" });
+      }
     } catch (error) {
       setWorkspaceStatusError(String(error));
     }
@@ -117,5 +150,9 @@ export function createWorkspaceCreationActions({
     }
   }
 
-  return { addTeam, addRoom, chooseNewRoomProjectPath, setTeamLifecycle, setRoomLifecycle };
+  async function createOnboardingWorkspace(input: FirstWorkspaceCreationInput) {
+    return createFirstWorkspace(input);
+  }
+
+  return { addTeam, addRoom, createOnboardingWorkspace, chooseNewRoomProjectPath, setTeamLifecycle, setRoomLifecycle };
 }

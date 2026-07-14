@@ -30,6 +30,7 @@ const zustandStateOwners = {
   localPreviewByRoom: "localPreviewSlice",
   localPreviewDialog: "localPreviewSlice",
   messagesByRoom: "workspaceDataSlice",
+  onboarding: "onboardingSlice",
   roomChatByRoom: "roomChatSlice",
   roomSettingsByRoom: "roomSettingsSlice",
   sensitiveAttachmentReviewKey: "roomChatSlice",
@@ -48,6 +49,9 @@ const zustandStateOwners = {
   selectedRoomId: "workspaceUiSlice",
   selectedTeam: "workspaceUiSlice",
   teams: "workspaceUiSlice",
+  workspaceBootstrapAttempt: "workspaceUiSlice",
+  workspaceBootstrapError: "workspaceUiSlice",
+  workspaceBootstrapStatus: "workspaceUiSlice",
   workspaceUiInitialized: "workspaceUiSlice"
 };
 

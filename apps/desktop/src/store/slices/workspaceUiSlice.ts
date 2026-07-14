@@ -20,6 +20,9 @@ export interface WorkspaceUiInitialState {
 
 export interface WorkspaceUiSlice {
   workspaceUiInitialized: boolean;
+  workspaceBootstrapStatus: "loading" | "ready" | "error";
+  workspaceBootstrapError: string | null;
+  workspaceBootstrapAttempt: number;
   teams: TeamRecord[];
   rooms: RoomRecord[];
   workspaceError: string | null;
@@ -42,6 +45,10 @@ export interface WorkspaceUiSlice {
   hydrateRoomReadState: (roomId: string, readState?: LocalRoomReadState) => void;
   markIncomingChatUnread: (roomId: string, activeRoomId: string, senderDeviceId: string, localDeviceId: string) => void;
   setWorkspaceStatusError: (message: string | null) => void;
+  beginWorkspaceBootstrap: () => void;
+  completeWorkspaceBootstrap: () => void;
+  failWorkspaceBootstrap: (message: string) => void;
+  retryWorkspaceBootstrap: () => void;
   setActiveSidebarPanel: (panel: SidebarPanel) => void;
   setNewTeamName: (name: string) => void;
   setNewRoomName: (name: string) => void;
@@ -58,6 +65,9 @@ export interface WorkspaceUiSlice {
 export const emptyWorkspaceUiState: Pick<
   WorkspaceUiSlice,
   | "workspaceUiInitialized"
+  | "workspaceBootstrapStatus"
+  | "workspaceBootstrapError"
+  | "workspaceBootstrapAttempt"
   | "teams"
   | "rooms"
   | "workspaceError"
@@ -70,6 +80,9 @@ export const emptyWorkspaceUiState: Pick<
   | "sidebarQuery"
 > = {
   workspaceUiInitialized: false,
+  workspaceBootstrapStatus: "loading",
+  workspaceBootstrapError: null,
+  workspaceBootstrapAttempt: 0,
   teams: [],
   rooms: [],
   workspaceError: null,
@@ -180,6 +193,27 @@ export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], Workspa
     }));
   },
   setWorkspaceStatusError: (workspaceError) => set({ workspaceError }),
+  beginWorkspaceBootstrap: () =>
+    set({
+      workspaceBootstrapStatus: "loading",
+      workspaceBootstrapError: null
+    }),
+  completeWorkspaceBootstrap: () =>
+    set({
+      workspaceBootstrapStatus: "ready",
+      workspaceBootstrapError: null
+    }),
+  failWorkspaceBootstrap: (workspaceBootstrapError) =>
+    set({
+      workspaceBootstrapStatus: "error",
+      workspaceBootstrapError
+    }),
+  retryWorkspaceBootstrap: () =>
+    set((state) => ({
+      workspaceBootstrapStatus: "loading",
+      workspaceBootstrapError: null,
+      workspaceBootstrapAttempt: state.workspaceBootstrapAttempt + 1
+    })),
   setActiveSidebarPanel: (activeSidebarPanel) => set({ activeSidebarPanel }),
   setNewTeamName: (newTeamName) => set({ newTeamName }),
   setNewRoomName: (newRoomName) => set({ newRoomName }),

@@ -97,6 +97,14 @@ async function visible(browser: Browser, selector: string, timeout = 30_000) {
   return element;
 }
 
+async function passFirstRunWelcome(browser: Browser) {
+  const welcome = await browser.$("h1=Work with Codex together");
+  if (!(await welcome.isDisplayed())) return;
+  assert.equal(await welcome.isFocused(), true, "first-run onboarding did not focus its welcome heading");
+  await (await visible(browser, "button=Explore the interface")).click();
+  await visible(browser, "button=Profile");
+}
+
 async function createRoom(host: Browser) {
   await (await visible(host, 'button[aria-label="New room"]')).click();
   await (await visible(host, 'input[placeholder="Room name"]')).setValue(roomName);
@@ -326,6 +334,7 @@ async function main() {
     stage("native WebDriver sessions ready");
     const host = browser.getInstance("host");
     let guest = browser.getInstance("guest");
+    await Promise.all([passFirstRunWelcome(host), passFirstRunWelcome(guest)]);
     stage("authenticating both native clients");
     await Promise.all([
       authenticate(host, stableRelayProxy.baseUrl, hostIdentity),

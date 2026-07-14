@@ -236,14 +236,16 @@ export function RoomChatContent({
       ))}
 
       {approvalVisible && (
-        <CodexApprovalCard
-          summary={approvalSummary}
-          isActiveHost={isActiveHost}
-          codexRunning={codexRunning}
-          canApprove={canApproveCodex}
-          onDeny={onDenyApproval}
-          onApprove={onApproveApproval}
-        />
+        <div data-onboarding-anchor="approval-card" tabIndex={-1}>
+          <CodexApprovalCard
+            summary={approvalSummary}
+            isActiveHost={isActiveHost}
+            codexRunning={codexRunning}
+            canApprove={canApproveCodex}
+            onDeny={onDenyApproval}
+            onApprove={onApproveApproval}
+          />
+        </div>
       )}
       {queuedCodexTurns.length > 0 && (
         <section className="codex-queue" aria-label="Queued Codex turns">

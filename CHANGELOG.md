@@ -10,6 +10,7 @@ All notable user-visible and security-relevant changes are recorded here. Releas
 - Room-scoped Codex hosting with explicit turn approval, bounded queues, goal controls, project/file/diff tools, terminals, browser previews, GitHub workflows, and host handoff.
 - SQLite relay persistence, production readiness checks, rate and quota controls, signed/notarized macOS release enforcement, checksums, SBOMs, and provenance attestations.
 - Bounded, re-redacted native diagnostics export and an in-app release update banner.
+- Resumable first-run create/join setup with device readiness checks, conservative defaults, partial room-creation recovery, a persistent setup checklist, Help-based reopen/restart controls, and an in-room guided first Codex turn.
 
 ### Security
 

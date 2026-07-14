@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createCoalescedAsyncTask, shouldRefreshCodexHostSnapshot } from "../src/lib/localBackend/codexHostBackend";
+import { projectCodexAccountReadiness } from "../src/hooks/useCodexAccount";
+import type { CodexHostSnapshot } from "../src/lib/localBackend";
 
 const repoRoot = new URL("../../..", import.meta.url);
 
@@ -10,11 +12,12 @@ async function source(path: string) {
 }
 
 test("Codex account controls stay in a host-local backend and out of relay/history paths", async () => {
-  const [native, projection, backend, panel] = await Promise.all([
+  const [native, projection, backend, panel, controller] = await Promise.all([
     source("apps/desktop/src-tauri/src/codex_account.rs"),
     source("apps/desktop/src-tauri/src/codex_request_projection.rs"),
     source("apps/desktop/src/lib/localBackend/codexHostBackend.ts"),
-    source("apps/desktop/src/components/CodexAccountPanel.tsx")
+    source("apps/desktop/src/components/CodexAccountPanel.tsx"),
+    source("apps/desktop/src/hooks/useCodexAccount.tsx")
   ]);
 
   assert.match(native, /stderr\(Stdio::null\(\)\)/);
@@ -23,7 +26,8 @@ test("Codex account controls stay in a host-local backend and out of relay/histo
   assert.match(native, /sanitize_notification/);
   assert.doesNotMatch(backend, /relay|appendRoom|localStorage|sessionStorage|diagnostic/i);
   assert.doesNotMatch(panel, /relay|appendRoom|localStorage|sessionStorage|diagnostic/i);
-  assert.match(panel, /Credentials remain in Codex on this device/);
+  assert.doesNotMatch(controller, /relay|appendRoom|localStorage|sessionStorage|diagnostic/i);
+  assert.match(controller, /Credentials remain in Codex on this device/);
 });
 
 test("Codex host UI exposes browser and device login, MCP status, and gated writes approval", async () => {
@@ -42,12 +46,19 @@ test("Codex host UI exposes browser and device login, MCP status, and gated writ
   assert.ok(!previousManifest.appToolApprovalModes.includes("writes"));
 });
 
-test("host notifications refresh local account state without entering the app store", async () => {
-  const panel = await source("apps/desktop/src/components/CodexAccountPanel.tsx");
-  assert.match(panel, /listenForCodexHostNotifications/);
-  assert.match(panel, /account\/login\/completed/);
-  assert.match(panel, /mcpServer\/oauthLogin\/completed/);
-  assert.doesNotMatch(panel, /useAppStore|publishRoom|roomId/);
+test("host notifications refresh the shared local account controller without entering the app store", async () => {
+  const [panel, controller, app] = await Promise.all([
+    source("apps/desktop/src/components/CodexAccountPanel.tsx"),
+    source("apps/desktop/src/hooks/useCodexAccount.tsx"),
+    source("apps/desktop/src/App.tsx")
+  ]);
+  assert.match(controller, /listenForCodexHostNotifications/);
+  assert.match(controller, /account\/login\/completed/);
+  assert.match(controller, /mcpServer\/oauthLogin\/completed/);
+  assert.doesNotMatch(controller, /useAppStore|publishRoom|roomId/);
+  assert.match(panel, /useCodexAccount\(\)/);
+  assert.match(app, /<CodexAccountProvider>/);
+  assert.equal(app.match(/<CodexAccountProvider>/g)?.length, 1);
 });
 
 test("Codex host refreshes coalesce bursts and never overlap", async () => {
@@ -84,4 +95,67 @@ test("inventory notifications cannot create a list-refresh feedback loop", () =>
   assert.equal(shouldRefreshCodexHostSnapshot("app/list/updated", 1_001), true);
   assert.equal(shouldRefreshCodexHostSnapshot("account/login/completed", 0), true);
   assert.equal(shouldRefreshCodexHostSnapshot("mcpServer/oauthLogin/completed", 0), true);
+});
+
+const hostSnapshot = (overrides: Partial<CodexHostSnapshot> = {}): CodexHostSnapshot => ({
+  capabilities: {
+    codexVersion: "0.144.0",
+    manifestVersion: "0.144.0",
+    supportsAccount: true,
+    supportsBrowserLogin: true,
+    supportsDeviceLogin: true,
+    supportsHostedLoginSuccess: true,
+    supportsApps: true,
+    supportsMcp: true,
+    supportsWritesApproval: true,
+    compatibilityWarning: null
+  },
+  requiresOpenaiAuth: true,
+  account: null,
+  apps: [],
+  appsError: null,
+  mcpServers: [],
+  mcpError: null,
+  ...overrides
+});
+
+test("Codex account readiness distinguishes loading, unavailable, sign-in, and ready states", () => {
+  assert.deepEqual(projectCodexAccountReadiness({ native: true, snapshot: null, busy: true, error: null }), {
+    status: "checking",
+    ready: false,
+    message: "Checking Codex and ChatGPT account status…"
+  });
+  assert.deepEqual(projectCodexAccountReadiness({ native: true, snapshot: null, busy: false, error: "offline" }), {
+    status: "unavailable",
+    ready: false,
+    message: "offline"
+  });
+  assert.equal(
+    projectCodexAccountReadiness({ native: true, snapshot: hostSnapshot(), busy: false, error: null }).status,
+    "sign_in_required"
+  );
+  assert.deepEqual(
+    projectCodexAccountReadiness({
+      native: true,
+      snapshot: hostSnapshot({
+        account: { accountType: "chatgpt", email: "person@example.com", planType: "pro" }
+      }),
+      busy: false,
+      error: null
+    }),
+    { status: "ready", ready: true, message: "ChatGPT account connected." }
+  );
+  assert.deepEqual(
+    projectCodexAccountReadiness({
+      native: true,
+      snapshot: hostSnapshot({ requiresOpenaiAuth: false }),
+      busy: false,
+      error: null
+    }),
+    { status: "ready", ready: true, message: "Codex is ready without ChatGPT sign-in." }
+  );
+  assert.equal(
+    projectCodexAccountReadiness({ native: false, snapshot: null, busy: false, error: null }).status,
+    "native_required"
+  );
 });

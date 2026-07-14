@@ -77,6 +77,9 @@ test("workspace UI initializes once from the React seed and resets coherently", 
 
   store = useAppStore.getState();
   assert.equal(store.workspaceUiInitialized, false);
+  assert.equal(store.workspaceBootstrapStatus, "loading");
+  assert.equal(store.workspaceBootstrapError, null);
+  assert.equal(store.workspaceBootstrapAttempt, 0);
   assert.deepEqual(store.teams, []);
   assert.deepEqual(store.rooms, []);
   assert.equal(store.workspaceError, null);
@@ -85,6 +88,27 @@ test("workspace UI initializes once from the React seed and resets coherently", 
   assert.equal(store.newRoomName, "");
   assert.equal(store.newRoomProjectPath, "");
   assert.equal(store.sidebarQuery, "");
+});
+
+test("workspace bootstrap readiness transitions and retries independently of room relay state", () => {
+  const store = useAppStore.getState();
+  assert.equal(store.workspaceBootstrapStatus, "loading");
+  assert.equal(store.relayStatus, "closed");
+
+  store.completeWorkspaceBootstrap();
+  assert.equal(useAppStore.getState().workspaceBootstrapStatus, "ready");
+  assert.equal(useAppStore.getState().relayStatus, "closed");
+
+  store.failWorkspaceBootstrap("Relay HTTP failed");
+  assert.equal(useAppStore.getState().workspaceBootstrapStatus, "error");
+  assert.equal(useAppStore.getState().workspaceBootstrapError, "Relay HTTP failed");
+
+  store.retryWorkspaceBootstrap();
+  const state = useAppStore.getState();
+  assert.equal(state.workspaceBootstrapStatus, "loading");
+  assert.equal(state.workspaceBootstrapError, null);
+  assert.equal(state.workspaceBootstrapAttempt, 1);
+  assert.equal(state.relayStatus, "closed");
 });
 
 test("team replacement and upsert keep selection valid and preserve record update semantics", () => {

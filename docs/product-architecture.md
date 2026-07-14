@@ -17,6 +17,16 @@ The core promise:
 
 > multAIplayer does not store plaintext transcripts or hold AI credentials.
 
+### First-run experience
+
+The desktop treats onboarding as a resumable local workflow, not a marketing carousel or a relay-owned account record. A new installation presents equal create and join paths, projects relay/GitHub/Codex/ChatGPT/project readiness into ordered fixed-copy rows, applies conservative room defaults, and then moves guidance into the real room for the first Codex turn. Starter prompts only populate the composer; approval and sending remain explicit user actions.
+
+The create workflow is sequential. Team creation commits first; if first-room creation fails, a bounded local `workspaceCreatedTeamId` marker makes a retry target that team rather than duplicate it. The join workflow uses the existing capability-authenticated invite lifecycle and can remain in a device-verification state until the active host approves it. Neither workflow invents a parallel membership or encryption path.
+
+The versioned onboarding state lives in local webview storage and is deliberately separate from encrypted room history and native MLS storage. Its allowlist contains intent/presentation state, bounded team and room identifiers, and boolean milestones. It excludes names, paths, invite capabilities, form drafts, prompts, account data, room content, and secrets. Unsupported or internally inconsistent persisted versions fail closed to a fresh local setup state. The alpha sends no onboarding or tutorial telemetry.
+
+Assistant completion and the persistent five-item checklist are separate projections. Users can dismiss, skip, resume, reopen, or restart the guide from Help; dismissing the checklist does not falsify completion. A teammate milestone comes from observed roster membership, while an explicit local “Not now” marker resolves that optional task without claiming a member joined.
+
 The short public pitch:
 
 > Build with Codex together. Private by default. Open source.

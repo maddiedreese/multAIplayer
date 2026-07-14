@@ -2,6 +2,7 @@ import React, { useMemo, type ComponentProps } from "react";
 import { codexModelOptions, defaultCodexModel } from "@multaiplayer/protocol";
 import { AppSidebarDrawer } from "./AppSidebarDrawer";
 import { DesktopSidebar } from "./DesktopSidebar";
+import { SetupChecklist } from "./SetupChecklist";
 import { allowRelayConfiguration, defaultRelayHttpUrl, defaultRelayWsUrl } from "../lib/appConfig";
 import { formatCodexModel, formatSessionPersistence } from "../lib/appFormatters";
 import { formatCodexCompatibilitySummary } from "../lib/codexCompatibility";
@@ -21,6 +22,7 @@ import { projectBrowserPanelMaps } from "../store/slices/browserSlice";
 import { projectCodexRuntimeMaps } from "../store/slices/codexHostHandoffSlice";
 import { projectHistorySearchMessagesByRoom } from "../store/slices/historyPresenceSlice";
 import { projectTerminalRuntimeRequestsByRoom } from "../store/slices/terminalSlice";
+import { deriveOnboardingProgress, onboardingRestartEvent } from "../lib/onboardingState";
 import type { useGitHubAuth } from "../hooks/useGitHubAuth";
 import type { useRoomRuntimeContext } from "../hooks/useRoomRuntimeContext";
 import type { useWorkspaceFlowContext } from "../hooks/useWorkspaceFlowContext";
@@ -143,6 +145,36 @@ export function DesktopSidebarContainer({ sources }: { sources: SidebarSources }
     browserRequestsByRoom,
     approvalPolicyLabels
   });
+  const onboarding = useAppStore((state) => state.onboarding);
+  const applyOnboardingEvent = useAppStore((state) => state.applyOnboardingEvent);
+  const onboardingProgress = useMemo(() => deriveOnboardingProgress(onboarding), [onboarding]);
+
+  const continueSetup = () => {
+    const setupRoom = onboarding.markers.membership;
+    switch (onboardingProgress.nextStep) {
+      case "connect_codex":
+        applyOnboardingEvent({ type: "show_surface", surface: "readiness" });
+        break;
+      case "create_or_join_room":
+        applyOnboardingEvent({ type: "show_surface", surface: "welcome" });
+        break;
+      case "attach_project":
+        if (setupRoom) {
+          selectWorkspaceRoom(setupRoom.teamId, setupRoom.roomId);
+          useAppStore.getState().setInspectorTabForRoom(setupRoom.roomId, "files");
+        }
+        break;
+      case "run_first_turn":
+        applyOnboardingEvent({ type: "show_surface", surface: "guided_turn" });
+        break;
+      case "invite_teammate":
+        if (setupRoom) {
+          selectWorkspaceRoom(setupRoom.teamId, setupRoom.roomId);
+          useAppStore.getState().setInspectorTabForRoom(setupRoom.roomId, "room");
+        }
+        break;
+    }
+  };
 
   return (
     <DesktopSidebar
@@ -164,6 +196,19 @@ export function DesktopSidebarContainer({ sources }: { sources: SidebarSources }
       messageHits={display.sidebarMessageHitRows}
       historySearchBusy={historySearchBusy}
       activeSidebarPanel={activeSidebarPanel}
+      setupChecklist={
+        <SetupChecklist
+          progress={onboardingProgress}
+          teammateJoined={onboarding.markers.teammateJoined}
+          teammateDeferred={onboarding.markers.teammateDeferred}
+          onContinue={continueSetup}
+          onDeferTeammate={() => {
+            const teamId = onboarding.markers.membership?.teamId;
+            if (teamId) applyOnboardingEvent({ type: "teammate_deferred", teamId });
+          }}
+          onDismiss={() => applyOnboardingEvent({ type: "dismiss_checklist" })}
+        />
+      }
       onSignIn={capabilities.signIn}
       onSignOut={capabilities.signOut}
       onSidebarQueryChange={setSidebarQuery}
@@ -228,6 +273,9 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
     setTeamDefaultBrowserProfilePersistent
   } = useAppStore(useShallow(selectSidebarDrawerView));
   const { deviceId, localUser } = useLocalIdentity(currentUser);
+  const onboarding = useAppStore((state) => state.onboarding);
+  const applyOnboardingEvent = useAppStore((state) => state.applyOnboardingEvent);
+  const onboardingProgress = useMemo(() => deriveOnboardingProgress(onboarding), [onboarding]);
   const access = useRoomAccess({
     hasSelectedRoom,
     selectedRoom,
@@ -320,6 +368,26 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent,
         onTeamDefaultInviteApprovalGateChange: capabilities.updateTeamDefaultInviteApprovalGate,
         onApplyTeamDefaultsToRoom: capabilities.applyTeamDefaultsToRoom
+      }}
+      help={{
+        completedSteps: onboardingProgress.completedSteps,
+        totalSteps: onboardingProgress.totalSteps,
+        onOpenSetupGuide: () => {
+          setActiveSidebarPanel(null);
+          applyOnboardingEvent({ type: "show_surface", surface: "welcome" });
+        },
+        onShowSetupChecklist: () => applyOnboardingEvent({ type: "reopen_checklist" }),
+        onRestartSetupGuide: () => {
+          const partialTeamId = onboarding.markers.workspaceCreatedTeamId;
+          const prompt = partialTeamId
+            ? "Return to first-room setup? The workspace already created on the relay will be reused."
+            : "Restart the setup guide on this device? Your teams, rooms, and account sessions stay intact.";
+          if (!window.confirm(prompt)) {
+            return;
+          }
+          setActiveSidebarPanel(null);
+          applyOnboardingEvent(onboardingRestartEvent(onboarding));
+        }
       }}
       onClose={() => setActiveSidebarPanel(null)}
     />
