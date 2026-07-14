@@ -39,9 +39,11 @@ COPY --from=build /app/package.json /app/package-lock.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages ./packages
 COPY --from=build /app/apps/relay/package.json ./apps/relay/package.json
+COPY --from=build /app/apps/relay/node_modules ./apps/relay/node_modules
 COPY --from=build /app/apps/relay/dist ./apps/relay/dist
 COPY --from=mls-validator /src/apps/desktop/src-tauri/target/release/mls-keypackage-validator /app/bin/mls-keypackage-validator
 
+RUN node --input-type=module -e "await import('./apps/relay/dist/auth/session.js')"
 RUN mkdir -p /data && chown node:node /data
 
 USER node
