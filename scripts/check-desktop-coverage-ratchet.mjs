@@ -9,7 +9,7 @@ const defaultSummaryPath = fileURLToPath(new URL("../apps/desktop/coverage/cover
 const defaultBaselinePath = fileURLToPath(new URL("../apps/desktop/coverage-baseline.json", import.meta.url));
 const metrics = ["lines", "functions", "branches", "statements"];
 
-export function normalizeDesktopCoverage(summary) {
+export function normalizeDesktopCoverage(summary, nodeMajor = Number.parseInt(process.versions.node, 10)) {
   const files = {};
   for (const [absolutePath, coverage] of Object.entries(summary)) {
     if (absolutePath === "total") continue;
@@ -22,13 +22,19 @@ export function normalizeDesktopCoverage(summary) {
     );
   }
   return {
-    version: 1,
+    version: 2,
+    nodeMajor,
     files: Object.fromEntries(Object.entries(files).sort(([left], [right]) => left.localeCompare(right)))
   };
 }
 
 export function compareDesktopCoverage(baseline, current) {
-  if (baseline.version !== 1 || current.version !== 1) return ["Unsupported desktop coverage baseline version."];
+  if (baseline.version !== 2 || current.version !== 2) return ["Unsupported desktop coverage baseline version."];
+  if (baseline.nodeMajor !== current.nodeMajor) {
+    return [
+      `Desktop coverage uses Node ${current.nodeMajor}, but the reviewed baseline uses Node ${baseline.nodeMajor}; run this gate with the .nvmrc runtime.`
+    ];
+  }
   const failures = [];
   const paths = new Set([...Object.keys(baseline.files), ...Object.keys(current.files)]);
   for (const path of [...paths].sort()) {
@@ -71,13 +77,19 @@ export function serializeDesktopCoverage(baseline) {
   const lines = Object.entries(baseline.files).map(
     ([path, coverage]) => `    ${JSON.stringify(path)}: ${JSON.stringify(coverage)}`
   );
-  return `{\n  "version": 1,\n  "files": {\n${lines.join(",\n")}\n  }\n}\n`;
+  return `{\n  "version": 2,\n  "nodeMajor": ${baseline.nodeMajor},\n  "files": {\n${lines.join(",\n")}\n  }\n}\n`;
 }
 
 async function main() {
   const update = process.argv.includes("--update");
   const summary = normalizeDesktopCoverage(JSON.parse(await readFile(defaultSummaryPath, "utf8")));
   if (update) {
+    const reviewedBaseline = JSON.parse(await readFile(defaultBaselinePath, "utf8"));
+    if (reviewedBaseline.nodeMajor !== summary.nodeMajor) {
+      throw new Error(
+        `Desktop coverage updates require Node ${reviewedBaseline.nodeMajor}; current runtime is Node ${summary.nodeMajor}. Use the .nvmrc runtime.`
+      );
+    }
     await writeFile(defaultBaselinePath, serializeDesktopCoverage(summary));
     console.log(`Updated ${relative(workspaceRoot, defaultBaselinePath)}.`);
     return;

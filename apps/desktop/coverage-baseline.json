@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "version": 2,
+  "nodeMajor": 22,
   "files": {
     "apps/desktop/src/App.tsx": {"lines":[38,268],"functions":[2,3],"branches":[2,3],"statements":[38,268]},
     "apps/desktop/src/appDefaults.ts": {"lines":[69,69],"functions":[0,0],"branches":[0,0],"statements":[69,69]},
@@ -199,8 +200,8 @@
     "apps/desktop/src/lib/invite/inviteRelayActions.ts": {"lines":[72,284],"functions":[3,5],"branches":[7,7],"statements":[72,284]},
     "apps/desktop/src/lib/invite/membershipCommitActions.ts": {"lines":[18,64],"functions":[2,3],"branches":[2,2],"statements":[18,64]},
     "apps/desktop/src/lib/invite/mlsInviteProtocol.ts": {"lines":[11,29],"functions":[1,3],"branches":[1,1],"statements":[11,29]},
-    "apps/desktop/src/lib/invite/pendingInviteRecovery.ts": {"lines":[192,199],"functions":[9,9],"branches":[43,50],"statements":[192,199]},
-    "apps/desktop/src/lib/invite/pendingInviteWaitRegistry.ts": {"lines":[161,166],"functions":[25,27],"branches":[44,54],"statements":[161,166]},
+    "apps/desktop/src/lib/invite/pendingInviteRecovery.ts": {"lines":[192,199],"functions":[8,9],"branches":[42,48],"statements":[192,199]},
+    "apps/desktop/src/lib/invite/pendingInviteWaitRegistry.ts": {"lines":[157,166],"functions":[24,26],"branches":[43,53],"statements":[157,166]},
     "apps/desktop/src/lib/inviteActionsHelpers.ts": {"lines":[59,86],"functions":[2,3],"branches":[30,32],"statements":[59,86]},
     "apps/desktop/src/lib/inviteApproval.ts": {"lines":[34,34],"functions":[4,4],"branches":[8,9],"statements":[34,34]},
     "apps/desktop/src/lib/inviteJoinError.ts": {"lines":[25,25],"functions":[4,4],"branches":[4,4],"statements":[25,25]},
@@ -242,7 +243,7 @@
     "apps/desktop/src/lib/onboardingReadiness.ts": {"lines":[241,250],"functions":[8,8],"branches":[47,55],"statements":[241,250]},
     "apps/desktop/src/lib/onboardingState.ts": {"lines":[410,423],"functions":[21,21],"branches":[119,150],"statements":[410,423]},
     "apps/desktop/src/lib/relayAccess.ts": {"lines":[7,7],"functions":[3,3],"branches":[3,3],"statements":[7,7]},
-    "apps/desktop/src/lib/relayClient.ts": {"lines":[160,177],"functions":[11,13],"branches":[31,37],"statements":[160,177]},
+    "apps/desktop/src/lib/relayClient.ts": {"lines":[160,177],"functions":[10,12],"branches":[30,36],"statements":[160,177]},
     "apps/desktop/src/lib/relayWorkspaceStartup.ts": {"lines":[31,31],"functions":[3,3],"branches":[15,16],"statements":[31,31]},
     "apps/desktop/src/lib/roomActions.ts": {"lines":[225,258],"functions":[3,4],"branches":[13,16],"statements":[225,258]},
     "apps/desktop/src/lib/roomApprovalSettingsActions.ts": {"lines":[48,81],"functions":[3,3],"branches":[4,6],"statements":[48,81]},

@@ -5,8 +5,9 @@ import { compareDesktopCoverage, normalizeDesktopCoverage } from "./check-deskto
 const path = "/checkout/apps/desktop/src/store/slices/terminalSlice.ts";
 
 test("normalizes absolute coverage paths into repository-relative exact fractions", () => {
-  assert.deepEqual(normalizeDesktopCoverage({ total: {}, [path]: coverage(3, 7) }), {
-    version: 1,
+  assert.deepEqual(normalizeDesktopCoverage({ total: {}, [path]: coverage(3, 7) }, 22), {
+    version: 2,
+    nodeMajor: 22,
     files: {
       "apps/desktop/src/store/slices/terminalSlice.ts": {
         lines: [3, 7],
@@ -19,21 +20,30 @@ test("normalizes absolute coverage paths into repository-relative exact fraction
 });
 
 test("rejects regressions and stale improvements using exact fraction comparison", () => {
-  const baseline = normalizeDesktopCoverage({ total: {}, [path]: coverage(3, 7) });
-  const regression = normalizeDesktopCoverage({ total: {}, [path]: coverage(2, 7) });
-  const improvement = normalizeDesktopCoverage({ total: {}, [path]: coverage(4, 7) });
+  const baseline = normalizeDesktopCoverage({ total: {}, [path]: coverage(3, 7) }, 22);
+  const regression = normalizeDesktopCoverage({ total: {}, [path]: coverage(2, 7) }, 22);
+  const improvement = normalizeDesktopCoverage({ total: {}, [path]: coverage(4, 7) }, 22);
   assert.equal(compareDesktopCoverage(baseline, baseline).length, 0);
   assert.match(compareDesktopCoverage(baseline, regression)[0], /regressed from 3\/7 to 2\/7/);
   assert.match(compareDesktopCoverage(baseline, improvement)[0], /improved from 3\/7 to 4\/7/);
 });
 
+test("rejects coverage produced by a different Node instrumentation runtime", () => {
+  const baseline = normalizeDesktopCoverage({ total: {}, [path]: coverage(3, 7) }, 22);
+  const current = normalizeDesktopCoverage({ total: {}, [path]: coverage(3, 7) }, 24);
+  assert.match(compareDesktopCoverage(baseline, current)[0], /uses Node 24.*baseline uses Node 22/);
+});
+
 test("requires additions and removals to update the reviewed file inventory", () => {
-  const baseline = normalizeDesktopCoverage({ total: {}, [path]: coverage(3, 7) });
-  const added = normalizeDesktopCoverage({
-    total: {},
-    [path]: coverage(3, 7),
-    "/checkout/apps/desktop/src/new.ts": coverage(0, 4)
-  });
+  const baseline = normalizeDesktopCoverage({ total: {}, [path]: coverage(3, 7) }, 22);
+  const added = normalizeDesktopCoverage(
+    {
+      total: {},
+      [path]: coverage(3, 7),
+      "/checkout/apps/desktop/src/new.ts": coverage(0, 4)
+    },
+    22
+  );
   assert.match(compareDesktopCoverage(baseline, added).at(-1), /not recorded/);
   assert.match(compareDesktopCoverage(added, baseline).at(-1), /missing from the coverage report/);
 });
