@@ -28,8 +28,10 @@ async function publishNativeKeyPackage(browser: Browser, deviceId: string, keyPa
   const resultKey = randomUUID();
   await browser.execute(
     (targetDeviceId, upload, key) => {
+      // WebDriver reserves an `error` response key for protocol failures, so
+      // keep the expected application rejection under `message` in-page.
       const page = globalThis as typeof globalThis & {
-        __multaiplayerKeyPackageResults?: Record<string, { accepted: boolean; error?: string } | undefined>;
+        __multaiplayerKeyPackageResults?: Record<string, { accepted: boolean; message?: string } | undefined>;
       };
       const results = (page.__multaiplayerKeyPackageResults ??= {});
       results[key] = undefined;
@@ -39,7 +41,7 @@ async function publishNativeKeyPackage(browser: Browser, deviceId: string, keyPa
           results[key] = { accepted: true };
         })
         .catch((error) => {
-          results[key] = { accepted: false, error: String(error) };
+          results[key] = { accepted: false, message: String(error) };
         });
     },
     deviceId,
@@ -50,20 +52,22 @@ async function publishNativeKeyPackage(browser: Browser, deviceId: string, keyPa
     () =>
       browser.execute((key) => {
         const page = globalThis as typeof globalThis & {
-          __multaiplayerKeyPackageResults?: Record<string, { accepted: boolean; error?: string } | undefined>;
+          __multaiplayerKeyPackageResults?: Record<string, { accepted: boolean; message?: string } | undefined>;
         };
         return page.__multaiplayerKeyPackageResults?.[key] !== undefined;
       }, resultKey),
     { timeout: 30_000, timeoutMsg: "native KeyPackage publication did not settle" }
   );
-  return browser.execute((key) => {
+  const result = await browser.execute((key) => {
     const page = globalThis as typeof globalThis & {
-      __multaiplayerKeyPackageResults?: Record<string, { accepted: boolean; error?: string } | undefined>;
+      __multaiplayerKeyPackageResults?: Record<string, { accepted: boolean; message?: string } | undefined>;
     };
     const result = page.__multaiplayerKeyPackageResults?.[key];
     if (page.__multaiplayerKeyPackageResults) delete page.__multaiplayerKeyPackageResults[key];
     return result;
-  }, resultKey) as Promise<{ accepted: boolean; error?: string }>;
+  }, resultKey);
+  assert.ok(result, "native KeyPackage publication result disappeared before collection");
+  return { accepted: result.accepted, ...(result.message ? { error: result.message } : {}) };
 }
 
 export async function keyPackageCount(browser: Browser, relayBaseUrl: string, deviceId: string) {
