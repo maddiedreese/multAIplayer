@@ -189,7 +189,9 @@ export async function rejectExpiredInvite(host: Browser, guest: Browser, context
   );
   const prunedStatus = await guest.executeAsync(
     (baseUrl, targetInviteId, done) => {
-      fetch(`${baseUrl}/invites/${encodeURIComponent(targetInviteId)}`, { credentials: "include" })
+      const probe = new URL(`${baseUrl}/invites/${encodeURIComponent(targetInviteId)}`);
+      probe.searchParams.set("pruneProbe", crypto.randomUUID());
+      fetch(probe, { credentials: "include", cache: "no-store" })
         .then((response) => done(response.status))
         .catch((error) => done(String(error)));
     },
