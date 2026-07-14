@@ -79,7 +79,12 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     shutdown: shutdownConfig
   } = relayConfig;
   const relayMetrics = createRelayMetrics();
-  const relayPersistence = createRelayPersistence({ backend: storageBackend, dataPath, legacyJsonImportPath });
+  const relayPersistence = createRelayPersistence({
+    backend: storageBackend,
+    dataPath,
+    legacyJsonImportPath,
+    recordSqliteWriteDuration: relayMetrics.recordSqliteWriteDuration
+  });
   const originPolicy = createRelayOriginPolicy({ nodeEnv, allowedCorsOrigins });
   const app = express();
   app.use(originPolicy.enforceAllowedOrigin);

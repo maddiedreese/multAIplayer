@@ -1535,7 +1535,7 @@ button:disabled {
 
 .terminal-request span,
 .terminal-request small {
-  color: #707070;
+  color: var(--text-muted);
   font-size: 11px;
 }
 

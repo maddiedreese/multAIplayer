@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import { execFile, spawn } from "node:child_process";
+import { mkdir, writeFile } from "node:fs/promises";
 import { cpus, platform, release, arch } from "node:os";
+import { dirname, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -13,6 +15,7 @@ const cargo = process.env.MULTAIPLAYER_CARGO_BIN?.trim() || "cargo";
 const samples = integerArgument("--samples", 50);
 const warmups = integerArgument("--warmups", 5);
 const concurrency = integerArgument("--concurrency", 1);
+const outputPath = stringArgument("--output");
 const executable = fileURLToPath(
   new URL(
     `../apps/desktop/src-tauri/target/release/mls-keypackage-validator${platform() === "win32" ? ".exe" : ""}`,
@@ -30,7 +33,8 @@ excluded from the measurements.
 Options:
   --samples N       measured invocations (default: 50)
   --warmups N       unmeasured warm-up invocations (default: 5)
-  --concurrency N   maximum simultaneous child processes (default: 1)`);
+  --concurrency N   maximum simultaneous child processes (default: 1)
+  --output PATH     also write the JSON result to PATH`);
   process.exit(0);
 }
 
@@ -105,13 +109,27 @@ const result = {
     node: process.version
   }
 };
-console.log(JSON.stringify(result, null, 2));
+const encodedResult = `${JSON.stringify(result, null, 2)}\n`;
+if (outputPath) {
+  const resolvedOutput = resolve(workspaceRoot, outputPath);
+  await mkdir(dirname(resolvedOutput), { recursive: true });
+  await writeFile(resolvedOutput, encodedResult, "utf8");
+}
+process.stdout.write(encodedResult);
 
 function integerArgument(name, fallback) {
   const index = process.argv.indexOf(name);
   if (index === -1) return fallback;
   const value = Number(process.argv[index + 1]);
   if (!Number.isSafeInteger(value) || value < 1) throw new Error(`${name} must be a positive integer`);
+  return value;
+}
+
+function stringArgument(name) {
+  const index = process.argv.indexOf(name);
+  if (index === -1) return undefined;
+  const value = process.argv[index + 1]?.trim();
+  if (!value || value.startsWith("--")) throw new Error(`${name} requires a path`);
   return value;
 }
 

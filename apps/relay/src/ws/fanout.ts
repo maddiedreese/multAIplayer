@@ -36,7 +36,11 @@ interface Options {
 export function createRelayFanout(options: Options) {
   const queues = new Map<RoomKey, Promise<void>>();
   const send = (socket: WebSocket, message: RelayServerMessage) => {
-    if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(message));
+    if (socket.readyState !== socket.OPEN) return;
+    const startedAt = performance.now();
+    socket.send(JSON.stringify(message), () => {
+      options.metrics.recordWebSocketSendDuration(performance.now() - startedAt);
+    });
   };
   const broadcast = (key: RoomKey, message: RelayServerMessage) => {
     for (const socket of options.roomSockets.get(key) ?? []) send(socket, message);
@@ -56,6 +60,7 @@ export function createRelayFanout(options: Options) {
     }
   }
   async function publishMlsMessage(message: MlsRelayMessage): Promise<void> {
+    const startedAt = performance.now();
     const key = options.roomKey(message.teamId, message.roomId);
     const previous = queues.get(key) ?? Promise.resolve();
     let release!: () => void;
@@ -66,7 +71,9 @@ export function createRelayFanout(options: Options) {
     queues.set(key, queued);
     await previous.catch(() => undefined);
     try {
-      await publishForRoom(key, message);
+      if (await publishForRoom(key, message)) {
+        options.metrics.recordPublishToFanoutDuration(performance.now() - startedAt);
+      }
     } finally {
       release();
       if (queues.get(key) === queued) queues.delete(key);
@@ -77,13 +84,13 @@ export function createRelayFanout(options: Options) {
     const receiptKey = `${key}\0${message.id}`;
     const acceptedReceipt = options.store.acceptedMessageReceipts.get(receiptKey);
     if (acceptedReceipt) {
-      if (acceptedReceipt.digest === digest) return;
+      if (acceptedReceipt.digest === digest) return false;
       throw new RelayPublishError("invalid_message", "Message id is already bound to different MLS bytes or metadata.");
     }
     const previous = options.store.getMlsBacklog(key) ?? [];
     const replay = previous.find((item) => item.id === message.id);
     if (replay) {
-      if (sameRetry(replay, message)) return;
+      if (sameRetry(replay, message)) return false;
       throw new RelayPublishError("invalid_message", "Message id is already bound to different MLS bytes or metadata.");
     }
     const room = options.store.getRoom(message.roomId);
@@ -166,6 +173,7 @@ export function createRelayFanout(options: Options) {
       const updatedRoom = options.store.getRoom(message.roomId);
       if (updatedRoom) broadcastRoomUpdated(updatedRoom);
     }
+    return true;
   }
   function publishPresence(session: ClientSession, teamId: string, roomId: string, presence: PresenceRecord) {
     session.displayName = presence.displayName;

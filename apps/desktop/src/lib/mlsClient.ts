@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeNative, isNativeCommandErrorCode } from "./nativeCommandError";
 import { reportExpectedFailure } from "./nonFatalReporting";
 
 export interface MlsIdentityPublic {
@@ -105,37 +105,37 @@ export interface MlsInviteCapabilityBinding {
 }
 
 export async function initializeMlsIdentity(githubUserId: string, deviceId: string): Promise<MlsIdentityPublic> {
-  return invoke("mls_identity_initialize", { request: { githubUserId, deviceId } });
+  return invokeNative("mls_identity_initialize", { request: { githubUserId, deviceId } });
 }
 
 export async function signDeviceChallenge(
   challenge: string
 ): Promise<{ signatureDer: string; publicKeySpkiDer: string }> {
-  return invoke("mls_device_auth_sign", { request: { challenge } });
+  return invokeNative("mls_device_auth_sign", { request: { challenge } });
 }
 
 export async function generateMlsKeyPackage(): Promise<MlsKeyPackageUpload> {
-  return invoke("mls_generate_key_package");
+  return invokeNative("mls_generate_key_package");
 }
 
 export async function createMlsGroup(roomId: string): Promise<number> {
-  return invoke("mls_create_group", { request: { roomId } });
+  return invokeNative("mls_create_group", { request: { roomId } });
 }
 
 export async function openMlsGroup(roomId: string): Promise<number> {
-  return invoke("mls_group_open", { request: { roomId } });
+  return invokeNative("mls_group_open", { request: { roomId } });
 }
 
 export async function forgetCorruptMlsGroup(roomId: string): Promise<void> {
-  return invoke("mls_forget_corrupt_group", { request: { roomId } });
+  return invokeNative("mls_forget_corrupt_group", { request: { roomId } });
 }
 
 export function isMlsRequiresRejoin(error: unknown): boolean {
-  return error === "MLS_REQUIRES_REJOIN" || (error instanceof Error && error.message === "MLS_REQUIRES_REJOIN");
+  return isNativeCommandErrorCode(error, "requires_rejoin");
 }
 
 export async function joinMlsWelcome(roomId: string, welcome: string): Promise<number> {
-  return invoke("mls_join_welcome", { request: { roomId, welcome } });
+  return invokeNative("mls_join_welcome", { request: { roomId, welcome } });
 }
 
 export async function encryptMlsApplication(
@@ -143,7 +143,7 @@ export async function encryptMlsApplication(
   authenticatedData: Omit<MlsAuthenticatedData, "epoch">,
   payload: unknown
 ): Promise<{ message: string; outboxId: string; epoch: number; authenticatedData: string }> {
-  const result = await invoke<{ message: string; outboxId: string; epoch: number; authenticatedData: string }>(
+  const result = await invokeNative<{ message: string; outboxId: string; epoch: number; authenticatedData: string }>(
     "mls_encrypt_application",
     {
       request: {
@@ -167,22 +167,22 @@ export async function encryptMlsApplication(
 }
 
 export async function retireStaleMlsApplication(roomId: string, messageId: string): Promise<number> {
-  return invoke("mls_retire_stale_application", { request: { roomId, messageId } });
+  return invokeNative("mls_retire_stale_application", { request: { roomId, messageId } });
 }
 
 export async function setMlsHistoryRetention(roomId: string, retentionDays: number): Promise<void> {
-  return invoke("mls_history_retention_set", { request: { roomId, retentionDays } });
+  return invokeNative("mls_history_retention_set", { request: { roomId, retentionDays } });
 }
 
 export async function processMlsIncoming(roomId: string, message: string): Promise<MlsIncomingApplication | null> {
-  return invoke("mls_process_incoming", { request: { roomId, message } });
+  return invokeNative("mls_process_incoming", { request: { roomId, message } });
 }
 
 export async function removeMlsMember(
   roomId: string,
   leaf: number
 ): Promise<{ message: string; outboxId: string; parentEpoch: number }> {
-  return invoke("mls_remove_member", { request: { roomId, leaf } });
+  return invokeNative("mls_remove_member", { request: { roomId, leaf } });
 }
 
 export async function transferMlsHost(
@@ -190,30 +190,30 @@ export async function transferMlsHost(
   nextHostLeaf: number,
   nextHostDeviceId: string
 ): Promise<{ message: string; outboxId: string; parentEpoch: number }> {
-  return invoke("mls_transfer_host", { request: { roomId, nextHostLeaf, nextHostDeviceId } });
+  return invokeNative("mls_transfer_host", { request: { roomId, nextHostLeaf, nextHostDeviceId } });
 }
 
 export async function currentMlsEpoch(roomId: string): Promise<number> {
-  return invoke("mls_current_epoch", { request: { roomId } });
+  return invokeNative("mls_current_epoch", { request: { roomId } });
 }
 
 export async function mlsGroupState(roomId: string): Promise<MlsGroupState> {
-  return invoke("mls_group_state", { request: { roomId } });
+  return invokeNative("mls_group_state", { request: { roomId } });
 }
 
 export async function markMlsPublishSucceeded(roomId: string, messageId: string): Promise<number> {
-  return invoke("mls_publish_succeeded", { request: { roomId, messageId } });
+  return invokeNative("mls_publish_succeeded", { request: { roomId, messageId } });
 }
 
 export async function clearPendingMlsCommit(roomId: string, expectedMessageId: string): Promise<number> {
-  return invoke("mls_clear_pending_commit", { request: { roomId, expectedMessageId } });
+  return invokeNative("mls_clear_pending_commit", { request: { roomId, expectedMessageId } });
 }
 
 export async function issueMlsInviteCapability(): Promise<{
   capabilityHandle: string;
   capabilityUrlValue: string;
 }> {
-  return invoke("mls_invite_capability_issue");
+  return invokeNative("mls_invite_capability_issue");
 }
 
 export async function sealMlsInviteRequest(
@@ -224,7 +224,7 @@ export async function sealMlsInviteRequest(
   keyPackage: string,
   keyPackageId: string
 ): Promise<{ keyPackageHash: string; sealedRequest: string }> {
-  return invoke("mls_invite_request_seal", {
+  return invokeNative("mls_invite_request_seal", {
     request: { recipientHpkePublicKey, capabilityHandle, capabilityUrlValue, binding, keyPackage, keyPackageId }
   });
 }
@@ -240,7 +240,7 @@ export async function openMlsInviteRequest(
   requesterSignaturePublicKey: string;
   requesterSignatureKeyFingerprint: string;
 }> {
-  return invoke("mls_invite_request_open", { request: { binding, sealedPayload } });
+  return invokeNative("mls_invite_request_open", { request: { binding, sealedPayload } });
 }
 
 export async function approveMlsInvite(
@@ -258,7 +258,7 @@ export async function approveMlsInvite(
   requesterSignaturePublicKey: string;
   requesterSignatureKeyFingerprint: string;
 }> {
-  return invoke("mls_invite_approve", {
+  return invokeNative("mls_invite_approve", {
     request: { capabilityHandle, binding, mac, keyPackage, keyPackageId }
   });
 }
@@ -268,7 +268,7 @@ export async function denyMlsInvite(
   binding: MlsInviteCapabilityBinding,
   mac: string
 ): Promise<{ outboxId: string; responseBinding: MlsInviteCapabilityBinding; responseMac: string }> {
-  return invoke("mls_invite_deny", { request: { capabilityHandle, binding, mac } });
+  return invokeNative("mls_invite_deny", { request: { capabilityHandle, binding, mac } });
 }
 
 export async function acceptMlsInviteResponse(
@@ -278,7 +278,7 @@ export async function acceptMlsInviteResponse(
   responseMac: string,
   welcome?: string
 ): Promise<{ status: "approved" | "denied"; epoch?: number }> {
-  return invoke("mls_invite_response_accept", {
+  return invokeNative("mls_invite_response_accept", {
     request: { capabilityUrlValue, originalBinding, responseBinding, responseMac, ...(welcome ? { welcome } : {}) }
   });
 }
@@ -297,7 +297,7 @@ export interface PendingMlsInviteRequest {
 }
 
 export async function listPendingMlsInviteRequests(): Promise<PendingMlsInviteRequest[]> {
-  return invoke("mls_pending_invite_requests_list");
+  return invokeNative("mls_pending_invite_requests_list");
 }
 
 export async function acceptPendingMlsInviteResponse(
@@ -306,17 +306,17 @@ export async function acceptPendingMlsInviteResponse(
   responseMac: string,
   welcome?: string
 ): Promise<{ status: "approved" | "denied"; epoch?: number }> {
-  return invoke("mls_pending_invite_response_accept", {
+  return invokeNative("mls_pending_invite_response_accept", {
     request: { requestId, responseBinding, responseMac, ...(welcome ? { welcome } : {}) }
   });
 }
 
 export async function completePendingMlsInviteRequest(requestId: string, roomId: string): Promise<void> {
-  return invoke("mls_pending_invite_complete", { request: { requestId, roomId } });
+  return invokeNative("mls_pending_invite_complete", { request: { requestId, roomId } });
 }
 
 export async function listMlsOutbox(): Promise<MlsOutboxItem[]> {
-  return invoke("mls_outbox_list");
+  return invokeNative("mls_outbox_list");
 }
 
 export interface MlsJoinAdmission {
@@ -329,11 +329,11 @@ export interface MlsJoinAdmission {
 }
 
 export async function listMlsJoinAdmissions(): Promise<MlsJoinAdmission[]> {
-  return invoke("mls_join_admissions_list");
+  return invokeNative("mls_join_admissions_list");
 }
 
 export async function completeMlsJoinAdmission(roomId: string, requestId: string): Promise<void> {
-  return invoke("mls_join_admission_complete", { request: { roomId, requestId } });
+  return invokeNative("mls_join_admission_complete", { request: { roomId, requestId } });
 }
 
 export async function findMlsOutboxMessage(roomId: string, payload: string, kind?: string): Promise<MlsOutboxItem> {
@@ -364,17 +364,17 @@ export async function authorizeMlsHostTransfer(
   roomId: string,
   commitMessageId: string
 ): Promise<MlsHostTransferAuthorization> {
-  return invoke("mls_host_transfer_authorization", { request: { roomId, commitMessageId } });
+  return invokeNative("mls_host_transfer_authorization", { request: { roomId, commitMessageId } });
 }
 
 export async function encryptMlsBlob(roomId: string, blobId: string, plaintext: unknown): Promise<MlsBlobCiphertext> {
-  return invoke("mls_blob_encrypt", {
+  return invokeNative("mls_blob_encrypt", {
     request: { roomId, blobId, plaintext: encodeUtf8(JSON.stringify(plaintext)) }
   });
 }
 
 export async function decryptMlsBlob(roomId: string, blobId: string, value: MlsBlobCiphertext): Promise<unknown> {
-  const plaintext = await invoke<string>("mls_blob_decrypt", { request: { roomId, blobId, value } });
+  const plaintext = await invokeNative<string>("mls_blob_decrypt", { request: { roomId, blobId, value } });
   return JSON.parse(decodeUtf8(plaintext)) as unknown;
 }
 

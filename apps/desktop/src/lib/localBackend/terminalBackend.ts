@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeNative } from "../nativeCommandError";
 
 import { isTauriRuntime } from "./runtime";
 import type { TerminalSnapshot } from "./types";
@@ -12,7 +12,7 @@ export async function startTerminal(
   command: string
 ): Promise<TerminalSnapshot> {
   if (isTauriRuntime()) {
-    const authorizationToken = await invoke<string>("authorize_shell_execution", {
+    const authorizationToken = await invokeNative<string>("authorize_shell_execution", {
       request: {
         roomId,
         cwd,
@@ -21,7 +21,7 @@ export async function startTerminal(
         requesterLabel: "Local host"
       }
     });
-    return invoke<TerminalSnapshot>("terminal_start", {
+    return invokeNative<TerminalSnapshot>("terminal_start", {
       request: { roomId, name, cwd, command, authorizationToken }
     });
   }
@@ -51,7 +51,7 @@ export async function startTerminal(
 
 export async function listTerminals(roomId: string): Promise<TerminalSnapshot[]> {
   if (isTauriRuntime()) {
-    return invoke<TerminalSnapshot[]>("terminal_list", { roomId });
+    return invokeNative<TerminalSnapshot[]>("terminal_list", { roomId });
   }
 
   return Array.from(previewTerminals.values()).filter((terminal) => terminal.roomId === roomId);
@@ -59,7 +59,7 @@ export async function listTerminals(roomId: string): Promise<TerminalSnapshot[]>
 
 export async function readTerminal(id: string): Promise<TerminalSnapshot> {
   if (isTauriRuntime()) {
-    return invoke<TerminalSnapshot>("terminal_read", { id });
+    return invokeNative<TerminalSnapshot>("terminal_read", { id });
   }
 
   const existing = previewTerminals.get(id);
@@ -69,10 +69,10 @@ export async function readTerminal(id: string): Promise<TerminalSnapshot> {
 
 export async function writeTerminal(roomId: string, id: string, input: string): Promise<TerminalSnapshot> {
   if (isTauriRuntime()) {
-    const authorizationToken = await invoke<string>("authorize_terminal_input", {
+    const authorizationToken = await invokeNative<string>("authorize_terminal_input", {
       request: { roomId, terminalId: id, input, requesterLabel: "Local host" }
     });
-    return invoke<TerminalSnapshot>("terminal_write", {
+    return invokeNative<TerminalSnapshot>("terminal_write", {
       request: { roomId, id, input, authorizationToken }
     });
   }
@@ -88,7 +88,7 @@ export async function writeTerminal(roomId: string, id: string, input: string): 
 
 export async function stopTerminal(id: string): Promise<TerminalSnapshot> {
   if (isTauriRuntime()) {
-    return invoke<TerminalSnapshot>("terminal_stop", { id });
+    return invokeNative<TerminalSnapshot>("terminal_stop", { id });
   }
 
   const snapshot = await readTerminal(id);

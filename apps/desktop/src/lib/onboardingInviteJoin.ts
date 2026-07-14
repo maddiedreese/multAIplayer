@@ -2,6 +2,7 @@ import { parseInviteInput } from "./inviteActionsHelpers";
 import { readInviteUrlPayload, type InviteUrlParts } from "./inviteUrl";
 import { RelayHttpError } from "./httpResponse";
 import { reportExpectedFailure } from "./nonFatalReporting";
+import { isInviteJoinError } from "./inviteJoinError";
 
 export type OnboardingInviteJoinStatus =
   | "no_invite"
@@ -126,38 +127,32 @@ function safeJoinFailure(error: unknown): OnboardingInviteJoinResult {
     }
   }
 
-  const knownMessage = error instanceof Error ? error.message : "";
-  if (knownMessage === "This invite has expired.") {
-    return result("expired_invite", "This invite has expired. Ask the active host for a new one.", true, false);
-  }
-  if (knownMessage.includes("pre-v2 invite") || knownMessage.includes("legacy invite")) {
-    return result(
-      "legacy_invite",
-      "This legacy invite is no longer accepted. Ask the active host for a new approval-gated invite.",
-      true,
-      false
-    );
-  }
-  if (
-    knownMessage.includes("active host device") ||
-    knownMessage.includes("host HPKE key") ||
-    knownMessage.includes("metadata does not match") ||
-    knownMessage.includes("unexpected KeyPackage hash")
-  ) {
-    return result(
-      "verification_failed",
-      "The invite could not be verified against the active host device. Ask the host for a new invite.",
-      true,
-      false
-    );
-  }
-  if (
-    knownMessage.includes("complete host-approved") ||
-    knownMessage.includes("relay invite id is missing") ||
-    knownMessage.includes("required metadata") ||
-    error instanceof SyntaxError
-  ) {
-    return result("invalid_invite", "Paste a complete, current multAIplayer invite link.", true, false);
+  if (isInviteJoinError(error)) {
+    switch (error.code) {
+      case "invite_expired":
+        return result("expired_invite", "This invite has expired. Ask the active host for a new one.", true, false);
+      case "legacy_invite":
+        return result(
+          "legacy_invite",
+          "This legacy invite is no longer accepted. Ask the active host for a new approval-gated invite.",
+          true,
+          false
+        );
+      case "active_host_mismatch":
+      case "host_hpke_key_mismatch":
+      case "invite_metadata_mismatch":
+      case "key_package_hash_mismatch":
+      case "pending_recovery_mismatch":
+        return result(
+          "verification_failed",
+          "The invite could not be verified against the active host device. Ask the host for a new invite.",
+          true,
+          false
+        );
+      case "invalid_invite":
+      case "invite_id_missing":
+        return result("invalid_invite", "Paste a complete, current multAIplayer invite link.", true, false);
+    }
   }
   return result(
     "temporarily_unavailable",

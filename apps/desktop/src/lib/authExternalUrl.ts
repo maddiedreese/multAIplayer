@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeNative } from "./nativeCommandError";
 import { isTauriRuntime } from "./localBackend/runtime";
 import { reportExpectedFailure } from "./nonFatalReporting";
 
@@ -33,7 +33,7 @@ export async function openTrustedAuthenticationUrl(provider: "github" | "openai"
   if (!trusted) return false;
   try {
     if (isTauriRuntime()) {
-      await invoke<void>("open_trusted_authentication_url", { provider, url: trusted });
+      await invokeNative<void>("open_trusted_authentication_url", { provider, url: trusted });
     } else {
       if (!window.open(trusted, "_blank", "noopener,noreferrer")) return false;
     }

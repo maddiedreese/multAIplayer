@@ -77,7 +77,7 @@ pub(crate) fn terminal_start(
     state: State<'_, TerminalState>,
     authorization_state: State<'_, ShellAuthorizationState>,
     request: TerminalStartRequest,
-) -> Result<TerminalSnapshot, String> {
+) -> crate::command_error::CommandResult<TerminalSnapshot> {
     ensure_room_id(&request.room_id)?;
     ensure_existing_dir(&request.cwd)?;
     ensure_terminal_name(&request.name)?;
@@ -98,7 +98,7 @@ pub(crate) fn terminal_start(
 
     if let Some(existing) = sessions.get_mut(&id) {
         if existing_is_running(existing) {
-            return Err(format!("Terminal {} is already running", request.name));
+            return Err(format!("Terminal {} is already running", request.name).into());
         }
         terminate_terminal_child(existing.child.as_mut());
         sessions.remove(&id);
@@ -155,14 +155,14 @@ pub(crate) fn terminal_start(
     let session = sessions
         .get_mut(&id)
         .ok_or_else(|| "Terminal failed to start".to_string())?;
-    snapshot_terminal(&id, session)
+    Ok(snapshot_terminal(&id, session)?)
 }
 
 #[tauri::command]
 pub(crate) fn terminal_list(
     state: State<'_, TerminalState>,
     room_id: String,
-) -> Result<Vec<TerminalSnapshot>, String> {
+) -> crate::command_error::CommandResult<Vec<TerminalSnapshot>> {
     ensure_room_id(&room_id)?;
     let mut sessions = state
         .sessions
@@ -182,7 +182,7 @@ pub(crate) fn terminal_list(
 pub(crate) fn terminal_read(
     state: State<'_, TerminalState>,
     id: String,
-) -> Result<TerminalSnapshot, String> {
+) -> crate::command_error::CommandResult<TerminalSnapshot> {
     ensure_terminal_id(&id)?;
     let mut sessions = state
         .sessions
@@ -191,7 +191,7 @@ pub(crate) fn terminal_read(
     let session = sessions
         .get_mut(&id)
         .ok_or_else(|| format!("Terminal not found: {id}"))?;
-    snapshot_terminal(&id, session)
+    Ok(snapshot_terminal(&id, session)?)
 }
 
 #[tauri::command]
@@ -199,7 +199,7 @@ pub(crate) fn terminal_write(
     state: State<'_, TerminalState>,
     authorization_state: State<'_, ShellAuthorizationState>,
     request: TerminalWriteRequest,
-) -> Result<TerminalSnapshot, String> {
+) -> crate::command_error::CommandResult<TerminalSnapshot> {
     ensure_terminal_id(&request.id)?;
     ensure_room_id(&request.room_id)?;
     ensure_terminal_input(&request.input)?;
@@ -217,10 +217,10 @@ pub(crate) fn terminal_write(
         .get_mut(&request.id)
         .ok_or_else(|| format!("Terminal not found: {}", request.id))?;
     if session.room_id != request.room_id {
-        return Err("Terminal does not belong to the confirmed room".to_string());
+        return Err("Terminal does not belong to the confirmed room".into());
     }
     if !existing_is_running(session) {
-        return Err(format!("Terminal {} is not running", session.name));
+        return Err(format!("Terminal {} is not running", session.name).into());
     }
     write!(session.writer, "{}", request.input)
         .map_err(|error| format!("Failed to write terminal input: {error}"))?;
@@ -235,14 +235,14 @@ pub(crate) fn terminal_write(
             text: request.input.trim_end_matches('\n').to_string(),
         },
     );
-    snapshot_terminal(&request.id, session)
+    Ok(snapshot_terminal(&request.id, session)?)
 }
 
 #[tauri::command]
 pub(crate) fn terminal_stop(
     state: State<'_, TerminalState>,
     id: String,
-) -> Result<TerminalSnapshot, String> {
+) -> crate::command_error::CommandResult<TerminalSnapshot> {
     ensure_terminal_id(&id)?;
     let mut sessions = state
         .sessions
@@ -252,7 +252,7 @@ pub(crate) fn terminal_stop(
         .get_mut(&id)
         .ok_or_else(|| format!("Terminal not found: {id}"))?;
     terminate_terminal_child(session.child.as_mut());
-    snapshot_terminal(&id, session)
+    Ok(snapshot_terminal(&id, session)?)
 }
 
 fn terminal_id(room_id: &str, name: &str) -> String {

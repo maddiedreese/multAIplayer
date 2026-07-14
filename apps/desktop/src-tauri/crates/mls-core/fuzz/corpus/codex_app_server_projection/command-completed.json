@@ -1,0 +1,1 @@
+{"params":{"threadId":"thread-corpus","item":{"id":"command-corpus","type":"commandExecution","status":"completed","command":"cargo test","aggregatedOutput":"ok","exitCode":0,"durationMs":12}}}

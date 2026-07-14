@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { attachPageDiagnostics, uiContractScenarioUrl } from "./helpers";
+import { attachPageDiagnostics, expectNoAxeViolations, uiContractScenarioUrl } from "./helpers";
 
 test("chat renders both roles' code, generated images, and expandable Codex work", async ({ page }) => {
   attachPageDiagnostics(page);
@@ -13,6 +13,7 @@ test("chat renders both roles' code, generated images, and expandable Codex work
   await expect(followUpBehavior.locator("option")).toHaveText(["Steer current turn", "Queue next turn"]);
   await followUpBehavior.selectOption("queue");
   await expect(followUpBehavior).toHaveValue("queue");
+  await expectNoAxeViolations(page);
 
   await page.getByText("Codex worked", { exact: true }).click();
   await expect(page.getByText("Thinking")).toBeVisible();

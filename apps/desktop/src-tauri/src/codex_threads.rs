@@ -43,7 +43,7 @@ pub(crate) fn list_codex_threads(
     request: CodexThreadListRequest,
     app: AppHandle,
     state: State<'_, CodexHostState>,
-) -> Result<Vec<CodexThreadNode>, String> {
+) -> crate::command_error::CommandResult<Vec<CodexThreadNode>> {
     ensure_room_id(&request.room_id)?;
     ensure_existing_dir(&request.cwd)?;
     let limit = request.limit.unwrap_or(100).clamp(1, MAX_THREADS);
@@ -73,7 +73,7 @@ pub(crate) fn fork_codex_thread(
     request: CodexThreadForkRequest,
     app: AppHandle,
     state: State<'_, CodexHostState>,
-) -> Result<CodexThreadNode, String> {
+) -> crate::command_error::CommandResult<CodexThreadNode> {
     ensure_room_id(&request.room_id)?;
     let thread_id = normalize_codex_thread_id(Some(&request.thread_id))?
         .ok_or_else(|| "Codex thread id is required".to_string())?;
@@ -84,17 +84,17 @@ pub(crate) fn fork_codex_thread(
         .transpose()?
         .flatten();
     if last_turn_id.is_some() && !state.capabilities(&app)?.supports_last_turn_fork {
-        return Err("Forking through a specific turn requires Codex 0.143.0 or newer".to_string());
+        return Err("Forking through a specific turn requires Codex 0.143.0 or newer".into());
     }
     if let Some(cwd) = request.cwd.as_deref() {
         ensure_existing_dir(cwd)?;
     }
     let params = thread_fork_params(&thread_id, last_turn_id.as_deref(), request.cwd.as_deref());
     let result = state.request(&app, "thread/fork", params)?;
-    result
+    Ok(result
         .get("thread")
         .and_then(parse_thread_node)
-        .ok_or_else(|| "thread/fork returned no valid thread".to_string())
+        .ok_or_else(|| "thread/fork returned no valid thread".to_string())?)
 }
 
 fn thread_fork_params(thread_id: &str, last_turn_id: Option<&str>, cwd: Option<&str>) -> Value {

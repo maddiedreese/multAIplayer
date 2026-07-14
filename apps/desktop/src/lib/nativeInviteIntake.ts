@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeNative } from "./nativeCommandError";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export interface NativeInvitePayload {
@@ -18,7 +18,11 @@ interface NativeInviteBindings {
  * The event carries no URL or capability.
  */
 export async function installNativeInviteIntake(onInvite: InviteHandler, signal?: AbortSignal): Promise<UnlistenFn> {
-  return createNativeInviteIntake({ invoke, listen: (event, handler) => listen(event, handler) }, onInvite, signal);
+  return createNativeInviteIntake(
+    { invoke: invokeNative, listen: (event, handler) => listen(event, handler) },
+    onInvite,
+    signal
+  );
 }
 
 export async function createNativeInviteIntake(

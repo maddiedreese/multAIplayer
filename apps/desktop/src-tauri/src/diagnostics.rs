@@ -209,8 +209,8 @@ impl DiagnosticStore {
 pub(crate) fn record_diagnostic(
     state: State<'_, DiagnosticState>,
     entry: DiagnosticEntry,
-) -> Result<(), String> {
-    state.record(entry, Utc::now())
+) -> crate::command_error::CommandResult<()> {
+    Ok(state.record(entry, Utc::now())?)
 }
 
 #[tauri::command]
@@ -218,7 +218,7 @@ pub(crate) async fn save_diagnostic_bundle(
     app: AppHandle,
     state: State<'_, DiagnosticState>,
     context: DiagnosticExportContext,
-) -> Result<DiagnosticExportOutcome, String> {
+) -> crate::command_error::CommandResult<DiagnosticExportOutcome> {
     let now = Utc::now();
     let bundle = build_diagnostic_bundle(&state, context, now)?;
     let suggested_name = format!("multaiplayer-diagnostics-{}.json", now.format("%Y-%m-%d"));

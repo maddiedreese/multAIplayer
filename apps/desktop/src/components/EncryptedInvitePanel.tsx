@@ -78,10 +78,18 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
               <small>{request.status}</small>
               {request.status === "pending" && (
                 <div>
-                  <button onClick={() => onDecideInviteRequest(request, "approved")} disabled={approvalDisabled}>
+                  <button
+                    aria-label={`Approve ${request.requester}'s invite request`}
+                    onClick={() => onDecideInviteRequest(request, "approved")}
+                    disabled={approvalDisabled}
+                  >
                     <Check size={13} />
                   </button>
-                  <button onClick={() => onDecideInviteRequest(request, "denied")} disabled={approvalDisabled}>
+                  <button
+                    aria-label={`Deny ${request.requester}'s invite request`}
+                    onClick={() => onDecideInviteRequest(request, "denied")}
+                    disabled={approvalDisabled}
+                  >
                     <X size={13} />
                   </button>
                 </div>
@@ -92,7 +100,11 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
           <div className="empty-state compact">No invite approval requests in this room.</div>
         )}
       </div>
-      {inviteLink && <div className="invite-link">{inviteLink}</div>}
+      {inviteLink && (
+        <div className="invite-link" tabIndex={0} aria-label="Generated invite link">
+          {inviteLink}
+        </div>
+      )}
       {inviteMessage && <div className="workflow-message">{inviteMessage}</div>}
     </section>
   );

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct CodexActivityEvent {
+pub struct CodexActivityEvent {
     room_id: String,
     activity_id: String,
     turn_id: String,
@@ -111,7 +111,7 @@ struct CodexAgentActivity {
     receiver_ids: Vec<String>,
 }
 
-pub(crate) fn bounded_codex_identifier(value: Option<&str>, fallback: &str) -> String {
+pub fn bounded_codex_identifier(value: Option<&str>, fallback: &str) -> String {
     let value = value.unwrap_or(fallback).trim();
     let safe: String = value
         .chars()
@@ -127,7 +127,7 @@ pub(crate) fn bounded_codex_identifier(value: Option<&str>, fallback: &str) -> S
     }
 }
 
-pub(crate) fn project_codex_activity(
+pub fn project_codex_activity(
     method: &str,
     notification: &Value,
     room_id: &str,

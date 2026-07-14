@@ -9,12 +9,21 @@ cargo-fuzz = true
 
 [dependencies]
 base64 = "=0.22.1"
+codex-activity-projection = { path = "../../codex-activity-projection" }
 libfuzzer-sys = "=0.4.13"
 mls-core = { path = ".." }
+serde_json = "=1.0.150"
 
 [[bin]]
 name = "key_package_deserialization"
 path = "fuzz_targets/key_package_deserialization.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "codex_app_server_projection"
+path = "fuzz_targets/codex_app_server_projection.rs"
 test = false
 doc = false
 bench = false

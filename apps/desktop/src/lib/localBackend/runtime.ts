@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeNative } from "../nativeCommandError";
 
 import type { CommandResult } from "./types";
 
@@ -15,7 +15,7 @@ async function authorizeShellExecution(request: {
   kind: "remote_request" | "interactive_terminal";
   requesterLabel: string;
 }): Promise<string> {
-  return invoke<string>("authorize_shell_execution", { request });
+  return invokeNative<string>("authorize_shell_execution", { request });
 }
 
 export async function runShellCommand(
@@ -32,7 +32,7 @@ export async function runShellCommand(
       kind: "remote_request",
       requesterLabel
     });
-    return invoke<CommandResult>("run_shell_command", {
+    return invokeNative<CommandResult>("run_shell_command", {
       request: { roomId, cwd, command, authorizationToken }
     });
   }
@@ -48,5 +48,5 @@ export async function runShellCommand(
 
 export async function clearShellExecutionGrants(roomId: string): Promise<number> {
   if (!isTauriRuntime()) return 0;
-  return invoke<number>("clear_shell_execution_grants", { roomId });
+  return invokeNative<number>("clear_shell_execution_grants", { roomId });
 }

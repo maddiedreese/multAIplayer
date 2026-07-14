@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { attachPageDiagnostics, uiContractHarnessUrl, uiContractScenarioUrl } from "./helpers";
+import { attachPageDiagnostics, expectNoAxeViolations, uiContractHarnessUrl, uiContractScenarioUrl } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   attachPageDiagnostics(page);
@@ -14,6 +14,7 @@ test("welcome gives keyboard-equivalent create and join paths", async ({ page })
   await expect(heading).toBeFocused();
   await expect(page.getByRole("button", { name: /Create a workspace/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Join with an invite/ })).toBeVisible();
+  await expectNoAxeViolations(page);
 
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: /Create a workspace/ })).toBeFocused();
@@ -22,6 +23,7 @@ test("welcome gives keyboard-equivalent create and join paths", async ({ page })
   await page.getByRole("button", { name: "Back" }).click();
   await page.getByRole("button", { name: /Join with an invite/ }).click();
   await expect(page.getByRole("heading", { name: "Check this device" })).toBeVisible();
+  await expectNoAxeViolations(page);
 });
 
 test("Explore persists a resumable checklist and Help can reopen or reset setup", async ({ page }) => {

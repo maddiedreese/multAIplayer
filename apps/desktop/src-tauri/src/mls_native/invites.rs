@@ -22,7 +22,8 @@ pub(super) fn serialize_directed_invite_request(
 }
 
 #[tauri::command]
-pub(crate) fn mls_invite_capability_issue() -> Result<CapabilityIssueResponse, String> {
+pub(crate) fn mls_invite_capability_issue(
+) -> crate::command_error::CommandResult<CapabilityIssueResponse> {
     let mut issued = issue_capability();
     let raw = issued.take_url_value();
     let handle = uuid::Uuid::new_v4().to_string();
@@ -44,7 +45,7 @@ pub(crate) fn mls_invite_capability_issue() -> Result<CapabilityIssueResponse, S
 pub(crate) fn mls_invite_request_seal(
     request: InviteRequestSealRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<InviteRequestSealResponse, String> {
+) -> crate::command_error::CommandResult<InviteRequestSealResponse> {
     if request.binding.phase != "request" {
         return Err("Invite request binding is invalid".into());
     }
@@ -110,7 +111,7 @@ pub(crate) fn mls_invite_request_seal(
 pub(crate) fn mls_invite_request_open(
     request: InviteRequestOpenRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<InviteRequestOpenResponse, String> {
+) -> crate::command_error::CommandResult<InviteRequestOpenResponse> {
     let aad = encode_capability_binding(&request.binding).map_err(safe_error)?;
     let hpke = state
         .hpke
@@ -155,7 +156,7 @@ pub(crate) fn mls_invite_request_open(
 pub(crate) fn mls_invite_approve(
     request: InviteApproveRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<InviteApproveResponse, String> {
+) -> crate::command_error::CommandResult<InviteApproveResponse> {
     let _approval = state
         .invite_approval
         .lock()
@@ -260,7 +261,7 @@ pub(crate) fn mls_invite_approve(
 pub(crate) fn mls_invite_deny(
     request: InviteDenyRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<InviteDenyResponse, String> {
+) -> crate::command_error::CommandResult<InviteDenyResponse> {
     let _approval = state
         .invite_approval
         .lock()
@@ -328,8 +329,8 @@ pub(crate) fn mls_invite_deny(
 pub(crate) fn mls_invite_response_accept(
     request: InviteResponseAcceptRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<InviteResponseAcceptResponse, String> {
-    accept_invite_response(request, &state)
+) -> crate::command_error::CommandResult<InviteResponseAcceptResponse> {
+    Ok(accept_invite_response(request, &state)?)
 }
 
 fn accept_invite_response(
@@ -396,8 +397,8 @@ fn accept_invite_response(
 #[tauri::command]
 pub(crate) fn mls_pending_invite_requests_list(
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<Vec<PendingInviteRequestPublic>, String> {
-    with_store(&state, |store| store.pending_invite_requests())
+) -> crate::command_error::CommandResult<Vec<PendingInviteRequestPublic>> {
+    Ok(with_store(&state, |store| store.pending_invite_requests())
         .map(|requests| {
             requests
                 .into_iter()
@@ -418,14 +419,14 @@ pub(crate) fn mls_pending_invite_requests_list(
                 })
                 .collect::<Result<Vec<_>, String>>()
         })
-        .and_then(|requests| requests)
+        .and_then(|requests| requests)?)
 }
 
 #[tauri::command]
 pub(crate) fn mls_pending_invite_response_accept(
     request: PendingInviteResponseAcceptRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<InviteResponseAcceptResponse, String> {
+) -> crate::command_error::CommandResult<InviteResponseAcceptResponse> {
     let pending = with_store(&state, |store| {
         store.pending_invite_request(&request.request_id)
     })?
@@ -434,7 +435,7 @@ pub(crate) fn mls_pending_invite_response_accept(
         return Err("Pending invite request does not match recovery metadata".into());
     }
     ensure_pending_invite_identity(&state, &pending.original_binding)?;
-    accept_invite_response(
+    Ok(accept_invite_response(
         InviteResponseAcceptRequest {
             capability_url_value: pending.capability_url_value,
             original_binding: pending.original_binding,
@@ -443,14 +444,14 @@ pub(crate) fn mls_pending_invite_response_accept(
             welcome: request.welcome,
         },
         &state,
-    )
+    )?)
 }
 
 #[tauri::command]
 pub(crate) fn mls_pending_invite_complete(
     request: PendingInviteCompleteRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<(), String> {
+) -> crate::command_error::CommandResult<()> {
     let Some(pending) = with_store(&state, |store| {
         store.pending_invite_request(&request.request_id)
     })?
@@ -461,9 +462,9 @@ pub(crate) fn mls_pending_invite_complete(
         return Err("Pending invite request does not match its room".into());
     }
     ensure_pending_invite_identity(&state, &pending.original_binding)?;
-    with_store(&state, |store| {
+    Ok(with_store(&state, |store| {
         store.delete_pending_invite_request(&request.request_id)
-    })
+    })?)
 }
 
 fn ensure_pending_invite_identity(
@@ -486,30 +487,32 @@ fn ensure_pending_invite_identity(
 #[tauri::command]
 pub(crate) fn mls_join_admissions_list(
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<Vec<PendingJoinAdmissionPublic>, String> {
-    with_engine(&state, |engine| engine.pending_join_admissions()).map(|receipts| {
-        receipts
-            .into_iter()
-            .map(|receipt| PendingJoinAdmissionPublic {
-                invite_id: receipt.invite_id,
-                team_id: receipt.team_id,
-                room_id: receipt.room_id,
-                request_id: receipt.request_id,
-                requester_user_id: receipt.requester_user_id,
-                requester_device_id: receipt.requester_device_id,
-            })
-            .collect()
-    })
+) -> crate::command_error::CommandResult<Vec<PendingJoinAdmissionPublic>> {
+    Ok(
+        with_engine(&state, |engine| engine.pending_join_admissions()).map(|receipts| {
+            receipts
+                .into_iter()
+                .map(|receipt| PendingJoinAdmissionPublic {
+                    invite_id: receipt.invite_id,
+                    team_id: receipt.team_id,
+                    room_id: receipt.room_id,
+                    request_id: receipt.request_id,
+                    requester_user_id: receipt.requester_user_id,
+                    requester_device_id: receipt.requester_device_id,
+                })
+                .collect()
+        })?,
+    )
 }
 
 #[tauri::command]
 pub(crate) fn mls_join_admission_complete(
     request: JoinAdmissionCompleteRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<(), String> {
-    with_engine(&state, |engine| {
+) -> crate::command_error::CommandResult<()> {
+    Ok(with_engine(&state, |engine| {
         engine.complete_join_admission(&request.room_id, &request.request_id)
-    })
+    })?)
 }
 
 pub(super) fn fixed32(value: &str) -> Result<[u8; 32], String> {

@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeNative } from "../nativeCommandError";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import { isTauriRuntime } from "./runtime";
@@ -75,32 +75,32 @@ export async function readCodexHostSnapshot(): Promise<CodexHostSnapshot> {
   if (!isTauriRuntime()) {
     throw new Error("Codex account controls are available in the native app.");
   }
-  return invoke<CodexHostSnapshot>("codex_host_snapshot");
+  return invokeNative<CodexHostSnapshot>("codex_host_snapshot");
 }
 
 export async function startCodexLogin(
   flow: "browser" | "device",
   options: { useHostedLoginSuccessPage?: boolean; appBrand?: "codex" | "chatgpt" } = {}
 ): Promise<CodexLoginStartResult> {
-  return invoke<CodexLoginStartResult>("codex_account_login_start", {
+  return invokeNative<CodexLoginStartResult>("codex_account_login_start", {
     request: { flow, ...options }
   });
 }
 
 export async function cancelCodexLogin(loginId: string): Promise<void> {
-  await invoke("codex_account_login_cancel", { request: { loginId } });
+  await invokeNative("codex_account_login_cancel", { request: { loginId } });
 }
 
 export async function logoutCodexAccount(): Promise<void> {
-  await invoke("codex_account_logout");
+  await invokeNative("codex_account_logout");
 }
 
 export async function startCodexMcpLogin(name: string): Promise<CodexMcpLoginResult> {
-  return invoke<CodexMcpLoginResult>("codex_mcp_login_start", { request: { name } });
+  return invokeNative<CodexMcpLoginResult>("codex_mcp_login_start", { request: { name } });
 }
 
 export async function setCodexAppApprovalMode(mode: CodexAppApprovalMode): Promise<void> {
-  await invoke("codex_app_approval_mode_set", { request: { mode } });
+  await invokeNative("codex_app_approval_mode_set", { request: { mode } });
 }
 
 export async function listenForCodexHostNotifications(

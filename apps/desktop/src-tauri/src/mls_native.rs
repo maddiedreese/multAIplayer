@@ -47,7 +47,7 @@ pub(crate) fn mls_identity_initialize(
     request: IdentityInitializeRequest,
     state: tauri::State<'_, MlsNativeState>,
     app: tauri::AppHandle,
-) -> Result<IdentityPublic, String> {
+) -> crate::command_error::CommandResult<IdentityPublic> {
     let mut identity_lock = state
         .identity
         .lock()
@@ -96,7 +96,7 @@ pub(crate) fn mls_identity_initialize(
                 )
                 .map_err(|_| safe_error(error))?
             }
-            Err(error) => return Err(safe_error(error)),
+            Err(error) => return Err(safe_error(error).into()),
         };
     let store = EncryptedStore::open(&database_path, wrapping_key).map_err(safe_error)?;
     secure_store_permissions(&database_path)?;
@@ -149,8 +149,8 @@ pub(crate) fn mls_identity_initialize(
 pub(crate) fn mls_group_state(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<RosterPublic, String> {
-    with_engine(&state, |engine| {
+) -> crate::command_error::CommandResult<RosterPublic> {
+    Ok(with_engine(&state, |engine| {
         let roster = engine.roster(&request.room_id)?;
         let self_leaf = engine.self_leaf(&request.room_id)?;
         let epoch = engine.current_epoch(&request.room_id)?;
@@ -166,44 +166,44 @@ pub(crate) fn mls_group_state(
             self_leaf,
             epoch,
         })
-    })
+    })?)
 }
 
 #[tauri::command]
 pub(crate) fn mls_blob_encrypt(
     request: BlobEncryptRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<ExporterCiphertext, String> {
+) -> crate::command_error::CommandResult<ExporterCiphertext> {
     let plaintext = decode(&request.plaintext)?;
-    with_engine(&state, |engine| {
+    Ok(with_engine(&state, |engine| {
         engine.encrypt_blob(&request.room_id, request.blob_id.as_bytes(), &plaintext)
-    })
+    })?)
 }
 #[tauri::command]
 pub(crate) fn mls_blob_prepare(
     request: BlobPrepareRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<u64, String> {
-    with_engine(&state, |engine| {
+) -> crate::command_error::CommandResult<u64> {
+    Ok(with_engine(&state, |engine| {
         engine.prepare_blob(&request.room_id, request.blob_id.as_bytes())
-    })
+    })?)
 }
 #[tauri::command]
 pub(crate) fn mls_blob_decrypt(
     request: BlobDecryptRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<String, String> {
-    with_engine(&state, |engine| {
+) -> crate::command_error::CommandResult<String> {
+    Ok(with_engine(&state, |engine| {
         engine.decrypt_blob(&request.room_id, request.blob_id.as_bytes(), &request.value)
     })
-    .map(|v| STANDARD.encode(v))
+    .map(|v| STANDARD.encode(v))?)
 }
 
 #[tauri::command]
 pub(crate) fn mls_history_save(
     request: HistorySaveRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<u64, String> {
+) -> crate::command_error::CommandResult<u64> {
     let plaintext = decode(&request.plaintext)?;
     let value = with_engine(&state, |engine| {
         engine.encrypt_history(&request.room_id, &plaintext)
@@ -225,20 +225,20 @@ pub(crate) fn mls_history_save(
 pub(crate) fn mls_history_retention_set(
     request: HistoryRetentionRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<(), String> {
+) -> crate::command_error::CommandResult<()> {
     with_engine(&state, |engine| {
         engine.set_history_retention(&request.room_id, request.retention_days)
     })?;
-    with_store(&state, |store| {
+    Ok(with_store(&state, |store| {
         store.set_history_ciphertext_retention(&request.room_id, request.retention_days)
-    })
+    })?)
 }
 
 #[tauri::command]
 pub(crate) fn mls_history_load(
     request: HistoryEpochRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<Option<String>, String> {
+) -> crate::command_error::CommandResult<Option<String>> {
     with_engine(&state, |engine| {
         engine.prune_expired_material(&request.room_id)
     })?;
@@ -250,30 +250,30 @@ pub(crate) fn mls_history_load(
     };
     let value: ExporterCiphertext =
         serde_json::from_slice(&encoded).map_err(|_| "Encrypted history is corrupt".to_string())?;
-    with_engine(&state, |engine| {
+    Ok(with_engine(&state, |engine| {
         engine.decrypt_history(&request.room_id, &value)
     })
-    .map(|value| Some(STANDARD.encode(value)))
+    .map(|value| Some(STANDARD.encode(value)))?)
 }
 
 #[tauri::command]
 pub(crate) fn mls_history_delete(
     request: HistoryEpochRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<(), String> {
+) -> crate::command_error::CommandResult<()> {
     with_engine(&state, |engine| {
         engine.forget_history_epoch(&request.room_id, request.epoch)
     })?;
-    with_store(&state, |store| {
+    Ok(with_store(&state, |store| {
         store.delete_history_ciphertext(&request.room_id, request.epoch)
-    })
+    })?)
 }
 
 #[tauri::command]
 pub(crate) fn mls_history_load_latest(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<Option<String>, String> {
+) -> crate::command_error::CommandResult<Option<String>> {
     with_engine(&state, |engine| {
         engine.prune_expired_material(&request.room_id)
     })?;
@@ -285,17 +285,17 @@ pub(crate) fn mls_history_load_latest(
     };
     let value: ExporterCiphertext =
         serde_json::from_slice(&encoded).map_err(|_| "Encrypted history is corrupt".to_string())?;
-    with_engine(&state, |engine| {
+    Ok(with_engine(&state, |engine| {
         engine.decrypt_history(&request.room_id, &value)
     })
-    .map(|value| Some(STANDARD.encode(value)))
+    .map(|value| Some(STANDARD.encode(value)))?)
 }
 
 #[tauri::command]
 pub(crate) fn mls_history_delete_all(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<(), String> {
+) -> crate::command_error::CommandResult<()> {
     let engine = state
         .engine
         .lock()
@@ -304,7 +304,7 @@ pub(crate) fn mls_history_delete_all(
         .store
         .lock()
         .map_err(|_| "MLS store is unavailable".to_string())?;
-    delete_all_history_native(
+    Ok(delete_all_history_native(
         engine
             .as_ref()
             .ok_or_else(|| "MLS identity is not initialized".to_string())?,
@@ -312,7 +312,7 @@ pub(crate) fn mls_history_delete_all(
             .as_ref()
             .ok_or_else(|| "MLS identity is not initialized".to_string())?,
         &request.room_id,
-    )
+    )?)
 }
 
 fn delete_all_history_native(
@@ -333,7 +333,7 @@ fn delete_all_history_native(
 pub(crate) fn mls_device_auth_sign(
     request: DeviceAuthRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<DeviceAuthResponse, String> {
+) -> crate::command_error::CommandResult<DeviceAuthResponse> {
     let challenge = decode(&request.challenge)?;
     let lock = state
         .signer
@@ -353,7 +353,7 @@ pub(crate) fn mls_device_auth_sign(
 #[tauri::command]
 pub(crate) fn mls_generate_key_package(
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<KeyPackagePublish, String> {
+) -> crate::command_error::CommandResult<KeyPackagePublish> {
     let bytes = with_engine(&state, |engine| engine.generate_key_package())?;
     let id = uuid::Uuid::new_v4().to_string();
     let key_package_hash = format!("sha256:{:x}", Sha256::digest(&bytes));
@@ -369,35 +369,37 @@ pub(crate) fn mls_generate_key_package(
 pub(crate) fn mls_create_group(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<u64, String> {
-    with_engine(&state, |engine| engine.create_group(&request.room_id))
+) -> crate::command_error::CommandResult<u64> {
+    Ok(with_engine(&state, |engine| {
+        engine.create_group(&request.room_id)
+    })?)
 }
 
 #[tauri::command]
 pub(crate) fn mls_join_welcome(
     request: JoinRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<u64, String> {
+) -> crate::command_error::CommandResult<u64> {
     let welcome = decode(&request.welcome)?;
-    with_engine(&state, |engine| {
+    Ok(with_engine(&state, |engine| {
         engine.join_welcome(&request.room_id, &welcome)
-    })
+    })?)
 }
 
 #[tauri::command]
 pub(crate) fn mls_encrypt_application(
     request: EncryptRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<OutboundApplicationResponse, String> {
+) -> crate::command_error::CommandResult<OutboundApplicationResponse> {
     let payload = decode(&request.payload)?;
-    with_engine(&state, |engine| {
+    Ok(with_engine(&state, |engine| {
         engine.encrypt_application(
             &request.room_id,
             &request.message_id,
             &payload,
             request.authenticated_data,
         )
-    })
+    })?)
     .and_then(|output| {
         Ok(OutboundApplicationResponse {
             message: STANDARD.encode(output.message),
@@ -413,7 +415,7 @@ pub(crate) fn mls_encrypt_application(
 pub(crate) fn mls_process_incoming(
     request: IncomingRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<Option<IncomingApplication>, String> {
+) -> crate::command_error::CommandResult<Option<IncomingApplication>> {
     let message = decode(&request.message)?;
     let value = with_engine(&state, |engine| {
         engine.process_incoming(&request.room_id, &message)
@@ -435,10 +437,10 @@ pub(crate) fn mls_process_incoming(
 pub(crate) fn mls_remove_member(
     request: RemoveRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<OutboundCommitResponse, String> {
-    with_engine(&state, |engine| {
+) -> crate::command_error::CommandResult<OutboundCommitResponse> {
+    Ok(with_engine(&state, |engine| {
         engine.remove_member(&request.room_id, request.leaf)
-    })
+    })?)
     .map(|output| OutboundCommitResponse {
         message: STANDARD.encode(output.message),
         outbox_id: output.outbox_id,
@@ -450,14 +452,14 @@ pub(crate) fn mls_remove_member(
 pub(crate) fn mls_transfer_host(
     request: TransferRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<OutboundCommitResponse, String> {
-    with_engine(&state, |engine| {
+) -> crate::command_error::CommandResult<OutboundCommitResponse> {
+    Ok(with_engine(&state, |engine| {
         engine.transfer_host(
             &request.room_id,
             request.next_host_leaf,
             request.next_host_device_id,
         )
-    })
+    })?)
     .map(|output| OutboundCommitResponse {
         message: STANDARD.encode(output.message),
         outbox_id: output.outbox_id,
@@ -469,7 +471,7 @@ pub(crate) fn mls_transfer_host(
 pub(crate) fn mls_host_transfer_authorization(
     request: HostTransferAuthorizationRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<HostTransferAuthorizationResponse, String> {
+) -> crate::command_error::CommandResult<HostTransferAuthorizationResponse> {
     let authorization = with_engine(&state, |engine| {
         engine.host_transfer_authorization(&request.room_id, &request.commit_message_id)
     })?;
@@ -495,15 +497,17 @@ pub(crate) fn mls_host_transfer_authorization(
 pub(crate) fn mls_current_epoch(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<u64, String> {
-    with_engine(&state, |engine| engine.current_epoch(&request.room_id))
+) -> crate::command_error::CommandResult<u64> {
+    Ok(with_engine(&state, |engine| {
+        engine.current_epoch(&request.room_id)
+    })?)
 }
 
 #[tauri::command]
 pub(crate) fn mls_group_open(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<u64, String> {
+) -> crate::command_error::CommandResult<u64> {
     match with_engine(&state, |engine| engine.open_group(&request.room_id)) {
         Err(error) if error == "MLS_REQUIRES_REJOIN" => {
             state
@@ -511,9 +515,9 @@ pub(crate) fn mls_group_open(
                 .lock()
                 .map_err(|_| "MLS rejoin state is unavailable".to_string())?
                 .insert(request.room_id);
-            Err(error)
+            Err(crate::command_error::CommandError::requires_rejoin(error))
         }
-        result => result,
+        result => Ok(result?),
     }
 }
 
@@ -521,7 +525,7 @@ pub(crate) fn mls_group_open(
 pub(crate) fn mls_forget_corrupt_group(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<(), String> {
+) -> crate::command_error::CommandResult<()> {
     {
         let flagged = state
             .requires_rejoin_rooms
@@ -549,7 +553,7 @@ pub(crate) fn mls_forget_corrupt_group(
 pub(crate) fn mls_publish_succeeded(
     request: PublishSucceededRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<u64, String> {
+) -> crate::command_error::CommandResult<u64> {
     let (epoch, capability_handle) = with_engine(&state, |engine| {
         let capability_handle = engine
             .invite_receipt_for_commit(&request.message_id)?
@@ -571,7 +575,7 @@ pub(crate) fn mls_publish_succeeded(
 #[tauri::command]
 pub(crate) fn mls_outbox_list(
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<Vec<OutboxPublic>, String> {
+) -> crate::command_error::CommandResult<Vec<OutboxPublic>> {
     let items = with_store(&state, |store| store.pending_outbox())?;
     items
         .into_iter()
@@ -598,20 +602,20 @@ pub(crate) fn mls_outbox_list(
 pub(crate) fn mls_clear_pending_commit(
     request: ClearPendingRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<u64, String> {
-    with_engine(&state, |engine| {
+) -> crate::command_error::CommandResult<u64> {
+    Ok(with_engine(&state, |engine| {
         engine.clear_pending_commit(&request.room_id, &request.expected_message_id)
-    })
+    })?)
 }
 
 #[tauri::command]
 pub(crate) fn mls_retire_stale_application(
     request: PublishSucceededRequest,
     state: tauri::State<'_, MlsNativeState>,
-) -> Result<u64, String> {
-    with_engine(&state, |engine| {
+) -> crate::command_error::CommandResult<u64> {
+    Ok(with_engine(&state, |engine| {
         engine.retire_stale_application(&request.room_id, &request.message_id)
-    })
+    })?)
 }
 
 fn with_engine<T>(

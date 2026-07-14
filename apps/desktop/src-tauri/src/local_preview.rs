@@ -88,7 +88,8 @@ pub(crate) struct LocalPreviewStatusResult {
 }
 
 #[tauri::command]
-pub(crate) fn detect_local_preview_servers() -> Result<Vec<LocalPreviewDetectedServer>, String> {
+pub(crate) fn detect_local_preview_servers(
+) -> crate::command_error::CommandResult<Vec<LocalPreviewDetectedServer>> {
     let mut servers = Vec::new();
     for port in LOCAL_PREVIEW_PORTS {
         for host in ["localhost", "127.0.0.1"] {
@@ -136,7 +137,7 @@ pub(crate) fn probe_cloudflared() -> CloudflaredProbe {
 pub(crate) fn local_preview_start(
     state: State<'_, LocalPreviewState>,
     request: LocalPreviewStartRequest,
-) -> Result<LocalPreviewStartResult, String> {
+) -> crate::command_error::CommandResult<LocalPreviewStartResult> {
     ensure_preview_id(&request.id)?;
     let local_url = validate_local_preview_url(&request.local_url)?;
     ensure_local_preview_reachable(&local_url)?;
@@ -172,7 +173,7 @@ pub(crate) fn local_preview_start(
         (Ok(stdout), Ok(stderr)) => (stdout, stderr),
         (Err(error), _) | (_, Err(error)) => {
             terminate_child(&mut child);
-            return Err(error);
+            return Err(error.into());
         }
     };
 
@@ -192,7 +193,8 @@ pub(crate) fn local_preview_start(
             return Err(format!(
                 "cloudflared exited before the tunnel was ready with status {status}. {}",
                 trim_command_output(&startup_log)
-            ));
+            )
+            .into());
         }
 
         match receiver.recv_timeout(Duration::from_millis(250)) {
@@ -213,7 +215,8 @@ pub(crate) fn local_preview_start(
         return Err(format!(
             "cloudflared started but did not produce a trycloudflare.com URL. {}",
             trim_command_output(&startup_log)
-        ));
+        )
+        .into());
     };
 
     {
@@ -244,14 +247,14 @@ pub(crate) fn local_preview_start(
 pub(crate) fn local_preview_stop(
     state: State<'_, LocalPreviewState>,
     id: String,
-) -> Result<LocalPreviewStopResult, String> {
+) -> crate::command_error::CommandResult<LocalPreviewStopResult> {
     ensure_preview_id(&id)?;
     let mut tunnels = state
         .tunnels
         .lock()
         .map_err(|_| "Local preview state lock is poisoned".to_string())?;
     let Some(mut tunnel) = tunnels.remove(&id) else {
-        return Err("Local preview tunnel is not running on this device.".to_string());
+        return Err("Local preview tunnel is not running on this device.".into());
     };
     terminate_child(&mut tunnel.child);
     Ok(LocalPreviewStopResult {
@@ -266,14 +269,14 @@ pub(crate) fn local_preview_stop(
 pub(crate) fn local_preview_status(
     state: State<'_, LocalPreviewState>,
     id: String,
-) -> Result<LocalPreviewStatusResult, String> {
+) -> crate::command_error::CommandResult<LocalPreviewStatusResult> {
     ensure_preview_id(&id)?;
     let mut tunnels = state
         .tunnels
         .lock()
         .map_err(|_| "Local preview state lock is poisoned".to_string())?;
     let Some(tunnel) = tunnels.get_mut(&id) else {
-        return Err("Local preview tunnel is not running on this device.".to_string());
+        return Err("Local preview tunnel is not running on this device.".into());
     };
     let status = tunnel
         .child

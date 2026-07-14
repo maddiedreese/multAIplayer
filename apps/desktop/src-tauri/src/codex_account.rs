@@ -472,7 +472,7 @@ use compatibility::*;
 pub(crate) fn codex_host_snapshot(
     state: tauri::State<'_, CodexHostState>,
     app: AppHandle,
-) -> Result<CodexHostSnapshot, String> {
+) -> crate::command_error::CommandResult<CodexHostSnapshot> {
     let capabilities = state.capabilities(&app)?;
     let account_result = state.request(&app, "account/read", json!({ "refreshToken": false }))?;
     let requires_openai_auth = account_result
@@ -600,16 +600,14 @@ pub(crate) fn codex_account_login_start(
     request: CodexLoginStartRequest,
     state: tauri::State<'_, CodexHostState>,
     app: AppHandle,
-) -> Result<CodexLoginStartResult, String> {
+) -> crate::command_error::CommandResult<CodexLoginStartResult> {
     let capabilities = state.capabilities(&app)?;
     let params = match request.flow.as_str() {
         "browser" if capabilities.supports_browser_login => {
             let mut params = json!({ "type": "chatgpt" });
             if request.use_hosted_login_success_page.unwrap_or(false) {
                 if !capabilities.supports_hosted_login_success {
-                    return Err(
-                        "Hosted login success pages require Codex 0.144.0 or newer".to_string()
-                    );
+                    return Err("Hosted login success pages require Codex 0.144.0 or newer".into());
                 }
                 params["useHostedLoginSuccessPage"] = Value::Bool(true);
                 params["appBrand"] = Value::String(
@@ -624,11 +622,9 @@ pub(crate) fn codex_account_login_start(
         }
         "device" if capabilities.supports_device_login => json!({ "type": "chatgptDeviceCode" }),
         "browser" | "device" => {
-            return Err(
-                "The selected login flow is not supported by this Codex version".to_string(),
-            )
+            return Err("The selected login flow is not supported by this Codex version".into())
         }
-        _ => return Err("Codex login flow must be browser or device".to_string()),
+        _ => return Err("Codex login flow must be browser or device".into()),
     };
     let result = state.request(&app, "account/login/start", params)?;
     let login_id = bounded_string(result.get("loginId"), "login id", 256)?;
@@ -653,9 +649,9 @@ pub(crate) fn codex_account_login_cancel(
     request: CodexLoginCancelRequest,
     state: tauri::State<'_, CodexHostState>,
     app: AppHandle,
-) -> Result<(), String> {
+) -> crate::command_error::CommandResult<()> {
     if request.login_id.is_empty() || request.login_id.len() > 256 {
-        return Err("Codex login id is invalid".to_string());
+        return Err("Codex login id is invalid".into());
     }
     state.request(
         &app,
@@ -669,7 +665,7 @@ pub(crate) fn codex_account_login_cancel(
 pub(crate) fn codex_account_logout(
     state: tauri::State<'_, CodexHostState>,
     app: AppHandle,
-) -> Result<(), String> {
+) -> crate::command_error::CommandResult<()> {
     state.request(&app, "account/logout", json!({}))?;
     Ok(())
 }
@@ -679,9 +675,9 @@ pub(crate) fn codex_mcp_login_start(
     request: CodexMcpLoginRequest,
     state: tauri::State<'_, CodexHostState>,
     app: AppHandle,
-) -> Result<CodexMcpLoginResult, String> {
+) -> crate::command_error::CommandResult<CodexMcpLoginResult> {
     if request.name.is_empty() || request.name.chars().count() > 256 {
-        return Err("MCP server name is invalid".to_string());
+        return Err("MCP server name is invalid".into());
     }
     let result = state.request(
         &app,
@@ -699,13 +695,13 @@ pub(crate) fn codex_app_approval_mode_set(
     request: CodexAppApprovalRequest,
     state: tauri::State<'_, CodexHostState>,
     app: AppHandle,
-) -> Result<(), String> {
+) -> crate::command_error::CommandResult<()> {
     if !is_supported_app_approval_mode(&request.mode) {
-        return Err("App approval mode is invalid".to_string());
+        return Err("App approval mode is invalid".into());
     }
     let capabilities = state.capabilities(&app)?;
     if request.mode == "writes" && !capabilities.supports_writes_approval {
-        return Err("The writes approval mode requires Codex 0.144.0 or newer".to_string());
+        return Err("The writes approval mode requires Codex 0.144.0 or newer".into());
     }
     state.request(
         &app,

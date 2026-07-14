@@ -3,7 +3,6 @@
 mod browser;
 mod codex;
 mod codex_account;
-mod codex_activity;
 mod codex_catalog;
 mod codex_goal;
 mod codex_request_projection;
@@ -13,6 +12,7 @@ mod codex_rpc;
 mod codex_steering;
 mod codex_threads;
 mod codex_turn_lifecycle;
+mod command_error;
 mod command_safety;
 mod diagnostics;
 mod git;
