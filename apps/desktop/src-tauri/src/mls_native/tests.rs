@@ -1,4 +1,7 @@
-use super::invites::{decision_timestamp, fixed32, fixed32_url, validate_invite_response_pair};
+use super::invites::{
+    decision_timestamp, fixed32, fixed32_url, serialize_directed_invite_request,
+    validate_invite_response_pair,
+};
 use super::{
     decode_stored_signing_secret, delete_all_history_native, engine_error, fingerprint,
     is_corruption_error_message, quarantine_store, BasicAppCredential, CapabilityBinding,
@@ -76,6 +79,29 @@ fn invite_decision_timestamp_is_canonical_utc_milliseconds() {
     assert!(value.ends_with('Z'));
     assert_eq!(&value[19..20], ".");
     assert!(value[20..23].bytes().all(|byte| byte.is_ascii_digit()));
+}
+
+#[test]
+fn directed_invite_request_uses_the_relay_canonical_field_order() {
+    let encoded = serialize_directed_invite_request(
+        &request_binding(),
+        &mls_core::SealedPayload {
+            version: 1,
+            kem_id: 16,
+            kdf_id: 1,
+            aead_id: 1,
+            encapsulated_key: vec![0; 65],
+            ciphertext: vec![0; 16],
+        },
+    )
+    .unwrap();
+    assert!(encoded.starts_with(
+        r#"{"version":3,"binding":{"version":3,"phase":"request","inviteId":"invite","teamId":"team","roomId":"room","keyEpoch":0,"keyPackageHash":"sha256:package","requestId":"request","requestNonce":"nonce","requesterUserId":"joiner","requesterDeviceId":"joiner-device","hostUserId":"host","hostDeviceId":"host-device","expiresAt":"2030-01-01T00:00:00Z","status":null,"decidedAt":null},"sealedPayload":{"version":1,"kem_id":16,"kdf_id":1,"aead_id":1,"encapsulated_key":"#
+    ));
+    assert!(encoded.ends_with(&format!(
+        r#","ciphertext":[{}]}}}}"#,
+        vec!["0"; 16].join(",")
+    )));
 }
 
 #[test]

@@ -8,7 +8,7 @@ use mls_core::{
     validate_credential, validate_key_package_upload, verify_request_binding,
     verify_response_binding, BasicAppCredential, CapabilityBinding, DeviceAuthSigner,
     EncryptedStore, ExporterCiphertext, HpkeKeyPair, JoinAdmissionMetadata, KeyPackageUpload,
-    MlsEngine, PendingInviteRequest, WelcomeRetryMetadata,
+    MlsEngine, PendingInviteRequest, SealedPayload, WelcomeRetryMetadata,
 };
 use sha2::{Digest, Sha256};
 use std::{collections::HashSet, sync::Mutex};

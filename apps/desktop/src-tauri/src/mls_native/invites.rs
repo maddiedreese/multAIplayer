@@ -1,4 +1,25 @@
 use super::*;
+use serde::Serialize;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DirectedInviteRequestEnvelope<'a> {
+    version: u8,
+    binding: &'a CapabilityBinding,
+    sealed_payload: &'a SealedPayload,
+}
+
+pub(super) fn serialize_directed_invite_request(
+    binding: &CapabilityBinding,
+    sealed_payload: &SealedPayload,
+) -> Result<String, String> {
+    serde_json::to_string(&DirectedInviteRequestEnvelope {
+        version: 3,
+        binding,
+        sealed_payload,
+    })
+    .map_err(|_| "Invite request recovery is invalid".to_string())
+}
 
 #[tauri::command]
 pub(crate) fn mls_invite_capability_issue() -> Result<CapabilityIssueResponse, String> {
@@ -70,12 +91,7 @@ pub(crate) fn mls_invite_request_seal(
             .map_err(|_| "Invite request payload is invalid".to_string())?,
     )
     .map_err(safe_error)?;
-    let sealed_request = serde_json::to_string(&serde_json::json!({
-        "version": 3,
-        "binding": &original_binding,
-        "sealedPayload": &sealed_payload,
-    }))
-    .map_err(|_| "Invite request recovery is invalid".to_string())?;
+    let sealed_request = serialize_directed_invite_request(&original_binding, &sealed_payload)?;
     with_store(&state, |store| {
         store.put_pending_invite_request(&PendingInviteRequest {
             capability_url_value,
