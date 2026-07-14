@@ -7,6 +7,12 @@ interface AdmissionDependencies {
   complete: typeof completeMlsJoinAdmission;
 }
 
+interface AdmissionSelectionStore {
+  selectedTeam: string;
+  selectedRoomId: string;
+  selectWorkspaceRoom: (teamId: string, roomId: string) => void;
+}
+
 const defaultDependencies: AdmissionDependencies = {
   acknowledge: acknowledgeDirectedInviteResponse,
   complete: async (roomId, requestId) => {
@@ -19,6 +25,15 @@ const pendingAdmissionCompletions = new Map<string, Promise<void>>();
 
 function admissionCompletionKey(admission: MlsJoinAdmission): string {
   return `${admission.roomId}\0${admission.requestId}`;
+}
+
+export function synchronizeMlsRecoverySelection(
+  admission: Pick<MlsJoinAdmission, "teamId" | "roomId">,
+  store: AdmissionSelectionStore
+): void {
+  if (store.selectedRoomId === admission.roomId && store.selectedTeam !== admission.teamId) {
+    store.selectWorkspaceRoom(admission.teamId, admission.roomId);
+  }
 }
 
 export function completeMlsRelayAdmission(

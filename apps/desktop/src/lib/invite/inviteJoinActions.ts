@@ -16,14 +16,16 @@ import {
   generateMlsKeyPackage,
   acceptPendingMlsInviteResponse,
   completePendingMlsInviteRequest,
+  listMlsJoinAdmissions,
   listPendingMlsInviteRequests,
   sealMlsInviteRequest,
   type MlsInviteCapabilityBinding,
+  type MlsJoinAdmission,
   type PendingMlsInviteRequest
 } from "../mlsClient";
 import { randomInviteNonce } from "./mlsInviteProtocol";
 import type { InviteJoinRequest, NoSecretRoomInvite } from "../../types";
-import { completeMlsRelayAdmission } from "../mlsJoinAdmission";
+import { completeMlsRelayAdmission, synchronizeMlsRecoverySelection } from "../mlsJoinAdmission";
 import {
   clearPendingInviteIfMissing,
   publishPendingInviteRequest,
@@ -80,6 +82,33 @@ export function assertInviteHostDevice(
   ) {
     throw new Error("The invite host HPKE key does not match the registered device.");
   }
+}
+
+export function pendingInviteHasMatchingAdmission(
+  pending: PendingMlsInviteRequest,
+  admissions: readonly MlsJoinAdmission[]
+): boolean {
+  return admissions.some(
+    (admission) =>
+      admission.requestId === pending.requestId &&
+      admission.inviteId === pending.inviteId &&
+      admission.teamId === pending.teamId &&
+      admission.roomId === pending.roomId &&
+      admission.requesterUserId === pending.requesterUserId &&
+      admission.requesterDeviceId === pending.requesterDeviceId
+  );
+}
+
+export async function loadResumablePendingInvites(
+  loadAdmissions: () => Promise<MlsJoinAdmission[]>,
+  loadPending: () => Promise<PendingMlsInviteRequest[]>,
+  isActive: (requestId: string) => boolean
+): Promise<PendingMlsInviteRequest[]> {
+  const admissions = await loadAdmissions();
+  const pending = await loadPending();
+  return pending.filter(
+    (request) => !isActive(request.requestId) && !pendingInviteHasMatchingAdmission(request, admissions)
+  );
 }
 
 export function createInviteJoinActions(
@@ -253,7 +282,15 @@ export function createInviteJoinActions(
 
   async function resumePendingInviteRequests(): Promise<void> {
     const { localUser, deviceId } = currentLocalIdentity();
-    for (const pending of await listPendingMlsInviteRequests()) {
+    // Snapshot admissions first. Native completion removes the pending request
+    // before its superseding admission, so this ordering cannot rediscover a
+    // consumed relay invite after admission recovery has already won the race.
+    const pendingRequests = await loadResumablePendingInvites(
+      listMlsJoinAdmissions,
+      listPendingMlsInviteRequests,
+      (requestId) => pendingInviteWaits.has(requestId)
+    );
+    for (const pending of pendingRequests) {
       try {
         const metadata = await lookupInvite(pending.inviteId);
         assertPendingInviteRecoveryContext(pending, { userId: localUser.id, deviceId }, metadata);
@@ -262,6 +299,7 @@ export function createInviteJoinActions(
         store.restoreWorkspaceAccess(pending.teamId, pending.roomId);
         store.setInviteAdmissionForRoom(pending.roomId, pending.inviteId);
         store.initializeMessagesForRoom(pending.roomId);
+        synchronizeMlsRecoverySelection(pending, useAppStore.getState());
         const existing = useAppStore
           .getState()
           .inviteByRoom?.[pending.roomId]?.requests?.some((request) => request.id === pending.requestId);
@@ -281,8 +319,13 @@ export function createInviteJoinActions(
         }
         void waitForResponse(pending, metadata.room.name);
       } catch (error) {
-        await clearPendingInviteIfMissing(error, pending, completePendingMlsInviteRequest);
-        store.setInviteMessageForRoom(pending.roomId, `Could not recover the pending invite: ${String(error)}`);
+        const cleared = await clearPendingInviteIfMissing(error, pending, completePendingMlsInviteRequest);
+        store.setInviteMessageForRoom(
+          pending.roomId,
+          cleared
+            ? "The pending invite is no longer available on the relay."
+            : `Could not recover the pending invite: ${String(error)}`
+        );
       }
     }
   }

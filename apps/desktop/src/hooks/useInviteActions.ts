@@ -3,6 +3,7 @@ import { createInviteLinkActions } from "../lib/invite/inviteLinkActions";
 import { createInviteRelayActions } from "../lib/invite/inviteRelayActions";
 import { createMembershipCommitActions } from "../lib/invite/membershipCommitActions";
 import type { UseInviteActionsOptions } from "../lib/invite/inviteActionTypes";
+import { reportExpectedFailure } from "../lib/nonFatalReporting";
 import { useAppStore } from "../store/appStore";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
@@ -54,7 +55,9 @@ export function usePendingInviteRecovery(resumePendingInviteRequests: () => Prom
     const scope = deviceSessionToken;
     if (lastStartedScope.current === scope) return;
     lastStartedScope.current = scope;
-    void resumePendingInviteRequests();
+    void resumePendingInviteRequests().catch(() => {
+      reportExpectedFailure("pending invite recovery deferred until reconnect");
+    });
   }, [deviceSessionToken, relayStatus, resumePendingInviteRequests, workspaceBootstrapStatus]);
 }
 

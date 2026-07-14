@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertInviteHostDevice, assertPendingInviteRecoveryContext } from "../src/lib/invite/inviteJoinActions";
+import {
+  assertInviteHostDevice,
+  assertPendingInviteRecoveryContext,
+  loadResumablePendingInvites,
+  pendingInviteHasMatchingAdmission
+} from "../src/lib/invite/inviteJoinActions";
 import { inviteRequesterDeviceMatches } from "../src/lib/invite/inviteRelayActions";
 import type { PendingMlsInviteRequest } from "../src/lib/mlsClient";
 
@@ -104,4 +109,55 @@ test("host accepts only the request-scoped registered device pinned by the HPKE 
   ]) {
     assert.equal(inviteRequesterDeviceMatches({ ...record, requesterDevice }, protectedRequest), false);
   }
+});
+
+test("a durable admission supersedes only its exact pending invite request", () => {
+  const admission = {
+    inviteId: pending.inviteId,
+    teamId: pending.teamId,
+    roomId: pending.roomId,
+    requestId: pending.requestId,
+    requesterUserId: pending.requesterUserId,
+    requesterDeviceId: pending.requesterDeviceId
+  };
+  assert.equal(pendingInviteHasMatchingAdmission(pending, [admission]), true);
+  for (const candidate of [
+    { ...admission, inviteId: "other-invite" },
+    { ...admission, teamId: "other-team" },
+    { ...admission, roomId: "other-room" },
+    { ...admission, requestId: "other-request" },
+    { ...admission, requesterUserId: "other-user" },
+    { ...admission, requesterDeviceId: "other-device" }
+  ]) {
+    assert.equal(pendingInviteHasMatchingAdmission(pending, [candidate]), false);
+  }
+});
+
+test("pending recovery snapshots admissions first and skips admitted or already-active requests", async () => {
+  const order: string[] = [];
+  const otherPending = { ...pending, inviteId: "invite-2", requestId: "request-2" };
+  const activePending = { ...pending, inviteId: "invite-3", requestId: "request-3" };
+  const admission = {
+    inviteId: pending.inviteId,
+    teamId: pending.teamId,
+    roomId: pending.roomId,
+    requestId: pending.requestId,
+    requesterUserId: pending.requesterUserId,
+    requesterDeviceId: pending.requesterDeviceId
+  };
+
+  const result = await loadResumablePendingInvites(
+    async () => {
+      order.push("admissions");
+      return [admission];
+    },
+    async () => {
+      order.push("pending");
+      return [pending, activePending, otherPending];
+    },
+    (requestId) => requestId === activePending.requestId
+  );
+
+  assert.deepEqual(order, ["admissions", "pending"]);
+  assert.deepEqual(result, [otherPending]);
 });

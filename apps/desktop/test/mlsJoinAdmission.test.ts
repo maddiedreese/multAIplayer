@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { completeMlsRelayAdmission } from "../src/lib/mlsJoinAdmission";
+import { completeMlsRelayAdmission, synchronizeMlsRecoverySelection } from "../src/lib/mlsJoinAdmission";
 
 const admission = {
   inviteId: "invite-1",
@@ -10,6 +10,30 @@ const admission = {
   requesterUserId: "user-1",
   requesterDeviceId: "device-1"
 };
+
+test("invite recovery synchronizes only the team of an already-selected room", () => {
+  const selections: Array<[string, string]> = [];
+  synchronizeMlsRecoverySelection(admission, {
+    selectedTeam: "other-team",
+    selectedRoomId: admission.roomId,
+    selectWorkspaceRoom: (teamId, roomId) => selections.push([teamId, roomId])
+  });
+  assert.deepEqual(selections, [[admission.teamId, admission.roomId]]);
+
+  synchronizeMlsRecoverySelection(admission, {
+    selectedTeam: admission.teamId,
+    selectedRoomId: admission.roomId,
+    selectWorkspaceRoom: (teamId, roomId) => selections.push([teamId, roomId])
+  });
+  assert.deepEqual(selections, [[admission.teamId, admission.roomId]]);
+
+  synchronizeMlsRecoverySelection(admission, {
+    selectedTeam: "other-team",
+    selectedRoomId: "other-room",
+    selectWorkspaceRoom: (teamId, roomId) => selections.push([teamId, roomId])
+  });
+  assert.deepEqual(selections, [[admission.teamId, admission.roomId]]);
+});
 
 test("admission recovery preserves ACK, joined, native-clear ordering", async () => {
   const calls: string[] = [];

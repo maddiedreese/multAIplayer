@@ -15,7 +15,7 @@ import {
   openMlsGroup
 } from "../../lib/mlsClient";
 import { drainMlsOutboxForRoom, pendingMlsOutboxRoomIds } from "../../lib/mlsOutboxDrain";
-import { completeMlsRelayAdmission } from "../../lib/mlsJoinAdmission";
+import { completeMlsRelayAdmission, synchronizeMlsRecoverySelection } from "../../lib/mlsJoinAdmission";
 import { reportNonFatal } from "../../lib/nonFatalReporting";
 import { getRelayHttpUrl } from "../../lib/appConfig";
 import { recoverDeviceSessionForRelayError } from "../../lib/deviceSession";
@@ -101,6 +101,7 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
                   await completeMlsRelayAdmission(client, admission, current.deviceSessionToken, () => {
                     store.restoreWorkspaceAccess(admission.teamId, admission.roomId);
                     store.restoreForgottenRoom(admission.roomId);
+                    synchronizeMlsRecoverySelection(admission, useAppStore.getState());
                     store.updateInviteRequestStatus(admission.roomId, admission.requestId, "approved");
                     store.setInviteAdmissionForRoom(admission.roomId, null);
                     const roomName = current.roomsRef.current.find((room) => room.id === admission.roomId)?.name;
