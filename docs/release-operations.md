@@ -67,8 +67,8 @@ MULTAIPLAYER_RELAY_REQUIRE_AUTH=true
 MULTAIPLAYER_RELAY_DEBUG=false
 MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
 MULTAIPLAYER_RELAY_RATE_LIMITS=true
-MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
-MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=false
+MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=true
+MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=true
 ```
 
 Generate the stable session secret with a password manager or `openssl rand -base64 32`. Rotating it signs users out. Configure all size, retention, upload, rate, connection, and room quotas from `.env.example`; do not copy a stale second list into this guide.
@@ -91,7 +91,7 @@ The doctor must pass before the endpoint is advertised. Also verify:
 - rate and quota failures are observable without plaintext payloads; and
 - relay storage and traffic contain no plaintext transcripts, attachments, repo files, terminal output, Codex/OpenAI credentials, or plaintext GitHub tokens.
 
-Trust proxy headers only when a documented reverse proxy strips client-supplied forwarding headers and writes its own. In that case set both proxy variables true; otherwise keep both false.
+Trust proxy headers only when a documented reverse proxy strips client-supplied forwarding headers and writes its own. Railway documents `X-Real-IP` as the client address supplied by its public edge, so the official Railway deployment sets both proxy variables true. Other deployments must keep both false unless their proxy provides an equivalent guarantee.
 
 ### Relay rollback
 

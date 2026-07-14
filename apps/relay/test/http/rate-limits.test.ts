@@ -85,6 +85,33 @@ test("relay ignores forwarded IP headers for rate limits unless explicitly trust
   }
 });
 
+test("trusted proxy rate limits prefer the provider-authenticated real IP header", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_RATE_LIMIT_READ: "1",
+    MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS: "60000",
+    MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS: "true",
+    MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED: "true"
+  });
+  try {
+    const first = await fetch(`${relay.baseUrl}/teams`, {
+      headers: { "x-real-ip": "203.0.113.40", "x-forwarded-for": "198.51.100.1" }
+    });
+    assert.equal(first.status, 200);
+
+    const spoofedForwardedFor = await fetch(`${relay.baseUrl}/teams`, {
+      headers: { "x-real-ip": "203.0.113.40", "x-forwarded-for": "198.51.100.2" }
+    });
+    assert.equal(spoofedForwardedFor.status, 429);
+
+    const secondRealIp = await fetch(`${relay.baseUrl}/teams`, {
+      headers: { "x-real-ip": "203.0.113.41", "x-forwarded-for": "198.51.100.1" }
+    });
+    assert.equal(secondRealIp.status, 200);
+  } finally {
+    await relay.close();
+  }
+});
+
 test("rate-limit identifiers prune at the earliest expiry without scanning on every request", () => {
   class CountingMap extends Map<string, RateLimitRecord> {
     entryScans = 0;
