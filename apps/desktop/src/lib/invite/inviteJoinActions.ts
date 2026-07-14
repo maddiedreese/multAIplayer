@@ -25,7 +25,11 @@ import {
 } from "../mlsClient";
 import { randomInviteNonce } from "./mlsInviteProtocol";
 import type { InviteJoinRequest, NoSecretRoomInvite } from "../../types";
-import { completeMlsRelayAdmission, synchronizeMlsRecoverySelection } from "../mlsJoinAdmission";
+import {
+  completeMlsRelayAdmission,
+  pendingInviteMatchesAdmission,
+  synchronizeMlsRecoverySelection
+} from "../mlsJoinAdmission";
 import {
   clearPendingInviteIfMissing,
   publishPendingInviteRequest,
@@ -94,15 +98,7 @@ export function pendingInviteHasMatchingAdmission(
   pending: PendingMlsInviteRequest,
   admissions: readonly MlsJoinAdmission[]
 ): boolean {
-  return admissions.some(
-    (admission) =>
-      admission.requestId === pending.requestId &&
-      admission.inviteId === pending.inviteId &&
-      admission.teamId === pending.teamId &&
-      admission.roomId === pending.roomId &&
-      admission.requesterUserId === pending.requesterUserId &&
-      admission.requesterDeviceId === pending.requesterDeviceId
-  );
+  return admissions.some((admission) => pendingInviteMatchesAdmission(pending, admission));
 }
 
 export async function loadObservedResumablePendingInvites(
