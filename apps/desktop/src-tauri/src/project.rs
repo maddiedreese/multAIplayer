@@ -97,25 +97,64 @@ pub(crate) fn project_file_read(
 ) -> crate::command_error::CommandResult<ProjectFileContent> {
     ensure_existing_dir(&request.cwd)?;
     let root = canonical_project_root(&request.cwd)?;
-    let requested = safe_project_path(&root, &request.path)?;
-    let metadata = fs::metadata(&requested)
-        .map_err(|error| format!("Failed to read file metadata: {error}"))?;
+    let relative = Path::new(&request.path);
+    if relative.is_absolute()
+        || relative
+            .components()
+            .any(|component| matches!(component, Component::ParentDir))
+    {
+        return Err(crate::command_error::CommandError::invalid_argument(
+            "File path must stay inside the project",
+        ));
+    }
+    match fs::metadata(root.join(relative)) {
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Err(crate::command_error::CommandError::not_found(
+                "The requested project file was not found",
+            ));
+        }
+        Err(error) => {
+            return Err(crate::command_error::CommandError::storage(format!(
+                "Failed to read file metadata: {error}"
+            )));
+        }
+    }
+    let requested = safe_project_path(&root, &request.path)
+        .map_err(crate::command_error::CommandError::invalid_argument)?;
+    let metadata = fs::metadata(&requested).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            crate::command_error::CommandError::not_found(
+                "The requested project file was not found",
+            )
+        } else {
+            crate::command_error::CommandError::storage(format!(
+                "Failed to read file metadata: {error}"
+            ))
+        }
+    })?;
     if !metadata.is_file() {
-        return Err(format!("{} is not a file", request.path).into());
+        return Err(crate::command_error::CommandError::invalid_argument(
+            format!("{} is not a file", request.path),
+        ));
     }
     let image_extension = project_image_extension(&request.path);
     if image_extension.is_some() && metadata.len() > MAX_PROJECT_IMAGE_BYTES {
-        return Err(format!(
-            "Image is too large to attach safely ({} bytes; limit {} bytes)",
-            metadata.len(),
-            MAX_PROJECT_IMAGE_BYTES
-        )
-        .into());
+        return Err(crate::command_error::CommandError::invalid_argument(
+            format!(
+                "Image is too large to attach safely ({} bytes; limit {} bytes)",
+                metadata.len(),
+                MAX_PROJECT_IMAGE_BYTES
+            ),
+        ));
     }
     let max_bytes = request.max_bytes.unwrap_or(80_000).clamp(1_024, 250_000);
-    let bytes = fs::read(&requested).map_err(|error| format!("Failed to read file: {error}"))?;
+    let bytes = fs::read(&requested).map_err(|error| {
+        crate::command_error::CommandError::storage(format!("Failed to read file: {error}"))
+    })?;
     if let Some(extension) = image_extension {
-        let media_type = verified_project_image_media_type(extension, &bytes)?;
+        let media_type = verified_project_image_media_type(extension, &bytes)
+            .map_err(crate::command_error::CommandError::invalid_argument)?;
         return Ok(ProjectFileContent {
             path: request.path,
             size: metadata.len(),
@@ -187,14 +226,21 @@ pub(crate) fn project_file_write(
 ) -> crate::command_error::CommandResult<ProjectFileWriteResult> {
     ensure_existing_dir(&request.cwd)?;
     let root = canonical_project_root(&request.cwd)?;
-    let requested = safe_project_write_path(&root, &request.path)?;
+    let requested = safe_project_write_path(&root, &request.path)
+        .map_err(crate::command_error::CommandError::invalid_argument)?;
     if request.content.len() > 1_000_000 {
-        return Err("File content is too large to save from the editor".into());
+        return Err(crate::command_error::CommandError::invalid_argument(
+            "File content is too large to save from the editor",
+        ));
     }
-    fs::write(&requested, request.content.as_bytes())
-        .map_err(|error| format!("Failed to write file: {error}"))?;
-    let metadata = fs::metadata(&requested)
-        .map_err(|error| format!("Failed to read saved file metadata: {error}"))?;
+    fs::write(&requested, request.content.as_bytes()).map_err(|error| {
+        crate::command_error::CommandError::storage(format!("Failed to write file: {error}"))
+    })?;
+    let metadata = fs::metadata(&requested).map_err(|error| {
+        crate::command_error::CommandError::storage(format!(
+            "Failed to read saved file metadata: {error}"
+        ))
+    })?;
     Ok(ProjectFileWriteResult {
         path: request.path,
         size: metadata.len(),

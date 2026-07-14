@@ -32,18 +32,22 @@ pub(crate) fn run_shell_command(
 ) -> crate::command_error::CommandResult<CommandResult> {
     ensure_existing_dir(&request.cwd)?;
     ensure_terminal_command(&request.command)?;
-    let canonical_cwd = state.consume(
-        &request.authorization_token,
-        &request.room_id,
-        &request.cwd,
-        &request.command,
-        ShellExecutionKind::RemoteRequest,
-    )?;
+    let canonical_cwd = state
+        .consume(
+            &request.authorization_token,
+            &request.room_id,
+            &request.cwd,
+            &request.command,
+            ShellExecutionKind::RemoteRequest,
+        )
+        .map_err(crate::command_error::CommandError::unauthorized)?;
 
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
     let output = sandboxed_shell_command(&shell, &canonical_cwd, &request.command)?
         .output()
-        .map_err(|error| format!("Failed to run command: {error}"))?;
+        .map_err(|error| {
+            crate::command_error::CommandError::process(format!("Failed to run command: {error}"))
+        })?;
 
     Ok(CommandResult {
         command: request.command,

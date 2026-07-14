@@ -354,7 +354,16 @@ pub(crate) fn mls_device_auth_sign(
 pub(crate) fn mls_generate_key_package(
     state: tauri::State<'_, MlsNativeState>,
 ) -> crate::command_error::CommandResult<KeyPackagePublish> {
-    let bytes = with_engine(&state, |engine| engine.generate_key_package())?;
+    let engine = state
+        .engine
+        .lock()
+        .map_err(|_| crate::command_error::CommandError::unavailable("MLS state is unavailable"))?;
+    let engine = engine.as_ref().ok_or_else(|| {
+        crate::command_error::CommandError::unavailable("MLS identity is not initialized")
+    })?;
+    let bytes = engine
+        .generate_key_package()
+        .map_err(|error| crate::command_error::CommandError::crypto(safe_error(error)))?;
     let id = uuid::Uuid::new_v4().to_string();
     let key_package_hash = format!("sha256:{:x}", Sha256::digest(&bytes));
     Ok(KeyPackagePublish {

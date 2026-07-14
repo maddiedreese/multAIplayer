@@ -667,6 +667,63 @@ test("TypeScript quality gates stay enforced", () => {
   assert.equal(rootPackage.devDependencies.prettier, "3.9.5");
 });
 
+test("accessibility automation gates the main UI contract surfaces", () => {
+  const helper = readFileSync("e2e/helpers.ts", "utf8");
+  const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+  const requiredScenarios = ["e2e/codex-chat-parity.spec.ts", "e2e/onboarding.spec.ts", "e2e/invite-join.spec.ts"];
+
+  assert.equal(rootPackage.devDependencies["@axe-core/playwright"], "4.12.1");
+  assert.match(helper, /new AxeBuilder\(\{ page \}\)/);
+  for (const tag of ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]) {
+    assert.match(helper, new RegExp(`["]${tag}["]`), `axe helper must retain ${tag}`);
+  }
+  assert.match(helper, /\.analyze\(\)/);
+  for (const scenario of requiredScenarios) {
+    assert.match(
+      readFileSync(scenario, "utf8"),
+      /await expectNoAxeViolations\(page\)/,
+      `${scenario} must execute the shared axe assertion`
+    );
+  }
+  assert.match(workflow, /web-shell-e2e:[\s\S]*run: npm run test:e2e/);
+});
+
+test("the staged exact optional-property migration has an owner and removal trigger", () => {
+  const inventory = readFileSync("docs/compatibility-inventory.md", "utf8");
+  const policy = inventory.match(/`exactOptionalPropertyTypes` remains staged[\s\S]*?(?=\n## |\n$)/)?.[0];
+
+  assert.ok(policy, "compatibility inventory must retain the staged exactOptionalPropertyTypes policy");
+  assert.match(policy, /maintainer owns the migration/);
+  assert.match(policy, /before protocol\/store schema v2 or the first stable release, whichever comes first/);
+  assert.match(policy, /define omitted, explicit `null`, and `undefined` semantics/);
+  assert.match(policy, /enabling the flag/);
+  assert.match(policy, /paragraph is removed when that gate lands/);
+});
+
+test("scheduled native fuzzing restores and saves a growing corpus", () => {
+  const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+  const start = workflow.indexOf("\n  mls-deserialization-fuzz:");
+  const end = workflow.indexOf("\n  mls-validator-benchmark:", start);
+  assert.ok(start >= 0 && end > start, "native fuzz job must remain present");
+  const job = workflow.slice(start, end);
+
+  assert.match(job, /if: github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch'/);
+  assert.match(job, /uses: actions\/cache@[a-f0-9]{40}/);
+  assert.match(job, /path: apps\/desktop\/src-tauri\/crates\/mls-core\/fuzz\/corpus/);
+  assert.match(job, /key: native-fuzz-corpus-[^\n]*\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/);
+  assert.match(job, /restore-keys:[\s\S]*native-fuzz-corpus-[^\n]*\$\{\{ hashFiles\([^\n]+\) \}\}-/);
+  assert.match(job, /fuzz run key_package_deserialization -- -max_total_time=120/);
+  assert.match(job, /fuzz run codex_app_server_projection -- -max_total_time=120/);
+  assert.ok(
+    existsSync(
+      "apps/desktop/src-tauri/crates/mls-core/fuzz/corpus/key_package_deserialization/invalid-key-package-upload.json"
+    )
+  );
+  assert.ok(
+    existsSync("apps/desktop/src-tauri/crates/mls-core/fuzz/corpus/codex_app_server_projection/command-completed.json")
+  );
+});
+
 test("relay HTTP handlers use the structured error taxonomy", () => {
   const handlerFiles = ["apps/relay/src/auth", "apps/relay/src/http"].flatMap((directory) =>
     readdirSync(directory, { recursive: true })

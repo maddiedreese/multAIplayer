@@ -10,7 +10,7 @@ Tauri commands previously rejected with display strings. That made any frontend 
 
 ## Decision
 
-Every fallible Tauri command returns a serializable `CommandError` with a stable snake-case `code` and a bounded human-readable `message`. Internal Rust helpers may retain richer domain errors or `Result<_, String>` while they are not an IPC contract; the outer command assigns an explicit code when frontend recovery needs one and otherwise uses `internal_error`. Codes are never inferred by matching old message text.
+Every fallible Tauri command returns a serializable `CommandError` with a stable snake-case `code` and a bounded human-readable `message`. Rust and TypeScript share the complete code vocabulary: `crypto_error`, `internal_error`, `invalid_argument`, `not_found`, `process_error`, `requires_rejoin`, `storage_error`, `unauthorized`, and `unavailable`. Internal Rust helpers may retain richer domain errors or `Result<_, String>` while they are not an IPC contract; the outer command assigns the narrowest stable category and otherwise uses `internal_error`. Codes are never inferred by matching old message text. `npm run check:tauri-command-errors` fails if a fallible `#[tauri::command]` returns `Result` directly instead of the typed alias.
 
 Every frontend command call goes through `invokeNative`. It validates the rejection shape, produces a real `NativeCommandError`, preserves legacy string readability during migration, and maps malformed values to a fixed internal failure. Frontend control flow branches only on the validated code. Copy remains presentation and may change independently.
 

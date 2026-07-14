@@ -47,7 +47,7 @@ The official invitation transport is an HTTPS universal link, not a custom URL s
 
 ## Official relay deployment
 
-The official relay is a stronger operational commitment than a local self-hosted instance. Use stable HTTPS/WSS routing, persistent mounted storage, provider secret management, rollback support, health checks, backup support, and logs with redaction controls. One instance is acceptable for alpha; a second replica is blocked on shared persistence/attachment coordination and the accepted [edge plus atomic shared-store rate-limiting contract](decisions/multi-instance-rate-limiting.md).
+The official relay is a stronger operational commitment than a local self-hosted instance. Use stable HTTPS/WSS routing, persistent mounted storage, provider secret management, rollback support, health checks, backup support, and logs with redaction controls. One instance is acceptable for alpha; a second replica is blocked on shared persistence/attachment coordination and both the implementation and required adversarial acceptance suite in the accepted [edge plus atomic shared-store rate-limiting contract](decisions/multi-instance-rate-limiting.md).
 
 Start from `.env.example` and set production values in the same environment that launches the relay. The critical shape is:
 

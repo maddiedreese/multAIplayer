@@ -4,8 +4,15 @@ use std::fmt;
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum CommandErrorCode {
+    CryptoError,
     InternalError,
+    InvalidArgument,
+    NotFound,
+    ProcessError,
     RequiresRejoin,
+    StorageError,
+    Unauthorized,
+    Unavailable,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -27,6 +34,34 @@ impl CommandError {
 
     pub(crate) fn requires_rejoin(message: impl Into<String>) -> Self {
         Self::new(CommandErrorCode::RequiresRejoin, message)
+    }
+
+    pub(crate) fn crypto(message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::CryptoError, message)
+    }
+
+    pub(crate) fn invalid_argument(message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::InvalidArgument, message)
+    }
+
+    pub(crate) fn not_found(message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::NotFound, message)
+    }
+
+    pub(crate) fn process(message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::ProcessError, message)
+    }
+
+    pub(crate) fn storage(message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::StorageError, message)
+    }
+
+    pub(crate) fn unauthorized(message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::Unauthorized, message)
+    }
+
+    pub(crate) fn unavailable(message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::Unavailable, message)
     }
 }
 
@@ -75,5 +110,29 @@ mod tests {
         let error = CommandError::from("legacy failure".to_string());
         assert_eq!(error.code, CommandErrorCode::InternalError);
         assert_eq!(error.message, "legacy failure");
+    }
+
+    #[test]
+    fn serializes_every_frontend_supported_code() {
+        let cases = [
+            (CommandError::crypto("message"), "crypto_error"),
+            (CommandError::from("message"), "internal_error"),
+            (
+                CommandError::invalid_argument("message"),
+                "invalid_argument",
+            ),
+            (CommandError::not_found("message"), "not_found"),
+            (CommandError::process("message"), "process_error"),
+            (CommandError::requires_rejoin("message"), "requires_rejoin"),
+            (CommandError::storage("message"), "storage_error"),
+            (CommandError::unauthorized("message"), "unauthorized"),
+            (CommandError::unavailable("message"), "unavailable"),
+        ];
+
+        for (error, expected_code) in cases {
+            let value = serde_json::to_value(error).expect("command error should serialize");
+            assert_eq!(value["code"], expected_code);
+            assert_eq!(value["message"], "message");
+        }
     }
 }
