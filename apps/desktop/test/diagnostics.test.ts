@@ -3,13 +3,11 @@ import test, { beforeEach } from "node:test";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { JSDOM } from "jsdom";
 import {
-  buildWebPreviewDiagnosticBundle,
   clearDiagnosticEntries,
   loadDiagnosticEntries,
   recordDiagnosticEvent,
   saveNativeDiagnosticBundle
 } from "../src/lib/diagnostics";
-import { appVersion } from "../src/lib/appVersion";
 import { reportExpectedFailure, reportNonFatal } from "../src/lib/nonFatalReporting";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
@@ -279,23 +277,6 @@ test("diagnostic memory ring retains only the newest 80 entries", () => {
   assert.equal(entries.length, 80);
   assert.equal(entries[0].message, "Event 5");
   assert.equal(entries[79].message, "Event 84");
-});
-
-test("web-preview bundle includes app metadata and relay origins only", () => {
-  localStorage.setItem(
-    "multaiplayer:app-config",
-    JSON.stringify({
-      relayHttpUrl: "https://relay.example.com/api?secret=1",
-      relayWsUrl: "wss://relay.example.com/rooms?secret=1"
-    })
-  );
-  recordDiagnosticEvent("warn", "Something happened");
-  const bundle = buildWebPreviewDiagnosticBundle(new Date("2026-07-08T00:00:00.000Z"));
-  const parsedBundle = JSON.parse(bundle) as { app: { version: string } };
-  assert.equal(parsedBundle.app.version, appVersion);
-  assert.match(bundle, /"httpOrigin": "https:\/\/relay\.example\.com"/);
-  assert.match(bundle, /"wsOrigin": "wss:\/\/relay\.example\.com"/);
-  assert.doesNotMatch(bundle, /secret=1/);
 });
 
 test("native bundle save sends bounded context but never reads persisted entries into JavaScript", async () => {

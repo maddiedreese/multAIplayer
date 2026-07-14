@@ -27,6 +27,17 @@ test("relay validates PORT with the bounded integer parser", () => {
   }
 });
 
+test("relay defaults to the disclosed public and private GitHub repository scopes", () => {
+  const previous = process.env.GITHUB_OAUTH_SCOPES;
+  try {
+    delete process.env.GITHUB_OAUTH_SCOPES;
+    assert.deepEqual(loadRelayConfig().githubOAuthScopes, ["read:user", "repo"]);
+  } finally {
+    if (previous === undefined) delete process.env.GITHUB_OAUTH_SCOPES;
+    else process.env.GITHUB_OAUTH_SCOPES = previous;
+  }
+});
+
 test("relay only enables metrics with a strong bearer token", () => {
   const previous = process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN;
   try {

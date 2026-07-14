@@ -11,7 +11,7 @@ Protocol v2 is a clean break. Pre-v2 rooms and invite links are invalid and ther
 - Credential: MLS BasicCredential binding GitHub user id and device id.
 - Fingerprint: full SHA-256 digest of the MLS signature public key.
 - Authority: only the currently designated active-host leaf may produce a Commit.
-- Browser: seeded local demo rooms only; no browser MLS implementation.
+- Browser: static native-app notice only; no workspace, relay client, identity, or browser MLS implementation.
 
 All group state and cryptographic operations live in Rust. Webview IPC accepts bounded intents and returns plaintext display data, public state, opaque MLS messages, or opaque handles. It never returns signature private keys, HPKE private keys, group secrets, exporter output, or retained history secrets.
 

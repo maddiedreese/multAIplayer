@@ -28,11 +28,15 @@ test("release workflow validates signed and notarized macOS artifacts", () => {
   assert.match(releaseWorkflow, /xcrun stapler validate "\$dmg_path"/);
   assert.match(releaseWorkflow, /spctl -a -vvv -t install "\$app_path"/);
   assert.match(releaseWorkflow, /spctl -a -vvv -t open --context context:primary-signature "\$dmg_path"/);
+  assert.match(releaseWorkflow, /lipo -archs "\$app_path\/Contents\/MacOS\/multAIplayer"/);
+  assert.match(releaseWorkflow, /Release executable must contain only arm64/);
+  assert.match(releaseWorkflow, /LSMinimumSystemVersion/);
   assert.match(releaseWorkflow, /shasum -a 256 \* > SHA256SUMS\.txt/);
 });
 
 test("release workflow packages the frontend already produced by preflight", () => {
   assert.match(releaseWorkflow, /run: npm run release:preflight/);
-  assert.match(releaseWorkflow, /run: npm run tauri:build:prebuilt -w @multaiplayer\/desktop/);
+  assert.match(releaseWorkflow, /run: npm run tauri:build:release -w @multaiplayer\/desktop/);
+  assert.match(releaseWorkflow, /aarch64-apple-darwin/);
   assert.doesNotMatch(releaseWorkflow, /run: npm run tauri:build -w @multaiplayer\/desktop/);
 });

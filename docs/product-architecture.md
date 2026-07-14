@@ -198,7 +198,7 @@ Rooms have persistent named terminal sessions per project room, such as:
 
 The terminal surface uses xterm.js as the emulator and a Rust PTY layer through `portable-pty` in the Tauri host. Before Rust starts either a one-shot command or an interactive PTY, the native app displays the exact command, room, and canonical working directory in an operating-system dialog. For a one-shot room request, the host can run once or choose “Repeat this command text for 10 minutes.” This in-memory grant binds those exact command bytes to that exact room and canonical workspace. The dialog warns that workspace files, scripts, hooks, configuration, and environment may change between runs. Rust performs matching and expiry; grants do not survive app restart and the terminal panel provides native-confirmed room revocation. They are never executable-name or command-family patterns. Every PTY input write still has its own native confirmation bound to the exact room, terminal session, and input bytes, with control characters escaped for review. Each confirmation issues a short-lived, one-use authorization that Rust atomically consumes before spawning or writing. The webview cannot authorize shell execution or inject input into an approved session by itself. New terminal creation, live terminal listing, terminal selection, restart, stop, and interactive input are active-host local workspace actions. The alpha does not present a separate command-composer UI beside xterm; users type directly into the terminal surface.
 
-Terminal requests are MLS application events. The relay routes the opaque message but cannot read the command or event kind. The active host sees the requester and command before approving or denying it locally. Approved terminal requests always execute from the active room's selected project folder on the host machine; the host app does not trust a requester-provided working directory. Approval grants shell access on the host account, not a project sandbox.
+Terminal requests are MLS application events. The relay routes the opaque message but cannot read the command or event kind. The active host sees the requester and command before approving or denying it locally. Approved terminal requests always execute from the active room's selected project folder on the host machine; the host app does not trust a requester-provided working directory. After approval, the macOS host executes the command with an OS sandbox profile: writes are confined to the canonical selected project, reads are allowed from that project and named system/toolchain locations, and process creation plus network access remain available. This is project-filesystem confinement, not complete host isolation; workspace scripts, inherited environment values, and network-visible services remain security-sensitive.
 
 The macOS alpha bounds approved one-shot terminal commands and interactive terminal input to 4,000 characters each, caps one-shot command output at 120,000 characters with an explicit truncation marker, and keeps the latest 1,000 output chunks per terminal session in memory. Terminal snapshots are saved in encrypted local room history as stopped/restartable sessions, so a room can remember its named terminal roster and recent output after reload without claiming the underlying OS process survived. The desktop room activity feed for terminal, Codex, Git, and Actions events is also scoped per room and capped to the latest 1,000 lines per room.
 
@@ -216,13 +216,15 @@ Local preview sharing uses `cloudflared` on the active host's machine to create 
 
 ### GitHub And Git
 
+The relay-side GitHub proxy transiently receives the plaintext repository owner/name and explicit PR title/body/head/base needed to forward a user-approved PR operation, plus GitHub run metadata returned for Actions refreshes. It does not add those operation fields to relay persistence or structured logs by design. GitHub display identity and registered device display/public-key information are visible to authorized teammates through presence and roster surfaces.
+
 GitHub is used for identity in v1.
 
 GitHub authentication uses OAuth Device Flow. The relay owns the polling device code and eventual access token; the desktop receives only the short user code, verification URL, expiry, and completion state needed for presentation. The blocking onboarding assistant renders those controls directly. ChatGPT authentication is unrelated: the desktop asks the local Codex app-server to start its supported browser or device flow, and Codex retains the resulting credentials. Join readiness requires relay access and GitHub identity, but Codex installation, ChatGPT authorization, and a project folder are deferrable until that device hosts Codex. Create readiness keeps those host prerequisites blocking.
 
-Authentication navigation crosses a deliberately narrow native boundary. TypeScript allowlists exact HTTPS provider hosts and the GitHub device path; Rust independently revalidates provider, scheme, authority, path, bounds, and credential/port restrictions before the native opener launches the system default browser. Browser preview uses `window.open` only after the same TypeScript validation. Login ids, polling device codes, user codes, verification URLs, invite values, and account details are not onboarding persistence fields.
+Authentication navigation crosses a deliberately narrow native boundary. TypeScript allowlists exact HTTPS provider hosts and the GitHub device path; Rust independently revalidates provider, scheme, authority, path, bounds, and credential/port restrictions before the native opener launches the system default browser. Login ids, polling device codes, user codes, verification URLs, invite values, and account details are not onboarding persistence fields.
 
-GitHub OAuth is configurable through `GITHUB_OAUTH_SCOPES`, and the app displays the active scopes in Account settings. The default is `read:user public_repo` for open-source PR creation; self-hosters can use `read:user repo` when private repository PRs are required.
+GitHub OAuth is configurable through `GITHUB_OAUTH_SCOPES`, and the app displays the active scopes in Account settings. The official/default configuration is `read:user repo` so GitHub workflows can operate on both public and private repositories. GitHub's `repo` scope grants broad access to repositories the signed-in user can access; public-only self-hosters may narrow it to `read:user public_repo`.
 
 Git operations in v1:
 
@@ -240,7 +242,7 @@ When a room has an attached local project with a GitHub `origin` remote, the des
 
 Before a host can approve a workflow that pushes and opens a draft PR, the desktop performs a GitHub readiness check. On the official hosted relay, GitHub sign-in is required for identity and GitHub workflows. Local-only branch and commit workflows without GitHub sign-in may exist only for local/LAN or self-hosted relays configured without GitHub auth. Push/PR workflows require a signed-in GitHub session, a relay with GitHub OAuth configured, PR-capable OAuth scopes (`public_repo` for public repos or `repo` for private repos), and normalized owner/repo/base/head values. The app shows any blocker before approval so a host does not run local git steps and only then discover that the PR cannot be created.
 
-The open-source repo includes a GitHub Actions CI workflow. It checks, tests, and builds all TypeScript workspaces on Ubuntu; on the pinned `macos-15` runner it runs native formatting, lints, and tests, builds the desktop prerequisites, executes the real two-process native-core/relay/validator composition journey, then builds an ad-hoc-signed desktop app and uploads the `.app` and `.dmg` artifacts for inspection. The ad-hoc (`-`) identity uses no Apple account or Developer ID certificate and exists so CI can inspect the assembled entitlement; these artifacts are not trusted distribution builds and do not prove universal-link dispatch. Tauri is configured for those two macOS bundle formats only; Windows and Linux desktop bundles are outside the supported alpha surface until corresponding CI and release verification exist. The repo requires Node.js 22 or newer through package metadata, provides `.nvmrc` for the CI major, and provides `npm run doctor` as a read-only local setup check for Node/npm/Rust/Cargo and macOS packaging prerequisites.
+The open-source repo includes a GitHub Actions CI workflow. It checks, tests, and builds all TypeScript workspaces on Ubuntu; on the pinned `macos-15` runner it runs native formatting, lints, and tests, builds the desktop prerequisites, executes the real two-process native-core/relay/validator composition journey, then builds an ad-hoc-signed Apple silicon desktop app and uploads the `.app` and `.dmg` artifacts for inspection. Both CI and release build `aarch64-apple-darwin` explicitly and reject a package unless its executable is arm64-only and its `LSMinimumSystemVersion` is 11.0. The ad-hoc (`-`) identity uses no Apple account or Developer ID certificate and exists so CI can inspect the assembled entitlement; these artifacts are not trusted distribution builds and do not prove universal-link dispatch. Intel Macs, Windows, and Linux are outside the supported alpha release surface. The repo requires Node.js 22 or newer through package metadata, provides `.nvmrc` for the CI major, and provides `npm run doctor` as a read-only local setup check for Node/npm/Rust/Cargo and macOS packaging prerequisites.
 
 Example approval:
 
@@ -308,7 +310,7 @@ E2EE model:
 - the active host produces transactionally persisted Add, Remove, Update, and handoff Commits; clients and relay reject other committers;
 - authenticated application metadata uses canonical serialization in MLS `authenticated_data`;
 - MLS state and exporter-derived history secrets stay in encrypted native SQLite with Keychain-held wrapping material;
-- the web preview is a seeded local demonstration and cannot participate in E2EE rooms;
+- browser builds are a static native-app notice and cannot initialize a workspace, identity, relay connection, or MLS state;
 - encrypted local history is stored on device;
 - losing a device/key may make old local history unrecoverable until recovery is designed.
 
@@ -455,7 +457,7 @@ Right sidebar / inspector:
   Diffs
   Git status
   PR details
-  Browser preview
+  Embedded room browser
   Room settings
 
 Bottom panel:

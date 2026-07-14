@@ -134,6 +134,7 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     addTeamMember: options.addTeamMember,
     revokeTeamInvites: options.revokeTeamInvites,
     revokeTeamMemberSessions: roomManager.revokeTeamMemberSessions,
+    revokeUserPresence: roomManager.revokeUserPresence,
     broadcastWorkspaceUpdated: fanout.broadcastWorkspaceUpdated,
     broadcastRoomUpdated: fanout.broadcastRoomUpdated,
     maxTeamNameChars,

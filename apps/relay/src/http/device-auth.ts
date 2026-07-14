@@ -2,7 +2,6 @@ import { sendRelayError } from "./errors.js";
 import { createPublicKey, randomBytes, verify } from "node:crypto";
 import type { Express, Response } from "express";
 import type { AuthSession, RelayStore } from "../state.js";
-const challenges = new Map<string, { userId: string; deviceId: string; expiresAt: number }>();
 export function registerDeviceAuthRoutes(options: {
   app: Express;
   store: RelayStore;
@@ -16,11 +15,15 @@ export function registerDeviceAuthRoutes(options: {
     if (!s || !options.store.getDevice(s.user.id, d))
       return void sendRelayError(res, 404, "not_found", "Device not found.");
     pruneExpired(options.store);
-    if (challenges.size >= 10_000 || pendingChallengeCount(s.user.id, d) >= 5) {
+    if (options.store.deviceChallenges.size >= 10_000 || pendingChallengeCount(options.store, s.user.id, d) >= 5) {
       return void sendRelayError(res, 429, "rate_limited", "Device challenge limit exceeded.");
     }
     const challenge = randomBytes(32).toString("base64");
-    challenges.set(challenge, { userId: s.user.id, deviceId: d, expiresAt: Date.now() + 60_000 });
+    options.store.deviceChallenges.set(challenge, {
+      userId: s.user.id,
+      deviceId: d,
+      expiresAt: Date.now() + 60_000
+    });
     res.json({ challenge, expiresAt: new Date(Date.now() + 60_000).toISOString() });
   });
   options.app.post("/devices/:deviceId/session", (req, res) => {
@@ -32,8 +35,8 @@ export function registerDeviceAuthRoutes(options: {
     if (!isCanonicalBase64(challenge, 32) || !isCanonicalBase64(signature, undefined, 256)) {
       return void sendRelayError(res, 403, "device_auth_required", "Invalid device proof encoding.");
     }
-    const pending = challenges.get(challenge);
-    challenges.delete(challenge);
+    const pending = options.store.deviceChallenges.get(challenge);
+    options.store.deviceChallenges.delete(challenge);
     const device = s && options.store.getDevice(s.user.id, d);
     if (
       !s ||
@@ -70,13 +73,15 @@ export function registerDeviceAuthRoutes(options: {
 
 function pruneExpired(store: RelayStore) {
   const now = Date.now();
-  for (const [challenge, item] of challenges) if (item.expiresAt < now) challenges.delete(challenge);
+  for (const [challenge, item] of store.deviceChallenges)
+    if (item.expiresAt < now) store.deviceChallenges.delete(challenge);
   for (const [token, item] of store.deviceSessions) if (item.expiresAt < now) store.deviceSessions.delete(token);
 }
 
-function pendingChallengeCount(userId: string, deviceId: string): number {
+function pendingChallengeCount(store: RelayStore, userId: string, deviceId: string): number {
   let count = 0;
-  for (const item of challenges.values()) if (item.userId === userId && item.deviceId === deviceId) count += 1;
+  for (const item of store.deviceChallenges.values())
+    if (item.userId === userId && item.deviceId === deviceId) count += 1;
   return count;
 }
 

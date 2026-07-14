@@ -24,14 +24,14 @@ import { createAppRoomPanelActions } from "./lib/appRoomPanelActions";
 import { AppShellView } from "./components/AppShellView";
 import { CodexServerRequestDialog } from "./components/CodexServerRequestDialog";
 import { defaultBrowserReason, defaultBrowserUrl, emptyRoom, maxTerminalActivityLines } from "./appDefaults";
-import { WebPreviewDemo } from "./components/WebPreviewDemo";
+import { NativeAppRequired } from "./components/NativeAppRequired";
 import { CodexAccountProvider } from "./hooks/useCodexAccount";
 import { OnboardingAssistant } from "./components/OnboardingAssistant";
 import { useOnboardingFlow } from "./hooks/useOnboardingFlow";
 import { useNativeInviteIntake } from "./hooks/useNativeInviteIntake";
 
 export function App() {
-  if (!isTauriRuntime()) return <WebPreviewDemo />;
+  if (!isTauriRuntime()) return <NativeAppRequired />;
   return (
     <CodexAccountProvider>
       <NativeApp />

@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve multAIplayer. Do not paste secrets, private repo code, room keys, GitHub tokens, Codex credentials, or plaintext private room transcripts.
+        Thanks for helping improve multAIplayer. Never paste a complete invitation link or any invite fragment. Do not paste secrets, private repo code, room keys, GitHub tokens, Codex credentials, or plaintext private room transcripts.
   - type: textarea
     id: summary
     attributes:
@@ -50,4 +50,4 @@ body:
     id: logs
     attributes:
       label: Logs or screenshots
-      description: Redact secrets and private repo content before attaching anything.
+      description: Redact secrets, complete invite links/fragments, and private repo content before attaching anything.

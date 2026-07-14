@@ -153,7 +153,7 @@ export function loadRelayConfig(): RelayConfig {
 }
 
 function parseGitHubScopes(value: string | undefined): string[] {
-  return parseListEnv(value ?? "read:user public_repo");
+  return parseListEnv(value ?? "read:user repo");
 }
 
 function parseStorageBackend(value: string | undefined): RelayStorageBackend {

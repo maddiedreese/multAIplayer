@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Do not paste production secrets, GitHub OAuth secrets, access tokens, private room data, relay store contents, or unredacted logs.
+        Never paste a complete invitation link or any invite fragment. Do not paste production secrets, GitHub OAuth secrets, access tokens, private room data, relay store contents, or unredacted logs.
   - type: dropdown
     id: deployment_type
     attributes:
@@ -30,7 +30,7 @@ body:
     id: production_doctor
     attributes:
       label: Production doctor result
-      description: Paste the redacted output of `NODE_ENV=production npm run doctor:production-relay` if relevant.
+      description: Paste the redacted output of `NODE_ENV=production npm run doctor:production-relay` if relevant. Remove complete invite links/fragments.
       render: shell
   - type: textarea
     id: config
@@ -46,4 +46,4 @@ body:
     id: logs
     attributes:
       label: Redacted logs or screenshots
-      description: Remove tokens, cookies, private room ids, invite fragments, repo data, and user content.
+      description: Remove tokens, cookies, private room ids, complete invitation links and fragments, repo data, and user content.

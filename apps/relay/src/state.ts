@@ -74,6 +74,15 @@ export interface RateLimitRecord {
   count: number;
   resetAt: number;
 }
+export interface ByteQuotaRecord {
+  bytes: number;
+  resetAt: number;
+}
+export interface DeviceChallengeRecord {
+  userId: string;
+  deviceId: string;
+  expiresAt: number;
+}
 export interface DeviceSessionRecord {
   token: string;
   userId: string;
@@ -122,6 +131,10 @@ export interface RelayStore {
   attachmentBlobs: Map<string, AttachmentBlobRecord>;
   teamMembers: Map<string, Map<string, TeamMemberRecord>>;
   rateLimitStore: Map<string, RateLimitRecord>;
+  dailyTeamCreationCounts: Map<string, RateLimitRecord>;
+  dailyRoomCreationCounts: Map<string, RateLimitRecord>;
+  attachmentBlobUploadByteCounts: Map<string, ByteQuotaRecord>;
+  deviceChallenges: Map<string, DeviceChallengeRecord>;
   deviceSessions: Map<string, DeviceSessionRecord>;
   allTeams(): TeamRecord[];
   getTeam(teamId: string): TeamRecord | undefined;
@@ -176,6 +189,10 @@ export class InMemoryRelayStore implements RelayStore {
     this.durableMutations.push({ entity: "teamMembers", key })
   );
   readonly rateLimitStore = new Map<string, RateLimitRecord>();
+  readonly dailyTeamCreationCounts = new Map<string, RateLimitRecord>();
+  readonly dailyRoomCreationCounts = new Map<string, RateLimitRecord>();
+  readonly attachmentBlobUploadByteCounts = new Map<string, ByteQuotaRecord>();
+  readonly deviceChallenges = new Map<string, DeviceChallengeRecord>();
   readonly deviceSessions = new Map<string, DeviceSessionRecord>();
 
   allTeams(): TeamRecord[] {

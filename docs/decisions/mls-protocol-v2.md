@@ -44,9 +44,9 @@ This is a deliberate product-policy tradeoff. MLS provides forward secrecy for l
 
 History secrets, exporter output, epoch secrets, signature private keys, and group state never cross the Rust IPC boundary. They are stored only in the encrypted local provider, whose wrapping key is held by the operating-system credential store.
 
-### Browser preview
+### Browser builds
 
-Full MLS rooms are native-only. The browser/web preview is demoted to local seeded demo rooms and does not create, join, decrypt, or participate in end-to-end encrypted relay rooms.
+Full MLS rooms are native-only. Browser builds are a static native-app notice and do not initialize a workspace, identity, relay connection, or MLS implementation.
 
 The project will not ship a second MLS implementation in TypeScript or put production MLS keys in browser WASM linear memory. If a future browser product needs MLS, it must reuse the Rust core and receive a separate threat-model review of its weaker key-handling boundary before that capability is enabled.
 

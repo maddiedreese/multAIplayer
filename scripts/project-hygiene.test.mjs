@@ -169,12 +169,23 @@ test("local runtime and desktop bundle targets match supported CI", () => {
     null,
     "ordinary local builds must not silently select a signing identity"
   );
+  assert.equal(
+    tauriConfig.bundle.macOS.minimumSystemVersion,
+    "11.0",
+    "the Apple silicon package must declare its supported macOS floor"
+  );
 
   const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
   const release = readFileSync(".github/workflows/release.yml", "utf8");
+  const deploymentTargetCheck = readFileSync("scripts/verify-macos-deployment-target.sh", "utf8");
+  assert.match(
+    deploymentTargetCheck,
+    /lipo "\$candidate" -verify_arch arm64/,
+    "every bundled Mach-O file must be checked for Apple silicon support"
+  );
   assert.match(
     workflow,
-    /Build ad-hoc signed Tauri app[\s\S]{0,160}APPLE_SIGNING_IDENTITY: "-"[\s\S]{0,160}tauri:build:prebuilt/,
+    /Build ad-hoc signed Tauri app[\s\S]{0,160}APPLE_SIGNING_IDENTITY: "-"[\s\S]{0,160}tauri:build:release/,
     "macOS CI must explicitly ad-hoc sign the inspection bundle before verifying entitlements"
   );
   for (const [name, source] of [
@@ -183,8 +194,21 @@ test("local runtime and desktop bundle targets match supported CI", () => {
   ]) {
     assert.match(source, /node-version: 22/, `${name} must use the documented Node baseline`);
     assert.match(source, /runs-on: macos-15/, `${name} must build the supported desktop platform`);
-    assert.match(source, /bundle\/macos\/multAIplayer\.app/, `${name} must handle the configured app bundle`);
-    assert.match(source, /bundle\/dmg/, `${name} must handle the configured DMG bundle`);
+    assert.match(source, /aarch64-apple-darwin/, `${name} must build the Apple silicon target`);
+    assert.match(source, /lipo -archs/, `${name} must verify the packaged executable architecture`);
+    assert.match(source, /LSMinimumSystemVersion/, `${name} must verify the packaged macOS floor`);
+    assert.match(source, /MACOSX_DEPLOYMENT_TARGET: "11\.0"/, `${name} must compile for the documented macOS floor`);
+    assert.match(
+      source,
+      /verify-macos-deployment-target\.sh/,
+      `${name} must inspect Mach-O build-version load commands`
+    );
+    assert.match(
+      source,
+      /(?:bundle\/macos\/multAIplayer\.app|\$bundle_root\/macos\/multAIplayer\.app)/,
+      `${name} must handle the configured app bundle`
+    );
+    assert.match(source, /(?:bundle\/dmg|\$bundle_root\/dmg)/, `${name} must handle the configured DMG bundle`);
   }
 });
 
@@ -264,7 +288,7 @@ test("CI verifies each layer once before packaging prebuilt desktop assets", () 
   assert.match(workflow, /relay-authorization-mutation:\n\s+name: Relay authorization mutation policy/);
   assert.match(workflow, /protocol-type-guard-mutation:\n\s+name: Protocol type-guard mutation policy/);
   assert.equal(workflow.match(/run: npm run build -w @multaiplayer\/desktop$/gm)?.length, 1);
-  assert.equal(workflow.match(/run: npm run tauri:build:prebuilt -w @multaiplayer\/desktop$/gm)?.length, 1);
+  assert.equal(workflow.match(/run: npm run tauri:build:release -w @multaiplayer\/desktop$/gm)?.length, 1);
   assert.doesNotMatch(workflow, /run: npm run (?:check|test|build)$/m);
 });
 

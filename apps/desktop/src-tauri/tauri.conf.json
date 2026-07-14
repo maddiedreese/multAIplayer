@@ -28,6 +28,7 @@
     "targets": ["app", "dmg"],
     "macOS": {
       "hardenedRuntime": true,
+      "minimumSystemVersion": "11.0",
       "signingIdentity": null,
       "entitlements": "Entitlements.plist"
     },

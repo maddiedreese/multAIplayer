@@ -4,7 +4,7 @@ import {
   maxAttachmentBlobIdChars,
   type AttachmentBlobRecord as AttachmentBlobRecordType
 } from "@multaiplayer/protocol";
-import type { AuthSession, RelayStore } from "../state.js";
+import type { AuthSession, ByteQuotaRecord, RelayStore } from "../state.js";
 import { isStrictExporterCiphertextJson } from "../opaque.js";
 
 interface RegisterAttachmentRoutesOptions {
@@ -29,13 +29,6 @@ interface RegisterAttachmentRoutesOptions {
   maxCiphertextCharactersForBlob: (maxBytes: number) => number;
   isExpiredAttachmentBlob: (blob: AttachmentBlobRecordType) => boolean;
 }
-
-interface ByteQuotaRecord {
-  bytes: number;
-  resetAt: number;
-}
-
-const attachmentBlobUploadByteCounts = new Map<string, ByteQuotaRecord>();
 
 export function registerAttachmentRoutes({
   app,
@@ -153,6 +146,7 @@ export function registerAttachmentRoutes({
       }
       if (
         !consumeAttachmentUploadByteQuota({
+          counts: store.attachmentBlobUploadByteCounts,
           userId: session.user.id,
           bytes: size,
           limit: attachmentBlobUploadBytesPerWindow,
@@ -224,6 +218,7 @@ function hasExactKeys(value: unknown, allowed: string[]): value is Record<string
 }
 
 function consumeAttachmentUploadByteQuota({
+  counts,
   userId,
   bytes,
   limit,
@@ -232,6 +227,7 @@ function consumeAttachmentUploadByteQuota({
   recordUploadRejection,
   res
 }: {
+  counts: Map<string, ByteQuotaRecord>;
   userId: string;
   bytes: number;
   limit: number;
@@ -242,8 +238,8 @@ function consumeAttachmentUploadByteQuota({
 }): boolean {
   const quota = "attachment_blob_upload_bytes";
   const now = Date.now();
-  pruneByteQuotaRecords(attachmentBlobUploadByteCounts, now);
-  const current = attachmentBlobUploadByteCounts.get(userId);
+  pruneByteQuotaRecords(counts, now);
+  const current = counts.get(userId);
   const record = current && current.resetAt > now ? current : { bytes: 0, resetAt: now + windowMs };
   if (record.bytes + bytes > limit) {
     const retryAfterSeconds = Math.max(1, Math.ceil((record.resetAt - now) / 1000));
@@ -262,7 +258,7 @@ function consumeAttachmentUploadByteQuota({
     });
     return false;
   }
-  attachmentBlobUploadByteCounts.set(userId, {
+  counts.set(userId, {
     bytes: record.bytes + bytes,
     resetAt: record.resetAt
   });
@@ -270,7 +266,6 @@ function consumeAttachmentUploadByteQuota({
 }
 
 function pruneByteQuotaRecords(records: Map<string, ByteQuotaRecord>, now = Date.now()) {
-  if (records.size < 10_000) return;
   for (const [key, record] of records.entries()) {
     if (record.resetAt <= now) records.delete(key);
   }

@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { installGlobalDiagnostics } from "./lib/diagnostics";
+import { isTauriRuntime } from "./lib/localBackend/runtime";
 import "@xterm/xterm/css/xterm.css";
 import "./styles.css";
 
@@ -10,7 +11,7 @@ async function bootstrap() {
     await import("@wdio/tauri-plugin");
   }
 
-  installGlobalDiagnostics();
+  if (isTauriRuntime()) installGlobalDiagnostics();
   createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
       <App />

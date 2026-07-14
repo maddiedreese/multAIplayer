@@ -141,6 +141,17 @@ export function createRelayRoomSocketManager({
     }
   }
 
+  function revokeUserPresence(userId: string) {
+    for (const [key, roster] of roomPresence) {
+      for (const [deviceId, presence] of roster) {
+        if (presence.userId !== userId) continue;
+        roster.delete(deviceId);
+        broadcast(key, { type: "presence", ...presence, status: "offline" });
+      }
+      if (roster.size === 0) roomPresence.delete(key);
+    }
+  }
+
   function consumeApprovedInvite(
     inviteId: string,
     teamId: string,
@@ -172,6 +183,7 @@ export function createRelayRoomSocketManager({
     leaveRoom,
     leaveTeams,
     leaveWorkspace,
-    revokeTeamMemberSessions
+    revokeTeamMemberSessions,
+    revokeUserPresence
   };
 }

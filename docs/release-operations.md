@@ -14,7 +14,7 @@ This covers the TypeScript and Rust verification suites, package/application bui
 
 Release Please maintains [the project changelog](../CHANGELOG.md), workspace versions, release pull request, version tag, and GitHub Release from Conventional Commit subjects. Its `extra-files` configuration updates exact internal npm pins together with the Tauri Cargo version and Codex app-server client version; the workflow then deterministically regenerates npm lock metadata, synchronizes the native Cargo lock package version, and signs that follow-up commit. The project-hygiene suite checks every synchronized version source and the lock synchronization path; review the resulting diff on every generated release pull request. With the built-in Actions token, GitHub suppresses recursive pull-request workflows, so a maintainer must close and reopen the generated pull request to create the required CI event. An optional fine-grained `RELEASE_PLEASE_TOKEN` with repository Contents and Pull requests read/write access removes that step. When the built-in token creates the tag, the preparation workflow explicitly dispatches the signed-artifact workflow. Merging the generated pull request attaches the notarized app, checksums, SBOM, and attestations to the generated release. Do not maintain point-in-time release-note drafts in `docs/`.
 
-Before a wider alpha, manually verify on two macOS devices and two GitHub accounts:
+Before a wider alpha, manually verify on two Apple silicon Macs running macOS 11 or later and two GitHub accounts:
 
 - first-run create and join readiness, GitHub Device Flow in the system browser, local Codex/ChatGPT browser or device login, cancellation, and copy-link recovery when the browser cannot open;
 - a signed, installed build receiving the official HTTPS invitation as both a cold start and a warm-app activation, including the explicit alternate-host retry after installation; confirm that neither app nor website logs, storage, analytics, or network requests contain the fragment;
@@ -33,13 +33,15 @@ Do not present the alpha as externally audited, production-ready, enterprise com
 Decide and record the official website, relay HTTP origin, relay WebSocket URL, GitHub OAuth owner/scopes, hosting provider, release cadence, support expectation, disclosure contact, and Apple signing identity. Do not ship a desktop build until these operator-owned values are configured. Use this shape when recording the final values:
 
 ```text
-Website: https://<official-site>
-Relay API: https://<relay-host>
-Relay rooms: wss://<relay-host>/rooms
-GitHub scopes: read:user public_repo
+Website: https://multaiplayer.com
+Relay provider: Railway
+Relay API: https://relay.multaiplayer.com
+Relay rooms: wss://relay.multaiplayer.com/rooms
+GitHub scopes: read:user repo
+Desktop support: Apple silicon, macOS 11 or later
 ```
 
-Use `read:user repo` only after making private-repository access an explicit product and trust decision. Codex/OpenAI credentials never belong in the relay: Codex uses the active host's local app-server.
+The official alpha deliberately supports both public and private repositories. Disclose that GitHub's broad `repo` scope covers repositories the signed-in user can access. Codex/OpenAI credentials never belong in the relay: Codex uses the active host's local app-server.
 
 The desktop release build should set `VITE_RELAY_HTTP_URL` and `VITE_RELAY_URL` to the final hosted endpoints, and its CSP must allow exactly those origins. Publish `https://<official-site>/releases/latest.json` for each release; set `security: true` for security fixes.
 
@@ -47,14 +49,14 @@ The official invitation transport is an HTTPS universal link, not a custom URL s
 
 ## Official relay deployment
 
-The official relay is a stronger operational commitment than a local self-hosted instance. Use stable HTTPS/WSS routing, persistent mounted storage, provider secret management, rollback support, health checks, backup support, and logs with redaction controls. One instance is acceptable for alpha; a second replica is blocked on shared persistence/attachment coordination and both the implementation and required adversarial acceptance suite in the accepted [edge plus atomic shared-store rate-limiting contract](decisions/multi-instance-rate-limiting.md).
+The official free-alpha relay is planned for Railway and is not live until this runbook's DNS, persistence, secrets, TLS/WSS, monitoring, and backup/restore gates pass. Deploy the repository's relay container with Railway-managed secrets, HTTPS/WSS custom-domain routing, and a persistent volume mounted at the configured SQLite path. Railway will be an infrastructure processor, not an additional identity provider or plaintext room-content service. The official relay is a stronger operational commitment than a local self-hosted instance: retain rollback support, health checks, backups, and logs with redaction controls. One instance is acceptable for alpha; a second replica is blocked on shared persistence/attachment coordination and both the implementation and required adversarial acceptance suite in the accepted [edge plus atomic shared-store rate-limiting contract](decisions/multi-instance-rate-limiting.md).
 
 Start from `.env.example` and set production values in the same environment that launches the relay. The critical shape is:
 
 ```bash
 NODE_ENV=production
 GITHUB_CLIENT_ID=...
-GITHUB_OAUTH_SCOPES="read:user public_repo"
+GITHUB_OAUTH_SCOPES="read:user repo"
 MULTAIPLAYER_RELAY_SESSION_SECRET=...
 MULTAIPLAYER_RELAY_STORAGE=sqlite
 MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
@@ -106,7 +108,7 @@ APPLE_TEAM_ID
 KEYCHAIN_PASSWORD
 ```
 
-It builds the macOS app/DMG, verifies Developer ID signing and stapled notarization, runs Gatekeeper checks, writes checksums, emits an SPDX SBOM, records build-provenance attestations, and keyless-signs the checksum manifest and SBOM with Sigstore. Missing signing secrets fail the release; do not publish ad hoc or unsigned local builds as public artifacts.
+It builds only `aarch64-apple-darwin`, verifies that the executable is arm64-only and declares `LSMinimumSystemVersion` 11.0, then verifies Developer ID signing and stapled notarization, runs Gatekeeper checks, writes checksums, emits an SPDX SBOM, records build-provenance attestations, and keyless-signs the checksum manifest and SBOM with Sigstore. Missing signing secrets fail the release; do not publish ad hoc or unsigned local builds as public artifacts.
 
 The release lane validates the live AASA documents before the Developer ID build and verifies the packaged associated-domain entitlement afterward. Keep `APPLE_TEAM_ID` synchronized across signing, the AASA application identifier, and the ten-character Team ID validation. The ordinary macOS CI package uses Tauri's ad-hoc (`-`) identity, which requires no Apple account or personal certificate and proves that the entitlement was assembled into the code signature. Only a Developer ID-signed, installed application whose Team ID matches the live domains can prove macOS universal-link routing.
 

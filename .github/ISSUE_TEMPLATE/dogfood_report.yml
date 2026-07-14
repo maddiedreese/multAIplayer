@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Use this for two-person/two-device alpha testing. Do not paste secrets, private repo code, room keys, invite fragments, GitHub tokens, Codex credentials, signed-in browser pages, terminal output, or plaintext private room transcripts.
+        Use this for two-person/two-device alpha testing. Never paste a complete invitation link or any invite fragment. Do not paste secrets, private repo code, room keys, GitHub tokens, Codex credentials, signed-in browser pages, terminal output, or plaintext private room transcripts.
   - type: textarea
     id: scenario
     attributes:
@@ -52,5 +52,4 @@ body:
     id: notes
     attributes:
       label: Notes or redacted screenshots
-      description: Attach only redacted screenshots/logs.
-
+      description: Attach only redacted screenshots/logs. Remove complete invite links and fragments, including anything after `#`.

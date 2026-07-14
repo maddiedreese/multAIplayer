@@ -9,7 +9,10 @@ import type { MlsRelayMessage } from "@multaiplayer/protocol";
 export class JsonFileRelayPersistence implements RelayPersistence {
   readonly flushMode = "debounced";
 
-  constructor(private readonly dataPath: string) {}
+  constructor(
+    private readonly dataPath: string,
+    private readonly fileOperations: JsonFilePersistenceFileOperations = { chmod, rename, writeFile }
+  ) {}
 
   async load(): Promise<unknown | null> {
     try {
@@ -23,9 +26,12 @@ export class JsonFileRelayPersistence implements RelayPersistence {
   async save(state: unknown): Promise<void> {
     await ensureDataDirectory(dirname(this.dataPath));
     const tempPath = `${this.dataPath}.${process.pid}.${nanoid(8)}.tmp`;
-    await writeFile(tempPath, `${JSON.stringify(state, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-    await rename(tempPath, this.dataPath);
-    await chmod(this.dataPath, 0o600);
+    await this.fileOperations.writeFile(tempPath, `${JSON.stringify(state, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600
+    });
+    await this.fileOperations.chmod(tempPath, 0o600);
+    await this.fileOperations.rename(tempPath, this.dataPath);
   }
 
   async finalizeLoad(): Promise<void> {}
@@ -67,6 +73,12 @@ export class JsonFileRelayPersistence implements RelayPersistence {
     }
   }
   close() {}
+}
+
+export interface JsonFilePersistenceFileOperations {
+  chmod: typeof chmod;
+  rename: typeof rename;
+  writeFile: typeof writeFile;
 }
 
 async function ensureDataDirectory(path: string): Promise<void> {

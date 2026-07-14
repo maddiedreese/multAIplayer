@@ -69,6 +69,9 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Install Apple silicon Rust target
+        run: rustup target add aarch64-apple-darwin
+
       - name: Cache Cargo registry and build output
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -158,12 +161,14 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npm run tauri:build:prebuilt -w @multaiplayer/desktop
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: npm run tauri:build:release -w @multaiplayer/desktop
 
       - name: Verify signed and notarized app
         run: |
-          app_path="apps/desktop/src-tauri/target/release/bundle/macos/multAIplayer.app"
-          dmg_path="$(find apps/desktop/src-tauri/target/release/bundle/dmg -maxdepth 1 -type f -name '*.dmg' | head -n 1)"
+          bundle_root="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle"
+          app_path="$bundle_root/macos/multAIplayer.app"
+          dmg_path="$(find "$bundle_root/dmg" -maxdepth 1 -type f -name '*.dmg' | head -n 1)"
           if [ -z "$dmg_path" ]; then
             echo "No DMG found." >&2
             exit 1
@@ -173,20 +178,32 @@ jobs:
           xcrun stapler validate "$dmg_path"
           spctl -a -vvv -t install "$app_path"
           spctl -a -vvv -t open --context context:primary-signature "$dmg_path"
+          archs="$(lipo -archs "$app_path/Contents/MacOS/multAIplayer")"
+          if [ "$archs" != "arm64" ]; then
+            echo "Release executable must contain only arm64; found: $archs" >&2
+            exit 1
+          fi
+          minimum_system_version="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app_path/Contents/Info.plist")"
+          if [ "$minimum_system_version" != "11.0" ]; then
+            echo "Release minimum macOS version must be 11.0; found: $minimum_system_version" >&2
+            exit 1
+          fi
+          bash scripts/verify-macos-deployment-target.sh "$app_path"
           npm run verify:macos-associated-domains -- "$app_path"
 
       - name: Package release assets
         run: |
           mkdir -p release-assets
-          dmg_path="$(find apps/desktop/src-tauri/target/release/bundle/dmg -maxdepth 1 -type f -name '*.dmg' | head -n 1)"
+          bundle_root="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle"
+          dmg_path="$(find "$bundle_root/dmg" -maxdepth 1 -type f -name '*.dmg' | head -n 1)"
           if [ -z "$dmg_path" ]; then
             echo "No DMG found." >&2
             exit 1
           fi
           cp "$dmg_path" "release-assets/$(basename "$dmg_path")"
           ditto -c -k --sequesterRsrc --keepParent \
-            apps/desktop/src-tauri/target/release/bundle/macos/multAIplayer.app \
-            release-assets/multAIplayer-macos-app.zip
+            "$bundle_root/macos/multAIplayer.app" \
+            release-assets/multAIplayer-macos-arm64-app.zip
 
       - name: Generate SPDX SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0

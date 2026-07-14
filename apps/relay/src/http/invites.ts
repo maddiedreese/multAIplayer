@@ -46,6 +46,7 @@ export function registerInviteRoutes({
       id: `invite_${nanoid(16)}`,
       teamId,
       roomId,
+      ...(session ? { creatorUserId: session.user.id } : {}),
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + inviteTtlDays * 24 * 60 * 60 * 1000).toISOString()
     };
@@ -93,7 +94,8 @@ export function registerInviteRoutes({
     // An invitee is not a team member yet, so the protected invite lookup must
     // carry the exact active-host public identity needed to verify the fragment.
     // Do not expose the rest of the team device directory or device activity.
-    res.json({ invite, team, room, hostDevice });
+    const { creatorUserId: _creatorUserId, ...publicInvite } = invite;
+    res.json({ invite: publicInvite, team, room, hostDevice });
   });
 
   app.delete("/teams/:teamId/rooms/:roomId/invites", (req, res) => {
