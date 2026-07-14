@@ -49,7 +49,7 @@ The official invitation transport is an HTTPS universal link, not a custom URL s
 
 ## Official relay deployment
 
-The official free-alpha relay is planned for Railway and is not live until this runbook's DNS, persistence, secrets, TLS/WSS, monitoring, and backup/restore gates pass. Deploy the repository's relay container with Railway-managed secrets, HTTPS/WSS custom-domain routing, and a persistent volume mounted at the configured SQLite path. Railway will be an infrastructure processor, not an additional identity provider or plaintext room-content service. The official relay is a stronger operational commitment than a local self-hosted instance: retain rollback support, health checks, backups, and logs with redaction controls. One instance is acceptable for alpha; a second replica is blocked on shared persistence/attachment coordination and both the implementation and required adversarial acceptance suite in the accepted [edge plus atomic shared-store rate-limiting contract](decisions/multi-instance-rate-limiting.md).
+The official free-alpha relay is deployed on Railway at `https://relay.multaiplayer.com` (`wss://relay.multaiplayer.com/rooms`). It is not release-ready until this runbook's persistence, secrets, TLS/WSS, monitoring, OAuth, and backup/restore gates pass. Railway builds `apps/relay/Dockerfile` from `main`; `railway.json` pins the deployment health check, restart policy, drain timing, and the single San Francisco replica. The service uses Railway-managed secrets and a 5 GB persistent volume mounted at `/data`, with SQLite at `/data/relay-store.sqlite`. Railway is an infrastructure processor, not an additional identity provider or plaintext room-content service. The official relay is a stronger operational commitment than a local self-hosted instance: retain rollback support, health checks, backups, and logs with redaction controls. A second replica is blocked on shared persistence/attachment coordination and both the implementation and required adversarial acceptance suite in the accepted [edge plus atomic shared-store rate-limiting contract](decisions/multi-instance-rate-limiting.md).
 
 Start from `.env.example` and set production values in the same environment that launches the relay. The critical shape is:
 
@@ -61,7 +61,7 @@ MULTAIPLAYER_RELAY_SESSION_SECRET=...
 MULTAIPLAYER_RELAY_STORAGE=sqlite
 MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
 MULTAIPLAYER_MLS_VALIDATOR_PATH=/app/bin/mls-keypackage-validator
-MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://<official-site>
+MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://multaiplayer.com,https://open.multaiplayer.com
 MULTAIPLAYER_RELAY_REQUIRE_AUTH=true
 MULTAIPLAYER_RELAY_DEBUG=false
 MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
