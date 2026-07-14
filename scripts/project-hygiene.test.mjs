@@ -230,6 +230,20 @@ test("CI verifies each layer once before packaging prebuilt desktop assets", () 
   assert.doesNotMatch(workflow, /run: npm run (?:check|test|build)$/m);
 });
 
+test("CI retains native journey timing and honest cross-platform composition evidence", () => {
+  const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+  assert.match(workflow, /name: Upload native journey duration metrics[\s\S]*name: native-shell-journey-metrics/);
+  assert.match(
+    workflow,
+    /name: native-shell-journey-metrics[\s\S]*path: reports\/native-shell-e2e\/duration\.json[\s\S]*if-no-files-found: error[\s\S]*retention-days: 30/
+  );
+  assert.equal(
+    workflow.match(/run: npx tsx --test apps\/relay\/test\/live-native-relay-journey\.test\.ts$/gm)?.length,
+    1,
+    "the macOS package lane must run the real native-core/relay composition exactly once"
+  );
+});
+
 test("relay authorization tests remain visible to the mutation runner", () => {
   const config = readFileSync("apps/relay/stryker.config.mjs", "utf8");
   const source = readFileSync("apps/relay/test/security-units.test.ts", "utf8");

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import {
   WebSocket,
   assert,
+  createDebugSession,
   emptyWorkspaceFixture,
   onceOpen,
   readFile,
@@ -126,6 +127,10 @@ test("relay disables debug endpoints in every environment unless explicitly enab
   try {
     const disabled = await fetch(`${productionRelay.baseUrl}/debug/rooms`);
     assert.equal(disabled.status, 404);
+    const expireDisabled = await fetch(`${productionRelay.baseUrl}/debug/invites/anything/expire`, {
+      method: "POST"
+    });
+    assert.equal(expireDisabled.status, 404);
   } finally {
     await productionRelay.close();
   }
@@ -145,6 +150,19 @@ test("relay disables debug endpoints in every environment unless explicitly enab
   try {
     const enabled = await fetch(`${debugRelay.baseUrl}/debug/rooms`);
     assert.equal(enabled.status, 200);
+    const cookie = await createDebugSession(debugRelay.baseUrl, "github:maddiedreese", "maddiedreese");
+    const created = await fetch(`${debugRelay.baseUrl}/invites`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
+    });
+    assert.equal(created.status, 201);
+    const { invite } = (await created.json()) as { invite: { id: string } };
+    const expired = await fetch(`${debugRelay.baseUrl}/debug/invites/${invite.id}/expire`, { method: "POST" });
+    assert.equal(expired.status, 204);
+    const rejected = await fetch(`${debugRelay.baseUrl}/invites/${invite.id}`);
+    assert.equal(rejected.status, 410);
+    assert.equal(((await rejected.json()) as { code?: string }).code, "invite_expired");
   } finally {
     await debugRelay.close();
   }

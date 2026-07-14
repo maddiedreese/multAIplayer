@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
-import { access, chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:net";
+import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import { multiremote, type Browser } from "webdriverio";
 import { startRelay, type StoredRelayStateFixture } from "../../apps/relay/test/support/relay.js";
+import { NativeJourneyTimer, writeNativeJourneyMetrics } from "../../scripts/native-journey-metrics.mjs";
+import { assertTamperedKeyPackageRejected } from "./key-package-negative.js";
+import { inviteAndApprove, inviteAndDeny, rejectExpiredInvite } from "./invite-scenarios.js";
+import { NativeShellRuntime } from "./runtime.js";
 
 const root = resolve(import.meta.dirname, "../..");
 const desktopRoot = join(root, "apps/desktop");
@@ -16,8 +17,10 @@ const cargoBuildOnly = join(root, "e2e/native-shell/cargo-build-only.sh");
 const frontendUrl = "http://127.0.0.1:1420";
 const roomName = `Native integration ${Date.now()}`;
 const messageText = `real MLS message ${Date.now()}`;
-const processes: ChildProcess[] = [];
 const webdriverOperationTimeoutMs = 15_000;
+const journeyWarningBudgetMs = 6 * 60_000;
+const journeyTimer = new NativeJourneyTimer();
+const runtime = new NativeShellRuntime({ root, appBinary, operationTimeoutMs: webdriverOperationTimeoutMs });
 
 interface Identity {
   id: string;
@@ -50,217 +53,9 @@ function workspace(): StoredRelayStateFixture {
   };
 }
 
-async function freePort(): Promise<number> {
-  return new Promise((resolvePort, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      assert.ok(address && typeof address !== "string");
-      server.close((error) => (error ? reject(error) : resolvePort(address.port)));
-    });
-  });
-}
-
-async function freePorts(count: number) {
-  const ports = new Set<number>();
-  while (ports.size < count) ports.add(await freePort());
-  return [...ports];
-}
-
-function spawnProcess(
-  command: string,
-  args: string[],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv; detached?: boolean; persistent?: boolean } = {}
-) {
-  const persistent = options.persistent ?? true;
-  const child = spawn(command, args, {
-    cwd: options.cwd ?? root,
-    env: { ...process.env, ...options.env },
-    detached: options.detached ?? (persistent && process.platform !== "win32"),
-    stdio: ["ignore", "pipe", "pipe"]
-  });
-  const label = `${command} ${args.join(" ")}`;
-  child.stdout?.on("data", (chunk) => process.stdout.write(`[native-e2e] ${chunk}`));
-  child.stderr?.on("data", (chunk) => process.stderr.write(`[native-e2e] ${chunk}`));
-  child.once("error", (error) => console.error(`[native-e2e] ${label}: ${error.message}`));
-  if (persistent) processes.push(child);
-  return child;
-}
-
 function stage(message: string) {
+  journeyTimer.markStage(message);
   console.log(`[native-e2e] ${new Date().toISOString()} ${message}`);
-}
-
-async function run(
-  command: string,
-  args: string[],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}
-) {
-  const { timeoutMs = 8 * 60_000, ...spawnOptions } = options;
-  const detached = process.platform !== "win32";
-  const child = spawnProcess(command, args, { ...spawnOptions, detached, persistent: false });
-  const terminate = (signal: NodeJS.Signals) => {
-    try {
-      if (detached && child.pid) process.kill(-child.pid, signal);
-      else child.kill(signal);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ESRCH")
-        console.warn(`[native-e2e] failed to send ${signal} to ${command}: ${String(error)}`);
-    }
-  };
-  const code = await new Promise<number>((resolveCode, reject) => {
-    let timedOut = false;
-    let forceKillTimer: NodeJS.Timeout | undefined;
-    const timeout = setTimeout(() => {
-      timedOut = true;
-      terminate("SIGTERM");
-      forceKillTimer = setTimeout(() => terminate("SIGKILL"), 2_000);
-    }, timeoutMs);
-    child.once("error", (error) => {
-      clearTimeout(timeout);
-      if (forceKillTimer) clearTimeout(forceKillTimer);
-      reject(error);
-    });
-    child.once("exit", (exitCode, signal) => {
-      clearTimeout(timeout);
-      if (forceKillTimer) clearTimeout(forceKillTimer);
-      if (timedOut) reject(new Error(`${command} exceeded its ${timeoutMs}ms timeout`));
-      else if (signal) reject(new Error(`${command} exited from ${signal}`));
-      else resolveCode(exitCode ?? 1);
-    });
-  });
-  if (code !== 0) throw new Error(`${command} exited with code ${code}`);
-}
-
-async function withTimeout<T>(operation: Promise<T>, timeoutMs: number, label: string): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      operation,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${label} exceeded its ${timeoutMs}ms timeout`)), timeoutMs);
-      })
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
-async function bestEffort(label: string, operation: Promise<unknown>, timeoutMs = webdriverOperationTimeoutMs) {
-  await withTimeout(operation, timeoutMs, label).catch((error) => {
-    console.warn(`[native-e2e] ${label} failed: ${String(error)}`);
-  });
-}
-
-async function stopProcess(child: ChildProcess) {
-  child.stdout?.removeAllListeners("data");
-  child.stderr?.removeAllListeners("data");
-  child.stdout?.destroy();
-  child.stderr?.destroy();
-
-  if (process.platform !== "win32" && child.pid) {
-    const signalGroup = (signal: NodeJS.Signals) => {
-      try {
-        process.kill(-child.pid!, signal);
-        return true;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
-        console.warn(`[native-e2e] failed to send ${signal} to process group ${child.pid}: ${String(error)}`);
-        return false;
-      }
-    };
-    if (!signalGroup("SIGTERM")) return;
-    const deadline = Date.now() + 2_000;
-    while (Date.now() < deadline) {
-      await delay(100);
-      try {
-        process.kill(-child.pid, 0);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ESRCH") return;
-      }
-    }
-    signalGroup("SIGKILL");
-    return;
-  }
-
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  const exited = new Promise<void>((resolveExit) => child.once("exit", () => resolveExit()));
-  child.kill("SIGTERM");
-  await Promise.race([
-    exited,
-    delay(2_000).then(() => {
-      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
-    })
-  ]);
-}
-
-async function unmountRuntimeDocumentPortal(path: string) {
-  for (const [command, args] of [
-    ["fusermount3", ["-uz", path]],
-    ["fusermount", ["-uz", path]],
-    ["umount", ["-l", path]]
-  ] as const) {
-    const child = spawn(command, args, { stdio: "ignore" });
-    const code = await new Promise<number>((resolveCode) => {
-      const timeout = setTimeout(() => child.kill("SIGKILL"), 3_000);
-      child.once("error", () => {
-        clearTimeout(timeout);
-        resolveCode(1);
-      });
-      child.once("exit", (exitCode) => {
-        clearTimeout(timeout);
-        resolveCode(exitCode ?? 1);
-      });
-    });
-    if (code === 0) return;
-  }
-}
-
-async function waitForUrl(url: string, timeoutMs = 120_000) {
-  const deadline = Date.now() + timeoutMs;
-  let lastError: unknown;
-  while (Date.now() < deadline) {
-    try {
-      const remainingMs = Math.max(1, deadline - Date.now());
-      const response = await fetch(url, { signal: AbortSignal.timeout(Math.min(2_000, remainingMs)) });
-      if (response.ok) return;
-    } catch (error) {
-      lastError = error;
-    }
-    await delay(250);
-  }
-  throw new Error(`Timed out waiting for ${url}: ${String(lastError)}`);
-}
-
-async function waitForDriver(port: number) {
-  await waitForUrl(`http://127.0.0.1:${port}/status`, 30_000);
-}
-
-async function makeIsolatedLauncher(tempRoot: string, name: string) {
-  const profile = join(tempRoot, name);
-  const launcher = join(tempRoot, `launch-${name}`);
-  await writeFile(
-    launcher,
-    `#!/usr/bin/env bash
-set -euo pipefail
-export XDG_DATA_HOME=${JSON.stringify(join(profile, "data"))}
-export XDG_CONFIG_HOME=${JSON.stringify(join(profile, "config"))}
-export XDG_CACHE_HOME=${JSON.stringify(join(profile, "cache"))}
-export XDG_RUNTIME_DIR=${JSON.stringify(join(profile, "runtime"))}
-export HOME=${JSON.stringify(join(profile, "home"))}
-mkdir -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_RUNTIME_DIR" "$HOME"
-chmod 700 "$XDG_RUNTIME_DIR"
-export MULTAIPLAYER_E2E_APP_BINARY=${JSON.stringify(appBinary)}
-exec dbus-run-session -- bash -euo pipefail -c '
-  printf "%s\\n" native-e2e | gnome-keyring-daemon --unlock --components=secrets >/dev/null
-  exec "$MULTAIPLAYER_E2E_APP_BINARY"
-'
-`,
-    "utf8"
-  );
-  await chmod(launcher, 0o700);
-  return launcher;
 }
 
 async function authenticate(browser: Browser, relayBaseUrl: string, identity: Identity) {
@@ -321,89 +116,6 @@ async function createRoom(host: Browser) {
   });
 }
 
-async function selectRoom(browser: Browser) {
-  const room = await visible(
-    browser,
-    `//button[contains(concat(" ", normalize-space(@class), " "), " room-button ") and contains(., "${roomName}")]`,
-    60_000
-  );
-  await room.click();
-  const title = await visible(browser, 'input[aria-label="Room title"]');
-  await title.waitUntil(async () => (await title.getValue()) === roomName, { timeout: 30_000 });
-}
-
-async function openRoomInspector(browser: Browser) {
-  const tools = await visible(browser, 'nav[aria-label="Room tools"]');
-  await (await tools.$("button=Room")).click();
-}
-
-async function inviteAndApprove(host: Browser, guest: Browser) {
-  await openRoomInspector(host);
-  await (await visible(host, "button=Copy room invite")).click();
-  await visible(host, ".invite-link");
-  const invite = await host.execute(() => document.querySelector(".invite-link")?.textContent?.trim() ?? "");
-  assert.match(invite, /^http:\/\/127\.0\.0\.1:1420\/?\?invite=/);
-  assert.match(invite, /#multaiplayerJoin=/);
-
-  await selectRoom(guest);
-  await openRoomInspector(guest);
-  await (await visible(guest, 'textarea[placeholder="Paste a multAIplayer invite..."]')).setValue(invite);
-  await (await visible(guest, "button=Import invite")).click();
-  await guest.waitUntil(
-    () =>
-      guest.execute(() =>
-        (document.querySelector(".invite-panel .workflow-message")?.textContent ?? "").includes("Requested access")
-      ),
-    { timeout: 60_000, timeoutMsg: "guest did not persist the protected invite request" }
-  );
-
-  await host.refresh();
-  await visible(host, ".profile-card strong");
-  await selectRoom(host);
-  await openRoomInspector(host);
-  const request = await visible(host, ".invite-panel .terminal-request.pending", 60_000);
-  const requestText = await host.execute(
-    () => document.querySelector(".invite-panel .terminal-request.pending")?.textContent ?? ""
-  );
-  assert.ok(requestText.includes(guestIdentity.id), "host did not receive the guest's authenticated identity");
-  assert.match(requestText, /Capability-authenticated MLS KeyPackage request/);
-  const approve = await request.$("button");
-  await approve.waitForEnabled({ timeout: 60_000, timeoutMsg: "host invite approval did not become available" });
-  const previousHostMessage = await host.execute(
-    () => document.querySelector(".invite-panel .workflow-message")?.textContent ?? ""
-  );
-  const previousGuestMessage = await guest.execute(
-    () => document.querySelector(".invite-panel .workflow-message")?.textContent ?? ""
-  );
-  await approve.click();
-  await host.waitUntil(
-    () =>
-      host.execute((previousMessage) => {
-        const approved = Boolean(document.querySelector(".invite-panel .terminal-request.approved"));
-        const message = document.querySelector(".invite-panel .workflow-message")?.textContent ?? "";
-        return approved || (message.length > 0 && message !== previousMessage);
-      }, previousHostMessage),
-    { timeout: 60_000, timeoutMsg: "host invite approval produced neither a decision nor an error" }
-  );
-  const hostDecision = await host.execute(() => ({
-    approved: Boolean(document.querySelector(".invite-panel .terminal-request.approved")),
-    message: document.querySelector(".invite-panel .workflow-message")?.textContent ?? ""
-  }));
-  assert.equal(hostDecision.approved, true, `host invite approval failed: ${hostDecision.message}`);
-  await guest.waitUntil(
-    () =>
-      guest.execute((previousMessage) => {
-        const message = document.querySelector(".invite-panel .workflow-message")?.textContent ?? "";
-        return message.length > 0 && message !== previousMessage;
-      }, previousGuestMessage),
-    { timeout: 60_000, timeoutMsg: "guest received neither an invite decision nor a Welcome-processing error" }
-  );
-  const guestDecision = await guest.execute(
-    () => document.querySelector(".invite-panel .workflow-message")?.textContent ?? ""
-  );
-  assert.match(guestDecision, /approved|unlocked|joined/i, `guest MLS Welcome processing failed: ${guestDecision}`);
-}
-
 async function sendAndReceive(sender: Browser, receiver: Browser, text: string) {
   const composer = await visible(sender, 'textarea[placeholder^="Message the room"]');
   await composer.setValue(text);
@@ -452,9 +164,9 @@ async function handoff(host: Browser, guest: Browser) {
 }
 
 async function boundedHandoffDiagnostics(browser: Browser, client: string) {
-  return withTimeout(handoffDiagnostics(browser), webdriverOperationTimeoutMs, `${client} handoff diagnostics`).catch(
-    (error) => ({ error: String(error) })
-  );
+  return runtime
+    .withTimeout(handoffDiagnostics(browser), webdriverOperationTimeoutMs, `${client} handoff diagnostics`)
+    .catch((error) => ({ error: String(error) }));
 }
 
 async function handoffDiagnostics(browser: Browser) {
@@ -495,6 +207,7 @@ async function assertRelayHost(guest: Browser, relayBaseUrl: string) {
 }
 
 async function main() {
+  stage("initializing native journey");
   if (process.platform !== "linux") throw new Error("Native shell E2E requires Linux WebKitWebDriver and Xvfb");
   const tempRoot = await mkdtemp(join(tmpdir(), "multaiplayer-native-e2e-"));
   const relay = await startRelay(
@@ -511,7 +224,7 @@ async function main() {
   let browser: Awaited<ReturnType<typeof multiremote>> | undefined;
   try {
     stage("starting desktop frontend");
-    const vite = spawnProcess("npm", ["run", "dev", "-w", "@multaiplayer/desktop"], {
+    const vite = runtime.spawn("npm", ["run", "dev", "-w", "@multaiplayer/desktop"], {
       env: {
         VITE_DESKTOP_PORT: "1420",
         VITE_RELAY_HTTP_URL: relay.baseUrl,
@@ -519,11 +232,11 @@ async function main() {
       }
     });
     void vite;
-    await waitForUrl(frontendUrl);
+    await runtime.waitForUrl(frontendUrl);
 
     stage("building native desktop shell");
     const mergedConfig = JSON.stringify({ build: { beforeDevCommand: null } });
-    await run(
+    await runtime.run(
       "npm",
       [
         "exec",
@@ -545,13 +258,13 @@ async function main() {
     await access(appBinary);
     stage("native desktop shell build completed");
 
-    const hostLauncher = await makeIsolatedLauncher(tempRoot, "host");
-    const guestLauncher = await makeIsolatedLauncher(tempRoot, "guest");
-    const [hostPort, hostNativePort, guestPort, guestNativePort] = await freePorts(4);
+    const hostLauncher = await runtime.makeIsolatedLauncher(tempRoot, "host");
+    const guestLauncher = await runtime.makeIsolatedLauncher(tempRoot, "guest");
+    const [hostPort, hostNativePort, guestPort, guestNativePort] = await runtime.freePorts(4);
     stage("starting native WebDriver bridges");
-    spawnProcess("tauri-driver", ["--port", String(hostPort), "--native-port", String(hostNativePort)]);
-    spawnProcess("tauri-driver", ["--port", String(guestPort), "--native-port", String(guestNativePort)]);
-    await Promise.all([waitForDriver(hostPort), waitForDriver(guestPort)]);
+    runtime.spawn("tauri-driver", ["--port", String(hostPort), "--native-port", String(hostNativePort)]);
+    runtime.spawn("tauri-driver", ["--port", String(guestPort), "--native-port", String(guestNativePort)]);
+    await Promise.all([runtime.waitForDriver(hostPort), runtime.waitForDriver(guestPort)]);
 
     stage("creating isolated native WebDriver sessions");
     browser = await multiremote({
@@ -588,8 +301,20 @@ async function main() {
     ]);
     stage("creating and bootstrapping MLS room");
     await createRoom(host);
+    stage("proving the real validator rejects a tampered native KeyPackage");
+    const guestDeviceId = await assertTamperedKeyPackageRejected(
+      guest,
+      relay.baseUrl,
+      "team-native-e2e",
+      guestIdentity.id
+    );
+    const inviteContext = { roomName, guestUserId: guestIdentity.id, guestDeviceId, relayBaseUrl: relay.baseUrl };
+    stage("denying admission and proving the guest native MLS group stays locked");
+    await inviteAndDeny(host, guest, inviteContext);
+    stage("rejecting an expired invite capability before KeyPackage publication");
+    await rejectExpiredInvite(host, guest, inviteContext);
     stage("running invite approval and Welcome processing");
-    await inviteAndApprove(host, guest);
+    await inviteAndApprove(host, guest, inviteContext);
     stage("sending pre-handoff encrypted message");
     await sendAndReceive(host, guest, messageText);
     stage("transferring MLS host authority");
@@ -598,7 +323,9 @@ async function main() {
     await assertRelayHost(guest, relay.baseUrl);
     stage("sending post-handoff encrypted message");
     await sendAndReceive(guest, host, `post-handoff ${messageText}`);
-    console.log("[native-e2e] real invite -> approve -> MLS message -> host handoff journey passed");
+    console.log(
+      "[native-e2e] real validator rejection -> deny/locked -> expired capability rejection -> approve -> MLS message -> host handoff journey passed"
+    );
   } catch (error) {
     const reportDir = join(root, "reports/native-shell-e2e");
     await mkdir(reportDir, { recursive: true });
@@ -606,8 +333,11 @@ async function main() {
     if (browser) {
       stage("capturing bounded failure diagnostics");
       await Promise.all([
-        bestEffort("host failure screenshot", browser.getInstance("host").saveScreenshot(join(reportDir, "host.png"))),
-        bestEffort(
+        runtime.bestEffort(
+          "host failure screenshot",
+          browser.getInstance("host").saveScreenshot(join(reportDir, "host.png"))
+        ),
+        runtime.bestEffort(
           "guest failure screenshot",
           browser.getInstance("guest").saveScreenshot(join(reportDir, "guest.png"))
         )
@@ -616,22 +346,34 @@ async function main() {
     throw error;
   } finally {
     stage("cleaning up native journey resources");
-    if (browser) await bestEffort("WebDriver session cleanup", browser.deleteSession());
-    await Promise.all(processes.reverse().map((child) => stopProcess(child)));
+    if (browser) await runtime.bestEffort("WebDriver session cleanup", browser.deleteSession());
+    await runtime.stopProcesses();
     await relay.close();
-    await Promise.all([
-      unmountRuntimeDocumentPortal(join(tempRoot, "host/runtime/doc")),
-      unmountRuntimeDocumentPortal(join(tempRoot, "guest/runtime/doc"))
-    ]);
-    await withTimeout(
-      rm(tempRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 }),
-      10_000,
-      "isolated profile cleanup"
-    ).catch((error) => {
-      console.warn(`[native-e2e] isolated profile cleanup deferred: ${String(error)}`);
-    });
+    await runtime.cleanupProfiles(tempRoot, ["host", "guest"]);
     stage("native journey cleanup completed");
   }
 }
 
-await main();
+let journeyOutcome: "passed" | "failed" = "failed";
+try {
+  await main();
+  journeyOutcome = "passed";
+} finally {
+  const report = journeyTimer.finish(journeyOutcome, {
+    platform: `${process.platform}-${process.arch}`,
+    runnerOs: process.env.RUNNER_OS ?? null,
+    gitSha: process.env.GITHUB_SHA ?? null,
+    warningBudgetMs: journeyWarningBudgetMs
+  });
+  await writeNativeJourneyMetrics(
+    report,
+    join(root, "reports/native-shell-e2e"),
+    process.env.GITHUB_STEP_SUMMARY
+  ).catch((error) => console.warn(`[native-e2e] failed to write duration metrics: ${String(error)}`));
+  if (report.totalDurationMs > journeyWarningBudgetMs) {
+    console.warn(
+      `::warning title=Native journey duration regression::Journey took ${(report.totalDurationMs / 1_000).toFixed(1)}s, exceeding the ${(journeyWarningBudgetMs / 1_000).toFixed(0)}s warning budget.`
+    );
+  }
+  console.log(`[native-e2e] total journey duration: ${(report.totalDurationMs / 1_000).toFixed(1)}s`);
+}
