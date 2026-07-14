@@ -180,7 +180,7 @@ test("local runtime and desktop bundle targets match supported CI", () => {
   const deploymentTargetCheck = readFileSync("scripts/verify-macos-deployment-target.sh", "utf8");
   assert.match(
     deploymentTargetCheck,
-    /lipo -verify_arch arm64 "\$candidate"/,
+    /lipo "\$candidate" -verify_arch arm64/,
     "every bundled Mach-O file must be checked for Apple silicon support"
   );
   assert.match(
