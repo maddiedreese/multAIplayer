@@ -25,6 +25,8 @@ The create workflow is sequential. Team creation commits first; if first-room cr
 
 The versioned onboarding state lives in local webview storage and is deliberately separate from encrypted room history and native MLS storage. Its allowlist contains intent/presentation state, bounded team and room identifiers, and boolean milestones. It excludes names, paths, invite capabilities, form drafts, prompts, account data, room content, and secrets. Unsupported or internally inconsistent persisted versions fail closed to a fresh local setup state. The alpha sends no onboarding or tutorial telemetry.
 
+Invite recovery classifies local failures with `InviteJoinError.code`, not human-readable copy. The same contract holds at native IPC: fallible Tauri commands serialize `{ code, message }`, every frontend invocation passes through the validating `invokeNative` adapter, and only the stable code may drive recovery. Unknown structured errors fail to a fixed internal code; native causes and display prose are not control-flow contracts.
+
 Assistant completion and the persistent five-item checklist are separate projections. Users can dismiss, skip, resume, reopen, or restart the guide from Help; dismissing the checklist does not falsify completion. A teammate milestone comes from observed roster membership, while an explicit local “Not now” marker resolves that optional task without claiming a member joined.
 
 The short public pitch:
@@ -526,7 +528,7 @@ Responsibilities:
 - self-host configuration;
 - abuse/rate protections.
 
-The relay keeps its composition and domain boundaries explicit. `relay-app.ts` wires configuration, lifecycle, route, WebSocket, and persistence adapters; HTTP room creation/settings/host/lifecycle handlers live in separate route modules; WebSocket admission, validation, and dispatch are independent; and persistence exposes a small facade over JSON compatibility and SQLite schema/entity/MLS repositories. HTTP failures carry a stable protocol error code in addition to bounded prose. Authenticated `/metrics` output uses the Prometheus text exposition format.
+The relay keeps its composition and domain boundaries explicit. `relay-app.ts` wires configuration, lifecycle, route, WebSocket, and persistence adapters; HTTP room creation/settings/host/lifecycle handlers live in separate route modules; WebSocket admission, validation, and dispatch are independent; and persistence exposes a small facade over JSON compatibility and SQLite schema/entity/MLS repositories. HTTP failures carry a stable protocol error code in addition to bounded prose. Authenticated `/metrics` output uses Prometheus counters plus fixed-bucket publish/fanout, WebSocket-send, and SQLite-write latency histograms.
 
 Non-responsibilities:
 

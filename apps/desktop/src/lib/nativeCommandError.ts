@@ -1,6 +1,27 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type NativeCommandErrorCode = "internal_error" | "requires_rejoin";
+export type NativeCommandErrorCode =
+  | "crypto_error"
+  | "internal_error"
+  | "invalid_argument"
+  | "not_found"
+  | "process_error"
+  | "requires_rejoin"
+  | "storage_error"
+  | "unauthorized"
+  | "unavailable";
+
+const nativeCommandErrorCodes = new Set<NativeCommandErrorCode>([
+  "crypto_error",
+  "internal_error",
+  "invalid_argument",
+  "not_found",
+  "process_error",
+  "requires_rejoin",
+  "storage_error",
+  "unauthorized",
+  "unavailable"
+]);
 
 export class NativeCommandError extends Error {
   override readonly name = "NativeCommandError";
@@ -42,7 +63,7 @@ export function isNativeCommandErrorCode(error: unknown, code: NativeCommandErro
 }
 
 function isSupportedNativeCommandErrorCode(value: unknown): value is NativeCommandErrorCode {
-  return value === "internal_error" || value === "requires_rejoin";
+  return typeof value === "string" && nativeCommandErrorCodes.has(value as NativeCommandErrorCode);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

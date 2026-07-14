@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  invokeNative,
-  NativeCommandError,
-  normalizeNativeCommandError
-} from "../src/lib/nativeCommandError";
+import { invokeNative, NativeCommandError, normalizeNativeCommandError } from "../src/lib/nativeCommandError";
 
 test("structured Tauri rejections become Error instances with stable codes", async () => {
   const binding = async () => {
@@ -19,6 +15,21 @@ test("structured Tauri rejections become Error instances with stable codes", asy
       error.message === "Copy can change" &&
       String(error) === "NativeCommandError: Copy can change"
   );
+});
+
+test("the frontend accepts every code serialized by the native command contract", () => {
+  const codes = [
+    "crypto_error",
+    "internal_error",
+    "invalid_argument",
+    "not_found",
+    "process_error",
+    "requires_rejoin",
+    "storage_error",
+    "unauthorized",
+    "unavailable"
+  ] as const;
+  for (const code of codes) assert.equal(normalizeNativeCommandError({ code, message: "copy" }).code, code);
 });
 
 test("legacy strings remain readable during boundary migration", () => {

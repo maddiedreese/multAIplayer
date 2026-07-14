@@ -154,7 +154,7 @@ export async function runCodexTurn(
 
 export async function steerCodexTurn(roomId: string, input: string): Promise<CodexSteerResult> {
   if (isTauriRuntime()) {
-    return invoke<CodexSteerResult>("steer_codex_turn", { request: { roomId, input } });
+    return invokeNative<CodexSteerResult>("steer_codex_turn", { request: { roomId, input } });
   }
   return {
     threadId: "preview-thread",
