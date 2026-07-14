@@ -127,8 +127,8 @@ async function sendAndReceive(sender: Browser, receiver: Browser, text: string) 
     () =>
       receiver.execute(
         (expectedText) =>
-          [...document.querySelectorAll(".chat-scroll article.message .bubble > p")].some(
-            (element) => element.textContent === expectedText
+          [...document.querySelectorAll(".chat-scroll article.message .message-markdown")].some(
+            (element) => element.textContent?.trim() === expectedText
           ),
         text
       ),
