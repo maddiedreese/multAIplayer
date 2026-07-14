@@ -6,6 +6,7 @@ import type { LocalPreviewCardDisplay, QueuedCodexTurnDisplay, RoomChatMessageDi
 import type { CodexActivity } from "../types";
 
 export interface RoomChatContentProps {
+  onboardingAnchor?: string;
   messages: RoomChatMessageDisplay[];
   codexActivities: readonly CodexActivity[];
   localPreviewCards: LocalPreviewCardDisplay[];
@@ -34,6 +35,7 @@ export interface RoomChatContentProps {
 }
 
 export function RoomChatContent({
+  onboardingAnchor,
   messages,
   codexActivities,
   localPreviewCards,
@@ -61,7 +63,7 @@ export function RoomChatContent({
   onCancelQueuedCodexTurn
 }: RoomChatContentProps) {
   return (
-    <div className="chat-scroll">
+    <div className="chat-scroll" data-onboarding-anchor={onboardingAnchor}>
       {messages.map((message) => {
         const visibleReactions = message.reactions.filter((reaction) => reaction.count > 0 || reaction.active);
 
