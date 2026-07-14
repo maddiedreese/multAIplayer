@@ -232,6 +232,10 @@ test("CI verifies each layer once before packaging prebuilt desktop assets", () 
 
 test("CI retains native journey timing and honest cross-platform composition evidence", () => {
   const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+  assert.match(
+    workflow,
+    /name: Run two real native clients through invite, message, and handoff[\s\S]*name: Enforce native journey duration policy\n\s+run: node scripts\/check-native-journey-duration\.mjs reports\/native-shell-e2e\/duration\.json[\s\S]*name: Upload native journey duration metrics/
+  );
   assert.match(workflow, /name: Upload native journey duration metrics[\s\S]*name: native-shell-journey-metrics/);
   assert.match(
     workflow,

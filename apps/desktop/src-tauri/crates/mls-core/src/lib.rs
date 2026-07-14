@@ -29,7 +29,7 @@ pub use policy::{
 };
 pub use storage::{
     AtomicGroupStateStorage, ConsumedInviteReceipt, ConsumedJoinReceipt, DeniedInviteReceipt,
-    EncryptedStore, OutboxItem, StoreError,
+    EncryptedStore, OutboxItem, PendingInviteRequest, StoreError,
 };
 pub use validator::{
     validate_key_package_document, validate_key_package_upload, KeyPackageUpload,

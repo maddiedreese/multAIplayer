@@ -154,13 +154,21 @@ export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
     const directed = parseStrictDirectedInviteRequestJson(parsed.data.sealedRequest, 1_400_000);
     const invite = store.getInvite(parsed.data.inviteId);
     const room = invite && store.getRoom(invite.roomId);
+    const acceptedEpoch = room?.acceptedMlsEpoch ?? 0;
+    const requestEpochIsRecoverable =
+      directed?.binding.keyEpoch === acceptedEpoch ||
+      (acceptedEpoch > 0 &&
+        directed?.binding.keyEpoch === acceptedEpoch - 1 &&
+        invite?.approvedUserId === parsed.data.requesterUserId &&
+        invite.approvedDeviceId === parsed.data.requesterDeviceId &&
+        invite.keyPackageHash === parsed.data.keyPackageHash);
     return directed &&
       invite &&
       room &&
       directed.binding.inviteId === invite.id &&
       directed.binding.teamId === invite.teamId &&
       directed.binding.roomId === invite.roomId &&
-      directed.binding.keyEpoch === (room.acceptedMlsEpoch ?? 0) &&
+      requestEpochIsRecoverable &&
       directed.binding.keyPackageHash === parsed.data.keyPackageHash &&
       directed.binding.requestId === parsed.data.requestId &&
       directed.binding.requesterUserId === parsed.data.requesterUserId &&

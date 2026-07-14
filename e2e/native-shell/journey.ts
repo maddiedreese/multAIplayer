@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { multiremote, type Browser } from "webdriverio";
-import { startRelay, type StoredRelayStateFixture } from "../../apps/relay/test/support/relay.js";
+import { multiremote, remote, type Browser } from "webdriverio";
+import { startRelay, type RelayHarness, type StoredRelayStateFixture } from "../../apps/relay/test/support/relay.js";
 import { NativeJourneyTimer, writeNativeJourneyMetrics } from "../../scripts/native-journey-metrics.mjs";
 import { assertTamperedKeyPackageRejected } from "./key-package-negative.js";
-import { inviteAndApprove, inviteAndDeny, rejectExpiredInvite } from "./invite-scenarios.js";
+import { inviteAndDeny, rejectExpiredInvite } from "./invite-scenarios.js";
+import { approveInviteAcrossGuestCrash } from "./messy-failure.js";
+import { RestartableRelayProxy } from "./restart-proxy.js";
 import { NativeShellRuntime } from "./runtime.js";
 
 const root = resolve(import.meta.dirname, "../..");
@@ -206,29 +208,56 @@ async function assertRelayHost(guest: Browser, relayBaseUrl: string) {
   assert.equal((result as { room?: { hostUserId?: string } }).room?.hostUserId, guestIdentity.id);
 }
 
+async function acceptedMlsEpoch(browser: Browser, relayBaseUrl: string) {
+  const result = await browser.executeAsync(
+    (baseUrl, targetRoomName, done) => {
+      fetch(`${baseUrl}/teams`, { credentials: "include" })
+        .then(async (response) => {
+          const body = (await response.json()) as { rooms?: Array<{ name?: string; acceptedMlsEpoch?: number }> };
+          done({
+            status: response.status,
+            epoch: body.rooms?.find((candidate) => candidate.name === targetRoomName)?.acceptedMlsEpoch
+          });
+        })
+        .catch((error) => done({ error: String(error) }));
+    },
+    relayBaseUrl,
+    roomName
+  );
+  assert.equal((result as { status?: number }).status, 200, `relay epoch lookup failed: ${JSON.stringify(result)}`);
+  const epoch = (result as { epoch?: number }).epoch;
+  assert.ok(Number.isSafeInteger(epoch) && epoch! > 0, `relay did not persist the membership Commit epoch: ${epoch}`);
+  return epoch!;
+}
+
 async function main() {
   stage("initializing native journey");
   if (process.platform !== "linux") throw new Error("Native shell E2E requires Linux WebKitWebDriver and Xvfb");
   const tempRoot = await mkdtemp(join(tmpdir(), "multaiplayer-native-e2e-"));
-  const relay = await startRelay(
-    {
-      NODE_ENV: "test",
-      MULTAIPLAYER_RELAY_DEBUG: "true",
-      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-      MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: frontendUrl,
-      MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-      MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorBinary
-    },
-    workspace()
-  );
+  const relayEnvironment = {
+    NODE_ENV: "test",
+    MULTAIPLAYER_RELAY_DEBUG: "true",
+    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: frontendUrl,
+    MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+    MULTAIPLAYER_RELAY_SESSION_SECRET: "native-e2e-session-secret-with-at-least-32-characters",
+    MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorBinary
+  };
+  let relay: RelayHarness | undefined;
+  let relayProxy: RestartableRelayProxy | undefined;
   let browser: Awaited<ReturnType<typeof multiremote>> | undefined;
+  let restartedGuest: Browser | undefined;
   try {
+    relay = await startRelay(relayEnvironment, workspace());
+    const relayDataPath = relay.dataPath;
+    relayProxy = await RestartableRelayProxy.start(relay.baseUrl);
+    const stableRelayProxy = relayProxy;
     stage("starting desktop frontend");
     const vite = runtime.spawn("npm", ["run", "dev", "-w", "@multaiplayer/desktop"], {
       env: {
         VITE_DESKTOP_PORT: "1420",
-        VITE_RELAY_HTTP_URL: relay.baseUrl,
-        VITE_RELAY_URL: relay.wsUrl
+        VITE_RELAY_HTTP_URL: stableRelayProxy.baseUrl,
+        VITE_RELAY_URL: stableRelayProxy.wsUrl
       }
     });
     void vite;
@@ -253,7 +282,10 @@ async function main() {
         cargoBuildOnly,
         "--no-watch"
       ],
-      { env: { VITE_RELAY_HTTP_URL: relay.baseUrl, VITE_RELAY_URL: relay.wsUrl }, timeoutMs: 8 * 60_000 }
+      {
+        env: { VITE_RELAY_HTTP_URL: stableRelayProxy.baseUrl, VITE_RELAY_URL: stableRelayProxy.wsUrl },
+        timeoutMs: 8 * 60_000
+      }
     );
     await access(appBinary);
     stage("native desktop shell build completed");
@@ -293,34 +325,83 @@ async function main() {
     });
     stage("native WebDriver sessions ready");
     const host = browser.getInstance("host");
-    const guest = browser.getInstance("guest");
+    let guest = browser.getInstance("guest");
     stage("authenticating both native clients");
     await Promise.all([
-      authenticate(host, relay.baseUrl, hostIdentity),
-      authenticate(guest, relay.baseUrl, guestIdentity)
+      authenticate(host, stableRelayProxy.baseUrl, hostIdentity),
+      authenticate(guest, stableRelayProxy.baseUrl, guestIdentity)
     ]);
     stage("creating and bootstrapping MLS room");
     await createRoom(host);
     stage("proving the real validator rejects a tampered native KeyPackage");
     const guestDeviceId = await assertTamperedKeyPackageRejected(
       guest,
-      relay.baseUrl,
+      stableRelayProxy.baseUrl,
       "team-native-e2e",
       guestIdentity.id
     );
-    const inviteContext = { roomName, guestUserId: guestIdentity.id, guestDeviceId, relayBaseUrl: relay.baseUrl };
+    const inviteContext = {
+      roomName,
+      guestUserId: guestIdentity.id,
+      guestDeviceId,
+      relayBaseUrl: stableRelayProxy.baseUrl
+    };
     stage("denying admission and proving the guest native MLS group stays locked");
     await inviteAndDeny(host, guest, inviteContext);
     stage("rejecting an expired invite capability before KeyPackage publication");
     await rejectExpiredInvite(host, guest, inviteContext);
-    stage("running invite approval and Welcome processing");
-    await inviteAndApprove(host, guest, inviteContext);
+    stage("crashing the guest and restarting the relay after Commit before Welcome delivery");
+    const welcomeGate = stableRelayProxy.armInviteResponseGate();
+    guest = await approveInviteAcrossGuestCrash(host, guest, {
+      ...inviteContext,
+      hostUserId: hostIdentity.id,
+      async killGuest() {
+        await runtime.killIsolatedApp(tempRoot, "guest");
+        await runtime.bestEffort("clear crashed guest WebDriver session", guest.deleteSession());
+      },
+      async restartGuest() {
+        const nextGuest = await remote({
+          hostname: "127.0.0.1",
+          port: guestPort,
+          connectionRetryTimeout: webdriverOperationTimeoutMs,
+          connectionRetryCount: 1,
+          capabilities: {
+            browserName: "wry",
+            "wdio:enforceWebDriverClassic": true,
+            "tauri:options": { application: guestLauncher }
+          } as never
+        });
+        restartedGuest = nextGuest;
+        await authenticate(nextGuest, stableRelayProxy.baseUrl, guestIdentity);
+        return nextGuest;
+      },
+      async afterApprovalStarted() {
+        await runtime.withTimeout(
+          welcomeGate.blocked,
+          60_000,
+          "membership Commit did not reach the pre-Welcome relay restart boundary"
+        );
+        try {
+          const committedEpoch = await acceptedMlsEpoch(host, stableRelayProxy.baseUrl);
+          await relay.close({ preserveData: true });
+          relay = await startRelay(relayEnvironment, undefined, relayDataPath);
+          stableRelayProxy.setTarget(relay.baseUrl);
+          assert.equal(
+            await acceptedMlsEpoch(host, stableRelayProxy.baseUrl),
+            committedEpoch,
+            "restarted SQLite relay did not recover the accepted membership Commit epoch"
+          );
+        } finally {
+          welcomeGate.release();
+        }
+      }
+    });
     stage("sending pre-handoff encrypted message");
     await sendAndReceive(host, guest, messageText);
     stage("transferring MLS host authority");
     await handoff(host, guest);
     stage("verifying relay host authority");
-    await assertRelayHost(guest, relay.baseUrl);
+    await assertRelayHost(guest, stableRelayProxy.baseUrl);
     stage("sending post-handoff encrypted message");
     await sendAndReceive(guest, host, `post-handoff ${messageText}`);
     console.log(
@@ -339,16 +420,18 @@ async function main() {
         ),
         runtime.bestEffort(
           "guest failure screenshot",
-          browser.getInstance("guest").saveScreenshot(join(reportDir, "guest.png"))
+          (restartedGuest ?? browser.getInstance("guest")).saveScreenshot(join(reportDir, "guest.png"))
         )
       ]);
     }
     throw error;
   } finally {
     stage("cleaning up native journey resources");
+    if (restartedGuest) await runtime.bestEffort("restarted guest WebDriver cleanup", restartedGuest.deleteSession());
     if (browser) await runtime.bestEffort("WebDriver session cleanup", browser.deleteSession());
     await runtime.stopProcesses();
-    await relay.close();
+    if (relayProxy) await relayProxy.close();
+    if (relay) await relay.close();
     await runtime.cleanupProfiles(tempRoot, ["host", "guest"]);
     stage("native journey cleanup completed");
   }

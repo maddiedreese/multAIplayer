@@ -17,6 +17,8 @@ import {
 import { drainMlsOutboxForRoom, pendingMlsOutboxRoomIds } from "../../lib/mlsOutboxDrain";
 import { completeMlsRelayAdmission } from "../../lib/mlsJoinAdmission";
 import { reportNonFatal } from "../../lib/nonFatalReporting";
+import { getRelayHttpUrl } from "../../lib/appConfig";
+import { recoverDeviceSessionForRelayError } from "../../lib/deviceSession";
 
 interface LocalUser {
   id: string;
@@ -99,7 +101,13 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
                   await completeMlsRelayAdmission(client, admission, current.deviceSessionToken, () => {
                     store.restoreWorkspaceAccess(admission.teamId, admission.roomId);
                     store.restoreForgottenRoom(admission.roomId);
+                    store.updateInviteRequestStatus(admission.roomId, admission.requestId, "approved");
                     store.setInviteAdmissionForRoom(admission.roomId, null);
+                    const roomName = current.roomsRef.current.find((room) => room.id === admission.roomId)?.name;
+                    store.setInviteMessageForRoom(
+                      admission.roomId,
+                      `The host approved this device.${roomName ? ` ${roomName}` : " This room"} is now unlocked.`
+                    );
                   });
                 }
                 if (admissions.length > 0 && current.hasSelectedRoom) {
@@ -152,6 +160,23 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
           return;
         }
         if (message.type === "error") {
+          try {
+            if (
+              await recoverDeviceSessionForRelayError(
+                message,
+                getRelayHttpUrl(),
+                current.deviceId,
+                current.deviceSessionToken,
+                (session) => {
+                  if (!cancelled) useAppStore.getState().replaceDeviceSessionToken(session.token);
+                }
+              )
+            )
+              return;
+          } catch (error) {
+            current.handleRelayError(`Device session recovery failed: ${String(error)}`);
+            return;
+          }
           current.handleRelayError(message.message);
           return;
         }

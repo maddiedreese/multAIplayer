@@ -16,7 +16,7 @@ async function visible(browser: Browser, selector: string, timeout = 30_000) {
   return element;
 }
 
-async function selectRoom(browser: Browser, roomName: string) {
+export async function selectRoom(browser: Browser, roomName: string) {
   const room = await visible(
     browser,
     `//button[contains(concat(" ", normalize-space(@class), " "), " room-button ") and contains(., "${roomName}")]`,
@@ -27,12 +27,12 @@ async function selectRoom(browser: Browser, roomName: string) {
   await title.waitUntil(async () => (await title.getValue()) === roomName, { timeout: 30_000 });
 }
 
-async function openRoomInspector(browser: Browser) {
+export async function openRoomInspector(browser: Browser) {
   const tools = await visible(browser, 'nav[aria-label="Room tools"]');
   await (await tools.$("button=Room")).click();
 }
 
-async function createInviteLink(host: Browser) {
+export async function createInviteLink(host: Browser) {
   await openRoomInspector(host);
   const previousInvite = await host.execute(() => document.querySelector(".invite-link")?.textContent?.trim() ?? "");
   await (await visible(host, "button=Copy room invite")).click();
@@ -50,14 +50,14 @@ async function createInviteLink(host: Browser) {
   return invite;
 }
 
-async function importInvite(guest: Browser, invite: string, roomName: string) {
+export async function importInvite(guest: Browser, invite: string, roomName: string) {
   await selectRoom(guest, roomName);
   await openRoomInspector(guest);
   await (await visible(guest, 'textarea[placeholder="Paste a multAIplayer invite..."]')).setValue(invite);
   await (await visible(guest, "button=Import invite")).click();
 }
 
-async function waitForGuestInviteRequest(guest: Browser) {
+export async function waitForGuestInviteRequest(guest: Browser) {
   await guest.waitUntil(
     () =>
       guest.execute(() =>
@@ -67,7 +67,7 @@ async function waitForGuestInviteRequest(guest: Browser) {
   );
 }
 
-async function loadPendingInviteRequest(host: Browser, context: InviteScenarioContext) {
+export async function loadPendingInviteRequest(host: Browser, context: InviteScenarioContext) {
   await host.refresh();
   await visible(host, ".profile-card strong");
   await selectRoom(host, context.roomName);

@@ -1,8 +1,12 @@
-use super::invites::{decision_timestamp, fixed32, fixed32_url, validate_invite_response_pair};
+use super::invites::{
+    decision_timestamp, fixed32, fixed32_url, serialize_directed_invite_request,
+    validate_invite_response_pair,
+};
 use super::{
     decode_stored_signing_secret, delete_all_history_native, engine_error, fingerprint,
     is_corruption_error_message, quarantine_store, BasicAppCredential, CapabilityBinding,
-    EncryptRequest, EncryptedStore, MlsEngine, PendingJoinAdmissionPublic, StoredMlsIdentity,
+    EncryptRequest, EncryptedStore, MlsEngine, PendingInviteRequestPublic,
+    PendingJoinAdmissionPublic, StoredMlsIdentity,
 };
 
 fn request_binding() -> CapabilityBinding {
@@ -78,6 +82,29 @@ fn invite_decision_timestamp_is_canonical_utc_milliseconds() {
 }
 
 #[test]
+fn directed_invite_request_uses_the_relay_canonical_field_order() {
+    let encoded = serialize_directed_invite_request(
+        &request_binding(),
+        &mls_core::SealedPayload {
+            version: 1,
+            kem_id: 16,
+            kdf_id: 1,
+            aead_id: 1,
+            encapsulated_key: vec![0; 65],
+            ciphertext: vec![0; 16],
+        },
+    )
+    .unwrap();
+    assert!(encoded.starts_with(
+        r#"{"version":3,"binding":{"version":3,"phase":"request","inviteId":"invite","teamId":"team","roomId":"room","keyEpoch":0,"keyPackageHash":"sha256:package","requestId":"request","requestNonce":"nonce","requesterUserId":"joiner","requesterDeviceId":"joiner-device","hostUserId":"host","hostDeviceId":"host-device","expiresAt":"2030-01-01T00:00:00Z","status":null,"decidedAt":null},"sealedPayload":{"version":1,"kem_id":16,"kdf_id":1,"aead_id":1,"encapsulated_key":"#
+    ));
+    assert!(encoded.ends_with(&format!(
+        r#","ciphertext":[{}]}}}}"#,
+        vec!["0"; 16].join(",")
+    )));
+}
+
+#[test]
 fn native_delete_all_history_removes_ciphertext_and_epoch_secret() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("history.db");
@@ -147,6 +174,30 @@ fn pending_admission_ipc_contains_only_public_routing_fields() {
     assert!(value.get("capabilityUrlValue").is_none());
     assert!(value.get("welcome").is_none());
     assert!(value.get("responseMac").is_none());
+}
+
+#[test]
+fn pending_invite_recovery_ipc_keeps_the_bearer_capability_native_only() {
+    let value = serde_json::to_value(PendingInviteRequestPublic {
+        invite_id: "invite".into(),
+        team_id: "team".into(),
+        room_id: "room".into(),
+        request_id: "request".into(),
+        requester_user_id: "user".into(),
+        requester_device_id: "device".into(),
+        key_package_id: "package".into(),
+        key_package_hash: "hash".into(),
+        expires_at: "2030-01-01T00:00:00.000Z".into(),
+        sealed_request: "opaque".into(),
+    })
+    .unwrap();
+    assert_eq!(value.as_object().unwrap().len(), 10);
+    assert!(value.get("capabilityUrlValue").is_none());
+    assert!(value.get("originalBinding").is_none());
+    assert_eq!(
+        value.get("sealedRequest").and_then(|value| value.as_str()),
+        Some("opaque")
+    );
 }
 
 #[test]
