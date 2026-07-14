@@ -140,7 +140,10 @@ export function createInviteJoinActions(
     const { localUser, deviceId } = currentLocalIdentity();
     const metadata = await lookupInvite(inviteId);
     if (metadata.invite.teamId !== invite.teamId || metadata.invite.roomId !== invite.roomId)
-      throw new InviteJoinError("invite_metadata_mismatch", "Invite metadata does not match the protected URL fragment.");
+      throw new InviteJoinError(
+        "invite_metadata_mismatch",
+        "Invite metadata does not match the protected URL fragment."
+      );
     if (metadata.room.hostUserId !== invite.hostUserId || metadata.room.activeHostDeviceId !== invite.hostDeviceId)
       throw new InviteJoinError("active_host_mismatch", "The invite is not issued by the active host device.");
     assertInviteHostDevice(invite, metadata);

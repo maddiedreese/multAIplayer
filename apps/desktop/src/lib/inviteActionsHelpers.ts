@@ -44,7 +44,10 @@ export function parseInviteInput(raw: string) {
   const fragment = raw.includes("#") ? raw.slice(raw.indexOf("#") + 1) : raw.replace(/^#/, "");
   const params = new URLSearchParams(fragment);
   if (params.has("multaiplayerInvite")) {
-    throw new InviteJoinError("legacy_invite", "This pre-v2 invite is invalid. Ask the active host for a new MLS invite.");
+    throw new InviteJoinError(
+      "legacy_invite",
+      "This pre-v2 invite is invalid. Ask the active host for a new MLS invite."
+    );
   }
   const allowedFragmentKeys = new Set(["invite", "multaiplayerJoin", "approval"]);
   if (
