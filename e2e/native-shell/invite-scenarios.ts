@@ -67,6 +67,20 @@ export async function waitForGuestInviteRequest(guest: Browser) {
   );
 }
 
+async function passDeviceVerificationGuidance(guest: Browser, roomName: string) {
+  await visible(guest, "h1=Join a workspace", 60_000);
+  const verification = await visible(guest, '.onboarding-join-state[data-phase="verification_required"]');
+  assert.match(
+    await verification.getText(),
+    /Device verification required.*active host must verify and approve this device/is,
+    "onboarding did not explain the host-approval boundary"
+  );
+  await (await visible(guest, "button=Save and close")).click();
+  await visible(guest, "button=Profile");
+  await selectRoom(guest, roomName);
+  await openRoomInspector(guest);
+}
+
 export async function loadPendingInviteRequest(host: Browser, context: InviteScenarioContext) {
   await host.refresh();
   await visible(host, ".profile-card strong");
@@ -140,6 +154,7 @@ async function assertGuestMlsGroupLocked(guest: Browser, roomName: string, asser
 export async function inviteAndDeny(host: Browser, guest: Browser, context: InviteScenarioContext) {
   const invite = await createInviteLink(host);
   await importInvite(guest, invite, context.roomName);
+  await passDeviceVerificationGuidance(guest, context.roomName);
   await waitForGuestInviteRequest(guest);
   const request = await loadPendingInviteRequest(host, context);
   const deny = await request.$("button:last-child");
