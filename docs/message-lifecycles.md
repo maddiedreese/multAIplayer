@@ -45,7 +45,7 @@ The relay cannot decrypt the MLS message and does not parse its application even
 
 ## Life of an invite
 
-1. The joiner validates the fragment-carried invite id and encoded host/capability binding against current relay metadata and the active host device.
+1. The joiner validates the fragment-carried invite id and encoded host/capability binding against current relay metadata and the invite-scoped projection of the exact active host device. A not-yet-member invitee cannot enumerate the team device directory.
 2. The joiner publishes a bounded, suite-pinned single-use KeyPackage from Rust.
 3. The capability request is HPKE-sealed to the pinned host and binds the exact KeyPackage id/hash plus identities, room, operation, and epoch context.
 4. The relay stores only the opaque request and content-free notification metadata.

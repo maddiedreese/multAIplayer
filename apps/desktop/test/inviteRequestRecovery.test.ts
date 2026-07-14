@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertPendingInviteRecoveryContext } from "../src/lib/invite/inviteJoinActions";
+import { assertInviteHostDevice, assertPendingInviteRecoveryContext } from "../src/lib/invite/inviteJoinActions";
 import type { PendingMlsInviteRequest } from "../src/lib/mlsClient";
 
 const pending: PendingMlsInviteRequest = {
@@ -45,4 +45,35 @@ test("fails closed when pending recovery identity or relay metadata differs", ()
       } as never),
     /does not match this device or relay invite metadata/
   );
+});
+
+const protectedHost = {
+  hostUserId: "host-user",
+  hostDeviceId: "host-device",
+  hostHpkePublicKey: "host-hpke-key",
+  hostHpkeKeyFingerprint: "sha256:host-hpke"
+};
+const inviteHostDevice = {
+  userId: "host-user",
+  deviceId: "host-device",
+  signaturePublicKey: "host-signature-key",
+  signatureKeyFingerprint: "sha256:host-signature",
+  hpkePublicKey: "host-hpke-key",
+  hpkeKeyFingerprint: "sha256:host-hpke"
+};
+
+test("accepts only the invite-scoped active-host device pinned by the protected fragment", () => {
+  assert.doesNotThrow(() => assertInviteHostDevice(protectedHost, { hostDevice: inviteHostDevice }));
+  for (const hostDevice of [
+    null,
+    { ...inviteHostDevice, userId: "other-host" },
+    { ...inviteHostDevice, deviceId: "other-device" },
+    { ...inviteHostDevice, hpkePublicKey: "other-key" },
+    { ...inviteHostDevice, hpkeKeyFingerprint: "sha256:other" }
+  ]) {
+    assert.throws(
+      () => assertInviteHostDevice(protectedHost, { hostDevice }),
+      /host HPKE key does not match the registered device/
+    );
+  }
 });

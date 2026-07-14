@@ -20,6 +20,7 @@ All notable user-visible and security-relevant changes are recorded here. Releas
 ### Fixed
 
 - New-room onboarding now persists the local-history preference before native MLS setup and applies retention only after the group exists, preventing false room-creation failures and duplicate-room retries.
+- Invitation lookup now exposes only the pinned active-host public identity required for pre-membership verification, allowing genuine new members to request approval without opening the team device directory.
 
 ### Known limitations
 

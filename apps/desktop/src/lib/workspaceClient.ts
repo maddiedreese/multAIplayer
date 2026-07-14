@@ -40,6 +40,10 @@ export interface InviteLookupResult {
   invite: InviteRecord;
   team: TeamRecord;
   room: RoomRecord;
+  hostDevice: Pick<
+    DeviceRecord,
+    "userId" | "deviceId" | "signaturePublicKey" | "signatureKeyFingerprint" | "hpkePublicKey" | "hpkeKeyFingerprint"
+  > | null;
 }
 
 export interface DeviceRegistrationRequest {
