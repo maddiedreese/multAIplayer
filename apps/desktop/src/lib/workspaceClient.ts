@@ -75,6 +75,7 @@ export interface DirectedInviteRequest {
   keyPackageHash: string;
   sealedRequest: string;
   createdAt: string;
+  requesterDevice: Pick<DeviceRecord, "userId" | "deviceId" | "signaturePublicKey" | "signatureKeyFingerprint"> | null;
 }
 
 export async function loadWorkspace(): Promise<WorkspaceSnapshot> {
@@ -330,7 +331,7 @@ export async function revokeRoomInvites(teamId: string, roomId: string): Promise
 
 export async function publishDirectedInviteRequest(
   inviteId: string,
-  request: Omit<DirectedInviteRequest, "requesterUserId" | "createdAt">
+  request: Omit<DirectedInviteRequest, "requesterUserId" | "requesterDevice" | "createdAt">
 ): Promise<void> {
   const response = await fetch(`${getRelayHttpUrl()}/invites/${encodeURIComponent(inviteId)}/requests`, {
     method: "POST",

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { assertInviteHostDevice, assertPendingInviteRecoveryContext } from "../src/lib/invite/inviteJoinActions";
+import { inviteRequesterDeviceMatches } from "../src/lib/invite/inviteRelayActions";
 import type { PendingMlsInviteRequest } from "../src/lib/mlsClient";
 
 const pending: PendingMlsInviteRequest = {
@@ -75,5 +76,32 @@ test("accepts only the invite-scoped active-host device pinned by the protected 
       () => assertInviteHostDevice(protectedHost, { hostDevice }),
       /host HPKE key does not match the registered device/
     );
+  }
+});
+
+test("host accepts only the request-scoped registered device pinned by the HPKE payload", () => {
+  const protectedRequest = {
+    requesterSignaturePublicKey: "requester-signature-key",
+    requesterSignatureKeyFingerprint: "sha256:requester-signature"
+  };
+  const record = {
+    requesterUserId: "requester-user",
+    requesterDeviceId: "requester-device",
+    requesterDevice: {
+      userId: "requester-user",
+      deviceId: "requester-device",
+      signaturePublicKey: "requester-signature-key",
+      signatureKeyFingerprint: "sha256:requester-signature"
+    }
+  };
+  assert.equal(inviteRequesterDeviceMatches(record, protectedRequest), true);
+  for (const requesterDevice of [
+    null,
+    { ...record.requesterDevice, userId: "other-user" },
+    { ...record.requesterDevice, deviceId: "other-device" },
+    { ...record.requesterDevice, signaturePublicKey: "other-key" },
+    { ...record.requesterDevice, signatureKeyFingerprint: "sha256:other" }
+  ]) {
+    assert.equal(inviteRequesterDeviceMatches({ ...record, requesterDevice }, protectedRequest), false);
   }
 });

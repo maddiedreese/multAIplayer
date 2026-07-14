@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { loadTeamMembers } from "../lib/workspaceClient";
+import { RelayHttpError } from "../lib/httpResponse";
 import { useAppStore } from "../store/appStore";
 
 interface UseTeamMembersRefreshOptions {
@@ -19,7 +20,12 @@ export function useTeamMembersRefresh({ selectedTeam }: UseTeamMembersRefreshOpt
         setTeamMembersMessageForTeam(teamId, null);
       } catch (error) {
         if (showErrors) {
-          setTeamMembersMessageForTeam(teamId, String(error));
+          setTeamMembersMessageForTeam(
+            teamId,
+            error instanceof RelayHttpError && error.status === 403
+              ? "Team members become available after this device has team access."
+              : "Team members could not be loaded. Check the relay connection and try again."
+          );
         }
       }
     },

@@ -228,6 +228,21 @@ test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
     );
     const notification = await notified;
     assert.deepEqual(notification, { type: "invite.requested", inviteId: invite.id, requestId: "request-one" });
+    const pendingResponse = await fetch(`${relay.baseUrl}/invites/${invite.id}/requests?hostDeviceId=host-device-1`, {
+      headers: hostHeaders
+    });
+    assert.equal(pendingResponse.status, 200);
+    const pendingBody = (await pendingResponse.json()) as {
+      requests: Array<{ requesterDevice: Record<string, unknown> | null }>;
+    };
+    assert.deepEqual(pendingBody.requests[0]?.requesterDevice, {
+      userId: "github:tester",
+      deviceId: "peer-device-1",
+      signaturePublicKey: peer.signaturePublicKey,
+      signatureKeyFingerprint: fingerprint(peer.signaturePublicKey)
+    });
+    assert.equal("hpkePublicKey" in pendingBody.requests[0]!.requesterDevice!, false);
+    assert.equal("displayName" in pendingBody.requests[0]!.requesterDevice!, false);
     assert.equal(JSON.stringify(notification).includes("sealedRequest"), false);
     const alternateKeyPackage = "BQ==";
     const alternateKeyPackageHash = `sha256:${createHash("sha256").update(Buffer.from(alternateKeyPackage, "base64")).digest("hex")}`;
@@ -625,7 +640,12 @@ async function device(baseUrl: string, userId: string, deviceId: string) {
     headers,
     body: JSON.stringify({ challenge, signature })
   });
-  return { cookie, token: ((await session.json()) as { deviceSessionToken: string }).deviceSessionToken, privateKey };
+  return {
+    cookie,
+    token: ((await session.json()) as { deviceSessionToken: string }).deviceSessionToken,
+    privateKey,
+    signaturePublicKey
+  };
 }
 function fingerprint(encoded: string) {
   const hex = createHash("sha256").update(Buffer.from(encoded, "base64")).digest("hex");
