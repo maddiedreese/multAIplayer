@@ -99,7 +99,9 @@ export function createRelayRequestGuards({
     const cookies = parseCookieHeader(request.headers.cookie);
     const sessionId = normalizeSessionId(cookies.get("multaiplayer_session"));
     if (sessionId) return `session:${sessionId}`;
-    const forwardedIp = trustProxyHeaders ? firstForwardedForIp(request.headers["x-forwarded-for"]) : null;
+    const forwardedIp = trustProxyHeaders
+      ? firstHeaderValue(request.headers["x-real-ip"]) || firstForwardedForIp(request.headers["x-forwarded-for"])
+      : null;
     const ip = forwardedIp || request.socket.remoteAddress || "unknown";
     return `ip:${ip}`;
   }
@@ -112,7 +114,12 @@ export function createRelayRequestGuards({
 }
 
 function firstForwardedForIp(header: string | string[] | undefined): string | null {
-  const value = Array.isArray(header) ? header[0] : header;
+  const value = firstHeaderValue(header);
   const ip = value?.split(",")[0]?.trim();
   return ip || null;
+}
+
+function firstHeaderValue(header: string | string[] | undefined): string | null {
+  const value = Array.isArray(header) ? header[0] : header;
+  return value?.trim() || null;
 }

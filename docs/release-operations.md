@@ -55,6 +55,7 @@ Start from `.env.example` and set production values in the same environment that
 
 ```bash
 NODE_ENV=production
+PORT=8080
 RAILWAY_RUN_UID=0
 GITHUB_CLIENT_ID=...
 GITHUB_OAUTH_SCOPES="read:user repo"
@@ -67,13 +68,13 @@ MULTAIPLAYER_RELAY_REQUIRE_AUTH=true
 MULTAIPLAYER_RELAY_DEBUG=false
 MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
 MULTAIPLAYER_RELAY_RATE_LIMITS=true
-MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
-MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=false
+MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=true
+MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=true
 ```
 
 Generate the stable session secret with a password manager or `openssl rand -base64 32`. Rotating it signs users out. Configure all size, retention, upload, rate, connection, and room quotas from `.env.example`; do not copy a stale second list into this guide.
 
-Railway volumes are mounted as `root`, so Railway's documented `RAILWAY_RUN_UID=0` override is required for the relay to write SQLite data under `/data`. This grants root only inside the isolated service container; it does not grant host or Railway control-plane access. Reassess the override if Railway adds managed non-root volume ownership or the image gains a verified privilege-dropping entrypoint.
+Pin `PORT=8080` and target both the generated and custom Railway domains at port `8080`; otherwise a stale domain target can pass Railway's internal health check while returning `502` publicly. Railway volumes are mounted as `root`, so Railway's documented `RAILWAY_RUN_UID=0` override is required for the relay to write SQLite data under `/data`. This grants root only inside the isolated service container; it does not grant host or Railway control-plane access. Reassess the override if Railway adds managed non-root volume ownership or the image gains a verified privilege-dropping entrypoint.
 
 Run in the deployed environment:
 
@@ -91,7 +92,7 @@ The doctor must pass before the endpoint is advertised. Also verify:
 - rate and quota failures are observable without plaintext payloads; and
 - relay storage and traffic contain no plaintext transcripts, attachments, repo files, terminal output, Codex/OpenAI credentials, or plaintext GitHub tokens.
 
-Trust proxy headers only when a documented reverse proxy strips client-supplied forwarding headers and writes its own. In that case set both proxy variables true; otherwise keep both false.
+Trust proxy headers only when a documented reverse proxy strips client-supplied forwarding headers and writes its own. Railway documents `X-Real-IP` as the client address supplied by its public edge, so the official Railway deployment sets both proxy variables true. Other deployments must keep both false unless their proxy provides an equivalent guarantee.
 
 ### Relay rollback
 
