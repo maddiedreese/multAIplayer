@@ -80,7 +80,7 @@ async function authenticate(browser: Browser, relayBaseUrl: string, identity: Id
   // The debug-auth refresh can recreate the isolated WebKitGTK test page.
   // Keep the setup bypass idempotent so this relay-auth fixture does not
   // mistake a second first-run surface for an authentication failure.
-  await passFirstRunWelcome(browser);
+  await dismissFirstRunAfterRefresh(browser);
   await visible(browser, ".profile-card strong");
   await browser.waitUntil(
     () =>
@@ -102,20 +102,37 @@ async function visible(browser: Browser, selector: string, timeout = 30_000) {
 }
 
 async function passFirstRunWelcome(browser: Browser) {
-  const onboardingVisible = await browser.waitUntil(
-    () =>
-      browser.execute(() => {
-        if (document.querySelector(".onboarding-assistant")) return true;
-        return [...document.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Profile");
-      }),
-    { timeout: 30_000, timeoutMsg: "native shell did not settle on onboarding or the workspace" }
-  );
-  assert.equal(onboardingVisible, true);
-  if (!(await browser.$(".onboarding-assistant")).isDisplayed()) return;
+  await visible(browser, ".onboarding-assistant");
   const welcome = await visible(browser, "h1=Work with Codex together");
   assert.equal(await welcome.isFocused(), true, "first-run onboarding did not focus its welcome heading");
   await (await visible(browser, "button=Explore the interface")).click();
   await visible(browser, "button=Profile");
+}
+
+async function dismissFirstRunAfterRefresh(browser: Browser) {
+  await browser.waitUntil(
+    () =>
+      browser.execute(() => {
+        const profileVisible = [...document.querySelectorAll("button")].some(
+          (button) => button.textContent?.trim() === "Profile" && button.getClientRects().length > 0
+        );
+        if (profileVisible) return true;
+
+        const assistant = document.querySelector(".onboarding-assistant");
+        if (!assistant) return false;
+        const action =
+          assistant.querySelector<HTMLButtonElement>(".onboarding-explore") ??
+          [...assistant.querySelectorAll<HTMLButtonElement>("button")].find(
+            (button) => button.textContent?.trim() === "Save and close"
+          );
+        action?.click();
+        return false;
+      }),
+    {
+      timeout: 30_000,
+      timeoutMsg: "native shell did not settle on the workspace after debug authentication"
+    }
+  );
 }
 
 async function createRoom(host: Browser) {
