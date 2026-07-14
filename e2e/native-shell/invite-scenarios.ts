@@ -17,15 +17,27 @@ async function visible(browser: Browser, selector: string, timeout = 30_000) {
 }
 
 export async function selectRoom(browser: Browser, roomName: string) {
-  const alreadySelected = await browser.execute(
-    (expected) => document.querySelector<HTMLInputElement>('input[aria-label="Room title"]')?.value === expected,
-    roomName
-  );
-  if (alreadySelected) return;
+  const selectionState = async () =>
+    browser.execute((expected) => {
+      if (document.querySelector<HTMLInputElement>('input[aria-label="Room title"]')?.value === expected) {
+        return "selected";
+      }
+      return [...document.querySelectorAll<HTMLButtonElement>("button.room-button")].some((candidate) =>
+        candidate.textContent?.includes(expected)
+      )
+        ? "available"
+        : null;
+    }, roomName);
+
+  await browser.waitUntil(async () => (await selectionState()) !== null, {
+    timeout: 60_000,
+    timeoutMsg: `room ${roomName} was neither selected nor available after native startup`
+  });
+  if ((await selectionState()) === "selected") return;
   const room = await visible(
     browser,
     `//button[contains(concat(" ", normalize-space(@class), " "), " room-button ") and contains(., "${roomName}")]`,
-    60_000
+    30_000
   );
   await room.click();
   const title = await visible(browser, 'input[aria-label="Room title"]');
