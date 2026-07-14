@@ -94,12 +94,37 @@ function dispatchJoin(
   }
   options.rooms.joinRoom(session, message.teamId, message.roomId, message.userId, message.deviceId);
   send(socket, { type: "joined", teamId: message.teamId, roomId: message.roomId });
+  replayPendingInviteRequests(options, session);
   const key = options.rooms.roomKey(message.teamId, message.roomId);
   for (const backlogMessage of options.state.store.getMlsBacklog(key) ?? []) {
     send(socket, { type: "mls.message", message: backlogMessage });
   }
   for (const presence of options.state.roomPresence.get(key)?.values() ?? []) {
     send(socket, { type: "presence", ...presence, status: "online" });
+  }
+}
+
+function replayPendingInviteRequests(options: RelayWebSocketConnectionOptions, session: ClientSession) {
+  const { store } = options.state;
+  const room = session.roomId ? store.getRoom(session.roomId) : undefined;
+  if (
+    !room ||
+    room.teamId !== session.teamId ||
+    room.hostStatus !== "active" ||
+    room.hostUserId !== session.userId ||
+    room.activeHostDeviceId !== session.deviceId
+  )
+    return;
+
+  for (const request of store.inviteRequests.values()) {
+    if (store.inviteResponses.has(request.requestId)) continue;
+    const invite = store.getInvite(request.inviteId);
+    if (!invite || invite.roomId !== room.id || invite.teamId !== room.teamId) continue;
+    options.transport.send(session.socket, {
+      type: "invite.requested",
+      inviteId: request.inviteId,
+      requestId: request.requestId
+    });
   }
 }
 

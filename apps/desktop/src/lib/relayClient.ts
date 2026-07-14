@@ -162,6 +162,11 @@ export function connectRelay(
           window.clearTimeout(pending.timeout);
           pending.reject(new RelayPublishRejectedError(message.code, message.messageId, message.message));
         }
+      } else if (message.type === "error") {
+        // Preflight, schema, and connection-level relay failures cannot always
+        // carry an operation id. Fail closed instead of leaving an acknowledged
+        // publish or join to report a misleading timeout later.
+        rejectPendingAcks(new Error(message.message));
       }
       onMessage(message);
     });

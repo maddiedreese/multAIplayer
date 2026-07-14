@@ -255,6 +255,65 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  native-shell-e2e:
+    name: Real two-client native MLS journey
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          rustup default 1.89.0
+
+      - name: Install Tauri, WebDriver, display, and Secret Service dependencies
+        run: >-
+          sudo apt-get update &&
+          sudo apt-get install -y
+          build-essential
+          dbus-x11
+          gnome-keyring
+          libayatana-appindicator3-dev
+          librsvg2-dev
+          libssl-dev
+          libwebkit2gtk-4.1-dev
+          libxdo-dev
+          webkit2gtk-driver
+          xvfb
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Build package dependencies and the real KeyPackage validator
+        run: |
+          npm run build:packages
+          cargo build --locked --manifest-path apps/desktop/src-tauri/Cargo.toml -p mls-core --bin mls-keypackage-validator
+
+      - name: Install pinned Tauri WebDriver bridge
+        run: cargo install tauri-driver --version 2.0.6 --locked
+
+      - name: Run two real native clients through invite, message, and handoff
+        run: xvfb-run -a npm run test:e2e:native
+
+      - name: Upload native journey failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-shell-journey-failures
+          path: |
+            apps/desktop/src-tauri/target/debug/*.log
+            reports/native-shell-e2e
+          if-no-files-found: ignore
+          retention-days: 7
+
   security-journey:
     name: Multi-client security journey and injection red-team
     runs-on: ubuntu-latest

@@ -103,6 +103,60 @@ test("publishAndWaitForAck rejects on timeout and relay error", async () => {
   closedClient.close();
 });
 
+test("unscoped relay errors reject pending acknowledged operations without masking the cause", async () => {
+  const client = connectRelay(
+    "ws://relay",
+    () => undefined,
+    () => undefined
+  );
+  FakeWebSocket.latest.open();
+  const published = client.publishAndWaitForAck(publishMessage, 100);
+  const joined = client.joinAndWaitForAck(
+    {
+      type: "join",
+      teamId: "team-other",
+      roomId: "room-other",
+      userId: "user-test",
+      deviceId: "device-test",
+      deviceSessionToken: "session-test"
+    },
+    100
+  );
+
+  FakeWebSocket.latest.receive({ type: "error", message: "MLS envelope failed relay preflight validation." });
+
+  await assert.rejects(published, /failed relay preflight validation/);
+  await assert.rejects(joined, /failed relay preflight validation/);
+  client.close();
+});
+
+test("scoped relay errors still reject only their matching publish", async () => {
+  const client = connectRelay(
+    "ws://relay",
+    () => undefined,
+    () => undefined
+  );
+  FakeWebSocket.latest.open();
+  const first = client.publishAndWaitForAck(publishMessage, 100);
+  const secondMessage = {
+    ...publishMessage,
+    message: { ...publishMessage.message, id: "message-ack-test-2" }
+  };
+  const second = client.publishAndWaitForAck(secondMessage, 100);
+
+  FakeWebSocket.latest.receive({
+    type: "error",
+    message: "publish rejected",
+    code: "stale_epoch",
+    messageId: publishMessage.message.id
+  });
+  await assert.rejects(first, (error) => error instanceof RelayPublishRejectedError && error.code === "stale_epoch");
+
+  FakeWebSocket.latest.receive({ type: "published", messageId: secondMessage.message.id });
+  await second;
+  client.close();
+});
+
 test("joinAndWaitForAck resolves only after exact relay room admission", async () => {
   const client = connectRelay(
     "ws://relay",

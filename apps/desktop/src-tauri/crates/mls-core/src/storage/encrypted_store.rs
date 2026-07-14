@@ -265,6 +265,18 @@ pub(super) fn validate_component(value: &str) -> Result<(), StoreError> {
     Ok(())
 }
 
+pub(super) fn validate_identity_component(value: &str) -> Result<(), StoreError> {
+    if value.is_empty()
+        || value.len() > 128
+        || !value
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b':'))
+    {
+        return Err(StoreError::InvalidValue);
+    }
+    Ok(())
+}
+
 pub(super) fn unix_seconds() -> Result<u64, StoreError> {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -316,6 +328,35 @@ mod tests {
 
         assert!(matches!(result, Err(StoreError::InvalidValue)));
         assert_staging_is_empty(&storage);
+    }
+
+    #[test]
+    fn join_receipt_staging_accepts_protocol_identity_ids_but_rejects_unsafe_text() {
+        let storage = AtomicGroupStateStorage::new(Connection::open_in_memory().unwrap());
+        let receipt = ConsumedJoinReceipt {
+            invite_id: "invite-1".into(),
+            team_id: "team-1".into(),
+            room_id: "room-1".into(),
+            request_id: "request-1".into(),
+            requester_user_id: "github:native-guest".into(),
+            requester_device_id: "device_1".into(),
+            response_hash: "a".repeat(64),
+            epoch: 1,
+        };
+        storage.stage_join_receipt(receipt.clone()).unwrap();
+        assert_eq!(
+            storage.staged_join_receipts.lock().unwrap().as_slice(),
+            std::slice::from_ref(&receipt)
+        );
+        storage.clear_staged_join_receipts();
+
+        assert!(matches!(
+            storage.stage_join_receipt(ConsumedJoinReceipt {
+                requester_user_id: "github:unsafe user".into(),
+                ..receipt
+            }),
+            Err(StoreError::InvalidValue)
+        ));
     }
 
     #[test]

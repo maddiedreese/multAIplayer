@@ -1,0 +1,137 @@
+import assert from "node:assert/strict";
+import { afterEach, beforeEach, test } from "node:test";
+import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { JSDOM } from "jsdom";
+import { useDeviceIdentityLifecycle } from "../src/hooks/useDeviceIdentityLifecycle";
+import { useGitHubAuth } from "../src/hooks/useGitHubAuth";
+import { useAppStore } from "../src/store/appStore";
+
+const dom = new JSDOM("<!doctype html><html><body></body></html>", {
+  url: "http://127.0.0.1:1420/"
+});
+
+Object.defineProperty(globalThis, "window", { configurable: true, value: dom.window });
+Object.defineProperty(globalThis, "document", { configurable: true, value: dom.window.document });
+Object.defineProperty(globalThis, "navigator", { configurable: true, value: dom.window.navigator });
+Object.defineProperty(globalThis, "localStorage", { configurable: true, value: dom.window.localStorage });
+Object.assign(globalThis, { Element: dom.window.Element, HTMLElement: dom.window.HTMLElement });
+
+const originalFetch = globalThis.fetch;
+
+beforeEach(() => {
+  localStorage.setItem(
+    "multaiplayer:app-config",
+    JSON.stringify({ relayHttpUrl: "http://127.0.0.1:4322", relayWsUrl: "ws://127.0.0.1:4322/rooms" })
+  );
+  useAppStore.getState().resetAppStore();
+});
+afterEach(() => {
+  cleanup();
+  globalThis.fetch = originalFetch;
+  delete (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+});
+
+function installAuthResponses(options: {
+  mutationsRequireAuth: boolean;
+  authenticated: () => boolean;
+  onAuthMe?: () => void;
+}) {
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.endsWith("/auth/config")) {
+      return Response.json({
+        provider: "github",
+        configured: true,
+        scopes: ["read:user"],
+        mutationsRequireAuth: options.mutationsRequireAuth,
+        allowedOrigins: ["http://127.0.0.1:1420"],
+        sessionPersistence: "memory_only"
+      });
+    }
+    if (url.endsWith("/auth/me")) {
+      options.onAuthMe?.();
+      return options.authenticated()
+        ? Response.json({ user: { id: "github:native-host", login: "native-host", name: "Native Host" } })
+        : Response.json({ error: "authentication required" }, { status: 401 });
+    }
+    throw new Error(`Unexpected auth bootstrap request: ${url}`);
+  };
+}
+
+test("auth-required startup keeps native identity gated after an unauthenticated /auth/me response", async () => {
+  let authenticated = false;
+  let authMeResponses = 0;
+  installAuthResponses({
+    mutationsRequireAuth: true,
+    authenticated: () => authenticated,
+    onAuthMe: () => {
+      authMeResponses += 1;
+    }
+  });
+
+  const first = renderHook(() => useGitHubAuth("http://127.0.0.1:4322"));
+  await waitFor(() => assert.equal(first.result.current.authConfig?.mutationsRequireAuth, true));
+  await waitFor(() => assert.equal(authMeResponses, 1));
+  assert.equal(first.result.current.currentUser, null);
+  assert.equal(first.result.current.identityResolved, false);
+
+  first.unmount();
+  authenticated = true;
+  const refreshed = renderHook(() => useGitHubAuth("http://127.0.0.1:4322"));
+  await waitFor(() => assert.equal(refreshed.result.current.currentUser?.id, "github:native-host"));
+  await waitFor(() => assert.equal(refreshed.result.current.identityResolved, true));
+});
+
+test("unauthenticated LAN mode enables a local identity only after auth policy and user resolution", async () => {
+  installAuthResponses({ mutationsRequireAuth: false, authenticated: () => false });
+
+  const auth = renderHook(() => useGitHubAuth("http://127.0.0.1:4322"));
+  assert.equal(auth.result.current.identityResolved, false);
+  await waitFor(() => assert.equal(auth.result.current.authConfig?.mutationsRequireAuth, false));
+  await waitFor(() => assert.equal(auth.result.current.identityResolved, true));
+  assert.equal(auth.result.current.currentUser, null);
+});
+
+test("device identity lifecycle never invokes native MLS before identity resolution", async () => {
+  const invocations: Array<{ command: string; args: unknown }> = [];
+  (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {
+    invoke: async (command: string, args: unknown) => {
+      invocations.push({ command, args });
+      return {
+        githubUserId: "github:native-host",
+        deviceId: "device-native-host",
+        ciphersuite: 2,
+        signaturePublicKey: "signature-key",
+        signatureKeyFingerprint: "sha256:signature",
+        hpkePublicKey: "hpke-key",
+        hpkeKeyFingerprint: "sha256:hpke",
+        requiresRejoin: false
+      };
+    }
+  };
+  const noop = () => undefined;
+  const lifecycle = renderHook(
+    ({ identityResolved }: { identityResolved: boolean }) =>
+      useDeviceIdentityLifecycle({
+        relayHttpUrl: "http://127.0.0.1:4322",
+        identityResolved,
+        deviceId: "device-native-host",
+        userId: "github:native-host",
+        displayName: "Native Host",
+        deviceIdentity: null,
+        replaceDeviceIdentity: noop,
+        setDeviceIdentityStatusMessage: noop
+      }),
+    { initialProps: { identityResolved: false } }
+  );
+
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
+  assert.equal(invocations.length, 0);
+
+  lifecycle.rerender({ identityResolved: true });
+  await waitFor(() => assert.equal(invocations.length, 1));
+  assert.deepEqual(invocations[0], {
+    command: "mls_identity_initialize",
+    args: { request: { githubUserId: "github:native-host", deviceId: "device-native-host" } }
+  });
+});

@@ -13,6 +13,11 @@ name = "mls-lifecycle-fixture"
 path = "src/bin/mls-lifecycle-fixture.rs"
 required-features = ["test-fixtures"]
 
+[[bin]]
+name = "mls-integration-client"
+path = "src/bin/mls-integration-client.rs"
+required-features = ["test-fixtures"]
+
 [dependencies]
 base64 = "=0.22.1"
 aes-gcm = "=0.10.3"

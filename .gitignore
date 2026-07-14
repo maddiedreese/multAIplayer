@@ -16,3 +16,4 @@ test-results/
 coverage/
 **/.stryker-tmp/
 **/reports/mutation/
+reports/native-shell-e2e/

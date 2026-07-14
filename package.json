@@ -28,6 +28,7 @@
     "audit:npm": "npm audit --audit-level=high",
     "test": "npm run build:packages && npm run test:scripts && npm run test:workspaces",
     "test:e2e": "node scripts/run-e2e.mjs",
+    "test:e2e:native": "node --import tsx e2e/native-shell/journey.ts",
     "test:security-journey": "npm run build:packages && npm run test:security-journey -w @multaiplayer/relay",
     "fmt:rust:check": "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --all -- --check",
     "lint:rust": "cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --workspace --all-targets --all-features -- -D warnings",
@@ -61,7 +62,8 @@
     "globals": "17.7.0",
     "prettier": "3.9.5",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.63.0"
+    "typescript-eslint": "8.63.0",
+    "webdriverio": "9.29.1"
   },
   "overrides": {
     "monaco-editor": {
