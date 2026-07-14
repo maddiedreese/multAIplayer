@@ -31,12 +31,13 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-function useStoreBackedWorkspaceBootstrap() {
+function useStoreBackedWorkspaceBootstrap(authenticatedUserId: string | null = null) {
   const relayHttpUrl = useAppStore((state) => state.appConfig.relayHttpUrl);
   const bootstrapAttempt = useAppStore((state) => state.workspaceBootstrapAttempt);
   const store = useAppStore.getState();
   useWorkspaceBootstrap({
     relayHttpUrl,
+    authenticatedUserId,
     bootstrapAttempt,
     replaceTeams: store.replaceTeams,
     replaceRooms: store.replaceRooms,
@@ -94,4 +95,38 @@ test("HTTP workspace bootstrap exposes an error and retries through the same loa
   assert.equal(state.workspaceError, null);
   assert.equal(state.teams[0]?.id, "team-recovered");
   assert.equal(state.relayStatus, "closed");
+});
+
+test("auth-required bootstrap reruns once when GitHub Device Flow resolves an authenticated identity", async () => {
+  let requests = 0;
+  globalThis.fetch = async () => {
+    requests += 1;
+    return requests === 1
+      ? Response.json(
+          { error: "Sign in before reading the workspace.", code: "authentication_required" },
+          { status: 401 }
+        )
+      : Response.json({
+          teams: [{ id: "team-member", name: "Member workspace", members: 1, role: "member" }],
+          rooms: []
+        });
+  };
+
+  const { rerender } = renderHook(
+    ({ authenticatedUserId }: { authenticatedUserId: string | null }) =>
+      useStoreBackedWorkspaceBootstrap(authenticatedUserId),
+    { initialProps: { authenticatedUserId: null as string | null } }
+  );
+
+  await waitFor(() => assert.equal(useAppStore.getState().workspaceBootstrapStatus, "error"));
+  assert.equal(requests, 1);
+
+  rerender({ authenticatedUserId: "github:new-member" });
+  await waitFor(() => assert.equal(useAppStore.getState().workspaceBootstrapStatus, "ready"));
+  assert.equal(requests, 2, "the authenticated transition should trigger exactly one fresh bootstrap");
+  assert.equal(useAppStore.getState().teams[0]?.id, "team-member");
+
+  rerender({ authenticatedUserId: "github:new-member" });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(requests, 2, "stable authenticated renders must not create a retry loop");
 });

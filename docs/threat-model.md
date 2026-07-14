@@ -69,7 +69,7 @@ The apex and `open` hosts publish no-redirect Apple App Site Association files f
 
 The native associated-domain handler accepts a single URL only. It requires HTTPS, one of the two exact hosts, the invite path, no credentials/port/query, exactly one bounded base64url invite id and capability plus `approval=request`, and rejects extra, duplicate, legacy, or ambiguous data. A one-shot, replacement-only memory slot holds the parsed payload. The emitted event contains no URL; the frontend subscribes before draining, and React clears the payload after delegation, error, denial, cancellation, or supersession. These controls reduce accidental exposure but do not protect a link already leaked outside the app.
 
-AASA generation, static-page headers/scrubbing, parser rules, one-shot cold/warm intake, and packaged entitlement presence are automated evidence. Whether macOS actually dispatches a clicked link depends on the live AASA response, Apple Team ID, signed entitlement, installation location/state, and OS/browser behavior. Release operations therefore require a manual signed-app cold-start and already-running click test; unsigned CI packaging is not that evidence.
+AASA generation, static-page headers/scrubbing, parser rules, one-shot cold/warm intake, and packaged entitlement presence are automated evidence. Whether macOS actually dispatches a clicked link depends on the live AASA response, Apple Team ID, Developer ID-signed entitlement, installation location/state, and OS/browser behavior. Release operations therefore require a manual signed-app cold-start and already-running click test; the ad-hoc-signed CI inspection package uses no Apple account or Developer ID certificate and is not that evidence.
 
 ## Codex App-server Boundary
 

@@ -61,6 +61,7 @@ export interface OnboardingAuthenticationFlow {
   url: string;
   userCode: string | null;
   expiresAt: number | null;
+  browserOpenFailed: boolean;
 }
 
 export interface OnboardingAssistantProps {
@@ -367,9 +368,13 @@ function ReadinessStep({
 
 function AuthenticationFlowPanel({ flow, onCancel }: { flow: OnboardingAuthenticationFlow; onCancel: () => void }) {
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied_code" | "copied_link" | "failed">("idle");
-  const [openStatus, setOpenStatus] = useState<"idle" | "failed">("idle");
+  const [openStatus, setOpenStatus] = useState<"idle" | "failed">(flow.browserOpenFailed ? "failed" : "idle");
   const providerLabel = flow.provider === "github" ? "GitHub" : "ChatGPT";
   const remainingMinutes = flow.expiresAt ? Math.max(0, Math.ceil((flow.expiresAt - Date.now()) / 60_000)) : null;
+
+  useEffect(() => {
+    if (flow.browserOpenFailed) setOpenStatus("failed");
+  }, [flow.browserOpenFailed]);
 
   async function copyCode() {
     if (!flow.userCode) return;

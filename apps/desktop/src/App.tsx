@@ -122,6 +122,7 @@ function NativeApp() {
   const workspaceFlow = useAppWorkspaceFlow({
     appRefs,
     identityResolved: githubAuth.identityResolved,
+    authenticatedUserId: githubAuth.currentUser?.id ?? null,
     localIdentity,
     selected: selectedContext,
     roomInteraction,

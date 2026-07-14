@@ -188,6 +188,7 @@ export function useOnboardingFlow({
       setMessage(null);
       if (action === "retry_workspace_bootstrap") {
         useAppStore.getState().retryWorkspaceBootstrap();
+        githubAuth.retryAuthBootstrap();
       } else if (action === "sign_in_github") {
         await githubAuth.beginGitHubSignIn();
       } else if (action === "sign_in_chatgpt") {
@@ -305,7 +306,8 @@ export function useOnboardingFlow({
           flow: "device" as const,
           url: githubAuth.deviceFlow.verification_uri,
           userCode: githubAuth.deviceFlow.user_code,
-          expiresAt: githubAuth.deviceFlow.expiresAt
+          expiresAt: githubAuth.deviceFlow.expiresAt,
+          browserOpenFailed: githubAuth.authenticationBrowserOpenFailed
         }
       : null,
     codexAuthentication: account.login
@@ -314,7 +316,8 @@ export function useOnboardingFlow({
           flow: account.login.flow,
           url: account.login.url,
           userCode: account.login.userCode,
-          expiresAt: null
+          expiresAt: null,
+          browserOpenFailed: account.loginBrowserOpenFailed
         }
       : null,
     supportsCodexDeviceLogin: account.snapshot?.capabilities.supportsDeviceLogin === true,

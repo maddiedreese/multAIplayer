@@ -5,6 +5,13 @@ import { ensureRoomDefaults } from "../lib/roomDefaults";
 
 interface UseWorkspaceBootstrapOptions {
   relayHttpUrl: string;
+  /**
+   * A signed-in identity changes the authorization available to `/teams`.
+   * Keeping this nullable preserves the single anonymous bootstrap used by
+   * LAN/self-hosted relays while allowing a failed pre-login request to rerun
+   * once after Device Flow completes.
+   */
+  authenticatedUserId: string | null;
   bootstrapAttempt: number;
   replaceTeams: (teams: TeamRecord[]) => void;
   replaceRooms: (rooms: RoomRecord[]) => void;
@@ -18,6 +25,7 @@ interface UseWorkspaceBootstrapOptions {
 
 export function useWorkspaceBootstrap({
   relayHttpUrl,
+  authenticatedUserId,
   bootstrapAttempt,
   replaceTeams,
   replaceRooms,
@@ -52,6 +60,7 @@ export function useWorkspaceBootstrap({
       cancelled = true;
     };
   }, [
+    authenticatedUserId,
     beginWorkspaceBootstrap,
     bootstrapAttempt,
     completeWorkspaceBootstrap,

@@ -98,6 +98,15 @@ function projectGitHub(intent: OnboardingIntent, github: OnboardingReadinessInpu
   if (!github.configResolved || !github.userResolved || github.busy) {
     return row("github", "GitHub", "checking", "Checking GitHub sign-in requirements…", null, true);
   }
+  if (!github.config) {
+    return row(
+      "github",
+      "GitHub",
+      "blocked",
+      "GitHub sign-in requirements could not be checked. Check the relay connection and try again.",
+      "retry_workspace_bootstrap"
+    );
+  }
   if (github.user) {
     return row("github", "GitHub", "ready", "Signed in for workspace identity, invitations, and repository workflows.");
   }

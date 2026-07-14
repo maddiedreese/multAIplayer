@@ -24,6 +24,8 @@ const fallbackAuthConfig: GitHubAuthConfig = {
 export function useGitHubAuth(relayHttpUrl: string) {
   const [authConfigResolved, setAuthConfigResolved] = useState(false);
   const [currentUserResolved, setCurrentUserResolved] = useState(false);
+  const [authBootstrapAttempt, setAuthBootstrapAttempt] = useState(0);
+  const [authenticationBrowserOpenFailed, setAuthenticationBrowserOpenFailed] = useState(false);
   const authConfig = useAppStore((state) => state.authConfig);
   const currentUser = useAppStore((state) => state.currentUser);
   const deviceFlow = useAppStore((state) => state.deviceFlow);
@@ -60,8 +62,11 @@ export function useGitHubAuth(relayHttpUrl: string) {
       })
       .catch((error) => {
         if (cancelled) return;
-        setAuthConfig(fallbackAuthConfig);
+        // A transport failure is not evidence that authentication is optional.
+        // Settle into an explicit fail-closed state that onboarding can retry.
+        setAuthConfig(null);
         setAuthError(String(error));
+        setAuthConfigResolved(true);
       });
     getCurrentUser()
       .then((user) => {
@@ -76,7 +81,11 @@ export function useGitHubAuth(relayHttpUrl: string) {
     return () => {
       cancelled = true;
     };
-  }, [relayHttpUrl, setAuthConfig, setAuthError, setCurrentUser]);
+  }, [authBootstrapAttempt, relayHttpUrl, setAuthConfig, setAuthError, setCurrentUser]);
+
+  const retryAuthBootstrap = useCallback(() => {
+    setAuthBootstrapAttempt((attempt) => attempt + 1);
+  }, []);
 
   useEffect(() => {
     if (!deviceFlow || currentUser) return;
@@ -85,6 +94,7 @@ export function useGitHubAuth(relayHttpUrl: string) {
     let intervalSeconds = Math.max(1, deviceFlow.interval);
     const poll = () => {
       if (Date.now() >= deviceFlow.expiresAt) {
+        setAuthenticationBrowserOpenFailed(false);
         setAuthBusy(false);
         setAuthError("The GitHub sign-in code expired. Start sign-in again.");
         setDeviceFlow(null);
@@ -94,6 +104,7 @@ export function useGitHubAuth(relayHttpUrl: string) {
         .then((result) => {
           if (cancelled) return;
           if (result.status === "complete") {
+            setAuthenticationBrowserOpenFailed(false);
             setCurrentUser(result.user);
             setDeviceFlow(null);
             setAuthBusy(false);
@@ -105,6 +116,7 @@ export function useGitHubAuth(relayHttpUrl: string) {
         })
         .catch((error) => {
           if (cancelled) return;
+          setAuthenticationBrowserOpenFailed(false);
           setAuthBusy(false);
           setAuthError(String(error));
           setDeviceFlow(null);
@@ -118,12 +130,13 @@ export function useGitHubAuth(relayHttpUrl: string) {
   }, [currentUser, deviceFlow, setAuthBusy, setAuthError, setCurrentUser, setDeviceFlow]);
 
   const beginGitHubSignIn = useCallback(async () => {
+    setAuthenticationBrowserOpenFailed(false);
     setAuthBusy(true);
     setAuthError(null);
     try {
       const flow = await startGitHubDeviceFlow();
       setDeviceFlow(flow);
-      await openTrustedAuthenticationUrl("github", flow.verification_uri);
+      setAuthenticationBrowserOpenFailed(!(await openTrustedAuthenticationUrl("github", flow.verification_uri)));
     } catch (error) {
       setAuthError(String(error));
       setAuthBusy(false);
@@ -131,6 +144,7 @@ export function useGitHubAuth(relayHttpUrl: string) {
   }, [setAuthBusy, setAuthError, setDeviceFlow]);
 
   const cancelGitHubSignIn = useCallback(() => {
+    setAuthenticationBrowserOpenFailed(false);
     setDeviceFlow(null);
     setAuthBusy(false);
     setAuthError(null);
@@ -138,6 +152,7 @@ export function useGitHubAuth(relayHttpUrl: string) {
 
   const signOutGitHub = useCallback(async () => {
     await logout();
+    setAuthenticationBrowserOpenFailed(false);
     setCurrentUser(null);
     setDeviceFlow(null);
     setAuthBusy(false);
@@ -151,7 +166,9 @@ export function useGitHubAuth(relayHttpUrl: string) {
     deviceFlow,
     authError,
     authBusy,
+    authenticationBrowserOpenFailed,
     identityResolved,
+    retryAuthBootstrap,
     beginGitHubSignIn,
     cancelGitHubSignIn,
     signOutGitHub

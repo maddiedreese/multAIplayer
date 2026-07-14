@@ -101,6 +101,20 @@ test("unconfigured GitHub blocks join and only warns for create", () => {
   assert.equal(join.action, null);
 });
 
+test("failed GitHub policy discovery is explicit, fail closed, and directly retryable", () => {
+  const github = {
+    ...readyInput().github,
+    config: null,
+    user: null,
+    error: "relay token=must-not-render"
+  };
+  const row = byId(projectOnboardingReadiness(readyInput({ github })), "github");
+  assert.equal(row.status, "blocked");
+  assert.equal(row.blocking, true);
+  assert.equal(row.action, "retry_workspace_bootstrap");
+  assert.doesNotMatch(row.text, /token|must-not-render/i);
+});
+
 test("workspace failure and unresolved relay state both block progress", () => {
   const loading = byId(
     projectOnboardingReadiness(readyInput({ workspace: { status: "loading", error: null } })),

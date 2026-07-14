@@ -56,17 +56,45 @@ export async function approveInviteAcrossGuestCrash(
   const restartedGuest = await context.restartGuest();
   await selectRoom(restartedGuest, context.roomName);
   await openRoomInspector(restartedGuest);
-  await restartedGuest.waitUntil(
-    () =>
-      restartedGuest.execute(() => {
-        const message = document.querySelector(".invite-panel .workflow-message")?.textContent ?? "";
-        return /approved|unlocked|joined/i.test(message);
-      }),
-    {
-      timeout: 60_000,
-      timeoutMsg: "restarted guest did not recover and process its durable Welcome"
-    }
-  );
+  try {
+    await restartedGuest.waitUntil(
+      () =>
+        restartedGuest.execute(() => {
+          const message = document.querySelector(".invite-panel .workflow-message")?.textContent ?? "";
+          return /approved|unlocked|joined/i.test(message);
+        }),
+      {
+        timeout: 60_000,
+        timeoutMsg: "restarted guest did not recover and process its durable Welcome"
+      }
+    );
+  } catch (error) {
+    const diagnostics = await restartedGuest.executeAsync((done) => {
+      import("/src/store/appStore.ts")
+        .then(({ useAppStore }) => {
+          const state = useAppStore.getState();
+          done({
+            workspaceBootstrapStatus: state.workspaceBootstrapStatus,
+            selectedTeam: state.selectedTeam.slice(0, 160),
+            selectedRoomId: state.selectedRoomId.slice(0, 160),
+            roomTitle: (document.querySelector<HTMLInputElement>('input[aria-label="Room title"]')?.value ?? "").slice(
+              0,
+              160
+            ),
+            workflowMessage: (
+              document.querySelector(".invite-panel .workflow-message")?.textContent?.trim() ?? ""
+            ).slice(0, 300),
+            rooms: state.rooms.slice(0, 10).map((room) => ({
+              id: room.id.slice(0, 160),
+              teamId: room.teamId.slice(0, 160),
+              name: room.name.slice(0, 160)
+            }))
+          });
+        })
+        .catch((diagnosticError) => done({ diagnosticError: String(diagnosticError).slice(0, 300) }));
+    });
+    throw new Error(`${String(error)}; restarted guest diagnostics: ${JSON.stringify(diagnostics)}`);
+  }
   await visible(restartedGuest, ".invite-panel .terminal-request.approved", 60_000);
   await assertRecoveredNativeMembership(restartedGuest, context);
   return restartedGuest;

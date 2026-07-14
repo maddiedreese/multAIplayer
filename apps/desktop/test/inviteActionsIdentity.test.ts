@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 import { JSDOM } from "jsdom";
-import { cleanup, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { createElement, StrictMode, type ReactNode } from "react";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import type { UseInviteActionsOptions } from "../src/lib/invite/inviteActionTypes";
-import { useInviteActions } from "../src/hooks/useInviteActions";
+import { useInviteActions, usePendingInviteRecovery } from "../src/hooks/useInviteActions";
 import { useAppStore } from "../src/store/appStore";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
@@ -123,4 +123,24 @@ test("stable invite actions call the latest implementation after inputs change",
     useAppStore.getState().inviteByRoom[room.id]?.message,
     "Create or join a room before copying an invite."
   );
+});
+
+test("pending invite recovery waits for workspace bootstrap and starts once when ready", async () => {
+  let starts = 0;
+  const resume = async () => {
+    starts += 1;
+  };
+  act(() => {
+    const store = useAppStore.getState();
+    store.replaceDeviceSessionToken("device-session");
+    store.replaceRelayStatus("open");
+  });
+
+  const { rerender } = renderHook(() => usePendingInviteRecovery(resume), { wrapper: StrictModeWrapper });
+  assert.equal(starts, 0);
+
+  act(() => useAppStore.getState().completeWorkspaceBootstrap());
+  await waitFor(() => assert.equal(starts, 1));
+  rerender();
+  assert.equal(starts, 1);
 });

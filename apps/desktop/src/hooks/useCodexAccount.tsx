@@ -66,6 +66,7 @@ export interface CodexAccountController {
   native: boolean;
   snapshot: CodexHostSnapshot | null;
   login: CodexLoginStartResult | null;
+  loginBrowserOpenFailed: boolean;
   mcpLogin: { name: string; url: string } | null;
   busy: boolean;
   message: string | null;
@@ -96,6 +97,7 @@ function useCodexAccountController(): CodexAccountController {
   const native = isTauriRuntime();
   const [snapshot, setSnapshot] = useState<CodexHostSnapshot | null>(null);
   const [login, setLogin] = useState<CodexLoginStartResult | null>(null);
+  const [loginBrowserOpenFailed, setLoginBrowserOpenFailed] = useState(false);
   const [mcpLogin, setMcpLogin] = useState<{ name: string; url: string } | null>(null);
   const [busy, setBusy] = useState(native);
   const [message, setMessage] = useState<string | null>(null);
@@ -124,6 +126,7 @@ function useCodexAccountController(): CodexAccountController {
     let unlisten: () => void = () => undefined;
     void listenForCodexHostNotifications((notification) => {
       if (notification.method === "account/login/completed") {
+        setLoginBrowserOpenFailed(false);
         setMessage(
           notification.params.success === true
             ? "Codex sign-in completed."
@@ -153,6 +156,7 @@ function useCodexAccountController(): CodexAccountController {
 
   const beginLogin = useCallback(
     async (flow: "browser" | "device") => {
+      setLoginBrowserOpenFailed(false);
       setBusy(true);
       try {
         const next = await startCodexLogin(flow, {
@@ -168,7 +172,9 @@ function useCodexAccountController(): CodexAccountController {
         }
         const trustedLogin = { ...next, url: trustedUrl };
         setLogin(trustedLogin);
-        if (flow === "browser") await openTrustedAuthenticationUrl("openai", trustedUrl);
+        if (flow === "browser") {
+          setLoginBrowserOpenFailed(!(await openTrustedAuthenticationUrl("openai", trustedUrl)));
+        }
         setMessage("Complete sign-in in the link below. Credentials remain in Codex on this device.");
       } catch (error) {
         setMessage(String(error));
@@ -184,6 +190,7 @@ function useCodexAccountController(): CodexAccountController {
     setBusy(true);
     try {
       await cancelCodexLogin(login.loginId);
+      setLoginBrowserOpenFailed(false);
       setLogin(null);
       setMessage("Codex sign-in cancelled.");
     } catch (error) {
@@ -197,6 +204,7 @@ function useCodexAccountController(): CodexAccountController {
     setBusy(true);
     try {
       await logoutCodexAccount();
+      setLoginBrowserOpenFailed(false);
       setLogin(null);
       await refresh();
     } catch (error) {
@@ -246,6 +254,7 @@ function useCodexAccountController(): CodexAccountController {
       native,
       snapshot,
       login,
+      loginBrowserOpenFailed,
       mcpLogin,
       busy,
       message,
@@ -265,6 +274,7 @@ function useCodexAccountController(): CodexAccountController {
       cancelLogin,
       connectMcp,
       login,
+      loginBrowserOpenFailed,
       mcpLogin,
       message,
       native,

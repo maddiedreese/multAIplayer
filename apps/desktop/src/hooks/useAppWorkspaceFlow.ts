@@ -22,6 +22,7 @@ type RoomSettingsActor = ReturnType<typeof useRoomSettingsActor>;
 export function useAppWorkspaceFlow({
   appRefs,
   identityResolved,
+  authenticatedUserId,
   localIdentity,
   selected,
   roomInteraction,
@@ -32,6 +33,7 @@ export function useAppWorkspaceFlow({
 }: {
   appRefs: AppRefs;
   identityResolved: boolean;
+  authenticatedUserId: string | null;
   localIdentity: LocalIdentity;
   selected: SelectedRoomContext;
   roomInteraction: RoomInteraction;
@@ -72,6 +74,7 @@ export function useAppWorkspaceFlow({
     bootstrap: {
       workspace: {
         relayHttpUrl,
+        authenticatedUserId,
         bootstrapAttempt: workspaceBootstrapAttempt,
         replaceTeams: storeAction("replaceTeams"),
         replaceRooms: storeAction("replaceRooms"),

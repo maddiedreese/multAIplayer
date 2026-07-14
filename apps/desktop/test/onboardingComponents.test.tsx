@@ -238,14 +238,16 @@ test("readiness surfaces ephemeral GitHub and ChatGPT authorization controls wit
           flow: "device",
           url: "https://github.com/login/device",
           userCode: "GH-CODE",
-          expiresAt: Date.now() + 5 * 60_000
+          expiresAt: Date.now() + 5 * 60_000,
+          browserOpenFailed: true
         },
         codexAuthentication: {
           provider: "chatgpt",
           flow: "device",
           url: "https://auth.openai.com/activate",
           userCode: "OPENAI-CODE",
-          expiresAt: null
+          expiresAt: null,
+          browserOpenFailed: true
         },
         onCancelGitHubAuthentication: () => {
           githubCancelled += 1;
@@ -259,6 +261,11 @@ test("readiness surfaces ephemeral GitHub and ChatGPT authorization controls wit
   assert.equal(view.getByLabelText("GitHub device code").textContent, "GH-CODE");
   assert.match(view.getByText(/This code expires in about/).textContent ?? "", /5 minutes/);
   assert.equal(view.getByLabelText("ChatGPT device code").textContent, "OPENAI-CODE");
+  assert.equal(view.getAllByRole("alert").length, 2);
+  assert.ok(
+    view.getAllByRole("alert").every((alert) => alert.textContent?.includes("system browser could not be opened"))
+  );
+  assert.equal(view.getAllByRole("button", { name: /Copy sign-in link/ }).length, 2);
   const cancelButtons = view.getAllByRole("button", { name: "Cancel sign-in" });
   assert.ok(cancelButtons.every((button) => !(button as HTMLButtonElement).disabled));
   fireEvent.click(cancelButtons[0]);
