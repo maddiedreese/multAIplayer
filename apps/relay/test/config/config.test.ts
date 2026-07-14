@@ -42,6 +42,21 @@ test("relay only enables metrics with a strong bearer token", () => {
   }
 });
 
+test("relay falls back safely for invalid shutdown drain values", () => {
+  const previous = process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS;
+  try {
+    process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS = "not-a-number";
+    assert.equal(loadRelayConfig().shutdown.drainMs, 0);
+    process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS = "-1";
+    assert.equal(loadRelayConfig().shutdown.drainMs, 0);
+    process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS = "60001";
+    assert.equal(loadRelayConfig().shutdown.drainMs, 60_000);
+  } finally {
+    if (previous === undefined) delete process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS;
+    else process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS = previous;
+  }
+});
+
 test("relay defaults to SQLite and requires an explicit JSON compatibility choice", () => {
   const previousStorage = process.env.MULTAIPLAYER_RELAY_STORAGE;
   const previousDataPath = process.env.MULTAIPLAYER_RELAY_DATA_PATH;
