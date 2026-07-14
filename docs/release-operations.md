@@ -55,6 +55,7 @@ Start from `.env.example` and set production values in the same environment that
 
 ```bash
 NODE_ENV=production
+PORT=8080
 RAILWAY_RUN_UID=0
 GITHUB_CLIENT_ID=...
 GITHUB_OAUTH_SCOPES="read:user repo"
@@ -73,7 +74,7 @@ MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=true
 
 Generate the stable session secret with a password manager or `openssl rand -base64 32`. Rotating it signs users out. Configure all size, retention, upload, rate, connection, and room quotas from `.env.example`; do not copy a stale second list into this guide.
 
-Railway volumes are mounted as `root`, so Railway's documented `RAILWAY_RUN_UID=0` override is required for the relay to write SQLite data under `/data`. This grants root only inside the isolated service container; it does not grant host or Railway control-plane access. Reassess the override if Railway adds managed non-root volume ownership or the image gains a verified privilege-dropping entrypoint.
+Pin `PORT=8080` and target both the generated and custom Railway domains at port `8080`; otherwise a stale domain target can pass Railway's internal health check while returning `502` publicly. Railway volumes are mounted as `root`, so Railway's documented `RAILWAY_RUN_UID=0` override is required for the relay to write SQLite data under `/data`. This grants root only inside the isolated service container; it does not grant host or Railway control-plane access. Reassess the override if Railway adds managed non-root volume ownership or the image gains a verified privilege-dropping entrypoint.
 
 Run in the deployed environment:
 
