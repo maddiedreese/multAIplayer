@@ -3,6 +3,12 @@ import type { CookieOptions, Express } from "express";
 import { nanoid } from "nanoid";
 import type { AuthSession } from "../state.js";
 import { fetchUpstream } from "../http/upstream.js";
+import {
+  accountDeletionConfirmation,
+  deleteAccountOwnedRelayDataAtomically,
+  findAccountDeletionBlockers
+} from "./account-deletion.js";
+import type { RelayStore } from "../state.js";
 
 export interface RegisterGitHubAuthRoutesOptions {
   app: Express;
@@ -12,10 +18,14 @@ export interface RegisterGitHubAuthRoutesOptions {
   allowedCorsOrigins: string[];
   sessionPersistenceSecret: string | null;
   authSessions: Map<string, AuthSession>;
+  store: RelayStore;
   authSessionMaxAgeMs: number;
   authCookieOptions: (maxAge?: number) => CookieOptions;
   getAuthSession: (sessionId: unknown) => AuthSession | null;
   scheduleStoreSave: () => void;
+  saveRelayStore: () => Promise<void>;
+  revokeTeamMemberSessions: (teamId: string, userId: string) => void;
+  revokeUserPresence: (userId: string) => void;
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
   maxGitHubDeviceCodeChars: number;
   maxUserIdChars: number;
@@ -32,10 +42,14 @@ export function registerGitHubAuthRoutes({
   allowedCorsOrigins,
   sessionPersistenceSecret,
   authSessions,
+  store,
   authSessionMaxAgeMs,
   authCookieOptions,
   getAuthSession,
   scheduleStoreSave,
+  saveRelayStore,
+  revokeTeamMemberSessions,
+  revokeUserPresence,
   normalizeMetadataText,
   maxGitHubDeviceCodeChars,
   maxUserIdChars,
@@ -207,5 +221,64 @@ export function registerGitHubAuthRoutes({
     }
     res.clearCookie("multaiplayer_session", authCookieOptions());
     res.json({ ok: true });
+  });
+
+  app.delete("/auth/account", async (req, res) => {
+    const session = getAuthSession(req.cookies?.multaiplayer_session);
+    if (!session) {
+      sendRelayError(res, 401, "authentication_required", "Sign in before deleting hosted account data.");
+      return;
+    }
+    if (req.body?.confirmation !== accountDeletionConfirmation) {
+      sendRelayError(res, 400, "invalid_request", `confirmation must equal \"${accountDeletionConfirmation}\"`);
+      return;
+    }
+
+    const userId = session.user.id;
+    const blockers = findAccountDeletionBlockers(store, userId);
+    if (blockers.ownedTeams.length > 0 || blockers.hostedRooms.length > 0) {
+      sendRelayError(
+        res,
+        409,
+        "account_deletion_blocked",
+        "Transfer or delete every owned team and hand off every hosted room before deleting your hosted data.",
+        { blockers }
+      );
+      return;
+    }
+
+    const memberTeamIds = Array.from(store.teamMembers.entries())
+      .filter(([, members]) => members.has(userId))
+      .map(([teamId]) => teamId);
+    let deleted;
+    try {
+      deleted = await deleteAccountOwnedRelayDataAtomically(store, userId, saveRelayStore);
+    } catch {
+      sendRelayError(
+        res,
+        503,
+        "persistence_unavailable",
+        "Hosted account deletion could not be committed. Your session remains active; retry when storage is available."
+      );
+      return;
+    }
+    for (const teamId of memberTeamIds) revokeTeamMemberSessions(teamId, userId);
+    revokeUserPresence(userId);
+    for (const client of store.sessions.values()) {
+      if (client.authSession?.user.id === userId || client.userId === userId) {
+        client.socket.close(1008, "Hosted account data deleted");
+      }
+    }
+    res.clearCookie("multaiplayer_session", authCookieOptions());
+    res.json({
+      ok: true,
+      deleted,
+      retainedSharedData: [
+        "team_and_room_records",
+        "mls_ciphertext_and_routing_metadata",
+        "encrypted_attachment_blobs",
+        "accepted_message_receipts"
+      ]
+    });
   });
 }

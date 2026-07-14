@@ -3,11 +3,16 @@ import { GitHubIcon } from "./GitHubIcon";
 import { useState } from "react";
 import type { DeviceIdentity } from "../lib/deviceIdentity";
 import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
-import { buildWebPreviewDiagnosticBundle, saveNativeDiagnosticBundle } from "../lib/diagnostics";
-import { copyTextToClipboard } from "../lib/clipboard";
-import { isTauriRuntime } from "../lib/localBackend/runtime";
+import { saveNativeDiagnosticBundle } from "../lib/diagnostics";
 import { InfoRow } from "./common";
 import { CodexAccountPanel } from "./CodexAccountPanel";
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../lib/productLinks";
+import {
+  deleteHostedAccount,
+  recheckHostedAccountDeletion,
+  hostedAccountDeletionConfirmation,
+  type HostedAccountDeletionResult
+} from "../lib/authClient";
 
 export function ProfileDrawerPanel({
   currentUser,
@@ -20,6 +25,7 @@ export function ProfileDrawerPanel({
   deviceIdentityMessage,
   relaySessionPersistence,
   onRotateDeviceIdentity,
+  onHostedAccountDeleted,
   onSignIn,
   onSignOut
 }: {
@@ -33,22 +39,17 @@ export function ProfileDrawerPanel({
   deviceIdentityMessage: string | null;
   relaySessionPersistence: string;
   onRotateDeviceIdentity: () => void;
+  onHostedAccountDeleted: () => void;
   onSignIn: () => void;
   onSignOut: () => void;
 }) {
   const [diagnosticsMessage, setDiagnosticsMessage] = useState<string | null>(null);
-  const nativeDiagnostics = isTauriRuntime();
+  const [deletionOpen, setDeletionOpen] = useState(false);
+  const [deletionConfirmation, setDeletionConfirmation] = useState("");
+  const [deletionBusy, setDeletionBusy] = useState(false);
+  const [deletionResult, setDeletionResult] = useState<HostedAccountDeletionResult | null>(null);
+  const [deletionStatus, setDeletionStatus] = useState<string | null>(null);
   async function exportDiagnostics() {
-    if (!nativeDiagnostics) {
-      const result = await copyTextToClipboard(buildWebPreviewDiagnosticBundle());
-      setDiagnosticsMessage(
-        result.status === "copied"
-          ? "Copied in-memory diagnostics. Review before attaching to a bug report."
-          : `Could not copy diagnostics: ${result.reason}`
-      );
-      return;
-    }
-
     const outcome = await saveNativeDiagnosticBundle();
     setDiagnosticsMessage(
       outcome === "saved"
@@ -57,6 +58,51 @@ export function ProfileDrawerPanel({
           ? "Diagnostics save cancelled."
           : "Could not save diagnostics."
     );
+  }
+
+  async function deleteAccount() {
+    setDeletionBusy(true);
+    setDeletionResult(null);
+    try {
+      const result = await deleteHostedAccount(deletionConfirmation);
+      setDeletionResult(result);
+      if (result.status === "deleted") {
+        setDeletionConfirmation("");
+        onHostedAccountDeleted();
+      } else if (result.status === "indeterminate") {
+        setDeletionStatus(
+          "The configured relay reports this session as signed out after the deletion response was lost. Deletion may have completed, but an expired session can look the same; sign in again to inspect or delete any remaining hosted data."
+        );
+        onHostedAccountDeleted();
+      }
+    } catch (error) {
+      setDeletionStatus(
+        `The configured relay's deletion response could not be confirmed (${String(error)}). The request may have committed even though the response was lost. Recheck account status before retrying.`
+      );
+    } finally {
+      setDeletionBusy(false);
+    }
+  }
+
+  async function recheckDeletion() {
+    setDeletionBusy(true);
+    try {
+      const result = await recheckHostedAccountDeletion();
+      if (result.status === "signed_in") {
+        setDeletionStatus(
+          "The configured relay still reports this session as signed in, so deletion is not confirmed. Review any blockers and retry the deletion request."
+        );
+      } else {
+        setDeletionStatus(
+          "The configured relay reports this session as signed out. Deletion may have completed, but an expired session can look the same; sign in again to inspect or delete any remaining hosted data."
+        );
+        onHostedAccountDeleted();
+      }
+    } catch (error) {
+      setDeletionStatus(`Account status could not be rechecked: ${String(error)}. Do not assume deletion completed.`);
+    } finally {
+      setDeletionBusy(false);
+    }
   }
 
   return (
@@ -94,7 +140,7 @@ export function ProfileDrawerPanel({
 
       <button className="ghost-wide" onClick={exportDiagnostics}>
         <ClipboardList size={15} />
-        {nativeDiagnostics ? "Save diagnostics" : "Copy diagnostics"}
+        Save diagnostics
       </button>
       {diagnosticsMessage && <div className="workflow-message">{diagnosticsMessage}</div>}
 
@@ -126,6 +172,94 @@ export function ProfileDrawerPanel({
         </div>
       )}
       {authError && <div className="auth-error">{authError}</div>}
+
+      {currentUser && (
+        <section className="drawer-section danger-zone">
+          <strong>Delete hosted account data</strong>
+          <p>
+            This removes your current configured relay's sign-in sessions, registered devices and KeyPackages, team
+            memberships, and pending invite artifacts. It does not erase shared team or room records, MLS ciphertext and
+            routing records, encrypted attachment blobs, or accepted receipts already shared with other members.
+          </p>
+          <p>
+            You must transfer or delete teams you own and hand off rooms you host first. Local encrypted room data is
+            controlled separately on this Mac; use each room's <strong>Forget on this device</strong> control to remove
+            it.
+          </p>
+          {!deletionOpen ? (
+            <button className="ghost-wide" type="button" onClick={() => setDeletionOpen(true)}>
+              Delete hosted account data
+            </button>
+          ) : (
+            <div className="account-deletion-confirmation">
+              <label htmlFor="hosted-account-deletion-confirmation">
+                Type <strong>{hostedAccountDeletionConfirmation}</strong> to confirm
+              </label>
+              <input
+                id="hosted-account-deletion-confirmation"
+                value={deletionConfirmation}
+                onChange={(event) => setDeletionConfirmation(event.target.value)}
+                autoComplete="off"
+              />
+              <button
+                className="ghost-wide"
+                type="button"
+                disabled={deletionBusy || deletionConfirmation !== hostedAccountDeletionConfirmation}
+                onClick={() => void deleteAccount()}
+              >
+                {deletionBusy ? "Deleting…" : "Permanently delete hosted account data"}
+              </button>
+              <button
+                className="ghost-wide"
+                type="button"
+                disabled={deletionBusy}
+                onClick={() => {
+                  setDeletionOpen(false);
+                  setDeletionConfirmation("");
+                  setDeletionResult(null);
+                  setDeletionStatus(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+          {deletionResult?.status === "blocked" && (
+            <div className="workflow-message" role="status">
+              Account deletion is blocked. Transfer or delete {deletionResult.blockers.ownedTeams.length} owned team(s)
+              and hand off {deletionResult.blockers.hostedRooms.length} hosted room(s), then try again.
+            </div>
+          )}
+          {deletionResult?.status === "deleted" && (
+            <div className="workflow-message" role="status">
+              Hosted account data deleted. This app has cleared its signed-in workspace state.
+            </div>
+          )}
+        </section>
+      )}
+
+      {deletionStatus && (
+        <section className="drawer-section" role="status">
+          <strong>Account deletion status</strong>
+          <p>{deletionStatus}</p>
+          <button className="ghost-wide" type="button" disabled={deletionBusy} onClick={() => void recheckDeletion()}>
+            Recheck account status
+          </button>
+        </section>
+      )}
+
+      <section className="drawer-section">
+        <strong>Flared Inc.</strong>
+        <p>
+          <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer noopener">
+            Privacy Policy
+          </a>{" "}
+          ·{" "}
+          <a href={TERMS_OF_SERVICE_URL} target="_blank" rel="noreferrer noopener">
+            Terms of Service
+          </a>
+        </p>
+      </section>
     </div>
   );
 }

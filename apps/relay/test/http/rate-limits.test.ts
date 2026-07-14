@@ -1,5 +1,8 @@
 import { test } from "node:test";
 import { assert, startRelay } from "../support/relay.js";
+import { createRelayRequestGuards } from "../../src/http/middleware.js";
+import { createRelayMetrics } from "../../src/observability.js";
+import type { RateLimitRecord } from "../../src/state.js";
 
 test("relay rate limits repeated HTTP reads and mutations", async () => {
   const readLimitedRelay = await startRelay({
@@ -79,5 +82,46 @@ test("relay ignores forwarded IP headers for rate limits unless explicitly trust
     assert.equal(repeatedSecondIp.status, 429);
   } finally {
     await trustedProxyRelay.close();
+  }
+});
+
+test("rate-limit identifiers prune at the earliest expiry without scanning on every request", () => {
+  class CountingMap extends Map<string, RateLimitRecord> {
+    entryScans = 0;
+    override entries(): MapIterator<[string, RateLimitRecord]> {
+      this.entryScans += 1;
+      return super.entries();
+    }
+    override [Symbol.iterator](): MapIterator<[string, RateLimitRecord]> {
+      return this.entries();
+    }
+  }
+  const records = new CountingMap([
+    ["read:session:expired", { count: 1, resetAt: 999 }],
+    ["read:session:live", { count: 1, resetAt: 1_100 }]
+  ]);
+  const guards = createRelayRequestGuards({
+    rateLimitsEnabled: true,
+    rateLimitWindowMs: 100,
+    rateLimitCaps: { auth: 10, read: 10, mutation: 10, attachment: 10, websocket: 10, websocketConnect: 10 },
+    rateLimitStore: records,
+    trustProxyHeaders: false,
+    metrics: createRelayMetrics(),
+    normalizeSessionId: (value) => (typeof value === "string" ? value : "")
+  });
+  const originalNow = Date.now;
+  try {
+    Date.now = () => 1_000;
+    guards.consumeRateLimit("read", "session:first");
+    assert.equal(records.has("read:session:expired"), false);
+    assert.equal(records.entryScans, 1);
+    guards.consumeRateLimit("read", "session:second");
+    assert.equal(records.entryScans, 1, "a live window must not trigger another full scan");
+    Date.now = () => 1_100;
+    guards.consumeRateLimit("read", "session:third");
+    assert.equal(records.has("read:session:live"), false);
+    assert.equal(records.entryScans, 2);
+  } finally {
+    Date.now = originalNow;
   }
 });

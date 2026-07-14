@@ -22,12 +22,10 @@ import {
   consumeDailyCreationQuota,
   normalizeCatalogSelectionPolicy,
   normalizeCodexSandboxLevel,
-  normalizeTrustedApproverUserIds,
-  type DailyCreationQuotaRecord
+  normalizeTrustedApproverUserIds
 } from "./room-validation.js";
 import type { RegisterRoomRoutesOptions } from "./room-route-types.js";
 
-const dailyRoomCreationCounts = new Map<string, DailyCreationQuotaRecord>();
 const codexReasoningEffortError = `codexReasoningEffort must be one of ${codexReasoningEffortIds.join(", ")}`;
 
 export function registerRoomCreateRoute(options: RegisterRoomRoutesOptions) {
@@ -174,7 +172,7 @@ export function registerRoomCreateRoute(options: RegisterRoomRoutesOptions) {
       session &&
       !consumeDailyCreationQuota({
         cap: dailyCreationCaps.roomsPerUser,
-        counts: dailyRoomCreationCounts,
+        counts: store.dailyRoomCreationCounts,
         quota: "daily_user_room_creations",
         userId: session.user.id,
         res,

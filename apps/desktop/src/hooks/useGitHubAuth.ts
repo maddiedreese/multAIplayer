@@ -158,6 +158,15 @@ export function useGitHubAuth(relayHttpUrl: string) {
     setAuthBusy(false);
   }, [setAuthBusy, setCurrentUser, setDeviceFlow]);
 
+  const clearDeletedHostedAccount = useCallback(() => {
+    setAuthenticationBrowserOpenFailed(false);
+    useAppStore.getState().resetAppStore();
+    setCurrentUser(null);
+    setDeviceFlow(null);
+    setAuthBusy(false);
+    setAuthError(null);
+  }, [setAuthBusy, setAuthError, setCurrentUser, setDeviceFlow]);
+
   return {
     authConfig,
     authConfigResolved,
@@ -171,6 +180,7 @@ export function useGitHubAuth(relayHttpUrl: string) {
     retryAuthBootstrap,
     beginGitHubSignIn,
     cancelGitHubSignIn,
-    signOutGitHub
+    signOutGitHub,
+    clearDeletedHostedAccount
   };
 }

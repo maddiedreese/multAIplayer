@@ -3,6 +3,10 @@ description: Suggest a product improvement, interaction polish, or new alpha fea
 title: "[UX]: "
 labels: ["enhancement", "needs-triage"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Never paste a complete invitation link or any invite fragment. Avoid private room content, credentials, private repository data, and unredacted logs or screenshots.
   - type: textarea
     id: problem
     attributes:

@@ -8,13 +8,15 @@ Treat room membership as controlled access to the active host's machine: admitte
 
 Short version: build with Codex together. Private by default. Open source.
 
-Native room traffic uses RFC 9420 MLS through a Rust-owned cryptographic boundary. Invite links contain no group secret but do contain a private single-use bearer capability: the active host validates an HPKE-sealed request bound to the joiner's exact KeyPackage before creating an MLS Add and Welcome. Member removal uses MLS Remove without claiming to erase content already delivered. The browser preview is a seeded local demo only.
+Native room traffic uses RFC 9420 MLS through a Rust-owned cryptographic boundary. Invite links contain no group secret but do contain a private single-use bearer capability: the active host validates an HPKE-sealed request bound to the joiner's exact KeyPackage before creating an MLS Add and Welcome. Member removal uses MLS Remove without claiming to erase content already delivered. The product is native-only; browser builds show an install notice and never initialize a workspace, relay connection, identity, or MLS state.
 
-Official invitations use an HTTPS universal link at `https://open.multaiplayer.com/invite#…`. All invitation fields, including the relay invite id, stay in the URL fragment; the landing request therefore carries no invite material to either website host. On macOS, a correctly signed release whose associated-domain entitlement matches the live AASA file can receive the link directly. Otherwise the same static landing page offers the signed DMG and an explicit retry through `multaiplayer.com`. There is no custom URL scheme. Treat the complete link as a private bearer secret even though host approval and MLS admission are still required.
+Official invitations use an HTTPS universal link at `https://open.multaiplayer.com/invite#…`. All invitation fields, including the relay invite id, stay in the URL fragment; the landing request therefore carries no invite material to either website host. On macOS, a correctly signed release whose associated-domain entitlement matches the live AASA file can receive the link directly. Until the supported signed release replaces the placeholder download, the landing page must not present that placeholder as trusted; afterward it can offer the signed DMG and an explicit retry through `multaiplayer.com`. There is no custom URL scheme. Treat the complete link as a private bearer secret even though host approval and MLS admission are still required.
 
 Start with [docs/using-the-app.md](docs/using-the-app.md) for the desktop features, [docs/product-architecture.md](docs/product-architecture.md) for the product model, [docs/cryptography.md](docs/cryptography.md) for key architecture and the MLS decision, [docs/codex-hosting.md](docs/codex-hosting.md) for how host-side Codex works, [docs/local-preview-sharing.md](docs/local-preview-sharing.md) for localhost preview tunnels, [docs/threat-model.md](docs/threat-model.md) and its [public changelog](docs/threat-model-changelog.md) for privacy boundaries, [docs/self-hosting.md](docs/self-hosting.md) for relay deployment, and [docs/if-unmaintained.md](docs/if-unmaintained.md) for the project exit path. Contributors and maintainers can use [CHANGELOG.md](CHANGELOG.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [CONTRIBUTING.md](CONTRIBUTING.md), [GOVERNANCE.md](GOVERNANCE.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md), [docs/architecture-walkthrough.md](docs/architecture-walkthrough.md), [docs/ci-policy.md](docs/ci-policy.md), [docs/release-operations.md](docs/release-operations.md), [docs/reproducible-builds.md](docs/reproducible-builds.md), and [docs/alpha-limitations.md](docs/alpha-limitations.md).
 
 External cryptographic and protocol reviewers should begin with the curated [external review packet](docs/external-review-packet.md).
+
+The hosted service is governed by the [Privacy Policy](https://multaiplayer.com/privacy) and [Terms of Service](https://multaiplayer.com/terms).
 
 ## Maintenance reality
 
@@ -28,9 +30,9 @@ Codex hosting uses the active host's local app-server. The supported compatibili
 
 ## Download
 
-Public macOS alpha downloads are published through [GitHub Releases](https://github.com/maddiedreese/multAIplayer/releases).
+Public alpha downloads support Apple silicon Macs running macOS 11 or later and are published through [GitHub Releases](https://github.com/maddiedreese/multAIplayer/releases). Windows, Linux, and Intel Macs are not supported.
 
-Public macOS alpha artifacts are Developer ID signed and notarized. Treat every build as security-sensitive alpha software and prefer test/self-hosted rooms before using private projects.
+The supported public alpha must be Developer ID signed and notarized; the existing scaffold download is not a supported release. Treat every build as security-sensitive alpha software and prefer test/self-hosted rooms before using private projects.
 
 Universal-link delivery additionally depends on the signed app's Apple Team ID, associated-domain entitlement, and the live no-redirect AASA files on both `open.multaiplayer.com` and `multaiplayer.com`. Release automation validates their shape and the packaged entitlement, but a manual signed-release cold-launch and already-running-app check remains required.
 
@@ -52,7 +54,7 @@ To run the native Tauri app with the relay:
 npm run tauri:dev
 ```
 
-Copy `.env.example` to `.env` and set `GITHUB_CLIENT_ID` to enable GitHub sign-in. The relay loads the repo root `.env`, a relay-local `apps/relay/.env`, or an explicit `MULTAIPLAYER_RELAY_ENV_FILE`; shell-exported variables take precedence. Set `MULTAIPLAYER_RELAY_SESSION_SECRET` to a stable high-entropy value if the relay should keep encrypted GitHub sessions across restarts. The default `GITHUB_OAUTH_SCOPES=read:user public_repo` supports public open-source PR creation; use `read:user repo` if your self-hosted relay needs private repo PRs.
+Copy `.env.example` to `.env` and set `GITHUB_CLIENT_ID` to enable GitHub sign-in. The relay loads the repo root `.env`, a relay-local `apps/relay/.env`, or an explicit `MULTAIPLAYER_RELAY_ENV_FILE`; shell-exported variables take precedence. Set `MULTAIPLAYER_RELAY_SESSION_SECRET` to a stable high-entropy value if the relay should keep encrypted GitHub sessions across restarts. The default `GITHUB_OAUTH_SCOPES=read:user repo` supports GitHub workflows for both public and private repositories. The `repo` scope grants broad access to repositories the signed-in user can access; self-hosters that need public repositories only may narrow it to `read:user public_repo`.
 
 GitHub OAuth is required for signed-in workspace access. For `NODE_ENV=production`, the relay requires authentication by default even if GitHub OAuth is not configured. Self-hosters who intentionally want an unauthenticated private LAN relay must set `MULTAIPLAYER_RELAY_REQUIRE_AUTH=false` explicitly.
 
@@ -64,7 +66,7 @@ For an internet-facing relay, configure exact allowed origins, durable encrypted
 npm run doctor:production-relay
 ```
 
-The relay also ships with a Dockerfile at `apps/relay/Dockerfile`; see [docs/self-hosting.md](docs/self-hosting.md) for the build/run command and production env checklist. Teams leaving the hosted relay can follow the migration section in [docs/release-operations.md](docs/release-operations.md); the hosted relay policy is at least 30 days' notice before any planned shutdown, with migration kept available during that window whenever safely possible.
+The official free-alpha relay will be hosted on Railway after its DNS, persistent storage, secrets, TLS/WSS routing, monitoring, and backup/restore checks pass; it is not currently live. The relay also ships with a Dockerfile at `apps/relay/Dockerfile`; see [docs/self-hosting.md](docs/self-hosting.md) for the build/run command and production env checklist. Teams leaving the hosted relay can follow the migration section in [docs/release-operations.md](docs/release-operations.md); the hosted relay policy is at least 30 days' notice before any planned shutdown, with migration kept available during that window whenever safely possible.
 
 Production deploys should wire `/readyz` to platform readiness: shutdown makes it not-ready, rejects new HTTP/WS work, closes existing room WebSockets with `1012`, and flushes the relay store before exit.
 
@@ -77,6 +79,6 @@ npm run verify
 npm run tauri:build -w @multaiplayer/desktop
 ```
 
-`npm run verify` type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the relay/desktop web artifacts. The macOS CI job runs on the pinned `macos-15` runner, builds a Tauri app with Tauri's ad-hoc (`-`) identity, verifies that the packaged associated-domain entitlement is present, and uploads both the `.app` bundle and `.dmg` as workflow artifacts for inspection only. Ad-hoc signing uses no Apple account or Developer ID certificate and cannot prove Apple universal-link dispatch. Those are the only configured desktop bundle targets: Windows and Linux packages are not supported or published during the macOS-first alpha.
+`npm run verify` type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the relay/desktop web artifacts. The macOS CI job runs on the pinned `macos-15` runner, builds a Tauri app with Tauri's ad-hoc (`-`) identity, verifies that the packaged associated-domain entitlement is present, and uploads both the `.app` bundle and `.dmg` as workflow artifacts for inspection only. Ad-hoc signing uses no Apple account or Developer ID certificate and cannot prove Apple universal-link dispatch. Apple silicon is the only configured desktop release architecture: Windows, Linux, and Intel Mac packages are not supported or published during the alpha.
 
 Tagged versions matching `v*` run the release workflow. It verifies the repo on the pinned `macos-15` runner, checks both live AASA documents against the release Team ID, requires Apple Developer ID signing/notarization secrets, builds the signed and notarized macOS app, validates its associated-domain entitlement plus the stapled app and DMG tickets, packages the `.app` bundle and `.dmg`, writes `SHA256SUMS.txt`, and creates a GitHub Release. Tags containing `alpha`, `beta`, or `rc` are published as prereleases.

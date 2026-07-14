@@ -75,6 +75,7 @@ export function consumeDailyCreationQuota({
   recordQuotaRejection?: (type: string) => void;
 }): boolean {
   const now = Date.now();
+  for (const [existingKey, existing] of counts) if (existing.resetAt <= now) counts.delete(existingKey);
   const resetAt = nextUtcMidnight(now);
   const key = `${quota}:${userId}`;
   const current = counts.get(key);

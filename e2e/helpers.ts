@@ -84,7 +84,7 @@ export async function openApp(context: BrowserContext): Promise<Page> {
   const page = await context.newPage();
   attachPageDiagnostics(page);
   await page.goto(appUrl);
-  await expect(page.getByText("Development web preview")).toBeVisible();
+  await expect(page.getByTestId("native-app-required")).toBeVisible();
   return page;
 }
 

@@ -88,10 +88,7 @@ export function createRoomProjectSettingsActions(options: ProjectActionsOptions)
       const selectedPath = await chooseProjectFolder(draft || selectedRoom.projectPath);
       if (!selectedPath) {
         if (shouldApplyRoomScopedUiUpdate(options.selectedRoomId(), roomId))
-          c.setSettingsMessageForRoom(
-            roomId,
-            "Native folder picker is available in the Tauri app. In web preview, paste a local folder path."
-          );
+          c.setSettingsMessageForRoom(roomId, "No project folder was selected.");
         return;
       }
       if (shouldApplyRoomScopedUiUpdate(options.selectedRoomId(), roomId)) {

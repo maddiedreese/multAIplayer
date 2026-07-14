@@ -27,22 +27,24 @@ const { App } = await import("../src/App");
 
 afterEach(() => cleanup());
 
-test("browser preview is a seeded local demo with native MLS actions disabled", () => {
+test("browser build directs users to the native product without rendering a workspace", () => {
   render(createElement(App));
-  assert.ok(screen.getByTestId("web-preview-demo"));
-  assert.equal(screen.getAllByText("Welcome room").length, 2);
-  assert.match(
-    screen.getByRole("status").textContent ?? "",
-    /End-to-end encrypted rooms require the native desktop app/
+  assert.ok(screen.getByTestId("native-app-required"));
+  assert.match(screen.getByRole("heading").textContent ?? "", /Apple silicon Macs/);
+  assert.equal(screen.queryByRole("button"), null);
+  assert.equal(
+    screen.getByRole("link", { name: "Privacy Policy" }).getAttribute("href"),
+    "https://multaiplayer.com/privacy"
   );
-  assert.equal((screen.getByRole("button", { name: "New encrypted room" }) as HTMLButtonElement).disabled, true);
-  assert.equal((screen.getByRole("button", { name: "Join with invite" }) as HTMLButtonElement).disabled, true);
-  assert.equal((screen.getByLabelText("Demo message composer") as HTMLTextAreaElement).disabled, true);
+  assert.equal(
+    screen.getByRole("link", { name: "Terms of Service" }).getAttribute("href"),
+    "https://multaiplayer.com/terms"
+  );
 });
 
-test("browser preview exposes no relay or private MLS material", () => {
+test("browser build exposes no room, relay, or private MLS material", () => {
   render(createElement(App));
-  assert.match(screen.getByText(/This browser preview cannot create/).textContent ?? "", /no device identity/);
+  assert.match(screen.getByText(/There is no browser preview/).textContent ?? "", /supported signed release/);
   assert.equal(document.querySelector("[data-relay-room]"), null);
   assert.equal(localStorage.length, 0);
 });

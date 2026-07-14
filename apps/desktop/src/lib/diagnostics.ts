@@ -1,5 +1,4 @@
 import { loadAppConfig } from "./appConfig";
-import { appVersion } from "./appVersion";
 import { configureNonFatalReporter } from "./nonFatalReporting";
 import {
   recordPersistedDiagnostic,
@@ -65,26 +64,6 @@ export function recordDiagnosticEvent(level: DiagnosticLevel, message: string, .
 configureNonFatalReporter((operation, error) => {
   recordDiagnosticEvent("warn", `Non-fatal failure: ${operation}`, ...(error === undefined ? [] : [error]));
 });
-
-export function buildWebPreviewDiagnosticBundle(now = new Date()): string {
-  const config = safeLoadAppConfig();
-  const bundle = {
-    generatedAt: now.toISOString(),
-    app: {
-      version: appVersion,
-      runtime: "web-preview",
-      userAgent: typeof navigator === "undefined" ? "unavailable" : navigator.userAgent,
-      language: typeof navigator === "undefined" ? "unavailable" : navigator.language,
-      platform: typeof navigator === "undefined" ? "unavailable" : navigator.platform
-    },
-    relay: {
-      httpOrigin: config ? safeOrigin(config.relayHttpUrl) : "unavailable",
-      wsOrigin: config ? safeOrigin(config.relayWsUrl) : "unavailable"
-    },
-    entries: loadDiagnosticEntries()
-  };
-  return `${JSON.stringify(bundle, null, 2)}\n`;
-}
 
 export async function saveNativeDiagnosticBundle(): Promise<DiagnosticExportOutcome> {
   const config = safeLoadAppConfig();

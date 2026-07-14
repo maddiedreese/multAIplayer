@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { chmod } from "node:fs/promises";
 import {
   WebSocket,
   assert,
@@ -228,6 +229,147 @@ test("relay logout clears the session cookie with matching attributes", async ()
     await relay.close();
   }
 });
+
+test("hosted account deletion requires explicit confirmation and reports ownership blockers", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  try {
+    const unauthenticated = await fetch(`${relay.baseUrl}/auth/account`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ confirmation: "delete my account" })
+    });
+    assert.equal(unauthenticated.status, 401);
+    assert.equal((await unauthenticated.json()).code, "authentication_required");
+
+    const cookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    const unconfirmed = await fetch(`${relay.baseUrl}/auth/account`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ confirmation: "delete" })
+    });
+    assert.equal(unconfirmed.status, 400);
+    assert.equal((await unconfirmed.json()).code, "invalid_request");
+
+    const blocked = await fetch(`${relay.baseUrl}/auth/account`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ confirmation: "delete my account" })
+    });
+    assert.equal(blocked.status, 409);
+    assert.deepEqual(await blocked.json(), {
+      error: "Transfer or delete every owned team and hand off every hosted room before deleting your hosted data.",
+      code: "account_deletion_blocked",
+      blockers: {
+        ownedTeams: [{ id: "team-core", name: "Core Team" }],
+        hostedRooms: [{ id: "room-desktop", name: "Desktop app", teamId: "team-core" }]
+      }
+    });
+    assert.equal((await fetch(`${relay.baseUrl}/auth/me`, { headers: { cookie } })).status, 200);
+  } finally {
+    await relay.close();
+  }
+});
+
+test("hosted account deletion removes identity-owned relay data durably and retains shared records", async () => {
+  const secret = "test-session-secret-with-at-least-32-characters";
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_SESSION_SECRET: secret
+  });
+  let restarted = null as Awaited<ReturnType<typeof startRelay>> | null;
+  try {
+    const cookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
+    const response = await fetch(`${relay.baseUrl}/auth/account`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ confirmation: "delete my account" })
+    });
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as {
+      ok: boolean;
+      deleted: { authSessions: number; teamMemberships: number };
+      retainedSharedData: string[];
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.deleted.authSessions, 1);
+    assert.equal(body.deleted.teamMemberships, 1);
+    assert.deepEqual(body.retainedSharedData, [
+      "team_and_room_records",
+      "mls_ciphertext_and_routing_metadata",
+      "encrypted_attachment_blobs",
+      "accepted_message_receipts"
+    ]);
+    assert.match(response.headers.get("set-cookie") ?? "", /^multaiplayer_session=;/);
+    assert.equal((await fetch(`${relay.baseUrl}/auth/me`, { headers: { cookie } })).status, 401);
+
+    const stored = await waitForStoredState(
+      relay.dataPath,
+      (state) =>
+        Array.isArray(state.authSessions) &&
+        state.authSessions.length === 0 &&
+        Array.isArray(state.teamMembers) &&
+        !JSON.stringify(state.teamMembers).includes("github:tester")
+    );
+    assert.equal(JSON.stringify(stored.authSessions), "[]");
+    assert.match(JSON.stringify(stored.teams), /team-core/);
+    assert.match(JSON.stringify(stored.rooms), /room-desktop/);
+
+    await relay.close({ preserveData: true });
+    restarted = await startRelay(
+      {
+        MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+        MULTAIPLAYER_RELAY_SESSION_SECRET: secret
+      },
+      undefined,
+      relay.dataPath
+    );
+    const newCookie = await createDebugSession(restarted.baseUrl, "github:tester", "tester");
+    const workspace = await fetch(`${restarted.baseUrl}/teams`, { headers: { cookie: newCookie } });
+    assert.equal(workspace.status, 200);
+    assert.deepEqual(await workspace.json(), { teams: [], rooms: [] });
+  } finally {
+    if (restarted) await restarted.close();
+    else await relay.close();
+  }
+});
+
+test(
+  "hosted account deletion keeps authentication and data retryable after a real persistence failure",
+  { skip: process.platform === "win32" },
+  async () => {
+    const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+    const cookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
+    try {
+      await chmod(relay.tempDir, 0o500);
+      const failed = await fetch(`${relay.baseUrl}/auth/account`, {
+        method: "DELETE",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ confirmation: "delete my account" })
+      });
+      assert.equal(failed.status, 503);
+      assert.equal((await failed.json()).code, "persistence_unavailable");
+      assert.equal((await fetch(`${relay.baseUrl}/auth/me`, { headers: { cookie } })).status, 200);
+      const workspace = await fetch(`${relay.baseUrl}/teams`, { headers: { cookie } });
+      assert.equal(workspace.status, 200);
+      assert.equal(
+        ((await workspace.json()) as { teams: Array<{ id: string }> }).teams.some((team) => team.id === "team-core"),
+        true
+      );
+
+      await chmod(relay.tempDir, 0o700);
+      const retried = await fetch(`${relay.baseUrl}/auth/account`, {
+        method: "DELETE",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ confirmation: "delete my account" })
+      });
+      assert.equal(retried.status, 200);
+      assert.equal((await fetch(`${relay.baseUrl}/auth/me`, { headers: { cookie } })).status, 401);
+    } finally {
+      await chmod(relay.tempDir, 0o700).catch(() => undefined);
+      await relay.close();
+    }
+  }
+);
 
 test("relay persists auth sessions encrypted when a session secret is configured", async () => {
   const strongSecret = "test-session-secret-with-at-least-32-characters";

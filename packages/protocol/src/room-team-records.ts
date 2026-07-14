@@ -90,6 +90,7 @@ export const InviteRecord = z.object({
   id: z.string().min(1).max(maxEnvelopeIdChars),
   teamId: TeamId,
   roomId: RoomId,
+  creatorUserId: UserId.optional(),
   approvedUserId: UserId.optional(),
   approvedDeviceId: DeviceId.optional(),
   keyPackageHash: z

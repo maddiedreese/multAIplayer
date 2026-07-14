@@ -3,7 +3,6 @@ import { AppWorkspaceShell } from "./AppWorkspaceShell";
 import { LocalPreviewDialogContainer, type LocalPreviewDialogActions } from "./LocalPreviewDialogContainer";
 import { RoomInspectorContainer, type RoomInspectorSources } from "./RoomInspectorContainer";
 import { RoomMainColumnContainer, type RoomMainColumnSources } from "./RoomMainColumnContainer";
-import { isWebPreviewRuntime } from "../lib/appRuntime";
 import { useUpdateNotice } from "../hooks/useUpdateNotice";
 import { useShellLayout } from "../hooks/useShellLayout";
 import { AppSidebarDrawerContainer, DesktopSidebarContainer, type SidebarSources } from "./SidebarContainers";
@@ -24,14 +23,6 @@ export function AppShellView({
   const shellLayout = useShellLayout();
   const dialog: ReactNode = <LocalPreviewDialogContainer {...localPreviewDialogActions} />;
   const updateNotice = useUpdateNotice();
-  const webPreviewBanner: ReactNode = isWebPreviewRuntime() ? (
-    <div className="web-preview-banner" role="status">
-      <strong>Development web preview</strong>
-      <span>
-        Private MLS rooms are unavailable in this browser-only preview. Use the native desktop app for E2EE rooms.
-      </span>
-    </div>
-  ) : null;
   const updateBanner: ReactNode = updateNotice ? (
     <div className={`update-banner ${updateNotice.security ? "security" : ""}`} role="status">
       <strong>{updateNotice.security ? "Security update available" : "Update available"}</strong>
@@ -42,12 +33,7 @@ export function AppShellView({
       <button onClick={() => window.open(updateNotice.url, "_blank", "noopener,noreferrer")}>Download</button>
     </div>
   ) : null;
-  const shellBanner: ReactNode = (
-    <>
-      {updateBanner}
-      {webPreviewBanner}
-    </>
-  );
+  const shellBanner: ReactNode = <>{updateBanner}</>;
 
   return (
     <AppWorkspaceShell
@@ -63,7 +49,7 @@ export function AppShellView({
       main={<RoomMainColumnContainer sources={roomMainColumnSources} />}
       inspector={<RoomInspectorContainer sources={roomInspectorSources} />}
       dialog={dialog}
-      shellBanner={updateBanner || webPreviewBanner ? shellBanner : null}
+      shellBanner={updateBanner ? shellBanner : null}
     />
   );
 }

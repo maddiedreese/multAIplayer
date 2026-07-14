@@ -1,4 +1,5 @@
 import { BookOpen, CheckCircle2, RotateCcw } from "lucide-react";
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../lib/productLinks";
 
 export function HelpDrawerPanel({
   completedSteps,
@@ -56,6 +57,22 @@ export function HelpDrawerPanel({
         <p>
           The guide does not store invite links, project paths, prompts, account details, or project content. It keeps
           only bounded progress flags and workspace identifiers on this device.
+        </p>
+      </section>
+
+      <section className="drawer-section">
+        <strong>Policies and support</strong>
+        <p>
+          multAIplayer is a free, open-source alpha provided without guaranteed support or continued hosted service.
+        </p>
+        <p>
+          <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer noopener">
+            Privacy Policy
+          </a>{" "}
+          ·{" "}
+          <a href={TERMS_OF_SERVICE_URL} target="_blank" rel="noreferrer noopener">
+            Terms of Service
+          </a>
         </p>
       </section>
     </div>

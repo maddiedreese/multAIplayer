@@ -31,13 +31,15 @@ test("invite lookup exposes only the pinned active-host public identity to non-m
       body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
     });
     assert.equal(created.status, 201);
-    const { invite } = (await created.json()) as { invite: { id: string } };
+    const { invite } = (await created.json()) as { invite: { id: string; creatorUserId?: string } };
+    assert.equal(invite.creatorUserId, "github:maddiedreese");
 
     // No member cookie: possession of the relay invite id reveals only the
     // exact public identity needed to verify the protected invite fragment.
     const lookup = await fetch(`${relay.baseUrl}/invites/${invite.id}`);
     assert.equal(lookup.status, 200);
-    const body = (await lookup.json()) as { hostDevice: Record<string, unknown> };
+    const body = (await lookup.json()) as { invite: Record<string, unknown>; hostDevice: Record<string, unknown> };
+    assert.equal("creatorUserId" in body.invite, false);
     assert.deepEqual(body.hostDevice, {
       userId: "github:maddiedreese",
       deviceId: "host-device-1",

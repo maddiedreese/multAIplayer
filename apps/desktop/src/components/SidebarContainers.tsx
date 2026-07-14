@@ -43,6 +43,7 @@ export interface SidebarDrawerCapabilities {
   signIn: () => void;
   signOut: () => void;
   rotateDeviceIdentity: () => void;
+  clearDeletedHostedAccount: () => void;
   chooseProject: () => void;
   updateLocalHistorySettings: (settings: DrawerSettingsProps["historySettings"]) => void;
   clearRoomHistory: () => void;
@@ -55,7 +56,7 @@ export interface SidebarDrawerCapabilities {
 }
 
 export interface SidebarSources {
-  githubAuth: Pick<ReturnType<typeof useGitHubAuth>, "beginGitHubSignIn">;
+  githubAuth: Pick<ReturnType<typeof useGitHubAuth>, "beginGitHubSignIn" | "clearDeletedHostedAccount">;
   roomRuntime: Pick<ReturnType<typeof useRoomRuntimeContext>, "signOut" | "rotateDeviceIdentity" | "chooseProjectPath">;
   workspaceFlow: Pick<
     ReturnType<typeof useWorkspaceFlowContext>,
@@ -310,6 +311,7 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         deviceIdentityMessage,
         relaySessionPersistence: formatSessionPersistence(authConfig?.sessionPersistence),
         onRotateDeviceIdentity: capabilities.rotateDeviceIdentity,
+        onHostedAccountDeleted: capabilities.clearDeletedHostedAccount,
         onSignIn: capabilities.signIn,
         onSignOut: capabilities.signOut
       }}

@@ -6,21 +6,19 @@ test.beforeEach(async ({ page }) => {
   await page.goto(appUrl);
 });
 
-test("shows a seeded local demo without initializing a relay workspace", async ({ page }) => {
-  await expect(page.getByText("Local demo preview")).toBeVisible();
-  await expect(page.getByTestId("web-preview-demo")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Welcome room" })).toBeVisible();
-  await expect(page.getByText("Seeded local room")).toBeVisible();
-  await expect(page.getByText("No relay connection")).toBeVisible();
-  await expect(page.getByText(/This seeded room shows/)).toBeVisible();
-});
-
-test("disables relay, MLS, invite, and publish actions", async ({ page }) => {
-  await expect(page.getByRole("button", { name: "New encrypted room" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Join with invite" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Send message" })).toBeDisabled();
-  await expect(page.getByLabel("Demo message composer")).toBeDisabled();
-  await expect(page.getByText(/cannot create, join, send to, or decrypt MLS rooms/)).toBeVisible();
+test("requires the native Apple silicon app without initializing a workspace", async ({ page }) => {
+  await expect(page.getByTestId("native-app-required")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Apple silicon Macs/ })).toBeVisible();
+  await expect(page.getByText(/There is no browser preview or browser workspace/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute(
+    "href",
+    "https://multaiplayer.com/privacy"
+  );
+  await expect(page.getByRole("link", { name: "Terms of Service" })).toHaveAttribute(
+    "href",
+    "https://multaiplayer.com/terms"
+  );
+  await expect(page.getByRole("button")).toHaveCount(0);
 });
 
 test("does not persist or request private room material", async ({ page }) => {

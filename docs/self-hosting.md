@@ -293,13 +293,13 @@ GITHUB_CLIENT_ID=your_client_id npm run dev:relay
 By default the relay requests:
 
 ```bash
-GITHUB_OAUTH_SCOPES="read:user public_repo"
+GITHUB_OAUTH_SCOPES="read:user repo"
 ```
 
-That is enough for identity plus public open-source PR creation. For private repositories, set:
+That authorizes identity plus GitHub workflows for both public and private repositories. GitHub's `repo` scope grants broad access to repositories the signed-in user can access. If this relay will only work with public repositories, narrow it to:
 
 ```bash
-GITHUB_OAUTH_SCOPES="read:user repo"
+GITHUB_OAUTH_SCOPES="read:user public_repo"
 ```
 
 The app shows the relay-advertised scopes in the Account drawer so users can see what the self-hosted relay is asking GitHub to authorize.
@@ -307,6 +307,14 @@ The app shows the relay-advertised scopes in the Account drawer so users can see
 While authorization is pending, the desktop polls at GitHub's advertised interval. It increases that interval when GitHub asks it to slow down and stops when the device code expires, is denied, or GitHub returns another terminal error. Users must start sign-in again after a terminal error.
 
 GitHub access tokens stay on the relay and are used only for identity, draft pull request creation, and Actions run reads. The relay does not return tokens to desktop clients, does not persist plaintext tokens, and normalizes successful/error responses from GitHub before returning them so arbitrary upstream fields are not relayed into the app.
+
+For draft pull requests, the relay transiently receives the repository owner/name, title, body, head/base branches, and draft flag and forwards them to GitHub. For Actions reads, it transiently receives the repository owner/name and optional branch and returns a bounded normalized subset of GitHub run metadata. These request and response fields are not written to relay persistence. Structured relay request logs record only method, route path without its query string, status, duration, and a bounded request id; they do not record request bodies, GitHub tokens, repository query values, PR text, or upstream response bodies. GitHub remains a separate processor of the data sent to its API.
+
+The relay has no separate user-profile or billing-account table. A signed-in user can call `DELETE /auth/account` with JSON `{ "confirmation": "delete my account" }`; the desktop exposes this as a destructive Account action. Deletion is blocked with `409 account_deletion_blocked` until the user transfers or deletes every team they own and hands off every non-deleted room they host. On success, the relay immediately removes all of that GitHub identity's encrypted OAuth sessions, process-local device sessions and challenges, registered devices, unused KeyPackages, team memberships, creator-owned unused invites, pending invite admission artifacts, and identity/session quota records from primary or process-local state. It removes and broadcasts room presence, closes live relay connections, and clears the browser cookie only after the durable deletion commits. It also removes the identity from trusted-approver lists and removes host identity metadata from already-deleted rooms. A failed persistence commit rolls back only deletion-touched entries, leaves authentication available for retry, and does not overwrite unrelated changes made while persistence was pending.
+
+Deletion does not rewrite shared team or room records, MLS ciphertext and its sender/routing metadata, encrypted attachments, or accepted-message receipts. Those records remain available to collaborators and follow their ordinary configured retention because rewriting them would break shared encrypted history, downloads, replay/idempotency protection, or MLS state. Deleting relay data does not erase encrypted data already stored on a user's Macs, revoke the OAuth grant at GitHub, or selectively purge an operator's existing backups. Users remove local history with the app's per-room local controls and may revoke the OAuth grant in GitHub settings.
+
+The relay repository does not currently provide an external deletion-request ledger, so backup restoration needs an explicit operator control. Before enabling hosted self-service deletion, keep a restricted ledger outside the relay database and outside every backup set that can restore it. Retain only an HMAC-SHA-256 of the GitHub user id under a dedicated ledger key, the deletion time, and the date when the last covered backup expires; do not retain the raw GitHub id, login, token, or deleted record inventory. Keep each entry through the maximum backup-retention window. Restore backups only into an isolated environment: enumerate GitHub ids in the restored relay, compare their keyed hashes with unexpired ledger entries, reapply the same identity-owned deletion to every match, verify the result, and only then reopen traffic. Delete a ledger entry after every backup it covers has expired. The ledger key and ledger backups require separate access control. Until that external ledger and restore runbook exist for the Railway deployment, backup restoration after self-service deletion remains a launch blocker rather than an automated repository claim.
 
 For local development, the desktop app expects:
 

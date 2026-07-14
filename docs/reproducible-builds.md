@@ -26,7 +26,7 @@ git checkout --detach v0.1.0-alpha.0
 git status --porcelain
 npm ci
 npm run release:preflight
-npm run tauri:build:prebuilt -w @multaiplayer/desktop
+npm run tauri:build:release -w @multaiplayer/desktop
 ```
 
 Replace the example tag with the release under review. `git status --porcelain` must be empty before the build. Record `git rev-parse HEAD`, `node --version`, `npm --version`, `rustc --version`, `cargo --version`, `xcodebuild -version`, and `sw_vers` with the result. Do not provide signing credentials when producing the comparison build.
@@ -37,7 +37,7 @@ Compare stable application content rather than the outer signed/notarized DMG or
 
 ```bash
 cp -R /path/to/published/multAIplayer.app /tmp/multaiplayer-published.app
-cp -R apps/desktop/src-tauri/target/release/bundle/macos/multAIplayer.app /tmp/multaiplayer-rebuilt.app
+cp -R apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/multAIplayer.app /tmp/multaiplayer-rebuilt.app
 codesign --remove-signature /tmp/multaiplayer-published.app
 codesign --remove-signature /tmp/multaiplayer-rebuilt.app
 diff -qr /tmp/multaiplayer-published.app /tmp/multaiplayer-rebuilt.app

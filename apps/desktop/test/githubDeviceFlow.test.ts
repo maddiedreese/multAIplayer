@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  deleteHostedAccount,
+  HostedAccountDeletionIndeterminateError,
   githubDevicePollDelayMs,
   nextGitHubDevicePollIntervalSeconds,
   pollGitHubDeviceFlow,
+  recheckHostedAccountDeletion,
   startGitHubDeviceFlow,
   type GitHubDevicePollResult
 } from "../src/lib/authClient";
@@ -90,6 +93,112 @@ test("GitHub device polling keeps 202 pending semantics and propagates terminal 
     const error = await pollGitHubDeviceFlow("device-code").catch((caught: unknown) => caught);
     assert.ok(error instanceof RelayHttpError);
     assert.equal(error.code, "invalid_request");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("hosted account deletion sends exact confirmation and preserves typed blockers", async () => {
+  const originalFetch = globalThis.fetch;
+  let request: { input: string; init?: RequestInit } | null = null;
+  try {
+    globalThis.fetch = async (input, init) => {
+      request = { input: String(input), init };
+      return new Response(
+        JSON.stringify({
+          error: "Transfer ownership first.",
+          code: "account_deletion_blocked",
+          blockers: {
+            ownedTeams: [{ id: "team-one", name: "One" }],
+            hostedRooms: [{ id: "room-one", name: "One", teamId: "team-one" }]
+          }
+        }),
+        { status: 409, headers: { "content-type": "application/json" } }
+      );
+    };
+    assert.deepEqual(await deleteHostedAccount(), {
+      status: "blocked",
+      blockers: {
+        ownedTeams: [{ id: "team-one", name: "One" }],
+        hostedRooms: [{ id: "room-one", name: "One", teamId: "team-one" }]
+      }
+    });
+    assert.equal(request?.input, "https://relay.example/auth/account");
+    assert.equal(request?.init?.method, "DELETE");
+    assert.equal(request?.init?.credentials, "include");
+    assert.equal(request?.init?.body, JSON.stringify({ confirmation: "delete my account" }));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("hosted account deletion treats a lost response plus signed-out session as indeterminate", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  try {
+    globalThis.fetch = async () => {
+      calls += 1;
+      if (calls === 1) throw new TypeError("response lost");
+      return new Response(JSON.stringify({ error: "Not signed in", code: "authentication_required" }), {
+        status: 401,
+        headers: { "content-type": "application/json" }
+      });
+    };
+    const result = await deleteHostedAccount();
+    assert.deepEqual(result, { status: "indeterminate", signedOut: true });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("hosted account deletion reports an indeterminate result when both deletion and status responses are lost", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => {
+      throw new TypeError("network unavailable");
+    };
+    const error = await deleteHostedAccount().catch((caught: unknown) => caught);
+    assert.ok(error instanceof HostedAccountDeletionIndeterminateError);
+    assert.match(error.message, /could not be verified/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("hosted account deletion preserves its transport failure when the relay still authenticates the user", async () => {
+  const originalFetch = globalThis.fetch;
+  const transportFailure = new TypeError("response lost");
+  let calls = 0;
+  try {
+    globalThis.fetch = async () => {
+      calls += 1;
+      if (calls === 1) throw transportFailure;
+      return new Response(JSON.stringify({ user: { id: "github:still-here", login: "still-here" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    };
+    assert.equal(await deleteHostedAccount().catch((caught: unknown) => caught), transportFailure);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("hosted account deletion recheck distinguishes a live session from ambiguous sign-out", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ user: { id: "user-one", login: "one" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    assert.deepEqual(await recheckHostedAccountDeletion(), {
+      status: "signed_in",
+      user: { id: "user-one", login: "one" }
+    });
+
+    globalThis.fetch = async () => new Response(null, { status: 401 });
+    assert.deepEqual(await recheckHostedAccountDeletion(), { status: "signed_out_or_deleted" });
   } finally {
     globalThis.fetch = originalFetch;
   }

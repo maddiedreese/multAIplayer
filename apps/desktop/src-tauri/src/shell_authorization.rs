@@ -268,8 +268,8 @@ pub(crate) async fn authorize_shell_execution(
         ShellExecutionKind::InteractiveTerminal => "",
     };
     let risk_warning = match review_risk {
-        Some(CommandReviewRisk::CredentialAccess) => "\n\nHIGH-RISK REVIEW SIGNAL: this command text mentions a credential or secret path. This heuristic is incomplete. Approval grants the command the host account's full shell authority and can only be used once.",
-        Some(CommandReviewRisk::NetworkAccess) => "\n\nHIGH-RISK REVIEW SIGNAL: this command text names a network-capable operation. This heuristic is incomplete. Approval grants the command the host account's full shell authority and can only be used once.",
+        Some(CommandReviewRisk::CredentialAccess) => "\n\nHIGH-RISK REVIEW SIGNAL: this command text mentions a credential or secret path. This heuristic is incomplete. The macOS filesystem sandbox confines writes to the selected workspace but permits documented system/toolchain reads, child processes, inherited environment, and network access. This approval can only be used once.",
+        Some(CommandReviewRisk::NetworkAccess) => "\n\nHIGH-RISK REVIEW SIGNAL: this command text names a network-capable operation. This heuristic is incomplete. The macOS filesystem sandbox confines writes to the selected workspace but permits documented system/toolchain reads, child processes, inherited environment, and network access. This approval can only be used once.",
         None => "",
     };
     let message = format!(

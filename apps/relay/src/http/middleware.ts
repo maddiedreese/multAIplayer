@@ -33,6 +33,7 @@ export function createRelayRequestGuards({
   metrics,
   normalizeSessionId
 }: RelayRequestGuardsOptions) {
+  let nextRateLimitPruneAt = 0;
   function rateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
     const bucket = rateLimitBucketForRequest(req);
     if (!bucket) {
@@ -74,14 +75,18 @@ export function createRelayRequestGuards({
     const resetAt = current && current.resetAt > now ? current.resetAt : now + rateLimitWindowMs;
     const count = current && current.resetAt > now ? current.count + 1 : 1;
     rateLimitStore.set(key, { count, resetAt });
+    nextRateLimitPruneAt = nextRateLimitPruneAt === 0 ? resetAt : Math.min(nextRateLimitPruneAt, resetAt);
     return count <= rateLimitCaps[bucket] ? { allowed: true, resetAt } : { allowed: false, resetAt };
   }
 
   function pruneRateLimitStore(now = Date.now()) {
-    if (rateLimitStore.size < 10_000) return;
+    if (now < nextRateLimitPruneAt) return;
+    let earliestLiveExpiry = Number.POSITIVE_INFINITY;
     for (const [key, record] of rateLimitStore.entries()) {
       if (record.resetAt <= now) rateLimitStore.delete(key);
+      else earliestLiveExpiry = Math.min(earliestLiveExpiry, record.resetAt);
     }
+    nextRateLimitPruneAt = Number.isFinite(earliestLiveExpiry) ? earliestLiveExpiry : now + rateLimitWindowMs;
   }
 
   function clientIdentityFromRequest(req: Request): string {

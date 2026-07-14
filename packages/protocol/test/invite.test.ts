@@ -2,11 +2,24 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   InviteJoinRequestRecord,
+  InviteRecord,
   InviteResponseRecord,
   KeyPackageUpload,
   RelayServerMessage,
   pinnedMlsCiphersuite
 } from "../src/index.js";
+
+test("invite creator attribution is optional for stored-state compatibility", () => {
+  const legacy = {
+    id: "invite",
+    teamId: "team",
+    roomId: "room",
+    createdAt: "2026-07-01T00:00:00.000Z"
+  };
+  assert.equal(InviteRecord.safeParse(legacy).success, true);
+  assert.equal(InviteRecord.parse({ ...legacy, creatorUserId: "github:creator" }).creatorUserId, "github:creator");
+});
+
 test("KeyPackages reject unpinned suites", () => {
   const value = {
     id: "kp",

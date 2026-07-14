@@ -25,11 +25,7 @@ export function roomLockMessage(room: RoomRecord, revoked: boolean): string {
 }
 
 export function mlsStateStorageLabel(): string {
-  return isTauriRuntime() ? "encrypted native MLS store" : "unavailable in web preview";
-}
-
-export function isWebPreviewRuntime(): boolean {
-  return !isTauriRuntime();
+  return isTauriRuntime() ? "encrypted native MLS store" : "unavailable outside the native app";
 }
 
 function isTauriRuntime(): boolean {

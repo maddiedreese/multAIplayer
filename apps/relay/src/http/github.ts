@@ -1,5 +1,5 @@
 import type { CookieOptions, Express } from "express";
-import type { AuthSession } from "../state.js";
+import type { AuthSession, RelayStore } from "../state.js";
 import { registerGitHubAuthRoutes } from "../auth/github.js";
 import { registerGitHubProxyRoutes } from "./githubProxy.js";
 
@@ -11,10 +11,14 @@ interface RegisterGitHubRoutesOptions {
   allowedCorsOrigins: string[];
   sessionPersistenceSecret: string | null;
   authSessions: Map<string, AuthSession>;
+  store: RelayStore;
   authSessionMaxAgeMs: number;
   authCookieOptions: (maxAge?: number) => CookieOptions;
   getAuthSession: (sessionId: unknown) => AuthSession | null;
   scheduleStoreSave: () => void;
+  saveRelayStore: () => Promise<void>;
+  revokeTeamMemberSessions: (teamId: string, userId: string) => void;
+  revokeUserPresence: (userId: string) => void;
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
   maxGitHubDeviceCodeChars: number;
   maxUserIdChars: number;

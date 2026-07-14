@@ -30,7 +30,7 @@ Onboarding progress stays on the device. It stores bounded identifiers and compl
 
 Official invites are HTTPS universal links, not a custom app scheme. All invitation material is in the fragment after `#`, so neither `open.multaiplayer.com` nor `multaiplayer.com` receives it in the landing-page request. A correctly signed, installed macOS release can receive the link through Apple's associated-domain mechanism. The native app validates the host, path, absence of query/credentials/port, exact fragment fields, bounds, and base64url alphabets before showing a content-free **Invitation received securely** status.
 
-If the app is not installed, the same static page offers the official signed DMG. It keeps a valid original link only in page memory long enough for an explicit cross-host retry; it never stores or renders the capability. Install into Applications, select **Open multAIplayer**, and if the browser still does not hand off, return to the original private message after installation and click the link again. Refresh or navigation deliberately loses the in-memory link. The project does not use cookies, local/session storage, analytics, automatic clipboard access, or a `multaiplayer:` fallback for this journey.
+After the supported release is published, the same static page can offer its signed DMG. Until then, the placeholder download is not a trusted release. The page keeps a valid original link only in memory long enough for an explicit cross-host retry; it never stores or renders the capability. Install into Applications, select **Open multAIplayer**, and if the browser still does not hand off, return to the original private message after installation and click the link again. Refresh or navigation deliberately loses the in-memory link. The project does not use cookies, local/session storage, analytics, automatic clipboard access, or a `multaiplayer:` fallback for this journey.
 
 Universal-link routing is an operating-system and signed-release boundary. Parser, AASA-shape, entitlement-presence, static-page, cold-start intake, and already-running intake code have automated tests, but each release still needs a manual signed-app cold/warm click check against the live AASA files and real Apple Team ID.
 
@@ -65,9 +65,17 @@ The relay can see the metadata it needs for authentication, membership, routing,
 - Attachment blob names, MIME types, declared sizes, epochs, expiration data, and storage usage; blob contents remain sealed
 - Operational counters, rate-limit data, request identifiers, and connection information
 
-The relay is designed not to receive or store plaintext room messages, attachment contents, project files, file diffs, terminal output, browser contents, Codex credentials, OpenAI credentials, MLS private state, group secrets, exporter output, retained history secrets, or plaintext GitHub access tokens. GitHub access tokens remain relay-side for identity and GitHub integrations, and they are encrypted before persistent storage when the relay is configured with a strong session secret.
+The relay is designed not to persist plaintext room messages, attachment contents, project files, file diffs, terminal output, browser contents, Codex credentials, OpenAI credentials, MLS private state, group secrets, exporter output, retained history secrets, or plaintext GitHub access tokens. One deliberate exception to “does not receive project content” is the authenticated GitHub proxy: when you explicitly create a pull request, it transiently receives and forwards the repository owner/name and PR title/body/head/base; Actions refreshes also pass GitHub run metadata through it. Those fields are not added to relay storage or logs by design. GitHub access tokens remain relay-side for identity and GitHub integrations, and they are encrypted before persistent storage when the relay is configured with a strong session secret. Authorized teammates can see GitHub display identity, avatar, device labels, and public device fingerprints in presence and roster surfaces.
 
 This is an intended and tested architecture boundary, not an independently audited guarantee. See the [Threat model](threat-model.md) for the detailed inventory.
+
+The [Privacy Policy](https://multaiplayer.com/privacy) gives the hosted-service inventory and the [Terms of Service](https://multaiplayer.com/terms) covers the free open-source alpha's acceptable-use and service terms.
+
+### Do I have a multAIplayer account, and can I delete it?
+
+There is no separate multAIplayer username or password. On the official relay, your hosted account is the GitHub identity you authorized together with relay sessions, registered devices and KeyPackages, team memberships, and invite/admission records.
+
+The Account drawer provides **Delete hosted account data**. It requires an exact confirmation phrase and blocks deletion until you transfer or delete teams you own and hand off rooms you host. Successful deletion removes your relay auth/device sessions, devices, KeyPackages, memberships, and pending invite artifacts. It cannot retract shared team/room records, opaque MLS ciphertext, encrypted attachment blobs, or accepted receipts already relied on by other room members. Local encrypted room data is separate; use each room's **Forget on this device** action before deleting the hosted account if you also want to remove that Mac's room copy.
 
 ### If I invite someone to a room, what exactly can they make happen on my machine, and what requires my approval?
 
@@ -124,7 +132,7 @@ The native desktop app relies on platform-sensitive behavior including Tauri and
 
 Linux is used as a development and CI compatibility target in parts of the project, but Linux desktop packages are not supported or published. Windows packages are also not configured or published.
 
-There is no committed Windows or Linux timeline. The immediate priority is making the macOS alpha reliable enough to validate the product, security model, and real multi-device workflow.
+The supported alpha package is Apple silicon only and requires macOS 11 or later. Intel Macs, Windows, and Linux are not supported, and there is no committed timeline for them. The immediate priority is making the Apple silicon alpha reliable enough to validate the product, security model, and real multi-device workflow.
 
 ### Why do you only support Codex 0.133 through 0.144, and what happens on newer versions?
 

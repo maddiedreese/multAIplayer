@@ -4,7 +4,8 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 
 ## Release And Installation
 
-- Public macOS alpha artifacts are Developer ID signed and notarized. Local development builds are not release artifacts and may be unsigned.
+- The supported public alpha must be Developer ID signed and notarized. The existing scaffold download and local development builds are not supported release artifacts and may be unsigned.
+- Public packages support Apple silicon Macs running macOS 11 or later. Intel Macs, Windows, and Linux are not supported release targets.
 - Release checksums help verify artifact integrity, but they do not replace signing.
 - Public releases should come from GitHub Actions, not ad hoc local builds.
 - Official invitations use signed macOS universal links on `open.multaiplayer.com` and `multaiplayer.com`; there is no custom-scheme fallback. Automated parser, AASA-shape, and entitlement checks do not prove operating-system dispatch, so every release still requires cold-start and warm-app testing with a signed installed build.
@@ -15,6 +16,7 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 - GitHub sign-in requires a GitHub OAuth app configured on the relay.
 - GitHub Device Flow identifies workspace members and authorizes relay/repository workflows. ChatGPT login separately authorizes the local Codex process. Joining requires relay and GitHub readiness but does not require Codex, a ChatGPT login, or a project folder until that device hosts Codex work.
 - A hosted production relay requires real domain, TLS, secrets, persistent storage, and operator monitoring.
+- The official free-alpha relay is planned for Railway and will use GitHub identity for hosted access. It is not live until DNS, persistent storage, secrets, TLS/WSS routing, monitoring, and backup/restore checks pass, and it carries no uptime or support guarantee.
 - The relay Dockerfile and SQLite storage are available. Multi-instance production hosting needs external/shared rate limiting, backup/restore drills, and operational monitoring.
 - SQLite opaque MLS messages use an incremental append/delete path, but the normalized non-message relay state rewrites teams, rooms, invites, devices, members, and sessions on each debounced flush. That is acceptable for alpha-scale trusted teams, but larger hosted relays should plan an incremental or shared-store rewrite before rooms and membership counts grow enough for whole-store rewrites to become a scaling ceiling.
 
@@ -28,7 +30,7 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 - Exporter-derived history secrets are deliberately retained in encrypted native storage. Forward secrecy applies to live traffic, not retained local history.
 - Multi-device recovery and history backfill remain limited; each device enrolls with its own MLS credential and KeyPackages. State loss requires a clean rejoin and loses pre-rejoin history access.
 - Pre-v2 rooms and pre-v3 invite authenticators are intentionally incompatible and are not migrated.
-- The web preview is a seeded local demonstration only; E2EE room workflows require the native app.
+- The product is native-only. Browser builds show a static install notice and initialize no workspace, identity, relay connection, or MLS state.
 
 ## Codex Hosting
 

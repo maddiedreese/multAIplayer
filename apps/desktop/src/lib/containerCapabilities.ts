@@ -112,6 +112,7 @@ export function buildSidebarDrawerCapabilities(sources: SidebarSources): Sidebar
     signIn: sources.githubAuth.beginGitHubSignIn,
     signOut: sources.roomRuntime.signOut,
     rotateDeviceIdentity: sources.roomRuntime.rotateDeviceIdentity,
+    clearDeletedHostedAccount: sources.githubAuth.clearDeletedHostedAccount,
     chooseProject: sources.roomRuntime.chooseProjectPath,
     updateLocalHistorySettings: sources.workspaceFlow.updateLocalHistorySettings,
     clearRoomHistory: sources.workspaceFlow.clearRoomHistory,

@@ -8,14 +8,14 @@ Security reports are welcome for the current `main` branch and latest published 
 
 The intended security properties are:
 
-- the relay does not store plaintext chat transcripts, plaintext attachments, Codex credentials, OpenAI credentials, repo contents, terminal output, file diffs, or plaintext GitHub access tokens;
+- the relay does not persist plaintext chat transcripts, plaintext attachments, Codex credentials, OpenAI credentials, repo contents, terminal output, file diffs, or plaintext GitHub access tokens. Its authenticated GitHub proxy necessarily receives and forwards the plaintext repository owner/name, pull-request title/body/head/base, and Actions metadata involved in an explicit GitHub operation; those transient fields are not added to relay storage or logs by design;
 - room events are RFC 9420 MLS PrivateMessages, while attachments are encrypted with per-blob keys derived by the native MLS core;
 - MLS authenticated data binds canonical room, sender, event-kind, timestamp, message-id, and epoch routing fields;
 - invite approval binds an independent random single-use bearer capability to an authenticated requester, exact KeyPackage hash, and pinned host HPKE key before an MLS Add and Welcome are created;
 - membership changes use MLS Add and Remove commits, and both native clients and the relay enforce that only the active host can commit;
 - MLS signature and HPKE private keys, group state, exporter output, history secrets, and per-blob keys remain behind the Rust IPC boundary and are stored with the operating-system credential store plus SQLCipher;
 - retained exporter-derived history secrets intentionally preserve local history readability across epochs, so forward secrecy applies to live traffic rather than retained device-local history;
-- the browser/web preview contains seeded local demo rooms only and cannot create or join E2EE rooms;
+- browser builds contain no preview workspace and do not initialize identity, relay, project, or MLS state;
 - GitHub session persistence is memory-only unless a strong `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured, in which case access tokens are encrypted at rest.
 - production relays require authentication by default; unauthenticated relay mode is an explicit self-host opt-out.
 
@@ -33,7 +33,7 @@ Good reports include:
 - commit or version tested;
 - local reproduction steps using dummy secrets;
 - expected vs actual behavior;
-- whether the issue affects the relay, native desktop app, web preview, or documentation.
+- whether the issue affects the relay, native desktop app, browser install notice, or documentation.
 
 Expect an initial acknowledgement within 3 business days and a status update at least every 7 days while a report remains open. We coordinate fixes and release timing privately, aim to publish a patched release before technical disclosure, and credit reporters who want attribution. Please allow 90 days for coordinated disclosure unless active exploitation or another urgent risk requires a shorter timeline.
 
@@ -48,7 +48,7 @@ cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 npm run build
 ```
 
-For native encryption issues, reproduce with `npm run tauri:dev`; the browser preview intentionally has no MLS or E2EE room support.
+For native encryption issues, reproduce with `npm run tauri:dev`; the browser build is only an install notice and contains no workspace behavior.
 
 ## Secret Handling
 
@@ -62,9 +62,11 @@ Never paste:
 - real terminal output containing credentials;
 - private repository files.
 
+Support and maintainers will never ask for a complete invitation link or any invite fragment. If one is accidentally received, redact or delete it from the support system immediately, do not copy it into another tool, and tell the sender to invalidate the invite and create a replacement. These handling rules reduce exposure; they do not promise that a third-party support platform can mathematically prevent every transient receipt or backup copy.
+
 ### Host command authorization
 
-Native room commands and interactive terminals require an operating-system approval dialog bound to the exact room, canonical working directory, command or input, and execution kind. The selected project is the process working directory, not a filesystem sandbox; an approved command runs with the host account's ambient access. Native authorization is an enforcement boundary, but users must review commands as granting host-account shell authority.
+Native room commands and interactive terminals require an operating-system approval dialog bound to the exact room, canonical working directory, command or input, and execution kind. On macOS they then run under an OS sandbox profile that permits process creation and network access, permits reads from the selected workspace plus named system/toolchain locations, and permits filesystem writes only beneath the canonical selected workspace. This is meaningful filesystem confinement, not complete isolation: commands inherit a host-controlled environment, can make network requests, can run workspace scripts and hooks, and can read the documented system/toolchain paths. Native authorization and confinement are enforcement boundaries, but users must still review the exact command and treat admitted members as able to influence the selected project and network-visible services after approval.
 
 Before command or PTY output can be returned to the webview and encrypted into a room event, the native host redacts known GitHub/OpenAI token forms, secret-bearing environment assignments, and PEM private keys. Pattern redaction reduces accidental disclosure; it cannot recognize every possible secret encoding.
 

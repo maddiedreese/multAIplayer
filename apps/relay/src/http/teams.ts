@@ -31,8 +31,6 @@ interface RegisterTeamRoutesOptions {
   maxTeamNameChars: number;
 }
 
-const dailyTeamCreationCounts = new Map<string, DailyCreationQuotaRecord>();
-
 export function registerTeamRoutes({
   app,
   store,
@@ -262,7 +260,7 @@ export function registerTeamRoutes({
       session &&
       !consumeDailyCreationQuota({
         cap: dailyCreationCaps.teamsPerUser,
-        counts: dailyTeamCreationCounts,
+        counts: store.dailyTeamCreationCounts,
         quota: "daily_user_team_creations",
         userId: session.user.id,
         res,
@@ -331,6 +329,7 @@ function consumeDailyCreationQuota({
   recordQuotaRejection?: (type: string) => void;
 }): boolean {
   const now = Date.now();
+  for (const [existingKey, existing] of counts) if (existing.resetAt <= now) counts.delete(existingKey);
   const resetAt = nextUtcMidnight(now);
   const key = `${quota}:${userId}`;
   const current = counts.get(key);
