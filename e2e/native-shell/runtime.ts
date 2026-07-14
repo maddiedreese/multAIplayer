@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { chmod, rm, writeFile } from "node:fs/promises";
+import { chmod, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -156,8 +156,10 @@ export HOME=${JSON.stringify(join(profile, "home"))}
 mkdir -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_RUNTIME_DIR" "$HOME"
 chmod 700 "$XDG_RUNTIME_DIR"
 export MULTAIPLAYER_E2E_APP_BINARY=${JSON.stringify(this.#appBinary)}
+export MULTAIPLAYER_E2E_APP_PID_FILE=${JSON.stringify(join(tempRoot, `${name}-app.pid`))}
 exec dbus-run-session -- bash -euo pipefail -c '
   printf "%s\\n" native-e2e | gnome-keyring-daemon --unlock --components=secrets >/dev/null
+  printf "%s\\n" "$$" > "$MULTAIPLAYER_E2E_APP_PID_FILE"
   exec "$MULTAIPLAYER_E2E_APP_BINARY"
 '
 `,
@@ -165,6 +167,28 @@ exec dbus-run-session -- bash -euo pipefail -c '
     );
     await chmod(launcher, 0o700);
     return launcher;
+  }
+
+  async killIsolatedApp(tempRoot: string, name: string) {
+    const pidPath = join(tempRoot, `${name}-app.pid`);
+    const pid = Number((await readFile(pidPath, "utf8")).trim());
+    if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error(`invalid ${name} native app pid in ${pidPath}`);
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+    }
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      await delay(50);
+      try {
+        process.kill(pid, 0);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ESRCH") return;
+        throw error;
+      }
+    }
+    throw new Error(`${name} native app process ${pid} remained alive after SIGKILL`);
   }
 
   async stopProcesses() {

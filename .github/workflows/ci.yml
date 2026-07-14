@@ -303,6 +303,9 @@ jobs:
       - name: Run two real native clients through invite, message, and handoff
         run: xvfb-run -a npm run test:e2e:native
 
+      - name: Enforce native journey duration policy
+        run: node scripts/check-native-journey-duration.mjs reports/native-shell-e2e/duration.json
+
       - name: Upload native journey duration metrics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
