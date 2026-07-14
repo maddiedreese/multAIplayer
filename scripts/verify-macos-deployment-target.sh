@@ -23,7 +23,7 @@ while IFS= read -r -d '' candidate; do
     continue
   fi
   checked=$((checked + 1))
-  if ! lipo -verify_arch arm64 "$candidate"; then
+  if ! lipo "$candidate" -verify_arch arm64; then
     echo "Bundled Mach-O file does not contain arm64: $candidate" >&2
     exit 1
   fi

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 const releaseWorkflow = readFileSync(".github/workflows/release.yml", "utf8");
+const deploymentTargetVerifier = readFileSync("scripts/verify-macos-deployment-target.sh", "utf8");
 
 test("release workflow requires Apple signing and notarization secrets", () => {
   for (const secret of [
@@ -39,4 +40,9 @@ test("release workflow packages the frontend already produced by preflight", () 
   assert.match(releaseWorkflow, /run: npm run tauri:build:release -w @multaiplayer\/desktop/);
   assert.match(releaseWorkflow, /aarch64-apple-darwin/);
   assert.doesNotMatch(releaseWorkflow, /run: npm run tauri:build -w @multaiplayer\/desktop/);
+});
+
+test("deployment target verifier passes the Mach-O path before lipo's architecture command", () => {
+  assert.match(deploymentTargetVerifier, /lipo "\$candidate" -verify_arch arm64/);
+  assert.doesNotMatch(deploymentTargetVerifier, /lipo -verify_arch arm64 "\$candidate"/);
 });
