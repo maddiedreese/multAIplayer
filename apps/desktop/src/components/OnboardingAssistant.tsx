@@ -6,6 +6,8 @@ import {
   CircleAlert,
   CircleDashed,
   FolderOpen,
+  Copy,
+  ExternalLink,
   KeyRound,
   LockKeyhole,
   RefreshCw,
@@ -25,6 +27,8 @@ import type {
   OnboardingReadinessRowId,
   OnboardingReadinessStatus
 } from "../lib/onboardingReadiness";
+import { openTrustedAuthenticationUrl } from "../lib/authExternalUrl";
+import { maxInviteLinkChars } from "../lib/inviteUrl";
 export type {
   OnboardingReadinessAction,
   OnboardingReadinessRow,
@@ -51,6 +55,14 @@ export interface OnboardingJoinState {
   message?: string;
 }
 
+export interface OnboardingAuthenticationFlow {
+  provider: "github" | "chatgpt";
+  flow: "browser" | "device";
+  url: string;
+  userCode: string | null;
+  expiresAt: number | null;
+}
+
 export interface OnboardingAssistantProps {
   state: OnboardingState;
   readiness: OnboardingReadinessRow[];
@@ -58,13 +70,21 @@ export interface OnboardingAssistantProps {
   busy?: boolean;
   message?: string | null;
   initialProjectPath?: string;
+  githubAuthentication?: OnboardingAuthenticationFlow | null;
+  codexAuthentication?: OnboardingAuthenticationFlow | null;
+  supportsCodexDeviceLogin?: boolean;
+  receivedInvite?: boolean;
   onChooseIntent: (intent: OnboardingIntent) => void;
   onExplore: () => void;
   onShowSurface: (surface: OnboardingSurface) => void;
   onReadinessAction: (action: OnboardingReadinessAction) => void;
+  onStartCodexDeviceLogin?: () => void;
+  onCancelGitHubAuthentication?: () => void;
+  onCancelCodexAuthentication?: () => void;
   onSubmitCreate: (draft: OnboardingCreateDraft) => void;
   onRetryRoomCreation: (draft: OnboardingRoomRetryDraft) => void;
   onSubmitJoin: (draft: OnboardingJoinDraft) => void;
+  onSubmitReceivedInvite?: () => void;
   onChooseProjectFolder: (currentPath: string) => Promise<string | null>;
   onContinueSafety: () => void;
   onDismiss: () => void;
@@ -87,13 +107,21 @@ export function OnboardingAssistant({
   busy = false,
   message,
   initialProjectPath = "",
+  githubAuthentication = null,
+  codexAuthentication = null,
+  supportsCodexDeviceLogin = false,
+  receivedInvite = false,
   onChooseIntent,
   onExplore,
   onShowSurface,
   onReadinessAction,
+  onStartCodexDeviceLogin = () => undefined,
+  onCancelGitHubAuthentication = () => undefined,
+  onCancelCodexAuthentication = () => undefined,
   onSubmitCreate,
   onRetryRoomCreation,
   onSubmitJoin,
+  onSubmitReceivedInvite = () => undefined,
   onChooseProjectFolder,
   onContinueSafety,
   onDismiss
@@ -140,7 +168,13 @@ export function OnboardingAssistant({
               headingRef={headingRef}
               rows={readiness}
               busy={busy}
+              githubAuthentication={githubAuthentication}
+              codexAuthentication={codexAuthentication}
+              supportsCodexDeviceLogin={supportsCodexDeviceLogin}
               onAction={onReadinessAction}
+              onStartCodexDeviceLogin={onStartCodexDeviceLogin}
+              onCancelGitHubAuthentication={onCancelGitHubAuthentication}
+              onCancelCodexAuthentication={onCancelCodexAuthentication}
               onBack={() => onShowSurface("welcome")}
               onContinue={() => onShowSurface("workspace")}
             />
@@ -162,8 +196,10 @@ export function OnboardingAssistant({
               headingRef={headingRef}
               busy={busy}
               joinState={joinState}
+              receivedInvite={receivedInvite}
               onBack={() => onShowSurface("readiness")}
               onSubmit={onSubmitJoin}
+              onSubmitReceived={onSubmitReceivedInvite}
             />
           )}
           {state.surface === "safety" && (
@@ -247,22 +283,32 @@ function ReadinessStep({
   headingRef,
   rows,
   busy,
+  githubAuthentication,
+  codexAuthentication,
+  supportsCodexDeviceLogin,
   onAction,
+  onStartCodexDeviceLogin,
+  onCancelGitHubAuthentication,
+  onCancelCodexAuthentication,
   onBack,
   onContinue
 }: {
   headingRef: React.RefObject<HTMLHeadingElement | null>;
   rows: OnboardingReadinessRow[];
   busy: boolean;
+  githubAuthentication: OnboardingAuthenticationFlow | null;
+  codexAuthentication: OnboardingAuthenticationFlow | null;
+  supportsCodexDeviceLogin: boolean;
   onAction: (action: OnboardingReadinessAction) => void;
+  onStartCodexDeviceLogin: () => void;
+  onCancelGitHubAuthentication: () => void;
+  onCancelCodexAuthentication: () => void;
   onBack: () => void;
   onContinue: () => void;
 }) {
   const rowsById = new Map(rows.map((row) => [row.id, row]));
   const orderedRows = readinessOrder.map((id) => rowsById.get(id)).filter(Boolean) as OnboardingReadinessRow[];
-  const blocking =
-    orderedRows.length !== readinessOrder.length ||
-    orderedRows.some((row) => row.status === "checking" || row.blocking);
+  const blocking = orderedRows.length !== readinessOrder.length || orderedRows.some((row) => row.blocking);
   return (
     <div className="onboarding-step">
       <StepHeading ref={headingRef} eyebrow="Step 1" title="Check this device" />
@@ -277,15 +323,31 @@ function ReadinessStep({
                 <strong>{row.label}</strong>
                 <small>{row.text}</small>
               </span>
-              {action && row.status !== "ready" && (
-                <button type="button" onClick={() => onAction(action)} disabled={busy || row.status === "checking"}>
-                  {readinessActionLabels[action]}
-                </button>
-              )}
+              {action &&
+                row.status !== "ready" &&
+                !(row.id === "github" && githubAuthentication) &&
+                !(row.id === "chatgpt" && codexAuthentication) && (
+                  <button type="button" onClick={() => onAction(action)} disabled={busy || row.status === "checking"}>
+                    {readinessActionLabels[action]}
+                  </button>
+                )}
             </div>
           );
         })}
       </div>
+      {githubAuthentication && (
+        <AuthenticationFlowPanel flow={githubAuthentication} onCancel={onCancelGitHubAuthentication} />
+      )}
+      {codexAuthentication ? (
+        <AuthenticationFlowPanel flow={codexAuthentication} onCancel={onCancelCodexAuthentication} />
+      ) : (
+        supportsCodexDeviceLogin &&
+        orderedRows.some((row) => row.id === "chatgpt" && row.action === "sign_in_chatgpt") && (
+          <button type="button" className="onboarding-text-button" onClick={onStartCodexDeviceLogin}>
+            Use a ChatGPT device code instead
+          </button>
+        )
+      )}
       <div className="onboarding-auth-explainer">
         <p>
           <strong>GitHub</strong> identifies workspace members and enables repository workflows.
@@ -300,6 +362,89 @@ function ReadinessStep({
         </button>
       </StepActions>
     </div>
+  );
+}
+
+function AuthenticationFlowPanel({ flow, onCancel }: { flow: OnboardingAuthenticationFlow; onCancel: () => void }) {
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied_code" | "copied_link" | "failed">("idle");
+  const [openStatus, setOpenStatus] = useState<"idle" | "failed">("idle");
+  const providerLabel = flow.provider === "github" ? "GitHub" : "ChatGPT";
+  const remainingMinutes = flow.expiresAt ? Math.max(0, Math.ceil((flow.expiresAt - Date.now()) / 60_000)) : null;
+
+  async function copyCode() {
+    if (!flow.userCode) return;
+    try {
+      await navigator.clipboard.writeText(flow.userCode);
+      setCopyStatus("copied_code");
+    } catch {
+      setCopyStatus("failed");
+    }
+  }
+
+  async function openAuthentication() {
+    const provider = flow.provider === "github" ? "github" : "openai";
+    setOpenStatus((await openTrustedAuthenticationUrl(provider, flow.url)) ? "idle" : "failed");
+  }
+
+  async function copyAuthenticationLink() {
+    try {
+      await navigator.clipboard.writeText(flow.url);
+      setCopyStatus("copied_link");
+    } catch {
+      setCopyStatus("failed");
+    }
+  }
+
+  return (
+    <section className="onboarding-auth-flow" aria-label={`${providerLabel} sign-in`}>
+      <div>
+        <strong>Finish signing in with {providerLabel}</strong>
+        <small role="status" aria-live="polite">
+          Waiting for authorization in your browser. You can cancel and continue setup later.
+        </small>
+        {remainingMinutes !== null && (
+          <small>
+            {remainingMinutes > 0
+              ? `This code expires in about ${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"}.`
+              : "This code has expired. Cancel sign-in and start again."}
+          </small>
+        )}
+      </div>
+      {flow.userCode && (
+        <div className="onboarding-auth-code">
+          <span>{providerLabel} code</span>
+          <strong aria-label={`${providerLabel} device code`}>{flow.userCode}</strong>
+          <button type="button" onClick={() => void copyCode()} aria-label={`Copy ${providerLabel} device code`}>
+            <Copy size={14} /> Copy
+          </button>
+        </div>
+      )}
+      <div className="onboarding-auth-actions">
+        <button type="button" onClick={() => void openAuthentication()}>
+          Open {providerLabel} in your browser <ExternalLink size={14} />
+        </button>
+        <button type="button" onClick={onCancel}>
+          Cancel sign-in
+        </button>
+      </div>
+      {openStatus === "failed" && (
+        <div className="onboarding-auth-fallback" role="alert">
+          <span>The system browser could not be opened.</span>
+          <button type="button" onClick={() => void copyAuthenticationLink()}>
+            <Copy size={14} /> Copy sign-in link
+          </button>
+        </div>
+      )}
+      <span className="sr-only" role="status" aria-live="polite">
+        {copyStatus === "copied_code"
+          ? `${providerLabel} code copied.`
+          : copyStatus === "copied_link"
+            ? `${providerLabel} sign-in link copied.`
+            : copyStatus === "failed"
+              ? `Could not copy the ${providerLabel} code. Select the visible code instead.`
+              : ""}
+      </span>
+    </section>
   );
 }
 
@@ -432,16 +577,20 @@ function JoinStep({
   headingRef,
   busy,
   joinState,
+  receivedInvite,
   onBack,
-  onSubmit
+  onSubmit,
+  onSubmitReceived
 }: {
   headingRef: React.RefObject<HTMLHeadingElement | null>;
   busy: boolean;
   joinState: OnboardingJoinState;
+  receivedInvite: boolean;
   onBack: () => void;
   onSubmit: (draft: OnboardingJoinDraft) => void;
+  onSubmitReceived: () => void;
 }) {
-  const [invite, setInvite] = useState("");
+  const inviteRef = useRef<HTMLInputElement>(null);
   const id = useId();
   const pending =
     busy ||
@@ -453,24 +602,36 @@ function JoinStep({
       className="onboarding-step"
       onSubmit={(event) => {
         event.preventDefault();
-        onSubmit({ invite: invite.trim() });
+        const protectedInvite = inviteRef.current?.value.trim() ?? "";
+        if (!protectedInvite) return;
+        if (inviteRef.current) inviteRef.current.value = "";
+        onSubmit({ invite: protectedInvite });
       }}
     >
       <StepHeading ref={headingRef} eyebrow="Step 2" title="Join a workspace" />
       <p className="onboarding-lede">
         Paste the invite you received. Device verification will appear here if the workspace requires it.
       </p>
-      <Field id={id} label="Invite link or code">
-        <input
-          id={id}
-          value={invite}
-          onChange={(event) => setInvite(event.target.value)}
-          maxLength={2048}
-          required
-          autoComplete="off"
-          spellCheck={false}
-        />
-      </Field>
+      {receivedInvite ? (
+        <div className="onboarding-recovery" role="status">
+          <ShieldCheck size={17} aria-hidden="true" />
+          <span>
+            <strong>Invitation received securely.</strong> Continue to verify this device and request access from the
+            active host.
+          </span>
+        </div>
+      ) : (
+        <Field id={id} label="Invite link or code">
+          <input
+            id={id}
+            ref={inviteRef}
+            maxLength={maxInviteLinkChars}
+            required
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </Field>
+      )}
       {joinState.phase !== "idle" && (
         <div className="onboarding-join-state" role="status" data-phase={joinState.phase}>
           {joinState.phase === "verification_required" ? (
@@ -495,7 +656,12 @@ function JoinStep({
         </div>
       )}
       <StepActions onBack={onBack}>
-        <button type="submit" className="onboarding-primary" disabled={pending}>
+        <button
+          type={receivedInvite ? "button" : "submit"}
+          className="onboarding-primary"
+          disabled={pending}
+          onClick={receivedInvite ? onSubmitReceived : undefined}
+        >
           {pending ? "Waiting…" : "Accept invite"} <ArrowRight size={16} />
         </button>
       </StepActions>

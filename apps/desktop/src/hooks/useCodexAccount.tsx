@@ -15,6 +15,7 @@ import {
 } from "../lib/localBackend";
 import { isTauriRuntime } from "../lib/localBackend/runtime";
 import { reportExpectedFailure } from "../lib/nonFatalReporting";
+import { openTrustedAuthenticationUrl, trustedAuthenticationUrl } from "../lib/authExternalUrl";
 
 export type CodexAccountReadinessStatus = "checking" | "native_required" | "unavailable" | "sign_in_required" | "ready";
 
@@ -158,7 +159,16 @@ function useCodexAccountController(): CodexAccountController {
           useHostedLoginSuccessPage: flow === "browser" && snapshot?.capabilities.supportsHostedLoginSuccess,
           appBrand: "chatgpt"
         });
-        setLogin(next);
+        const trustedUrl = trustedAuthenticationUrl("openai", next.url);
+        if (!trustedUrl) {
+          await cancelCodexLogin(next.loginId).catch(() =>
+            reportExpectedFailure("cancel Codex login after rejecting its authorization URL")
+          );
+          throw new Error("Codex returned an unsupported ChatGPT authorization address.");
+        }
+        const trustedLogin = { ...next, url: trustedUrl };
+        setLogin(trustedLogin);
+        if (flow === "browser") await openTrustedAuthenticationUrl("openai", trustedUrl);
         setMessage("Complete sign-in in the link below. Credentials remain in Codex on this device.");
       } catch (error) {
         setMessage(String(error));

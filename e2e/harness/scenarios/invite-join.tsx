@@ -29,7 +29,7 @@ const joinPayload = encodeNoSecretRoomInvite({
   hostHpkePublicKey: "test-only-public-key",
   hostHpkeKeyFingerprint: "sha256:test-only"
 });
-const inviteUrl = `https://invite.invalid/?invite=${inviteId}#multaiplayerJoin=${joinPayload}&approval=request`;
+const inviteUrl = `https://open.multaiplayer.com/invite#invite=${inviteId}&multaiplayerJoin=${joinPayload}&approval=request`;
 
 function noop() {}
 

@@ -10,6 +10,7 @@ import { useCodexAccount } from "./useCodexAccount";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppWorkspaceFlow } from "./useAppWorkspaceFlow";
 import type { useGitHubAuth } from "./useGitHubAuth";
+import type { useNativeInviteIntake } from "./useNativeInviteIntake";
 import type {
   OnboardingCreateDraft,
   OnboardingJoinState,
@@ -19,15 +20,18 @@ import type {
 type GitHubAuth = ReturnType<typeof useGitHubAuth>;
 type WorkspaceFlow = ReturnType<typeof useAppWorkspaceFlow>;
 type InviteActions = ReturnType<typeof useAppInviteActions>;
+type NativeInvite = ReturnType<typeof useNativeInviteIntake>;
 
 export function useOnboardingFlow({
   githubAuth,
   workspaceFlow,
-  inviteActions
+  inviteActions,
+  nativeInvite
 }: {
   githubAuth: GitHubAuth;
   workspaceFlow: WorkspaceFlow;
   inviteActions: InviteActions;
+  nativeInvite: NativeInvite;
 }) {
   const account = useCodexAccount();
   const onboarding = useAppStore((state) => state.onboarding);
@@ -51,6 +55,12 @@ export function useOnboardingFlow({
   const localDeviceId = useMemo(() => loadOrCreateDeviceId(), []);
   const completedTurnBaseline = useRef<Record<string, Set<string>>>({});
 
+  useEffect(() => {
+    if (!nativeInvite.invite) return;
+    setJoinState({ phase: "idle" });
+    applyEvent({ type: "choose_intent", intent: "join" });
+  }, [applyEvent, nativeInvite.invite]);
+
   const intent: OnboardingIntent = onboarding.intent ?? "create";
   const readinessProjection = useMemo(
     () =>
@@ -62,7 +72,7 @@ export function useOnboardingFlow({
           userResolved: githubAuth.currentUserResolved,
           config: githubAuth.authConfig,
           user: githubAuth.currentUser,
-          busy: githubAuth.authBusy,
+          busy: githubAuth.authBusy && !githubAuth.deviceFlow,
           error: githubAuth.authError
         },
         codexProbe,
@@ -78,6 +88,7 @@ export function useOnboardingFlow({
       githubAuth.authError,
       githubAuth.currentUser,
       githubAuth.currentUserResolved,
+      githubAuth.deviceFlow,
       intent,
       selectedProjectPath,
       workspaceError,
@@ -252,6 +263,27 @@ export function useOnboardingFlow({
     [inviteActions.requestNoSecretInviteAccess]
   );
 
+  const submitReceivedInvite = useCallback(async () => {
+    const invite = nativeInvite.invite;
+    if (!invite) return;
+    // Consume the React-memory copy before native/relay work. Errors present a
+    // safe recovery message and require reopening or manually pasting the link.
+    nativeInvite.clearInvite();
+    setBusy(true);
+    setMessage(null);
+    setJoinState({ phase: "accepting", message: "Verifying the invite and this device…" });
+    const adapter = createOnboardingInviteJoinAdapter({
+      requestNoSecretInviteAccess: inviteActions.requestNoSecretInviteAccess
+    });
+    const result = await adapter.joinProtectedPayload(invite.encodedInvite, invite.inviteId);
+    setBusy(false);
+    setJoinState(
+      result.status === "approval_pending"
+        ? { phase: "verification_required", message: result.message }
+        : { phase: "error", message: result.message }
+    );
+  }, [inviteActions.requestNoSecretInviteAccess, nativeInvite]);
+
   const showSurface = useCallback(
     (surface: OnboardingSurface) => applyEvent({ type: "show_surface", surface }),
     [applyEvent]
@@ -264,9 +296,29 @@ export function useOnboardingFlow({
     progress: deriveOnboardingProgress(onboarding),
     readiness: readinessProjection,
     joinState,
-    busy: busy || githubAuth.authBusy || account.busy,
+    busy,
     message,
     selectedProjectPath: selectedProjectPath ?? "",
+    githubAuthentication: githubAuth.deviceFlow
+      ? {
+          provider: "github" as const,
+          flow: "device" as const,
+          url: githubAuth.deviceFlow.verification_uri,
+          userCode: githubAuth.deviceFlow.user_code,
+          expiresAt: githubAuth.deviceFlow.expiresAt
+        }
+      : null,
+    codexAuthentication: account.login
+      ? {
+          provider: "chatgpt" as const,
+          flow: account.login.flow,
+          url: account.login.url,
+          userCode: account.login.userCode,
+          expiresAt: null
+        }
+      : null,
+    supportsCodexDeviceLogin: account.snapshot?.capabilities.supportsDeviceLogin === true,
+    receivedInvite: nativeInvite.invite !== null,
     blockingAssistant: deriveOnboardingProgress(onboarding).assistantVisible && onboarding.surface !== "guided_turn",
     guidedVisible:
       deriveOnboardingProgress(onboarding).assistantVisible &&
@@ -276,9 +328,13 @@ export function useOnboardingFlow({
     onExplore: () => applyEvent({ type: "skip_assistant" }),
     onShowSurface: showSurface,
     onReadinessAction: runReadinessAction,
+    onStartCodexDeviceLogin: () => void account.beginLogin("device"),
+    onCancelGitHubAuthentication: githubAuth.cancelGitHubSignIn,
+    onCancelCodexAuthentication: () => void account.cancelLogin(),
     onSubmitCreate: create,
     onRetryRoomCreation: create,
     onSubmitJoin: submitJoin,
+    onSubmitReceivedInvite: () => void submitReceivedInvite(),
     onChooseProjectFolder: chooseFolder,
     onContinueSafety: continueSafety,
     onDismiss: dismiss

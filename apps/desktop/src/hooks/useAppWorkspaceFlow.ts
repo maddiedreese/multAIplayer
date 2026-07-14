@@ -66,12 +66,7 @@ export function useAppWorkspaceFlow({
     }))
   );
   const { hasSelectedRoom, selectedRoom } = selected;
-  const {
-    setSelectedInviteMessage,
-    setSelectedTeamHistoryMessage,
-    setTeamHistoryMessageForTeam,
-    hydrateLocalRoomHistoryForRoom
-  } = roomActions;
+  const { setSelectedTeamHistoryMessage, setTeamHistoryMessageForTeam, hydrateLocalRoomHistoryForRoom } = roomActions;
 
   return useWorkspaceFlowContext({
     bootstrap: {
@@ -103,10 +98,6 @@ export function useAppWorkspaceFlow({
       },
       selectedTeamDefaults: {
         selectedTeam
-      },
-      inviteUrl: {
-        requestNoSecretInviteAccess: inviteActions.requestNoSecretInviteAccess,
-        setSelectedInviteMessage
       }
     },
     workspaceRoomActions: {

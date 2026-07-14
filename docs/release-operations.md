@@ -16,6 +16,8 @@ Release Please maintains [the project changelog](../CHANGELOG.md), workspace ver
 
 Before a wider alpha, manually verify on two macOS devices and two GitHub accounts:
 
+- first-run create and join readiness, GitHub Device Flow in the system browser, local Codex/ChatGPT browser or device login, cancellation, and copy-link recovery when the browser cannot open;
+- a signed, installed build receiving the official HTTPS invitation as both a cold start and a warm-app activation, including the explicit alternate-host retry after installation; confirm that neither app nor website logs, storage, analytics, or network requests contain the fragment;
 - KeyPackage publication, capability invite approval, Welcome join, encrypted chat, attachments, MLS removal, epoch advancement, and removed-device exclusion;
 - project selection, file/diff inspection, Codex approval, terminal and browser approval;
 - Git branch, commit, push, draft PR, and Actions status;
@@ -40,6 +42,8 @@ GitHub scopes: read:user public_repo
 Use `read:user repo` only after making private-repository access an explicit product and trust decision. Codex/OpenAI credentials never belong in the relay: Codex uses the active host's local app-server.
 
 The desktop release build should set `VITE_RELAY_HTTP_URL` and `VITE_RELAY_URL` to the final hosted endpoints, and its CSP must allow exactly those origins. Publish `https://<official-site>/releases/latest.json` for each release; set `security: true` for security fixes.
+
+The official invitation transport is an HTTPS universal link, not a custom URL scheme. Before signing, publish no-redirect Apple App Site Association files on both `multaiplayer.com` and `open.multaiplayer.com` for exactly `/invite` and `/invite/`, with the release Team ID and bundle id `com.multaiplayer.desktop`. The canonical link is `https://open.multaiplayer.com/invite#invite=<id>&multaiplayerJoin=<capability>&approval=request`; all invite material stays in the fragment. The apex host is the explicit retry target after installation. `npm run verify:aasa` checks the live association files, and the package checks verify that the associated-domain entitlement is present. Those checks establish configuration shape, not operating-system dispatch: the cold-start and warm-app cases above remain signed-release manual checks.
 
 ## Official relay deployment
 
@@ -103,6 +107,8 @@ KEYCHAIN_PASSWORD
 ```
 
 It builds the macOS app/DMG, verifies Developer ID signing and stapled notarization, runs Gatekeeper checks, writes checksums, emits an SPDX SBOM, records build-provenance attestations, and keyless-signs the checksum manifest and SBOM with Sigstore. Missing signing secrets fail the release; do not publish ad hoc or unsigned local builds as public artifacts.
+
+The release lane validates the live AASA documents before the signed build and verifies the packaged associated-domain entitlement afterward. Keep `APPLE_TEAM_ID` synchronized across signing, the AASA application identifier, and the ten-character Team ID validation. An unsigned CI package can prove that the entitlement was assembled, but only a signed, installed application against the live domains can prove macOS universal-link routing.
 
 Use [reproducible-builds.md](reproducible-builds.md) to compare the unsigned application payload. Signed/notarized archives are not claimed to be bit-for-bit reproducible.
 

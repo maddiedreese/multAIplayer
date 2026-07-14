@@ -43,6 +43,14 @@ Application publishes may arrive at the current epoch or either of the two immed
 
 Host handoff changes the authenticated host designation alongside a Commit. After the transfer, neither clients nor relay accept further Commits from the old host.
 
+## Invite transport versus admission
+
+The official transport URL is `https://open.multaiplayer.com/invite#invite=<id>&multaiplayerJoin=<encoded>&approval=request`. All three fields are fragment parameters. They are not HTTP query parameters and are not sent to the website origin by a conforming browser. The apex host is an associated-domain fallback for one explicit user retry. No `multaiplayer:` custom scheme is defined.
+
+Universal-link and website parsing are transport gates only. Native intake validates the HTTPS host/path/authority, exact singleton fragment fields, base64url alphabets, and independent size ceilings, then provides the parsed values once to the existing join adapter. It does not register membership, publish a KeyPackage, or unlock a room. The encoded invitation is still decoded and matched against relay metadata, active-host identity/device/fingerprint, expiry, and the production v3 capability binding before the device publishes its HPKE-sealed request.
+
+GitHub OAuth and ChatGPT authorization are out-of-band account protocols, not room or MLS events. GitHub Device Flow polling and access tokens terminate at the relay; Codex browser/device login terminates at the local app-server. Onboarding stores neither flow's transient identifiers. An invite join requires authenticated GitHub identity when relay auth is enabled, but does not require local Codex or ChatGPT authorization.
+
 ## Removal
 
 Removal is an MLS Remove Commit. The relay first closes the removed member's live sockets, blocks future reads, and revokes outstanding invites. The active host then commits the removal and advances the MLS epoch. The removed leaf has no new epoch secret. Already delivered plaintext, exports, screenshots, and retained older history cannot be revoked.

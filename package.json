@@ -39,6 +39,8 @@
     "verify:native": "npm run fmt:rust:check && npm run lint:rust && npm run test:native",
     "verify": "npm run verify:web && npm run verify:native",
     "release:preflight": "npm run doctor && npm run license:check && npm run sqlite:backup-restore-drill && npm run verify",
+    "verify:aasa": "node scripts/verify-aasa.mjs",
+    "verify:macos-associated-domains": "node scripts/verify-macos-associated-domains.mjs",
     "license:check": "node scripts/license-check.mjs",
     "sqlite:backup-restore-drill": "node scripts/sqlite-backup-restore-drill.mjs --fixture",
     "verify:relay-container-reproducibility": "node scripts/verify-relay-container-reproducibility.mjs",

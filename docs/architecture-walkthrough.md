@@ -31,6 +31,8 @@ Show the root workspaces:
 Point out that imports are intentionally directional and `scripts/eslint-boundaries.test.mjs` guards those boundaries.
 For the native boundary, also show `apps/desktop/src-tauri/src/mls_native.rs`: its `types`, `invites`, and test child modules preserve one Tauri command API while keeping IPC records and invite policy independently reviewable. Repository hygiene caps every production Rust source file at 1,000 physical lines.
 
+Before moving on, trace one invitation transport without exposing a real link. Start at `inviteLinkActions.ts`, where the app creates an HTTPS `open.multaiplayer.com/invite` URL whose entire payload is a fragment. Then show `invite_link.rs` and `nativeInviteIntake.ts`: macOS associated-domain delivery is parsed again in Rust, retained in one one-shot memory slot, announced by a content-free event, and delegated to the existing MLS join action. Contrast that with the website landing, which scrubs the fragment before hydration and uses an in-memory cross-host retry rather than storage or a custom scheme. Finally show `trusted_auth.rs` and `authExternalUrl.ts` as the independent Rust/TypeScript validation pair for opening GitHub or ChatGPT in the system browser.
+
 ## 6:00 — One encrypted message
 
 Follow `docs/message-lifecycles.md` from a desktop intent through Rust MLS encryption, opaque relay persistence/broadcast, and Rust MLS decryption. Show that the relay stores an opaque MLS message rather than chat plaintext. Mention that group cryptography belongs in the Rust MLS core, not React components or relay handlers.

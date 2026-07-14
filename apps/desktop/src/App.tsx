@@ -28,6 +28,7 @@ import { WebPreviewDemo } from "./components/WebPreviewDemo";
 import { CodexAccountProvider } from "./hooks/useCodexAccount";
 import { OnboardingAssistant } from "./components/OnboardingAssistant";
 import { useOnboardingFlow } from "./hooks/useOnboardingFlow";
+import { useNativeInviteIntake } from "./hooks/useNativeInviteIntake";
 
 export function App() {
   if (!isTauriRuntime()) return <WebPreviewDemo />;
@@ -129,7 +130,8 @@ function NativeApp() {
     inviteActions,
     roomSettingsActor
   });
-  const onboarding = useOnboardingFlow({ githubAuth, workspaceFlow, inviteActions });
+  const nativeInvite = useNativeInviteIntake();
+  const onboarding = useOnboardingFlow({ githubAuth, workspaceFlow, inviteActions, nativeInvite });
 
   const relaySync = useAppRelaySync({
     appRefs,
@@ -208,13 +210,21 @@ function NativeApp() {
         busy={onboarding.busy}
         message={onboarding.message}
         initialProjectPath={onboarding.selectedProjectPath}
+        githubAuthentication={onboarding.githubAuthentication}
+        codexAuthentication={onboarding.codexAuthentication}
+        supportsCodexDeviceLogin={onboarding.supportsCodexDeviceLogin}
+        receivedInvite={onboarding.receivedInvite}
         onChooseIntent={onboarding.onChooseIntent}
         onExplore={onboarding.onExplore}
         onShowSurface={onboarding.onShowSurface}
         onReadinessAction={onboarding.onReadinessAction}
+        onStartCodexDeviceLogin={onboarding.onStartCodexDeviceLogin}
+        onCancelGitHubAuthentication={onboarding.onCancelGitHubAuthentication}
+        onCancelCodexAuthentication={onboarding.onCancelCodexAuthentication}
         onSubmitCreate={onboarding.onSubmitCreate}
         onRetryRoomCreation={onboarding.onRetryRoomCreation}
         onSubmitJoin={onboarding.onSubmitJoin}
+        onSubmitReceivedInvite={onboarding.onSubmitReceivedInvite}
         onChooseProjectFolder={onboarding.onChooseProjectFolder}
         onContinueSafety={onboarding.onContinueSafety}
         onDismiss={onboarding.onDismiss}

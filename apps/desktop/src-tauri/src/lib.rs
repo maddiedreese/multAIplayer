@@ -16,6 +16,7 @@ mod command_safety;
 mod diagnostics;
 mod git;
 mod host_sandbox;
+mod invite_link;
 mod local_preview;
 mod mls_native;
 mod output;
@@ -24,6 +25,7 @@ mod project;
 mod shell;
 mod shell_authorization;
 mod terminal;
+mod trusted_auth;
 mod validation;
 mod workspace;
 use browser::*;
@@ -35,6 +37,7 @@ use codex_requests::CodexRpcState;
 use codex_threads::*;
 use diagnostics::*;
 use git::*;
+use invite_link::*;
 use local_preview::*;
 use mls_native::*;
 use project::*;
@@ -42,6 +45,7 @@ use shell::*;
 use shell_authorization::*;
 use tauri::Manager;
 use terminal::*;
+use trusted_auth::*;
 
 #[tauri::command]
 fn app_version() -> &'static str {
@@ -57,6 +61,7 @@ pub fn run() {
         .manage(CodexRpcState::default())
         .manage(CodexHostState::default())
         .manage(MlsNativeState::default())
+        .manage(NativeInviteState::default())
         .setup(|app| {
             let state = match app.path().app_log_dir() {
                 Ok(log_dir) => DiagnosticState::initialize(log_dir.join("diagnostics.jsonl")),
@@ -72,15 +77,22 @@ pub fn run() {
         })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(
+            tauri_plugin_opener::Builder::new()
+                .open_js_links_on_click(false)
+                .build(),
+        )
         .plugin(tauri_plugin_shell::init());
     #[cfg(feature = "native-e2e")]
     let builder = builder
         .plugin(tauri_plugin_wdio::init())
         .plugin(tauri_plugin_wdio_webdriver::init());
 
-    if let Err(error) = builder
+    let app = match builder
         .invoke_handler(tauri::generate_handler![
             app_version,
+            take_pending_native_invite,
+            open_trusted_authentication_url,
             record_diagnostic,
             save_diagnostic_bundle,
             git_status,
@@ -164,11 +176,22 @@ pub fn run() {
             list_codex_threads,
             fork_codex_thread
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
     {
-        eprintln!("error while running multAIplayer: {error}");
-        std::process::exit(1);
-    }
+        Ok(app) => app,
+        Err(error) => {
+            eprintln!("error while building multAIplayer: {error}");
+            std::process::exit(1);
+        }
+    };
+    app.run(|app_handle, event| {
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Opened { urls } = event {
+            handle_opened_invite_urls(app_handle, &urls);
+        }
+        #[cfg(not(target_os = "macos"))]
+        let _ = (app_handle, event);
+    });
 }
 
 #[cfg(test)]

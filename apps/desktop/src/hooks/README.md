@@ -37,7 +37,7 @@ Use this index to find the React lifecycle or composition point for a desktop be
 - `useAppSelectedRoomContext.ts` assembles selected-room state and capabilities.
 - `useAppSelectedRoomRuntime.ts` composes runtime values for the selected room.
 - `useInviteActions.ts` owns create, accept, and approval invite flows.
-- `useInviteUrlBootstrap.ts` handles an invite URL at application startup.
+- `useNativeInviteIntake.ts` consumes verified macOS universal links from the one-shot native intake boundary.
 - `useRoomAccess.ts` derives room access and permission state.
 - `useRoomBackgroundEffects.ts` runs room-scoped background effects.
 - `useRoomChatMutations.ts` exposes room chat mutation actions.

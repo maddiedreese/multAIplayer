@@ -6,8 +6,8 @@ test("readInviteUrlPayload parses gated no-secret invite URLs", () => {
   assert.deepEqual(
     readInviteUrlPayload({
       pathname: "/rooms",
-      search: "?invite=invite_123",
-      hash: "#multaiplayerJoin=encoded-join&approval=request"
+      search: "",
+      hash: "#invite=invite_123&multaiplayerJoin=encoded-join&approval=request"
     }),
     {
       kind: "join",
@@ -23,8 +23,8 @@ test("readInviteUrlPayload recognizes legacy room-key invites only so callers ca
   assert.deepEqual(
     readInviteUrlPayload({
       pathname: "/",
-      search: "?invite=invite_456",
-      hash: "#multaiplayerInvite=encoded-secret"
+      search: "",
+      hash: "#invite=invite_456&multaiplayerInvite=encoded-secret"
     }),
     {
       kind: "legacy-secret",

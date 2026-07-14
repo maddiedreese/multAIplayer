@@ -26,6 +26,8 @@ Large attachments remain opaque relay blobs. The native core derives a per-blob 
 
 Invite capabilities remain an authorization mechanism. A link carries a random single-use capability in its URL fragment, the pinned host identity, and bounded room metadata; it never carries an MLS group secret. The issuer persists only a domain-separated verifier. The joiner publishes a single-use KeyPackage and sends an invite request sealed to the pinned host's dedicated HPKE key.
 
+The official HTTPS universal link is only a delivery envelope. The relay invite id is also fragment-carried, so the website request contains no invitation field. Apple associated-domain routing, the static install page, native one-shot intake, and React onboarding do not transform or authenticate MLS bytes and cannot grant membership. They fail into the same decoder and capability-bound request path described here. No custom scheme or browser-persisted handoff exists.
+
 Pairwise invite requests use RFC 9180 HPKE with P-256, HKDF-SHA-256, and AES-128-GCM. Invite authenticator v3 encodes the binding independently of Serde and Rust field declaration order: a fixed versioned prefix, one-byte version and phase discriminant, big-endian epoch, eleven unsigned-32-bit-length-prefixed UTF-8 fields, and tagged optional status/decision fields. The same bytes are the HPKE AAD and the input to the request receipt hash. They bind purpose, host and requester identities/devices, room, epoch, expiry, request id/nonce, and the exact KeyPackage hash.
 
 The raw 256-bit capability is reduced to the issuer's verifier with `SHA-256("multaiplayer:invite-capability-verifier:v3\0" || raw)`. Request and response HMAC-SHA-256 subkeys are then derived independently from that verifier with `multaiplayer:invite-capability-request-key:v3\0` and `multaiplayer:invite-capability-response-key:v3\0`; their MAC inputs additionally use distinct `...request-mac:v3\0` and `...response-mac:v3\0` labels. Phase-specific verification APIs reject the other phase before authenticating. This is deliberate belt-and-braces domain separation rather than relying on the encoded phase alone.
@@ -41,6 +43,8 @@ This creates a precise tradeoff: live MLS traffic gains forward secrecy and post
 ## Onboarding state is not cryptographic state
 
 The resumable setup record is a local webview preference, not MLS state, a room-history payload, or a source of authority. It may retain bounded team and room identifiers plus boolean workflow markers, including a partial team id used to avoid duplicate creation. It does not retain an invite capability, KeyPackage private material, Welcome, project path, prompt, account credential, transcript, or room key.
+
+GitHub Device Flow codes/URLs and Codex login ids/URLs/codes are likewise excluded. They exist only in their live auth controllers and are erased on completion, cancellation, expiry, or process exit. Joining a room does not cryptographically depend on local Codex availability or ChatGPT authorization; those are host-execution prerequisites, not membership inputs.
 
 Choosing “Join with an invite” does not create membership locally. The normal HPKE request, active-host approval, MLS Add Commit, and Welcome lifecycle remains authoritative. Likewise, a local checklist marker cannot grant room or host access. Compromise of the onboarding record can reveal coarse setup progress and identifiers or confuse the local presentation, but it cannot decrypt room traffic; strict normalization discards unsupported and inconsistent records.
 

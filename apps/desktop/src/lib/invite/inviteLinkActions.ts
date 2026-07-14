@@ -49,7 +49,6 @@ export function createInviteLinkActions(
     setInviteLinkForRoom(roomId, "");
     try {
       const invite = await createInvite(selectedRoom.teamId, roomId);
-      const inviteUrl = `${window.location.origin}${window.location.pathname}?invite=${invite.id}`;
       if (!deviceIdentity) {
         if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
           setInviteMessageForRoom(roomId, "Device identity is still being prepared. Try again in a moment.");
@@ -71,7 +70,7 @@ export function createInviteLinkActions(
       };
       rememberIssuedMlsInvite(invite.id, capability);
       const fragment = encodeNoSecretRoomInvite(capabilityInvite);
-      const link = `${inviteUrl}#multaiplayerJoin=${fragment}&approval=request`;
+      const link = `https://open.multaiplayer.com/invite#invite=${encodeURIComponent(invite.id)}&multaiplayerJoin=${fragment}&approval=request`;
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setInviteLinkForRoom(roomId, link);
       }

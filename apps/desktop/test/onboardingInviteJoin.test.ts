@@ -3,7 +3,7 @@ import test from "node:test";
 import { RelayHttpError } from "../src/lib/httpResponse";
 import { createOnboardingInviteJoinAdapter } from "../src/lib/onboardingInviteJoin";
 
-const manualInvite = "https://app.example.test/?invite=invite_123#multaiplayerJoin=protected-fragment";
+const manualInvite = "https://app.example.test/#invite=invite_123&multaiplayerJoin=protected-fragment&approval=request";
 
 test("manual input delegates to the real MLS join port and reports only pending host approval", async () => {
   const calls: Array<{ encoded: string; inviteId?: string | null }> = [];
@@ -24,6 +24,17 @@ test("manual input delegates to the real MLS join port and reports only pending 
   assert.doesNotMatch(JSON.stringify(outcome), /protected-fragment|invite_123/);
 });
 
+test("native protected payload delegates without reconstructing or rendering a URL", async () => {
+  const calls: Array<{ encoded: string; inviteId?: string | null }> = [];
+  const adapter = createOnboardingInviteJoinAdapter({
+    requestNoSecretInviteAccess: async (encoded, inviteId) => calls.push({ encoded, inviteId })
+  });
+  const outcome = await adapter.joinProtectedPayload("protected-fragment", "invite_123");
+  assert.deepEqual(calls, [{ encoded: "protected-fragment", inviteId: "invite_123" }]);
+  assert.equal(outcome.status, "approval_pending");
+  assert.doesNotMatch(JSON.stringify(outcome), /protected-fragment|invite_123/);
+});
+
 test("URL invite fragments are scrubbed before the MLS request begins", async () => {
   const order: string[] = [];
   const adapter = createOnboardingInviteJoinAdapter({
@@ -34,8 +45,8 @@ test("URL invite fragments are scrubbed before the MLS request begins", async ()
   const outcome = await adapter.joinFromUrl(
     {
       pathname: "/app",
-      search: "?invite=invite_123",
-      hash: "#multaiplayerJoin=protected-fragment&approval=request"
+      search: "",
+      hash: "#invite=invite_123&multaiplayerJoin=protected-fragment&approval=request"
     },
     (cleanupPath) => {
       assert.equal(cleanupPath, "/app");
@@ -55,7 +66,7 @@ test("scrub failure fails closed without sending the bearer capability", async (
     }
   });
   const outcome = await adapter.joinFromUrl(
-    { pathname: "/", search: "?invite=invite_123", hash: "#multaiplayerJoin=protected-fragment" },
+    { pathname: "/", search: "", hash: "#invite=invite_123&multaiplayerJoin=protected-fragment" },
     () => {
       throw new Error("history unavailable");
     }
@@ -72,7 +83,7 @@ test("legacy and incomplete manual invites are rejected without entering MLS", a
     }
   });
   const legacy = await adapter.joinManualInput(
-    "https://app.example.test/?invite=old#multaiplayerInvite=legacy-room-secret"
+    "https://app.example.test/#invite=old&multaiplayerInvite=legacy-room-secret"
   );
   const incomplete = await adapter.joinManualInput("https://app.example.test/");
   assert.equal(legacy.status, "legacy_invite");
@@ -87,7 +98,7 @@ test("URL legacy invite is scrubbed and rejected without entering MLS", async ()
     requestNoSecretInviteAccess: async () => order.push("request")
   });
   const outcome = await adapter.joinFromUrl(
-    { pathname: "/", search: "?invite=old", hash: "#multaiplayerInvite=legacy-room-secret" },
+    { pathname: "/", search: "", hash: "#invite=old&multaiplayerInvite=legacy-room-secret" },
     () => order.push("scrub")
   );
   assert.equal(outcome.status, "legacy_invite");

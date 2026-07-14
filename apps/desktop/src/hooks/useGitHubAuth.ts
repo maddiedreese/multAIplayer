@@ -10,6 +10,7 @@ import {
   type GitHubAuthConfig
 } from "../lib/authClient";
 import { useAppStore } from "../store/appStore";
+import { openTrustedAuthenticationUrl } from "../lib/authExternalUrl";
 
 const fallbackAuthConfig: GitHubAuthConfig = {
   provider: "github",
@@ -122,11 +123,17 @@ export function useGitHubAuth(relayHttpUrl: string) {
     try {
       const flow = await startGitHubDeviceFlow();
       setDeviceFlow(flow);
-      window.open(flow.verification_uri, "_blank", "noopener,noreferrer");
+      await openTrustedAuthenticationUrl("github", flow.verification_uri);
     } catch (error) {
       setAuthError(String(error));
       setAuthBusy(false);
     }
+  }, [setAuthBusy, setAuthError, setDeviceFlow]);
+
+  const cancelGitHubSignIn = useCallback(() => {
+    setDeviceFlow(null);
+    setAuthBusy(false);
+    setAuthError(null);
   }, [setAuthBusy, setAuthError, setDeviceFlow]);
 
   const signOutGitHub = useCallback(async () => {
@@ -146,6 +153,7 @@ export function useGitHubAuth(relayHttpUrl: string) {
     authBusy,
     identityResolved,
     beginGitHubSignIn,
+    cancelGitHubSignIn,
     signOutGitHub
   };
 }

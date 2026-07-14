@@ -421,6 +421,9 @@ jobs:
       - name: Build unsigned Tauri app
         run: npm run tauri:build:prebuilt -w @multaiplayer/desktop
 
+      - name: Verify packaged associated-domain entitlements
+        run: npm run verify:macos-associated-domains -- apps/desktop/src-tauri/target/release/bundle/macos/multAIplayer.app
+
       - name: Upload macOS app bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

@@ -6845,6 +6845,7 @@ button svg {
 }
 
 .onboarding-auth-explainer,
+.onboarding-auth-flow,
 .onboarding-recovery,
 .onboarding-join-state,
 .onboarding-message,
@@ -6853,6 +6854,67 @@ button svg {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-muted);
+}
+
+.onboarding-auth-flow {
+  display: grid;
+  gap: 12px;
+}
+
+.onboarding-auth-flow small,
+.onboarding-auth-code span {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+}
+
+.onboarding-auth-code {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 12px;
+  align-items: center;
+}
+
+.onboarding-auth-code span {
+  flex-basis: 100%;
+}
+
+.onboarding-auth-code strong {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  letter-spacing: 0.09em;
+  user-select: text;
+}
+
+.onboarding-auth-code button,
+.onboarding-auth-actions button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.onboarding-auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.onboarding-auth-actions a {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.onboarding-auth-fallback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--danger);
 }
 
 .onboarding-auth-explainer p,

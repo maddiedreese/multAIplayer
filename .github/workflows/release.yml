@@ -147,6 +147,11 @@ jobs:
       - name: Run release preflight
         run: npm run release:preflight
 
+      - name: Verify live invitation app-site associations
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run verify:aasa
+
       - name: Build signed and notarized Tauri app
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -168,6 +173,7 @@ jobs:
           xcrun stapler validate "$dmg_path"
           spctl -a -vvv -t install "$app_path"
           spctl -a -vvv -t open --context context:primary-signature "$dmg_path"
+          npm run verify:macos-associated-domains -- "$app_path"
 
       - name: Package release assets
         run: |

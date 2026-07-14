@@ -1,3 +1,6 @@
+/** Public website, native intake, and manual paste share this complete-link bound. */
+export const maxInviteLinkChars = 12_288;
+
 export type InviteUrlPayload =
   | {
       kind: "join";
@@ -19,7 +22,9 @@ export interface InviteUrlParts {
 
 export function readInviteUrlPayload(location: InviteUrlParts): InviteUrlPayload | null {
   const fragment = new URLSearchParams(location.hash.replace(/^#/, ""));
-  const inviteId = new URLSearchParams(location.search).get("invite");
+  // Manual paste keeps one alpha-generation compatibility window for links
+  // whose opaque relay id preceded the fragment. OS intake rejects query data.
+  const inviteId = fragment.get("invite") ?? new URLSearchParams(location.search).get("invite");
   const approvalRequested = fragment.get("approval") === "request";
   const joinInvite = fragment.get("multaiplayerJoin");
   if (joinInvite) {

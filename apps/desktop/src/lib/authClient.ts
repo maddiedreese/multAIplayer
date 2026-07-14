@@ -1,6 +1,7 @@
 import { normalizeGitHubBranchName, normalizeGitHubRepoRef, normalizePullRequestDraft } from "@multaiplayer/github";
 import { getRelayHttpUrl } from "./appConfig";
 import { readJsonResponse } from "./httpResponse";
+import { trustedAuthenticationUrl } from "./authExternalUrl";
 
 export interface GitHubAuthConfig {
   provider: "github";
@@ -53,7 +54,13 @@ export async function startGitHubDeviceFlow(): Promise<GitHubDeviceStart> {
     response,
     "Failed to start GitHub device flow"
   );
-  return { ...flow, expiresAt: Date.now() + Math.max(0, flow.expires_in) * 1000 };
+  const verificationUri = trustedAuthenticationUrl("github", flow.verification_uri);
+  if (!verificationUri) throw new Error("GitHub returned an unsupported verification address.");
+  return {
+    ...flow,
+    verification_uri: verificationUri,
+    expiresAt: Date.now() + Math.max(0, flow.expires_in) * 1000
+  };
 }
 
 export async function pollGitHubDeviceFlow(deviceCode: string): Promise<GitHubDevicePollResult> {
