@@ -2,6 +2,7 @@ import React, { type ComponentProps } from "react";
 import { SidebarDrawer } from "./AppShellLayout";
 import { ProfileDrawerPanel } from "./ProfileDrawerPanel";
 import { RoomSettingsDrawerPanel } from "./RoomSettingsDrawerPanel";
+import { HelpDrawerPanel } from "./HelpDrawerPanel";
 import type { SidebarPanel } from "../types";
 
 export function AppSidebarDrawer({
@@ -10,6 +11,7 @@ export function AppSidebarDrawer({
   settingsTitle,
   profile,
   settings,
+  help,
   onClose
 }: {
   activePanel: SidebarPanel;
@@ -17,19 +19,23 @@ export function AppSidebarDrawer({
   settingsTitle: string;
   profile: ComponentProps<typeof ProfileDrawerPanel>;
   settings: ComponentProps<typeof RoomSettingsDrawerPanel>;
+  help: ComponentProps<typeof HelpDrawerPanel>;
   onClose: () => void;
 }) {
   if (!activePanel) return null;
 
-  const isProfile = activePanel === "profile";
+  const label = activePanel === "profile" ? "Account" : activePanel === "help" ? "Help" : "Room settings";
+  const title = activePanel === "profile" ? profileTitle : activePanel === "help" ? "Get help" : settingsTitle;
 
   return (
-    <SidebarDrawer
-      label={isProfile ? "Account" : "Room settings"}
-      title={isProfile ? profileTitle : settingsTitle}
-      onClose={onClose}
-    >
-      {isProfile ? <ProfileDrawerPanel {...profile} /> : <RoomSettingsDrawerPanel {...settings} />}
+    <SidebarDrawer label={label} title={title} onClose={onClose}>
+      {activePanel === "profile" ? (
+        <ProfileDrawerPanel {...profile} />
+      ) : activePanel === "help" ? (
+        <HelpDrawerPanel {...help} />
+      ) : (
+        <RoomSettingsDrawerPanel {...settings} />
+      )}
     </SidebarDrawer>
   );
 }

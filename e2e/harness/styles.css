@@ -67,6 +67,43 @@ body {
   text-align: center;
 }
 
+.e2e-onboarding-shell {
+  max-width: 1120px;
+  min-height: 620px;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.e2e-onboarding-shell > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.e2e-onboarding-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(260px, 320px);
+  gap: 18px;
+  padding: 18px;
+}
+
+.e2e-onboarding-body > main {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.e2e-onboarding-body textarea {
+  display: block;
+  width: 100%;
+  min-height: 100px;
+  margin-top: 6px;
+}
+
 .e2e-invite-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -85,6 +122,10 @@ body {
 
 @media (max-width: 800px) {
   .e2e-invite-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .e2e-onboarding-body {
     grid-template-columns: 1fr;
   }
 }

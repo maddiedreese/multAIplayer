@@ -25,10 +25,17 @@ import { AppShellView } from "./components/AppShellView";
 import { CodexServerRequestDialog } from "./components/CodexServerRequestDialog";
 import { defaultBrowserReason, defaultBrowserUrl, emptyRoom, maxTerminalActivityLines } from "./appDefaults";
 import { WebPreviewDemo } from "./components/WebPreviewDemo";
+import { CodexAccountProvider } from "./hooks/useCodexAccount";
+import { OnboardingAssistant } from "./components/OnboardingAssistant";
+import { useOnboardingFlow } from "./hooks/useOnboardingFlow";
 
 export function App() {
   if (!isTauriRuntime()) return <WebPreviewDemo />;
-  return <NativeApp />;
+  return (
+    <CodexAccountProvider>
+      <NativeApp />
+    </CodexAccountProvider>
+  );
 }
 
 function NativeApp() {
@@ -122,6 +129,7 @@ function NativeApp() {
     inviteActions,
     roomSettingsActor
   });
+  const onboarding = useOnboardingFlow({ githubAuth, workspaceFlow, inviteActions });
 
   const relaySync = useAppRelaySync({
     appRefs,
@@ -176,6 +184,43 @@ function NativeApp() {
     relaySync,
     workspaceFlow
   });
+  const updateProjectPathWithOnboarding = async () => {
+    const before = useAppStore.getState().rooms.find((room) => room.id === useAppStore.getState().selectedRoomId);
+    await roomRuntime.updateProjectPath();
+    const state = useAppStore.getState();
+    const after = state.rooms.find((room) => room.id === state.selectedRoomId);
+    if (
+      before &&
+      after &&
+      before.projectPath !== after.projectPath &&
+      state.onboarding.markers.membership?.roomId === after.id
+    ) {
+      state.applyOnboardingEvent({ type: "project_attached", roomId: after.id });
+    }
+  };
+
+  if (onboarding.blockingAssistant) {
+    return (
+      <OnboardingAssistant
+        state={onboarding.state}
+        readiness={onboarding.readiness}
+        joinState={onboarding.joinState}
+        busy={onboarding.busy}
+        message={onboarding.message}
+        initialProjectPath={onboarding.selectedProjectPath}
+        onChooseIntent={onboarding.onChooseIntent}
+        onExplore={onboarding.onExplore}
+        onShowSurface={onboarding.onShowSurface}
+        onReadinessAction={onboarding.onReadinessAction}
+        onSubmitCreate={onboarding.onSubmitCreate}
+        onRetryRoomCreation={onboarding.onRetryRoomCreation}
+        onSubmitJoin={onboarding.onSubmitJoin}
+        onChooseProjectFolder={onboarding.onChooseProjectFolder}
+        onContinueSafety={onboarding.onContinueSafety}
+        onDismiss={onboarding.onDismiss}
+      />
+    );
+  }
 
   return (
     <>
@@ -192,7 +237,7 @@ function NativeApp() {
           chatActions: roomPanels.roomChatPanelActions
         }}
         roomInspectorSources={{
-          roomRuntime,
+          roomRuntime: { ...roomRuntime, updateProjectPath: updateProjectPathWithOnboarding },
           workspaceFlow,
           hostHandoff: hostHandoffActions,
           inviteActions,

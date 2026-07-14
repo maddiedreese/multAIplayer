@@ -138,7 +138,9 @@ export function useGitHubAuth(relayHttpUrl: string) {
 
   return {
     authConfig,
+    authConfigResolved,
     currentUser,
+    currentUserResolved,
     deviceFlow,
     authError,
     authBusy,

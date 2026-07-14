@@ -38,6 +38,12 @@ MLS erases superseded epoch secrets as its key schedule advances. multAIplayer d
 
 This creates a precise tradeoff: live MLS traffic gains forward secrecy and post-compromise recovery properties, while locally retained history does not gain forward secrecy against later compromise of that device's encrypted store and credential-store wrapping key. New members receive no pre-join history. A device that loses MLS state can rejoin, but cannot recover old backlog or local history secrets from the relay.
 
+## Onboarding state is not cryptographic state
+
+The resumable setup record is a local webview preference, not MLS state, a room-history payload, or a source of authority. It may retain bounded team and room identifiers plus boolean workflow markers, including a partial team id used to avoid duplicate creation. It does not retain an invite capability, KeyPackage private material, Welcome, project path, prompt, account credential, transcript, or room key.
+
+Choosing “Join with an invite” does not create membership locally. The normal HPKE request, active-host approval, MLS Add Commit, and Welcome lifecycle remains authoritative. Likewise, a local checklist marker cannot grant room or host access. Compromise of the onboarding record can reveal coarse setup progress and identifiers or confuse the local presentation, but it cannot decrypt room traffic; strict normalization discards unsupported and inconsistent records.
+
 ## Verification strategy
 
 The native suite includes a shrinkable generated model of add, remove, host-handoff, and rejoin transitions. After every generated transition, it proves that every active non-host is rejected by the add, remove, and handoff Commit constructors and that removed or retired engine instances cannot decrypt the current epoch. Separate adversarial cases feed every truncated prefix of a valid Commit, deliver later Commits before their parents, and replay already-applied Commits; rejected inputs must not prevent the later valid ordered transition.

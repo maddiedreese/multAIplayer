@@ -5,6 +5,7 @@ import type { PendingAttachmentDisplay } from "./RoomChatPanel";
 import type { RoomGoal } from "../types";
 
 export function RoomChatComposer({
+  onboardingAnchor,
   roomGoal,
   pendingAttachments,
   pendingAttachmentSummary,
@@ -26,6 +27,7 @@ export function RoomChatComposer({
   onDraftChange,
   onSendMessage
 }: {
+  onboardingAnchor?: string;
   roomGoal: RoomGoal | null;
   pendingAttachments: PendingAttachmentDisplay[];
   pendingAttachmentSummary: string;
@@ -48,7 +50,7 @@ export function RoomChatComposer({
   onSendMessage: () => void;
 }) {
   return (
-    <footer className="composer">
+    <footer className="composer" data-onboarding-anchor={onboardingAnchor}>
       {roomGoal && (
         <RoomGoalPopup
           goal={roomGoal}

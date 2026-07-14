@@ -1,4 +1,4 @@
-import React from "react";
+import React, { type ReactNode } from "react";
 import type { CodexApprovalSummaryDisplay } from "./CodexApprovalCard";
 import { RoomChatContent } from "./RoomChatContent";
 import { RoomChatComposer } from "./RoomChatComposer";
@@ -113,7 +113,8 @@ export function RoomChatPanel({
   onCancelReply,
   onCancelQueuedCodexTurn,
   onDraftChange,
-  onSendMessage
+  onSendMessage,
+  guidedFirstTurn
 }: {
   messages: RoomChatMessageDisplay[];
   codexActivities?: readonly CodexActivity[];
@@ -162,12 +163,14 @@ export function RoomChatPanel({
   onCancelQueuedCodexTurn: (turnId: string) => void;
   onDraftChange: (draft: string) => void;
   onSendMessage: () => void;
+  guidedFirstTurn?: ReactNode;
 }) {
   useRoomGoalTicker(roomGoal, onTickGoalElapsed);
 
   return (
     <>
       <RoomChatContent
+        onboardingAnchor="activity-feed"
         messages={messages}
         codexActivities={codexActivities}
         localPreviewCards={localPreviewCards}
@@ -194,7 +197,9 @@ export function RoomChatPanel({
         onApproveApproval={onApproveApproval}
         onCancelQueuedCodexTurn={onCancelQueuedCodexTurn}
       />
+      {guidedFirstTurn}
       <RoomChatComposer
+        onboardingAnchor="composer"
         roomGoal={roomGoal}
         pendingAttachments={pendingAttachments}
         pendingAttachmentSummary={pendingAttachmentSummary}

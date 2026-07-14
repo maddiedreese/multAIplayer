@@ -18,6 +18,14 @@ That may be two developers working through a feature, a small product team revie
 
 It is not designed as an anonymous public chat service, a large enterprise collaboration platform, or a way to let untrusted users operate someone else's computer.
 
+### What happens the first time I open the app?
+
+The setup guide asks whether you want to create an encrypted workspace and first room or join one with an invite. It then checks relay connectivity, GitHub identity requirements, the local Codex installation, ChatGPT authorization for Codex, and project-folder readiness. GitHub identifies collaborators and enables repository workflows; ChatGPT authorizes Codex on the local host device. They are separate accounts, and the guide explains when GitHub is optional or required.
+
+You can explore without finishing, save and close, or reopen/restart setup from Help. A five-item sidebar checklist remains available until its milestones are complete or you dismiss it. The first-turn guide runs inside the real room and does not automatically send a starter prompt or approve Codex.
+
+Onboarding progress stays on the device. It stores bounded identifiers and completion flags, not invite links, project paths, form values, prompts, project content, account details, or secrets. There is no tutorial telemetry. If a step fails, the guide stays at a recoverable state: it can retry relay or Codex checks, reopen account sign-in, retry folder selection, resume room creation without duplicating an already-created team, or wait for host device approval on an invite.
+
 ## Trust and security
 
 ### Why do you use MLS instead of custom cryptography or Matrix?

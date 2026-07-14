@@ -5,6 +5,7 @@ import {
   maxMessageAttachments
 } from "@multaiplayer/protocol";
 import { RoomMainColumn } from "../components/RoomMainColumn";
+import { GuidedFirstTurn, type GuidedActivityKind, type GuidedFirstTurnPhase } from "../components/GuidedFirstTurn";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
 import { loadOrCreateDeviceId } from "../lib/appRuntime";
@@ -39,7 +40,7 @@ import {
 } from "../lib/containerPropBuilders";
 import { isLocalUserActiveHostForRoom } from "../lib/roomHost";
 import { acknowledgeRoomVisibilityWarning, hasAcknowledgedRoomVisibilityWarning } from "../lib/roomVisibilityWarning";
-import type { ChatAttachment, ChatMessage, CodexRoomEvent } from "../types";
+import type { ChatAttachment, ChatMessage, CodexActivity, CodexRoomEvent } from "../types";
 import type { createAppRoomPanelActions } from "../lib/appRoomPanelActions";
 import type { useHostHandoffActions } from "../hooks/useHostHandoffActions";
 import type { useRoomRuntimeContext } from "../hooks/useRoomRuntimeContext";
@@ -136,6 +137,7 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
     browserRequests
   } = useAppStore(useShallow(selectRoomMainColumnView));
   const roomId = selectedRoom.id;
+  const onboarding = useAppStore((state) => state.onboarding);
 
   const localDeviceId = React.useMemo(() => loadOrCreateDeviceId(), []);
   const localUser = {
@@ -245,56 +247,93 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
     onClearSelectedMessages,
     ...headerCapabilities
   });
-  const chatProps = buildRoomMainChatProps({
-    messages: chatMessageRows,
-    codexActivities: codex?.activities ?? [],
-    approvalVisible: codex?.approvalVisible ?? false,
-    approvalSummary: {
-      messages: formatApprovalMessages(approvalMessages),
-      attachments: formatApprovalAttachments(approvalMessages),
-      sandbox: formatCodexSandboxLevel(selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel),
-      highPrivilegeLabels: buildHighPrivilegeLabels(activeApproval?.summary, selectedRoom.codexSandboxLevel),
-      riskFlags: activeApproval ? detectCodexTurnRiskFlags(approvalMessages, selectedRoom, browserRequests, null) : []
-    },
-    isActiveHost,
-    codexRunning: codex?.running ?? false,
-    canApproveCodex: hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, roomLocked),
-    canUseChat: canUseRoomChat(selectedRoom, roomLocked),
-    canSendMessage:
-      canUseRoomChat(selectedRoom, roomLocked) && (Boolean(chat?.draft?.trim()) || pendingAttachments.length > 0),
-    roomLocked,
-    lockedPlaceholder: roomLockMessage(selectedRoom, revoked),
-    chatEnabled: !roomLocked,
-    draft: chat?.draft ?? "",
-    replyTarget: replyTargetMessage
-      ? {
-          author: replyTargetMessage.deletedAt ? "Original message" : replyTargetMessage.author,
-          body: replyTargetMessage.deletedAt
-            ? "Original message deleted"
-            : replyTargetMessage.body || "Original message unavailable or deleted"
-        }
-      : null,
-    roomGoal: codex?.goal ?? null,
-    pendingAttachments: pendingAttachmentRows,
-    queuedCodexTurns: buildQueuedCodexTurnRows(
-      queuedApprovals,
-      currentMessagesSinceLastCodex,
+  const guidedVisible =
+    onboarding.presentation === "open" &&
+    onboarding.surface === "guided_turn" &&
+    onboarding.markers.membership?.roomId === roomId;
+  const guidedPhase: GuidedFirstTurnPhase = onboarding.markers.firstTurnCompleted
+    ? "complete"
+    : codex?.approvalVisible
+      ? "approval"
+      : codex?.running
+        ? "activity"
+        : isActiveHost
+          ? "composer"
+          : "host";
+  const guidedActivityKinds = Array.from(
+    new Set((codex?.activities ?? []).map((activity) => guidedActivityKind(activity.kind)).filter(Boolean))
+  ) as GuidedActivityKind[];
+  const guidedFirstTurn = guidedVisible ? (
+    <GuidedFirstTurn
+      phase={guidedPhase}
+      isActiveHost={isActiveHost}
+      activityKinds={guidedActivityKinds}
+      onUseStarterPrompt={onDraftChange}
+      onReviewApproval={() => {
+        const target = document.querySelector<HTMLElement>('[data-onboarding-anchor="approval-card"]');
+        if (!target) return;
+        target.focus({ preventScroll: true });
+        target.scrollIntoView({
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+          block: "center"
+        });
+      }}
+      onDismiss={() => useAppStore.getState().applyOnboardingEvent({ type: "dismiss_assistant" })}
+    />
+  ) : null;
+  const chatProps = {
+    ...buildRoomMainChatProps({
+      messages: chatMessageRows,
+      codexActivities: codex?.activities ?? [],
+      approvalVisible: codex?.approvalVisible ?? false,
+      approvalSummary: {
+        messages: formatApprovalMessages(approvalMessages),
+        attachments: formatApprovalAttachments(approvalMessages),
+        sandbox: formatCodexSandboxLevel(selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel),
+        highPrivilegeLabels: buildHighPrivilegeLabels(activeApproval?.summary, selectedRoom.codexSandboxLevel),
+        riskFlags: activeApproval ? detectCodexTurnRiskFlags(approvalMessages, selectedRoom, browserRequests, null) : []
+      },
+      isActiveHost,
+      codexRunning: codex?.running ?? false,
+      canApproveCodex: hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, roomLocked),
+      canUseChat: canUseRoomChat(selectedRoom, roomLocked),
+      canSendMessage:
+        canUseRoomChat(selectedRoom, roomLocked) && (Boolean(chat?.draft?.trim()) || pendingAttachments.length > 0),
       roomLocked,
-      localUser.id,
-      selectedRoom.hostUserId
-    ),
-    localPreviewCards,
-    pendingAttachmentSummary:
-      `${pendingAttachments.length}/${maxMessageAttachments} files · ` +
-      `${formatBytes(embeddedAttachmentBytes(pendingAttachments))}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`,
-    markdownSelectionMode,
-    onToggleMessageSelection,
-    onOpenFileSelector,
-    onReplyToMessage,
-    onCancelReply,
-    onDraftChange,
-    ...capabilities.chat
-  });
+      lockedPlaceholder: roomLockMessage(selectedRoom, revoked),
+      chatEnabled: !roomLocked,
+      draft: chat?.draft ?? "",
+      replyTarget: replyTargetMessage
+        ? {
+            author: replyTargetMessage.deletedAt ? "Original message" : replyTargetMessage.author,
+            body: replyTargetMessage.deletedAt
+              ? "Original message deleted"
+              : replyTargetMessage.body || "Original message unavailable or deleted"
+          }
+        : null,
+      roomGoal: codex?.goal ?? null,
+      pendingAttachments: pendingAttachmentRows,
+      queuedCodexTurns: buildQueuedCodexTurnRows(
+        queuedApprovals,
+        currentMessagesSinceLastCodex,
+        roomLocked,
+        localUser.id,
+        selectedRoom.hostUserId
+      ),
+      localPreviewCards,
+      pendingAttachmentSummary:
+        `${pendingAttachments.length}/${maxMessageAttachments} files · ` +
+        `${formatBytes(embeddedAttachmentBytes(pendingAttachments))}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`,
+      markdownSelectionMode,
+      onToggleMessageSelection,
+      onOpenFileSelector,
+      onReplyToMessage,
+      onCancelReply,
+      onDraftChange,
+      ...capabilities.chat
+    }),
+    guidedFirstTurn
+  };
 
   const secretWarningVisible =
     hasSelectedRoom && (codex?.secretWarningVisible ?? !hasAcknowledgedRoomVisibilityWarning(roomId));
@@ -324,4 +363,13 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
       chatProps={chatProps}
     />
   );
+}
+
+function guidedActivityKind(kind: CodexActivity["kind"]): GuidedActivityKind | null {
+  if (kind === "reasoning") return "thinking";
+  if (kind === "command") return "commands";
+  if (kind === "file_change") return "edits";
+  if (kind === "agent") return "subagents";
+  if (kind === "tool" || kind === "web_search" || kind === "image_generation" || kind === "hook") return "tools";
+  return null;
 }

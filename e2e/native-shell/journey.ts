@@ -77,6 +77,10 @@ async function authenticate(browser: Browser, relayBaseUrl: string, identity: Id
   );
   assert.deepEqual(result, { status: 201 }, `debug authentication failed for ${identity.id}`);
   await browser.refresh();
+  // The debug-auth refresh can recreate the isolated WebKitGTK test page.
+  // Keep the setup bypass idempotent so this relay-auth fixture does not
+  // mistake a second first-run surface for an authentication failure.
+  await dismissFirstRunAfterRefresh(browser);
   await visible(browser, ".profile-card strong");
   await browser.waitUntil(
     () =>
@@ -95,6 +99,40 @@ async function visible(browser: Browser, selector: string, timeout = 30_000) {
   const element = await browser.$(selector);
   await element.waitForDisplayed({ timeout });
   return element;
+}
+
+async function passFirstRunWelcome(browser: Browser) {
+  await visible(browser, ".onboarding-assistant");
+  const welcome = await visible(browser, "h1=Work with Codex together");
+  assert.equal(await welcome.isFocused(), true, "first-run onboarding did not focus its welcome heading");
+  await (await visible(browser, "button=Explore the interface")).click();
+  await visible(browser, "button=Profile");
+}
+
+async function dismissFirstRunAfterRefresh(browser: Browser) {
+  await browser.waitUntil(
+    () =>
+      browser.execute(() => {
+        const profileVisible = [...document.querySelectorAll("button")].some(
+          (button) => button.textContent?.trim() === "Profile" && button.getClientRects().length > 0
+        );
+        if (profileVisible) return true;
+
+        const assistant = document.querySelector(".onboarding-assistant");
+        if (!assistant) return false;
+        const action =
+          assistant.querySelector<HTMLButtonElement>(".onboarding-explore") ??
+          [...assistant.querySelectorAll<HTMLButtonElement>("button")].find(
+            (button) => button.textContent?.trim() === "Save and close"
+          );
+        action?.click();
+        return false;
+      }),
+    {
+      timeout: 30_000,
+      timeoutMsg: "native shell did not settle on the workspace after debug authentication"
+    }
+  );
 }
 
 async function createRoom(host: Browser) {
@@ -326,6 +364,7 @@ async function main() {
     stage("native WebDriver sessions ready");
     const host = browser.getInstance("host");
     let guest = browser.getInstance("guest");
+    await Promise.all([passFirstRunWelcome(host), passFirstRunWelcome(guest)]);
     stage("authenticating both native clients");
     await Promise.all([
       authenticate(host, stableRelayProxy.baseUrl, hostIdentity),

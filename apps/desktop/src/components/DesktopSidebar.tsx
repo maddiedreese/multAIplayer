@@ -10,12 +10,12 @@ import {
   UsersRound,
   X
 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useState, type ReactNode } from "react";
 import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
 import { useThemeMode } from "../hooks/useThemeMode";
 import { SidebarAccountSection } from "./SidebarAccountSection";
 
-export type SidebarPanelName = "profile" | "settings" | null;
+export type SidebarPanelName = "help" | "profile" | "settings" | null;
 export type ThemeMode = "light" | "dark";
 
 export interface SidebarTeamDisplay {
@@ -218,6 +218,12 @@ function SidebarFooter({
       >
         Profile
       </button>
+      <button
+        className={activeSidebarPanel === "help" ? "active" : ""}
+        onClick={() => onSelectSidebarPanel(activeSidebarPanel === "help" ? null : "help")}
+      >
+        Help
+      </button>
     </div>
   );
 }
@@ -241,6 +247,7 @@ export interface DesktopSidebarProps {
   messageHits: SidebarMessageHitDisplay[];
   historySearchBusy: boolean;
   activeSidebarPanel: SidebarPanelName;
+  setupChecklist?: ReactNode;
   onSignIn: () => void;
   onSignOut: () => void;
   onSidebarQueryChange: (query: string) => void;
@@ -277,6 +284,7 @@ export function DesktopSidebar({
   messageHits,
   historySearchBusy,
   activeSidebarPanel,
+  setupChecklist,
   onSignIn,
   onSignOut,
   onSidebarQueryChange,
@@ -488,6 +496,7 @@ export function DesktopSidebar({
         </section>
       )}
 
+      {setupChecklist}
       <SidebarFooter activeSidebarPanel={activeSidebarPanel} onSelectSidebarPanel={onSelectSidebarPanel} />
     </aside>
   );

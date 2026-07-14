@@ -2,6 +2,16 @@
 
 These traces describe the native protocol-v2 path. Seeded browser demo rooms stop at local state and never join an encrypted relay room.
 
+## Life of first-run setup state
+
+1. A fresh installation loads a versioned local onboarding record. Missing state opens Welcome; unsupported, malformed, or internally inconsistent state is discarded rather than partially trusted.
+2. Create/join selection and presentation progress update an allowlisted local record containing bounded identifiers and booleans. Form drafts, project paths, invite input, prompts, account data, and project content remain in component memory and are not onboarding milestones.
+3. Readiness rows are derived from current relay, GitHub, Codex, ChatGPT-account, and project-selection state. They are presentation projections, not room messages.
+4. On create, the relay-backed team operation completes before room creation. If the room fails, local state retains the bounded team id so the next attempt creates only the room. A successful room event consumes that partial marker.
+5. On join, invite parsing and the device-bound HPKE request follow the invite lifecycle below. The local guide may remain at verification-required until an approved Welcome unlocks the room.
+6. Codex connection, room/project readiness, a completed first turn, and observed teammate membership advance checklist markers. An explicit local “Not now” marker can resolve the optional teammate task without representing a membership event.
+7. Dismiss, skip, reopen, restart, and checklist visibility remain local UI state. None is published through MLS or the relay, and none changes room membership or host authority.
+
 ## Life of a chat message
 
 1. The React composer validates the draft and dispatches a send intent through the room action layer.

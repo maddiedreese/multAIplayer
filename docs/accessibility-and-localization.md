@@ -6,6 +6,12 @@ The alpha UI is English-only. User-facing strings live alongside React component
 
 Accessibility is a release quality requirement even before formal conformance certification. Playwright journeys exercise semantic roles and accessible names for critical controls, but automated checks do not establish conformance.
 
+The first-run setup uses one heading and native buttons, links, inputs, forms, details, lists, status regions, alerts, and progressbar semantics. Moving between setup surfaces transfers focus to the new heading without trapping focus. Readiness is communicated with text as well as icons and color; blocking states disable forward progress and expose a named recovery action. Async invite, folder, and workspace outcomes use status or alert regions rather than relying on a transient visual change.
+
+Create and join are peers in the reading and tab order. Back, Save and close, Explore, checklist dismissal, and Help-based reopen/restart controls make the flow skippable and resumable without requiring pointer input. Starter prompts are buttons that populate the composer only, so keyboard and assistive-technology users retain the same explicit send and approval boundaries as pointer users.
+
+The setup surface reflows to a single narrow column. Progress transitions are removed under `prefers-reduced-motion`. Text labels remain visible for icon-only controls through accessible names. Copy should stay sentence-cased and plain-language; readiness and recovery text must not interpolate raw paths, tokens, account responses, or upstream errors.
+
 ## Release audit
 
 Before a public release, record an audit issue covering keyboard operation and focus; VoiceOver on the supported macOS version for sign-in, invite acceptance, host handoff, Codex approval, messaging, settings, and recovery; 200% text zoom, narrow-window reflow, reduced motion, and contrast; axe checks plus manual review; labels, status announcements, validation, dialogs, and icon-only controls; and WCAG 2.2 AA color contrast.

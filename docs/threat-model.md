@@ -53,6 +53,10 @@ The browser/web preview is a seeded local demonstration only. It does not create
 
 On every epoch, the native core derives a history secret with the MLS exporter and retains it in encrypted storage according to local retention policy. This deliberately preserves device-local readability across epochs. New members receive no pre-join history, and a device that loses its MLS store can rejoin but cannot recover old backlog or history secrets.
 
+The onboarding workflow has a smaller, non-secret localStorage boundary. Its versioned allowlist contains coarse presentation state, bounded team/room identifiers, and boolean milestones. It excludes invite links and capabilities, project paths, form drafts, starter prompts, account details, credentials, raw readiness errors, and project/room content. Unknown versions and inconsistent scoped markers are removed and treated as fresh setup. A compromised webview can still tamper with or read this coarse local state, so it is never used as proof of authentication, membership, host authority, project access, or MLS progress.
+
+Readiness copy reduces upstream failures to fixed explanations before display. Onboarding does not add tutorial telemetry. Normal bounded diagnostics may still record an application warning/error under the diagnostics policy, but onboarding fields and payloads are not a telemetry stream. Sensitive invite, project, authentication, and room operations continue through their existing native/relay boundaries; the guide only orchestrates those operations and presents recovery.
+
 ## Codex App-server Boundary
 
 Codex account/login, app inventory, MCP authentication, login refreshes, and the persistent `auto`/`prompt`/`writes` app approval default remain host-local. They are not published into MLS room events or local room history. The global approval default can affect other Codex clients on the host and is labelled accordingly.

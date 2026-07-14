@@ -20,6 +20,22 @@ export interface WorkspaceSnapshot {
   rooms: RoomRecord[];
 }
 
+export interface RoomCreationSettings {
+  approvalPolicy?: ApprovalPolicy;
+  approvalDelegationPolicy?: RoomRecord["approvalDelegationPolicy"];
+  trustedApproverUserIds?: string[];
+  codexModel?: string;
+  codexModelPolicy?: RoomRecord["codexModelPolicy"];
+  codexReasoningEffort?: RoomRecord["codexReasoningEffort"];
+  codexReasoningEffortPolicy?: RoomRecord["codexReasoningEffortPolicy"];
+  codexRawReasoningEnabled?: boolean;
+  codexSpeed?: RoomRecord["codexSpeed"];
+  codexServiceTierPolicy?: RoomRecord["codexServiceTierPolicy"];
+  codexSandboxLevel?: RoomRecord["codexSandboxLevel"];
+  browserAllowedOrigins?: string[];
+  browserProfilePersistent?: boolean;
+}
+
 export interface InviteLookupResult {
   invite: InviteRecord;
   team: TeamRecord;
@@ -204,21 +220,7 @@ export async function createRoom(
   teamId: string,
   name: string,
   projectPath: string,
-  settings: {
-    approvalPolicy?: ApprovalPolicy;
-    approvalDelegationPolicy?: RoomRecord["approvalDelegationPolicy"];
-    trustedApproverUserIds?: string[];
-    codexModel?: string;
-    codexModelPolicy?: RoomRecord["codexModelPolicy"];
-    codexReasoningEffort?: RoomRecord["codexReasoningEffort"];
-    codexReasoningEffortPolicy?: RoomRecord["codexReasoningEffortPolicy"];
-    codexRawReasoningEnabled?: boolean;
-    codexSpeed?: RoomRecord["codexSpeed"];
-    codexServiceTierPolicy?: RoomRecord["codexServiceTierPolicy"];
-    codexSandboxLevel?: RoomRecord["codexSandboxLevel"];
-    browserAllowedOrigins?: string[];
-    browserProfilePersistent?: boolean;
-  } = {}
+  settings: RoomCreationSettings = {}
 ): Promise<RoomRecord> {
   const response = await fetch(`${getRelayHttpUrl()}/rooms`, {
     method: "POST",
