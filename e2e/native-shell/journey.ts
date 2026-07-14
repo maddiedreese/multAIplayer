@@ -111,6 +111,13 @@ async function visible(browser: Browser, selector: string, timeout = 30_000) {
   return element;
 }
 
+async function assertFirstRunWelcome(browser: Browser) {
+  // WebKitWebDriver supports parallel clients, but concurrent commands within
+  // one session can wedge the GTK bridge. Keep each client's probes ordered.
+  await visible(browser, ".onboarding-assistant");
+  await visible(browser, "h1=Work with Codex together");
+}
+
 async function dismissFirstRunAfterRefresh(browser: Browser) {
   await browser.waitUntil(
     () =>
@@ -424,12 +431,7 @@ async function main() {
     stage("native WebDriver sessions ready");
     const host = browser.getInstance("host");
     let guest = browser.getInstance("guest");
-    await Promise.all([
-      visible(host, ".onboarding-assistant"),
-      visible(guest, ".onboarding-assistant"),
-      visible(host, "h1=Work with Codex together"),
-      visible(guest, "h1=Work with Codex together")
-    ]);
+    await Promise.all([assertFirstRunWelcome(host), assertFirstRunWelcome(guest)]);
     assert.equal(
       await (await host.$("h1=Work with Codex together")).isFocused(),
       true,
