@@ -37,13 +37,21 @@ export async function approveInviteAcrossGuestCrash(
   await context.killGuest();
   await approve.click();
   await context.afterApprovalStarted?.();
-  await host.waitUntil(
-    () => host.execute(() => Boolean(document.querySelector(".invite-panel .terminal-request.approved"))),
-    {
-      timeout: 60_000,
-      timeoutMsg: "host did not persist an approval and Welcome while the requesting client was offline"
-    }
-  );
+  try {
+    await host.waitUntil(
+      () => host.execute(() => Boolean(document.querySelector(".invite-panel .terminal-request.approved"))),
+      {
+        timeout: 60_000,
+        timeoutMsg: "host did not persist an approval and Welcome while the requesting client was offline"
+      }
+    );
+  } catch (error) {
+    const diagnostics = await host.execute(() => ({
+      workflowMessage: document.querySelector(".invite-panel .workflow-message")?.textContent?.trim() ?? "",
+      pendingRequest: document.querySelector(".invite-panel .terminal-request.pending")?.textContent?.trim() ?? ""
+    }));
+    throw new Error(`${String(error)}; host invite diagnostics: ${JSON.stringify(diagnostics)}`);
+  }
 
   const restartedGuest = await context.restartGuest();
   await selectRoom(restartedGuest, context.roomName);

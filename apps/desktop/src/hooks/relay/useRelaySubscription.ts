@@ -17,6 +17,8 @@ import {
 import { drainMlsOutboxForRoom, pendingMlsOutboxRoomIds } from "../../lib/mlsOutboxDrain";
 import { completeMlsRelayAdmission } from "../../lib/mlsJoinAdmission";
 import { reportNonFatal } from "../../lib/nonFatalReporting";
+import { getRelayHttpUrl } from "../../lib/appConfig";
+import { recoverDeviceSessionForRelayError } from "../../lib/deviceSession";
 
 interface LocalUser {
   id: string;
@@ -152,6 +154,23 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
           return;
         }
         if (message.type === "error") {
+          try {
+            if (
+              await recoverDeviceSessionForRelayError(
+                message,
+                getRelayHttpUrl(),
+                current.deviceId,
+                current.deviceSessionToken,
+                (session) => {
+                  if (!cancelled) useAppStore.getState().replaceDeviceSessionToken(session.token);
+                }
+              )
+            )
+              return;
+          } catch (error) {
+            current.handleRelayError(`Device session recovery failed: ${String(error)}`);
+            return;
+          }
           current.handleRelayError(message.message);
           return;
         }

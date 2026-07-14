@@ -25,6 +25,9 @@ import { isStaleMlsPublish } from "../relayClient";
 import { clearAndRebaseStaleMlsCommit } from "../mlsCommitRebase";
 import { parseDirectedMlsInviteCiphertext } from "./mlsInviteProtocol";
 import { reportExpectedFailure } from "../nonFatalReporting";
+import { getRelayHttpUrl } from "../appConfig";
+import { retryAfterDeviceSessionExpiry } from "../deviceSession";
+import { assertInviteApprovalEpoch, recoverInviteApproval, type PendingInviteApproval } from "./inviteApprovalRecovery";
 
 type InviteRelayActionOptions = Pick<UseInviteActionsOptions, "relayRef" | "seenEnvelopeIds" | "selectedRoomIdRef">;
 const inviteDecisionsInFlight = new Set<string>();
@@ -35,7 +38,7 @@ const validatedRequests = new Map<
     protected: Awaited<ReturnType<typeof openMlsInviteRequest>>;
   }
 >();
-const approvedInviteOutboxes = new Map<string, Awaited<ReturnType<typeof approveMlsInvite>>>();
+const approvedInviteOutboxes = new Map<string, PendingInviteApproval>();
 
 type InviteRelayStore = Pick<
   AppStoreState,
@@ -140,45 +143,36 @@ export function createInviteRelayActions(
           validated.protected.binding,
           validated.protected.mac
         );
-        await publishDirectedInviteResponse(request.inviteId, {
-          hostDeviceId: deviceId,
-          requestId: request.id,
-          status: "denied",
-          responseBinding: denial.responseBinding as never,
-          responseMac: denial.responseMac
-        });
+        await retryAfterDeviceSessionExpiry(
+          getRelayHttpUrl(),
+          deviceId,
+          () =>
+            publishDirectedInviteResponse(request.inviteId, {
+              hostDeviceId: deviceId,
+              requestId: request.id,
+              status: "denied",
+              responseBinding: denial.responseBinding as never,
+              responseMac: denial.responseMac
+            }),
+          (session) => useAppStore.getState().replaceDeviceSessionToken(session.token)
+        );
         await markMlsPublishSucceeded(room.id, denial.outboxId);
         validatedRequests.delete(request.id);
         store.updateInviteRequestStatus(room.id, request.id, "denied");
         store.setInviteMessageForRoom(room.id, `Denied ${request.requester}'s join request.`);
         return;
       }
-      const epoch = await currentMlsEpoch(room.id);
-      if (epoch !== validated.protected.binding.keyEpoch)
-        throw new Error("Invite expired after the MLS epoch changed.");
       let approval = approvedInviteOutboxes.get(request.id);
       if (!approval) {
         const priorOutbox = await listMlsOutbox();
-        const retriedWelcome = priorOutbox.find(
-          (item) =>
-            item.kind === "welcome" && item.metadata?.type === "welcome" && item.metadata.requestId === request.id
-        );
-        if (retriedWelcome && retriedWelcome.metadata?.type === "welcome") {
-          const retriedCommit = priorOutbox.find(
-            (item) => item.roomId === room.id && item.epoch === retriedWelcome.epoch && item.metadata?.type === "commit"
-          );
-          approval = {
-            epoch: retriedWelcome.epoch,
-            commitOutboxId: retriedCommit?.id ?? "",
-            welcomeOutboxId: retriedWelcome.id,
-            responseBinding: retriedWelcome.metadata.responseBinding as never,
-            responseMac: String(retriedWelcome.metadata.responseMac),
-            requesterSignaturePublicKey: validated.protected.requesterSignaturePublicKey,
-            requesterSignatureKeyFingerprint: validated.protected.requesterSignatureKeyFingerprint
-          };
-          approvedInviteOutboxes.set(request.id, approval);
-        }
+        approval = recoverInviteApproval(priorOutbox, {
+          requestBinding: validated.protected.binding,
+          keyPackageId: request.keyPackageId
+        });
+        if (approval) approvedInviteOutboxes.set(request.id, approval);
       }
+      const epoch = await currentMlsEpoch(room.id);
+      assertInviteApprovalEpoch(epoch, validated.protected.binding.keyEpoch, approval);
       if (!approval) {
         const consumed = await consumeKeyPackage(
           room.id,
@@ -255,14 +249,20 @@ export function createInviteRelayActions(
       } else if ((await currentMlsEpoch(room.id)) < approval.epoch) {
         throw new Error("Native MLS invite commit is missing before its Welcome was delivered.");
       }
-      await publishDirectedInviteResponse(request.inviteId, {
-        hostDeviceId: deviceId,
-        requestId: request.id,
-        status: "approved",
-        responseBinding: approval.responseBinding as never,
-        responseMac: approval.responseMac,
-        welcome: welcome.payload
-      });
+      await retryAfterDeviceSessionExpiry(
+        getRelayHttpUrl(),
+        deviceId,
+        () =>
+          publishDirectedInviteResponse(request.inviteId, {
+            hostDeviceId: deviceId,
+            requestId: request.id,
+            status: "approved",
+            responseBinding: approval.responseBinding as never,
+            responseMac: approval.responseMac,
+            welcome: welcome.payload
+          }),
+        (session) => useAppStore.getState().replaceDeviceSessionToken(session.token)
+      );
       await markMlsPublishSucceeded(room.id, welcome.id);
       approvedInviteOutboxes.delete(request.id);
       validatedRequests.delete(request.id);
