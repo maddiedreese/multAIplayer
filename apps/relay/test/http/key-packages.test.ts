@@ -243,6 +243,24 @@ test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
     });
     assert.equal("hpkePublicKey" in pendingBody.requests[0]!.requesterDevice!, false);
     assert.equal("displayName" in pendingBody.requests[0]!.requesterDevice!, false);
+    assert.equal(
+      (
+        await fetch(`${relay.baseUrl}/invites/${invite.id}/requests?hostDeviceId=peer-device-1`, {
+          headers: peerHeaders
+        })
+      ).status,
+      403,
+      "a requester cannot read the host-only identity projection"
+    );
+    assert.equal(
+      (
+        await fetch(`${relay.baseUrl}/invites/${invite.id}/requests?hostDeviceId=host-device-1`, {
+          headers: { cookie: host.cookie }
+        })
+      ).status,
+      403,
+      "the host account cannot read the projection without its device session"
+    );
     assert.equal(JSON.stringify(notification).includes("sealedRequest"), false);
     const alternateKeyPackage = "BQ==";
     const alternateKeyPackageHash = `sha256:${createHash("sha256").update(Buffer.from(alternateKeyPackage, "base64")).digest("hex")}`;
