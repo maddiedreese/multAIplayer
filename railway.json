@@ -1,0 +1,30 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "apps/relay/Dockerfile",
+    "watchPatterns": [
+      "/apps/relay/**",
+      "/apps/desktop/src-tauri/Cargo.lock",
+      "/apps/desktop/src-tauri/Cargo.toml",
+      "/apps/desktop/src-tauri/crates/mls-core/**",
+      "/packages/**",
+      "/package.json",
+      "/package-lock.json",
+      "/tsconfig.base.json",
+      "/railway.json"
+    ]
+  },
+  "deploy": {
+    "healthcheckPath": "/healthz",
+    "healthcheckTimeout": 300,
+    "restartPolicyType": "ALWAYS",
+    "multiRegionConfig": {
+      "sfo": {
+        "numReplicas": 1
+      }
+    },
+    "overlapSeconds": 0,
+    "drainingSeconds": 20
+  }
+}
