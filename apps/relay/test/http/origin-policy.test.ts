@@ -1,5 +1,31 @@
 import { test } from "node:test";
-import { assert, startRelay } from "../support/relay.js";
+import { WebSocket, assert, startRelay } from "../support/relay.js";
+
+async function openSocket(url: string, options?: ConstructorParameters<typeof WebSocket>[1]): Promise<WebSocket> {
+  return await new Promise((resolve, reject) => {
+    const socket = new WebSocket(url, options);
+    socket.once("open", () => resolve(socket));
+    socket.once("error", reject);
+  });
+}
+
+async function rejectedSocketStatus(
+  url: string,
+  options?: ConstructorParameters<typeof WebSocket>[1]
+): Promise<number> {
+  return await new Promise((resolve, reject) => {
+    const socket = new WebSocket(url, options);
+    socket.once("unexpected-response", (_request, response) => {
+      resolve(response.statusCode ?? 0);
+      response.resume();
+    });
+    socket.once("open", () => {
+      socket.close();
+      reject(new Error("expected the WebSocket upgrade to be rejected"));
+    });
+    socket.once("error", reject);
+  });
+}
 
 test("relay normalizes configured CORS origins", async () => {
   const relay = await startRelay({
@@ -75,6 +101,60 @@ test("relay denies browser CORS origins by default in production", async () => {
     assert.equal(response.status, 403);
     assert.deepEqual(await response.json(), { error: "Origin not allowed", code: "forbidden" });
     assert.equal(response.headers.get("access-control-allow-origin"), null);
+  } finally {
+    await relay.close();
+  }
+});
+
+test("empty origin allowlist is permissive only for development browser clients", async () => {
+  const relay = await startRelay({
+    NODE_ENV: "development",
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: " , "
+  });
+  try {
+    const response = await fetch(`${relay.baseUrl}/auth/config`, {
+      headers: { origin: "https://development.example" }
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("access-control-allow-origin"), "https://development.example");
+
+    const socket = await openSocket(relay.wsUrl, { origin: "https://development.example" });
+    socket.close();
+  } finally {
+    await relay.close();
+  }
+});
+
+test("empty production allowlist denies browser origins but permits clients that omit Origin", async () => {
+  const relay = await startRelay({
+    NODE_ENV: "production",
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: " , "
+  });
+  try {
+    const browserResponse = await fetch(`${relay.baseUrl}/auth/config`, {
+      headers: { origin: "https://browser.example" }
+    });
+    assert.equal(browserResponse.status, 403);
+
+    const nativeResponse = await fetch(`${relay.baseUrl}/auth/config`);
+    assert.equal(nativeResponse.status, 200);
+
+    assert.equal(await rejectedSocketStatus(relay.wsUrl, { origin: "https://browser.example" }), 403);
+    const nativeSocket = await openSocket(relay.wsUrl);
+    nativeSocket.close();
+  } finally {
+    await relay.close();
+  }
+});
+
+test("an empty Origin header is invalid rather than a native-client omission", async () => {
+  const relay = await startRelay({ NODE_ENV: "production" });
+  try {
+    const response = await fetch(`${relay.baseUrl}/auth/config`, {
+      headers: { origin: "" }
+    });
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), { error: "Origin not allowed", code: "forbidden" });
   } finally {
     await relay.close();
   }

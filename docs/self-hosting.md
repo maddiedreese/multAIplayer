@@ -274,9 +274,9 @@ Credentialed browser origins and WebSocket room upgrades can be restricted:
 MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://multaiplayer.com,https://app.multaiplayer.com
 ```
 
-If set, the relay only emits CORS credential headers and accepts browser-origin WebSocket upgrades for those exact origins. If unset, local development is permissive, while production denies browser origins by default. Requests without a browser `Origin` header are still allowed so native clients and server-side health checks continue to work.
+If one or more valid origins are configured, the relay only emits CORS credential headers and accepts browser-origin WebSocket upgrades for those exact origins. An unset, empty, whitespace-only, or all-invalid value produces an empty allowlist: local development remains permissive for browser origins, while production denies every request or WebSocket upgrade that supplies an `Origin`. The production relay doctor rejects that empty configuration. Requests that omit the `Origin` header are still allowed in either environment so native clients and server-side health checks continue to work.
 
-The allowlist is therefore a browser CORS and WebSocket-origin control, not a client-authentication boundary. Native and server-side clients can omit `Origin`; authentication, device-session signatures, membership authorization, and TLS provide the corresponding identity and transport controls.
+The allowlist is therefore a browser CORS and WebSocket-origin control, not a client-authentication boundary. Native and server-side clients can omit `Origin`; authentication, device-session signatures, membership authorization, and TLS provide the corresponding identity and transport controls. Only an omitted header receives this exemption: an explicitly empty `Origin` value is invalid and rejected.
 
 Origin entries are normalized to bare origins by the relay. `https://multaiplayer.com/` becomes `https://multaiplayer.com`. Entries with paths, queries, fragments, credentials, wildcards, or non-HTTP(S) schemes are invalid for production doctor because CORS and WebSocket `Origin` checks cannot be path-scoped. Native desktop requests without an `Origin` header are still allowed.
 

@@ -112,6 +112,17 @@ test("production relay doctor rejects wildcard and pathful origins", () => {
   assert.match(pathful.stdout, /bare origin/);
 });
 
+test("production relay doctor rejects an explicitly empty origin allowlist", () => {
+  const result = runProductionDoctor({
+    ...productionRelayEnv,
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: " , "
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /MULTAIPLAYER_RELAY_ALLOWED_ORIGINS/);
+  assert.match(result.stdout, /no origins were provided/);
+});
+
 test("production relay doctor rejects disabled rate limits and temporary storage", () => {
   const result = runProductionDoctor({
     ...productionRelayEnv,

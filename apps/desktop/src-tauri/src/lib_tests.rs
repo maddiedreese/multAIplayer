@@ -110,12 +110,13 @@ fn project_file_write_saves_inside_project_and_rejects_escape() {
         fs::read_to_string(root.join("src/new-file.ts")).expect("read saved file"),
         "export const saved = true;\n"
     );
-    assert!(project_file_write(project::ProjectFileWriteRequest {
+    let error = project_file_write(project::ProjectFileWriteRequest {
         cwd,
         path: "../secret.txt".to_string(),
         content: "nope".to_string(),
     })
-    .is_err());
+    .expect_err("path escape should fail");
+    assert_eq!(error.code, command_error::CommandErrorCode::InvalidArgument);
 
     let _ = fs::remove_dir_all(root);
 }
@@ -174,6 +175,33 @@ fn project_file_read_rejects_mislabeled_and_oversized_raster_images() {
         max_bytes: None,
     })
     .is_err());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn project_file_read_emits_stable_not_found_and_invalid_argument_codes() {
+    let root = test_temp_dir("project-file-error-codes");
+    let cwd = root.to_str().expect("utf8 temp path").to_string();
+
+    let missing = project_file_read(project::ProjectFileReadRequest {
+        cwd: cwd.clone(),
+        path: "missing.txt".to_string(),
+        max_bytes: None,
+    })
+    .expect_err("missing file should fail");
+    assert_eq!(missing.code, command_error::CommandErrorCode::NotFound);
+
+    let escape = project_file_read(project::ProjectFileReadRequest {
+        cwd,
+        path: "../secret.txt".to_string(),
+        max_bytes: None,
+    })
+    .expect_err("path escape should fail");
+    assert_eq!(
+        escape.code,
+        command_error::CommandErrorCode::InvalidArgument
+    );
+
     let _ = fs::remove_dir_all(root);
 }
 

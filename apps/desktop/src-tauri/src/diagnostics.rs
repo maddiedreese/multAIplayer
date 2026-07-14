@@ -210,7 +210,9 @@ pub(crate) fn record_diagnostic(
     state: State<'_, DiagnosticState>,
     entry: DiagnosticEntry,
 ) -> crate::command_error::CommandResult<()> {
-    Ok(state.record(entry, Utc::now())?)
+    state
+        .record(entry, Utc::now())
+        .map_err(crate::command_error::CommandError::storage)
 }
 
 #[tauri::command]
@@ -220,7 +222,8 @@ pub(crate) async fn save_diagnostic_bundle(
     context: DiagnosticExportContext,
 ) -> crate::command_error::CommandResult<DiagnosticExportOutcome> {
     let now = Utc::now();
-    let bundle = build_diagnostic_bundle(&state, context, now)?;
+    let bundle = build_diagnostic_bundle(&state, context, now)
+        .map_err(crate::command_error::CommandError::storage)?;
     let suggested_name = format!("multaiplayer-diagnostics-{}.json", now.format("%Y-%m-%d"));
     let Some(destination) = app
         .dialog()
@@ -233,9 +236,12 @@ pub(crate) async fn save_diagnostic_bundle(
         return Ok(DiagnosticExportOutcome::Cancelled);
     };
     let destination = destination.into_path().map_err(|_| {
-        "The selected diagnostic export destination is not a local file".to_string()
+        crate::command_error::CommandError::invalid_argument(
+            "The selected diagnostic export destination is not a local file",
+        )
     })?;
-    write_diagnostic_bundle(&destination, &bundle)?;
+    write_diagnostic_bundle(&destination, &bundle)
+        .map_err(crate::command_error::CommandError::storage)?;
     Ok(DiagnosticExportOutcome::Saved)
 }
 

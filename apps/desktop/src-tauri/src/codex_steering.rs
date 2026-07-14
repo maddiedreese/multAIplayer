@@ -46,22 +46,38 @@ pub(crate) struct CodexSteerResult {
 }
 
 #[tauri::command]
-pub(crate) fn steer_codex_turn(request: CodexSteerRequest) -> Result<CodexSteerResult, String> {
-    ensure_room_id(&request.room_id)?;
-    ensure_codex_input(&request.input)?;
+pub(crate) fn steer_codex_turn(
+    request: CodexSteerRequest,
+) -> crate::command_error::CommandResult<CodexSteerResult> {
+    ensure_room_id(&request.room_id)
+        .map_err(crate::command_error::CommandError::invalid_argument)?;
+    ensure_codex_input(&request.input)
+        .map_err(crate::command_error::CommandError::invalid_argument)?;
     let active = ACTIVE_CODEX_TURNS
         .get_or_init(|| Mutex::new(HashMap::new()))
         .lock()
-        .map_err(|_| "Active Codex turn state is unavailable".to_string())?
+        .map_err(|_| {
+            crate::command_error::CommandError::unavailable(
+                "Active Codex turn state is unavailable",
+            )
+        })?
         .get(&request.room_id)
         .cloned()
-        .ok_or_else(|| "The active Codex turn is not ready to be steered. Retry, or queue the message for the next turn.".to_string())?;
+        .ok_or_else(|| {
+            crate::command_error::CommandError::unavailable(
+                "The active Codex turn is not ready to be steered. Retry, or queue the message for the next turn.",
+            )
+        })?;
     let request_id = NEXT_STEER_REQUEST_ID.fetch_sub(1, Ordering::Relaxed);
     let (response_tx, response_rx) = mpsc::channel();
     active
         .responses
         .lock()
-        .map_err(|_| "Codex steering response state is unavailable".to_string())?
+        .map_err(|_| {
+            crate::command_error::CommandError::unavailable(
+                "Codex steering response state is unavailable",
+            )
+        })?
         .insert(request_id, response_tx);
     let send_result = send_to_active_codex_turn(
         &request.room_id,
@@ -76,18 +92,19 @@ pub(crate) fn steer_codex_turn(request: CodexSteerRequest) -> Result<CodexSteerR
     );
     if let Err(error) = send_result {
         remove_pending_response(&active.responses, request_id);
-        return Err(error);
+        return Err(crate::command_error::CommandError::process(error));
     }
     let response = match response_rx.recv_timeout(Duration::from_secs(10)) {
         Ok(response) => response,
         Err(_) => {
             remove_pending_response(&active.responses, request_id);
-            return Err(
-                "Timed out waiting for Codex to acknowledge the steering message".to_string(),
-            );
+            return Err(crate::command_error::CommandError::process(
+                "Timed out waiting for Codex to acknowledge the steering message",
+            ));
         }
     };
-    parse_codex_steer_response(&response, &active.turn_id)?;
+    parse_codex_steer_response(&response, &active.turn_id)
+        .map_err(crate::command_error::CommandError::process)?;
     Ok(CodexSteerResult {
         thread_id: active.thread_id,
         turn_id: active.turn_id,
@@ -240,6 +257,29 @@ impl Drop for ActiveCodexTurnGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn command_emits_typed_validation_and_availability_codes() {
+        let invalid = steer_codex_turn(CodexSteerRequest {
+            room_id: "".to_string(),
+            input: "steer".to_string(),
+        })
+        .expect_err("empty room id should fail validation");
+        assert_eq!(
+            invalid.code,
+            crate::command_error::CommandErrorCode::InvalidArgument
+        );
+
+        let unavailable = steer_codex_turn(CodexSteerRequest {
+            room_id: "native-error-code-no-active-turn".to_string(),
+            input: "steer".to_string(),
+        })
+        .expect_err("room without active turn should be unavailable");
+        assert_eq!(
+            unavailable.code,
+            crate::command_error::CommandErrorCode::Unavailable
+        );
+    }
 
     #[test]
     fn steering_request_binds_the_expected_active_turn() {

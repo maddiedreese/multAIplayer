@@ -16,7 +16,10 @@ export function createRelayOriginPolicy({
   allowedCorsOrigins: string[];
 }): RelayOriginPolicy {
   function isAllowedOrigin(origin: string | undefined): boolean {
-    if (!origin) return true;
+    // Native and server-side clients do not necessarily send Origin. An empty
+    // header is still a supplied (and invalid) origin, so only absence receives
+    // this exemption.
+    if (origin === undefined) return true;
     if (allowedCorsOrigins.length > 0) return allowedCorsOrigins.includes(origin);
     return nodeEnv !== "production";
   }

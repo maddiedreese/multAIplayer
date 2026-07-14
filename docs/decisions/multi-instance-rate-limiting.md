@@ -27,7 +27,21 @@ If the shared limiter is unavailable, protected mutations fail closed with a bou
 - Operators need an explicit trusted-proxy boundary and must test spoofed forwarding headers before enabling client-IP enforcement at the edge.
 - Identity- and resource-aware limits belong beside the authoritative shared mutation, while coarse denial-of-service protection remains at the edge.
 - The local limiter stays enabled so a configuration or edge failure does not remove every in-process bound.
-- Multi-instance readiness requires adversarial tests for concurrent reservations, expiry, retry, failover, and limiter-store outage behavior.
+- Multi-instance readiness is blocked on the adversarial acceptance suite below; design review or ordinary process-local limiter tests cannot substitute for it.
+
+## Required adversarial acceptance suite
+
+The relay maintainers own this gate. The tests must run against the same shared-store limiter adapter and transactional mutation path used in production, not a standalone model. They land with that implementation and must be required CI before the second production replica or any multi-instance availability claim.
+
+| Scenario                            | Required assertion                                                                                                                                                                     | Current status                                                      |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Concurrent reservations             | Requests sent concurrently through at least two relay processes cannot consume more than the shared identity/resource budget, including the final boundary reservation.                | Blocked: no shared limiter adapter exists.                          |
+| Commit, rollback, expiry, and retry | A failed protected mutation releases or expires its reservation exactly once; retry cannot double-consume or exceed the budget.                                                        | Blocked: the atomic reservation/commit protocol is not implemented. |
+| Replica failover                    | Killing a relay after reservation and before response cannot reset the budget or allow replay through another replica; recovery follows the documented commit/expiry rule.             | Blocked: multi-process shared persistence is not implemented.       |
+| Limiter-store outage                | Quota-consuming writes fail closed with a bounded retry response, allowed read-only/health behavior remains explicit, and no request silently falls back to process-local enforcement. | Blocked: the shared limiter failure mode is not implemented.        |
+| Edge/local interaction              | Trusted proxy identity is stable across replicas, spoofed forwarding headers are rejected, and edge, shared, and local rejection metrics remain distinguishable.                       | Blocked: the production edge/shared topology is not deployed.       |
+
+The implementation PR must replace each blocked entry with the concrete automated test path and record the chosen failure/recovery semantics in this ADR. Release review verifies those paths exist and are required; it does not waive or manually attest the behaviors.
 
 ## Revisit when
 
