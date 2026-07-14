@@ -77,6 +77,10 @@ async function authenticate(browser: Browser, relayBaseUrl: string, identity: Id
   );
   assert.deepEqual(result, { status: 201 }, `debug authentication failed for ${identity.id}`);
   await browser.refresh();
+  // The debug-auth refresh can recreate the isolated WebKitGTK test page.
+  // Keep the setup bypass idempotent so this relay-auth fixture does not
+  // mistake a second first-run surface for an authentication failure.
+  await passFirstRunWelcome(browser);
   await visible(browser, ".profile-card strong");
   await browser.waitUntil(
     () =>
