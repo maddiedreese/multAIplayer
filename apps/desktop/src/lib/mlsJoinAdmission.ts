@@ -109,21 +109,71 @@ export async function coordinateMlsAdmissionRecovery(options: {
   requesterDeviceId: string;
   loadPendingRequests: () => Promise<PendingMlsInviteRequest[]>;
   complete: (admission: MlsJoinAdmission, pendingRequests: readonly PendingMlsInviteRequest[]) => Promise<void>;
-}): Promise<number> {
+  onFailure?: (admission: MlsJoinAdmission, error: unknown) => void;
+  isCurrent?: () => boolean;
+}): Promise<{
+  attempted: number;
+  completed: number;
+  failed: number;
+  failedAdmissions: MlsJoinAdmission[];
+}> {
   const relevantAdmissions = options.admissions.filter(
     (admission) =>
       admission.requesterUserId === options.requesterUserId && admission.requesterDeviceId === options.requesterDeviceId
   );
-  if (relevantAdmissions.length === 0) return 0;
+  if (relevantAdmissions.length === 0) {
+    return { attempted: 0, completed: 0, failed: 0, failedAdmissions: [] };
+  }
 
   let pendingRequests: PendingMlsInviteRequest[] = [];
   try {
     pendingRequests = await options.loadPendingRequests();
   } catch (_error) {
-    reportExpectedFailure("durable MLS admission projection snapshot unavailable");
+    if (options.isCurrent?.() !== false) {
+      reportExpectedFailure("durable MLS admission projection snapshot unavailable");
+    }
   }
-  for (const admission of relevantAdmissions) await options.complete(admission, pendingRequests);
-  return relevantAdmissions.length;
+  if (options.isCurrent?.() === false) {
+    return { attempted: 0, completed: 0, failed: 0, failedAdmissions: [] };
+  }
+  let completed = 0;
+  const failedAdmissions: MlsJoinAdmission[] = [];
+  for (const admission of relevantAdmissions) {
+    if (options.isCurrent?.() === false) break;
+    try {
+      await options.complete(admission, pendingRequests);
+      completed += 1;
+    } catch (error) {
+      failedAdmissions.push(admission);
+      if (options.isCurrent?.() !== false) options.onFailure?.(admission, error);
+    }
+  }
+  return {
+    attempted: completed + failedAdmissions.length,
+    completed,
+    failed: failedAdmissions.length,
+    failedAdmissions
+  };
+}
+
+export async function coordinateMlsAdmissionRecoveryWithRetry(
+  options: Parameters<typeof coordinateMlsAdmissionRecovery>[0]
+): ReturnType<typeof coordinateMlsAdmissionRecovery> {
+  const first = await coordinateMlsAdmissionRecovery(options);
+  if (first.failed === 0 || options.isCurrent?.() === false) return first;
+
+  // A reconnect can briefly share the old socket's coalesced completion. Once
+  // that promise settles, retry only its failed durable receipts on this socket.
+  const retry = await coordinateMlsAdmissionRecovery({
+    ...options,
+    admissions: first.failedAdmissions
+  });
+  return {
+    attempted: first.attempted,
+    completed: first.completed + retry.completed,
+    failed: retry.failed,
+    failedAdmissions: retry.failedAdmissions
+  };
 }
 
 function admissionCompletionKey(admission: MlsJoinAdmission): string {

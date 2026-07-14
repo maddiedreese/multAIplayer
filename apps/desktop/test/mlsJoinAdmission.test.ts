@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   completeMlsRelayAdmission,
   coordinateMlsAdmissionRecovery,
+  coordinateMlsAdmissionRecoveryWithRetry,
   projectMlsAdmissionInviteRequest,
   synchronizeMlsRecoverySelection
 } from "../src/lib/mlsJoinAdmission";
@@ -136,7 +137,7 @@ test("admission coordinator awaits a deferred projection snapshot before complet
   await Promise.resolve();
   assert.deepEqual(calls, ["snapshot"]);
   resolvePending([pending]);
-  assert.equal(await recovery, 1);
+  assert.deepEqual(await recovery, { attempted: 1, completed: 1, failed: 0, failedAdmissions: [] });
   assert.deepEqual(calls, ["snapshot", "complete"]);
 });
 
@@ -165,7 +166,7 @@ test("admission coordinator completes after a rejected projection snapshot witho
     }
   });
 
-  assert.equal(result, 1);
+  assert.deepEqual(result, { attempted: 1, completed: 1, failed: 0, failedAdmissions: [] });
   assert.deepEqual(calls, ["snapshot", "complete"]);
 });
 
@@ -181,8 +182,128 @@ test("admission coordinator skips projection I/O when no admission belongs to th
     },
     complete: async () => calls.push("complete")
   });
-  assert.equal(result, 0);
+  assert.deepEqual(result, { attempted: 0, completed: 0, failed: 0, failedAdmissions: [] });
   assert.deepEqual(calls, []);
+});
+
+test("admission coordinator scopes failures by room and preserves other successes", async () => {
+  const secondAdmission = {
+    ...admission,
+    inviteId: "invite-2",
+    roomId: "room-2",
+    requestId: "request-2"
+  };
+  const calls: string[] = [];
+  const result = await coordinateMlsAdmissionRecovery({
+    admissions: [admission, secondAdmission],
+    requesterUserId: admission.requesterUserId,
+    requesterDeviceId: admission.requesterDeviceId,
+    loadPendingRequests: async () => [],
+    complete: async (candidate) => {
+      calls.push(`complete:${candidate.roomId}`);
+      if (candidate.roomId === admission.roomId) throw new Error("relay interrupted");
+    },
+    onFailure: (candidate) => calls.push(`failure:${candidate.roomId}`)
+  });
+
+  assert.deepEqual(result, {
+    attempted: 2,
+    completed: 1,
+    failed: 1,
+    failedAdmissions: [admission]
+  });
+  assert.deepEqual(calls, ["complete:room-1", "failure:room-1", "complete:room-2"]);
+});
+
+test("a new socket retries after inheriting an obsolete coalesced completion", async () => {
+  const calls: string[] = [];
+  let releaseOld: () => void = () => undefined;
+  let markOldStarted: () => void = () => undefined;
+  const oldStarted = new Promise<void>((resolve) => {
+    markOldStarted = resolve;
+  });
+  const oldGate = new Promise<void>((resolve) => {
+    releaseOld = resolve;
+  });
+  const client = {
+    publish() {},
+    publishAndWaitForAck: async () => undefined,
+    joinAndWaitForAck: async () => void calls.push("joined"),
+    close() {}
+  };
+  const dependencies = {
+    acknowledge: async () => void calls.push("ack"),
+    complete: async () => void calls.push("clear")
+  };
+  const obsolete = completeMlsRelayAdmission(
+    client,
+    admission,
+    "session-1",
+    async () => {
+      calls.push("old-before-complete");
+      markOldStarted();
+      await oldGate;
+      throw new Error("old socket superseded");
+    },
+    dependencies
+  );
+  await oldStarted;
+
+  const recovered = coordinateMlsAdmissionRecoveryWithRetry({
+    admissions: [admission],
+    requesterUserId: admission.requesterUserId,
+    requesterDeviceId: admission.requesterDeviceId,
+    loadPendingRequests: async () => [],
+    complete: async (candidate) =>
+      completeMlsRelayAdmission(
+        client,
+        candidate,
+        "session-1",
+        () => void calls.push("new-before-complete"),
+        dependencies
+      )
+  });
+  releaseOld();
+
+  await assert.rejects(obsolete, /old socket superseded/);
+  assert.deepEqual(await recovered, {
+    attempted: 1,
+    completed: 1,
+    failed: 0,
+    failedAdmissions: []
+  });
+  assert.deepEqual(calls, ["ack", "joined", "old-before-complete", "ack", "joined", "new-before-complete", "clear"]);
+});
+
+test("bounded recovery retries only failed admissions and counts eventual successes once", async () => {
+  const secondAdmission = {
+    ...admission,
+    inviteId: "invite-2",
+    roomId: "room-2",
+    requestId: "request-2"
+  };
+  const attempts = new Map<string, number>();
+  const result = await coordinateMlsAdmissionRecoveryWithRetry({
+    admissions: [admission, secondAdmission],
+    requesterUserId: admission.requesterUserId,
+    requesterDeviceId: admission.requesterDeviceId,
+    loadPendingRequests: async () => [],
+    complete: async (candidate) => {
+      const attempt = (attempts.get(candidate.roomId) ?? 0) + 1;
+      attempts.set(candidate.roomId, attempt);
+      if (candidate.roomId === admission.roomId && attempt === 1) {
+        throw new Error("coalesced old-socket rejection");
+      }
+    }
+  });
+
+  assert.deepEqual(result, {
+    attempted: 2,
+    completed: 2,
+    failed: 0,
+    failedAdmissions: []
+  });
+  assert.deepEqual(Object.fromEntries(attempts), { "room-1": 2, "room-2": 1 });
 });
 
 test("invite recovery synchronizes only the team of an already-selected room", () => {

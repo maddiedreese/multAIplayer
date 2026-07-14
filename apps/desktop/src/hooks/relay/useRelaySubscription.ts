@@ -18,13 +18,17 @@ import {
 import { drainMlsOutboxForRoom, pendingMlsOutboxRoomIds } from "../../lib/mlsOutboxDrain";
 import {
   completeMlsRelayAdmission,
-  coordinateMlsAdmissionRecovery,
+  coordinateMlsAdmissionRecoveryWithRetry,
   projectMlsAdmissionInviteRequest,
   synchronizeMlsRecoverySelection
 } from "../../lib/mlsJoinAdmission";
 import { reportExpectedFailure, reportNonFatal } from "../../lib/nonFatalReporting";
 import { getRelayHttpUrl } from "../../lib/appConfig";
 import { recoverDeviceSessionForRelayError } from "../../lib/deviceSession";
+import {
+  canContinueSelectedWorkspaceAfterAdmissionRecovery,
+  runRelayWorkspaceStartupBarrier
+} from "../../lib/relayWorkspaceStartup";
 
 interface LocalUser {
   id: string;
@@ -80,6 +84,8 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
 
   useEffect(() => {
     let cancelled = false;
+    let socketGeneration = 0;
+    let workspaceStartupGeneration: number | null = null;
     const roomReceiveQueues = new Map<string, Promise<void>>();
     useAppStore.getState().clearPresenceByRoom();
     if (!relayWsUrl || !deviceSessionToken) {
@@ -87,6 +93,75 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
       relayRef.current = null;
       return;
     }
+    const continueSelectedWorkspace = (openClient: RelayClient, isCurrent: () => boolean) => {
+      if (!isCurrent()) return;
+      const current = latest.current;
+      const access = useAppStore.getState();
+      const teamId = access.selectedTeam;
+      const room = access.rooms.find((candidate) => candidate.id === access.selectedRoomId);
+      if (teamId && !access.revokedTeamIds.has(teamId)) {
+        openClient.publish({
+          type: "subscribe.team",
+          teamId,
+          userId: current.localUser.id,
+          deviceId: current.deviceId
+        });
+      }
+      if (!isCurrent()) return;
+      if (!room || access.revokedRoomIds.has(room.id) || access.revokedTeamIds.has(room.teamId)) return;
+      void openMlsGroup(room.id)
+        .then(() => {
+          if (!isCurrent()) return;
+          const fresh = latest.current;
+          const freshStore = useAppStore.getState();
+          if (freshStore.selectedRoomId !== room.id) return;
+          openClient.publish({
+            type: "join",
+            teamId: room.teamId,
+            roomId: room.id,
+            userId: fresh.localUser.id,
+            deviceId: fresh.deviceId,
+            deviceSessionToken: fresh.deviceSessionToken,
+            inviteId: freshStore.inviteByRoom[room.id]?.admission
+          });
+          openClient.publish({
+            type: "presence",
+            teamId: room.teamId,
+            roomId: room.id,
+            userId: fresh.localUser.id,
+            deviceId: fresh.deviceId,
+            displayName: fresh.localUser.name,
+            avatarUrl: fresh.localUser.avatarUrl,
+            publicKeyFingerprint: fresh.devicePublicKeyFingerprint
+          });
+        })
+        .catch((error) => {
+          if (!isCurrent()) return;
+          if (isMlsRequiresRejoin(error)) {
+            void forgetCorruptMlsGroup(room.id)
+              .then(() => {
+                if (!isCurrent()) return;
+                useAppStore.getState().rememberForgottenRoom(room.id);
+                useAppStore
+                  .getState()
+                  .setHostMessageForRoom(
+                    room.id,
+                    "Local MLS state was corrupt and has been removed. Ask the host to remove this device's old leaf and issue a fresh invite."
+                  );
+              })
+              .catch((cleanupError) => {
+                if (!isCurrent()) return;
+                useAppStore
+                  .getState()
+                  .setHostMessageForRoom(
+                    room.id,
+                    `Local MLS state is corrupt, but its rejoin cleanup failed: ${String(cleanupError)}`
+                  );
+              });
+          }
+          // Missing group state belongs to a pending invite; transient failures retry on reconnect.
+        });
+    };
     const client = connectRelay(
       relayWsUrl,
       async (message) => {
@@ -96,15 +171,35 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
         if (message.type === "joined" || message.type === "workspace.subscribed") {
           store.replaceRelayStatus("open");
           if (message.type === "workspace.subscribed") {
-            void listMlsJoinAdmissions()
-              .then(async (admissions) => {
-                const completedAdmissions = await coordinateMlsAdmissionRecovery({
+            // A relay acknowledgement may be replayed, but admission recovery and
+            // selection continuation must run only once for each socket opening.
+            if (workspaceStartupGeneration === socketGeneration) return;
+            const startupGeneration = socketGeneration;
+            workspaceStartupGeneration = startupGeneration;
+            const isCurrent = () => !cancelled && socketGeneration === startupGeneration;
+            let recoveryFailureReported = false;
+            void runRelayWorkspaceStartupBarrier({
+              recoverAdmissions: async () => {
+                let admissions: Awaited<ReturnType<typeof listMlsJoinAdmissions>>;
+                try {
+                  admissions = await listMlsJoinAdmissions();
+                } catch (error) {
+                  if (isCurrent()) {
+                    recoveryFailureReported = true;
+                    reportExpectedFailure("enumerate durable MLS admissions during workspace startup");
+                  }
+                  throw error;
+                }
+                if (!isCurrent()) return;
+                const result = await coordinateMlsAdmissionRecoveryWithRetry({
                   admissions,
                   requesterUserId: current.localUser.id,
                   requesterDeviceId: current.deviceId,
                   loadPendingRequests: listPendingMlsInviteRequests,
+                  isCurrent,
                   complete: async (admission, pendingRequests) => {
-                    await completeMlsRelayAdmission(client, admission, current.deviceSessionToken, () => {
+                    await completeMlsRelayAdmission(client, admission, current.deviceSessionToken, async () => {
+                      if (!isCurrent()) throw new Error("Workspace startup was superseded by a newer relay socket.");
                       store.restoreWorkspaceAccess(admission.teamId, admission.roomId);
                       store.restoreForgottenRoom(admission.roomId);
                       synchronizeMlsRecoverySelection(admission, useAppStore.getState());
@@ -127,27 +222,43 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
                         admission.roomId,
                         `The host approved this device.${roomName ? ` ${roomName}` : " This room"} is now unlocked.`
                       );
+                      // Keep the durable receipt if this socket is superseded before
+                      // the native completion step resumes after this callback.
+                      await Promise.resolve();
+                      if (!isCurrent()) throw new Error("Workspace startup was superseded by a newer relay socket.");
                     });
+                  },
+                  onFailure: (admission) => {
+                    if (!isCurrent()) return;
+                    recoveryFailureReported = true;
+                    reportExpectedFailure("complete a durable MLS admission during workspace startup");
+                    store.setInviteMessageForRoom(
+                      admission.roomId,
+                      "This room's persisted MLS admission is awaiting relay confirmation and will retry after reconnecting."
+                    );
                   }
                 });
-                if (completedAdmissions > 0 && current.hasSelectedRoom) {
-                  await client.joinAndWaitForAck({
-                    type: "join",
-                    teamId: current.selectedRoom.teamId,
-                    roomId: current.selectedRoom.id,
-                    userId: current.localUser.id,
-                    deviceId: current.deviceId,
-                    deviceSessionToken: current.deviceSessionToken
-                  });
+                const freshSelection = useAppStore.getState();
+                if (
+                  !canContinueSelectedWorkspaceAfterAdmissionRecovery({
+                    failedAdmissions: result.failedAdmissions,
+                    selectedTeamId: freshSelection.selectedTeam,
+                    selectedRoomId: freshSelection.selectedRoomId
+                  })
+                ) {
+                  throw new Error("The selected workspace still has an incomplete durable MLS admission.");
                 }
-              })
-              .catch(() => {
-                store.setInviteMessageForRoom(
-                  current.selectedRoom.id,
-                  "A persisted MLS admission is awaiting relay confirmation and will retry after reconnecting."
-                );
-              });
+              },
+              continueSelection: () => continueSelectedWorkspace(client, isCurrent),
+              onRecoveryFailure: () => {
+                if (!recoveryFailureReported) {
+                  reportExpectedFailure("recover durable MLS admissions before workspace subscription");
+                }
+              },
+              isCurrent
+            });
             void pendingMlsOutboxRoomIds().then((roomIds) => {
+              if (!isCurrent()) return;
               for (const roomId of roomIds) {
                 if (roomId === current.selectedRoom.id) continue;
                 store.setHostMessageForRoom(
@@ -267,77 +378,21 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
       },
       (status) => useAppStore.getState().replaceRelayStatus(status),
       (openClient) => {
+        socketGeneration += 1;
+        workspaceStartupGeneration = null;
+        const current = latest.current;
         openClient.publish({
           type: "subscribe.workspace",
-          userId: localUser.id,
-          deviceId
+          userId: current.localUser.id,
+          deviceId: current.deviceId
         });
-        const access = useAppStore.getState();
-        if (selectedTeam && !access.revokedTeamIds.has(selectedTeam)) {
-          openClient.publish({
-            type: "subscribe.team",
-            teamId: selectedTeam,
-            userId: localUser.id,
-            deviceId
-          });
-        }
-        if (
-          !hasSelectedRoom ||
-          access.revokedRoomIds.has(selectedRoom.id) ||
-          access.revokedTeamIds.has(selectedRoom.teamId)
-        )
-          return;
-        void openMlsGroup(selectedRoom.id)
-          .then(() => {
-            openClient.publish({
-              type: "join",
-              teamId: selectedRoom.teamId,
-              roomId: selectedRoom.id,
-              userId: localUser.id,
-              deviceId,
-              deviceSessionToken,
-              inviteId: selectedRoomInviteAdmission
-            });
-            openClient.publish({
-              type: "presence",
-              teamId: selectedRoom.teamId,
-              roomId: selectedRoom.id,
-              userId: localUser.id,
-              deviceId,
-              displayName: localUser.name,
-              avatarUrl: localUser.avatarUrl,
-              publicKeyFingerprint: devicePublicKeyFingerprint
-            });
-          })
-          .catch((error) => {
-            if (isMlsRequiresRejoin(error)) {
-              void forgetCorruptMlsGroup(selectedRoom.id)
-                .then(() => {
-                  useAppStore.getState().rememberForgottenRoom(selectedRoom.id);
-                  useAppStore
-                    .getState()
-                    .setHostMessageForRoom(
-                      selectedRoom.id,
-                      "Local MLS state was corrupt and has been removed. Ask the host to remove this device's old leaf and issue a fresh invite."
-                    );
-                })
-                .catch((cleanupError) => {
-                  useAppStore
-                    .getState()
-                    .setHostMessageForRoom(
-                      selectedRoom.id,
-                      `Local MLS state is corrupt, but its rejoin cleanup failed: ${String(cleanupError)}`
-                    );
-                });
-            }
-            // Missing group state belongs to a pending invite; transient failures retry on reconnect.
-          });
       }
     );
 
     relayRef.current = client;
     return () => {
       cancelled = true;
+      socketGeneration += 1;
       relayRef.current = null;
       client.close();
     };
