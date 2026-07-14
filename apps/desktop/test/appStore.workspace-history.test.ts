@@ -281,7 +281,18 @@ test("desktop store hydrates local room history through one room-scoped action",
       updatedAt: "2026-07-06T00:13:00.000Z",
       elapsedMs: 60000
     },
-    codexThreadId: "thread-a"
+    codexThreadGraph: {
+      activeThreadId: "thread-a",
+      nodesById: {
+        "thread-a": {
+          id: "thread-a",
+          title: "Codex thread",
+          status: "unknown",
+          createdAt: 0,
+          updatedAt: 0
+        }
+      }
+    }
   });
 
   const state = useAppStore.getState();
@@ -322,7 +333,7 @@ test("desktop store hydrates local room history through one room-scoped action",
   assert.equal(state.codexRuntimeByRoom["room-a"]?.hostHandoffs?.[0]?.reason, "usage_limit");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.queuedApprovals?.[0]?.turnId, "turn-queued-1");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.goal?.text, "Finish encrypted history polish");
-  assert.equal(state.codexRuntimeByRoom["room-a"]?.threadId, "thread-a");
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.threadGraph?.activeThreadId, "thread-a");
 });
 
 test("desktop store clears stale Codex handoff history when hydrating an empty room payload", () => {
@@ -373,7 +384,7 @@ test("desktop store clears stale Codex handoff history when hydrating an empty r
   const state = useAppStore.getState();
   assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.events, []);
   assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.hostHandoffs, []);
-  assert.equal(state.codexRuntimeByRoom["room-a"]?.threadId, undefined);
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.threadGraph, undefined);
 });
 
 test("desktop store exposes team member actions", () => {

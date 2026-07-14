@@ -209,7 +209,6 @@ export interface LocalRoomHistoryPayload {
   hostHandoffs: HostHandoffRecord[];
   queuedCodexTurns?: QueuedCodexTurn[];
   roomGoal?: RoomGoal;
-  codexThreadId?: string;
   codexThreadGraph?: CodexThreadGraph;
 }
 

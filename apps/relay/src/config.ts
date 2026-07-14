@@ -195,6 +195,7 @@ function parseEnvFile(contents: string): Record<string, string> {
     const match = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(trimmed);
     if (!match) continue;
     const [, key, rawValue] = match;
+    if (key === undefined || rawValue === undefined) continue;
     parsed[key] = normalizeEnvFileValue(rawValue);
   }
   return parsed;

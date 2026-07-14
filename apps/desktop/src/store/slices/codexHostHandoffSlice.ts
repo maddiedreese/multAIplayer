@@ -1,7 +1,7 @@
 import type { StateCreator } from "zustand";
 import { maxCodexActivitiesPerRoom } from "@multaiplayer/protocol";
 import { omitRecordKey } from "../../lib/setUtils";
-import { legacyCodexThreadGraph, mergeCodexThreadGraph } from "../../lib/codexThreadGraph";
+import { emptyCodexThreadGraph, mergeCodexThreadGraph } from "../../lib/codexThreadGraph";
 import type {
   CodexRoomEvent,
   CodexActivity,
@@ -24,8 +24,6 @@ export interface CodexRuntimeRoomState {
   goal?: RoomGoal;
   secretWarningVisible?: boolean;
   threadGraph?: CodexThreadGraph;
-  /** Legacy mirror; threadGraph.activeThreadId is authoritative. */
-  threadId?: string;
   hostHandoffs?: HostHandoffRecord[];
   continuation?: HostHandoffRecord;
 }
@@ -74,7 +72,7 @@ export function projectCodexRuntimeMaps(codexRuntimeByRoom: CodexRuntimeByRoom):
     if (runtime.threadGraph) {
       codexThreadGraphsByRoom[roomId] = runtime.threadGraph;
       if (runtime.threadGraph.activeThreadId) codexThreadIdsByRoom[roomId] = runtime.threadGraph.activeThreadId;
-    } else if (runtime.threadId) codexThreadIdsByRoom[roomId] = runtime.threadId;
+    }
   });
 
   return {
@@ -363,13 +361,12 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
   setCodexThreadIdForRoom: (roomId, threadId) => {
     set((state) => ({
       codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => {
-        const { threadGraph: _threadGraph, threadId: _threadId, ...rest } = roomRuntime;
+        const { threadGraph: _threadGraph, ...rest } = roomRuntime;
         if (!threadId) return rest;
-        const graph = roomRuntime.threadGraph ?? legacyCodexThreadGraph(null);
+        const graph = roomRuntime.threadGraph ?? emptyCodexThreadGraph();
         const existing = graph.nodesById[threadId];
         return {
           ...rest,
-          threadId,
           threadGraph: {
             activeThreadId: threadId,
             nodesById: {
@@ -391,21 +388,17 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
     set((state) => ({
       codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (runtime) => ({
         ...runtime,
-        threadGraph: mergeCodexThreadGraph(
-          runtime.threadGraph ?? legacyCodexThreadGraph(runtime.threadId ?? null),
-          nodes
-        )
+        threadGraph: mergeCodexThreadGraph(runtime.threadGraph ?? emptyCodexThreadGraph(), nodes)
       }))
     }));
   },
   addCodexForkForRoom: (roomId, node) => {
     set((state) => ({
       codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (runtime) => {
-        const graph = runtime.threadGraph ?? legacyCodexThreadGraph(runtime.threadId ?? null);
+        const graph = runtime.threadGraph ?? emptyCodexThreadGraph();
         if (!graph.activeThreadId || node.parentThreadId !== graph.activeThreadId) return runtime;
         return {
           ...runtime,
-          threadId: node.id,
           threadGraph: { activeThreadId: node.id, nodesById: { ...graph.nodesById, [node.id]: node } }
         };
       })
@@ -416,7 +409,7 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
       codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (runtime) => {
         const graph = runtime.threadGraph;
         if (!graph?.nodesById[threadId]) return runtime;
-        return { ...runtime, threadId, threadGraph: { ...graph, activeThreadId: threadId } };
+        return { ...runtime, threadGraph: { ...graph, activeThreadId: threadId } };
       })
     }));
   },

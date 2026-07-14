@@ -272,8 +272,10 @@ test("CI retains native journey timing and honest cross-platform composition evi
   const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
   assert.match(
     workflow,
-    /name: Run two real native clients through invite, message, and handoff[\s\S]*name: Enforce native journey duration policy\n\s+run: node scripts\/check-native-journey-duration\.mjs reports\/native-shell-e2e\/duration\.json[\s\S]*name: Upload native journey duration metrics/
+    /name: Run two real native clients through invite, message, and handoff[\s\S]*name: Enforce native journey duration policy\n\s+if: steps\.native-policy\.outputs\.run == 'true'\n\s+run: node scripts\/check-native-journey-duration\.mjs reports\/native-shell-e2e\/duration\.json[\s\S]*name: Upload native journey duration metrics/
   );
+  assert.match(workflow, /name: Real two-client native MLS journey[\s\S]*name: Classify native journey applicability/);
+  assert.match(workflow, /node scripts\/native-journey-change-policy\.mjs --changed-files/);
   assert.match(workflow, /name: Upload native journey duration metrics[\s\S]*name: native-shell-journey-metrics/);
   assert.match(
     workflow,
@@ -651,11 +653,15 @@ test("desktop owns Monaco while the root enforces its DOMPurify security overrid
 });
 
 test("TypeScript quality gates stay enforced", () => {
-  assert.equal(rootPackage.scripts.lint, 'eslint eslint.config.mjs "{apps,packages,scripts,e2e}/**/*.{ts,tsx,mjs}"');
+  assert.equal(
+    rootPackage.scripts.lint,
+    'eslint eslint.config.mjs "{apps,packages,scripts,e2e,tools}/**/*.{ts,tsx,mjs}"'
+  );
   assert.equal(
     rootPackage.scripts["format:check"],
-    'prettier --check eslint.config.mjs "{apps,packages,scripts,e2e}/**/*.{ts,tsx,mjs}"'
+    'prettier --check eslint.config.mjs "{apps,packages,scripts,e2e,tools}/**/*.{ts,tsx,mjs}"'
   );
+  assert.equal(readJson("tsconfig.base.json").compilerOptions.noUncheckedIndexedAccess, true);
   assert.match(rootPackage.scripts["verify:web"], /^npm run lint && npm run format:check && /);
   assert.equal(rootPackage.devDependencies.eslint, "10.7.0");
   assert.equal(rootPackage.devDependencies.prettier, "3.9.5");

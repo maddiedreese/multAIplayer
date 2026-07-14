@@ -379,7 +379,7 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
       const draftByRoom = state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.draft
         ? { [roomId]: state.gitWorkflowRuntimeByRoom[roomId].workflow.draft }
         : {};
-      const currentDraft = updateGitWorkflowDraftRecord(draftByRoom, roomId, {})[roomId];
+      const currentDraft = updateGitWorkflowDraftRecord(draftByRoom, roomId, {})[roomId] ?? defaultGitWorkflowDraft;
       const isDefaultTarget =
         currentDraft.prOwner === defaultGitWorkflowDraft.prOwner &&
         currentDraft.prRepo === defaultGitWorkflowDraft.prRepo;
@@ -388,10 +388,11 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
         return state;
       }
       applied = true;
-      const nextDraft = updateGitWorkflowDraftRecord(draftByRoom, roomId, {
-        prOwner: remote.owner,
-        prRepo: remote.repo
-      })[roomId];
+      const nextDraft =
+        updateGitWorkflowDraftRecord(draftByRoom, roomId, {
+          prOwner: remote.owner,
+          prRepo: remote.repo
+        })[roomId] ?? currentDraft;
       return {
         gitWorkflowRuntimeByRoom: updateGitWorkflowRuntimeForRoom(
           state.gitWorkflowRuntimeByRoom,

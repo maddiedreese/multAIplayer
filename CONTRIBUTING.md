@@ -31,11 +31,16 @@ Use `npm run tauri:dev` instead of `npm run dev` when you need the native Tauri 
 
 The supported alpha desktop release target is macOS. Tauri produces only `.app` and `.dmg` bundles, matching CI and the release workflow; Windows and Linux bundles are not currently tested or published.
 
-Make a focused change, use the [fast development loop](#fast-development-loop) for the area you touched, then run the full gate:
+Make a focused change, use the [fast development loop](#fast-development-loop) for the area you touched, then run the quick repository tier while iterating and the full gate before handoff:
 
 ```sh
+npm run verify:quick
 npm run verify
 ```
+
+`verify:quick` omits Rust, native packaging, browser journeys, the relay's long process suite, fuzzing, and mutation work. It still lints, checks formatting and workspace types, runs repository policy tests, enforces shared-package coverage, exercises the desktop suite, reports desktop coverage, and enforces the invite/MLS-adjacent TypeScript coverage floors. Pair it with the affected workspace command in the table below—for example, relay changes still need `npm run test -w @multaiplayer/relay`.
+
+An optional staged-file hook runs Prettier and ESLint before a commit. Enable it per clone with `npm run hooks:install`; contributors who prefer another hook manager can leave it disabled. CI remains authoritative.
 
 Open a PR with a cohesive, outcome-specific commit. Before submitting, check the [engineering guidelines](#engineering-guidelines) and [area-specific test requirements](#area-specific-test-requirements) that apply to your change. Security concerns belong in [SECURITY.md](SECURITY.md), not a public issue.
 
@@ -76,7 +81,7 @@ Run the smallest relevant loop while iterating, then run `npm run verify` before
 | Cross-cutting TypeScript or workspace configuration                                                   | `npm run verify:web`                                                                                                                                                                                                                           |
 | Repository scripts                                                                                    | `npm run test:scripts`                                                                                                                                                                                                                         |
 
-Use `npm run format` to apply the repository's Prettier baseline. `npm run verify` lints and checks formatting for TypeScript and JavaScript, type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the workspaces.
+Use `npm run format` to apply the repository's Prettier baseline. `npm run verify:quick` is the short TypeScript/UI policy loop and must be paired with the affected-workspace row above. `npm run verify` lints and checks formatting for TypeScript and JavaScript, type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the workspaces.
 
 The relay fuzz suite feeds seedable arbitrary bytes, recursive JSON values, and mutated valid MLS routing records/messages through the protocol schemas. It runs 100,000 cases by default; reproduce or tune a run with `MULTAIPLAYER_RELAY_FUZZ_SEED` and `MULTAIPLAYER_RELAY_FUZZ_ITERATIONS`.
 
@@ -89,6 +94,7 @@ The relay fuzz suite feeds seedable arbitrary bytes, recursive JSON values, and 
 - Log stable error codes and bounded identifiers, never request/response bodies, decrypted plaintext, tokens, keys, secrets, passphrases, or other payload objects. The diagnostics object sanitizer is a safety net, not permission to log payloads.
 - Avoid adding OpenAI API quota bridging. The desktop app talks to the user's local Codex app-server instead.
 - Keep cross-workspace imports aligned with each package's declared dependencies and public entry point. ESLint rejects undeclared package edges, deep imports, and relative source-tree bypasses; declare and review an intentional boundary change before using it.
+- Prefer compiler-, schema-, or established-tool checks over hand-rolled source scanning. When a repository policy genuinely needs a script, consume structured input, keep the rule narrowly scoped and tested, and source volatile facts from one manifest; for example, Codex range documentation is asserted against `contracts/codex-app-server/support-policy.json` rather than maintained as an independent policy value.
 - A hook earns its own file only when it is reused or owns a real React lifecycle (such as subscriptions, effects, or refs). Otherwise, inline it at its call site so the hooks directory remains navigable.
 - Use Conventional Commit subjects such as `feat:`, `fix:`, `docs:`, or `chore:` so Release Please can maintain the changelog and version. Keep each commit cohesive and reviewable; split unrelated or unusually broad changes when practical.
 

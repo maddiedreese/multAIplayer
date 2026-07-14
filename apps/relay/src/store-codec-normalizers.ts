@@ -228,7 +228,8 @@ export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
       Date.parse(value.expiresAt) <= now()
     )
       return null;
-    const [inviteId, requestId, teamId, requesterUserId, requesterDeviceId] = fields as string[];
+    const [inviteId, requestId, teamId, requesterUserId, requesterDeviceId] = fields;
+    if (!inviteId || !requestId || !teamId || !requesterUserId || !requesterDeviceId) return null;
     if (value.status !== "approved" && value.status !== "denied") return null;
     const status = value.status;
     if (!store.hasTeam(teamId) || (status === "approved" && !store.hasTeamMember(teamId, requesterUserId))) return null;

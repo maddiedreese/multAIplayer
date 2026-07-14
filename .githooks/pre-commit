@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+staged_files="$(mktemp)"
+trap 'rm -f "$staged_files"' EXIT HUP INT TERM
+
+git diff --cached --name-only --diff-filter=ACMR -z -- \
+  'eslint.config.mjs' \
+  'apps/**/*.ts' 'apps/**/*.tsx' 'apps/**/*.mjs' \
+  'packages/**/*.ts' 'packages/**/*.tsx' 'packages/**/*.mjs' \
+  'scripts/**/*.ts' 'scripts/**/*.tsx' 'scripts/**/*.mjs' \
+  'e2e/**/*.ts' 'e2e/**/*.tsx' 'e2e/**/*.mjs' \
+  'tools/**/*.ts' 'tools/**/*.tsx' 'tools/**/*.mjs' > "$staged_files"
+
+if [ ! -s "$staged_files" ]; then
+  exit 0
+fi
+
+echo "Checking staged TypeScript and JavaScript files..."
+xargs -0 npx prettier --check -- < "$staged_files"
+xargs -0 npx eslint -- < "$staged_files"

@@ -2,8 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadOrCreateDeviceId } from "../lib/appRuntime";
 import { chooseProjectFolder, defaultProjectPath, probeCodex } from "../lib/localBackend";
 import { createOnboardingInviteJoinAdapter } from "../lib/onboardingInviteJoin";
+import {
+  successfulAuthenticationReadyToAdvance,
+  type OnboardingAuthenticationProvider,
+  type OnboardingCreateDraft,
+  type OnboardingJoinState,
+  type OnboardingRoomRetryDraft
+} from "../lib/onboardingAssistantModel";
 import { completedTurnIds, hasNewCompletedTurn, newestInviteRequestForDevice } from "../lib/onboardingMilestones";
-import { projectOnboardingReadiness, type OnboardingReadinessAction } from "../lib/onboardingReadiness";
+import {
+  projectOnboardingReadiness,
+  type OnboardingReadinessAction,
+  type OnboardingReadinessRow
+} from "../lib/onboardingReadiness";
 import { deriveOnboardingProgress, type OnboardingIntent, type OnboardingSurface } from "../lib/onboardingState";
 import { useAppStore } from "../store/appStore";
 import { useCodexAccount } from "./useCodexAccount";
@@ -11,12 +22,6 @@ import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppWorkspaceFlow } from "./useAppWorkspaceFlow";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useNativeInviteIntake } from "./useNativeInviteIntake";
-import type {
-  OnboardingCreateDraft,
-  OnboardingJoinState,
-  OnboardingRoomRetryDraft
-} from "../components/OnboardingAssistant";
-
 type GitHubAuth = ReturnType<typeof useGitHubAuth>;
 type WorkspaceFlow = ReturnType<typeof useAppWorkspaceFlow>;
 type InviteActions = ReturnType<typeof useAppInviteActions>;
@@ -54,6 +59,8 @@ export function useOnboardingFlow({
   const [joinState, setJoinState] = useState<OnboardingJoinState>({ phase: "idle" });
   const localDeviceId = useMemo(() => loadOrCreateDeviceId(), []);
   const completedTurnBaseline = useRef<Record<string, Set<string>>>({});
+  const previousReadiness = useRef<OnboardingReadinessRow[] | null>(null);
+  const authenticationAttempts = useRef<Set<OnboardingAuthenticationProvider>>(new Set());
 
   useEffect(() => {
     if (!nativeInvite.invite) return;
@@ -95,6 +102,25 @@ export function useOnboardingFlow({
       workspaceStatus
     ]
   );
+
+  useEffect(() => {
+    if (onboarding.surface !== "readiness") {
+      previousReadiness.current = null;
+      authenticationAttempts.current.clear();
+      return;
+    }
+
+    const shouldAdvance = successfulAuthenticationReadyToAdvance({
+      previousRows: previousReadiness.current,
+      currentRows: readinessProjection,
+      attemptedProviders: authenticationAttempts.current
+    });
+    previousReadiness.current = readinessProjection;
+    if (!shouldAdvance) return;
+
+    authenticationAttempts.current.clear();
+    applyEvent({ type: "show_surface", surface: "workspace" });
+  }, [applyEvent, onboarding.surface, readinessProjection]);
 
   useEffect(() => {
     if (codexProbe?.available && account.readiness.ready && !onboarding.markers.codexConnected) {
@@ -190,8 +216,10 @@ export function useOnboardingFlow({
         useAppStore.getState().retryWorkspaceBootstrap();
         githubAuth.retryAuthBootstrap();
       } else if (action === "sign_in_github") {
+        authenticationAttempts.current.add("github");
         await githubAuth.beginGitHubSignIn();
       } else if (action === "sign_in_chatgpt") {
+        authenticationAttempts.current.add("chatgpt");
         await account.beginLogin("browser");
       } else if (action === "select_project_folder") {
         await chooseFolder(selectedProjectPath ?? "");
@@ -331,7 +359,10 @@ export function useOnboardingFlow({
     onExplore: () => applyEvent({ type: "skip_assistant" }),
     onShowSurface: showSurface,
     onReadinessAction: runReadinessAction,
-    onStartCodexDeviceLogin: () => void account.beginLogin("device"),
+    onStartCodexDeviceLogin: () => {
+      authenticationAttempts.current.add("chatgpt");
+      void account.beginLogin("device");
+    },
     onCancelGitHubAuthentication: githubAuth.cancelGitHubSignIn,
     onCancelCodexAuthentication: () => void account.cancelLogin(),
     onSubmitCreate: create,

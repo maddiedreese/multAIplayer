@@ -4,8 +4,9 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CodexThreadGraphView } from "../src/components/CodexThreadGraphPanel";
 import { deriveCodexAgentTree, mergeCodexThreadGraph, normalizeCodexThreadGraph } from "../src/lib/codexThreadGraph";
+import { emptyLocalRoomHistoryPayload, normalizeLocalRoomHistory } from "../src/lib/localRoomHistoryPayload";
 import { useAppStore } from "../src/store/appStore";
-import type { CodexActivity, CodexThreadGraph } from "../src/types";
+import type { CodexActivity, CodexThreadGraph, LocalRoomHistoryPayload } from "../src/types";
 
 test.beforeEach(() => useAppStore.getState().resetAppStore());
 
@@ -13,6 +14,16 @@ test("legacy active thread state migrates into a normalized durable graph", () =
   const graph = normalizeCodexThreadGraph(undefined, "thread-legacy");
   assert.equal(graph.activeThreadId, "thread-legacy");
   assert.equal(graph.nodesById["thread-legacy"]?.title, "Codex thread");
+});
+
+test("legacy persisted thread ids migrate one-way to graph-only history", () => {
+  const legacy = {
+    ...emptyLocalRoomHistoryPayload(),
+    codexThreadId: "thread-legacy"
+  } as unknown as LocalRoomHistoryPayload;
+  const normalized = normalizeLocalRoomHistory(legacy);
+  assert.equal(normalized.codexThreadGraph?.activeThreadId, "thread-legacy");
+  assert.equal("codexThreadId" in normalized, false);
 });
 
 test("thread graph merge adopts only the active session tree", () => {
@@ -32,7 +43,7 @@ test("thread graph discovery fails closed when the unresolved active thread is a
   assert.deepEqual(Object.keys(graph.nodesById), ["thread-root"]);
 });
 
-test("active-thread selection drives the legacy turn and goal projection", () => {
+test("active-thread selection drives the turn and goal projection", () => {
   const store = useAppStore.getState();
   store.setCodexThreadIdForRoom("room-a", "thread-root");
   store.mergeCodexThreadsForRoom("room-a", [

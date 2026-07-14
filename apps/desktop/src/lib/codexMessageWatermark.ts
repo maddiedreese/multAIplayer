@@ -3,7 +3,6 @@ import type { CodexRoomEvent, ChatMessage } from "../types";
 export function codexConsumedMessageIds(events: readonly CodexRoomEvent[] = []): Set<string> {
   const consumed = new Set<string>();
   for (const event of events) {
-    if (event.status !== "started") continue;
     for (const messageId of event.consumedMessageIds ?? []) {
       consumed.add(messageId);
     }

@@ -96,6 +96,9 @@ test("welcome is keyboard-native, focuses its heading, and exposes equal create 
     />
   );
   assert.equal(document.activeElement, view.getByRole("heading", { name: "Work with Codex together" }));
+  const brandImages = Array.from(view.container.querySelectorAll<HTMLImageElement>('img[src*="multaiplayer-icon"]'));
+  assert.equal(brandImages.length, 2);
+  assert.ok(brandImages.every((image) => image.alt === ""));
   fireEvent.click(view.getByRole("button", { name: /Create a workspace/ }));
   fireEvent.click(view.getByRole("button", { name: /Join with an invite/ }));
   fireEvent.click(view.getByRole("button", { name: "Explore the interface" }));

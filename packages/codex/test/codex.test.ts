@@ -4,7 +4,8 @@ import {
   classifyJsonRpcMessage,
   createInitializeRequest,
   createThreadStartRequest,
-  createTurnStartRequest
+  createTurnStartRequest,
+  createTurnSteerRequest
 } from "../src/index";
 import codexPackage from "../package.json";
 
@@ -42,6 +43,15 @@ test("thread and turn request builders preserve optional context", () => {
     params: { threadId: "thread-1", input: [{ type: "text", text: "hello" }] }
   });
   assert.equal((createTurnStartRequest(4, "thread-1", "hello", "/repo").params as { cwd: string }).cwd, "/repo");
+  assert.deepEqual(createTurnSteerRequest(5, "thread-1", "turn-1", "change direction"), {
+    method: "turn/steer",
+    id: 5,
+    params: {
+      threadId: "thread-1",
+      expectedTurnId: "turn-1",
+      input: [{ type: "text", text: "change direction" }]
+    }
+  });
 });
 
 test("classifies server requests before colliding responses", () => {

@@ -138,6 +138,18 @@ test("initialize and turn helpers allocate monotonic ids and honor defaults", as
   });
   transport().message({ id: 3, result: {} });
   await turn;
+  const steering = client.steerTurn("thread-1", "turn-1", "change direction");
+  assert.deepEqual(transport().sent[4], {
+    method: "turn/steer",
+    id: 4,
+    params: {
+      threadId: "thread-1",
+      expectedTurnId: "turn-1",
+      input: [{ type: "text", text: "change direction" }]
+    }
+  });
+  transport().message({ id: 4, result: { turnId: "turn-1" } });
+  await steering;
 });
 
 test("thread errors reject and missing results normalize to an empty object", async () => {

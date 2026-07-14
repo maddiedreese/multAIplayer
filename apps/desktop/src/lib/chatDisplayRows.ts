@@ -87,11 +87,12 @@ export function safeInlineImageSource(attachment: ChatAttachment): string | null
   if (!attachment.content || attachment.content.length > 300_000) return null;
   const match = safeImageDataUrl.exec(attachment.content);
   if (!match) return null;
+  const encoded = match[2];
   const declaredImage =
     attachment.type === "image" ||
     /^image\/(?:png|jpeg|gif|webp)$/i.test(attachment.type) ||
     /\.(?:png|jpe?g|gif|webp)$/i.test(attachment.name);
-  if (!declaredImage || match[2].length % 4 !== 0) return null;
+  if (!declaredImage || !encoded || encoded.length % 4 !== 0) return null;
   return attachment.content;
 }
 

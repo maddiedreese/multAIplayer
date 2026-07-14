@@ -8,6 +8,7 @@ import type {
   CodexProbe,
   CodexServerRequest,
   CodexServerResponse,
+  CodexSteerResult,
   CodexThreadNode,
   CodexTurnResult
 } from "./types";
@@ -148,6 +149,17 @@ export async function runCodexTurn(
     ],
     generatedImages: [],
     stderr: ""
+  };
+}
+
+export async function steerCodexTurn(roomId: string, input: string): Promise<CodexSteerResult> {
+  if (isTauriRuntime()) {
+    return invoke<CodexSteerResult>("steer_codex_turn", { request: { roomId, input } });
+  }
+  return {
+    threadId: "preview-thread",
+    turnId: "preview-active-turn",
+    clientTurnId: "preview-client-turn"
   };
 }
 

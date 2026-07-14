@@ -620,7 +620,7 @@ test("desktop store clears local room-scoped state", () => {
   assert.deepEqual(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"], { events: [] });
   assert.deepEqual(projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.events, []);
   assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.hostHandoffs, []);
-  assert.equal(state.codexRuntimeByRoom["room-a"]?.threadId, undefined);
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.threadGraph, undefined);
   assert.equal(projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.runs, undefined);
   assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.busy, undefined);
   assert.equal(state.roomSettingsByRoom["room-a"], undefined);
@@ -641,7 +641,7 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.browserByRoom["room-a"]?.url, undefined);
   assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "keep");
   assert.equal(state.codexRuntimeByRoom["room-b"]?.events?.[0]?.turnId, "turn-b");
-  assert.equal(state.codexRuntimeByRoom["room-b"]?.threadId, "thread-b");
+  assert.equal(state.codexRuntimeByRoom["room-b"]?.threadGraph?.activeThreadId, "thread-b");
   assert.equal(state.historyPresenceByRoom["room-b"]?.searchMessages?.[0]?.body, "Keep search result");
   assert.equal(state.historyPresenceByRoom["room-b"]?.inspectorTab, "terminal");
   assert.equal(state.historyPresenceByRoom["room-b"]?.presence?.["device-b"]?.displayName, "Jordan");

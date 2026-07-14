@@ -55,6 +55,19 @@ export function createTurnStartRequest(id: JsonRpcId, threadId: string, input: s
   };
 }
 
+export function createTurnSteerRequest(
+  id: JsonRpcId,
+  threadId: string,
+  expectedTurnId: string,
+  input: string
+): JsonRpcRequest {
+  return {
+    method: "turn/steer",
+    id,
+    params: { threadId, expectedTurnId, input: [{ type: "text", text: input }] }
+  };
+}
+
 export function classifyJsonRpcMessage(value: unknown): JsonRpcInboundMessage {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("App-server message must be a JSON object");

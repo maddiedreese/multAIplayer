@@ -116,7 +116,7 @@ export default function CodexChatParityScenario() {
           riskFlags: []
         }}
         isActiveHost
-        codexRunning={false}
+        codexRunning
         canApproveCodex
         canUseChat
         canSendMessage={false}

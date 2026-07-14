@@ -2,7 +2,7 @@
 name = "multaiplayer"
 version = "0.1.0-alpha.0"
 description = "Private group chat for coding with Codex."
-authors = ["Maddie Dreese"]
+authors = ["Maddie D. Reese"]
 edition = "2021"
 license = "Apache-2.0"
 

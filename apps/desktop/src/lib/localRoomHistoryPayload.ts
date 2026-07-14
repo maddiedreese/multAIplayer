@@ -71,7 +71,6 @@ export function pruneLocalRoomHistory(
     ...(payload.roomGoal && isWithinRetention(payload.roomGoal.updatedAt, cutoffMs)
       ? { roomGoal: payload.roomGoal }
       : {}),
-    ...(payload.codexThreadId ? { codexThreadId: payload.codexThreadId } : {}),
     ...(payload.codexThreadGraph?.activeThreadId
       ? { codexThreadGraph: normalizeCodexThreadGraph(payload.codexThreadGraph) }
       : {})
@@ -108,7 +107,11 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
     };
   }
 
-  const codexThreadId = normalizeCodexThreadId(value.codexThreadId);
+  // One-way v2-alpha migration: old encrypted history may contain the former
+  // flat thread-id mirror, but all normalized and newly persisted payloads are
+  // graph-only. No runtime state writes the mirror back.
+  const legacyValue = value as LocalRoomHistoryPayload & { codexThreadId?: unknown };
+  const codexThreadId = normalizeCodexThreadId(legacyValue.codexThreadId);
   const codexThreadGraph = normalizeCodexThreadGraph(value.codexThreadGraph, codexThreadId);
   return {
     version: 3,
@@ -143,7 +146,6 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
     ...(isRoomGoal(value.roomGoal) ? { roomGoal: value.roomGoal } : {}),
     ...(codexThreadGraph.activeThreadId
       ? {
-          codexThreadId: codexThreadGraph.activeThreadId,
           codexThreadGraph
         }
       : {})

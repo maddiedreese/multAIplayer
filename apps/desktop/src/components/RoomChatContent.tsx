@@ -342,16 +342,20 @@ export function parseMarkdownBlocks(body: string): MarkdownBlock[] {
     textLines = [];
   };
   for (let index = 0; index < lines.length; index += 1) {
-    const opening = /^ {0,3}```([A-Za-z0-9_+.#-]*)[ \t]*$/.exec(lines[index]);
+    const line = lines[index];
+    if (line === undefined) continue;
+    const opening = /^ {0,3}```([A-Za-z0-9_+.#-]*)[ \t]*$/.exec(line);
     if (!opening) {
-      textLines.push(lines[index]);
+      textLines.push(line);
       continue;
     }
     flushText();
     const codeLines: string[] = [];
     index += 1;
-    while (index < lines.length && !/^ {0,3}```[ \t]*$/.test(lines[index])) {
-      codeLines.push(lines[index]);
+    while (index < lines.length) {
+      const codeLine = lines[index];
+      if (codeLine === undefined || /^ {0,3}```[ \t]*$/.test(codeLine)) break;
+      codeLines.push(codeLine);
       index += 1;
     }
     blocks.push({ kind: "code", value: codeLines.join("\n"), language: opening[1] ?? "" });

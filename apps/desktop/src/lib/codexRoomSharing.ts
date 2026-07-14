@@ -8,7 +8,12 @@ const safeCodexStatuses = new Set([
   "disconnected"
 ]);
 
-const safeStandaloneEvents = new Set(["turn/start acknowledged", "applyPatchApproval", "execCommandApproval"]);
+const safeStandaloneEvents = new Set([
+  "turn/start acknowledged",
+  "turn/steer acknowledged",
+  "applyPatchApproval",
+  "execCommandApproval"
+]);
 
 const appServerMethodPattern = /^[a-z][A-Za-z0-9]*(?:\/[A-Za-z][A-Za-z0-9]*)+$/;
 

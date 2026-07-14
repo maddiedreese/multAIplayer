@@ -4,6 +4,7 @@ import {
   createInitializeRequest,
   createThreadStartRequest,
   createTurnStartRequest,
+  createTurnSteerRequest,
   defaultCodexModel,
   type JsonRpcId,
   type JsonRpcNotification,
@@ -81,6 +82,10 @@ export class CodexAppServerClient extends EventEmitter<CodexAppServerEvents> {
 
   startTurn(threadId: string, input: string, cwd = this.config.cwd): Promise<JsonRpcResponse> {
     return this.request(createTurnStartRequest(this.allocateId(), threadId, input, cwd));
+  }
+
+  steerTurn(threadId: string, expectedTurnId: string, input: string): Promise<JsonRpcResponse> {
+    return this.request(createTurnSteerRequest(this.allocateId(), threadId, expectedTurnId, input));
   }
 
   request<TResult = unknown>(request: JsonRpcRequest, timeoutMs = 120_000): Promise<JsonRpcResponse<TResult>> {

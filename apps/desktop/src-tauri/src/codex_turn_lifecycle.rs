@@ -22,16 +22,22 @@ impl CodexTurnLease {
     pub(crate) fn begin(room_id: &str) -> Result<Self, String> {
         let id = NEXT_TURN_LEASE_ID.fetch_add(1, Ordering::Relaxed);
         let cancelled = Arc::new(AtomicBool::new(false));
-        active_turns()
+        let mut turns = active_turns()
             .lock()
-            .map_err(|_| "Codex active-turn registry is unavailable".to_string())?
-            .insert(
-                id,
-                ActiveTurn {
-                    room_id: room_id.to_string(),
-                    cancelled: cancelled.clone(),
-                },
-            );
+            .map_err(|_| "Codex active-turn registry is unavailable".to_string())?;
+        if turns
+            .values()
+            .any(|turn| turn.room_id == room_id && !turn.cancelled.load(Ordering::Acquire))
+        {
+            return Err("A Codex turn is already active for this room".to_string());
+        }
+        turns.insert(
+            id,
+            ActiveTurn {
+                room_id: room_id.to_string(),
+                cancelled: cancelled.clone(),
+            },
+        );
         Ok(Self { id, cancelled })
     }
 
@@ -112,5 +118,18 @@ mod tests {
         let mut ran = false;
         assert!(!lease.run_if_active(|| ran = true));
         assert!(!ran);
+    }
+
+    #[test]
+    fn a_room_has_only_one_live_turn_but_can_restart_after_cancellation() {
+        let first = CodexTurnLease::begin("lifecycle-room-exclusive").expect("first lease");
+        assert!(CodexTurnLease::begin("lifecycle-room-exclusive").is_err());
+
+        assert_eq!(cancel_codex_turns_for_room("lifecycle-room-exclusive"), 1);
+        let replacement =
+            CodexTurnLease::begin("lifecycle-room-exclusive").expect("replacement lease");
+        assert!(!replacement.is_cancelled());
+        drop(first);
+        drop(replacement);
     }
 }

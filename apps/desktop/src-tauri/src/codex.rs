@@ -19,6 +19,9 @@ use crate::codex_rpc::{
     allocate_rpc_session_id, send_json_shared, ActiveTimeout, RpcId, RpcInbox, RpcMessage,
     SharedStdin,
 };
+use crate::codex_steering::{
+    new_codex_steering_responses, register_active_codex_turn, route_codex_steer_response,
+};
 use crate::codex_turn_lifecycle::{cancel_codex_turns_for_room, CodexTurnLease};
 use crate::process::terminate_child;
 use crate::validation::{
@@ -107,7 +110,6 @@ struct CodexServerSession {
 
 static CODEX_SESSIONS: OnceLock<Mutex<HashMap<CodexServerKey, CodexServerSession>>> =
     OnceLock::new();
-
 const CODEX_SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(20 * 60);
 
 #[tauri::command]
@@ -503,6 +505,8 @@ impl CodexServerSession {
         let mut transcript = String::new();
         let mut activity_started_at = HashMap::<String, String>::new();
         let mut generated_images = Vec::new();
+        let steering_responses = new_codex_steering_responses();
+        let mut active_turn_guard = None;
 
         let status = loop {
             if cancelled.load(Ordering::Acquire) {
@@ -526,6 +530,25 @@ impl CodexServerSession {
                             events.push("turn/start failed".to_string());
                             break "error".to_string();
                         }
+                        let Some(active_turn_id) = parsed
+                            .get("result")
+                            .and_then(|result| result.get("turn"))
+                            .and_then(|turn| turn.get("id"))
+                            .and_then(Value::as_str)
+                        else {
+                            events.push("turn/start omitted the active turn id".to_string());
+                            break "error".to_string();
+                        };
+                        active_turn_guard = Some(register_active_codex_turn(
+                            &room_id,
+                            self.stdin.clone(),
+                            thread_id.clone(),
+                            active_turn_id.to_string(),
+                            client_turn_id.to_string(),
+                            steering_responses.clone(),
+                        )?);
+                    } else {
+                        route_codex_steer_response(&steering_responses, &id, parsed);
                     }
                 }
                 Ok(RpcMessage::ServerRequest { id, method, params }) => {
@@ -600,6 +623,7 @@ impl CodexServerSession {
             self.session_id,
             "Codex turn ended before the request was answered",
         );
+        drop(active_turn_guard);
 
         self.last_used = Instant::now();
         let stderr = self.stderr_rx.try_iter().collect::<Vec<_>>().join("\n");

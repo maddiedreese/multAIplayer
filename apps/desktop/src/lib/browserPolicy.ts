@@ -1,6 +1,5 @@
-import { defaultBrowserAllowedOrigins, type RoomRecord } from "@multaiplayer/protocol";
+import type { RoomRecord } from "@multaiplayer/protocol";
 import { isLocalUserActiveHostForRoom, type LocalHostUser } from "./roomHost";
-import { detectBrowserSecretRisks } from "./secretRisks";
 import { reportExpectedFailure } from "./nonFatalReporting";
 
 export function normalizeBrowserAllowedOrigins(value: string[] | string): string[] | null {
@@ -39,12 +38,6 @@ export function shouldAutoApproveBrowserRequest(url: string, room: RoomRecord, a
   void room;
   void activeHost;
   return false;
-}
-
-export function shouldAutoApproveBrowserRequestLegacy(url: string, room: RoomRecord, activeHost: boolean): boolean {
-  if (!activeHost || room.approvalPolicy !== "auto_browser_allowed_sites") return false;
-  if (detectBrowserSecretRisks(url).length > 0) return false;
-  return isBrowserUrlAllowed(url, room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins);
 }
 
 export function canRequestBrowserAccess(room: RoomRecord, locked = false): boolean {
