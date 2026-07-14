@@ -174,7 +174,7 @@ async function main() {
   const unitTimeoutMs = positiveIntegerFromEnvironment("MULTAIPLAYER_DESKTOP_TEST_TIMEOUT_MS", 180_000);
   const smokeTimeoutMs = positiveIntegerFromEnvironment("MULTAIPLAYER_SMOKE_TIMEOUT_MS", 30_000);
   const allTests = readdirSync(join(desktopRoot, "test"))
-    .filter((name) => name.endsWith(".test.ts"))
+    .filter((name) => /\.test\.tsx?$/.test(name))
     .sort()
     .map((name) => `test/${name}`);
   const unitTests = allTests.filter((name) => name !== smokeTest);

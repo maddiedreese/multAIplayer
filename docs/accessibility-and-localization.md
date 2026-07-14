@@ -4,7 +4,7 @@
 
 The alpha UI is English-only. User-facing strings live alongside React components; there is no translation catalog or right-to-left layout guarantee. Do not describe the application as localized until those foundations and at least one non-English locale are tested.
 
-Accessibility is a release quality requirement even before formal conformance certification. Playwright journeys exercise semantic roles and accessible names for critical controls, but automated checks do not establish conformance.
+Accessibility is a release quality requirement even before formal conformance certification. Required Playwright journeys run exact-pinned axe-core WCAG 2.0, 2.1, and 2.2 A/AA rules against the production-component chat, onboarding, and invite scenarios in addition to exercising semantic roles and accessible names. The desktop runner also includes both `.test.ts` and `.test.tsx` component suites. These automated checks catch regressions but do not establish conformance or replace the release audit below.
 
 The first-run setup uses one heading and native buttons, links, inputs, forms, details, lists, status regions, alerts, and progressbar semantics. Moving between setup surfaces transfers focus to the new heading without trapping focus. Readiness is communicated with text as well as icons and color; blocking states disable forward progress and expose a named recovery action. Async invite, folder, and workspace outcomes use status or alert regions rather than relying on a transient visual change.
 

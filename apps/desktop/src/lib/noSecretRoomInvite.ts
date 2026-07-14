@@ -1,11 +1,17 @@
 import type { NoSecretRoomInvite } from "../types";
+import { InviteJoinError } from "./inviteJoinError";
 
 export function encodeNoSecretRoomInvite(invite: NoSecretRoomInvite): string {
   return bytesToBase64Url(new TextEncoder().encode(JSON.stringify(invite)));
 }
 
 export function decodeNoSecretRoomInvite(value: string): NoSecretRoomInvite {
-  const decoded = JSON.parse(new TextDecoder().decode(base64UrlToBytes(value))) as Partial<NoSecretRoomInvite>;
+  let decoded: Partial<NoSecretRoomInvite>;
+  try {
+    decoded = JSON.parse(new TextDecoder().decode(base64UrlToBytes(value))) as Partial<NoSecretRoomInvite>;
+  } catch {
+    throw new InviteJoinError("invalid_invite", "The protected invite payload is invalid.");
+  }
   if (
     decoded.version !== 4 ||
     typeof decoded.teamId !== "string" ||
@@ -23,7 +29,7 @@ export function decodeNoSecretRoomInvite(value: string): NoSecretRoomInvite {
     !decoded.hostHpkePublicKey ||
     typeof decoded.hostHpkeKeyFingerprint !== "string"
   ) {
-    throw new Error("No-secret invite is missing required metadata");
+    throw new InviteJoinError("invalid_invite", "No-secret invite is missing required metadata");
   }
   return {
     version: decoded.version,

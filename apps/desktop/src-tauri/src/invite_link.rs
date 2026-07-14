@@ -35,10 +35,10 @@ impl NativeInviteState {
 #[tauri::command]
 pub fn take_pending_native_invite(
     state: tauri::State<'_, NativeInviteState>,
-) -> Result<Option<NativeInvitePayload>, String> {
+) -> crate::command_error::CommandResult<Option<NativeInvitePayload>> {
     state
         .take()
-        .map_err(|()| "Native invite intake is temporarily unavailable.".to_string())
+        .map_err(|()| "Native invite intake is temporarily unavailable.".into())
 }
 
 /// Accept an OS-delivered link without ever emitting or logging its bearer

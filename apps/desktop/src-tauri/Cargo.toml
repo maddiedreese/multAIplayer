@@ -7,7 +7,7 @@ edition = "2021"
 license = "Apache-2.0"
 
 [workspace]
-members = ["crates/mls-core"]
+members = ["crates/codex-activity-projection", "crates/mls-core"]
 resolver = "2"
 
 [lib]
@@ -23,6 +23,7 @@ tauri-build = { version = "=2.6.3", features = [] }
 [dependencies]
 base64 = "=0.22.1"
 chrono = { version = "=0.4.45", default-features = false, features = ["clock", "std"] }
+codex-activity-projection = { path = "crates/codex-activity-projection" }
 keyring = "=4.1.4"
 libc = "=0.2.186"
 portable-pty = "=0.9.0"

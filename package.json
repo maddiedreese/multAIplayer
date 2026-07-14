@@ -58,6 +58,7 @@
     "tauri:build": "npm run tauri:build -w @multaiplayer/desktop"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.12.1",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.61.1",
     "@vitejs/plugin-react": "6.0.3",

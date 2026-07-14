@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { parseInviteInput } from "../src/lib/inviteActionsHelpers";
+import { InviteJoinError } from "../src/lib/inviteJoinError";
+
+function hasInviteCode(code: InviteJoinError["code"]) {
+  return (error: unknown) => error instanceof InviteJoinError && error.code === code;
+}
 
 test("pasted legacy room-key invites are rejected with safe recovery guidance", () => {
   assert.throws(
     () => parseInviteInput("https://app.example/rooms#invite=invite-old&multaiplayerInvite=raw-room-key"),
-    /pre-v2 invite is invalid.*Ask the active host for a new MLS invite/i
+    hasInviteCode("legacy_invite")
   );
 });
 
@@ -14,7 +19,7 @@ test("only host-approved invite fragments are accepted", () => {
     parseInviteInput("https://app.example/rooms#invite=invite-new&multaiplayerJoin=capability&approval=request"),
     { inviteId: "invite-new", joinInvite: "capability" }
   );
-  assert.throws(() => parseInviteInput("not-an-invite"), /complete host-approved multAIplayer invite link/);
+  assert.throws(() => parseInviteInput("not-an-invite"), hasInviteCode("invalid_invite"));
 });
 
 test("manual paste temporarily accepts the immediately prior query-id link without ambiguity", () => {
@@ -25,7 +30,7 @@ test("manual paste temporarily accepts the immediately prior query-id link witho
   assert.throws(
     () =>
       parseInviteInput("https://app.example/rooms?invite=one#invite=two&multaiplayerJoin=capability&approval=request"),
-    /complete host-approved/
+    hasInviteCode("invalid_invite")
   );
   for (const ambiguous of [
     "https://app.example/rooms#invite=one&multaiplayerJoin=capability&multaiplayerJoin=other&approval=request",
@@ -33,13 +38,13 @@ test("manual paste temporarily accepts the immediately prior query-id link witho
     "https://app.example/rooms?invite=one&extra=value#multaiplayerJoin=capability&approval=request",
     "https://app.example/rooms#invite=one&multaiplayerJoin=capability&approval=other"
   ]) {
-    assert.throws(() => parseInviteInput(ambiguous), /complete host-approved/);
+    assert.throws(() => parseInviteInput(ambiguous), hasInviteCode("invalid_invite"));
   }
 });
 
 test("manual paste enforces the same complete-link bound as native and website intake", () => {
   assert.throws(
     () => parseInviteInput(`https://open.multaiplayer.com/invite#${"a".repeat(12_289)}`),
-    /complete host-approved/
+    hasInviteCode("invalid_invite")
   );
 });

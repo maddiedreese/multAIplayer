@@ -29,7 +29,7 @@ pub(crate) struct ShellCommandRequest {
 pub(crate) fn run_shell_command(
     state: State<'_, ShellAuthorizationState>,
     request: ShellCommandRequest,
-) -> Result<CommandResult, String> {
+) -> crate::command_error::CommandResult<CommandResult> {
     ensure_existing_dir(&request.cwd)?;
     ensure_terminal_command(&request.command)?;
     let canonical_cwd = state.consume(

@@ -41,6 +41,7 @@ import {
   type PendingInviteWaitObserver,
   type PendingInviteWaitOwnership
 } from "./pendingInviteWaitRegistry";
+import { InviteJoinError } from "../inviteJoinError";
 
 type InviteJoinActionOptions = Pick<
   UseInviteActionsOptions,
@@ -59,6 +60,7 @@ type InviteJoinStore = Pick<
 >;
 
 const pendingInviteWaits = new PendingInviteWaitRegistry();
+const inviteMetadataMismatchMessage = "Invite metadata does not match the protected URL fragment.";
 
 export function assertPendingInviteRecoveryContext(
   pending: PendingMlsInviteRequest,
@@ -74,7 +76,10 @@ export function assertPendingInviteRecoveryContext(
     metadata.room.id !== pending.roomId ||
     metadata.room.teamId !== pending.teamId
   ) {
-    throw new Error("Pending invite recovery does not match this device or relay invite metadata.");
+    throw new InviteJoinError(
+      "pending_recovery_mismatch",
+      "Pending invite recovery does not match this device or relay invite metadata."
+    );
   }
 }
 
@@ -90,7 +95,10 @@ export function assertInviteHostDevice(
     hostDevice.hpkePublicKey !== invite.hostHpkePublicKey ||
     hostDevice.hpkeKeyFingerprint !== invite.hostHpkeKeyFingerprint
   ) {
-    throw new Error("The invite host HPKE key does not match the registered device.");
+    throw new InviteJoinError(
+      "host_hpke_key_mismatch",
+      "The invite host HPKE key does not match the registered device."
+    );
   }
 }
 
@@ -127,14 +135,15 @@ export function createInviteJoinActions(
 
   async function requestNoSecretInviteAccess(encodedInvite: string, inviteId?: string | null) {
     const invite = decodeNoSecretRoomInvite(encodedInvite);
-    if (!inviteId) throw new Error("The relay invite id is missing.");
-    if (Date.parse(invite.expiresAt) <= Date.now()) throw new Error("This invite has expired.");
+    if (!inviteId) throw new InviteJoinError("invite_id_missing", "The relay invite id is missing.");
+    if (Date.parse(invite.expiresAt) <= Date.now())
+      throw new InviteJoinError("invite_expired", "This invite has expired.");
     const { localUser, deviceId } = currentLocalIdentity();
     const metadata = await lookupInvite(inviteId);
     if (metadata.invite.teamId !== invite.teamId || metadata.invite.roomId !== invite.roomId)
-      throw new Error("Invite metadata does not match the protected URL fragment.");
+      throw new InviteJoinError("invite_metadata_mismatch", inviteMetadataMismatchMessage);
     if (metadata.room.hostUserId !== invite.hostUserId || metadata.room.activeHostDeviceId !== invite.hostDeviceId)
-      throw new Error("The invite is not issued by the active host device.");
+      throw new InviteJoinError("active_host_mismatch", "The invite is not issued by the active host device.");
     assertInviteHostDevice(invite, metadata);
 
     upsertTeam(metadata.team);
@@ -175,7 +184,10 @@ export function createInviteJoinActions(
       keyPackage.id
     );
     if (protectedRequest.keyPackageHash !== keyPackage.keyPackageHash)
-      throw new Error("Native invite protection returned an unexpected KeyPackage hash.");
+      throw new InviteJoinError(
+        "key_package_hash_mismatch",
+        "Native invite protection returned an unexpected KeyPackage hash."
+      );
     const pendingRequest: PendingMlsInviteRequest = {
       inviteId,
       teamId: invite.teamId,

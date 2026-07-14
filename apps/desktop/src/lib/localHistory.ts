@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeNative } from "./nativeCommandError";
 import { createMlsGroup, setMlsHistoryRetention } from "./mlsClient";
 import { reportNonFatal } from "./nonFatalReporting";
 
@@ -12,7 +12,7 @@ export interface LocalHistorySettings {
 export async function loadEncryptedHistory<T>(roomId: string): Promise<T | null> {
   const settings = loadHistorySettings(roomId);
   if (!settings.enabled) return null;
-  const encoded = await invoke<string | null>("mls_history_load_latest", { request: { roomId } });
+  const encoded = await invokeNative<string | null>("mls_history_load_latest", { request: { roomId } });
   if (!encoded) return null;
   return JSON.parse(decodeUtf8(encoded)) as T;
 }
@@ -23,13 +23,13 @@ export async function saveEncryptedHistory(roomId: string, value: unknown): Prom
     await clearEncryptedHistory(roomId);
     return;
   }
-  await invoke<number>("mls_history_save", {
+  await invokeNative<number>("mls_history_save", {
     request: { roomId, plaintext: encodeUtf8(JSON.stringify(value)), retentionDays: settings.retentionDays }
   });
 }
 
 export async function clearEncryptedHistory(roomId: string): Promise<void> {
-  await invoke("mls_history_delete_all", { request: { roomId } });
+  await invokeNative("mls_history_delete_all", { request: { roomId } });
 }
 
 export async function forgetRoomLocalData(roomId: string): Promise<void> {

@@ -736,24 +736,24 @@ function Field({ id, label, hint, children }: { id: string; label: string; hint?
 function ReadinessIcon({ status }: { status: OnboardingReadinessStatus }) {
   if (status === "ready")
     return (
-      <span className="onboarding-status-icon" aria-label="Ready">
+      <span className="onboarding-status-icon" role="img" aria-label="Ready">
         <Check size={15} />
       </span>
     );
   if (status === "checking")
     return (
-      <span className="onboarding-status-icon" aria-label="Checking">
+      <span className="onboarding-status-icon" role="img" aria-label="Checking">
         <CircleDashed size={15} />
       </span>
     );
   if (status === "blocked")
     return (
-      <span className="onboarding-status-icon" aria-label="Blocked">
+      <span className="onboarding-status-icon" role="img" aria-label="Blocked">
         <CircleAlert size={15} />
       </span>
     );
   return (
-    <span className="onboarding-status-icon" aria-label="Warning">
+    <span className="onboarding-status-icon" role="img" aria-label="Warning">
       <LockKeyhole size={15} />
     </span>
   );

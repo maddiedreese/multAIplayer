@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import type { MlsRelayMessage } from "@multaiplayer/protocol";
+import type { WebSocket } from "ws";
 import { createRelayMetrics } from "../src/observability.js";
 import { createRelayStore, type RoomKey } from "../src/state.js";
 import { createRelayFanout } from "../src/ws/fanout.js";
@@ -86,6 +87,42 @@ test("applications may arrive from the three retained epochs but fail distinctly
   );
   await assert.rejects(fanout.publishMlsMessage(message("future", "application", 4)), /ahead of accepted epoch 3/);
   await assert.rejects(fanout.publishMlsMessage(message("old-commit", "commit", 2)), /stale/);
+});
+
+test("successful publishes record queue-to-fanout and WebSocket send latency", async () => {
+  const store = createRelayStore();
+  const key = "team-core:room-desktop" as RoomKey;
+  store.setRoom({
+    id: "room-desktop",
+    teamId: "team-core",
+    acceptedMlsEpoch: 0,
+    host: "Host",
+    hostUserId: "github:host",
+    activeHostDeviceId: "device-host",
+    hostStatus: "active"
+  } as never);
+  const metrics = createRelayMetrics();
+  const socket = {
+    OPEN: 1,
+    readyState: 1,
+    send(_payload: string, callback: () => void) {
+      callback();
+    }
+  } as unknown as WebSocket;
+  store.roomSockets.set(key, new Set([socket]));
+  const fanout = fanoutFor(
+    store,
+    key,
+    async () => undefined,
+    async () => undefined,
+    metrics
+  );
+
+  await fanout.publishMlsMessage(message("observed", "application", 0));
+
+  const snapshot = metrics.snapshot(1);
+  assert.equal(snapshot.publishToFanoutDurationSeconds.count, 1);
+  assert.equal(snapshot.webSocketSendDurationSeconds.count, 1);
 });
 
 test("application floods cannot evict Commit or another sender's durable retry receipt", async () => {
@@ -215,7 +252,8 @@ function fanoutFor(
   store: ReturnType<typeof createRelayStore>,
   key: RoomKey,
   saveMlsCommit: () => Promise<void>,
-  saveMlsMessage: () => Promise<void> = async () => undefined
+  saveMlsMessage: () => Promise<void> = async () => undefined,
+  metrics = createRelayMetrics()
 ) {
   return createRelayFanout({
     store,
@@ -224,7 +262,7 @@ function fanoutFor(
     workspaceSockets: store.workspaceSockets,
     sessions: store.sessions,
     roomPresence: store.roomPresence,
-    metrics: createRelayMetrics(),
+    metrics,
     roomKey: () => key,
     pruneMlsBacklog: (items) => items,
     addTeamMember: () => undefined,

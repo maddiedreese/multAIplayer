@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { attachPageDiagnostics, uiContractScenarioUrl } from "./helpers";
+import { attachPageDiagnostics, expectNoAxeViolations, uiContractScenarioUrl } from "./helpers";
 
 async function requestAccess(page: Page): Promise<{ host: Locator; guest: Locator; pendingRequest: Locator }> {
   attachPageDiagnostics(page);
@@ -23,6 +23,7 @@ async function requestAccess(page: Page): Promise<{ host: Locator; guest: Locato
   await expect(pendingRequest).toContainText("Requesting access to UI Contract Room.");
   await expect(guest.getByPlaceholder(/Host approval is required/)).toBeDisabled();
   await expect(guest.getByRole("button", { name: "Send message" })).toBeDisabled();
+  await expectNoAxeViolations(page);
   return { host, guest, pendingRequest };
 }
 

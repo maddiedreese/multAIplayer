@@ -1,6 +1,6 @@
 # Rust panic policy
 
-The Tauri backend treats data, filesystem, process, lock, and protocol failures as recoverable. Production command paths return typed values or `Result<_, String>` errors to the frontend; they must not use `unwrap()` or `expect()` to handle runtime input or mutable external state.
+The Tauri backend treats data, filesystem, process, lock, and protocol failures as recoverable. Every fallible production Tauri command returns `CommandResult<T>` with the serialized `{ code, message }` contract; internal helpers may retain narrower domain errors or `Result<_, String>` until the command boundary assigns a stable code. Commands must not use `unwrap()` or `expect()` to handle runtime input or mutable external state. Frontend recovery branches on validated codes through `invokeNative`, never on message prose.
 
 An audit on 2026-07-12 found no runtime-input `unwrap()` or `expect()` calls. A session-cache ownership assertion in `codex.rs` was converted to a non-panicking conditional, and the outer Tauri bootstrap now reports its fatal error and exits unsuccessfully without unwinding. The seven constant redaction expressions are compiled once into fallible `LazyLock` values. If any expression cannot compile, the applicable redactor replaces the entire value with a failure marker; it never returns potentially sensitive input and never panics.
 

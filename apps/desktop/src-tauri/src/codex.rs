@@ -9,7 +9,6 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tauri::Emitter;
 
-use crate::codex_activity::{bounded_codex_identifier, project_codex_activity};
 use crate::codex_catalog::{normalize_reasoning_effort, normalize_service_tier};
 use crate::codex_requests::{
     wait_for_response, wait_for_response_message, CodexRpcState, CodexServerRequestEvent,
@@ -28,6 +27,7 @@ use crate::validation::{
     codex_timeout, ensure_codex_input, ensure_room_id, normalize_codex_thread_id,
 };
 use crate::workspace::ensure_existing_dir;
+use codex_activity_projection::{bounded_codex_identifier, project_codex_activity};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -117,7 +117,7 @@ pub(crate) fn run_codex_turn(
     request: CodexTurnRequest,
     app: tauri::AppHandle,
     rpc_state: tauri::State<'_, CodexRpcState>,
-) -> Result<CodexTurnResult, String> {
+) -> crate::command_error::CommandResult<CodexTurnResult> {
     let lifecycle_room_id = request.room_id.as_deref().unwrap_or("__legacy_room");
     ensure_room_id(lifecycle_room_id)?;
     let turn_lease = CodexTurnLease::begin(lifecycle_room_id)?;
@@ -140,7 +140,7 @@ pub(crate) fn run_codex_turn(
         &sandbox_config,
     )?;
     if turn_lease.is_cancelled() {
-        return Err("Codex turn was cancelled because the room host context changed".to_string());
+        return Err("Codex turn was cancelled because the room host context changed".into());
     }
     let cancellation = turn_lease.cancellation_flag();
     let mut session = checkout_codex_session(
@@ -176,14 +176,14 @@ pub(crate) fn run_codex_turn(
             }
         });
     }
-    result
+    Ok(result?)
 }
 
 #[tauri::command]
 pub(crate) fn shutdown_codex_room(
     request: CodexRoomShutdownRequest,
     rpc_state: tauri::State<'_, CodexRpcState>,
-) -> Result<usize, String> {
+) -> crate::command_error::CommandResult<usize> {
     ensure_room_id(&request.room_id)?;
     rpc_state.cancel_room(&request.room_id, "Codex room shut down");
     let active = cancel_codex_turns_for_room(&request.room_id);
@@ -193,16 +193,16 @@ pub(crate) fn shutdown_codex_room(
 #[tauri::command]
 pub(crate) fn list_codex_server_requests(
     rpc_state: tauri::State<'_, CodexRpcState>,
-) -> Result<Vec<CodexServerRequestEvent>, String> {
-    rpc_state.list()
+) -> crate::command_error::CommandResult<Vec<CodexServerRequestEvent>> {
+    Ok(rpc_state.list()?)
 }
 
 #[tauri::command]
 pub(crate) fn respond_codex_server_request(
     request: RespondCodexServerRequest,
     rpc_state: tauri::State<'_, CodexRpcState>,
-) -> Result<(), String> {
-    rpc_state.respond(request)
+) -> crate::command_error::CommandResult<()> {
+    Ok(rpc_state.respond(request)?)
 }
 
 pub(crate) fn codex_sandbox_config(value: Option<&str>) -> Result<CodexSandboxConfig, String> {

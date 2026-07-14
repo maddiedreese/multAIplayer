@@ -24,7 +24,8 @@ export class SqliteRelayPersistence implements RelayPersistence {
   constructor(
     private readonly dataPath: string,
     private readonly legacyJsonImportPath: string | null,
-    private readonly renameLegacyFile: typeof rename = rename
+    private readonly renameLegacyFile: typeof rename = rename,
+    private readonly recordWriteDuration: (durationMs: number) => void = () => undefined
   ) {}
 
   async load(): Promise<unknown | null> {
@@ -54,7 +55,7 @@ export class SqliteRelayPersistence implements RelayPersistence {
 
   async finalizeLoad(state: () => unknown): Promise<void> {
     if (!this.pendingLegacyImport || !this.legacyJsonImportPath) return;
-    saveNormalizedRelayState(this.getDb(), state(), this.legacyJsonImportPath);
+    this.timedWrite(() => saveNormalizedRelayState(this.getDb(), state(), this.legacyJsonImportPath!));
     try {
       await this.renameLegacyFile(this.legacyJsonImportPath, availableMigrationBackupPath(this.legacyJsonImportPath));
     } catch (error) {
@@ -83,18 +84,18 @@ export class SqliteRelayPersistence implements RelayPersistence {
 
   async save(state: unknown): Promise<void> {
     await ensureDataDirectory(dirname(this.dataPath));
-    saveNormalizedRelayState(this.getDb(), state);
+    this.timedWrite(() => saveNormalizedRelayState(this.getDb(), state));
   }
   async saveChanges(changes: StoredRelayMutation[]): Promise<boolean> {
-    if (changes.length > 0) applyStoredRelayMutations(this.getDb(), changes);
+    if (changes.length > 0) this.timedWrite(() => applyStoredRelayMutations(this.getDb(), changes));
     return true;
   }
   async saveMlsBacklog(roomKey: RoomKey, messages: MlsRelayMessage[]): Promise<boolean> {
-    saveMlsBacklogRows(this.getDb(), roomKey, messages);
+    this.timedWrite(() => saveMlsBacklogRows(this.getDb(), roomKey, messages));
     return true;
   }
   async saveKeyPackages(changes: StoredRelayMutation[], _fallbackState: () => unknown): Promise<void> {
-    applyStoredRelayMutations(this.getDb(), changes);
+    this.timedWrite(() => applyStoredRelayMutations(this.getDb(), changes));
   }
   async saveMlsMessage(
     roomKey: RoomKey,
@@ -103,10 +104,12 @@ export class SqliteRelayPersistence implements RelayPersistence {
     changes: StoredRelayMutation[],
     _fallbackState: () => unknown
   ): Promise<boolean> {
-    this.getDb().transaction(() => {
-      appendMlsBacklogRow(this.getDb(), roomKey, message, prunedIds);
-      applyStoredRelayMutationsInTransaction(this.getDb(), changes, new Set(["mlsBacklog"]));
-    })();
+    this.timedWrite(() =>
+      this.getDb().transaction(() => {
+        appendMlsBacklogRow(this.getDb(), roomKey, message, prunedIds);
+        applyStoredRelayMutationsInTransaction(this.getDb(), changes, new Set(["mlsBacklog"]));
+      })()
+    );
     return true;
   }
   async saveMlsCommit(
@@ -116,15 +119,17 @@ export class SqliteRelayPersistence implements RelayPersistence {
     changes: StoredRelayMutation[],
     _fallbackState: () => unknown
   ): Promise<void> {
-    this.getDb().transaction(() => {
-      this.getDb().prepare("insert or ignore into relay_room_epochs values (?, ?)").run(roomKey, message.epochHint);
-      const advanced = this.getDb()
-        .prepare("update relay_room_epochs set accepted_epoch = ? where room_key = ? and accepted_epoch = ?")
-        .run(message.epochHint + 1, roomKey, message.epochHint);
-      if (advanced.changes !== 1) throw new RelayStaleEpochError();
-      appendMlsBacklogRow(this.getDb(), roomKey, message, prunedIds);
-      applyStoredRelayMutationsInTransaction(this.getDb(), changes, new Set(["mlsBacklog"]));
-    })();
+    this.timedWrite(() =>
+      this.getDb().transaction(() => {
+        this.getDb().prepare("insert or ignore into relay_room_epochs values (?, ?)").run(roomKey, message.epochHint);
+        const advanced = this.getDb()
+          .prepare("update relay_room_epochs set accepted_epoch = ? where room_key = ? and accepted_epoch = ?")
+          .run(message.epochHint + 1, roomKey, message.epochHint);
+        if (advanced.changes !== 1) throw new RelayStaleEpochError();
+        appendMlsBacklogRow(this.getDb(), roomKey, message, prunedIds);
+        applyStoredRelayMutationsInTransaction(this.getDb(), changes, new Set(["mlsBacklog"]));
+      })()
+    );
   }
   async quarantine(reason: string): Promise<void> {
     this.close();
@@ -136,6 +141,14 @@ export class SqliteRelayPersistence implements RelayPersistence {
   }
   private getDb(): Database.Database {
     return (this.db ??= openRelayDatabase(this.dataPath));
+  }
+  private timedWrite<T>(write: () => T): T {
+    const startedAt = performance.now();
+    try {
+      return write();
+    } finally {
+      this.recordWriteDuration(performance.now() - startedAt);
+    }
   }
   close() {
     this.db?.close();

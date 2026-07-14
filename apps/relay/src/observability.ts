@@ -16,8 +16,17 @@ export interface RelayMetricsSnapshot {
   webSocketConnectionAttemptsTotal: number;
   webSocketConnectionsAcceptedTotal: number;
   webSocketConnectionRejectionsByReason: Record<string, number>;
+  publishToFanoutDurationSeconds: RelayHistogramSnapshot;
+  webSocketSendDurationSeconds: RelayHistogramSnapshot;
+  sqliteWriteDurationSeconds: RelayHistogramSnapshot;
   startedAt: string;
   uptimeSeconds: number;
+}
+
+export interface RelayHistogramSnapshot {
+  buckets: Record<string, number>;
+  count: number;
+  sum: number;
 }
 
 export interface RelayMetrics {
@@ -29,6 +38,9 @@ export interface RelayMetrics {
   recordWebSocketConnectionAttempt(): void;
   recordWebSocketConnectionAccepted(): void;
   recordWebSocketConnectionRejection(reason: string): void;
+  recordPublishToFanoutDuration(durationMs: number): void;
+  recordWebSocketSendDuration(durationMs: number): void;
+  recordSqliteWriteDuration(durationMs: number): void;
   snapshot(activeSockets: number, gauges?: RelayMetricsSnapshotGauges): RelayMetricsSnapshot;
 }
 
@@ -47,6 +59,19 @@ export function relayMetricsToPrometheus(snapshot: RelayMetricsSnapshot): string
     for (const [key, value] of Object.entries(values).sort(([left], [right]) => left.localeCompare(right))) {
       lines.push(`${name}{${label}="${escapePrometheusLabel(key)}"} ${finiteMetricValue(value)}`);
     }
+  };
+  const histogram = (name: string, help: string, value: RelayHistogramSnapshot) => {
+    lines.push(`# HELP ${name} ${help}`, `# TYPE ${name} histogram`);
+    for (const [boundary, count] of Object.entries(value.buckets).sort(
+      ([left], [right]) => Number(left) - Number(right)
+    )) {
+      lines.push(`${name}_bucket{le="${boundary}"} ${finiteMetricValue(count)}`);
+    }
+    lines.push(
+      `${name}_bucket{le="+Inf"} ${finiteMetricValue(value.count)}`,
+      `${name}_sum ${finiteMetricValue(value.sum)}`,
+      `${name}_count ${finiteMetricValue(value.count)}`
+    );
   };
 
   metric(
@@ -133,6 +158,21 @@ export function relayMetricsToPrometheus(snapshot: RelayMetricsSnapshot): string
     "reason",
     snapshot.webSocketConnectionRejectionsByReason
   );
+  histogram(
+    "multaiplayer_relay_publish_to_fanout_duration_seconds",
+    "Time from an MLS publish entering its room queue until successful persistence and fanout.",
+    snapshot.publishToFanoutDurationSeconds
+  );
+  histogram(
+    "multaiplayer_relay_websocket_send_duration_seconds",
+    "Time for queued WebSocket sends to complete, including transport backpressure.",
+    snapshot.webSocketSendDurationSeconds
+  );
+  histogram(
+    "multaiplayer_relay_sqlite_write_duration_seconds",
+    "Time spent in synchronous SQLite relay write operations.",
+    snapshot.sqliteWriteDurationSeconds
+  );
   metric("multaiplayer_relay_uptime_seconds", "gauge", "Relay process uptime in seconds.", snapshot.uptimeSeconds);
   metric(
     "multaiplayer_relay_start_time_seconds",
@@ -184,6 +224,9 @@ export function createRelayMetrics(now = () => Date.now()): RelayMetrics {
   let webSocketConnectionAttemptsTotal = 0;
   let webSocketConnectionsAcceptedTotal = 0;
   const webSocketConnectionRejectionsByReason = new Map<string, number>();
+  const publishToFanoutDuration = createFixedBucketHistogram();
+  const webSocketSendDuration = createFixedBucketHistogram();
+  const sqliteWriteDuration = createFixedBucketHistogram();
 
   return {
     recordMlsMessagePublished() {
@@ -214,6 +257,15 @@ export function createRelayMetrics(now = () => Date.now()): RelayMetrics {
     recordWebSocketConnectionRejection(reason) {
       incrementMap(webSocketConnectionRejectionsByReason, normalizeMetricType(reason));
     },
+    recordPublishToFanoutDuration(durationMs) {
+      publishToFanoutDuration.observe(millisecondsToSeconds(durationMs));
+    },
+    recordWebSocketSendDuration(durationMs) {
+      webSocketSendDuration.observe(millisecondsToSeconds(durationMs));
+    },
+    recordSqliteWriteDuration(durationMs) {
+      sqliteWriteDuration.observe(millisecondsToSeconds(durationMs));
+    },
     snapshot(activeSockets, gauges = {}) {
       return {
         activeSockets,
@@ -229,11 +281,39 @@ export function createRelayMetrics(now = () => Date.now()): RelayMetrics {
         webSocketConnectionAttemptsTotal,
         webSocketConnectionsAcceptedTotal,
         webSocketConnectionRejectionsByReason: Object.fromEntries(webSocketConnectionRejectionsByReason),
+        publishToFanoutDurationSeconds: publishToFanoutDuration.snapshot(),
+        webSocketSendDurationSeconds: webSocketSendDuration.snapshot(),
+        sqliteWriteDurationSeconds: sqliteWriteDuration.snapshot(),
         startedAt: new Date(startedAtMs).toISOString(),
         uptimeSeconds: Math.max(0, Math.floor((now() - startedAtMs) / 1000))
       };
     }
   };
+}
+
+const latencyBucketsSeconds = [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5] as const;
+
+function createFixedBucketHistogram() {
+  const counts = new Map(latencyBucketsSeconds.map((boundary) => [boundary, 0]));
+  let count = 0;
+  let sum = 0;
+  return {
+    observe(value: number) {
+      const finiteValue = Number.isFinite(value) ? Math.max(0, value) : 0;
+      count += 1;
+      sum += finiteValue;
+      for (const boundary of latencyBucketsSeconds) {
+        if (finiteValue <= boundary) counts.set(boundary, (counts.get(boundary) ?? 0) + 1);
+      }
+    },
+    snapshot(): RelayHistogramSnapshot {
+      return { buckets: Object.fromEntries(counts), count, sum };
+    }
+  };
+}
+
+function millisecondsToSeconds(durationMs: number): number {
+  return durationMs / 1_000;
 }
 
 function incrementMap(map: Map<string, number>, key: string) {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { logRelayEvent, relayMetricsToPrometheus } from "../src/observability.js";
+import { createRelayMetrics, logRelayEvent, relayMetricsToPrometheus } from "../src/observability.js";
 
 test("relay operational logs are structured and contain only explicit safe fields", () => {
   const lines: string[] = [];
@@ -37,6 +37,9 @@ test("Prometheus metrics are stable, typed, and escape labels", () => {
     webSocketConnectionAttemptsTotal: 7,
     webSocketConnectionsAcceptedTotal: 2,
     webSocketConnectionRejectionsByReason: { quota: 5 },
+    publishToFanoutDurationSeconds: { buckets: { "0.001": 0, "0.005": 2 }, count: 3, sum: 0.02 },
+    webSocketSendDurationSeconds: { buckets: { "0.001": 1 }, count: 1, sum: 0.001 },
+    sqliteWriteDurationSeconds: { buckets: { "0.001": 0 }, count: 2, sum: 0.004 },
     startedAt: "2026-01-01T00:00:00.000Z",
     uptimeSeconds: 8
   });
@@ -44,6 +47,27 @@ test("Prometheus metrics are stable, typed, and escape labels", () => {
   assert.match(output, /# TYPE multaiplayer_relay_envelopes_published_total counter/);
   assert.match(output, /multaiplayer_relay_active_sockets 2/);
   assert.match(output, /reason="bad\\"reason\\\\line\\n"} 4/);
+  assert.match(output, /multaiplayer_relay_publish_to_fanout_duration_seconds_bucket\{le="0\.005"} 2/);
+  assert.match(output, /multaiplayer_relay_publish_to_fanout_duration_seconds_bucket\{le="\+Inf"} 3/);
+  assert.match(output, /multaiplayer_relay_publish_to_fanout_duration_seconds_sum 0\.02/);
+  assert.match(output, /multaiplayer_relay_sqlite_write_duration_seconds_count 2/);
   assert.match(output, /multaiplayer_relay_start_time_seconds 1767225600/);
   assert.ok(output.endsWith("\n"));
+});
+
+test("latency histograms use cumulative fixed buckets and sanitize invalid durations", () => {
+  const metrics = createRelayMetrics(() => 0);
+  metrics.recordPublishToFanoutDuration(3);
+  metrics.recordPublishToFanoutDuration(20);
+  metrics.recordWebSocketSendDuration(Number.NaN);
+  metrics.recordSqliteWriteDuration(-5);
+
+  const snapshot = metrics.snapshot(0);
+  assert.equal(snapshot.publishToFanoutDurationSeconds.count, 2);
+  assert.equal(snapshot.publishToFanoutDurationSeconds.buckets["0.001"], 0);
+  assert.equal(snapshot.publishToFanoutDurationSeconds.buckets["0.005"], 1);
+  assert.equal(snapshot.publishToFanoutDurationSeconds.buckets["0.025"], 2);
+  assert.equal(snapshot.publishToFanoutDurationSeconds.sum, 0.023);
+  assert.equal(snapshot.webSocketSendDurationSeconds.buckets["0.001"], 1);
+  assert.equal(snapshot.sqliteWriteDurationSeconds.sum, 0);
 });

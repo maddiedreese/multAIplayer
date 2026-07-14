@@ -47,7 +47,7 @@ The official invitation transport is an HTTPS universal link, not a custom URL s
 
 ## Official relay deployment
 
-The official relay is a stronger operational commitment than a local self-hosted instance. Use stable HTTPS/WSS routing, persistent mounted storage, provider secret management, rollback support, health checks, backup support, and logs with redaction controls. One instance is acceptable for alpha; multi-instance operation requires shared storage and shared or edge rate limiting.
+The official relay is a stronger operational commitment than a local self-hosted instance. Use stable HTTPS/WSS routing, persistent mounted storage, provider secret management, rollback support, health checks, backup support, and logs with redaction controls. One instance is acceptable for alpha; a second replica is blocked on shared persistence/attachment coordination and the accepted [edge plus atomic shared-store rate-limiting contract](decisions/multi-instance-rate-limiting.md).
 
 Start from `.env.example` and set production values in the same environment that launches the relay. The critical shape is:
 
@@ -81,7 +81,7 @@ The doctor must pass before the endpoint is advertised. Also verify:
 - `/healthz` reports process health and `/readyz` becomes not-ready during shutdown;
 - WebSocket upgrades reach `/rooms` and enforce the exact browser origin;
 - a staged drain rejects new HTTP/WS work, closes sockets with `1012`, and flushes storage;
-- `/metrics` contains bounded counters rather than room content;
+- `/metrics` contains bounded counters and publish, WebSocket-send, and SQLite-write latency histograms rather than room content;
 - SQLite is mounted persistently outside `/tmp` and a staged backup restores successfully;
 - rate and quota failures are observable without plaintext payloads; and
 - relay storage and traffic contain no plaintext transcripts, attachments, repo files, terminal output, Codex/OpenAI credentials, or plaintext GitHub tokens.

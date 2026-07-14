@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeNative } from "../nativeCommandError";
 
 import { isTauriRuntime } from "./runtime";
 import type { BrowserOpenResult, BrowserProfileResult } from "./types";
@@ -11,7 +11,7 @@ export async function openBrowserView(
   persistent = true
 ): Promise<BrowserOpenResult> {
   if (isTauriRuntime()) {
-    return invoke<BrowserOpenResult>("open_browser_view", {
+    return invokeNative<BrowserOpenResult>("open_browser_view", {
       request: { roomId, projectPath, url, title, persistent }
     });
   }
@@ -31,7 +31,7 @@ export async function openBrowserView(
 
 export async function resetBrowserProfile(roomId: string, projectPath: string): Promise<BrowserProfileResult> {
   if (isTauriRuntime()) {
-    return invoke<BrowserProfileResult>("reset_browser_profile", {
+    return invokeNative<BrowserProfileResult>("reset_browser_profile", {
       request: { roomId, projectPath }
     });
   }

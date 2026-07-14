@@ -80,7 +80,7 @@ pub(crate) struct GitDiffResult {
 #[tauri::command]
 pub(crate) fn project_files(
     request: ProjectFileSearchRequest,
-) -> Result<Vec<ProjectFileEntry>, String> {
+) -> crate::command_error::CommandResult<Vec<ProjectFileEntry>> {
     ensure_existing_dir(&request.cwd)?;
     let root = canonical_project_root(&request.cwd)?;
     let query = request.query.trim().to_lowercase();
@@ -94,14 +94,14 @@ pub(crate) fn project_files(
 #[tauri::command]
 pub(crate) fn project_file_read(
     request: ProjectFileReadRequest,
-) -> Result<ProjectFileContent, String> {
+) -> crate::command_error::CommandResult<ProjectFileContent> {
     ensure_existing_dir(&request.cwd)?;
     let root = canonical_project_root(&request.cwd)?;
     let requested = safe_project_path(&root, &request.path)?;
     let metadata = fs::metadata(&requested)
         .map_err(|error| format!("Failed to read file metadata: {error}"))?;
     if !metadata.is_file() {
-        return Err(format!("{} is not a file", request.path));
+        return Err(format!("{} is not a file", request.path).into());
     }
     let image_extension = project_image_extension(&request.path);
     if image_extension.is_some() && metadata.len() > MAX_PROJECT_IMAGE_BYTES {
@@ -109,7 +109,8 @@ pub(crate) fn project_file_read(
             "Image is too large to attach safely ({} bytes; limit {} bytes)",
             metadata.len(),
             MAX_PROJECT_IMAGE_BYTES
-        ));
+        )
+        .into());
     }
     let max_bytes = request.max_bytes.unwrap_or(80_000).clamp(1_024, 250_000);
     let bytes = fs::read(&requested).map_err(|error| format!("Failed to read file: {error}"))?;
@@ -183,12 +184,12 @@ fn verified_project_image_media_type(
 #[tauri::command]
 pub(crate) fn project_file_write(
     request: ProjectFileWriteRequest,
-) -> Result<ProjectFileWriteResult, String> {
+) -> crate::command_error::CommandResult<ProjectFileWriteResult> {
     ensure_existing_dir(&request.cwd)?;
     let root = canonical_project_root(&request.cwd)?;
     let requested = safe_project_write_path(&root, &request.path)?;
     if request.content.len() > 1_000_000 {
-        return Err("File content is too large to save from the editor".to_string());
+        return Err("File content is too large to save from the editor".into());
     }
     fs::write(&requested, request.content.as_bytes())
         .map_err(|error| format!("Failed to write file: {error}"))?;
@@ -237,7 +238,9 @@ fn safe_project_write_path(root: &Path, relative_path: &str) -> Result<PathBuf, 
 }
 
 #[tauri::command]
-pub(crate) fn git_diff_file(request: GitDiffRequest) -> Result<GitDiffResult, String> {
+pub(crate) fn git_diff_file(
+    request: GitDiffRequest,
+) -> crate::command_error::CommandResult<GitDiffResult> {
     ensure_existing_dir(&request.cwd)?;
     let root = canonical_project_root(&request.cwd)?;
     let requested = safe_project_path(&root, &request.path)?;
@@ -256,7 +259,8 @@ pub(crate) fn git_diff_file(request: GitDiffRequest) -> Result<GitDiffResult, St
     if !status_output.status.success() {
         return Err(String::from_utf8_lossy(&status_output.stderr)
             .trim()
-            .to_string());
+            .to_string()
+            .into());
     }
 
     let status = String::from_utf8_lossy(&status_output.stdout);
@@ -274,7 +278,10 @@ pub(crate) fn git_diff_file(request: GitDiffRequest) -> Result<GitDiffResult, St
         .output()
         .map_err(|error| format!("Failed to run git diff: {error}"))?;
     if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+        return Err(String::from_utf8_lossy(&output.stderr)
+            .trim()
+            .to_string()
+            .into());
     }
 
     Ok(GitDiffResult {

@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeNative } from "../nativeCommandError";
 
 import { isTauriRuntime } from "./runtime";
 import type {
@@ -11,7 +11,7 @@ import type {
 
 export async function detectLocalPreviewServers(): Promise<LocalPreviewDetectedServer[]> {
   if (isTauriRuntime()) {
-    return invoke<LocalPreviewDetectedServer[]>("detect_local_preview_servers");
+    return invokeNative<LocalPreviewDetectedServer[]>("detect_local_preview_servers");
   }
 
   return [
@@ -22,7 +22,7 @@ export async function detectLocalPreviewServers(): Promise<LocalPreviewDetectedS
 
 export async function probeCloudflared(): Promise<CloudflaredProbe> {
   if (isTauriRuntime()) {
-    return invoke<CloudflaredProbe>("probe_cloudflared");
+    return invokeNative<CloudflaredProbe>("probe_cloudflared");
   }
 
   return {
@@ -34,7 +34,7 @@ export async function probeCloudflared(): Promise<CloudflaredProbe> {
 
 export async function startLocalPreviewTunnel(id: string, localUrl: string): Promise<LocalPreviewStartResult> {
   if (isTauriRuntime()) {
-    return invoke<LocalPreviewStartResult>("local_preview_start", {
+    return invokeNative<LocalPreviewStartResult>("local_preview_start", {
       request: { id, localUrl }
     });
   }
@@ -49,7 +49,7 @@ export async function startLocalPreviewTunnel(id: string, localUrl: string): Pro
 
 export async function stopLocalPreviewTunnel(id: string): Promise<LocalPreviewStopResult> {
   if (isTauriRuntime()) {
-    return invoke<LocalPreviewStopResult>("local_preview_stop", { id });
+    return invokeNative<LocalPreviewStopResult>("local_preview_stop", { id });
   }
 
   return {
@@ -62,7 +62,7 @@ export async function stopLocalPreviewTunnel(id: string): Promise<LocalPreviewSt
 
 export async function readLocalPreviewTunnelStatus(id: string): Promise<LocalPreviewStatusResult> {
   if (isTauriRuntime()) {
-    return invoke<LocalPreviewStatusResult>("local_preview_status", { id });
+    return invokeNative<LocalPreviewStatusResult>("local_preview_status", { id });
   }
 
   return {

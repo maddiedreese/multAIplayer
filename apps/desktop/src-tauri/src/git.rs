@@ -90,7 +90,7 @@ pub(crate) struct GitWorkflowRequest {
 }
 
 #[tauri::command]
-pub(crate) fn git_status(cwd: String) -> Result<GitStatusSummary, String> {
+pub(crate) fn git_status(cwd: String) -> crate::command_error::CommandResult<GitStatusSummary> {
     ensure_existing_dir(&cwd)?;
 
     let branch_output = Command::new("git")
@@ -106,7 +106,8 @@ pub(crate) fn git_status(cwd: String) -> Result<GitStatusSummary, String> {
     if !status_output.status.success() {
         return Err(String::from_utf8_lossy(&status_output.stderr)
             .trim()
-            .to_string());
+            .to_string()
+            .into());
     }
 
     let branch = String::from_utf8_lossy(&branch_output.stdout)
@@ -143,7 +144,7 @@ pub(crate) fn git_status(cwd: String) -> Result<GitStatusSummary, String> {
 }
 
 #[tauri::command]
-pub(crate) fn git_remote_origin(cwd: String) -> Result<GitRemoteInfo, String> {
+pub(crate) fn git_remote_origin(cwd: String) -> crate::command_error::CommandResult<GitRemoteInfo> {
     ensure_existing_dir(&cwd)?;
 
     let output = Command::new("git")
@@ -166,7 +167,7 @@ pub(crate) fn git_remote_origin(cwd: String) -> Result<GitRemoteInfo, String> {
 }
 
 #[tauri::command]
-pub(crate) fn git_create_patch(cwd: String) -> Result<GitPatchResult, String> {
+pub(crate) fn git_create_patch(cwd: String) -> crate::command_error::CommandResult<GitPatchResult> {
     ensure_existing_dir(&cwd)?;
     let status = git_status(cwd.clone())?;
     if status.files.is_empty() {
@@ -182,7 +183,10 @@ pub(crate) fn git_create_patch(cwd: String) -> Result<GitPatchResult, String> {
         .output()
         .map_err(|error| format!("Failed to create git patch: {error}"))?;
     if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+        return Err(String::from_utf8_lossy(&output.stderr)
+            .trim()
+            .to_string()
+            .into());
     }
 
     let mut patch = String::from_utf8_lossy(&output.stdout).to_string();
@@ -230,7 +234,9 @@ pub(crate) fn git_create_patch(cwd: String) -> Result<GitPatchResult, String> {
 }
 
 #[tauri::command]
-pub(crate) fn git_clone_repository(request: GitCloneRequest) -> Result<GitCloneResult, String> {
+pub(crate) fn git_clone_repository(
+    request: GitCloneRequest,
+) -> crate::command_error::CommandResult<GitCloneResult> {
     ensure_git_remote_url(&request.remote_url)?;
     ensure_existing_dir(&request.parent_dir)?;
     if let Some(branch) = request.branch.as_deref() {
@@ -265,7 +271,7 @@ pub(crate) fn git_clone_repository(request: GitCloneRequest) -> Result<GitCloneR
 #[tauri::command]
 pub(crate) fn git_apply_patch(
     request: GitApplyPatchRequest,
-) -> Result<GitApplyPatchResult, String> {
+) -> crate::command_error::CommandResult<GitApplyPatchResult> {
     ensure_existing_dir(&request.cwd)?;
     ensure_git_patch(&request.patch)?;
     let mut child = Command::new("git")
@@ -293,7 +299,9 @@ pub(crate) fn git_apply_patch(
 }
 
 #[tauri::command]
-pub(crate) fn run_git_workflow(request: GitWorkflowRequest) -> Result<Vec<CommandResult>, String> {
+pub(crate) fn run_git_workflow(
+    request: GitWorkflowRequest,
+) -> crate::command_error::CommandResult<Vec<CommandResult>> {
     ensure_existing_dir(&request.cwd)?;
     ensure_safe_branch_name(&request.branch)?;
     let commit_message = normalize_commit_message(&request.message)?;

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { RelayHttpError } from "../src/lib/httpResponse";
 import { createOnboardingInviteJoinAdapter } from "../src/lib/onboardingInviteJoin";
+import { InviteJoinError, type InviteJoinErrorCode } from "../src/lib/inviteJoinError";
 
 const manualInvite = "https://app.example.test/#invite=invite_123&multaiplayerJoin=protected-fragment&approval=request";
 
@@ -128,15 +129,17 @@ test("relay errors map to actionable fixed statuses without forwarding server de
   assert.doesNotMatch(JSON.stringify(statuses), /server-secret|private\/project|bearer=hidden|database host/);
 });
 
-test("host binding failures are fixed verification errors and arbitrary failures stay retryable", async () => {
-  for (const message of [
-    "Invite metadata does not match the protected URL fragment.",
-    "The invite is not issued by the active host device.",
-    "The invite host HPKE key does not match the registered device."
-  ]) {
+test("host binding codes are fixed verification errors independent of prose", async () => {
+  const codes: InviteJoinErrorCode[] = [
+    "invite_metadata_mismatch",
+    "active_host_mismatch",
+    "host_hpke_key_mismatch",
+    "key_package_hash_mismatch"
+  ];
+  for (const code of codes) {
     const adapter = createOnboardingInviteJoinAdapter({
       requestNoSecretInviteAccess: async () => {
-        throw new Error(message);
+        throw new InviteJoinError(code, `copy may change for ${code}`);
       }
     });
     assert.equal((await adapter.joinManualInput(manualInvite)).status, "verification_failed");

@@ -91,7 +91,7 @@ pub(crate) struct BrowserProfileResult {
 pub(crate) fn open_browser_view(
     app: AppHandle,
     request: BrowserOpenRequest,
-) -> Result<BrowserOpenResult, String> {
+) -> crate::command_error::CommandResult<BrowserOpenResult> {
     let url = validate_browser_url(&request.url)?;
     let persistent = request.persistent.unwrap_or(true);
 
@@ -177,7 +177,7 @@ pub(crate) fn open_browser_view(
 pub(crate) fn reset_browser_profile(
     app: AppHandle,
     request: BrowserProfileRequest,
-) -> Result<BrowserProfileResult, String> {
+) -> crate::command_error::CommandResult<BrowserProfileResult> {
     let label = browser_window_label(&request.room_id, request.project_path.as_deref())?;
     if let Some(window) = app.get_webview_window(&label) {
         window

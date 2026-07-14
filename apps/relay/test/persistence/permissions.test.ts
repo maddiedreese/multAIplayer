@@ -39,3 +39,22 @@ test("persistence preserves existing parent permissions while protecting store f
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("SQLite persistence reports synchronous write durations", async () => {
+  const root = await mkdtemp(join(tmpdir(), "multaiplayer-sqlite-duration-test-"));
+  const durations: number[] = [];
+  try {
+    const persistence = createRelayPersistence({
+      backend: "sqlite",
+      dataPath: join(root, "relay-store.sqlite"),
+      recordSqliteWriteDuration: (duration) => durations.push(duration)
+    });
+    await persistence.save({ version: 1, teams: [], rooms: [], invites: [], mlsBacklog: [] });
+    await persistence.saveChanges([]);
+    persistence.close();
+    assert.equal(durations.length, 1);
+    assert.ok(durations[0]! >= 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

@@ -8,12 +8,13 @@ pub fn open_trusted_authentication_url<R: Runtime>(
     app: AppHandle<R>,
     provider: String,
     url: String,
-) -> Result<(), String> {
-    let trusted = validate_authentication_url(&provider, &url)
-        .map_err(|()| "The authentication URL was not trusted.".to_string())?;
+) -> crate::command_error::CommandResult<()> {
+    let trusted = validate_authentication_url(&provider, &url).map_err(|()| {
+        crate::command_error::CommandError::from("The authentication URL was not trusted.")
+    })?;
     app.opener()
         .open_url(trusted.as_str(), None::<&str>)
-        .map_err(|_| "The system browser could not be opened.".to_string())
+        .map_err(|_| "The system browser could not be opened.".into())
 }
 
 fn validate_authentication_url(provider: &str, value: &str) -> Result<Url, ()> {

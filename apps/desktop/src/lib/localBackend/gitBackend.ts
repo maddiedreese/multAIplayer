@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeNative } from "../nativeCommandError";
 
 import { isTauriRuntime } from "./runtime";
 import type {
@@ -17,7 +17,7 @@ function nativeGitUnavailable(): never {
 
 export async function getGitStatus(cwd: string): Promise<GitStatusSummary> {
   if (isTauriRuntime()) {
-    return invoke<GitStatusSummary>("git_status", { cwd });
+    return invokeNative<GitStatusSummary>("git_status", { cwd });
   }
 
   return nativeGitUnavailable();
@@ -25,7 +25,7 @@ export async function getGitStatus(cwd: string): Promise<GitStatusSummary> {
 
 export async function getGitRemoteOrigin(cwd: string): Promise<GitRemoteInfo> {
   if (isTauriRuntime()) {
-    return invoke<GitRemoteInfo>("git_remote_origin", { cwd });
+    return invokeNative<GitRemoteInfo>("git_remote_origin", { cwd });
   }
 
   return nativeGitUnavailable();
@@ -33,7 +33,7 @@ export async function getGitRemoteOrigin(cwd: string): Promise<GitRemoteInfo> {
 
 export async function getGitDiff(cwd: string, path: string): Promise<GitDiffResult> {
   if (isTauriRuntime()) {
-    return invoke<GitDiffResult>("git_diff_file", {
+    return invokeNative<GitDiffResult>("git_diff_file", {
       request: { cwd, path }
     });
   }
@@ -43,7 +43,7 @@ export async function getGitDiff(cwd: string, path: string): Promise<GitDiffResu
 
 export async function createGitPatch(cwd: string): Promise<GitPatchResult> {
   if (isTauriRuntime()) {
-    return invoke<GitPatchResult>("git_create_patch", { cwd });
+    return invokeNative<GitPatchResult>("git_create_patch", { cwd });
   }
 
   return nativeGitUnavailable();
@@ -55,7 +55,7 @@ export async function cloneGitRepository(
   branch?: string
 ): Promise<GitCloneResult> {
   if (isTauriRuntime()) {
-    return invoke<GitCloneResult>("git_clone_repository", {
+    return invokeNative<GitCloneResult>("git_clone_repository", {
       request: { remoteUrl, parentDir, branch }
     });
   }
@@ -65,7 +65,7 @@ export async function cloneGitRepository(
 
 export async function applyGitPatch(cwd: string, patch: string): Promise<GitApplyPatchResult> {
   if (isTauriRuntime()) {
-    return invoke<GitApplyPatchResult>("git_apply_patch", {
+    return invokeNative<GitApplyPatchResult>("git_apply_patch", {
       request: { cwd, patch }
     });
   }
@@ -80,7 +80,7 @@ export async function runGitWorkflow(
   push: boolean
 ): Promise<GitWorkflowResult[]> {
   if (isTauriRuntime()) {
-    return invoke<GitWorkflowResult[]>("run_git_workflow", {
+    return invokeNative<GitWorkflowResult[]>("run_git_workflow", {
       request: { cwd, branch, message, push }
     });
   }

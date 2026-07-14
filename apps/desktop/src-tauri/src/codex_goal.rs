@@ -45,7 +45,7 @@ pub(crate) fn set_codex_goal(
     request: CodexGoalSetRequest,
     app: tauri::AppHandle,
     rpc_state: tauri::State<'_, CodexRpcState>,
-) -> Result<CodexGoal, String> {
+) -> crate::command_error::CommandResult<CodexGoal> {
     ensure_room_id(&request.room_id)?;
     let thread_id = normalize_codex_thread_id(Some(&request.thread_id))?
         .ok_or_else(|| "Codex thread id is required before setting a goal.".to_string())?;
@@ -57,7 +57,7 @@ pub(crate) fn set_codex_goal(
         | Some("usageLimited")
         | Some("budgetLimited")
         | Some("complete") => request.status,
-        Some(_) => return Err("Codex goal status is invalid.".to_string()),
+        Some(_) => return Err("Codex goal status is invalid.".into()),
     };
     let room_id = request.room_id.clone();
     let response = run_codex_goal_request(
@@ -72,7 +72,7 @@ pub(crate) fn set_codex_goal(
         }),
         (&app, rpc_state.inner().clone(), room_id),
     )?;
-    parse_codex_goal_response(&response)
+    Ok(parse_codex_goal_response(&response)?)
 }
 
 #[tauri::command]
@@ -80,7 +80,7 @@ pub(crate) fn get_codex_goal(
     request: CodexGoalThreadRequest,
     app: tauri::AppHandle,
     rpc_state: tauri::State<'_, CodexRpcState>,
-) -> Result<Option<CodexGoal>, String> {
+) -> crate::command_error::CommandResult<Option<CodexGoal>> {
     ensure_room_id(&request.room_id)?;
     let thread_id = normalize_codex_thread_id(Some(&request.thread_id))?
         .ok_or_else(|| "Codex thread id is required before reading a goal.".to_string())?;
@@ -109,7 +109,7 @@ pub(crate) fn clear_codex_goal(
     request: CodexGoalThreadRequest,
     app: tauri::AppHandle,
     rpc_state: tauri::State<'_, CodexRpcState>,
-) -> Result<(), String> {
+) -> crate::command_error::CommandResult<()> {
     ensure_room_id(&request.room_id)?;
     let thread_id = normalize_codex_thread_id(Some(&request.thread_id))?
         .ok_or_else(|| "Codex thread id is required before clearing a goal.".to_string())?;

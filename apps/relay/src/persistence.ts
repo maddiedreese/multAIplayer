@@ -9,8 +9,14 @@ export function createRelayPersistence(options: {
   backend: RelayStorageBackend;
   dataPath: string;
   legacyJsonImportPath?: string | null;
+  recordSqliteWriteDuration?: (durationMs: number) => void;
 }): RelayPersistence {
   return options.backend === "sqlite"
-    ? new SqliteRelayPersistence(options.dataPath, options.legacyJsonImportPath ?? null)
+    ? new SqliteRelayPersistence(
+        options.dataPath,
+        options.legacyJsonImportPath ?? null,
+        undefined,
+        options.recordSqliteWriteDuration
+      )
     : new JsonFileRelayPersistence(options.dataPath);
 }

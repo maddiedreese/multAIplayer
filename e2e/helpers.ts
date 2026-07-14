@@ -1,4 +1,5 @@
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 export const appUrl = "http://127.0.0.1:1421";
 export const relayUrl = "http://127.0.0.1:4322";
@@ -33,6 +34,19 @@ export function attachPageDiagnostics(page: Page): void {
   page.on("requestfailed", (request) =>
     console.error(`[browser request failed] ${request.method()} ${request.url()} ${request.failure()?.errorText ?? ""}`)
   );
+}
+
+export async function expectNoAxeViolations(page: Page): Promise<void> {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
+  const summary = results.violations.map((violation) => ({
+    id: violation.id,
+    impact: violation.impact,
+    help: violation.help,
+    nodes: violation.nodes.map((node) => node.target)
+  }));
+  expect(summary, "axe found WCAG A/AA accessibility violations").toEqual([]);
 }
 
 export async function authenticateContext(

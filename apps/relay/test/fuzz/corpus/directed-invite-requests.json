@@ -1,0 +1,17 @@
+[
+  {
+    "name": "canonical minimum ciphertext",
+    "expected": "accepted",
+    "value": "{\"version\":3,\"binding\":{\"version\":3,\"phase\":\"request\",\"inviteId\":\"invite-corpus\",\"teamId\":\"team-corpus\",\"roomId\":\"room-corpus\",\"keyEpoch\":0,\"keyPackageHash\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"requestId\":\"request-corpus\",\"requestNonce\":\"request_nonce_1234\",\"requesterUserId\":\"github:joiner\",\"requesterDeviceId\":\"device-joiner\",\"hostUserId\":\"github:host\",\"hostDeviceId\":\"device-host\",\"expiresAt\":\"2030-01-01T00:00:00.000Z\",\"status\":null,\"decidedAt\":null},\"sealedPayload\":{\"version\":1,\"kem_id\":16,\"kdf_id\":1,\"aead_id\":1,\"encapsulated_key\":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],\"ciphertext\":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}}"
+  },
+  {
+    "name": "noncanonical top-level order",
+    "expected": "rejected",
+    "value": "{\"binding\":{},\"version\":3,\"sealedPayload\":{}}"
+  },
+  {
+    "name": "control character",
+    "expected": "rejected",
+    "value": "{\"version\":3}\n"
+  }
+]

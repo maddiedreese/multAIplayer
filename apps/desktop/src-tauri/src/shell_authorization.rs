@@ -245,7 +245,7 @@ pub(crate) async fn authorize_shell_execution(
     app: AppHandle,
     state: State<'_, ShellAuthorizationState>,
     request: ShellAuthorizationRequest,
-) -> Result<String, String> {
+) -> crate::command_error::CommandResult<String> {
     validate_authorization_request(&request)?;
     let canonical_cwd = canonical_workspace(&request.cwd)?;
     // State methods independently canonicalize before matching or storing authority. Keep the
@@ -253,7 +253,7 @@ pub(crate) async fn authorize_shell_execution(
     let request_for_issue = request.clone();
     let review_risk = command_review_risk(&request_for_issue.command);
     if review_risk.is_none() && state.has_exact_command_grant(&request_for_issue)? {
-        return state.issue(&request_for_issue);
+        return Ok(state.issue(&request_for_issue)?);
     }
     state.begin_confirmation()?;
     let source = match request.kind {
@@ -320,12 +320,12 @@ pub(crate) async fn authorize_shell_execution(
         || matches!(decision, MessageDialogResult::Custom(ref value) if value == "Run once" || value == "Start terminal" || value == "Allow once")
         || (reusable && review_risk.is_none());
     if !approved {
-        return Err("Command execution was denied in the native confirmation dialog".to_string());
+        return Err("Command execution was denied in the native confirmation dialog".into());
     }
     if reusable {
         state.grant_exact_command(&request_for_issue)?;
     }
-    state.issue(&request_for_issue)
+    Ok(state.issue(&request_for_issue)?)
 }
 
 #[tauri::command]
@@ -333,7 +333,7 @@ pub(crate) async fn clear_shell_execution_grants(
     app: AppHandle,
     state: State<'_, ShellAuthorizationState>,
     room_id: String,
-) -> Result<usize, String> {
+) -> crate::command_error::CommandResult<usize> {
     ensure_room_id(&room_id)?;
     state.begin_confirmation()?;
     let room_for_dialog = room_id.clone();
@@ -355,9 +355,9 @@ pub(crate) async fn clear_shell_execution_grants(
     let approved =
         dialog_result.map_err(|error| format!("Native grant revocation failed: {error}"))?;
     if !approved {
-        return Err("Command-grant revocation was cancelled".to_string());
+        return Err("Command-grant revocation was cancelled".into());
     }
-    state.clear_exact_command_grants(&room_id)
+    Ok(state.clear_exact_command_grants(&room_id)?)
 }
 
 #[tauri::command]
@@ -365,7 +365,7 @@ pub(crate) async fn authorize_terminal_input(
     app: AppHandle,
     state: State<'_, ShellAuthorizationState>,
     request: TerminalInputAuthorizationRequest,
-) -> Result<String, String> {
+) -> crate::command_error::CommandResult<String> {
     validate_terminal_input_authorization_request(&request)?;
     state.begin_confirmation()?;
     let message = format!(
@@ -391,9 +391,9 @@ pub(crate) async fn authorize_terminal_input(
     let approved = dialog_result
         .map_err(|error| format!("Native terminal input confirmation failed: {error}"))?;
     if !approved {
-        return Err("Terminal input was denied in the native confirmation dialog".to_string());
+        return Err("Terminal input was denied in the native confirmation dialog".into());
     }
-    state.issue_terminal_input(&request)
+    Ok(state.issue_terminal_input(&request)?)
 }
 
 fn validate_authorization_request(request: &ShellAuthorizationRequest) -> Result<(), String> {
