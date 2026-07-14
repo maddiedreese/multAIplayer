@@ -31,6 +31,12 @@ import {
   publishPendingInviteRequest,
   runPendingInviteRecoveryLoop
 } from "./pendingInviteRecovery";
+import {
+  PendingInviteWaitRegistry,
+  runOwnedPendingInviteRecovery,
+  type PendingInviteWaitObserver,
+  type PendingInviteWaitOwnership
+} from "./pendingInviteWaitRegistry";
 
 type InviteJoinActionOptions = Pick<
   UseInviteActionsOptions,
@@ -48,7 +54,7 @@ type InviteJoinStore = Pick<
   | "updateInviteRequestStatus"
 >;
 
-const pendingInviteWaits = new Set<string>();
+const pendingInviteWaits = new PendingInviteWaitRegistry();
 
 export function assertPendingInviteRecoveryContext(
   pending: PendingMlsInviteRequest,
@@ -99,16 +105,20 @@ export function pendingInviteHasMatchingAdmission(
   );
 }
 
-export async function loadResumablePendingInvites(
+export async function loadObservedResumablePendingInvites(
+  registry: PendingInviteWaitRegistry,
   loadAdmissions: () => Promise<MlsJoinAdmission[]>,
-  loadPending: () => Promise<PendingMlsInviteRequest[]>,
-  isActive: (requestId: string) => boolean
-): Promise<PendingMlsInviteRequest[]> {
-  const admissions = await loadAdmissions();
-  const pending = await loadPending();
-  return pending.filter(
-    (request) => !isActive(request.requestId) && !pendingInviteHasMatchingAdmission(request, admissions)
-  );
+  loadPending: () => Promise<PendingMlsInviteRequest[]>
+): Promise<Array<{ pending: PendingMlsInviteRequest; observer: PendingInviteWaitObserver }>> {
+  const scan = registry.beginScan();
+  try {
+    const admissions = await loadAdmissions();
+    const pending = (await loadPending()).filter((request) => !pendingInviteHasMatchingAdmission(request, admissions));
+    const observers = scan.observe(pending.map((request) => request.requestId));
+    return pending.map((request) => ({ pending: request, observer: observers.get(request.requestId)! }));
+  } finally {
+    scan.release();
+  }
 }
 
 export function createInviteJoinActions(
@@ -210,9 +220,13 @@ export function createInviteJoinActions(
     void waitForResponse(pendingRequest, metadata.room.name);
   }
 
-  async function waitForResponse(pending: PendingMlsInviteRequest, roomName: string) {
-    if (pendingInviteWaits.has(pending.requestId)) return;
-    pendingInviteWaits.add(pending.requestId);
+  async function waitForResponse(
+    pending: PendingMlsInviteRequest,
+    roomName: string,
+    transferredOwnership?: PendingInviteWaitOwnership
+  ) {
+    const ownership = transferredOwnership ?? pendingInviteWaits.claim(pending.requestId);
+    if (!ownership) return;
     const { requestId, roomId } = pending;
     try {
       const result = await runPendingInviteRecoveryLoop(pending, {
@@ -245,16 +259,19 @@ export function createInviteJoinActions(
         }
       });
       if (result === "expired") {
+        ownership.settle();
         store.updateInviteRequestStatus(roomId, requestId, "denied");
         store.setInviteMessageForRoom(roomId, "The pending invite expired before the host responded.");
         return;
       }
       if (result === "denied") {
+        ownership.settle();
         store.updateInviteRequestStatus(roomId, requestId, "denied");
         store.setInviteMessageForRoom(roomId, `The host denied access to ${roomName}.`);
         return;
       }
       if (result === "admission-pending") {
+        ownership.settle();
         store.setInviteMessageForRoom(
           roomId,
           "The host approved this device. Relay admission is pending and will resume after reconnecting."
@@ -262,6 +279,7 @@ export function createInviteJoinActions(
         return;
       }
       if (result === "approved") {
+        ownership.settle();
         store.updateInviteRequestStatus(roomId, requestId, "approved");
         store.setInviteMessageForRoom(roomId, `The host approved this device. ${roomName} is now unlocked.`);
         return;
@@ -269,6 +287,7 @@ export function createInviteJoinActions(
       store.setInviteMessageForRoom(roomId, "The invite request is still pending and will retry after reconnecting.");
     } catch (error) {
       const cleared = await clearPendingInviteIfMissing(error, pending, completePendingMlsInviteRequest);
+      if (cleared) ownership.settle();
       store.setInviteMessageForRoom(
         roomId,
         cleared
@@ -276,7 +295,7 @@ export function createInviteJoinActions(
           : `Could not join the MLS group: ${String(error)}`
       );
     } finally {
-      pendingInviteWaits.delete(requestId);
+      ownership.release();
     }
   }
 
@@ -285,48 +304,61 @@ export function createInviteJoinActions(
     // Snapshot admissions first. Native completion removes the pending request
     // before its superseding admission, so this ordering cannot rediscover a
     // consumed relay invite after admission recovery has already won the race.
-    const pendingRequests = await loadResumablePendingInvites(
+    const pendingRequests = await loadObservedResumablePendingInvites(
+      pendingInviteWaits,
       listMlsJoinAdmissions,
-      listPendingMlsInviteRequests,
-      (requestId) => pendingInviteWaits.has(requestId)
+      listPendingMlsInviteRequests
     );
-    for (const pending of pendingRequests) {
-      try {
-        const metadata = await lookupInvite(pending.inviteId);
-        assertPendingInviteRecoveryContext(pending, { userId: localUser.id, deviceId }, metadata);
-        upsertTeam(metadata.team);
-        upsertRoom(ensureRoomDefaults(metadata.room));
-        store.restoreWorkspaceAccess(pending.teamId, pending.roomId);
-        store.setInviteAdmissionForRoom(pending.roomId, pending.inviteId);
-        store.initializeMessagesForRoom(pending.roomId);
-        synchronizeMlsRecoverySelection(pending, useAppStore.getState());
-        const existing = useAppStore
-          .getState()
-          .inviteByRoom?.[pending.roomId]?.requests?.some((request) => request.id === pending.requestId);
-        if (!existing) {
-          store.appendInviteRequest(pending.roomId, {
-            id: pending.requestId,
-            inviteId: pending.inviteId,
-            requester: localUser.name,
-            requesterUserId: pending.requesterUserId,
-            requesterDeviceId: pending.requesterDeviceId,
-            keyPackageId: pending.keyPackageId,
-            keyPackageHash: pending.keyPackageHash,
-            requestedAt: new Date().toISOString(),
-            note: `Recovering access to ${metadata.room.name}.`,
-            status: "pending"
-          });
-        }
-        void waitForResponse(pending, metadata.room.name);
-      } catch (error) {
-        const cleared = await clearPendingInviteIfMissing(error, pending, completePendingMlsInviteRequest);
-        store.setInviteMessageForRoom(
-          pending.roomId,
-          cleared
-            ? "The pending invite is no longer available on the relay."
-            : `Could not recover the pending invite: ${String(error)}`
-        );
+    try {
+      for (const { pending, observer } of pendingRequests) {
+        await runOwnedPendingInviteRecovery({
+          observer,
+          load: async () => {
+            const metadata = await lookupInvite(pending.inviteId);
+            assertPendingInviteRecoveryContext(pending, { userId: localUser.id, deviceId }, metadata);
+            return metadata;
+          },
+          recover: (metadata, ownership) => {
+            upsertTeam(metadata.team);
+            upsertRoom(ensureRoomDefaults(metadata.room));
+            store.restoreWorkspaceAccess(pending.teamId, pending.roomId);
+            store.setInviteAdmissionForRoom(pending.roomId, pending.inviteId);
+            store.initializeMessagesForRoom(pending.roomId);
+            synchronizeMlsRecoverySelection(pending, useAppStore.getState());
+            const existing = useAppStore
+              .getState()
+              .inviteByRoom?.[pending.roomId]?.requests?.some((request) => request.id === pending.requestId);
+            if (!existing) {
+              store.appendInviteRequest(pending.roomId, {
+                id: pending.requestId,
+                inviteId: pending.inviteId,
+                requester: localUser.name,
+                requesterUserId: pending.requesterUserId,
+                requesterDeviceId: pending.requesterDeviceId,
+                keyPackageId: pending.keyPackageId,
+                keyPackageHash: pending.keyPackageHash,
+                requestedAt: new Date().toISOString(),
+                note: `Recovering access to ${metadata.room.name}.`,
+                status: "pending"
+              });
+            }
+            void waitForResponse(pending, metadata.room.name, ownership);
+            return "transfer";
+          },
+          onError: async (error, ownership) => {
+            const cleared = await clearPendingInviteIfMissing(error, pending, completePendingMlsInviteRequest);
+            if (cleared) ownership.settle();
+            store.setInviteMessageForRoom(
+              pending.roomId,
+              cleared
+                ? "The pending invite is no longer available on the relay."
+                : `Could not recover the pending invite: ${String(error)}`
+            );
+          }
+        });
       }
+    } finally {
+      for (const { observer } of pendingRequests) observer.release();
     }
   }
 

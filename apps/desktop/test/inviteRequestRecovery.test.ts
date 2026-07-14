@@ -3,10 +3,11 @@ import test from "node:test";
 import {
   assertInviteHostDevice,
   assertPendingInviteRecoveryContext,
-  loadResumablePendingInvites,
+  loadObservedResumablePendingInvites,
   pendingInviteHasMatchingAdmission
 } from "../src/lib/invite/inviteJoinActions";
 import { inviteRequesterDeviceMatches } from "../src/lib/invite/inviteRelayActions";
+import { PendingInviteWaitRegistry } from "../src/lib/invite/pendingInviteWaitRegistry";
 import type { PendingMlsInviteRequest } from "../src/lib/mlsClient";
 
 const pending: PendingMlsInviteRequest = {
@@ -134,6 +135,7 @@ test("a durable admission supersedes only its exact pending invite request", () 
 });
 
 test("pending recovery snapshots admissions first and skips admitted or already-active requests", async () => {
+  const registry = new PendingInviteWaitRegistry();
   const order: string[] = [];
   const otherPending = { ...pending, inviteId: "invite-2", requestId: "request-2" };
   const activePending = { ...pending, inviteId: "invite-3", requestId: "request-3" };
@@ -146,7 +148,10 @@ test("pending recovery snapshots admissions first and skips admitted or already-
     requesterDeviceId: pending.requesterDeviceId
   };
 
-  const result = await loadResumablePendingInvites(
+  const activeOwnership = registry.claim(activePending.requestId);
+  assert.ok(activeOwnership);
+  const result = await loadObservedResumablePendingInvites(
+    registry,
     async () => {
       order.push("admissions");
       return [admission];
@@ -154,10 +159,55 @@ test("pending recovery snapshots admissions first and skips admitted or already-
     async () => {
       order.push("pending");
       return [pending, activePending, otherPending];
-    },
-    (requestId) => requestId === activePending.requestId
+    }
   );
 
   assert.deepEqual(order, ["admissions", "pending"]);
-  assert.deepEqual(result, [otherPending]);
+  assert.deepEqual(
+    result.map(({ pending: observed }) => observed),
+    [activePending, otherPending]
+  );
+  assert.equal(result[0]?.observer.claim(), null);
+  const otherOwnership = result[1]?.observer.claim();
+  assert.ok(otherOwnership);
+  otherOwnership.release();
+  activeOwnership.release();
+  assert.equal(registry.trackedCount(), 0);
+});
+
+test("a pending-list scan retains a terminal result across a deferred snapshot and more than 256 settlements", async () => {
+  const registry = new PendingInviteWaitRegistry();
+  let resolvePending: (value: PendingMlsInviteRequest[]) => void = () => undefined;
+  let pendingLoadStarted: () => void = () => undefined;
+  const loadStarted = new Promise<void>((resolve) => {
+    pendingLoadStarted = resolve;
+  });
+  const deferredPending = new Promise<PendingMlsInviteRequest[]>((resolve) => {
+    resolvePending = resolve;
+  });
+  const loading = loadObservedResumablePendingInvites(
+    registry,
+    async () => [],
+    async () => {
+      pendingLoadStarted();
+      return deferredPending;
+    }
+  );
+  await loadStarted;
+
+  const terminal = registry.claim(pending.requestId);
+  assert.ok(terminal);
+  terminal.settle();
+  terminal.release();
+  for (let index = 0; index < 300; index += 1) {
+    const later = registry.claim(`later-${index}`);
+    assert.ok(later);
+    later.settle();
+    later.release();
+  }
+  resolvePending([pending]);
+
+  const [{ observer }] = await loading;
+  assert.equal(observer.claim(), null);
+  assert.equal(registry.trackedCount(), 0);
 });
