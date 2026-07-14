@@ -23,6 +23,7 @@ export function buildRoomInspectorModelProjection(
   return {
     selectedModel,
     selectedReasoningEffort: room.codexReasoningEffort ?? defaultCodexReasoningEffort,
+    rawReasoningEnabled: room.codexRawReasoningEnabled ?? false,
     selectedSpeed: room.codexSpeed ?? defaultCodexSpeed,
     selectedSandboxLevel: room.codexSandboxLevel ?? defaultCodexSandboxLevel,
     customModel: customModelDraft ?? selectedModel,

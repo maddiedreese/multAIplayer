@@ -539,6 +539,46 @@ test("room settings actions report room locks through the current store without 
   assert.deepEqual(settingsBusyRef.current, {});
 });
 
+test("room settings actions publish the host-controlled raw reasoning sharing decision", async () => {
+  const originalFetch = globalThis.fetch;
+  const events: Array<{ setting: string; previousValue: string; nextValue: string }> = [];
+  let requestBody: Record<string, unknown> | null = null;
+  globalThis.fetch = async (_input, init) => {
+    requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    return new Response(JSON.stringify({ room: { ...room, codexRawReasoningEnabled: true } }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const actions = createRoomSettingsActions({
+      selectedRoomIdRef: { current: room.id },
+      settingsBusyRef: { current: {} },
+      approvalPolicyLabels: { ask_every_turn: "Ask every turn" },
+      reportRoomSettingsMutationInFlight: () => false,
+      replaceRoom: () => undefined,
+      publishRoomSettingsEvent: async (_updatedRoom, event) =>
+        events.push({
+          setting: event.setting,
+          previousValue: event.previousValue,
+          nextValue: event.nextValue
+        })
+    });
+
+    await actions.setCodexRawReasoningEnabled(true);
+
+    assert.equal(requestBody?.codexRawReasoningEnabled, true);
+    assert.equal(requestBody?.requesterUserId, "github:maddie");
+    assert.deepEqual(events, [{ setting: "codexRawReasoningEnabled", previousValue: "false", nextValue: "true" }]);
+    assert.match(
+      useAppStore.getState().roomSettingsByRoom[room.id]?.settingsMessage ?? "",
+      /shared with and retained by room members/i
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("team default actions report missing selection without touching storage", () => {
   const storageSizeBefore = localStorage.length;
   const messages: Array<string | null> = [];
@@ -629,6 +669,30 @@ test("file actions resolve current Zustand file state when invoked without React
   });
   actions.denyFileSaveRequest("save-after-create");
   assert.equal(useAppStore.getState().filePanelByRoom[room.id]?.saveRequests?.[0]?.status, "denied");
+});
+
+test("file actions preserve a validated inline project image for chat rendering", async () => {
+  const actions = createFileActions({
+    selectedRoomIdRef: { current: room.id },
+    relayRef: { current: null },
+    seenEnvelopeIds: { current: new Set() },
+    reportRoomFileActionInFlight: () => false
+  });
+  const content = "data:image/png;base64,iVBORw0KGgo=";
+  useAppStore.getState().setSelectedFileForRoom(room.id, {
+    path: "art/result.png",
+    content,
+    mediaType: "image/png",
+    size: 8,
+    truncated: false
+  });
+
+  await actions.attachSelectedFileToMessage();
+
+  const [attachment] = useAppStore.getState().roomChatByRoom[room.id]?.pendingAttachments ?? [];
+  assert.equal(attachment?.type, "image/png");
+  assert.equal(attachment?.content, content);
+  assert.equal(attachment?.blobId, undefined);
 });
 
 test("git workflow actions report host gating through Zustand without React", async () => {

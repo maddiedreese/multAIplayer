@@ -111,7 +111,8 @@ export async function runCodexTurn(
   sandboxLevel = "workspace_write",
   previousThreadId: string | null = null,
   timeoutSeconds = 180,
-  provenance: { proposedBy: string; contextSummary: string } | null = null
+  provenance: { proposedBy: string; contextSummary: string } | null = null,
+  shareRawReasoning = false
 ): Promise<CodexTurnResult> {
   if (isTauriRuntime()) {
     return invoke<CodexTurnResult>("run_codex_turn", {
@@ -128,7 +129,8 @@ export async function runCodexTurn(
         previousThreadId,
         timeoutSeconds,
         proposedBy: provenance?.proposedBy ?? null,
-        contextSummary: provenance?.contextSummary ?? null
+        contextSummary: provenance?.contextSummary ?? null,
+        shareRawReasoning
       }
     });
   }
@@ -144,6 +146,7 @@ export async function runCodexTurn(
       "preview:turn/start",
       "preview:turn/completed"
     ],
+    generatedImages: [],
     stderr: ""
   };
 }

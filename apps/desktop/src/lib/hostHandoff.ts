@@ -21,6 +21,7 @@ export interface HandoffSettingsPatch {
   codexModelPolicy: RoomRecord["codexModelPolicy"];
   codexReasoningEffort: RoomRecord["codexReasoningEffort"];
   codexReasoningEffortPolicy: RoomRecord["codexReasoningEffortPolicy"];
+  codexRawReasoningEnabled: boolean;
   codexSpeed: RoomRecord["codexSpeed"];
   codexServiceTierPolicy: RoomRecord["codexServiceTierPolicy"];
   codexSandboxLevel: RoomRecord["codexSandboxLevel"];
@@ -64,6 +65,7 @@ export function createHandoffSettingsPatch(handoff: HostHandoffPlaintextPayload)
     codexModelPolicy: handoff.codexModelPolicy ?? legacyCodexCatalogSelectionPolicy,
     codexReasoningEffort,
     codexReasoningEffortPolicy: handoff.codexReasoningEffortPolicy ?? legacyCodexCatalogSelectionPolicy,
+    codexRawReasoningEnabled: handoff.codexRawReasoningEnabled ?? false,
     codexSpeed,
     codexServiceTierPolicy: handoff.codexServiceTierPolicy ?? legacyCodexCatalogSelectionPolicy
   };

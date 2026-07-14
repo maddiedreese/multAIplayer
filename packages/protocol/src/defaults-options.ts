@@ -9,6 +9,7 @@ export const defaultApprovalDelegationPolicy: ApprovalDelegationPolicy = "host_o
 export const defaultCodexModel = "gpt-5.6-sol";
 export const defaultCodexReasoningEffort = "medium";
 export const defaultCodexSpeed = "standard";
+export const defaultCodexRawReasoningEnabled = false;
 export const defaultCodexSandboxLevel = "workspace_write";
 export const defaultCodexModelPolicy: CodexCatalogSelectionPolicy = "auto";
 export const defaultCodexReasoningEffortPolicy: CodexCatalogSelectionPolicy = "auto";

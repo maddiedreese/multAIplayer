@@ -46,11 +46,11 @@ Protocol v2 superseded the protocol-v1 cryptography decisions in ADR-007 through
 - **Decision:** Describe and enforce canonical workspace binding without claiming filesystem isolation.
 - **Consequences:** Dialogs warn about mutable repository behavior and threat documentation avoids sandbox claims.
 
-## ADR-014: Codex activity is metadata-only
+## ADR-014: Codex activity is bounded and structured
 
 - **Context:** Raw model/tool streams may contain secrets, commands, environment data, or prompt injection.
-- **Decision:** Share an allowlisted, bounded lifecycle projection; richer artifacts require separate explicit approval flows.
-- **Consequences:** Projection schemas fail closed on unknown/raw fields and are independently tested.
+- **Decision:** Share an allowlisted, bounded typed projection. Reasoning summaries remain the default; host-controlled raw-reasoning sharing is per-room, off by default, and dependent on provider availability.
+- **Consequences:** Projection schemas fail closed on unknown fields. Accepted details are encrypted but visible to and retainable by room members, and enabling or disabling raw-reasoning sharing does not provide retroactive revocation.
 
 ## ADR-015: Codex transport is injectable
 

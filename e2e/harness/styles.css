@@ -40,6 +40,33 @@ body {
   color: var(--danger);
 }
 
+.e2e-chat-parity {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  width: min(920px, 100%);
+  height: min(760px, calc(100vh - 140px));
+  min-height: 560px;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.e2e-model-setting {
+  display: grid;
+  gap: 12px;
+  width: min(420px, 100%);
+  margin: 0 auto;
+}
+
+.e2e-model-setting > p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+
 .e2e-invite-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

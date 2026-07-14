@@ -17,6 +17,7 @@ test("room inspector model projection applies protocol defaults without duplicat
       ...room,
       codexModel: undefined,
       codexReasoningEffort: undefined,
+      codexRawReasoningEnabled: undefined,
       codexSpeed: undefined,
       codexSandboxLevel: undefined
     },
@@ -25,9 +26,17 @@ test("room inspector model projection applies protocol defaults without duplicat
 
   assert.equal(projection.selectedModel, defaultCodexModel);
   assert.equal(projection.selectedReasoningEffort, defaultCodexReasoningEffort);
+  assert.equal(projection.rawReasoningEnabled, false);
   assert.equal(projection.selectedSpeed, defaultCodexSpeed);
   assert.equal(projection.selectedSandboxLevel, defaultCodexSandboxLevel);
   assert.equal(projection.customModel, defaultCodexModel);
+});
+
+test("room inspector model projection exposes the room raw-reasoning sharing decision", () => {
+  const room = seededRooms[0];
+  assert.ok(room);
+  const projection = buildRoomInspectorModelProjection({ ...room, codexRawReasoningEnabled: true }, null);
+  assert.equal(projection.rawReasoningEnabled, true);
 });
 
 test("room inspector model projection keeps a room-scoped custom draft", () => {

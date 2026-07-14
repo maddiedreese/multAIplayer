@@ -203,6 +203,7 @@ export function useHostHandoffActions({
       codexModelPolicy: room.codexModelPolicy,
       codexReasoningEffort: room.codexReasoningEffort,
       codexReasoningEffortPolicy: room.codexReasoningEffortPolicy,
+      codexRawReasoningEnabled: room.codexRawReasoningEnabled ?? false,
       codexSpeed: room.codexSpeed,
       codexServiceTierPolicy: room.codexServiceTierPolicy,
       codexSandboxLevel: (room.codexSandboxLevel ?? defaultCodexSandboxLevel) as CodexSandboxLevel,
@@ -240,6 +241,7 @@ export function useHostHandoffActions({
       codexModelPolicy: handoff.codexModelPolicy,
       codexReasoningEffort: handoff.codexReasoningEffort,
       codexReasoningEffortPolicy: handoff.codexReasoningEffortPolicy,
+      codexRawReasoningEnabled: handoff.codexRawReasoningEnabled,
       codexSpeed: handoff.codexSpeed,
       codexServiceTierPolicy: handoff.codexServiceTierPolicy,
       codexSandboxLevel: handoff.codexSandboxLevel,
@@ -362,7 +364,7 @@ export function useHostHandoffActions({
     }
     const committedEpoch = await markMlsPublishSucceeded(selectedRoom.id, commit.outboxId);
     await publishHostHandoffAccepted(selectedRoom, handoff, candidate.leaf, committedEpoch);
-    markHostHandoffAccepted(selectedRoom.id, handoff.id);
+    markHostHandoffAcceptedForRoom(selectedRoom.id, handoff.id);
   }
 
   async function publishHostHandoffAccepted(
@@ -398,14 +400,10 @@ export function useHostHandoffActions({
     await publishMlsApplicationMessage(client, envelope);
   }
 
-  function markHostHandoffAccepted(roomId: string, handoffId: string) {
-    markHostHandoffAcceptedForRoom(roomId, handoffId);
-  }
-
   return {
     setRoomHost,
     acceptHostHandoff,
     publishHostHandoff,
-    markHostHandoffAccepted
+    markHostHandoffAccepted: markHostHandoffAcceptedForRoom
   };
 }

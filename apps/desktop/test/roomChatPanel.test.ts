@@ -3,13 +3,15 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RoomChatPanel, type RoomChatMessageDisplay } from "../src/components/RoomChatPanel";
+import type { CodexActivity } from "../src/types";
 
 const noop = () => {};
 
-function renderChat(messages: RoomChatMessageDisplay[]) {
+function renderChat(messages: RoomChatMessageDisplay[], codexActivities: CodexActivity[] = []) {
   return renderToStaticMarkup(
     createElement(RoomChatPanel, {
       messages,
+      codexActivities,
       approvalVisible: false,
       approvalSummary: {
         messages: "0 since last Codex response",
@@ -80,6 +82,111 @@ test("RoomChatPanel composes transcript content before the composer", () => {
   assert.ok(composerIndex > contentIndex);
   assert.equal(html.match(/class="chat-scroll"/g)?.length, 1);
   assert.match(html, /Keep the content boundary explicit\./);
+});
+
+test("RoomChatPanel renders fenced and inline code for human and Codex messages without parsing raw HTML", () => {
+  const html = renderChat([
+    {
+      id: "human-code",
+      author: "Avery",
+      role: "human",
+      body: "Use `roomId` here.\n\n```ts\nconst roomId = '<img src=x onerror=alert(1)>';\n```",
+      time: "10:03",
+      selected: false,
+      attachments: [],
+      reactions: []
+    },
+    {
+      id: "codex-code",
+      author: "Codex via Avery",
+      role: "codex",
+      body: "Done.\n\n```rust\nlet safe = true;\n```",
+      time: "10:04",
+      selected: false,
+      attachments: [],
+      reactions: []
+    }
+  ]);
+
+  assert.match(html, /<code>roomId<\/code>/);
+  assert.match(html, /class="language-ts"/);
+  assert.match(html, /class="language-rust"/);
+  assert.match(html, /aria-label="Copy ts code"/);
+  assert.match(html, /aria-label="Copy rust code"/);
+  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.doesNotMatch(html, /<img src="x"/);
+});
+
+test("RoomChatPanel renders only prevalidated inline image display sources", () => {
+  const image = "data:image/png;base64,iVBORw0KGgo=";
+  const html = renderChat([
+    {
+      id: "codex-image",
+      author: "Codex via Avery",
+      role: "codex",
+      body: "Generated image:",
+      time: "10:05",
+      selected: false,
+      attachments: [
+        {
+          id: "generated-image",
+          name: "generated.png",
+          meta: "image/png, 8 B",
+          encryptedBlob: false,
+          canPreview: true,
+          image: { src: image, alt: "generated.png" }
+        }
+      ],
+      reactions: []
+    }
+  ]);
+
+  assert.match(html, /class="chat-image-attachment"/);
+  assert.match(html, /src="data:image\/png;base64,iVBORw0KGgo="/);
+  assert.match(html, /alt="generated.png"/);
+  assert.match(html, /loading="lazy"/);
+});
+
+test("RoomChatPanel shows Codex work and subagent disclosures in the conversation", () => {
+  const html = renderChat(
+    [],
+    [
+      {
+        eventType: "codex.activity",
+        activityId: "reasoning-1",
+        turnId: "turn-1",
+        itemId: "reasoning-1",
+        kind: "reasoning",
+        status: "running",
+        title: "Reasoning",
+        details: { type: "reasoning", summaries: ["Inspecting the renderer and its tests."] },
+        startedAt: "2026-07-13T12:00:00.000Z",
+        updatedAt: "2026-07-13T12:00:01.000Z",
+        host: "Avery",
+        hostUserId: "github:1"
+      },
+      {
+        eventType: "codex.activity",
+        activityId: "agent-1",
+        turnId: "turn-1",
+        itemId: "agent-1",
+        kind: "agent",
+        status: "completed",
+        title: "Agent activity",
+        agent: { action: "spawn", senderId: "root", receiverIds: ["child"] },
+        details: { type: "agent", prompt: "Audit chat image support" },
+        startedAt: "2026-07-13T12:00:00.000Z",
+        updatedAt: "2026-07-13T12:00:02.000Z",
+        host: "Avery",
+        hostUserId: "github:1"
+      }
+    ]
+  );
+  assert.match(html, /Codex is working/);
+  assert.match(html, /Thinking/);
+  assert.match(html, /Inspecting the renderer/);
+  assert.match(html, /Spawned a subagent/);
+  assert.match(html, /Audit chat image support/);
 });
 
 test("RoomChatPanel hides zero-count reaction placeholders", () => {

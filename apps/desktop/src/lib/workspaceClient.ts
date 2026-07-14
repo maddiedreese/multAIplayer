@@ -212,6 +212,7 @@ export async function createRoom(
     codexModelPolicy?: RoomRecord["codexModelPolicy"];
     codexReasoningEffort?: RoomRecord["codexReasoningEffort"];
     codexReasoningEffortPolicy?: RoomRecord["codexReasoningEffortPolicy"];
+    codexRawReasoningEnabled?: boolean;
     codexSpeed?: RoomRecord["codexSpeed"];
     codexServiceTierPolicy?: RoomRecord["codexServiceTierPolicy"];
     codexSandboxLevel?: RoomRecord["codexSandboxLevel"];
@@ -258,6 +259,7 @@ export async function updateRoomSettings(
     codexModelPolicy?: RoomRecord["codexModelPolicy"];
     codexReasoningEffort?: RoomRecord["codexReasoningEffort"];
     codexReasoningEffortPolicy?: RoomRecord["codexReasoningEffortPolicy"];
+    codexRawReasoningEnabled?: boolean;
     codexSpeed?: RoomRecord["codexSpeed"];
     codexServiceTierPolicy?: RoomRecord["codexServiceTierPolicy"];
     codexSandboxLevel?: RoomRecord["codexSandboxLevel"];

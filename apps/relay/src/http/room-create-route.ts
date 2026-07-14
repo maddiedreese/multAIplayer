@@ -8,6 +8,7 @@ import {
   defaultCodexModelPolicy,
   defaultCodexReasoningEffort,
   defaultCodexReasoningEffortPolicy,
+  defaultCodexRawReasoningEnabled,
   defaultCodexSandboxLevel,
   defaultCodexServiceTierPolicy,
   defaultCodexSpeed,
@@ -80,6 +81,7 @@ export function registerRoomCreateRoute(options: RegisterRoomRoutesOptions) {
       req.body?.codexReasoningEffortPolicy,
       defaultCodexReasoningEffortPolicy
     );
+    const codexRawReasoningEnabled = req.body?.codexRawReasoningEnabled;
     const codexSpeed =
       req.body?.codexSpeed === undefined ? defaultCodexSpeed : normalizeCodexSpeed(req.body.codexSpeed);
     const codexServiceTierPolicy = normalizeCatalogSelectionPolicy(
@@ -133,6 +135,8 @@ export function registerRoomCreateRoute(options: RegisterRoomRoutesOptions) {
         "Codex catalog selection policies must be auto or pinned"
       );
     if (!codexReasoningEffort) return void sendRelayError(res, 400, "invalid_request", codexReasoningEffortError);
+    if (codexRawReasoningEnabled !== undefined && typeof codexRawReasoningEnabled !== "boolean")
+      return void sendRelayError(res, 400, "invalid_request", "codexRawReasoningEnabled must be a boolean");
     if (!codexSpeed) return void sendRelayError(res, 400, "invalid_request", "codexSpeed must be standard or fast");
     if (!codexSandboxLevel)
       return void sendRelayError(
@@ -196,6 +200,7 @@ export function registerRoomCreateRoute(options: RegisterRoomRoutesOptions) {
       codexModelPolicy,
       codexReasoningEffort,
       codexReasoningEffortPolicy,
+      codexRawReasoningEnabled: codexRawReasoningEnabled ?? defaultCodexRawReasoningEnabled,
       codexSpeed,
       codexServiceTierPolicy,
       codexSandboxLevel,

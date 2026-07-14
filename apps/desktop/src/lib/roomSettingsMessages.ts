@@ -53,6 +53,8 @@ export function buildRoomSettingsMessageBody(
       return `${event.changedBy} changed the Codex model from ${formatCodexModel(event.previousValue)} to ${formatCodexModel(event.nextValue)}.`;
     case "codexReasoningEffort":
       return `${event.changedBy} changed Codex reasoning from ${formatCodexReasoningEffort(event.previousValue)} to ${formatCodexReasoningEffort(event.nextValue)}.`;
+    case "codexRawReasoningEnabled":
+      return `${event.changedBy} ${event.nextValue === "true" ? "enabled" : "disabled"} sharing and retention of raw provider reasoning for room members.`;
     case "codexSpeed":
       return `${event.changedBy} changed Codex speed from ${formatCodexSpeed(event.previousValue)} to ${formatCodexSpeed(event.nextValue)}.`;
     case "codexSandboxLevel":

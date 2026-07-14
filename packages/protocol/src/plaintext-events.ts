@@ -152,6 +152,69 @@ export const CodexEventPlaintextPayload = z.object({
 
 export const maxCodexActivitiesPerRoom = 160;
 
+const CodexActivityDetail = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("reasoning"),
+    summaries: z.array(z.string().min(1).max(maxMediumTextChars)).max(12),
+    rawContent: z.array(z.string().min(1).max(maxMediumTextChars)).max(12).optional()
+  }),
+  z.object({
+    type: z.literal("command"),
+    command: z.string().min(1).max(maxLongTextChars),
+    output: z.string().max(maxLongTextChars).optional(),
+    exitCode: z.number().int().optional(),
+    durationMs: z.number().int().nonnegative().optional()
+  }),
+  z.object({
+    type: z.literal("file_change"),
+    changes: z
+      .array(
+        z.object({
+          path: z.string().min(1).max(maxProjectPathChars),
+          action: z.enum(["add", "delete", "update"]),
+          diff: z.string().max(maxLongTextChars).optional()
+        })
+      )
+      .max(64)
+  }),
+  z.object({
+    type: z.literal("tool"),
+    name: z.string().min(1).max(maxShortTextChars),
+    server: z.string().min(1).max(maxShortTextChars).optional(),
+    arguments: z.string().max(maxLongTextChars).optional(),
+    result: z.string().max(maxLongTextChars).optional(),
+    error: z.string().max(maxMediumTextChars).optional(),
+    durationMs: z.number().int().nonnegative().optional()
+  }),
+  z.object({
+    type: z.literal("web_search"),
+    action: z.enum(["search", "open_page", "find_in_page", "other"]).optional(),
+    query: z.string().max(maxMediumTextChars).optional(),
+    url: z.string().max(maxUrlChars).optional(),
+    pattern: z.string().max(maxMediumTextChars).optional()
+  }),
+  z.object({
+    type: z.literal("image_generation"),
+    prompt: z.string().max(maxLongTextChars).optional()
+  }),
+  z.object({
+    type: z.literal("agent"),
+    prompt: z.string().max(maxLongTextChars).optional(),
+    model: z.string().max(maxCodexModelChars).optional(),
+    reasoningEffort: z.enum(codexReasoningEffortIds).optional(),
+    states: z
+      .array(
+        z.object({
+          threadId: z.string().min(1).max(maxCodexThreadIdChars),
+          status: z.string().min(1).max(maxShortTextChars),
+          message: z.string().max(maxMediumTextChars).optional()
+        })
+      )
+      .max(16)
+      .optional()
+  })
+]);
+
 export const CodexActivityPlaintextPayload = z.object({
   eventType: z.literal("codex.activity"),
   activityId: z.string().min(1).max(maxEnvelopeIdChars),
@@ -172,6 +235,7 @@ export const CodexActivityPlaintextPayload = z.object({
   ]),
   status: z.enum(["started", "running", "completed", "failed", "declined"]),
   title: z.string().min(1).max(maxShortTextChars),
+  details: CodexActivityDetail.optional(),
   agent: z
     .object({
       action: z.enum(["spawn", "send", "resume", "wait", "close"]),
@@ -319,6 +383,7 @@ export const HostHandoffPlaintextPayload = z.object({
   codexModelPolicy: z.enum(["auto", "pinned"]).optional(),
   codexReasoningEffort: z.enum(codexReasoningEffortIds).optional(),
   codexReasoningEffortPolicy: z.enum(["auto", "pinned"]).optional(),
+  codexRawReasoningEnabled: z.boolean().optional(),
   codexSpeed: z.enum(["standard", "fast"]).optional(),
   codexServiceTierPolicy: z.enum(["auto", "pinned"]).optional(),
   codexSandboxLevel: z
@@ -379,6 +444,7 @@ export const RoomSettingsPlaintextPayload = z.object({
     "roomMode",
     "codexModel",
     "codexReasoningEffort",
+    "codexRawReasoningEnabled",
     "codexSpeed",
     "codexSandboxLevel",
     "projectPath",

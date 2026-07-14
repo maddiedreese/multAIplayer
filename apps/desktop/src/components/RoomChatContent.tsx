@@ -1,10 +1,13 @@
 import React from "react";
-import { Bot, Copy, ExternalLink, FileCode2, Pencil, Square, Trash2, X } from "lucide-react";
+import { Bot, Check, Copy, ExternalLink, FileCode2, Pencil, Square, Trash2, X } from "lucide-react";
 import { CodexApprovalCard, type CodexApprovalSummaryDisplay } from "./CodexApprovalCard";
+import { CodexActivityFeed } from "./CodexActivityDisclosure";
 import type { LocalPreviewCardDisplay, QueuedCodexTurnDisplay, RoomChatMessageDisplay } from "./RoomChatPanel";
+import type { CodexActivity } from "../types";
 
 export interface RoomChatContentProps {
   messages: RoomChatMessageDisplay[];
+  codexActivities: readonly CodexActivity[];
   localPreviewCards: LocalPreviewCardDisplay[];
   approvalVisible: boolean;
   approvalSummary: CodexApprovalSummaryDisplay;
@@ -32,6 +35,7 @@ export interface RoomChatContentProps {
 
 export function RoomChatContent({
   messages,
+  codexActivities,
   localPreviewCards,
   approvalVisible,
   approvalSummary,
@@ -129,21 +133,28 @@ export function RoomChatContent({
                   <span>{message.replyPreview.body}</span>
                 </div>
               )}
-              <p>{message.body}</p>
+              <ChatMessageMarkdown body={message.body} />
               {message.attachments.map((attachment) => (
-                <button
-                  className="attachment"
-                  key={attachment.id}
-                  onClick={() => {
-                    if (attachment.canPreview && !roomLocked) onOpenAttachment(message.id, attachment.id);
-                  }}
-                  title={attachment.canPreview ? "Open in file editor" : undefined}
-                  disabled={!attachment.canPreview || roomLocked}
-                >
-                  <FileCode2 size={15} />
-                  <span>{attachment.name}</span>
-                  <small>{attachment.meta}</small>
-                </button>
+                <React.Fragment key={attachment.id}>
+                  {attachment.image && (
+                    <figure className="chat-image-attachment">
+                      <img src={attachment.image.src} alt={attachment.image.alt} loading="lazy" decoding="async" />
+                      <figcaption>{attachment.name}</figcaption>
+                    </figure>
+                  )}
+                  <button
+                    className="attachment"
+                    onClick={() => {
+                      if (attachment.canPreview && !roomLocked) onOpenAttachment(message.id, attachment.id);
+                    }}
+                    title={attachment.canPreview ? "Open attachment" : undefined}
+                    disabled={!attachment.canPreview || roomLocked}
+                  >
+                    <FileCode2 size={15} />
+                    <span>{attachment.name}</span>
+                    <small>{attachment.meta}</small>
+                  </button>
+                </React.Fragment>
               ))}
               {visibleReactions.length > 0 && (
                 <div className="reaction-row">
@@ -165,6 +176,8 @@ export function RoomChatContent({
           </article>
         );
       })}
+
+      <CodexActivityFeed activities={codexActivities} />
 
       {localPreviewCards.map((preview) => (
         <article className="message system local-preview-message" key={preview.id}>
@@ -259,4 +272,111 @@ export function RoomChatContent({
       )}
     </div>
   );
+}
+
+type MarkdownBlock = { kind: "text"; value: string } | { kind: "code"; value: string; language: string };
+
+export function ChatMessageMarkdown({ body }: { body: string }) {
+  const blocks = parseMarkdownBlocks(body);
+  return (
+    <div className="message-markdown">
+      {blocks.map((block, index) =>
+        block.kind === "code" ? (
+          <ChatCodeBlock key={index} code={block.value} language={block.language} />
+        ) : (
+          <React.Fragment key={index}>
+            {block.value.split(/\n[ \t]*\n/).map((paragraph, paragraphIndex) => (
+              <p key={paragraphIndex}>{renderInlineCode(paragraph)}</p>
+            ))}
+          </React.Fragment>
+        )
+      )}
+    </div>
+  );
+}
+
+function ChatCodeBlock({ code, language }: { code: string; language: string }) {
+  const [copyState, setCopyState] = React.useState<"idle" | "copied" | "failed">("idle");
+  const label = language ? `${language} code` : "code";
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+  }
+  return (
+    <div className="chat-code-block">
+      <div className="chat-code-toolbar">
+        <span>{language || "Code"}</span>
+        <button type="button" onClick={() => void copyCode()} aria-label={`Copy ${label}`} title={`Copy ${label}`}>
+          {copyState === "copied" ? <Check size={13} /> : <Copy size={13} />}
+          <span>{copyState === "copied" ? "Copied" : "Copy"}</span>
+        </button>
+      </div>
+      <pre>
+        <code className={language ? `language-${language}` : undefined}>{code}</code>
+      </pre>
+      <span className="sr-only" aria-live="polite">
+        {copyState === "copied"
+          ? "Code copied to clipboard."
+          : copyState === "failed"
+            ? "Code could not be copied."
+            : ""}
+      </span>
+    </div>
+  );
+}
+
+export function parseMarkdownBlocks(body: string): MarkdownBlock[] {
+  const lines = body.split("\n");
+  const blocks: MarkdownBlock[] = [];
+  let textLines: string[] = [];
+  const flushText = () => {
+    if (textLines.length) blocks.push({ kind: "text", value: textLines.join("\n") });
+    textLines = [];
+  };
+  for (let index = 0; index < lines.length; index += 1) {
+    const opening = /^ {0,3}```([A-Za-z0-9_+.#-]*)[ \t]*$/.exec(lines[index]);
+    if (!opening) {
+      textLines.push(lines[index]);
+      continue;
+    }
+    flushText();
+    const codeLines: string[] = [];
+    index += 1;
+    while (index < lines.length && !/^ {0,3}```[ \t]*$/.test(lines[index])) {
+      codeLines.push(lines[index]);
+      index += 1;
+    }
+    blocks.push({ kind: "code", value: codeLines.join("\n"), language: opening[1] ?? "" });
+  }
+  flushText();
+  return blocks.length ? blocks : [{ kind: "text", value: "" }];
+}
+
+function renderInlineCode(value: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+  while (cursor < value.length) {
+    const start = value.indexOf("`", cursor);
+    if (start < 0) {
+      nodes.push(value.slice(cursor));
+      break;
+    }
+    let runEnd = start;
+    while (value[runEnd] === "`") runEnd += 1;
+    const delimiter = value.slice(start, runEnd);
+    const end = value.indexOf(delimiter, runEnd);
+    if (end < 0) {
+      nodes.push(value.slice(cursor));
+      break;
+    }
+    if (start > cursor) nodes.push(value.slice(cursor, start));
+    nodes.push(<code key={`${start}-${end}`}>{value.slice(runEnd, end)}</code>);
+    cursor = end + delimiter.length;
+  }
+  if (value === "") nodes.push("");
+  return nodes;
 }

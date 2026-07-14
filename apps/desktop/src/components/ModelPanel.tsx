@@ -10,6 +10,7 @@ export function ModelPanel({
   selectedModel,
   selectedModelLabel,
   selectedReasoningEffort,
+  rawReasoningEnabled,
   selectedSpeed,
   customModel,
   modelOptions,
@@ -19,6 +20,7 @@ export function ModelPanel({
   canApplyCustomModel,
   onSelectModel,
   onSelectReasoningEffort,
+  onRawReasoningEnabledChange,
   onSelectSpeed,
   onCustomModelChange,
   onApplyCustomModel
@@ -26,6 +28,7 @@ export function ModelPanel({
   selectedModel: string;
   selectedModelLabel: string;
   selectedReasoningEffort: string;
+  rawReasoningEnabled: boolean;
   selectedSpeed: string;
   customModel: string;
   modelOptions: readonly ModelOptionDisplay[];
@@ -35,6 +38,7 @@ export function ModelPanel({
   canApplyCustomModel: boolean;
   onSelectModel: (model: string) => void;
   onSelectReasoningEffort: (effort: string) => void;
+  onRawReasoningEnabledChange: (enabled: boolean) => void;
   onSelectSpeed: (speed: string) => void;
   onCustomModelChange: (model: string) => void;
   onApplyCustomModel: () => void;
@@ -65,6 +69,18 @@ export function ModelPanel({
           ))}
           <option value="custom">Custom</option>
         </select>
+      </label>
+      <label className="checkbox-row">
+        <input
+          type="checkbox"
+          checked={rawReasoningEnabled}
+          disabled={disabled}
+          onChange={(event) => onRawReasoningEnabledChange(event.target.checked)}
+        />
+        <span>
+          Share raw provider reasoning
+          <small>When available, raw reasoning is shared with and retained by every room member.</small>
+        </span>
       </label>
       <label>
         <span>Reasoning</span>

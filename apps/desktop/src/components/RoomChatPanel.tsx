@@ -3,7 +3,7 @@ import type { CodexApprovalSummaryDisplay } from "./CodexApprovalCard";
 import { RoomChatContent } from "./RoomChatContent";
 import { RoomChatComposer } from "./RoomChatComposer";
 import { useRoomGoalTicker } from "../hooks/useRoomGoalTicker";
-import type { RoomGoal } from "../types";
+import type { CodexActivity, RoomGoal } from "../types";
 
 export interface RoomChatAttachmentDisplay {
   id: string;
@@ -11,6 +11,10 @@ export interface RoomChatAttachmentDisplay {
   meta: string;
   encryptedBlob: boolean;
   canPreview: boolean;
+  image?: {
+    src: string;
+    alt: string;
+  };
 }
 
 export interface RoomChatReactionDisplay {
@@ -67,6 +71,7 @@ export interface QueuedCodexTurnDisplay {
 
 export function RoomChatPanel({
   messages,
+  codexActivities = [],
   approvalVisible,
   approvalSummary,
   isActiveHost,
@@ -111,6 +116,7 @@ export function RoomChatPanel({
   onSendMessage
 }: {
   messages: RoomChatMessageDisplay[];
+  codexActivities?: readonly CodexActivity[];
   approvalVisible: boolean;
   approvalSummary: CodexApprovalSummaryDisplay;
   isActiveHost: boolean;
@@ -163,6 +169,7 @@ export function RoomChatPanel({
     <>
       <RoomChatContent
         messages={messages}
+        codexActivities={codexActivities}
         localPreviewCards={localPreviewCards}
         approvalVisible={approvalVisible}
         approvalSummary={approvalSummary}

@@ -10,13 +10,97 @@ pub(crate) struct CodexActivityEvent {
     activity_id: String,
     turn_id: String,
     item_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     thread_id: Option<String>,
     kind: String,
     status: String,
     title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    details: Option<CodexActivityDetails>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     agent: Option<CodexAgentActivity>,
     started_at: String,
     updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(
+    tag = "type",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
+enum CodexActivityDetails {
+    Reasoning {
+        summaries: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        raw_content: Option<Vec<String>>,
+    },
+    Command {
+        command: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        output: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        exit_code: Option<i64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        duration_ms: Option<u64>,
+    },
+    FileChange {
+        changes: Vec<CodexFileChange>,
+    },
+    Tool {
+        name: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        server: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        arguments: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        result: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        duration_ms: Option<u64>,
+    },
+    WebSearch {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        action: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        query: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pattern: Option<String>,
+    },
+    ImageGeneration {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        prompt: Option<String>,
+    },
+    Agent {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        prompt: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reasoning_effort: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        states: Option<Vec<CodexAgentState>>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CodexFileChange {
+    path: String,
+    action: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    diff: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CodexAgentState {
+    thread_id: String,
+    status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -49,6 +133,7 @@ pub(crate) fn project_codex_activity(
     room_id: &str,
     client_turn_id: &str,
     started_by_item: &mut HashMap<String, String>,
+    share_raw_reasoning: bool,
 ) -> Option<CodexActivityEvent> {
     let lifecycle_status = match method {
         "item/started" => "started",
@@ -72,6 +157,7 @@ pub(crate) fn project_codex_activity(
         "reasoning" => ("reasoning", "Reasoning"),
         _ => ("other", "Codex activity"),
     };
+    let details = project_activity_details(item_type, item, share_raw_reasoning);
     let agent = if item_type == "collabAgentToolCall" {
         let action = match item.get("tool").and_then(Value::as_str)? {
             "spawnAgent" => "spawn",
@@ -134,10 +220,208 @@ pub(crate) fn project_codex_activity(
         kind: kind.to_string(),
         status: status.to_string(),
         title: title.to_string(),
+        details,
         agent,
         started_at,
         updated_at: now,
     })
+}
+
+fn project_activity_details(
+    item_type: &str,
+    item: &Value,
+    share_raw_reasoning: bool,
+) -> Option<CodexActivityDetails> {
+    match item_type {
+        "reasoning" => {
+            let summaries = item
+                .get("summary")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|value| reasoning_text(value, &["summary_text"]))
+                .take(12)
+                .collect::<Vec<_>>();
+            let raw_content = share_raw_reasoning.then(|| {
+                item.get("content")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|value| reasoning_text(value, &["reasoning_text", "text"]))
+                    .take(12)
+                    .collect::<Vec<_>>()
+            });
+            let raw_content = raw_content.filter(|content| !content.is_empty());
+            (!summaries.is_empty() || raw_content.is_some()).then_some(
+                CodexActivityDetails::Reasoning {
+                    summaries,
+                    raw_content,
+                },
+            )
+        }
+        "commandExecution" => Some(CodexActivityDetails::Command {
+            command: bounded_nonempty(item.get("command")?.as_str()?, 120_000)?,
+            output: item
+                .get("aggregatedOutput")
+                .and_then(Value::as_str)
+                .map(|value| bounded_text(value, 120_000)),
+            exit_code: item.get("exitCode").and_then(Value::as_i64),
+            duration_ms: item.get("durationMs").and_then(Value::as_u64),
+        }),
+        "fileChange" => {
+            let changes = item
+                .get("changes")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|change| {
+                    let action = match change.get("kind").and_then(Value::as_str)? {
+                        "add" => "add",
+                        "delete" => "delete",
+                        "update" => "update",
+                        _ => return None,
+                    };
+                    Some(CodexFileChange {
+                        path: bounded_nonempty(change.get("path")?.as_str()?, 2_048)?,
+                        action: action.to_string(),
+                        diff: change
+                            .get("diff")
+                            .and_then(Value::as_str)
+                            .map(|value| bounded_text(value, 120_000)),
+                    })
+                })
+                .take(64)
+                .collect::<Vec<_>>();
+            Some(CodexActivityDetails::FileChange { changes })
+        }
+        "mcpToolCall" | "dynamicToolCall" => {
+            let name = bounded_nonempty(item.get("tool")?.as_str()?, 240)?;
+            Some(CodexActivityDetails::Tool {
+                name,
+                server: item
+                    .get("server")
+                    .and_then(Value::as_str)
+                    .and_then(|value| bounded_nonempty(value, 240)),
+                arguments: item.get("arguments").map(bounded_json),
+                result: item
+                    .get("result")
+                    .or_else(|| item.get("contentItems"))
+                    .filter(|value| !value.is_null())
+                    .map(bounded_json),
+                error: item
+                    .get("error")
+                    .and_then(|error| error.get("message").or(Some(error)))
+                    .and_then(Value::as_str)
+                    .map(|value| bounded_text(value, 4_096)),
+                duration_ms: item.get("durationMs").and_then(Value::as_u64),
+            })
+        }
+        "webSearch" => {
+            let action = item.get("action");
+            let action_type = action
+                .and_then(|value| value.get("type"))
+                .and_then(Value::as_str)
+                .map(|value| match value {
+                    "openPage" | "open_page" => "open_page",
+                    "findInPage" | "find_in_page" => "find_in_page",
+                    "search" => "search",
+                    _ => "other",
+                })
+                .map(str::to_string);
+            Some(CodexActivityDetails::WebSearch {
+                action: action_type,
+                query: action
+                    .and_then(|value| value.get("query"))
+                    .or_else(|| item.get("query"))
+                    .and_then(Value::as_str)
+                    .map(|value| bounded_text(value, 4_096)),
+                url: action
+                    .and_then(|value| value.get("url"))
+                    .and_then(Value::as_str)
+                    .map(|value| bounded_text(value, 8_192)),
+                pattern: action
+                    .and_then(|value| value.get("pattern"))
+                    .and_then(Value::as_str)
+                    .map(|value| bounded_text(value, 4_096)),
+            })
+        }
+        "imageGeneration" => Some(CodexActivityDetails::ImageGeneration {
+            prompt: item
+                .get("revisedPrompt")
+                .and_then(Value::as_str)
+                .map(|value| bounded_text(value, 120_000)),
+        }),
+        "collabAgentToolCall" => {
+            let states = item
+                .get("agentsStates")
+                .and_then(Value::as_object)
+                .map(|states| {
+                    states
+                        .iter()
+                        .filter_map(|(thread_id, state)| {
+                            Some(CodexAgentState {
+                                thread_id: bounded_codex_identifier(Some(thread_id), "agent"),
+                                status: bounded_nonempty(state.get("status")?.as_str()?, 240)?,
+                                message: state
+                                    .get("message")
+                                    .and_then(Value::as_str)
+                                    .map(|value| bounded_text(value, 4_096)),
+                            })
+                        })
+                        .take(16)
+                        .collect::<Vec<_>>()
+                });
+            Some(CodexActivityDetails::Agent {
+                prompt: item
+                    .get("prompt")
+                    .and_then(Value::as_str)
+                    .map(|value| bounded_text(value, 120_000)),
+                model: item
+                    .get("model")
+                    .and_then(Value::as_str)
+                    .and_then(|value| bounded_nonempty(value, 240)),
+                reasoning_effort: item
+                    .get("reasoningEffort")
+                    .and_then(Value::as_str)
+                    .filter(|value| {
+                        matches!(
+                            *value,
+                            "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max"
+                        )
+                    })
+                    .map(str::to_string),
+                states,
+            })
+        }
+        _ => None,
+    }
+}
+
+fn reasoning_text(value: &Value, allowed_types: &[&str]) -> Option<String> {
+    if let Some(value) = value.as_str() {
+        return bounded_nonempty(value, 4_096);
+    }
+    let item_type = value.get("type").and_then(Value::as_str)?;
+    if !allowed_types.contains(&item_type) {
+        return None;
+    }
+    value
+        .get("text")
+        .and_then(Value::as_str)
+        .and_then(|value| bounded_nonempty(value, 4_096))
+}
+
+fn bounded_json(value: &Value) -> String {
+    bounded_text(&serde_json::to_string(value).unwrap_or_default(), 120_000)
+}
+
+fn bounded_text(value: &str, max_chars: usize) -> String {
+    value.chars().take(max_chars).collect()
+}
+
+fn bounded_nonempty(value: &str, max_chars: usize) -> Option<String> {
+    let value = bounded_text(value.trim(), max_chars);
+    (!value.is_empty()).then_some(value)
 }
 
 #[cfg(test)]
@@ -146,7 +430,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn projects_only_bounded_safe_lifecycle_metadata() {
+    fn projects_bounded_command_disclosure_details() {
         let raw = json!({"params": {"threadId": "thread-1", "item": {
             "id": "command-1", "type": "commandExecution", "status": "inProgress",
             "command": "echo super-secret", "aggregatedOutput": "token=secret"
@@ -157,12 +441,85 @@ mod tests {
             "room-1",
             "turn-1",
             &mut HashMap::new(),
+            false,
         )
         .expect("activity");
         let encoded = serde_json::to_string(&activity).expect("serialize");
         assert!(encoded.contains("Command execution"));
-        assert!(!encoded.contains("super-secret"));
-        assert!(!encoded.contains("token=secret"));
+        assert!(encoded.contains("echo super-secret"));
+        assert!(encoded.contains("token=secret"));
+        assert!(encoded.contains("\"type\":\"command\""));
+    }
+
+    #[test]
+    fn exposes_reasoning_summaries_but_not_raw_reasoning_content() {
+        let raw = json!({"params": {"item": {
+            "id": "reasoning-1", "type": "reasoning", "status": "completed",
+            "summary": [{"type":"summary_text","text":"Checked the public contract."}],
+            "content": [{"type":"reasoning_text","text":"private chain of thought"}]
+        }}});
+        let activity = project_codex_activity(
+            "item/completed",
+            &raw,
+            "room-1",
+            "turn-1",
+            &mut HashMap::new(),
+            false,
+        )
+        .expect("activity");
+        let encoded = serde_json::to_string(&activity).expect("serialize");
+        assert!(encoded.contains("Checked the public contract."));
+        assert!(!encoded.contains("private chain of thought"));
+
+        let shared = project_codex_activity(
+            "item/completed",
+            &raw,
+            "room-1",
+            "turn-1",
+            &mut HashMap::new(),
+            true,
+        )
+        .expect("activity");
+        let shared_encoded = serde_json::to_string(&shared).expect("serialize");
+        assert!(shared_encoded.contains("private chain of thought"));
+        assert!(shared_encoded.contains("rawContent"));
+    }
+
+    #[test]
+    fn projects_file_tool_web_image_and_agent_details() {
+        let cases = [
+            json!({"params":{"item":{"id":"file-1","type":"fileChange","changes":[
+                {"path":"src/app.ts","kind":"update","diff":"+ready"}
+            ]}}}),
+            json!({"params":{"item":{"id":"tool-1","type":"mcpToolCall","server":"docs","tool":"search","arguments":{"q":"ipc"},"durationMs":12}}}),
+            json!({"params":{"item":{"id":"web-1","type":"webSearch","query":"WebKit bridge","action":{"type":"search","query":"WebKit bridge"}}}}),
+            json!({"params":{"item":{"id":"image-1","type":"imageGeneration","revisedPrompt":"A safe prompt","savedPath":"/private/image.png"}}}),
+            json!({"params":{"item":{"id":"agent-1","type":"collabAgentToolCall","tool":"spawnAgent","senderThreadId":"root","receiverThreadIds":["child"],"prompt":"Inspect tests","model":"gpt-5","reasoningEffort":"high","agentsStates":{"child":{"status":"running","message":"Reviewing"}}}}}),
+        ];
+        let encoded = cases
+            .iter()
+            .map(|raw| {
+                serde_json::to_string(
+                    &project_codex_activity(
+                        "item/completed",
+                        raw,
+                        "room-1",
+                        "turn-1",
+                        &mut HashMap::new(),
+                        false,
+                    )
+                    .expect("activity"),
+                )
+                .expect("serialize")
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(encoded.contains("src/app.ts"));
+        assert!(encoded.contains("\"name\":\"search\""));
+        assert!(encoded.contains("WebKit bridge"));
+        assert!(encoded.contains("A safe prompt"));
+        assert!(encoded.contains("Inspect tests"));
+        assert!(!encoded.contains("/private/image.png"));
     }
 
     #[test]
@@ -173,6 +530,7 @@ mod tests {
             "room-1",
             "turn-1",
             &mut HashMap::new(),
+            false,
         )
         .is_none());
     }

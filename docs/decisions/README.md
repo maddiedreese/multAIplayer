@@ -7,7 +7,7 @@ These records explain durable implementation constraints that are easy to miss w
 - [Zustand store boundaries](zustand-store-boundaries.md)
 - [Active-host authorization](active-host-authorization.md)
 - [Host handoff and key authority](host-handoff.md)
-- [Metadata-only Codex activity](metadata-only-codex-activity.md)
+- [Bounded structured Codex collaboration activity](metadata-only-codex-activity.md)
 - [Multi-repository room evaluation](multi-repository-rooms.md)
 - [Epoch crypto and the MLS migration boundary](epoch-crypto-migration-boundary.md)
 - [MLS protocol v2](mls-protocol-v2.md)

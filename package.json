@@ -30,6 +30,7 @@
     "test": "npm run build:packages && npm run test:scripts && npm run test:harness && npm run test:workspaces",
     "test:e2e": "node scripts/run-e2e.mjs",
     "test:e2e:native": "node --import tsx e2e/native-shell/journey.ts",
+    "test:e2e:native:macos-smoke": "wdio run e2e/native-macos/wdio.conf.mjs",
     "test:security-journey": "npm run build:packages && npm run test:security-journey -w @multaiplayer/relay",
     "fmt:rust:check": "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --all -- --check",
     "lint:rust": "cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --workspace --all-targets --all-features -- -D warnings",
@@ -55,6 +56,13 @@
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.61.1",
     "@vitejs/plugin-react": "6.0.3",
+    "@wdio/cli": "9.29.1",
+    "@wdio/globals": "9.29.1",
+    "@wdio/local-runner": "9.29.1",
+    "@wdio/mocha-framework": "9.29.1",
+    "@wdio/spec-reporter": "9.29.1",
+    "@wdio/tauri-plugin": "1.2.0",
+    "@wdio/tauri-service": "1.2.0",
     "c8": "11.0.0",
     "concurrently": "10.0.3",
     "dompurify": "3.4.12",
@@ -67,6 +75,8 @@
     "webdriverio": "9.29.1"
   },
   "overrides": {
+    "@wdio/native-utils": "2.5.0",
+    "serialize-javascript": "7.0.5",
     "monaco-editor": {
       "dompurify": "$dompurify"
     },
@@ -75,5 +85,21 @@
         "qs": "6.15.3"
       }
     }
+  },
+  "optionalDependencies": {
+    "@esbuild/darwin-arm64": "0.28.1",
+    "@esbuild/darwin-x64": "0.28.1",
+    "@esbuild/linux-arm64": "0.28.1",
+    "@esbuild/linux-x64": "0.28.1",
+    "@esbuild/win32-arm64": "0.28.1",
+    "@esbuild/win32-x64": "0.28.1",
+    "@rolldown/binding-darwin-arm64": "1.1.5",
+    "@rolldown/binding-darwin-x64": "1.1.5",
+    "@rolldown/binding-linux-arm64-gnu": "1.1.5",
+    "@rolldown/binding-linux-arm64-musl": "1.1.5",
+    "@rolldown/binding-linux-x64-gnu": "1.1.5",
+    "@rolldown/binding-linux-x64-musl": "1.1.5",
+    "@rolldown/binding-win32-arm64-msvc": "1.1.5",
+    "@rolldown/binding-win32-x64-msvc": "1.1.5"
   }
 }

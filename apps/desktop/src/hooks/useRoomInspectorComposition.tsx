@@ -223,11 +223,13 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
       selectedModel: model.selectedModel,
       selectedModelLabel: formatCodexModel(model.selectedModel),
       selectedReasoningEffort: model.selectedReasoningEffort,
+      rawReasoningEnabled: model.rawReasoningEnabled,
       selectedSpeed: model.selectedSpeed,
       disabled: !hasSelectedRoom || access.isSelectedRoomLocked || settingsBusy || !access.isActiveHost,
       canApplyCustomModel: Boolean(model.customModel.trim()) && model.customModel.trim() !== model.selectedModel,
       onSelectModel: capabilities.settings.selectModel,
       onSelectReasoningEffort: capabilities.settings.selectReasoningEffort,
+      onRawReasoningEnabledChange: capabilities.settings.setRawReasoningEnabled,
       onSelectSpeed: capabilities.settings.selectSpeed,
       onCustomModelChange: (value) => setCustomCodexModelForRoom(selectedRoom.id, value, model.selectedModel),
       onApplyCustomModel: () => capabilities.settings.selectModel(model.customModel)

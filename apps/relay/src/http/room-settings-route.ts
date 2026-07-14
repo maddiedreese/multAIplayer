@@ -55,6 +55,7 @@ export function registerRoomSettingsRoute(options: RegisterRoomRoutesOptions) {
         ? undefined
         : normalizeCodexReasoningEffort(req.body.codexReasoningEffort);
     const codexReasoningEffortPolicy = normalizeCatalogSelectionPolicy(req.body?.codexReasoningEffortPolicy);
+    const codexRawReasoningEnabled = req.body?.codexRawReasoningEnabled;
     const codexSpeed = req.body?.codexSpeed === undefined ? undefined : normalizeCodexSpeed(req.body.codexSpeed);
     const codexServiceTierPolicy = normalizeCatalogSelectionPolicy(req.body?.codexServiceTierPolicy);
     const codexSandboxLevel =
@@ -117,6 +118,8 @@ export function registerRoomSettingsRoute(options: RegisterRoomRoutesOptions) {
       );
     if (codexReasoningEffort !== undefined && !codexReasoningEffort)
       return void sendRelayError(res, 400, "invalid_request", codexReasoningEffortError);
+    if (codexRawReasoningEnabled !== undefined && typeof codexRawReasoningEnabled !== "boolean")
+      return void sendRelayError(res, 400, "invalid_request", "codexRawReasoningEnabled must be a boolean");
     if (codexSpeed !== undefined && !codexSpeed)
       return void sendRelayError(res, 400, "invalid_request", "codexSpeed must be standard or fast");
     if (codexSandboxLevel !== undefined && !codexSandboxLevel)
@@ -158,6 +161,7 @@ export function registerRoomSettingsRoute(options: RegisterRoomRoutesOptions) {
       codexReasoningEffort: codexReasoningEffort ?? room.codexReasoningEffort,
       codexReasoningEffortPolicy:
         codexReasoningEffortPolicy ?? (codexReasoningEffort !== undefined ? "pinned" : room.codexReasoningEffortPolicy),
+      codexRawReasoningEnabled: codexRawReasoningEnabled ?? room.codexRawReasoningEnabled ?? false,
       codexSpeed: codexSpeed ?? room.codexSpeed,
       codexServiceTierPolicy:
         codexServiceTierPolicy ?? (codexSpeed !== undefined ? "pinned" : room.codexServiceTierPolicy),

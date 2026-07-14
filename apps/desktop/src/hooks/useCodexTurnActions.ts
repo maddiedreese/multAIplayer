@@ -24,6 +24,7 @@ import type { UseCodexTurnActionsOptions } from "./codexTurnActionTypes";
 import { promoteNextCodexApproval } from "./codexApprovalPromotion";
 import { refreshApprovalMessagesFromRoom } from "./codexTurnQueue";
 import { handleCodexUsageLimit as executeCodexUsageLimit } from "./codexUsageLimit";
+import { createCodexImageAttachment } from "../lib/codexGeneratedImage";
 
 export function useCodexTurnActions({
   localUser,
@@ -210,7 +211,8 @@ export function useCodexTurnActions({
         {
           proposedBy: approval?.requestedBy ?? localUser.name,
           contextSummary: `${turnSummary.messagesSinceLastCodex} room message(s); ${turnSummary.attachments.length} attachment(s); ${turnSummary.browserAccess.length} approved browser origin(s); ${turnSummary.terminals.length} terminal label(s); ${turnSummary.git?.totalFiles ?? 0} Git change(s)`
-        }
+        },
+        room.codexRawReasoningEnabled ?? false
       );
       if (classifyCodexFailure([result.status, result.stderr, result.transcript, ...result.events]) === "usage_limit") {
         await executeCodexUsageLimit(
@@ -261,9 +263,23 @@ export function useCodexTurnActions({
         },
         room
       );
+      const imageAttachments = [];
+      for (const generatedImage of result.generatedImages ?? []) {
+        try {
+          imageAttachments.push(await createCodexImageAttachment(room, generatedImage));
+        } catch (error) {
+          appendTerminalLinesForRoom(
+            roomId,
+            [`Could not publish a Codex-generated image: ${String(error)}`],
+            maxTerminalActivityLines
+          );
+        }
+      }
       const body =
         result.transcript.trim() ||
-        `Codex turn finished with status: ${roomStatus}.${roomEvents.length ? ` Events: ${roomEvents.slice(0, 8).join(", ")}` : ""}`;
+        (imageAttachments.length
+          ? "Generated an image."
+          : `Codex turn finished with status: ${roomStatus}.${roomEvents.length ? ` Events: ${roomEvents.slice(0, 8).join(", ")}` : ""}`);
       await publishChatMessage(
         {
           id: crypto.randomUUID(),
@@ -271,7 +287,8 @@ export function useCodexTurnActions({
           role: "codex",
           body,
           time: formatMessageTime(),
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          ...(imageAttachments.length ? { attachments: imageAttachments } : {})
         },
         room
       );

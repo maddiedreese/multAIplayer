@@ -121,6 +121,63 @@ fn project_file_write_saves_inside_project_and_rejects_escape() {
 }
 
 #[test]
+fn project_file_read_returns_allowlisted_raster_images_as_bounded_data_urls() {
+    let root = test_temp_dir("project-image-read");
+    let cwd = root.to_str().expect("utf8 temp path").to_string();
+    let fixtures = [
+        (
+            "image.png",
+            vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a],
+            "image/png",
+        ),
+        ("image.jpg", vec![0xff, 0xd8, 0xff, 0xe0], "image/jpeg"),
+        ("image.gif", b"GIF89a".to_vec(), "image/gif"),
+        ("image.webp", b"RIFF\0\0\0\0WEBP".to_vec(), "image/webp"),
+    ];
+    for (path, bytes, expected_media_type) in fixtures {
+        write(root.join(path), bytes).expect("write image fixture");
+        let read = project_file_read(project::ProjectFileReadRequest {
+            cwd: cwd.clone(),
+            path: path.to_string(),
+            max_bytes: Some(1_024),
+        })
+        .expect("read image fixture");
+        assert_eq!(read.media_type.as_deref(), Some(expected_media_type));
+        assert!(read
+            .content
+            .starts_with(&format!("data:{expected_media_type};base64,")));
+        assert!(!read.truncated);
+    }
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn project_file_read_rejects_mislabeled_and_oversized_raster_images() {
+    let root = test_temp_dir("project-image-reject");
+    let cwd = root.to_str().expect("utf8 temp path").to_string();
+    write(root.join("not-really.png"), b"<svg onload='bad'></svg>")
+        .expect("write mismatched image");
+    assert!(project_file_read(project::ProjectFileReadRequest {
+        cwd: cwd.clone(),
+        path: "not-really.png".to_string(),
+        max_bytes: None,
+    })
+    .is_err());
+
+    let oversized = fs::File::create(root.join("oversized.webp")).expect("create oversized image");
+    oversized
+        .set_len(2_500_001)
+        .expect("size oversized image fixture");
+    assert!(project_file_read(project::ProjectFileReadRequest {
+        cwd,
+        path: "oversized.webp".to_string(),
+        max_bytes: None,
+    })
+    .is_err());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn git_diff_output_is_bounded_with_truncation_marker() {
     let huge_diff = format!("start\n{}\nend", "x".repeat(MAX_GIT_DIFF_CHARS + 50_000));
     let bounded = bound_git_diff(&huge_diff);

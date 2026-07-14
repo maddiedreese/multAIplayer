@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CodexQueuePlaintextPayload, MlsRelayMessage } from "../src/index.js";
+import { CodexActivityPlaintextPayload, CodexQueuePlaintextPayload, MlsRelayMessage } from "../src/index.js";
 test("relay framing carries opaque MLS bytes without plaintext event fields", () => {
   const parsed = MlsRelayMessage.parse({
     id: "m1",
@@ -70,4 +70,67 @@ test("queued Codex events require a queue position", () => {
   assert.equal(CodexQueuePlaintextPayload.safeParse({ ...base, action: "queued", queuePosition: 1 }).success, true);
   assert.equal(CodexQueuePlaintextPayload.safeParse({ ...base, action: "promoted" }).success, false);
   assert.equal(CodexQueuePlaintextPayload.safeParse({ ...base, action: "cancelled" }).success, true);
+});
+
+test("Codex activities accept bounded disclosure details", () => {
+  const base = {
+    eventType: "codex.activity",
+    activityId: "activity-1",
+    turnId: "turn-1",
+    itemId: "item-1",
+    kind: "reasoning",
+    status: "completed",
+    title: "Reasoning",
+    startedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    host: "Host",
+    hostUserId: "host-user"
+  };
+  assert.equal(
+    CodexActivityPlaintextPayload.safeParse({
+      ...base,
+      details: {
+        type: "reasoning",
+        summaries: ["Checked the protocol boundary."],
+        rawContent: ["Provider-supplied raw reasoning."]
+      }
+    }).success,
+    true
+  );
+  assert.equal(
+    CodexActivityPlaintextPayload.safeParse({
+      ...base,
+      details: { type: "reasoning", summaries: ["x".repeat(4_097)] }
+    }).success,
+    false
+  );
+  assert.equal(
+    CodexActivityPlaintextPayload.safeParse({
+      ...base,
+      details: { type: "reasoning", summaries: [], rawContent: ["x".repeat(4_097)] }
+    }).success,
+    false
+  );
+});
+
+test("Codex activity detail is kind-specific and bounded", () => {
+  const parsed = CodexActivityPlaintextPayload.safeParse({
+    eventType: "codex.activity",
+    activityId: "activity-1",
+    turnId: "turn-1",
+    itemId: "item-1",
+    kind: "file_change",
+    status: "completed",
+    title: "File change",
+    details: {
+      type: "file_change",
+      changes: [{ path: "src/app.ts", action: "update", diff: "+const ready = true;" }]
+    },
+    startedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    host: "Host",
+    hostUserId: "host-user"
+  });
+  assert.equal(parsed.success, true);
+  if (parsed.success) assert.equal(parsed.data.details?.type, "file_change");
 });

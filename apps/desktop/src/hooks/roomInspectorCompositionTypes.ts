@@ -43,6 +43,7 @@ export interface RoomInspectorCapabilities {
     selectSandboxLevel: InspectorWorkProps["approvalPolicy"]["onSelectSandboxLevel"];
     selectModel: InspectorWorkProps["model"]["onSelectModel"];
     selectReasoningEffort: InspectorWorkProps["model"]["onSelectReasoningEffort"];
+    setRawReasoningEnabled: InspectorWorkProps["model"]["onRawReasoningEnabledChange"];
     selectSpeed: InspectorWorkProps["model"]["onSelectSpeed"];
   };
   history: Pick<
@@ -81,6 +82,7 @@ export interface RoomInspectorSources {
     | "setCodexSandboxLevel"
     | "setCodexModel"
     | "setCodexReasoningEffort"
+    | "setCodexRawReasoningEnabled"
     | "setCodexSpeed"
     | "approveGitWorkflow"
     | "refreshGitHubActions"
