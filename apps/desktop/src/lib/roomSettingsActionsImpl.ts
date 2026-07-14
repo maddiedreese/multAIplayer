@@ -22,6 +22,7 @@ import { currentSelectedRoom } from "./selectedWorkspace";
 import { createRoomSettingsMutationContext } from "./roomSettingsMutationContext";
 import { createRoomProjectSettingsActions } from "./roomProjectSettingsActions";
 import { createRoomApprovalSettingsActions } from "./roomApprovalSettingsActions";
+import { updateCodexRawReasoningSetting } from "./roomRawReasoningSettingsAction";
 import { defaultCodexReasoningEffort, defaultCodexSandboxLevel, defaultCodexSpeed } from "@multaiplayer/protocol";
 
 type CurrentRef<T> = { current: T };
@@ -225,6 +226,15 @@ export function createRoomSettingsActions({
     }
   }
 
+  const setCodexRawReasoningEnabled = (enabled: boolean) =>
+    updateCodexRawReasoningSetting(enabled, {
+      selectedRoomId: () => selectedRoomIdRef.current,
+      reportInFlight: reportRoomSettingsMutationInFlight,
+      replaceRoom,
+      publishEvent: publishRoomSettingsEvent,
+      context: mutationContext
+    });
+
   async function setCodexSandboxLevel(sandboxLevel: string) {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) return;
@@ -376,6 +386,7 @@ export function createRoomSettingsActions({
     setApprovalDelegationPolicy,
     setCodexModel,
     setCodexReasoningEffort,
+    setCodexRawReasoningEnabled,
     setCodexSpeed,
     setCodexSandboxLevel,
     renameRoom,

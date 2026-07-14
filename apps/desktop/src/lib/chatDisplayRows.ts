@@ -51,13 +51,17 @@ export function buildRoomChatMessageRows({
     selected: markdownSelectionMode && selectedMessageIds.includes(message.id),
     attachments: message.deletedAt
       ? []
-      : (message.attachments ?? []).map((attachment) => ({
-          id: attachment.id,
-          name: attachment.name,
-          meta: formatAttachmentMeta(attachment),
-          encryptedBlob: Boolean(attachment.blobId),
-          canPreview: canOpenChatAttachment(attachment)
-        })),
+      : (message.attachments ?? []).map((attachment) => {
+          const imageSource = safeInlineImageSource(attachment);
+          return {
+            id: attachment.id,
+            name: attachment.name,
+            meta: formatAttachmentMeta(attachment),
+            encryptedBlob: Boolean(attachment.blobId),
+            canPreview: canOpenChatAttachment(attachment),
+            ...(imageSource ? { image: { src: imageSource, alt: attachment.name } } : {})
+          };
+        }),
     reactions: message.deletedAt
       ? []
       : roomReactionEmoji.map((emoji) => {
@@ -70,6 +74,25 @@ export function buildRoomChatMessageRows({
           };
         })
   }));
+}
+
+const safeImageDataUrl = /^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/]+={0,2})$/i;
+
+/**
+ * Convert only an explicitly embedded, allowlisted raster data URL into a display source.
+ * File paths, remote URLs, SVG, malformed base64, and encrypted blob ids stay behind the
+ * normal attachment-open flow instead of becoming ambient image requests in the chat.
+ */
+export function safeInlineImageSource(attachment: ChatAttachment): string | null {
+  if (!attachment.content || attachment.content.length > 300_000) return null;
+  const match = safeImageDataUrl.exec(attachment.content);
+  if (!match) return null;
+  const declaredImage =
+    attachment.type === "image" ||
+    /^image\/(?:png|jpeg|gif|webp)$/i.test(attachment.type) ||
+    /\.(?:png|jpe?g|gif|webp)$/i.test(attachment.name);
+  if (!declaredImage || match[2].length % 4 !== 0) return null;
+  return attachment.content;
 }
 
 function canMutateMessage(message: ChatMessage, localUserId: string): boolean {

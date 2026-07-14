@@ -34,4 +34,4 @@ The relay cannot decrypt the MLS message and does not parse its application even
 
 ## Life of a Codex turn
 
-Codex approval, native execution, safe event projection, and transcript handling remain host-local policy. Room-visible queue, progress, activity, and result payloads follow the same MLS application-message lifecycle as chat. Raw RPC traffic, credentials, tool arguments/results, and host-local diagnostics are not projected into room messages.
+Codex approval, native execution, safe event projection, and transcript handling remain host-local policy. Room-visible queue, progress, typed activity, and result payloads follow the same MLS application-message lifecycle as chat. Bounded tool input/results and provider-supplied reasoning summaries may enter the typed activity schema. Raw reasoning may enter only under the host's off-by-default per-room setting and is not guaranteed to be supplied. Raw RPC objects, unknown fields, credentials, environment/account/auth state, token data, and host-local diagnostics are not projected wholesale into room messages.

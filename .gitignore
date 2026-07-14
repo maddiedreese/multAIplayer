@@ -17,3 +17,4 @@ coverage/
 **/.stryker-tmp/
 **/reports/mutation/
 reports/native-shell-e2e/
+reports/native-macos-smoke/

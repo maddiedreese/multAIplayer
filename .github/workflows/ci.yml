@@ -362,7 +362,7 @@ jobs:
   macos-desktop:
     name: macOS desktop package
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
@@ -392,8 +392,28 @@ jobs:
       - name: Verify native formatting, lints, and tests
         run: npm run verify:native
 
-      - name: Build desktop prerequisites
-        run: npm run build:packages && npm run build -w @multaiplayer/desktop
+      - name: Build desktop package dependencies
+        run: npm run build:packages
+
+      - name: Build test-only macOS app with embedded WebDriver
+        env:
+          VITE_NATIVE_E2E: "true"
+        run: npm run tauri:build:native-e2e -w @multaiplayer/desktop
+
+      - name: Smoke-test packaged WKWebView input and Tauri IPC
+        run: npm run test:e2e:native:macos-smoke
+
+      - name: Upload macOS WKWebView smoke evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-wkwebview-smoke
+          path: reports/native-macos-smoke
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Rebuild the production frontend without the test driver
+        run: npm run build -w @multaiplayer/desktop
 
       - name: Run macOS native-core and relay composition journey
         run: npx tsx --test apps/relay/test/live-native-relay-journey.test.ts

@@ -1,3 +1,5 @@
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -21,7 +23,14 @@ pub(crate) struct ProjectFileContent {
     pub(crate) size: u64,
     pub(crate) truncated: bool,
     pub(crate) content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) media_type: Option<String>,
 }
+
+// A 2.5 MB binary image becomes about 3.34 MB as a data URL and about 4.45 MB
+// after the encrypted envelope is base64 encoded. This stays below the relay's
+// default 5 MB ciphertext cap with room for the authenticated envelope metadata.
+const MAX_PROJECT_IMAGE_BYTES: u64 = 2_500_000;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -94,8 +103,29 @@ pub(crate) fn project_file_read(
     if !metadata.is_file() {
         return Err(format!("{} is not a file", request.path));
     }
+    let image_extension = project_image_extension(&request.path);
+    if image_extension.is_some() && metadata.len() > MAX_PROJECT_IMAGE_BYTES {
+        return Err(format!(
+            "Image is too large to attach safely ({} bytes; limit {} bytes)",
+            metadata.len(),
+            MAX_PROJECT_IMAGE_BYTES
+        ));
+    }
     let max_bytes = request.max_bytes.unwrap_or(80_000).clamp(1_024, 250_000);
     let bytes = fs::read(&requested).map_err(|error| format!("Failed to read file: {error}"))?;
+    if let Some(extension) = image_extension {
+        let media_type = verified_project_image_media_type(extension, &bytes)?;
+        return Ok(ProjectFileContent {
+            path: request.path,
+            size: metadata.len(),
+            truncated: false,
+            content: format!(
+                "data:{media_type};base64,{}",
+                BASE64_STANDARD.encode(&bytes)
+            ),
+            media_type: Some(media_type.to_string()),
+        });
+    }
     let truncated = bytes.len() > max_bytes;
     let slice = if truncated {
         &bytes[..max_bytes]
@@ -108,6 +138,45 @@ pub(crate) fn project_file_read(
         size: metadata.len(),
         truncated,
         content,
+        media_type: None,
+    })
+}
+
+fn project_image_extension(path: &str) -> Option<&str> {
+    let extension = Path::new(path).extension()?.to_str()?;
+    if extension.eq_ignore_ascii_case("png") {
+        Some("png")
+    } else if extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg") {
+        Some("jpeg")
+    } else if extension.eq_ignore_ascii_case("gif") {
+        Some("gif")
+    } else if extension.eq_ignore_ascii_case("webp") {
+        Some("webp")
+    } else {
+        None
+    }
+}
+
+fn verified_project_image_media_type(
+    extension: &str,
+    bytes: &[u8],
+) -> Result<&'static str, String> {
+    let valid = match extension {
+        "png" => bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]),
+        "jpeg" => bytes.starts_with(&[0xff, 0xd8, 0xff]),
+        "gif" => bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a"),
+        "webp" => bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP",
+        _ => false,
+    };
+    if !valid {
+        return Err("Image contents do not match the allowlisted file type".to_string());
+    }
+    Ok(match extension {
+        "png" => "image/png",
+        "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        _ => return Err("Unsupported image file type".to_string()),
     })
 }
 

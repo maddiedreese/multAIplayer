@@ -11,6 +11,7 @@ import {
   defaultApprovalDelegationPolicy,
   defaultCodexModel,
   defaultCodexReasoningEffort,
+  defaultCodexRawReasoningEnabled,
   defaultCodexSpeed,
   legacyCodexCatalogSelectionPolicy,
   defaultRoomMode,
@@ -411,6 +412,10 @@ export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
         normalizeCodexCatalogSelectionPolicy(
           (room as { codexReasoningEffortPolicy?: unknown }).codexReasoningEffortPolicy
         ) ?? legacyCodexCatalogSelectionPolicy,
+      codexRawReasoningEnabled:
+        typeof (room as { codexRawReasoningEnabled?: unknown }).codexRawReasoningEnabled === "boolean"
+          ? (room as { codexRawReasoningEnabled: boolean }).codexRawReasoningEnabled
+          : defaultCodexRawReasoningEnabled,
       codexSpeed: normalizeCodexSpeedOrDefault((room as { codexSpeed?: unknown }).codexSpeed ?? defaultCodexSpeed),
       codexServiceTierPolicy:
         normalizeCodexCatalogSelectionPolicy((room as { codexServiceTierPolicy?: unknown }).codexServiceTierPolicy) ??

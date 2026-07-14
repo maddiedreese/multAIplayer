@@ -51,6 +51,7 @@ export interface ProjectFileContent {
   size: number;
   truncated: boolean;
   content: string;
+  mediaType?: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
 }
 
 export interface ProjectFileWriteResult {
@@ -93,6 +94,14 @@ export interface CodexTurnResult {
   transcript: string;
   events: string[];
   stderr: string;
+  generatedImages: CodexGeneratedImage[];
+}
+
+export interface CodexGeneratedImage {
+  data: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+  name: string;
+  prompt?: string;
 }
 
 export interface CodexActivityEvent {
@@ -114,6 +123,34 @@ export interface CodexActivityEvent {
     | "other";
   status: "started" | "running" | "completed" | "failed" | "declined";
   title: string;
+  details?:
+    | { type: "reasoning"; summaries: string[] }
+    | { type: "command"; command: string; output?: string; exitCode?: number; durationMs?: number }
+    | { type: "file_change"; changes: Array<{ path: string; action: "add" | "delete" | "update"; diff?: string }> }
+    | {
+        type: "tool";
+        name: string;
+        server?: string;
+        arguments?: string;
+        result?: string;
+        error?: string;
+        durationMs?: number;
+      }
+    | {
+        type: "web_search";
+        action?: "search" | "open_page" | "find_in_page" | "other";
+        query?: string;
+        url?: string;
+        pattern?: string;
+      }
+    | { type: "image_generation"; prompt?: string }
+    | {
+        type: "agent";
+        prompt?: string;
+        model?: string;
+        reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+        states?: Array<{ threadId: string; status: string; message?: string }>;
+      };
   agent?: {
     action: "spawn" | "send" | "resume" | "wait" | "close";
     senderId: string;

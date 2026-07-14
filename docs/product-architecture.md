@@ -319,7 +319,7 @@ Defaults:
 
 ### Secrets Visibility
 
-Room members can see content deliberately shared through chat, approved terminal results, diffs, Git/workflow events, and coarse Codex turn status. Canonical Codex activity shares lifecycle metadata only; it does not expose raw tool logs, commands, output, arguments, results, secrets, or token deltas.
+Room members can see content deliberately shared through chat, approved terminal results, diffs, Git/workflow events, and bounded structured Codex activity. Codex disclosures can include commands, output, file changes, diffs, tool input/results, web activity, image prompts, subagent state, and reasoning summaries. Provider-supplied raw reasoning is eligible only under the active host's off-by-default per-room sharing setting, is not guaranteed to be available, and follows the same encrypted room visibility and retention rules. The projection does not copy the entire upstream notification or unknown fields into room state.
 
 The app must warn that secrets may be exposed. The first-time room warning covers full visibility, is acknowledged per room on the local device, and reappears after the user forgets that room locally. Inline warnings should appear for:
 
@@ -370,7 +370,7 @@ The desktop app talks to local Codex via `codex app-server`.
 
 The app-server is treated as the UI-to-agent protocol. multAIplayer is a rich client built on top of the Codex harness, not a hosted quota bridge.
 
-The alpha shares coarse turn state as encrypted `codex.event` room events and canonical item lifecycle metadata as encrypted `codex.activity` events. Activity projection is allowlisted and bounded: stable ids, type/status/timestamps, and limited normalized subagent relationships. The projector never copies raw app-server commands/output, tool arguments/results, upstream JSON, environment values, secret-bearing fields, account/auth data, token refreshes, or token/output deltas into room events or local room history. This does not change the separate, explicit sharing rules for chat, approved terminal results, or attachments.
+The alpha shares coarse turn state as encrypted `codex.event` room events and typed item disclosures as encrypted `codex.activity` events. Activity projection is allowlisted and bounded: stable ids, type/status/timestamps, typed command/file/tool/web/image/agent/reasoning details, and normalized subagent relationships. Reasoning summaries are the default; provider-supplied raw reasoning can be projected only when the active host enables its off-by-default per-room sharing setting, and availability is not guaranteed. Included details are visible to room members and retained under their encrypted local-history policies. The projector discards the raw upstream object, unknown fields, environment/account/auth state, token refreshes, token deltas, and streaming output deltas. This does not change the separate sharing and expiry rules for chat or attachments.
 
 Each room keeps a normalized encrypted Codex thread graph on the host device. The selected active thread drives `thread/resume`, `turn/start`, and goal operations. Hosts can list their active session tree, switch branches, and fork. Full forks work across the tested range; fork-through-turn using `lastTurnId` requires 0.143.0 or newer. Discovery fails closed until the active session is resolved and never imports prompt previews as titles. The separately rendered agent tree is derived only from normalized subagent activity and is not the conversation thread graph.
 

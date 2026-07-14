@@ -34,6 +34,7 @@ export function buildRoomInspectorCapabilities(sources: RoomInspectorSources): R
       selectSandboxLevel: sources.roomRuntime.setCodexSandboxLevel,
       selectModel: sources.roomRuntime.setCodexModel,
       selectReasoningEffort: sources.roomRuntime.setCodexReasoningEffort,
+      setRawReasoningEnabled: sources.roomRuntime.setCodexRawReasoningEnabled,
       selectSpeed: sources.roomRuntime.setCodexSpeed
     },
     history: {

@@ -73,6 +73,7 @@ export const RoomRecord = z.object({
   codexModelPolicy: z.enum(["auto", "pinned"]).optional(),
   codexReasoningEffort: z.enum(codexReasoningEffortIds).optional(),
   codexReasoningEffortPolicy: z.enum(["auto", "pinned"]).optional(),
+  codexRawReasoningEnabled: z.boolean().optional(),
   codexSpeed: z.enum(["standard", "fast"]).optional(),
   codexServiceTierPolicy: z.enum(["auto", "pinned"]).optional(),
   codexSandboxLevel: z

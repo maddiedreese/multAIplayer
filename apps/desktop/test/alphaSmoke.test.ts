@@ -224,6 +224,7 @@ test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, brow
     codexModelPolicy: "pinned",
     codexReasoningEffort: "medium",
     codexReasoningEffortPolicy: "pinned",
+    codexRawReasoningEnabled: false,
     codexSpeed: "standard",
     codexServiceTierPolicy: "pinned",
     codexSandboxLevel: "workspace_write",

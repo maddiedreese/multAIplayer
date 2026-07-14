@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "com.multaiplayer.desktop.native-e2e",
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "capabilities": [
+        {
+          "identifier": "native-e2e",
+          "description": "Test-only permissions for the embedded macOS WebDriver smoke.",
+          "windows": ["main"],
+          "permissions": [
+            "core:default",
+            "dialog:default",
+            "notification:default",
+            "core:webview:allow-create-webview",
+            "core:webview:allow-webview-close",
+            "core:webview:allow-set-webview-position",
+            "core:webview:allow-set-webview-size",
+            "core:webview:allow-set-webview-focus",
+            "wdio:default",
+            "wdio-webdriver:default"
+          ]
+        }
+      ]
+    }
+  },
+  "bundle": {
+    "targets": ["app"]
+  }
+}

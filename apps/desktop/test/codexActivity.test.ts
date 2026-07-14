@@ -71,6 +71,53 @@ test("activity timeline renders safe lifecycle metadata", () => {
   );
   assert.match(html, /Codex activity/);
   assert.match(html, /Command execution/);
-  assert.match(html, /in progress/);
+  assert.match(html, /in progress/i);
   assert.doesNotMatch(html, /secret|command-argument/i);
+});
+
+test("activity disclosures render bounded reasoning, edits, commands, and subagent state behind details", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(CodexActivityTimelineView, {
+      activities: [
+        activity({
+          activityId: "reasoning",
+          kind: "reasoning",
+          title: "Reasoning",
+          details: {
+            type: "reasoning",
+            summaries: ["Checking the room boundary before editing."],
+            rawContent: ["Provider-supplied raw reasoning detail."]
+          }
+        }),
+        activity({
+          activityId: "command",
+          details: { type: "command", command: "npm test", output: "15 passing", exitCode: 0 }
+        }),
+        activity({
+          activityId: "files",
+          kind: "file_change",
+          details: { type: "file_change", changes: [{ path: "src/chat.tsx", action: "update", diff: "+ safe" }] }
+        }),
+        activity({
+          activityId: "agent",
+          kind: "agent",
+          agent: { action: "spawn", senderId: "root", receiverIds: ["child"] },
+          details: {
+            type: "agent",
+            prompt: "Audit the chat renderer",
+            states: [{ threadId: "child", status: "running", message: "Inspecting tests" }]
+          }
+        })
+      ]
+    })
+  );
+  assert.match(html, /<details/);
+  assert.match(html, /Thinking/);
+  assert.match(html, /Checking the room boundary/);
+  assert.match(html, /Raw reasoning shared with this room/);
+  assert.match(html, /Provider-supplied raw reasoning detail/);
+  assert.match(html, /npm test/);
+  assert.match(html, /src\/chat.tsx/);
+  assert.match(html, /Spawned a subagent/);
+  assert.match(html, /Inspecting tests/);
 });

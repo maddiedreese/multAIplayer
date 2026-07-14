@@ -50,7 +50,7 @@ fn app_version() -> &'static str {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    if let Err(error) = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .manage(TerminalState::default())
         .manage(ShellAuthorizationState::default())
         .manage(LocalPreviewState::default())
@@ -72,7 +72,13 @@ pub fn run() {
         })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_shell::init());
+    #[cfg(feature = "native-e2e")]
+    let builder = builder
+        .plugin(tauri_plugin_wdio::init())
+        .plugin(tauri_plugin_wdio_webdriver::init());
+
+    if let Err(error) = builder
         .invoke_handler(tauri::generate_handler![
             app_version,
             record_diagnostic,

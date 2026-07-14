@@ -27,7 +27,10 @@ pub(crate) struct MlsNativeState {
     requires_rejoin_rooms: Mutex<HashSet<String>>,
 }
 
+#[cfg(not(feature = "native-e2e"))]
 const MLS_KEYCHAIN_SERVICE: &str = "com.multaiplayer.desktop.room-secrets";
+#[cfg(feature = "native-e2e")]
+const MLS_KEYCHAIN_SERVICE: &str = "com.multaiplayer.desktop.native-e2e.room-secrets";
 const MLS_IDENTITY_ACCOUNT: &str = "mls-identity:v1";
 const MLS_HPKE_ACCOUNT: &str = "mls-hpke:v1";
 

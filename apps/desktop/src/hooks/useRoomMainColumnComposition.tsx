@@ -247,6 +247,7 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
   });
   const chatProps = buildRoomMainChatProps({
     messages: chatMessageRows,
+    codexActivities: codex?.activities ?? [],
     approvalVisible: codex?.approvalVisible ?? false,
     approvalSummary: {
       messages: formatApprovalMessages(approvalMessages),

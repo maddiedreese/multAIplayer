@@ -28,6 +28,7 @@ import {
 import { canStageRoomChatAttachment, roomChatGateMessage } from "./chatPolicy";
 import { roomLockMessage } from "./appRuntime";
 import { shouldApplyRoomScopedUiUpdate } from "./roomScopedUi";
+import { createImageThumbnail } from "./codexGeneratedImage";
 import { isAttachmentBlobContent } from "./localRoomHistoryPayload";
 import {
   attachmentTypeFromName,
@@ -171,7 +172,7 @@ export function createFileActions({
     const attachment: ChatAttachment = {
       id: crypto.randomUUID(),
       name: fileToAttach.path,
-      type: attachmentTypeFromName(fileToAttach.path),
+      type: fileToAttach.mediaType ?? attachmentTypeFromName(fileToAttach.path),
       size: fileToAttach.size,
       content: fileToAttach.content,
       truncated: fileToAttach.truncated
@@ -188,6 +189,13 @@ export function createFileActions({
       if (reportRoomFileActionInFlight(roomId)) return;
       try {
         setFileBusyForRoom(roomId, true);
+        const originalContent = attachment.content ?? "";
+        const inlineThumbnail = fileToAttach.mediaType
+          ? await createImageThumbnail(originalContent).catch((_error) => {
+              reportExpectedFailure("create an inline project-image thumbnail");
+              return null;
+            })
+          : null;
         const blobId = `blob_${crypto.randomUUID()}`;
         const sealed = await encryptMlsBlob(roomId, blobId, {
           name: fileToAttach.path,
@@ -206,7 +214,7 @@ export function createFileActions({
           epoch: sealed.epoch,
           sealedBlob: JSON.stringify(sealed)
         });
-        attachment.content = undefined;
+        attachment.content = inlineThumbnail ?? undefined;
         attachment.blobId = blob.id;
         attachment.blobBytes = selectedContentBytes;
         attachment.truncated = fileToAttach.truncated || selectedContentBytes > maxEmbeddedAttachmentBytes;

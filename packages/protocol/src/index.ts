@@ -89,6 +89,7 @@ export {
   defaultCodexModelPolicy,
   defaultCodexReasoningEffort,
   defaultCodexReasoningEffortPolicy,
+  defaultCodexRawReasoningEnabled,
   defaultCodexSandboxLevel,
   defaultCodexServiceTierPolicy,
   defaultCodexSpeed,

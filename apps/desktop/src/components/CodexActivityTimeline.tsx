@@ -1,6 +1,7 @@
 import React from "react";
 import type { CodexActivity } from "../types";
 import { useAppStore } from "../store/appStore";
+import { CodexActivityDisclosure } from "./CodexActivityDisclosure";
 
 const noActivities: CodexActivity[] = [];
 
@@ -24,27 +25,13 @@ export function CodexActivityTimelineView({ activities }: { activities: CodexAct
         {visible.map((activity) => (
           <li key={activity.activityId} data-status={activity.status}>
             <span className="codex-activity-marker" aria-hidden="true" />
-            <div>
-              <strong>{activity.title}</strong>
-              <small>
-                {formatActivityKind(activity.kind)} · {formatActivityStatus(activity.status)}
-              </small>
-            </div>
+            <CodexActivityDisclosure activity={activity} />
             <time dateTime={activity.updatedAt}>{formatActivityTime(activity.updatedAt)}</time>
           </li>
         ))}
       </ol>
     </section>
   );
-}
-
-function formatActivityKind(kind: CodexActivity["kind"]): string {
-  return kind.replaceAll("_", " ");
-}
-
-function formatActivityStatus(status: CodexActivity["status"]): string {
-  if (status === "running") return "in progress";
-  return status;
 }
 
 function formatActivityTime(value: string): string {

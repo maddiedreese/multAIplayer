@@ -208,6 +208,34 @@ test("the UI-contract E2E harness cannot enter the production desktop bundle", (
   }
 });
 
+test("native WebView drivers stay exactly pinned and outside production registration", () => {
+  const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+  const releaseWorkflow = readFileSync(".github/workflows/release.yml", "utf8");
+  const cargoManifest = readFileSync("apps/desktop/src-tauri/Cargo.toml", "utf8");
+  const nativeLibrary = readFileSync("apps/desktop/src-tauri/src/lib.rs", "utf8");
+  const mlsNative = readFileSync("apps/desktop/src-tauri/src/mls_native.rs", "utf8");
+  const desktopEntry = readFileSync("apps/desktop/src/main.tsx", "utf8");
+  const nativeE2eConfig = readFileSync("apps/desktop/src-tauri/tauri.native-e2e.conf.json", "utf8");
+
+  assert.match(workflow, /cargo install tauri-driver --version 2\.0\.6 --locked/);
+  assert.equal(rootPackage.devDependencies["@wdio/tauri-service"], "1.2.0");
+  assert.equal(rootPackage.devDependencies["@wdio/tauri-plugin"], "1.2.0");
+  assert.equal(rootPackage.overrides["@wdio/native-utils"], "2.5.0");
+  assert.match(cargoManifest, /native-e2e = \["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"\]/);
+  assert.match(cargoManifest, /tauri-plugin-wdio = \{ version = "=1\.2\.0", optional = true \}/);
+  assert.match(cargoManifest, /tauri-plugin-wdio-webdriver = \{ version = "=1\.2\.0", optional = true \}/);
+  assert.match(nativeLibrary, /#\[cfg\(feature = "native-e2e"\)\]/);
+  assert.match(mlsNative, /com\.multaiplayer\.desktop\.native-e2e\.room-secrets/);
+  assert.match(desktopEntry, /import\.meta\.env\.VITE_NATIVE_E2E === "true"/);
+  assert.match(nativeE2eConfig, /"wdio:default"/);
+  assert.match(nativeE2eConfig, /"wdio-webdriver:default"/);
+  assert.match(workflow, /VITE_NATIVE_E2E: "true"/);
+  assert.match(workflow, /npm run test:e2e:native:macos-smoke/);
+  assert.match(workflow, /name: macos-wkwebview-smoke/);
+  assert.match(workflow, /Rebuild the production frontend without the test driver/);
+  assert.doesNotMatch(releaseWorkflow, /native-e2e|wdio/i);
+});
+
 test("CI verifies each layer once before packaging prebuilt desktop assets", () => {
   const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
   for (const packagePath of ["apps/relay/package.json", "packages/protocol/package.json"]) {
@@ -225,7 +253,7 @@ test("CI verifies each layer once before packaging prebuilt desktop assets", () 
   assert.match(workflow, /name: Build package dependencies\n\s+run: npm run build:packages/);
   assert.match(workflow, /relay-authorization-mutation:\n\s+name: Relay authorization mutation policy/);
   assert.match(workflow, /protocol-type-guard-mutation:\n\s+name: Protocol type-guard mutation policy/);
-  assert.equal(workflow.match(/run: npm run build:packages && npm run build -w @multaiplayer\/desktop$/gm)?.length, 1);
+  assert.equal(workflow.match(/run: npm run build -w @multaiplayer\/desktop$/gm)?.length, 1);
   assert.equal(workflow.match(/run: npm run tauri:build:prebuilt -w @multaiplayer\/desktop$/gm)?.length, 1);
   assert.doesNotMatch(workflow, /run: npm run (?:check|test|build)$/m);
 });

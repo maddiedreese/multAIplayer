@@ -32,7 +32,7 @@ The Members panel shows live room presence, host status, device labels, and devi
 
 ## Chat
 
-Room chat supports encrypted messages, replies, reactions, attachments, local edits, and local deletes. A user can edit or delete their own message only before that message has entered a started Codex turn. Once Codex consumes a message, post a follow-up correction instead.
+Room chat supports encrypted messages, replies, reactions, attachments, local edits, and local deletes. Human and Codex messages use the same safe Markdown presentation: inline backticks render as inline code, and triple-backtick fences render as scrollable code blocks with an optional language label and a copy control. Message Markdown is rendered by the app's bounded parser rather than as arbitrary HTML. A user can edit or delete their own message only before that message has entered a started Codex turn. Once Codex consumes a message, post a follow-up correction instead.
 
 Typing `@Codex` or clicking the Codex button proposes a Codex turn. If another proposal is pending or a turn is running, the request enters the room-visible Codex queue. Queued turns refresh against current chat until they start.
 
@@ -40,7 +40,9 @@ Typing `@Codex` or clicking the Codex button proposes a Codex turn. If another p
 
 ## Attachments
 
-The host can attach project files to chat from the file editor. Small text/code previews can be embedded directly in encrypted chat payloads. Larger previews are encrypted locally, uploaded to relay blob storage as ciphertext, and opened from the file preview pane after local decryption.
+The host can attach project files to chat from the file editor. Small text/code previews can be embedded directly in encrypted chat payloads. Allowlisted PNG, JPEG, WebP, and GIF attachments can render inline for both user and Codex messages; SVG, remote URLs, local file paths, malformed data, and unsupported media stay out of the ambient inline-image path. Larger previews are encrypted locally, uploaded to relay blob storage as ciphertext, and opened from the file preview pane after local decryption.
+
+When the local Codex app-server returns an image-generation result, the native boundary accepts only bounded allowlisted raster data, gives it a generated safe filename, and publishes it as an encrypted chat attachment beside the Codex response. Small images can travel inline. Larger images use an exporter-encrypted relay blob and may include a bounded inline thumbnail; the relay sees blob metadata and ciphertext, not image pixels or the image-generation prompt. The app does not persist or share an upstream local output path. The default relay blob lifetime is 30 days, subject to the self-hosted relay's configured attachment retention, while locally decrypted attachment records follow the room's encrypted local-history retention and clearing controls.
 
 The app shows review warnings for files that look like `.env` files, credentials, private keys, or environment dumps. These warnings are review aids, not complete secret scanners. If the host attaches a sensitive file anyway, everyone in the room may see it and it may enter approved Codex context.
 
@@ -68,7 +70,11 @@ Model, reasoning, and speed/service-tier controls can be automatic or pinned. Au
 
 Codex can pause a running turn to ask the active host for a command, file, permission, tool-input, MCP, or authentication decision. These requests are room-scoped and bidirectional; answering the proposal card is separate from answering later app-server requests. A pending app-server request expires after 15 minutes of human wait.
 
-The Codex activity timeline shows encrypted metadata-only command, file, tool, web, image, review, reasoning, and subagent lifecycle entries. It deliberately does not share command text, output, arguments, results, environment values, raw JSON, secrets, or token deltas.
+The Codex work disclosure appears in chat as a collapsible “Codex is working” or “Codex worked” group. Each typed step has its own disclosure for the information Codex reported: reasoning summaries; command text, bounded output, exit status, and duration; changed paths and bounded diffs; tool name, bounded input/result/error; web action, query, page, or find pattern; image-generation prompt; and subagent prompt, model, reasoning effort, state, and normalized spawn/send/resume/wait/close relationships. The adjacent agent visualization uses those normalized relationships so room members can see subagent spawning and progress without confusing it with the Codex conversation branch graph.
+
+“Thinking” shows provider-supplied reasoning summaries by default. The active host can enable an off-by-default, per-room setting to share provider-supplied raw reasoning when the selected provider, model, and app-server build make it available. Enabling the setting does not guarantee that a turn will produce raw reasoning. When present, raw reasoning appears behind its own disclosure and is treated like other room activity: it is bounded, MLS-encrypted before relay transport, visible to room members, and retained in their encrypted local history according to the room retention window. Turning sharing off prevents raw reasoning from being included in later projected activity; it does not retract copies already delivered or retained by members.
+
+These structured details are schema-validated, but they are not a secret scrubber: reasoning, commands, output, diffs, tool data, URLs, prompts, and Codex-reported paths can contain sensitive project information. The activity history retains at most 160 records per room. Raw upstream notification JSON, unknown fields, environment/account/authentication state, token refreshes, token deltas, and streaming output deltas are not copied wholesale into room activity.
 
 After a thread exists, the thread graph can refresh the active session tree, switch the active branch, or fork it. An optional last-turn id forks through that turn on Codex 0.143.0 or newer. The selected thread is used for the next turn and `/goal`. The adjacent agent tree is a different view derived from normalized subagent activity; it is not the conversation branch graph.
 
@@ -128,7 +134,7 @@ Removing a member first revokes relay access and then advances the group through
 
 ## Local History, Notifications, And Forgetting A Room
 
-Local history is encrypted on the device and has a configurable retention window. It can include chat, workflow events, terminal snapshots, browser approvals, Codex turn events, bounded metadata-only Codex activities, Git events, GitHub Actions refreshes, host handoff packages, local previews, and the normalized Codex thread graph/active selection.
+Local history is encrypted on the device and has a configurable retention window. It can include chat and image-attachment records, workflow events, terminal snapshots, browser approvals, Codex turn events, bounded structured Codex activities, Git events, GitHub Actions refreshes, host handoff packages, local previews, and the normalized Codex thread graph/active selection. Encrypted attachment blobs have their own relay-side expiry, so a retained message or thumbnail does not guarantee that a larger original blob remains downloadable.
 
 Clearing local history removes saved local room history while keeping the device's native MLS state. Forgetting a room on one device removes local history, local room settings, the saved Codex thread graph/active selection, native MLS state and retained history secrets, and warning acknowledgements. The room becomes locked on that device until it completes a fresh KeyPackage/Welcome rejoin; rejoining does not restore pre-rejoin history secrets.
 

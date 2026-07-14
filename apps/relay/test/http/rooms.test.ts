@@ -34,6 +34,7 @@ test("relay accepts room defaults when creating a room", async () => {
         approvalPolicy: string;
         codexModel: string;
         codexReasoningEffort: string;
+        codexRawReasoningEnabled: boolean;
         browserAllowedOrigins: string[];
         browserProfilePersistent: boolean;
       };
@@ -41,6 +42,7 @@ test("relay accepts room defaults when creating a room", async () => {
     assert.equal(body.room.approvalPolicy, "ask_every_turn");
     assert.equal(body.room.codexModel, "gpt-5.4-thinking");
     assert.equal(body.room.codexReasoningEffort, "none");
+    assert.equal(body.room.codexRawReasoningEnabled, false);
     assert.deepEqual(body.room.browserAllowedOrigins, ["https://github.com", "https://example.com"]);
     assert.equal(body.room.browserProfilePersistent, false);
 
@@ -50,6 +52,15 @@ test("relay accepts room defaults when creating a room", async () => {
         name: "Bad policy room",
         projectPath: "/tmp/multaiplayer",
         approvalPolicy: "surprise"
+      }),
+      400
+    );
+    assert.equal(
+      await postJsonStatus(relay.baseUrl, "/rooms", {
+        teamId: "team-core",
+        name: "Bad raw reasoning setting",
+        projectPath: "/tmp/multaiplayer",
+        codexRawReasoningEnabled: "yes"
       }),
       400
     );
@@ -280,6 +291,28 @@ test("relay lets only the active host change room settings", async () => {
       }),
       200
     );
+    assert.equal(
+      await patchRoomSettings(relay.baseUrl, {
+        requesterName: "Peer",
+        requesterUserId: "github:peer",
+        codexRawReasoningEnabled: true
+      }),
+      403
+    );
+    const rawReasoningResponse = await fetch(`${relay.baseUrl}/rooms/room-desktop/settings`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        requesterName: "Maddie",
+        requesterUserId: "github:maddiedreese",
+        codexRawReasoningEnabled: true
+      })
+    });
+    assert.equal(rawReasoningResponse.status, 200);
+    const rawReasoningBody = (await rawReasoningResponse.json()) as {
+      room: { codexRawReasoningEnabled?: boolean };
+    };
+    assert.equal(rawReasoningBody.room.codexRawReasoningEnabled, true);
   } finally {
     await relay.close();
   }

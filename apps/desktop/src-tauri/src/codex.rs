@@ -34,6 +34,17 @@ pub(crate) struct CodexTurnResult {
     transcript: String,
     events: Vec<String>,
     stderr: String,
+    generated_images: Vec<CodexGeneratedImage>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CodexGeneratedImage {
+    data: String,
+    mime_type: String,
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prompt: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -52,6 +63,8 @@ pub(crate) struct CodexTurnRequest {
     timeout_seconds: Option<u64>,
     proposed_by: Option<String>,
     context_summary: Option<String>,
+    #[serde(default)]
+    share_raw_reasoning: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -148,6 +161,7 @@ pub(crate) fn run_codex_turn(
         cancellation,
         request.proposed_by.as_deref(),
         request.context_summary.as_deref(),
+        request.share_raw_reasoning,
     );
     if result.as_ref().is_ok_and(CodexTurnResult::is_reusable) && session.is_alive() {
         let mut checked_out = Some(session);
@@ -234,6 +248,8 @@ impl CodexServerSession {
             .arg(format!("model_reasoning_effort=\"{reasoning_effort}\""))
             .arg("-c")
             .arg(format!("service_tier=\"{service_tier}\""))
+            .arg("-c")
+            .arg("show_raw_agent_reasoning=true")
             .arg("-c")
             .arg(format!("sandbox_mode=\"{}\"", sandbox_config.sandbox_mode))
             .arg("-c")
@@ -369,6 +385,7 @@ impl CodexServerSession {
         cancelled: Arc<std::sync::atomic::AtomicBool>,
         proposed_by: Option<&str>,
         context_summary: Option<&str>,
+        share_raw_reasoning: bool,
     ) -> Result<CodexTurnResult, String> {
         let mut budget = ActiveTimeout::new(timeout);
         let stdin = self.stdin.clone();
@@ -485,6 +502,7 @@ impl CodexServerSession {
 
         let mut transcript = String::new();
         let mut activity_started_at = HashMap::<String, String>::new();
+        let mut generated_images = Vec::new();
 
         let status = loop {
             if cancelled.load(Ordering::Acquire) {
@@ -524,12 +542,18 @@ impl CodexServerSession {
                     method,
                     value: parsed,
                 }) => {
+                    if method == "item/completed" && generated_images.len() < 5 {
+                        if let Some(image) = project_generated_image(&parsed) {
+                            generated_images.push(image);
+                        }
+                    }
                     if let Some(activity) = project_codex_activity(
                         &method,
                         &parsed,
                         &room_id,
                         client_turn_id,
                         &mut activity_started_at,
+                        share_raw_reasoning,
                     ) {
                         let _ = self.app.emit("codex://activity", activity);
                     }
@@ -586,6 +610,7 @@ impl CodexServerSession {
             transcript,
             events,
             stderr,
+            generated_images,
         })
     }
 
@@ -598,6 +623,65 @@ impl CodexServerSession {
     fn is_alive(&mut self) -> bool {
         matches!(self.child.try_wait(), Ok(None))
     }
+}
+
+fn project_generated_image(notification: &Value) -> Option<CodexGeneratedImage> {
+    // Keep the IPC result within the relay's default 5 MB encrypted-blob budget.
+    const MAX_IMAGE_DATA_CHARS: usize = 5_000_000;
+    let item = notification.get("params")?.get("item")?;
+    if item.get("type")?.as_str()? != "imageGeneration" {
+        return None;
+    }
+    let result = item.get("result")?.as_str()?.trim();
+    if result.is_empty() || result.len() > MAX_IMAGE_DATA_CHARS {
+        return None;
+    }
+
+    let (data, mime_type, extension) = if result.starts_with("data:") {
+        let (metadata, encoded) = result.split_once(',')?;
+        let mime_type = metadata.strip_prefix("data:")?.strip_suffix(";base64")?;
+        let extension = supported_image_extension(mime_type)?;
+        if !is_base64_payload(encoded) {
+            return None;
+        }
+        (result.to_string(), mime_type.to_string(), extension)
+    } else {
+        if !is_base64_payload(result) {
+            return None;
+        }
+        (
+            format!("data:image/png;base64,{result}"),
+            "image/png".to_string(),
+            "png",
+        )
+    };
+    let id = bounded_codex_identifier(item.get("id").and_then(Value::as_str), "generated-image");
+    Some(CodexGeneratedImage {
+        data,
+        mime_type,
+        name: format!("{id}.{extension}"),
+        prompt: item
+            .get("revisedPrompt")
+            .and_then(Value::as_str)
+            .map(|value| value.chars().take(120_000).collect()),
+    })
+}
+
+fn supported_image_extension(mime_type: &str) -> Option<&'static str> {
+    match mime_type {
+        "image/png" => Some("png"),
+        "image/jpeg" => Some("jpg"),
+        "image/webp" => Some("webp"),
+        "image/gif" => Some("gif"),
+        _ => None,
+    }
+}
+
+fn is_base64_payload(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/' | b'='))
 }
 
 impl Drop for CodexServerSession {
@@ -763,4 +847,40 @@ fn cleanup_on_error<T>(child: &mut Child, result: Result<T, String>) -> Result<T
         terminate_child(child);
     }
     result
+}
+
+#[cfg(test)]
+mod generated_image_tests {
+    use super::*;
+
+    #[test]
+    fn projects_completed_image_data_without_saved_path() {
+        let notification = json!({"params":{"item":{
+            "id":"image-1",
+            "type":"imageGeneration",
+            "status":"completed",
+            "revisedPrompt":"A lighthouse at dusk",
+            "result":"iVBORw0KGgo=",
+            "savedPath":"/Users/private/result.png"
+        }}});
+        let image = project_generated_image(&notification).expect("generated image");
+        let encoded = serde_json::to_string(&image).expect("serialize");
+        assert!(encoded.contains("data:image/png;base64,iVBORw0KGgo="));
+        assert!(encoded.contains("image-1.png"));
+        assert!(encoded.contains("A lighthouse at dusk"));
+        assert!(!encoded.contains("/Users/private"));
+    }
+
+    #[test]
+    fn accepts_only_bounded_supported_image_data() {
+        let unsupported = json!({"params":{"item":{
+            "id":"image-1", "type":"imageGeneration",
+            "result":"data:image/svg+xml;base64,PHN2Zz4="
+        }}});
+        let path_only = json!({"params":{"item":{
+            "id":"image-2", "type":"imageGeneration", "savedPath":"/tmp/image.png"
+        }}});
+        assert!(project_generated_image(&unsupported).is_none());
+        assert!(project_generated_image(&path_only).is_none());
+    }
 }

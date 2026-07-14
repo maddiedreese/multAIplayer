@@ -36,6 +36,7 @@ test("createHandoffSettingsPatch trims and returns inherited room settings", () 
     codexModelPolicy: "pinned",
     codexReasoningEffort: "medium",
     codexReasoningEffortPolicy: "pinned",
+    codexRawReasoningEnabled: false,
     codexSpeed: "standard",
     codexServiceTierPolicy: "pinned",
     codexSandboxLevel: "workspace_write",
