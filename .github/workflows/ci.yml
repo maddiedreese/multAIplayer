@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
   pull_request:
   schedule:
     - cron: "23 7 * * 2"
@@ -74,6 +76,35 @@ jobs:
           path: |
             apps/relay/coverage
             packages/*/coverage
+          if-no-files-found: error
+          retention-days: 14
+
+  desktop-coverage:
+    name: Desktop TypeScript coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build package dependencies
+        run: npm run build:packages
+      - name: Measure desktop coverage and enforce invite/MLS-adjacent floors
+        run: npm run test:coverage:desktop
+      - name: Upload desktop coverage reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-typescript-coverage
+          path: |
+            apps/desktop/coverage
+            apps/desktop/coverage-critical
           if-no-files-found: error
           retention-days: 14
 
@@ -262,19 +293,58 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Classify native journey applicability
+        id: native-policy
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            changed_files="$RUNNER_TEMP/native-journey-changed-files"
+            if ! git diff --no-renames --name-only -z "$BASE_SHA" "$HEAD_SHA" > "$changed_files"; then
+              : > "$changed_files"
+            fi
+            node scripts/native-journey-change-policy.mjs --changed-files "$changed_files" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "reason=Required for $EVENT_NAME runs, including main, scheduled, manual, and release-tag evidence." >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report native journey policy decision
+        env:
+          RUN_JOURNEY: ${{ steps.native-policy.outputs.run }}
+          POLICY_REASON: ${{ steps.native-policy.outputs.reason }}
+        run: |
+          {
+            echo "## Real two-client native MLS journey"
+            echo
+            if [ "$RUN_JOURNEY" = "true" ]; then
+              echo "**Required.** $POLICY_REASON"
+            else
+              echo "**Not applicable.** $POLICY_REASON"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Node
+        if: steps.native-policy.outputs.run == 'true'
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 22
           cache: npm
 
       - name: Install pinned Rust toolchain
+        if: steps.native-policy.outputs.run == 'true'
         run: |
           rustup toolchain install 1.89.0 --profile minimal
           rustup default 1.89.0
 
       - name: Install Tauri, WebDriver, display, and Secret Service dependencies
+        if: steps.native-policy.outputs.run == 'true'
         run: >-
           sudo apt-get update &&
           sudo apt-get install -y
@@ -290,24 +360,29 @@ jobs:
           xvfb
 
       - name: Install JavaScript dependencies
+        if: steps.native-policy.outputs.run == 'true'
         run: npm ci
 
       - name: Build package dependencies and the real KeyPackage validator
+        if: steps.native-policy.outputs.run == 'true'
         run: |
           npm run build:packages
           cargo build --locked --manifest-path apps/desktop/src-tauri/Cargo.toml -p mls-core --bin mls-keypackage-validator
 
       - name: Install pinned Tauri WebDriver bridge
+        if: steps.native-policy.outputs.run == 'true'
         run: cargo install tauri-driver --version 2.0.6 --locked
 
       - name: Run two real native clients through invite, message, and handoff
+        if: steps.native-policy.outputs.run == 'true'
         run: xvfb-run -a npm run test:e2e:native
 
       - name: Enforce native journey duration policy
+        if: steps.native-policy.outputs.run == 'true'
         run: node scripts/check-native-journey-duration.mjs reports/native-shell-e2e/duration.json
 
       - name: Upload native journey duration metrics
-        if: always()
+        if: always() && steps.native-policy.outputs.run == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: native-shell-journey-metrics
@@ -316,7 +391,7 @@ jobs:
           retention-days: 30
 
       - name: Upload native journey failure artifacts
-        if: failure()
+        if: failure() && steps.native-policy.outputs.run == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: native-shell-journey-failures
@@ -325,6 +400,16 @@ jobs:
             reports/native-shell-e2e
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Explain native journey failure handling
+        if: failure() && steps.native-policy.outputs.run == 'true'
+        run: |
+          {
+            echo
+            echo "### Failure posture"
+            echo
+            echo "Treat intermittent behavior as a product race until the failing stage, screenshots, logs, and duration report identify another cause. Do not rerun blindly."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   security-journey:
     name: Multi-client security journey and injection red-team
@@ -350,6 +435,7 @@ jobs:
         run: |
           mkdir -p reports/security-journey
           npm run test:security-journey -w @multaiplayer/relay > reports/security-journey/junit.xml
+          node scripts/assert-security-journey-executed.mjs reports/security-journey/junit.xml
       - name: Upload security journey results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

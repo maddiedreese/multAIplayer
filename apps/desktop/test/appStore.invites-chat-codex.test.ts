@@ -242,7 +242,7 @@ test("desktop store keeps Codex room state room scoped", () => {
   assert.equal(state.codexRuntimeByRoom["room-b"]?.running, undefined);
   assert.equal(state.codexRuntimeByRoom["room-a"]?.goal?.text, "Finish the room");
   assert.equal(state.codexRuntimeByRoom["room-a"]?.secretWarningVisible, true);
-  assert.equal(state.codexRuntimeByRoom["room-a"]?.threadId, "thread-room-a");
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.threadGraph?.activeThreadId, "thread-room-a");
 });
 
 test("desktop store exposes room Codex approval actions", () => {
@@ -508,10 +508,10 @@ test("desktop store exposes room Codex thread actions", () => {
   const store = useAppStore.getState();
 
   store.setCodexThreadIdForRoom("room-a", "thread-room-a");
-  assert.equal(useAppStore.getState().codexRuntimeByRoom["room-a"]?.threadId, "thread-room-a");
+  assert.equal(useAppStore.getState().codexRuntimeByRoom["room-a"]?.threadGraph?.activeThreadId, "thread-room-a");
 
   store.setCodexThreadIdForRoom("room-a", null);
-  assert.equal(useAppStore.getState().codexRuntimeByRoom["room-a"]?.threadId, undefined);
+  assert.equal(useAppStore.getState().codexRuntimeByRoom["room-a"]?.threadGraph, undefined);
 });
 
 test("desktop store keeps markdown message selection room scoped", () => {

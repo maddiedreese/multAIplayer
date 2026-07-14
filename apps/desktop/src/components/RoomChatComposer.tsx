@@ -3,10 +3,17 @@ import { Bot, FileCode2, Paperclip, Send, X } from "lucide-react";
 import { RoomGoalPopup } from "./RoomGoalPopup";
 import type { PendingAttachmentDisplay } from "./RoomChatPanel";
 import type { RoomGoal } from "../types";
+import {
+  loadCodexFollowUpBehavior,
+  saveCodexFollowUpBehavior,
+  type CodexFollowUpBehavior
+} from "../lib/codexFollowUpBehavior";
 
 export function RoomChatComposer({
   onboardingAnchor,
   roomGoal,
+  codexRunning,
+  isActiveHost,
   pendingAttachments,
   pendingAttachmentSummary,
   replyTarget,
@@ -29,6 +36,8 @@ export function RoomChatComposer({
 }: {
   onboardingAnchor?: string;
   roomGoal: RoomGoal | null;
+  codexRunning: boolean;
+  isActiveHost: boolean;
   pendingAttachments: PendingAttachmentDisplay[];
   pendingAttachmentSummary: string;
   replyTarget?: { author: string; body: string } | null;
@@ -49,6 +58,15 @@ export function RoomChatComposer({
   onDraftChange: (draft: string) => void;
   onSendMessage: () => void;
 }) {
+  const [followUpBehavior, setFollowUpBehavior] = React.useState<CodexFollowUpBehavior>(() =>
+    loadCodexFollowUpBehavior()
+  );
+
+  function updateFollowUpBehavior(behavior: CodexFollowUpBehavior) {
+    setFollowUpBehavior(behavior);
+    saveCodexFollowUpBehavior(behavior);
+  }
+
   return (
     <footer className="composer" data-onboarding-anchor={onboardingAnchor}>
       {roomGoal && (
@@ -72,6 +90,19 @@ export function RoomChatComposer({
         <Paperclip size={18} />
       </button>
       <div className="composer-body">
+        {codexRunning && isActiveHost && (
+          <label className="codex-follow-up-behavior">
+            <span>While Codex works</span>
+            <select
+              value={followUpBehavior}
+              onChange={(event) => updateFollowUpBehavior(event.target.value as CodexFollowUpBehavior)}
+              aria-label="Codex follow-up behavior"
+            >
+              <option value="steer">Steer current turn</option>
+              <option value="queue">Queue next turn</option>
+            </select>
+          </label>
+        )}
         {pendingAttachments.length > 0 && (
           <div className="pending-attachments">
             {pendingAttachments.map((attachment) => (

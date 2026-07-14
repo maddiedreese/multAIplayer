@@ -92,7 +92,6 @@ export function createLocalHistoryActions({
           terminalSnapshots: terminalsForLocalHistory(store.terminals.filter((terminal) => terminal.roomId === roomId)),
           hostHandoffs: codexRuntime.hostHandoffs ?? [],
           ...(codexRuntime.goal ? { roomGoal: codexRuntime.goal } : {}),
-          ...(codexThreadGraph.activeThreadId ? { codexThreadId: codexThreadGraph.activeThreadId } : {}),
           ...(codexThreadGraph.activeThreadId ? { codexThreadGraph } : {})
         },
         saved.retentionDays

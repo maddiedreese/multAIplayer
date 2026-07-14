@@ -65,7 +65,7 @@ export function useAppSelectedRoomRuntime({
     codexActivitiesByRoom: activeMap(roomId, codexRuntime?.activities),
     gitWorkflowEventsByRoom: activeMap(roomId, gitRuntime?.workflow?.events),
     githubActionsEventsByRoom: activeMap(roomId, gitRuntime?.actions?.events),
-    codexThreadIdsByRoom: activeMap(roomId, codexRuntime?.threadGraph?.activeThreadId ?? codexRuntime?.threadId),
+    codexThreadIdsByRoom: activeMap(roomId, codexRuntime?.threadGraph?.activeThreadId),
     codexThreadGraphsByRoom: activeMap(roomId, codexRuntime?.threadGraph),
     codexRunningByRoom: activeMap(roomId, codexRuntime?.running),
     hostBusyByRoom: activeMap(roomId, roomSettings?.hostBusy),

@@ -1,7 +1,6 @@
 import {
   ArrowLeft,
   ArrowRight,
-  Bot,
   Check,
   CircleAlert,
   CircleDashed,
@@ -24,45 +23,37 @@ import {
 import type {
   OnboardingReadinessAction,
   OnboardingReadinessRow,
-  OnboardingReadinessRowId,
   OnboardingReadinessStatus
 } from "../lib/onboardingReadiness";
 import { openTrustedAuthenticationUrl } from "../lib/authExternalUrl";
 import { maxInviteLinkChars } from "../lib/inviteUrl";
+import {
+  hasBlockingOnboardingReadiness,
+  onboardingJoinIsPending,
+  onboardingJoinTitle,
+  onboardingSafetyDefaults,
+  orderOnboardingReadinessRows,
+  type OnboardingAuthenticationFlow,
+  type OnboardingCreateDraft,
+  type OnboardingJoinDraft,
+  type OnboardingJoinState,
+  type OnboardingRoomRetryDraft
+} from "../lib/onboardingAssistantModel";
+
+const brandIcon = new URL("../assets/multaiplayer-icon.png", import.meta.url).href;
 export type {
   OnboardingReadinessAction,
   OnboardingReadinessRow,
   OnboardingReadinessRowId,
   OnboardingReadinessStatus
 } from "../lib/onboardingReadiness";
-
-export interface OnboardingCreateDraft {
-  workspaceName: string;
-  roomName: string;
-  projectPath: string;
-}
-
-export interface OnboardingRoomRetryDraft extends Omit<OnboardingCreateDraft, "workspaceName"> {
-  teamId: string;
-}
-
-export interface OnboardingJoinDraft {
-  invite: string;
-}
-
-export interface OnboardingJoinState {
-  phase: "idle" | "accepting" | "verification_required" | "complete" | "error";
-  message?: string;
-}
-
-export interface OnboardingAuthenticationFlow {
-  provider: "github" | "chatgpt";
-  flow: "browser" | "device";
-  url: string;
-  userCode: string | null;
-  expiresAt: number | null;
-  browserOpenFailed: boolean;
-}
+export type {
+  OnboardingAuthenticationFlow,
+  OnboardingCreateDraft,
+  OnboardingJoinDraft,
+  OnboardingJoinState,
+  OnboardingRoomRetryDraft
+} from "../lib/onboardingAssistantModel";
 
 export interface OnboardingAssistantProps {
   state: OnboardingState;
@@ -91,7 +82,6 @@ export interface OnboardingAssistantProps {
   onDismiss: () => void;
 }
 
-const readinessOrder: OnboardingReadinessRowId[] = ["relay", "github", "codex", "chatgpt", "project"];
 const readinessActionLabels: Record<OnboardingReadinessAction, string> = {
   retry_workspace_bootstrap: "Try again",
   sign_in_github: "Sign in",
@@ -139,9 +129,7 @@ export function OnboardingAssistant({
       <div className="onboarding-shell">
         <header className="onboarding-topbar">
           <div className="onboarding-brand">
-            <span className="onboarding-brand-mark" aria-hidden="true">
-              <Users size={17} />
-            </span>
+            <img className="onboarding-brand-mark" src={brandIcon} alt="" />
             <span>multAIplayer</span>
           </div>
           <button type="button" className="onboarding-text-button" onClick={onDismiss}>
@@ -247,7 +235,7 @@ function WelcomeStep({
   return (
     <div className="onboarding-step onboarding-welcome">
       <div className="onboarding-hero-icon" aria-hidden="true">
-        <Bot size={26} />
+        <img src={brandIcon} alt="" />
       </div>
       <StepHeading ref={headingRef} eyebrow="Welcome" title="Work with Codex together" />
       <p className="onboarding-lede">Create an encrypted project room, or join one you’ve been invited to.</p>
@@ -307,9 +295,8 @@ function ReadinessStep({
   onBack: () => void;
   onContinue: () => void;
 }) {
-  const rowsById = new Map(rows.map((row) => [row.id, row]));
-  const orderedRows = readinessOrder.map((id) => rowsById.get(id)).filter(Boolean) as OnboardingReadinessRow[];
-  const blocking = orderedRows.length !== readinessOrder.length || orderedRows.some((row) => row.blocking);
+  const orderedRows = orderOnboardingReadinessRows(rows);
+  const blocking = hasBlockingOnboardingReadiness(rows);
   return (
     <div className="onboarding-step">
       <StepHeading ref={headingRef} eyebrow="Step 1" title="Check this device" />
@@ -597,11 +584,7 @@ function JoinStep({
 }) {
   const inviteRef = useRef<HTMLInputElement>(null);
   const id = useId();
-  const pending =
-    busy ||
-    joinState.phase === "accepting" ||
-    joinState.phase === "verification_required" ||
-    joinState.phase === "complete";
+  const pending = onboardingJoinIsPending(joinState, busy);
   return (
     <form
       className="onboarding-step"
@@ -647,15 +630,7 @@ function JoinStep({
             <CircleDashed size={18} />
           )}
           <span>
-            <strong>
-              {joinState.phase === "verification_required"
-                ? "Device verification required"
-                : joinState.phase === "error"
-                  ? "Could not join yet"
-                  : joinState.phase === "complete"
-                    ? "Invite accepted"
-                    : "Accepting invite"}
-            </strong>
+            <strong>{onboardingJoinTitle(joinState.phase)}</strong>
             {joinState.message && <small>{joinState.message}</small>}
           </span>
         </div>
@@ -685,13 +660,6 @@ function SafetyStep({
   onBack: () => void;
   onContinue: () => void;
 }) {
-  const defaults = [
-    ["Ask before every Codex turn", "You decide when Codex starts."],
-    ["Workspace-write sandbox", "Codex is limited to the selected project."],
-    ["Raw reasoning sharing off", "Only reasoning summaries are shared by default."],
-    ["Browser access restricted", "Sites must be explicitly allowed."],
-    ["Local history", "Encrypted room history stays on this device until you clear it."]
-  ];
   return (
     <div className="onboarding-step">
       <StepHeading ref={headingRef} eyebrow="Step 3" title="Start with safe defaults" />
@@ -699,7 +667,7 @@ function SafetyStep({
         These defaults keep Codex local to the selected project and ask before it acts. You can change them per room.
       </p>
       <div className="onboarding-safety-list">
-        {defaults.map(([label, detail]) => (
+        {onboardingSafetyDefaults.map(([label, detail]) => (
           <div key={label}>
             <span aria-hidden="true">
               <Check size={15} />

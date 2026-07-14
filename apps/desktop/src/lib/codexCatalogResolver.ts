@@ -64,7 +64,9 @@ export function resolveCodexRunSettings(
     reasoningEffortPolicy === "auto" ? (catalogReasoning ?? requestedReasoning) : requestedReasoning;
   if (supportedReasoning.length && !supportedReasoning.includes(reasoningEffort)) {
     const fallback =
-      catalogReasoning && supportedReasoning.includes(catalogReasoning) ? catalogReasoning : supportedReasoning[0];
+      catalogReasoning && supportedReasoning.includes(catalogReasoning)
+        ? catalogReasoning
+        : (supportedReasoning[0] ?? requestedReasoning);
     warnings.push(`Reasoning effort ${reasoningEffort} is not supported by ${model}; using ${fallback}.`);
     reasoningEffort = fallback;
   }
@@ -84,7 +86,7 @@ export function resolveCodexRunSettings(
         ? modelEntry.defaultServiceTier
         : supportedTiers.includes("default")
           ? "default"
-          : supportedTiers[0];
+          : (supportedTiers[0] ?? requestedTier);
     warnings.push(`Service tier ${serviceTier} is not supported by ${model}; using ${fallback}.`);
     serviceTier = fallback;
   }

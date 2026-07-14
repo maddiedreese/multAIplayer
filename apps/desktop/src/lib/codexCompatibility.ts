@@ -71,7 +71,9 @@ function parseSemver(version: string): [number, number, number] | null {
 
 function compareSemver(left: [number, number, number], right: [number, number, number]): number {
   for (let index = 0; index < left.length; index += 1) {
-    if (left[index] !== right[index]) return left[index] - right[index];
+    const leftPart = left[index];
+    const rightPart = right[index];
+    if (leftPart !== undefined && rightPart !== undefined && leftPart !== rightPart) return leftPart - rightPart;
   }
   return 0;
 }

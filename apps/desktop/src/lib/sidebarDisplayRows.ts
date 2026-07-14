@@ -52,7 +52,7 @@ export function buildSidebarRoomRows({
       id: room.id,
       teamId: room.teamId,
       name: room.name,
-      detail: searchActive ? (team?.name ?? "Team") : room.projectPath.split("/").slice(-1)[0],
+      detail: searchActive ? (team?.name ?? "Team") : (room.projectPath.split("/").at(-1) ?? room.projectPath),
       active: room.id === selectedRoomId,
       attention: roomAttentionTotal,
       unread: roomRecord.unread,

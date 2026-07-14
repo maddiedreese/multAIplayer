@@ -10,6 +10,7 @@ mod codex_request_projection;
 mod codex_request_validation;
 mod codex_requests;
 mod codex_rpc;
+mod codex_steering;
 mod codex_threads;
 mod codex_turn_lifecycle;
 mod command_safety;
@@ -34,6 +35,7 @@ use codex_account::*;
 use codex_catalog::*;
 use codex_goal::*;
 use codex_requests::CodexRpcState;
+use codex_steering::*;
 use codex_threads::*;
 use diagnostics::*;
 use git::*;
@@ -161,6 +163,7 @@ pub fn run() {
             run_git_workflow,
             probe_codex,
             run_codex_turn,
+            steer_codex_turn,
             set_codex_goal,
             get_codex_goal,
             clear_codex_goal,

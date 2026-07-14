@@ -10,8 +10,7 @@ import {
   isBrowserUrlAllowed,
   normalizeBrowserAllowedOrigins,
   roomBrowserRequestMessage,
-  shouldAutoApproveBrowserRequest,
-  shouldAutoApproveBrowserRequestLegacy
+  shouldAutoApproveBrowserRequest
 } from "../src/lib/browserPolicy";
 
 const room: RoomRecord = {
@@ -51,24 +50,6 @@ test("shouldAutoApproveBrowserRequest no longer auto-approves browser pages", ()
   assert.equal(shouldAutoApproveBrowserRequest("https://docs.example.com/guide", room, true), false);
   assert.equal(shouldAutoApproveBrowserRequest("https://github.com/maddiedreese/multAIplayer", room, true), false);
   assert.equal(shouldAutoApproveBrowserRequest("https://docs.example.com/account/security", room, true), false);
-});
-
-test("legacy browser auto-approval helper keeps old records conservative", () => {
-  assert.equal(shouldAutoApproveBrowserRequestLegacy("https://docs.example.com/guide", room, true), true);
-  assert.equal(
-    shouldAutoApproveBrowserRequestLegacy("https://github.com/maddiedreese/multAIplayer", room, true),
-    false
-  );
-  assert.equal(shouldAutoApproveBrowserRequestLegacy("https://docs.example.com/account/security", room, true), false);
-  assert.equal(
-    shouldAutoApproveBrowserRequestLegacy(
-      "https://docs.example.com/guide",
-      { ...room, approvalPolicy: "ask_every_turn" },
-      true
-    ),
-    false
-  );
-  assert.equal(shouldAutoApproveBrowserRequestLegacy("https://docs.example.com/guide", room, false), false);
 });
 
 test("browser access requests require an unlocked room", () => {

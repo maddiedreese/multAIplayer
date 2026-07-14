@@ -209,7 +209,7 @@ export function boundCodexTurnInput(input: string, maxChars = maxCodexTurnInputC
 export function messagesSinceLastCodex(messages: CodexChatMessage[]): CodexChatMessage[] {
   let lastCodexIndex = -1;
   for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (messages[index].role === "codex") {
+    if (messages[index]?.role === "codex") {
       lastCodexIndex = index;
       break;
     }

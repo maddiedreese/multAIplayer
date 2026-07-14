@@ -1,4 +1,4 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import { defaultCodexModel, type CodexEventPlaintextPayload, type RoomRecord } from "@multaiplayer/protocol";
 import { useAppStore } from "../store/appStore";
 import { buildCodexApprovalSnapshot, hasActionableCodexTurnContext } from "./codexTurn";
 import { canUseRoomChat, roomChatGateMessage } from "./chatPolicy";
@@ -7,7 +7,8 @@ import { roomLockMessage } from "./appRuntime";
 import { formatMessageTime, validatePendingAttachments } from "./appFormatters";
 import { shouldApplyRoomScopedUiUpdate } from "./roomScopedUi";
 import { codexGoalToRoomGoal, parseRoomGoalCommand, updateRoomGoalElapsed } from "./roomGoals";
-import { clearCodexGoal, setCodexGoal } from "./localBackend";
+import { clearCodexGoal, setCodexGoal, steerCodexTurn, type CodexSteerResult } from "./localBackend";
+import { codexSteeringInput, loadCodexFollowUpBehavior } from "./codexFollowUpBehavior";
 import { currentSelectedRoomContext } from "./selectedWorkspace";
 import type { ChatMessage, PendingCodexApproval, QueuedCodexTurn, RoomGoal } from "../types";
 
@@ -26,13 +27,18 @@ export interface CodexInvokeActionsOptions {
     },
     room?: RoomRecord
   ) => Promise<void>;
+  publishCodexEvent: (
+    event: Omit<CodexEventPlaintextPayload, "eventType" | "host" | "hostUserId" | "createdAt">,
+    room?: RoomRecord
+  ) => Promise<void>;
 }
 
 export function createCodexInvokeActions({
   selectedRoomIdRef,
   publishChatMessage,
   handleCodexBrowserOpenCommand,
-  publishCodexQueueEvent
+  publishCodexQueueEvent,
+  publishCodexEvent
 }: CodexInvokeActionsOptions) {
   const store = useAppStore.getState;
 
@@ -60,7 +66,7 @@ export function createCodexInvokeActions({
       gitStatus: state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.status ?? null,
       activeCodexApproval: codexRuntime.pendingApproval ?? null,
       queuedCodexApprovals: codexRuntime.queuedApprovals ?? [],
-      codexThreadId: codexRuntime.threadGraph?.activeThreadId ?? codexRuntime.threadId ?? null,
+      codexThreadId: codexRuntime.threadGraph?.activeThreadId ?? null,
       selectedRoom,
       ...context
     };
@@ -265,6 +271,61 @@ export function createCodexInvokeActions({
       queuedAt: new Date().toISOString(),
       ...(pendingMessage?.id ? { triggerMessageId: pendingMessage.id } : {})
     };
+    const followUpBehavior = loadCodexFollowUpBehavior();
+    const steeringInput = pendingMessage ? codexSteeringInput(pendingMessage.body) : "";
+    const steeringFallback =
+      codexRunning && isActiveHost && pendingMessage && followUpBehavior === "steer"
+        ? pendingMessage.attachments?.length
+          ? "Attachments cannot be added to an in-flight turn, so this was queued for the next turn."
+          : !steeringInput
+            ? "The message has no steering instruction, so it was queued for the next turn."
+            : null
+        : null;
+    if (codexRunning && isActiveHost && pendingMessage && followUpBehavior === "steer" && !steeringFallback) {
+      store().setHostMessageForRoom(roomId, "Steering the current Codex turn…");
+      void (async () => {
+        let result: CodexSteerResult;
+        try {
+          result = await steerCodexTurn(roomId, steeringInput);
+        } catch {
+          if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+            store().setHostMessageForRoom(
+              roomId,
+              "Codex could not steer the current turn. Choose Queue next turn and send the instruction again."
+            );
+          }
+          return;
+        }
+
+        try {
+          await publishCodexEvent(
+            {
+              turnId: result.clientTurnId,
+              status: "event",
+              message: `${localUser.name} steered the current Codex turn.`,
+              model: selectedRoom.codexModel ?? defaultCodexModel,
+              threadId: result.threadId,
+              eventName: "turn/steer acknowledged",
+              consumedMessageIds: [pendingMessage.id]
+            },
+            selectedRoom
+          );
+        } catch {
+          if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+            store().setHostMessageForRoom(
+              roomId,
+              "Codex accepted the steering message, but its room acknowledgement could not be shared. Do not send the instruction again."
+            );
+          }
+          return;
+        }
+
+        if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
+          store().setHostMessageForRoom(roomId, "Codex accepted the steering message for the current turn.");
+        }
+      })();
+      return;
+    }
     if (activeCodexApproval || codexRunning || queuedCodexApprovals.length > 0) {
       if (queuedCodexApprovals.length >= 5) {
         store().setHostMessageForRoom(
@@ -275,7 +336,10 @@ export function createCodexInvokeActions({
       }
       store().enqueueCodexApprovalForRoom(roomId, turnIntent);
       const queuePosition = queuedCodexApprovals.length + 1;
-      store().setHostMessageForRoom(roomId, `Proposed Codex turn ${queuePosition} of 5 for host approval.`);
+      store().setHostMessageForRoom(
+        roomId,
+        steeringFallback ?? `Proposed Codex turn ${queuePosition} of 5 for host approval.`
+      );
       publishCodexQueueEvent(
         {
           turnId: turnIntent.turnId,

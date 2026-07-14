@@ -1,5 +1,4 @@
 import type { StateCreator } from "zustand";
-import { normalizeCodexThreadId } from "../../lib/codexThread";
 import { normalizeCodexThreadGraph } from "../../lib/codexThreadGraph";
 import { omitRecordKey } from "../../lib/setUtils";
 import { replaceRoomTerminalSnapshots } from "../../lib/terminalState";
@@ -24,13 +23,8 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
       const shouldHydrateTerminalRuntime =
         payload.terminalRequests.length > 0 || Boolean(payload.terminalSnapshots.length && nextTerminalId);
       const queuedCodexTurns = payload.queuedCodexTurns ?? [];
-      const codexThreadId = normalizeCodexThreadId(payload.codexThreadId);
-      const codexThreadGraph = normalizeCodexThreadGraph(payload.codexThreadGraph, codexThreadId);
-      const {
-        threadGraph: _threadGraph,
-        threadId: _threadId,
-        ...codexRuntimeWithoutThread
-      } = state.codexRuntimeByRoom[roomId] ?? {};
+      const codexThreadGraph = normalizeCodexThreadGraph(payload.codexThreadGraph);
+      const { threadGraph: _threadGraph, ...codexRuntimeWithoutThread } = state.codexRuntimeByRoom[roomId] ?? {};
       const chatEdits = payload.chatEdits ?? [];
       const chatDeletes = payload.chatDeletes ?? [];
       const fileSaveRequests = payload.fileSaveRequests ?? [];
@@ -89,12 +83,7 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
             hostHandoffs: payload.hostHandoffs,
             ...(queuedCodexTurns.length ? { queuedApprovals: queuedCodexTurns } : {}),
             ...(payload.roomGoal ? { goal: payload.roomGoal } : {}),
-            ...(codexThreadGraph.activeThreadId
-              ? {
-                  threadId: codexThreadGraph.activeThreadId,
-                  threadGraph: codexThreadGraph
-                }
-              : {})
+            ...(codexThreadGraph.activeThreadId ? { threadGraph: codexThreadGraph } : {})
           }
         },
         gitWorkflowRuntimeByRoom:

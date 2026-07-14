@@ -131,7 +131,7 @@ Codex approval distinguishes inline attachment content from encrypted blob refer
 
 Composer text and attachment drafts are scoped per room. If a user switches rooms, unfinished message text stays with its original room. If a large encrypted attachment blob finishes uploading after a switch, the finished attachment remains queued only for the room where the upload began.
 
-Room goals use Codex thread Goal mode. After a room has an approved Codex thread, `/goal <objective>` calls Codex app-server's thread goal API. Pause, resume, edit, and clear controls update the active thread's goal. Encrypted local history stores the normalized thread graph and active selection, with the legacy thread id retained only as a compatibility mirror.
+Room goals use Codex thread Goal mode. After a room has an approved Codex thread, `/goal <objective>` calls Codex app-server's thread goal API. Pause, resume, edit, and clear controls update the active thread's goal. Runtime state and newly encrypted local history store only the normalized thread graph and active selection. An old flat thread id is accepted solely by a one-way history migration and is never written back; its removal condition is tracked in the [compatibility inventory](compatibility-inventory.md).
 
 Project file previews and encrypted attachment blob opens are also tied to the originating room. If a room switch happens while a file read or blob decrypt is in flight, the completed read is ignored rather than rendered into the newly selected room's inspector. Attachment previews are blocked while a room is locally locked after forget or relay membership revocation.
 
@@ -159,7 +159,7 @@ Codex turn execution is an active-host local workspace action in the macOS app. 
 
 Codex invocations are proposed before they run. Any member can tag Codex or press invoke, but that creates a pending room-visible proposal. Only the active host, checked by stable host user id at approval time, can authorize the proposal to spend that host's Codex subscription or touch that host's machine. If host role transfers while a proposal is waiting, the proposal remains queued and the new active host can approve or decline it.
 
-Codex proposals are queued when another proposal is pending or a turn is running. The queue is bounded to five waiting turns, renders in the room, can be cancelled by the requester or host, times out if host approval does not arrive, and is saved in encrypted local history so handoff/reload context stays coherent. Once a turn starts, server-initiated app-server requests are routed bidirectionally to the same active host/session. Human wait pauses active execution time but has a 15-minute wall-clock deadline; expiry and malformed or unauthorized responses fail closed.
+Codex proposals are queued when another proposal is pending or a turn is running. The queue is bounded to five waiting turns, renders in the room, can be cancelled by the requester or host, times out if host approval does not arrive, and is saved in encrypted local history so handoff/reload context stays coherent. While a turn runs, the active host can instead select same-turn steering. Native steering writes `turn/steer` to the already checked-out app-server session with the exact thread id and app-server-reported active turn id as a precondition, correlates its negative request id to one bounded acknowledgement wait, and rejects stale, mismatched, unavailable, or non-steerable turns. Accepted steering records the consumed chat message in the encrypted room event; collaborators and attachments remain on the host-approved queue path. Once a turn starts, server-initiated app-server requests are routed bidirectionally to the same active host/session. Human wait pauses active execution time but has a 15-minute wall-clock deadline; expiry and malformed or unauthorized responses fail closed.
 
 Example approval summary:
 
@@ -394,7 +394,7 @@ The app-server is treated as the UI-to-agent protocol. multAIplayer is a rich cl
 
 The alpha shares coarse turn state as encrypted `codex.event` room events and typed item disclosures as encrypted `codex.activity` events. Activity projection is allowlisted and bounded: stable ids, type/status/timestamps, typed command/file/tool/web/image/agent/reasoning details, and normalized subagent relationships. Reasoning summaries are the default; provider-supplied raw reasoning can be projected only when the active host enables its off-by-default per-room sharing setting, and availability is not guaranteed. Included details are visible to room members and retained under their encrypted local-history policies. The projector discards the raw upstream object, unknown fields, environment/account/auth state, token refreshes, token deltas, and streaming output deltas. This does not change the separate sharing and expiry rules for chat or attachments.
 
-Each room keeps a normalized encrypted Codex thread graph on the host device. The selected active thread drives `thread/resume`, `turn/start`, and goal operations. Hosts can list their active session tree, switch branches, and fork. Full forks work across the tested range; fork-through-turn using `lastTurnId` requires 0.143.0 or newer. Discovery fails closed until the active session is resolved and never imports prompt previews as titles. The separately rendered agent tree is derived only from normalized subagent activity and is not the conversation thread graph.
+Each room keeps a normalized encrypted Codex thread graph on the host device. The selected active thread drives `thread/resume`, `turn/start`, `turn/steer`, and goal operations. Hosts can list their active session tree, switch branches, and fork. Full forks work across the tested range; fork-through-turn using `lastTurnId` requires 0.143.0 or newer. Discovery fails closed until the active session is resolved and never imports prompt previews as titles. The separately rendered agent tree is derived only from normalized subagent activity and is not the conversation thread graph.
 
 The supported contract range is Codex app-server 0.133.0–0.144.0. Older versions cannot host. Newer versions show an unverified warning, and contract-sensitive account, authentication, approval, and fork behavior remains capability-gated rather than inferred.
 
@@ -410,6 +410,7 @@ Responsibilities:
 - initialize a JSON-RPC session;
 - start the first room thread and resume it on later approved turns;
 - send turn input;
+- append active-host text to the exact in-flight turn through `turn/steer`, or preserve it for the next approved turn;
 - pass the room-selected model to `thread/start`, `thread/resume`, and `turn/start`;
 - stream turn events back into the room;
 - surface approvals to the active host;

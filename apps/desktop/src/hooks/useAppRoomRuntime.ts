@@ -109,7 +109,8 @@ export function useAppRoomRuntime({
         selectedRoomIdRef: appRefs.selectedRoomIdRef,
         publishChatMessage: roomInteraction.publishChatMessage,
         handleCodexBrowserOpenCommand: relaySync.handleCodexBrowserOpenCommand,
-        publishCodexQueueEvent: relaySync.publishCodexQueueEvent
+        publishCodexQueueEvent: relaySync.publishCodexQueueEvent,
+        publishCodexEvent: relaySync.publishCodexEvent
       }
     },
     toolActions: {
@@ -195,7 +196,6 @@ export function useAppRoomRuntime({
         hostHandoffs: selectedRuntime.hostHandoffs,
         queuedCodexTurns: selectedRuntime.queuedCodexApprovals,
         roomGoal,
-        selectedCodexThreadId: selectedRuntime.selectedCodexThreadId,
         codexThreadGraph: selectedRuntime.codexThreadGraph
       },
       localPreviewPolling: {

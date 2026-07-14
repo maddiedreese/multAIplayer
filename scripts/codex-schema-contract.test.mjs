@@ -6,6 +6,14 @@ const supportedVersions = ["0.133.0", "0.143.0", "0.144.0"];
 const supportPolicy = JSON.parse(
   await readFile(new URL("../contracts/codex-app-server/support-policy.json", import.meta.url), "utf8")
 );
+const compatibilityDocumentation = [
+  "README.md",
+  "docs/alpha-limitations.md",
+  "docs/codex-hosting.md",
+  "docs/faq.md",
+  "docs/threat-model.md",
+  "docs/using-the-app.md"
+];
 const manifests = new Map(
   await Promise.all(
     supportedVersions.map(async (version) => [
@@ -15,7 +23,7 @@ const manifests = new Map(
   )
 );
 
-const requiredClientMethods = ["initialize", "model/list", "thread/resume", "thread/start", "turn/start"];
+const requiredClientMethods = ["initialize", "model/list", "thread/resume", "thread/start", "turn/start", "turn/steer"];
 const requiredNotifications = ["item/agentMessage/delta", "item/completed", "item/started", "turn/completed"];
 const requiredServerRequests = [
   "item/commandExecution/requestApproval",
@@ -28,6 +36,14 @@ const requiredServerRequests = [
 test("Codex support policy remains bounded by the checked-in contract fixtures", () => {
   assert.equal(supportPolicy.minimumSupportedVersion, supportedVersions[0]);
   assert.equal(supportPolicy.latestContractTestedVersion, supportedVersions.at(-1));
+});
+
+test("user-facing Codex compatibility ranges stay sourced from the support policy", async () => {
+  for (const path of compatibilityDocumentation) {
+    const contents = await readFile(new URL(`../${path}`, import.meta.url), "utf8");
+    assert.ok(contents.includes(supportPolicy.minimumSupportedVersion), `${path}: minimum supported version`);
+    assert.ok(contents.includes(supportPolicy.latestContractTestedVersion), `${path}: latest tested version`);
+  }
 });
 
 test("supported Codex manifests preserve the app-server transport contract", () => {

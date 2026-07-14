@@ -97,6 +97,12 @@ export interface CodexTurnResult {
   generatedImages: CodexGeneratedImage[];
 }
 
+export interface CodexSteerResult {
+  threadId: string;
+  turnId: string;
+  clientTurnId: string;
+}
+
 export interface CodexGeneratedImage {
   data: string;
   mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";

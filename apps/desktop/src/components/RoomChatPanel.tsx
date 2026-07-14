@@ -201,6 +201,8 @@ export function RoomChatPanel({
       <RoomChatComposer
         onboardingAnchor="composer"
         roomGoal={roomGoal}
+        codexRunning={codexRunning}
+        isActiveHost={isActiveHost}
         pendingAttachments={pendingAttachments}
         pendingAttachmentSummary={pendingAttachmentSummary}
         replyTarget={replyTarget}

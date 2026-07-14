@@ -1,0 +1,23 @@
+{
+  "all": true,
+  "src": ["src"],
+  "include": [
+    "src/lib/inviteUrl.ts",
+    "src/lib/invitePolicy.ts",
+    "src/lib/inviteApproval.ts",
+    "src/lib/nativeInviteIntake.ts",
+    "src/lib/onboardingInviteJoin.ts",
+    "src/lib/mlsJoinAdmission.ts",
+    "src/lib/invite/inviteApprovalRecovery.ts",
+    "src/lib/invite/pendingInviteRecovery.ts",
+    "src/lib/invite/pendingInviteWaitRegistry.ts"
+  ],
+  "temp-directory": "coverage/tmp",
+  "report-dir": "coverage-critical",
+  "reporter": ["text", "json-summary", "lcov"],
+  "check-coverage": true,
+  "lines": 95,
+  "statements": 95,
+  "functions": 90,
+  "branches": 80
+}

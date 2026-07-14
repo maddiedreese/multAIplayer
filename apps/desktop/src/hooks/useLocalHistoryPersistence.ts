@@ -57,7 +57,6 @@ interface UseLocalHistoryPersistenceOptions {
   hostHandoffs: HostHandoffRecord[];
   queuedCodexTurns: QueuedCodexTurn[];
   roomGoal: RoomGoal | null;
-  selectedCodexThreadId: string | null;
   codexThreadGraph: CodexThreadGraph;
 }
 
@@ -87,7 +86,6 @@ export function useLocalHistoryPersistence({
   hostHandoffs,
   queuedCodexTurns,
   roomGoal,
-  selectedCodexThreadId,
   codexThreadGraph
 }: UseLocalHistoryPersistenceOptions) {
   useEffect(() => {
@@ -119,7 +117,6 @@ export function useLocalHistoryPersistence({
         hostHandoffs,
         queuedCodexTurns,
         ...(roomGoal ? { roomGoal } : {}),
-        ...(selectedCodexThreadId ? { codexThreadId: selectedCodexThreadId } : {}),
         ...(codexThreadGraph.activeThreadId ? { codexThreadGraph } : {})
       },
       historySettings.retentionDays
@@ -150,7 +147,6 @@ export function useLocalHistoryPersistence({
     chatDeletes,
     messages,
     hasSelectedRoom,
-    selectedCodexThreadId,
     codexThreadGraph,
     selectedRoomId,
     selectedRoomTeamId,

@@ -33,7 +33,13 @@ export function normalizeCodexThreadGraph(value: unknown, legacyThreadId?: unkno
         ? legacy
         : (bounded[0]?.id ?? legacy);
   if (activeThreadId && !nodesById[activeThreadId]) {
-    nodesById[activeThreadId] = legacyCodexThreadGraph(activeThreadId).nodesById[activeThreadId];
+    nodesById[activeThreadId] = {
+      id: activeThreadId,
+      title: "Codex thread",
+      status: "unknown",
+      createdAt: 0,
+      updatedAt: 0
+    };
   }
   return { activeThreadId: activeThreadId ?? null, nodesById };
 }

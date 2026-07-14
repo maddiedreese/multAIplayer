@@ -88,7 +88,7 @@ export function checkGitHubWorkflowReadiness(input: GitHubWorkflowReadinessInput
   }
 
   return {
-    ready: messages.length === 1 && messages[0].startsWith("Ready to push"),
+    ready: messages.length === 1 && messages[0]?.startsWith("Ready to push") === true,
     messages,
     target,
     normalizedBase
@@ -125,7 +125,7 @@ export function checkGitHubActionsReadiness(input: GitHubActionsReadinessInput):
   }
 
   return {
-    ready: messages.length === 1 && messages[0].startsWith("Ready to check GitHub Actions"),
+    ready: messages.length === 1 && messages[0]?.startsWith("Ready to check GitHub Actions") === true,
     messages,
     target,
     normalizedTarget

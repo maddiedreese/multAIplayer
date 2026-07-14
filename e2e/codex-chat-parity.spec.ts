@@ -8,6 +8,11 @@ test("chat renders both roles' code, generated images, and expandable Codex work
   await expect(page.getByText("const roomId = 'encrypted-room';")).toBeVisible();
   await expect(page.getByText("let shared = true;")).toBeVisible();
   await expect(page.getByRole("img", { name: "Codex-generated preview" })).toBeVisible();
+  const followUpBehavior = page.getByRole("combobox", { name: "Codex follow-up behavior" });
+  await expect(followUpBehavior).toHaveValue("steer");
+  await expect(followUpBehavior.locator("option")).toHaveText(["Steer current turn", "Queue next turn"]);
+  await followUpBehavior.selectOption("queue");
+  await expect(followUpBehavior).toHaveValue("queue");
 
   await page.getByText("Codex worked", { exact: true }).click();
   await expect(page.getByText("Thinking")).toBeVisible();

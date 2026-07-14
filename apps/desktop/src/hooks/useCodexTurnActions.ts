@@ -86,10 +86,7 @@ export function useCodexTurnActions({
     const gitStatusByRoom = { [roomId]: state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.status ?? null };
     const codexContinuationByRoom = { [roomId]: state.codexRuntimeByRoom[roomId]?.continuation ?? null };
     const codexThreadIdsByRoom = {
-      [roomId]:
-        state.codexRuntimeByRoom[roomId]?.threadGraph?.activeThreadId ??
-        state.codexRuntimeByRoom[roomId]?.threadId ??
-        ""
+      [roomId]: state.codexRuntimeByRoom[roomId]?.threadGraph?.activeThreadId ?? ""
     };
     if (!room) {
       setHostMessageForRoom(roomId, "This Codex approval belongs to a room that is no longer available.");

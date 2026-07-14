@@ -465,7 +465,8 @@ test("Codex invoke actions report room locks through Zustand without React", () 
     localUser: { id: "github:maddie", name: "Maddie" },
     publishChatMessage: async () => undefined,
     handleCodexBrowserOpenCommand: () => false,
-    publishCodexQueueEvent: async () => undefined
+    publishCodexQueueEvent: async () => undefined,
+    publishCodexEvent: async () => undefined
   });
 
   useAppStore.getState().rememberForgottenRoom(room.id);
