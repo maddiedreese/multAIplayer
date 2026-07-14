@@ -51,6 +51,10 @@ export class RestartableRelayProxy {
     server.on("upgrade", (incoming, socket, head) => proxy.#proxyWebSocket(incoming, socket, head));
     server.on("connection", (socket) => {
       proxy.#sockets.add(socket);
+      // A killed WebView or relay restart can reset a proxied TCP stream. The
+      // request-level paths report actionable failures; the raw socket must not
+      // turn expected crash-test teardown into an uncaught process exception.
+      socket.on("error", () => undefined);
       socket.once("close", () => proxy.#sockets.delete(socket));
     });
     return proxy;

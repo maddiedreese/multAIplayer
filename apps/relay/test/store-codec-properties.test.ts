@@ -89,6 +89,99 @@ function semantic(state: StoredRelayState): Omit<StoredRelayState, "savedAt"> {
   return rest;
 }
 
+function pendingInviteState({
+  acceptedMlsEpoch,
+  requestEpoch,
+  approval = "exact"
+}: {
+  acceptedMlsEpoch: number;
+  requestEpoch: number;
+  approval?: "exact" | "none" | "wrong-device" | "wrong-hash" | "wrong-user";
+}) {
+  const createdAt = "2026-07-11T11:00:00.000Z";
+  const expiresAt = "2026-07-13T12:00:00.000Z";
+  const keyPackageHash = `sha256:${"a".repeat(64)}`;
+  const approvalFields =
+    approval === "none"
+      ? {}
+      : {
+          approvedUserId: approval === "wrong-user" ? "github:other" : "github:joiner",
+          approvedDeviceId: approval === "wrong-device" ? "device-other" : "device-joiner",
+          keyPackageHash: approval === "wrong-hash" ? `sha256:${"b".repeat(64)}` : keyPackageHash
+        };
+  const sealedRequest = JSON.stringify({
+    version: 3,
+    binding: {
+      version: 3,
+      phase: "request",
+      inviteId: "invite-one",
+      teamId: "team-core",
+      roomId: "room-desktop",
+      keyEpoch: requestEpoch,
+      keyPackageHash,
+      requestId: "request-one",
+      requestNonce: "nonce-request-one",
+      requesterUserId: "github:joiner",
+      requesterDeviceId: "device-joiner",
+      hostUserId: "github:host",
+      hostDeviceId: "device-host",
+      expiresAt,
+      status: null,
+      decidedAt: null
+    },
+    sealedPayload: {
+      version: 1,
+      kem_id: 16,
+      kdf_id: 1,
+      aead_id: 1,
+      encapsulated_key: Array(65).fill(1),
+      ciphertext: Array(16).fill(2)
+    }
+  });
+  return {
+    version: 1,
+    savedAt: createdAt,
+    teams: [{ id: "team-core", name: "Core", members: 1 }],
+    rooms: [
+      {
+        id: "room-desktop",
+        teamId: "team-core",
+        name: "Desktop",
+        projectPath: "/repo",
+        host: "Host",
+        hostUserId: "github:host",
+        hostStatus: "active",
+        activeHostDeviceId: "device-host",
+        unread: 0,
+        acceptedMlsEpoch
+      }
+    ],
+    invites: [
+      {
+        id: "invite-one",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        expiresAt,
+        createdAt,
+        ...approvalFields
+      }
+    ],
+    inviteRequests: [
+      {
+        requestId: "request-one",
+        inviteId: "invite-one",
+        requesterUserId: "github:joiner",
+        requesterDeviceId: "device-joiner",
+        keyPackageId: "kp-one",
+        keyPackageHash,
+        sealedRequest,
+        createdAt
+      }
+    ],
+    mlsBacklog: []
+  };
+}
+
 test("relay store codec round-trips normalized generated states idempotently", () => {
   fc.assert(
     fc.property(storedState, (value) => {
@@ -365,6 +458,34 @@ test("startup normalization rejects corrupt invite anchors and retains bounded r
     inviteResponses: [{ ...response, requesterDeviceId: "device-mismatch" }]
   });
   assert.equal(corrupt.store.inviteResponses.size, 0);
+});
+
+test("startup normalization retains only the exact approved request from the immediately preceding epoch", async (t) => {
+  await t.test("retains the approved request after its membership Commit advances the room epoch", () => {
+    const { store, codec: relayCodec } = codec();
+    relayCodec.applyStoredRelayState(pendingInviteState({ acceptedMlsEpoch: 2, requestEpoch: 1 }));
+    assert.equal(store.inviteRequests.has("request-one"), true);
+  });
+
+  await t.test("retains a pending request for the current epoch without approval", () => {
+    const { store, codec: relayCodec } = codec();
+    relayCodec.applyStoredRelayState(pendingInviteState({ acceptedMlsEpoch: 1, requestEpoch: 1, approval: "none" }));
+    assert.equal(store.inviteRequests.has("request-one"), true);
+  });
+
+  for (const approval of ["none", "wrong-user", "wrong-device", "wrong-hash"] as const) {
+    await t.test(`rejects a previous-epoch request with ${approval} approval`, () => {
+      const { store, codec: relayCodec } = codec();
+      relayCodec.applyStoredRelayState(pendingInviteState({ acceptedMlsEpoch: 2, requestEpoch: 1, approval }));
+      assert.equal(store.inviteRequests.has("request-one"), false);
+    });
+  }
+
+  await t.test("rejects an approved request more than one epoch behind", () => {
+    const { store, codec: relayCodec } = codec();
+    relayCodec.applyStoredRelayState(pendingInviteState({ acceptedMlsEpoch: 3, requestEpoch: 1 }));
+    assert.equal(store.inviteRequests.has("request-one"), false);
+  });
 });
 
 test("startup normalization preserves an offline room's reserved bootstrap host", () => {
