@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import type { Browser } from "webdriverio";
 import { keyPackageCount } from "./key-package-negative.js";
 
@@ -81,27 +82,56 @@ async function loadPendingInviteRequest(host: Browser, context: InviteScenarioCo
 }
 
 async function assertGuestMlsGroupLocked(guest: Browser, roomName: string, assertionContext: string) {
-  const state = await guest.executeAsync((targetRoomName, done) => {
-    const storeModule = "/src/store/appStore.ts";
-    const mlsModule = "/src/lib/mlsClient.ts";
-    Promise.all([import(/* @vite-ignore */ storeModule), import(/* @vite-ignore */ mlsModule)])
-      .then(([{ useAppStore }, { mlsGroupState }]) => {
-        const room = useAppStore
-          .getState()
-          .rooms.find((candidate: { id: string; name: string }) => candidate.name === targetRoomName);
-        if (!room) throw new Error(`Room ${targetRoomName} is unavailable in the guest store`);
-        return mlsGroupState(room.id);
-      })
-      .then((value) => done({ value }))
-      .catch((error) => done({ error: String(error) }));
-  }, roomName);
-  assert.equal(
-    "value" in (state as object),
-    false,
-    `${assertionContext}: guest unexpectedly had native MLS group state`
+  const resultKey = randomUUID();
+  await guest.execute(
+    (targetRoomName, key) => {
+      const page = globalThis as typeof globalThis & {
+        __multaiplayerGroupStateResults?: Record<string, { state?: unknown; message?: string } | undefined>;
+      };
+      const results = (page.__multaiplayerGroupStateResults ??= {});
+      results[key] = undefined;
+      const storeModule = "/src/store/appStore.ts";
+      const mlsModule = "/src/lib/mlsClient.ts";
+      void Promise.all([import(/* @vite-ignore */ storeModule), import(/* @vite-ignore */ mlsModule)])
+        .then(([{ useAppStore }, { mlsGroupState }]) => {
+          const room = useAppStore
+            .getState()
+            .rooms.find((candidate: { id: string; name: string }) => candidate.name === targetRoomName);
+          if (!room) throw new Error(`Room ${targetRoomName} is unavailable in the guest store`);
+          return mlsGroupState(room.id);
+        })
+        .then((state) => {
+          results[key] = { state };
+        })
+        .catch((error) => {
+          results[key] = { message: String(error) };
+        });
+    },
+    roomName,
+    resultKey
   );
+  await guest.waitUntil(
+    () =>
+      guest.execute((key) => {
+        const page = globalThis as typeof globalThis & {
+          __multaiplayerGroupStateResults?: Record<string, { state?: unknown; message?: string } | undefined>;
+        };
+        return page.__multaiplayerGroupStateResults?.[key] !== undefined;
+      }, resultKey),
+    { timeout: 30_000, timeoutMsg: `${assertionContext}: native MLS group-state lookup did not settle` }
+  );
+  const result = await guest.execute((key) => {
+    const page = globalThis as typeof globalThis & {
+      __multaiplayerGroupStateResults?: Record<string, { state?: unknown; message?: string } | undefined>;
+    };
+    const value = page.__multaiplayerGroupStateResults?.[key];
+    if (page.__multaiplayerGroupStateResults) delete page.__multaiplayerGroupStateResults[key];
+    return value;
+  }, resultKey);
+  assert.ok(result, `${assertionContext}: native MLS group-state result disappeared before collection`);
+  assert.equal("state" in result, false, `${assertionContext}: guest unexpectedly had native MLS group state`);
   assert.match(
-    (state as { error?: string }).error ?? "",
+    result.message ?? "",
     /group is not open/i,
     `${assertionContext}: native MLS lookup did not report an absent group`
   );
