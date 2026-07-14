@@ -144,3 +144,37 @@ test("pending invite recovery waits for workspace bootstrap and starts once when
   rerender();
   assert.equal(starts, 1);
 });
+
+test("failed pending invite recovery is reported once and retries only after reconnect", async () => {
+  let starts = 0;
+  const reports: string[] = [];
+  const originalDebug = console.debug;
+  console.debug = (message?: unknown) => reports.push(String(message));
+  const resume = async () => {
+    starts += 1;
+    throw new Error("sensitive transport detail");
+  };
+  try {
+    act(() => {
+      const store = useAppStore.getState();
+      store.replaceDeviceSessionToken("device-session");
+      store.replaceRelayStatus("open");
+      store.completeWorkspaceBootstrap();
+    });
+
+    renderHook(() => usePendingInviteRecovery(resume));
+    await waitFor(() => assert.equal(reports.length, 1));
+    assert.equal(starts, 1);
+
+    act(() => useAppStore.getState().replaceRelayStatus("closed"));
+    act(() => useAppStore.getState().replaceRelayStatus("open"));
+    await waitFor(() => assert.equal(reports.length, 2));
+    assert.equal(starts, 2);
+    assert.equal(
+      reports.some((message) => message.includes("sensitive transport detail")),
+      false
+    );
+  } finally {
+    console.debug = originalDebug;
+  }
+});

@@ -10,13 +10,19 @@ import { routeMlsMessage } from "./routeMlsMessage";
 import {
   currentMlsEpoch,
   listMlsJoinAdmissions,
+  listPendingMlsInviteRequests,
   isMlsRequiresRejoin,
   forgetCorruptMlsGroup,
   openMlsGroup
 } from "../../lib/mlsClient";
 import { drainMlsOutboxForRoom, pendingMlsOutboxRoomIds } from "../../lib/mlsOutboxDrain";
-import { completeMlsRelayAdmission } from "../../lib/mlsJoinAdmission";
-import { reportNonFatal } from "../../lib/nonFatalReporting";
+import {
+  completeMlsRelayAdmission,
+  coordinateMlsAdmissionRecovery,
+  projectMlsAdmissionInviteRequest,
+  synchronizeMlsRecoverySelection
+} from "../../lib/mlsJoinAdmission";
+import { reportExpectedFailure, reportNonFatal } from "../../lib/nonFatalReporting";
 import { getRelayHttpUrl } from "../../lib/appConfig";
 import { recoverDeviceSessionForRelayError } from "../../lib/deviceSession";
 
@@ -92,25 +98,39 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
           if (message.type === "workspace.subscribed") {
             void listMlsJoinAdmissions()
               .then(async (admissions) => {
-                for (const admission of admissions) {
-                  if (
-                    admission.requesterUserId !== current.localUser.id ||
-                    admission.requesterDeviceId !== current.deviceId
-                  )
-                    continue;
-                  await completeMlsRelayAdmission(client, admission, current.deviceSessionToken, () => {
-                    store.restoreWorkspaceAccess(admission.teamId, admission.roomId);
-                    store.restoreForgottenRoom(admission.roomId);
-                    store.updateInviteRequestStatus(admission.roomId, admission.requestId, "approved");
-                    store.setInviteAdmissionForRoom(admission.roomId, null);
-                    const roomName = current.roomsRef.current.find((room) => room.id === admission.roomId)?.name;
-                    store.setInviteMessageForRoom(
-                      admission.roomId,
-                      `The host approved this device.${roomName ? ` ${roomName}` : " This room"} is now unlocked.`
-                    );
-                  });
-                }
-                if (admissions.length > 0 && current.hasSelectedRoom) {
+                const completedAdmissions = await coordinateMlsAdmissionRecovery({
+                  admissions,
+                  requesterUserId: current.localUser.id,
+                  requesterDeviceId: current.deviceId,
+                  loadPendingRequests: listPendingMlsInviteRequests,
+                  complete: async (admission, pendingRequests) => {
+                    await completeMlsRelayAdmission(client, admission, current.deviceSessionToken, () => {
+                      store.restoreWorkspaceAccess(admission.teamId, admission.roomId);
+                      store.restoreForgottenRoom(admission.roomId);
+                      synchronizeMlsRecoverySelection(admission, useAppStore.getState());
+                      const latestStore = useAppStore.getState();
+                      const roomName = current.roomsRef.current.find((room) => room.id === admission.roomId)?.name;
+                      const projection = projectMlsAdmissionInviteRequest({
+                        admission,
+                        pendingRequests,
+                        existingRequests: latestStore.inviteByRoom[admission.roomId]?.requests ?? [],
+                        requesterName: current.localUser.name,
+                        roomName: roomName ?? "this room",
+                        append: store.appendInviteRequest,
+                        approve: (roomId, requestId) => store.updateInviteRequestStatus(roomId, requestId, "approved")
+                      });
+                      if (projection === "unavailable") {
+                        reportExpectedFailure("durable MLS admission UI projection unavailable");
+                      }
+                      store.setInviteAdmissionForRoom(admission.roomId, null);
+                      store.setInviteMessageForRoom(
+                        admission.roomId,
+                        `The host approved this device.${roomName ? ` ${roomName}` : " This room"} is now unlocked.`
+                      );
+                    });
+                  }
+                });
+                if (completedAdmissions > 0 && current.hasSelectedRoom) {
                   await client.joinAndWaitForAck({
                     type: "join",
                     teamId: current.selectedRoom.teamId,
