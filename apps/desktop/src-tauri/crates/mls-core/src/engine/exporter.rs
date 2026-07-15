@@ -203,9 +203,10 @@ fn seal_exporter(
     ))?;
     let mut nonce = vec![0u8; 12];
     rand::fill(&mut nonce[..]);
+    let nonce_array = Nonce::try_from(nonce.as_slice()).map_err(|_| EngineError::InvalidInput)?;
     let ciphertext = cipher
         .encrypt(
-            Nonce::from_slice(&nonce),
+            &nonce_array,
             Payload {
                 msg: plaintext,
                 aad: &aad,
@@ -234,9 +235,10 @@ fn open_exporter(
         EngineErrorCategory::Crypto,
         "initialize_export_cipher",
     ))?;
+    let nonce = Nonce::try_from(value.nonce.as_slice()).map_err(|_| EngineError::InvalidInput)?;
     cipher
         .decrypt(
-            Nonce::from_slice(&value.nonce),
+            &nonce,
             Payload {
                 msg: &value.ciphertext,
                 aad: &aad,
