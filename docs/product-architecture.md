@@ -87,7 +87,7 @@ Room-level settings include:
 - local notification mute state;
 - visibility/secrets warning acknowledgement.
 
-The active project folder is a host-local path. The macOS app can attach it with a native folder picker or a pasted path. The relay stores the path as room metadata so members understand what project a room is about, but it never receives plaintext file contents. Project tree, file preview, diff, and Git status visibility is shared to room members through encrypted room-scoped app state. Terminal commands, Git mutations, file saves, browser opens, and Codex turns execute from the active host's local desktop app after host approval.
+The active project folder is a host-local path. The macOS app can attach it with a native folder picker or a pasted path. The active host shares the path and Codex configuration with members through an MLS-encrypted `room.config` snapshot; neither value is stored in relay room metadata. Project tree, file preview, diff, and Git status visibility is likewise shared through encrypted room-scoped app state. Terminal commands, Git mutations, file saves, browser opens, and Codex turns execute from the active host's local desktop app after host approval.
 
 Native project file access is confined to the selected project root and rejects parent-directory or symlink escapes. File previews are read with a byte cap, and native diff output is bounded to 200,000 characters with an explicit truncation marker so generated files or large diffs do not overwhelm the desktop UI or copied context.
 
@@ -97,11 +97,11 @@ Project file search, file editing, Git status, diff reads, and Git remote infere
 
 Desktop git-status summaries are scoped per room/project. Switching rooms clears the visible status for the incoming room until its own local `git status` read completes, so changed-file counts, PR drafts, and diff summaries do not reuse another room's project state.
 
-The relay bounds its remaining metadata before storage and broadcast: team names, room names, WebSocket user/device identities, device ids, display names, live presence labels, host labels, avatar URLs, public key fingerprints, and public key JWK blobs all have explicit length limits and reject control characters where human-visible text is expected. Project paths and Codex model/tuning fields are not relay metadata; native validation bounds them before the active host encrypts a complete MLS `room.config` snapshot.
+The relay bounds public metadata before storage and broadcast: team names, room names, WebSocket user/device identities, device ids, display names, live presence labels, host labels, avatar URLs, public key fingerprints, and public key JWK blobs have explicit length limits and reject control characters where human-visible text is expected. Room create/settings endpoints reject project paths and Codex configuration rather than accepting or silently dropping them.
 
-The desktop catches invalid values in the UI, and the native boundary authoritatively repeats `room.config` schema, size, and epoch checks before MLS encryption.
+The desktop and authoritative Rust boundary validate the member-only configuration independently: project paths are non-empty strings up to 2,048 characters, model ids are model-like values up to 80 characters, and all policy fields are closed enums. Rust also requires a positive revision and the current MLS epoch before persisting the latest validated snapshot in SQLCipher and producing its PrivateMessage.
 
-When the active host changes settings, the desktop sends an encrypted `room.settings` activity event. Model, project-path, and Codex-tuning changes also publish a complete revisioned `room.config` snapshot; the relay never receives those plaintext values. Room members see a system transcript message after local decryption, while the relay cannot read the human-readable before/after activity text.
+When the active host changes Codex model/tuning or project path, the desktop sends an encrypted `room.settings` activity event and a complete encrypted `room.config` snapshot. It also emits a snapshot after every Add and host handoff so a new member with no pre-join backlog can converge on the current values. Members accept only the active host's newest authenticated epoch/revision; while waiting, configuration-dependent UI remains pending. Room members see settings activity only after local decryption, and the relay cannot read either the before/after text or current configuration.
 
 ### Active Codex Host
 
