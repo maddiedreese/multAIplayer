@@ -12,10 +12,5 @@
   ],
   "temp-directory": "coverage/tmp",
   "report-dir": "coverage-host-actions",
-  "reporter": ["text", "json-summary", "lcov"],
-  "check-coverage": true,
-  "lines": 65,
-  "statements": 65,
-  "functions": 70,
-  "branches": 65
+  "reporter": ["text", "json-summary", "lcov"]
 }

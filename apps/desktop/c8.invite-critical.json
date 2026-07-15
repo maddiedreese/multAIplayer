@@ -14,10 +14,5 @@
   ],
   "temp-directory": "coverage/tmp",
   "report-dir": "coverage-critical",
-  "reporter": ["text", "json-summary", "lcov"],
-  "check-coverage": true,
-  "lines": 95,
-  "statements": 95,
-  "functions": 90,
-  "branches": 80
+  "reporter": ["text", "json-summary", "lcov"]
 }

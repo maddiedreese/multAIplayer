@@ -1,5 +1,5 @@
+import { useEffect } from "react";
 import { useDeviceIdentityLifecycle } from "./useDeviceIdentityLifecycle";
-import { useSelectedRoomReadReceipt } from "./useSelectedRoomReadReceipt";
 import { useSelectedTeamDefaults } from "./useSelectedTeamDefaults";
 import { useWorkspaceBootstrap } from "./useWorkspaceBootstrap";
 
@@ -10,12 +10,16 @@ export function useAppBootstrapEffects({
   selectedTeamDefaults
 }: {
   workspace: Parameters<typeof useWorkspaceBootstrap>[0];
-  selectedRoomReadReceipt: Parameters<typeof useSelectedRoomReadReceipt>[0];
+  selectedRoomReadReceipt: { selectedRoomId: string; markRoomRead: (roomId: string) => void };
   deviceIdentity: Parameters<typeof useDeviceIdentityLifecycle>[0];
   selectedTeamDefaults: Parameters<typeof useSelectedTeamDefaults>[0];
 }) {
+  const { selectedRoomId, markRoomRead } = selectedRoomReadReceipt;
   useWorkspaceBootstrap(workspace);
-  useSelectedRoomReadReceipt(selectedRoomReadReceipt);
+  useEffect(() => {
+    if (!selectedRoomId) return;
+    markRoomRead(selectedRoomId);
+  }, [markRoomRead, selectedRoomId]);
   useDeviceIdentityLifecycle(deviceIdentity);
   useSelectedTeamDefaults(selectedTeamDefaults);
 }

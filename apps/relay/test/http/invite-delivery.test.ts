@@ -12,7 +12,7 @@ test("invite response ACK rolls back on persistence failure and retries atomical
   const dir = await mkdtemp(join(tmpdir(), "relay-invite-ack-"));
   const path = join(dir, "relay.sqlite");
   const initial = seededStore();
-  let persistence = createRelayPersistence({ backend: "sqlite", dataPath: path });
+  let persistence = createRelayPersistence({ dataPath: path });
   try {
     await persistence.save(snapshot(initial.store));
     assert.equal(
@@ -27,7 +27,7 @@ test("invite response ACK rolls back on persistence failure and retries atomical
     assert.equal(initial.store.getTeam("team-core")?.members, 1);
 
     persistence.close();
-    persistence = createRelayPersistence({ backend: "sqlite", dataPath: path });
+    persistence = createRelayPersistence({ dataPath: path });
     const afterFailure = (await persistence.load()) as PersistedFixture;
     assert.equal(afterFailure.inviteResponses.length, 1);
     assert.equal(afterFailure.invites.length, 1);
@@ -53,7 +53,7 @@ test("invite response ACK rolls back on persistence failure and retries atomical
     assert.equal(restarted.getTeam("team-core")?.members, 2);
 
     persistence.close();
-    persistence = createRelayPersistence({ backend: "sqlite", dataPath: path });
+    persistence = createRelayPersistence({ dataPath: path });
     const afterRetry = (await persistence.load()) as PersistedFixture;
     assert.equal(afterRetry.inviteResponses.length, 0);
     assert.equal(afterRetry.invites.length, 0);

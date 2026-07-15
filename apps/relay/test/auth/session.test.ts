@@ -15,7 +15,6 @@ import {
   tmpdir,
   waitForError,
   waitForStoredState,
-  writeFile,
   type RelayHarness,
   type StoredRelayStateFixture
 } from "../support/relay.js";
@@ -324,8 +323,9 @@ test(
   async () => {
     const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
     const cookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
+    const blocker = new Database(relay.dataPath);
     try {
-      await chmod(relay.tempDir, 0o500);
+      blocker.exec("BEGIN EXCLUSIVE");
       const failed = await fetch(`${relay.baseUrl}/auth/account`, {
         method: "DELETE",
         headers: { "content-type": "application/json", cookie },
@@ -335,7 +335,8 @@ test(
       assert.equal((await failed.json()).status, "pending");
       assert.equal((await fetch(`${relay.baseUrl}/auth/me`, { headers: { cookie } })).status, 401);
     } finally {
-      await chmod(relay.tempDir, 0o700).catch(() => undefined);
+      blocker.exec("ROLLBACK");
+      blocker.close();
       await relay.close();
     }
   }
@@ -394,8 +395,7 @@ test("relay hashes persisted session ids, migrates legacy ids, and purges legacy
       ciphertext: "legacy-secret",
       tag: "legacy"
     };
-    await writeFile(relay.dataPath, `${JSON.stringify(stored, null, 2)}\n`, "utf8");
-    restarted = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" }, undefined, relay.dataPath);
+    restarted = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" }, stored);
     assert.equal((await fetch(`${restarted.baseUrl}/auth/me`, { headers: { cookie } })).status, 200);
     const rewritten = await waitForStoredState(restarted.dataPath, (state) => state.authSessions?.length === 1);
     assert.doesNotMatch(

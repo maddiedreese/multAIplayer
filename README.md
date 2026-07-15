@@ -107,11 +107,11 @@ npm test
 npm run verify
 ```
 
-`npm run verify` runs the TypeScript, UI, relay, package, Rust, and native verification layers. More expensive mutation, fuzzing, supply-chain, and reproducibility jobs run on their documented CI schedules. See [the CI policy](docs/engineering-practices.md#continuous-integration-policy) for exact evidence boundaries.
+`npm run verify` runs the TypeScript, UI, relay, package, Rust, and native verification layers. More expensive mutation, fuzzing, supply-chain, and reproducibility jobs run on their documented CI schedules. See [the CI policy](docs/external-review-packet.md#continuous-integration-policy) for exact evidence boundaries.
 
 Development is AI-accelerated. Fuzzing, focused mutation testing, cross-language contract tests, and end-to-end security journeys are compensating controls for that velocity: they make important failures observable, but do not replace maintainer review or an independent security audit.
 
-SQLite is the only supported hosted relay backend. The JSON snapshot backend remains only for local development/test compatibility, while SQLite imports legacy snapshots during migration.
+SQLite is the relay's only runtime persistence backend. Startup can import an existing legacy JSON snapshot into SQLite once, but the relay no longer runs against or writes JSON storage.
 
 ## Repository map
 

@@ -1,0 +1,359 @@
+name: Product journeys
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "apps/desktop/src-tauri/**"
+      - "apps/desktop/src/application/mls/**"
+      - "apps/desktop/src/lib/invite/**"
+      - "apps/desktop/src/lib/mls/**"
+      - "apps/desktop/src/lib/onboarding/**"
+      - "apps/relay/**"
+      - "packages/protocol/**"
+      - "e2e/native-shell/**"
+      - ".github/workflows/journeys.yml"
+  schedule:
+    - cron: "23 7 * * 2"
+  workflow_dispatch:
+
+concurrency:
+  group: journeys-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  web-shell-e2e:
+    name: UI contract journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run UI contract journeys
+        run: npm run test:e2e
+      - name: Upload journey failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web-shell-journey-failures
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  native-shell-e2e:
+    name: Real two-client native MLS journey
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          rustup default 1.89.0
+      - name: Install Tauri, WebDriver, display, and Secret Service dependencies
+        run: >-
+          sudo apt-get update &&
+          sudo apt-get install -y
+          build-essential
+          dbus-x11
+          gnome-keyring
+          libayatana-appindicator3-dev
+          librsvg2-dev
+          libssl-dev
+          libwebkit2gtk-4.1-dev
+          libxdo-dev
+          webkit2gtk-driver
+          xvfb
+      - name: Install JavaScript dependencies
+        run: npm ci
+      - name: Build package dependencies and the real KeyPackage validator
+        run: |
+          npm run build:packages
+          cargo build --locked --manifest-path apps/desktop/src-tauri/Cargo.toml -p mls-core --bin mls-keypackage-validator
+      - name: Install pinned Tauri WebDriver bridge
+        run: cargo install tauri-driver --version 2.0.6 --locked
+      - name: Run two real native clients through invite, message, and handoff
+        run: xvfb-run -a npm run test:e2e:native
+      - name: Upload native journey duration metrics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-shell-journey-metrics
+          path: reports/native-shell-e2e/duration.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload native journey failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-shell-journey-failures
+          path: |
+            apps/desktop/src-tauri/target/debug/*.log
+            reports/native-shell-e2e
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Explain native journey failure handling
+        if: failure()
+        run: |
+          {
+            echo "### Failure posture"
+            echo
+            echo "Treat intermittent behavior as a product race until the failing stage, screenshots, logs, and duration report identify another cause. Do not rerun blindly."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  security-journey:
+    name: Multi-client security journey and injection red-team
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup default 1.88.0
+      - name: Build package dependencies
+        run: npm run build:packages
+      - name: Run deterministic lifecycle and adversarial corpus
+        run: |
+          mkdir -p reports/security-journey
+          npm run test:security-journey -w @multaiplayer/relay > reports/security-journey/junit.xml
+          node scripts/assert-security-journey-executed.mjs reports/security-journey/junit.xml
+      - name: Upload security journey results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: security-journey-results
+          path: reports/security-journey/junit.xml
+          if-no-files-found: error
+          retention-days: 14
+
+  macos-two-client:
+    name: Scheduled macOS two-client MLS journey
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build packages and native MLS clients
+        run: npm run build:packages
+      - name: Run two native MLS clients against a live relay
+        run: |
+          mkdir -p reports/macos-two-client
+          npx tsx --test --test-reporter=junit apps/relay/test/live-native-relay-journey.test.ts > reports/macos-two-client/junit.xml
+      - name: Upload two-client journey result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-two-client-journey
+          path: reports/macos-two-client/junit.xml
+          if-no-files-found: error
+          retention-days: 30
+
+  relay-security-depth:
+    name: Scheduled relay security depth
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build package dependencies
+        run: npm run build:packages
+      - name: Fuzz relay message and envelope parsing
+        run: npm run test:fuzz -w @multaiplayer/relay
+      - name: Run advisory relay authorization mutation test
+        id: mutation
+        continue-on-error: true
+        run: npm run test:mutation:run -w @multaiplayer/relay
+      - name: Build and publish the relay mutation summary
+        if: always() && hashFiles('apps/relay/reports/mutation/mutation.json') != ''
+        continue-on-error: true
+        run: |
+          npm run test:mutation:summary -w @multaiplayer/relay
+          node scripts/write-mutation-step-summary.mjs "Relay authorization mutation score (advisory)" apps/relay/reports/mutation/summary.json
+      - name: Review mutation-policy drift in the first weekly run of each month
+        if: always() && hashFiles('apps/relay/reports/mutation/summary.json') != ''
+        continue-on-error: true
+        shell: bash
+        run: |
+          if [ "$(date -u +%d)" -gt 7 ]; then
+            echo "Monthly mutation-policy drift review is not due this week." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          set +e
+          npm run test:mutation:policy -w @multaiplayer/relay
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "Mutation-policy drift review passed." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Mutation-policy drift needs review; inspect the mutation artifact."
+            echo "Mutation-policy drift review found changes; inspect the mutation artifact." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$status"
+      - name: Upload relay authorization mutation reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: relay-authorization-mutation-report
+          path: apps/relay/reports/mutation
+          if-no-files-found: ignore
+          retention-days: 30
+      - name: Exercise relay churn, restart, backup, and restore
+        env:
+          MULTAIPLAYER_RELAY_SOAK_DURATION_MS: "300000"
+          MULTAIPLAYER_RELAY_SOAK_CLIENTS: "32"
+          MULTAIPLAYER_RELAY_SOAK_RESTART_CYCLES: "4"
+        run: npm run test:soak -w @multaiplayer/relay
+      - name: Upload relay soak evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: relay-chaos-soak
+          path: apps/relay/reports/soak
+          if-no-files-found: error
+          retention-days: 14
+
+  mls-deserialization-fuzz:
+    name: Native untrusted-input fuzz smoke tests
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Restore and extend native fuzz corpora
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/desktop/src-tauri/crates/mls-core/fuzz/corpus
+          key: native-fuzz-corpus-${{ runner.os }}-${{ hashFiles('apps/desktop/src-tauri/crates/mls-core/fuzz/Cargo.lock') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: native-fuzz-corpus-${{ runner.os }}-${{ hashFiles('apps/desktop/src-tauri/crates/mls-core/fuzz/Cargo.lock') }}-
+      - name: Install nightly Rust and pinned cargo-fuzz
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo +nightly install cargo-fuzz --version 0.12.0 --locked
+      - name: Fuzz bounded validator JSON, MLS KeyPackage, and credential parsing
+        working-directory: apps/desktop/src-tauri/crates/mls-core
+        run: cargo +nightly fuzz run key_package_deserialization -- -max_total_time=120
+      - name: Fuzz Codex app-server activity projection
+        working-directory: apps/desktop/src-tauri/crates/mls-core
+        run: cargo +nightly fuzz run codex_app_server_projection -- -max_total_time=120
+      - name: Upload minimized fuzz artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mls-deserialization-fuzz-artifacts
+          path: apps/desktop/src-tauri/crates/mls-core/fuzz/artifacts
+          if-no-files-found: ignore
+          retention-days: 14
+
+  macos-desktop:
+    name: macOS desktop package
+    if: github.event_name != 'schedule'
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Cache Cargo registry and build output
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/desktop/src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+      - name: Install dependencies
+        run: npm ci
+      - name: Build desktop package dependencies
+        run: npm run build:packages
+      - name: Install Apple silicon Rust target
+        run: rustup target add aarch64-apple-darwin
+      - name: Build test-only macOS app with embedded WebDriver
+        env:
+          VITE_NATIVE_E2E: "true"
+        run: npm run tauri:build:native-e2e -w @multaiplayer/desktop
+      - name: Smoke-test packaged WKWebView input and Tauri IPC
+        run: npm run test:e2e:native:macos-smoke
+      - name: Upload macOS WKWebView smoke evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-wkwebview-smoke
+          path: reports/native-macos-smoke
+          if-no-files-found: error
+          retention-days: 14
+      - name: Rebuild the production frontend without the test driver
+        run: npm run build -w @multaiplayer/desktop
+      - name: Build ad-hoc signed Tauri app
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: npm run tauri:build:release -w @multaiplayer/desktop
+      - name: Verify Apple silicon deployment target and entitlements
+        run: |
+          app_path="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/multAIplayer.app"
+          test "$(lipo -archs "$app_path/Contents/MacOS/multAIplayer")" = "arm64"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app_path/Contents/Info.plist")" = "11.0"
+          bash scripts/verify-macos-deployment-target.sh "$app_path"
+          npm run verify:macos-associated-domains -- "$app_path"
+      - name: Upload macOS packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: multaiplayer-macos-packages
+          path: |
+            apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/multAIplayer.app
+            apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 14

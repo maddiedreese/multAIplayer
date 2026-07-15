@@ -1,8 +1,6 @@
 import type { MlsRelayMessage } from "@multaiplayer/protocol";
 import type { RelayStoreMutationEntity, RoomKey } from "./state.js";
 
-export type RelayStorageBackend = "json" | "sqlite";
-
 export type StoredRelayMutation =
   | { entity: RelayStoreMutationEntity; key: string; operation: "delete" }
   | { entity: RelayStoreMutationEntity; key: string; operation: "upsert"; value: unknown };

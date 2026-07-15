@@ -63,7 +63,6 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     nodeEnv,
     port,
     dataPath,
-    storageBackend,
     legacyJsonImportPath,
     mlsBacklogLimit,
     mlsBacklogRetentionDays,
@@ -90,7 +89,6 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
         )
     : null;
   const relayPersistence = createRelayPersistence({
-    backend: storageBackend,
     dataPath,
     legacyJsonImportPath,
     recordSqliteWriteDuration: relayMetrics.recordSqliteWriteDuration

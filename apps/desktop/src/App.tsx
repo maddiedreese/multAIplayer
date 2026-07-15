@@ -15,7 +15,7 @@ import { createAppRoomActions } from "./hooks/appRoomActions";
 import { useAppSelectedRoomRuntime } from "./hooks/useAppSelectedRoomRuntime";
 import { useAppHostHandoffActions } from "./hooks/useAppHostHandoffActions";
 import { useAppInviteActions } from "./hooks/useAppInviteActions";
-import { useRoomSettingsActor } from "./hooks/useRoomSettingsActor";
+import { createRoomSettingsActor } from "./application/workspace/roomSettingsActor";
 import { useAppRefs } from "./hooks/useAppRefs";
 import { useAppSelectedRoomContext } from "./hooks/useAppSelectedRoomContext";
 import { useAppWorkspaceFlow } from "./hooks/useAppWorkspaceFlow";
@@ -55,7 +55,7 @@ function NativeApp() {
   );
   const githubAuth = useGitHubAuth(relayHttpUrl);
   const localIdentity = useLocalIdentity(githubAuth.currentUser);
-  const roomSettingsActor = useRoomSettingsActor(localIdentity.localUser);
+  const roomSettingsActor = createRoomSettingsActor(localIdentity.localUser);
 
   const selectedContext = useAppSelectedRoomContext({
     githubAuth,

@@ -1,8 +1,5 @@
 import test from "node:test";
 import express from "express";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import {
   acquireDurableQuotaTransaction,
   reserveDurableQuota,
@@ -10,7 +7,6 @@ import {
   type DurableQuota
 } from "../src/auth/account-quotas.js";
 import { registerAttachmentRoutes } from "../src/http/attachments.js";
-import { JsonFileRelayPersistence } from "../src/json-file-persistence.js";
 import { createRelayStore } from "../src/state.js";
 import { assert, createDebugSession, startRelayWithWorkspace } from "./support/relay.js";
 
@@ -106,14 +102,13 @@ test("rolling back an older reservation subtracts only its contribution", () => 
   }
 });
 
-test("JSON quota transactions wait for failed persistence rollback before taking the next snapshot", async (t) => {
+test("quota transactions wait for failed persistence rollback before taking the next snapshot", async (t) => {
   for (const [quota, amount] of [
     ["daily_team_creations", 1],
     ["daily_room_creations", 1],
     ["attachment_upload_bytes", 40]
   ] as const satisfies ReadonlyArray<readonly [DurableQuota, number]>) {
     await t.test(quota, async () => {
-      const directory = await mkdtemp(join(tmpdir(), "multaiplayer-quota-json-"));
       const store = createRelayStore();
       const snapshots: Array<Record<string, unknown>> = [];
       let rejectFirstWrite!: (error: Error) => void;
@@ -121,75 +116,68 @@ test("JSON quota transactions wait for failed persistence rollback before taking
       const firstWrite = new Promise<void>((resolve) => {
         firstWriteEntered = resolve;
       });
-      const persistence = new JsonFileRelayPersistence(join(directory, "relay.json"), {
-        async writeFile(_path, data) {
-          snapshots.push(JSON.parse(String(data)) as Record<string, unknown>);
+      const persistence = {
+        async save(state: Record<string, unknown>) {
+          snapshots.push(structuredClone(state));
           if (snapshots.length === 1) {
             firstWriteEntered();
             await new Promise<void>((_resolve, reject) => {
               rejectFirstWrite = reject;
             });
           }
-        },
-        async chmod() {},
-        async rename() {}
-      });
+        }
+      };
       const state = () => ({
         version: 1,
         accountQuotaRecords: Array.from(store.accountQuotaRecords.values())
       });
-      try {
-        const releaseFirst = await acquireDurableQuotaTransaction(store);
-        const failedReservation = reserveDurableQuota({
-          store,
-          quota,
-          userId: "github:user",
-          amount,
-          limit: amount * 3,
-          resetAt: 2_000,
-          now: 1_000
-        });
-        assert.equal(failedReservation.allowed, true);
-        const failedSave = persistence.save(state());
-        await firstWrite;
+      const releaseFirst = await acquireDurableQuotaTransaction(store);
+      const failedReservation = reserveDurableQuota({
+        store,
+        quota,
+        userId: "github:user",
+        amount,
+        limit: amount * 3,
+        resetAt: 2_000,
+        now: 1_000
+      });
+      assert.equal(failedReservation.allowed, true);
+      const failedSave = persistence.save(state());
+      await firstWrite;
 
-        const successfulTransaction = (async () => {
-          const release = await acquireDurableQuotaTransaction(store);
-          try {
-            const reservation = reserveDurableQuota({
-              store,
-              quota,
-              userId: "github:user",
-              amount,
-              limit: amount * 3,
-              resetAt: 2_000,
-              now: 1_000
-            });
-            assert.equal(reservation.allowed, true);
-            await persistence.save(state());
-          } finally {
-            release();
-          }
-        })();
-        await Promise.resolve();
-        assert.equal(snapshots.length, 1);
+      const successfulTransaction = (async () => {
+        const release = await acquireDurableQuotaTransaction(store);
+        try {
+          const reservation = reserveDurableQuota({
+            store,
+            quota,
+            userId: "github:user",
+            amount,
+            limit: amount * 3,
+            resetAt: 2_000,
+            now: 1_000
+          });
+          assert.equal(reservation.allowed, true);
+          await persistence.save(state());
+        } finally {
+          release();
+        }
+      })();
+      await Promise.resolve();
+      assert.equal(snapshots.length, 1);
 
-        rejectFirstWrite(new Error("injected JSON persistence failure"));
-        await assert.rejects(failedSave, /injected JSON persistence failure/);
-        if (failedReservation.allowed) rollbackDurableQuota(store, failedReservation);
-        releaseFirst();
-        await successfulTransaction;
+      rejectFirstWrite(new Error("injected persistence failure"));
+      await assert.rejects(failedSave, /injected persistence failure/);
+      if (failedReservation.allowed) rollbackDurableQuota(store, failedReservation);
+      releaseFirst();
+      await successfulTransaction;
 
-        assert.equal(snapshots.length, 2);
-        const persistedQuotas = snapshots[1].accountQuotaRecords as Array<{ quota: DurableQuota; used: number }>;
-        assert.deepEqual(
-          persistedQuotas.map(({ quota: type, used }) => ({ type, used })),
-          [{ type: quota, used: amount }]
-        );
-      } finally {
-        persistence.close();
-        await rm(directory, { recursive: true, force: true });
-      }
+      assert.equal(snapshots.length, 2);
+      const persistedQuotas = snapshots[1].accountQuotaRecords as Array<{ quota: DurableQuota; used: number }>;
+      assert.deepEqual(
+        persistedQuotas.map(({ quota: type, used }) => ({ type, used })),
+        [{ type: quota, used: amount }]
+      );
     });
   }
 });

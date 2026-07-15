@@ -2,6 +2,8 @@ name: Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
   workflow_dispatch:
@@ -12,15 +14,70 @@ on:
         type: string
 
 permissions:
-  contents: read
+  actions: write
+  contents: write
+  pull-requests: write
 
 concurrency:
   group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
+  prepare:
+    name: Prepare release pull request
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Select release automation credential
+        id: credential
+        env:
+          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          if [ -n "$RELEASE_PLEASE_TOKEN" ]; then
+            echo "uses_custom_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "uses_custom_token=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Open or update the release pull request
+        id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+      - name: Check out the generated release branch
+        if: steps.release.outputs.prs_created == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+      - name: Set up Node for release metadata synchronization
+        if: steps.release.outputs.prs_created == 'true'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Synchronize generated lock metadata
+        if: steps.release.outputs.prs_created == 'true'
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          node scripts/sync-release-metadata.mjs
+          if git diff --quiet -- package-lock.json apps/desktop/src-tauri/Cargo.lock; then
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add package-lock.json apps/desktop/src-tauri/Cargo.lock
+          git commit --signoff --message "chore: synchronize release metadata"
+          git push
+      - name: Dispatch the signed release build when using the built-in token
+        if: steps.release.outputs.release_created == 'true' && steps.credential.outputs.uses_custom_token == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+        run: gh workflow run release.yml --ref main --field tag="$RELEASE_TAG"
+
   build:
     name: Build signed macOS artifacts
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     runs-on: macos-15
     timeout-minutes: 60
     outputs:

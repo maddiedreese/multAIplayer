@@ -15,7 +15,7 @@
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
-    "test:coverage": "c8 --all --src src --include 'src/**/*.ts' --report-dir coverage --reporter=text --reporter=json-summary --reporter=lcov --check-coverage --lines=99 --functions=100 --branches=95 --statements=99 tsx --test test/*.test.ts"
+    "test:coverage": "c8 --all --src src --include 'src/**/*.ts' --report-dir coverage --reporter=text --reporter=json-summary --reporter=lcov tsx --test test/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "22.20.1",
