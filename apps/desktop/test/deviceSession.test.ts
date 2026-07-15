@@ -142,6 +142,17 @@ test("leaves ordinary relay errors to the existing error handler", async () => {
   assert.equal(sessionRequests, 0);
 });
 
+test("coalesces concurrent initial establishment so a late response cannot invalidate the selected token", async () => {
+  const sessions = await Promise.all([
+    establishDeviceSession("http://initial-relay", "initial-device"),
+    establishDeviceSession("http://initial-relay", "initial-device")
+  ]);
+
+  assert.equal(sessions[0], sessions[1]);
+  assert.equal(challengeRequests, 1);
+  assert.equal(sessionRequests, 1);
+});
+
 test("an older in-flight establishment cannot overwrite a newer relay and device scope", async () => {
   let releaseOlderSession!: (response: Response) => void;
   deferredSessionResponse = new Promise<Response>((resolve) => {
