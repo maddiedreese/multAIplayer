@@ -258,6 +258,7 @@ for _ in $(seq 1 100); do
     if ! printf '%s\n' "$initial_windows" | grep -qx "$current_window"; then
       window_name="$(xdotool getwindowname "$current_window" 2>/dev/null || true)"
       echo "native handoff folder chooser: window=$current_window name=$window_name"
+      xdotool windowactivate --sync "$current_window"
       xdotool key --window "$current_window" --clearmodifiers ctrl+l
       sleep 0.2
       xdotool type --window "$current_window" --clearmodifiers --delay 1 -- "$HANDOFF_PROJECT_ROOT"
