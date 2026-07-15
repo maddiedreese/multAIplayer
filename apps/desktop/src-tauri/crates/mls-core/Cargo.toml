@@ -23,10 +23,10 @@ base64 = "=0.22.1"
 aes-gcm = "=0.10.3"
 hpke = { version = "=0.14.0", default-features = false, features = ["alloc", "getrandom", "aes", "nistp"] }
 hmac = "=0.12.1"
-mls-rs = { version = "=0.54.0", default-features = false, features = ["std", "private_message", "prior_epoch", "custom_proposal", "fast_serialize", "external_client", "sqlcipher-bundled"] }
-mls-rs-crypto-awslc = { version = "=0.23.0", default-features = true }
-mls-rs-provider-sqlite = { version = "=0.22.0", default-features = false, features = ["sqlcipher-bundled"] }
-mls-rs-core = "=0.26.0"
+mls-rs = { version = "=0.55.2", default-features = false, features = ["std", "private_message", "prior_epoch", "custom_proposal", "fast_serialize", "external_client", "sqlcipher-bundled"] }
+mls-rs-crypto-awslc = { version = "=0.25.0", default-features = true }
+mls-rs-provider-sqlite = { version = "=0.23.0", default-features = false, features = ["sqlcipher-bundled"] }
+mls-rs-core = "=0.27.0"
 maybe-async = "=0.2.11"
 rand = "=0.10.2"
 rusqlite = "=0.37.0"
