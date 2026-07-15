@@ -1,5 +1,5 @@
 use hmac::{Hmac, Mac};
-use rand::RngCore;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
