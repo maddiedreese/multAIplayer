@@ -6,13 +6,13 @@ import {
   buildQueuedCodexTurnRows,
   buildRoomBrowserProps,
   resolveSidebarSettingsMessage
-} from "../src/lib/containerPropBuilders";
+} from "../src/presentation/containers/containerPropBuilders";
 import {
   selectRoomInspectorView,
   selectRoomMainColumnView,
   selectSidebarDrawerView,
   selectSidebarNavigationView
-} from "../src/lib/containerViewSelectors";
+} from "../src/application/views/containerViewSelectors";
 import { useAppStore } from "../src/store/appStore";
 
 test.beforeEach(() => useAppStore.getState().resetAppStore());

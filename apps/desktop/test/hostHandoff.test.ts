@@ -11,7 +11,7 @@ import {
   roomHostHandoffMessage,
   roomHostMutationInFlightMessage,
   sameHandoffRepo
-} from "../src/lib/hostHandoff";
+} from "../src/lib/handoff/hostHandoff";
 import type { HostHandoffPlaintextPayload } from "@multaiplayer/protocol";
 
 const baseHandoff: HostHandoffPlaintextPayload = {

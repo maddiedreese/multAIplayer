@@ -1,8 +1,12 @@
 import { useMemo } from "react";
 import type { ApprovalPolicy, ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import type { BrowserAccessRequest, ChatMessage, TerminalCommandRequest } from "../types";
-import { buildSidebarMessageHitRows, buildSidebarRoomRows, buildSidebarTeamRows } from "../lib/sidebarDisplayRows";
-import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "../lib/sidebarSearch";
+import {
+  buildSidebarMessageHitRows,
+  buildSidebarRoomRows,
+  buildSidebarTeamRows
+} from "../presentation/sidebar/sidebarDisplayRows";
+import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "../presentation/sidebar/sidebarSearch";
 
 interface UseSidebarNavigationOptions {
   sidebarQuery: string;

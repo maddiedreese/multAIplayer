@@ -1,7 +1,8 @@
 import type { StateCreator } from "zustand";
 import { maxCodexActivitiesPerRoom } from "@multaiplayer/protocol";
-import { omitRecordKey } from "../../lib/setUtils";
-import { emptyCodexThreadGraph, mergeCodexThreadGraph } from "../../lib/codexThreadGraph";
+import { omitRecordKey } from "../../lib/core/setUtils";
+import { emptyCodexThreadGraph, mergeCodexThreadGraph } from "../../lib/codex/codexThreadGraph";
+import { transitionHostHandoffRecord } from "../../lib/handoff/hostHandoffMachine";
 import type {
   CodexRoomEvent,
   CodexActivity,
@@ -127,6 +128,7 @@ export interface CodexHostHandoffSlice {
   ) => void;
   markHostHandoffAcceptedForRoom: (roomId: string, handoffId: string) => void;
   markLatestHostHandoffAcceptedForRoom: (roomId: string) => void;
+  markHostHandoffPatchAppliedForRoom: (roomId: string, handoffId: string) => void;
   setCodexContinuationForRoom: (roomId: string, handoff: HostHandoffRecord | null) => void;
   appendCodexEvent: (roomId: string, event: CodexRoomEvent) => void;
   upsertCodexActivity: (roomId: string, activity: CodexActivity) => void;
@@ -164,17 +166,14 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
   },
   applyAcceptedHostHandoffForRoom: (roomId, handoff) => {
     set((state) => {
-      const acceptedHandoff: HostHandoffRecord = { ...handoff, status: "accepted" };
+      const acceptedHandoff = transitionHostHandoffRecord(handoff, { type: "transfer-committed" });
       const roomHandoffs = state.codexRuntimeByRoom[roomId]?.hostHandoffs ?? [];
       const existingIndex = roomHandoffs.findIndex((existing) => existing.id === handoff.id);
       const nextHandoffs =
         existingIndex >= 0
           ? roomHandoffs.map((existing) =>
               existing.id === handoff.id
-                ? {
-                    ...existing,
-                    ...acceptedHandoff
-                  }
+                ? transitionHostHandoffRecord({ ...existing, ...acceptedHandoff }, { type: "transfer-committed" })
                 : existing
             )
           : [...roomHandoffs, acceptedHandoff];
@@ -189,13 +188,14 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
   markHostHandoffRequestedForRoom: (roomId, handoffId, candidate) => {
     set((state) => {
       const roomHandoffs = state.codexRuntimeByRoom[roomId]?.hostHandoffs ?? [];
-      if (!roomHandoffs.some((handoff) => handoff.id === handoffId && handoff.status === "available")) return state;
+      const handoff = roomHandoffs.find((item) => item.id === handoffId);
+      if (!handoff || (handoff.status !== "available" && handoff.status !== "requested")) return state;
+      const nextHandoff = transitionHostHandoffRecord(handoff, { type: "candidate-requested", candidate });
+      if (nextHandoff === handoff) return state;
       return {
         codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => ({
           ...roomRuntime,
-          hostHandoffs: roomHandoffs.map((handoff) =>
-            handoff.id === handoffId ? { ...handoff, ...candidate, status: "requested" } : handoff
-          )
+          hostHandoffs: roomHandoffs.map((handoff) => (handoff.id === handoffId ? nextHandoff : handoff))
         }))
       };
     });
@@ -208,7 +208,7 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
         codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => ({
           ...roomRuntime,
           hostHandoffs: roomHandoffs.map((handoff) =>
-            handoff.id === handoffId ? { ...handoff, status: "accepted" } : handoff
+            handoff.id === handoffId ? transitionHostHandoffRecord(handoff, { type: "transfer-committed" }) : handoff
           )
         }))
       };
@@ -228,6 +228,16 @@ export const createCodexHostHandoffSlice: StateCreator<AppStoreState, [], [], Co
         }))
       };
     });
+  },
+  markHostHandoffPatchAppliedForRoom: (roomId, handoffId) => {
+    set((state) => ({
+      codexRuntimeByRoom: updateCodexRuntimeForRoom(state.codexRuntimeByRoom, roomId, (roomRuntime) => ({
+        ...roomRuntime,
+        hostHandoffs: (roomRuntime.hostHandoffs ?? []).map((handoff) =>
+          handoff.id === handoffId ? transitionHostHandoffRecord(handoff, { type: "patch-applied" }) : handoff
+        )
+      }))
+    }));
   },
   setCodexContinuationForRoom: (roomId, handoff) => {
     set((state) => ({

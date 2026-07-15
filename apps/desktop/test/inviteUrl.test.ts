@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readInviteUrlPayload } from "../src/lib/inviteUrl";
+import { readInviteUrlPayload } from "../src/lib/invite/inviteUrl";
 
 test("readInviteUrlPayload parses gated no-secret invite URLs", () => {
   assert.deepEqual(

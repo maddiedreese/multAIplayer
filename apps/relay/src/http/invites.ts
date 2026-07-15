@@ -12,6 +12,9 @@ interface RegisterInviteRoutesOptions {
   allowMutation: (session: AuthSession | null, res: Response) => boolean;
   canAccessRoom: (teamId: string, roomId: string, userId: string) => boolean;
   scheduleStoreSave: () => void;
+  saveRelayStore: () => Promise<void>;
+  liveInviteCapPerUser: number;
+  recordQuotaRejection?: (type: string) => void;
 }
 
 export function registerInviteRoutes({
@@ -21,9 +24,12 @@ export function registerInviteRoutes({
   getAuthSession,
   allowMutation,
   canAccessRoom,
-  scheduleStoreSave
+  scheduleStoreSave,
+  saveRelayStore,
+  liveInviteCapPerUser,
+  recordQuotaRejection
 }: RegisterInviteRoutesOptions) {
-  app.post("/invites", (req, res) => {
+  app.post("/invites", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
 
@@ -41,6 +47,18 @@ export function registerInviteRoutes({
       sendRelayError(res, 403, "forbidden", "Join this room before creating invites.");
       return;
     }
+    if (
+      session &&
+      Array.from(store.invites.values()).filter(
+        (invite) =>
+          invite.creatorUserId === session.user.id && (!invite.expiresAt || Date.parse(invite.expiresAt) > Date.now())
+      ).length >= liveInviteCapPerUser
+    ) {
+      recordQuotaRejection?.("live_invites_per_user");
+      return void sendRelayError(res, 429, "quota_exceeded", "Live invite quota exceeded.", {
+        quota: { type: "live_invites_per_user", limit: liveInviteCapPerUser, remaining: 0 }
+      });
+    }
 
     const invite: InviteRecordType = {
       id: `invite_${nanoid(16)}`,
@@ -51,7 +69,12 @@ export function registerInviteRoutes({
       expiresAt: new Date(Date.now() + inviteTtlDays * 24 * 60 * 60 * 1000).toISOString()
     };
     store.setInvite(invite);
-    scheduleStoreSave();
+    try {
+      await saveRelayStore();
+    } catch {
+      store.deleteInvite(invite.id);
+      return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist invite quota and invite.");
+    }
     res.status(201).json({ invite });
   });
 

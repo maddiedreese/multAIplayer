@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { RelayHttpError } from "../src/lib/httpResponse";
-import { createOnboardingInviteJoinAdapter } from "../src/lib/onboardingInviteJoin";
-import { InviteJoinError, type InviteJoinErrorCode } from "../src/lib/inviteJoinError";
+import { RelayHttpError } from "../src/lib/core/httpResponse";
+import { createOnboardingInviteJoinAdapter } from "../src/lib/onboarding/onboardingInviteJoin";
+import { InviteJoinError, type InviteJoinErrorCode } from "../src/lib/invite/inviteJoinError";
 
 const manualInvite = "https://app.example.test/#invite=invite_123&multaiplayerJoin=protected-fragment&approval=request";
 

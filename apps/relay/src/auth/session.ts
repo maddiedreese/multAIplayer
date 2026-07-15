@@ -14,6 +14,7 @@ interface RelayAuthSessionManagerOptions {
   normalizeSessionId: (value: unknown) => string;
   scheduleStoreSave: () => void;
   isDeletedIdentity?: (userId: string) => boolean;
+  isRestrictedIdentity?: (userId: string) => boolean;
 }
 
 export interface RelayAuthSessionManager {
@@ -59,7 +60,8 @@ export function createRelayAuthSessionManager({
   nodeEnv,
   normalizeSessionId,
   scheduleStoreSave,
-  isDeletedIdentity = () => false
+  isDeletedIdentity = () => false,
+  isRestrictedIdentity = () => false
 }: RelayAuthSessionManagerOptions): RelayAuthSessionManager {
   function authCookieOptions(maxAge?: number): CookieOptions {
     return {
@@ -82,7 +84,7 @@ export function createRelayAuthSessionManager({
       scheduleStoreSave();
       return null;
     }
-    if (isDeletedIdentity(session.user.id)) {
+    if (isDeletedIdentity(session.user.id) || isRestrictedIdentity(session.user.id)) {
       authSessions.delete(sessionIdHash);
       scheduleStoreSave();
       return null;
@@ -180,22 +182,18 @@ export function createRelayAuthSessionPersistence({
     normalizeStoredAuthSession(stored) {
       if (!isRecord(stored)) return null;
       const sessionIdHash = normalizeStoredSessionIdHash(stored, maxAuthSessionIdChars);
-      const user = isRecord(stored.user) ? stored.user : null;
-      const userId = normalizeMetadataText(user?.id, maxUserIdChars);
-      const login = normalizeMetadataText(user?.login, maxDisplayNameChars);
-      const name = user?.name === undefined ? undefined : normalizeMetadataText(user.name, maxDisplayNameChars);
-      const avatarUrl =
-        user?.avatarUrl === undefined ? undefined : normalizeMetadataText(user.avatarUrl, maxRoomProjectPathChars);
+      const user = normalizeStoredSessionUser(stored.user, {
+        maxDisplayNameChars,
+        maxRoomProjectPathChars,
+        maxUserIdChars
+      });
       if (
         !sessionIdHash ||
         typeof stored.expiresAt !== "number" ||
         !Number.isSafeInteger(stored.expiresAt) ||
         stored.expiresAt <= Date.now() ||
         stored.expiresAt > Date.now() + authSessionMaxAgeMs ||
-        !userId ||
-        !login ||
-        (user?.name !== undefined && !name) ||
-        (user?.avatarUrl !== undefined && !avatarUrl)
+        !user
       ) {
         return null;
       }
@@ -204,17 +202,28 @@ export function createRelayAuthSessionPersistence({
         sessionIdHash,
         session: {
           sessionIdHash,
-          user: {
-            id: userId,
-            login,
-            name: name ?? undefined,
-            avatarUrl: avatarUrl ?? undefined
-          },
+          user,
           expiresAt: stored.expiresAt
         }
       };
     }
   };
+}
+
+function normalizeStoredSessionUser(
+  value: unknown,
+  limits: Pick<RelayAuthSessionPersistenceOptions, "maxDisplayNameChars" | "maxRoomProjectPathChars" | "maxUserIdChars">
+): AuthSession["user"] | null {
+  if (!isRecord(value)) return null;
+  const id = normalizeMetadataText(value.id, limits.maxUserIdChars);
+  const login = normalizeMetadataText(value.login, limits.maxDisplayNameChars);
+  const name = value.name === undefined ? undefined : normalizeMetadataText(value.name, limits.maxDisplayNameChars);
+  const avatarUrl =
+    value.avatarUrl === undefined ? undefined : normalizeMetadataText(value.avatarUrl, limits.maxRoomProjectPathChars);
+  if (!id || !login || (value.name !== undefined && !name) || (value.avatarUrl !== undefined && !avatarUrl)) {
+    return null;
+  }
+  return { id, login, name: name ?? undefined, avatarUrl: avatarUrl ?? undefined };
 }
 
 function normalizeStoredSessionIdHash(stored: Record<string, unknown>, maxAuthSessionIdChars: number): string | null {

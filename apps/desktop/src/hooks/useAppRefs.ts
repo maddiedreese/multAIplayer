@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { RelayClient } from "../lib/relayClient";
+import type { RelayClient } from "../lib/relay/relayClient";
 import { projectBrowserRequestsByRoom } from "../store/slices/browserSlice";
 import { projectGitHubWorkflowPanelMaps } from "../store/slices/gitWorkflowSlice";
 import { projectInvitePanelMaps } from "../store/slices/inviteSlice";

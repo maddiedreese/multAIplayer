@@ -4,7 +4,7 @@ import {
   createImageThumbnail,
   normalizeGeneratedImageData,
   safeGeneratedImageName
-} from "../src/lib/codexGeneratedImage";
+} from "../src/application/codex/codexGeneratedImage";
 
 test("normalizes bounded generated-image base64 without accepting remote URLs", () => {
   assert.equal(

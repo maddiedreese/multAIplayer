@@ -1,8 +1,8 @@
 import type { ApprovalPolicy } from "@multaiplayer/protocol";
 import type { StateCreator } from "zustand";
-import type { LocalHistorySettings } from "../../lib/localHistory";
-import { loadTeamHistorySettings } from "../../lib/localHistory";
-import { loadTeamRoomDefaults, sanitizeTeamRoomDefaults } from "../../lib/teamRoomDefaults";
+import type { LocalHistorySettings } from "../../lib/history/localHistory";
+import { loadTeamHistorySettings } from "../../lib/history/localHistory";
+import { loadTeamRoomDefaults, sanitizeTeamRoomDefaults } from "../../lib/team/teamRoomDefaults";
 import type { AppStoreState } from "../appStore";
 
 export interface HistoryDefaultsState {

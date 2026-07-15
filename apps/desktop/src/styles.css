@@ -3983,6 +3983,61 @@ select {
   min-width: 0;
 }
 
+.room-archive-panel .drawer-section-title {
+  align-items: center;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.archive-library-list,
+.archive-message-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.archive-library-row {
+  align-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.6rem;
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 0.55rem;
+}
+
+.archive-library-row > div,
+.read-only-archive header,
+.archive-message-list > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.read-only-archive {
+  background: var(--surface-soft);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.65rem;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.7rem;
+}
+
+.read-only-archive header span,
+.archive-library-row small {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.archive-message-list {
+  max-height: 18rem;
+  overflow: auto;
+}
+
+.archive-message-list > div {
+  border-block-start: 1px solid var(--border-subtle);
+  padding-block-start: 0.45rem;
+  white-space: pre-wrap;
+}
+
 .history-defaults strong,
 .history-defaults span {
   display: block;

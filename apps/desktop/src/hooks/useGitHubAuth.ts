@@ -8,10 +8,10 @@ import {
   pollGitHubDeviceFlow,
   startGitHubDeviceFlow,
   type GitHubAuthConfig
-} from "../lib/authClient";
+} from "../lib/identity/authClient";
 import { useAppStore } from "../store/appStore";
-import { openTrustedAuthenticationUrl } from "../lib/authExternalUrl";
-import { invokeNative } from "../lib/nativeCommandError";
+import { openTrustedAuthenticationUrl } from "../lib/identity/authExternalUrl";
+import { invokeNative } from "../lib/platform/nativeCommandError";
 
 const fallbackAuthConfig: GitHubAuthConfig = {
   provider: "github",

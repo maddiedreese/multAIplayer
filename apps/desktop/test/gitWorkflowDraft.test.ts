@@ -7,7 +7,7 @@ import {
   parseGitHubRemoteUrl,
   resolveGitWorkflowDraft,
   updateGitWorkflowDraftRecord
-} from "../src/lib/gitWorkflowDraft";
+} from "../src/lib/git/gitWorkflowDraft";
 
 test("resolveGitWorkflowDraft returns defaults for a room without a draft", () => {
   assert.deepEqual(resolveGitWorkflowDraft({}, "room-a"), defaultGitWorkflowDraft);

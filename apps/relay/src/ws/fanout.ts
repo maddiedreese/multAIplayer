@@ -83,63 +83,17 @@ export function createRelayFanout(options: Options) {
     const digest = retryDigest(message);
     const receiptKey = `${key}\0${message.id}`;
     const acceptedReceipt = options.store.acceptedMessageReceipts.get(receiptKey);
-    if (acceptedReceipt) {
-      if (acceptedReceipt.digest === digest) return false;
-      throw new RelayPublishError("invalid_message", "Message id is already bound to different MLS bytes or metadata.");
-    }
+    if (acceptedReceipt && isAcceptedReceiptRetry(acceptedReceipt.digest, digest)) return false;
     const previous = options.store.getMlsBacklog(key) ?? [];
     const replay = previous.find((item) => item.id === message.id);
-    if (replay) {
-      if (sameRetry(replay, message)) return false;
-      throw new RelayPublishError("invalid_message", "Message id is already bound to different MLS bytes or metadata.");
-    }
+    if (replay && isBacklogRetry(replay, message)) return false;
     const room = options.store.getRoom(message.roomId);
     if (!room) throw new Error("Room not found.");
     const acceptedEpoch = room.acceptedMlsEpoch ?? 0;
-    if (message.messageType === "commit" && message.epochHint !== acceptedEpoch) {
-      throw new RelayPublishError(
-        "stale_epoch",
-        `Commit epoch ${message.epochHint} is stale; accepted epoch is ${acceptedEpoch}.`
-      );
-    }
-    if (message.messageType === "application" && message.epochHint > acceptedEpoch) {
-      throw new RelayPublishError(
-        "stale_epoch",
-        `Application epoch ${message.epochHint} is ahead of accepted epoch ${acceptedEpoch}.`
-      );
-    }
-    if (message.messageType === "application" && acceptedEpoch - message.epochHint > 2) {
-      throw new RelayPublishError(
-        "application_epoch_expired",
-        `Application epoch ${message.epochHint} is outside the retained window at epoch ${acceptedEpoch}.`
-      );
-    }
-    if (
-      message.messageType === "commit" &&
-      (room.hostStatus !== "active" ||
-        room.hostUserId !== message.senderUserId ||
-        room.activeHostDeviceId !== message.senderDeviceId)
-    ) {
-      throw new RelayPublishError("not_active_host", "Only the active host device may publish an MLS Commit.");
-    }
-    if (message.commitEffect === "host_handoff" && !validHostTransferAuthorization(options.store, room, message)) {
-      throw new RelayPublishError("not_active_host", "Host transfer authorization is invalid or unauthenticated.");
-    }
+    validatePublishAuthority(options.store, room, message, acceptedEpoch);
     const oldRoom = room;
     const previousReceipts = new Map(options.store.acceptedMessageReceipts);
-    if (message.messageType === "commit")
-      options.store.setRoom({
-        ...room,
-        acceptedMlsEpoch: acceptedEpoch + 1,
-        ...(message.commitEffect === "host_handoff"
-          ? {
-              host: message.nextHostUserId!,
-              hostUserId: message.nextHostUserId,
-              activeHostDeviceId: message.nextHostDeviceId,
-              hostStatus: "active" as const
-            }
-          : {})
-      });
+    if (message.messageType === "commit") options.store.setRoom(roomAfterCommit(room, message, acceptedEpoch));
     const backlog = options.pruneMlsBacklog([...previous, message]);
     const retained = new Set(backlog.map((item) => item.id));
     const prunedIds = previous.filter((item) => !retained.has(item.id)).map((item) => item.id);
@@ -191,6 +145,68 @@ export function createRelayFanout(options: Options) {
     broadcast(key, { type: "presence", ...verified, status: "online" });
   }
   return { send, broadcast, broadcastRoomUpdated, broadcastWorkspaceUpdated, publishMlsMessage, publishPresence };
+}
+
+function isAcceptedReceiptRetry(previousDigest: string, nextDigest: string): boolean {
+  if (previousDigest === nextDigest) return true;
+  throw new RelayPublishError("invalid_message", "Message id is already bound to different MLS bytes or metadata.");
+}
+
+function isBacklogRetry(previous: MlsRelayMessage, next: MlsRelayMessage): boolean {
+  if (sameRetry(previous, next)) return true;
+  throw new RelayPublishError("invalid_message", "Message id is already bound to different MLS bytes or metadata.");
+}
+
+function validatePublishAuthority(
+  store: RelayStore,
+  room: RoomRecord,
+  message: MlsRelayMessage,
+  acceptedEpoch: number
+): void {
+  if (message.messageType === "commit" && message.epochHint !== acceptedEpoch) {
+    throw new RelayPublishError(
+      "stale_epoch",
+      `Commit epoch ${message.epochHint} is stale; accepted epoch is ${acceptedEpoch}.`
+    );
+  }
+  if (message.messageType === "application" && message.epochHint > acceptedEpoch) {
+    throw new RelayPublishError(
+      "stale_epoch",
+      `Application epoch ${message.epochHint} is ahead of accepted epoch ${acceptedEpoch}.`
+    );
+  }
+  if (message.messageType === "application" && acceptedEpoch - message.epochHint > 2) {
+    throw new RelayPublishError(
+      "application_epoch_expired",
+      `Application epoch ${message.epochHint} is outside the retained window at epoch ${acceptedEpoch}.`
+    );
+  }
+  if (message.messageType === "commit" && !isActiveHostMessage(room, message)) {
+    throw new RelayPublishError("not_active_host", "Only the active host device may publish an MLS Commit.");
+  }
+  if (message.commitEffect === "host_handoff" && !validHostTransferAuthorization(store, room, message)) {
+    throw new RelayPublishError("not_active_host", "Host transfer authorization is invalid or unauthenticated.");
+  }
+}
+
+function isActiveHostMessage(room: RoomRecord, message: MlsRelayMessage): boolean {
+  return (
+    room.hostStatus !== "offline" &&
+    room.hostUserId === message.senderUserId &&
+    room.activeHostDeviceId === message.senderDeviceId
+  );
+}
+
+function roomAfterCommit(room: RoomRecord, message: MlsRelayMessage, acceptedEpoch: number): RoomRecord {
+  if (message.commitEffect !== "host_handoff") return { ...room, acceptedMlsEpoch: acceptedEpoch + 1 };
+  return {
+    ...room,
+    acceptedMlsEpoch: acceptedEpoch + 1,
+    host: message.nextHostUserId!,
+    hostUserId: message.nextHostUserId,
+    activeHostDeviceId: message.nextHostDeviceId,
+    hostStatus: "active"
+  };
 }
 
 function retryDigest(message: MlsRelayMessage): string {

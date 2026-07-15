@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { searchProjectFiles } from "../lib/localBackend";
+import { searchProjectFiles } from "../lib/platform/localBackend";
 import { useAppStore } from "../store/appStore";
 
 interface UseProjectFilesSearchOptions {

@@ -1,5 +1,5 @@
 import type { StateCreator } from "zustand";
-import { omitRecordKey } from "../../lib/setUtils";
+import { omitRecordKey } from "../../lib/core/setUtils";
 import type { AppStoreState } from "../appStore";
 
 export interface RoomSettingsRoomState {

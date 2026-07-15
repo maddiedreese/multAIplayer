@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { getGitStatus } from "../lib/localBackend";
+import { getGitStatus } from "../lib/platform/localBackend";
 import { useAppStore } from "../store/appStore";
 
 interface UseRoomGitStatusRefreshOptions {

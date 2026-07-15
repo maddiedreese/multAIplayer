@@ -1,6 +1,11 @@
 import { Maximize2, Minimize2, Plus, RotateCcw, Save, Search, ShieldAlert, X } from "lucide-react";
-import type { FilePreviewTab } from "../lib/filePreview";
-import type { GitDiffResult, GitStatusSummary, ProjectFileContent, ProjectFileEntry } from "../lib/localBackend";
+import type { FilePreviewTab } from "../lib/files/filePreview";
+import type {
+  GitDiffResult,
+  GitStatusSummary,
+  ProjectFileContent,
+  ProjectFileEntry
+} from "../lib/platform/localBackend";
 import type { WorkspaceFileSaveRequest } from "../types";
 import { FilePreviewTabs } from "./FilePreviewTabs";
 import { InlineSecretWarning } from "./common";
@@ -72,39 +77,14 @@ export function WorkspaceFileViewer({
   const saveButtonLabel = access.isActiveHost ? "Save" : "Request save";
   return (
     <section className={`panel file-viewer-open ${editor.expanded ? "expanded" : ""}`}>
-      <div className="file-viewer-toolbar">
-        <button className="ghost icon-only" onClick={actions.close} aria-label="Close file editor">
-          <X size={15} />
-        </button>
-        <div>
-          <strong>{selectedFileName}</strong>
-          <span>{model.path}</span>
-        </div>
-        <div className="file-viewer-toolbar-actions">
-          <button
-            className={
-              attachmentReview.needsReview && attachmentReview.sensitiveFileReviewed ? "ghost danger" : "ghost"
-            }
-            onClick={actions.attachSelectedFile}
-            disabled={!model.selectedFile || !access.canReadWorkspace || !access.canAttachSelectedFile}
-          >
-            {attachmentReview.needsReview && !attachmentReview.sensitiveFileReviewed ? (
-              <ShieldAlert size={14} />
-            ) : (
-              <Plus size={14} />
-            )}
-            {attachmentReview.actionLabel}
-          </button>
-          <button
-            className="ghost icon-only"
-            onClick={actions.toggleExpanded}
-            aria-label={editor.expanded ? "Return file editor to column" : "Expand file editor"}
-            title={editor.expanded ? "Return to column" : "Expand"}
-          >
-            {editor.expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          </button>
-        </div>
-      </div>
+      <FileViewerToolbar
+        selectedFileName={selectedFileName}
+        model={model}
+        access={access}
+        attachmentReview={attachmentReview}
+        editor={editor}
+        actions={actions}
+      />
 
       <label className="file-search viewer-search">
         <Search size={14} />
@@ -176,6 +156,53 @@ export function WorkspaceFileViewer({
       />
       {model.message && <div className="workflow-message">{model.message}</div>}
     </section>
+  );
+}
+
+function FileViewerToolbar({
+  selectedFileName,
+  model,
+  access,
+  attachmentReview,
+  editor,
+  actions
+}: {
+  selectedFileName: string;
+  model: WorkspaceFileViewerModel;
+  access: WorkspaceFileViewerAccess;
+  attachmentReview: WorkspaceFileAttachmentReview;
+  editor: WorkspaceFileEditorState;
+  actions: WorkspaceFileViewerActions;
+}) {
+  const sensitiveReviewPending = attachmentReview.needsReview && !attachmentReview.sensitiveFileReviewed;
+  return (
+    <div className="file-viewer-toolbar">
+      <button className="ghost icon-only" onClick={actions.close} aria-label="Close file editor">
+        <X size={15} />
+      </button>
+      <div>
+        <strong>{selectedFileName}</strong>
+        <span>{model.path}</span>
+      </div>
+      <div className="file-viewer-toolbar-actions">
+        <button
+          className={attachmentReview.needsReview && attachmentReview.sensitiveFileReviewed ? "ghost danger" : "ghost"}
+          onClick={actions.attachSelectedFile}
+          disabled={!model.selectedFile || !access.canReadWorkspace || !access.canAttachSelectedFile}
+        >
+          {sensitiveReviewPending ? <ShieldAlert size={14} /> : <Plus size={14} />}
+          {attachmentReview.actionLabel}
+        </button>
+        <button
+          className="ghost icon-only"
+          onClick={actions.toggleExpanded}
+          aria-label={editor.expanded ? "Return file editor to column" : "Expand file editor"}
+          title={editor.expanded ? "Return to column" : "Expand"}
+        >
+          {editor.expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </button>
+      </div>
+    </div>
   );
 }
 

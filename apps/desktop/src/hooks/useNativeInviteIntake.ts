@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { installNativeInviteIntake, type NativeInvitePayload } from "../lib/nativeInviteIntake";
-import { reportExpectedFailure } from "../lib/nonFatalReporting";
+import { installNativeInviteIntake, type NativeInvitePayload } from "../lib/invite/nativeInviteIntake";
+import { reportExpectedFailure } from "../lib/core/nonFatalReporting";
 
 type NativeInviteInstaller = (
   onInvite: (invite: NativeInvitePayload) => void | Promise<void>,

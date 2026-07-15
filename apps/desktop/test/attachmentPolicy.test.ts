@@ -5,7 +5,7 @@ import {
   attachmentReviewScopeKey,
   decideAttachmentReview,
   reviewedAttachmentPathForScope
-} from "../src/lib/attachmentPolicy";
+} from "../src/lib/files/attachmentPolicy";
 
 test("ordinary files can be attached without extra review", () => {
   assert.deepEqual(decideAttachmentReview("const ok = true;\nconsole.log(ok);", "src/app.ts", null), {

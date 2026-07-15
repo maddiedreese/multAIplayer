@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveFilePreviewTab } from "../src/lib/filePreview";
+import { resolveFilePreviewTab } from "../src/lib/files/filePreview";
 
 test("resolveFilePreviewTab keeps diff selected only when a diff exists", () => {
   assert.equal(resolveFilePreviewTab("diff", true), "diff");

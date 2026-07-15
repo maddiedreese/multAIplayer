@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import { applyGitPatch, shutdownCodexRoom } from "../lib/localBackend";
-import { createHandoffSettingsPatch } from "../lib/hostHandoff";
-import { updateRoomSettings } from "../lib/workspaceClient";
+import { shutdownCodexRoom } from "../lib/platform/localBackend";
+import { createHandoffSettingsPatch } from "../lib/handoff/hostHandoff";
+import { updateRoomSettings } from "../application/workspace/workspaceClient";
 import { useAppStore } from "../store/appStore";
 import type { HostHandoffRecord } from "../types";
 import { buildAcceptedHandoffMessage, resolveHandoffProject } from "./hostHandoffHelpers";
@@ -61,10 +61,6 @@ async function finalize(
 ): Promise<void> {
   const patch = createHandoffSettingsPatch(handoff);
   const project = await resolveHandoffProject(handoff, patch.projectPath);
-  if (handoff.gitPatch && !handoff.gitPatchTruncated) {
-    const result = await applyGitPatch(project.path, handoff.gitPatch);
-    if (result.status !== 0) throw new Error(result.stderr || result.stdout || "git apply failed");
-  }
   const updated = await updateRoomSettings(options.room.id, {
     ...options.roomSettingsActor(),
     ...patch,
@@ -73,11 +69,19 @@ async function finalize(
   void shutdownCodexRoom(options.room.id);
   options.replaceRoom(updated);
   await options.publishConfig(updated);
-  setContinuation(options.room.id, handoff.reason === "usage_limit" ? handoff : null);
+  setContinuation(
+    options.room.id,
+    handoff.reason === "usage_limit" || (handoff.gitPatch && !handoff.patchAppliedLocally) ? handoff : null
+  );
   options.resetFileContext(options.room.id);
   options.resetCodexApproval(options.room.id);
   options.setProjectPathDraft(options.room.id, project.path);
   options.setCustomCodexModel(options.room.id, patch.codexModel);
   options.setSettingsMessage(options.room.id, buildAcceptedHandoffMessage(handoff, project, patch.codexModel));
-  options.setHostMessage(options.room.id, `You are now hosting ${updated.name} from ${handoff.fromHost}'s handoff.`);
+  options.setHostMessage(
+    options.room.id,
+    handoff.gitPatch && !handoff.patchAppliedLocally
+      ? `You are now hosting ${updated.name}. The previous host's patch is staged for explicit review and approval.`
+      : `You are now hosting ${updated.name} from ${handoff.fromHost}'s handoff.`
+  );
 }

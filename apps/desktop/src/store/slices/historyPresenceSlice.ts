@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
-import type { InspectorTab } from "../../components/RoomInspectorPanel";
-import { omitRecordKey } from "../../lib/setUtils";
+import type { InspectorTab } from "../../lib/core/uiTypes";
+import { omitRecordKey } from "../../lib/core/setUtils";
 import type { ChatMessage, RoomPresence } from "../../types";
 import type { AppStoreState } from "../appStore";
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { stripTerminalControlSequences } from "../src/lib/terminalText";
+import { stripTerminalControlSequences } from "../src/lib/terminal/terminalText";
 
 test("stripTerminalControlSequences removes ANSI and bracketed paste controls", () => {
   assert.equal(stripTerminalControlSequences("\u001b[?2004hMaddies-MacBook-Pro%\u001b[?2004l"), "Maddies-MacBook-Pro%");

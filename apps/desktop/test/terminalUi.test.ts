@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { nextShellTerminalName } from "../src/lib/terminalUi";
+import { nextShellTerminalName } from "../src/lib/terminal/terminalUi";
 
 test("nextShellTerminalName uses shell for the first terminal", () => {
   assert.equal(nextShellTerminalName([]), "shell");

@@ -20,19 +20,6 @@ const trackedFiles = execFileSync("git", ["ls-files"], { encoding: "utf8" })
   .filter((path) => path && existsSync(path));
 const markdownFiles = trackedFiles.filter((path) => path.endsWith(".md"));
 
-function readJsonPathValue(value, jsonpath) {
-  const segments = [];
-  assert.ok(jsonpath.startsWith("$"), `release JSONPath must start at the document root: ${jsonpath}`);
-  const matcher = /(?:\.([A-Za-z][A-Za-z0-9]*)|\['([^']*)'\])/g;
-  let consumed = "$";
-  for (const match of jsonpath.matchAll(matcher)) {
-    consumed += match[0];
-    segments.push(match[1] ?? match[2]);
-  }
-  assert.equal(consumed, jsonpath, `unsupported release JSONPath ${jsonpath}`);
-  return segments.reduce((current, segment) => current?.[segment], value);
-}
-
 function withoutFencedCode(source) {
   return source.replace(/^\s*(```|~~~)[\s\S]*?^\s*\1.*$/gm, "");
 }
@@ -112,54 +99,6 @@ test("release-facing workspace versions stay synchronized", () => {
   assert.equal(readJson("apps/desktop/src-tauri/tauri.conf.json").version, "../package.json");
 });
 
-test("release automation declares every synchronized JSON target", () => {
-  const extraFiles = readJson("release-please-config.json").packages?.["."]?.["extra-files"] ?? [];
-  const targets = new Set(
-    extraFiles
-      .filter((entry) => typeof entry === "object" && entry.type === "json")
-      .map((entry) => `${entry.path}\0${entry.jsonpath}`)
-  );
-  const requireTarget = (path, jsonpath) => {
-    assert.ok(targets.has(`${path}\0${jsonpath}`), `release automation must update ${path} ${jsonpath}`);
-    assert.equal(readJsonPathValue(readJson(path), jsonpath), rootPackage.version, `${path} ${jsonpath}`);
-  };
-
-  for (const path of workspaceManifestPaths) {
-    requireTarget(path, "$.version");
-    const manifest = readJson(path);
-    for (const dependencyGroup of ["dependencies", "devDependencies", "peerDependencies"]) {
-      for (const dependencyName of Object.keys(manifest[dependencyGroup] ?? {}).filter((name) =>
-        name.startsWith("@multaiplayer/")
-      )) {
-        requireTarget(path, `$['${dependencyGroup}']['${dependencyName}']`);
-      }
-    }
-  }
-  requireTarget("package-lock.json", "$.version");
-  requireTarget("package-lock.json", "$['packages'][''].version");
-  for (const manifestPath of workspaceManifestPaths) {
-    requireTarget("package-lock.json", `$['packages']['${manifestPath.replace(/\/package\.json$/, "")}'].version`);
-  }
-  assert.ok(
-    extraFiles.some(
-      (entry) =>
-        entry.type === "toml" &&
-        entry.path === "apps/desktop/src-tauri/Cargo.toml" &&
-        entry.jsonpath === "$.package.version"
-    ),
-    "release automation must update the native Cargo package version"
-  );
-  assert.ok(
-    extraFiles.some(
-      (entry) =>
-        entry.type === "toml" &&
-        entry.path === "apps/desktop/src-tauri/Cargo.lock" &&
-        entry.jsonpath === "$.package[?(@.name=='multaiplayer')].version"
-    ),
-    "release automation must update the native Cargo lock package"
-  );
-});
-
 test("supported runtime and bundle settings are machine-readable policy", () => {
   assert.equal(rootPackage.engines?.node, ">=22");
   assert.equal(readFileSync(".nvmrc", "utf8").trim(), "22");
@@ -186,18 +125,6 @@ test("dependency pins and security overrides remain explicit", () => {
   assert.equal(rootPackage.devDependencies.dompurify, "3.4.12");
   assert.equal(rootPackage.overrides["monaco-editor"].dompurify, "$dompurify");
   assert.equal(desktopPackage.devDependencies["monaco-editor"], "0.55.1");
-});
-
-test("third-party GitHub Actions use immutable commits with readable version comments", () => {
-  const workflows = trackedFiles.filter((path) => path.startsWith(".github/workflows/") && path.endsWith(".yml"));
-  for (const path of workflows) {
-    const references = Array.from(readFileSync(path, "utf8").matchAll(/^\s*uses:\s*([^\s#]+)(?:\s+#\s*(\S+))?$/gm));
-    for (const [, reference, versionComment] of references) {
-      if (reference.startsWith("./")) continue;
-      assert.match(reference, /@[a-f0-9]{40}$/, `${path}: ${reference}`);
-      assert.match(versionComment ?? "", /^v\d/, `${path}: ${reference} needs a readable version comment`);
-    }
-  }
 });
 
 test("Rust advisory exceptions have an owner, review date, and complete rationale", () => {

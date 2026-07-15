@@ -4,25 +4,25 @@ import { codexModelOptions, codexSandboxLevelOptions, defaultCodexModel } from "
 import { BrowserAccessPanel } from "../components/BrowserAccessPanel";
 import { RoomInspectorPanel } from "../components/RoomInspectorPanel";
 import { RoomInspectorWorkPanel } from "../components/RoomInspectorWorkPanel";
-import { canStageRoomChatAttachment } from "../lib/chatPolicy";
-import { formatBytes, formatCodexModel, formatTimestamp } from "../lib/appFormatters";
-import { resolveFilePreviewTab } from "../lib/filePreview";
-import { resolveGitWorkflowDraft } from "../lib/gitWorkflowDraft";
-import { selectRoomInspectorView } from "../lib/containerViewSelectors";
-import { buildRoomInspectorCapabilities } from "../lib/containerCapabilities";
+import { canStageRoomChatAttachment } from "../lib/chat/chatPolicy";
+import { formatBytes, formatCodexModel, formatTimestamp } from "../lib/formatting/appFormatters";
+import { resolveFilePreviewTab } from "../lib/files/filePreview";
+import { resolveGitWorkflowDraft } from "../lib/git/gitWorkflowDraft";
+import { selectRoomInspectorView } from "../application/views/containerViewSelectors";
+import { buildRoomInspectorCapabilities } from "./containerCapabilities";
 import {
   buildProjectControlState,
   buildRoomBrowserProps,
   buildRoomInspectorWorkProps
-} from "../lib/containerPropBuilders";
-import { defaultProjectPath } from "../lib/localBackend";
-import { buildRoomMemberRows, buildTeamMemberRows } from "../lib/rosterDisplayRows";
-import { canControlRoomTerminal } from "../lib/terminalAccess";
-import { buildRoomInspectorModelProjection } from "../lib/roomInspectorModelProjection";
-import { useFileTerminalDisplay } from "../hooks/useFileTerminalDisplay";
-import { useGitHubWorkflowState } from "../hooks/useGitHubWorkflowState";
-import { useLocalIdentity } from "../hooks/useLocalIdentity";
-import { useRoomAccess } from "../hooks/useRoomAccess";
+} from "../presentation/containers/containerPropBuilders";
+import { defaultProjectPath } from "../lib/platform/localBackend";
+import { buildRoomMemberRows, buildTeamMemberRows } from "../presentation/roster/rosterDisplayRows";
+import { canControlRoomTerminal } from "../lib/terminal/terminalAccess";
+import { buildRoomInspectorModelProjection } from "../presentation/rooms/roomInspectorModelProjection";
+import { useFileTerminalDisplay } from "./useFileTerminalDisplay";
+import { useGitHubWorkflowState } from "./useGitHubWorkflowState";
+import { useLocalIdentity } from "./useLocalIdentity";
+import { useRoomAccess } from "./useRoomAccess";
 import { approvalDelegationPolicyLabels, approvalPolicyLabels, defaultBrowserUrl } from "../appDefaults";
 import { useAppStore } from "../store/appStore";
 import type { RoomInspectorSources } from "./roomInspectorCompositionTypes";
@@ -165,6 +165,52 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
     settingsBusy,
     access.isActiveHost
   );
+  function composeWorkspaceFilesProps() {
+    return {
+      fileQuery: filePanel.query ?? "",
+      projectFiles: filePanel.projectFiles ?? [],
+      selectedFile: filePanel.selectedFile ?? null,
+      gitStatus,
+      selectedDiff: filePanel.selectedDiff ?? null,
+      fileBusy: Boolean(filePanel.busy),
+      fileMessage: filePanel.message ?? null,
+      fileSaveRequests: filePanel.saveRequests ?? [],
+      canReadLocalWorkspace: access.canReadLocalWorkspace,
+      isActiveHost: access.isActiveHost,
+      canAttachSelectedFile: canStageRoomChatAttachment(selectedRoom, access.isSelectedRoomLocked),
+      selectedFileRisks: fileDisplay.selectedFileRisks,
+      selectedFileNeedsAttachmentReview: fileDisplay.selectedFileNeedsAttachmentReview,
+      selectedSensitiveFileReviewed: fileDisplay.selectedSensitiveFileReviewed,
+      selectedAttachmentActionLabel: fileDisplay.selectedAttachmentReview?.actionLabel ?? "Attach",
+      selectedAttachmentWarningDetail: fileDisplay.selectedAttachmentReview?.warningDetail ?? undefined,
+      filePreviewTab,
+      formatBytes,
+      ...capabilities.workspaceFiles,
+      onFileQueryChange: (query: string) => setFileQueryForRoom(selectedRoom.id, query),
+      onFilePreviewTabChange: (tab: "file" | "diff") => setFilePreviewTabForRoom(selectedRoom.id, tab)
+    };
+  }
+  function composeGithubActionsProps() {
+    return {
+      summary: github.actionsSummary,
+      readiness: github.githubActionsReadiness,
+      runs: gitRuntime.actions?.runs ?? [],
+      owner: gitWorkflowDraft.prOwner,
+      repo: gitWorkflowDraft.prRepo,
+      branch: gitWorkflowDraft.branchName,
+      lastChecked: gitRuntime.actions?.lastChecked ?? null,
+      busy: Boolean(gitRuntime.actions?.busy),
+      refreshDisabled:
+        !access.canReadLocalWorkspace ||
+        Boolean(gitRuntime.actions?.busy) ||
+        !access.isActiveHost ||
+        !github.githubActionsReadiness.ready,
+      currentUserSignedIn: Boolean(currentUser),
+      message: gitRuntime.actions?.message ?? null,
+      formatTimestamp,
+      onRefresh: capabilities.github.refresh
+    };
+  }
   function composeCommonWorkProps() {
     return buildRoomInspectorWorkProps({
       project: {
@@ -178,37 +224,15 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
           setProjectPathDraftForRoom(selectedRoom.id, defaultProjectPath, selectedRoom.projectPath),
         onUpdateProjectPath: capabilities.project.updatePath
       },
-      teamRoster: {
-        members: teamMemberRows,
-        hasSelectedTeam: Boolean(selectedTeamId),
-        busy: Boolean(teamRoster?.busy),
-        message: teamRoster?.message ?? null,
-        ...capabilities.teamRoster
-      },
+      teamRoster: composeTeamRosterProps(),
       roomMembers: {
         members: roomMemberRows,
         localDeviceId: deviceId,
         message: deviceIdentityMessage,
         ...capabilities.roomMembers
       },
-      hostHandoff: {
-        handoffs: codexRuntime.hostHandoffs ?? [],
-        acceptDisabled: !hasSelectedRoom || access.isSelectedRoomLocked || hostBusy,
-        onAcceptHandoff: capabilities.hostHandoff.accept,
-        formatModel: formatCodexModel
-      },
-      encryptedInvite: {
-        copyDisabled: !access.canCopyRoomInvite,
-        inviteSecretInput,
-        inviteRequests: invite.requests ?? [],
-        localDeviceId: deviceId,
-        importDisabled: !inviteSecretInput.trim(),
-        approvalDisabled: !hasSelectedRoom || access.isSelectedRoomLocked || !access.isActiveHost,
-        inviteLink: invite.link ?? "",
-        inviteMessage: invite.message ?? null,
-        ...capabilities.invite,
-        onInviteSecretInputChange: setInviteSecretInputValue
-      },
+      hostHandoff: composeHostHandoffProps(),
+      encryptedInvite: composeEncryptedInviteProps(),
       approvalPolicy: {
         labels: approvalPolicyLabels,
         delegationLabels: approvalDelegationPolicyLabels,
@@ -259,29 +283,7 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
         ...capabilities.history,
         onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent
       },
-      workspaceFiles: {
-        fileQuery: filePanel.query ?? "",
-        projectFiles: filePanel.projectFiles ?? [],
-        selectedFile: filePanel.selectedFile ?? null,
-        gitStatus,
-        selectedDiff: filePanel.selectedDiff ?? null,
-        fileBusy: Boolean(filePanel.busy),
-        fileMessage: filePanel.message ?? null,
-        fileSaveRequests: filePanel.saveRequests ?? [],
-        canReadLocalWorkspace: access.canReadLocalWorkspace,
-        isActiveHost: access.isActiveHost,
-        canAttachSelectedFile: canStageRoomChatAttachment(selectedRoom, access.isSelectedRoomLocked),
-        selectedFileRisks: fileDisplay.selectedFileRisks,
-        selectedFileNeedsAttachmentReview: fileDisplay.selectedFileNeedsAttachmentReview,
-        selectedSensitiveFileReviewed: fileDisplay.selectedSensitiveFileReviewed,
-        selectedAttachmentActionLabel: fileDisplay.selectedAttachmentReview?.actionLabel ?? "Attach",
-        selectedAttachmentWarningDetail: fileDisplay.selectedAttachmentReview?.warningDetail ?? undefined,
-        filePreviewTab,
-        formatBytes,
-        ...capabilities.workspaceFiles,
-        onFileQueryChange: (query) => setFileQueryForRoom(selectedRoom.id, query),
-        onFilePreviewTabChange: (tab) => setFilePreviewTabForRoom(selectedRoom.id, tab)
-      },
+      workspaceFiles: composeWorkspaceFilesProps(),
       gitHandoff: {
         draft: gitWorkflowDraft,
         preview: github.gitApprovalPreview,
@@ -293,25 +295,7 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
         onDraftChange: (patch) => editGitWorkflowDraftForRoom(selectedRoom.id, patch),
         ...capabilities.git
       },
-      githubActions: {
-        summary: github.actionsSummary,
-        readiness: github.githubActionsReadiness,
-        runs: gitRuntime.actions?.runs ?? [],
-        owner: gitWorkflowDraft.prOwner,
-        repo: gitWorkflowDraft.prRepo,
-        branch: gitWorkflowDraft.branchName,
-        lastChecked: gitRuntime.actions?.lastChecked ?? null,
-        busy: Boolean(gitRuntime.actions?.busy),
-        refreshDisabled:
-          !access.canReadLocalWorkspace ||
-          Boolean(gitRuntime.actions?.busy) ||
-          !access.isActiveHost ||
-          !github.githubActionsReadiness.ready,
-        currentUserSignedIn: Boolean(currentUser),
-        message: gitRuntime.actions?.message ?? null,
-        formatTimestamp,
-        onRefresh: capabilities.github.refresh
-      },
+      githubActions: composeGithubActionsProps(),
       terminal: {
         terminalBusy: Boolean(terminal.busy),
         terminalError: terminal.ui?.error ?? null,
@@ -335,6 +319,41 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
         onSelectTerminal: (terminalId) => setSelectedTerminalIdForRoom(selectedRoom.id, terminalId)
       }
     });
+  }
+
+  function composeTeamRosterProps() {
+    return {
+      members: teamMemberRows,
+      hasSelectedTeam: Boolean(selectedTeamId),
+      busy: Boolean(teamRoster?.busy),
+      message: teamRoster?.message ?? null,
+      ...capabilities.teamRoster
+    };
+  }
+
+  function composeHostHandoffProps() {
+    return {
+      handoffs: codexRuntime.hostHandoffs ?? [],
+      acceptDisabled: !hasSelectedRoom || access.isSelectedRoomLocked || hostBusy,
+      patchApplyDisabled: !access.isActiveHost,
+      onAcceptHandoff: capabilities.hostHandoff.accept,
+      formatModel: formatCodexModel
+    };
+  }
+
+  function composeEncryptedInviteProps() {
+    return {
+      copyDisabled: !access.canCopyRoomInvite,
+      inviteSecretInput,
+      inviteRequests: invite.requests ?? [],
+      localDeviceId: deviceId,
+      importDisabled: !inviteSecretInput.trim(),
+      approvalDisabled: !hasSelectedRoom || access.isSelectedRoomLocked || !access.isActiveHost,
+      inviteLink: invite.link ?? "",
+      inviteMessage: invite.message ?? null,
+      ...capabilities.invite,
+      onInviteSecretInputChange: setInviteSecretInputValue
+    };
   }
   const commonWorkProps = composeCommonWorkProps();
   const browserProps = buildRoomBrowserProps({

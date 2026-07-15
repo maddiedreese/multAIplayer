@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import type { CodexEventPlaintextPayload, ClientRoomRecord } from "@multaiplayer/protocol";
-import { createCodexInvokeActions } from "../src/lib/codexInvokeActions";
-import { saveCodexFollowUpBehavior } from "../src/lib/codexFollowUpBehavior";
+import { createCodexInvokeActions } from "../src/application/codex/codexInvokeActions";
+import { saveCodexFollowUpBehavior } from "../src/lib/codex/codexFollowUpBehavior";
 import { useAppStore } from "../src/store/appStore";
 import type { ChatMessage } from "../src/types";
 

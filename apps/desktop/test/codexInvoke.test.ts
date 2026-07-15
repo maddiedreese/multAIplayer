@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { extractCodexBrowserOpenUrl, messageInvokesCodex, normalizeBrowserCommandUrl } from "../src/lib/codexInvoke";
+import {
+  extractCodexBrowserOpenUrl,
+  messageInvokesCodex,
+  normalizeBrowserCommandUrl
+} from "../src/lib/codex/codexInvoke";
 
 test("messageInvokesCodex accepts explicit Codex mentions case-insensitively", () => {
   assert.equal(messageInvokesCodex("@Codex please review this diff"), true);

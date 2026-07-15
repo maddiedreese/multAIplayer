@@ -6,8 +6,8 @@ import {
   catalogReasoningOptionsForModel,
   catalogSpeedOptionsForModel,
   resolveCodexRunSettings
-} from "../src/lib/codexCatalogResolver";
-import type { CodexProbe } from "../src/lib/localBackend";
+} from "../src/lib/codex/codexCatalogResolver";
+import type { CodexProbe } from "../src/lib/platform/localBackend";
 
 const room: ClientRoomRecord = {
   id: "room-catalog",

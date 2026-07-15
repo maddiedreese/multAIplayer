@@ -1,4 +1,7 @@
-use crate::{validate_credential, BasicAppCredential, HostContext, HOST_CONTEXT_EXTENSION_TYPE};
+use crate::{
+    validate_credential, validate_host_commit, BasicAppCredential, HostContext,
+    HOST_CONTEXT_EXTENSION_TYPE,
+};
 use mls_rs::{
     extension::ExtensionType,
     group::{GroupContext, Roster},
@@ -32,7 +35,7 @@ pub(crate) fn host_from_extensions(
         .ok_or(HostRuleError)?;
     let host: HostContext =
         serde_json::from_slice(&extension.extension_data).map_err(|_| HostRuleError)?;
-    if host.version != 1 || host.host_device_id.is_empty() || host.host_device_id.len() > 128 {
+    if validate_host_commit(host.host_leaf, &host).is_err() {
         return Err(HostRuleError);
     }
     Ok(host)

@@ -3,15 +3,16 @@ import { codexModelOptions, defaultCodexModel } from "@multaiplayer/protocol";
 import { AppSidebarDrawer } from "./AppSidebarDrawer";
 import { DesktopSidebar } from "./DesktopSidebar";
 import { SetupChecklist } from "./SetupChecklist";
-import { allowRelayConfiguration, defaultRelayHttpUrl, defaultRelayWsUrl } from "../lib/appConfig";
-import { formatCodexModel, formatSessionPersistence } from "../lib/appFormatters";
-import { formatCodexCompatibilitySummary } from "../lib/codexCompatibility";
-import { defaultProjectPath } from "../lib/localBackend";
-import { mlsStateStorageLabel } from "../lib/appRuntime";
-import { selectSidebarDrawerView, selectSidebarNavigationView } from "../lib/containerViewSelectors";
-import { buildSidebarDrawerCapabilities, buildSidebarNavigationCapabilities } from "../lib/containerCapabilities";
-import { resolveSidebarSettingsMessage } from "../lib/containerPropBuilders";
-import { hideUnreadForLockedRooms } from "../lib/roomUnread";
+import { RoomArchivePanel } from "./RoomArchivePanel";
+import { allowRelayConfiguration, defaultRelayHttpUrl, defaultRelayWsUrl } from "../lib/core/appConfig";
+import { formatCodexModel, formatSessionPersistence } from "../lib/formatting/appFormatters";
+import { formatCodexCompatibilitySummary } from "../lib/codex/codexCompatibility";
+import { defaultProjectPath } from "../lib/platform/localBackend";
+import { mlsStateStorageLabel } from "../application/runtime/appRuntime";
+import { selectSidebarDrawerView, selectSidebarNavigationView } from "../application/views/containerViewSelectors";
+import { buildSidebarDrawerCapabilities, buildSidebarNavigationCapabilities } from "../hooks/containerCapabilities";
+import { resolveSidebarSettingsMessage } from "../presentation/containers/containerPropBuilders";
+import { hideUnreadForLockedRooms } from "../lib/history/roomUnread";
 import { useLocalIdentity } from "../hooks/useLocalIdentity";
 import { useRoomAccess } from "../hooks/useRoomAccess";
 import { useSidebarNavigation } from "../hooks/useSidebarNavigation";
@@ -22,7 +23,7 @@ import { projectBrowserRequestsByRoom } from "../store/slices/browserSlice";
 import { projectCodexRuntimeMaps } from "../store/slices/codexHostHandoffSlice";
 import { projectHistorySearchMessagesByRoom } from "../store/slices/historyPresenceSlice";
 import { projectTerminalRuntimeRequestsByRoom } from "../store/slices/terminalSlice";
-import { deriveOnboardingProgress, onboardingRestartEvent } from "../lib/onboardingState";
+import { deriveOnboardingProgress, onboardingRestartEvent } from "../lib/onboarding/onboardingState";
 import type { useGitHubAuth } from "../hooks/useGitHubAuth";
 import type { useRoomRuntimeContext } from "../hooks/useRoomRuntimeContext";
 import type { useWorkspaceFlowContext } from "../hooks/useWorkspaceFlowContext";
@@ -307,6 +308,13 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         deviceIdentity,
         deviceIdentityMessage,
         relaySessionPersistence: formatSessionPersistence(authConfig?.sessionPersistence),
+        archivePanel: (
+          <RoomArchivePanel
+            selectedRoomId={selectedRoom.id}
+            selectedRoomName={selectedRoom.name}
+            hasSelectedRoom={hasSelectedRoom}
+          />
+        ),
         onRotateDeviceIdentity: capabilities.rotateDeviceIdentity,
         onHostedAccountDeleted: capabilities.clearDeletedHostedAccount,
         onSignIn: capabilities.signIn,
@@ -347,6 +355,13 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         teamDefaultBrowserProfilePersistent,
         teamDefaultInviteApprovalGate,
         message: settingsMessage,
+        archivePanel: (
+          <RoomArchivePanel
+            selectedRoomId={selectedRoom.id}
+            selectedRoomName={selectedRoom.name}
+            hasSelectedRoom={hasSelectedRoom}
+          />
+        ),
         onChooseProject: capabilities.chooseProject,
         onRelayHttpDraftChange: setRelayHttpDraft,
         onRelayWsDraftChange: setRelayWsDraft,

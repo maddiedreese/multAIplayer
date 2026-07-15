@@ -19,6 +19,7 @@ export interface RelayHarness {
   dataPath: string;
   tempDir: string;
   beginShutdown(): Promise<void>;
+  crash(options?: { preserveData?: boolean }): Promise<void>;
   close(options?: { preserveData?: boolean }): Promise<void>;
 }
 
@@ -31,6 +32,7 @@ export interface StoredRelayStateFixture {
   teamMembers?: unknown[];
   devices?: unknown[];
   authSessions?: unknown[];
+  accountRestrictions?: unknown[];
   attachmentBlobs?: unknown[];
   inviteRequests?: unknown[];
   inviteResponses?: unknown[];
@@ -66,22 +68,11 @@ export async function startRelay(
   storedState?: StoredRelayStateFixture,
   existingDataPath?: string
 ): Promise<RelayHarness> {
-  const tempDir = existingDataPath
-    ? resolve(existingDataPath, "..")
-    : await mkdtemp(join(tmpdir(), "multaiplayer-relay-test-"));
-  const dataPath = existingDataPath ?? join(tempDir, "relay-store.json");
-  const dataAlreadyExists = await access(dataPath).then(
-    () => true,
-    () => false
+  const { tempDir, dataPath, initialState, storageBackend, initialStatePath } = await prepareRelayStorage(
+    extraEnv,
+    storedState,
+    existingDataPath
   );
-  const initialState = storedState ?? (dataAlreadyExists ? undefined : defaultWorkspaceFixture());
-  const storageBackend = extraEnv.MULTAIPLAYER_RELAY_STORAGE ?? "json";
-  const initialStatePath = join(tempDir, "initial-relay-state.json");
-  if (initialState && storageBackend === "sqlite") {
-    await writeFile(initialStatePath, `${JSON.stringify(initialState, null, 2)}\n`, "utf8");
-  } else if (initialState) {
-    await writeFile(dataPath, `${JSON.stringify(initialState, null, 2)}\n`, "utf8");
-  }
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -129,19 +120,7 @@ export async function startRelay(
     const baseUrl = `http://127.0.0.1:${port}`;
     try {
       await waitForReady(baseUrl, child, () => output);
-      return {
-        baseUrl,
-        wsUrl: `ws://127.0.0.1:${port}/rooms`,
-        dataPath,
-        tempDir,
-        beginShutdown() {
-          return beginProcessShutdown(child);
-        },
-        async close(options = {}) {
-          await stopProcess(child);
-          if (!options.preserveData) await rm(tempDir, { recursive: true, force: true });
-        }
-      };
+      return createRelayHarness(child, baseUrl, port, dataPath, tempDir);
     } catch (error) {
       lastError = error;
       await stopProcess(child);
@@ -151,6 +130,56 @@ export async function startRelay(
 
   await rm(tempDir, { recursive: true, force: true });
   throw lastError;
+}
+
+async function prepareRelayStorage(
+  extraEnv: NodeJS.ProcessEnv,
+  storedState?: StoredRelayStateFixture,
+  existingDataPath?: string
+) {
+  const tempDir = existingDataPath
+    ? resolve(existingDataPath, "..")
+    : await mkdtemp(join(tmpdir(), "multaiplayer-relay-test-"));
+  const dataPath = existingDataPath ?? join(tempDir, "relay-store.json");
+  const dataAlreadyExists = await access(dataPath).then(
+    () => true,
+    () => false
+  );
+  const initialState = storedState ?? (dataAlreadyExists ? undefined : defaultWorkspaceFixture());
+  const storageBackend = extraEnv.MULTAIPLAYER_RELAY_STORAGE ?? "json";
+  const initialStatePath = join(tempDir, "initial-relay-state.json");
+  if (initialState) {
+    const targetPath = storageBackend === "sqlite" ? initialStatePath : dataPath;
+    await writeFile(targetPath, `${JSON.stringify(initialState, null, 2)}\n`, "utf8");
+  }
+  return { tempDir, dataPath, initialState, storageBackend, initialStatePath };
+}
+
+function createRelayHarness(
+  child: ChildProcessWithoutNullStreams,
+  baseUrl: string,
+  port: number,
+  dataPath: string,
+  tempDir: string
+): RelayHarness {
+  const removeTemporaryData = async (preserveData = false) => {
+    if (!preserveData) await rm(tempDir, { recursive: true, force: true });
+  };
+  return {
+    baseUrl,
+    wsUrl: `ws://127.0.0.1:${port}/rooms`,
+    dataPath,
+    tempDir,
+    beginShutdown: () => beginProcessShutdown(child),
+    async crash(options = {}) {
+      await crashProcess(child);
+      await removeTemporaryData(options.preserveData);
+    },
+    async close(options = {}) {
+      await stopProcess(child);
+      await removeTemporaryData(options.preserveData);
+    }
+  };
 }
 
 export function startRelayWithWorkspace(
@@ -721,6 +750,12 @@ export async function beginProcessShutdown(child: ChildProcessWithoutNullStreams
       child.kill("SIGKILL");
     })
   ]);
+}
+
+export async function crashProcess(child: ChildProcessWithoutNullStreams) {
+  if (child.exitCode !== null) return;
+  child.kill("SIGKILL");
+  await new Promise<void>((resolveExit) => child.once("exit", () => resolveExit()));
 }
 
 export async function getFreePort(): Promise<number> {

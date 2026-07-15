@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assessCodexCompatibility, formatCodexCompatibilitySummary } from "../src/lib/codexCompatibility";
+import { assessCodexCompatibility, formatCodexCompatibilitySummary } from "../src/lib/codex/codexCompatibility";
 
 test("Codex compatibility accepts the contract-tested version range", () => {
   assert.equal(assessCodexCompatibility("codex-cli 0.133.0").status, "supported");

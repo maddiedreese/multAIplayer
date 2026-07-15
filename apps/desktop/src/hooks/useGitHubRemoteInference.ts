@@ -1,9 +1,9 @@
 import { useEffect } from "react";
-import { getGitRemoteOrigin } from "../lib/localBackend";
-import { parseGitHubRemoteUrl } from "../lib/gitWorkflowDraft";
-import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
+import { getGitRemoteOrigin } from "../lib/platform/localBackend";
+import { parseGitHubRemoteUrl } from "../lib/git/gitWorkflowDraft";
+import { shouldApplyRoomScopedUiUpdate } from "../lib/room/roomScopedUi";
 import { useAppStore } from "../store/appStore";
-import { reportExpectedFailure } from "../lib/nonFatalReporting";
+import { reportExpectedFailure } from "../lib/core/nonFatalReporting";
 
 interface LatestRef<T> {
   current: T;

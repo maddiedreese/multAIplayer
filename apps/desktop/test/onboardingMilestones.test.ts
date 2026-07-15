@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { completedTurnIds, hasNewCompletedTurn, newestInviteRequestForDevice } from "../src/lib/onboardingMilestones";
+import {
+  completedTurnIds,
+  hasNewCompletedTurn,
+  newestInviteRequestForDevice
+} from "../src/lib/onboarding/onboardingMilestones";
 import type { CodexRoomEvent, InviteJoinRequest } from "../src/types";
 
 test("invite reconciliation is bound to both the signed-in user and this device", () => {

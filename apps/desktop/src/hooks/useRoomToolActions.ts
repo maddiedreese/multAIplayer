@@ -1,9 +1,9 @@
-import { createAccountActions } from "../lib/accountActions";
-import { createBrowserActions } from "../lib/browserActions";
-import { createGitWorkflowActions } from "../lib/gitWorkflowActions";
-import { createLocalPreviewActions } from "../lib/localPreviewActions";
-import { createRoomSettingsActions } from "../lib/roomSettingsActions";
-import { createTerminalActions } from "../lib/terminalActions";
+import { createAccountActions } from "../application/account/accountActions";
+import { createBrowserActions } from "../application/browser/browserActions";
+import { createGitWorkflowActions } from "../application/git/gitWorkflowActions";
+import { createLocalPreviewActions } from "../application/files/localPreviewActions";
+import { createRoomSettingsActions } from "../application/rooms/roomSettingsActions";
+import { createTerminalActions } from "../application/terminal/terminalActions";
 import { useGitHubActionsRefresh } from "./useGitHubActionsRefresh";
 
 type AccountActionsOptions = Omit<Parameters<typeof createAccountActions>[0], "stopOwnedLocalPreviews">;

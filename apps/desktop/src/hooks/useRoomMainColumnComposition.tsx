@@ -8,9 +8,9 @@ import { RoomMainColumn } from "../components/RoomMainColumn";
 import { GuidedFirstTurn, type GuidedActivityKind, type GuidedFirstTurnPhase } from "../components/GuidedFirstTurn";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
-import { loadOrCreateDeviceId } from "../lib/appRuntime";
-import { canApproveCodexTurn } from "../lib/codexApproval";
-import { formatApprovalAttachments, formatApprovalMessages } from "../lib/codexApprovalSummary";
+import { loadOrCreateDeviceId } from "../application/runtime/appRuntime";
+import { canApproveCodexTurn } from "../lib/codex/codexApproval";
+import { formatApprovalAttachments, formatApprovalMessages } from "../presentation/codex/codexApprovalSummary";
 import {
   embeddedAttachmentBytes,
   formatBytes,
@@ -18,33 +18,40 @@ import {
   formatCodexReasoningEffort,
   formatCodexSandboxLevel,
   formatCodexSpeed
-} from "../lib/appFormatters";
-import { roomLockMessage } from "../lib/appRuntime";
+} from "../lib/formatting/appFormatters";
+import { roomLockMessage } from "../application/runtime/appRuntime";
 import {
   catalogModelOptions,
   catalogReasoningOptionsForModel,
   catalogSpeedOptionsForModel,
   resolveCodexRunSettings
-} from "../lib/codexCatalogResolver";
-import { canUseRoomChat } from "../lib/chatPolicy";
-import { buildLocalPreviewCards, buildPendingAttachmentRows, buildRoomChatMessageRows } from "../lib/chatDisplayRows";
-import { detectCodexTurnRiskFlags, messagesSinceLastCodex } from "../lib/codexTurn";
-import { buildRoomNotices } from "../lib/roomNotices";
-import { selectRoomMainColumnView } from "../lib/containerViewSelectors";
-import { buildRoomMainColumnCapabilities } from "../lib/containerCapabilities";
+} from "../lib/codex/codexCatalogResolver";
+import { canUseRoomChat } from "../lib/chat/chatPolicy";
+import {
+  buildLocalPreviewCards,
+  buildPendingAttachmentRows,
+  buildRoomChatMessageRows
+} from "../presentation/chat/chatDisplayRows";
+import { detectCodexTurnRiskFlags, messagesSinceLastCodex } from "../lib/codex/codexTurn";
+import { buildRoomNotices } from "./roomNotices";
+import { selectRoomMainColumnView } from "../application/views/containerViewSelectors";
+import { buildRoomMainColumnCapabilities } from "./containerCapabilities";
 import {
   buildHighPrivilegeLabels,
   buildQueuedCodexTurnRows,
   buildRoomMainChatProps,
   buildRoomMainHeaderProps
-} from "../lib/containerPropBuilders";
-import { isLocalUserActiveHostForRoom } from "../lib/roomHost";
-import { acknowledgeRoomVisibilityWarning, hasAcknowledgedRoomVisibilityWarning } from "../lib/roomVisibilityWarning";
+} from "../presentation/containers/containerPropBuilders";
+import { isLocalUserActiveHostForRoom } from "../lib/access/roomHost";
+import {
+  acknowledgeRoomVisibilityWarning,
+  hasAcknowledgedRoomVisibilityWarning
+} from "../lib/history/roomVisibilityWarning";
 import type { ChatAttachment, ChatMessage, CodexActivity, CodexRoomEvent } from "../types";
-import type { createAppRoomPanelActions } from "../lib/appRoomPanelActions";
-import type { useHostHandoffActions } from "../hooks/useHostHandoffActions";
-import type { useRoomRuntimeContext } from "../hooks/useRoomRuntimeContext";
-import type { useWorkspaceFlowContext } from "../hooks/useWorkspaceFlowContext";
+import type { createAppRoomPanelActions } from "./appRoomPanelActions";
+import type { useHostHandoffActions } from "./useHostHandoffActions";
+import type { useRoomRuntimeContext } from "./useRoomRuntimeContext";
+import type { useWorkspaceFlowContext } from "./useWorkspaceFlowContext";
 
 type MainColumnProps = ComponentProps<typeof RoomMainColumn>;
 type HeaderProps = MainColumnProps["headerProps"];
@@ -140,24 +147,21 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
   const onboarding = useAppStore((state) => state.onboarding);
 
   const localDeviceId = React.useMemo(() => loadOrCreateDeviceId(), []);
-  const localUser = {
-    id: currentUser?.id ?? `local:${localDeviceId}`,
-    name: currentUser?.name ?? currentUser?.login ?? "Local user"
-  };
+  const localUser = mainColumnLocalUser(currentUser, localDeviceId);
   const roomLocked = forgotten || revoked || Boolean(selectedRoom.archivedAt);
   const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser);
-  const pendingAttachments = chat?.pendingAttachments ?? noPendingAttachments;
-  const selectedMessageIds = chat?.selectedMessageIds ?? noSelectedMessageIds;
-  const markdownSelectionMode = chat?.markdownSelectionMode ?? false;
-  const activeApproval = codex?.pendingApproval ?? null;
-  const approvalMessages = messagesSinceLastCodex(activeApproval?.messages ?? messages) as ChatMessage[];
+  const {
+    pendingAttachments,
+    selectedMessageIds,
+    markdownSelectionMode,
+    activeApproval,
+    approvalMessages,
+    codexEvents,
+    queuedApprovals,
+    currentMessagesSinceLastCodex,
+    replyTargetMessage
+  } = deriveMainColumnValues(chat, codex, messages);
   const resolvedSettings = resolveCodexRunSettings(selectedRoom, codexProbe);
-  const codexEvents = codex?.events ?? noCodexEvents;
-  const queuedApprovals = codex?.queuedApprovals ?? [];
-  const currentMessagesSinceLastCodex = messagesSinceLastCodex(messages).length;
-  const replyTargetMessage = chat?.replyToMessageId
-    ? (messages.find((message) => message.id === chat.replyToMessageId) ?? null)
-    : null;
 
   const { onOpenRoomBrowser, ...headerCapabilities } = capabilities.header;
   const onSelectTeam = useCallback(
@@ -283,38 +287,23 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
   const guidedFirstTurn = composeGuidedFirstTurn();
 
   function composeChatProps() {
+    const canUseChat = canUseRoomChat(selectedRoom, roomLocked);
     return {
       ...buildRoomMainChatProps({
         messages: chatMessageRows,
         codexActivities: codex?.activities ?? [],
         approvalVisible: codex?.approvalVisible ?? false,
-        approvalSummary: {
-          messages: formatApprovalMessages(approvalMessages),
-          attachments: formatApprovalAttachments(approvalMessages),
-          sandbox: formatCodexSandboxLevel(selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel),
-          highPrivilegeLabels: buildHighPrivilegeLabels(activeApproval?.summary, selectedRoom.codexSandboxLevel),
-          riskFlags: activeApproval
-            ? detectCodexTurnRiskFlags(approvalMessages, selectedRoom, browserRequests, null)
-            : []
-        },
+        approvalSummary: composeApprovalSummary(),
         isActiveHost,
         codexRunning: codex?.running ?? false,
         canApproveCodex: hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, roomLocked),
-        canUseChat: canUseRoomChat(selectedRoom, roomLocked),
-        canSendMessage:
-          canUseRoomChat(selectedRoom, roomLocked) && (Boolean(chat?.draft?.trim()) || pendingAttachments.length > 0),
+        canUseChat,
+        canSendMessage: canUseChat && (Boolean(chat?.draft?.trim()) || pendingAttachments.length > 0),
         roomLocked,
         lockedPlaceholder: roomLockMessage(selectedRoom, revoked),
         chatEnabled: !roomLocked,
         draft: chat?.draft ?? "",
-        replyTarget: replyTargetMessage
-          ? {
-              author: replyTargetMessage.deletedAt ? "Original message" : replyTargetMessage.author,
-              body: replyTargetMessage.deletedAt
-                ? "Original message deleted"
-                : replyTargetMessage.body || "Original message unavailable or deleted"
-            }
-          : null,
+        replyTarget: composeReplyTarget(),
         roomGoal: codex?.goal ?? null,
         pendingAttachments: pendingAttachmentRows,
         queuedCodexTurns: buildQueuedCodexTurnRows(
@@ -337,6 +326,26 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
         ...capabilities.chat
       }),
       guidedFirstTurn
+    };
+  }
+
+  function composeApprovalSummary() {
+    return {
+      messages: formatApprovalMessages(approvalMessages),
+      attachments: formatApprovalAttachments(approvalMessages),
+      sandbox: formatCodexSandboxLevel(selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel),
+      highPrivilegeLabels: buildHighPrivilegeLabels(activeApproval?.summary, selectedRoom.codexSandboxLevel),
+      riskFlags: activeApproval ? detectCodexTurnRiskFlags(approvalMessages, selectedRoom, browserRequests, null) : []
+    };
+  }
+
+  function composeReplyTarget() {
+    if (!replyTargetMessage) return null;
+    return {
+      author: replyTargetMessage.deletedAt ? "Original message" : replyTargetMessage.author,
+      body: replyTargetMessage.deletedAt
+        ? "Original message deleted"
+        : replyTargetMessage.body || "Original message unavailable or deleted"
     };
   }
   const chatProps = composeChatProps();
@@ -369,6 +378,39 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
       chatProps={chatProps}
     />
   );
+}
+
+function mainColumnLocalUser(user: { id: string; name?: string; login: string } | null, localDeviceId: string) {
+  return {
+    id: user?.id ?? `local:${localDeviceId}`,
+    name: user?.name ?? user?.login ?? "Local user"
+  };
+}
+
+type MainColumnStore = ReturnType<typeof useAppStore.getState>;
+
+function deriveMainColumnValues(
+  chat: MainColumnStore["roomChatByRoom"][string] | undefined,
+  codex: MainColumnStore["codexRuntimeByRoom"][string] | undefined,
+  messages: ChatMessage[]
+) {
+  const activeApproval = codex?.pendingApproval ?? null;
+  return {
+    pendingAttachments: chat?.pendingAttachments ?? noPendingAttachments,
+    selectedMessageIds: chat?.selectedMessageIds ?? noSelectedMessageIds,
+    markdownSelectionMode: chat?.markdownSelectionMode ?? false,
+    activeApproval,
+    approvalMessages: messagesSinceLastCodex(activeApproval?.messages ?? messages) as ChatMessage[],
+    codexEvents: codex?.events ?? noCodexEvents,
+    queuedApprovals: codex?.queuedApprovals ?? [],
+    currentMessagesSinceLastCodex: messagesSinceLastCodex(messages).length,
+    replyTargetMessage: findReplyTargetMessage(messages, chat?.replyToMessageId)
+  };
+}
+
+function findReplyTargetMessage(messages: ChatMessage[], replyToMessageId: string | null | undefined) {
+  if (!replyToMessageId) return null;
+  return messages.find((message) => message.id === replyToMessageId) ?? null;
 }
 
 function focusApprovalCard() {

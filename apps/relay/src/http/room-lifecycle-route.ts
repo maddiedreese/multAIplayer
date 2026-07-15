@@ -29,9 +29,7 @@ export function registerRoomLifecycleRoute(options: RegisterRoomRoutesOptions) {
     if (!isRoomLifecycleAction(action))
       return void sendRelayError(res, 400, "invalid_request", "action must be archive, restore, or delete");
     const requesterRole = session ? store.getTeamMember(room.teamId, session.user.id)?.role : "owner";
-    const teamAdmin = requesterRole === "owner" || requesterRole === "admin";
-    const roomHost = room.hostStatus === "active" && isRoomHost(room, requester);
-    if (!teamAdmin && !roomHost)
+    if (!canManageRoomLifecycle(requesterRole, room, requester, isRoomHost))
       return void sendRelayError(
         res,
         403,
@@ -42,18 +40,28 @@ export function registerRoomLifecycleRoute(options: RegisterRoomRoutesOptions) {
     if (action === "restore" && team?.archivedAt)
       return void sendRelayError(res, 409, "conflict", "Restore the team before restoring this room.");
 
-    const now = new Date().toISOString();
-    const updated: RoomRecord =
-      action === "restore"
-        ? { ...room, archivedAt: undefined }
-        : action === "archive"
-          ? { ...room, archivedAt: room.archivedAt ?? now }
-          : { ...room, archivedAt: undefined, deletedAt: now };
+    const updated = roomAfterLifecycleAction(room, action, new Date().toISOString());
     store.setRoom(updated);
     scheduleStoreSave();
     broadcastRoomUpdated(updated);
     res.json({ room: updated });
   });
+}
+
+function canManageRoomLifecycle(
+  role: string | undefined,
+  room: RoomRecord,
+  requester: Parameters<RegisterRoomRoutesOptions["isRoomHost"]>[1],
+  isRoomHost: RegisterRoomRoutesOptions["isRoomHost"]
+): boolean {
+  if (role === "owner" || role === "admin") return true;
+  return room.hostStatus === "active" && isRoomHost(room, requester);
+}
+
+function roomAfterLifecycleAction(room: RoomRecord, action: "archive" | "restore" | "delete", now: string): RoomRecord {
+  if (action === "restore") return { ...room, archivedAt: undefined };
+  if (action === "archive") return { ...room, archivedAt: room.archivedAt ?? now };
+  return { ...room, archivedAt: undefined, deletedAt: now };
 }
 
 function isRoomLifecycleAction(value: string): value is "archive" | "restore" | "delete" {

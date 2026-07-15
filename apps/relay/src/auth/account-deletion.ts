@@ -10,6 +10,7 @@ import type {
 } from "@multaiplayer/protocol";
 import type {
   AuthSession,
+  AccountQuotaRecord,
   AppliedDeletionLedgerEntry,
   ByteQuotaRecord,
   DeviceChallengeRecord,
@@ -36,6 +37,7 @@ export interface AccountDeletionSummary {
   dailyTeamCreationQuotaRecords: number;
   dailyRoomCreationQuotaRecords: number;
   attachmentUploadQuotaRecords: number;
+  durableQuotaRecords: number;
   rateLimitRecords: number;
   deviceChallenges: number;
 }
@@ -54,6 +56,7 @@ interface AccountDeletionStateSnapshot {
   dailyTeamCreationCounts: Map<string, RateLimitRecord>;
   dailyRoomCreationCounts: Map<string, RateLimitRecord>;
   attachmentBlobUploadByteCounts: Map<string, ByteQuotaRecord>;
+  accountQuotaRecords: Map<string, AccountQuotaRecord>;
   rateLimitStore: Map<string, RateLimitRecord>;
   deviceChallenges: Map<string, DeviceChallengeRecord>;
   appliedDeletionLedgerEntries: Map<string, AppliedDeletionLedgerEntry>;
@@ -119,6 +122,7 @@ export function deleteAccountOwnedRelayData(store: RelayStore, userId: string): 
       (key) => key === `daily_user_room_creations:${userId}`
     ),
     attachmentUploadQuotaRecords: deleteMatching(store.attachmentBlobUploadByteCounts, (key) => key === userId),
+    durableQuotaRecords: deleteMatching(store.accountQuotaRecords, (_key, quota) => quota.userId === userId),
     rateLimitRecords: deleteMatching(store.rateLimitStore, (key) =>
       Array.from(sessionIds).some((sessionId) => key.endsWith(`:session:${sessionId}`))
     ),
@@ -251,6 +255,7 @@ function snapshotAccountDeletionState(
       (key) => key === `daily_user_room_creations:${userId}`
     ),
     attachmentBlobUploadByteCounts: select(store.attachmentBlobUploadByteCounts, (key) => key === userId),
+    accountQuotaRecords: select(store.accountQuotaRecords, (_key, quota) => quota.userId === userId),
     rateLimitStore: select(store.rateLimitStore, (key) =>
       Array.from(sessionIds).some((sessionId) => key.endsWith(`:session:${sessionId}`))
     ),
@@ -276,6 +281,7 @@ function touchedMapKeys(
   if (source === store.dailyTeamCreationCounts) return touched.dailyTeamCreationCounts.keys();
   if (source === store.dailyRoomCreationCounts) return touched.dailyRoomCreationCounts.keys();
   if (source === store.attachmentBlobUploadByteCounts) return touched.attachmentBlobUploadByteCounts.keys();
+  if (source === store.accountQuotaRecords) return touched.accountQuotaRecords.keys();
   if (source === store.rateLimitStore) return touched.rateLimitStore.keys();
   return touched.deviceChallenges.keys();
 }
@@ -315,6 +321,7 @@ function restoreAccountDeletionState(
     before.attachmentBlobUploadByteCounts,
     after.attachmentBlobUploadByteCounts
   );
+  restoreChangedEntries(store.accountQuotaRecords, before.accountQuotaRecords, after.accountQuotaRecords);
   restoreChangedEntries(store.rateLimitStore, before.rateLimitStore, after.rateLimitStore);
   restoreChangedEntries(store.deviceChallenges, before.deviceChallenges, after.deviceChallenges);
   restoreChangedEntries(

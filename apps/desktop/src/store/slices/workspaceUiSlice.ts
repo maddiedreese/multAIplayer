@@ -1,13 +1,13 @@
 import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import type { StateCreator } from "zustand";
-import { ensureRoomDefaults } from "../../lib/roomDefaults";
+import { ensureRoomDefaults } from "../../lib/room/roomDefaults";
 import {
   applyLocalRoomReadState,
   markRoomRead as markRoomReadRecord,
   markRoomUnreadForIncomingChat,
   replaceRoomPreservingUnread,
   upsertRoomPreservingUnread
-} from "../../lib/roomUnread";
+} from "../../lib/history/roomUnread";
 import type { LocalRoomReadState, SidebarPanel } from "../../types";
 import type { AppStoreState } from "../appStore";
 

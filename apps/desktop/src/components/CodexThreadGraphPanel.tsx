@@ -1,11 +1,11 @@
 import React from "react";
 import { Circle, CornerDownRight } from "lucide-react";
-import { forkCodexThread, getCodexGoal, listCodexThreads } from "../lib/localBackend";
-import { deriveCodexAgentTree } from "../lib/codexThreadGraph";
-import { codexGoalToRoomGoal } from "../lib/roomGoals";
+import { forkCodexThread, getCodexGoal, listCodexThreads } from "../lib/platform/localBackend";
+import { deriveCodexAgentTree } from "../lib/codex/codexThreadGraph";
+import { codexGoalToRoomGoal } from "../lib/room/roomGoals";
 import { useAppStore } from "../store/appStore";
 import type { CodexAgentTreeNode, CodexThreadGraph } from "../types";
-import { reportNonFatal } from "../lib/nonFatalReporting";
+import { reportNonFatal } from "../lib/core/nonFatalReporting";
 
 export function CodexThreadGraphPanel({ roomId, projectPath }: { roomId: string; projectPath: string }) {
   const runtime = useAppStore((state) => state.codexRuntimeByRoom[roomId]);

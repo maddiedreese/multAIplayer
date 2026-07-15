@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { fetchUpdateNotice, type UpdateNotice } from "../lib/updateCheck";
-import { recordDiagnosticEvent } from "../lib/diagnostics";
+import { fetchUpdateNotice, type UpdateNotice } from "../lib/core/updateCheck";
+import { recordDiagnosticEvent } from "../lib/platform/diagnostics";
 
 export function useUpdateNotice() {
   const [notice, setNotice] = useState<UpdateNotice | null>(null);

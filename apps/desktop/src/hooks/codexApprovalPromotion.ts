@@ -1,7 +1,7 @@
-import { buildCodexApprovalSnapshot, hasActionableCodexTurnContext } from "../lib/codexTurn";
-import { formatMessageTime } from "../lib/appFormatters";
-import { roomLockMessage } from "../lib/appRuntime";
-import { canUseLocalWorkspace } from "../lib/workspaceAccess";
+import { buildCodexApprovalSnapshot, hasActionableCodexTurnContext } from "../lib/codex/codexTurn";
+import { formatMessageTime } from "../lib/formatting/appFormatters";
+import { roomLockMessage } from "../application/runtime/appRuntime";
+import { canUseLocalWorkspace } from "../lib/access/workspaceAccess";
 import { useAppStore } from "../store/appStore";
 import type { UseCodexTurnActionsOptions } from "./codexTurnActionTypes";
 import { isExpiredCodexInvocation } from "./codexTurnQueue";

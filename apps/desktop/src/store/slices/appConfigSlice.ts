@@ -1,5 +1,11 @@
 import type { StateCreator } from "zustand";
-import { loadAppConfig, normalizeAppConfig, resetAppConfig, saveAppConfig, type AppConfig } from "../../lib/appConfig";
+import {
+  loadAppConfig,
+  normalizeAppConfig,
+  resetAppConfig,
+  saveAppConfig,
+  type AppConfig
+} from "../../lib/core/appConfig";
 import type { AppStoreState } from "../appStore";
 
 export interface AppConfigState {

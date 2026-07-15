@@ -5,7 +5,7 @@ import {
   defaultCodexFollowUpBehavior,
   loadCodexFollowUpBehavior,
   saveCodexFollowUpBehavior
-} from "../src/lib/codexFollowUpBehavior.js";
+} from "../src/lib/codex/codexFollowUpBehavior.js";
 
 test("follow-up behavior defaults to steering and preserves supported choices", () => {
   assert.equal(loadCodexFollowUpBehavior(null), defaultCodexFollowUpBehavior);

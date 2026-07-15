@@ -49,7 +49,9 @@ The official invitation transport is an HTTPS universal link, not a custom URL s
 
 ## Official relay deployment
 
-The official free-alpha relay is deployed on Railway at `https://relay.multaiplayer.com` (`wss://relay.multaiplayer.com/rooms`). It is not release-ready until this runbook's persistence, secrets, TLS/WSS, monitoring, OAuth, and backup/restore gates pass. Railway builds `apps/relay/Dockerfile` from `main`; `railway.json` disables Serverless sleeping and pins the deployment health check, restart policy, drain timing, and the single San Francisco replica. Keeping the relay warm removes wake-up latency but bills its continuous actual CPU and memory use; the Railway project-level hard spending limit remains the cost backstop. The service uses Railway-managed secrets and a 5 GB persistent volume mounted at `/data`, with SQLite at `/data/relay-store.sqlite`. Railway is an infrastructure processor, not an additional identity provider or plaintext room-content service. The official relay is a stronger operational commitment than a local self-hosted instance: retain rollback support, health checks, backups, and logs with redaction controls. A second replica is blocked on shared persistence/attachment coordination and both the implementation and required adversarial acceptance suite in the accepted [edge plus atomic shared-store rate-limiting contract](decisions/multi-instance-rate-limiting.md).
+The official free-alpha relay is deployed on Railway at `https://relay.multaiplayer.com` (`wss://relay.multaiplayer.com/rooms`). It is not release-ready until this runbook's persistence, secrets, TLS/WSS, monitoring, OAuth, and backup/restore gates pass. Railway builds `apps/relay/Dockerfile` from `main`; `railway.json` disables Serverless sleeping and pins the deployment health check, restart policy, drain timing, and the single San Francisco replica. Keeping the relay warm removes wake-up latency but bills its continuous actual CPU and memory use; the Railway project-level hard spending limit remains the cost backstop. The service uses Railway-managed secrets and a 5 GB persistent volume mounted at `/data`, with SQLite at `/data/relay-store.sqlite`. Railway is an infrastructure processor, not an additional identity provider or plaintext room-content service. The official relay is a stronger operational commitment than a local self-hosted instance: retain rollback support, health checks, backups, and logs with redaction controls. It deliberately runs one writer and one process; scale vertically or shard whole teams across independent relays under the [single-node relay decision](decisions/single-node-relay.md). A second replica is blocked on shared persistence/attachment coordination and both the implementation and required adversarial acceptance suite in the accepted [edge plus atomic shared-store rate-limiting contract](decisions/multi-instance-rate-limiting.md).
+
+Railway's public edge must be the only public path to the service. It terminates TLS/WSS and supplies the trusted client IP; the service must not expose a bypass domain or public origin that accepts direct traffic. Configure coarse IP request/connection controls at the platform edge, strip incoming forwarding headers, and test that a client-supplied `X-Forwarded-For` cannot select its limiter identity. The in-process limiter remains enabled as defense in depth.
 
 Start from `.env.example` and set production values in the same environment that launches the relay. The critical shape is:
 
@@ -110,6 +112,33 @@ The production snapshot maximum is 7,689,600 seconds (89 days); every tombstone 
 ### Relay rollback
 
 Keep the previous artifact and a pre-deploy SQLite backup. A rollback that restores SQLite must follow the isolated deletion-replay procedure above before traffic resumes; restoring SQLite alone is prohibited because it can resurrect deleted identity data. If authentication, storage, or WebSocket routing fails, remove the official relay from public copy and direct users to self-hosting. If plaintext leakage is suspected, stop the relay, preserve evidence privately, and follow `SECURITY.md` instead of opening a public issue.
+
+## Hosted account restriction
+
+Account restriction is an operator denial control, not deletion or moderation of encrypted history. It prevents a GitHub identity from creating a new relay session, invalidates restored session cookies at startup, and leaves shared teams, rooms, MLS ciphertext, encrypted attachments, and device-local copies unchanged. Use a short non-sensitive reason code; do not put reports, names, or support notes in the relay database.
+
+The CLI is deliberately offline because the relay has one authoritative writer. Stop and fence the relay, back up SQLite, build the relay, then run:
+
+```bash
+npm run build -w @multaiplayer/relay
+npm run restrictions:manage -w @multaiplayer/relay -- \
+  restrict github:123456 abuse \
+  --data-path=/data/relay-store.sqlite \
+  --storage=sqlite \
+  --confirm-relay-stopped
+```
+
+An optional `--expires-at=2026-08-01T00:00:00.000Z` makes the restriction temporary. Expired restrictions fail open to normal authentication and are omitted when state is normalized. To remove a restriction:
+
+```bash
+npm run restrictions:manage -w @multaiplayer/relay -- \
+  unrestrict github:123456 \
+  --data-path=/data/relay-store.sqlite \
+  --storage=sqlite \
+  --confirm-relay-stopped
+```
+
+Restart one relay writer, verify `/readyz`, and confirm the affected identity receives `account_restricted` from GitHub verification while another test identity can still authenticate. The in-process restriction control performs immediate socket, presence, auth-session, device-session, and challenge eviction when an embedded operator invokes it; no public or loopback HTTP administration route exists.
 
 ## Signing, provenance, and publication
 

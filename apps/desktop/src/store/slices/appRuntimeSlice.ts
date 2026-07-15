@@ -1,7 +1,12 @@
 import type { StateCreator } from "zustand";
-import type { DeviceIdentity } from "../../lib/deviceIdentity";
-import { loadTrustedDeviceKeys, trustDeviceKey, untrustDeviceKey, type TrustedDeviceKey } from "../../lib/deviceTrust";
-import type { CodexProbe } from "../../lib/localBackend";
+import type { DeviceIdentity } from "../../lib/identity/deviceIdentity";
+import {
+  loadTrustedDeviceKeys,
+  trustDeviceKey,
+  untrustDeviceKey,
+  type TrustedDeviceKey
+} from "../../lib/identity/deviceTrust";
+import type { CodexProbe } from "../../lib/platform/localBackend";
 import type { AppStoreState } from "../appStore";
 
 export interface AppRuntimeSlice {

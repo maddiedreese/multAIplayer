@@ -9,7 +9,7 @@ import {
   sanitizeTeamRoomDefaults,
   teamDefaultsRoomSettings,
   teamRoomDefaultsKey
-} from "../src/lib/teamRoomDefaults";
+} from "../src/lib/team/teamRoomDefaults";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();

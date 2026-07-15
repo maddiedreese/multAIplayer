@@ -1,7 +1,7 @@
 import { useAppBootstrapEffects } from "./useAppBootstrapEffects";
-import { createMarkdownCopyActions } from "../lib/markdownCopyActions";
+import { createMarkdownCopyActions } from "../application/markdown/markdownCopyActions";
 import { useWorkspaceHistoryEffects } from "./useWorkspaceHistoryEffects";
-import { createWorkspaceRoomActions } from "../lib/workspaceRoomActions";
+import { createWorkspaceRoomActions } from "../application/workspace/workspaceRoomActions";
 
 type AppBootstrapOptions = Parameters<typeof useAppBootstrapEffects>[0];
 type WorkspaceHistoryOptions = Parameters<typeof useWorkspaceHistoryEffects>[0];

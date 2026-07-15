@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import { createRoomChatPanelActions } from "../src/lib/roomChatPanelActions";
-import { createRoomHeaderActions } from "../src/lib/roomHeaderActions";
-import { createTerminalPanelActions } from "../src/lib/terminalPanelActions";
-import { createWorkspaceFilesPanelActions } from "../src/lib/workspaceFilesPanelActions";
+import { createRoomChatPanelActions } from "../src/application/chat/roomChatPanelActions";
+import { createRoomHeaderActions } from "../src/application/rooms/roomHeaderActions";
+import { createTerminalPanelActions } from "../src/application/terminal/terminalPanelActions";
+import { createWorkspaceFilesPanelActions } from "../src/application/files/workspaceFilesPanelActions";
 import { useAppStore } from "../src/store/appStore";
 
 const room: ClientRoomRecord = {

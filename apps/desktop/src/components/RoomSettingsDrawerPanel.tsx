@@ -1,7 +1,8 @@
 import { Check, KeyRound, RefreshCw, X } from "lucide-react";
 import type { ApprovalPolicy } from "@multaiplayer/protocol";
-import type { LocalHistorySettings } from "../lib/localHistory";
+import type { LocalHistorySettings } from "../lib/history/localHistory";
 import { RoomSettingsOverview, type RoomPostureDisplay } from "./RoomSettingsOverview";
+import type { ReactNode } from "react";
 
 export interface CodexModelOptionDisplay {
   id: string;
@@ -41,6 +42,7 @@ export function RoomSettingsDrawerPanel({
   codexModelOptions,
   teamDefaultBrowserProfilePersistent,
   message,
+  archivePanel,
   onChooseProject,
   onRelayHttpDraftChange,
   onRelayWsDraftChange,
@@ -89,6 +91,7 @@ export function RoomSettingsDrawerPanel({
   teamDefaultBrowserProfilePersistent: boolean;
   teamDefaultInviteApprovalGate: boolean;
   message: string | null;
+  archivePanel?: ReactNode;
   onChooseProject: () => void;
   onRelayHttpDraftChange: (value: string) => void;
   onRelayWsDraftChange: (value: string) => void;
@@ -267,6 +270,8 @@ export function RoomSettingsDrawerPanel({
           Apply team default to room
         </button>
       </section>
+
+      {archivePanel}
 
       {message && <div className="workflow-message">{message}</div>}
     </div>

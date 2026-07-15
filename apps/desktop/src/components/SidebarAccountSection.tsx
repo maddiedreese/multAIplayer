@@ -1,5 +1,5 @@
 import { ExternalLink, Search, X } from "lucide-react";
-import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
+import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/identity/authClient";
 import { GitHubIcon } from "./GitHubIcon";
 
 const brandIcon = new URL("../assets/multaiplayer-icon.png", import.meta.url).href;

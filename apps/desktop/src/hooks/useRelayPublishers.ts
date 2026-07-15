@@ -11,11 +11,11 @@ import type {
   RoomSettingsPlaintextPayload,
   TerminalResultPlaintextPayload
 } from "@multaiplayer/protocol";
-import { createMlsApplicationMessage, publishMlsApplicationMessage } from "../lib/mlsApplicationMessage";
-import type { RelayClient } from "../lib/relayClient";
-import { buildRoomSettingsSystemMessage } from "../lib/roomSettingsMessages";
-import { buildCodexEventLine } from "../lib/activityLines";
-import { publishRoomConfigSnapshot } from "../lib/roomConfigSnapshot";
+import { createMlsApplicationMessage, publishMlsApplicationMessage } from "../application/mls/mlsApplicationMessage";
+import type { RelayClient } from "../lib/relay/relayClient";
+import { buildRoomSettingsSystemMessage } from "../presentation/rooms/roomSettingsMessages";
+import { buildCodexEventLine } from "../presentation/activity/activityLines";
+import { publishRoomConfigSnapshot } from "../application/mls/roomConfigSnapshot";
 import type {
   ChatMessage,
   CodexRoomEvent,

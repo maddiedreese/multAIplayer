@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "../src/lib/relayAccess";
+import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "../src/lib/relay/relayAccess";
 
 test("isMembershipRemovedRelayError detects relay membership revocation", () => {
   assert.equal(

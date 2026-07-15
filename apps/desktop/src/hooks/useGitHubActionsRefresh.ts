@@ -1,18 +1,18 @@
 import type { MutableRefObject } from "react";
 import type { GitHubActionsEventPlaintextPayload, ClientRoomRecord } from "@multaiplayer/protocol";
-import { listGitHubActionRuns, type GitHubAuthConfig, type SignedInUser } from "../lib/authClient";
+import { listGitHubActionRuns, type GitHubAuthConfig, type SignedInUser } from "../lib/identity/authClient";
 import {
   checkGitHubActionsReadiness,
   gitHubActionsRefreshInFlightMessage,
   isGitHubActionsRefreshInFlight,
   type GitHubActionsTarget
-} from "../lib/githubWorkflowReadiness";
-import { resolveGitWorkflowDraft, type GitWorkflowDraft } from "../lib/gitWorkflowDraft";
-import { summarizeActionRuns } from "../lib/githubActionsSummary";
-import { isLocalUserActiveHostForRoom } from "../lib/roomHost";
-import { canUseLocalWorkspace, localWorkspaceGateMessage } from "../lib/workspaceAccess";
+} from "../lib/git/githubWorkflowReadiness";
+import { resolveGitWorkflowDraft, type GitWorkflowDraft } from "../lib/git/gitWorkflowDraft";
+import { summarizeActionRuns } from "../presentation/git/githubActionsSummary";
+import { isLocalUserActiveHostForRoom } from "../lib/access/roomHost";
+import { canUseLocalWorkspace, localWorkspaceGateMessage } from "../lib/access/workspaceAccess";
 import { useAppStore } from "../store/appStore";
-import { reportNonFatal } from "../lib/nonFatalReporting";
+import { reportNonFatal } from "../lib/core/nonFatalReporting";
 
 interface LocalUser {
   id: string;
@@ -66,24 +66,11 @@ export function useGitHubActionsRefresh({
       setActionsMessageForRoom(roomId, gitHubActionsRefreshInFlightMessage());
       return;
     }
-    if (!roomsRef.current.some((item) => item.id === roomId)) {
-      setActionsMessageForRoom(roomId, "This room is no longer available for GitHub Actions refresh.");
-      return;
-    }
     const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
     const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
-    const roomActiveHost = isLocalUserActiveHostForRoom(room, localUser);
-    const roomCanReadLocalWorkspace = canUseLocalWorkspace(room, localUser, roomLocked);
-    if (!roomActiveHost) {
-      const roomHostGateMessage =
-        room.hostStatus === "active"
-          ? `Only ${room.host} can refresh GitHub Actions in this room.`
-          : "Claim host before refreshing GitHub Actions in this room.";
-      setActionsMessageForRoom(roomId, roomHostGateMessage);
-      return;
-    }
-    if (!roomCanReadLocalWorkspace) {
-      setActionsMessageForRoom(roomId, localWorkspaceGateMessage(room, roomLocked));
+    const gateMessage = githubActionsRoomGateMessage(room, roomsRef.current, localUser, roomLocked);
+    if (gateMessage) {
+      setActionsMessageForRoom(roomId, gateMessage);
       return;
     }
     const workflowDraft = resolveGitWorkflowDraft(gitWorkflowDraftsRef.current, roomId);
@@ -141,4 +128,21 @@ export function useGitHubActionsRefresh({
   return {
     refreshGitHubActions
   };
+}
+
+function githubActionsRoomGateMessage(
+  room: ClientRoomRecord,
+  rooms: ClientRoomRecord[],
+  localUser: LocalUser,
+  roomLocked: boolean
+) {
+  if (!rooms.some((item) => item.id === room.id)) {
+    return "This room is no longer available for GitHub Actions refresh.";
+  }
+  if (!isLocalUserActiveHostForRoom(room, localUser)) {
+    return room.hostStatus === "active"
+      ? `Only ${room.host} can refresh GitHub Actions in this room.`
+      : "Claim host before refreshing GitHub Actions in this room.";
+  }
+  return canUseLocalWorkspace(room, localUser, roomLocked) ? null : localWorkspaceGateMessage(room, roomLocked);
 }

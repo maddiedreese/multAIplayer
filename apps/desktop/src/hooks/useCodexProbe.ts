@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { probeCodex } from "../lib/localBackend";
+import { probeCodex } from "../lib/platform/localBackend";
 import { useAppStore } from "../store/appStore";
 
 export function useCodexProbe() {

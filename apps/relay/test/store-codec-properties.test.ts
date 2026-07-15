@@ -1,7 +1,22 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import fc from "fast-check";
+import {
+  AttachmentBlobRecord,
+  InviteRecord,
+  KeyPackageRecord,
+  RoomRecord,
+  TeamMemberRecord,
+  TeamRecord
+} from "@multaiplayer/protocol";
 import { createRelayStoreCodec, type StoredRelayState } from "../src/store-codec.js";
+import {
+  StoredAcceptedMessageReceipt,
+  StoredAccountQuotaRecord,
+  StoredAccountRestriction,
+  StoredDeletionLedgerEntry,
+  StoredInviteAckReceipt
+} from "../src/store-codec-schemas.js";
 import { InMemoryRelayStore } from "../src/state.js";
 
 const fixedNow = Date.parse("2026-07-11T12:00:00.000Z");
@@ -219,7 +234,7 @@ test("arbitrary decoded store documents never escape codec normalization", () =>
   fc.assert(
     fc.property(fc.dictionary(fc.string(), fc.jsonValue({ maxDepth: 10 })), (document) => {
       const first = codec();
-      assert.doesNotThrow(() => first.codec.applyStoredRelayState(document));
+      assert.doesNotThrow(() => first.codec.applyStoredRelayState({ ...document, version: 1 }));
       const normalized = first.codec.toStoredRelayState();
       const second = codec();
       assert.doesNotThrow(() => second.codec.applyStoredRelayState(normalized));
@@ -227,6 +242,77 @@ test("arbitrary decoded store documents never escape codec normalization", () =>
     }),
     { numRuns: 2_000 }
   );
+});
+
+test("every emitted row satisfies its authoritative protocol or persistence schema", () => {
+  fc.assert(
+    fc.property(fc.dictionary(fc.string(), fc.jsonValue({ maxDepth: 10 })), (document) => {
+      const instance = codec();
+      instance.codec.applyStoredRelayState({ ...document, version: 1 });
+      const stored = instance.codec.toStoredRelayState();
+      for (const [schema, rows] of [
+        [TeamRecord, stored.teams],
+        [RoomRecord, stored.rooms],
+        [InviteRecord, stored.invites],
+        [KeyPackageRecord, stored.keyPackages ?? []],
+        [TeamMemberRecord, stored.teamMembers?.flatMap((entry) => entry.members ?? []) ?? []],
+        [AttachmentBlobRecord, stored.attachmentBlobs ?? []],
+        [StoredInviteAckReceipt, stored.inviteAckReceipts ?? []],
+        [StoredAcceptedMessageReceipt, stored.acceptedMessageReceipts ?? []],
+        [StoredAccountRestriction, stored.accountRestrictions ?? []],
+        [StoredAccountQuotaRecord, stored.accountQuotaRecords ?? []],
+        [StoredDeletionLedgerEntry, stored.appliedDeletionLedgerEntries ?? []]
+      ] as const) {
+        for (const row of rows) assert.equal(schema.safeParse(row).success, true);
+      }
+    }),
+    { numRuns: 1_000 }
+  );
+});
+
+test("invalid persistence-only rows are dropped independently of valid siblings", () => {
+  const { store, codec: relayCodec } = codec();
+  relayCodec.applyStoredRelayState({
+    version: 1,
+    accountRestrictions: [
+      { userId: "github:valid", reasonCode: "abuse", createdAt: "2026-07-11T11:00:00.000Z" },
+      { userId: "github:bad\u0000", reasonCode: "abuse", createdAt: "2026-07-11T11:00:00.000Z" },
+      { userId: "github:bad", reasonCode: "NOT_ALLOWED", createdAt: "2026-07-11T11:00:00.000Z" }
+    ],
+    accountQuotaRecords: [
+      {
+        key: "daily_team_creations:github:valid",
+        userId: "github:valid",
+        quota: "daily_team_creations",
+        used: 2,
+        resetAt: fixedNow + 60_000
+      },
+      {
+        key: "daily_room_creations:github:other",
+        userId: "github:valid",
+        quota: "daily_room_creations",
+        used: 1,
+        resetAt: fixedNow + 60_000
+      }
+    ],
+    appliedDeletionLedgerEntries: [
+      { entryId: "ledger-valid", appliedAt: "2026-07-11T11:00:00.000Z" },
+      { entryId: "ledger-invalid", appliedAt: "not-a-date" }
+    ]
+  });
+  assert.deepEqual([...store.accountRestrictions.keys()], ["github:valid"]);
+  assert.deepEqual([...store.accountQuotaRecords.keys()], ["daily_team_creations:github:valid"]);
+  assert.deepEqual([...store.appliedDeletionLedgerEntries.keys()], ["ledger-valid"]);
+});
+
+test("unsupported store versions cannot partially populate an existing store", () => {
+  const instance = codec();
+  instance.store.teams.set("team-existing", { id: "team-existing", name: "Existing", members: 0 });
+  instance.codec.applyStoredRelayState({
+    version: 2,
+    teams: [{ id: "team-new", name: "New", members: 0 }]
+  });
+  assert.deepEqual([...instance.store.teams.keys()], ["team-existing"]);
 });
 
 test("expiry and pruning use the injected clock", () => {

@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import { loadEncryptedHistory, loadHistorySettings } from "../lib/localHistory";
-import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
+import { loadEncryptedHistory, loadHistorySettings } from "../lib/history/localHistory";
+import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/history/localRoomHistoryPayload";
 import { useAppStore } from "../store/appStore";
 import { historySearchEntriesToMessagesByRoom } from "../store/slices/historyPresenceSlice";
-import { reportNonFatal } from "../lib/nonFatalReporting";
+import { reportNonFatal } from "../lib/core/nonFatalReporting";
 import type { ChatMessage, LocalRoomHistoryPayload } from "../types";
 
 interface UseHistorySearchOptions {

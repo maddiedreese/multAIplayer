@@ -1,5 +1,5 @@
 use crate::host_sandbox::sandboxed_shell_command;
-use crate::output::{bound_command_output, redact_known_secrets};
+use crate::output::redact_and_bound_command_output;
 use crate::shell_authorization::{ShellAuthorizationState, ShellExecutionKind};
 use crate::validation::ensure_terminal_command;
 use crate::workspace::ensure_existing_dir;
@@ -53,7 +53,7 @@ pub(crate) fn run_shell_command(
         command: request.command,
         cwd: canonical_cwd,
         status: output.status.code(),
-        stdout: redact_known_secrets(&bound_command_output(&output.stdout)),
-        stderr: redact_known_secrets(&bound_command_output(&output.stderr)),
+        stdout: redact_and_bound_command_output(&output.stdout),
+        stderr: redact_and_bound_command_output(&output.stderr),
     })
 }

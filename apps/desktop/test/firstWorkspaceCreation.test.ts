@@ -4,8 +4,8 @@ import {
   createFirstWorkspaceCreator,
   firstWorkspaceSafeRoomSettings,
   type WorkspaceCreationRuntime
-} from "../src/lib/firstWorkspaceCreation";
-import type { RoomCreationSettings } from "../src/lib/workspaceClient";
+} from "../src/application/history/firstWorkspaceCreation";
+import type { RoomCreationSettings } from "../src/application/workspace/workspaceClient";
 import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 
 const team: TeamRecord = { id: "team-first", name: "Core", members: 1, role: "owner" };

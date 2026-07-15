@@ -11,7 +11,7 @@ import {
   buildTerminalMarkdown,
   fencedCode,
   inlineCode
-} from "../src/lib/markdownExport";
+} from "../src/lib/files/markdownExport";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 
 const room: ClientRoomRecord = {

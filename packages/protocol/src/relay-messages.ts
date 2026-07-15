@@ -22,7 +22,8 @@ const CanonicalPaddedBase64 = z
   .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/);
 const HostTransferAuthorization = z
   .object({
-    version: z.literal(1),
+    version: z.literal(2),
+    transferId: z.string().min(1).max(maxEnvelopeIdChars),
     roomId: RoomId,
     commitMessageId: z.string().regex(/^[0-9a-f]{64}$/),
     parentEpoch: z.number().int().nonnegative(),

@@ -141,6 +141,8 @@ Project file previews and encrypted attachment blob opens are also tied to the o
 
 The app keeps encrypted local history with a default retention window of 30 days. Retention is configurable per room, and each team can define the default retention policy inherited by newly created rooms. The local encrypted room payload includes chat messages plus workflow records such as terminal requests, terminal snapshots, non-host file-save requests, browser approvals, Codex events, Git workflow events, GitHub Actions refreshes, and host handoff packages.
 
+Users can export the normalized display-history projection available on one device as a bounded, passphrase-encrypted age archive. Import stores the encrypted bytes in an owner-only local library and opens them only as a read-only projection after native envelope validation and the ordinary history normalizers. The archive omits MLS/device secrets, admission material, pending approvals and turns, host authority, live process/browser state, relay sessions, and attachment-blob ciphertext. It is a portable data-exit format, not a live-room or membership backup.
+
 ### Invoke Codex
 
 Codex can be invoked by:

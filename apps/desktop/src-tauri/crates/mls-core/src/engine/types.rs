@@ -139,6 +139,7 @@ pub struct RosterMember {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostTransferAuthorizationPayload {
     pub version: u8,
+    pub transfer_id: String,
     pub room_id: String,
     pub commit_message_id: String,
     pub parent_epoch: u64,

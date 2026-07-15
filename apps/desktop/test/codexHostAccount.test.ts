@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { createCoalescedAsyncTask, shouldRefreshCodexHostSnapshot } from "../src/lib/localBackend/codexHostBackend";
+import {
+  createCoalescedAsyncTask,
+  shouldRefreshCodexHostSnapshot
+} from "../src/lib/platform/localBackend/codexHostBackend";
 import { projectCodexAccountReadiness } from "../src/hooks/useCodexAccount";
-import type { CodexHostSnapshot } from "../src/lib/localBackend";
+import type { CodexHostSnapshot } from "../src/lib/platform/localBackend";
 
 const repoRoot = new URL("../../..", import.meta.url);
 
@@ -15,7 +18,7 @@ test("Codex account controls stay in a host-local backend and out of relay/histo
   const [native, projection, backend, panel, controller] = await Promise.all([
     source("apps/desktop/src-tauri/src/codex_account.rs"),
     source("apps/desktop/src-tauri/src/codex_request_projection.rs"),
-    source("apps/desktop/src/lib/localBackend/codexHostBackend.ts"),
+    source("apps/desktop/src/lib/platform/localBackend/codexHostBackend.ts"),
     source("apps/desktop/src/components/CodexAccountPanel.tsx"),
     source("apps/desktop/src/hooks/useCodexAccount.tsx")
   ]);

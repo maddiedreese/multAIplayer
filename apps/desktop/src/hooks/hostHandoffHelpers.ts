@@ -6,11 +6,11 @@ import {
   getGitRemoteOrigin,
   type GitApplyPatchResult,
   type GitCloneResult
-} from "../lib/localBackend";
-import { formatCodexModel } from "../lib/appFormatters";
-import { handoffRepoIdentity, hostHandoffDetail, sameHandoffRepo } from "../lib/hostHandoff";
-import { parseGitHubRemoteUrl } from "../lib/gitWorkflowDraft";
-import { reportExpectedFailure } from "../lib/nonFatalReporting";
+} from "../lib/platform/localBackend";
+import { formatCodexModel } from "../lib/formatting/appFormatters";
+import { handoffRepoIdentity, hostHandoffDetail, sameHandoffRepo } from "../lib/handoff/hostHandoff";
+import { parseGitHubRemoteUrl } from "../lib/git/gitWorkflowDraft";
+import { reportExpectedFailure } from "../lib/core/nonFatalReporting";
 import type { HostHandoffRecord, QueuedCodexTurn } from "../types";
 
 export interface HandoffProject {
@@ -63,7 +63,9 @@ export function buildAcceptedHandoffMessage(
         : "matched locally";
   const patchMessage =
     handoff.gitPatch && !handoff.gitPatchTruncated
-      ? " Applied the previous host's local patch."
+      ? handoff.patchAppliedLocally
+        ? " Applied the previous host's locally reviewed patch."
+        : " The previous host's patch is staged and requires explicit review before it is applied."
       : handoff.gitPatchTruncated
         ? " The previous host's patch was too large to apply automatically; ask them to push or share it."
         : handoff.gitDirtyFiles?.length

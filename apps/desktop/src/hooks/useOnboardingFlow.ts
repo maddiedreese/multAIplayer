@@ -1,21 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { loadOrCreateDeviceId } from "../lib/appRuntime";
-import { chooseProjectFolder, defaultProjectPath, probeCodex } from "../lib/localBackend";
-import { createOnboardingInviteJoinAdapter } from "../lib/onboardingInviteJoin";
+import { loadOrCreateDeviceId } from "../application/runtime/appRuntime";
+import { chooseProjectFolder, defaultProjectPath, probeCodex } from "../lib/platform/localBackend";
+import { createOnboardingInviteJoinAdapter } from "../lib/onboarding/onboardingInviteJoin";
 import {
   successfulAuthenticationReadyToAdvance,
   type OnboardingAuthenticationProvider,
   type OnboardingCreateDraft,
   type OnboardingJoinState,
   type OnboardingRoomRetryDraft
-} from "../lib/onboardingAssistantModel";
-import { completedTurnIds, hasNewCompletedTurn, newestInviteRequestForDevice } from "../lib/onboardingMilestones";
+} from "../application/onboarding/onboardingAssistantModel";
+import {
+  completedTurnIds,
+  hasNewCompletedTurn,
+  newestInviteRequestForDevice
+} from "../lib/onboarding/onboardingMilestones";
 import {
   projectOnboardingReadiness,
   type OnboardingReadinessAction,
   type OnboardingReadinessRow
-} from "../lib/onboardingReadiness";
-import { deriveOnboardingProgress, type OnboardingIntent, type OnboardingSurface } from "../lib/onboardingState";
+} from "../application/onboarding/onboardingReadiness";
+import {
+  deriveOnboardingProgress,
+  type OnboardingIntent,
+  type OnboardingSurface
+} from "../lib/onboarding/onboardingState";
 import { useAppStore } from "../store/appStore";
 import { useCodexAccount } from "./useCodexAccount";
 import type { useAppInviteActions } from "./useAppInviteActions";

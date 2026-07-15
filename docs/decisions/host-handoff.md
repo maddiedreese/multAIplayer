@@ -12,7 +12,9 @@ The outgoing host may be malicious, compromised, or simply unavailable. It can r
 
 ## Decision
 
-A host handoff is complete only after the incoming member publishes an authenticated request naming its exact user, device, and MLS leaf; the outgoing host explicitly approves it; an MLS commit authenticates the mandatory GroupContext extension change to that leaf; the relay accepts the expected epoch from the old host and atomically records the new host device; and native clients apply the commit. A candidate cannot claim authority with a direct relay metadata mutation.
+A host handoff is complete only after the incoming member publishes an authenticated request naming its exact user, device, and MLS leaf; the outgoing host explicitly approves it; an MLS commit authenticates the mandatory GroupContext extension change to that leaf and the exact handoff offer id; the relay accepts the expected epoch from the old host and atomically records the new host device; and native clients apply the commit. A candidate cannot claim authority with a direct relay metadata mutation.
+
+The commit is the completion record. The offer id is carried in the authenticated native host context and the outgoing device's signed relay authorization, so a reconnecting client can correlate the committed transfer without a second message from the outgoing process. The encrypted `room.host.accepted` event is informational and may improve the live UI, but correctness and recovery never depend on its delivery. This avoids a crash window after relay commit persistence. Concurrent requests converge on a deterministic candidate binding until one is committed; the committed native binding always wins.
 
 The incoming host must re-verify, rather than inherit on trust:
 
@@ -22,9 +24,24 @@ The incoming host must re-verify, rather than inherit on trust:
 - its own Codex login, model/app-server compatibility, MCP/app connections, Git/GitHub identity, browser profile, credentials, and approval defaults;
 - every pending Codex turn, terminal/browser/file request, and native approval under the new host's current context and policy.
 
-Old approvals, repeat-command grants, native session bindings, pending invite approvals, browser sessions, terminal sessions, and claimed credential state do not transfer. Pending proposals may remain visible for continuity, but they are untrusted input and require a new decision by the incoming host. The incoming host must not execute an outgoing host's serialized local state as authority.
+Old approvals, repeat-command grants, native session bindings, pending invite approvals, browser sessions, terminal sessions, and claimed credential state do not transfer. Pending proposals may remain visible for continuity, but they are untrusted input and require a new decision by the incoming host. The incoming host must not execute an outgoing host's serialized local state as authority. In particular, a transferred Git patch is staged and shown to the incoming host; applying it is a separate explicit action after authority changes.
 
 The authority-transfer commit advances the MLS epoch using the RFC 9420 key schedule. The authenticated GroupContext extension names the new host leaf and device, and every client rejects a commit whose author was not the host designated for its parent epoch. The relay independently rejects stale epochs and commits from the wrong authenticated device. After acknowledgement, the old host cannot publish further commits; the new host's next honest commit can provide post-compromise recovery for future live traffic, provided the attacker no longer retains authorized membership or current endpoint access.
+
+Room authority remains `active` while offers and candidate requests are pending. Offer state is separate from authority state. Legacy persisted `handoff` room status remains commit-capable only as a recovery bridge; successful transfer returns it to `active`. New code must not use that status to represent an open offer.
+
+## Model and invariants
+
+The dependency-free bounded exploration in `apps/desktop/test/hostHandoffModel.test.ts` enumerates offer, concurrent-request, commit, outgoing-process crash, optional accepted-event delivery, reconnect recovery, patch approval, and old-host-action interleavings. Its candidate-requested, transfer-committed, and patch-applied record transitions run the same pure reducer used by the production store; candidate ordering and authenticated commit correlation are also production helpers exercised directly by the test. The surrounding authority, crash, delivery, and recovery scheduler is intentionally an abstract finite model, not a TLA+/stateright proof or an execution of the React and relay wiring. Native state-machine and end-to-end tests cover those separate boundaries.
+
+The checked invariants are:
+
+- one user/device/leaf binding owns each accepted epoch;
+- an accepted successor always has an authenticated committed transfer;
+- the outgoing host cannot run a host action after the authority epoch changes;
+- duplicate or reordered candidate requests converge;
+- a durable transfer can recover after the outgoing process crashes without an accepted event; and
+- a staged patch cannot be applied before the successor explicitly approves it.
 
 Room history from earlier epochs remains readable only to devices that already retained the corresponding exporter-derived history secrets. Handoff does not re-encrypt history and cannot revoke copies already delivered. If the outgoing host's retained credentials, repository access, or other external capabilities are no longer appropriate, their owners must revoke or rotate them in the relevant external systems; an MLS commit cannot do that.
 

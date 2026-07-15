@@ -127,3 +127,48 @@ globalThis.fetch = async (input, init = {}) => {
     await rm(tempDir, { recursive: true, force: true });
   }
 });
+
+test("verify denies an operator-restricted identity with a stable error code", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-restricted-github-test-"));
+  const mockPath = join(tempDir, "mock-github-fetch.mjs");
+  await writeFile(
+    mockPath,
+    `
+const nativeFetch = globalThis.fetch;
+globalThis.fetch = async (input, init = {}) =>
+  String(input) === "https://api.github.com/user"
+    ? Response.json({ id: 42, login: "octocat" })
+    : nativeFetch(input, init);
+`,
+    "utf8"
+  );
+  const relay = await startRelay(
+    {
+      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --import=${mockPath}`.trim()
+    },
+    {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [],
+      rooms: [],
+      invites: [],
+      teamMembers: [],
+      encryptedBacklog: [],
+      mlsBacklog: [],
+      accountRestrictions: [{ userId: "github:42", reasonCode: "abuse", createdAt: new Date().toISOString() }]
+    }
+  );
+  try {
+    const response = await fetch(`${relay.baseUrl}/auth/github/verify`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ access_token: "bounded-test-token" })
+    });
+    assert.equal(response.status, 403);
+    assert.equal(((await response.json()) as { code: string }).code, "account_restricted");
+  } finally {
+    await relay.close();
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});

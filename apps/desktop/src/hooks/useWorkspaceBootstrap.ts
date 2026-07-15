@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
-import { loadWorkspace } from "../lib/workspaceClient";
-import { ensureRoomDefaults } from "../lib/roomDefaults";
+import { loadWorkspace } from "../application/workspace/workspaceClient";
+import { ensureRoomDefaults } from "../lib/room/roomDefaults";
 import { useAppStore } from "../store/appStore";
 
 interface UseWorkspaceBootstrapOptions {

@@ -11,12 +11,13 @@ import {
   X
 } from "lucide-react";
 import React, { useState, type ReactNode } from "react";
-import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
+import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/identity/authClient";
 import { useThemeMode } from "../hooks/useThemeMode";
+import type { SidebarPanelName, ThemeMode } from "../lib/core/uiTypes";
 import { SidebarAccountSection } from "./SidebarAccountSection";
 
-export type SidebarPanelName = "help" | "profile" | "settings" | null;
-export type ThemeMode = "light" | "dark";
+export type { SidebarPanelName };
+export type { ThemeMode };
 
 export interface SidebarTeamDisplay {
   id: string;
@@ -308,16 +309,9 @@ export function DesktopSidebar({
 
   const teamFormVisible = !searchActive && !showArchived && teamCreateOpen;
   const roomFormVisible = !searchActive && !showArchived && roomCreateOpen;
-  const visibleTeams = showArchived
-    ? teams.filter((team) => team.archived || rooms.some((room) => room.teamId === team.id && room.archived))
-    : teams.filter((team) => !team.archived);
-  const sectionLabel = searchActive ? "Matching teams" : showArchived ? "Archived" : "Teams";
+  const visibleTeams = visibleSidebarTeams(teams, rooms, showArchived);
   const archivedCount = teams.filter((team) => team.archived).length + rooms.filter((room) => room.archived).length;
-  const roomsForTeam = (team: SidebarTeamDisplay) =>
-    rooms.filter(
-      (room) =>
-        room.teamId === team.id && (showArchived ? room.archived || team.archived : !room.archived && !team.archived)
-    );
+  const roomsForTeam = (team: SidebarTeamDisplay) => visibleSidebarRooms(rooms, team, showArchived);
 
   return (
     <aside className="sidebar">
@@ -336,34 +330,17 @@ export function DesktopSidebar({
       />
 
       <section className="sidebar-section">
-        <div className="section-title">
-          <span>{sectionLabel}</span>
-          {!searchActive && (
-            <div className="section-title-actions">
-              <button
-                onClick={() => {
-                  setShowArchived((current) => !current);
-                  setTeamCreateOpen(false);
-                  setRoomCreateOpen(false);
-                }}
-                aria-label={showArchived ? "Show active teams" : "Show archived teams and rooms"}
-                aria-pressed={showArchived}
-                title={showArchived ? "Show active teams" : "Show archived"}
-              >
-                {showArchived ? <UsersRound size={14} /> : <Archive size={14} />}
-              </button>
-              {!showArchived && (
-                <button
-                  onClick={() => setTeamCreateOpen((open) => !open)}
-                  aria-label={teamCreateOpen ? "Hide team form" : "New team"}
-                  aria-expanded={teamCreateOpen}
-                >
-                  {teamCreateOpen ? <X size={14} /> : <Plus size={15} />}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+        <SidebarTeamsTitle
+          searchActive={searchActive}
+          showArchived={showArchived}
+          teamCreateOpen={teamCreateOpen}
+          onToggleArchived={() => {
+            setShowArchived((current) => !current);
+            setTeamCreateOpen(false);
+            setRoomCreateOpen(false);
+          }}
+          onToggleTeamCreate={() => setTeamCreateOpen((open) => !open)}
+        />
         {teamFormVisible && (
           <div className="sidebar-create-form">
             <input
@@ -402,15 +379,7 @@ export function DesktopSidebar({
             />
           ))}
           {visibleTeams.length === 0 && (
-            <div className="sidebar-empty">
-              {searchActive
-                ? "No teams found."
-                : showArchived
-                  ? archivedCount === 0
-                    ? "No archived teams or rooms."
-                    : "No archived teams found."
-                  : "No teams yet. Create one to start."}
-            </div>
+            <div className="sidebar-empty">{sidebarTeamEmptyMessage(searchActive, showArchived, archivedCount)}</div>
           )}
         </div>
       </section>
@@ -500,4 +469,72 @@ export function DesktopSidebar({
       <SidebarFooter activeSidebarPanel={activeSidebarPanel} onSelectSidebarPanel={onSelectSidebarPanel} />
     </aside>
   );
+}
+
+function SidebarTeamsTitle({
+  searchActive,
+  showArchived,
+  teamCreateOpen,
+  onToggleArchived,
+  onToggleTeamCreate
+}: {
+  searchActive: boolean;
+  showArchived: boolean;
+  teamCreateOpen: boolean;
+  onToggleArchived: () => void;
+  onToggleTeamCreate: () => void;
+}) {
+  const label = searchActive ? "Matching teams" : showArchived ? "Archived" : "Teams";
+  return (
+    <div className="section-title">
+      <span>{label}</span>
+      {!searchActive && (
+        <div className="section-title-actions">
+          <button
+            onClick={onToggleArchived}
+            aria-label={showArchived ? "Show active teams" : "Show archived teams and rooms"}
+            aria-pressed={showArchived}
+            title={showArchived ? "Show active teams" : "Show archived"}
+          >
+            {showArchived ? <UsersRound size={14} /> : <Archive size={14} />}
+          </button>
+          {!showArchived && (
+            <button
+              onClick={onToggleTeamCreate}
+              aria-label={teamCreateOpen ? "Hide team form" : "New team"}
+              aria-expanded={teamCreateOpen}
+            >
+              {teamCreateOpen ? <X size={14} /> : <Plus size={15} />}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function sidebarTeamEmptyMessage(searchActive: boolean, showArchived: boolean, archivedCount: number): string {
+  if (searchActive) return "No teams found.";
+  if (!showArchived) return "No teams yet. Create one to start.";
+  return archivedCount === 0 ? "No archived teams or rooms." : "No archived teams found.";
+}
+
+function visibleSidebarTeams(
+  teams: SidebarTeamDisplay[],
+  rooms: SidebarRoomDisplay[],
+  showArchived: boolean
+): SidebarTeamDisplay[] {
+  if (!showArchived) return teams.filter((team) => !team.archived);
+  return teams.filter((team) => team.archived || rooms.some((room) => room.teamId === team.id && room.archived));
+}
+
+function visibleSidebarRooms(
+  rooms: SidebarRoomDisplay[],
+  team: SidebarTeamDisplay,
+  showArchived: boolean
+): SidebarRoomDisplay[] {
+  return rooms.filter((room) => {
+    if (room.teamId !== team.id) return false;
+    return showArchived ? room.archived || team.archived : !room.archived && !team.archived;
+  });
 }

@@ -91,6 +91,11 @@ pub(crate) fn bound_command_output(output: &[u8]) -> String {
     bound_text_chars(&text, MAX_COMMAND_OUTPUT_CHARS, marker)
 }
 
+pub(crate) fn redact_and_bound_command_output(output: &[u8]) -> String {
+    let redacted = redact_known_secrets(&String::from_utf8_lossy(output));
+    bound_command_output(redacted.as_bytes())
+}
+
 pub(crate) fn bound_text_chars(text: &str, max_chars: usize, marker: &str) -> String {
     if text.chars().count() <= max_chars {
         return text.to_string();

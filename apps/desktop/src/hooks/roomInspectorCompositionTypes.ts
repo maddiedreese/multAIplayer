@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 import type { RoomInspectorWorkPanel } from "../components/RoomInspectorWorkPanel";
-import type { createAppRoomPanelActions } from "../lib/appRoomPanelActions";
+import type { createAppRoomPanelActions } from "./appRoomPanelActions";
 import type { useAppHostHandoffActions } from "./useAppHostHandoffActions";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useRoomRuntimeContext } from "./useRoomRuntimeContext";

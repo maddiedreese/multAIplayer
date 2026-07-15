@@ -5,6 +5,7 @@ export const RelayHttpErrorCode = z.enum([
   "invalid_request",
   "authentication_required",
   "account_deletion_blocked",
+  "account_restricted",
   "device_auth_required",
   "forbidden",
   "not_found",

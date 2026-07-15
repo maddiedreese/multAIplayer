@@ -39,7 +39,7 @@ Object.defineProperty(globalThis, "window", {
   value: {}
 });
 
-const { loadOrCreateDeviceIdentity, resetDeviceIdentity } = await import("../src/lib/deviceIdentity");
+const { loadOrCreateDeviceIdentity, resetDeviceIdentity } = await import("../src/lib/identity/deviceIdentity");
 
 test.beforeEach(() => {
   localStorage.clear();

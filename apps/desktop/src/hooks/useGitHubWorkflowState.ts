@@ -1,8 +1,8 @@
 import { useMemo } from "react";
-import type { GitHubActionRun, GitHubAuthConfig, SignedInUser } from "../lib/authClient";
-import { checkGitHubActionsReadiness, checkGitHubWorkflowReadiness } from "../lib/githubWorkflowReadiness";
-import { summarizeActionRuns } from "../lib/githubActionsSummary";
-import { buildGitWorkflowApprovalPreview, type GitWorkflowDraft } from "../lib/gitWorkflowDraft";
+import type { GitHubActionRun, GitHubAuthConfig, SignedInUser } from "../lib/identity/authClient";
+import { checkGitHubActionsReadiness, checkGitHubWorkflowReadiness } from "../lib/git/githubWorkflowReadiness";
+import { summarizeActionRuns } from "../presentation/git/githubActionsSummary";
+import { buildGitWorkflowApprovalPreview, type GitWorkflowDraft } from "../lib/git/gitWorkflowDraft";
 
 interface UseGitHubWorkflowStateOptions {
   actionRuns: GitHubActionRun[];

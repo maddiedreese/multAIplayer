@@ -1,9 +1,9 @@
-import { createInviteJoinActions } from "../lib/invite/inviteJoinActions";
-import { createInviteLinkActions } from "../lib/invite/inviteLinkActions";
-import { createInviteRelayActions } from "../lib/invite/inviteRelayActions";
-import { createMembershipCommitActions } from "../lib/invite/membershipCommitActions";
-import type { UseInviteActionsOptions } from "../lib/invite/inviteActionTypes";
-import { reportExpectedFailure } from "../lib/nonFatalReporting";
+import { createInviteJoinActions } from "../application/invite/inviteJoinActions";
+import { createInviteLinkActions } from "../application/invite/inviteLinkActions";
+import { createInviteRelayActions } from "../application/invite/inviteRelayActions";
+import { createMembershipCommitActions } from "../application/invite/membershipCommitActions";
+import type { UseInviteActionsOptions } from "../application/invite/inviteActionTypes";
+import { reportExpectedFailure } from "../lib/core/nonFatalReporting";
 import { useAppStore } from "../store/appStore";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 

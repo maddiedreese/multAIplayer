@@ -6,8 +6,8 @@ import {
   runPendingInviteRecoveryLoop,
   type PendingInviteRecoveryResult
 } from "../src/lib/invite/pendingInviteRecovery";
-import type { PendingMlsInviteRequest } from "../src/lib/mlsClient";
-import { RelayHttpError } from "../src/lib/httpResponse";
+import type { PendingMlsInviteRequest } from "../src/lib/mls/mlsClient";
+import { RelayHttpError } from "../src/lib/core/httpResponse";
 
 const pending: PendingMlsInviteRequest = {
   inviteId: "invite-one",

@@ -2,6 +2,8 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
@@ -54,6 +56,7 @@ pub(crate) struct ProjectFileWriteRequest {
     pub(crate) cwd: String,
     pub(crate) path: String,
     pub(crate) content: String,
+    pub(crate) expected_content: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -233,9 +236,20 @@ pub(crate) fn project_file_write(
             "File content is too large to save from the editor",
         ));
     }
-    fs::write(&requested, request.content.as_bytes()).map_err(|error| {
-        crate::command_error::CommandError::storage(format!("Failed to write file: {error}"))
-    })?;
+    if let Some(expected) = request.expected_content.as_deref() {
+        let current = fs::read(&requested).map_err(|error| {
+            crate::command_error::CommandError::storage(format!(
+                "Failed to compare current file: {error}"
+            ))
+        })?;
+        if current != expected.as_bytes() {
+            return Err(crate::command_error::CommandError::invalid_argument(
+                "The file changed after this edit was prepared. Reload it before saving.",
+            ));
+        }
+    }
+    atomic_write_project_file(&requested, request.content.as_bytes())
+        .map_err(crate::command_error::CommandError::storage)?;
     let metadata = fs::metadata(&requested).map_err(|error| {
         crate::command_error::CommandError::storage(format!(
             "Failed to read saved file metadata: {error}"
@@ -245,6 +259,30 @@ pub(crate) fn project_file_write(
         path: request.path,
         size: metadata.len(),
     })
+}
+
+fn atomic_write_project_file(path: &Path, content: &[u8]) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| "File path must stay inside the project".to_string())?;
+    let temporary = parent.join(format!(".multaiplayer-write-{}", uuid::Uuid::new_v4()));
+    let mut file = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&temporary)
+        .map_err(|error| format!("Failed to create temporary project file: {error}"))?;
+    let result = (|| {
+        file.write_all(content)
+            .map_err(|error| format!("Failed to write temporary project file: {error}"))?;
+        file.sync_all()
+            .map_err(|error| format!("Failed to sync temporary project file: {error}"))?;
+        fs::rename(&temporary, path)
+            .map_err(|error| format!("Failed to replace project file: {error}"))
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
 }
 
 fn safe_project_write_path(root: &Path, relative_path: &str) -> Result<PathBuf, String> {

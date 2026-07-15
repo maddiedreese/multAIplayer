@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { roomPostureSummary } from "../src/lib/roomPosture";
+import { roomPostureSummary } from "../src/lib/room/roomPosture";
 
 test("roomPostureSummary explains host, workspace, history, and browser posture", () => {
   assert.deepEqual(

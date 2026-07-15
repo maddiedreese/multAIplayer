@@ -4,7 +4,7 @@ import {
   codexConsumedMessageIds,
   latestCodexStartedAt,
   messageIsBeforeCodexWatermark
-} from "../src/lib/codexMessageWatermark";
+} from "../src/lib/codex/codexMessageWatermark";
 import type { CodexRoomEvent } from "../src/types";
 
 const startedWithIds: CodexRoomEvent = {

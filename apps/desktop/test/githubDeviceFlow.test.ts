@@ -8,7 +8,7 @@ import {
   nextGitHubDevicePollIntervalSeconds,
   recheckHostedAccountDeletion,
   type GitHubDevicePollResult
-} from "../src/lib/authClient";
+} from "../src/lib/identity/authClient";
 
 Object.defineProperty(globalThis, "localStorage", {
   configurable: true,

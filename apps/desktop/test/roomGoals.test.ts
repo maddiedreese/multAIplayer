@@ -8,7 +8,7 @@ import {
   pauseRoomGoal,
   resumeRoomGoal,
   updateRoomGoalElapsed
-} from "../src/lib/roomGoals";
+} from "../src/lib/room/roomGoals";
 
 test("parseRoomGoalCommand accepts /goal commands only", () => {
   assert.equal(parseRoomGoalCommand("/goal build the editor"), "build the editor");

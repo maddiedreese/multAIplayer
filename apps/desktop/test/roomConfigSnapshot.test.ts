@@ -6,8 +6,8 @@ import {
   resolveRoomConfigForPublish,
   roomConfigPayload,
   shouldApplyRoomConfig
-} from "../src/lib/roomConfigSnapshot";
-import { ensureRoomDefaults } from "../src/lib/roomDefaults";
+} from "../src/application/mls/roomConfigSnapshot";
+import { ensureRoomDefaults } from "../src/lib/room/roomDefaults";
 import { seededRooms } from "./support/workspaceFixtures";
 
 function room(overrides: Partial<ClientRoomRecord> = {}): ClientRoomRecord {

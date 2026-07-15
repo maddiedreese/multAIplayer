@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { quickTunnelDisclaimer, quickTunnelSafetyText } from "../lib/localPreview";
+import { quickTunnelDisclaimer, quickTunnelSafetyText } from "../lib/files/localPreview";
 import { LocalPreviewDialog } from "../components/LocalPreviewDialog";
 import type { LocalPreviewDialogState } from "../types";
 

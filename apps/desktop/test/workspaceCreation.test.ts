@@ -11,7 +11,7 @@ import {
   normalizeCodexSpeed,
   planRoomCreation,
   planTeamCreation
-} from "../src/lib/workspaceCreation";
+} from "../src/lib/workspace/workspaceCreation";
 
 test("planTeamCreation trims team names", () => {
   assert.deepEqual(planTeamCreation("  Core Team  "), { name: "Core Team" });

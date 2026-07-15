@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildRoomChatMessageRows, safeInlineImageSource } from "../src/lib/chatDisplayRows";
+import { buildRoomChatMessageRows, safeInlineImageSource } from "../src/presentation/chat/chatDisplayRows";
 import type { ChatMessage, CodexRoomEvent } from "../src/types";
 
 const ownMessage: ChatMessage = {

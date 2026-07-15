@@ -14,7 +14,7 @@ import {
   createInitialOnboardingState,
   deriveOnboardingProgress,
   reduceOnboardingState
-} from "../src/lib/onboardingState";
+} from "../src/lib/onboarding/onboardingState";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://127.0.0.1:5173/" });
 for (const [key, value] of Object.entries({

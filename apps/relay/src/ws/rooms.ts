@@ -152,6 +152,19 @@ export function createRelayRoomSocketManager({
     }
   }
 
+  function revokeUserSessions(userId: string, message: string, closeReason: string) {
+    for (const session of Array.from(sessions.values())) {
+      if (session.authSession?.user.id !== userId && session.userId !== userId) continue;
+      send(session.socket, { type: "error", message });
+      leaveRoom(session);
+      leaveTeams(session);
+      leaveWorkspace(session);
+      sessions.delete(session.socket);
+      session.socket.close(1008, closeReason);
+    }
+    revokeUserPresence(userId);
+  }
+
   function consumeApprovedInvite(
     inviteId: string,
     teamId: string,
@@ -184,6 +197,7 @@ export function createRelayRoomSocketManager({
     leaveTeams,
     leaveWorkspace,
     revokeTeamMemberSessions,
-    revokeUserPresence
+    revokeUserPresence,
+    revokeUserSessions
   };
 }

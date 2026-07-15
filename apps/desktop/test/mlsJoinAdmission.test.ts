@@ -6,7 +6,7 @@ import {
   coordinateMlsAdmissionRecoveryWithRetry,
   projectMlsAdmissionInviteRequest,
   synchronizeMlsRecoverySelection
-} from "../src/lib/mlsJoinAdmission";
+} from "../src/application/mls/mlsJoinAdmission";
 import type { InviteJoinRequest } from "../src/types";
 
 const admission = {

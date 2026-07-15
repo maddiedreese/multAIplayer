@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { GitWorkflowDraft } from "../lib/gitWorkflowDraft";
+import type { GitWorkflowDraft } from "../lib/git/gitWorkflowDraft";
 import { useAppStore } from "../store/appStore";
 
 interface UseGitHubActionsDraftResetOptions {

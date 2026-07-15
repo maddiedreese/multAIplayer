@@ -103,3 +103,54 @@ test("immediate row persistence never serializes the whole relay store", async (
   await coordinator.closeRelayStore();
   assert.equal(globalPrunes, 1);
 });
+
+test("debounced whole-state saves never overlap and the queue continues after failure", async () => {
+  let saveCalls = 0;
+  let activeSaves = 0;
+  let rejectFirst!: (error: Error) => void;
+  const firstEntered = Promise.withResolvers<void>();
+  const persistence = {
+    flushMode: "debounced" as const,
+    load: async () => null,
+    async save() {
+      saveCalls++;
+      activeSaves++;
+      assert.equal(activeSaves, 1);
+      if (saveCalls === 1) {
+        firstEntered.resolve();
+        await new Promise<void>((_resolve, reject) => {
+          rejectFirst = reject;
+        }).finally(() => activeSaves--);
+        return;
+      }
+      activeSaves--;
+    },
+    saveChanges: async () => false,
+    saveKeyPackages: async () => {},
+    saveMlsBacklog: async () => true,
+    saveMlsMessage: async () => true,
+    saveMlsCommit: async () => {},
+    quarantine: async () => {},
+    close: () => {}
+  };
+  const codec = {
+    isExpiredInvite: () => false,
+    isExpiredAttachmentBlob: () => false,
+    applyStoredRelayState: () => {},
+    pruneExpiredRelayState: () => {},
+    drainStoredRelayMutations: () => [],
+    discardStoredRelayMutations: () => {},
+    toStoredRelayState: () => ({ version: 1 }) as never
+  };
+  const coordinator = createRelayStorePersistenceCoordinator({ dataPath: "unused", persistence, storeCodec: codec });
+  const failed = coordinator.saveRelayStore();
+  await firstEntered.promise;
+  const queued = coordinator.saveRelayStore();
+  await Promise.resolve();
+  assert.equal(saveCalls, 1);
+  rejectFirst(new Error("injected first save failure"));
+  await assert.rejects(failed, /injected first save failure/);
+  await queued;
+  assert.equal(saveCalls, 2);
+  assert.equal(activeSaves, 0);
+});

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { assertInviteApprovalEpoch, recoverInviteApproval } from "../src/lib/invite/inviteApprovalRecovery";
-import type { MlsInviteCapabilityBinding, MlsOutboxItem } from "../src/lib/mlsClient";
+import type { MlsInviteCapabilityBinding, MlsOutboxItem } from "../src/lib/mls/mlsClient";
 
 const requestBinding: MlsInviteCapabilityBinding = {
   version: 3,

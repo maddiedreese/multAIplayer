@@ -21,6 +21,8 @@ pub struct HostContext {
     pub version: u8,
     pub host_leaf: u32,
     pub host_device_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transfer_id: Option<String>,
 }
 
 #[derive(Debug, Error, Eq, PartialEq)]
@@ -54,7 +56,11 @@ pub fn validate_credential(bytes: &[u8]) -> Result<BasicAppCredential, PolicyErr
 }
 
 pub fn validate_host_commit(sender_leaf: u32, context: &HostContext) -> Result<(), PolicyError> {
-    if context.version != 1 || !valid_id(&context.host_device_id) {
+    if !matches!(context.version, 1 | 2)
+        || !valid_id(&context.host_device_id)
+        || (context.version == 1 && context.transfer_id.is_some())
+        || (context.version == 2 && !context.transfer_id.as_deref().is_some_and(valid_id))
+    {
         return Err(PolicyError::InvalidHostContext);
     }
     (sender_leaf == context.host_leaf)
@@ -102,11 +108,43 @@ mod tests {
             version: 1,
             host_leaf: 7,
             host_device_id: "mac-1".into(),
+            transfer_id: None,
         };
         assert_eq!(validate_host_commit(7, &context), Ok(()));
         assert_eq!(
             validate_host_commit(8, &context),
             Err(PolicyError::NonHostCommit)
+        );
+    }
+
+    #[test]
+    fn transferred_host_context_requires_a_bounded_correlation_id() {
+        let transferred = HostContext {
+            version: 2,
+            host_leaf: 9,
+            host_device_id: "mac-2".into(),
+            transfer_id: Some("offer_123".into()),
+        };
+        assert_eq!(validate_host_commit(9, &transferred), Ok(()));
+        assert_eq!(
+            validate_host_commit(
+                9,
+                &HostContext {
+                    transfer_id: None,
+                    ..transferred.clone()
+                }
+            ),
+            Err(PolicyError::InvalidHostContext)
+        );
+        assert_eq!(
+            validate_host_commit(
+                9,
+                &HostContext {
+                    transfer_id: Some("offer with spaces".into()),
+                    ..transferred
+                }
+            ),
+            Err(PolicyError::InvalidHostContext)
         );
     }
 }

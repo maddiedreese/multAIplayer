@@ -7,8 +7,8 @@ import {
   loadDiagnosticEntries,
   recordDiagnosticEvent,
   saveNativeDiagnosticBundle
-} from "../src/lib/diagnostics";
-import { reportExpectedFailure, reportNonFatal } from "../src/lib/nonFatalReporting";
+} from "../src/lib/platform/diagnostics";
+import { reportExpectedFailure, reportNonFatal } from "../src/lib/core/nonFatalReporting";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://127.0.0.1:5173/"

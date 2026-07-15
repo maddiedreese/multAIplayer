@@ -54,7 +54,8 @@ Run the relay or Vite frontend separately with `npm run dev:relay` or `npm run d
 
 ### Code map
 
-- `apps/desktop/src` contains the React desktop UI, hooks, stores, and local backend adapters.
+- `apps/desktop/src/lib/<domain>` contains pure desktop domain and platform modules, including native adapters under `lib/platform`; files may not be added directly to the `lib` root.
+- `apps/desktop/src/application/<domain>` contains store-aware workflows, while `apps/desktop/src/presentation/<domain>` contains component-facing projections and view models. Components, hooks, and stores compose those layers without making the pure library depend on UI state.
 - `apps/desktop/src-tauri/src` contains native Rust commands, split by capability; `lib.rs` wires those modules into Tauri. The MLS IPC boundary keeps command orchestration in `mls_native.rs`, serde records in `mls_native/types.rs`, and invite commands in `mls_native/invites.rs`.
 - `apps/desktop/src-tauri/crates/mls-core` owns MLS and residual cryptography. `engine.rs` composes focused output/error, outbound, host-transfer, exporter, and validation modules; `storage.rs` composes the MLS transaction adapter, automatic staged-write rollback guard, and encrypted application store.
 - `apps/relay/src/server.ts` composes the relay from focused `http`, `ws`, and `auth` handlers plus state, persistence, limits, and lifecycle modules.

@@ -31,6 +31,7 @@ export interface RegisterGitHubAuthRoutesOptions {
   maxDisplayNameChars: number;
   maxRoomProjectPathChars: number;
   maxAccessTokenChars: number;
+  isAccountRestricted: (userId: string) => boolean;
 }
 
 export function registerGitHubAuthRoutes({
@@ -52,7 +53,8 @@ export function registerGitHubAuthRoutes({
   maxUserIdChars,
   maxDisplayNameChars,
   maxRoomProjectPathChars,
-  maxAccessTokenChars
+  maxAccessTokenChars,
+  isAccountRestricted
 }: RegisterGitHubAuthRoutesOptions) {
   app.get("/auth/config", (_req, res) => {
     res.json({
@@ -99,6 +101,10 @@ export function registerGitHubAuthRoutes({
       : null;
     if (!normalizedUserId || !login || (githubUser.name && !name) || (githubUser.avatar_url && !avatarUrl)) {
       sendRelayError(res, 502, "upstream_unavailable", "GitHub returned unsupported user metadata");
+      return;
+    }
+    if (isAccountRestricted(normalizedUserId)) {
+      sendRelayError(res, 403, "account_restricted", "This account is restricted by the relay operator.");
       return;
     }
     if (deletionLedger) {

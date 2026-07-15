@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import { readLocalPreviewTunnelStatus } from "../lib/localBackend";
+import { readLocalPreviewTunnelStatus } from "../lib/platform/localBackend";
 import type { LocalPreviewRecord } from "../types";
 
 interface LatestRef<T> {

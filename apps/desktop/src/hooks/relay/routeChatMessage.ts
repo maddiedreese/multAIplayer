@@ -4,13 +4,13 @@ import {
   ChatPlaintextPayload,
   ChatReactionPlaintextPayload
 } from "@multaiplayer/protocol";
-import { normalizeChatMessage } from "../../lib/chatSanitizer";
-import { plaintextUserMatchesEnvelope } from "../../lib/mlsApplicationMessage";
-import { isLegacyDebugChatMessage } from "../../lib/localRoomHistoryPayload";
-import { sendRoomMessageNotification } from "../../lib/roomNotifications";
+import { normalizeChatMessage } from "../../lib/chat/chatSanitizer";
+import { plaintextUserMatchesEnvelope } from "../../application/mls/mlsApplicationMessage";
+import { isLegacyDebugChatMessage } from "../../lib/history/localRoomHistoryPayload";
+import { sendRoomMessageNotification } from "../../lib/room/roomNotifications";
 import type { AppStoreState } from "../../store/appStore";
 import type { ChatMessage } from "../../types";
-import { reportNonFatal } from "../../lib/nonFatalReporting";
+import { reportNonFatal } from "../../lib/core/nonFatalReporting";
 import type { MlsMessageRouteContext, MlsMessageStoreActions, RoutedMlsMessage } from "./mlsMessageRouteTypes";
 
 export async function routeChatMessage(

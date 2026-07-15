@@ -1,30 +1,34 @@
 import { defaultCodexSandboxLevel, type ClientRoomRecord } from "@multaiplayer/protocol";
-import { runCodexTurn, getCodexGoal } from "../lib/localBackend";
-import { codexGoalToRoomGoal } from "../lib/roomGoals";
-import { assessCodexCompatibility } from "../lib/codexCompatibility";
-import { resolveCodexRunSettings } from "../lib/codexCatalogResolver";
-import { canApproveCodexTurn } from "../lib/codexApproval";
+import { runCodexTurn, getCodexGoal } from "../lib/platform/localBackend";
+import { codexGoalToRoomGoal } from "../lib/room/roomGoals";
+import { assessCodexCompatibility } from "../lib/codex/codexCompatibility";
+import { resolveCodexRunSettings } from "../lib/codex/codexCatalogResolver";
+import { canApproveCodexTurn } from "../lib/codex/codexApproval";
 import {
   buildCodexTurnInput,
   buildCodexTurnSummary,
   detectCodexTurnRiskFlags,
   hasActionableCodexTurnContext,
   messagesSinceLastCodex
-} from "../lib/codexTurn";
-import { normalizeCodexThreadId } from "../lib/codexThread";
-import { codexHostFailureRoomMessage, projectCodexRoomEvent, projectCodexRoomStatus } from "../lib/codexRoomSharing";
-import { classifyCodexFailure } from "../lib/codexFailure";
-import { formatCodexModel, formatMessageTime } from "../lib/appFormatters";
-import { roomLockMessage } from "../lib/appRuntime";
-import { canUseLocalWorkspace } from "../lib/workspaceAccess";
+} from "../lib/codex/codexTurn";
+import { normalizeCodexThreadId } from "../lib/codex/codexThread";
+import {
+  codexHostFailureRoomMessage,
+  projectCodexRoomEvent,
+  projectCodexRoomStatus
+} from "../lib/codex/codexRoomSharing";
+import { classifyCodexFailure } from "../lib/codex/codexFailure";
+import { formatCodexModel, formatMessageTime } from "../lib/formatting/appFormatters";
+import { roomLockMessage } from "../application/runtime/appRuntime";
+import { canUseLocalWorkspace } from "../lib/access/workspaceAccess";
 import { useAppStore } from "../store/appStore";
-import { reportNonFatal } from "../lib/nonFatalReporting";
+import { reportNonFatal } from "../lib/core/nonFatalReporting";
 import type { PendingCodexApproval } from "../types";
 import type { UseCodexTurnActionsOptions } from "./codexTurnActionTypes";
 import { promoteNextCodexApproval } from "./codexApprovalPromotion";
 import { refreshApprovalMessagesFromRoom } from "./codexTurnQueue";
 import { handleCodexUsageLimit as executeCodexUsageLimit } from "./codexUsageLimit";
-import { createCodexImageAttachment } from "../lib/codexGeneratedImage";
+import { createCodexImageAttachment } from "../application/codex/codexGeneratedImage";
 
 export function useCodexTurnActions({
   localUser,
@@ -56,15 +60,48 @@ export function useCodexTurnActions({
     });
   }
 
+  function validateApprovalRoom(
+    room: ClientRoomRecord,
+    roomId: string,
+    state: ReturnType<typeof useAppStore.getState>
+  ) {
+    const revoked = state.revokedRoomIds.has(room.id) || state.revokedTeamIds.has(room.teamId);
+    const locked = state.forgottenRoomIds.has(room.id) || revoked;
+    if (locked) {
+      state.setHostMessageForRoom(roomId, roomLockMessage(room, revoked));
+      state.setPendingCodexApprovalForRoom(roomId, null);
+      state.setApprovalVisibleForRoom(roomId, false);
+      return false;
+    }
+    if (room.approvalPolicy === "never_host") {
+      state.setHostMessageForRoom(roomId, "This room is set to never host Codex turns.");
+      state.setPendingCodexApprovalForRoom(roomId, null);
+      state.setApprovalVisibleForRoom(roomId, false);
+      return false;
+    }
+    if (!canApproveCodexTurn(room, localUser, locked)) {
+      const message =
+        room.hostStatus === "active"
+          ? `Only ${room.host} can approve host-side actions in this room.`
+          : "Claim host before approving host-side actions in this room.";
+      state.setHostMessageForRoom(roomId, message);
+      state.setApprovalVisibleForRoom(roomId, false);
+      return false;
+    }
+    const compatibility = assessCodexCompatibility(state.codexProbe?.version);
+    if (state.codexProbe?.available && compatibility.status === "unsupported_older") {
+      state.setHostMessageForRoom(roomId, compatibility.message);
+      state.setApprovalVisibleForRoom(roomId, true);
+      return false;
+    }
+    return true;
+  }
+
   async function approveCodexTurn(approval: PendingCodexApproval | null = null) {
     const state = useAppStore.getState();
-    const selectedRoom = state.rooms.find((item) => item.id === state.selectedRoomId);
-    const activeCodexApproval = selectedRoom
-      ? (state.codexRuntimeByRoom[selectedRoom.id]?.pendingApproval ?? null)
-      : null;
-    approval ??= activeCodexApproval;
-    const roomId = approval?.roomId ?? selectedRoom?.id ?? state.selectedRoomId;
-    const room = state.rooms.find((item) => item.id === roomId);
+    const selected = selectCodexApprovalContext(state, approval);
+    approval = selected.approval;
+    const { roomId, room, browserRequests, gitStatus, codexContinuation, codexThreadId } = selected;
     const {
       codexProbe,
       forgottenRoomIds,
@@ -82,46 +119,16 @@ export function useCodexTurnActions({
       setCodexContinuationForRoom,
       setRoomGoalForRoom
     } = state;
-    const browserRequests = state.browserByRoom[roomId]?.requests ?? [];
-    const gitStatus = state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.status ?? null;
-    const codexContinuation = state.codexRuntimeByRoom[roomId]?.continuation ?? null;
-    const codexThreadId = state.codexRuntimeByRoom[roomId]?.threadGraph?.activeThreadId ?? null;
     if (!room) {
       setHostMessageForRoom(roomId, "This Codex approval belongs to a room that is no longer available.");
       setPendingCodexApprovalForRoom(roomId, null);
       setApprovalVisibleForRoom(roomId, false);
       return;
     }
+    if (!validateApprovalRoom(room, roomId, state)) return;
     const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
     const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
     const roomCanReadLocalWorkspace = canUseLocalWorkspace(room, localUser, roomLocked);
-    if (roomLocked) {
-      setHostMessageForRoom(roomId, roomLockMessage(room, roomRevoked));
-      setPendingCodexApprovalForRoom(roomId, null);
-      setApprovalVisibleForRoom(roomId, false);
-      return;
-    }
-    const roomHostGateMessage =
-      room.hostStatus === "active"
-        ? `Only ${room.host} can approve host-side actions in this room.`
-        : "Claim host before approving host-side actions in this room.";
-    if (room.approvalPolicy === "never_host") {
-      setHostMessageForRoom(roomId, "This room is set to never host Codex turns.");
-      setPendingCodexApprovalForRoom(roomId, null);
-      setApprovalVisibleForRoom(roomId, false);
-      return;
-    }
-    if (!canApproveCodexTurn(room, localUser, roomLocked)) {
-      setHostMessageForRoom(roomId, roomHostGateMessage);
-      setApprovalVisibleForRoom(roomId, false);
-      return;
-    }
-    const compatibility = assessCodexCompatibility(codexProbe?.version);
-    if (codexProbe?.available && compatibility.status === "unsupported_older") {
-      setHostMessageForRoom(roomId, compatibility.message);
-      setApprovalVisibleForRoom(roomId, true);
-      return;
-    }
     const currentRoomMessages = messagesByRoom[roomId] ?? [];
     const turnMessages = approval?.messages
       ? refreshApprovalMessagesFromRoom(approval.messages, currentRoomMessages)
@@ -224,82 +231,7 @@ export function useCodexTurnActions({
           );
           return;
         }
-        const threadId = normalizeCodexThreadId(result.threadId);
-        if (threadId) {
-          setCodexThreadIdForRoom(roomId, threadId);
-          void getCodexGoal(roomId, threadId)
-            .then((goal) => {
-              setRoomGoalForRoom(roomId, goal ? codexGoalToRoomGoal(goal) : null);
-            })
-            .catch((error) => reportNonFatal("load a Codex goal after completing a turn", error));
-        }
-        const roomEvents = result.events
-          .map(projectCodexRoomEvent)
-          .filter((eventName): eventName is string => Boolean(eventName))
-          .slice(-16);
-        const roomStatus = projectCodexRoomStatus(result.status);
-        for (const eventName of roomEvents) {
-          await publishCodexEvent(
-            {
-              turnId,
-              status: "event",
-              message: eventName,
-              eventName,
-              model,
-              ...(threadId ? { threadId } : {})
-            },
-            room
-          );
-        }
-        await publishCodexEvent(
-          {
-            turnId,
-            status: roomStatus === "completed" ? "completed" : "failed",
-            message: `Codex turn finished with status: ${roomStatus}.`,
-            model,
-            ...(threadId ? { threadId } : {})
-          },
-          room
-        );
-        const imageAttachments = [];
-        for (const generatedImage of result.generatedImages ?? []) {
-          try {
-            imageAttachments.push(await createCodexImageAttachment(room, generatedImage));
-          } catch (error) {
-            appendTerminalLinesForRoom(
-              roomId,
-              [`Could not publish a Codex-generated image: ${String(error)}`],
-              maxTerminalActivityLines
-            );
-          }
-        }
-        const body =
-          result.transcript.trim() ||
-          (imageAttachments.length
-            ? "Generated an image."
-            : `Codex turn finished with status: ${roomStatus}.${roomEvents.length ? ` Events: ${roomEvents.slice(0, 8).join(", ")}` : ""}`);
-        await publishChatMessage(
-          {
-            id: crypto.randomUUID(),
-            author: `Codex via ${localUser.name}`,
-            role: "codex",
-            body,
-            time: formatMessageTime(),
-            createdAt: new Date().toISOString(),
-            ...(imageAttachments.length ? { attachments: imageAttachments } : {})
-          },
-          room
-        );
-        appendTerminalLinesForRoom(
-          roomId,
-          [
-            `Codex status: ${result.status}`,
-            `Codex thread: ${result.threadId ?? "unknown"}`,
-            ...result.events.slice(-8).map((event) => `event: ${event}`),
-            ...(result.stderr ? [`stderr: ${result.stderr}`] : [])
-          ],
-          maxTerminalActivityLines
-        );
+        await publishSuccessfulTurn(room, result);
       } catch (error) {
         if (classifyCodexFailure([String(error)]) === "usage_limit") {
           await executeCodexUsageLimit(
@@ -313,15 +245,7 @@ export function useCodexTurnActions({
           );
           return;
         }
-        await publishCodexEvent(
-          {
-            turnId,
-            status: "failed",
-            message: codexHostFailureRoomMessage,
-            model
-          },
-          room
-        );
+        await publishCodexEvent({ turnId, status: "failed", message: codexHostFailureRoomMessage, model }, room);
         await publishChatMessage(
           {
             id: crypto.randomUUID(),
@@ -335,12 +259,89 @@ export function useCodexTurnActions({
         );
         appendTerminalLinesForRoom(roomId, [`Codex error: ${String(error)}`], maxTerminalActivityLines);
       } finally {
-        if (continuationHandoff) {
-          setCodexContinuationForRoom(roomId, null);
-        }
+        if (continuationHandoff) setCodexContinuationForRoom(roomId, null);
         setCodexRunningForRoom(roomId, false);
         promoteNextCodexApprovalForRoom(roomId);
       }
+    }
+
+    async function publishSuccessfulTurn(room: ClientRoomRecord, result: Awaited<ReturnType<typeof runCodexTurn>>) {
+      const threadId = normalizeCodexThreadId(result.threadId);
+      if (threadId) {
+        setCodexThreadIdForRoom(roomId, threadId);
+        void getCodexGoal(roomId, threadId)
+          .then((goal) => {
+            setRoomGoalForRoom(roomId, goal ? codexGoalToRoomGoal(goal) : null);
+          })
+          .catch((error) => reportNonFatal("load a Codex goal after completing a turn", error));
+      }
+      const roomEvents = result.events
+        .map(projectCodexRoomEvent)
+        .filter((eventName): eventName is string => Boolean(eventName))
+        .slice(-16);
+      const roomStatus = projectCodexRoomStatus(result.status);
+      for (const eventName of roomEvents) {
+        await publishCodexEvent(
+          {
+            turnId,
+            status: "event",
+            message: eventName,
+            eventName,
+            model,
+            ...(threadId ? { threadId } : {})
+          },
+          room
+        );
+      }
+      await publishCodexEvent(
+        {
+          turnId,
+          status: roomStatus === "completed" ? "completed" : "failed",
+          message: `Codex turn finished with status: ${roomStatus}.`,
+          model,
+          ...(threadId ? { threadId } : {})
+        },
+        room
+      );
+      const imageAttachments = [];
+      for (const generatedImage of result.generatedImages ?? []) {
+        try {
+          imageAttachments.push(await createCodexImageAttachment(room, generatedImage));
+        } catch (error) {
+          appendTerminalLinesForRoom(
+            roomId,
+            [`Could not publish a Codex-generated image: ${String(error)}`],
+            maxTerminalActivityLines
+          );
+        }
+      }
+      const body =
+        result.transcript.trim() ||
+        (imageAttachments.length
+          ? "Generated an image."
+          : `Codex turn finished with status: ${roomStatus}.${roomEvents.length ? ` Events: ${roomEvents.slice(0, 8).join(", ")}` : ""}`);
+      await publishChatMessage(
+        {
+          id: crypto.randomUUID(),
+          author: `Codex via ${localUser.name}`,
+          role: "codex",
+          body,
+          time: formatMessageTime(),
+          createdAt: new Date().toISOString(),
+          ...(imageAttachments.length ? { attachments: imageAttachments } : {})
+        },
+        room
+      );
+      appendTerminalLinesForRoom(
+        roomId,
+        [
+          `Codex status: ${result.status}`,
+          `Codex thread: ${result.threadId ?? "unknown"}`,
+          ...result.events.slice(-8).map((event) => `event: ${event}`),
+          ...(result.stderr ? [`stderr: ${result.stderr}`] : [])
+        ],
+        maxTerminalActivityLines
+      );
     }
     await executeApprovedTurn(room);
   }
@@ -349,4 +350,30 @@ export function useCodexTurnActions({
     approveCodexTurn,
     promoteNextCodexApprovalForRoom
   };
+}
+
+function selectCodexApprovalContext(
+  state: ReturnType<typeof useAppStore.getState>,
+  requestedApproval: PendingCodexApproval | null
+) {
+  const selectedRoom = state.rooms.find((item) => item.id === state.selectedRoomId);
+  const activeApproval = selectedRoom ? pendingApprovalForRoom(state.codexRuntimeByRoom, selectedRoom.id) : null;
+  const approval = requestedApproval ?? activeApproval;
+  const roomId = approval?.roomId ?? selectedRoom?.id ?? state.selectedRoomId;
+  return {
+    approval,
+    roomId,
+    room: state.rooms.find((item) => item.id === roomId),
+    browserRequests: state.browserByRoom[roomId]?.requests ?? [],
+    gitStatus: state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.status ?? null,
+    codexContinuation: state.codexRuntimeByRoom[roomId]?.continuation ?? null,
+    codexThreadId: state.codexRuntimeByRoom[roomId]?.threadGraph?.activeThreadId ?? null
+  };
+}
+
+function pendingApprovalForRoom(
+  runtimeByRoom: ReturnType<typeof useAppStore.getState>["codexRuntimeByRoom"],
+  roomId: string
+) {
+  return runtimeByRoom[roomId]?.pendingApproval ?? null;
 }

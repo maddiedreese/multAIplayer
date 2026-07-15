@@ -36,7 +36,7 @@ Object.defineProperty(globalThis, "localStorage", {
 });
 
 const { buildDeviceFingerprintMarkdown, isDeviceKeyTrusted, loadTrustedDeviceKeys, trustDeviceKey, untrustDeviceKey } =
-  await import("../src/lib/deviceTrust");
+  await import("../src/lib/identity/deviceTrust");
 
 const trustStorageKey = "multaiplayer:trusted-device-keys:v1";
 const fingerprintA = `sha256:${Array(16).fill("abcd").join(":")}`;

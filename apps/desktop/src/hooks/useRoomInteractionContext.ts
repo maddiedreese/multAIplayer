@@ -1,10 +1,10 @@
-import { createChatActions } from "../lib/chatActions";
-import { createRoomVisibilityWarningActions } from "../lib/roomVisibilityWarningActions";
+import { createChatActions } from "../application/chat/chatActions";
+import { createRoomVisibilityWarningActions } from "../application/rooms/roomVisibilityWarningActions";
 import { useGitHubWorkflowState } from "./useGitHubWorkflowState";
 import { useRoomAccess } from "./useRoomAccess";
 import { useRoomInFlightReporters } from "./useRoomInFlightReporters";
 import { useRoomMemberRows } from "./useRoomMemberRows";
-import { buildRoomNotices } from "../lib/roomNotices";
+import { buildRoomNotices } from "./roomNotices";
 
 export function useRoomInteractionContext({
   inFlightReporters,

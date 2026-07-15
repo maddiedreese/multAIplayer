@@ -1,6 +1,6 @@
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
-import type { WorkspaceRecordActions } from "../lib/workspaceRecordActions";
+import type { WorkspaceRecordActions } from "../application/workspace/workspaceRecordActions";
 import { useInviteActions } from "./useInviteActions";
 import { useAppStore } from "../store/appStore";
 

@@ -29,7 +29,7 @@ Show the root workspaces:
 - `scripts`: repository policy and verification gates.
 
 Point out that imports are intentionally directional and `scripts/eslint-boundaries.test.mjs` guards those boundaries.
-For the native boundary, also show `apps/desktop/src-tauri/src/mls_native.rs`: its `types`, `invites`, and test child modules preserve one Tauri command API while keeping IPC records and invite policy independently reviewable. Repository hygiene caps every production Rust source file at 1,000 physical lines.
+For the native boundary, also show `apps/desktop/src-tauri/src/mls_native.rs`: its identity, crypto, history, group-command, store-support, `types`, and `invites` child modules preserve one Tauri command API while keeping responsibilities independently reviewable. Reviewability comes from domain splits and semantic tests rather than a physical-line threshold.
 
 Before moving on, trace one invitation transport without exposing a real link. Start at `inviteLinkActions.ts`, where the app creates an HTTPS `open.multaiplayer.com/invite` URL whose entire payload is a fragment. Then show `invite_link.rs` and `nativeInviteIntake.ts`: macOS associated-domain delivery is parsed again in Rust, retained in one one-shot memory slot, announced by a content-free event, and delegated to the existing MLS join action. Contrast that with the website landing, which scrubs the fragment before hydration and uses an in-memory cross-host retry rather than storage or a custom scheme. Finally show `trusted_auth.rs` and `authExternalUrl.ts` as the independent Rust/TypeScript validation pair for opening GitHub or ChatGPT in the system browser.
 
@@ -43,7 +43,13 @@ Use `docs/codex-hosting.md` to trace a Codex request. Show the approval UI in th
 
 ## 12:00 — State and UI boundaries
 
-Open the desktop store modules and one component test. Explain that components render state and dispatch actions, while protocol, crypto, transport, and native capabilities remain behind adapters. New contributors should extend an existing domain module rather than add a cross-cutting import.
+Open the desktop store modules and one component test. Then show the three desktop code layers:
+
+- `apps/desktop/src/lib/<domain>` contains pure domain and platform modules; direct files at the `lib` root are forbidden;
+- `apps/desktop/src/application/<domain>` owns store-aware workflows and use cases; and
+- `apps/desktop/src/presentation/<domain>` owns component-facing projections and view models.
+
+Components render state and dispatch actions, while protocol, crypto, transport, and native capabilities remain behind adapters. The ESLint desktop-architecture rules enforce the layer boundaries and the measured acyclic dependency matrix between `lib` domains. New contributors should extend the narrowest existing domain rather than add a flat helper or cross-cutting import.
 
 ## 15:00 — Verification ladder
 

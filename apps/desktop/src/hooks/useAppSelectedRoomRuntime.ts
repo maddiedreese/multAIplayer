@@ -53,25 +53,49 @@ export function useAppSelectedRoomRuntime({
     browserRequests,
     roomTerminals,
     selectedTerminalId,
-    pendingCodexApprovalsByRoom: activeMap(roomId, codexRuntime?.pendingApproval),
-    queuedCodexApprovalsByRoom: activeMap(roomId, codexRuntime?.queuedApprovals),
-    approvalVisibleByRoom: activeMap(roomId, codexRuntime?.approvalVisible),
-    hostHandoffsByRoom: activeMap(roomId, codexRuntime?.hostHandoffs),
-    terminalRequestsByRoom: activeMap(roomId, terminalRuntime?.requests),
-    localPreviewsByRoom: activeMap(roomId, localPreview?.previews),
-    localPreviewBusyByRoom: activeMap(roomId, localPreview?.busy),
-    inviteRequestsByRoom: activeMap(roomId, invite?.requests),
-    codexEventsByRoom: activeMap(roomId, codexRuntime?.events),
-    codexActivitiesByRoom: activeMap(roomId, codexRuntime?.activities),
-    gitWorkflowEventsByRoom: activeMap(roomId, gitRuntime?.workflow?.events),
-    githubActionsEventsByRoom: activeMap(roomId, gitRuntime?.actions?.events),
-    codexThreadIdsByRoom: activeMap(roomId, codexRuntime?.threadGraph?.activeThreadId),
-    codexThreadGraphsByRoom: activeMap(roomId, codexRuntime?.threadGraph),
-    codexRunningByRoom: activeMap(roomId, codexRuntime?.running),
-    hostBusyByRoom: activeMap(roomId, roomSettings?.hostBusy),
-    settingsBusyByRoom: activeMap(roomId, roomSettings?.settingsBusy),
-    membershipCommitBusyByRoom: activeMap(roomId, invite?.membershipCommitBusy)
+    ...codexRuntimeMaps(roomId, codexRuntime),
+    ...supportingRuntimeMaps(roomId, { terminalRuntime, localPreview, invite, gitRuntime, roomSettings })
   });
+}
+
+function codexRuntimeMaps(
+  roomId: string,
+  runtime: ReturnType<typeof useAppStore.getState>["codexRuntimeByRoom"][string] | undefined
+) {
+  return {
+    pendingCodexApprovalsByRoom: activeMap(roomId, runtime?.pendingApproval),
+    queuedCodexApprovalsByRoom: activeMap(roomId, runtime?.queuedApprovals),
+    approvalVisibleByRoom: activeMap(roomId, runtime?.approvalVisible),
+    hostHandoffsByRoom: activeMap(roomId, runtime?.hostHandoffs),
+    codexEventsByRoom: activeMap(roomId, runtime?.events),
+    codexActivitiesByRoom: activeMap(roomId, runtime?.activities),
+    codexThreadIdsByRoom: activeMap(roomId, runtime?.threadGraph?.activeThreadId),
+    codexThreadGraphsByRoom: activeMap(roomId, runtime?.threadGraph),
+    codexRunningByRoom: activeMap(roomId, runtime?.running)
+  };
+}
+
+function supportingRuntimeMaps(
+  roomId: string,
+  sources: Pick<ReturnType<typeof useAppStore.getState>, never> & {
+    terminalRuntime: ReturnType<typeof useAppStore.getState>["terminalRuntimeByRoom"][string] | undefined;
+    localPreview: ReturnType<typeof useAppStore.getState>["localPreviewByRoom"][string] | undefined;
+    invite: ReturnType<typeof useAppStore.getState>["inviteByRoom"][string] | undefined;
+    gitRuntime: ReturnType<typeof useAppStore.getState>["gitWorkflowRuntimeByRoom"][string] | undefined;
+    roomSettings: ReturnType<typeof useAppStore.getState>["roomSettingsByRoom"][string] | undefined;
+  }
+) {
+  return {
+    terminalRequestsByRoom: activeMap(roomId, sources.terminalRuntime?.requests),
+    localPreviewsByRoom: activeMap(roomId, sources.localPreview?.previews),
+    localPreviewBusyByRoom: activeMap(roomId, sources.localPreview?.busy),
+    inviteRequestsByRoom: activeMap(roomId, sources.invite?.requests),
+    gitWorkflowEventsByRoom: activeMap(roomId, sources.gitRuntime?.workflow?.events),
+    githubActionsEventsByRoom: activeMap(roomId, sources.gitRuntime?.actions?.events),
+    hostBusyByRoom: activeMap(roomId, sources.roomSettings?.hostBusy),
+    settingsBusyByRoom: activeMap(roomId, sources.roomSettings?.settingsBusy),
+    membershipCommitBusyByRoom: activeMap(roomId, sources.invite?.membershipCommitBusy)
+  };
 }
 
 function activeMap<T>(roomId: string, value: T | null | undefined): Record<string, T> {

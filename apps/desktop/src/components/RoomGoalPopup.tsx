@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Bot, Pause, Pencil, Play, Trash2 } from "lucide-react";
-import { formatRoomGoalDuration } from "../lib/roomGoals";
+import { formatRoomGoalDuration } from "../lib/room/roomGoals";
 import type { RoomGoal } from "../types";
 
 export function RoomGoalPopup({

@@ -6,10 +6,18 @@ impl MlsEngine {
         room_id: &str,
         next_leaf: u32,
         next_device_id: String,
+        transfer_id: String,
     ) -> Result<OutboundCommit, EngineError> {
         self.ensure_host(room_id)?;
         self.ensure_application_outbox_drained(room_id)?;
-        if next_device_id.is_empty() || next_device_id.len() > 128 {
+        if next_device_id.is_empty()
+            || next_device_id.len() > 128
+            || transfer_id.is_empty()
+            || transfer_id.len() > 128
+            || !transfer_id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b':'))
+        {
             return Err(EngineError::InvalidInput);
         }
         let group_storage = self.group_storage.clone();
@@ -18,9 +26,10 @@ impl MlsEngine {
             .get_mut(room_id)
             .ok_or(EngineError::GroupNotFound)?;
         let record = HostContext {
-            version: 1,
+            version: 2,
             host_leaf: next_leaf,
             host_device_id: next_device_id,
+            transfer_id: Some(transfer_id.clone()),
         };
         if roster_credential(group, next_leaf)?.device_id != record.host_device_id {
             return Err(EngineError::InvalidInput);
@@ -53,7 +62,8 @@ impl MlsEngine {
         let next = roster_credential(group, next_leaf)?;
         let parent_epoch = group.current_epoch();
         let authorization = HostTransferAuthorizationPayload {
-            version: 1,
+            version: 2,
+            transfer_id,
             room_id: room_id.to_owned(),
             commit_message_id: commit_message_id.clone(),
             parent_epoch: group.current_epoch(),

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "../src/lib/sidebarSearch";
+import {
+  findSidebarMessageHits,
+  mergeSearchableMessages,
+  searchMatches
+} from "../src/presentation/sidebar/sidebarSearch";
 
 const historyMessages = {
   "room-alpha": [{ id: "old-alpha", author: "Maddie", body: "older local history mention", attachments: [] }],

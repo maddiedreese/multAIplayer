@@ -48,6 +48,10 @@ pub(crate) struct RosterPublic {
     pub(super) roster: Vec<RosterEntry>,
     pub(super) self_leaf: u32,
     pub(super) epoch: u64,
+    pub(super) host_leaf: u32,
+    pub(super) host_device_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) host_transfer_id: Option<String>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -359,6 +363,7 @@ pub(crate) struct TransferRequest {
     pub(super) room_id: String,
     pub(super) next_host_leaf: u32,
     pub(super) next_host_device_id: String,
+    pub(super) transfer_id: String,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

@@ -6,7 +6,7 @@ import {
   defaultCodexSandboxLevel,
   defaultCodexSpeed
 } from "@multaiplayer/protocol";
-import { buildRoomInspectorModelProjection } from "../src/lib/roomInspectorModelProjection";
+import { buildRoomInspectorModelProjection } from "../src/presentation/rooms/roomInspectorModelProjection";
 import { seededRooms } from "./support/workspaceFixtures";
 
 test("room inspector model projection applies protocol defaults without duplicating state", () => {

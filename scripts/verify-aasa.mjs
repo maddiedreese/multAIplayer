@@ -4,26 +4,33 @@ import { pathToFileURL } from "node:url";
 export const associatedDomainHosts = ["multaiplayer.com", "open.multaiplayer.com"];
 export const bundleIdentifier = "com.multaiplayer.desktop";
 
+function hasExactAppBinding(entry, appId) {
+  if (entry.appID === appId) return entry.appIDs === undefined;
+  return (
+    entry.appID === undefined && Array.isArray(entry.appIDs) && entry.appIDs.length === 1 && entry.appIDs[0] === appId
+  );
+}
+
+function componentPath(component, allowedPaths) {
+  if (!component || typeof component !== "object" || Array.isArray(component)) return null;
+  if (!Object.keys(component).every((key) => key === "/" || key === "comment")) return null;
+  const path = component["/"];
+  return typeof path === "string" && allowedPaths.has(path) ? path : null;
+}
+
 export function validateAssociationDocument(document, appId) {
   if (!document || typeof document !== "object" || Array.isArray(document)) return false;
   const details = document.applinks?.details;
   if (!Array.isArray(details) || details.length !== 1) return false;
   const [entry] = details;
   if (!entry || !Array.isArray(entry.components)) return false;
-  const exactAppBinding =
-    (entry.appID === appId && entry.appIDs === undefined) ||
-    (entry.appID === undefined &&
-      Array.isArray(entry.appIDs) &&
-      entry.appIDs.length === 1 &&
-      entry.appIDs[0] === appId);
-  if (!exactAppBinding || entry.components.length !== 2) return false;
+  if (!hasExactAppBinding(entry, appId) || entry.components.length !== 2) return false;
   const allowedPaths = new Set(["/invite", "/invite/"]);
   const paths = new Set();
   for (const component of entry.components) {
-    if (!component || typeof component !== "object" || Array.isArray(component)) return false;
-    if (!Object.keys(component).every((key) => key === "/" || key === "comment")) return false;
-    if (typeof component["/"] !== "string" || !allowedPaths.has(component["/"])) return false;
-    paths.add(component["/"]);
+    const path = componentPath(component, allowedPaths);
+    if (!path) return false;
+    paths.add(path);
   }
   return paths.size === allowedPaths.size;
 }

@@ -45,7 +45,7 @@ Object.defineProperty(globalThis, "__TAURI_INTERNALS__", {
   }
 });
 
-const history = await import("../src/lib/localHistory");
+const history = await import("../src/lib/history/localHistory");
 
 beforeEach(() => {
   calls.length = 0;

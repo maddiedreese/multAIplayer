@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { connectRelay, RelayPublishRejectedError } from "../src/lib/relayClient";
+import { connectRelay, RelayPublishRejectedError } from "../src/lib/relay/relayClient";
 
 class FakeWebSocket extends EventTarget {
   static readonly OPEN = 1;

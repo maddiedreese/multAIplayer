@@ -37,6 +37,73 @@ test("applications keep their distinct dependency boundaries", async () => {
   assert.match(desktopToRelay[0].message, /@multaiplayer\/desktop does not depend on @multaiplayer\/relay/);
 });
 
+test("desktop library modules must live under a named domain", async () => {
+  const flat = await ruleMessages(
+    "apps/desktop/src/lib/brandNewHelper.ts",
+    "export const value = 1;",
+    "desktop/no-flat-lib-module"
+  );
+  assert.equal(flat.length, 1);
+  assert.match(flat[0].message, /named domain directory/);
+  assert.deepEqual(
+    await ruleMessages(
+      "apps/desktop/src/lib/core/brandNewHelper.ts",
+      "export const value = 1;",
+      "desktop/no-flat-lib-module"
+    ),
+    []
+  );
+  const unknown = await ruleMessages(
+    "apps/desktop/src/lib/misc/brandNewHelper.ts",
+    "export const value = 1;",
+    "desktop/no-flat-lib-module"
+  );
+  assert.equal(unknown.length, 1);
+  assert.match(unknown[0].message, /reviewed domain/);
+});
+
+test("desktop layers and library domains enforce the acyclic dependency table", async () => {
+  const cases = [
+    ["apps/desktop/src/lib/core/probe.ts", 'import "../codex/value";', 1],
+    ["apps/desktop/src/lib/browser/probe.ts", 'import "../access/value";', 0],
+    ["apps/desktop/src/lib/browser/probe.ts", 'import "../room/value";', 1],
+    ["apps/desktop/src/lib/room/probe.ts", 'import "../browser/value";', 0],
+    ["apps/desktop/src/lib/history/probe.ts", 'import type { Value } from "../codex/value";', 0],
+    ["apps/desktop/src/lib/core/probe.ts", 'import type { State } from "../../store/appStore";', 1],
+    ["apps/desktop/src/lib/core/probe.ts", 'import type { View } from "../../components/View";', 1],
+    ["apps/desktop/src/lib/core/probe.ts", 'import type { Hook } from "../../hooks/useHook";', 1],
+    ["apps/desktop/src/application/rooms/probe.ts", 'import "../../lib/room/roomDefaults";', 0],
+    ["apps/desktop/src/application/rooms/probe.ts", 'import "../../store/appStore";', 0],
+    ["apps/desktop/src/application/rooms/probe.ts", 'import "../../components/View";', 1],
+    ["apps/desktop/src/application/rooms/probe.ts", 'import "../../hooks/useHook";', 1],
+    ["apps/desktop/src/application/rooms/probe.ts", 'import "../../presentation/rooms/view";', 1],
+    ["apps/desktop/src/presentation/rooms/probe.ts", 'import "../../components/View";', 0],
+    ["apps/desktop/src/presentation/rooms/probe.ts", 'import "../../application/rooms/actions";', 0],
+    ["apps/desktop/src/presentation/rooms/probe.ts", 'import "../../store/appStore";', 1],
+    ["apps/desktop/src/lib/core/probe.ts", 'import "../newFlatHelper";', 1],
+    ["apps/desktop/src/lib/core/probe.ts", 'import "@/store/appStore";', 1]
+  ];
+  for (const [filePath, source, expected] of cases) {
+    const messages = await ruleMessages(filePath, source, "desktop/layer-boundaries");
+    assert.equal(messages.length, expected, `${filePath}: ${source}`);
+  }
+});
+
+test("desktop layer boundaries cover re-exports and dynamic imports", async () => {
+  for (const source of [
+    'export { value } from "../../components/View";',
+    'export * from "../../components/View";',
+    'const view = import("../../components/View");'
+  ]) {
+    const messages = await ruleMessages(
+      "apps/desktop/src/application/rooms/probe.ts",
+      source,
+      "desktop/layer-boundaries"
+    );
+    assert.equal(messages.length, 1, source);
+  }
+});
+
 test("workspace consumers cannot bypass public package entry points", async () => {
   const deepImport = await boundaryMessages(
     "apps/desktop/src/boundary-probe.ts",
@@ -47,7 +114,7 @@ test("workspace consumers cannot bypass public package entry points", async () =
 
   const relativeImport = await boundaryMessages(
     "packages/github/src/boundary-probe.ts",
-    'import "../../protocol/src/relay-messages.js";'
+    'import "../../../packages/protocol/src/relay-messages.js";'
   );
   assert.equal(relativeImport.length, 1);
   assert.match(relativeImport[0].message, /reaching across workspace source trees/);

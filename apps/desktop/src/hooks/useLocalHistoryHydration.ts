@@ -6,9 +6,9 @@ import {
   loadTeamHistorySettings,
   saveHistorySettings,
   type LocalHistorySettings
-} from "../lib/localHistory";
-import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
-import { reportNonFatal } from "../lib/nonFatalReporting";
+} from "../lib/history/localHistory";
+import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/history/localRoomHistoryPayload";
+import { reportNonFatal } from "../lib/core/nonFatalReporting";
 import type { ChatMessage, LocalRoomHistoryPayload, LocalRoomReadState } from "../types";
 
 interface LatestRef<T> {

@@ -1,8 +1,8 @@
 import type { MutableRefObject } from "react";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import type { RelayClient } from "../lib/relayClient";
+import type { RelayClient } from "../lib/relay/relayClient";
 import type { BrowserAccessRequest, ChatMessage, HostHandoffRecord, QueuedCodexTurn, RelayStatus } from "../types";
-import type { GitStatusSummary, TerminalSnapshot } from "../lib/localBackend";
+import type { GitStatusSummary, TerminalSnapshot } from "../lib/platform/localBackend";
 
 export interface UseHostHandoffActionsOptions {
   hasSelectedRoom: boolean;

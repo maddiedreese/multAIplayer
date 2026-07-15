@@ -7,7 +7,7 @@ const workspacePackages = [
   "@multaiplayer/relay"
 ];
 const relativeWorkspaceSourcePattern =
-  "^(?:\\.\\./)+(?:apps/(?:desktop|relay)|packages/(?:codex|git|github|protocol)|(?:desktop|relay|codex|git|github|protocol))(?:/|$)";
+  "^(?:\\.\\./)+(?:apps/(?:desktop|relay)|packages/(?:codex|git|github|protocol))(?:/|$)";
 
 export function packageBoundaryRule(workspaceName, dependencies = []) {
   const dependencySet = new Set(dependencies);

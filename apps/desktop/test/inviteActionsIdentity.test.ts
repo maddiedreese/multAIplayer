@@ -4,7 +4,7 @@ import { JSDOM } from "jsdom";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { createElement, StrictMode, type ReactNode } from "react";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import type { UseInviteActionsOptions } from "../src/lib/invite/inviteActionTypes";
+import type { UseInviteActionsOptions } from "../src/application/invite/inviteActionTypes";
 import { useInviteActions, usePendingInviteRecovery } from "../src/hooks/useInviteActions";
 import { useAppStore } from "../src/store/appStore";
 

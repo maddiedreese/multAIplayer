@@ -23,6 +23,7 @@ interface RegisterGitHubRoutesOptions {
   maxDisplayNameChars: number;
   maxRoomProjectPathChars: number;
   maxAccessTokenChars: number;
+  isAccountRestricted: (userId: string) => boolean;
   maxShortTextChars: number;
   maxMediumTextChars: number;
   maxUrlChars: number;

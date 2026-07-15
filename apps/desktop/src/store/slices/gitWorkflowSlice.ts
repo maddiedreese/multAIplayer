@@ -1,13 +1,13 @@
 import type { StateCreator } from "zustand";
 import type { GitHubActionsEventPlaintextPayload, GitWorkflowEventPlaintextPayload } from "@multaiplayer/protocol";
-import type { GitHubActionRun } from "../../lib/authClient";
+import type { GitHubActionRun } from "../../lib/identity/authClient";
 import {
   defaultGitWorkflowDraft,
   updateGitWorkflowDraftRecord,
   type GitWorkflowDraft
-} from "../../lib/gitWorkflowDraft";
-import type { GitStatusSummary } from "../../lib/localBackend";
-import { omitRecordKey } from "../../lib/setUtils";
+} from "../../lib/git/gitWorkflowDraft";
+import type { GitStatusSummary } from "../../lib/platform/localBackend";
+import { omitRecordKey } from "../../lib/core/setUtils";
 import type { AppStoreState } from "../appStore";
 
 export interface GitWorkflowRoomState {

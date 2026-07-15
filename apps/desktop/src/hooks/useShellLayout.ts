@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { clamp } from "../lib/appFormatters";
+import { clamp } from "../lib/formatting/appFormatters";
 import { useAppStore } from "../store/appStore";
 
 export function useShellLayout() {

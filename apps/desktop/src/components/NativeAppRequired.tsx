@@ -1,4 +1,4 @@
-import { PRIVACY_POLICY_URL, PRODUCT_SITE_URL, TERMS_OF_SERVICE_URL } from "../lib/productLinks";
+import { PRIVACY_POLICY_URL, PRODUCT_SITE_URL, TERMS_OF_SERVICE_URL } from "../lib/core/productLinks";
 
 /**
  * The production product is native-only. Vite still serves a browser document for

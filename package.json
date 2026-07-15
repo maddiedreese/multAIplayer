@@ -22,6 +22,7 @@
     "format:check": "prettier --check eslint.config.mjs \"{apps,packages,scripts,e2e,tools}/**/*.{ts,tsx,mjs}\"",
     "test:scripts": "node --test scripts/*.test.mjs",
     "check:tauri-command-errors": "node scripts/check-tauri-command-errors.mjs",
+    "check:threat-model-changelog": "node scripts/check-threat-model-changelog.mjs",
     "test:harness": "node --import tsx --test e2e/native-shell/*.test.ts",
     "mutation:summary": "node scripts/summarize-mutation-report.mjs",
     "test:workspaces": "npm run test --workspaces --if-present",
@@ -55,7 +56,6 @@
     "dev": "concurrently -k --names relay,desktop --prefix-colors cyan,green \"npm:dev:relay\" \"npm:dev:desktop\"",
     "dev:desktop": "npm run dev -w @multaiplayer/desktop",
     "build:mls-validator:dev": "cargo build --locked --manifest-path apps/desktop/src-tauri/Cargo.toml -p mls-core --bin mls-keypackage-validator",
-    "bench:mls-validator": "node scripts/benchmark-mls-validator.mjs",
     "dev:relay": "npm run build:mls-validator:dev && npm run dev -w @multaiplayer/relay",
     "tauri:dev": "npm run tauri:dev -w @multaiplayer/desktop",
     "tauri:build": "npm run tauri:build -w @multaiplayer/desktop"

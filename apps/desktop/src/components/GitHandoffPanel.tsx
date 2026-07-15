@@ -1,8 +1,8 @@
 import { Copy } from "lucide-react";
 import { GitHubIcon } from "./GitHubIcon";
 import type { GitWorkflowApprovalPreview } from "@multaiplayer/git";
-import type { GitHubWorkflowReadiness } from "../lib/githubWorkflowReadiness";
-import type { GitWorkflowDraft } from "../lib/gitWorkflowDraft";
+import type { GitHubWorkflowReadiness } from "../lib/git/githubWorkflowReadiness";
+import type { GitWorkflowDraft } from "../lib/git/gitWorkflowDraft";
 
 export interface GitApprovalPreviewDisplay {
   error: string | null;

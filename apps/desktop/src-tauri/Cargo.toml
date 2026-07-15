@@ -21,6 +21,7 @@ native-e2e = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]
 tauri-build = { version = "=2.6.3", features = [] }
 
 [dependencies]
+age = { version = "=0.11.1", default-features = false }
 base64 = "=0.22.1"
 chrono = { version = "=0.4.45", default-features = false, features = ["clock", "std"] }
 codex-activity-projection = { path = "crates/codex-activity-projection" }
