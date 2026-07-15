@@ -9,6 +9,81 @@ interface NativeKeyPackageUpload {
   ciphersuite: number;
 }
 
+interface DeviceListResponse {
+  status?: number;
+  retryAfter?: string | null;
+  body?: {
+    devices?: Array<{ userId: string; deviceId: string }>;
+    retryAfterSeconds?: number;
+    code?: string;
+    message?: string;
+  };
+  error?: string;
+}
+
+interface DeviceRegistrationPollOptions {
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+  now?: () => number;
+  sleep?: (delayMs: number) => Promise<void>;
+}
+
+const DEVICE_REGISTRATION_TIMEOUT_MS = 30_000;
+const DEVICE_REGISTRATION_POLL_INTERVAL_MS = 750;
+
+export async function pollForRegisteredDevice(
+  fetchDevices: () => Promise<DeviceListResponse>,
+  guestUserId: string,
+  options: DeviceRegistrationPollOptions = {}
+) {
+  const timeoutMs = options.timeoutMs ?? DEVICE_REGISTRATION_TIMEOUT_MS;
+  const pollIntervalMs = options.pollIntervalMs ?? DEVICE_REGISTRATION_POLL_INTERVAL_MS;
+  const now = options.now ?? Date.now;
+  const sleep = options.sleep ?? ((delayMs: number) => new Promise<void>((resolve) => setTimeout(resolve, delayMs)));
+  const deadline = now() + timeoutMs;
+  let attempts = 0;
+  let lastResponse: DeviceListResponse | undefined;
+
+  while (now() < deadline) {
+    attempts += 1;
+    lastResponse = await fetchDevices();
+    const deviceId = lastResponse.body?.devices?.find((device) => device.userId === guestUserId)?.deviceId;
+    if (lastResponse.status === 200 && deviceId) return deviceId;
+
+    const remainingMs = deadline - now();
+    if (remainingMs <= 0) break;
+    await sleep(Math.min(deviceRegistrationPollDelay(lastResponse, pollIntervalMs), remainingMs));
+  }
+
+  throw new Error(
+    `authenticated native guest device was not registered with the relay after ${attempts} checks; ${describeDeviceListResponse(lastResponse)}`
+  );
+}
+
+function deviceRegistrationPollDelay(response: DeviceListResponse, pollIntervalMs: number) {
+  if (response.status !== 429) return pollIntervalMs;
+  const headerSeconds = Number(response.retryAfter);
+  const bodySeconds = response.body?.retryAfterSeconds;
+  const retryAfterSeconds =
+    typeof bodySeconds === "number" && Number.isFinite(bodySeconds) && bodySeconds >= 0
+      ? bodySeconds
+      : Number.isFinite(headerSeconds) && headerSeconds >= 0
+        ? headerSeconds
+        : 0;
+  return Math.max(pollIntervalMs, Math.ceil(retryAfterSeconds * 1_000));
+}
+
+function describeDeviceListResponse(response: DeviceListResponse | undefined) {
+  if (!response) return "the relay returned no response";
+  const details = [
+    response.status === undefined ? undefined : `HTTP ${response.status}`,
+    response.body?.code,
+    response.body?.message,
+    response.error
+  ].filter((value): value is string => Boolean(value));
+  return details.length > 0 ? `last response: ${details.join(": ")}` : "last response had no status or error detail";
+}
+
 async function generateNativeKeyPackage(browser: Browser): Promise<NativeKeyPackageUpload> {
   return browser
     .executeAsync((done) => {
@@ -90,28 +165,25 @@ export async function assertTamperedKeyPackageRejected(
   teamId: string,
   guestUserId: string
 ) {
-  let deviceId: string | undefined;
-  await guest.waitUntil(
-    async () => {
-      const devices = await guest.executeAsync(
+  const deviceId = await pollForRegisteredDevice(
+    () =>
+      guest.executeAsync(
         (baseUrl, targetTeamId, done) => {
           fetch(`${baseUrl}/teams/${encodeURIComponent(targetTeamId)}/devices`, { credentials: "include" })
-            .then(async (response) => done({ status: response.status, body: await response.json() }))
+            .then(async (response) =>
+              done({
+                status: response.status,
+                retryAfter: response.headers.get("retry-after"),
+                body: await response.json()
+              })
+            )
             .catch((error) => done({ error: String(error) }));
         },
         relayBaseUrl,
         teamId
-      );
-      const deviceResponse = devices as {
-        status?: number;
-        body?: { devices?: Array<{ userId: string; deviceId: string }> };
-      };
-      deviceId = deviceResponse.body?.devices?.find((device) => device.userId === guestUserId)?.deviceId;
-      return deviceResponse.status === 200 && Boolean(deviceId);
-    },
-    { timeout: 30_000, timeoutMsg: "authenticated native guest device was not registered with the relay" }
+      ) as Promise<DeviceListResponse>,
+    guestUserId
   );
-  assert.ok(deviceId, "authenticated native guest device was not registered with the relay");
 
   await guest.waitUntil(
     async () => {
