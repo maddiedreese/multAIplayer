@@ -7,7 +7,7 @@ use mls_core::{
     generate_hpke_key_pair, issue_capability, mac_binding, mac_response_binding, open, seal,
     validate_credential, validate_key_package_upload, verify_request_binding,
     verify_response_binding, BasicAppCredential, CapabilityBinding, DeviceAuthSigner,
-    EncryptedStore, EngineError, ExporterCiphertext, HpkeKeyPair, JoinAdmissionMetadata,
+    EncryptedStore, ExporterCiphertext, HpkeKeyPair, JoinAdmissionMetadata,
     KeyPackageUpload, MlsEngine, PendingInviteRequest, SealedPayload, WelcomeRetryMetadata,
 };
 use sha2::{Digest, Sha256};
@@ -401,17 +401,24 @@ pub(crate) fn mls_encrypt_application(
     state: tauri::State<'_, MlsNativeState>,
 ) -> crate::command_error::CommandResult<OutboundApplicationResponse> {
     let payload = decode(&request.payload)?;
-    let config_epoch = if request.authenticated_data.kind == "room.config" {
+    let room_config = if request.authenticated_data.kind == "room.config" {
         Some(validate_room_config_payload(&payload)?)
     } else {
         None
     };
-    Ok(with_engine(&state, |engine| {
-        if config_epoch
-            .is_some_and(|expected| engine.current_epoch(&request.room_id).ok() != Some(expected))
-        {
-            return Err(EngineError::InvalidInput);
+    if let Some(config) = room_config.as_ref() {
+        let epoch = with_engine(&state, |engine| engine.current_epoch(&request.room_id))?;
+        if config.emitting_epoch != epoch {
+            return Err("Encrypted room configuration is invalid".into());
         }
+        // Persist the validated local source of truth before constructing the
+        // outbound record. A crash or relay restart can then retry the
+        // post-Add snapshot without consulting relay metadata.
+        with_store(&state, |store| {
+            store.put_room_config(&request.room_id, &payload)
+        })?;
+    }
+    Ok(with_engine(&state, |engine| {
         engine.encrypt_application(
             &request.room_id,
             &request.message_id,
@@ -430,7 +437,7 @@ pub(crate) fn mls_encrypt_application(
     })
 }
 
-fn validate_room_config_payload(payload: &[u8]) -> Result<u64, String> {
+fn validate_room_config_payload(payload: &[u8]) -> Result<RoomConfigPayload, String> {
     let config: RoomConfigPayload = serde_json::from_slice(payload)
         .map_err(|_| "Encrypted room configuration is invalid".to_string())?;
     let bounded_text = |value: &str, max: usize| {
@@ -467,7 +474,19 @@ fn validate_room_config_payload(payload: &[u8]) -> Result<u64, String> {
         return Err("Encrypted room configuration is invalid".to_string());
     }
     let _ = config.codex_raw_reasoning_enabled;
-    Ok(config.emitting_epoch)
+    Ok(config)
+}
+
+#[tauri::command]
+pub(crate) fn mls_room_config_load(
+    request: RoomRequest,
+    state: tauri::State<'_, MlsNativeState>,
+) -> crate::command_error::CommandResult<Option<RoomConfigPayload>> {
+    let payload = with_store(&state, |store| store.room_config(&request.room_id))?;
+    payload
+        .map(|value| validate_room_config_payload(&value))
+        .transpose()
+        .map_err(Into::into)
 }
 
 #[tauri::command]

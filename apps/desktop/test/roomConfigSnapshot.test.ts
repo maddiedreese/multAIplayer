@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { ClientRoomRecord, RoomConfigPlaintextPayload } from "@multaiplayer/protocol";
-import { applyRoomConfig, roomConfigPayload, shouldApplyRoomConfig } from "../src/lib/roomConfigSnapshot";
+import {
+  applyRoomConfig,
+  resolveRoomConfigForPublish,
+  roomConfigPayload,
+  shouldApplyRoomConfig
+} from "../src/lib/roomConfigSnapshot";
 import { ensureRoomDefaults } from "../src/lib/roomDefaults";
 import { seededRooms } from "./support/workspaceFixtures";
 
@@ -77,4 +82,26 @@ test("public relay room updates cannot overwrite an MLS-derived local config", (
   assert.equal(merged.codexModel, configured.codexModel);
   assert.equal(merged.configRevision, 12);
   assert.equal(merged.configEpoch, 9);
+});
+
+test("post-Add publication recovers host configuration from the encrypted native store", async () => {
+  const configured = room({ projectPath: "/private/current", configRevision: 12, configEpoch: 9 });
+  const lostInMemory = room({ projectPath: "", configRevision: 0, configEpoch: 0, configPending: true });
+  const persisted = roomConfigPayload(configured, 9, 12);
+  const recovered = await resolveRoomConfigForPublish(lostInMemory, async (roomId) => {
+    assert.equal(roomId, lostInMemory.id);
+    return persisted;
+  });
+  assert.equal(recovered.projectPath, "/private/current");
+  assert.equal(recovered.configRevision, 12);
+  assert.equal(recovered.configEpoch, 9);
+  assert.equal(recovered.configPending, false);
+});
+
+test("post-Add publication fails closed when no valid local configuration survives", async () => {
+  const lostInMemory = room({ projectPath: "", configRevision: 0, configEpoch: 0, configPending: true });
+  await assert.rejects(
+    resolveRoomConfigForPublish(lostInMemory, async () => null),
+    /no longer has the encrypted room configuration/
+  );
 });

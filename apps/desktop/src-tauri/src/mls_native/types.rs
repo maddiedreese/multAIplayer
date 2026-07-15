@@ -297,9 +297,9 @@ pub(crate) struct EncryptRequest {
     pub(super) authenticated_data: ApplicationAuthenticatedDataInput,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct RoomConfigPayload {
+pub(crate) struct RoomConfigPayload {
     pub(super) event_type: String,
     pub(super) config_revision: u64,
     pub(super) emitting_epoch: u64,

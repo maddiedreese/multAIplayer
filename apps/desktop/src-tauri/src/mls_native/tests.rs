@@ -287,8 +287,10 @@ fn native_room_config_validation_is_strict_and_bounded() {
         "codexSandboxLevel": "workspace_write"
     });
     assert_eq!(
-        validate_room_config_payload(&serde_json::to_vec(&valid).unwrap()),
-        Ok(4)
+        validate_room_config_payload(&serde_json::to_vec(&valid).unwrap())
+            .unwrap()
+            .emitting_epoch,
+        4
     );
     let mut unknown = valid.clone();
     unknown["accessToken"] = serde_json::json!("must-not-enter-mls");

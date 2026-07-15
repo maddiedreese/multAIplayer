@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { loadWorkspace } from "../lib/workspaceClient";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
+import { useAppStore } from "../store/appStore";
 
 interface UseWorkspaceBootstrapOptions {
   relayHttpUrl: string;
@@ -42,7 +43,13 @@ export function useWorkspaceBootstrap({
     loadWorkspace()
       .then((snapshot) => {
         if (cancelled) return;
-        const nextRooms = snapshot.rooms.map((room) => ensureRoomDefaults(room));
+        const currentRooms = useAppStore.getState().rooms;
+        const nextRooms = snapshot.rooms.map((room) =>
+          ensureRoomDefaults(
+            room,
+            currentRooms.find((current) => current.id === room.id)
+          )
+        );
         replaceTeams(snapshot.teams);
         replaceRooms(nextRooms);
         selectExistingTeamOrFirst(snapshot.teams);

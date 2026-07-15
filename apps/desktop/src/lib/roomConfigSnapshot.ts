@@ -1,7 +1,7 @@
 import { RoomConfigPlaintextPayload, type ClientRoomRecord, type MlsRelayMessage } from "@multaiplayer/protocol";
 import { useAppStore } from "../store/appStore";
 import { createMlsApplicationMessage, publishMlsApplicationMessage } from "./mlsApplicationMessage";
-import { currentMlsEpoch } from "./mlsClient";
+import { currentMlsEpoch, loadMlsRoomConfig } from "./mlsClient";
 import type { RelayClient } from "./relayClient";
 
 export function roomConfigPayload(
@@ -50,6 +50,19 @@ export function applyRoomConfig(
   };
 }
 
+export async function resolveRoomConfigForPublish(
+  room: ClientRoomRecord,
+  load: (roomId: string) => Promise<unknown | null> = loadMlsRoomConfig
+): Promise<ClientRoomRecord> {
+  if (room.projectPath.length > 0) return room;
+  const persisted = RoomConfigPlaintextPayload.safeParse(await load(room.id));
+  if (!persisted.success) {
+    throw new Error("This device no longer has the encrypted room configuration required to host this room.");
+  }
+  const { eventType: _eventType, emittingEpoch, ...config } = persisted.data;
+  return { ...room, ...config, configEpoch: emittingEpoch, configPending: false };
+}
+
 /** Encrypts the complete snapshot before relay publication; only MLS ciphertext leaves this process. */
 export async function publishRoomConfigSnapshot(input: {
   client: RelayClient;
@@ -59,15 +72,16 @@ export async function publishRoomConfigSnapshot(input: {
   seenEnvelopeIds: Set<string>;
   incrementRevision?: boolean;
 }): Promise<ClientRoomRecord> {
-  const epoch = await currentMlsEpoch(input.room.id);
-  const revision = input.incrementRevision ? input.room.configRevision + 1 : input.room.configRevision;
-  const payload = roomConfigPayload(input.room, epoch, revision);
+  const room = await resolveRoomConfigForPublish(input.room);
+  const epoch = await currentMlsEpoch(room.id);
+  const revision = input.incrementRevision ? room.configRevision + 1 : room.configRevision;
+  const payload = roomConfigPayload(room, epoch, revision);
   const id = crypto.randomUUID();
   const envelope: MlsRelayMessage = await createMlsApplicationMessage(
     {
       id,
-      teamId: input.room.teamId,
-      roomId: input.room.id,
+      teamId: room.teamId,
+      roomId: room.id,
       senderDeviceId: input.senderDeviceId,
       senderUserId: input.senderUserId,
       createdAt: new Date().toISOString(),
@@ -77,7 +91,7 @@ export async function publishRoomConfigSnapshot(input: {
   );
   input.seenEnvelopeIds.add(id);
   await publishMlsApplicationMessage(input.client, envelope);
-  const updated = { ...input.room, configRevision: revision, configEpoch: epoch, configPending: false };
+  const updated = { ...room, configRevision: revision, configEpoch: epoch, configPending: false };
   useAppStore.getState().replaceRoomRecord(updated);
   return updated;
 }

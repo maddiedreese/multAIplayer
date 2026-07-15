@@ -158,6 +158,7 @@ pub fn run() {
             mls_create_group,
             mls_join_welcome,
             mls_encrypt_application,
+            mls_room_config_load,
             mls_process_incoming,
             mls_remove_member,
             mls_transfer_host,

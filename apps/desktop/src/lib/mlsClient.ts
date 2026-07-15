@@ -138,6 +138,10 @@ export async function joinMlsWelcome(roomId: string, welcome: string): Promise<n
   return invokeNative("mls_join_welcome", { request: { roomId, welcome } });
 }
 
+export async function loadMlsRoomConfig(roomId: string): Promise<unknown | null> {
+  return invokeNative("mls_room_config_load", { request: { roomId } });
+}
+
 export async function encryptMlsApplication(
   roomId: string,
   authenticatedData: Omit<MlsAuthenticatedData, "epoch">,

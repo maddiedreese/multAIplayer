@@ -4,6 +4,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { JSDOM } from "jsdom";
 import { useWorkspaceBootstrap } from "../src/hooks/useWorkspaceBootstrap";
 import { useAppStore } from "../src/store/appStore";
+import { seededRooms } from "./support/workspaceFixtures";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://127.0.0.1:1420/"
@@ -63,6 +64,45 @@ test("HTTP workspace bootstrap reports ready before any room WebSocket exists", 
   assert.equal(state.workspaceBootstrapError, null);
   assert.equal(state.workspaceError, null);
   assert.equal(state.relayStatus, "closed");
+});
+
+test("workspace rebootstrap preserves the host's MLS-only room configuration", async () => {
+  const configured = {
+    ...seededRooms[0]!,
+    projectPath: "/private/host/project",
+    codexModel: "gpt-5.4",
+    configRevision: 7,
+    configEpoch: 3,
+    configPending: false
+  };
+  useAppStore.getState().replaceRooms([configured]);
+  const {
+    projectPath: _projectPath,
+    codexModel: _codexModel,
+    codexModelPolicy: _codexModelPolicy,
+    codexReasoningEffort: _codexReasoningEffort,
+    codexReasoningEffortPolicy: _codexReasoningEffortPolicy,
+    codexRawReasoningEnabled: _codexRawReasoningEnabled,
+    codexSpeed: _codexSpeed,
+    codexServiceTierPolicy: _codexServiceTierPolicy,
+    codexSandboxLevel: _codexSandboxLevel,
+    configRevision: _configRevision,
+    configEpoch: _configEpoch,
+    configPending: _configPending,
+    ...relayRoom
+  } = configured;
+  globalThis.fetch = async () =>
+    Response.json({ teams: [{ id: configured.teamId, name: "Team", members: 1 }], rooms: [relayRoom] });
+
+  renderHook(() => useStoreBackedWorkspaceBootstrap());
+
+  await waitFor(() => assert.equal(useAppStore.getState().workspaceBootstrapStatus, "ready"));
+  const room = useAppStore.getState().rooms[0]!;
+  assert.equal(room.projectPath, "/private/host/project");
+  assert.equal(room.codexModel, "gpt-5.4");
+  assert.equal(room.configRevision, 7);
+  assert.equal(room.configEpoch, 3);
+  assert.equal(room.configPending, false);
 });
 
 test("HTTP workspace bootstrap exposes an error and retries through the same load path", async () => {

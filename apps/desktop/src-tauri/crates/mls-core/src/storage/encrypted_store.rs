@@ -123,6 +123,38 @@ impl EncryptedStore {
         Ok(())
     }
 
+    /// Persists the latest validated member-only room configuration in the
+    /// SQLCipher application store. Callers validate the payload before it
+    /// reaches this boundary; the relay never receives this record.
+    pub fn put_room_config(&self, room_id: &str, payload: &[u8]) -> Result<(), StoreError> {
+        validate_component(room_id)?;
+        if payload.is_empty() || payload.len() > MAX_OUTBOX_PAYLOAD {
+            return Err(StoreError::InvalidValue);
+        }
+        self.application
+            .insert(&format!("room-config:{room_id}"), payload)?;
+        Ok(())
+    }
+
+    pub fn room_config(&self, room_id: &str) -> Result<Option<Vec<u8>>, StoreError> {
+        validate_component(room_id)?;
+        let Some(item) = self.application.get(&format!("room-config:{room_id}"))? else {
+            return Ok(None);
+        };
+        if item.is_empty() || item.len() > MAX_OUTBOX_PAYLOAD {
+            self.application.delete(&format!("room-config:{room_id}"))?;
+            return Err(StoreError::CorruptValue);
+        }
+        Ok(Some(item))
+    }
+
+    pub fn delete_room_config(&self, room_id: &str) -> Result<(), StoreError> {
+        validate_component(room_id)?;
+        self.application
+            .delete(&format!("room-config:{room_id}"))?;
+        Ok(())
+    }
+
     pub fn put_pending_invite_request(
         &self,
         request: &PendingInviteRequest,
@@ -500,6 +532,22 @@ mod tests {
         reopened.acknowledge("msg-1").unwrap();
         assert!(reopened.pending_outbox().unwrap().is_empty());
         assert!(EncryptedStore::open(&path, [8; 32]).is_err());
+    }
+
+    #[test]
+    fn room_config_is_local_durable_and_deletable() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mls.db");
+        let key = [11; 32];
+        let payload = br#"{"eventType":"room.config","projectPath":"/private/project"}"#;
+        EncryptedStore::open(&path, key)
+            .unwrap()
+            .put_room_config("room-1", payload)
+            .unwrap();
+        let reopened = EncryptedStore::open(&path, key).unwrap();
+        assert_eq!(reopened.room_config("room-1").unwrap().as_deref(), Some(payload.as_slice()));
+        reopened.delete_room_config("room-1").unwrap();
+        assert_eq!(reopened.room_config("room-1").unwrap(), None);
     }
 
     #[test]
