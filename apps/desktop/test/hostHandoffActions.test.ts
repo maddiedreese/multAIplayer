@@ -14,8 +14,10 @@ Object.defineProperty(globalThis, "document", { configurable: true, value: dom.w
 Object.defineProperty(globalThis, "navigator", { configurable: true, value: dom.window.navigator });
 Object.assign(globalThis, { Element: dom.window.Element, HTMLElement: dom.window.HTMLElement });
 
+let nativeCommands: string[] = [];
 const tauriInternals = {
   invoke: async (command: string, args?: { request?: Record<string, unknown> }) => {
+    nativeCommands.push(command);
     if (command === "mls_group_state") {
       return {
         roster: [
@@ -150,6 +152,7 @@ function options(publish: () => Promise<void>, seen = new Set<string>()): UseHos
 
 beforeEach(() => {
   cleanup();
+  nativeCommands = [];
   useAppStore.getState().resetAppStore();
   useAppStore.getState().appendHostHandoff(room.id, offer);
 });
@@ -168,6 +171,7 @@ test("candidate records its authenticated host request only after relay acknowle
   assert.equal(stored?.candidateUserId, "github:candidate");
   assert.equal(stored?.candidateDeviceId, "device-candidate");
   assert.equal(stored?.candidateLeaf, 1);
+  assert.equal(nativeCommands.includes("plugin:dialog|open"), false);
 });
 
 test("failed host requests remain retryable and are not self-suppressed", async () => {

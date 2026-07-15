@@ -105,7 +105,7 @@ After a thread exists, the thread graph can refresh the active session tree, swi
 
 Host handoff lets the active host pass continuity to another eligible member, including when the host hits Codex usage limits or needs to step away.
 
-A handoff package can include recent-message counts, queued Codex turns, attachment names, terminal names, model, project path, Git repository metadata, dirty-file names, and an encrypted patch when small enough. The replacement host uses their own Codex access and attaches their own local project folder.
+A handoff package can include recent-message counts, queued Codex turns, attachment names, terminal names, model, project path, Git repository metadata, dirty-file names, and an encrypted patch when small enough. The replacement host uses their own Codex access and local project folder. If their already-attached project has the expected GitHub remote, the app reuses that locally approved path; otherwise, the replacement host must explicitly select a matching clone or a destination for cloning.
 
 ## Project Files And Diffs
 

@@ -183,7 +183,7 @@ KeyPackage validation intentionally remains one child process per upload. KeyPac
 
 The relay uses SQLite as the only hosted backend. Its JSON snapshot backend is retained only for local development/test compatibility, and SQLite's importer handles legacy snapshot migration.
 
-Incoming handoff patches remain staged until explicit review. Native `git_apply_patch` canonicalizes the approved project root and requested working directory, rejects outside and symlink escapes, and runs Git against the validated canonical directory. Focused Rust tests cover nested roots, outside roots, and symlink aliases.
+Incoming handoff patches remain staged until explicit review. A receiver reuses its already-approved room project only when that path's parsed GitHub remote matches the handoff repository; otherwise, it must explicitly select a matching clone or a clone destination. The sender-provided project path is never treated as local filesystem authority. Native `git_apply_patch` canonicalizes the approved project root and requested working directory, rejects outside and symlink escapes, and runs Git against the validated canonical directory. Focused Rust tests cover nested roots, outside roots, and symlink aliases.
 
 ## Honest non-goals
 

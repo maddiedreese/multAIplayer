@@ -276,7 +276,6 @@ jobs:
           libwebkit2gtk-4.1-dev
           libxdo-dev
           webkit2gtk-driver
-          xdotool
           xvfb
 
       - name: Install JavaScript dependencies

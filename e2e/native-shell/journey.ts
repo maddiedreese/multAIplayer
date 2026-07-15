@@ -245,56 +245,7 @@ async function handoff(host: Browser, guest: Browser) {
   await (await visible(host, "button=Handoff")).click();
   const available = await visible(guest, ".handoff-row.available", 60_000);
   const requestButton = await available.$("button=Request handoff");
-  const folderApproval = runtime.run(
-    "bash",
-    [
-      "-euo",
-      "pipefail",
-      "-c",
-      `initial_windows="$(xdotool search --onlyvisible --name '.*' 2>/dev/null || true)"
-for _ in $(seq 1 100); do
-  current_windows="$(xdotool search --onlyvisible --name '.*' 2>/dev/null || true)"
-  for current_window in $current_windows; do
-    if ! printf '%s\n' "$initial_windows" | grep -qx "$current_window"; then
-      window_name="$(xdotool getwindowname "$current_window" 2>/dev/null || true)"
-      echo "native handoff folder chooser: window=$current_window name=$window_name"
-      # Focus the X11 window directly. windowactivate requires a window
-      # manager, which would reparent the WRY app windows and break WebDriver's
-      # native coordinate mapping under Xvfb.
-      xdotool windowfocus --sync "$current_window"
-      # Once focused, omit --window so xdotool uses XTest input. GTK rejects
-      # the XSendEvent path used by targeted key events under this portal.
-      xdotool key --clearmodifiers ctrl+l
-      sleep 0.2
-      xdotool type --clearmodifiers --delay 1 -- "$HANDOFF_PROJECT_ROOT"
-      xdotool key --clearmodifiers Return
-      sleep 0.5
-      eval "$(xdotool getwindowgeometry --shell "$current_window")"
-      echo "native handoff folder chooser geometry: \${WIDTH}x\${HEIGHT}"
-      # GTK's affirmative Select/Open button is the rightmost control in the
-      # bottom action row. Move relative to the dialog and use a real XTest
-      # pointer event; GTK rejects targeted synthetic key events under Xvfb.
-      xdotool mousemove --sync --window "$current_window" "$((WIDTH - 52))" "$((HEIGHT - 29))"
-      xdotool click 1
-      for _ in $(seq 1 20); do
-        if ! xdotool getwindowname "$current_window" >/dev/null 2>&1; then
-          echo "native handoff folder chooser closed"
-          exit 0
-        fi
-        sleep 0.1
-      done
-      echo "native handoff folder chooser remained open after confirmation" >&2
-      exit 1
-    fi
-  done
-  sleep 0.1
-done
-echo "native handoff folder chooser did not become active" >&2
-exit 1`
-    ],
-    { env: { HANDOFF_PROJECT_ROOT: root }, timeoutMs: 20_000 }
-  );
-  await Promise.all([requestButton.click(), folderApproval]);
+  await requestButton.click();
   await visible(guest, ".handoff-row.requested", 60_000);
   const requested = await visible(host, ".handoff-row.requested", 60_000);
   await (await requested.$("button=Approve candidate")).click();

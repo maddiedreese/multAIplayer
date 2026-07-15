@@ -182,7 +182,7 @@ export function useHostHandoffActions({
     if (reportRoomHostMutationInFlight(roomId)) return;
     setHostBusyForRoom(roomId, true);
     try {
-      const project = await resolveHandoffProject(handoff);
+      const project = await resolveHandoffProject(handoff, selectedRoom.projectPath);
       const result = await applyGitPatch(project.path, project.path, handoff.gitPatch!);
       if (result.status !== 0) throw new Error(result.stderr || result.stdout || "git apply failed");
       markHostHandoffPatchAppliedForRoom(roomId, handoff.id);
@@ -297,7 +297,7 @@ export function useHostHandoffActions({
     };
   }
   async function requestHostAuthority(handoff: HostHandoffRecord) {
-    await resolveHandoffProject(handoff);
+    await resolveHandoffProject(handoff, selectedRoom.projectPath);
     const group = await mlsGroupState(selectedRoom.id);
     const self = group.roster.find((member) => member.leaf === group.selfLeaf);
     if (!self || self.githubUserId !== localUser.id || self.deviceId !== deviceId)

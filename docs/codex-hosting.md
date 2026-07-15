@@ -65,7 +65,7 @@ GitHub access tokens are stored in the operating-system credential store behind 
 
 ## Host Handoff
 
-If a host runs out of Codex usage or needs to step away, they can create a handoff. The new host gets the room context and inherited room settings, then attaches their own local project folder. If they have access to the same GitHub repository, they can continue from the same branch or recreate the work locally.
+If a host runs out of Codex usage or needs to step away, they can create a handoff. The new host gets the room context and inherited room settings, then uses their own local project folder. The app reuses an already-attached project only when its GitHub remote matches the handoff repository; otherwise, the new host explicitly selects a matching clone or a destination for cloning. The outgoing host's path is context, not filesystem authority.
 
 The alpha sends the available room context to the new host's Codex invocation when accepting a usage-limit handoff. Codex-native compaction is not part of the public alpha contract.
 

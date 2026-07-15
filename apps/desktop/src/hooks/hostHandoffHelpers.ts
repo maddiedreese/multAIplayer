@@ -33,7 +33,10 @@ function rememberHandoffProject(handoffId: string, project: HandoffProject): Han
   return project;
 }
 
-export async function resolveHandoffProject(handoff: HostHandoffRecord): Promise<HandoffProject> {
+export async function resolveHandoffProject(
+  handoff: HostHandoffRecord,
+  approvedProjectPath?: string
+): Promise<HandoffProject> {
   const expectedRepo = handoffRepoIdentity(handoff);
   async function repoAtPath(path: string) {
     const remote = await getGitRemoteOrigin(path).catch(() => {
@@ -44,6 +47,10 @@ export async function resolveHandoffProject(handoff: HostHandoffRecord): Promise
   }
   const resolved = resolvedHandoffProjects.get(handoff.id);
   if (resolved && (!expectedRepo || sameHandoffRepo(expectedRepo, await repoAtPath(resolved.path)))) return resolved;
+
+  if (approvedProjectPath && (!expectedRepo || sameHandoffRepo(expectedRepo, await repoAtPath(approvedProjectPath)))) {
+    return rememberHandoffProject(handoff.id, { path: approvedProjectPath, source: "existing" });
+  }
 
   const selected = await chooseProjectFolder(defaultProjectPath);
   if (!selected) throw new Error(`${hostHandoffDetail(handoff)} No local project folder was selected.`);
