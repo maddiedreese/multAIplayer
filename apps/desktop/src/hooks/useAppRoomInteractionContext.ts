@@ -102,7 +102,9 @@ export function useAppRoomInteractionContext({
       selectedRoomId,
       localUser: localIdentity.localUser,
       localDeviceId: localIdentity.deviceId,
-      localPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
+      ...(deviceIdentity?.publicKeyFingerprint
+        ? { localPublicKeyFingerprint: deviceIdentity.publicKeyFingerprint }
+        : {}),
       trustedDeviceKeys
     }
   });

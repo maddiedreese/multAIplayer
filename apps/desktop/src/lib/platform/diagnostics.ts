@@ -48,10 +48,11 @@ export function installGlobalDiagnostics() {
 }
 
 export function recordDiagnosticEvent(level: DiagnosticLevel, message: string, ...details: unknown[]) {
+  const detail = details.length ? boundText(redactText(details.map(formatDiagnosticValue).join(" ")), 800) : undefined;
   const nextEntry: DiagnosticEntry = {
     level,
     message: boundText(redactText(message), 240),
-    detail: details.length ? boundText(redactText(details.map(formatDiagnosticValue).join(" ")), 800) : undefined,
+    ...(detail ? { detail } : {}),
     createdAt: new Date().toISOString()
   };
   appendDiagnosticEntry(nextEntry);

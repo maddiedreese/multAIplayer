@@ -83,7 +83,6 @@ export function emptyLocalRoomHistoryPayload(): LocalRoomHistoryPayload {
     messages: [],
     chatEdits: [],
     chatDeletes: [],
-    readState: undefined,
     terminalRequests: [],
     fileSaveRequests: [],
     browserRequests: [],
@@ -113,12 +112,13 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
   const legacyValue = value as LocalRoomHistoryPayload & { codexThreadId?: unknown };
   const codexThreadId = normalizeCodexThreadId(legacyValue.codexThreadId);
   const codexThreadGraph = normalizeCodexThreadGraph(value.codexThreadGraph, codexThreadId);
+  const readState = sanitizeLocalRoomReadState(value.readState);
   return {
     version: 3,
     messages: Array.isArray(value.messages) ? normalizeChatHistoryMessages(value.messages) : [],
     chatEdits: Array.isArray(value.chatEdits) ? value.chatEdits.filter(isChatEditPlaintextPayload) : [],
     chatDeletes: Array.isArray(value.chatDeletes) ? value.chatDeletes.filter(isChatDeletePlaintextPayload) : [],
-    readState: sanitizeLocalRoomReadState(value.readState),
+    ...(readState ? { readState } : {}),
     terminalRequests: Array.isArray(value.terminalRequests)
       ? value.terminalRequests.filter(isTerminalCommandRequest)
       : [],

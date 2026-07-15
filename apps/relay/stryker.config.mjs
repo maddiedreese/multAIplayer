@@ -56,6 +56,8 @@ export default {
   jsonReporter: { fileName: "reports/mutation/mutation.json" },
   coverageAnalysis: "off",
   timeoutMS: 15000,
-  thresholds: { high: 80, low: 60, break: 0 },
+  // Stryker's colors are not policy. report.mjs enforces only measured,
+  // checked-in baselines and emits monthly candidates toward the 80% target.
+  thresholds: { high: 80, low: 0, break: 0 },
   tempDirName: ".stryker-tmp"
 };

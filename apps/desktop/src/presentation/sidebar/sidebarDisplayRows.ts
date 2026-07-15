@@ -75,7 +75,7 @@ export function buildSidebarMessageHitRows(
     return {
       key: `${hit.roomId}-${hit.message.id}`,
       roomId: hit.roomId,
-      teamId: room?.teamId,
+      ...(room ? { teamId: room.teamId } : {}),
       author: hit.message.author,
       preview: `${room?.name ?? "Room"} · ${hit.message.body}`
     };

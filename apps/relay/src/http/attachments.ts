@@ -72,8 +72,8 @@ export function registerAttachmentRoutes(options: RegisterAttachmentRoutesOption
             uploadLimit: attachmentBlobUploadBytesPerWindow,
             uploadWindowMs: attachmentBlobUploadWindowMs,
             isExpiredAttachmentBlob,
-            recordQuotaRejection,
-            recordUploadRejection,
+            ...(recordQuotaRejection ? { recordQuotaRejection } : {}),
+            ...(recordUploadRejection ? { recordUploadRejection } : {}),
             res
           })
         : null;
@@ -287,8 +287,8 @@ function reserveAttachmentQuota({
     limit: uploadLimit,
     used: reservation.used,
     resetAt: reservation.resetAt,
-    recordQuotaRejection,
-    recordUploadRejection,
+    ...(recordQuotaRejection ? { recordQuotaRejection } : {}),
+    ...(recordUploadRejection ? { recordUploadRejection } : {}),
     res
   });
   return null;

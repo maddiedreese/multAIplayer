@@ -136,8 +136,8 @@ export function registerGitHubAuthRoutes({
       user: {
         id: normalizedUserId,
         login,
-        name: name ?? undefined,
-        avatarUrl: avatarUrl ?? undefined
+        ...(name ? { name } : {}),
+        ...(avatarUrl ? { avatarUrl } : {})
       },
       expiresAt: Date.now() + authSessionMaxAgeMs
     };

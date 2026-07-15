@@ -16,8 +16,9 @@
     ]
   },
   "deploy": {
+    "preDeployCommand": "node apps/relay/dist/predeploy-check.js",
     "sleepApplication": false,
-    "healthcheckPath": "/healthz",
+    "healthcheckPath": "/readyz",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ALWAYS",
     "multiRegionConfig": {

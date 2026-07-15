@@ -71,7 +71,10 @@ export function registerRoomHostRoute(options: RegisterRoomRoutesOptions) {
   });
 }
 
-function hostStateUnavailable(room: RoomRecord, team: { archivedAt?: string; deletedAt?: string } | undefined) {
+function hostStateUnavailable(
+  room: RoomRecord,
+  team: { archivedAt?: string | undefined; deletedAt?: string | undefined } | undefined
+) {
   return Boolean(room.archivedAt || room.deletedAt || team?.archivedAt || team?.deletedAt);
 }
 

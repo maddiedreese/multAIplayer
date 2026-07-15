@@ -250,14 +250,14 @@ export async function createRoom(
   return ensureRoomDefaults({
     ...body.room,
     projectPath,
-    codexModel,
-    codexModelPolicy,
-    codexReasoningEffort,
-    codexReasoningEffortPolicy,
-    codexRawReasoningEnabled,
-    codexSpeed,
-    codexServiceTierPolicy,
-    codexSandboxLevel,
+    ...(codexModel === undefined ? {} : { codexModel }),
+    ...(codexModelPolicy === undefined ? {} : { codexModelPolicy }),
+    ...(codexReasoningEffort === undefined ? {} : { codexReasoningEffort }),
+    ...(codexReasoningEffortPolicy === undefined ? {} : { codexReasoningEffortPolicy }),
+    ...(codexRawReasoningEnabled === undefined ? {} : { codexRawReasoningEnabled }),
+    ...(codexSpeed === undefined ? {} : { codexSpeed }),
+    ...(codexServiceTierPolicy === undefined ? {} : { codexServiceTierPolicy }),
+    ...(codexSandboxLevel === undefined ? {} : { codexSandboxLevel }),
     configRevision: 1,
     configEpoch: 0,
     configPending: false
@@ -442,21 +442,36 @@ export async function publishDirectedInviteResponse(
   await readJsonResponse<unknown>(response, "Failed to publish invite response");
 }
 
+type DirectedInviteResponse = Pick<InviteResponseRecord, "status" | "responseBinding" | "responseMac"> & {
+  welcome?: string;
+};
+
+export function normalizeDirectedInviteResponse(
+  directed: Pick<InviteResponseRecord, "status" | "responseBinding" | "responseMac" | "welcome">
+): DirectedInviteResponse {
+  return {
+    status: directed.status,
+    responseBinding: directed.responseBinding,
+    responseMac: directed.responseMac,
+    ...(directed.welcome ? { welcome: directed.welcome } : {})
+  };
+}
+
 export async function loadDirectedInviteResponse(
   inviteId: string,
   requestId: string,
   requesterDeviceId: string
-): Promise<Pick<InviteResponseRecord, "status" | "responseBinding" | "responseMac" | "welcome"> | null> {
+): Promise<DirectedInviteResponse | null> {
   const params = new URLSearchParams({ requesterDeviceId });
   const response = await fetch(
     `${getRelayHttpUrl()}/invites/${encodeURIComponent(inviteId)}/response/${encodeURIComponent(requestId)}?${params.toString()}`,
     { credentials: "include", headers: deviceSessionHeaders() }
   );
   if (response.status === 404) return null;
-  return readJsonResponse<Pick<InviteResponseRecord, "status" | "responseBinding" | "responseMac" | "welcome">>(
-    response,
-    "Failed to load invite response"
-  );
+  const directed = await readJsonResponse<
+    Pick<InviteResponseRecord, "status" | "responseBinding" | "responseMac" | "welcome">
+  >(response, "Failed to load invite response");
+  return normalizeDirectedInviteResponse(directed);
 }
 
 export async function acknowledgeDirectedInviteResponse(

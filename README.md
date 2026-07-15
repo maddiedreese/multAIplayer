@@ -7,82 +7,39 @@
 <p align="center"><strong>Build with Codex. Together.</strong></p>
 
 <p align="center">
-  Multiplayer Codex for trusted teams: talk through the work, steer one shared Codex session,<br>
-  review what it changes, and move the active host between teammates.
+  Multiplayer Codex for trusted teams: discuss the work, steer one shared local Codex session,<br>
+  review what it changes, and hand hosting between teammates.
 </p>
 
 <p align="center">
   <a href="https://multaiplayer.com">Website</a> ·
-  <a href="docs/using-the-app.md">Using the app</a> ·
+  <a href="docs/using-the-app.md">User guide</a> ·
   <a href="docs/faq.md">FAQ</a> ·
-  <a href="docs/threat-model.md">Security model</a> ·
+  <a href="docs/threat-model.md">Threat model</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
 > [!IMPORTANT]
-> multAIplayer is a free, open-source alpha for Apple silicon Macs running macOS 11 or later. No supported public build has been published yet. The website will enable its download only after a Developer ID-signed and notarized release passes the release gates.
+> multAIplayer is a free, open-source alpha for Apple-silicon Macs running macOS 11 or later. No supported public build has been published yet.
 
-## Multiplayer Codex, built around your project
+## The product
 
-Start a private room around a local project, invite the people you trust, and work with Codex as a team. Everyone can follow the conversation, propose the next turn, see structured progress, review changes, and keep the work moving. One active host at a time provides the project, local tools, credentials, and Codex account; hosting can be handed to another verified member when the work moves to their machine.
-
-## Start together, stay in control
+Start a private project room, invite people you trust, and work with Codex as a team. Everyone can follow the conversation, propose the next turn, inspect structured progress, review changes, and use room-scoped files, diffs, terminals, browser previews, Git, and GitHub workflows. One active host supplies the project, local tools, credentials, and Codex account; an explicit handoff can move that responsibility to another verified member.
 
 <p align="center">
   <img src="docs/assets/screens/onboarding.png" width="49%" alt="Create a multiplayer Codex workspace or join a trusted teammate's invitation">
-  <img src="docs/assets/screens/safe-defaults.png" width="49%" alt="Review safe defaults before entering a multiplayer Codex room">
+  <img src="docs/assets/screens/codex-room.png" width="49%" alt="A teammate request, Codex result, and activity inside a shared room">
 </p>
 
-## Work with Codex in the room
+## Security posture
 
-<p align="center">
-  <img src="docs/assets/screens/codex-room.png" width="78%" alt="A teammate request, Codex result, and expandable activity shown inside a shared room">
-</p>
+Rooms use RFC 9420 MLS through the Rust `mls-rs` implementation, and relevant payloads use exporter-derived encryption in the native boundary. The relay routes encrypted records but necessarily observes bounded identity, routing, size, timing, and lifecycle metadata. The active host remains responsible for local approvals, and admitted members receive meaningful shared context. Complete invite links are capabilities and must remain private. The integration is **unaudited**; automated tests, fuzzing, property checks, scheduled mutation testing, and release verification reduce regression risk but do not replace independent review. The [threat model](docs/threat-model.md) is the only normative source for intended properties, assumptions, evidence, and residual risks.
 
-## One room for the whole build loop
+Before private use, read the [alpha limitations](docs/alpha-limitations.md), [cryptography mechanism guide](docs/cryptography.md), and [external review packet](docs/external-review-packet.md). Report vulnerabilities through [SECURITY.md](SECURITY.md).
 
-multAIplayer puts the collaboration surfaces around Codex beside the conversation, so a team can inspect, run, preview, and ship the work without losing the shared thread.
+## Build locally
 
-- **A real code editor.** Browse the active host's project and edit text files in an embedded [Monaco Editor](https://microsoft.github.io/monaco-editor/) surface with language-aware editing. Open bounded file previews and diffs, attach a file to chat, or expand the editor for focused work. The host can save directly; a teammate's save becomes an explicit host approval request.
-- **A real terminal.** Named, room-scoped terminals use [xterm.js](https://xtermjs.org/) over a native Rust PTY. The host can create, restart, stop, and interact with terminals while the room keeps a reviewable workflow around command requests. Native confirmation shows the exact room, project, command, or input before execution.
-- **An isolated project browser.** Open localhost, documentation, or an approved site in room/project-scoped native WebView tabs instead of the host's everyday browser profile. Hosts control profile persistence and can reset it; downloads, page clipboard access, file inputs, and drag/drop uploads are blocked where the platform permits.
-- **Share a localhost build.** The host can expose an explicit `localhost` or `127.0.0.1` port with a temporary Cloudflare Quick Tunnel and open the resulting preview in the room browser. Preview sharing requires [`cloudflared`](docs/local-preview-sharing.md) on the host Mac (`brew install cloudflare/cloudflare/cloudflared`); multAIplayer does not proxy the site through its relay. Quick Tunnel URLs are public while running, so review the build before sharing it.
-- **Codex work you can follow.** See bounded, structured activity for commands, file changes, tools, web work, images, and subagents. Steer an active turn, queue the next proposal, set a thread goal, or inspect and fork the Codex thread graph.
-- **Git and GitHub in context.** Review the current working tree, copy project and diff summaries, create a branch, commit, push, open a draft pull request, and follow GitHub Actions from the room. The **Changed files** list is the current Git working-tree status—not a list of everything merged since the last PR; [the user guide explains the exact comparison](docs/using-the-app.md#project-files-and-diffs).
-- **Encrypted room portability.** Export a room's display history to a passphrase-encrypted, interoperable age archive, then import it later as a read-only library—even while signed out or disconnected. Archives deliberately omit MLS keys, device credentials, pending approvals, host authority, and other live capabilities; see [Encrypted room archives](docs/room-archives.md).
-- **Private team continuity.** Chat, attachments, approvals, activity, and host handoff travel as RFC 9420 MLS-encrypted room events via `mls-rs`; multAIplayer's integration layer is unaudited. One active host supplies the current checkout, tools, credentials, and Codex account, and can hand that role to another verified member.
-
-## How a room works
-
-Each room connects your team to one active host's project and Codex session:
-
-1. Create a workspace, attach a project, and invite trusted teammates—or join a room you were invited to.
-2. Discuss the work in the room and propose Codex turns together.
-3. The active host reviews what the turn will share and what access it requests before Codex starts.
-4. Codex works locally on the host's machine while the room shows progress, approvals, edits, Git activity, and results.
-5. Hand hosting to another verified member when the team needs their project checkout, tools, or credentials.
-
-Alongside chat and Codex, the room brings together project files and diffs, terminals, Git and GitHub workflows, encrypted attachments, Codex thread forks, and subagent activity. See [Using the app](docs/using-the-app.md) for a tour.
-
-## What sharing a room means
-
-A room is for trusted collaborators; members can propose project, terminal, Git, GitHub, browser, and Codex actions, while the active host remains responsible for each approval. Room messages use RFC 9420 MLS through `mls-rs`, and attachment content uses exporter-derived encryption in the native Rust boundary; the multAIplayer integration is **unaudited**. The relay-visible metadata, retained-history tradeoffs, local-machine risks, and exact intended properties are stated only in the [threat model](docs/threat-model.md). GitHub/Codex credentials and invite capabilities have separate native handling boundaries, and complete invite links must stay in private channels. Automated evidence includes focused `mls-core` parser fuzz targets, relay parsing fuzz/property tests, native/relay lifecycle journeys, and scheduled relay-decision mutation testing; it does not cover every integration state or replace independent review.
-
-Read the [cryptography mechanism guide](docs/cryptography.md), [alpha limitations](docs/alpha-limitations.md), [security policy](SECURITY.md), and [external review packet](docs/external-review-packet.md) before using private projects.
-
-## The free alpha
-
-The official relay is live on Railway at `https://relay.multaiplayer.com` and `wss://relay.multaiplayer.com/rooms`. GitHub Device Flow identifies members, so there is no separate multAIplayer password, subscription, or billing account.
-
-The service is free, experimental, and has no uptime, recovery, or response-time guarantee. Keep normal Git and project backups. The Profile drawer can delete hosted account data after owned teams are transferred or deleted and hosted rooms are handed off; shared encrypted records, other members' copies, local room state, GitHub's OAuth grant, and backup rotation are separate deletion boundaries.
-
-The alpha relay is deliberately a single Node process with one SQLite writer and process-local WebSocket fan-out, deployed behind a trusted TLS reverse proxy/WAF. It enforces durable account quotas and operator-managed account restrictions, but does not claim horizontal failover. Larger installations should shard complete teams across independent relays rather than point multiple processes at one store; the rationale is recorded in the [single-node relay ADR](docs/decisions/single-node-relay.md).
-
-Hosted use is governed by the [Privacy Policy](https://multaiplayer.com/privacy) and [Terms of Service](https://multaiplayer.com/terms). The [self-hosting guide](docs/self-hosting.md) covers independent relay deployments, and [If this project goes unmaintained](docs/if-unmaintained.md) explains the continuity plan.
-
-## Build the app locally
-
-Prerequisites are Node.js 22, npm, Rust/Cargo, Xcode command-line tools, and Codex. On macOS:
+Prerequisites are Node.js 22, npm, Rust/Cargo, Xcode command-line tools, and Codex:
 
 ```sh
 npm ci
@@ -91,9 +48,9 @@ node scripts/doctor.mjs
 npm run tauri:dev
 ```
 
-GitHub sign-in uses the public OAuth client id embedded in the native build; no client secret is required or supported. Self-built native clients can override the client id and pinned relay origin at compile time as documented in [Self-hosting](docs/self-hosting.md). The root development command starts the local relay and the frontend used by Tauri. multAIplayer is a native app; opening the development URL in a normal browser shows only an install notice.
+The root command starts the local relay and Tauri frontend. GitHub sign-in uses a public OAuth client id; no client secret is supported. Custom relay origins require a self-built client as described in [Self-hosting](docs/self-hosting.md).
 
-Useful verification commands:
+Run the verification ladder before publishing changes:
 
 ```sh
 npm run check
@@ -101,35 +58,26 @@ npm test
 npm run verify
 ```
 
-`npm run verify` runs the TypeScript, UI, relay, package, Rust, and native verification layers. More expensive mutation, fuzzing, supply-chain, and reproducibility jobs run on their documented CI schedules. See [the CI policy](CONTRIBUTING.md#continuous-integration-policy) for exact evidence boundaries.
-
-Development is AI-accelerated. Fuzzing, focused mutation testing, cross-language contract tests, and end-to-end security journeys are compensating controls for that velocity: they make important failures observable, but do not replace maintainer review or an independent security audit.
-
-SQLite is the relay's only runtime persistence backend. Startup can import an existing legacy JSON snapshot into SQLite once, but the relay no longer runs against or writes JSON storage.
+Pull requests run fast checks and path-selected journeys. Scheduled workflows provide expensive mutation, fuzz, supply-chain, and compatibility evidence. Releases additionally verify signing, notarization, updater metadata, SBOM publication, and reproducibility. [CONTRIBUTING.md](CONTRIBUTING.md) owns the exact workflow policy.
 
 ## Repository map
 
-| Path                                     | Responsibility                                                                     |
-| ---------------------------------------- | ---------------------------------------------------------------------------------- |
-| `apps/desktop`                           | React desktop UI and the Tauri/Rust native boundary                                |
-| `apps/desktop/src-tauri/crates/mls-core` | MLS lifecycle, HPKE invites, encrypted state, and history/blob exporters           |
-| `apps/relay`                             | Authenticated HTTP/WebSocket relay, identity verification, persistence, and quotas |
-| `packages/protocol`                      | Shared wire records and runtime validation                                         |
-| `packages/codex`                         | Codex app-server client and compatibility contract                                 |
-| `packages/git`, `packages/github`        | Host-side Git and GitHub adapters                                                  |
-| `e2e`                                    | UI contracts and real multi-process native journeys                                |
-| `docs`                                   | User guides, architecture, operations, decisions, and review material              |
+| Path                                                | Responsibility                                          |
+| --------------------------------------------------- | ------------------------------------------------------- |
+| `apps/desktop`                                      | React/Tauri desktop and native capability boundary      |
+| `apps/desktop/src-tauri/crates/mls-core`            | MLS, invite cryptography, exporters, encrypted state    |
+| `apps/relay`                                        | Authenticated transport, SQLite persistence, and quotas |
+| `packages/protocol`                                 | Shared wire records and runtime validation              |
+| `packages/codex`, `packages/git`, `packages/github` | Host-side integrations                                  |
+| `e2e`                                               | UI contracts and multi-process journeys                 |
+| `docs/decisions`                                    | Normative architecture decisions                        |
 
-The supported Codex app-server range is 0.133.0–0.144.0. Newer versions are marked unverified, and contract-sensitive behavior fails closed until reviewed. Read [How Codex hosting works](docs/codex-hosting.md) for the exact local-account, approval, projection, and compatibility boundaries.
+The [architecture guide](docs/product-architecture.md) maps flows to code. SQLite is the relay's sole runtime backend; startup can perform a one-time import of a legacy JSON snapshot.
 
-## Contributing and review
+## Releases and operations
 
-Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [architecture walkthrough](docs/product-architecture.md#architecture-walkthrough), then choose an open issue whose scope is clear and unclaimed.
+Supported macOS releases are Developer ID-signed, notarized, published with checksums, Sigstore evidence, an SPDX SBOM, authenticated updater metadata bound to the exact signed bundle, and desktop reproducibility evidence. Verification instructions live in [Reproducible builds](docs/reproducible-builds.md).
 
-Protocol and cryptography reviewers can use the [external review packet](docs/external-review-packet.md), which defines the narrow first engagement and maps canonical threat-model claims to implementation evidence. Report exploitable findings privately through the process in [SECURITY.md](SECURITY.md).
+The official alpha relay is a deliberately single-node Node/SQLite service with no uptime or recovery guarantee. Keep ordinary Git/project backups. Operators should follow [Self-hosting](docs/self-hosting.md) and the [single-node relay ADR](docs/decisions/single-node-relay.md).
 
-## Release integrity
-
-The alpha deliberately uses manual downloads from [GitHub Releases](https://github.com/maddiedreese/multAIplayer/releases); it has no in-app downloader or Tauri updater. Supported public artifacts are Apple-silicon-only, Developer ID signed, notarized, and published by the tagged release workflow. Verify the checksum manifest and keyless Sigstore bundle using [the release verification instructions](docs/reproducible-builds.md) before installation. Local and ordinary CI packages are development evidence, not supported downloads.
-
-Apache-2.0 licensed. Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Contributions are welcome; start with [CONTRIBUTING.md](CONTRIBUTING.md). Apache-2.0 licensed. Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

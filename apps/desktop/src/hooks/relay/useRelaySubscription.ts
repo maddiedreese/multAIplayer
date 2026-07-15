@@ -1,10 +1,10 @@
 import { useEffect, type MutableRefObject } from "react";
-import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, RelayServerMessage, TeamRecord } from "@multaiplayer/protocol";
 import { connectRelay, type RelayClient } from "../../lib/relay/relayClient";
 import { trustedAvatarUrl } from "../../lib/core/avatarUrl";
 import { ensureRoomDefaults } from "../../lib/room/roomDefaults";
 import { useAppStore } from "../../store/appStore";
-import type { ChatMessage } from "../../types";
+import type { ChatMessage, RoomPresence } from "../../types";
 import { useLatestRef } from "../useLatestRef";
 import { recoverAuthenticatedHostTransfer, routeMlsMessage } from "./routeMlsMessage";
 import {
@@ -317,20 +317,7 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
           return;
         }
         if (message.type === "presence") {
-          store.setRoomPresenceForDevice(
-            message.roomId,
-            message.deviceId,
-            message.status === "offline"
-              ? null
-              : {
-                  userId: message.userId,
-                  deviceId: message.deviceId,
-                  displayName: message.displayName,
-                  avatarUrl: trustedAvatarUrl(message.avatarUrl),
-                  publicKeyFingerprint: message.publicKeyFingerprint,
-                  status: message.status
-                }
-          );
+          store.setRoomPresenceForDevice(message.roomId, message.deviceId, onlineRoomPresence(message));
           return;
         }
         if (message.type === "room.updated") {
@@ -421,4 +408,17 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
     selectedRoom.teamId,
     selectedTeam
   ]);
+}
+
+function onlineRoomPresence(message: Extract<RelayServerMessage, { type: "presence" }>): RoomPresence | null {
+  if (message.status === "offline") return null;
+  const avatarUrl = trustedAvatarUrl(message.avatarUrl);
+  return {
+    userId: message.userId,
+    deviceId: message.deviceId,
+    displayName: message.displayName,
+    ...(avatarUrl ? { avatarUrl } : {}),
+    ...(message.publicKeyFingerprint ? { publicKeyFingerprint: message.publicKeyFingerprint } : {}),
+    status: message.status
+  };
 }

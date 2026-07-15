@@ -35,6 +35,9 @@ export function registerRelayRoutes(dependencies: RelayRouteDependencies) {
   registerTeamRoutes(dependencies);
   registerDeviceRoutes(dependencies);
   registerDeviceAuthRoutes(dependencies);
-  registerOpsRoutes({ ...dependencies, attachmentBlobs: dependencies.opsAttachmentBlobs });
+  registerOpsRoutes({
+    ...dependencies,
+    attachmentBlobs: dependencies.opsAttachmentBlobs ?? []
+  });
   registerRoomRoutes(dependencies);
 }

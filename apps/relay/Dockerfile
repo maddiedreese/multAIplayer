@@ -17,6 +17,7 @@ COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages ./packages
 COPY apps/relay ./apps/relay
 
+RUN npm install --global npm@11.16.0 --ignore-scripts
 RUN npm ci
 RUN npm run build:packages
 RUN npm run build -w @multaiplayer/relay

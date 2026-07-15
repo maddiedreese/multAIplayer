@@ -223,7 +223,7 @@ function normalizeStoredSessionUser(
   if (!id || !login || (value.name !== undefined && !name) || (value.avatarUrl !== undefined && !avatarUrl)) {
     return null;
   }
-  return { id, login, name: name ?? undefined, avatarUrl: avatarUrl ?? undefined };
+  return { id, login, ...(name ? { name } : {}), ...(avatarUrl ? { avatarUrl } : {}) };
 }
 
 function normalizeStoredSessionIdHash(stored: Record<string, unknown>, maxAuthSessionIdChars: number): string | null {

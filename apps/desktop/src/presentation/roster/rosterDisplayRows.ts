@@ -68,8 +68,8 @@ export function buildRoomMemberRows({
           userId: localUser.id,
           deviceId: localDeviceId,
           displayName: localUser.name,
-          avatarUrl: localUser.avatarUrl,
-          publicKeyFingerprint: localPublicKeyFingerprint,
+          ...(localUser.avatarUrl ? { avatarUrl: localUser.avatarUrl } : {}),
+          ...(localPublicKeyFingerprint ? { publicKeyFingerprint: localPublicKeyFingerprint } : {}),
           status: "online"
         }
       ];

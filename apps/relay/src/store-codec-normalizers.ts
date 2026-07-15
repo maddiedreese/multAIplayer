@@ -523,7 +523,12 @@ export function normalizeAccountRestriction(
   if (!parsed) return null;
   const userId = normalizeMetadataText(parsed.userId, maxUserIdChars);
   if (!userId || (parsed.expiresAt && Date.parse(parsed.expiresAt) <= now)) return null;
-  return { ...parsed, userId };
+  return {
+    userId,
+    reasonCode: parsed.reasonCode,
+    createdAt: parsed.createdAt,
+    ...(parsed.expiresAt ? { expiresAt: parsed.expiresAt } : {})
+  };
 }
 
 export function normalizeAccountQuotaRecord(value: unknown, now: number): AccountQuotaRecord | null {

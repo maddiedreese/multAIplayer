@@ -208,7 +208,7 @@ export function RoomChatPanel({
         isActiveHost={isActiveHost}
         pendingAttachments={pendingAttachments}
         pendingAttachmentSummary={pendingAttachmentSummary}
-        replyTarget={replyTarget}
+        {...(replyTarget === undefined ? {} : { replyTarget })}
         roomLocked={roomLocked}
         lockedPlaceholder={lockedPlaceholder}
         chatEnabled={chatEnabled}

@@ -1,5 +1,5 @@
 import type { RelayClientMessage } from "@multaiplayer/protocol";
-import type { ClientSession } from "../state.js";
+import type { ClientSession, PresenceRecord } from "../state.js";
 import { socketConnectionQuotaError } from "./connection-admission.js";
 import type { RelayWebSocketConnectionOptions } from "./connection-types.js";
 import {
@@ -223,17 +223,18 @@ function dispatchPresence(
     });
     return;
   }
-  if (!isPresenceWithinLimits(options, message)) {
-    options.transport.send(session.socket, { type: "error", message: presenceLimitError });
-    return;
-  }
-  options.rooms.publishPresence(session, message.teamId, message.roomId, {
+  const presence: PresenceRecord = {
     teamId: message.teamId,
     roomId: message.roomId,
     userId: message.userId,
     deviceId: message.deviceId,
     displayName: message.displayName,
-    avatarUrl: message.avatarUrl,
-    publicKeyFingerprint: message.publicKeyFingerprint
-  });
+    ...(message.avatarUrl ? { avatarUrl: message.avatarUrl } : {}),
+    ...(message.publicKeyFingerprint ? { publicKeyFingerprint: message.publicKeyFingerprint } : {})
+  };
+  if (!isPresenceWithinLimits(options, presence)) {
+    options.transport.send(session.socket, { type: "error", message: presenceLimitError });
+    return;
+  }
+  options.rooms.publishPresence(session, message.teamId, message.roomId, presence);
 }

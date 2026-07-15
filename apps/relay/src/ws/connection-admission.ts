@@ -64,9 +64,10 @@ export function admitRelayWebSocketConnection(
   }
   options.metrics.recordRateLimitAllowed?.("websocketConnect");
 
+  const authSession = options.authentication.getAuthSessionFromRequest(request);
   const session: ClientSession = {
     socket,
-    authSession: options.authentication.getAuthSessionFromRequest(request),
+    ...(authSession ? { authSession } : {}),
     rateClientId,
     subscribedTeamIds: new Set<string>(),
     workspaceSubscribed: false

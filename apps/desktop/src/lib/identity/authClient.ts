@@ -255,6 +255,36 @@ export interface GitHubActionRunsResult {
   runs: GitHubActionRun[];
 }
 
+type GitHubActionRunInput = Omit<
+  GitHubActionRun,
+  "displayTitle" | "runNumber" | "workflowId" | "branch" | "headSha" | "event"
+> & {
+  displayTitle?: string | undefined;
+  runNumber?: number | undefined;
+  workflowId?: number | undefined;
+  branch?: string | undefined;
+  headSha?: string | undefined;
+  event?: string | undefined;
+};
+
+export function normalizeGitHubActionRun(run: GitHubActionRunInput): GitHubActionRun {
+  return {
+    id: run.id,
+    name: run.name,
+    ...(run.displayTitle ? { displayTitle: run.displayTitle } : {}),
+    ...(run.runNumber === undefined ? {} : { runNumber: run.runNumber }),
+    ...(run.workflowId === undefined ? {} : { workflowId: run.workflowId }),
+    status: run.status,
+    conclusion: run.conclusion,
+    ...(run.branch ? { branch: run.branch } : {}),
+    ...(run.headSha ? { headSha: run.headSha } : {}),
+    ...(run.event ? { event: run.event } : {}),
+    url: run.url,
+    createdAt: run.createdAt,
+    updatedAt: run.updatedAt
+  };
+}
+
 export async function createPullRequest(request: PullRequestRequest): Promise<PullRequestResult> {
   if (!isTauriRuntime()) throw new Error("Pull requests are available only in the native desktop app.");
   return invokeNative<PullRequestResult>("github_create_pull_request", { request });

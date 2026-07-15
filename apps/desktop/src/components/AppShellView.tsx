@@ -6,7 +6,7 @@ import { RoomMainColumnContainer, type RoomMainColumnSources } from "./RoomMainC
 import { useUpdateNotice } from "../hooks/useUpdateNotice";
 import { useShellLayout } from "../hooks/useShellLayout";
 import { AppSidebarDrawerContainer, DesktopSidebarContainer, type SidebarSources } from "./SidebarContainers";
-import { ManualUpdateBanner } from "./ManualUpdateBanner";
+import { SignedUpdateBanner } from "./SignedUpdateBanner";
 
 interface AppShellViewProps {
   sidebarSources: SidebarSources;
@@ -23,8 +23,10 @@ export function AppShellView({
 }: AppShellViewProps) {
   const shellLayout = useShellLayout();
   const dialog: ReactNode = <LocalPreviewDialogContainer {...localPreviewDialogActions} />;
-  const updateNotice = useUpdateNotice();
-  const updateBanner: ReactNode = updateNotice ? <ManualUpdateBanner notice={updateNotice} /> : null;
+  const { notice: updateNotice, installStatus, install: installUpdate } = useUpdateNotice();
+  const updateBanner: ReactNode = updateNotice ? (
+    <SignedUpdateBanner notice={updateNotice} installStatus={installStatus} onInstall={installUpdate} />
+  ) : null;
   const shellBanner: ReactNode = <>{updateBanner}</>;
 
   return (

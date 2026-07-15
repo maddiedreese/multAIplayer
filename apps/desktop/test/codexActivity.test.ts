@@ -63,6 +63,15 @@ test("legacy local history migrates to an empty canonical activity timeline", ()
   assert.deepEqual(normalizeLocalRoomHistory(legacy).codexActivities, []);
 });
 
+test("local-history round trips omit absent optional state", () => {
+  const empty = emptyLocalRoomHistoryPayload();
+  assert.equal(Object.hasOwn(empty, "readState"), false);
+
+  const roundTripped = normalizeLocalRoomHistory(JSON.parse(JSON.stringify({ ...empty, readState: undefined })));
+  assert.equal(Object.hasOwn(roundTripped, "readState"), false);
+  assert.equal(Object.hasOwn(JSON.parse(JSON.stringify(roundTripped)), "readState"), false);
+});
+
 test("activity timeline renders safe lifecycle metadata", () => {
   const html = renderToStaticMarkup(
     React.createElement(CodexActivityTimelineView, {

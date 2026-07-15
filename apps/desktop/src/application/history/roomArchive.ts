@@ -98,9 +98,10 @@ function isResolved(value: { status: string }): boolean {
 }
 
 function sanitizeMessage(message: ChatMessage): ChatMessage {
+  const attachments = message.attachments?.map(sanitizeAttachment);
   return {
     ...message,
-    attachments: message.attachments?.map(sanitizeAttachment)
+    ...(attachments ? { attachments } : {})
   };
 }
 

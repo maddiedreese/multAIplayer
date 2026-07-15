@@ -5,14 +5,14 @@ import { trustedAvatarUrl } from "../lib/core/avatarUrl";
 
 export function useLocalIdentity(currentUser: SignedInUser | null) {
   const deviceId = useMemo(() => loadOrCreateDeviceId(), []);
-  const localUser = useMemo(
-    () => ({
+  const localUser = useMemo(() => {
+    const avatarUrl = trustedAvatarUrl(currentUser?.avatarUrl);
+    return {
       id: currentUser?.id ?? `local:${deviceId}`,
       name: currentUser?.name ?? currentUser?.login ?? "Local user",
-      avatarUrl: trustedAvatarUrl(currentUser?.avatarUrl)
-    }),
-    [currentUser, deviceId]
-  );
+      ...(avatarUrl ? { avatarUrl } : {})
+    };
+  }, [currentUser, deviceId]);
 
   return { deviceId, localUser };
 }

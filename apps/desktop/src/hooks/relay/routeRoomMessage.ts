@@ -104,7 +104,87 @@ async function routeHostHandoffOffer(
   const room = findEnvelopeRoom(context.roomsRef.current, envelope.roomId);
   if (!isEnvelopeFromHandoffInitiator(room, envelope) || parsed.data.fromUserId !== envelope.senderUserId) {
     store.setHostMessageForRoom(envelope.roomId, roomHostEnvelopeRejectionMessage(room, "host handoff"));
-  } else store.appendHostHandoff(envelope.roomId, { ...parsed.data, status: "available" });
+  } else store.appendHostHandoff(envelope.roomId, hostHandoffRecord(parsed.data));
+}
+
+type DecodedHostHandoff = ReturnType<typeof HostHandoffPlaintextPayload.parse>;
+type RoutedHostHandoff = Parameters<MlsMessageStoreActions["appendHostHandoff"]>[1];
+type HostHandoffGitFields = Pick<
+  RoutedHostHandoff,
+  "gitRemoteUrl" | "gitRepoOwner" | "gitRepoName" | "gitBranch" | "gitDirtyFiles" | "gitPatch" | "gitPatchTruncated"
+>;
+type HostHandoffCodexFields = Pick<
+  RoutedHostHandoff,
+  | "codexModelPolicy"
+  | "codexReasoningEffort"
+  | "codexReasoningEffortPolicy"
+  | "codexRawReasoningEnabled"
+  | "codexSpeed"
+  | "codexServiceTierPolicy"
+  | "codexSandboxLevel"
+>;
+type HostHandoffDecisionFields = Pick<
+  RoutedHostHandoff,
+  "candidateUserId" | "candidateDeviceId" | "candidateLeaf" | "acceptedBy" | "acceptedByUserId" | "acceptedAt"
+>;
+
+function hostHandoffRecord(payload: DecodedHostHandoff): RoutedHostHandoff {
+  return {
+    id: payload.id,
+    fromHost: payload.fromHost,
+    fromUserId: payload.fromUserId,
+    ...(payload.reason ? { reason: payload.reason } : {}),
+    projectPath: payload.projectPath,
+    ...hostHandoffGitFields(payload),
+    codexModel: payload.codexModel,
+    ...hostHandoffCodexFields(payload),
+    approvalPolicy: payload.approvalPolicy,
+    messagesSinceLastCodex: payload.messagesSinceLastCodex,
+    ...(payload.queuedCodexTurns ? { queuedCodexTurns: payload.queuedCodexTurns } : {}),
+    attachmentNames: payload.attachmentNames,
+    terminals: payload.terminals,
+    ...(payload.continuationSummary ? { continuationSummary: payload.continuationSummary } : {}),
+    createdAt: payload.createdAt,
+    status: "available",
+    ...hostHandoffDecisionFields(payload)
+  };
+}
+
+function hostHandoffGitFields(payload: DecodedHostHandoff): HostHandoffGitFields {
+  return {
+    ...(payload.gitRemoteUrl ? { gitRemoteUrl: payload.gitRemoteUrl } : {}),
+    ...(payload.gitRepoOwner ? { gitRepoOwner: payload.gitRepoOwner } : {}),
+    ...(payload.gitRepoName ? { gitRepoName: payload.gitRepoName } : {}),
+    ...(payload.gitBranch ? { gitBranch: payload.gitBranch } : {}),
+    ...(payload.gitDirtyFiles ? { gitDirtyFiles: payload.gitDirtyFiles } : {}),
+    ...(payload.gitPatch ? { gitPatch: payload.gitPatch } : {}),
+    ...(payload.gitPatchTruncated === undefined ? {} : { gitPatchTruncated: payload.gitPatchTruncated })
+  };
+}
+
+function hostHandoffCodexFields(payload: DecodedHostHandoff): HostHandoffCodexFields {
+  return {
+    ...(payload.codexModelPolicy ? { codexModelPolicy: payload.codexModelPolicy } : {}),
+    ...(payload.codexReasoningEffort ? { codexReasoningEffort: payload.codexReasoningEffort } : {}),
+    ...(payload.codexReasoningEffortPolicy ? { codexReasoningEffortPolicy: payload.codexReasoningEffortPolicy } : {}),
+    ...(payload.codexRawReasoningEnabled === undefined
+      ? {}
+      : { codexRawReasoningEnabled: payload.codexRawReasoningEnabled }),
+    ...(payload.codexSpeed ? { codexSpeed: payload.codexSpeed } : {}),
+    ...(payload.codexServiceTierPolicy ? { codexServiceTierPolicy: payload.codexServiceTierPolicy } : {}),
+    ...(payload.codexSandboxLevel ? { codexSandboxLevel: payload.codexSandboxLevel } : {})
+  };
+}
+
+function hostHandoffDecisionFields(payload: DecodedHostHandoff): HostHandoffDecisionFields {
+  return {
+    ...(payload.candidateUserId ? { candidateUserId: payload.candidateUserId } : {}),
+    ...(payload.candidateDeviceId ? { candidateDeviceId: payload.candidateDeviceId } : {}),
+    ...(payload.candidateLeaf === undefined ? {} : { candidateLeaf: payload.candidateLeaf }),
+    ...(payload.acceptedBy ? { acceptedBy: payload.acceptedBy } : {}),
+    ...(payload.acceptedByUserId ? { acceptedByUserId: payload.acceptedByUserId } : {}),
+    ...(payload.acceptedAt ? { acceptedAt: payload.acceptedAt } : {})
+  };
 }
 
 async function routeRoomSettings(

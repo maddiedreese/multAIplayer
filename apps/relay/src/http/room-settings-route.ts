@@ -166,6 +166,9 @@ function normalizeRoomSettingsInput(
   };
 }
 
-function roomSettingsUnavailable(room: RoomRecord, team: { archivedAt?: string; deletedAt?: string } | undefined) {
+function roomSettingsUnavailable(
+  room: RoomRecord,
+  team: { archivedAt?: string | undefined; deletedAt?: string | undefined } | undefined
+) {
   return Boolean(room.archivedAt || room.deletedAt || team?.archivedAt || team?.deletedAt);
 }

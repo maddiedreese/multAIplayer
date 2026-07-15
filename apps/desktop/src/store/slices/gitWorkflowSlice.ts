@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import type { GitHubActionsEventPlaintextPayload, GitWorkflowEventPlaintextPayload } from "@multaiplayer/protocol";
-import type { GitHubActionRun } from "../../lib/identity/authClient";
+import { normalizeGitHubActionRun, type GitHubActionRun } from "../../lib/identity/authClient";
 import {
   defaultGitWorkflowDraft,
   updateGitWorkflowDraftRecord,
@@ -227,7 +227,7 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
             actions: {
               ...runtime.actions,
               events: alreadyRecorded ? roomEvents : [...roomEvents, event].slice(-50),
-              runs: event.runs,
+              runs: event.runs.map(normalizeGitHubActionRun),
               lastChecked: event.checkedAt,
               message: `${event.summary.label}: ${event.message}`
             }
@@ -366,7 +366,7 @@ export const createGitWorkflowSlice: StateCreator<AppStoreState, [], [], GitWork
             ...runtime,
             workflow: {
               ...runtime.workflow,
-              draft: nextDraft
+              ...(nextDraft ? { draft: nextDraft } : {})
             }
           })
         )

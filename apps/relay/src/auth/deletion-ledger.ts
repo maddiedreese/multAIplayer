@@ -290,7 +290,12 @@ export class S3DeletionLedger implements DeletionLedger {
     );
     const signature = hmac(signingKey, stringToSign).toString("hex");
     headers.authorization = `AWS4-HMAC-SHA256 Credential=${this.options.accessKeyId}/${scope}, SignedHeaders=${signedHeaderNames.join(";")}, Signature=${signature}`;
-    return this.fetchImpl(url, { method, headers, body: body || undefined, signal: AbortSignal.timeout(10_000) });
+    return this.fetchImpl(url, {
+      method,
+      headers,
+      ...(body ? { body } : {}),
+      signal: AbortSignal.timeout(10_000)
+    });
   }
 }
 

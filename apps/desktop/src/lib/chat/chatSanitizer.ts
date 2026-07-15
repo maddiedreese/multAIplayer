@@ -27,9 +27,11 @@ export function normalizeChatMessage(value: unknown): SanitizedChatMessage | nul
   if (!isValidChatMessageEnvelope(value)) return null;
 
   const attachments = Array.isArray(value.attachments) ? normalizeChatAttachments(value.attachments) : undefined;
+  const { attachments: ignoredAttachments, ...metadata } = value;
+  void ignoredAttachments;
 
   return {
-    ...value,
+    ...metadata,
     id: value.id,
     author: value.author,
     ...(value.authorUserId ? { authorUserId: value.authorUserId } : {}),
@@ -43,7 +45,7 @@ export function normalizeChatMessage(value: unknown): SanitizedChatMessage | nul
     ...(value.deletedBy ? { deletedBy: value.deletedBy } : {}),
     ...(value.deletedByUserId ? { deletedByUserId: value.deletedByUserId } : {}),
     ...(typeof value.replyTo === "string" ? { replyTo: value.replyTo } : {}),
-    ...(attachments?.length ? { attachments } : { attachments: undefined })
+    ...(attachments?.length ? { attachments } : {})
   };
 }
 

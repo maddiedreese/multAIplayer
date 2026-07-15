@@ -60,7 +60,9 @@ export function WorkspaceFilesPanel(props: WorkspaceFilesPanelProps) {
         needsReview: props.selectedFileNeedsAttachmentReview,
         sensitiveFileReviewed: props.selectedSensitiveFileReviewed,
         actionLabel: props.selectedAttachmentActionLabel,
-        warningDetail: props.selectedAttachmentWarningDetail
+        ...(props.selectedAttachmentWarningDetail === undefined
+          ? {}
+          : { warningDetail: props.selectedAttachmentWarningDetail })
       }}
       editor={{
         content: editorContent,

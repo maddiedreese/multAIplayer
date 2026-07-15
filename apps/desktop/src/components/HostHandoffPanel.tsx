@@ -4,24 +4,26 @@ import { hostHandoffDetail, hostHandoffTitle } from "../lib/handoff/hostHandoff"
 export interface HostHandoffDisplay {
   id: string;
   status: "available" | "requested" | "accepted";
-  candidateDeviceId?: string;
+  candidateDeviceId?: string | undefined;
   fromHost: string;
-  reason?: "manual" | "usage_limit";
+  reason?: "manual" | "usage_limit" | undefined;
   messagesSinceLastCodex: number;
-  queuedCodexTurns?: Array<{
-    turnId: string;
-    requestedBy: string;
-  }>;
+  queuedCodexTurns?:
+    | Array<{
+        turnId: string;
+        requestedBy: string;
+      }>
+    | undefined;
   attachmentNames: string[];
   terminals: string[];
   projectPath: string;
-  gitRepoOwner?: string;
-  gitRepoName?: string;
-  gitBranch?: string;
-  gitDirtyFiles?: string[];
-  gitPatch?: string;
-  gitPatchTruncated?: boolean;
-  patchAppliedLocally?: boolean;
+  gitRepoOwner?: string | undefined;
+  gitRepoName?: string | undefined;
+  gitBranch?: string | undefined;
+  gitDirtyFiles?: string[] | undefined;
+  gitPatch?: string | undefined;
+  gitPatchTruncated?: boolean | undefined;
+  patchAppliedLocally?: boolean | undefined;
   codexModel: string;
 }
 
@@ -57,7 +59,7 @@ export function HostHandoffPanel<T extends HostHandoffDisplay>({
               key={handoff.id}
               handoff={handoff}
               acceptDisabled={acceptDisabled}
-              patchApplyDisabled={patchApplyDisabled}
+              {...(patchApplyDisabled === undefined ? {} : { patchApplyDisabled })}
               onAcceptHandoff={onAcceptHandoff}
               formatModel={formatModel}
             />
@@ -102,7 +104,12 @@ function HostHandoffRow<T extends HostHandoffDisplay>({
           </details>
         ) : null}
       </div>
-      <HandoffAction {...{ handoff, acceptDisabled, patchApplyDisabled, onAcceptHandoff }} />
+      <HandoffAction
+        handoff={handoff}
+        acceptDisabled={acceptDisabled}
+        {...(patchApplyDisabled === undefined ? {} : { patchApplyDisabled })}
+        onAcceptHandoff={onAcceptHandoff}
+      />
     </div>
   );
 }

@@ -91,6 +91,12 @@ test("S3 ledger signs Railway-compatible virtual-host requests", async () => {
   assert.match(headers.authorization, /Credential=test-access-key\/20260714\/auto\/s3\/aws4_request/);
   assert.match(headers.authorization, /SignedHeaders=content-type;host;if-none-match;x-amz-content-sha256;x-amz-date/);
   assert.doesNotMatch(String(requests[0]?.init.body), /github:77/);
+  assert.equal(
+    requests
+      .filter((request) => request.init.method !== "PUT")
+      .every((request) => !Object.hasOwn(request.init, "body")),
+    true
+  );
   assert.equal(requests[3]?.url.searchParams.get("prefix"), "relay-deletions/v1/");
 });
 

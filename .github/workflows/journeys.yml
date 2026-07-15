@@ -17,6 +17,8 @@ on:
       - "apps/relay/**"
       - "packages/protocol/**"
       - "e2e/native-shell/**"
+      - "tools/security/security-journey-evidence.mjs"
+      - "docs/threat-model.md"
       - ".github/workflows/journeys.yml"
   schedule:
     - cron: "23 7 * * 2"
@@ -145,15 +147,21 @@ jobs:
       - name: Build package dependencies
         run: npm run build:packages
       - name: Run deterministic lifecycle and adversarial corpus
+        env:
+          MULTAIPLAYER_SECURITY_CLAIMS_PATH: reports/security-journey/claims.json
         run: |
           mkdir -p reports/security-journey
           npm run test:security-journey -w @multaiplayer/relay > reports/security-journey/junit.xml
+      - name: Check canonical claims against executed journey evidence
+        run: node tools/security/security-journey-evidence.mjs check reports/security-journey/claims.json docs/threat-model.md
       - name: Upload security journey results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: security-journey-results
-          path: reports/security-journey/junit.xml
+          path: |
+            reports/security-journey/junit.xml
+            reports/security-journey/claims.json
           if-no-files-found: error
           retention-days: 14
 
@@ -243,26 +251,30 @@ jobs:
       - name: Build package dependencies
         run: npm run build:packages
       - name: Run advisory mutation shard
-        continue-on-error: true
         env:
           MULTAIPLAYER_MUTATION_SHARD: ${{ matrix.shard }}
         run: npm run test:mutation:run -w @multaiplayer/relay
       - name: Build and publish mutation shard summary
         if: always() && hashFiles('apps/relay/reports/mutation/mutation.json') != ''
-        continue-on-error: true
         run: |
           npm run test:mutation:summary -w @multaiplayer/relay
           node tools/mutation/report.mjs github "Relay mutation score: ${{ matrix.shard }} (advisory)" apps/relay/reports/mutation/summary.json
-      - name: Review mutation-policy drift in the first weekly run of each month
+      - name: Check the established mutation ratchet
         if: always() && hashFiles('apps/relay/reports/mutation/summary.json') != ''
-        continue-on-error: true
+        run: npm run test:mutation:policy -w @multaiplayer/relay -- --partial
+      - name: Propose ratchet advances in the first weekly run of each month
+        if: always() && hashFiles('apps/relay/reports/mutation/summary.json') != ''
         shell: bash
         run: |
           if [ "$(date -u +%d)" -gt 7 ]; then
-            echo "Monthly mutation-policy drift review is not due this week." >> "$GITHUB_STEP_SUMMARY"
+            echo "Monthly mutation-ratchet review is not due this week." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          npm run test:mutation:policy -w @multaiplayer/relay -- --partial
+          node tools/mutation/report.mjs ratchet \
+            apps/relay/reports/mutation/summary.json \
+            apps/relay/mutation-policy.json \
+            apps/relay/reports/mutation/ratchet-candidate.json \
+            --partial | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload relay mutation shard report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

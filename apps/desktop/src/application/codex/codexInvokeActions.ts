@@ -228,8 +228,8 @@ export function createCodexInvokeActions({
       body: body || "Attached files.",
       time: formatMessageTime(createdAt),
       createdAt,
-      replyTo: replyToMessageId ?? undefined,
-      attachments: attachments.length ? attachments : undefined
+      ...(replyToMessageId ? { replyTo: replyToMessageId } : {}),
+      ...(attachments.length ? { attachments } : {})
     };
     await publishChatMessage(message);
     if (invokesCodex) {

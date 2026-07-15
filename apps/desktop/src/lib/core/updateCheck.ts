@@ -1,9 +1,8 @@
-import { appVersion, updateManifestUrl } from "./appVersion";
 import { reportExpectedFailure } from "./nonFatalReporting";
 
-const officialReleaseOrigin = "https://github.com";
-const officialReleasePathPrefix = "/maddiedreese/multAIplayer/releases/";
 const maxVersionLength = 128;
+const envelopeSchema = "multaiplayer-updater-envelope-v1";
+const payloadSchema = "multaiplayer-updater-metadata-v1";
 
 interface ParsedSemVer {
   normalized: string;
@@ -13,57 +12,60 @@ interface ParsedSemVer {
   prerelease: string[];
 }
 
-export interface UpdateManifest {
-  version: string;
-  url: string;
-  notes?: string;
-  security?: boolean;
-}
-
 export interface UpdateNotice {
   currentVersion: string;
   latestVersion: string;
   url: string;
   notes?: string;
-  security: boolean;
 }
 
-export async function fetchUpdateNotice(
-  manifestUrl = updateManifestUrl,
-  currentVersion = appVersion,
-  fetchImpl: typeof fetch = fetch
-): Promise<UpdateNotice | null> {
-  const response = await fetchImpl(manifestUrl, {
-    cache: "no-store",
-    credentials: "omit"
-  });
-  if (!response.ok) throw new Error(`Update check failed with HTTP ${response.status}`);
-  const manifest = normalizeUpdateManifest(await response.json());
-  if (!manifest || compareVersions(manifest.version, currentVersion) <= 0) return null;
-  return {
-    currentVersion,
-    latestVersion: manifest.version,
-    url: manifest.url,
-    notes: manifest.notes,
-    security: manifest.security === true
-  };
-}
-
-export function normalizeUpdateManifest(value: unknown): UpdateManifest | null {
+export function normalizeSignedUpdate(value: unknown): UpdateNotice | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
-  if (typeof record.version !== "string" || typeof record.url !== "string") return null;
-  const parsedVersion = parseSemVer(record.version);
-  if (!parsedVersion) return null;
-  const version = parsedVersion.normalized;
-  const url = normalizeUpdateUrl(record.url, version);
-  if (!url) return null;
+  if (typeof record.version !== "string" || typeof record.currentVersion !== "string") return null;
+  const latest = parseSemVer(record.version);
+  const current = parseSemVer(record.currentVersion);
+  if (!latest || !current || compareVersions(latest.normalized, current.normalized) <= 0) return null;
+  const notes = normalizeAuthenticatedNotes(record.body, latest.normalized);
+  if (!notes) return null;
   return {
-    version,
-    url,
-    notes: typeof record.notes === "string" ? record.notes.slice(0, 240) : undefined,
-    security: record.security === true
+    currentVersion: current.normalized,
+    latestVersion: latest.normalized,
+    url: `https://github.com/maddiedreese/multAIplayer/releases/tag/v${latest.normalized}`,
+    notes
   };
+}
+
+function normalizeAuthenticatedNotes(value: unknown, version: string): string | null {
+  if (typeof value !== "string" || value.length > 16_384) return null;
+  try {
+    const envelope = JSON.parse(value) as Record<string, unknown>;
+    if (
+      Object.keys(envelope).sort().join(",") !== "payload,schema,signature" ||
+      envelope.schema !== envelopeSchema ||
+      typeof envelope.payload !== "string" ||
+      typeof envelope.signature !== "string"
+    )
+      return null;
+    const payload = JSON.parse(envelope.payload) as Record<string, unknown>;
+    if (
+      Object.keys(payload).sort().join(",") !== "archiveSignature,notes,schema,url,version" ||
+      payload.schema !== payloadSchema ||
+      payload.version !== version ||
+      typeof payload.archiveSignature !== "string" ||
+      typeof payload.url !== "string" ||
+      typeof payload.notes !== "string" ||
+      payload.notes.length === 0 ||
+      payload.notes.length > 240 ||
+      /[\u0000-\u001f\u007f]/.test(payload.notes)
+    )
+      return null;
+    const expectedUrl = `https://github.com/maddiedreese/multAIplayer/releases/download/v${version}/multAIplayer-macos-arm64.app.tar.gz`;
+    return payload.url === expectedUrl ? payload.notes : null;
+  } catch {
+    reportExpectedFailure("authenticated update notes rejected malformed metadata");
+    return null;
+  }
 }
 
 export function compareVersions(left: string, right: string): number {
@@ -115,22 +117,4 @@ function parseSemVer(value: string): ParsedSemVer | null {
     patch: core[2]!,
     prerelease
   };
-}
-
-function normalizeUpdateUrl(value: string, version: string): string | null {
-  try {
-    const parsed = new URL(value);
-    const expectedPath = `${officialReleasePathPrefix}tag/v${version}`;
-    if (
-      parsed.origin !== officialReleaseOrigin ||
-      parsed.username ||
-      parsed.password ||
-      decodeURIComponent(parsed.pathname) !== expectedPath
-    )
-      return null;
-    return parsed.toString();
-  } catch {
-    reportExpectedFailure("update URL validation rejected malformed input");
-    return null;
-  }
 }

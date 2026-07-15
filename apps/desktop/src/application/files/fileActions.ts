@@ -250,7 +250,8 @@ export function createFileActions({
         epoch: sealed.epoch,
         sealedBlob: JSON.stringify(sealed)
       });
-      attachment.content = inlineThumbnail ?? undefined;
+      if (inlineThumbnail) attachment.content = inlineThumbnail;
+      else delete attachment.content;
       attachment.blobId = blob.id;
       attachment.blobBytes = contentBytes;
       attachment.truncated = file.truncated || contentBytes > maxEmbeddedAttachmentBytes;
