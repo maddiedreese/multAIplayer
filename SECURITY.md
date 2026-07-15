@@ -18,6 +18,7 @@ The intended security properties are:
 - retained exporter-derived history secrets intentionally preserve local history readability across epochs, so forward secrecy applies to live traffic rather than retained device-local history;
 - browser builds contain no preview workspace and do not initialize identity, relay, project, or MLS state;
 - GitHub access tokens remain behind the native Rust IPC boundary in the operating-system credential store and are excluded from webview state, room events, relay sessions, and diagnostics;
+- relay session cookies are high-entropy bearer tokens; persistence stores only their SHA-256 digests, identity metadata, and expiry, while legacy plaintext session-id rows are migrated and rewritten on startup;
 - production account deletion fails closed around an authenticated HMAC-pseudonymous external ledger: the tombstone commits before primary deletion, protected identities lose authenticated access immediately, and every startup reconciles the complete active ledger before listening;
 - production relays require authentication by default; unauthenticated relay mode is an explicit self-host opt-out.
 

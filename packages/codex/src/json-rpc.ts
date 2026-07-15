@@ -35,7 +35,7 @@ export function createInitializeRequest(id: JsonRpcId): JsonRpcRequest {
     method: "initialize",
     id,
     params: {
-      clientInfo: { name: "multaiplayer", title: "multAIplayer", version: "0.1.0-alpha.0" }, // x-release-please-version
+      clientInfo: { name: "multaiplayer", title: "multAIplayer", version: codexPackage.version },
       capabilities: { experimentalApi: true }
     }
   };
@@ -90,3 +90,4 @@ export function classifyJsonRpcMessage(value: unknown): JsonRpcInboundMessage {
 function isJsonRpcId(value: unknown): value is JsonRpcId {
   return typeof value === "string" || (typeof value === "number" && Number.isSafeInteger(value));
 }
+import codexPackage from "../package.json" with { type: "json" };

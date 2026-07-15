@@ -39,7 +39,7 @@ For a hosted or internet-facing relay, run the production relay doctor against t
 npm run doctor:production-relay
 ```
 
-This check fails if GitHub OAuth is missing, durable session encryption is weak or missing, credentialed browser origins are unset or not exact HTTP(S) origins, auth is explicitly disabled, debug endpoints are enabled, in-process rate limits are disabled, relay storage points at `/tmp`, or untrusted proxy headers are accepted. It is a deployment sanity check, not a substitute for TLS, backups, log review, process supervision, or an external rate limiter in multi-instance deployments.
+This check fails if GitHub OAuth is missing, credentialed browser origins are unset or not exact HTTP(S) origins, auth is explicitly disabled, debug endpoints are enabled, in-process rate limits are disabled, relay storage points at `/tmp`, or untrusted proxy headers are accepted. Session identifiers are hashed before persistence by the relay rather than controlled by a deployment secret. The doctor is a deployment sanity check, not a substitute for TLS, backups, log review, process supervision, or an external rate limiter in multi-instance deployments.
 
 ## Docker Relay
 

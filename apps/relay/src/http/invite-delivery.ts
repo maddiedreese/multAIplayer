@@ -2,12 +2,19 @@ import { sendRelayError } from "./errors.js";
 import type { Express, Response } from "express";
 import {
   InviteResponseRecord,
+  type InviteRecord,
   type InviteJoinRequestRecord,
-  type InviteResponseRecord as InviteResponseRecordType
+  type InviteResponseRecord as InviteResponseRecordType,
+  type KeyPackageRecord,
+  type RoomRecord
 } from "@multaiplayer/protocol";
 import type { AuthSession, RelayStore } from "../state.js";
 import { hasDeviceSession } from "./device-auth.js";
-import { isCanonicalPaddedBase64, parseStrictDirectedInviteRequestJson } from "../opaque.js";
+import {
+  isCanonicalPaddedBase64,
+  parseStrictDirectedInviteRequestJson,
+  type StrictDirectedInviteRequest
+} from "../opaque.js";
 
 const maxOpaqueChars = 1_400_000;
 interface Options {
@@ -57,12 +64,15 @@ export function registerInviteDeliveryRoutes({
     const existingRequest = store.inviteRequests.get(requestId);
     if (existingRequest) {
       if (
-        existingRequest.inviteId === invite.id &&
-        existingRequest.requesterUserId === session.user.id &&
-        existingRequest.requesterDeviceId === requesterDeviceId &&
-        existingRequest.keyPackageId === keyPackageId &&
-        existingRequest.keyPackageHash === keyPackageHash &&
-        existingRequest.sealedRequest === sealedRequest
+        isSameInviteRequest(
+          existingRequest,
+          invite.id,
+          session.user.id,
+          requesterDeviceId,
+          keyPackageId,
+          keyPackageHash,
+          sealedRequest
+        )
       ) {
         const pendingSave = requestSaves.get(requestId);
         if (pendingSave && !(await pendingSave))
@@ -74,33 +84,22 @@ export function registerInviteDeliveryRoutes({
     if (Array.from(store.inviteRequests.values()).some((pending) => pending.inviteId === invite.id)) {
       return void sendRelayError(res, 409, "conflict", "This invite already has a pending request.");
     }
-    if (
-      Array.from(store.inviteResponses.values()).some((response) => response.inviteId === invite.id) ||
-      invite.approvedUserId !== undefined ||
-      invite.approvedDeviceId !== undefined ||
-      invite.keyPackageHash !== undefined
-    ) {
+    if (inviteHasPendingDecision(store, invite)) {
       return void sendRelayError(res, 409, "conflict", "This invite already has a pending decision.");
     }
     const directed = parseStrictDirectedInviteRequestJson(sealedRequest, maxOpaqueChars);
     const room = store.getRoom(invite.roomId);
     if (
-      !kp ||
-      kp.userId !== session.user.id ||
-      kp.deviceId !== requesterDeviceId ||
-      kp.keyPackageHash !== keyPackageHash ||
-      !directed ||
-      directed.binding.inviteId !== invite.id ||
-      directed.binding.teamId !== invite.teamId ||
-      directed.binding.roomId !== invite.roomId ||
-      directed.binding.keyEpoch !== (room?.acceptedMlsEpoch ?? 0) ||
-      directed.binding.keyPackageHash !== keyPackageHash ||
-      directed.binding.requestId !== requestId ||
-      directed.binding.requesterUserId !== session.user.id ||
-      directed.binding.requesterDeviceId !== requesterDeviceId ||
-      directed.binding.hostUserId !== room?.hostUserId ||
-      directed.binding.hostDeviceId !== room?.activeHostDeviceId ||
-      directed.binding.expiresAt !== invite.expiresAt
+      !isValidDirectedInviteRequest(
+        kp,
+        directed,
+        invite,
+        room,
+        requestId,
+        session.user.id,
+        requesterDeviceId,
+        keyPackageHash
+      )
     ) {
       return void sendRelayError(res, 400, "invalid_request", "Invalid invite request.");
     }
@@ -114,16 +113,7 @@ export function registerInviteDeliveryRoutes({
       sealedRequest,
       createdAt: new Date().toISOString()
     };
-    store.inviteRequests.set(requestId, record);
-    const saveResult = saveRelayStore().then(
-      () => true,
-      () => false
-    );
-    requestSaves.set(requestId, saveResult);
-    const persisted = await saveResult;
-    if (requestSaves.get(requestId) === saveResult) requestSaves.delete(requestId);
-    if (!persisted) {
-      store.inviteRequests.delete(requestId);
+    if (!(await saveInviteRequestAtomically(store, record, requestSaves, saveRelayStore))) {
       return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist invite request.");
     }
     notifyInviteRequested(invite.id, requestId);
@@ -192,22 +182,21 @@ export function registerInviteDeliveryRoutes({
     const existingWelcome = store.inviteResponses.get(String(req.body?.requestId ?? ""));
     if (existingWelcome) {
       if (
-        existingWelcome.inviteId === invite?.id &&
-        existingWelcome.status === status &&
-        existingWelcome.responseMac === req.body?.responseMac &&
-        JSON.stringify(existingWelcome.responseBinding) === JSON.stringify(req.body?.responseBinding) &&
-        existingWelcome.welcome === welcome
+        isSameInviteResponse(
+          existingWelcome,
+          invite?.id,
+          status,
+          req.body?.responseMac,
+          req.body?.responseBinding,
+          welcome
+        )
       )
         return void res.status(200).json({ requestId: existingWelcome.requestId, status: "ready" });
       return void sendRelayError(res, 409, "conflict", "requestId is already bound to another invite response.");
     }
     if (!request || request.inviteId !== invite?.id)
       return void sendRelayError(res, 400, "invalid_request", "Invalid invite response.");
-    const approved =
-      invite?.approvedUserId === request.requesterUserId &&
-      invite.approvedDeviceId === request.requesterDeviceId &&
-      invite.keyPackageHash === request.keyPackageHash;
-    if (status === "approved" && !approved)
+    if (status === "approved" && !isApprovedInviteRequest(invite, request))
       return void sendRelayError(res, 409, "conflict", "The exact invite request has not been approved.");
     if (status === "approved" && (!welcome || !isCanonicalPaddedBase64(welcome, maxOpaqueChars)))
       return void sendRelayError(res, 400, "invalid_request", "Approved invite response requires a canonical Welcome.");
@@ -231,27 +220,9 @@ export function registerInviteDeliveryRoutes({
     const record = parsedRecord.data;
     if (!isCanonicalPaddedBase64(record.responseMac, 128))
       return void sendRelayError(res, 400, "invalid_request", "Invalid invite response binding or MAC.");
-    const binding = record.responseBinding;
-    if (
-      binding.inviteId !== invite.id ||
-      binding.teamId !== invite.teamId ||
-      binding.roomId !== invite.roomId ||
-      binding.requestId !== request.requestId ||
-      binding.keyPackageHash !== request.keyPackageHash ||
-      binding.requesterUserId !== request.requesterUserId ||
-      binding.requesterDeviceId !== request.requesterDeviceId ||
-      binding.hostUserId !== session.user.id ||
-      binding.hostDeviceId !== room.activeHostDeviceId ||
-      binding.status !== record.status
-    )
+    if (!inviteResponseBindingMatches(record, invite, request, session.user.id, room))
       return void sendRelayError(res, 400, "invalid_request", "Invite response binding does not match its request.");
-    store.inviteRequests.delete(request.requestId);
-    store.inviteResponses.set(record.requestId, record);
-    try {
-      await saveRelayStore();
-    } catch {
-      store.inviteResponses.delete(record.requestId);
-      store.inviteRequests.set(request.requestId, request);
+    if (!(await saveInviteResponseAtomically(store, request, record, saveRelayStore))) {
       return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist invite response.");
     }
     res.status(201).json({ requestId: record.requestId, status: "ready" });
@@ -322,6 +293,147 @@ export function registerInviteDeliveryRoutes({
     }
     res.status(204).end();
   });
+}
+
+function isSameInviteRequest(
+  existing: InviteJoinRequestRecord,
+  inviteId: string,
+  requesterUserId: string,
+  requesterDeviceId: string,
+  keyPackageId: string,
+  keyPackageHash: string,
+  sealedRequest: string
+): boolean {
+  return (
+    existing.inviteId === inviteId &&
+    existing.requesterUserId === requesterUserId &&
+    existing.requesterDeviceId === requesterDeviceId &&
+    existing.keyPackageId === keyPackageId &&
+    existing.keyPackageHash === keyPackageHash &&
+    existing.sealedRequest === sealedRequest
+  );
+}
+
+function inviteHasPendingDecision(store: RelayStore, invite: InviteRecord): boolean {
+  return (
+    Array.from(store.inviteResponses.values()).some((response) => response.inviteId === invite.id) ||
+    invite.approvedUserId !== undefined ||
+    invite.approvedDeviceId !== undefined ||
+    invite.keyPackageHash !== undefined
+  );
+}
+
+function isValidDirectedInviteRequest(
+  keyPackage: KeyPackageRecord | undefined,
+  directed: StrictDirectedInviteRequest | null,
+  invite: InviteRecord,
+  room: RoomRecord | undefined,
+  requestId: string,
+  requesterUserId: string,
+  requesterDeviceId: string,
+  keyPackageHash: string
+): boolean {
+  if (!keyPackage || !directed) return false;
+  const binding = directed.binding;
+  return (
+    keyPackage.userId === requesterUserId &&
+    keyPackage.deviceId === requesterDeviceId &&
+    keyPackage.keyPackageHash === keyPackageHash &&
+    binding.inviteId === invite.id &&
+    binding.teamId === invite.teamId &&
+    binding.roomId === invite.roomId &&
+    binding.keyEpoch === (room?.acceptedMlsEpoch ?? 0) &&
+    binding.keyPackageHash === keyPackageHash &&
+    binding.requestId === requestId &&
+    binding.requesterUserId === requesterUserId &&
+    binding.requesterDeviceId === requesterDeviceId &&
+    binding.hostUserId === room?.hostUserId &&
+    binding.hostDeviceId === room?.activeHostDeviceId &&
+    binding.expiresAt === invite.expiresAt
+  );
+}
+
+async function saveInviteRequestAtomically(
+  store: RelayStore,
+  record: InviteJoinRequestRecord,
+  pendingSaves: Map<string, Promise<boolean>>,
+  saveRelayStore: () => Promise<void>
+): Promise<boolean> {
+  store.inviteRequests.set(record.requestId, record);
+  const saveResult = saveRelayStore().then(
+    () => true,
+    () => false
+  );
+  pendingSaves.set(record.requestId, saveResult);
+  const persisted = await saveResult;
+  if (pendingSaves.get(record.requestId) === saveResult) pendingSaves.delete(record.requestId);
+  if (!persisted) store.inviteRequests.delete(record.requestId);
+  return persisted;
+}
+
+function isSameInviteResponse(
+  existing: InviteResponseRecordType,
+  inviteId: string | undefined,
+  status: unknown,
+  responseMac: unknown,
+  responseBinding: unknown,
+  welcome: string | undefined
+): boolean {
+  return (
+    existing.inviteId === inviteId &&
+    existing.status === status &&
+    existing.responseMac === responseMac &&
+    JSON.stringify(existing.responseBinding) === JSON.stringify(responseBinding) &&
+    existing.welcome === welcome
+  );
+}
+
+function isApprovedInviteRequest(invite: InviteRecord, request: InviteJoinRequestRecord): boolean {
+  return (
+    invite.approvedUserId === request.requesterUserId &&
+    invite.approvedDeviceId === request.requesterDeviceId &&
+    invite.keyPackageHash === request.keyPackageHash
+  );
+}
+
+function inviteResponseBindingMatches(
+  record: InviteResponseRecordType,
+  invite: InviteRecord,
+  request: InviteJoinRequestRecord,
+  hostUserId: string,
+  room: RoomRecord
+): boolean {
+  const binding = record.responseBinding;
+  return (
+    binding.inviteId === invite.id &&
+    binding.teamId === invite.teamId &&
+    binding.roomId === invite.roomId &&
+    binding.requestId === request.requestId &&
+    binding.keyPackageHash === request.keyPackageHash &&
+    binding.requesterUserId === request.requesterUserId &&
+    binding.requesterDeviceId === request.requesterDeviceId &&
+    binding.hostUserId === hostUserId &&
+    binding.hostDeviceId === room.activeHostDeviceId &&
+    binding.status === record.status
+  );
+}
+
+async function saveInviteResponseAtomically(
+  store: RelayStore,
+  request: InviteJoinRequestRecord,
+  record: InviteResponseRecordType,
+  saveRelayStore: () => Promise<void>
+): Promise<boolean> {
+  store.inviteRequests.delete(request.requestId);
+  store.inviteResponses.set(record.requestId, record);
+  try {
+    await saveRelayStore();
+    return true;
+  } catch {
+    store.inviteResponses.delete(record.requestId);
+    store.inviteRequests.set(request.requestId, request);
+    return false;
+  }
 }
 
 export function isExactInviteAckReceipt(

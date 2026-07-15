@@ -370,17 +370,23 @@ test(
   }
 );
 
-test("relay persists identity-only sessions and purges legacy token fields", async () => {
+test("relay hashes persisted session ids, migrates legacy ids, and purges legacy token fields", async () => {
   const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
   let restarted: RelayHarness | null = null;
   let closed = false;
   try {
     const cookie = await createDebugSession(relay.baseUrl, "github:persisted", "persisted");
+    const sessionId = cookie.replace(/^multaiplayer_session=([^;]+).*$/, "$1");
     const stored = await waitForStoredState(relay.dataPath, (state) => state.authSessions?.length === 1);
-    assert.doesNotMatch(JSON.stringify(stored), /debug-token|accessToken|encryptedAccessToken/);
+    const serialized = JSON.stringify(stored);
+    assert.doesNotMatch(serialized, new RegExp(sessionId));
+    assert.doesNotMatch(serialized, /debug-token|accessToken|encryptedAccessToken/);
+    assert.match(String((stored.authSessions![0] as Record<string, unknown>).sessionIdHash), /^[a-f0-9]{64}$/);
     await relay.close({ preserveData: true });
     closed = true;
     const legacy = stored.authSessions![0] as StoredRelayStateFixture["authSessions"][number] & Record<string, unknown>;
+    delete legacy.sessionIdHash;
+    legacy.sessionId = sessionId;
     legacy.accessToken = "legacy-secret";
     legacy.encryptedAccessToken = {
       algorithm: "AES-GCM-256",
@@ -392,14 +398,22 @@ test("relay persists identity-only sessions and purges legacy token fields", asy
     restarted = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" }, undefined, relay.dataPath);
     assert.equal((await fetch(`${restarted.baseUrl}/auth/me`, { headers: { cookie } })).status, 200);
     const rewritten = await waitForStoredState(restarted.dataPath, (state) => state.authSessions?.length === 1);
-    assert.doesNotMatch(JSON.stringify(rewritten), /legacy-secret|accessToken|encryptedAccessToken/);
+    assert.doesNotMatch(
+      JSON.stringify(rewritten),
+      new RegExp(`${sessionId}|legacy-secret|accessToken|encryptedAccessToken`)
+    );
+    assert.match(String((rewritten.authSessions![0] as Record<string, unknown>).sessionIdHash), /^[a-f0-9]{64}$/);
+    const logout = await fetch(`${restarted.baseUrl}/auth/logout`, { method: "POST", headers: { cookie } });
+    assert.equal(logout.status, 200);
+    assert.equal((await fetch(`${restarted.baseUrl}/auth/me`, { headers: { cookie } })).status, 401);
+    await waitForStoredState(restarted.dataPath, (state) => state.authSessions?.length === 0);
   } finally {
     if (restarted) await restarted.close();
     else if (!closed) await relay.close();
   }
 });
 
-test("relay purges legacy token fields from normalized SQLite session rows", async () => {
+test("relay migrates plaintext ids and purges legacy token fields from normalized SQLite session rows", async () => {
   const relay = await startRelay({
     MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
     MULTAIPLAYER_RELAY_STORAGE: "sqlite"
@@ -408,6 +422,7 @@ test("relay purges legacy token fields from normalized SQLite session rows", asy
   let closed = false;
   try {
     const cookie = await createDebugSession(relay.baseUrl, "github:sqlite-persisted", "sqlite-persisted");
+    const sessionId = cookie.replace(/^multaiplayer_session=([^;]+).*$/, "$1");
     await relay.close({ preserveData: true });
     closed = true;
     const db = new Database(relay.dataPath);
@@ -415,10 +430,16 @@ test("relay purges legacy token fields from normalized SQLite session rows", asy
       session_id: string;
       data_json: string;
     };
+    assert.match(row.session_id, /^[a-f0-9]{64}$/);
+    assert.notEqual(row.session_id, sessionId);
+    assert.doesNotMatch(row.data_json, new RegExp(sessionId));
     const legacy = JSON.parse(row.data_json) as Record<string, unknown>;
+    delete legacy.sessionIdHash;
+    legacy.sessionId = sessionId;
     legacy.accessToken = "sqlite-legacy-secret";
     legacy.encryptedAccessToken = { ciphertext: "sqlite-legacy-secret" };
-    db.prepare("update relay_auth_sessions set data_json = ? where session_id = ?").run(
+    db.prepare("update relay_auth_sessions set session_id = ?, data_json = ? where session_id = ?").run(
+      sessionId,
       JSON.stringify(legacy),
       row.session_id
     );
@@ -430,11 +451,17 @@ test("relay purges legacy token fields from normalized SQLite session rows", asy
     );
     assert.equal((await fetch(`${restarted.baseUrl}/auth/me`, { headers: { cookie } })).status, 200);
     const verifyDb = new Database(restarted.dataPath, { readonly: true });
-    const rewritten = verifyDb.prepare("select data_json from relay_auth_sessions limit 1").get() as {
+    const rewritten = verifyDb.prepare("select session_id, data_json from relay_auth_sessions limit 1").get() as {
+      session_id: string;
       data_json: string;
     };
     verifyDb.close();
-    assert.doesNotMatch(rewritten.data_json, /sqlite-legacy-secret|accessToken|encryptedAccessToken/);
+    assert.match(rewritten.session_id, /^[a-f0-9]{64}$/);
+    assert.notEqual(rewritten.session_id, sessionId);
+    assert.doesNotMatch(
+      rewritten.data_json,
+      new RegExp(`${sessionId}|sqlite-legacy-secret|accessToken|encryptedAccessToken`)
+    );
   } finally {
     if (restarted) await restarted.close();
     else if (!closed) await relay.close();

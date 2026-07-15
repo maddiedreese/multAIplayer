@@ -4,6 +4,7 @@ import { defaultCodexModel } from "@multaiplayer/protocol";
 import { defaultProjectPath, type CodexActivityEvent } from "./lib/localBackend";
 import { isTauriRuntime } from "./lib/localBackend/runtime";
 import { registerRoomNotificationClickFocus } from "./lib/roomNotifications";
+import { reportNonFatal } from "./lib/nonFatalReporting";
 import { createWorkspaceRecordActions } from "./lib/workspaceRecordActions";
 import { useAppStore } from "./store/appStore";
 import { useGitHubAuth } from "./hooks/useGitHubAuth";
@@ -153,8 +154,8 @@ function NativeApp() {
       const { roomId, ...activity } = event.payload;
       const room = appRefs.roomsRef.current.find((candidate) => candidate.id === roomId);
       if (!room) return;
-      void publishCodexActivityRef.current(activity, room).catch(() => {
-        console.warn("Failed to publish encrypted Codex activity");
+      void publishCodexActivityRef.current(activity, room).catch((error) => {
+        reportNonFatal("publish encrypted Codex activity", error);
       });
     }).then((stop) => {
       if (disposed) stop();

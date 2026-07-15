@@ -1,4 +1,4 @@
-import { defaultCodexSandboxLevel } from "@multaiplayer/protocol";
+import { defaultCodexSandboxLevel, type ClientRoomRecord } from "@multaiplayer/protocol";
 import { runCodexTurn, getCodexGoal } from "../lib/localBackend";
 import { codexGoalToRoomGoal } from "../lib/roomGoals";
 import { assessCodexCompatibility } from "../lib/codexCompatibility";
@@ -82,12 +82,10 @@ export function useCodexTurnActions({
       setCodexContinuationForRoom,
       setRoomGoalForRoom
     } = state;
-    const browserRequestsByRoom = { [roomId]: state.browserByRoom[roomId]?.requests ?? [] };
-    const gitStatusByRoom = { [roomId]: state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.status ?? null };
-    const codexContinuationByRoom = { [roomId]: state.codexRuntimeByRoom[roomId]?.continuation ?? null };
-    const codexThreadIdsByRoom = {
-      [roomId]: state.codexRuntimeByRoom[roomId]?.threadGraph?.activeThreadId ?? ""
-    };
+    const browserRequests = state.browserByRoom[roomId]?.requests ?? [];
+    const gitStatus = state.gitWorkflowRuntimeByRoom[roomId]?.workflow?.status ?? null;
+    const codexContinuation = state.codexRuntimeByRoom[roomId]?.continuation ?? null;
+    const codexThreadId = state.codexRuntimeByRoom[roomId]?.threadGraph?.activeThreadId ?? null;
     if (!room) {
       setHostMessageForRoom(roomId, "This Codex approval belongs to a room that is no longer available.");
       setPendingCodexApprovalForRoom(roomId, null);
@@ -132,8 +130,8 @@ export function useCodexTurnActions({
       turnMessages,
       room,
       terminals.filter((terminal) => terminal.roomId === roomId),
-      browserRequestsByRoom[roomId] ?? [],
-      gitStatusByRoom[roomId] ?? null,
+      browserRequests,
+      gitStatus,
       { includeWorkspaceContext: roomCanReadLocalWorkspace }
     );
     const resolvedSettings = resolveCodexRunSettings(room, codexProbe);
@@ -168,182 +166,183 @@ export function useCodexTurnActions({
     );
 
     const turnId = approval?.turnId ?? crypto.randomUUID();
-    const continuationHandoff = codexContinuationByRoom[roomId] ?? null;
+    const continuationHandoff = codexContinuation;
     const input = buildCodexTurnInput(turnMessages, projectPath, model, turnSummary, {
       fullRoomContext: Boolean(continuationHandoff)
     });
-    const riskFlags = detectCodexTurnRiskFlags(
-      turnMessages,
-      room,
-      browserRequestsByRoom[roomId] ?? [],
-      gitStatusByRoom[roomId] ?? null,
-      { includeWorkspaceContext: roomCanReadLocalWorkspace }
-    );
+    const riskFlags = detectCodexTurnRiskFlags(turnMessages, room, browserRequests, gitStatus, {
+      includeWorkspaceContext: roomCanReadLocalWorkspace
+    });
     const consumedMessageIds = messagesSinceLastCodex(turnMessages)
       .map((message) => message.id)
       .filter((id): id is string => Boolean(id));
-    const previousThreadId = codexThreadIdsByRoom[roomId] ?? null;
-    try {
-      await publishCodexEvent(
-        {
-          turnId,
-          status: "started",
-          message: previousThreadId
-            ? `Resuming Codex thread ${previousThreadId} with ${formatCodexModel(model)}.`
-            : `Started Codex turn with ${formatCodexModel(model)}.`,
-          model,
-          ...(consumedMessageIds.length ? { consumedMessageIds } : {}),
-          ...(riskFlags.length ? { riskFlags } : {})
-        },
-        room
-      );
-      const result = await runCodexTurn(
-        roomId,
-        turnId,
-        projectPath,
-        input,
-        model,
-        reasoningEffort,
-        speed,
-        resolvedSettings.serviceTier,
-        sandboxLevel,
-        previousThreadId,
-        180,
-        {
-          proposedBy: approval?.requestedBy ?? localUser.name,
-          contextSummary: `${turnSummary.messagesSinceLastCodex} room message(s); ${turnSummary.attachments.length} attachment(s); ${turnSummary.browserAccess.length} approved browser origin(s); ${turnSummary.terminals.length} terminal label(s); ${turnSummary.git?.totalFiles ?? 0} Git change(s)`
-        },
-        room.codexRawReasoningEnabled ?? false
-      );
-      if (classifyCodexFailure([result.status, result.stderr, result.transcript, ...result.events]) === "usage_limit") {
-        await executeCodexUsageLimit(
-          codexUsageLimitContext,
-          room,
-          turnId,
-          model,
-          turnMessages,
-          result.events,
-          result.stderr
-        );
-        return;
-      }
-      const threadId = normalizeCodexThreadId(result.threadId);
-      if (threadId) {
-        setCodexThreadIdForRoom(roomId, threadId);
-        void getCodexGoal(roomId, threadId)
-          .then((goal) => {
-            setRoomGoalForRoom(roomId, goal ? codexGoalToRoomGoal(goal) : null);
-          })
-          .catch(() => reportNonFatal("load a Codex goal after completing a turn"));
-      }
-      const roomEvents = result.events
-        .map(projectCodexRoomEvent)
-        .filter((eventName): eventName is string => Boolean(eventName))
-        .slice(-16);
-      const roomStatus = projectCodexRoomStatus(result.status);
-      for (const eventName of roomEvents) {
+    const previousThreadId = codexThreadId;
+    async function executeApprovedTurn(room: ClientRoomRecord) {
+      try {
         await publishCodexEvent(
           {
             turnId,
-            status: "event",
-            message: eventName,
-            eventName,
+            status: "started",
+            message: previousThreadId
+              ? `Resuming Codex thread ${previousThreadId} with ${formatCodexModel(model)}.`
+              : `Started Codex turn with ${formatCodexModel(model)}.`,
+            model,
+            ...(consumedMessageIds.length ? { consumedMessageIds } : {}),
+            ...(riskFlags.length ? { riskFlags } : {})
+          },
+          room
+        );
+        const result = await runCodexTurn(
+          roomId,
+          turnId,
+          projectPath,
+          input,
+          model,
+          reasoningEffort,
+          speed,
+          resolvedSettings.serviceTier,
+          sandboxLevel,
+          previousThreadId,
+          180,
+          {
+            proposedBy: approval?.requestedBy ?? localUser.name,
+            contextSummary: `${turnSummary.messagesSinceLastCodex} room message(s); ${turnSummary.attachments.length} attachment(s); ${turnSummary.browserAccess.length} approved browser origin(s); ${turnSummary.terminals.length} terminal label(s); ${turnSummary.git?.totalFiles ?? 0} Git change(s)`
+          },
+          room.codexRawReasoningEnabled ?? false
+        );
+        if (
+          classifyCodexFailure([result.status, result.stderr, result.transcript, ...result.events]) === "usage_limit"
+        ) {
+          await executeCodexUsageLimit(
+            codexUsageLimitContext,
+            room,
+            turnId,
+            model,
+            turnMessages,
+            result.events,
+            result.stderr
+          );
+          return;
+        }
+        const threadId = normalizeCodexThreadId(result.threadId);
+        if (threadId) {
+          setCodexThreadIdForRoom(roomId, threadId);
+          void getCodexGoal(roomId, threadId)
+            .then((goal) => {
+              setRoomGoalForRoom(roomId, goal ? codexGoalToRoomGoal(goal) : null);
+            })
+            .catch((error) => reportNonFatal("load a Codex goal after completing a turn", error));
+        }
+        const roomEvents = result.events
+          .map(projectCodexRoomEvent)
+          .filter((eventName): eventName is string => Boolean(eventName))
+          .slice(-16);
+        const roomStatus = projectCodexRoomStatus(result.status);
+        for (const eventName of roomEvents) {
+          await publishCodexEvent(
+            {
+              turnId,
+              status: "event",
+              message: eventName,
+              eventName,
+              model,
+              ...(threadId ? { threadId } : {})
+            },
+            room
+          );
+        }
+        await publishCodexEvent(
+          {
+            turnId,
+            status: roomStatus === "completed" ? "completed" : "failed",
+            message: `Codex turn finished with status: ${roomStatus}.`,
             model,
             ...(threadId ? { threadId } : {})
           },
           room
         );
-      }
-      await publishCodexEvent(
-        {
-          turnId,
-          status: roomStatus === "completed" ? "completed" : "failed",
-          message: `Codex turn finished with status: ${roomStatus}.`,
-          model,
-          ...(threadId ? { threadId } : {})
-        },
-        room
-      );
-      const imageAttachments = [];
-      for (const generatedImage of result.generatedImages ?? []) {
-        try {
-          imageAttachments.push(await createCodexImageAttachment(room, generatedImage));
-        } catch (error) {
-          appendTerminalLinesForRoom(
-            roomId,
-            [`Could not publish a Codex-generated image: ${String(error)}`],
-            maxTerminalActivityLines
-          );
+        const imageAttachments = [];
+        for (const generatedImage of result.generatedImages ?? []) {
+          try {
+            imageAttachments.push(await createCodexImageAttachment(room, generatedImage));
+          } catch (error) {
+            appendTerminalLinesForRoom(
+              roomId,
+              [`Could not publish a Codex-generated image: ${String(error)}`],
+              maxTerminalActivityLines
+            );
+          }
         }
-      }
-      const body =
-        result.transcript.trim() ||
-        (imageAttachments.length
-          ? "Generated an image."
-          : `Codex turn finished with status: ${roomStatus}.${roomEvents.length ? ` Events: ${roomEvents.slice(0, 8).join(", ")}` : ""}`);
-      await publishChatMessage(
-        {
-          id: crypto.randomUUID(),
-          author: `Codex via ${localUser.name}`,
-          role: "codex",
-          body,
-          time: formatMessageTime(),
-          createdAt: new Date().toISOString(),
-          ...(imageAttachments.length ? { attachments: imageAttachments } : {})
-        },
-        room
-      );
-      appendTerminalLinesForRoom(
-        roomId,
-        [
-          `Codex status: ${result.status}`,
-          `Codex thread: ${result.threadId ?? "unknown"}`,
-          ...result.events.slice(-8).map((event) => `event: ${event}`),
-          ...(result.stderr ? [`stderr: ${result.stderr}`] : [])
-        ],
-        maxTerminalActivityLines
-      );
-    } catch (error) {
-      if (classifyCodexFailure([String(error)]) === "usage_limit") {
-        await executeCodexUsageLimit(
-          codexUsageLimitContext,
-          room,
-          turnId,
-          model,
-          turnMessages,
-          [String(error)],
-          String(error)
+        const body =
+          result.transcript.trim() ||
+          (imageAttachments.length
+            ? "Generated an image."
+            : `Codex turn finished with status: ${roomStatus}.${roomEvents.length ? ` Events: ${roomEvents.slice(0, 8).join(", ")}` : ""}`);
+        await publishChatMessage(
+          {
+            id: crypto.randomUUID(),
+            author: `Codex via ${localUser.name}`,
+            role: "codex",
+            body,
+            time: formatMessageTime(),
+            createdAt: new Date().toISOString(),
+            ...(imageAttachments.length ? { attachments: imageAttachments } : {})
+          },
+          room
         );
-        return;
+        appendTerminalLinesForRoom(
+          roomId,
+          [
+            `Codex status: ${result.status}`,
+            `Codex thread: ${result.threadId ?? "unknown"}`,
+            ...result.events.slice(-8).map((event) => `event: ${event}`),
+            ...(result.stderr ? [`stderr: ${result.stderr}`] : [])
+          ],
+          maxTerminalActivityLines
+        );
+      } catch (error) {
+        if (classifyCodexFailure([String(error)]) === "usage_limit") {
+          await executeCodexUsageLimit(
+            codexUsageLimitContext,
+            room,
+            turnId,
+            model,
+            turnMessages,
+            [String(error)],
+            String(error)
+          );
+          return;
+        }
+        await publishCodexEvent(
+          {
+            turnId,
+            status: "failed",
+            message: codexHostFailureRoomMessage,
+            model
+          },
+          room
+        );
+        await publishChatMessage(
+          {
+            id: crypto.randomUUID(),
+            author: `Codex via ${localUser.name}`,
+            role: "codex",
+            body: codexHostFailureRoomMessage,
+            time: formatMessageTime(),
+            createdAt: new Date().toISOString()
+          },
+          room
+        );
+        appendTerminalLinesForRoom(roomId, [`Codex error: ${String(error)}`], maxTerminalActivityLines);
+      } finally {
+        if (continuationHandoff) {
+          setCodexContinuationForRoom(roomId, null);
+        }
+        setCodexRunningForRoom(roomId, false);
+        promoteNextCodexApprovalForRoom(roomId);
       }
-      await publishCodexEvent(
-        {
-          turnId,
-          status: "failed",
-          message: codexHostFailureRoomMessage,
-          model
-        },
-        room
-      );
-      await publishChatMessage(
-        {
-          id: crypto.randomUUID(),
-          author: `Codex via ${localUser.name}`,
-          role: "codex",
-          body: codexHostFailureRoomMessage,
-          time: formatMessageTime(),
-          createdAt: new Date().toISOString()
-        },
-        room
-      );
-      appendTerminalLinesForRoom(roomId, [`Codex error: ${String(error)}`], maxTerminalActivityLines);
-    } finally {
-      if (continuationHandoff) {
-        setCodexContinuationForRoom(roomId, null);
-      }
-      setCodexRunningForRoom(roomId, false);
-      promoteNextCodexApprovalForRoom(roomId);
     }
+    await executeApprovedTurn(room);
   }
 
   return {

@@ -12,6 +12,7 @@ import { summarizeActionRuns } from "../lib/githubActionsSummary";
 import { isLocalUserActiveHostForRoom } from "../lib/roomHost";
 import { canUseLocalWorkspace, localWorkspaceGateMessage } from "../lib/workspaceAccess";
 import { useAppStore } from "../store/appStore";
+import { reportNonFatal } from "../lib/nonFatalReporting";
 
 interface LocalUser {
   id: string;
@@ -127,8 +128,8 @@ export function useGitHubActionsRefresh({
           runs: result.runs
         },
         room
-      ).catch(() => {
-        console.warn("Failed to publish GitHub Actions event");
+      ).catch((error) => {
+        reportNonFatal("publish GitHub Actions event", error);
       });
     } catch (error) {
       setActionsMessageForRoom(roomId, String(error));

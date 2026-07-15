@@ -59,6 +59,15 @@ test("recoverable failures are countable without including rejected input", () =
   assert.equal(entries[0].detail, undefined);
 });
 
+test("recoverable failures preserve redacted error context", () => {
+  reportNonFatal("publish workflow event", new Error("request failed for token_abcdefghijklmnopqrstuvwxyz123456"));
+
+  const [entry] = loadDiagnosticEntries();
+  assert.equal(entry.message, "Non-fatal failure: publish workflow event");
+  assert.match(entry.detail ?? "", /^Error: request failed for /);
+  assert.doesNotMatch(entry.detail ?? "", /token_abcdefghijklmnopqrstuvwxyz123456/);
+});
+
 test("expected failures emit a static debug breadcrumb", () => {
   const originalDebug = console.debug;
   const calls: unknown[][] = [];

@@ -167,7 +167,7 @@ There is no transparent machine failover. An abrupt disconnect may not produce a
 
 Yes. The relay is open source and can be self-hosted.
 
-An internet-facing deployment should use HTTPS and WSS, exact allowed origins, GitHub authentication, persistent SQLite storage, durable session encryption, rate limits, quotas, backups, health checks, monitoring, and the included production-relay doctor.
+An internet-facing deployment should use HTTPS and WSS, exact allowed origins, GitHub authentication, persistent SQLite storage, hashed session identifiers at rest, rate limits, quotas, backups, health checks, monitoring, and the included production-relay doctor.
 
 The origin allowlist is a browser CORS and WebSocket-origin control, not client authentication. Native and server-side requests may omit `Origin` and are allowed for that reason, so authenticated sessions, device signatures, membership checks, and TLS remain necessary.
 

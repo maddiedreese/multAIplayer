@@ -39,6 +39,18 @@ Start a private room around a local project, invite the people you trust, and wo
   <img src="docs/assets/screens/codex-room.png" width="78%" alt="A teammate request, Codex result, and expandable activity shown inside a shared room">
 </p>
 
+## One room for the whole build loop
+
+multAIplayer puts the collaboration surfaces around Codex beside the conversation, so a team can inspect, run, preview, and ship the work without losing the shared thread.
+
+- **A real code editor.** Browse the active host's project and edit text files in an embedded [Monaco Editor](https://microsoft.github.io/monaco-editor/) surface with language-aware editing. Open bounded file previews and diffs, attach a file to chat, or expand the editor for focused work. The host can save directly; a teammate's save becomes an explicit host approval request.
+- **A real terminal.** Named, room-scoped terminals use [xterm.js](https://xtermjs.org/) over a native Rust PTY. The host can create, restart, stop, and interact with terminals while the room keeps a reviewable workflow around command requests. Native confirmation shows the exact room, project, command, or input before execution.
+- **An isolated project browser.** Open localhost, documentation, or an approved site in room/project-scoped native WebView tabs instead of the host's everyday browser profile. Hosts control profile persistence and can reset it; downloads, page clipboard access, file inputs, and drag/drop uploads are blocked where the platform permits.
+- **Share a localhost build.** The host can expose an explicit `localhost` or `127.0.0.1` port with a temporary Cloudflare Quick Tunnel and open the resulting preview in the room browser. Preview sharing requires [`cloudflared`](docs/local-preview-sharing.md) on the host Mac (`brew install cloudflare/cloudflare/cloudflared`); multAIplayer does not proxy the site through its relay. Quick Tunnel URLs are public while running, so review the build before sharing it.
+- **Codex work you can follow.** See bounded, structured activity for commands, file changes, tools, web work, images, and subagents. Steer an active turn, queue the next proposal, set a thread goal, or inspect and fork the Codex thread graph.
+- **Git and GitHub in context.** Review the current working tree, copy project and diff summaries, create a branch, commit, push, open a draft pull request, and follow GitHub Actions from the room. The **Changed files** list is the current Git working-tree status—not a list of everything merged since the last PR; [the user guide explains the exact comparison](docs/using-the-app.md#project-files-and-diffs).
+- **Private team continuity.** Chat, attachments, approvals, activity, and host handoff travel as MLS-encrypted room events. One active host supplies the current checkout, tools, credentials, and Codex account, and can hand that role to another verified member.
+
 ## How a room works
 
 Each room connects your team to one active host's project and Codex session:

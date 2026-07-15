@@ -42,6 +42,11 @@ import { fingerprintPublicKey, validP256HpkeKey, validP256Spki } from "./http/de
 import type { RelayStoreCodecOptions } from "./store-codec.js";
 
 export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
+  // Persistence is a separate trust boundary from live protocol parsing. Reuse
+  // protocol schemas where a stored record has the same shape, then apply
+  // store-specific limits, referential checks, expiry, and legacy defaults.
+  // These normalizers deliberately return null so one bad row can be dropped
+  // without turning a recoverable store into a relay startup failure.
   const { store } = options;
   const now = options.now ?? Date.now;
 

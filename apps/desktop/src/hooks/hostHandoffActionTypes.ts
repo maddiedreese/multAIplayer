@@ -21,9 +21,8 @@ export interface UseHostHandoffActionsOptions {
   seenEnvelopeIds: MutableRefObject<Set<string>>;
   messages: ChatMessage[];
   terminals: TerminalSnapshot[];
-  browserRequestsByRoom: Record<string, BrowserAccessRequest[]>;
+  browserRequests: BrowserAccessRequest[];
   gitStatus: GitStatusSummary | null;
-  gitStatusByRoom: Record<string, GitStatusSummary | null>;
   reportRoomHostMutationInFlight: (roomId: string) => boolean;
   roomSettingsActor: () => { requesterName: string; requesterUserId: string };
   replaceRoom: (room: ClientRoomRecord) => void;

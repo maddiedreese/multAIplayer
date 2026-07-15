@@ -24,17 +24,6 @@ export interface BrowserTab {
   openedAt: string;
 }
 
-export interface BrowserPanelMaps {
-  browserRequestsByRoom: Record<string, BrowserAccessRequest[]>;
-  browserUrlsByRoom: Record<string, string>;
-  browserReasonsByRoom: Record<string, string>;
-  browserMessagesByRoom: Record<string, string | null>;
-  browserStatusByRoom: Record<string, BrowserStatus>;
-  activeBrowserUrlsByRoom: Record<string, string | null>;
-  browserTabsByRoom: Record<string, BrowserTab[]>;
-  activeBrowserTabIdsByRoom: Record<string, string | null>;
-}
-
 function compactBrowserRoomState(roomState: BrowserRoomState): BrowserRoomState {
   const next = { ...roomState };
   if (next.requests?.length === 0) {
@@ -72,52 +61,12 @@ function updateBrowserForRoom(
   };
 }
 
-export function projectBrowserPanelMaps(browserByRoom: BrowserByRoom): BrowserPanelMaps {
-  return {
-    browserRequestsByRoom: Object.fromEntries(
-      Object.entries(browserByRoom)
-        .filter(([, roomBrowser]) => roomBrowser.requests)
-        .map(([roomId, roomBrowser]) => [roomId, roomBrowser.requests ?? []])
-    ),
-    browserUrlsByRoom: Object.fromEntries(
-      Object.entries(browserByRoom)
-        .filter(([, roomBrowser]) => roomBrowser.url)
-        .map(([roomId, roomBrowser]) => [roomId, roomBrowser.url ?? ""])
-    ),
-    browserReasonsByRoom: Object.fromEntries(
-      Object.entries(browserByRoom)
-        .filter(([, roomBrowser]) => roomBrowser.reason)
-        .map(([roomId, roomBrowser]) => [roomId, roomBrowser.reason ?? ""])
-    ),
-    browserMessagesByRoom: Object.fromEntries(
-      Object.entries(browserByRoom)
-        .filter(([, roomBrowser]) => roomBrowser.message)
-        .map(([roomId, roomBrowser]) => [roomId, roomBrowser.message ?? null])
-    ),
-    browserStatusByRoom: Object.fromEntries(
-      Object.entries(browserByRoom)
-        .filter(([, roomBrowser]) => roomBrowser.status)
-        .map(([roomId, roomBrowser]) => [roomId, roomBrowser.status as BrowserStatus])
-    ),
-    activeBrowserUrlsByRoom: Object.fromEntries(
-      Object.entries(browserByRoom)
-        .filter(([, roomBrowser]) => roomBrowser.activeUrl || roomBrowser.activeTabId)
-        .map(([roomId, roomBrowser]) => {
-          const activeTab = activeBrowserTab(roomBrowser);
-          return [roomId, activeTab?.url ?? roomBrowser.activeUrl ?? null];
-        })
-    ),
-    browserTabsByRoom: Object.fromEntries(
-      Object.entries(browserByRoom)
-        .filter(([, roomBrowser]) => roomBrowser.tabs)
-        .map(([roomId, roomBrowser]) => [roomId, roomBrowser.tabs ?? []])
-    ),
-    activeBrowserTabIdsByRoom: Object.fromEntries(
-      Object.entries(browserByRoom)
-        .filter(([, roomBrowser]) => roomBrowser.activeTabId)
-        .map(([roomId, roomBrowser]) => [roomId, roomBrowser.activeTabId ?? null])
-    )
-  };
+export function projectBrowserRequestsByRoom(browserByRoom: BrowserByRoom): Record<string, BrowserAccessRequest[]> {
+  return Object.fromEntries(
+    Object.entries(browserByRoom)
+      .filter(([, roomBrowser]) => roomBrowser.requests)
+      .map(([roomId, roomBrowser]) => [roomId, roomBrowser.requests ?? []])
+  );
 }
 
 export interface BrowserSlice {

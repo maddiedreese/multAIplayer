@@ -1,7 +1,7 @@
 import { sendRelayError } from "./errors.js";
 import type { CookieOptions, Express } from "express";
 import { nanoid } from "nanoid";
-import type { AuthSession, RelayStore } from "../state.js";
+import type { NewAuthSession, RelayStore } from "../state.js";
 
 interface RegisterDebugRoutesOptions {
   app: Express;
@@ -9,7 +9,7 @@ interface RegisterDebugRoutesOptions {
   store: Pick<RelayStore, "allMlsBacklogEntries" | "getInvite" | "setInvite">;
   invites: Map<string, unknown>;
   attachmentBlobs: Map<string, unknown>;
-  authSessions: Map<string, AuthSession>;
+  setAuthSession: (sessionId: string, session: NewAuthSession) => void;
   authSessionMaxAgeMs: number;
   authCookieOptions: (maxAge?: number) => CookieOptions;
   scheduleStoreSave: () => void;
@@ -26,7 +26,7 @@ export function registerDebugRoutes({
   store,
   invites,
   attachmentBlobs,
-  authSessions,
+  setAuthSession,
   authSessionMaxAgeMs,
   authCookieOptions,
   scheduleStoreSave,
@@ -81,11 +81,11 @@ export function registerDebugRoutes({
       return;
     }
     const sessionId = nanoid(32);
-    const session: AuthSession = {
+    const session: NewAuthSession = {
       user: { id: userId, login: normalizedLogin, name: normalizedName },
       expiresAt: Date.now() + ttlMs
     };
-    authSessions.set(sessionId, session);
+    setAuthSession(sessionId, session);
     scheduleStoreSave();
     res.cookie("multaiplayer_session", sessionId, authCookieOptions(ttlMs));
     res.status(201).json({ user: session.user });

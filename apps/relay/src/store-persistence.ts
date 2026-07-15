@@ -66,9 +66,9 @@ export function createRelayStorePersistenceCoordinator(options: {
       }
       options.storeCodec.applyStoredRelayState(stored);
       await options.persistence.finalizeLoad?.(() => options.storeCodec.toStoredRelayState());
-      if (hasLegacyAuthTokenFields(stored)) {
+      if (hasLegacyAuthSessionFields(stored)) {
         await options.persistence.save(options.storeCodec.toStoredRelayState());
-        logRelayEvent("info", "legacy_auth_token_fields_purged");
+        logRelayEvent("info", "legacy_auth_session_fields_purged");
       }
       options.storeCodec.discardStoredRelayMutations();
       pendingChanges = [];
@@ -198,9 +198,10 @@ export function createRelayStorePersistenceCoordinator(options: {
   };
 }
 
-function hasLegacyAuthTokenFields(stored: Record<string, unknown>): boolean {
+function hasLegacyAuthSessionFields(stored: Record<string, unknown>): boolean {
   if (!Array.isArray(stored.authSessions)) return false;
   return stored.authSessions.some(
-    (session) => isRecord(session) && ("accessToken" in session || "encryptedAccessToken" in session)
+    (session) =>
+      isRecord(session) && ("sessionId" in session || "accessToken" in session || "encryptedAccessToken" in session)
   );
 }

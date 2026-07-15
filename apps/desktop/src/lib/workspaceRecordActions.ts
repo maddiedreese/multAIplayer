@@ -4,6 +4,7 @@ import { shouldResetCodexApprovalForRoomUpdate } from "./codexApproval";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./relayAccess";
 import { ensureRoomDefaults } from "./roomDefaults";
 import { currentLocalIdentity } from "./selectedWorkspace";
+import { reportNonFatal } from "./nonFatalReporting";
 
 interface CreateWorkspaceRecordActionsOptions {
   upsertTeamRecord: (team: TeamRecord) => void;
@@ -58,7 +59,7 @@ export function createWorkspaceRecordActions({
 
   function handleRelayError(message: string) {
     const membershipRemoved = isMembershipRemovedRelayError(message);
-    console.warn(membershipRemoved ? "Relay membership was removed" : "Relay request failed");
+    reportNonFatal(membershipRemoved ? "handle removed relay membership" : "handle relay request failure", message);
     const store = useAppStore.getState();
     const room = store.rooms.find((candidate) => candidate.id === store.selectedRoomId);
     if (!membershipRemoved || !room) return;

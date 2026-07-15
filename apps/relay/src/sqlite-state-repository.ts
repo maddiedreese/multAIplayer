@@ -197,7 +197,7 @@ export function saveNormalizedRelayState(db: Database.Database, state: unknown, 
       return messageId ? JSON.stringify([item.roomKey, messageId]) : null;
     });
     saveJsonRows(db, "relay_team_members", "team_id", state.teamMembers, (item) => relayId(item, "teamId"));
-    saveJsonRows(db, "relay_auth_sessions", "session_id", state.authSessions, (item) => relayId(item, "sessionId"));
+    saveJsonRows(db, "relay_auth_sessions", "session_id", state.authSessions, (item) => relayId(item, "sessionIdHash"));
     saveJsonRows(db, "relay_attachment_blobs", "id", state.attachmentBlobs, (item) => relayId(item, "id"));
     saveJsonRows(db, "relay_applied_deletion_ledger_entries", "id", state.appliedDeletionLedgerEntries, (item) =>
       relayId(item, "entryId")

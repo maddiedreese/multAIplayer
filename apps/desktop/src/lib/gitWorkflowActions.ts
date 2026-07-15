@@ -13,6 +13,7 @@ import { checkGitHubWorkflowReadiness, type GitHubActionsTarget } from "./github
 import { useAppStore } from "../store/appStore";
 import { omitRecordKey } from "./setUtils";
 import { currentSelectedRoom, currentSelectedRoomContext } from "./selectedWorkspace";
+import { reportNonFatal } from "./nonFatalReporting";
 
 interface GitWorkflowActionsOptions {
   gitWorkflowBusyRef: MutableRefObject<Record<string, boolean>>;
@@ -123,8 +124,8 @@ export function createGitWorkflowActions({
         message: `Started Git workflow on ${gitPlan.branch}.`
       },
       room
-    ).catch(() => {
-      console.warn("Failed to publish git workflow start");
+    ).catch((error) => {
+      reportNonFatal("publish git workflow start", error);
     });
     try {
       const results = await runGitWorkflow(gitPlan.cwd, gitPlan.branch, gitPlan.message, gitPlan.push);
@@ -147,8 +148,8 @@ export function createGitWorkflowActions({
             results
           },
           room
-        ).catch(() => {
-          console.warn("Failed to publish git workflow failure");
+        ).catch((error) => {
+          reportNonFatal("publish git workflow failure", error);
         });
         return;
       }
@@ -181,8 +182,8 @@ export function createGitWorkflowActions({
             }
           },
           room
-        ).catch(() => {
-          console.warn("Failed to publish git workflow PR event");
+        ).catch((error) => {
+          reportNonFatal("publish git workflow PR event", error);
         });
         refreshGitHubActions(room, {
           owner: workflowDraft.prOwner,
@@ -201,8 +202,8 @@ export function createGitWorkflowActions({
             results
           },
           room
-        ).catch(() => {
-          console.warn("Failed to publish git workflow completion");
+        ).catch((error) => {
+          reportNonFatal("publish git workflow completion", error);
         });
       }
 
@@ -220,8 +221,8 @@ export function createGitWorkflowActions({
           message
         },
         room
-      ).catch(() => {
-        console.warn("Failed to publish git workflow error");
+      ).catch((publishError) => {
+        reportNonFatal("publish git workflow error", publishError);
       });
     } finally {
       setGitWorkflowBusyForRoom(roomId, false);

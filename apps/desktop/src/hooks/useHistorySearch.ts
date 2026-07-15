@@ -4,6 +4,7 @@ import { loadEncryptedHistory, loadHistorySettings } from "../lib/localHistory";
 import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
 import { useAppStore } from "../store/appStore";
 import { historySearchEntriesToMessagesByRoom } from "../store/slices/historyPresenceSlice";
+import { reportNonFatal } from "../lib/nonFatalReporting";
 import type { ChatMessage, LocalRoomHistoryPayload } from "../types";
 
 interface UseHistorySearchOptions {
@@ -57,8 +58,8 @@ export function useHistorySearch({
         if (cancelled) return;
         setHistorySearchResultsByRoom(historySearchEntriesToMessagesByRoom(entries));
       })
-      .catch(() => {
-        if (!cancelled) console.warn("Failed to search encrypted local history");
+      .catch((error) => {
+        if (!cancelled) reportNonFatal("search encrypted local history", error);
       })
       .finally(() => {
         if (!cancelled) finishHistorySearch();
