@@ -152,8 +152,10 @@ function useCodexAccountController(): CodexAccountController {
       setLoginBrowserOpenFailed(false);
       setBusy(true);
       try {
+        const useHostedLoginSuccessPage =
+          flow === "browser" ? snapshot?.capabilities.supportsHostedLoginSuccess : false;
         const next = await startCodexLogin(flow, {
-          useHostedLoginSuccessPage: flow === "browser" && snapshot?.capabilities.supportsHostedLoginSuccess,
+          ...(useHostedLoginSuccessPage === undefined ? {} : { useHostedLoginSuccessPage }),
           appBrand: "chatgpt"
         });
         const trustedUrl = trustedAuthenticationUrl("openai", next.url);

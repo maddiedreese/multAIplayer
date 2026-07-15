@@ -95,7 +95,7 @@ export const emptyWorkspaceUiState: Pick<
   sidebarQuery: ""
 };
 
-function activeRecords<T extends { deletedAt?: string }>(records: T[]): T[] {
+function activeRecords<T extends { deletedAt?: string | undefined }>(records: T[]): T[] {
   return records.filter((record) => !record.deletedAt);
 }
 

@@ -28,7 +28,7 @@ export function useRoomMemberRows({
     room: selectedRoom,
     localUser,
     localDeviceId,
-    localPublicKeyFingerprint,
+    ...(localPublicKeyFingerprint ? { localPublicKeyFingerprint } : {}),
     trustedDeviceKeys
   });
 }

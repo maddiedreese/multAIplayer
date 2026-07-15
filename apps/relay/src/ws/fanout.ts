@@ -131,12 +131,17 @@ export function createRelayFanout(options: Options) {
   }
   function publishPresence(session: ClientSession, teamId: string, roomId: string, presence: PresenceRecord) {
     session.displayName = presence.displayName;
-    session.avatarUrl = presence.avatarUrl;
+    if (presence.avatarUrl) session.avatarUrl = presence.avatarUrl;
+    else delete session.avatarUrl;
     options.addTeamMember(teamId, presence.userId);
     const registered = options.store.getDevice(presence.userId, presence.deviceId);
     const verified = {
       ...presence,
-      publicKeyFingerprint: registered?.signatureKeyFingerprint ?? presence.publicKeyFingerprint
+      ...(registered?.signatureKeyFingerprint
+        ? { publicKeyFingerprint: registered.signatureKeyFingerprint }
+        : presence.publicKeyFingerprint
+          ? { publicKeyFingerprint: presence.publicKeyFingerprint }
+          : {})
     };
     const key = options.roomKey(teamId, roomId);
     const roster = options.roomPresence.get(key) ?? new Map();

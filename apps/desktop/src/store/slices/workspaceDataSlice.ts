@@ -261,17 +261,7 @@ function deleteRoomMessageState(state: AppStoreState, roomId: string, deletion: 
   if (!context) return state;
   const { roomMessages, roomRuntime } = context;
   const nextMessages = roomMessages.map((message) =>
-    message.id === deletion.messageId
-      ? {
-          ...message,
-          body: "",
-          deletedAt: deletion.deletedAt,
-          deletedBy: deletion.deletedBy,
-          deletedByUserId: deletion.deletedByUserId,
-          attachments: undefined,
-          reactions: undefined
-        }
-      : message
+    message.id === deletion.messageId ? deletedChatMessage(message, deletion) : message
   );
   const approvalIncludesMessage =
     roomRuntime?.pendingApproval?.messages.some((message) => message.id === deletion.messageId) ?? false;
@@ -299,6 +289,19 @@ function deleteRoomMessageState(state: AppStoreState, roomId: string, deletion: 
           }
         }
       : {})
+  };
+}
+
+function deletedChatMessage(message: ChatMessage, deletion: ChatDeletePlaintextPayload): ChatMessage {
+  const sanitized = { ...message };
+  delete sanitized.attachments;
+  delete sanitized.reactions;
+  return {
+    ...sanitized,
+    body: "",
+    deletedAt: deletion.deletedAt,
+    deletedBy: deletion.deletedBy,
+    deletedByUserId: deletion.deletedByUserId
   };
 }
 

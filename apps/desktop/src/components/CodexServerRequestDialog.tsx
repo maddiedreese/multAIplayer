@@ -384,8 +384,14 @@ function describeMcpForm(params: Record<string, unknown>): {
                   ? "select"
                   : "text",
         options,
-        min: numeric(field.minimum) ?? numeric(type === "array" ? field.minItems : field.minLength) ?? undefined,
-        max: numeric(field.maximum) ?? numeric(type === "array" ? field.maxItems : field.maxLength) ?? undefined,
+        ...optionalNumber(
+          "min",
+          numeric(field.minimum) ?? numeric(type === "array" ? field.minItems : field.minLength)
+        ),
+        ...optionalNumber(
+          "max",
+          numeric(field.maximum) ?? numeric(type === "array" ? field.maxItems : field.maxLength)
+        ),
         integer: type === "integer"
       };
       return type ? [question] : [];
@@ -408,6 +414,13 @@ function describeMcpForm(params: Record<string, unknown>): {
   const canAccept = (answers: Record<string, CodexRequestAnswer>) =>
     questions.every((question) => questionAcceptsAnswer(question, answers[question.id]));
   return { questions, content, canAccept };
+}
+
+function optionalNumber(
+  key: "min" | "max",
+  value: number | null | undefined
+): Partial<Pick<CodexRequestQuestion, "min" | "max">> {
+  return value === undefined || value === null ? {} : { [key]: value };
 }
 
 function questionAcceptsAnswer(question: CodexRequestQuestion, answer: CodexRequestAnswer | undefined): boolean {

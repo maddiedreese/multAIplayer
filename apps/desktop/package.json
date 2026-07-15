@@ -15,7 +15,7 @@
     "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "tauri:build": "tauri build",
     "tauri:build:prebuilt": "tauri build --config src-tauri/tauri.prebuilt.conf.json",
-    "tauri:build:release": "tauri build --target aarch64-apple-darwin --config src-tauri/tauri.prebuilt.conf.json",
+    "tauri:build:release": "tauri build --target aarch64-apple-darwin --config src-tauri/tauri.prebuilt.conf.json --config src-tauri/tauri.release.conf.json",
     "tauri:build:native-e2e": "tauri build --debug --bundles app --features native-e2e --config src-tauri/tauri.native-e2e.conf.json"
   },
   "dependencies": {
@@ -25,6 +25,8 @@
     "@tauri-apps/api": "2.11.1",
     "@tauri-apps/plugin-dialog": "2.7.1",
     "@tauri-apps/plugin-notification": "2.3.3",
+    "@tauri-apps/plugin-process": "2.3.1",
+    "@tauri-apps/plugin-updater": "2.10.1",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/xterm": "6.0.0",
     "lucide-react": "1.24.0",

@@ -1,6 +1,7 @@
 import type { StateCreator } from "zustand";
 import { normalizeCodexThreadGraph } from "../../lib/codex/codexThreadGraph";
 import { omitRecordKey } from "../../lib/core/setUtils";
+import { normalizeGitHubActionRun } from "../../lib/identity/authClient";
 import { replaceRoomTerminalSnapshots } from "../../lib/terminal/terminalState";
 import type { LocalRoomHistoryPayload } from "../../types";
 import type { AppStoreState } from "../appStore";
@@ -129,7 +130,7 @@ function hydrateGitWorkflowRuntime(state: AppStoreState, roomId: string, payload
               events: payload.githubActionsEvents,
               ...(latestActions
                 ? {
-                    runs: latestActions.runs,
+                    runs: latestActions.runs.map(normalizeGitHubActionRun),
                     lastChecked: latestActions.checkedAt,
                     message: `${latestActions.summary.label}: ${latestActions.message}`
                   }

@@ -19,6 +19,7 @@
     "test:mutation:run": "stryker run",
     "test:mutation:summary": "node ../../tools/mutation/report.mjs summarize reports/mutation/mutation.json reports/mutation/summary.json",
     "test:mutation:policy": "node ../../tools/mutation/report.mjs check reports/mutation/summary.json mutation-policy.json",
+    "test:mutation:ratchet": "node ../../tools/mutation/report.mjs ratchet reports/mutation/summary.json mutation-policy.json reports/mutation/ratchet-candidate.json",
     "test:mutation": "npm run test:mutation:run && npm run test:mutation:summary && npm run test:mutation:policy"
   },
   "dependencies": {

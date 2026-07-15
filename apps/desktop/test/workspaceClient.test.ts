@@ -5,6 +5,7 @@ import { readJsonResponse, RelayHttpError } from "../src/lib/core/httpResponse";
 import {
   createRoom,
   loadAttachmentBlob,
+  normalizeDirectedInviteResponse,
   updateTeamLifecycle,
   updateRoomSettings
 } from "../src/application/workspace/workspaceClient";
@@ -63,6 +64,17 @@ test("readJsonResponse returns typed JSON bodies", async () => {
     teams: [],
     rooms: []
   });
+});
+
+test("directed invite responses omit an absent Welcome after HTTP decoding", () => {
+  const directed = normalizeDirectedInviteResponse({
+    status: "denied",
+    responseBinding: { version: 3 },
+    responseMac: "response-mac",
+    welcome: undefined
+  });
+  assert.equal(Object.hasOwn(directed, "welcome"), false);
+  assert.equal(Object.hasOwn(JSON.parse(JSON.stringify(directed)), "welcome"), false);
 });
 
 const workspaceRoom: ClientRoomRecord = {

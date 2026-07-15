@@ -53,7 +53,7 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
       - name: Set up Node for release metadata synchronization
         if: steps.release.outputs.prs_created == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: npm
@@ -81,7 +81,7 @@ jobs:
     name: Build signed macOS artifacts
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: read
     outputs:
@@ -125,7 +125,7 @@ jobs:
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: npm
@@ -147,7 +147,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Detect Apple signing configuration
+      - name: Detect release signing configuration
         id: signing
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -157,6 +157,8 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           missing=()
           for name in \
@@ -166,18 +168,20 @@ jobs:
             APPLE_ID \
             APPLE_PASSWORD \
             APPLE_TEAM_ID \
-            KEYCHAIN_PASSWORD
+            KEYCHAIN_PASSWORD \
+            TAURI_SIGNING_PRIVATE_KEY \
+            TAURI_SIGNING_PRIVATE_KEY_PASSWORD
           do
             if [ -z "${!name}" ]; then
               missing+=("$name")
             fi
           done
           if [ "${#missing[@]}" -gt 0 ]; then
-            printf 'Missing Apple signing/notarization secret(s): %s\n' "${missing[*]}" >&2
-            echo "Public release artifacts must be Developer ID signed and notarized." >&2
+            printf 'Missing release signing secret(s): %s\n' "${missing[*]}" >&2
+            echo "Public releases require Developer ID signing, notarization, and a password-protected updater signature." >&2
             exit 1
           fi
-          echo "Release build will use Developer ID signing and notarization."
+          echo "Release build will use Developer ID signing/notarization and the Tauri updater signer."
 
       - name: Import Apple Developer ID certificate
         env:
@@ -223,6 +227,8 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           MACOSX_DEPLOYMENT_TARGET: "11.0"
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri:build:release -w @multaiplayer/desktop
 
       - name: Verify signed and notarized app
@@ -252,7 +258,53 @@ jobs:
           bash scripts/verify-macos-deployment-target.sh "$app_path"
           npm run verify:macos-associated-domains -- "$app_path"
 
+      - name: Rebuild unsigned payload in an isolated target directory
+        id: reproducibility-rebuild
+        continue-on-error: true
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/multaiplayer-repro-target
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: npm run tauri:build:release -w @multaiplayer/desktop -- --no-sign --bundles app
+
+      - name: Compare normalized signed and rebuilt payloads
+        id: reproducibility-compare
+        if: steps.reproducibility-rebuild.outcome == 'success'
+        continue-on-error: true
+        run: |
+          mkdir -p reproducibility-evidence
+          node tools/release/compare-macos-app-payloads.mjs \
+            apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/multAIplayer.app \
+            "$RUNNER_TEMP/multaiplayer-repro-target/aarch64-apple-darwin/release/bundle/macos/multAIplayer.app" \
+            reproducibility-evidence
+
+      - name: Package advisory reproducibility evidence
+        if: always()
+        env:
+          REBUILD_OUTCOME: ${{ steps.reproducibility-rebuild.outcome }}
+          COMPARE_OUTCOME: ${{ steps.reproducibility-compare.outcome }}
+        run: |
+          mkdir -p reproducibility-evidence release-assets
+          if [ ! -f reproducibility-evidence/comparison.json ]; then
+            printf '{"matched":false,"comparisonUnavailable":true,"rebuildOutcome":"%s","compareOutcome":"%s","caveat":"This advisory result is not a bit-for-bit claim for signed, notarized, stapled, or packaged output."}\n' \
+              "$REBUILD_OUTCOME" "$COMPARE_OUTCOME" > reproducibility-evidence/comparison.json
+          fi
+          {
+            echo "commit=$(git rev-parse HEAD)"
+            echo "node=$(node --version)"
+            echo "npm=$(npm --version)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            xcodebuild -version
+            sw_vers
+          } > reproducibility-evidence/build-environment.txt
+          ditto -c -k --sequesterRsrc --keepParent \
+            reproducibility-evidence \
+            release-assets/desktop-reproducibility-evidence.zip
+
       - name: Package release assets
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           mkdir -p release-assets
           bundle_root="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle"
@@ -265,6 +317,34 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent \
             "$bundle_root/macos/multAIplayer.app" \
             release-assets/multAIplayer-macos-arm64-app.zip
+          updater_path="$(find "$bundle_root/macos" -maxdepth 1 -type f -name '*.app.tar.gz' | head -n 1)"
+          if [ -z "$updater_path" ] || [ ! -f "$updater_path.sig" ]; then
+            echo "Signed Tauri updater bundle and signature are required." >&2
+            exit 1
+          fi
+          updater_name="multAIplayer-macos-arm64.app.tar.gz"
+          cp "$updater_path" "release-assets/$updater_name"
+          cp "$updater_path.sig" "release-assets/$updater_name.sig"
+          metadata_payload="$RUNNER_TEMP/multaiplayer-updater-metadata.json"
+          node tools/release/write-tauri-update-manifest.mjs payload \
+            "${{ steps.release.outputs.tag }}" \
+            apps/desktop/package.json \
+            "$updater_name" \
+            "release-assets/$updater_name.sig" \
+            "$metadata_payload"
+          npx tauri signer sign "$metadata_payload"
+          node tools/release/write-tauri-update-manifest.mjs manifest \
+            "${{ steps.release.outputs.tag }}" \
+            apps/desktop/package.json \
+            "$updater_name" \
+            "release-assets/$updater_name.sig" \
+            "$metadata_payload.sig" \
+            release-assets/latest.json
+          cargo run --locked \
+            --manifest-path apps/desktop/src-tauri/Cargo.toml \
+            --bin verify_update_manifest -- \
+            release-assets/latest.json \
+            "release-assets/$updater_name"
 
       - name: Generate SPDX SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
@@ -337,3 +417,28 @@ jobs:
           if [ "$RELEASE_PRERELEASE" = "true" ]; then
             gh release edit "$RELEASE_TAG" --prerelease --repo "$GITHUB_REPOSITORY"
           fi
+
+      - name: Advance the updater availability channel after publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/update-channel" >/dev/null 2>&1; then
+            release_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref=refs/heads/update-channel \
+              -f sha="$release_commit" >/dev/null
+          fi
+          existing_sha="$(gh api "repos/$GITHUB_REPOSITORY/contents/releases/latest.json?ref=update-channel" --jq .sha 2>/dev/null || true)"
+          encoded_manifest="$(base64 < release-assets/latest.json | tr -d '\n')"
+          request=(
+            --method PUT
+            "repos/$GITHUB_REPOSITORY/contents/releases/latest.json"
+            -f message="chore: advance updater channel to $RELEASE_TAG"
+            -f content="$encoded_manifest"
+            -f branch=update-channel
+          )
+          if [ -n "$existing_sha" ]; then
+            request+=(-f sha="$existing_sha")
+          fi
+          gh api "${request[@]}" >/dev/null

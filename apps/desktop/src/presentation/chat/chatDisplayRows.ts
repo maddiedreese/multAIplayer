@@ -47,7 +47,7 @@ export function buildRoomChatMessageRows({
       canMutateMessage(message, localUserId) &&
       visibleMessages.indexOf(message) > lastCodexIndex &&
       messageIsBeforeCodexWatermark(message, codexEvents),
-    replyPreview: message.replyTo ? buildReplyPreview(messagesById.get(message.replyTo)) : null,
+    replyPreview: message.replyTo ? (buildReplyPreview(messagesById.get(message.replyTo)) ?? null) : null,
     selected: markdownSelectionMode && selectedMessageIds.includes(message.id),
     attachments: message.deletedAt
       ? []
@@ -132,10 +132,10 @@ export function buildLocalPreviewCards(previews: LocalPreviewRecord[], localUser
     id: preview.id,
     sharedBy: preview.sharedBy,
     sourceUrl: preview.sourceUrl,
-    publicUrl: preview.publicUrl,
+    ...(preview.publicUrl ? { publicUrl: preview.publicUrl } : {}),
     status: preview.status,
     statusLabel: localPreviewStatusLabel(preview.status),
-    message: preview.message,
+    ...(preview.message ? { message: preview.message } : {}),
     canStop: preview.sharedByUserId === localUserId && (preview.status === "live" || preview.status === "starting")
   }));
 }

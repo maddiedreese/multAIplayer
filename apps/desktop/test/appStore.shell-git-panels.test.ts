@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { GitHubActionsEventPlaintextPayload } from "@multaiplayer/protocol";
 import { useAppStore } from "../src/store/appStore";
 import { projectGitHubActionsByRoom, projectGitWorkflowByRoom } from "../src/store/slices/gitWorkflowSlice";
 
@@ -350,6 +351,38 @@ test("desktop store applies GitHub Actions events as one room-scoped state updat
     message: "Passing: Loaded 1 workflow run for main."
   });
   assert.equal(projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.events?.length, 1);
+});
+
+test("decoded GitHub action runs omit absent optional IPC fields before persistence", () => {
+  const event = GitHubActionsEventPlaintextPayload.parse({
+    eventType: "github.actions",
+    checkedBy: "Maddie",
+    checkedByUserId: "github:maddie",
+    owner: "maddiedreese",
+    repo: "multAIplayer",
+    branch: "main",
+    checkedAt: "2026-07-06T00:03:00.000Z",
+    summary: { label: "Passing", detail: "Latest run passed.", tone: "green" },
+    message: "Loaded one run.",
+    runs: [
+      {
+        id: 8,
+        name: "CI",
+        displayTitle: undefined,
+        status: "completed",
+        conclusion: "success",
+        url: "https://github.com/maddiedreese/multAIplayer/actions/runs/8",
+        createdAt: "2026-07-06T00:00:00.000Z",
+        updatedAt: "2026-07-06T00:01:00.000Z"
+      }
+    ]
+  });
+
+  useAppStore.getState().applyGitHubActionsEventForRoom("room-a", event);
+  const run = useAppStore.getState().gitWorkflowRuntimeByRoom["room-a"]?.actions?.runs?.[0];
+  assert.ok(run);
+  assert.equal(Object.hasOwn(run, "displayTitle"), false);
+  assert.equal(Object.hasOwn(JSON.parse(JSON.stringify(run)), "displayTitle"), false);
 });
 
 test("desktop store keeps browser panel state room scoped", () => {

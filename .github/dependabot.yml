@@ -22,11 +22,8 @@ updates:
         update-types:
           - minor
           - patch
-      npm-major-update-batch:
-        patterns:
-          - "*"
-        update-types:
-          - major
+      # Major updates remain individual PRs. They frequently carry runtime or
+      # configuration migrations that cannot be reviewed honestly as one batch.
 
   - package-ecosystem: cargo
     directory: /apps/desktop/src-tauri
@@ -41,9 +38,13 @@ updates:
         update-types:
           - minor
           - patch
-      cargo-major-update-batch:
+      # The mls-rs crates share public types and must move together. Other
+      # Cargo majors remain individual PRs so crypto, RNG, storage, and age
+      # migrations keep separate compatibility and rollback boundaries.
+      cargo-mls-major-updates:
         patterns:
-          - "*"
+          - "mls-rs"
+          - "mls-rs-*"
         update-types:
           - major
 

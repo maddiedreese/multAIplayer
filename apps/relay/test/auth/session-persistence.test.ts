@@ -74,10 +74,10 @@ test("matching session digests survive persistence without exposing the bearer t
   assert.equal(normalized?.session.sessionIdHash, sessionIdHash);
   assert.deepEqual(normalized?.session.user, {
     id: "github:1",
-    login: "octocat",
-    name: undefined,
-    avatarUrl: undefined
+    login: "octocat"
   });
+  assert.equal(Object.hasOwn(normalized?.session.user ?? {}, "name"), false);
+  assert.equal(Object.hasOwn(normalized?.session.user ?? {}, "avatarUrl"), false);
 });
 
 test("session manager validates live state, cookies, authorization, and identity denials", () => {

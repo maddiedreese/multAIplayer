@@ -34,7 +34,7 @@ export function allowTotalRoomQuota({
   teamIds: Set<string>;
   cap: number;
   res: Response;
-  recordQuotaRejection?: (type: string) => void;
+  recordQuotaRejection?: ((type: string) => void) | undefined;
 }): boolean {
   const quota = "total_user_rooms";
   const used = store.allRooms().filter((room) => teamIds.has(room.teamId) && !room.deletedAt).length;

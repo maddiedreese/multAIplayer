@@ -30,6 +30,7 @@ mod shell;
 mod shell_authorization;
 mod terminal;
 mod trusted_auth;
+pub mod updater_auth;
 mod validation;
 mod workspace;
 use browser::*;
@@ -87,12 +88,18 @@ pub fn run() {
         })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_process::init())
         .plugin(
             tauri_plugin_opener::Builder::new()
                 .open_js_links_on_click(false)
                 .build(),
         )
-        .plugin(tauri_plugin_shell::init());
+        .plugin(tauri_plugin_shell::init())
+        .plugin(
+            tauri_plugin_updater::Builder::new()
+                .default_version_comparator(updater_auth::authenticated_update_is_newer)
+                .build(),
+        );
     #[cfg(feature = "native-e2e")]
     let builder = builder
         .plugin(tauri_plugin_wdio::init())

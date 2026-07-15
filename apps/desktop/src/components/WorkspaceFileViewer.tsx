@@ -130,7 +130,10 @@ export function WorkspaceFileViewer({
       </div>
 
       {attachmentReview.risks.length > 0 && (
-        <InlineSecretWarning risks={attachmentReview.risks} detail={attachmentReview.warningDetail} />
+        <InlineSecretWarning
+          risks={attachmentReview.risks}
+          {...(attachmentReview.warningDetail === undefined ? {} : { detail: attachmentReview.warningDetail })}
+        />
       )}
       <div className="file-viewer-meta">
         <FilePreviewTabs

@@ -67,8 +67,8 @@ Protocol v2 superseded the protocol-v1 cryptography decisions in ADR-007 through
 ## ADR-017: Relay decision mutation evidence is scheduled
 
 - **Context:** Coverage can execute authorization branches without proving assertions distinguish permissive mutations.
-- **Decision:** Run weekly advisory mutation testing across authorization, sessions, WebSocket admission, and room mutation routes. Keep `authz.ts` at zero survivors; use score floors and reviewable reports for the broader decision surface.
-- **Consequences:** The full run is intentionally too slow for pull requests. Its first expanded report establishes calibration evidence, while monthly drift review remains advisory and does not require per-refactor allowlists.
+- **Decision:** Run weekly advisory mutation testing across authorization, sessions, WebSocket admission, and room mutation routes. Keep the measured `authz.ts` baseline at 100% with zero survivors. Mark expanded files uncalibrated until a complete shard measures them, target 80%, check every established baseline weekly, and generate a monthly candidate that advances score floors in five-point steps without increasing survivor ceilings.
+- **Consequences:** The full run is intentionally too slow for pull requests. An uncalibrated file has no claimed score floor; its first successful report produces the baseline candidate reviewers may commit. Later reports can only tighten that policy, while the scheduled checks remain advisory and require no per-refactor allowlists.
 
 ## ADR-018: Protocol guards are mutation-gated
 

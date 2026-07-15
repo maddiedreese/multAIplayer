@@ -139,7 +139,9 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
         room: selectedRoom,
         localUser,
         localDeviceId: deviceId,
-        localPublicKeyFingerprint: deviceIdentity?.publicKeyFingerprint,
+        ...(deviceIdentity?.publicKeyFingerprint
+          ? { localPublicKeyFingerprint: deviceIdentity.publicKeyFingerprint }
+          : {}),
         trustedDeviceKeys
       }),
     [deviceId, deviceIdentity?.publicKeyFingerprint, localUser, presence, selectedRoom, trustedDeviceKeys]
@@ -182,7 +184,9 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
       selectedFileNeedsAttachmentReview: fileDisplay.selectedFileNeedsAttachmentReview,
       selectedSensitiveFileReviewed: fileDisplay.selectedSensitiveFileReviewed,
       selectedAttachmentActionLabel: fileDisplay.selectedAttachmentReview?.actionLabel ?? "Attach",
-      selectedAttachmentWarningDetail: fileDisplay.selectedAttachmentReview?.warningDetail ?? undefined,
+      ...(fileDisplay.selectedAttachmentReview?.warningDetail
+        ? { selectedAttachmentWarningDetail: fileDisplay.selectedAttachmentReview.warningDetail }
+        : {}),
       filePreviewTab,
       formatBytes,
       ...capabilities.workspaceFiles,

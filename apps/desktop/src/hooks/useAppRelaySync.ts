@@ -87,7 +87,7 @@ export function useAppRelaySync({
         relayWsUrl,
         deviceId: localIdentity.deviceId,
         localUser: localIdentity.localUser,
-        devicePublicKeyFingerprint,
+        ...(devicePublicKeyFingerprint ? { devicePublicKeyFingerprint } : {}),
         deviceSessionToken: deviceSessionToken ?? "",
         selectedTeam,
         selectedRoom,

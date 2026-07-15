@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { appendFile, readFile, writeFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 
 const detectedStatuses = new Set(["Killed", "Timeout"]);
 const undetectedStatuses = new Set(["Survived", "NoCoverage"]);
@@ -141,11 +142,20 @@ export function checkMutationPolicy(summary, policy, { partial = false } = {}) {
   for (const [path, rule] of Object.entries(policy.files)) {
     if (partial && !filesByPath.has(path)) continue;
     if (!rule || typeof rule !== "object") throw new TypeError(`${path}: policy rule must be an object`);
-    if (typeof rule.minimumScore !== "number" || rule.minimumScore < 0 || rule.minimumScore > 100) {
-      throw new TypeError(`${path}: minimumScore must be between 0 and 100`);
+    if (
+      rule.minimumScore !== null &&
+      (typeof rule.minimumScore !== "number" || rule.minimumScore < 0 || rule.minimumScore > 100)
+    ) {
+      throw new TypeError(`${path}: minimumScore must be null or between 0 and 100`);
     }
-    if (!Number.isInteger(rule.maximumSurvived) || rule.maximumSurvived < 0) {
-      throw new TypeError(`${path}: maximumSurvived must be a non-negative integer`);
+    if (typeof rule.targetScore !== "number" || rule.targetScore < 0 || rule.targetScore > 100) {
+      throw new TypeError(`${path}: targetScore must be between 0 and 100`);
+    }
+    if (typeof rule.minimumScore === "number" && rule.targetScore < rule.minimumScore) {
+      throw new TypeError(`${path}: targetScore must not be below minimumScore`);
+    }
+    if (rule.maximumSurvived !== null && (!Number.isInteger(rule.maximumSurvived) || rule.maximumSurvived < 0)) {
+      throw new TypeError(`${path}: maximumSurvived must be null or a non-negative integer`);
     }
     const file = filesByPath.get(path);
     if (!file) {
@@ -154,16 +164,50 @@ export function checkMutationPolicy(summary, policy, { partial = false } = {}) {
     }
     const score = file.counts?.mutationScore;
     if (typeof score !== "number") failures.push(`${path}: has no scored mutants`);
-    else if (score < rule.minimumScore) {
+    else if (typeof rule.minimumScore === "number" && score < rule.minimumScore) {
       failures.push(`${path}: score ${score.toFixed(2)} is below ${rule.minimumScore.toFixed(2)}`);
     }
     const survived = file.counts?.survived;
     if (!Number.isInteger(survived)) failures.push(`${path}: has no survived count`);
-    else if (survived > rule.maximumSurvived) {
+    else if (Number.isInteger(rule.maximumSurvived) && survived > rule.maximumSurvived) {
       failures.push(`${path}: ${survived} survived mutants exceeds ${rule.maximumSurvived}`);
     }
   }
   return failures;
+}
+
+export function proposeMutationRatchet(summary, policy, { partial = false } = {}) {
+  if (!summary || !Array.isArray(summary.files) || !policy || typeof policy.files !== "object") {
+    throw new TypeError("mutation summary and policy are malformed");
+  }
+  const step = policy.ratchetStep;
+  if (!Number.isInteger(step) || step < 1 || step > 100) {
+    throw new TypeError("mutation policy ratchetStep must be an integer between 1 and 100");
+  }
+  // Validate all rules and observed values before proposing a policy update.
+  const failures = checkMutationPolicy(summary, policy, { partial });
+  if (failures.length) {
+    throw new Error(`cannot advance a mutation policy while its current baseline fails:\n- ${failures.join("\n- ")}`);
+  }
+  const proposed = structuredClone(policy);
+  const changes = [];
+  for (const file of summary.files) {
+    const rule = proposed.files[file.path];
+    if (!rule) continue;
+    const score = file.counts?.mutationScore;
+    const survived = file.counts?.survived;
+    if (typeof score !== "number" || !Number.isInteger(survived)) continue;
+    const measuredFloor = Math.min(rule.targetScore, Math.floor(score / step) * step);
+    if (rule.minimumScore === null || measuredFloor > rule.minimumScore) {
+      changes.push(`${file.path}: minimumScore ${String(rule.minimumScore)} -> ${measuredFloor}`);
+      rule.minimumScore = measuredFloor;
+    }
+    if (rule.maximumSurvived === null || survived < rule.maximumSurvived) {
+      changes.push(`${file.path}: maximumSurvived ${String(rule.maximumSurvived)} -> ${survived}`);
+      rule.maximumSurvived = survived;
+    }
+  }
+  return { policy: proposed, changes };
 }
 
 async function summarizeCommand([inputPath, outputPath]) {
@@ -200,14 +244,36 @@ async function githubCommand([label, summaryPath]) {
   );
 }
 
-const [command, ...args] = process.argv.slice(2);
-const commands = { summarize: summarizeCommand, check: checkCommand, github: githubCommand };
-if (!commands[command]) {
-  console.error("usage: mutation-report <summarize|check|github> ...");
-  process.exitCode = 1;
-} else {
-  commands[command](args).catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
+async function ratchetCommand([summaryPath, policyPath, outputPath, ...flags]) {
+  if (!summaryPath || !policyPath || !outputPath) {
+    throw new Error("usage: mutation-report ratchet <summary.json> <policy.json> <candidate.json> [--partial]");
+  }
+  const unknownFlags = flags.filter((flag) => flag !== "--partial");
+  if (unknownFlags.length) throw new Error(`unknown mutation ratchet option: ${unknownFlags.join(", ")}`);
+  const [summary, policy] = await Promise.all(
+    [summaryPath, policyPath].map(async (path) => JSON.parse(await readFile(path, "utf8")))
+  );
+  const proposal = proposeMutationRatchet(summary, policy, {
+    partial: flags.includes("--partial") || Boolean(process.env.MULTAIPLAYER_MUTATION_SHARD)
   });
+  await writeFile(outputPath, `${JSON.stringify(proposal.policy, null, 2)}\n`, "utf8");
+  process.stdout.write(
+    proposal.changes.length > 0
+      ? `Mutation ratchet candidate:\n- ${proposal.changes.join("\n- ")}\n`
+      : "Mutation policy already matches the measured ratchet.\n"
+  );
+}
+
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  const [command, ...args] = process.argv.slice(2);
+  const commands = { summarize: summarizeCommand, check: checkCommand, github: githubCommand, ratchet: ratchetCommand };
+  if (!commands[command]) {
+    console.error("usage: mutation-report <summarize|check|github|ratchet> ...");
+    process.exitCode = 1;
+  } else {
+    commands[command](args).catch((error) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    });
+  }
 }

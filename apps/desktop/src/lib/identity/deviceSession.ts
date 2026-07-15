@@ -112,7 +112,7 @@ export async function retryAfterDeviceSessionExpiry<T>(
 }
 
 export async function recoverDeviceSessionForRelayError(
-  error: { code?: string },
+  error: { code?: string | undefined },
   relayHttpUrl: string,
   deviceId: string,
   rejectedToken: string,

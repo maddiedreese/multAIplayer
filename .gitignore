@@ -22,3 +22,4 @@ coverage-host-handoff/
 **/reports/soak/
 reports/native-shell-e2e/
 reports/native-macos-smoke/
+reports/security-journey/

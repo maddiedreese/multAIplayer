@@ -5,6 +5,7 @@
   "description": "Private group chat for coding with Codex. Open source.",
   "license": "Apache-2.0",
   "type": "module",
+  "packageManager": "npm@11.16.0",
   "engines": {
     "node": ">=22"
   },

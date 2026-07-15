@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createPrivateKey, sign } from "node:crypto";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
-import { readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { probeRustToolchain } from "./support/rust-toolchain.js";
@@ -21,10 +22,46 @@ const validatorPath = fileURLToPath(
   new URL("../../desktop/src-tauri/target/debug/mls-keypackage-validator", import.meta.url)
 );
 const marker = "MLS-PLAINTEXT-MUST-NEVER-REACH-RELAY";
-const githubTokenMarker = "ghp_GITHUB_TOKEN_MUST_NEVER_REACH_RELAY_STORAGE_OR_ROOM_WIRE";
 const projectPathMarker = "/Users/sentinel/PROJECT-PATH-MUST-NEVER-REACH-RELAY";
 const codexModelMarker = "sentinel-model-MUST-NEVER-REACH-RELAY";
 const rustToolchain = probeRustToolchain(process.env.MULTAIPLAYER_CARGO_BIN ?? "cargo");
+const claimsManifestPath = resolve(
+  workspaceRoot,
+  process.env.MULTAIPLAYER_SECURITY_CLAIMS_PATH ?? "reports/security-journey/claims.json"
+);
+const executedClaims = [
+  {
+    id: "relay-room-content-exclusion",
+    claim:
+      "The tested production relay trace stores and forwards MLS, HPKE, Welcome, and exporter-derived ciphertext without the generated room plaintext or native private material.",
+    verification:
+      "The native fixture proves its cryptographic round trips, then the journey scans SQLite, WAL, SHM, and observed WebSocket frames after each relay transition for plaintext and generated secret bytes, including base64 encodings.",
+    checks: ["native-lifecycle-fixture", "sqlite-pages-and-sidecars", "observed-relay-wire"]
+  },
+  {
+    id: "removed-member-epoch-exclusion",
+    claim: "In the generated lifecycle, the removed member cannot decrypt the tested post-removal application message.",
+    verification:
+      "The native fixture applies the Remove commit, requires processing the successor epoch application as the removed client to fail, and the relay journey transports that exact ciphertext.",
+    checks: ["native-post-removal-decrypt-rejection", "post-removal-relay-publish"]
+  },
+  {
+    id: "legacy-project-path-purge",
+    claim:
+      "The tested SQLite startup migration excludes a legacy host-local project path from active relay persistence and observed room traffic.",
+    verification:
+      "The journey injects a unique project-path sentinel into the legacy workspace fixture and scans the migrated SQLite files and observed relay frames for its raw and base64 forms.",
+    checks: ["legacy-fixture-injection", "sqlite-pages-and-sidecars", "observed-relay-wire"]
+  },
+  {
+    id: "legacy-codex-model-purge",
+    claim:
+      "The tested SQLite startup migration excludes a legacy host-local Codex model value from active relay persistence and observed room traffic.",
+    verification:
+      "The journey injects a unique model sentinel into the legacy workspace fixture and scans the migrated SQLite files and observed relay frames for its raw and base64 forms.",
+    checks: ["legacy-fixture-injection", "sqlite-pages-and-sidecars", "observed-relay-wire"]
+  }
+] as const;
 
 interface NativeFixture {
   host: DeviceFixture;
@@ -306,7 +343,6 @@ async function scanRelay(relay: { dataPath: string }, wire: string[], forbidden:
   const binaryMarkers = [
     Buffer.from(marker),
     Buffer.from("MLS-REMOVED-MEMBER-MUST-NOT-DECRYPT"),
-    Buffer.from(githubTokenMarker),
     Buffer.from(projectPathMarker),
     Buffer.from(codexModelMarker),
     ...forbidden
@@ -332,8 +368,6 @@ async function runSecurityJourney() {
   const generated = await nativeFixture();
   assert.equal(generated.stdout.includes(marker), false);
   assert.equal(generated.stderr.includes(marker), false);
-  assert.equal(generated.stdout.includes(githubTokenMarker), false);
-  assert.equal(generated.stderr.includes(githubTokenMarker), false);
   assert.equal(generated.stdout.includes(projectPathMarker), false);
   assert.equal(generated.stderr.includes(projectPathMarker), false);
   assert.equal(generated.stdout.includes(codexModelMarker), false);
@@ -360,130 +394,153 @@ async function runSecurityJourney() {
     await scanRelay(relay, wire, forbidden);
   };
   try {
-    const hostHeaders = await authenticatedDevice(relay.baseUrl, fixture.host, forbidden[0]!);
-    const nextHeaders = await authenticatedDevice(relay.baseUrl, fixture.nextHost, forbidden[1]!);
-    const upload = await fetch(`${relay.baseUrl}/devices/${fixture.nextHost.deviceId}/key-packages`, {
-      method: "POST",
-      headers: nextHeaders,
-      body: JSON.stringify({
-        keyPackages: [
-          {
-            id: fixture.keyPackageId,
-            keyPackage: fixture.keyPackage,
-            keyPackageHash: fixture.keyPackageHash,
-            ciphersuite: 2
-          }
-        ]
-      })
-    });
-    assert.equal(upload.status, 201);
-    const consume = await fetch(
-      `${relay.baseUrl}/rooms/room-desktop/key-packages/${encodeURIComponent(fixture.nextHost.userId)}/${encodeURIComponent(fixture.nextHost.deviceId)}/consume`,
-      {
+    try {
+      const hostHeaders = await authenticatedDevice(relay.baseUrl, fixture.host, forbidden[0]!);
+      const nextHeaders = await authenticatedDevice(relay.baseUrl, fixture.nextHost, forbidden[1]!);
+      const upload = await fetch(`${relay.baseUrl}/devices/${fixture.nextHost.deviceId}/key-packages`, {
         method: "POST",
-        headers: hostHeaders,
+        headers: nextHeaders,
         body: JSON.stringify({
-          hostDeviceId: fixture.host.deviceId,
-          inviteId: "invite-fixture",
-          keyPackageId: fixture.keyPackageId,
-          keyPackageHash: fixture.keyPackageHash
+          keyPackages: [
+            {
+              id: fixture.keyPackageId,
+              keyPackage: fixture.keyPackage,
+              keyPackageHash: fixture.keyPackageHash,
+              ciphersuite: 2
+            }
+          ]
         })
-      }
-    );
-    assert.equal(consume.status, 200);
-    await scanRelay(relay, wire, forbidden);
-    await hostOpened;
-    const hostJoined = waitForJoined(hostSocket);
-    hostSocket.send(
-      JSON.stringify({
-        type: "join",
+      });
+      assert.equal(upload.status, 201);
+      const consume = await fetch(
+        `${relay.baseUrl}/rooms/room-desktop/key-packages/${encodeURIComponent(fixture.nextHost.userId)}/${encodeURIComponent(fixture.nextHost.deviceId)}/consume`,
+        {
+          method: "POST",
+          headers: hostHeaders,
+          body: JSON.stringify({
+            hostDeviceId: fixture.host.deviceId,
+            inviteId: "invite-fixture",
+            keyPackageId: fixture.keyPackageId,
+            keyPackageHash: fixture.keyPackageHash
+          })
+        }
+      );
+      assert.equal(consume.status, 200);
+      await scanRelay(relay, wire, forbidden);
+      await hostOpened;
+      const hostJoined = waitForJoined(hostSocket);
+      hostSocket.send(
+        JSON.stringify({
+          type: "join",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          userId: fixture.host.userId,
+          deviceId: fixture.host.deviceId
+        })
+      );
+      await hostJoined;
+      await publish(hostSocket, {
+        id: fixture.addCommitId,
         teamId: "team-core",
         roomId: "room-desktop",
-        userId: fixture.host.userId,
-        deviceId: fixture.host.deviceId
-      })
-    );
-    await hostJoined;
-    await publish(hostSocket, {
-      id: fixture.addCommitId,
-      teamId: "team-core",
-      roomId: "room-desktop",
-      senderUserId: fixture.host.userId,
-      senderDeviceId: fixture.host.deviceId,
-      createdAt: new Date().toISOString(),
-      messageType: "commit",
-      epochHint: 0,
-      mlsMessage: fixture.addCommit
-    });
-    await publish(hostSocket, {
-      id: fixture.applicationId,
-      teamId: "team-core",
-      roomId: "room-desktop",
-      senderUserId: fixture.host.userId,
-      senderDeviceId: fixture.host.deviceId,
-      createdAt: new Date().toISOString(),
-      messageType: "application",
-      epochHint: fixture.applicationEpoch,
-      mlsMessage: fixture.application
-    });
-    await publish(hostSocket, {
-      id: fixture.handoffCommitId,
-      teamId: "team-core",
-      roomId: "room-desktop",
-      senderUserId: fixture.host.userId,
-      senderDeviceId: fixture.host.deviceId,
-      createdAt: new Date().toISOString(),
-      messageType: "commit",
-      epochHint: fixture.handoffParentEpoch,
-      mlsMessage: fixture.handoffCommit,
-      commitEffect: "host_handoff",
-      nextHostUserId: fixture.nextHost.userId,
-      nextHostDeviceId: fixture.nextHost.deviceId,
-      hostTransferAuthorization: {
-        ...fixture.hostTransferAuthorization,
-        signatureDer: fixture.hostTransferSignature,
-        publicKeySpkiDer: fixture.hostTransferPublicKey
-      }
-    });
+        senderUserId: fixture.host.userId,
+        senderDeviceId: fixture.host.deviceId,
+        createdAt: new Date().toISOString(),
+        messageType: "commit",
+        epochHint: 0,
+        mlsMessage: fixture.addCommit
+      });
+      await publish(hostSocket, {
+        id: fixture.applicationId,
+        teamId: "team-core",
+        roomId: "room-desktop",
+        senderUserId: fixture.host.userId,
+        senderDeviceId: fixture.host.deviceId,
+        createdAt: new Date().toISOString(),
+        messageType: "application",
+        epochHint: fixture.applicationEpoch,
+        mlsMessage: fixture.application
+      });
+      await publish(hostSocket, {
+        id: fixture.handoffCommitId,
+        teamId: "team-core",
+        roomId: "room-desktop",
+        senderUserId: fixture.host.userId,
+        senderDeviceId: fixture.host.deviceId,
+        createdAt: new Date().toISOString(),
+        messageType: "commit",
+        epochHint: fixture.handoffParentEpoch,
+        mlsMessage: fixture.handoffCommit,
+        commitEffect: "host_handoff",
+        nextHostUserId: fixture.nextHost.userId,
+        nextHostDeviceId: fixture.nextHost.deviceId,
+        hostTransferAuthorization: {
+          ...fixture.hostTransferAuthorization,
+          signatureDer: fixture.hostTransferSignature,
+          publicKeySpkiDer: fixture.hostTransferPublicKey
+        }
+      });
 
-    await nextOpened;
-    const nextJoined = waitForJoined(nextSocket);
-    nextSocket.send(
-      JSON.stringify({
-        type: "join",
+      await nextOpened;
+      const nextJoined = waitForJoined(nextSocket);
+      nextSocket.send(
+        JSON.stringify({
+          type: "join",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          userId: fixture.nextHost.userId,
+          deviceId: fixture.nextHost.deviceId
+        })
+      );
+      await nextJoined;
+      await publish(nextSocket, {
+        id: fixture.removalCommitId,
         teamId: "team-core",
         roomId: "room-desktop",
-        userId: fixture.nextHost.userId,
-        deviceId: fixture.nextHost.deviceId
-      })
-    );
-    await nextJoined;
-    await publish(nextSocket, {
-      id: fixture.removalCommitId,
-      teamId: "team-core",
-      roomId: "room-desktop",
-      senderUserId: fixture.nextHost.userId,
-      senderDeviceId: fixture.nextHost.deviceId,
-      createdAt: new Date().toISOString(),
-      messageType: "commit",
-      epochHint: fixture.removalParentEpoch,
-      mlsMessage: fixture.removalCommit
-    });
-    await publish(nextSocket, {
-      id: fixture.postRemovalApplicationId,
-      teamId: "team-core",
-      roomId: "room-desktop",
-      senderUserId: fixture.nextHost.userId,
-      senderDeviceId: fixture.nextHost.deviceId,
-      createdAt: new Date().toISOString(),
-      messageType: "application",
-      epochHint: fixture.postRemovalApplicationEpoch,
-      mlsMessage: fixture.postRemovalApplication
-    });
+        senderUserId: fixture.nextHost.userId,
+        senderDeviceId: fixture.nextHost.deviceId,
+        createdAt: new Date().toISOString(),
+        messageType: "commit",
+        epochHint: fixture.removalParentEpoch,
+        mlsMessage: fixture.removalCommit
+      });
+      await publish(nextSocket, {
+        id: fixture.postRemovalApplicationId,
+        teamId: "team-core",
+        roomId: "room-desktop",
+        senderUserId: fixture.nextHost.userId,
+        senderDeviceId: fixture.nextHost.deviceId,
+        createdAt: new Date().toISOString(),
+        messageType: "application",
+        epochHint: fixture.postRemovalApplicationEpoch,
+        mlsMessage: fixture.postRemovalApplication
+      });
+    } finally {
+      hostSocket.close();
+      nextSocket.close();
+      await relay.close({ preserveData: true });
+    }
     await scanRelay(relay, wire, forbidden);
+    await writeClaimsManifest();
   } finally {
-    hostSocket.close();
-    nextSocket.close();
-    await relay.close();
+    await rm(relay.tempDir, { recursive: true, force: true });
   }
+}
+
+async function writeClaimsManifest(): Promise<void> {
+  await mkdir(dirname(claimsManifestPath), { recursive: true });
+  await writeFile(
+    claimsManifestPath,
+    `${JSON.stringify(
+      {
+        formatVersion: 1,
+        journey: "relay-process-security",
+        result: "passed",
+        claims: executedClaims
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
 }

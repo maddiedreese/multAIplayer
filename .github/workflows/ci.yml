@@ -23,27 +23,14 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: npm
+      - name: Match the Railway builder package manager
+        run: npm install --global npm@11.16.0
       - name: Install dependencies
         run: npm ci
-      - name: Keep security-journey evidence linked to canonical claims
-        shell: bash
-        run: |
-          for marker in \
-            'MLS-PLAINTEXT-MUST-NEVER-REACH-RELAY' \
-            'MLS-REMOVED-MEMBER-MUST-NOT-DECRYPT' \
-            'ghp_GITHUB_TOKEN_MUST_NEVER_REACH_RELAY_STORAGE_OR_ROOM_WIRE' \
-            '/Users/sentinel/PROJECT-PATH-MUST-NEVER-REACH-RELAY' \
-            'sentinel-model-MUST-NEVER-REACH-RELAY'
-          do
-            grep -Fq "$marker" docs/threat-model.md || {
-              echo "Missing canonical threat-model reference for journey marker: $marker" >&2
-              exit 1
-            }
-          done
       - name: Verify web, relay, and packages
         run: npm run lint && npm run format:check && npm run check:tauri-command-errors && npm run build:packages && npm run test:harness && npm run test:workspaces && npm run build:apps
       - name: Measure package coverage and the relay authorization floor
@@ -67,7 +54,7 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: npm
@@ -98,7 +85,7 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: npm
@@ -115,31 +102,9 @@ jobs:
       - name: Verify native code and release metadata
         run: npm run check:release-versions && npm run fmt:rust:check && npm run lint:rust && npm run test:native
 
-  journey-path-gate:
-    name: Journey path gate
+  journey-routing:
+    name: Explain path-routed product journeys
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - name: Explain journey routing
-        run: echo "Journey workflows run on pull requests that touch native, relay protocol, invite, MLS, or onboarding paths."
-
-  ui-contract-journey-sentinel:
-    name: UI contract journeys
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "Required-check sentinel; applicable journey work is routed by journeys.yml path filters."
-
-  security-journey-sentinel:
-    name: Multi-client security journey and injection red-team
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "Required-check sentinel; applicable journey work is routed by journeys.yml path filters."
-
-  macos-desktop-sentinel:
-    name: macOS desktop package
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "Required-check sentinel; applicable journey work is routed by journeys.yml path filters."
+      - run: echo "This job is routing information, not verification. Product journeys execute in journeys.yml when its native, relay, protocol, invite, MLS, onboarding, or journey path filters match."

@@ -20,7 +20,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://avatars.githubusercontent.com https://*.githubusercontent.com; font-src 'self' data:; connect-src 'self' ipc: https://relay.multaiplayer.com wss://relay.multaiplayer.com https://multaiplayer.com; frame-src 'none'; object-src 'none'; base-uri 'none'"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://avatars.githubusercontent.com https://*.githubusercontent.com; font-src 'self' data:; connect-src 'self' ipc: https://relay.multaiplayer.com wss://relay.multaiplayer.com; frame-src 'none'; object-src 'none'; base-uri 'none'"
     }
   },
   "bundle": {
@@ -33,5 +33,11 @@
       "entitlements": "Entitlements.plist"
     },
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.png", "icons/icon.icns"]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaW5pIHB1YmxpYyBrZXk6IDVGOTdBRTI2MEJFMTZCMkYKUldRdmErRUxKcTZYWHhhc3BaTVRXN2NmZTcvN1YwdTJIN1BIUDFCbzR4M21La0FEQmE2UXJqRHQK",
+      "endpoints": ["https://raw.githubusercontent.com/maddiedreese/multAIplayer/update-channel/releases/latest.json"]
+    }
   }
 }

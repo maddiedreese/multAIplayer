@@ -85,7 +85,7 @@ Evidence demonstrates exercised behavior at a recorded revision; it does not con
 - `npm run test:e2e:native` — two real Tauri clients through invite, message, restart, and host handoff.
 - `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --workspace --all-features` — native unit/property/integration evidence.
 - Weekly `Product journeys` — scheduled relay parsing fuzzing, expanded relay decision mutation signal, chaos/restore exercise, and native parser fuzzing.
-- Scheduled macOS two-client and signed release workflows — platform and artifact evidence.
+- Scheduled macOS two-client and signed release workflows — platform evidence plus the authenticated version/URL/archive-signature metadata binding, signed updater bundle, SPDX SBOM, provenance, Sigstore bundles, and advisory normalized-payload comparison record.
 
 ### Reviewer record
 

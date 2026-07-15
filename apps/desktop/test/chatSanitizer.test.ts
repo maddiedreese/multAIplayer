@@ -35,6 +35,21 @@ test("normalizeChatMessage repairs malformed attachments without dropping chat t
   ]);
 });
 
+test("normalized chat JSON omits an absent attachment collection", () => {
+  const message = normalizeChatMessage({
+    id: "m-no-attachments",
+    author: "Maddie",
+    role: "human",
+    body: "No attachment payload",
+    time: "10:00",
+    attachments: undefined
+  });
+
+  assert.ok(message);
+  assert.equal(Object.hasOwn(message, "attachments"), false);
+  assert.equal(Object.hasOwn(JSON.parse(JSON.stringify(message)), "attachments"), false);
+});
+
 test("normalizeChatAttachment bounds oversized inline content", () => {
   const content = "a".repeat(maxEmbeddedAttachmentBytes + 10);
   const attachment = normalizeChatAttachment({
