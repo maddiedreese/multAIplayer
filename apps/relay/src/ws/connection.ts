@@ -20,6 +20,7 @@ export function registerRelayWebSocketConnection(options: RelayWebSocketConnecti
             send(socket, { type: "error", message: "Rate limit exceeded. Slow down before sending more room events." });
             return;
           }
+          options.metrics.recordRateLimitAllowed?.("websocket");
           const parsed = parseRelayClientMessage(options, raw);
           if (parsed.preflightError) {
             send(socket, { type: "error", message: parsed.preflightError });

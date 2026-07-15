@@ -1,14 +1,16 @@
 import Database from "better-sqlite3";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { openRelayDatabase } from "../apps/relay/src/sqlite-schema.ts";
+import { openRelayDatabase } from "../../apps/relay/src/sqlite-schema.ts";
 
 const args = new Set(process.argv.slice(2));
 const fixtureMode = args.has("--fixture");
 const dataPathArg = process.argv.find((arg) => arg.startsWith("--data-path="));
+const evidencePathArg = process.argv.find((arg) => arg.startsWith("--evidence-path="));
 const dataPath = dataPathArg?.slice("--data-path=".length) ?? process.env.MULTAIPLAYER_RELAY_DATA_PATH;
+const evidencePath = evidencePathArg?.slice("--evidence-path=".length);
 let tempDir = null;
 let sourcePath = dataPath;
 
@@ -41,6 +43,26 @@ try {
   assertIntegrity(restored, "backup");
   assertRelayTables(restored, sourceRelayTables);
   restored.close();
+
+  if (evidencePath) {
+    const temporaryEvidencePath = `${evidencePath}.tmp-${process.pid}`;
+    await writeFile(
+      temporaryEvidencePath,
+      `${JSON.stringify(
+        {
+          version: 1,
+          status: "passed",
+          completedAt: new Date().toISOString(),
+          sourcePath,
+          backupPath
+        },
+        null,
+        2
+      )}\n`,
+      { encoding: "utf8", mode: 0o600 }
+    );
+    await rename(temporaryEvidencePath, evidencePath);
+  }
 
   console.log(`SQLite backup/restore drill passed: ${sourcePath} -> ${backupPath}`);
 } finally {

@@ -217,11 +217,9 @@ async function publish(socket: WebSocket, message: Record<string, unknown>) {
 }
 
 if (rustToolchain.missing) {
-  test(
-    "skipped: Rust toolchain required for live native relay journey",
-    { skip: "Rust toolchain required" },
-    () => undefined
-  );
+  test("live native relay journey requires the Rust production boundary", () => {
+    assert.fail("Rust is required; the native journey must fail rather than report skipped evidence");
+  });
 } else {
   test("two live native MLS clients exchange an application and handoff through a real relay", async () => {
     await buildNativeBoundaries();

@@ -233,6 +233,35 @@ function desktopZustandSliceBoundaryRule() {
   };
 }
 
+function desktopZustandReducerOnlyRule() {
+  return {
+    meta: {
+      type: "problem",
+      schema: [],
+      messages: {
+        async: "Zustand slices own synchronous state and reducers only; move async choreography into src/application/."
+      }
+    },
+    create(context) {
+      if (!context.filename.replaceAll("\\", "/").includes("/store/slices/")) return {};
+      return {
+        AwaitExpression(node) {
+          context.report({ node, messageId: "async" });
+        },
+        ArrowFunctionExpression(node) {
+          if (node.async) context.report({ node, messageId: "async" });
+        },
+        FunctionExpression(node) {
+          if (node.async) context.report({ node, messageId: "async" });
+        },
+        FunctionDeclaration(node) {
+          if (node.async) context.report({ node, messageId: "async" });
+        }
+      };
+    }
+  };
+}
+
 function expressionContainsIdentifier(node, name) {
   if (node.type === "Identifier") return node.name === name;
   return Object.entries(node).some(([key, value]) => {
@@ -346,6 +375,7 @@ export const desktopArchitecturePlugin = {
     "layer-boundaries": desktopLayerBoundaryRule(),
     "no-flat-lib-module": desktopNoFlatLibModuleRule(),
     "zustand-slice-boundaries": desktopZustandSliceBoundaryRule(),
+    "zustand-reducer-only": desktopZustandReducerOnlyRule(),
     "no-unreported-bare-catch": desktopBareCatchRule()
   }
 };

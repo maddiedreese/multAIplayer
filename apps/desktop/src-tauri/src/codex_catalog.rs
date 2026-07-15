@@ -173,6 +173,7 @@ fn list_codex_models_once(
         cancelled: None,
         proposed_by: None,
         context_summary: None,
+        approved_project_root: None,
     };
     let result = (|| {
         send_json_shared(

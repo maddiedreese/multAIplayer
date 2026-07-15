@@ -8,8 +8,7 @@ Participation is governed by [the Code of Conduct](CODE_OF_CONDUCT.md).
 
 Keep changes to the Rust MLS core, `packages/protocol`, and `apps/desktop/src-tauri` small, explicit, and independently testable. Pull requests should identify AI-authored security-boundary changes and report the focused property, fuzz, mutation, or native checks that apply. This project currently has one maintainer, so it does not require a separate human or code-owner approval that the sole maintainer could never supply; required CI and branch protection remain the merge gate.
 
-Dependency advisory handling and coverage gates are documented in [Dependency security](docs/external-review-packet.md#dependency-security). Workflow purpose and merge impact are in [CI policy](docs/external-review-packet.md#continuous-integration-policy). Accessibility expectations and the honest localization status are in [Accessibility and localization](docs/using-the-app.md#accessibility-and-localization).
-Native failure-handling rules and fail-closed redaction initialization are documented in [Rust panic policy](docs/external-review-packet.md#rust-panic-policy).
+Dependency advisory handling, workflow purpose, merge impact, release operations, and native failure rules are maintained in this guide. Accessibility expectations and the honest localization status are in [Accessibility and localization](docs/using-the-app.md#accessibility-and-localization). Product security claims and residual risks belong only in the [threat model](docs/threat-model.md); contributing guidance must link there instead of paraphrasing a claim.
 
 ## Fast path
 
@@ -56,23 +55,23 @@ Run the relay or Vite frontend separately with `npm run dev:relay` or `npm run d
 - `packages/codex`, `packages/git`, and `packages/github` isolate integrations used by the desktop and relay applications.
 - `docs/message-lifecycles.md` traces chat messages and Codex turns vertically through the files they touch.
 - `docs/decisions` records cross-cutting architecture and trust decisions that contributors must preserve or explicitly supersede.
-- `scripts` contains repository-wide verification, security, release, and operational checks.
+- `scripts` contains the small set of day-to-day maintainer entry points. Scheduled/build helpers live under `tools`, while executable journeys and operational drills live under `e2e`; do not grow `scripts` back into a second application.
 - Root workspace metadata owns cross-workspace npm controls, including the Monaco/DOMPurify security override described below.
 
 ### Fast development loop
 
 Run the smallest relevant loop while iterating, then run `npm run verify` before opening a PR. Workspace commands are run from the repository root.
 
-| Changing                                                                                              | Fast checks while iterating                                                                                                                                                                                                                 |
-| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Relay HTTP, WebSocket, auth, persistence, or limits                                                   | `npm run check -w @multaiplayer/relay` and `npm run test -w @multaiplayer/relay`; run `npm run test:fuzz -w @multaiplayer/relay` after parser/schema changes and `npm run test:mutation -w @multaiplayer/relay` after authorization changes |
-| Desktop React UI, hooks, stores, or adapters                                                          | `npm run check -w @multaiplayer/desktop` and `npm run test:smoke -w @multaiplayer/desktop`; run `npm run test -w @multaiplayer/desktop` before handoff                                                                                      |
-| Browser E2E journeys or the UI-contract harness                                                       | `npm run test:e2e -- e2e/<journey>.spec.ts`; run `npm run test:e2e` before handoff. Keep simulated relay/native boundaries visible and keep the harness outside the production desktop graph.                                               |
-| Two-client native invite, MLS, or handoff composition                                                 | Run the focused relay process test while iterating, then `xvfb-run -a npm run test:e2e:native` in a Linux environment with the WebKit, Secret Service, and `tauri-driver` dependencies pinned by CI.                                        |
-| One shared package                                                                                    | `npm run check -w @multaiplayer/protocol` and `npm run test -w @multaiplayer/protocol`, replacing `protocol` with `codex`, `git`, or `github` as needed                                                                                     |
-| Native Tauri/Rust code                                                                                | `npm run fmt:rust:check` and `npm run test:native`                                                                                                                                                                                          |
-| Native packaging, Tauri config, browser windows, Keychain, terminals, or Codex app-server integration | Native checks above, then `npm run tauri:build -w @multaiplayer/desktop`                                                                                                                                                                    |
-| Cross-cutting TypeScript or workspace configuration                                                   | `npm run lint`, `npm run format:check`, and the affected workspace checks                                                                                                                                                                   |
+| Changing                                                                                              | Fast checks while iterating                                                                                                                                                                                                                                                                                  |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Relay HTTP, WebSocket, auth, persistence, or limits                                                   | `npm run check -w @multaiplayer/relay` and `npm run test -w @multaiplayer/relay`; run `npm run test:fuzz -w @multaiplayer/relay` after parser/schema changes. Mutation testing of authz, sessions, WebSocket admission, and room mutations is weekly/advisory; run it locally only to reproduce that report. |
+| Desktop React UI, hooks, stores, or adapters                                                          | `npm run check -w @multaiplayer/desktop` and `npm run test:smoke -w @multaiplayer/desktop`; run `npm run test -w @multaiplayer/desktop` before handoff                                                                                                                                                       |
+| Browser E2E journeys or the UI-contract harness                                                       | `npm run test:e2e -- e2e/<journey>.spec.ts`; run `npm run test:e2e` before handoff. Keep simulated relay/native boundaries visible and keep the harness outside the production desktop graph.                                                                                                                |
+| Two-client native invite, MLS, or handoff composition                                                 | Run the focused relay process test while iterating, then `xvfb-run -a npm run test:e2e:native` in a Linux environment with the WebKit, Secret Service, and `tauri-driver` dependencies pinned by CI.                                                                                                         |
+| One shared package                                                                                    | `npm run check -w @multaiplayer/protocol` and `npm run test -w @multaiplayer/protocol`, replacing `protocol` with `codex`, `git`, or `github` as needed                                                                                                                                                      |
+| Native Tauri/Rust code                                                                                | `npm run fmt:rust:check` and `npm run test:native`                                                                                                                                                                                                                                                           |
+| Native packaging, Tauri config, browser windows, Keychain, terminals, or Codex app-server integration | Native checks above, then `npm run tauri:build -w @multaiplayer/desktop`                                                                                                                                                                                                                                     |
+| Cross-cutting TypeScript or workspace configuration                                                   | `npm run lint`, `npm run format:check`, and the affected workspace checks                                                                                                                                                                                                                                    |
 
 Use `npm run format` to apply the repository's Prettier baseline. `npm run verify` lints and checks formatting for TypeScript and JavaScript, type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the workspaces.
 
@@ -93,7 +92,7 @@ The relay fuzz suite feeds seedable arbitrary bytes, recursive JSON values, and 
 
 #### Monaco DOMPurify security pin
 
-Monaco is consumed by the desktop editor, but its DOMPurify override and the direct `dompurify` pin intentionally live in the root `package.json`. npm applies workspace overrides only from the workspace root, and the direct dependency fixes the version referenced by that override. The desktop Vite resolver directs Monaco's sanitizer import to the patched package, while `scripts/verify-desktop-security-deps.mjs` fails the desktop build if the vulnerable bundled DOMPurify version appears in the output. Keep these pieces aligned when upgrading Monaco or DOMPurify; do not move or remove the root pin without replacing and testing the security control.
+Monaco is consumed by the desktop editor, but its DOMPurify override and the direct `dompurify` pin intentionally live in the root `package.json`. npm applies workspace overrides only from the workspace root, and the direct dependency fixes the version referenced by that override. The desktop Vite resolver directs Monaco's sanitizer import to the patched package, while `tools/security/verify-desktop-security-deps.mjs` fails the desktop build if the vulnerable bundled DOMPurify version appears in the output. Keep these pieces aligned when upgrading Monaco or DOMPurify; do not move or remove the root pin without replacing and testing the security control.
 
 ### Area-specific test requirements
 
@@ -112,3 +111,69 @@ Diagnostics changes need tests on both sides of the IPC boundary. Frontend tests
 ### Security reports
 
 See [SECURITY.md](SECURITY.md). Do not put live secrets, private repo contents, real transcripts, or decrypted room payloads in issues or PRs.
+
+## Stabilization and release operations
+
+### Active pre-v0.1.0 stabilization window
+
+The repository is feature-frozen from **2026-07-15 through 2026-07-22 inclusive**. During that interval, merge only fixes, deletion/simplification, documentation corrections, dependency or security updates, test repairs, and release operations. A change that adds user-visible capability resets the seven-consecutive-day stabilization clock; it is not made acceptable by calling it hardening. Before tagging v0.1.0, record seven consecutive feature-freeze days in the release PR and repeat the complete release preflight.
+
+Future releases use the same rule: declare a minimum seven-day stabilization window, name its start/end in the release PR, and reset it after any feature merge. The PR template makes the author state whether a stabilization exception applies; reviewers decide based on the diff.
+
+### Continuous-integration policy
+
+`ci.yml` contains fast blocking checks: workspace lint/type/test/build, coverage reports with a focused relay authorization floor, and Rust formatting/Clippy/tests. `journeys.yml` runs UI, deterministic security, native two-client, and macOS package evidence on `main`, tags, schedules, and security-relevant pull-request paths. Pull requests use stable sentinel contexts so path filtering does not deadlock branch protection; the real path-gated jobs remain visible separately.
+
+Mutation testing, parser fuzzing, extended supply-chain scans, reproducibility comparisons, soak/restore drills, and the scheduled macOS two-client run are advisory or scheduled evidence. Investigate regressions; do not turn them into a Tuesday bugfix blocker without deleting or demoting an existing blocking check. No new blocking check may be added without removing or demoting another one.
+
+The deterministic security journey fails when its Rust production boundary is unavailable. It must never convert missing prerequisites into a skipped-success artifact. Coverage artifacts describe what ran; only explicitly documented risk floors are merge gates.
+
+### Dependency security
+
+Dependencies remain exact-pinned for reproducibility. Dependabot batches npm, Cargo, GitHub Actions, and relay-container updates **weekly on Monday**. Review compatible batches first; isolate major upgrades when their migration surface obscures review. GitHub/Dependabot security advisories are handled immediately rather than waiting for the weekly batch: open a focused remediation PR, run the affected tests plus supply-chain policy, and record any temporary exception with owner and removal condition.
+
+`npm audit`, the license policy, RustSec, `cargo-deny`, CodeQL, Semgrep, Trivy, and secret scanning run on their documented schedules. Advisory-policy exceptions must identify the exact advisory, affected package, actual reachability, expiry/review date, and replacement or upstream tracking link. “No fix available” is not a permanent rationale.
+
+### Rust panic policy
+
+Production Rust command paths return typed errors and keep internal dependency/storage/cryptographic causes out of webview IPC. `unwrap`, `expect`, and deliberate panic are limited to tests or initialization invariants that cannot continue safely; a new use in runtime code needs a written invariant and focused failure test. Redaction/diagnostic initialization fails closed: a sanitizer construction failure suppresses the value rather than emitting unredacted content.
+
+### Manual update channel
+
+The alpha deliberately uses **manual GitHub Release downloads**, not `tauri-plugin-updater`. The in-app release banner may link only to this repository's HTTPS Releases surface and must also link to [Sigstore/checksum verification instructions](docs/reproducible-builds.md). The app does not download, install, restart, or hold an updater signing key.
+
+Release artifacts come from a validated tag through `release.yml`. The release operator runs `npm run release:preflight`, confirms the feature-freeze record, Developer ID signing/notarization, cold- and warm-start universal-link behavior, checksum/SBOM/provenance/Sigstore publication, and the two-device acceptance journey. If any artifact or verification bundle is missing, the release remains unsupported.
+
+### Relay operational floor
+
+Before inviting users outside the maintainer's controlled alpha, the hosted relay must expose and alert on:
+
+- SQLite filesystem free space and database size;
+- WAL size/growth;
+- timestamp and outcome of the last successful backup;
+- backup age and restore-drill age;
+- rate-limit decisions by bounded reason/route class, without identity tokens or payloads.
+
+Use the structured operational snapshot emitted by the relay rather than scraping prose logs. Alert thresholds and destinations are deployment configuration, not source-code secrets. A process-local metric is insufficient unless the platform collects it independently of the SQLite volume it monitors.
+
+#### Backup and restore runbook
+
+1. Stop or isolate the writer, identify the source SQLite file, and record the deployment revision and snapshot timestamp without copying credentials or user payloads into the ticket.
+2. Run `node --import tsx e2e/relay/sqlite-backup-restore-drill.mjs --data-path=/path/to/snapshot.sqlite --evidence-path=/path/to/relay-store.sqlite.backup-evidence.json` on a protected operator machine. The drill opens the source read-only, uses SQLite backup, runs integrity checks, verifies the relay table set on the restored copy, and atomically writes the timestamp consumed by `multaiplayer_relay_sqlite_backup_last_success_timestamp_seconds`.
+3. Start an isolated relay against the restored copy with outbound/public traffic disabled. Confirm deletion-ledger reconciliation completes before listen, a previously deleted synthetic/approved test identity remains denied, schema/version checks pass, and the operational snapshot reports bounded write latency, WAL size, and free disk capacity.
+4. Record only commit, snapshot time, drill time, result, operator, and sanitized failure category. Store the snapshot and detailed logs under the production access policy, never in GitHub artifacts.
+5. Delete the temporary restored copy according to the backup-retention policy and update the monitored last-success/last-drill timestamps.
+
+The fixture drill is a CI regression check, not evidence that a production snapshot was restored. A real production-snapshot drill remains a release/operations blocker until an authorized operator records it; repository contributors must not manufacture that claim.
+
+#### Hosted account restriction
+
+Account restriction is a stopped-relay/operator action, not a public administration route. Stop the writer, back up the database, run the documented restriction CLI with a bounded reason code and optional expiry, restart, and verify session/device eviction plus denial of new/restored sessions. Preserve shared encrypted records unless a separately authorized deletion operation applies.
+
+#### Hosted-to-self-hosted migration
+
+Deploy and validate the replacement relay, build clients pinned to its HTTPS/WSS origins, recreate teams/rooms/membership with fresh invites, and keep original devices intact until the new rooms are verified. Migration does not transfer live MLS authority, group secrets, or exporter-derived history keys; encrypted display-history archives remain a separate inert import. Announce a cutoff, revoke or expire old sessions/invites, retain the old database only for its published backup/deletion horizon, and verify the hosted exit policy before shutdown.
+
+### Compatibility inventory
+
+Compatibility readers need an owner and deletion condition. Current intentional readers are limited to documented Codex app-server versions, one-way legacy relay JSON-to-SQLite import, accepted local-history/archive versions, and explicitly enumerated native state migrations. Do not add a fallback that silently accepts a previous cryptographic wire format. Remove a compatibility path after its support window and migration evidence expire; update the threat model only when the trust or security boundary changes.

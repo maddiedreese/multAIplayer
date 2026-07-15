@@ -29,6 +29,7 @@ export interface RelayWebSocketConnectionOptions {
   metrics: {
     recordQuotaRejection?: (type: string) => void;
     recordRateLimitRejection?: (bucket: string) => void;
+    recordRateLimitAllowed?: (bucket: string) => void;
     recordConnectionAttempt?: () => void;
     recordConnectionAccepted?: () => void;
     recordConnectionRejection?: (reason: string) => void;

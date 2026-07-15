@@ -16,6 +16,7 @@ test-results/
 coverage/
 coverage-critical/
 coverage-host-actions/
+coverage-host-handoff/
 **/.stryker-tmp/
 **/reports/mutation/
 **/reports/soak/

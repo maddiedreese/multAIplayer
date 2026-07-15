@@ -12,6 +12,19 @@ codesign --verify --deep --strict --verbose=2 multAIplayer.app
 spctl -a -vvv -t install multAIplayer.app
 ```
 
+Verify the keyless Sigstore bundle for the checksum manifest before trusting those hashes:
+
+```bash
+cosign verify-blob \
+  --bundle SHA256SUMS.txt.sigstore.json \
+  --certificate-identity-regexp '^https://github.com/maddiedreese/multAIplayer/.github/workflows/release.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  SHA256SUMS.txt
+```
+
+The identity constraint binds the bundle to this repository's tagged release workflow. Inspect and replace the
+constraint deliberately if the release workflow path or repository ownership changes.
+
 A matching checksum proves that the downloaded bytes match the release manifest; Apple verification checks the published signing identity and notarization state. Neither proves that the binary matches source.
 
 ## Rebuild from the tagged source

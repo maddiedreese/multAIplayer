@@ -64,11 +64,11 @@ Protocol v2 superseded the protocol-v1 cryptography decisions in ADR-007 through
 - **Decision:** Keep preview room keys in memory and scrub sensitive join material after bootstrap.
 - **Consequences:** Refresh may require rejoining; leak scans cover URLs, logs, and persisted state.
 
-## ADR-017: Relay authorization is mutation-gated
+## ADR-017: Relay decision mutation evidence is scheduled
 
 - **Context:** Coverage can execute authorization branches without proving assertions distinguish permissive mutations.
-- **Decision:** Govern relay authorization with a focused mutation-visible suite, zero survivors, and reviewable reports.
-- **Consequences:** Test placement is part of policy and compile-error mutants are reported separately from behavioral kills.
+- **Decision:** Run weekly advisory mutation testing across authorization, sessions, WebSocket admission, and room mutation routes. Keep `authz.ts` at zero survivors; use score floors and reviewable reports for the broader decision surface.
+- **Consequences:** The full run is intentionally too slow for pull requests. Its first expanded report establishes calibration evidence, while monthly drift review remains advisory and does not require per-refactor allowlists.
 
 ## ADR-018: Protocol guards are mutation-gated
 

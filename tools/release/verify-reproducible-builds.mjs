@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+// This is scheduled release evidence, not a day-to-day maintainer command.
+
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
@@ -9,11 +11,7 @@ const [documentation, release, lockfile] = await Promise.all([
   readFile("package-lock.json", "utf8")
 ]);
 
-for (const command of [
-  "npm ci",
-  "npm run release:preflight",
-  "npm run tauri:build:prebuilt -w @multaiplayer/desktop"
-]) {
+for (const command of ["npm ci", "npm run release:preflight", "npm run tauri:build:release -w @multaiplayer/desktop"]) {
   assert.ok(documentation.includes(command), `reproducibility guide must document: ${command}`);
   assert.ok(release.includes(command), `release workflow must execute: ${command}`);
 }

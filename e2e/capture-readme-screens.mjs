@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdir } from "node:fs/promises";

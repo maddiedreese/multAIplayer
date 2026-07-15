@@ -1,27 +1,102 @@
+#!/usr/bin/env node
+
 import { execFileSync } from "node:child_process";
 import process from "node:process";
 
-const appPath = process.argv[2];
-if (!appPath) {
-  console.error("Usage: node scripts/verify-macos-associated-domains.mjs <path-to-app>");
-  process.exit(1);
+export const associatedDomainHosts = ["multaiplayer.com", "open.multaiplayer.com"];
+export const bundleIdentifier = "com.multaiplayer.desktop";
+
+function hasExactAppBinding(entry, appId) {
+  if (entry.appID === appId) return entry.appIDs === undefined;
+  return (
+    entry.appID === undefined && Array.isArray(entry.appIDs) && entry.appIDs.length === 1 && entry.appIDs[0] === appId
+  );
 }
 
-let entitlements;
-try {
-  entitlements = execFileSync("codesign", ["-d", "--entitlements", ":-", appPath], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"]
-  });
-} catch (error) {
-  const stdout = error && typeof error === "object" && "stdout" in error ? String(error.stdout) : "";
-  if (!stdout) throw error;
-  entitlements = stdout;
+function componentPath(component, allowedPaths) {
+  if (!component || typeof component !== "object" || Array.isArray(component)) return null;
+  if (!Object.keys(component).every((key) => key === "/" || key === "comment")) return null;
+  const path = component["/"];
+  return typeof path === "string" && allowedPaths.has(path) ? path : null;
 }
 
-for (const domain of ["applinks:multaiplayer.com", "applinks:open.multaiplayer.com"]) {
-  if (!entitlements.includes(`<string>${domain}</string>`)) {
-    throw new Error(`Signed application is missing ${domain}.`);
+export function validateAssociationDocument(document, appId) {
+  if (!document || typeof document !== "object" || Array.isArray(document)) return false;
+  const details = document.applinks?.details;
+  if (!Array.isArray(details) || details.length !== 1) return false;
+  const [entry] = details;
+  if (!entry || !Array.isArray(entry.components)) return false;
+  if (!hasExactAppBinding(entry, appId) || entry.components.length !== 2) return false;
+  const allowedPaths = new Set(["/invite", "/invite/"]);
+  const paths = new Set();
+  for (const component of entry.components) {
+    const path = componentPath(component, allowedPaths);
+    if (!path) return false;
+    paths.add(path);
+  }
+  return paths.size === allowedPaths.size;
+}
+
+export async function verifyLiveAssociations({ teamId, fetchImpl = fetch }) {
+  if (!/^[A-Z0-9]{10}$/.test(teamId ?? "")) {
+    throw new Error("APPLE_TEAM_ID must be a 10-character Apple team identifier.");
+  }
+  const appId = `${teamId}.${bundleIdentifier}`;
+  for (const host of associatedDomainHosts) {
+    const response = await fetchImpl(`https://${host}/.well-known/apple-app-site-association`, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+      headers: { accept: "application/json" }
+    });
+    if (response.status !== 200) throw new Error(`${host} AASA returned HTTP ${response.status}.`);
+    if (!response.headers.get("content-type")?.toLowerCase().includes("application/json")) {
+      throw new Error(`${host} AASA must use application/json.`);
+    }
+    let document;
+    try {
+      document = await response.json();
+    } catch {
+      throw new Error(`${host} AASA is not valid JSON.`);
+    }
+    if (!validateAssociationDocument(document, appId)) {
+      throw new Error(`${host} AASA does not bind ${appId} to only the invitation paths.`);
+    }
   }
 }
-console.log("Verified signed macOS associated-domain entitlements.");
+
+export function verifySignedAppEntitlements(appPath) {
+  let entitlements;
+  try {
+    entitlements = execFileSync("codesign", ["-d", "--entitlements", ":-", appPath], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+  } catch (error) {
+    const stdout = error && typeof error === "object" && "stdout" in error ? String(error.stdout) : "";
+    if (!stdout) throw error;
+    entitlements = stdout;
+  }
+  for (const host of associatedDomainHosts) {
+    const domain = `applinks:${host}`;
+    if (!entitlements.includes(`<string>${domain}</string>`)) {
+      throw new Error(`Signed application is missing ${domain}.`);
+    }
+  }
+}
+
+async function main() {
+  const [mode] = process.argv.slice(2);
+  if (mode === "--live") {
+    await verifyLiveAssociations({ teamId: process.env.APPLE_TEAM_ID });
+    console.log("Verified live Apple app-site associations for both invitation hosts.");
+    return;
+  }
+  if (!mode) throw new Error("Usage: verify-macos-associated-domains.mjs --live | <path-to-app>");
+  verifySignedAppEntitlements(mode);
+  console.log("Verified signed macOS associated-domain entitlements.");
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+});

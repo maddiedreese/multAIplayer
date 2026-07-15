@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { access, appendFile, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { performance } from "node:perf_hooks";
 import { multiremote, remote, type Browser } from "webdriverio";
 import { startRelay, type RelayHarness, type StoredRelayStateFixture } from "../../apps/relay/test/support/relay.js";
-import { NativeJourneyTimer, writeNativeJourneyMetrics } from "../../scripts/native-journey-metrics.mjs";
 import { assertTamperedKeyPackageRejected } from "./key-package-negative.js";
 import { inviteAndDeny, rejectExpiredInvite } from "./invite-scenarios.js";
 import { approveInviteAcrossGuestCrash } from "./messy-failure.js";
@@ -21,6 +21,86 @@ const roomName = `Native integration ${Date.now()}`;
 const messageText = `real MLS message ${Date.now()}`;
 const webdriverOperationTimeoutMs = 15_000;
 const journeyWarningBudgetMs = 6 * 60_000;
+
+interface NativeJourneyReport {
+  formatVersion: 1;
+  outcome: "passed" | "failed";
+  startedAt: string;
+  endedAt: string;
+  totalDurationMs: number;
+  stages: Array<{ name: string; durationMs: number }>;
+  metadata: Record<string, unknown>;
+}
+
+class NativeJourneyTimer {
+  private activeStage?: { name: string; startedAtMs: number };
+  private readonly startedAtDurationMs = performance.now();
+  private readonly startedAtWallMs = Date.now();
+  private finished = false;
+  private readonly stages: NativeJourneyReport["stages"] = [];
+
+  markStage(name: string) {
+    if (this.finished) throw new Error("cannot add a stage to finished native journey metrics");
+    const now = performance.now();
+    if (this.activeStage) {
+      this.stages.push({ name: this.activeStage.name, durationMs: now - this.activeStage.startedAtMs });
+    }
+    this.activeStage = { name, startedAtMs: now };
+  }
+
+  finish(outcome: NativeJourneyReport["outcome"], metadata: Record<string, unknown>): NativeJourneyReport {
+    if (this.finished) throw new Error("native journey metrics were already finished");
+    const endedAtDurationMs = performance.now();
+    const endedAtWallMs = Date.now();
+    if (this.activeStage) {
+      this.stages.push({
+        name: this.activeStage.name,
+        durationMs: endedAtDurationMs - this.activeStage.startedAtMs
+      });
+    }
+    this.finished = true;
+    return {
+      formatVersion: 1,
+      outcome,
+      startedAt: new Date(this.startedAtWallMs).toISOString(),
+      endedAt: new Date(endedAtWallMs).toISOString(),
+      totalDurationMs: endedAtDurationMs - this.startedAtDurationMs,
+      stages: this.stages,
+      metadata
+    };
+  }
+}
+
+const formatSeconds = (durationMs: number) => `${(durationMs / 1_000).toFixed(1)} s`;
+
+async function writeNativeJourneyMetrics(report: NativeJourneyReport, reportDirectory: string) {
+  await mkdir(reportDirectory, { recursive: true });
+  await writeFile(join(reportDirectory, "duration.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  if (!process.env.GITHUB_STEP_SUMMARY) return;
+  const warningBudget = report.metadata.warningBudgetMs;
+  const budgetLine =
+    typeof warningBudget === "number"
+      ? ` Warning budget: ${formatSeconds(warningBudget)} (${report.totalDurationMs > warningBudget ? "exceeded" : "within budget"}).`
+      : "";
+  const stageRows = report.stages
+    .map((item) => `| ${item.name.replaceAll("|", "\\|")} | ${formatSeconds(item.durationMs)} |`)
+    .join("\n");
+  await appendFile(
+    process.env.GITHUB_STEP_SUMMARY,
+    [
+      "## Real native MLS journey duration",
+      "",
+      `**${report.outcome.toUpperCase()}** in ${formatSeconds(report.totalDurationMs)} on ${String(report.metadata.platform ?? "unknown")}.${budgetLine}`,
+      "",
+      "| Stage | Duration |",
+      "| --- | ---: |",
+      stageRows || "| No stage recorded | 0.0 s |",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+}
+
 const journeyTimer = new NativeJourneyTimer();
 const runtime = new NativeShellRuntime({ root, appBinary, operationTimeoutMs: webdriverOperationTimeoutMs });
 
@@ -561,11 +641,9 @@ try {
     gitSha: process.env.GITHUB_SHA ?? null,
     warningBudgetMs: journeyWarningBudgetMs
   });
-  await writeNativeJourneyMetrics(
-    report,
-    join(root, "reports/native-shell-e2e"),
-    process.env.GITHUB_STEP_SUMMARY
-  ).catch((error) => console.warn(`[native-e2e] failed to write duration metrics: ${String(error)}`));
+  await writeNativeJourneyMetrics(report, join(root, "reports/native-shell-e2e")).catch((error) =>
+    console.warn(`[native-e2e] failed to write duration metrics: ${String(error)}`)
+  );
   if (report.totalDurationMs > journeyWarningBudgetMs) {
     console.warn(
       `::warning title=Native journey duration regression::Journey took ${(report.totalDurationMs / 1_000).toFixed(1)}s, exceeding the ${(journeyWarningBudgetMs / 1_000).toFixed(0)}s warning budget.`

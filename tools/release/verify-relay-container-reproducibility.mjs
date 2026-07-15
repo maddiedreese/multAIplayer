@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Release tooling lives outside scripts/ so the operator-facing script surface
+// stays intentionally small.
+
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";

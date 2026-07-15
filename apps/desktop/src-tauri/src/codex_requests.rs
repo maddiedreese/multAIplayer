@@ -1,3 +1,4 @@
+use crate::codex_authorization::CodexConfirmationBinding;
 use crate::codex_request_projection::project_server_request;
 use crate::codex_request_validation::validate_codex_server_result;
 use crate::codex_rpc::{
@@ -9,6 +10,7 @@ use crate::command_safety::enforced_permission_denial;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -58,6 +60,7 @@ struct PendingServerRequest {
     stdin: SharedStdin,
     app: tauri::AppHandle,
     expires_at: Instant,
+    approved_project_root: Option<PathBuf>,
 }
 
 #[derive(Clone, Default)]
@@ -87,6 +90,14 @@ pub(crate) struct RespondCodexServerRequest {
     response: CodexServerRequestResponse,
 }
 
+pub(crate) struct PreparedCodexServerResponse {
+    pub(crate) confirmation: Option<CodexConfirmationBinding>,
+    pub(crate) confirmation_message: Option<String>,
+    request_key: String,
+    response_field: &'static str,
+    response_value: Value,
+}
+
 pub(crate) struct RpcRequestContext<'a> {
     pub(crate) app: &'a tauri::AppHandle,
     pub(crate) state: CodexRpcState,
@@ -96,6 +107,7 @@ pub(crate) struct RpcRequestContext<'a> {
     pub(crate) cancelled: Option<Arc<std::sync::atomic::AtomicBool>>,
     pub(crate) proposed_by: Option<&'a str>,
     pub(crate) context_summary: Option<&'a str>,
+    pub(crate) approved_project_root: Option<&'a Path>,
 }
 
 impl RpcRequestContext<'_> {
@@ -184,12 +196,15 @@ impl CodexRpcState {
         Ok(requests)
     }
 
-    pub(crate) fn respond(&self, request: RespondCodexServerRequest) -> Result<(), String> {
+    pub(crate) fn prepare_response(
+        &self,
+        request: RespondCodexServerRequest,
+    ) -> Result<PreparedCodexServerResponse, String> {
         self.expire_due();
         if request.request_key.len() > 128 || request.request_key.trim().is_empty() {
             return Err("Codex server request key is invalid".to_string());
         }
-        let (method, request_params) = {
+        let (method, room_id, projected_params, request_params, approved_project_root) = {
             let pending = self
                 .pending
                 .lock()
@@ -199,7 +214,10 @@ impl CodexRpcState {
                 .ok_or_else(|| "Codex server request is no longer pending".to_string())?;
             (
                 pending.event.method.clone(),
+                pending.event.room_id.clone(),
+                pending.event.params.clone(),
                 pending.original_params.clone(),
+                pending.approved_project_root.clone(),
             )
         };
         let response = match (request.response.result, request.response.error) {
@@ -234,14 +252,89 @@ impl CodexRpcState {
         {
             return Err("Codex server response exceeds the size limit".to_string());
         }
+        let positive_approval =
+            response.0 == "result" && response_requires_native_confirmation(&method, &response.1);
+        if positive_approval && method == "item/permissions/requestApproval" {
+            if let Some(reason) = enforced_permission_denial(
+                &method,
+                &request_params,
+                approved_project_root.as_deref(),
+            ) {
+                return Err(format!(
+                    "Codex permission request changed or is no longer authorized: {reason}"
+                ));
+            }
+        }
+        let confirmation = positive_approval.then(|| CodexConfirmationBinding::ServerRequest {
+            request_key: request.request_key.clone(),
+            room_id: room_id.clone(),
+            method: method.clone(),
+        });
+        let confirmation_message = positive_approval.then(|| {
+            native_confirmation_message(
+                &request.request_key,
+                &room_id,
+                &method,
+                &projected_params,
+                &response.1,
+            )
+        });
+        Ok(PreparedCodexServerResponse {
+            confirmation,
+            confirmation_message,
+            request_key: request.request_key,
+            response_field: response.0,
+            response_value: response.1,
+        })
+    }
+
+    pub(crate) fn finish_response(
+        &self,
+        prepared: PreparedCodexServerResponse,
+    ) -> Result<(), String> {
+        self.expire_due();
+        if let Some(CodexConfirmationBinding::ServerRequest {
+            request_key,
+            room_id,
+            method,
+        }) = prepared.confirmation.as_ref()
+        {
+            let permission_recheck = {
+                let pending = self
+                    .pending
+                    .lock()
+                    .map_err(|_| "Codex server request state is unavailable".to_string())?;
+                let current = pending
+                    .get(request_key)
+                    .ok_or_else(|| "Codex server request is no longer pending".to_string())?;
+                if current.event.room_id != *room_id || current.event.method != *method {
+                    return Err(
+                        "Codex native confirmation does not match the pending request".to_string(),
+                    );
+                }
+                (method == "item/permissions/requestApproval").then(|| {
+                    (
+                        current.original_params.clone(),
+                        current.approved_project_root.clone(),
+                    )
+                })
+            };
+            if let Some((params, root)) = permission_recheck {
+                if let Some(reason) = enforced_permission_denial(method, &params, root.as_deref()) {
+                    return Err(format!(
+                        "Codex permission request is no longer authorized after native confirmation: {reason}"
+                    ));
+                }
+            }
+        }
         let pending = self
             .pending
             .lock()
             .map_err(|_| "Codex server request state is unavailable".to_string())?
-            .remove(&request.request_key)
+            .remove(&prepared.request_key)
             .ok_or_else(|| "Codex server request is no longer pending".to_string())?;
         let mut message = json!({ "id": pending.id.to_value() });
-        message[response.0] = response.1;
+        message[prepared.response_field] = prepared.response_value;
         send_json_shared(&pending.stdin, message)
     }
 
@@ -283,7 +376,9 @@ impl CodexRpcState {
                 "Unsupported app-server request",
             );
         }
-        if let Some(reason) = enforced_permission_denial(&method, &params) {
+        if let Some(reason) =
+            enforced_permission_denial(&method, &params, context.approved_project_root)
+        {
             return send_rpc_error(&context.stdin, &id, -32001, reason);
         }
         let projected = match project_server_request(&method, &params) {
@@ -345,6 +440,7 @@ impl CodexRpcState {
                 stdin: context.stdin.clone(),
                 app: context.app.clone(),
                 expires_at: Instant::now() + MAX_HUMAN_WAIT,
+                approved_project_root: context.approved_project_root.map(Path::to_path_buf),
             },
         );
         drop(pending);
@@ -430,6 +526,59 @@ impl CodexRpcState {
     }
 }
 
+fn response_requires_native_confirmation(method: &str, result: &Value) -> bool {
+    match method {
+        "item/commandExecution/requestApproval" | "item/fileChange/requestApproval" => result
+            .get("decision")
+            .and_then(Value::as_str)
+            .is_some_and(|decision| matches!(decision, "accept" | "acceptForSession")),
+        "execCommandApproval" | "applyPatchApproval" => result
+            .get("decision")
+            .and_then(Value::as_str)
+            .is_some_and(|decision| matches!(decision, "approved" | "approved_for_session")),
+        "item/permissions/requestApproval" => result
+            .get("permissions")
+            .and_then(Value::as_object)
+            .is_some_and(|permissions| !permissions.is_empty()),
+        _ => false,
+    }
+}
+
+fn native_confirmation_message(
+    request_key: &str,
+    room_id: &str,
+    method: &str,
+    params: &Value,
+    response: &Value,
+) -> String {
+    let details = match method {
+        "item/commandExecution/requestApproval" | "execCommandApproval" => params
+            .get("command")
+            .map(Value::to_string)
+            .unwrap_or_else(|| "(command unavailable)".to_string()),
+        "item/fileChange/requestApproval" | "applyPatchApproval" => params
+            .get("grantRoot")
+            .map(Value::to_string)
+            .unwrap_or_else(|| "(file change details unavailable)".to_string()),
+        "item/permissions/requestApproval" => params
+            .get("permissions")
+            .map(Value::to_string)
+            .unwrap_or_else(|| "(permission details unavailable)".to_string()),
+        _ => "(approval details unavailable)".to_string(),
+    };
+    let mut details = details.chars();
+    let preview = details.by_ref().take(4_000).collect::<String>();
+    let preview_note = if details.next().is_some() {
+        "\n[preview truncated; Rust retains and binds the complete projected request]"
+    } else {
+        ""
+    };
+    let response = response.to_string();
+    format!(
+        "A Codex app-server request is asking for native authority.\n\nRoom: {room_id}\nRequest: {request_key}\nMethod: {method}\nProposed response: {response}\n\nProjected request preview:\n{preview}{preview_note}\n\nApprove this exact pending request?"
+    )
+}
+
 fn pending_request_expired(expires_at: Instant, now: Instant) -> bool {
     expires_at <= now
 }
@@ -451,5 +600,44 @@ mod tests {
         assert!(pending_request_expired(now, now));
         assert!(pending_request_expired(now - Duration::from_secs(1), now));
         assert!(MAX_HUMAN_WAIT <= Duration::from_secs(15 * 60));
+    }
+
+    #[test]
+    fn only_positive_privileged_decisions_require_native_confirmation() {
+        for (method, result) in [
+            (
+                "item/commandExecution/requestApproval",
+                json!({"decision": "accept"}),
+            ),
+            (
+                "item/fileChange/requestApproval",
+                json!({"decision": "acceptForSession"}),
+            ),
+            ("execCommandApproval", json!({"decision": "approved"})),
+            (
+                "applyPatchApproval",
+                json!({"decision": "approved_for_session"}),
+            ),
+            (
+                "item/permissions/requestApproval",
+                json!({"permissions": {"fileSystem": {"read": ["src"]}}}),
+            ),
+        ] {
+            assert!(response_requires_native_confirmation(method, &result));
+        }
+        for (method, result) in [
+            (
+                "item/commandExecution/requestApproval",
+                json!({"decision": "decline"}),
+            ),
+            ("applyPatchApproval", json!({"decision": "denied"})),
+            (
+                "item/permissions/requestApproval",
+                json!({"permissions": {}}),
+            ),
+            ("item/tool/requestUserInput", json!({"answers": {}})),
+        ] {
+            assert!(!response_requires_native_confirmation(method, &result));
+        }
     }
 }

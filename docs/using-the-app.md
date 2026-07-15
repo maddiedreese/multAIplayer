@@ -2,6 +2,8 @@
 
 This guide explains the main desktop app surfaces and what each feature means in the public alpha.
 
+Security-related user guidance here explains operation; the [threat model](threat-model.md) is the sole normative claims and residual-risk source.
+
 ## First-Time Setup
 
 On a fresh install, the setup guide opens before the normal workspace shell. Choose **Create a workspace** to create a team and its first project room, or **Join with an invite** to request access with a capability invite. **Explore the interface** closes the guide without claiming that setup is complete. Progress is resumable: **Save and close** pauses at the current step, and the Help drawer can reopen or restart the guide and restore the setup checklist.
@@ -95,7 +97,7 @@ Codex can pause a running turn to ask the active host for a command, file, permi
 
 The Codex work disclosure appears in chat as a collapsible “Codex is working” or “Codex worked” group. Each typed step has its own disclosure for the information Codex reported: reasoning summaries; command text, bounded output, exit status, and duration; changed paths and bounded diffs; tool name, bounded input/result/error; web action, query, page, or find pattern; image-generation prompt; and subagent prompt, model, reasoning effort, state, and normalized spawn/send/resume/wait/close relationships. The adjacent agent visualization uses those normalized relationships so room members can see subagent spawning and progress without confusing it with the Codex conversation branch graph.
 
-“Thinking” shows provider-supplied reasoning summaries by default. The active host can enable an off-by-default, per-room setting to share provider-supplied raw reasoning when the selected provider, model, and app-server build make it available. Enabling the setting does not guarantee that a turn will produce raw reasoning. When present, raw reasoning appears behind its own disclosure and is treated like other room activity: it is bounded, RFC 9420 MLS-encrypted via `mls-rs` before relay transport, visible to room members, and retained in their encrypted local history according to the room retention window; multAIplayer's integration layer is unaudited. Turning sharing off prevents raw reasoning from being included in later projected activity; it does not retract copies already delivered or retained by members.
+“Thinking” shows provider-supplied reasoning summaries by default. The active host can enable an off-by-default, per-room setting to share provider-supplied raw reasoning when the selected provider, model, and app-server build make it available. Enabling the setting does not guarantee that a turn will produce raw reasoning. When present, raw reasoning appears behind its own disclosure and is treated like other room activity: it is bounded, encoded through RFC 9420 MLS via `mls-rs` before relay transport, visible to room members, and retained in their encrypted local history according to the room retention window. Turning sharing off prevents raw reasoning from being included in later projected activity; it does not retract copies already delivered or retained by members. The threat model owns the assurance and audit status for this path.
 
 These structured details are schema-validated, but they are not a secret scrubber: reasoning, commands, output, diffs, tool data, URLs, prompts, and Codex-reported paths can contain sensitive project information. The activity history retains at most 160 records per room. Raw upstream notification JSON, unknown fields, environment/account/authentication state, token refreshes, token deltas, and streaming output deltas are not copied wholesale into room activity.
 
@@ -185,7 +187,7 @@ Open **Room settings → Encrypted room archives** to export the selected room. 
 
 ## Updates
 
-The app checks `https://multaiplayer.com/releases/latest.json` when the app shell mounts and shows an in-app banner when the manifest contains a newer version. A manifest with `security: true` is labelled **Security update available**. The banner opens the manifest's HTTPS download URL; the alpha does not download, install, or restart automatically. When a supported public build is available, it will be signed and notarized, published through GitHub Releases, and installed manually by the user. No supported public build has been published yet.
+The app checks `https://multaiplayer.com/releases/latest.json` when the app shell mounts and shows an in-app banner when the manifest contains a newer version. A manifest with `security: true` is labelled **Security update available**. The manifest's destination is accepted only when it is this repository's GitHub Releases path. The banner states that delivery is manual, links separately to the Sigstore/checksum verification procedure, and does not download, install, or restart the app. When a supported public build is available, it will be signed and notarized, published through GitHub Releases, and installed manually by the user. No supported public build has been published yet.
 
 ## Accessibility and localization
 

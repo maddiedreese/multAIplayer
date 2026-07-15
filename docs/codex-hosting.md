@@ -1,5 +1,7 @@
 # How Codex Hosting Works
 
+This document describes the Codex hosting mechanism. The [threat model](threat-model.md) is normative for security claims and trust assumptions.
+
 multAIplayer does not use the OpenAI API and does not borrow another user's ChatGPT or Codex subscription from a hosted website.
 
 Instead, a room has one active host. The host is a desktop user who has local access to:
@@ -61,7 +63,7 @@ The relay does see operational metadata needed to route the room:
 - plaintext attachment routing and descriptive metadata such as filename, MIME type, declared size, room id, epoch, and expiry; attachment contents remain exporter-encrypted;
 - GitHub OAuth session identity metadata when sign-in is enabled.
 
-GitHub access tokens are stored in the operating-system credential store behind the native Rust boundary. The relay observes a token only during verify-then-discard identity bootstrap; native code calls GitHub directly for draft PR creation and Actions reads. Host-local project paths and Codex model/tuning configuration are sent to room members only as RFC 9420 MLS-encrypted snapshots via `mls-rs`; multAIplayer's integration layer is unaudited.
+GitHub access tokens are stored in the operating-system credential store behind the native Rust boundary. The relay observes a token only during verify-then-discard identity bootstrap; native code calls GitHub directly for draft PR creation and Actions reads. Host-local project paths and Codex model/tuning configuration are encoded for room members as RFC 9420 MLS snapshots via `mls-rs`; the threat model owns the security and audit claims for that path.
 
 ## Host Handoff
 

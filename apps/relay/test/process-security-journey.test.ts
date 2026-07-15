@@ -321,7 +321,9 @@ async function scanRelay(relay: { dataPath: string }, wire: string[], forbidden:
 }
 
 if (rustToolchain.missing) {
-  test("skipped: Rust toolchain required", { skip: "Rust toolchain required" }, () => undefined);
+  test("native security journey requires the Rust production boundary", () => {
+    assert.fail("Rust is required; the security journey must fail rather than report skipped evidence");
+  });
 } else {
   test("native MLS, HPKE, Welcome, and exporter ciphertexts never persist relay plaintext", runSecurityJourney);
 }

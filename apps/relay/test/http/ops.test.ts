@@ -9,13 +9,18 @@ import {
   waitForClose,
   waitForJoined,
   waitForNotReady,
-  waitForStoredState
+  waitForStoredState,
+  writeFile
 } from "../support/relay.js";
 
 test("relay exposes content-free operational metrics", async () => {
   const metricsToken = "test-metrics-token-that-is-at-least-32-characters";
   const relay = await startRelay({ MULTAIPLAYER_RELAY_METRICS_TOKEN: metricsToken });
   try {
+    await writeFile(
+      `${relay.dataPath}.backup-evidence.json`,
+      JSON.stringify({ version: 1, status: "passed", completedAt: "2026-07-15T12:00:00.000Z" })
+    );
     const unauthorized = await fetch(`${relay.baseUrl}/metrics`);
     assert.equal(unauthorized.status, 401);
     assert.match(unauthorized.headers.get("www-authenticate") ?? "", /^Bearer /);
@@ -32,6 +37,12 @@ test("relay exposes content-free operational metrics", async () => {
     assert.match(body, /multaiplayer_relay_envelopes_published_total 0/);
     assert.match(body, /multaiplayer_relay_websocket_connection_attempts_total 0/);
     assert.match(body, /multaiplayer_relay_start_time_seconds \d+/);
+    assert.match(body, /multaiplayer_relay_sqlite_database_bytes [1-9]\d*/);
+    assert.match(body, /multaiplayer_relay_sqlite_wal_bytes \d+/);
+    assert.match(body, /multaiplayer_relay_sqlite_filesystem_available_bytes [1-9]\d*/);
+    assert.match(body, /multaiplayer_relay_sqlite_backup_last_success_timestamp_seconds 1784116800/);
+    assert.match(body, /multaiplayer_relay_rate_limit_allowed_total \d+/);
+    assert.match(body, /multaiplayer_relay_rate_limit_rejections_total \d+/);
   } finally {
     await relay.close();
   }

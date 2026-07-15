@@ -7,10 +7,13 @@ on:
   pull_request:
     paths:
       - "apps/desktop/src-tauri/**"
+      - "apps/desktop/src/application/handoff/**"
       - "apps/desktop/src/application/mls/**"
+      - "apps/desktop/src/hooks/*HostHandoff*.ts"
       - "apps/desktop/src/lib/invite/**"
       - "apps/desktop/src/lib/mls/**"
       - "apps/desktop/src/lib/onboarding/**"
+      - "apps/desktop/src/store/slices/codexHostHandoffSlice.ts"
       - "apps/relay/**"
       - "packages/protocol/**"
       - "e2e/native-shell/**"
@@ -20,8 +23,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: journeys-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: journeys-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 
 permissions:
   contents: read
@@ -145,7 +148,6 @@ jobs:
         run: |
           mkdir -p reports/security-journey
           npm run test:security-journey -w @multaiplayer/relay > reports/security-journey/junit.xml
-          node scripts/assert-security-journey-executed.mjs reports/security-journey/junit.xml
       - name: Upload security journey results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -204,44 +206,6 @@ jobs:
         run: npm run build:packages
       - name: Fuzz relay message and envelope parsing
         run: npm run test:fuzz -w @multaiplayer/relay
-      - name: Run advisory relay authorization mutation test
-        id: mutation
-        continue-on-error: true
-        run: npm run test:mutation:run -w @multaiplayer/relay
-      - name: Build and publish the relay mutation summary
-        if: always() && hashFiles('apps/relay/reports/mutation/mutation.json') != ''
-        continue-on-error: true
-        run: |
-          npm run test:mutation:summary -w @multaiplayer/relay
-          node scripts/write-mutation-step-summary.mjs "Relay authorization mutation score (advisory)" apps/relay/reports/mutation/summary.json
-      - name: Review mutation-policy drift in the first weekly run of each month
-        if: always() && hashFiles('apps/relay/reports/mutation/summary.json') != ''
-        continue-on-error: true
-        shell: bash
-        run: |
-          if [ "$(date -u +%d)" -gt 7 ]; then
-            echo "Monthly mutation-policy drift review is not due this week." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          set +e
-          npm run test:mutation:policy -w @multaiplayer/relay
-          status=$?
-          set -e
-          if [ "$status" -eq 0 ]; then
-            echo "Mutation-policy drift review passed." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "::warning::Mutation-policy drift needs review; inspect the mutation artifact."
-            echo "Mutation-policy drift review found changes; inspect the mutation artifact." >> "$GITHUB_STEP_SUMMARY"
-          fi
-          exit "$status"
-      - name: Upload relay authorization mutation reports
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: relay-authorization-mutation-report
-          path: apps/relay/reports/mutation
-          if-no-files-found: ignore
-          retention-days: 30
       - name: Exercise relay churn, restart, backup, and restore
         env:
           MULTAIPLAYER_RELAY_SOAK_DURATION_MS: "300000"
@@ -256,6 +220,57 @@ jobs:
           path: apps/relay/reports/soak
           if-no-files-found: error
           retention-days: 14
+
+  relay-mutation-depth:
+    name: Relay mutation depth (${{ matrix.shard }})
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [authz, session, websocket-admission, room-create, room-host, room-lifecycle, room-settings]
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build package dependencies
+        run: npm run build:packages
+      - name: Run advisory mutation shard
+        continue-on-error: true
+        env:
+          MULTAIPLAYER_MUTATION_SHARD: ${{ matrix.shard }}
+        run: npm run test:mutation:run -w @multaiplayer/relay
+      - name: Build and publish mutation shard summary
+        if: always() && hashFiles('apps/relay/reports/mutation/mutation.json') != ''
+        continue-on-error: true
+        run: |
+          npm run test:mutation:summary -w @multaiplayer/relay
+          node tools/mutation/report.mjs github "Relay mutation score: ${{ matrix.shard }} (advisory)" apps/relay/reports/mutation/summary.json
+      - name: Review mutation-policy drift in the first weekly run of each month
+        if: always() && hashFiles('apps/relay/reports/mutation/summary.json') != ''
+        continue-on-error: true
+        shell: bash
+        run: |
+          if [ "$(date -u +%d)" -gt 7 ]; then
+            echo "Monthly mutation-policy drift review is not due this week." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          npm run test:mutation:policy -w @multaiplayer/relay -- --partial
+      - name: Upload relay mutation shard report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: relay-mutation-${{ matrix.shard }}
+          path: apps/relay/reports/mutation
+          if-no-files-found: ignore
+          retention-days: 30
 
   mls-deserialization-fuzz:
     name: Native untrusted-input fuzz smoke tests

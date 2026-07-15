@@ -38,7 +38,7 @@ jobs:
           pipx install semgrep==1.127.1
           pipx runpip semgrep install --force-reinstall setuptools==80.9.0
       - name: Scan TypeScript and JavaScript
-        run: semgrep scan --error --config p/typescript --config p/nodejs --config p/owasp-top-ten apps packages scripts
+        run: semgrep scan --error --config p/typescript --config p/nodejs --config p/owasp-top-ten apps packages scripts e2e tools
 
   relay-container:
     name: Relay container vulnerabilities
@@ -66,9 +66,9 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Verify documented locked build inputs
-        run: node scripts/verify-reproducible-builds.mjs
+        run: node tools/release/verify-reproducible-builds.mjs
       - name: Rebuild and compare relay containers
-        run: node scripts/verify-relay-container-reproducibility.mjs
+        run: node tools/release/verify-relay-container-reproducibility.mjs
 
   npm-and-license-policy:
     name: npm advisories and license policy
@@ -153,7 +153,7 @@ jobs:
             version="$($codex --version | awk '{print $NF}')"
             echo "version=$version" >> "$GITHUB_OUTPUT"
             "$codex" app-server generate-json-schema --out "$RUNNER_TEMP/codex-schema"
-            node scripts/generate-codex-schema-manifest.mjs --schema-dir "$RUNNER_TEMP/codex-schema" --codex-version "$version" --out "$RUNNER_TEMP/latest-codex-manifest.json"
+            node tools/codex/generate-schema-manifest.mjs --schema-dir "$RUNNER_TEMP/codex-schema" --codex-version "$version" --out "$RUNNER_TEMP/latest-codex-manifest.json"
             node scripts/check-latest-codex-contract.mjs "$RUNNER_TEMP/latest-codex-manifest.json"
             node scripts/check-latest-codex-runtime.mjs "$codex"
           } 2>&1 | tee "$RUNNER_TEMP/codex-contract-result.txt"

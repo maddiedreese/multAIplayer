@@ -6,25 +6,7 @@ multAIplayer is an honest alpha. Please treat it as security-sensitive software 
 
 Security reports are welcome for the current `main` branch and latest published alpha release. Older alphas and unreleased branches are unsupported; upgrade or reproduce on `main` when possible.
 
-The intended security properties are:
-
-- the relay does not persist plaintext chat transcripts, plaintext attachments, Codex credentials, OpenAI credentials, repo contents, terminal output, file diffs, host-local project paths, Codex model configuration, or GitHub access tokens. It observes a GitHub token transiently during sign-in identity verification, then discards it; native pull-request and Actions calls go directly to GitHub;
-- room events are RFC 9420 MLS PrivateMessages, while attachments are encrypted with per-blob keys derived by the native MLS core;
-- active project paths and Codex model/tuning configuration are member-only `room.config` payloads; the relay receives MLS ciphertext and routing metadata, not those plaintext values;
-- MLS authenticated data binds canonical room, sender, event-kind, timestamp, message-id, and epoch routing fields;
-- invite approval binds an independent random single-use bearer capability to an authenticated requester, exact KeyPackage hash, and pinned host HPKE key before an MLS Add and Welcome are created;
-- membership changes use MLS Add and Remove commits, and both native clients and the relay enforce that only the active host can commit;
-- MLS signature and HPKE private keys, group state, exporter output, history secrets, and per-blob keys remain behind the Rust IPC boundary. Versioned identity and SQLCipher-wrapping keys use the operating-system credential store; SQLCipher also holds the durable copy of the latest validated room configuration used for retry;
-- retained exporter-derived history secrets intentionally preserve local history readability across epochs, so forward secrecy applies to live traffic rather than retained device-local history;
-- browser builds contain no preview workspace and do not initialize identity, relay, project, or MLS state;
-- GitHub access tokens remain behind the native Rust IPC boundary in the operating-system credential store and are excluded from webview state, room events, relay sessions, and diagnostics;
-- relay session cookies are high-entropy bearer tokens; persistence stores only their SHA-256 digests, identity metadata, and expiry, while legacy plaintext session-id rows are migrated and rewritten on startup;
-- production account deletion fails closed around an authenticated HMAC-pseudonymous external ledger: the tombstone commits before primary deletion, protected identities lose authenticated access immediately, and every startup reconciles the complete active ledger before listening;
-- production relays require authentication by default; unauthenticated relay mode is an explicit self-host opt-out.
-
-Remaining alpha limitations are documented in [docs/threat-model.md](docs/threat-model.md), especially retroactive erasure, recovery, and local-machine risk.
-
-Release-specific checks, journey evidence, and artifact trust notes are tracked in the [external review and engineering guide](docs/external-review-packet.md).
+The [threat model](docs/threat-model.md) is the only normative source for intended security properties, trust assumptions, relay-visible metadata, and residual risks. Please evaluate a report against that exact revision rather than summaries elsewhere. The [external review packet](docs/external-review-packet.md) maps its reviewer-facing scope to implementation evidence, and [CONTRIBUTING.md](CONTRIBUTING.md) owns CI, dependency, release, and relay operations.
 
 ## Reporting
 

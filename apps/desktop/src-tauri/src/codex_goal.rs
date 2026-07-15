@@ -186,6 +186,7 @@ fn run_codex_goal_request(
             cancelled: None,
             proposed_by: None,
             context_summary: None,
+            approved_project_root: None,
         };
         send_json_shared(
             &stdin,

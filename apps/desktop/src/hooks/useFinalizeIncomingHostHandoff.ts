@@ -5,7 +5,7 @@ import { createHandoffSettingsPatch } from "../lib/handoff/hostHandoff";
 import { updateRoomSettings } from "../application/workspace/workspaceClient";
 import { useAppStore } from "../store/appStore";
 import type { HostHandoffRecord } from "../types";
-import { buildAcceptedHandoffMessage, resolveHandoffProject } from "./hostHandoffHelpers";
+import { buildAcceptedHandoffMessage, resolveHandoffProject } from "../application/handoff/hostHandoffProject";
 
 interface Options {
   room: ClientRoomRecord;

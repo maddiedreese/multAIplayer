@@ -1,4 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { readFileSync, statfsSync, statSync } from "node:fs";
+import { dirname } from "node:path";
 import type { Express } from "express";
 import type { AttachmentBlobRecord } from "@multaiplayer/protocol";
 import type { ClientSession } from "../state.js";
@@ -43,12 +45,54 @@ export function registerOpsRoutes({
       res.status(401).type("text/plain").send("Unauthorized\n");
       return;
     }
-    const snapshot = metrics.snapshot(
-      sessions.size,
-      liveAttachmentBlobGauges(attachmentBlobs, isExpiredAttachmentBlob)
-    );
+    const snapshot = metrics.snapshot(sessions.size, {
+      ...liveAttachmentBlobGauges(attachmentBlobs, isExpiredAttachmentBlob),
+      ...sqliteOperationalGauges(dataPath)
+    });
     res.type("text/plain; version=0.0.4; charset=utf-8").send(relayMetricsToPrometheus(snapshot));
   });
+}
+
+interface BackupDrillEvidence {
+  status: "passed";
+  completedAt: string;
+}
+
+function sqliteOperationalGauges(dataPath: string) {
+  return {
+    sqliteDatabaseBytes: fileSize(dataPath),
+    sqliteWalBytes: fileSize(`${dataPath}-wal`),
+    sqliteFilesystemAvailableBytes: availableFilesystemBytes(dirname(dataPath)),
+    sqliteBackupLastSuccessTimestampSeconds: backupSuccessTimestamp(`${dataPath}.backup-evidence.json`)
+  };
+}
+
+function fileSize(path: string): number {
+  try {
+    return statSync(path).size;
+  } catch {
+    return 0;
+  }
+}
+
+function availableFilesystemBytes(path: string): number {
+  try {
+    const stats = statfsSync(path);
+    return Number(stats.bavail) * Number(stats.bsize);
+  } catch {
+    return 0;
+  }
+}
+
+function backupSuccessTimestamp(path: string): number {
+  try {
+    const candidate = JSON.parse(readFileSync(path, "utf8")) as Partial<BackupDrillEvidence>;
+    if (candidate.status !== "passed" || typeof candidate.completedAt !== "string") return 0;
+    const timestamp = Date.parse(candidate.completedAt) / 1000;
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  } catch {
+    return 0;
+  }
 }
 
 function authorizedMetricsRequest(authorization: string | undefined, expectedToken: string): boolean {

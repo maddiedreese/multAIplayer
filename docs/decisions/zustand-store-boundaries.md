@@ -14,7 +14,10 @@ Use one typed Zustand store composed from domain slices. A slice owns the canoni
 
 Components subscribe to the narrowest value they render, preferably a room-scoped entry selected by room id. Multi-field component subscriptions use shallow comparison when the selected object is recreated. Derived display data belongs beside its domain or in a focused selector/helper, not in a parallel view-model store.
 
-React hooks own subscriptions, effects, refs, and component-tree composition. Imperative action factories belong under `lib/` and read current actions through `useAppStore.getState()` at invocation time. This keeps relay routing and commands independent of render-time closures and makes them directly testable without a renderer.
+React hooks own subscriptions, effects, refs, and component-tree composition. Imperative action factories belong under
+`application/` and read current actions through `useAppStore.getState()` at invocation time. Slices contain synchronous
+state transitions only; ESLint rejects async functions and `await` inside `store/slices/`. This keeps relay routing and
+commands independent of render-time closures and makes them directly testable without a renderer.
 
 Effectful capabilities that cannot safely live in serializable store state—native backends, relay connections, and current refs—are passed explicitly at composition boundaries.
 
