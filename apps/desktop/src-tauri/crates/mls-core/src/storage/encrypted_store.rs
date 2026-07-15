@@ -150,8 +150,7 @@ impl EncryptedStore {
 
     pub fn delete_room_config(&self, room_id: &str) -> Result<(), StoreError> {
         validate_component(room_id)?;
-        self.application
-            .delete(&format!("room-config:{room_id}"))?;
+        self.application.delete(&format!("room-config:{room_id}"))?;
         Ok(())
     }
 
@@ -545,7 +544,10 @@ mod tests {
             .put_room_config("room-1", payload)
             .unwrap();
         let reopened = EncryptedStore::open(&path, key).unwrap();
-        assert_eq!(reopened.room_config("room-1").unwrap().as_deref(), Some(payload.as_slice()));
+        assert_eq!(
+            reopened.room_config("room-1").unwrap().as_deref(),
+            Some(payload.as_slice())
+        );
         reopened.delete_room_config("room-1").unwrap();
         assert_eq!(reopened.room_config("room-1").unwrap(), None);
     }
