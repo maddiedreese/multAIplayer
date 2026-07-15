@@ -4,6 +4,7 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import { registerRoomCreateRoute } from "../../src/http/room-create-route.js";
 import { registerAttachmentRoutes } from "../../src/http/attachments.js";
+import { registerTeamRoutes } from "../../src/http/teams.js";
 import { createRelayStore } from "../../src/state.js";
 
 const session = {
@@ -11,6 +12,47 @@ const session = {
   user: { id: "github:capacity", login: "capacity" },
   expiresAt: Date.now() + 60_000
 };
+
+test("team creation rolls back its quota and team when member capacity is exhausted", async () => {
+  const store = createRelayStore(2);
+  const app = express();
+  app.use(express.json());
+  registerTeamRoutes({
+    app,
+    store,
+    getAuthSession: () => session,
+    allowRead: () => true,
+    allowMutation: () => true,
+    teamIdsForUser: () => new Set(),
+    isTeamMember: () => false,
+    teamRoleRank: () => 0,
+    canSetTeamMemberRole: () => false,
+    canRemoveTeamMember: () => false,
+    transferTeamOwnership: (members) => members,
+    revokeTeamInvites: () => {},
+    revokeTeamMemberSessions: () => {},
+    broadcastWorkspaceUpdated: () => assert.fail("capacity rejection must not broadcast"),
+    broadcastRoomUpdated: () => assert.fail("capacity rejection must not broadcast"),
+    scheduleStoreSave: () => assert.fail("capacity rejection must happen before persistence"),
+    saveRelayStore: async () => assert.fail("capacity rejection must happen before persistence"),
+    normalizeMetadataText: boundedText,
+    maxTeamNameChars: 120
+  });
+  const server = await listen(app);
+  try {
+    const response = await fetch(`${baseUrl(server)}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "No capacity" })
+    });
+    assert.equal(response.status, 503);
+    assert.equal(store.teams.size, 0);
+    assert.equal(store.teamMembers.size, 0);
+    assert.equal(store.accountQuotaRecords.size, 0);
+  } finally {
+    await close(server);
+  }
+});
 
 test("room creation rolls back its durable quota when capacity rejects the room", async () => {
   const store = createRelayStore(2);

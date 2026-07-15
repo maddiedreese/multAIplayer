@@ -34,7 +34,7 @@ Start a private project room, invite people you trust, and work with Codex as a 
   <img src="docs/assets/screens/room-terminal.png" width="49%" alt="A live host-controlled development terminal shared with the room">
 </p>
 
-multAIplayer does not replace Codex's system or developer instructions and does not ship a custom Codex prompt. It connects to the standard open-source Codex app-server running on the active host. An approved room turn becomes ordinary Codex turn input: the app formats the selected conversation and attachments, and explicitly labels teammate, file, terminal, browser, and tool material as untrusted context.
+multAIplayer does not provide or replace Codex's system or developer instructions. It connects to the standard open-source Codex app-server running on the active host. An approved room turn becomes ordinary user-turn input: the app formats the selected conversation and attachments, and explicitly labels teammate, file, terminal, browser, and tool material as untrusted context.
 
 ## Independent project
 
