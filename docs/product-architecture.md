@@ -97,11 +97,11 @@ Project file search, file editing, Git status, diff reads, and Git remote infere
 
 Desktop git-status summaries are scoped per room/project. Switching rooms clears the visible status for the incoming room until its own local `git status` read completes, so changed-file counts, PR drafts, and diff summaries do not reuse another room's project state.
 
-The relay bounds metadata before storage and broadcast: team names, room names, WebSocket user/device identities, device ids, display names, live presence labels, host labels, avatar URLs, public key fingerprints, public key JWK blobs, project paths, and model ids all have explicit length limits and reject control characters where human-visible text is expected. Project paths are non-empty strings up to 2,048 characters, and model ids are known ids or model-like ids up to 80 characters.
+The relay bounds its remaining metadata before storage and broadcast: team names, room names, WebSocket user/device identities, device ids, display names, live presence labels, host labels, avatar URLs, public key fingerprints, and public key JWK blobs all have explicit length limits and reject control characters where human-visible text is expected. Project paths and Codex model/tuning fields are not relay metadata; native validation bounds them before the active host encrypts a complete MLS `room.config` snapshot.
 
-The desktop client mirrors those bounds before creating teams/rooms, changing project paths or model ids, and accepting host handoff settings, so most invalid metadata is caught locally before it reaches the relay.
+The desktop catches invalid values in the UI, and the native boundary authoritatively repeats `room.config` schema, size, and epoch checks before MLS encryption.
 
-When the active host changes approval policy, Codex model, project path, or browser profile persistence, the relay metadata updates for routing/sidebar freshness and the desktop also sends an encrypted `room.settings` activity event. Room members see a system transcript message after local decryption, while the relay cannot read the human-readable before/after activity text.
+When the active host changes settings, the desktop sends an encrypted `room.settings` activity event. Model, project-path, and Codex-tuning changes also publish a complete revisioned `room.config` snapshot; the relay never receives those plaintext values. Room members see a system transcript message after local decryption, while the relay cannot read the human-readable before/after activity text.
 
 ### Active Codex Host
 
@@ -216,15 +216,15 @@ Local preview sharing uses `cloudflared` on the active host's machine to create 
 
 ### GitHub And Git
 
-The relay-side GitHub proxy transiently receives the plaintext repository owner/name and explicit PR title/body/head/base needed to forward a user-approved PR operation, plus GitHub run metadata returned for Actions refreshes. It does not add those operation fields to relay persistence or structured logs by design. GitHub display identity and registered device display/public-key information are visible to authorized teammates through presence and roster surfaces.
+Native Rust calls GitHub directly for pull-request creation and Actions reads, repeats authoritative input/response validation, and keeps the token in macOS Keychain. The relay never receives repository-operation fields. It observes the token transiently only during exact-origin verify-then-discard identity bootstrap. GitHub display identity and registered device display/public-key information are visible to authorized teammates through presence and roster surfaces.
 
 GitHub is used for identity in v1.
 
-GitHub authentication uses OAuth Device Flow. The relay owns the polling device code and eventual access token; the desktop receives only the short user code, verification URL, expiry, and completion state needed for presentation. The blocking onboarding assistant renders those controls directly. ChatGPT authentication is unrelated: the desktop asks the local Codex app-server to start its supported browser or device flow, and Codex retains the resulting credentials. Join readiness requires relay access and GitHub identity, but Codex installation, ChatGPT authorization, and a project folder are deferrable until that device hosts Codex. Create readiness keeps those host prerequisites blocking.
+GitHub authentication uses OAuth Device Flow. Native Rust owns the polling device code and eventual Keychain token; the webview receives only an opaque flow id, short user code, verification URL, expiry, and completion state needed for presentation. The blocking onboarding assistant renders those controls directly. ChatGPT authentication is unrelated: the desktop asks the local Codex app-server to start its supported browser or device flow, and Codex retains the resulting credentials. Join readiness requires relay access and GitHub identity, but Codex installation, ChatGPT authorization, and a project folder are deferrable until that device hosts Codex. Create readiness keeps those host prerequisites blocking.
 
 Authentication navigation crosses a deliberately narrow native boundary. TypeScript allowlists exact HTTPS provider hosts and the GitHub device path; Rust independently revalidates provider, scheme, authority, path, bounds, and credential/port restrictions before the native opener launches the system default browser. Login ids, polling device codes, user codes, verification URLs, invite values, and account details are not onboarding persistence fields.
 
-GitHub OAuth is configurable through `GITHUB_OAUTH_SCOPES`, and the app displays the active scopes in Account settings. The official/default configuration is `read:user repo` so GitHub workflows can operate on both public and private repositories. GitHub's `repo` scope grants broad access to repositories the signed-in user can access; public-only self-hosters may narrow it to `read:user public_repo`.
+The native alpha build owns the `read:user repo` scopes so GitHub workflows can operate on both public and private repositories. GitHub's `repo` scope grants broad access to repositories the signed-in user can access. The public client id and exact relay HTTPS origin are compile-time native configuration; there is no client secret or relay-side scope override.
 
 Git operations in v1:
 
@@ -236,7 +236,7 @@ Git operations in v1:
 - every commit, push, and PR action requires explicit host approval;
 - Git workflow progress, results, and GitHub Actions refreshes are shared as MLS application events, so peers can see branch, commit, push, PR, and CI outcomes without the relay seeing plaintext output or event kind.
 
-GitHub Actions are a room-visible branch status surface. After GitHub sign-in, workflow runs can be refreshed for the selected owner, repo, and branch while the room is unlocked. The desktop validates the owner, repo, and branch target before calling the relay-side GitHub proxy or publishing a room-visible Actions event. The loaded runs, last-checked timestamp, and status message are scoped to the current room so switching projects does not show another room's CI state. The UI summarizes whether the loaded runs are passing, failing, running, or unknown, and links directly to each run on GitHub.
+GitHub Actions are a room-visible branch status surface. After GitHub sign-in, workflow runs can be refreshed for the selected owner, repo, and branch while the room is unlocked. The native desktop validates the owner, repo, and branch target before calling GitHub directly or publishing a room-visible Actions event. The loaded runs, last-checked timestamp, and status message are scoped to the current room so switching projects does not show another room's CI state. The UI summarizes whether the loaded runs are passing, failing, running, or unknown, and links directly to each run on GitHub.
 
 When a room has an attached local project with a GitHub `origin` remote, the desktop infers the draft PR and Actions owner/repo target from that read-only git remote lookup. Manual owner/repo fields remain available and are not overwritten after the host edits them.
 
@@ -265,7 +265,7 @@ The official relay stores account metadata and encrypted room metadata, but not 
 The relay may store:
 
 - GitHub user id, username, avatar URL;
-- AES-GCM encrypted GitHub session access tokens when relay session persistence is configured;
+- token-free GitHub identity sessions;
 - device MLS signature and HPKE public keys and fingerprints;
 - public single-use KeyPackages and invite metadata;
 - opaque MLS messages, sealed requests, and Welcome blobs until pruned;
@@ -279,7 +279,8 @@ The relay must not store:
 - plaintext transcripts;
 - Codex tokens;
 - OpenAI credentials;
-- plaintext GitHub access tokens;
+- GitHub access tokens;
+- host-local project paths and Codex model/tuning configuration;
 - repo contents;
 - plaintext attachments;
 - terminal output in plaintext.

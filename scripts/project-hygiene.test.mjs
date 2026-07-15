@@ -165,6 +165,15 @@ test("release operations remain consolidated in one living runbook", () => {
   }
 });
 
+test("the hosted relay stays warm instead of scaling to zero", () => {
+  const railwayConfig = readJson("railway.json");
+  assert.equal(
+    railwayConfig.deploy?.sleepApplication,
+    false,
+    "Railway Serverless sleeping would add a cold start to the first relay request"
+  );
+});
+
 test("release-facing version metadata stays synchronized", () => {
   for (const path of workspaceManifestPaths) {
     const manifest = readJson(path);

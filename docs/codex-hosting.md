@@ -49,12 +49,11 @@ The relay routes metadata and ciphertext. It should not receive:
 - repo files or diffs;
 - terminal output;
 - browser page contents;
-- plaintext GitHub access tokens.
+- GitHub access tokens.
 
 The relay does see operational metadata needed to route the room:
 
 - team and room ids/names;
-- room project path labels;
 - host labels and status;
 - device public keys and fingerprints;
 - invite ids and expiry metadata;
@@ -62,7 +61,7 @@ The relay does see operational metadata needed to route the room:
 - plaintext attachment routing and descriptive metadata such as filename, MIME type, declared size, room id, epoch, and expiry; attachment contents remain exporter-encrypted;
 - GitHub OAuth session identity metadata when sign-in is enabled.
 
-GitHub access tokens are used server-side only for identity, draft PR creation, and Actions reads. With `MULTAIPLAYER_RELAY_SESSION_SECRET` configured, stored tokens are encrypted at rest in the relay store. Without that secret, sessions are memory-only.
+GitHub access tokens are stored in the operating-system credential store behind the native Rust boundary. The relay observes a token only during verify-then-discard identity bootstrap; native code calls GitHub directly for draft PR creation and Actions reads. Host-local project paths and Codex model/tuning configuration are sent to room members only as MLS-encrypted snapshots.
 
 ## Host Handoff
 

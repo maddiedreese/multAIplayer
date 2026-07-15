@@ -58,8 +58,6 @@ Run it with a persistent `/data` mount and the same environment that passes `npm
 ```bash
 docker run --rm -p 4321:4321 \
   -v multaiplayer-relay-data:/data \
-  -e GITHUB_CLIENT_ID=your_client_id \
-  -e MULTAIPLAYER_RELAY_SESSION_SECRET=replace_with_at_least_32_chars \
   -e MULTAIPLAYER_RELAY_METRICS_TOKEN=replace_with_a_different_32_char_token \
   -e MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://your-app.example \
   -e MULTAIPLAYER_RELAY_REQUIRE_AUTH=true \
@@ -102,7 +100,7 @@ MULTAIPLAYER_RELAY_STORAGE=sqlite
 MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
 ```
 
-SQLite uses WAL mode and immediate, incremental transactions against normalized relay tables for teams, rooms, invites, device public keys, KeyPackages, opaque MLS backlog, sealed attachment blobs, team membership, and encrypted GitHub sessions. Each in-memory entity mutation is tracked as an explicit row upsert or delete; steady-state writes do not encode, clear, or rewrite the full relay store. MLS message, receipt, room-epoch, and related entity changes share one transaction, including the compare-and-swap transition that accepts only one Commit for an expected room epoch. Full-state encoding remains only at the JSON compatibility and one-time JSON-to-SQLite migration boundaries. SQLite is the required alpha storage backend for hosted relays because it removes the debounced whole-file crash window and scales writes with the changed entities. JSON storage remains an explicit compatibility option for local development and migration; it is never selected implicitly.
+SQLite uses WAL mode and immediate, incremental transactions against normalized relay tables for teams, rooms, invites, device public keys, KeyPackages, opaque MLS backlog, sealed attachment blobs, team membership, and token-free GitHub identity sessions. Each in-memory entity mutation is tracked as an explicit row upsert or delete; steady-state writes do not encode, clear, or rewrite the full relay store. MLS message, receipt, room-epoch, and related entity changes share one transaction, including the compare-and-swap transition that accepts only one Commit for an expected room epoch. Full-state encoding remains only at the JSON compatibility and one-time JSON-to-SQLite migration boundaries. SQLite is the required alpha storage backend for hosted relays because it removes the debounced whole-file crash window and scales writes with the changed entities. JSON storage remains an explicit compatibility option for local development and migration; it is never selected implicitly.
 
 The relay still hydrates durable state into one process-local store at startup. Run one relay writer per SQLite database; general multi-instance coordination is not claimed until reads and all compare-and-swap mutations move behind a shared database service. Horizontal deployments also require shared rate limiting and attachment-storage coordination.
 
@@ -119,26 +117,21 @@ The alpha store contains:
 - public single-use MLS KeyPackages;
 - opaque MLS messages, sealed invite requests, and Welcome blobs;
 - exporter-sealed attachment blobs and metadata;
-- encrypted GitHub session access tokens, only when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured.
+- token-free GitHub identity sessions and their expiration.
 
 It does not contain:
 
 - plaintext chat transcripts;
 - Codex credentials;
 - OpenAI credentials;
-- plaintext GitHub access tokens;
+- GitHub access tokens;
+- host-local project paths and Codex model/tuning configuration;
 - repo files;
 - terminal output in plaintext.
 
-GitHub sign-in sessions are memory-only unless the relay has a session secret. To keep users signed in across relay restarts, configure a high-entropy secret and keep it stable:
+The native desktop owns GitHub Device Flow and stores the access token in the operating-system credential store. At sign-in it sends the token once over TLS to the relay's `/auth/github/verify` endpoint. The relay verifies `/user`, creates its ordinary token-free identity session, and discards the token. Pull-request creation and Actions reads go from native code directly to GitHub. `MULTAIPLAYER_RELAY_SESSION_SECRET`, relay-side OAuth scope configuration, device start/poll routes, and GitHub proxy routes no longer exist.
 
-```bash
-MULTAIPLAYER_RELAY_SESSION_SECRET=$(openssl rand -base64 32)
-```
-
-With this set, the relay encrypts GitHub session access tokens with AES-GCM before writing them to the configured relay store and prunes expired sessions on load and save. The secret must be at least 32 characters; shorter values are ignored and durable sessions stay disabled. If the secret is missing, sessions are not persisted and restarting the relay signs users out. If the secret changes, previously stored sessions cannot be decrypted and users must sign in again. Plaintext access tokens in the relay store are ignored.
-
-The desktop Account drawer reads `/auth/config` and shows whether the connected relay is using encrypted-at-rest sessions or memory-only sessions.
+A self-built desktop pins its public OAuth client id and exact relay HTTPS origin at compile time with `MULTAIPLAYER_NATIVE_GITHUB_CLIENT_ID` and `MULTAIPLAYER_NATIVE_RELAY_HTTP_ORIGIN`. No client secret is used. The current native grant is fixed to `read:user repo`; changing it requires a deliberately reviewed native build rather than a relay environment change.
 
 The encrypted reconnect backlog is pruned by both count and age:
 
@@ -282,35 +275,21 @@ Origin entries are normalized to bare origins by the relay. `https://multaiplaye
 
 ## GitHub OAuth
 
-The alpha relay supports GitHub device-code OAuth. This works well for the desktop app because users can sign in through a browser without the desktop app needing to receive an OAuth redirect.
-
-Create a GitHub OAuth app, enable its **Device Flow** setting, then start the relay with its client id. The device flow does not use a client secret or callback URL:
+The native desktop supports GitHub device-code OAuth. This works well because users can sign in through a browser without the desktop app receiving an OAuth redirect. Create a GitHub OAuth app, enable **Device Flow**, and compile the self-hosted desktop with its public client id and the exact relay origin:
 
 ```bash
-GITHUB_CLIENT_ID=your_client_id npm run dev:relay
+MULTAIPLAYER_NATIVE_GITHUB_CLIENT_ID=your_client_id \
+MULTAIPLAYER_NATIVE_RELAY_HTTP_ORIGIN=https://relay.example.com \
+npm run tauri:build
 ```
 
-By default the relay requests:
-
-```bash
-GITHUB_OAUTH_SCOPES="read:user repo"
-```
-
-That authorizes identity plus GitHub workflows for both public and private repositories. GitHub's `repo` scope grants broad access to repositories the signed-in user can access. If this relay will only work with public repositories, narrow it to:
-
-```bash
-GITHUB_OAUTH_SCOPES="read:user public_repo"
-```
-
-The app shows the relay-advertised scopes in the Account drawer so users can see what the self-hosted relay is asking GitHub to authorize.
+No client secret is embedded or required. The native alpha requests `read:user repo`, authorizing identity plus GitHub workflows for both public and private repositories. GitHub's `repo` scope grants broad access to repositories the signed-in user can access.
 
 While authorization is pending, the desktop polls at GitHub's advertised interval. It increases that interval when GitHub asks it to slow down and stops when the device code expires, is denied, or GitHub returns another terminal error. Users must start sign-in again after a terminal error.
 
-GitHub access tokens stay on the relay and are used only for identity, draft pull request creation, and Actions run reads. The relay does not return tokens to desktop clients, does not persist plaintext tokens, and normalizes successful/error responses from GitHub before returning them so arbitrary upstream fields are not relayed into the app.
+GitHub access tokens stay behind the native Rust IPC boundary. Native commands repeat repository, branch, request-size, response-size, text, and GitHub URL validation before returning bounded results to the webview. The relay never receives PR bodies, repository targets, or Actions responses. Structured relay request logs record only method, route path without its query string, status, duration, and a bounded request id; they do not record request bodies or the transient verification token. GitHub remains a separate processor of the data sent to its API.
 
-For draft pull requests, the relay transiently receives the repository owner/name, title, body, head/base branches, and draft flag and forwards them to GitHub. For Actions reads, it transiently receives the repository owner/name and optional branch and returns a bounded normalized subset of GitHub run metadata. These request and response fields are not written to relay persistence. Structured relay request logs record only method, route path without its query string, status, duration, and a bounded request id; they do not record request bodies, GitHub tokens, repository query values, PR text, or upstream response bodies. GitHub remains a separate processor of the data sent to its API.
-
-The relay has no separate user-profile or billing-account table. A signed-in user can call `DELETE /auth/account` with JSON `{ "confirmation": "delete my account" }`; the desktop exposes this as a destructive Account action. Deletion is blocked with `409 account_deletion_blocked` until the user transfers or deletes every team they own and hands off every non-deleted room they host. Before primary deletion, the relay commits an authenticated pseudonymous tombstone to its external deletion ledger. It then removes all of that GitHub identity's encrypted OAuth sessions, process-local device sessions and challenges, registered devices, unused KeyPackages, team memberships, creator-owned unused invites, pending invite admission artifacts, and identity/session quota records from primary or process-local state. It removes and broadcasts room presence, closes live relay connections, and clears the browser cookie. It also removes the identity from trusted-approver lists and removes host identity metadata from already-deleted rooms. If primary persistence fails after the tombstone commits, the response is `202` pending, the identity is immediately denied authenticated access, and startup reconciliation retries deletion before the relay listens. The primary rollback preserves unrelated concurrent mutations without reopening access.
+The relay has no separate user-profile or billing-account table. A signed-in user can call `DELETE /auth/account` with JSON `{ "confirmation": "delete my account" }`; the desktop exposes this as a destructive Account action. Deletion is blocked with `409 account_deletion_blocked` until the user transfers or deletes every team they own and hands off every non-deleted room they host. Before primary deletion, the relay commits an authenticated pseudonymous tombstone to its external deletion ledger. It then removes all of that GitHub identity's token-free relay sessions, process-local device sessions and challenges, registered devices, unused KeyPackages, team memberships, creator-owned unused invites, pending invite admission artifacts, and identity/session quota records from primary or process-local state. The native app separately deletes its Keychain token when it clears the signed-in workspace. It removes and broadcasts room presence, closes live relay connections, and clears the browser cookie. It also removes the identity from trusted-approver lists and removes host identity metadata from already-deleted rooms. If primary persistence fails after the tombstone commits, the response is `202` pending, the identity is immediately denied authenticated access, and startup reconciliation retries deletion before the relay listens. The primary rollback preserves unrelated concurrent mutations without reopening access.
 
 Deletion does not rewrite shared team or room records, MLS ciphertext and its sender/routing metadata, encrypted attachments, or accepted-message receipts. Those records remain available to collaborators and follow their ordinary configured retention because rewriting them would break shared encrypted history, downloads, replay/idempotency protection, or MLS state. Deleting relay data does not erase encrypted data already stored on a user's Macs, revoke the OAuth grant at GitHub, or selectively purge an operator's existing backups. Users remove local history with the app's per-room local controls and may revoke the OAuth grant in GitHub settings.
 
@@ -332,7 +311,7 @@ VITE_ALLOW_RELAY_CONFIGURATION=true
 
 The first two env vars define the packaged defaults; `VITE_ALLOW_RELAY_CONFIGURATION=true` exposes the endpoint controls in Settings. Official packaged builds pin their hosted endpoints, hide these controls, and do not allow localhost relay access. A custom self-hosted relay origin requires a self-built desktop app with `apps/desktop/src-tauri/tauri.conf.json` updated so `connect-src` includes both the relay HTTP origin and the matching WebSocket origin. The override is stored locally on that device.
 
-The alpha relay supports durable encrypted signed-in sessions when `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured. Hosted and internet-facing deployments should use SQLite and should add backup/restore drills, token-rotation operations, and shared/external rate limiting before making production or multi-instance claims.
+The alpha relay stores durable token-free signed-in sessions in its configured state store. Hosted and internet-facing deployments should use SQLite and should add backup/restore drills and shared/external rate limiting before making production or multi-instance claims.
 
 ## Migrating From The Hosted Relay
 

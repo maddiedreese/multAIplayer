@@ -27,7 +27,7 @@ Use the profile drawer to sign in with GitHub, sign out, inspect relay auth sett
 
 The same drawer has host-local Codex controls. It can show the local Codex account, apps, and MCP authentication status; start Codex browser/device login or MCP OAuth; and set the device-wide app approval default to `auto`, `prompt`, or supported `writes`. These controls use the host's local app-server and persistent Codex config. They are not shared room settings, and Codex tokens, login refresh data, and raw account/app/MCP responses never enter room events or room history.
 
-GitHub sign-in is used for identity, draft pull requests, and GitHub Actions reads. The relay keeps GitHub access tokens server-side; desktop clients do not receive those tokens.
+GitHub sign-in is used for identity, draft pull requests, and GitHub Actions reads. Native Rust stores the access token in macOS Keychain and calls GitHub directly; the webview never receives it. The relay observes it once during sign-in identity verification and immediately discards it.
 
 GitHub sign-in opens the operating system's default browser at GitHub's device-verification page and displays the short user code in the app. There is no redirect URI back to multAIplayer; the relay polls GitHub and the app observes completion. ChatGPT sign-in is a different browser or device-code flow owned by the local Codex app-server. Neither provider's credentials are exchanged with the other.
 

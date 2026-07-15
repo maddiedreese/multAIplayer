@@ -17,6 +17,8 @@ The same gate scans every serialized wire artifact for the stable canary strings
 
 The journey verifies that non-host and stale-epoch Commits fail closed and that relay SQLite, WAL, and SHM files do not contain application plaintext, private KeyPackage material, Welcome secrets, or exporter-derived values. CI publishes the JUnit result as the `security-journey-results` artifact.
 
+The migration regression set extends that scan with synthetic GitHub-token, project-path, and Codex-model sentinels. Relay auth tests exercise verify-then-discard success, token-shape rejection, upstream failure, token-free session serialization, and legacy token-field stripping. Native Rust tests exercise pinned client/scopes/origin, redirect refusal, Keychain abstraction, bounded GitHub request/response normalization, and absence of credentials from command results and diagnostics. Room-config tests exercise native schema/epoch bounds, active-host sender checks, highest epoch/revision convergence, post-Add and recovery re-emission, config-pending joiners, handoff, removed-member exclusion, legacy HTTP rejection, and active SQLite/WAL/SHM purge. Provider calls and a real macOS Keychain grant are still external/manual boundaries; dummy credentials and injected HTTP/keyring adapters are used in automation.
+
 Run it locally with:
 
 ```sh

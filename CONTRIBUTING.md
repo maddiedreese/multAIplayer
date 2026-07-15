@@ -27,7 +27,7 @@ npm run dev
 
 The first-contribution target is `npm run verify:web`; it does not require native macOS packaging. Start with the [architecture walkthrough](docs/architecture-walkthrough.md), then choose one of the live `good first issue` tickets linked from `.github/good-first-issues/`. Each ticket names its starting files, acceptance criteria, and focused checks. Comment before starting to avoid duplicated work.
 
-Use `npm run tauri:dev` when you need the native Tauri app. A normal browser shows only the native-app notice and cannot initialize workspace, identity, relay, project, diagnostic, or MLS behavior. Copy `.env.example` to `.env` and configure `GITHUB_CLIENT_ID` when testing GitHub authentication or authenticated relay workflows.
+Use `npm run tauri:dev` when you need the native Tauri app. A normal browser shows only the native-app notice and cannot initialize workspace, identity, relay, project, diagnostic, or MLS behavior. GitHub authentication uses the public client id and exact relay origin compiled into native Rust; no client secret is required. Use the documented native compile-time overrides only when testing a deliberate self-hosted OAuth/relay pairing.
 
 The supported alpha desktop release target is macOS. Tauri produces only `.app` and `.dmg` bundles, matching CI and the release workflow; Windows and Linux bundles are not currently tested or published.
 

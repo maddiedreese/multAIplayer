@@ -56,8 +56,8 @@ Alongside chat and Codex, the room brings together project files and diffs, term
 A room is for people you trust to collaborate on the active host's project. Members can see the context the host shares and can request actions involving the project, terminal, Git, GitHub, and Codex session. The active host stays responsible for reviewing approvals and choosing the access Codex receives.
 
 - Chat, shared Codex activity, and attachments travel through RFC 9420 MLS encryption owned by the native Rust boundary.
-- The relay coordinates rooms and membership. It is designed not to receive plaintext chat, attachment contents, project files, terminal output, or Codex/OpenAI credentials.
-- GitHub sign-in requests `read:user repo` so repository workflows can work with both public and private repositories the user can access. Local Git uses the host's existing credentials.
+- The relay coordinates rooms and membership. It is designed not to receive plaintext chat, attachment contents, project files, host-local project paths, Codex model configuration, terminal output, or Codex/OpenAI credentials.
+- GitHub sign-in requests `read:user repo` so repository workflows can work with both public and private repositories the user can access. The native app keeps the token in macOS Keychain and calls GitHub directly for pull requests and Actions; the relay observes it only during sign-in identity verification and immediately discards it. Local Git uses the host's existing credentials.
 - Invite links contain a private, single-use bearer capability in the URL fragment. Share the complete link only through a private channel; never paste it into an issue, log, diagnostic, or support request.
 - This is alpha software. Its encryption and host-authority boundaries have extensive automated test coverage, but they have not received an independent professional security audit.
 
@@ -82,7 +82,7 @@ npm run doctor
 npm run tauri:dev
 ```
 
-Set `GITHUB_CLIENT_ID` in `.env` to use GitHub sign-in. A stable `MULTAIPLAYER_RELAY_SESSION_SECRET` keeps encrypted OAuth sessions readable across relay restarts. The root development command starts the local relay and the frontend used by Tauri. multAIplayer is a native app; opening the development URL in a normal browser shows only an install notice.
+GitHub sign-in uses the public OAuth client id embedded in the native build; no client secret is required or supported. Self-built native clients can override the client id and pinned relay origin at compile time as documented in [Self-hosting](docs/self-hosting.md). The root development command starts the local relay and the frontend used by Tauri. multAIplayer is a native app; opening the development URL in a normal browser shows only an install notice.
 
 Useful verification commands:
 
@@ -100,7 +100,7 @@ npm run verify
 | --- | --- |
 | `apps/desktop` | React desktop UI and the Tauri/Rust native boundary |
 | `apps/desktop/src-tauri/crates/mls-core` | MLS lifecycle, HPKE invites, encrypted state, and history/blob exporters |
-| `apps/relay` | Authenticated HTTP/WebSocket relay, persistence, quotas, and GitHub proxy |
+| `apps/relay` | Authenticated HTTP/WebSocket relay, identity verification, persistence, and quotas |
 | `packages/protocol` | Shared wire records and runtime validation |
 | `packages/codex` | Codex app-server client and compatibility contract |
 | `packages/git`, `packages/github` | Host-side Git and GitHub adapters |

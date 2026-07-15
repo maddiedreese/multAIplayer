@@ -36,7 +36,7 @@ Universal-link routing is an operating-system and signed-release boundary. Parse
 
 ### How do GitHub and ChatGPT sign-in differ?
 
-GitHub Device Flow identifies the workspace member. The app shows a short code and opens GitHub in the system browser while the relay polls for completion; GitHub's access token remains relay-side. ChatGPT authorizes the local Codex app-server and can use a browser or device-code flow; its credentials remain under Codex's local credential management. The assistant displays both flows in place, but does not persist their codes, URLs, login ids, or account details.
+GitHub Device Flow identifies the workspace member. The native app shows a short code, opens GitHub in the system browser, polls for completion, and stores the token in macOS Keychain. It sends the token once over TLS so the relay can verify the GitHub identity, after which the relay discards it. ChatGPT authorizes the local Codex app-server and can use a browser or device-code flow; its credentials remain under Codex's local credential management. The assistant displays both flows in place, but does not persist their codes, URLs, login ids, or account details.
 
 Provider URLs are checked twice before native navigation: TypeScript accepts only the expected HTTPS GitHub or OpenAI hosts, and Rust independently repeats the provider-specific validation before using the operating system's default-browser opener. A browser-open failure leaves an explicit copy-link fallback rather than silently stranding setup.
 
@@ -58,14 +58,13 @@ The relay can see the metadata it needs for authentication, membership, routing,
 - Team and room identifiers and names
 - Membership, roles, host status, and live presence
 - Device identifiers, registered public keys, and public-key fingerprints
-- Project path labels stored in room metadata
-- Selected model identifiers and certain room configuration values
+- Relay-visible approval and browser-policy settings
 - Invite identifiers, expiration data, and other invite metadata
 - MLS message classes, sender and device identifiers, timestamps, epoch hints, and opaque message sizes
 - Attachment blob names, MIME types, declared sizes, epochs, expiration data, and storage usage; blob contents remain sealed
 - Operational counters, rate-limit data, request identifiers, and connection information
 
-The relay is designed not to persist plaintext room messages, attachment contents, project files, file diffs, terminal output, browser contents, Codex credentials, OpenAI credentials, MLS private state, group secrets, exporter output, retained history secrets, or plaintext GitHub access tokens. One deliberate exception to “does not receive project content” is the authenticated GitHub proxy: when you explicitly create a pull request, it transiently receives and forwards the repository owner/name and PR title/body/head/base; Actions refreshes also pass GitHub run metadata through it. Those fields are not added to relay storage or logs by design. GitHub access tokens remain relay-side for identity and GitHub integrations, and they are encrypted before persistent storage when the relay is configured with a strong session secret. Authorized teammates can see GitHub display identity, avatar, device labels, and public device fingerprints in presence and roster surfaces.
+The relay is designed not to persist plaintext room messages, attachment contents, project files, host-local project paths, Codex model/tuning configuration, file diffs, terminal output, browser contents, Codex credentials, OpenAI credentials, MLS private state, group secrets, exporter output, retained history secrets, or GitHub access tokens. The native app stores the GitHub token in macOS Keychain and calls GitHub directly for pull requests and Actions. The relay observes the token only during sign-in identity verification and immediately discards it. Authorized teammates can see GitHub display identity, avatar, device labels, and public device fingerprints in presence and roster surfaces.
 
 This is an intended and tested architecture boundary, not an independently audited guarantee. See the [Threat model](threat-model.md) for the detailed inventory.
 
@@ -146,7 +145,7 @@ A scheduled compatibility job installs the latest Codex CLI, generates its schem
 
 GitHub currently serves two related purposes: room identity and the project's built-in GitHub workflow.
 
-The relay uses GitHub Device Flow to identify users and scope team and room metadata. The same relay-side session supports draft pull-request creation and GitHub Actions status without exposing the access token to desktop clients. The official hosted grant is `read:user repo`: `read:user` provides identity, while GitHub's broad `repo` scope covers both public and private repositories the signed-in user can access. Self-hosters that need public repositories only may narrow their own OAuth configuration to `read:user public_repo`.
+The native app uses GitHub Device Flow to identify users, then the relay verifies that identity and creates a token-free session for team and room access. The native Rust boundary also creates draft pull requests and reads GitHub Actions without exposing the access token to the webview or relay proxy. The alpha grant is `read:user repo`: `read:user` provides identity, while GitHub's broad `repo` scope covers both public and private repositories the signed-in user can access.
 
 Using one provider keeps the alpha's identity, authorization, PR, and Actions surfaces small enough to review and operate. It also matches the current audience of software teams working in Git repositories hosted on GitHub.
 

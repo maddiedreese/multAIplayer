@@ -8,7 +8,7 @@ Security reports are welcome for the current `main` branch and latest published 
 
 The intended security properties are:
 
-- the relay does not persist plaintext chat transcripts, plaintext attachments, Codex credentials, OpenAI credentials, repo contents, terminal output, file diffs, or plaintext GitHub access tokens. Its authenticated GitHub proxy necessarily receives and forwards the plaintext repository owner/name, pull-request title/body/head/base, and Actions metadata involved in an explicit GitHub operation; those transient fields are not added to relay storage or logs by design;
+- the relay does not persist plaintext chat transcripts, plaintext attachments, Codex credentials, OpenAI credentials, repo contents, terminal output, file diffs, host-local project paths, Codex model configuration, or GitHub access tokens. It observes a GitHub token transiently during sign-in identity verification, then discards it; native pull-request and Actions calls go directly to GitHub;
 - room events are RFC 9420 MLS PrivateMessages, while attachments are encrypted with per-blob keys derived by the native MLS core;
 - MLS authenticated data binds canonical room, sender, event-kind, timestamp, message-id, and epoch routing fields;
 - invite approval binds an independent random single-use bearer capability to an authenticated requester, exact KeyPackage hash, and pinned host HPKE key before an MLS Add and Welcome are created;
@@ -16,7 +16,7 @@ The intended security properties are:
 - MLS signature and HPKE private keys, group state, exporter output, history secrets, and per-blob keys remain behind the Rust IPC boundary and are stored with the operating-system credential store plus SQLCipher;
 - retained exporter-derived history secrets intentionally preserve local history readability across epochs, so forward secrecy applies to live traffic rather than retained device-local history;
 - browser builds contain no preview workspace and do not initialize identity, relay, project, or MLS state;
-- GitHub session persistence is memory-only unless a strong `MULTAIPLAYER_RELAY_SESSION_SECRET` is configured, in which case access tokens are encrypted at rest;
+- GitHub access tokens remain behind the native Rust IPC boundary in the operating-system credential store and are excluded from webview state, room events, relay sessions, and diagnostics;
 - production account deletion fails closed around an authenticated HMAC-pseudonymous external ledger: the tombstone commits before primary deletion, protected identities lose authenticated access immediately, and every startup reconciles the complete active ledger before listening;
 - production relays require authentication by default; unauthenticated relay mode is an explicit self-host opt-out.
 

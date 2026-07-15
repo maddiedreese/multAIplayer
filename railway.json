@@ -16,6 +16,7 @@
     ]
   },
   "deploy": {
+    "sleepApplication": false,
     "healthcheckPath": "/healthz",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ALWAYS",
