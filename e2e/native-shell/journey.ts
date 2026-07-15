@@ -269,11 +269,13 @@ for _ in $(seq 1 100); do
       xdotool type --clearmodifiers --delay 1 -- "$HANDOFF_PROJECT_ROOT"
       xdotool key --clearmodifiers Return
       sleep 0.5
-      # GTK labels this confirmation action Select or Open depending on the
-      # available portal. Exercise its mnemonic instead of relying on focus.
-      xdotool key --clearmodifiers alt+s 2>/dev/null || true
-      sleep 0.3
-      xdotool key --clearmodifiers alt+o 2>/dev/null || true
+      eval "$(xdotool getwindowgeometry --shell "$current_window")"
+      echo "native handoff folder chooser geometry: ${WIDTH}x${HEIGHT}"
+      # GTK's affirmative Select/Open button is the rightmost control in the
+      # bottom action row. Move relative to the dialog and use a real XTest
+      # pointer event; GTK rejects targeted synthetic key events under Xvfb.
+      xdotool mousemove --sync --window "$current_window" "$((WIDTH - 52))" "$((HEIGHT - 29))"
+      xdotool click 1
       for _ in $(seq 1 20); do
         if ! xdotool getwindowname "$current_window" >/dev/null 2>&1; then
           echo "native handoff folder chooser closed"
