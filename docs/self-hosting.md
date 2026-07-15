@@ -129,7 +129,7 @@ It does not contain:
 - repo files;
 - terminal output in plaintext.
 
-The native desktop owns GitHub Device Flow and stores the access token in the operating-system credential store. At sign-in it sends the token once over TLS to the relay's `/auth/github/verify` endpoint. The relay verifies `/user`, creates its ordinary token-free identity session, and discards the token. Pull-request creation and Actions reads go from native code directly to GitHub. `MULTAIPLAYER_RELAY_SESSION_SECRET`, relay-side OAuth scope configuration, device start/poll routes, and GitHub proxy routes no longer exist.
+The native desktop owns GitHub Device Flow and stores the access token in the operating-system credential store. At sign-in it sends the token once over TLS to the relay's `/auth/github/verify` endpoint. The relay verifies `/user`, creates its ordinary token-free identity session, and discards the token. Pull-request creation and Actions reads go from native code directly to GitHub. The former relay OAuth client/scope and token-encryption configuration, device start/poll routes, and GitHub proxy routes no longer exist.
 
 A self-built desktop pins its public OAuth client id and exact relay HTTPS origin at compile time with `MULTAIPLAYER_NATIVE_GITHUB_CLIENT_ID` and `MULTAIPLAYER_NATIVE_RELAY_HTTP_ORIGIN`. No client secret is used. The current native grant is fixed to `read:user repo`; changing it requires a deliberately reviewed native build rather than a relay environment change.
 
