@@ -3,10 +3,11 @@ use super::invites::{
     validate_invite_response_pair,
 };
 use super::{
-    decode_stored_signing_secret, delete_all_history_native, engine_error, fingerprint,
-    is_corruption_error_message, quarantine_store, validate_room_config_payload,
-    BasicAppCredential, CapabilityBinding, EncryptRequest, EncryptedStore, MlsEngine,
-    PendingInviteRequestPublic, PendingJoinAdmissionPublic, StoredMlsIdentity,
+    decode_stored_signing_secret, delete_all_history_native, delete_room_local_data_native,
+    engine_error, fingerprint, is_corruption_error_message, quarantine_store,
+    validate_room_config_payload, BasicAppCredential, CapabilityBinding, EncryptRequest,
+    EncryptedStore, MlsEngine, PendingInviteRequestPublic, PendingJoinAdmissionPublic,
+    StoredMlsIdentity,
 };
 
 fn request_binding() -> CapabilityBinding {
@@ -133,12 +134,18 @@ fn native_delete_all_history_removes_ciphertext_and_epoch_secret() {
             30,
         )
         .unwrap();
+    store
+        .put_room_config("history-room", br#"{"eventType":"room.config"}"#)
+        .unwrap();
     delete_all_history_native(&engine, &store, "history-room").unwrap();
     assert!(store
         .latest_history_ciphertext("history-room")
         .unwrap()
         .is_none());
     assert!(engine.decrypt_history("history-room", &encrypted).is_err());
+    assert!(store.room_config("history-room").unwrap().is_some());
+    delete_room_local_data_native(&engine, &store, "history-room").unwrap();
+    assert_eq!(store.room_config("history-room").unwrap(), None);
 }
 
 #[test]

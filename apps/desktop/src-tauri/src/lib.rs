@@ -154,6 +154,7 @@ pub fn run() {
             mls_history_delete,
             mls_history_load_latest,
             mls_history_delete_all,
+            mls_room_local_data_delete,
             mls_generate_key_package,
             mls_create_group,
             mls_join_welcome,

@@ -7,8 +7,8 @@ use mls_core::{
     generate_hpke_key_pair, issue_capability, mac_binding, mac_response_binding, open, seal,
     validate_credential, validate_key_package_upload, verify_request_binding,
     verify_response_binding, BasicAppCredential, CapabilityBinding, DeviceAuthSigner,
-    EncryptedStore, ExporterCiphertext, HpkeKeyPair, JoinAdmissionMetadata,
-    KeyPackageUpload, MlsEngine, PendingInviteRequest, SealedPayload, WelcomeRetryMetadata,
+    EncryptedStore, ExporterCiphertext, HpkeKeyPair, JoinAdmissionMetadata, KeyPackageUpload,
+    MlsEngine, PendingInviteRequest, SealedPayload, WelcomeRetryMetadata,
 };
 use sha2::{Digest, Sha256};
 use std::{collections::HashSet, sync::Mutex};
@@ -315,6 +315,30 @@ pub(crate) fn mls_history_delete_all(
     )?)
 }
 
+#[tauri::command]
+pub(crate) fn mls_room_local_data_delete(
+    request: RoomRequest,
+    state: tauri::State<'_, MlsNativeState>,
+) -> crate::command_error::CommandResult<()> {
+    let engine = state
+        .engine
+        .lock()
+        .map_err(|_| "MLS engine is unavailable".to_string())?;
+    let store = state
+        .store
+        .lock()
+        .map_err(|_| "MLS store is unavailable".to_string())?;
+    Ok(delete_room_local_data_native(
+        engine
+            .as_ref()
+            .ok_or_else(|| "MLS identity is not initialized".to_string())?,
+        store
+            .as_ref()
+            .ok_or_else(|| "MLS identity is not initialized".to_string())?,
+        &request.room_id,
+    )?)
+}
+
 fn delete_all_history_native(
     engine: &MlsEngine,
     store: &EncryptedStore,
@@ -327,6 +351,15 @@ fn delete_all_history_native(
     store
         .delete_all_history_ciphertexts(room_id)
         .map_err(safe_error)
+}
+
+fn delete_room_local_data_native(
+    engine: &MlsEngine,
+    store: &EncryptedStore,
+    room_id: &str,
+) -> Result<(), String> {
+    delete_all_history_native(engine, store, room_id)?;
+    store.delete_room_config(room_id).map_err(safe_error)
 }
 
 #[tauri::command]
