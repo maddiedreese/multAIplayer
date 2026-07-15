@@ -17,13 +17,40 @@ body {
   display: grid;
   align-content: center;
   padding: 32px;
-  background:
-    radial-gradient(circle at 15% 10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 36%),
-    var(--bg);
+  background: #0f0f0f;
+}
+
+.readme-feature {
+  box-sizing: content-box;
+  width: min(720px, calc(100vw - 120px));
+  margin: 0 auto;
+  padding: 28px;
+  overflow: visible;
+  border: 1px solid #454139;
+  border-radius: 14px;
+  background: radial-gradient(circle at 14% 7%, rgba(185, 154, 72, 0.14), transparent 38%), #151410;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+}
+
+.readme-feature[data-scenario="codex-chat-parity"] {
+  width: min(920px, calc(100vw - 120px));
+}
+
+.readme-feature .onboarding-assistant {
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
 }
 
 .readme-presentation .e2e-chat-parity {
-  height: min(760px, calc(100vh - 64px));
+  display: block;
+  height: auto;
+  min-height: 0;
+}
+
+.readme-presentation .e2e-chat-parity .chat-scroll {
+  overflow: visible;
 }
 
 .e2e-harness-boundary {

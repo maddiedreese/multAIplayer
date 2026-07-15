@@ -82,6 +82,8 @@ test("tracked Markdown links resolve to repository files", () => {
 test("public entry points stay native-only, release-accurate, and backed by current UI captures", () => {
   const readme = readFileSync("README.md", "utf8");
   const captureScript = readFileSync("scripts/capture-readme-screens.mjs", "utf8");
+  const harnessMain = readFileSync("e2e/harness/main.tsx", "utf8");
+  const harnessStyles = readFileSync("e2e/harness/styles.css", "utf8");
   const currentGuides = [
     "README.md",
     "CONTRIBUTING.md",
@@ -101,7 +103,15 @@ test("public entry points stay native-only, release-accurate, and backed by curr
   assert.equal(rootPackage.scripts["docs:screenshots"], "node scripts/capture-readme-screens.mjs");
   assert.match(captureScript, /capture\(page, "onboarding"/);
   assert.match(captureScript, /scenarioUrl\("codex-chat-parity"\)/);
+  assert.match(captureScript, /page\.locator\("\.readme-feature"\)/);
+  assert.match(captureScript, /scrollHeight !== dimensions\.clientHeight/);
   assert.match(captureScript, /reducedMotion: "reduce"/);
+  assert.match(harnessMain, /document\.documentElement\.dataset\.theme = "dark"/);
+  assert.match(harnessStyles, /\.readme-feature \{/);
+  assert.match(harnessStyles, /padding: 28px/);
+  assert.match(readme, /Build with Codex\. Together\./);
+  assert.match(readme, /Multiplayer Codex for trusted teams/);
+  assert.doesNotMatch(readme, /deterministic captures|representative local data|not concept art/i);
   assert.match(currentGuides, /official free-alpha relay is live on Railway/i);
   assert.match(currentGuides, /read:user repo/);
   assert.doesNotMatch(
