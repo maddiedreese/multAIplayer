@@ -1,18 +1,30 @@
 use serde::Serialize;
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum CommandErrorCode {
-    CryptoError,
-    InternalError,
-    InvalidArgument,
-    NotFound,
-    ProcessError,
-    RequiresRejoin,
-    StorageError,
-    Unauthorized,
-    Unavailable,
+macro_rules! define_command_error_codes {
+    ($($variant:ident => $serialized:literal),+ $(,)?) => {
+        #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+        pub(crate) enum CommandErrorCode {
+            $(#[serde(rename = $serialized)] $variant),+
+        }
+
+        impl CommandErrorCode {
+            #[cfg(test)]
+            const ALL: &'static [Self] = &[$(Self::$variant),+];
+        }
+    };
+}
+
+define_command_error_codes! {
+    CryptoError => "crypto_error",
+    InternalError => "internal_error",
+    InvalidArgument => "invalid_argument",
+    NotFound => "not_found",
+    ProcessError => "process_error",
+    RequiresRejoin => "requires_rejoin",
+    StorageError => "storage_error",
+    Unauthorized => "unauthorized",
+    Unavailable => "unavailable",
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -88,6 +100,7 @@ impl std::error::Error for CommandError {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
 
     #[test]
     fn serializes_stable_code_and_human_message() {
@@ -134,5 +147,29 @@ mod tests {
             assert_eq!(value["code"], expected_code);
             assert_eq!(value["message"], "message");
         }
+    }
+
+    #[test]
+    fn rust_codes_match_the_shared_frontend_vocabulary() {
+        let shared = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(
+            include_str!("../../native-command-error-codes.json"),
+        )
+        .expect("shared native command error vocabulary should be valid JSON")
+        .into_iter()
+        .map(|(code, _)| code)
+        .collect::<BTreeSet<_>>();
+        let rust = CommandErrorCode::ALL
+            .iter()
+            .copied()
+            .map(|code| {
+                serde_json::to_value(code)
+                    .expect("command error code should serialize")
+                    .as_str()
+                    .expect("command error code should serialize as a string")
+                    .to_string()
+            })
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(rust, shared);
     }
 }

@@ -271,28 +271,27 @@ export function registerTeamRoutes({
         name,
         members: 1
       };
-      store.setTeam(team);
-      if (session) {
-        const members = new Map<string, TeamMemberRecord>([
-          [
-            session.user.id,
-            { teamId: team.id, userId: session.user.id, role: "owner", joinedAt: new Date().toISOString() }
-          ]
-        ]);
-        store.setTeamMembers(team.id, members);
-        try {
+      try {
+        store.setTeam(team);
+        if (session) {
+          const members = new Map<string, TeamMemberRecord>([
+            [
+              session.user.id,
+              { teamId: team.id, userId: session.user.id, role: "owner", joinedAt: new Date().toISOString() }
+            ]
+          ]);
+          store.setTeamMembers(team.id, members);
           await saveRelayStore();
-        } catch {
-          store.teams.delete(team.id);
-          store.teamMembers.delete(team.id);
-          if (reservation?.allowed) rollbackDurableQuota(store, reservation);
-          return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist team quota and team.");
+        } else {
+          scheduleStoreSave();
         }
-        broadcastWorkspaceUpdated(team);
-      } else {
-        scheduleStoreSave();
-        broadcastWorkspaceUpdated(team);
+      } catch {
+        store.teams.delete(team.id);
+        store.teamMembers.delete(team.id);
+        if (reservation?.allowed) rollbackDurableQuota(store, reservation);
+        return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist team quota and team.");
       }
+      broadcastWorkspaceUpdated(team);
       res.status(201).json({ team: teamRecordForUser(store.getTeam(team.id) ?? team, store, session?.user.id) });
     } finally {
       releaseQuotaTransaction();

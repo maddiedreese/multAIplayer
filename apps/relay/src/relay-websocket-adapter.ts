@@ -4,7 +4,6 @@ import type { loadRelayConfig } from "./config.js";
 import { hasDeviceSession } from "./http/device-auth.js";
 import type { createRelayRequestGuards } from "./http/middleware.js";
 import { isJsonStringifiableWithin, normalizeMetadataText, type RelayLimits } from "./limits.js";
-import type { createRelayLifecycle } from "./lifecycle.js";
 import type { createRelayMetrics } from "./observability.js";
 import { canPublishMlsMessage, roomKey } from "./relay-domain.js";
 import type { RelayStore } from "./state.js";
@@ -19,16 +18,16 @@ interface RegisterRelayWebSocketAdapterOptions {
   auth: ReturnType<typeof createRelayAuthSessionManager>;
   guards: ReturnType<typeof createRelayRequestGuards>;
   metrics: ReturnType<typeof createRelayMetrics>;
-  lifecycle: ReturnType<typeof createRelayLifecycle>;
   fanout: ReturnType<typeof createRelayFanout>;
   roomManager: ReturnType<typeof createRelayRoomSocketManager>;
   wss: Parameters<typeof registerRelayWebSocketConnection>[0]["transport"]["wss"];
+  isReady: () => boolean;
 }
 
 export function registerRelayWebSocketAdapter(options: RegisterRelayWebSocketAdapterOptions) {
   const { config, store, roomManager, fanout } = options;
   registerRelayWebSocketConnection({
-    transport: { wss: options.wss, send: fanout.send, isReady: options.lifecycle.isReady },
+    transport: { wss: options.wss, send: fanout.send, isReady: options.isReady },
     state: { store, sessions: store.sessions, roomPresence: store.roomPresence },
     limits: options.limits,
     authentication: {

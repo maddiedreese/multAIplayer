@@ -7,39 +7,39 @@
       "maximumSurvived": 0
     },
     "src/auth/session.ts": {
-      "minimumScore": 60,
+      "minimumScore": 80,
       "targetScore": 80,
-      "maximumSurvived": 200
+      "maximumSurvived": 10
     },
     "src/ws/connection-admission.ts": {
-      "minimumScore": 60,
+      "minimumScore": 65,
       "targetScore": 80,
-      "maximumSurvived": 100
+      "maximumSurvived": 18
     },
     "src/http/room-create-route.ts": {
-      "minimumScore": 60,
+      "minimumScore": 65,
       "targetScore": 80,
-      "maximumSurvived": 200
+      "maximumSurvived": 27
     },
     "src/http/room-host-route.ts": {
-      "minimumScore": 60,
+      "minimumScore": 80,
       "targetScore": 80,
-      "maximumSurvived": 100
+      "maximumSurvived": 14
     },
     "src/http/room-lifecycle-route.ts": {
-      "minimumScore": 60,
+      "minimumScore": 80,
       "targetScore": 80,
-      "maximumSurvived": 100
+      "maximumSurvived": 10
     },
     "src/http/room-settings-route.ts": {
-      "minimumScore": 60,
+      "minimumScore": 80,
       "targetScore": 80,
-      "maximumSurvived": 200
+      "maximumSurvived": 6
     },
     "src/http/room-validation.ts": {
-      "minimumScore": 60,
+      "minimumScore": 80,
       "targetScore": 80,
-      "maximumSurvived": 100
+      "maximumSurvived": 2
     }
   }
 }

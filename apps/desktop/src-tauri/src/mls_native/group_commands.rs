@@ -1,6 +1,6 @@
 use super::*;
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_room_config_load(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -12,7 +12,7 @@ pub(crate) fn mls_room_config_load(
         .map_err(Into::into)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_process_incoming(
     request: IncomingRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -34,7 +34,7 @@ pub(crate) fn mls_process_incoming(
         .transpose()
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_remove_member(
     request: RemoveRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -49,7 +49,7 @@ pub(crate) fn mls_remove_member(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_transfer_host(
     request: TransferRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -69,7 +69,7 @@ pub(crate) fn mls_transfer_host(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_host_transfer_authorization(
     request: HostTransferAuthorizationRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -95,7 +95,7 @@ pub(crate) fn mls_host_transfer_authorization(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_current_epoch(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -105,7 +105,7 @@ pub(crate) fn mls_current_epoch(
     })?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_group_open(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -123,7 +123,7 @@ pub(crate) fn mls_group_open(
     }
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_forget_corrupt_group(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -151,7 +151,7 @@ pub(crate) fn mls_forget_corrupt_group(
     Ok(())
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_publish_succeeded(
     request: PublishSucceededRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -174,7 +174,7 @@ pub(crate) fn mls_publish_succeeded(
     Ok(epoch)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_outbox_list(
     state: tauri::State<'_, MlsNativeState>,
 ) -> crate::command_error::CommandResult<Vec<OutboxPublic>> {
@@ -200,7 +200,7 @@ pub(crate) fn mls_outbox_list(
         .collect()
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_clear_pending_commit(
     request: ClearPendingRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -210,7 +210,7 @@ pub(crate) fn mls_clear_pending_commit(
     })?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_retire_stale_application(
     request: PublishSucceededRequest,
     state: tauri::State<'_, MlsNativeState>,

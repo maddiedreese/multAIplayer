@@ -116,7 +116,7 @@ static CODEX_SESSIONS: OnceLock<Mutex<HashMap<CodexServerKey, CodexServerSession
     OnceLock::new();
 const CODEX_SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(20 * 60);
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) async fn run_codex_turn(
     request: CodexTurnRequest,
     app: tauri::AppHandle,
@@ -247,7 +247,7 @@ pub(crate) async fn run_codex_turn(
     Ok(result?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn shutdown_codex_room(
     request: CodexRoomShutdownRequest,
     rpc_state: tauri::State<'_, CodexRpcState>,
@@ -260,14 +260,14 @@ pub(crate) fn shutdown_codex_room(
     Ok(active.saturating_add(shutdown_codex_room_sessions(&request.room_id)))
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn list_codex_server_requests(
     rpc_state: tauri::State<'_, CodexRpcState>,
 ) -> crate::command_error::CommandResult<Vec<CodexServerRequestEvent>> {
     Ok(rpc_state.list()?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) async fn respond_codex_server_request(
     request: RespondCodexServerRequest,
     app: tauri::AppHandle,

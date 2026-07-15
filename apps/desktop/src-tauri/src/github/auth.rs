@@ -40,7 +40,7 @@ pub(super) fn validate_scopes(scopes: &[String]) -> Result<String, String> {
     Ok(scopes.join(" "))
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub async fn github_device_flow_start(
     state: tauri::State<'_, GitHubState>,
 ) -> crate::command_error::CommandResult<DeviceFlowStart> {
@@ -109,7 +109,7 @@ async fn github_device_flow_start_inner(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub async fn github_device_flow_poll(
     window: WebviewWindow,
     state: tauri::State<'_, GitHubState>,
@@ -342,7 +342,7 @@ pub(super) fn load_token() -> Result<String, String> {
     Ok(token)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub fn github_token_delete() -> crate::command_error::CommandResult<()> {
     github_token_delete_inner().map_err(github_command_error)
 }

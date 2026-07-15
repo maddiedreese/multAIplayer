@@ -15,6 +15,7 @@ interface RegisterOpsRoutesOptions {
   attachmentBlobs?: Iterable<AttachmentBlobRecord>;
   isExpiredAttachmentBlob?: (blob: AttachmentBlobRecord) => boolean;
   isReady?: () => boolean;
+  readinessFailureCode?: () => "relay_shutting_down" | "persistence_unavailable";
 }
 
 export function registerOpsRoutes({
@@ -25,7 +26,8 @@ export function registerOpsRoutes({
   sessions,
   attachmentBlobs = [],
   isExpiredAttachmentBlob = () => false,
-  isReady = () => true
+  isReady = () => true,
+  readinessFailureCode = () => "relay_shutting_down"
 }: RegisterOpsRoutesOptions) {
   app.get("/healthz", (_req, res) => {
     res.json({ ok: true, service: "multaiplayer-relay" });
@@ -33,7 +35,7 @@ export function registerOpsRoutes({
 
   app.get("/readyz", (_req, res) => {
     if (!isReady()) {
-      res.status(503).json({ ok: false, dataPath, code: "relay_shutting_down" });
+      res.status(503).json({ ok: false, dataPath, code: readinessFailureCode() });
       return;
     }
     res.json({ ok: true, dataPath });

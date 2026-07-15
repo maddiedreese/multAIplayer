@@ -39,11 +39,33 @@ html[data-theme="dark"][data-presentation="readme"] #root {
   width: min(920px, calc(100vw - 120px));
 }
 
-.readme-feature .onboarding-assistant {
-  min-height: 0;
-  padding: 0;
-  overflow: visible;
-  background: transparent;
+.readme-feature[data-scenario="readme-browser"],
+.readme-feature[data-scenario="readme-terminal"] {
+  width: min(760px, calc(100vw - 120px));
+}
+
+.readme-browser-surface,
+.readme-terminal-surface {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.readme-browser-surface {
+  height: 560px;
+}
+
+.readme-browser-surface .browser-panel.browser-open {
+  height: 100%;
+}
+
+.readme-terminal-surface {
+  padding: 16px;
+}
+
+.readme-terminal-surface .terminal-panel {
+  margin: 0;
 }
 
 .readme-presentation .e2e-chat-parity {

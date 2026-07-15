@@ -3,7 +3,7 @@ use tauri_plugin_opener::OpenerExt;
 
 const OPENAI_AUTH_HOSTS: [&str; 3] = ["auth.openai.com", "chatgpt.com", "platform.openai.com"];
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub fn open_trusted_authentication_url<R: Runtime>(
     app: AppHandle<R>,
     provider: String,

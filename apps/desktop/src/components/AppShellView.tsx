@@ -6,7 +6,7 @@ import { RoomMainColumnContainer, type RoomMainColumnSources } from "./RoomMainC
 import { useUpdateNotice } from "../hooks/useUpdateNotice";
 import { useShellLayout } from "../hooks/useShellLayout";
 import { AppSidebarDrawerContainer, DesktopSidebarContainer, type SidebarSources } from "./SidebarContainers";
-import { SignedUpdateBanner } from "./SignedUpdateBanner";
+import { SignedUpdateBanner, UpdateVerificationWarning } from "./SignedUpdateBanner";
 
 interface AppShellViewProps {
   sidebarSources: SidebarSources;
@@ -23,11 +23,17 @@ export function AppShellView({
 }: AppShellViewProps) {
   const shellLayout = useShellLayout();
   const dialog: ReactNode = <LocalPreviewDialogContainer {...localPreviewDialogActions} />;
-  const { notice: updateNotice, installStatus, install: installUpdate } = useUpdateNotice();
+  const { notice: updateNotice, checkStatus, installStatus, install: installUpdate } = useUpdateNotice();
   const updateBanner: ReactNode = updateNotice ? (
     <SignedUpdateBanner notice={updateNotice} installStatus={installStatus} onInstall={installUpdate} />
   ) : null;
-  const shellBanner: ReactNode = <>{updateBanner}</>;
+  const verificationWarning: ReactNode = checkStatus === "unverified" ? <UpdateVerificationWarning /> : null;
+  const shellBanner: ReactNode = (
+    <>
+      {verificationWarning}
+      {updateBanner}
+    </>
+  );
 
   return (
     <AppWorkspaceShell
@@ -43,7 +49,7 @@ export function AppShellView({
       main={<RoomMainColumnContainer sources={roomMainColumnSources} />}
       inspector={<RoomInspectorContainer sources={roomInspectorSources} />}
       dialog={dialog}
-      shellBanner={updateBanner ? shellBanner : null}
+      shellBanner={updateBanner || verificationWarning ? shellBanner : null}
     />
   );
 }

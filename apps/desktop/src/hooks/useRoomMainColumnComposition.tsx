@@ -32,7 +32,7 @@ import {
   buildPendingAttachmentRows,
   buildRoomChatMessageRows
 } from "../presentation/chat/chatDisplayRows";
-import { detectCodexTurnRiskFlags, messagesSinceLastCodex } from "../lib/codex/codexTurn";
+import { detectCodexTurnRiskFlags } from "../lib/codex/codexTurn";
 import { buildRoomNotices } from "./roomNotices";
 import { selectRoomMainColumnView } from "../application/views/containerViewSelectors";
 import { buildRoomMainColumnCapabilities } from "./containerCapabilities";
@@ -47,11 +47,16 @@ import {
   acknowledgeRoomVisibilityWarning,
   hasAcknowledgedRoomVisibilityWarning
 } from "../lib/history/roomVisibilityWarning";
-import type { ChatAttachment, ChatMessage, CodexActivity, CodexRoomEvent } from "../types";
 import type { createAppRoomPanelActions } from "./appRoomPanelActions";
 import type { useHostHandoffActions } from "./useHostHandoffActions";
 import type { useRoomRuntimeContext } from "./useRoomRuntimeContext";
 import type { useWorkspaceFlowContext } from "./useWorkspaceFlowContext";
+import {
+  deriveMainColumnValues,
+  guidedActivityKind,
+  mainColumnLocalUser,
+  replyTargetDisplay
+} from "./roomMainColumnCompositionValues";
 
 type MainColumnProps = ComponentProps<typeof RoomMainColumn>;
 type HeaderProps = MainColumnProps["headerProps"];
@@ -117,10 +122,6 @@ export interface RoomMainColumnSources {
   hostHandoff: Pick<HostHandoffActions, "setRoomHost">;
   chatActions: RoomPanels["roomChatPanelActions"];
 }
-
-const noPendingAttachments: ChatAttachment[] = [];
-const noSelectedMessageIds: string[] = [];
-const noCodexEvents: CodexRoomEvent[] = [];
 
 export function useRoomMainColumnComposition({ sources }: { sources: RoomMainColumnSources }) {
   const capabilities = useMemo(() => buildRoomMainColumnCapabilities(sources), [sources]);
@@ -340,13 +341,7 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
   }
 
   function composeReplyTarget() {
-    if (!replyTargetMessage) return null;
-    return {
-      author: replyTargetMessage.deletedAt ? "Original message" : replyTargetMessage.author,
-      body: replyTargetMessage.deletedAt
-        ? "Original message deleted"
-        : replyTargetMessage.body || "Original message unavailable or deleted"
-    };
+    return replyTargetDisplay(replyTargetMessage);
   }
   const chatProps = composeChatProps();
 
@@ -380,39 +375,6 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
   );
 }
 
-function mainColumnLocalUser(user: { id: string; name?: string; login: string } | null, localDeviceId: string) {
-  return {
-    id: user?.id ?? `local:${localDeviceId}`,
-    name: user?.name ?? user?.login ?? "Local user"
-  };
-}
-
-type MainColumnStore = ReturnType<typeof useAppStore.getState>;
-
-function deriveMainColumnValues(
-  chat: MainColumnStore["roomChatByRoom"][string] | undefined,
-  codex: MainColumnStore["codexRuntimeByRoom"][string] | undefined,
-  messages: ChatMessage[]
-) {
-  const activeApproval = codex?.pendingApproval ?? null;
-  return {
-    pendingAttachments: chat?.pendingAttachments ?? noPendingAttachments,
-    selectedMessageIds: chat?.selectedMessageIds ?? noSelectedMessageIds,
-    markdownSelectionMode: chat?.markdownSelectionMode ?? false,
-    activeApproval,
-    approvalMessages: messagesSinceLastCodex(activeApproval?.messages ?? messages) as ChatMessage[],
-    codexEvents: codex?.events ?? noCodexEvents,
-    queuedApprovals: codex?.queuedApprovals ?? [],
-    currentMessagesSinceLastCodex: messagesSinceLastCodex(messages).length,
-    replyTargetMessage: findReplyTargetMessage(messages, chat?.replyToMessageId)
-  };
-}
-
-function findReplyTargetMessage(messages: ChatMessage[], replyToMessageId: string | null | undefined) {
-  if (!replyToMessageId) return null;
-  return messages.find((message) => message.id === replyToMessageId) ?? null;
-}
-
 function focusApprovalCard() {
   const target = document.querySelector<HTMLElement>('[data-onboarding-anchor="approval-card"]');
   if (!target) return;
@@ -421,13 +383,4 @@ function focusApprovalCard() {
     behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
     block: "center"
   });
-}
-
-function guidedActivityKind(kind: CodexActivity["kind"]): GuidedActivityKind | null {
-  if (kind === "reasoning") return "thinking";
-  if (kind === "command") return "commands";
-  if (kind === "file_change") return "edits";
-  if (kind === "agent") return "subagents";
-  if (kind === "tool" || kind === "web_search" || kind === "image_generation" || kind === "hook") return "tools";
-  return null;
 }

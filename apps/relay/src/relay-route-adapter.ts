@@ -22,7 +22,6 @@ import type { DeletionLedger } from "./auth/deletion-ledger.js";
 import type { createRelayAuthz } from "./authz.js";
 import type { loadRelayConfig } from "./config.js";
 import { registerRelayRoutes } from "./http/register-routes.js";
-import type { createRelayLifecycle } from "./lifecycle.js";
 import {
   isApprovalDelegationPolicy,
   isApprovalPolicy,
@@ -50,7 +49,6 @@ interface RegisterRelayRouteAdapterOptions {
   authz: ReturnType<typeof createRelayAuthz>;
   persistence: RelayStorePersistenceCoordinator;
   metrics: ReturnType<typeof createRelayMetrics>;
-  lifecycle: ReturnType<typeof createRelayLifecycle>;
   codec: RelayStoreCodec;
   fanout: ReturnType<typeof createRelayFanout>;
   roomManager: ReturnType<typeof createRelayRoomSocketManager>;
@@ -60,6 +58,8 @@ interface RegisterRelayRouteAdapterOptions {
   requesterFromRequest: (body: unknown, sessionId: unknown) => { id: string; name: string };
   deletionLedger: DeletionLedger | null;
   isAccountRestricted: (userId: string) => boolean;
+  isReady: () => boolean;
+  readinessFailureCode: () => "relay_shutting_down" | "persistence_unavailable";
 }
 
 export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOptions) {
@@ -148,7 +148,8 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     validator: options.keyPackageValidator,
     sessions: store.sessions,
     opsAttachmentBlobs: store.attachmentBlobs.values(),
-    isReady: options.lifecycle.isReady,
+    isReady: options.isReady,
+    readinessFailureCode: options.readinessFailureCode,
     requesterFromRequest: options.requesterFromRequest,
     isRoomHost,
     isApprovalPolicy,

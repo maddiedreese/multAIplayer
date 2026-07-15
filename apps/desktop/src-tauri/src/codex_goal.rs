@@ -40,7 +40,7 @@ pub(crate) struct CodexGoalThreadRequest {
     thread_id: String,
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn set_codex_goal(
     request: CodexGoalSetRequest,
     app: tauri::AppHandle,
@@ -75,7 +75,7 @@ pub(crate) fn set_codex_goal(
     Ok(parse_codex_goal_response(&response)?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn get_codex_goal(
     request: CodexGoalThreadRequest,
     app: tauri::AppHandle,
@@ -104,7 +104,7 @@ pub(crate) fn get_codex_goal(
     Ok(Some(parse_codex_goal(goal)?))
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn clear_codex_goal(
     request: CodexGoalThreadRequest,
     app: tauri::AppHandle,

@@ -28,6 +28,7 @@ import {
 import { createRelayAuthz } from "./authz.js";
 import { loadRelayConfig } from "./config.js";
 import { createRelayRequestGuards } from "./http/middleware.js";
+import { persistenceAvailabilityMiddleware } from "./http/persistence-availability.js";
 import { relayJsonBodyErrorMiddleware, typedRelayErrorMiddleware } from "./http/errors.js";
 import { createRelayOriginPolicy } from "./http/origin-policy.js";
 import { teamRecordForUser } from "./http/teams.js";
@@ -72,6 +73,7 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     mutationsRequireAuth,
     rateLimitsEnabled,
     trustProxyHeaders,
+    maxDurableEntries,
     structuredLogsEnabled,
     rateLimitWindowMs,
     rateLimitCaps,
@@ -115,7 +117,7 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     }
   });
 
-  const relayStore = createRelayStore();
+  const relayStore = createRelayStore(maxDurableEntries);
   const { sessions, roomSockets, teamSockets, workspaceSockets, roomPresence, authSessions, rateLimitStore } =
     relayStore;
   const relayAuthz = createRelayAuthz(relayStore);
@@ -180,11 +182,16 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     pruneMlsBacklog,
     storedAuthSessions
   });
+  let poisonRelayImpl = () => {};
   const relayStorePersistence = createRelayStorePersistenceCoordinator({
     dataPath,
     persistence: relayPersistence,
-    storeCodec: relayStoreCodec
+    storeCodec: relayStoreCodec,
+    onPoison: () => poisonRelayImpl()
   });
+  poisonRelayImpl = () => {
+    for (const socket of wss.clients) socket.close(1012, "Relay persistence unavailable");
+  };
   scheduleStoreSaveImpl = () => relayStorePersistence.scheduleStoreSave();
   const relayLifecycle = createRelayLifecycle({
     server,
@@ -193,6 +200,8 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     graceMs: shutdownConfig.graceMs,
     closeStore: () => relayStorePersistence.closeRelayStore()
   });
+  const relayIsReady = () => relayLifecycle.isReady() && relayStorePersistence.isHealthy();
+  app.use(persistenceAvailabilityMiddleware(relayStorePersistence.isHealthy));
   app.use((req, res, next) => {
     relayLifecycle.shutdownMiddleware(req.path, next, () =>
       res.status(503).json({ error: "Relay is shutting down.", code: "relay_shutting_down" })
@@ -262,7 +271,6 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     authz: relayAuthz,
     persistence: relayStorePersistence,
     metrics: relayMetrics,
-    lifecycle: relayLifecycle,
     codec: relayStoreCodec,
     fanout: relayFanout,
     roomManager: relayRoomManager,
@@ -271,7 +279,9 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     revokeTeamInvites: teamMutations.revokeTeamInvites,
     requesterFromRequest,
     deletionLedger,
-    isAccountRestricted: (userId) => isAccountRestricted(relayStore, userId)
+    isAccountRestricted: (userId) => isAccountRestricted(relayStore, userId),
+    isReady: relayIsReady,
+    readinessFailureCode: () => (relayStorePersistence.isHealthy() ? "relay_shutting_down" : "persistence_unavailable")
   });
   app.use(relayJsonBodyErrorMiddleware);
   registerRelayWebSocketAdapter({
@@ -281,10 +291,10 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     auth: authSessionManager,
     guards: relayRequestGuards,
     metrics: relayMetrics,
-    lifecycle: relayLifecycle,
     fanout: relayFanout,
     roomManager: relayRoomManager,
-    wss
+    wss,
+    isReady: relayIsReady
   });
 
   await relayStorePersistence.loadRelayStore();

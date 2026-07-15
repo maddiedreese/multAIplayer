@@ -87,7 +87,7 @@ pub(crate) struct BrowserProfileResult {
     reset: bool,
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn open_browser_view(
     app: AppHandle,
     request: BrowserOpenRequest,
@@ -173,7 +173,7 @@ pub(crate) fn open_browser_view(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn reset_browser_profile(
     app: AppHandle,
     request: BrowserProfileRequest,

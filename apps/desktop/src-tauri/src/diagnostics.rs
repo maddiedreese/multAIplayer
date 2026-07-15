@@ -205,7 +205,7 @@ impl DiagnosticStore {
     }
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn record_diagnostic(
     state: State<'_, DiagnosticState>,
     entry: DiagnosticEntry,
@@ -215,7 +215,7 @@ pub(crate) fn record_diagnostic(
         .map_err(crate::command_error::CommandError::storage)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) async fn save_diagnostic_bundle(
     app: AppHandle,
     state: State<'_, DiagnosticState>,

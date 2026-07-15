@@ -47,6 +47,30 @@ const validatedRequests = new Map<
   }
 >();
 const approvedInviteOutboxes = new Map<string, PendingInviteApproval>();
+const inviteRequestReplayDelaysMs = [0, 100, 400, 1_000] as const;
+
+export async function retryInviteRequestReplay(
+  attempt: () => Promise<boolean>,
+  delaysMs: readonly number[] = inviteRequestReplayDelaysMs,
+  wait: (delayMs: number) => Promise<void> = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs))
+): Promise<boolean> {
+  let lastError: unknown;
+  for (const delayMs of delaysMs) {
+    if (delayMs > 0) await wait(delayMs);
+    const outcome = await attempt().then(
+      (handled) => ({ handled, error: undefined }),
+      (error: unknown) => ({ handled: false, error })
+    );
+    if (outcome.handled) return true;
+    if (outcome.error === undefined) {
+      lastError = undefined;
+    } else {
+      lastError = outcome.error;
+    }
+  }
+  if (lastError !== undefined) throw lastError;
+  return false;
+}
 
 export function inviteRequesterDeviceMatches(
   record: Pick<DirectedInviteRequest, "requesterUserId" | "requesterDeviceId" | "requesterDevice">,
@@ -87,12 +111,20 @@ export function createInviteRelayActions(
   const { relayRef, seenEnvelopeIds, selectedRoomIdRef } = options;
 
   async function handleInviteRequested(inviteId: string): Promise<void> {
+    await retryInviteRequestReplay(() => loadInviteRequest(inviteId));
+  }
+
+  async function loadInviteRequest(inviteId: string): Promise<boolean> {
     const { localUser, deviceId } = currentLocalIdentity();
     const metadata = await lookupInvite(inviteId);
-    if (metadata.room.hostUserId !== localUser.id || metadata.room.activeHostDeviceId !== deviceId) return;
+    if (metadata.room.hostUserId !== localUser.id || metadata.room.activeHostDeviceId !== deviceId) return true;
     const records = await loadDirectedInviteRequests(inviteId, deviceId);
+    let handled = false;
     for (const record of records) {
-      if (validatedRequests.has(record.requestId)) continue;
+      if (validatedRequests.has(record.requestId)) {
+        handled = true;
+        continue;
+      }
       try {
         const ciphertext = parseDirectedMlsInviteCiphertext(record.sealedRequest);
         const binding = ciphertext.binding;
@@ -114,6 +146,7 @@ export function createInviteRelayActions(
         if (value.binding.keyPackageHash !== record.keyPackageHash) continue;
         if (!inviteRequesterDeviceMatches(record, value)) continue;
         validatedRequests.set(record.requestId, { record, protected: value });
+        handled = true;
         store.appendInviteRequest(metadata.room.id, {
           id: record.requestId,
           inviteId,
@@ -132,6 +165,7 @@ export function createInviteRelayActions(
         reportExpectedFailure("invite HPKE payload or capability binding validation failed");
       }
     }
+    return handled;
   }
 
   async function denyInviteJoinRequest(

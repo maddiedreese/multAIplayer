@@ -318,14 +318,26 @@ test("hosted account deletion removes identity-owned relay data durably and reta
 });
 
 test(
-  "hosted account deletion denies authentication after the ledger commits even when primary persistence fails",
+  "hosted account deletion poisons product traffic after the ledger commits and primary persistence fails",
   { skip: process.platform === "win32" || process.geteuid?.() === 0 },
   async () => {
     const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
     const cookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
+    const socket = new WebSocket(relay.wsUrl);
+    await onceOpen(socket);
     const blocker = new Database(relay.dataPath);
     try {
       blocker.exec("BEGIN EXCLUSIVE");
+      const socketClosed = new Promise<{ code: number; reason: string }>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error("Timed out waiting for poisoned relay socket close")),
+          10_000
+        );
+        socket.once("close", (code, reason) => {
+          clearTimeout(timeout);
+          resolve({ code, reason: reason.toString() });
+        });
+      });
       const failed = await fetch(`${relay.baseUrl}/auth/account`, {
         method: "DELETE",
         headers: { "content-type": "application/json", cookie },
@@ -333,8 +345,17 @@ test(
       });
       assert.equal(failed.status, 202);
       assert.equal((await failed.json()).status, "pending");
-      assert.equal((await fetch(`${relay.baseUrl}/auth/me`, { headers: { cookie } })).status, 401);
+      const refused = await fetch(`${relay.baseUrl}/auth/me`, { headers: { cookie } });
+      assert.equal(refused.status, 503);
+      assert.equal(((await refused.json()) as { code: string }).code, "persistence_unavailable");
+      const readiness = await fetch(`${relay.baseUrl}/readyz`);
+      assert.equal(readiness.status, 503);
+      assert.equal(((await readiness.json()) as { code: string }).code, "persistence_unavailable");
+      const close = await socketClosed;
+      assert.equal(close.code, 1012);
+      assert.equal(close.reason, "Relay persistence unavailable");
     } finally {
+      socket.close();
       blocker.exec("ROLLBACK");
       blocker.close();
       await relay.close();

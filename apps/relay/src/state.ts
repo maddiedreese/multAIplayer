@@ -195,8 +195,17 @@ export interface RelayStore {
   discardDurableMutations(): void;
 }
 
+export class RelayStoreCapacityError extends Error {
+  override readonly name = "RelayStoreCapacityError";
+
+  constructor(readonly maxDurableEntries: number) {
+    super(`Relay durable in-memory state reached its configured ceiling of ${maxDurableEntries} entries.`);
+  }
+}
+
 export class InMemoryRelayStore implements RelayStore {
   private durableMutations: RelayStoreMutation[] = [];
+  private readonly capacity = new DurableEntryCapacity();
   readonly sessions = new Map<WebSocket, ClientSession>();
   readonly roomSockets = new Map<RoomKey, Set<WebSocket>>();
   readonly teamSockets = new Map<string, Set<WebSocket>>();
@@ -216,9 +225,7 @@ export class InMemoryRelayStore implements RelayStore {
   readonly devices = this.trackedMap<string, DeviceRecord>("devices");
   readonly keyPackages = this.trackedMap<string, KeyPackageRecord>("keyPackages");
   readonly attachmentBlobs = this.trackedMap<string, AttachmentBlobRecord>("attachmentBlobs");
-  readonly teamMembers = new TeamMemberCollectionMap((key) =>
-    this.durableMutations.push({ entity: "teamMembers", key })
-  );
+  readonly teamMembers: TeamMemberCollectionMap;
   readonly rateLimitStore = new Map<string, RateLimitRecord>();
   readonly dailyTeamCreationCounts = new Map<string, RateLimitRecord>();
   readonly dailyRoomCreationCounts = new Map<string, RateLimitRecord>();
@@ -228,6 +235,14 @@ export class InMemoryRelayStore implements RelayStore {
   readonly appliedDeletionLedgerEntries = this.trackedMap<string, AppliedDeletionLedgerEntry>(
     "appliedDeletionLedgerEntries"
   );
+
+  constructor(maxDurableEntries = 250_000) {
+    this.capacity.configure(maxDurableEntries);
+    this.teamMembers = new TeamMemberCollectionMap(
+      (key) => this.durableMutations.push({ entity: "teamMembers", key }),
+      this.capacity
+    );
+  }
 
   allTeams(): TeamRecord[] {
     return Array.from(this.teams.values());
@@ -348,12 +363,12 @@ export class InMemoryRelayStore implements RelayStore {
   }
 
   private trackedMap<Key extends string, Value>(entity: RelayStoreMutationEntity): Map<Key, Value> {
-    return new DurableMutationMap<Key, Value>((key) => this.durableMutations.push({ entity, key }));
+    return new DurableMutationMap<Key, Value>((key) => this.durableMutations.push({ entity, key }), this.capacity);
   }
 }
 
-export function createRelayStore(): RelayStore {
-  return new InMemoryRelayStore();
+export function createRelayStore(maxDurableEntries = 250_000): RelayStore {
+  return new InMemoryRelayStore(maxDurableEntries);
 }
 
 function deviceKey(userId: string, deviceId: string): string {
@@ -361,11 +376,15 @@ function deviceKey(userId: string, deviceId: string): string {
 }
 
 class DurableMutationMap<Key extends string, Value> extends Map<Key, Value> {
-  constructor(private readonly onMutation: (key: string) => void) {
+  constructor(
+    private readonly onMutation: (key: string) => void,
+    private readonly capacity: DurableEntryCapacity
+  ) {
     super();
   }
 
   override set(key: Key, value: Value): this {
+    if (!this.has(key)) this.capacity.claim();
     super.set(key, value);
     this.onMutation(key);
     return this;
@@ -373,25 +392,75 @@ class DurableMutationMap<Key extends string, Value> extends Map<Key, Value> {
 
   override delete(key: Key): boolean {
     const deleted = super.delete(key);
-    if (deleted) this.onMutation(key);
+    if (deleted) {
+      this.capacity.release();
+      this.onMutation(key);
+    }
     return deleted;
   }
 
   override clear(): void {
     const keys = Array.from(this.keys());
     super.clear();
+    this.capacity.adjust(-keys.length);
     for (const key of keys) this.onMutation(key);
   }
 }
 
-class TeamMemberCollectionMap extends DurableMutationMap<string, Map<string, TeamMemberRecord>> {
-  constructor(private readonly onTeamMutation: (teamId: string) => void) {
-    super(onTeamMutation);
+class TeamMemberCollectionMap extends Map<string, Map<string, TeamMemberRecord>> {
+  constructor(
+    private readonly onTeamMutation: (teamId: string) => void,
+    private readonly capacity: DurableEntryCapacity
+  ) {
+    super();
   }
 
   override set(teamId: string, members: Map<string, TeamMemberRecord>): this {
-    const trackedMembers = new DurableMutationMap<string, TeamMemberRecord>(() => this.onTeamMutation(teamId));
+    const previousSize = this.get(teamId)?.size ?? 0;
+    this.capacity.adjust(members.size - previousSize + (this.has(teamId) ? 0 : 1));
+    const trackedMembers = new DurableMutationMap<string, TeamMemberRecord>(
+      () => this.onTeamMutation(teamId),
+      this.capacity
+    );
     for (const [userId, member] of members) Map.prototype.set.call(trackedMembers, userId, member);
-    return super.set(teamId, trackedMembers);
+    Map.prototype.set.call(this, teamId, trackedMembers);
+    this.onTeamMutation(teamId);
+    return this;
+  }
+
+  override delete(teamId: string): boolean {
+    const members = this.get(teamId);
+    const deleted = super.delete(teamId);
+    if (deleted) {
+      this.capacity.adjust(-(1 + (members?.size ?? 0)));
+      this.onTeamMutation(teamId);
+    }
+    return deleted;
+  }
+
+  override clear(): void {
+    for (const teamId of Array.from(this.keys())) this.delete(teamId);
+  }
+}
+
+class DurableEntryCapacity {
+  private used = 0;
+  private maximum = Number.POSITIVE_INFINITY;
+
+  configure(maximum: number) {
+    this.maximum = maximum;
+  }
+
+  adjust(delta: number) {
+    if (delta > 0 && this.used + delta > this.maximum) throw new RelayStoreCapacityError(this.maximum);
+    this.used += delta;
+  }
+
+  claim() {
+    this.adjust(1);
+  }
+
+  release() {
+    this.used--;
   }
 }

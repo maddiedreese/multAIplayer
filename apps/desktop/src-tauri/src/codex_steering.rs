@@ -45,7 +45,7 @@ pub(crate) struct CodexSteerResult {
     client_turn_id: String,
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn steer_codex_turn(
     request: CodexSteerRequest,
 ) -> crate::command_error::CommandResult<CodexSteerResult> {

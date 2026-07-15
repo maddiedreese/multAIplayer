@@ -99,14 +99,18 @@ test("SQLite accepts only one concurrent Commit for an epoch", async () => {
   });
   try {
     const results = await Promise.allSettled([
-      first.saveMlsCommit("team:room", message("one"), [], [], () => ({
-        ...state,
-        rooms: [{ ...room, acceptedMlsEpoch: 1 }]
-      })),
-      second.saveMlsCommit("team:room", message("two"), [], [], () => ({
-        ...state,
-        rooms: [{ ...room, acceptedMlsEpoch: 1 }]
-      }))
+      Promise.resolve().then(() =>
+        first.saveMlsCommit("team:room", message("one"), [], [], () => ({
+          ...state,
+          rooms: [{ ...room, acceptedMlsEpoch: 1 }]
+        }))
+      ),
+      Promise.resolve().then(() =>
+        second.saveMlsCommit("team:room", message("two"), [], [], () => ({
+          ...state,
+          rooms: [{ ...room, acceptedMlsEpoch: 1 }]
+        }))
+      )
     ]);
     assert.equal(results.filter((x) => x.status === "fulfilled").length, 1);
     assert.equal(results.filter((x) => x.status === "rejected").length, 1);

@@ -25,7 +25,7 @@ pub(crate) struct ShellCommandRequest {
     pub(crate) authorization_token: String,
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn run_shell_command(
     state: State<'_, ShellAuthorizationState>,
     request: ShellCommandRequest,

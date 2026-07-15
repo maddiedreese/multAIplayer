@@ -9,7 +9,7 @@ const endMarker = "<!-- END GENERATED SECURITY JOURNEY EVIDENCE -->";
 function validatedClaims(manifest) {
   if (
     !manifest ||
-    manifest.formatVersion !== 1 ||
+    manifest.formatVersion !== 2 ||
     manifest.journey !== "relay-process-security" ||
     manifest.result !== "passed" ||
     !Array.isArray(manifest.claims) ||
@@ -23,6 +23,7 @@ function validatedClaims(manifest) {
       !claim ||
       typeof claim.id !== "string" ||
       !/^[a-z][a-z0-9-]+$/.test(claim.id) ||
+      !["positive-behavior", "sentinel-absence"].includes(claim.evidenceKind) ||
       typeof claim.claim !== "string" ||
       claim.claim.trim() === "" ||
       typeof claim.verification !== "string" ||
@@ -45,21 +46,31 @@ function escapeCell(value) {
 
 export function renderSecurityJourneyEvidence(manifest) {
   const claims = validatedClaims(manifest);
-  const rows = claims.map(({ id, claim, verification, checks }) => [
-    `\`${escapeCell(id)}\``,
-    escapeCell(claim),
-    `${escapeCell(verification)} Checks: ${checks.map((check) => `\`${escapeCell(check)}\``).join(", ")}.`
-  ]);
-  const table = markdownTable(["Journey claim ID", "Tested property", "Executed verification"], rows);
-  return [startMarker, "", table, "", endMarker].join("\n");
-}
-
-function markdownTable(headers, rows) {
-  const widths = headers.map((header, index) =>
-    Math.max(header.length, ...rows.map((row) => row[index]?.length ?? 0), 3)
-  );
-  const renderRow = (row) => `| ${row.map((cell, index) => cell.padEnd(widths[index])).join(" | ")} |`;
-  return [renderRow(headers), renderRow(widths.map((width) => "-".repeat(width))), ...rows.map(renderRow)].join("\n");
+  const renderClaims = (evidenceKind) =>
+    claims
+      .filter((entry) => entry.evidenceKind === evidenceKind)
+      .map(
+        ({ id, claim, verification, checks }) =>
+          `- \`${escapeCell(id)}\`: ${escapeCell(claim)} Verification: ${escapeCell(verification)} Checks: ${checks
+            .map((check) => `\`${escapeCell(check)}\``)
+            .join(", ")}.`
+      )
+      .join("\n");
+  return [
+    startMarker,
+    "",
+    "### Executed trace checks",
+    "",
+    renderClaims("positive-behavior"),
+    "",
+    "### Sentinel-absence checks (negative evidence)",
+    "",
+    "These scans establish only that the named markers were absent from the tested files and frames. They do not prove that every possible host-local or plaintext value is excluded.",
+    "",
+    renderClaims("sentinel-absence"),
+    "",
+    endMarker
+  ].join("\n");
 }
 
 function replaceGeneratedSection(document, rendered) {

@@ -468,7 +468,7 @@ fn safe_error_text(value: &str) -> String {
 #[path = "codex_account/compatibility.rs"]
 mod compatibility;
 use compatibility::*;
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn codex_host_snapshot(
     state: tauri::State<'_, CodexHostState>,
     app: AppHandle,
@@ -595,7 +595,7 @@ fn parse_mcp_servers(value: &Value) -> Result<Vec<CodexHostMcpServer>, String> {
         .collect())
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn codex_account_login_start(
     request: CodexLoginStartRequest,
     state: tauri::State<'_, CodexHostState>,
@@ -644,7 +644,7 @@ pub(crate) fn codex_account_login_start(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn codex_account_login_cancel(
     request: CodexLoginCancelRequest,
     state: tauri::State<'_, CodexHostState>,
@@ -661,7 +661,7 @@ pub(crate) fn codex_account_login_cancel(
     Ok(())
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn codex_account_logout(
     state: tauri::State<'_, CodexHostState>,
     app: AppHandle,
@@ -670,7 +670,7 @@ pub(crate) fn codex_account_logout(
     Ok(())
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn codex_mcp_login_start(
     request: CodexMcpLoginRequest,
     state: tauri::State<'_, CodexHostState>,
@@ -690,7 +690,7 @@ pub(crate) fn codex_mcp_login_start(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn codex_app_approval_mode_set(
     request: CodexAppApprovalRequest,
     state: tauri::State<'_, CodexHostState>,

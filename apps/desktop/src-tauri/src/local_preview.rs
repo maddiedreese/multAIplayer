@@ -87,7 +87,7 @@ pub(crate) struct LocalPreviewStatusResult {
     exit_status: Option<i32>,
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn detect_local_preview_servers(
 ) -> crate::command_error::CommandResult<Vec<LocalPreviewDetectedServer>> {
     let mut servers = Vec::new();
@@ -133,7 +133,7 @@ pub(crate) fn probe_cloudflared() -> CloudflaredProbe {
     }
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn local_preview_start(
     state: State<'_, LocalPreviewState>,
     request: LocalPreviewStartRequest,
@@ -243,7 +243,7 @@ pub(crate) fn local_preview_start(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn local_preview_stop(
     state: State<'_, LocalPreviewState>,
     id: String,
@@ -265,7 +265,7 @@ pub(crate) fn local_preview_stop(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn local_preview_status(
     state: State<'_, LocalPreviewState>,
     id: String,

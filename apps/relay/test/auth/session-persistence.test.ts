@@ -3,7 +3,8 @@ import test from "node:test";
 import {
   createRelayAuthSessionManager,
   createRelayAuthSessionPersistence,
-  hashAuthSessionId
+  hashAuthSessionId,
+  parseCookieHeader
 } from "../../src/auth/session.js";
 import type { AuthSession } from "../../src/state.js";
 import type { Response } from "express";
@@ -138,6 +139,139 @@ test("session manager validates live state, cookies, authorization, and identity
   assert.equal(manager.getAuthSession(token), null);
   assert.equal(saves, 3);
   assert.equal(manager.deleteAuthSession("missing"), false);
+});
+
+test("session manager exposes the exact cookie lifetime and auth behavior", () => {
+  const sessions = new Map<string, AuthSession>();
+  const manager = createRelayAuthSessionManager({
+    authSessions: sessions,
+    mutationsRequireAuth: false,
+    nodeEnv: "test",
+    normalizeSessionId: (value) => (typeof value === "string" ? value.trim() : ""),
+    scheduleStoreSave: () => assert.fail("valid operations must not schedule cleanup")
+  });
+
+  assert.equal(manager.authSessionMaxAgeMs, 30 * 24 * 60 * 60 * 1000);
+  assert.deepEqual(manager.authCookieOptions(), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: false,
+    path: "/"
+  });
+  const readResponse = errorResponse();
+  const mutationResponse = errorResponse();
+  assert.equal(manager.allowRead(null, readResponse.value), true);
+  assert.equal(manager.allowMutation(null, mutationResponse.value), true);
+  assert.equal(readResponse.statusCode, 0);
+  assert.equal(mutationResponse.statusCode, 0);
+
+  manager.setAuthSession("trimmed-token", {
+    user: { id: "github:trimmed", login: "trimmed" },
+    expiresAt: Date.now() + 60_000
+  });
+  assert.equal(manager.getAuthSession(" trimmed-token ")?.user.id, "github:trimmed");
+  assert.equal(manager.getAuthSession(42), null);
+  assert.equal(manager.deleteAuthSession(42), false);
+  assert.equal(manager.deleteAuthSession(" trimmed-token "), true);
+  assert.equal(sessions.size, 0);
+});
+
+test("session authorization responses distinguish reads from mutations", () => {
+  const manager = createRelayAuthSessionManager({
+    authSessions: new Map(),
+    mutationsRequireAuth: true,
+    nodeEnv: "test",
+    normalizeSessionId: (value) => (typeof value === "string" ? value : ""),
+    scheduleStoreSave: () => undefined
+  });
+  const read = errorResponse();
+  const mutation = errorResponse();
+
+  assert.equal(manager.allowRead(null, read.value), false);
+  assert.deepEqual(read.body, {
+    error: "Sign in with GitHub before reading workspace state.",
+    code: "authentication_required"
+  });
+  assert.equal(manager.allowMutation(null, mutation.value), false);
+  assert.deepEqual(mutation.body, {
+    error: "Sign in with GitHub before changing workspace state.",
+    code: "authentication_required"
+  });
+});
+
+test("cookie parsing preserves decoded session values and rejects absent sessions", () => {
+  assert.deepEqual([...parseCookieHeader(undefined)], []);
+  assert.deepEqual(
+    [...parseCookieHeader("theme=dark; multaiplayer_session=token%20value")],
+    [
+      ["theme", "dark"],
+      ["multaiplayer_session", "token value"]
+    ]
+  );
+
+  const manager = createRelayAuthSessionManager({
+    authSessions: new Map(),
+    mutationsRequireAuth: true,
+    nodeEnv: "test",
+    normalizeSessionId: (value) => (typeof value === "string" ? value : ""),
+    scheduleStoreSave: () => undefined
+  });
+  assert.equal(manager.getAuthSessionFromRequest({ headers: {} } as never), undefined);
+});
+
+test("stored sessions reject malformed, expired, and overlong-lived records", () => {
+  const now = Date.now();
+  const digest = hashAuthSessionId("persisted-token");
+  const validUser = { id: "github:1", login: "octocat", name: "Octo Cat", avatarUrl: "https://example.test/a" };
+  const valid = { sessionIdHash: digest, user: validUser, expiresAt: now + 30_000 };
+
+  assert.deepEqual(persistence.normalizeStoredAuthSession(valid)?.session.user, validUser);
+  assert.equal(persistence.normalizeStoredAuthSession(null), null);
+  assert.equal(persistence.normalizeStoredAuthSession({ ...valid, sessionIdHash: `g${digest.slice(1)}` }), null);
+  assert.equal(persistence.normalizeStoredAuthSession({ ...valid, sessionIdHash: `${digest}0` }), null);
+  assert.equal(persistence.normalizeStoredAuthSession({ ...valid, expiresAt: "soon" }), null);
+  assert.equal(persistence.normalizeStoredAuthSession({ ...valid, expiresAt: 1.5 }), null);
+  assert.equal(persistence.normalizeStoredAuthSession({ ...valid, expiresAt: now - 1 }), null);
+  assert.equal(persistence.normalizeStoredAuthSession({ ...valid, expiresAt: now + 60 * 60 * 1000 + 1 }), null);
+  assert.equal(persistence.normalizeStoredAuthSession({ ...valid, user: null }), null);
+  assert.equal(persistence.normalizeStoredAuthSession({ ...valid, user: { ...validUser, id: "" } }), null);
+  assert.equal(persistence.normalizeStoredAuthSession({ ...valid, user: { ...validUser, login: "" } }), null);
+  assert.equal(persistence.normalizeStoredAuthSession({ ...valid, user: { ...validUser, name: "" } }), null);
+  assert.equal(persistence.normalizeStoredAuthSession({ ...valid, user: { ...validUser, avatarUrl: "" } }), null);
+});
+
+test("stored sessions migrate bounded legacy bearer ids to digests", () => {
+  const expiresAt = Date.now() + 30_000;
+  const normalized = persistence.normalizeStoredAuthSession({
+    sessionId: "legacy-token",
+    user: { id: "github:legacy", login: "legacy" },
+    expiresAt
+  });
+  assert.equal(normalized?.sessionIdHash, hashAuthSessionId("legacy-token"));
+  assert.equal(normalized?.session.expiresAt, expiresAt);
+  assert.equal(
+    persistence.normalizeStoredAuthSession({
+      sessionId: "x".repeat(129),
+      user: { id: "github:legacy", login: "legacy" },
+      expiresAt
+    }),
+    null
+  );
+});
+
+test("session serialization drops expired and malformed digest entries", () => {
+  const now = Date.now();
+  const validHash = hashAuthSessionId("valid");
+  const wrongHash = hashAuthSessionId("wrong");
+  const user = { id: "github:1", login: "octocat" };
+  const serialized = persistence.storedAuthSessions(
+    new Map([
+      [validHash, { sessionIdHash: validHash, user, expiresAt: now + 60_000 }],
+      [wrongHash, { sessionIdHash: wrongHash, user, expiresAt: now - 1 }],
+      ["not-a-digest", { sessionIdHash: "not-a-digest", user, expiresAt: now + 60_000 }]
+    ])
+  );
+  assert.deepEqual(serialized, [{ sessionIdHash: validHash, user, expiresAt: serialized[0]?.expiresAt }]);
 });
 
 function errorResponse() {

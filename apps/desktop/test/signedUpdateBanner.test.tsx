@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { releaseVerificationUrl, SignedUpdateBanner } from "../src/components/SignedUpdateBanner";
+import {
+  releaseVerificationUrl,
+  SignedUpdateBanner,
+  UpdateVerificationWarning
+} from "../src/components/SignedUpdateBanner";
 
 test("update banner identifies pinned signature verification and requires an explicit install", () => {
   const releaseUrl = "https://github.com/maddiedreese/multAIplayer/releases/tag/v0.1.1";
@@ -21,6 +25,16 @@ test("update banner identifies pinned signature verification and requires an exp
   assert.ok(markup.includes(`href="${releaseUrl}"`));
   assert.ok(markup.includes(`href="${releaseVerificationUrl("0.1.1").replaceAll("&", "&amp;")}"`));
   assert.doesNotMatch(markup, /blob\/main/);
+});
+
+test("authentication failure is visible and points to manual verification", () => {
+  const markup = renderToStaticMarkup(<UpdateVerificationWarning />);
+  assert.match(markup, /Update check could not be verified/);
+  assert.match(markup, /Nothing was downloaded or installed/);
+  assert.match(markup, /manually verifiable release path/);
+  assert.match(markup, /Manual verification/);
+  assert.match(markup, /Updater key fingerprint/);
+  assert.match(markup, /multaiplayer\.com\/security\/updater-key/);
 });
 
 test("update banner exposes installation progress and failure fallback", () => {

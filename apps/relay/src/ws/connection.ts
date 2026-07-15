@@ -15,6 +15,11 @@ export function registerRelayWebSocketConnection(options: RelayWebSocketConnecti
       messageChain = messageChain.then(async () => {
         let publishMessageId: string | undefined;
         try {
+          if (options.transport.isReady && !options.transport.isReady()) {
+            send(socket, { type: "error", message: "Relay is not ready. Restart or reconnect before continuing." });
+            socket.close(1012, "Relay not ready");
+            return;
+          }
           if (!options.rateLimiting.consume("websocket", session.rateClientId).allowed) {
             options.metrics.recordRateLimitRejection?.("websocket");
             send(socket, { type: "error", message: "Rate limit exceeded. Slow down before sending more room events." });

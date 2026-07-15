@@ -18,7 +18,6 @@ import {
 import type { RoomKey } from "./state.js";
 
 export class SqliteRelayPersistence implements RelayPersistence {
-  readonly flushMode = "immediate";
   private db: Database.Database | null = null;
   private pendingLegacyImport = false;
 
@@ -92,24 +91,24 @@ export class SqliteRelayPersistence implements RelayPersistence {
     await ensureDataDirectory(dirname(this.dataPath));
     this.timedWrite(() => saveNormalizedRelayState(this.getDb(), state));
   }
-  async saveChanges(changes: StoredRelayMutation[]): Promise<boolean> {
+  saveChanges(changes: StoredRelayMutation[]): boolean {
     if (changes.length > 0) this.timedWrite(() => applyStoredRelayMutations(this.getDb(), changes));
     return true;
   }
-  async saveMlsBacklog(roomKey: RoomKey, messages: MlsRelayMessage[]): Promise<boolean> {
+  saveMlsBacklog(roomKey: RoomKey, messages: MlsRelayMessage[]): boolean {
     this.timedWrite(() => saveMlsBacklogRows(this.getDb(), roomKey, messages));
     return true;
   }
-  async saveKeyPackages(changes: StoredRelayMutation[], _fallbackState: () => unknown): Promise<void> {
+  saveKeyPackages(changes: StoredRelayMutation[], _fallbackState: () => unknown): void {
     this.timedWrite(() => applyStoredRelayMutations(this.getDb(), changes));
   }
-  async saveMlsMessage(
+  saveMlsMessage(
     roomKey: RoomKey,
     message: MlsRelayMessage,
     prunedIds: string[],
     changes: StoredRelayMutation[],
     _fallbackState: () => unknown
-  ): Promise<boolean> {
+  ): boolean {
     this.timedWrite(() =>
       this.getDb().transaction(() => {
         appendMlsBacklogRow(this.getDb(), roomKey, message, prunedIds);
@@ -118,13 +117,13 @@ export class SqliteRelayPersistence implements RelayPersistence {
     );
     return true;
   }
-  async saveMlsCommit(
+  saveMlsCommit(
     roomKey: RoomKey,
     message: MlsRelayMessage,
     prunedIds: string[],
     changes: StoredRelayMutation[],
     _fallbackState: () => unknown
-  ): Promise<void> {
+  ): void {
     this.timedWrite(() =>
       this.getDb().transaction(() => {
         this.getDb().prepare("insert or ignore into relay_room_epochs values (?, ?)").run(roomKey, message.epochHint);

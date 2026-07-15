@@ -4,6 +4,5 @@
   "include": ["src/**/*.{ts,tsx}"],
   "exclude": ["src/**/*.d.ts"],
   "temp-directory": "coverage/tmp",
-  "report-dir": "coverage",
-  "reporter": ["text", "json-summary", "lcov"]
+  "reporter": ["none"]
 }

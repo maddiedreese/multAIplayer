@@ -2,13 +2,18 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use minisign_verify::{PublicKey, Signature};
 use semver::Version;
 use serde::Deserialize;
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::HashMap,
+    fmt,
+    sync::atomic::{AtomicBool, Ordering},
+};
 use tauri_plugin_updater::{ReleaseManifestPlatform, RemoteRelease};
 
 const ENVELOPE_SCHEMA: &str = "multaiplayer-updater-envelope-v1";
 const PAYLOAD_SCHEMA: &str = "multaiplayer-updater-metadata-v1";
 const SUPPORTED_TARGET: &str = "darwin-aarch64";
 const PUBLIC_KEY: &str = include_str!("../updater-public.key");
+static AUTHENTICATION_FAILURE_OBSERVED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -98,22 +103,35 @@ pub fn authenticated_update_is_newer(current: Version, release: RemoteRelease) -
     if release.version <= current {
         return false;
     }
-    let Some(notes) = release.notes.as_deref() else {
-        return false;
-    };
-    let Ok(url) = release.download_url(SUPPORTED_TARGET) else {
-        return false;
-    };
-    let Ok(archive_signature) = release.signature(SUPPORTED_TARGET) else {
-        return false;
-    };
-    verify_metadata_binding(
-        notes,
-        &release.version.to_string(),
-        url.as_str(),
-        archive_signature,
-    )
-    .is_ok()
+    let verified = (|| {
+        let notes = release.notes.as_deref().ok_or(MetadataVerificationError)?;
+        let url = release
+            .download_url(SUPPORTED_TARGET)
+            .map_err(|_| MetadataVerificationError)?;
+        let archive_signature = release
+            .signature(SUPPORTED_TARGET)
+            .map_err(|_| MetadataVerificationError)?;
+        verify_metadata_binding(
+            notes,
+            &release.version.to_string(),
+            url.as_str(),
+            archive_signature,
+        )
+    })()
+    .is_ok();
+    if !verified {
+        AUTHENTICATION_FAILURE_OBSERVED.store(true, Ordering::Release);
+    }
+    verified
+}
+
+/// Reads and clears the signal left by the synchronous updater comparator.
+///
+/// Tauri represents a comparator rejection as `None`, which otherwise makes an
+/// authenticated-metadata failure indistinguishable from an up-to-date client.
+#[tauri::command]
+pub fn take_updater_auth_failure() -> bool {
+    AUTHENTICATION_FAILURE_OBSERVED.swap(false, Ordering::AcqRel)
 }
 
 pub fn verify_published_manifest(
@@ -186,6 +204,7 @@ mod tests {
 
     #[test]
     fn rejects_tampered_signed_payload_or_bound_archive_url() {
+        take_updater_auth_failure();
         let tampered_payload =
             FIXTURE_PAYLOAD.replace("Authenticated fixture notes.", "Tampered notes.");
         assert!(!authenticated_update_is_newer(
@@ -200,6 +219,7 @@ mod tests {
                 FIXTURE_PAYLOAD,
             ),
         ));
+        assert!(take_updater_auth_failure());
     }
 
     #[test]
