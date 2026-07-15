@@ -86,12 +86,13 @@ test("relay loads configuration from env files without overriding process env", 
     envPath,
     [
       "MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://env-file.example/ # normalized",
-      "MULTAIPLAYER_RELAY_REQUIRE_AUTH=false"
+      "MULTAIPLAYER_RELAY_REQUIRE_AUTH=true"
     ].join("\n"),
     "utf8"
   );
   const relay = await startRelay({
-    MULTAIPLAYER_RELAY_ENV_FILE: envPath
+    MULTAIPLAYER_RELAY_ENV_FILE: envPath,
+    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "false"
   });
   try {
     const response = await fetch(`${relay.baseUrl}/auth/config`);
