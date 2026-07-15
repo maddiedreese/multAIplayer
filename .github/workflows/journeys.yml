@@ -363,11 +363,11 @@ jobs:
           retention-days: 14
       - name: Rebuild the production frontend without the test driver
         run: npm run build -w @multaiplayer/desktop
-      - name: Build ad-hoc signed Tauri app
+      - name: Build ad-hoc signed Tauri app without public updater artifacts
         env:
           APPLE_SIGNING_IDENTITY: "-"
           MACOSX_DEPLOYMENT_TARGET: "11.0"
-        run: npm run tauri:build:release -w @multaiplayer/desktop
+        run: npm run tauri:build:prebuilt -w @multaiplayer/desktop -- --target aarch64-apple-darwin
       - name: Verify Apple silicon deployment target and entitlements
         run: |
           app_path="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/multAIplayer.app"
