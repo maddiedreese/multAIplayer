@@ -275,7 +275,6 @@ jobs:
           libssl-dev
           libwebkit2gtk-4.1-dev
           libxdo-dev
-          openbox
           webkit2gtk-driver
           xdotool
           xvfb
@@ -296,7 +295,7 @@ jobs:
 
       - name: Run two real native clients through invite, message, and handoff
         if: steps.native-policy.outputs.run == 'true'
-        run: xvfb-run -a sh -c 'openbox >/tmp/native-e2e-openbox.log 2>&1 & exec npm run test:e2e:native'
+        run: xvfb-run -a npm run test:e2e:native
 
       - name: Upload native journey duration metrics
         if: always() && steps.native-policy.outputs.run == 'true'
