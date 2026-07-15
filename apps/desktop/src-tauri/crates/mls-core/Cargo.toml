@@ -22,7 +22,7 @@ required-features = ["test-fixtures"]
 base64 = "=0.22.1"
 aes-gcm = "=0.10.3"
 hpke = { version = "=0.14.0", default-features = false, features = ["alloc", "getrandom", "aes", "nistp"] }
-hmac = "=0.12.1"
+hmac = "=0.13.0"
 mls-rs = { version = "=0.54.0", default-features = false, features = ["std", "private_message", "prior_epoch", "custom_proposal", "fast_serialize", "external_client", "sqlcipher-bundled"] }
 mls-rs-crypto-awslc = { version = "=0.23.0", default-features = true }
 mls-rs-provider-sqlite = { version = "=0.22.0", default-features = false, features = ["sqlcipher-bundled"] }

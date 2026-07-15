@@ -3193,7 +3193,7 @@ version = "0.1.0"
 dependencies = [
  "aes-gcm 0.10.3",
  "base64 0.22.1",
- "hmac 0.12.1",
+ "hmac 0.13.0",
  "hpke",
  "maybe-async",
  "mls-rs",
