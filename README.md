@@ -27,9 +27,18 @@
 Start a private project room, invite people you trust, and work with Codex as a team. Everyone can follow the conversation, propose the next turn, inspect structured progress, review changes, and use room-scoped files, diffs, terminals, browser previews, Git, and GitHub workflows. One active host supplies the project, local tools, credentials, and Codex account; an explicit handoff can move that responsibility to another verified member.
 
 <p align="center">
-  <img src="docs/assets/screens/onboarding.png" width="49%" alt="Create a multiplayer Codex workspace or join a trusted teammate's invitation">
-  <img src="docs/assets/screens/codex-room.png" width="49%" alt="A teammate request, Codex result, and activity inside a shared room">
+  <img src="docs/assets/screens/codex-room.png" width="64%" alt="Team chat with a Codex result and structured activity inside a shared room">
 </p>
+<p align="center">
+  <img src="docs/assets/screens/room-browser.png" width="49%" alt="An approved local project preview open in the room browser">
+  <img src="docs/assets/screens/room-terminal.png" width="49%" alt="A live host-controlled development terminal shared with the room">
+</p>
+
+multAIplayer does not replace Codex's system or developer instructions and does not ship a custom Codex prompt. It connects to the standard open-source Codex app-server running on the active host. An approved room turn becomes ordinary Codex turn input: the app formats the selected conversation and attachments, and explicitly labels teammate, file, terminal, browser, and tool material as untrusted context.
+
+## Independent project
+
+multAIplayer is an independent open-source project. It is **not** an official OpenAI or Codex product and is not affiliated with, endorsed by, or sponsored by OpenAI. OpenAI and Codex are trademarks of OpenAI.
 
 ## Security posture
 
@@ -72,11 +81,13 @@ Pull requests run fast checks and path-selected journeys. Scheduled workflows pr
 | `e2e`                                               | UI contracts and multi-process journeys                 |
 | `docs/decisions`                                    | Normative architecture decisions                        |
 
-The [architecture guide](docs/product-architecture.md) maps flows to code. SQLite is the relay's sole runtime backend; startup can perform a one-time import of a legacy JSON snapshot.
+The [architecture guide](docs/product-architecture.md) maps flows to code. SQLite is the relay's sole runtime backend, but the alpha relay keeps its durable working set in memory and stores entity payloads as JSON rows rather than exposing a general relational query model. Mutations are synchronously committed before a successful response or broadcast, the in-memory durable-entry count has an explicit ceiling, and startup can perform a one-time import of a legacy JSON snapshot. A runtime SQLite write failure makes the relay not ready and stops further product traffic until restart rather than serving memory that may differ from disk. See the [single-node relay ADR](docs/decisions/single-node-relay.md).
 
 ## Releases and operations
 
 Supported macOS releases are Developer ID-signed, notarized, published with checksums, Sigstore evidence, an SPDX SBOM, authenticated updater metadata bound to the exact signed bundle, and desktop reproducibility evidence. Verification instructions live in [Reproducible builds](docs/reproducible-builds.md).
+
+The pre-committed updater public key has minisign key id `5F97AE260BE16B2F`. The SHA-256 fingerprint of the exact committed `apps/desktop/src-tauri/updater-public.key` file is `626f3a15f71fc8c5794c9ce00392a12f782cd05ec47a88ce27858b43ce774673`. Compare it with the independently published copy on [multaiplayer.com](https://multaiplayer.com/security/updater-key) before trusting a first install or a compromise-recovery key.
 
 The official alpha relay is a deliberately single-node Node/SQLite service with no uptime or recovery guarantee. Keep ordinary Git/project backups. Operators should follow [Self-hosting](docs/self-hosting.md) and the [single-node relay ADR](docs/decisions/single-node-relay.md).
 

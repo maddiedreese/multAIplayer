@@ -4,6 +4,14 @@ Third parties can rebuild a tagged multAIplayer release from source and compare 
 
 ## Verify the published artifact
 
+Before the first install, record the updater key independently of the release channel. Its minisign key id is `5F97AE260BE16B2F`; the SHA-256 fingerprint of the exact committed `apps/desktop/src-tauri/updater-public.key` file is:
+
+```text
+626f3a15f71fc8c5794c9ce00392a12f782cd05ec47a88ce27858b43ce774673
+```
+
+Verify it locally with `shasum -a 256 apps/desktop/src-tauri/updater-public.key` and compare the result with `https://multaiplayer.com/security/updater-key`, which is served outside the GitHub release channel. A matching fingerprint anchors the public key; it does not prove that a particular release or maintainer account is uncompromised.
+
 Download the release assets and `SHA256SUMS.txt` from the same GitHub Release, then run:
 
 ```bash

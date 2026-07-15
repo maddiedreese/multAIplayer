@@ -44,11 +44,19 @@ The second focused review surface is every `#[tauri::command]` registered by the
 2. whether every caller-controlled input is parsed, bounded, canonicalized, and authorized in Rust;
 3. whether the command fails closed when invoked before authentication, outside the selected room/project, twice, or after state changes.
 
-`scripts/check-tauri-command-errors.mjs` verifies stable error typing only. It is not authorization evidence and must never be cited as such.
+The `typed-tauri-command` procedural macro makes a noncanonical fallible command return type a compile error. A separate Rust exact-set test requires every compiler-owned registration to have exactly one IPC-audit row. Neither control is authorization evidence: reviewers must still inspect validation, authority, state, and sensitive output.
+
+### Updater trust review
+
+Review the signed metadata comparator, its read-once authentication-failure signal, and the desktop warning as one boundary. A tampered newer manifest must fail closed **and** surface **Update check could not be verified**; an authenticated non-increasing manifest remains a quiet no-update result. Confirm that the embedded public key matches the pre-committed SHA-256 fingerprint in the README, release verification guide, and independently hosted `multaiplayer.com/security/updater-key` page. Treat the updater key and Apple Developer ID as separate mechanisms but not as independent account-compromise defenses while one maintainer and GitHub release environment can authorize both.
 
 ### Out of scope for the narrow engagement
 
 The initial review does not certify the complete Tauri shell, relay availability, GitHub/Codex providers, Apple signing infrastructure, operating-system credential stores, SQLCipher, `mls-rs`, or the end-user device. Findings that depend on those systems should still be recorded as assumptions or follow-up scope.
+
+### Relay reliability boundary
+
+The single-node relay is not part of the narrow cryptography certification scope, but reviewers should not infer a conventional relational data model from “SQLite persistence.” The process keeps durable entities in memory, stores entity payloads as JSON rows, and synchronously commits tracked mutations before success or broadcast; whole-state serialization is limited to legacy import. Review the fail-stop path as part of this boundary: a runtime SQLite failure must poison readiness, close active sockets, and refuse later product traffic until restart rather than serve divergent memory. A configured durable-entry ceiling fails startup or insertion explicitly, and quota-consuming compound insertions must roll back their contributed quota/entity state on capacity rejection. The [single-node decision](decisions/single-node-relay.md) records this tradeoff, and [self-hosting](self-hosting.md) records the operational recovery and trusted-proxy checks.
 
 ## Locked choices
 
@@ -69,14 +77,14 @@ Changing any item requires an explicit compatibility decision, focused tests, an
 
 Evidence demonstrates exercised behavior at a recorded revision; it does not convert an unaudited integration into an audited one.
 
-| Review question                     | Primary implementation                                                                     | Focused evidence                                                                                         |
-| ----------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| 3 — host-only Commit and handoff    | `engine/host_transfer.rs`, `engine/membership.rs`, relay Commit admission/routes           | generated membership transitions, host-transfer tests, real two-client native journey                    |
-| 4 — exact request and replay safety | `engine/invite_admission.rs`, native admission persistence, relay KeyPackage/invite routes | lost-ack/restart journey, KeyPackage consumption tests, duplicate decision/receipt tests                 |
-| 5 — HPKE context binding            | `hpke_seal.rs`, invite binding/canonical encoding                                          | RFC 9180 known-answer tests, wrong-recipient/context tests, malformed-input cases                        |
-| 6 — authenticator separation        | `invite_capability.rs`, invite request/response validators                                 | request/response cross-use rejection, canonical encoding vectors, property tests                         |
-| 7 — exporter/history retention      | `engine/exporter.rs`, `engine/outbound.rs`, `storage/retained_material.rs`                 | epoch/history/blob round trips, removal/rejoin model, plaintext-marker journey                           |
-| IPC secret/validation/state review  | `apps/desktop/src-tauri/src/lib.rs` and registered command modules                         | `docs/tauri-ipc-boundary-audit.md`, Rust command tests, `check-tauri-command-errors.mjs` for typing only |
+| Review question                     | Primary implementation                                                                     | Focused evidence                                                                                       |
+| ----------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| 3 — host-only Commit and handoff    | `engine/host_transfer.rs`, `engine/membership.rs`, relay Commit admission/routes           | generated membership transitions, host-transfer tests, real two-client native journey                  |
+| 4 — exact request and replay safety | `engine/invite_admission.rs`, native admission persistence, relay KeyPackage/invite routes | lost-ack/restart journey, KeyPackage consumption tests, duplicate decision/receipt tests               |
+| 5 — HPKE context binding            | `hpke_seal.rs`, invite binding/canonical encoding                                          | RFC 9180 known-answer tests, wrong-recipient/context tests, malformed-input cases                      |
+| 6 — authenticator separation        | `invite_capability.rs`, invite request/response validators                                 | request/response cross-use rejection, canonical encoding vectors, property tests                       |
+| 7 — exporter/history retention      | `engine/exporter.rs`, `engine/outbound.rs`, `storage/retained_material.rs`                 | epoch/history/blob round trips, removal/rejoin model, plaintext-marker journey                         |
+| IPC secret/validation/state review  | `apps/desktop/src-tauri/src/lib.rs` and registered command modules                         | `docs/tauri-ipc-boundary-audit.md`, exact registration/audit Rust test, typed-command compile contract |
 
 ### Executable entry points
 

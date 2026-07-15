@@ -40,23 +40,13 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 940 }, deviceScaleFactor: 1 });
   await page.emulateMedia({ reducedMotion: "reduce" });
 
-  await capture(page, "onboarding", "onboarding.png");
-
-  await page.getByRole("button", { name: /Create a workspace/ }).click();
-  await page.getByRole("button", { name: "Try again" }).click();
-  await page.getByRole("button", { name: "Check again" }).click();
-  await page.getByRole("button", { name: /Continue/ }).click();
-  await page.getByLabel("Workspace name").fill("Launch team");
-  await page.getByRole("button", { name: /Create workspace/ }).click();
-  await page.getByRole("button", { name: /Retry room setup/ }).click();
-  await settlePage(page);
-  await captureFeature(page, "safe-defaults.png");
-
   await page.goto(scenarioUrl("codex-chat-parity"));
   await page.getByText("Codex worked", { exact: true }).click();
   await page.getByText("Thinking", { exact: true }).click();
   await settlePage(page);
   await captureFeature(page, "codex-room.png");
+  await capture(page, "readme-browser", "room-browser.png");
+  await capture(page, "readme-terminal", "room-terminal.png");
 } finally {
   await browser?.close();
   await stopServer(server);
@@ -70,6 +60,12 @@ async function capture(page, scenario, filename) {
 async function captureFeature(page, filename) {
   const feature = page.locator(".readme-feature");
   await feature.waitFor({ state: "visible" });
+  if (filename === "room-browser.png") {
+    await page
+      .frameLocator('iframe[title="Room browser"]')
+      .getByRole("heading", { name: /Ship the work/ })
+      .waitFor();
+  }
   await settlePage(page);
   const dimensions = await feature.evaluate((element) => ({
     clientHeight: element.clientHeight,

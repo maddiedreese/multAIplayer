@@ -1,59 +1,83 @@
-# Alpha Limitations
+# Alpha limitations
 
-This list routes users to current product constraints; the [threat model](threat-model.md) is normative for all security properties, audit status, and residual risks.
+multAIplayer is a public alpha for trusted-team testing, not production security
+software. This page summarizes product constraints; it does not restate security
+properties. The [threat model](threat-model.md) is authoritative for security
+claims, audit status, metadata exposure, and residual risks.
 
-multAIplayer is a Public Alpha. It is useful for local and trusted-team testing, but it is not production security software yet.
+## Releases and platforms
 
-## Release And Installation
+- No supported public build has shipped yet. A supported build must pass the
+  signed, notarized release process in [Reproducing release builds](reproducible-builds.md).
+- Public packages target Apple-silicon Macs on macOS 11 or later. Intel Macs,
+  Windows, and Linux are not supported release targets.
+- Official invitations use macOS universal links. Each release still needs a
+  cold-start and warm-app test; static entitlement and parser checks do not prove
+  operating-system dispatch.
+- The missing-app landing page retains an invitation only in memory. Refreshing,
+  closing, or leaving the page loses it, so the recipient must reopen the
+  original private link.
 
-- No supported public build has been published yet. The first supported alpha must be Developer ID signed and notarized; local development and ordinary CI builds are not release artifacts.
-- Public packages support Apple silicon Macs running macOS 11 or later. Intel Macs, Windows, and Linux are not supported release targets.
-- Release checksums help verify artifact integrity, but they do not replace signing.
-- Public releases should come from GitHub Actions, not ad hoc local builds.
-- Official invitations use signed macOS universal links on `open.multaiplayer.com` and `multaiplayer.com`; there is no custom-scheme fallback. Automated parser, AASA-shape, and entitlement checks do not prove operating-system dispatch, so every release still requires cold-start and warm-app testing with a signed installed build.
-- The missing-app landing keeps the complete invitation only in page memory after removing it from the address bar. Refreshing, closing, or navigating away deliberately loses that retry state; the recipient must return to the original private message and click the link again.
+## Accounts, hosting, and storage
 
-## Accounts And Hosting
+- GitHub identifies members and authorizes relay and repository workflows.
+  ChatGPT separately authorizes Codex on the active host. Joining a room does not
+  require a Codex login until that device becomes the host.
+- The free alpha relay has no uptime, recovery, or support guarantee. Keep normal
+  Git and project backups.
+- The relay is deliberately single-node. It loads durable entities into memory,
+  writes entity payloads immediately as SQLite JSON rows, and enforces a
+  configurable durable-entry ceiling. It is not an unbounded or general
+  relational store. See the [single-node relay decision](decisions/single-node-relay.md)
+  and [self-hosting guide](self-hosting.md).
+- Internet-facing self-hosted deployments require a non-bypassable trusted TLS
+  edge, persistent SQLite storage, monitoring, backups, restore drills, and abuse
+  controls. Official desktop builds pin the official relay; another origin
+  requires a self-built client.
 
-- GitHub sign-in requires a GitHub OAuth app configured on the relay.
-- GitHub Device Flow identifies workspace members and authorizes relay/repository workflows. ChatGPT login separately authorizes the local Codex process. Joining requires relay and GitHub readiness but does not require Codex, a ChatGPT login, or a project folder until that device hosts Codex work.
-- The official free-alpha relay is live on Railway at `relay.multaiplayer.com`. It requires GitHub identity, TLS/WSS, encrypted persistent sessions, persistent SQLite storage, monitoring, backups, and a tested restore procedure. It carries no uptime, recovery, or support guarantee.
-- The relay Dockerfile and SQLite storage are available for self-hosting. Multi-instance production hosting still needs shared persistence/attachment coordination and external or shared rate limiting; the official alpha remains a single-instance deployment.
-- SQLite opaque MLS messages use an incremental append/delete path, but the normalized non-message relay state rewrites teams, rooms, invites, devices, members, and sessions on each debounced flush. That is acceptable for alpha-scale trusted teams, but larger hosted relays should plan an incremental or shared-store rewrite before rooms and membership counts grow enough for whole-store rewrites to become a scaling ceiling.
+## Encryption and recovery
 
-## Privacy And Encryption
+- Protocol v2 uses RFC 9420 MLS through `mls-rs`, but the integration has not
+  received an independent professional security audit. Start with the
+  [cryptography guide](cryptography.md) and [external review packet](external-review-packet.md).
+- The relay cannot read encrypted room content, but it necessarily sees bounded
+  routing, identity, timing, size, attachment-description, and lifecycle
+  metadata. The threat model owns the exact inventory.
+- Complete invite links are private, single-use bearer capabilities. Send them
+  through a private channel. The active host must still validate the requesting
+  device before admitting it.
+- Removal blocks future relay access and advances the MLS group. It cannot erase
+  content, exports, screenshots, or retained history secrets that a former member
+  already received.
+- Each device has its own MLS state. State loss requires a clean rejoin and loses
+  access to pre-rejoin history; multi-device recovery and backfill remain limited.
+- Pre-v2 rooms and pre-v3 invite authenticators are intentionally incompatible.
+  Browser builds are an install notice and initialize no workspace, identity,
+  relay, or MLS state.
 
-- Protocol v2 uses RFC 9420 MLS through `mls-rs`; see the canonical threat model for the current audit status, intended properties, evidence limits, and residual risks.
-- Room chat and local history are encrypted, and the relay should not store plaintext transcripts or attachments.
-- The relay sees routing metadata such as team names, room names, host labels, device ids, invite ids, epoch hints, opaque MLS-message sizes, and attachment filename/MIME/declared-size/epoch/expiry metadata. Attachment contents are encrypted; those metadata fields are not.
-- Invite links contain a private single-use bearer capability and public host HPKE binding, never an MLS group secret. Anyone who obtains a complete link can submit a device-bound KeyPackage request, so links must be shared privately; the active host validates the requester before creating an Add and Welcome.
-- Member removal revokes relay access and advances the group through an MLS Remove commit. A removed member may still keep content, exports, screenshots, and retained history secrets already received.
-- Exporter-derived history secrets are deliberately retained in encrypted native storage. Forward secrecy applies to live traffic, not retained local history.
-- Multi-device recovery and history backfill remain limited; each device enrolls with its own MLS credential and KeyPackages. State loss requires a clean rejoin and loses pre-rejoin history access.
-- Pre-v2 rooms and pre-v3 invite authenticators are intentionally incompatible and are not migrated.
-- The product is native-only. Browser builds show a static install notice and initialize no workspace, identity, relay connection, or MLS state.
+## Codex and host-local risk
 
-## Codex Hosting
+- Codex runs through the active host's standard local Codex app-server and
+  account. The supported version range and version-specific feature limits live
+  in [How Codex hosting works](codex-hosting.md).
+- Codex settings, apps, MCP servers, project files, terminals, browser sessions,
+  Git, and GitHub credentials remain host-local. multAIplayer's warnings and
+  approval prompts reduce accidental sharing; they are not a sandbox or a
+  complete secret scanner.
+- Browser and Computer Use are not exposed because the app-server surface used by
+  multAIplayer does not support them. Usage-limit handoff also cannot transfer
+  processes, credentials, or unsaved host state.
+- Local preview sharing creates a temporary public `trycloudflare.com` URL.
+  Anyone with the URL may be able to view the preview until the tunnel stops.
 
-- Codex runs through the active host's local Codex app-server/session.
-- Codex app-server 0.133.0–0.144.0 is the supported compatibility range, with generated-schema fixtures at 0.133.0, 0.143.0, and 0.144.0. Older versions cannot host; newer versions are marked unverified and new security-sensitive capabilities remain fail closed until tested.
-- Fork-through-turn requires Codex 0.143.0 or newer. Version 0.133.0 supports full-thread forks only.
-- Codex account/app/MCP controls and the `auto`/`prompt`/`writes` app approval default are host-local; the approval default is global to that Codex installation, not isolated to one room.
-- Codex Browser Use and Codex Computer Use are not offered in multAIplayer because the Codex app-server API surface this app uses does not support them.
-- Usage-limit handoff is an alpha continuity flow. The replacement host must have their own Codex access and a suitable local project folder or repo checkout.
+## Deferred product work
 
-## Local Machine Risk
-
-- The active host controls local project files, terminals, browser profiles, Git, and GitHub actions.
-- Terminal output, diffs, private repo paths, signed-in browser pages, and copied Markdown may expose secrets to the room.
-- Sensitive file and terminal warnings are review aids, not complete secret scanners.
-- The in-room browser blocks downloads, clipboard access, and file uploads where the native platform allows it, but signed-in page content can be sensitive.
-- Local preview sharing uses `cloudflared` to create a temporary public `trycloudflare.com` URL for a host-local development server. Anyone with the link may be able to view the preview while the tunnel is running.
-
-## Known Product Gaps
-
-- Real multi-device, multi-account dogfooding is required before the first supported build is promoted broadly.
-- Release signing, notarization, cold/warm universal-link dispatch, and the complete two-device acceptance run remain maintainer-operated release gates.
-- Independently branded or self-hosted builds cannot inherit the official universal-link association. They need their own HTTPS domains, AASA files, Apple Team ID, bundle id, associated-domain entitlement, signing, and matching native allowlists; otherwise recipients can paste the complete private invitation into the app.
-- The visual design should continue to be reviewed in the native app on real screens, especially resizable columns and embedded browser behavior.
-- A room intentionally has one primary repository binding. Multi-repository rooms are deferred until app-server exposes a stable multi-root execution and sandbox contract; use separate rooms meanwhile. See [the accepted ADR](decisions/multi-repository-rooms.md).
+- Real multi-device, multi-account dogfooding remains required before broad
+  promotion of the first supported build.
+- Independently branded builds need their own domains, Apple identity, bundle id,
+  associated-domain configuration, signing, and native allowlists.
+- A room intentionally binds one primary repository. Multi-repository rooms wait
+  for a stable multi-root execution and sandbox contract; use separate rooms in
+  the meantime. See the [accepted decision](decisions/multi-repository-rooms.md).
+- Native layout, resizable columns, and embedded-browser behavior still require
+  review on real macOS screens.
