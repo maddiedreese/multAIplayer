@@ -1,21 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { RelayStaleEpochError } from "../src/persistence.js";
 import { createRelayStorePersistenceCoordinator } from "../src/store-persistence.js";
 
-test("relay persistence flushes and closes", async () => {
+test("relay persistence flushes durable mutations and closes", async () => {
   let saves = 0,
     closed = false;
   const persistence = {
-    flushMode: "debounced" as const,
     load: async () => null,
-    save: async () => {
+    save: async () => assert.fail("whole-state save is reserved for legacy migration"),
+    saveChanges: () => {
       saves++;
+      return true;
     },
-    saveChanges: async () => false,
-    saveKeyPackages: async () => {},
-    saveMlsBacklog: async () => true,
-    saveMlsMessage: async () => true,
-    saveMlsCommit: async () => {},
+    saveKeyPackages: () => {},
+    saveMlsBacklog: () => true,
+    saveMlsMessage: () => true,
+    saveMlsCommit: () => {},
     quarantine: async () => {},
     close: () => {
       closed = true;
@@ -26,7 +27,7 @@ test("relay persistence flushes and closes", async () => {
     isExpiredAttachmentBlob: () => false,
     applyStoredRelayState: () => {},
     pruneExpiredRelayState: () => {},
-    drainStoredRelayMutations: () => [],
+    drainStoredRelayMutations: () => [{ entity: "rooms" as const, key: "room", operation: "delete" as const }],
     discardStoredRelayMutations: () => {},
     toStoredRelayState: () =>
       ({
@@ -45,22 +46,21 @@ test("relay persistence flushes and closes", async () => {
   assert.equal(closed, true);
 });
 
-test("immediate row persistence never serializes the whole relay store", async () => {
+test("row persistence never serializes the whole relay store", async () => {
   let mutationDrains = 0;
   let globalPrunes = 0;
   const persisted: unknown[] = [];
   const persistence = {
-    flushMode: "immediate" as const,
     load: async () => null,
     save: async () => assert.fail("whole-state save must not run for immediate persistence"),
-    saveChanges: async (changes: unknown[]) => {
+    saveChanges: (changes: unknown[]) => {
       persisted.push(...changes);
       return true;
     },
-    saveKeyPackages: async () => {},
-    saveMlsBacklog: async () => true,
-    saveMlsMessage: async () => true,
-    saveMlsCommit: async () => {},
+    saveKeyPackages: () => {},
+    saveMlsBacklog: () => true,
+    saveMlsMessage: () => true,
+    saveMlsCommit: () => {},
     quarantine: async () => {},
     close: () => {}
   };
@@ -104,32 +104,59 @@ test("immediate row persistence never serializes the whole relay store", async (
   assert.equal(globalPrunes, 1);
 });
 
-test("debounced whole-state saves never overlap and the queue continues after failure", async () => {
-  let saveCalls = 0;
-  let activeSaves = 0;
-  let rejectFirst!: (error: Error) => void;
-  const firstEntered = Promise.withResolvers<void>();
+test("scheduled mutation failures poison persistence until restart and still close the database", async () => {
+  let poisoned = 0;
+  let closed = false;
   const persistence = {
-    flushMode: "debounced" as const,
     load: async () => null,
-    async save() {
-      saveCalls++;
-      activeSaves++;
-      assert.equal(activeSaves, 1);
-      if (saveCalls === 1) {
-        firstEntered.resolve();
-        await new Promise<void>((_resolve, reject) => {
-          rejectFirst = reject;
-        }).finally(() => activeSaves--);
-        return;
-      }
-      activeSaves--;
+    save: async () => {},
+    saveChanges: () => {
+      throw new Error("disk full");
     },
-    saveChanges: async () => false,
-    saveKeyPackages: async () => {},
-    saveMlsBacklog: async () => true,
-    saveMlsMessage: async () => true,
-    saveMlsCommit: async () => {},
+    saveKeyPackages: () => {},
+    saveMlsBacklog: () => true,
+    saveMlsMessage: () => true,
+    saveMlsCommit: () => {},
+    quarantine: async () => {},
+    close: () => {
+      closed = true;
+    }
+  };
+  const codec = {
+    isExpiredInvite: () => false,
+    isExpiredAttachmentBlob: () => false,
+    applyStoredRelayState: () => {},
+    pruneExpiredRelayState: () => {},
+    drainStoredRelayMutations: () => [{ entity: "rooms" as const, key: "room", operation: "delete" as const }],
+    discardStoredRelayMutations: () => {},
+    toStoredRelayState: () => ({ version: 1 }) as never
+  };
+  const coordinator = createRelayStorePersistenceCoordinator({
+    dataPath: "unused",
+    persistence,
+    storeCodec: codec,
+    onPoison: () => poisoned++
+  });
+  assert.throws(() => coordinator.scheduleStoreSave(), /restart the relay/);
+  assert.equal(coordinator.isHealthy(), false);
+  assert.equal(poisoned, 1);
+  assert.throws(() => coordinator.scheduleStoreSave(), /restart the relay/);
+  assert.equal(poisoned, 1);
+  await coordinator.closeRelayStore();
+  assert.equal(closed, true);
+});
+
+test("an expected competing MLS commit does not poison persistence", async () => {
+  const persistence = {
+    load: async () => null,
+    save: async () => {},
+    saveChanges: () => true,
+    saveKeyPackages: () => {},
+    saveMlsBacklog: () => true,
+    saveMlsMessage: () => true,
+    saveMlsCommit: () => {
+      throw new RelayStaleEpochError();
+    },
     quarantine: async () => {},
     close: () => {}
   };
@@ -143,14 +170,24 @@ test("debounced whole-state saves never overlap and the queue continues after fa
     toStoredRelayState: () => ({ version: 1 }) as never
   };
   const coordinator = createRelayStorePersistenceCoordinator({ dataPath: "unused", persistence, storeCodec: codec });
-  const failed = coordinator.saveRelayStore();
-  await firstEntered.promise;
-  const queued = coordinator.saveRelayStore();
-  await Promise.resolve();
-  assert.equal(saveCalls, 1);
-  rejectFirst(new Error("injected first save failure"));
-  await assert.rejects(failed, /injected first save failure/);
-  await queued;
-  assert.equal(saveCalls, 2);
-  assert.equal(activeSaves, 0);
+  await assert.rejects(
+    async () =>
+      coordinator.saveMlsCommit(
+        "team:room",
+        {
+          id: "commit",
+          teamId: "team",
+          roomId: "room",
+          senderUserId: "user",
+          senderDeviceId: "device",
+          createdAt: new Date().toISOString(),
+          messageType: "commit",
+          epochHint: 0,
+          mlsMessage: "AA=="
+        },
+        []
+      ),
+    RelayStaleEpochError
+  );
+  assert.equal(coordinator.isHealthy(), true);
 });

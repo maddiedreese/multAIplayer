@@ -32,6 +32,7 @@ const claimsManifestPath = resolve(
 const executedClaims = [
   {
     id: "relay-room-content-exclusion",
+    evidenceKind: "positive-behavior",
     claim:
       "The tested production relay trace stores and forwards MLS, HPKE, Welcome, and exporter-derived ciphertext without the generated room plaintext or native private material.",
     verification:
@@ -40,6 +41,7 @@ const executedClaims = [
   },
   {
     id: "removed-member-epoch-exclusion",
+    evidenceKind: "positive-behavior",
     claim: "In the generated lifecycle, the removed member cannot decrypt the tested post-removal application message.",
     verification:
       "The native fixture applies the Remove commit, requires processing the successor epoch application as the removed client to fail, and the relay journey transports that exact ciphertext.",
@@ -47,6 +49,7 @@ const executedClaims = [
   },
   {
     id: "legacy-project-path-purge",
+    evidenceKind: "sentinel-absence",
     claim:
       "The tested SQLite startup migration excludes a legacy host-local project path from active relay persistence and observed room traffic.",
     verification:
@@ -55,6 +58,7 @@ const executedClaims = [
   },
   {
     id: "legacy-codex-model-purge",
+    evidenceKind: "sentinel-absence",
     claim:
       "The tested SQLite startup migration excludes a legacy host-local Codex model value from active relay persistence and observed room traffic.",
     verification:
@@ -533,7 +537,7 @@ async function writeClaimsManifest(): Promise<void> {
     claimsManifestPath,
     `${JSON.stringify(
       {
-        formatVersion: 1,
+        formatVersion: 2,
         journey: "relay-process-security",
         result: "passed",
         claims: executedClaims

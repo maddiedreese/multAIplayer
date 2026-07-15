@@ -66,8 +66,11 @@ export function registerRoomCreateRoute(options: RegisterRoomRoutesOptions) {
     )
       return;
     const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
+    let reservation: ReturnType<typeof reserveDurableQuota> | null = null;
+    let room: RoomRecord | null = null;
+    let durableCommitCompleted = false;
     try {
-      const reservation = session
+      reservation = session
         ? reserveDurableQuota({
             store,
             quota: "daily_room_creations",
@@ -90,7 +93,7 @@ export function registerRoomCreateRoute(options: RegisterRoomRoutesOptions) {
           }
         });
       }
-      const room: RoomRecord = {
+      room = {
         id: `room_${nanoid(10)}`,
         teamId,
         name: input.name,
@@ -108,20 +111,28 @@ export function registerRoomCreateRoute(options: RegisterRoomRoutesOptions) {
         unread: 0
       };
       store.setRoom(room);
-      try {
-        if (session) await saveRelayStore();
-        else scheduleStoreSave();
-      } catch {
-        store.rooms.delete(room.id);
-        if (reservation?.allowed) rollbackDurableQuota(store, reservation);
-        return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist room quota and room.");
-      }
+      if (session) await saveRelayStore();
+      else scheduleStoreSave();
+      durableCommitCompleted = true;
       broadcastRoomUpdated(room);
       res.status(201).json({ room });
+    } catch (error) {
+      if (durableCommitCompleted) throw error;
+      rollbackRoomCreation(store, room, reservation);
+      return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist room quota and room.");
     } finally {
       releaseQuotaTransaction();
     }
   });
+}
+
+function rollbackRoomCreation(
+  store: RegisterRoomRoutesOptions["store"],
+  room: RoomRecord | null,
+  reservation: ReturnType<typeof reserveDurableQuota> | null
+) {
+  if (room) store.rooms.delete(room.id);
+  if (reservation?.allowed) rollbackDurableQuota(store, reservation);
 }
 
 function allowRoomCreation(

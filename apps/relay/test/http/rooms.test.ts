@@ -1,4 +1,11 @@
 import { test } from "node:test";
+import express from "express";
+import type { AddressInfo } from "node:net";
+import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import { registerRoomHostRoute } from "../../src/http/room-host-route.js";
+import { registerRoomLifecycleRoute } from "../../src/http/room-lifecycle-route.js";
+import type { RegisterRoomRoutesOptions } from "../../src/http/room-route-types.js";
+import { createRelayStore } from "../../src/state.js";
 import {
   assert,
   createDebugSession,
@@ -471,3 +478,401 @@ test("relay lets authorized users archive restore and delete rooms", async () =>
     await relay.close();
   }
 });
+
+test("host bootstrap requires exact identity, device proof, and pristine host state", async () => {
+  const room = hostBootstrapRoom();
+  const harness = await startHostRouteHarness(room);
+  try {
+    const validBody = {
+      host: room.host,
+      hostUserId: room.hostUserId,
+      hostDeviceId: "host-device-1",
+      hostStatus: "active"
+    };
+    const rejectedBodies: Array<[string, unknown, number]> = [
+      ["missing body", undefined, 400],
+      ["array body", [], 400],
+      ["missing host", { ...validBody, host: undefined }, 400],
+      ["empty host", { ...validBody, host: "" }, 400],
+      ["missing user", { ...validBody, hostUserId: undefined }, 400],
+      ["empty user", { ...validBody, hostUserId: "" }, 400],
+      ["missing device", { ...validBody, hostDeviceId: undefined }, 409],
+      ["empty device", { ...validBody, hostDeviceId: "" }, 400],
+      ["invalid status", { ...validBody, hostStatus: "ready" }, 400],
+      ["extra key", { ...validBody, requesterName: "Maddie" }, 409],
+      ["wrong host", { ...validBody, host: "Mallory" }, 409],
+      ["wrong requested user", { ...validBody, hostUserId: "github:mallory" }, 409],
+      [
+        "unexpected key cannot replace device",
+        { host: validBody.host, hostUserId: validBody.hostUserId, hostStatus: "active", unexpected: true },
+        409
+      ]
+    ];
+    for (const [label, body, status] of rejectedBodies) {
+      harness.reset();
+      const response = await harness.patch(body);
+      assert.equal(response.status, status, label);
+    }
+    for (const requestedStatus of ["offline", "handoff"] as const) {
+      harness.reset();
+      const response = await harness.patch({ ...validBody, hostStatus: requestedStatus });
+      assert.equal(response.status, 200, requestedStatus);
+      assert.equal(((await response.json()) as { room: RoomRecord }).room.hostStatus, "active");
+    }
+
+    for (const [label, mutate] of [
+      ["already active", (value: RoomRecord) => ({ ...value, hostStatus: "active" as const })],
+      ["epoch already established", (value: RoomRecord) => ({ ...value, acceptedMlsEpoch: 0 })],
+      ["different stored user", (value: RoomRecord) => ({ ...value, hostUserId: "github:mallory" })]
+    ] as const) {
+      harness.reset(mutate(room));
+      const response = await harness.patch(validBody);
+      assert.equal(response.status, 409, label);
+    }
+
+    harness.reset();
+    harness.store.deviceSessions.clear();
+    assert.equal((await harness.patch(validBody)).status, 409);
+    harness.reset();
+    harness.store.deviceSessions.set("device-token", {
+      token: "device-token",
+      userId: "github:mallory",
+      deviceId: "host-device-1",
+      expiresAt: Date.now() + 60_000
+    });
+    assert.equal((await harness.patch(validBody)).status, 409);
+    harness.reset();
+    harness.store.deviceSessions.set("device-token", {
+      token: "device-token",
+      userId: room.hostUserId,
+      deviceId: "other-device",
+      expiresAt: Date.now() + 60_000
+    });
+    assert.equal((await harness.patch(validBody)).status, 409);
+    harness.reset();
+    harness.store.deviceSessions.set("device-token", {
+      token: "device-token",
+      userId: room.hostUserId,
+      deviceId: "host-device-1",
+      expiresAt: Date.now() - 1
+    });
+    assert.equal((await harness.patch(validBody)).status, 409);
+
+    harness.reset();
+    const response = await harness.patch(validBody);
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as { room: RoomRecord };
+    assert.equal(body.room.activeHostDeviceId, "host-device-1");
+    assert.equal(body.room.hostStatus, "active");
+    assert.equal(body.room.acceptedMlsEpoch, 0);
+    assert.equal(harness.saves(), 1);
+    assert.equal(harness.broadcasts(), 1);
+    assert.deepEqual(harness.store.getRoom(room.id), body.room);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("host bootstrap rejects authorization, access, missing rooms, and unavailable state", async () => {
+  const room = hostBootstrapRoom();
+  const body = {
+    host: room.host,
+    hostUserId: room.hostUserId,
+    hostDeviceId: "host-device-1",
+    hostStatus: "active"
+  };
+  const harness = await startHostRouteHarness(room);
+  try {
+    harness.setMutationAllowed(false);
+    assert.equal((await harness.patch(body)).status, 401);
+    harness.setMutationAllowed(true);
+    harness.setCanAccess(false);
+    assert.equal((await harness.patch(body)).status, 403);
+    harness.setCanAccess(true);
+    harness.store.rooms.delete(room.id);
+    const missing = await harness.patch(body);
+    assert.equal(missing.status, 404);
+    assert.deepEqual(await missing.json(), { error: "Room not found", code: "room_not_found" });
+
+    for (const unavailable of [
+      { ...room, archivedAt: new Date().toISOString() },
+      { ...room, deletedAt: new Date().toISOString() }
+    ]) {
+      harness.reset(unavailable);
+      const response = await harness.patch(body);
+      assert.equal(response.status, 409);
+      assert.deepEqual(await response.json(), {
+        error: "Restore this room before changing host state.",
+        code: "conflict"
+      });
+    }
+    for (const unavailableTeam of [{ archivedAt: new Date().toISOString() }, { deletedAt: new Date().toISOString() }]) {
+      harness.reset();
+      harness.store.setTeam({ ...hostBootstrapTeam(), ...unavailableTeam });
+      assert.equal((await harness.patch(body)).status, 409);
+    }
+  } finally {
+    await harness.close();
+  }
+});
+
+function hostBootstrapTeam(): TeamRecord {
+  return { id: "team-host", name: "Host team", members: 1 };
+}
+
+function hostBootstrapRoom(): RoomRecord {
+  return {
+    id: "room-host-bootstrap",
+    teamId: "team-host",
+    name: "Bootstrap room",
+    host: "Maddie",
+    hostUserId: "github:maddiedreese",
+    hostStatus: "offline",
+    approvalPolicy: "ask_every_turn",
+    approvalDelegationPolicy: "host_only",
+    trustedApproverUserIds: [],
+    mode: { chat: true, code: true, workspace: true, browser: true },
+    browserAllowedOrigins: [],
+    browserProfilePersistent: false,
+    unread: 0
+  };
+}
+
+async function startHostRouteHarness(initialRoom: RoomRecord) {
+  const app = express();
+  app.use(express.json());
+  const store = createRelayStore();
+  let saves = 0;
+  let broadcasts = 0;
+  let mutationAllowed = true;
+  let canAccess = true;
+  const session = {
+    sessionIdHash: "a".repeat(64),
+    user: { id: initialRoom.hostUserId, login: "maddie" },
+    expiresAt: Date.now() + 60_000
+  };
+  const reset = (room = initialRoom) => {
+    store.rooms.clear();
+    store.teams.clear();
+    store.deviceSessions.clear();
+    store.setTeam(hostBootstrapTeam());
+    store.setRoom({ ...room });
+    store.deviceSessions.set("device-token", {
+      token: "device-token",
+      userId: initialRoom.hostUserId,
+      deviceId: "host-device-1",
+      expiresAt: Date.now() + 60_000
+    });
+    saves = 0;
+    broadcasts = 0;
+  };
+  reset();
+  registerRoomHostRoute({
+    app,
+    store,
+    getAuthSession: () => session,
+    allowMutation: (_session, res) => {
+      if (mutationAllowed) return true;
+      res.status(401).json({ code: "authentication_required" });
+      return false;
+    },
+    canAccessRoom: () => canAccess,
+    scheduleStoreSave: () => saves++,
+    broadcastRoomUpdated: () => broadcasts++,
+    normalizeMetadataText: (value, maxChars) =>
+      typeof value === "string" && value.length > 0 && value.length <= maxChars ? value : null,
+    maxHostNameChars: 120,
+    maxUserIdChars: 160,
+    maxDeviceIdChars: 160
+  } as RegisterRoomRoutesOptions);
+  const server = app.listen(0);
+  await new Promise<void>((resolve, reject) => {
+    server.once("listening", resolve);
+    server.once("error", reject);
+  });
+  const port = (server.address() as AddressInfo).port;
+  return {
+    store,
+    reset,
+    saves: () => saves,
+    broadcasts: () => broadcasts,
+    setMutationAllowed: (value: boolean) => (mutationAllowed = value),
+    setCanAccess: (value: boolean) => (canAccess = value),
+    patch: (body: unknown) =>
+      fetch(`http://127.0.0.1:${port}/rooms/${initialRoom.id}/host`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", "x-device-session": "device-token" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) })
+      }),
+    close: () => new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+  };
+}
+
+test("room lifecycle applies archive, restore, and delete transitions exactly", async () => {
+  const room = { ...hostBootstrapRoom(), hostStatus: "active" as const };
+  const harness = await startLifecycleRouteHarness(room);
+  try {
+    const archived = await harness.patch("archive");
+    assert.equal(archived.status, 200);
+    const archivedRoom = ((await archived.json()) as { room: RoomRecord }).room;
+    assert.ok(archivedRoom.archivedAt);
+    assert.equal(archivedRoom.deletedAt, undefined);
+    assert.equal(harness.saves(), 1);
+    assert.equal(harness.broadcasts(), 1);
+
+    harness.reset({ ...room, archivedAt: "2026-01-01T00:00:00.000Z" });
+    const rearchived = ((await (await harness.patch("archive")).json()) as { room: RoomRecord }).room;
+    assert.equal(rearchived.archivedAt, "2026-01-01T00:00:00.000Z");
+
+    harness.reset({ ...room, archivedAt: "2026-01-01T00:00:00.000Z" });
+    const restored = await harness.patch("restore");
+    assert.equal(restored.status, 200);
+    assert.equal(((await restored.json()) as { room: RoomRecord }).room.archivedAt, undefined);
+
+    harness.reset({ ...room, archivedAt: "2026-01-01T00:00:00.000Z" });
+    const deleted = await harness.patch("delete");
+    assert.equal(deleted.status, 200);
+    const deletedRoom = ((await deleted.json()) as { room: RoomRecord }).room;
+    assert.equal(deletedRoom.archivedAt, undefined);
+    assert.ok(deletedRoom.deletedAt);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("room lifecycle enforces existence, access, roles, and team restore ordering", async () => {
+  const room = { ...hostBootstrapRoom(), hostStatus: "active" as const };
+  const harness = await startLifecycleRouteHarness(room);
+  try {
+    harness.setMutationAllowed(false);
+    assert.equal((await harness.patch("archive")).status, 401);
+    harness.setMutationAllowed(true);
+
+    harness.setCanAccess(false);
+    assert.equal((await harness.patch("archive")).status, 403);
+    harness.setCanAccess(true);
+
+    harness.reset();
+    harness.store.rooms.delete(room.id);
+    assert.equal((await harness.patch("archive")).status, 404);
+    for (const unavailable of [{ ...room, deletedAt: "2026-01-01T00:00:00.000Z" }, { ...room }]) {
+      harness.reset(unavailable);
+      if (!unavailable.deletedAt) {
+        harness.store.setTeam({ ...hostBootstrapTeam(), deletedAt: "2026-01-01T00:00:00.000Z" });
+      }
+      assert.equal((await harness.patch("archive")).status, 404);
+    }
+
+    harness.reset();
+    assert.equal((await harness.patch(undefined)).status, 400);
+    assert.equal((await harness.patch("rename")).status, 400);
+
+    harness.reset();
+    harness.setRole("member");
+    harness.setIsHost(false);
+    assert.equal((await harness.patch("archive")).status, 403);
+    harness.setIsHost(true);
+    assert.equal((await harness.patch("archive")).status, 200);
+
+    harness.reset({ ...room, hostStatus: "offline" });
+    harness.setRole("member");
+    harness.setIsHost(true);
+    assert.equal((await harness.patch("archive")).status, 403);
+
+    for (const role of ["owner", "admin"] as const) {
+      harness.reset();
+      harness.setRole(role);
+      harness.setIsHost(false);
+      assert.equal((await harness.patch("archive")).status, 200, role);
+    }
+
+    harness.reset({ ...room, archivedAt: "2026-01-01T00:00:00.000Z" });
+    harness.store.setTeam({ ...hostBootstrapTeam(), archivedAt: "2026-01-01T00:00:00.000Z" });
+    assert.equal((await harness.patch("restore")).status, 409);
+    assert.equal((await harness.patch("delete")).status, 200);
+  } finally {
+    await harness.close();
+  }
+});
+
+async function startLifecycleRouteHarness(initialRoom: RoomRecord) {
+  const app = express();
+  app.use(express.json());
+  const store = createRelayStore();
+  let saves = 0;
+  let broadcasts = 0;
+  let mutationAllowed = true;
+  let canAccess = true;
+  let role: "owner" | "admin" | "member" = "owner";
+  let isHost = true;
+  const session = {
+    sessionIdHash: "b".repeat(64),
+    user: { id: initialRoom.hostUserId, login: "maddie" },
+    expiresAt: Date.now() + 60_000
+  };
+  const reset = (room = initialRoom) => {
+    store.rooms.clear();
+    store.teams.clear();
+    store.teamMembers.clear();
+    store.setTeam(hostBootstrapTeam());
+    store.setRoom({ ...room });
+    store.setTeamMembers(
+      room.teamId,
+      new Map([
+        [
+          session.user.id,
+          {
+            teamId: room.teamId,
+            userId: session.user.id,
+            role,
+            joinedAt: "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      ])
+    );
+    saves = 0;
+    broadcasts = 0;
+  };
+  reset();
+  registerRoomLifecycleRoute({
+    app,
+    store,
+    getAuthSession: () => session,
+    allowMutation: (_session, res) => {
+      if (mutationAllowed) return true;
+      res.status(401).json({ code: "authentication_required" });
+      return false;
+    },
+    canAccessRoom: () => canAccess,
+    requesterFromRequest: () => ({ id: session.user.id, name: "Maddie" }),
+    isRoomHost: () => isHost,
+    scheduleStoreSave: () => saves++,
+    broadcastRoomUpdated: () => broadcasts++
+  } as RegisterRoomRoutesOptions);
+  const server = app.listen(0);
+  await new Promise<void>((resolve, reject) => {
+    server.once("listening", resolve);
+    server.once("error", reject);
+  });
+  const port = (server.address() as AddressInfo).port;
+  return {
+    store,
+    reset,
+    saves: () => saves,
+    broadcasts: () => broadcasts,
+    setMutationAllowed: (value: boolean) => (mutationAllowed = value),
+    setCanAccess: (value: boolean) => (canAccess = value),
+    setRole: (value: typeof role) => {
+      role = value;
+      reset(store.getRoom(initialRoom.id) ?? initialRoom);
+    },
+    setIsHost: (value: boolean) => (isHost = value),
+    patch: (action: string | undefined) =>
+      fetch(`http://127.0.0.1:${port}/rooms/${initialRoom.id}/lifecycle`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        ...(action === undefined ? {} : { body: JSON.stringify({ action }) })
+      }),
+    close: () => new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+  };
+}

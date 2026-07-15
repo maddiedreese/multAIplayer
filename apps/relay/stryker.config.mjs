@@ -17,15 +17,15 @@ const shards = {
   },
   "room-host": {
     mutate: ["src/http/room-host-route.ts"],
-    command: "tsx --test test/http/rooms.test.ts"
+    command: "tsx --test --test-name-pattern='host bootstrap' test/http/rooms.test.ts"
   },
   "room-lifecycle": {
     mutate: ["src/http/room-lifecycle-route.ts"],
-    command: "tsx --test test/http/rooms.test.ts"
+    command: "tsx --test --test-name-pattern='room lifecycle' test/http/rooms.test.ts"
   },
   "room-settings": {
     mutate: ["src/http/room-settings-route.ts", "src/http/room-validation.ts"],
-    command: "tsx --test test/http/rooms.test.ts"
+    command: "tsx --test test/http/room-settings-route.test.ts test/http/room-validation.test.ts"
   }
 };
 

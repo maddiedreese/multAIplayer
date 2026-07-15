@@ -62,8 +62,11 @@ export function registerAttachmentRoutes(options: RegisterAttachmentRoutesOption
     const { teamId, roomId, blobId } = target;
     const { name, type, size, epoch, sealedBlob } = payload;
     const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
+    let reservation: ReturnType<typeof reserveAttachmentQuota> | null = null;
+    let blob: AttachmentBlobRecordType | null = null;
+    let durableCommitCompleted = false;
     try {
-      const reservation = session
+      reservation = session
         ? reserveAttachmentQuota({
             store,
             session,
@@ -79,7 +82,7 @@ export function registerAttachmentRoutes(options: RegisterAttachmentRoutesOption
         : null;
       if (session && !reservation) return;
 
-      const blob: AttachmentBlobRecordType = {
+      blob = {
         id: blobId,
         teamId,
         roomId,
@@ -94,23 +97,23 @@ export function registerAttachmentRoutes(options: RegisterAttachmentRoutesOption
       };
       store.setAttachmentBlob(blob);
       if (session) {
-        try {
-          await saveRelayStore();
-        } catch {
-          store.deleteAttachmentBlob(blob.id);
-          if (reservation) rollbackDurableQuota(store, reservation);
-          return void sendRelayError(
-            res,
-            503,
-            "persistence_unavailable",
-            "Could not persist attachment blob and upload quota."
-          );
-        }
+        await saveRelayStore();
       } else {
         scheduleStoreSave();
       }
+      durableCommitCompleted = true;
       recordUpload?.(size);
       res.status(201).json({ blob });
+    } catch (error) {
+      if (durableCommitCompleted) throw error;
+      if (blob) store.deleteAttachmentBlob(blob.id);
+      if (reservation) rollbackDurableQuota(store, reservation);
+      return void sendRelayError(
+        res,
+        503,
+        "persistence_unavailable",
+        "Could not persist attachment blob and upload quota."
+      );
     } finally {
       releaseQuotaTransaction();
     }

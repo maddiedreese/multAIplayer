@@ -68,6 +68,7 @@ export interface RelayConfig {
   totalRoomCapPerUser: number;
   liveKeyPackageCapPerUser: number;
   liveInviteCapPerUser: number;
+  maxDurableEntries: number;
 }
 
 export function loadRelayConfig(): RelayConfig {
@@ -171,7 +172,8 @@ export function loadRelayConfig(): RelayConfig {
       1,
       100_000
     ),
-    liveInviteCapPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_LIVE_INVITE_CAP_USER, 100, 1, 100_000)
+    liveInviteCapPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_LIVE_INVITE_CAP_USER, 100, 1, 100_000),
+    maxDurableEntries: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES, 250_000, 1_000, 10_000_000)
   };
 }
 
