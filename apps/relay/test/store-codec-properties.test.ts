@@ -1,25 +1,38 @@
 import assert from "node:assert/strict";
+import { createECDH, createHash, generateKeyPairSync } from "node:crypto";
 import { test } from "node:test";
 import fc from "fast-check";
 import {
   AttachmentBlobRecord,
+  DeviceRecord,
+  InviteJoinRequestRecord,
   InviteRecord,
+  InviteResponseRecord,
   KeyPackageRecord,
+  MlsRelayMessage,
   RoomRecord,
   TeamMemberRecord,
   TeamRecord
 } from "@multaiplayer/protocol";
 import { createRelayStoreCodec, type StoredRelayState } from "../src/store-codec.js";
+import { createRelayAuthSessionPersistence } from "../src/auth/session.js";
 import {
   StoredAcceptedMessageReceipt,
   StoredAccountQuotaRecord,
   StoredAccountRestriction,
   StoredDeletionLedgerEntry,
   StoredInviteAckReceipt
-} from "../src/store-codec-schemas.js";
+} from "../src/store-codec-normalizers.js";
 import { InMemoryRelayStore } from "../src/state.js";
 
 const fixedNow = Date.parse("2026-07-11T12:00:00.000Z");
+const authSessionPersistence = createRelayAuthSessionPersistence({
+  authSessionMaxAgeMs: 30 * 24 * 60 * 60 * 1000,
+  maxAuthSessionIdChars: 128,
+  maxDisplayNameChars: 128,
+  maxRoomProjectPathChars: 1_024,
+  maxUserIdChars: 128
+});
 
 function codec(store = new InMemoryRelayStore()) {
   return {
@@ -30,23 +43,19 @@ function codec(store = new InMemoryRelayStore()) {
       maxAttachmentBlobIdChars: 128,
       maxAttachmentBlobNameChars: 255,
       maxAttachmentBlobTypeChars: 128,
-      maxCodexModelChars: 128,
       maxDeviceIdChars: 128,
-      maxDisplayNameChars: 128,
       maxEnvelopeIdChars: 128,
       maxHostNameChars: 128,
       maxMlsMessageChars: 1_400_000,
-      maxPublicKeyFingerprintChars: 255,
       maxPublicKeyJwkChars: 2_048,
       maxRoomIdChars: 128,
       maxRoomNameChars: 128,
-      maxRoomProjectPathChars: 1_024,
       maxTeamIdChars: 128,
       maxTeamNameChars: 128,
       maxUserIdChars: 128,
-      normalizeStoredAuthSession: () => null,
+      normalizeStoredAuthSession: authSessionPersistence.normalizeStoredAuthSession,
       pruneMlsBacklog: (messages) => messages,
-      storedAuthSessions: () => [],
+      storedAuthSessions: authSessionPersistence.storedAuthSessions,
       now: () => fixedNow
     })
   };
@@ -250,25 +259,470 @@ test("every emitted row satisfies its authoritative protocol or persistence sche
       const instance = codec();
       instance.codec.applyStoredRelayState({ ...document, version: 1 });
       const stored = instance.codec.toStoredRelayState();
-      for (const [schema, rows] of [
-        [TeamRecord, stored.teams],
-        [RoomRecord, stored.rooms],
-        [InviteRecord, stored.invites],
-        [KeyPackageRecord, stored.keyPackages ?? []],
-        [TeamMemberRecord, stored.teamMembers?.flatMap((entry) => entry.members ?? []) ?? []],
-        [AttachmentBlobRecord, stored.attachmentBlobs ?? []],
-        [StoredInviteAckReceipt, stored.inviteAckReceipts ?? []],
-        [StoredAcceptedMessageReceipt, stored.acceptedMessageReceipts ?? []],
-        [StoredAccountRestriction, stored.accountRestrictions ?? []],
-        [StoredAccountQuotaRecord, stored.accountQuotaRecords ?? []],
-        [StoredDeletionLedgerEntry, stored.appliedDeletionLedgerEntries ?? []]
-      ] as const) {
-        for (const row of rows) assert.equal(schema.safeParse(row).success, true);
-      }
+      assertStoredStateAllowlist(stored);
+      assertStoredSchemas(stored);
     }),
     { numRuns: 1_000 }
   );
 });
+
+const storedStateKeys = new Set([
+  "version",
+  "savedAt",
+  "teams",
+  "rooms",
+  "invites",
+  "devices",
+  "keyPackages",
+  "inviteRequests",
+  "inviteResponses",
+  "inviteAckReceipts",
+  "acceptedMessageReceipts",
+  "teamMembers",
+  "authSessions",
+  "accountRestrictions",
+  "accountQuotaRecords",
+  "appliedDeletionLedgerEntries",
+  "attachmentBlobs",
+  "mlsBacklog"
+]);
+
+const storedRowKeys: Record<string, ReadonlySet<string>> = {
+  teams: new Set(["id", "name", "members", "role", "archivedAt", "deletedAt"]),
+  rooms: new Set([
+    "id",
+    "teamId",
+    "acceptedMlsEpoch",
+    "name",
+    "host",
+    "hostUserId",
+    "activeHostDeviceId",
+    "hostStatus",
+    "approvalPolicy",
+    "approvalDelegationPolicy",
+    "trustedApproverUserIds",
+    "mode",
+    "browserAllowedOrigins",
+    "browserProfilePersistent",
+    "unread",
+    "archivedAt",
+    "deletedAt"
+  ]),
+  invites: new Set([
+    "id",
+    "teamId",
+    "roomId",
+    "creatorUserId",
+    "approvedUserId",
+    "approvedDeviceId",
+    "keyPackageHash",
+    "createdAt",
+    "expiresAt"
+  ]),
+  devices: new Set([
+    "userId",
+    "deviceId",
+    "displayName",
+    "signaturePublicKey",
+    "signatureKeyFingerprint",
+    "hpkePublicKey",
+    "hpkeKeyFingerprint",
+    "registeredAt",
+    "lastSeenAt"
+  ]),
+  keyPackages: new Set([
+    "id",
+    "keyPackage",
+    "keyPackageHash",
+    "ciphersuite",
+    "userId",
+    "deviceId",
+    "credentialIdentity",
+    "createdAt"
+  ]),
+  inviteRequests: new Set([
+    "requestId",
+    "inviteId",
+    "requesterUserId",
+    "requesterDeviceId",
+    "keyPackageId",
+    "keyPackageHash",
+    "sealedRequest",
+    "createdAt"
+  ]),
+  inviteResponses: new Set([
+    "requestId",
+    "inviteId",
+    "requesterUserId",
+    "requesterDeviceId",
+    "keyPackageHash",
+    "status",
+    "responseBinding",
+    "responseMac",
+    "welcome",
+    "createdAt"
+  ]),
+  inviteAckReceipts: new Set([
+    "inviteId",
+    "requestId",
+    "teamId",
+    "requesterUserId",
+    "requesterDeviceId",
+    "keyPackageHash",
+    "status",
+    "acknowledgedAt",
+    "expiresAt"
+  ]),
+  acceptedMessageReceipts: new Set([
+    "roomKey",
+    "messageId",
+    "messageType",
+    "senderUserId",
+    "senderDeviceId",
+    "parentEpoch",
+    "digest",
+    "acceptedAt"
+  ]),
+  teamMembers: new Set(["teamId", "members", "userIds"]),
+  authSessions: new Set(["sessionIdHash", "user", "expiresAt"]),
+  accountRestrictions: new Set(["userId", "reasonCode", "createdAt", "expiresAt"]),
+  accountQuotaRecords: new Set(["key", "userId", "quota", "used", "resetAt"]),
+  appliedDeletionLedgerEntries: new Set(["entryId", "appliedAt"]),
+  attachmentBlobs: new Set([
+    "id",
+    "teamId",
+    "roomId",
+    "name",
+    "type",
+    "size",
+    "uploadedByUserId",
+    "epoch",
+    "sealedBlob",
+    "createdAt",
+    "expiresAt"
+  ]),
+  mlsBacklog: new Set(["key", "messages"])
+};
+
+function assertStoredStateAllowlist(stored: StoredRelayState): void {
+  assertOnlyKeys(stored, storedStateKeys, "stored state");
+  for (const [collection, allowed] of Object.entries(storedRowKeys)) {
+    const rows = stored[collection as keyof StoredRelayState];
+    if (!Array.isArray(rows)) continue;
+    for (const row of rows) assertOnlyKeys(row, allowed, collection);
+  }
+  for (const backlog of stored.mlsBacklog) {
+    for (const message of backlog.messages) {
+      assert.equal(MlsRelayMessage.safeParse(message).success, true);
+      assertOnlyKeys(
+        message,
+        new Set([
+          "id",
+          "teamId",
+          "roomId",
+          "senderDeviceId",
+          "senderUserId",
+          "createdAt",
+          "messageType",
+          "epochHint",
+          "mlsMessage",
+          "commitEffect",
+          "nextHostUserId",
+          "nextHostDeviceId",
+          "hostTransferAuthorization"
+        ]),
+        "mlsBacklog.messages"
+      );
+    }
+  }
+}
+
+function assertStoredSchemas(stored: StoredRelayState): void {
+  for (const [schema, rows] of [
+    [TeamRecord, stored.teams],
+    [RoomRecord, stored.rooms],
+    [InviteRecord, stored.invites],
+    [DeviceRecord, stored.devices ?? []],
+    [KeyPackageRecord, stored.keyPackages ?? []],
+    [InviteJoinRequestRecord, stored.inviteRequests ?? []],
+    [InviteResponseRecord, stored.inviteResponses ?? []],
+    [TeamMemberRecord, stored.teamMembers?.flatMap((entry) => entry.members ?? []) ?? []],
+    [AttachmentBlobRecord, stored.attachmentBlobs ?? []],
+    [StoredInviteAckReceipt, stored.inviteAckReceipts ?? []],
+    [StoredAcceptedMessageReceipt, stored.acceptedMessageReceipts ?? []],
+    [StoredAccountRestriction, stored.accountRestrictions ?? []],
+    [StoredAccountQuotaRecord, stored.accountQuotaRecords ?? []],
+    [StoredDeletionLedgerEntry, stored.appliedDeletionLedgerEntries ?? []]
+  ] as const) {
+    for (const row of rows) assert.equal(schema.safeParse(row).success, true);
+  }
+}
+
+function assertOnlyKeys(value: unknown, allowed: ReadonlySet<string>, label: string): void {
+  assert.equal(typeof value, "object", `${label} must serialize as an object`);
+  assert.ok(value !== null && !Array.isArray(value), `${label} must serialize as a record`);
+  const unexpected = Object.keys(value as object).filter((key) => !allowed.has(key));
+  assert.deepEqual(unexpected, [], `${label} serialized fields outside its allowlist`);
+}
+
+test("a complete valid relay store strips unknown fields and exercises every persisted entity allowlist", () => {
+  const signaturePublicKey = generateKeyPairSync("ec", { namedCurve: "prime256v1" })
+    .publicKey.export({ format: "der", type: "spki" })
+    .toString("base64");
+  const hpke = createECDH("prime256v1");
+  hpke.generateKeys();
+  const hpkePublicKey = hpke.getPublicKey(undefined, "uncompressed").toString("base64");
+  const createdAt = "2026-07-11T11:00:00.000Z";
+  const expiresAt = "2026-07-13T12:00:00.000Z";
+  const keyPackageHash = `sha256:${"a".repeat(64)}`;
+  const pending = pendingInviteState({ acceptedMlsEpoch: 0, requestEpoch: 0, approval: "none" });
+  const state = {
+    ...pending,
+    unknownRoot: "must not persist",
+    teams: [{ ...(pending.teams[0] as object), unknownTeam: "must not persist" }],
+    rooms: [
+      {
+        ...(pending.rooms[0] as object),
+        mode: { chat: true, code: true, workspace: true, browser: false, unknownMode: true },
+        unknownRoom: "must not persist"
+      }
+    ],
+    invites: [{ ...(pending.invites[0] as object), unknownInvite: "must not persist" }],
+    devices: [
+      {
+        userId: "github:joiner",
+        deviceId: "device-joiner",
+        displayName: "Joiner",
+        signaturePublicKey,
+        signatureKeyFingerprint: publicKeyFingerprint(signaturePublicKey),
+        hpkePublicKey,
+        hpkeKeyFingerprint: publicKeyFingerprint(hpkePublicKey),
+        registeredAt: createdAt,
+        lastSeenAt: createdAt,
+        unknownDevice: "must not persist"
+      }
+    ],
+    keyPackages: [
+      {
+        id: "kp-one",
+        keyPackage: "AA==",
+        keyPackageHash,
+        ciphersuite: 2,
+        userId: "github:joiner",
+        deviceId: "device-joiner",
+        credentialIdentity: "github:joiner",
+        createdAt,
+        unknownKeyPackage: "must not persist"
+      }
+    ],
+    inviteRequests: (pending.inviteRequests as object[]).map((request) => ({
+      ...request,
+      unknownRequest: "must not persist"
+    })),
+    inviteResponses: [
+      {
+        requestId: "request-one",
+        inviteId: "invite-one",
+        requesterUserId: "github:joiner",
+        requesterDeviceId: "device-joiner",
+        keyPackageHash,
+        status: "denied",
+        responseBinding: {
+          version: 3,
+          phase: "response",
+          inviteId: "invite-one",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          keyEpoch: 0,
+          keyPackageHash,
+          requestId: "request-one",
+          requestNonce: "nonce-request-one",
+          requesterUserId: "github:joiner",
+          requesterDeviceId: "device-joiner",
+          hostUserId: "github:host",
+          hostDeviceId: "device-host",
+          expiresAt,
+          status: "denied",
+          decidedAt: createdAt
+        },
+        responseMac: "AA==",
+        createdAt,
+        unknownResponse: "must not persist"
+      }
+    ],
+    teamMembers: [
+      {
+        teamId: "team-core",
+        members: [
+          { teamId: "team-core", userId: "github:host", role: "owner", joinedAt: createdAt },
+          { teamId: "team-core", userId: "github:joiner", role: "member", joinedAt: createdAt }
+        ],
+        unknownTeamMembers: "must not persist"
+      }
+    ],
+    inviteAckReceipts: [
+      {
+        inviteId: "invite-one",
+        requestId: "request-one",
+        teamId: "team-core",
+        requesterUserId: "github:joiner",
+        requesterDeviceId: "device-joiner",
+        keyPackageHash,
+        status: "approved",
+        acknowledgedAt: createdAt,
+        expiresAt,
+        unknownAck: "must not persist"
+      }
+    ],
+    acceptedMessageReceipts: [
+      {
+        roomKey: "team-core:room-desktop",
+        messageId: "message-one",
+        messageType: "application",
+        senderUserId: "github:host",
+        senderDeviceId: "device-host",
+        parentEpoch: 0,
+        digest: "c".repeat(64),
+        acceptedAt: createdAt,
+        unknownReceipt: "must not persist"
+      }
+    ],
+    authSessions: [
+      {
+        sessionIdHash: createHash("sha256").update("complete-session").digest("hex"),
+        user: { id: "github:joiner", login: "joiner", unknownUser: "must not persist" },
+        expiresAt: Date.now() + 60_000,
+        unknownSession: "must not persist"
+      }
+    ],
+    accountRestrictions: [
+      { userId: "github:restricted", reasonCode: "abuse", createdAt, unknownRestriction: "must not persist" }
+    ],
+    accountQuotaRecords: [
+      {
+        key: "daily_room_creations:github:joiner",
+        userId: "github:joiner",
+        quota: "daily_room_creations",
+        used: 1,
+        resetAt: fixedNow + 60_000,
+        unknownQuota: "must not persist"
+      }
+    ],
+    appliedDeletionLedgerEntries: [
+      { entryId: "ledger-one", appliedAt: createdAt, unknownDeletion: "must not persist" }
+    ],
+    attachmentBlobs: [
+      {
+        id: "blob-one",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "opaque.bin",
+        type: "application/octet-stream",
+        size: 1,
+        uploadedByUserId: "github:joiner",
+        epoch: 0,
+        sealedBlob: JSON.stringify({
+          version: 1,
+          epoch: 0,
+          nonce: Buffer.alloc(12).toString("base64"),
+          ciphertext: "AA=="
+        }),
+        createdAt,
+        expiresAt,
+        unknownBlob: "must not persist"
+      }
+    ],
+    mlsBacklog: [
+      {
+        key: "team-core:room-desktop",
+        messages: [
+          {
+            id: "message-one",
+            teamId: "team-core",
+            roomId: "room-desktop",
+            senderUserId: "github:host",
+            senderDeviceId: "device-host",
+            createdAt,
+            messageType: "application",
+            epochHint: 0,
+            mlsMessage: "AA=="
+          }
+        ],
+        unknownBacklog: "must not persist"
+      }
+    ]
+  };
+
+  const instance = codec();
+  instance.codec.applyStoredRelayState(state);
+  const stored = instance.codec.toStoredRelayState();
+  assertStoredStateAllowlist(stored);
+  assertStoredSchemas(stored);
+  for (const collection of Object.keys(storedRowKeys)) {
+    assert.ok(Array.isArray(stored[collection as keyof StoredRelayState]));
+    assert.ok(
+      (stored[collection as keyof StoredRelayState] as unknown[]).length > 0,
+      `${collection} was not exercised`
+    );
+  }
+  assert.equal(stored.teamMembers?.[0]?.members?.length, 2);
+  assert.equal(Object.hasOwn(stored.rooms[0]?.mode ?? {}, "unknownMode"), false);
+  assert.equal(Object.hasOwn(stored.authSessions?.[0]?.user ?? {}, "unknownUser"), false);
+
+  fc.assert(
+    fc.property(
+      fc.stringMatching(/^unknown_[a-z0-9_]{1,20}$/),
+      fc.jsonValue({ maxDepth: 4 }),
+      (unknownKey, unknownValue) => {
+        const contaminated = structuredClone(state) as Record<string, unknown>;
+        for (const collection of Object.keys(storedRowKeys)) {
+          const rows = contaminated[collection];
+          if (!Array.isArray(rows)) continue;
+          for (const row of rows) {
+            if (row && typeof row === "object") Object.assign(row, { [unknownKey]: unknownValue });
+          }
+        }
+        const rooms = contaminated.rooms as Array<{ mode?: Record<string, unknown> }>;
+        Object.assign(rooms[0]?.mode ?? {}, { [unknownKey]: unknownValue });
+        const sessions = contaminated.authSessions as Array<{ user?: Record<string, unknown> }>;
+        Object.assign(sessions[0]?.user ?? {}, { [unknownKey]: unknownValue });
+
+        const arbitrary = codec();
+        arbitrary.codec.applyStoredRelayState(contaminated);
+        const arbitraryStored = arbitrary.codec.toStoredRelayState();
+        assertStoredStateAllowlist(arbitraryStored);
+        assertStoredSchemas(arbitraryStored);
+        for (const collection of Object.keys(storedRowKeys)) {
+          assert.ok((arbitraryStored[collection as keyof StoredRelayState] as unknown[]).length > 0);
+        }
+        assertNestedKeyAbsent(arbitraryStored, unknownKey);
+      }
+    ),
+    { numRuns: 100 }
+  );
+
+  const nestedUnknown = structuredClone(state);
+  (nestedUnknown.inviteResponses[0]!.responseBinding as Record<string, unknown>).unknownBinding =
+    "must reject the strict cryptographic binding";
+  const rejected = codec();
+  rejected.codec.applyStoredRelayState(nestedUnknown);
+  assert.equal(rejected.store.inviteResponses.size, 0);
+});
+
+function publicKeyFingerprint(encoded: string): string {
+  const hex = createHash("sha256").update(Buffer.from(encoded, "base64")).digest("hex");
+  return `sha256:${hex.match(/.{1,4}/g)!.join(":")}`;
+}
+
+function assertNestedKeyAbsent(value: unknown, forbidden: string): void {
+  if (Array.isArray(value)) {
+    for (const item of value) assertNestedKeyAbsent(item, forbidden);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  assert.equal(Object.hasOwn(value, forbidden), false);
+  for (const child of Object.values(value)) assertNestedKeyAbsent(child, forbidden);
+}
 
 test("invalid persistence-only rows are dropped independently of valid siblings", () => {
   const { store, codec: relayCodec } = codec();

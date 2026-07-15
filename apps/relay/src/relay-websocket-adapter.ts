@@ -42,6 +42,7 @@ export function registerRelayWebSocketAdapter(options: RegisterRelayWebSocketAda
     metrics: {
       recordQuotaRejection: options.metrics.recordQuotaRejection,
       recordRateLimitRejection: options.metrics.recordRateLimitRejection,
+      recordRateLimitAllowed: options.metrics.recordRateLimitAllowed,
       recordConnectionAttempt: options.metrics.recordWebSocketConnectionAttempt,
       recordConnectionAccepted: options.metrics.recordWebSocketConnectionAccepted,
       recordConnectionRejection: options.metrics.recordWebSocketConnectionRejection

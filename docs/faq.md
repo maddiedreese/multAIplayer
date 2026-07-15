@@ -1,5 +1,7 @@
 # Frequently Asked Questions
 
+Answers describe product operation and route security questions to the [threat model](threat-model.md), the sole normative claims and residual-risk source.
+
 ## Positioning
 
 ### How is this different from VS Code Live Share, tmux sharing, or just screen-sharing on a call?
@@ -48,27 +50,11 @@ Protocol v2 uses RFC 9420 Messaging Layer Security through the Rust `mls-rs` imp
 
 The original alpha protocol used custom epoch keys and per-device wrapping. It was removed rather than extended with selected MLS-like pieces because a partial implementation would not inherit MLS security properties. Matrix would introduce a much broader federated messaging, identity, and server-state architecture than this product currently needs.
 
-Using a maintained MLS implementation reduces the application-owned cryptographic surface, but it does not make this integration audited. The host-authority rules, invite HPKE flow, authenticated context, native IPC boundary, and encrypted storage integration remain multAIplayer policy and code. Read [Cryptography architecture](cryptography.md), the [MLS protocol v2 decision](decisions/mls-protocol-v2.md), and the [Threat model](threat-model.md) for the exact boundaries.
+The host-authority rules, invite HPKE flow, authenticated context, native IPC boundary, and encrypted storage integration remain multAIplayer policy and code. Read the [Cryptography mechanism](cryptography.md), [MLS protocol v2 decision](decisions/mls-protocol-v2.md), and canonical [Threat model](threat-model.md) for mechanism, rationale, and current claims respectively.
 
 ### What can the relay see about me and my project?
 
-The relay can see the metadata it needs for authentication, membership, routing, limits, and operations. This includes information such as:
-
-- GitHub user identifiers and basic profile information used for sign-in
-- Team and room identifiers and names
-- Membership, roles, host status, and live presence
-- Device identifiers, registered public keys, and public-key fingerprints
-- Relay-visible approval and browser-policy settings
-- Invite identifiers, expiration data, and other invite metadata
-- MLS message classes, sender and device identifiers, timestamps, epoch hints, and opaque message sizes
-- Attachment blob names, MIME types, declared sizes, epochs, expiration data, and storage usage; blob contents remain sealed
-- Operational counters, rate-limit data, request identifiers, and connection information
-
-The relay is designed not to persist plaintext room messages, attachment contents, project files, host-local project paths, Codex model/tuning configuration, file diffs, terminal output, browser contents, Codex credentials, OpenAI credentials, MLS private state, group secrets, exporter output, retained history secrets, or GitHub access tokens. The native app stores the GitHub token in macOS Keychain and calls GitHub directly for pull requests and Actions. The relay observes the token only during sign-in identity verification and immediately discards it. Authorized teammates can see GitHub display identity, avatar, device labels, and public device fingerprints in presence and roster surfaces.
-
-This is an intended and tested architecture boundary, not an independently audited guarantee. See the [Threat model](threat-model.md) for the detailed inventory.
-
-The [Privacy Policy](https://multaiplayer.com/privacy) gives the hosted-service inventory and the [Terms of Service](https://multaiplayer.com/terms) covers the free open-source alpha's acceptable-use and service terms.
+Use the canonical [Relay Metadata Authorization](threat-model.md#relay-metadata-authorization) inventory; it is maintained alongside the exact intended exclusions and residual exposures so this FAQ cannot silently drift into a second claims source. The [Privacy Policy](https://multaiplayer.com/privacy) gives the hosted-service inventory, and the [Terms of Service](https://multaiplayer.com/terms) covers the free open-source alpha's acceptable-use and service terms.
 
 ### Do I have a multAIplayer account, and can I delete it?
 
@@ -105,13 +91,7 @@ If a link leaks, do not approve an unexpected request. Invalidate the invite and
 
 ### Has the encryption been audited?
 
-No. The cryptographic protocol and implementation have not received an independent professional security audit.
-
-The repository includes documented protocol boundaries, generated MLS membership/host-transition tests, adversarial Commit ordering/replay tests, RFC 9180 HPKE known-answer evidence, lifecycle and persistence tests, relay commit-ordering and KeyPackage-consumption tests, scheduled production-path parser fuzzing, focused relay-authorization mutation testing, and public threat-model history. There is also a curated [External review packet](external-review-packet.md) that identifies the protocol, implementation boundaries, invariants, test commands, and areas where review would be most useful.
-
-Those controls improve reviewability and catch regressions. They do not replace an independent audit or establish that the system is secure against every real-world attack.
-
-Cryptographers and protocol reviewers can help by using the external review packet, reviewing the MLS lifecycle, host-authority policy, invite bindings, storage transactions, and native secret boundary, and reporting findings through [GitHub private vulnerability reporting](https://github.com/maddiedreese/multAIplayer/security/advisories/new) or the private contact in [SECURITY.md](../SECURITY.md).
+The canonical [threat model](threat-model.md) records the current audit status, intended properties, and residual risks. Automated evidence includes generated MLS transitions, adversarial ordering/replay tests, RFC 9180 known-answer cases, relay persistence/lifecycle tests, parser fuzzing, and scheduled mutation testing across authorization, sessions, WebSocket admission, and room mutations. The reviewer-only [external review packet](external-review-packet.md) scopes questions 3–7 to a one-week cryptography engagement. Findings belong in [GitHub private vulnerability reporting](https://github.com/maddiedreese/multAIplayer/security/advisories/new) or the private contact in [SECURITY.md](../SECURITY.md).
 
 ## Scope and platform
 
@@ -199,9 +179,7 @@ The repository remains available under Apache-2.0 if maintenance stops, but ther
 
 ### Is this safe to use on a private or work repository yet?
 
-Probably not yet, unless your team has reviewed the risks and decided the current alpha controls are appropriate for that repository.
-
-The encryption is unaudited. Room membership grants access to meaningful project context. Approved Codex turns and terminal commands can affect the host's files and accounts. Signed-in browser pages, terminal output, private paths, diffs, copied Markdown, and local tools can expose sensitive information. Warnings and redaction are safeguards, not complete data-loss prevention.
+Probably not yet, unless your team has reviewed the current [threat model](threat-model.md) and [alpha limitations](alpha-limitations.md) and decided the documented risks are appropriate for that repository. Those two sources own the current assurance and audit status rather than this FAQ.
 
 The safer evaluation path is:
 

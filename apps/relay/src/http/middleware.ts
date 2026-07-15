@@ -42,6 +42,7 @@ export function createRelayRequestGuards({
     }
     const result = consumeRateLimit(bucket, clientIdentityFromRequest(req));
     if (result.allowed) {
+      metrics.recordRateLimitAllowed(bucket);
       next();
       return;
     }

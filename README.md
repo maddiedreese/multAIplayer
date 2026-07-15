@@ -66,15 +66,9 @@ Alongside chat and Codex, the room brings together project files and diffs, term
 
 ## What sharing a room means
 
-A room is for people you trust to collaborate on the active host's project. Members can see the context the host shares and can request actions involving the project, terminal, Git, GitHub, and Codex session. The active host stays responsible for reviewing approvals and choosing the access Codex receives.
+A room is for trusted collaborators; members can propose project, terminal, Git, GitHub, browser, and Codex actions, while the active host remains responsible for each approval. Room messages use RFC 9420 MLS through `mls-rs`, and attachment content uses exporter-derived encryption in the native Rust boundary; the multAIplayer integration is **unaudited**. The relay-visible metadata, retained-history tradeoffs, local-machine risks, and exact intended properties are stated only in the [threat model](docs/threat-model.md). GitHub/Codex credentials and invite capabilities have separate native handling boundaries, and complete invite links must stay in private channels. Automated evidence includes focused `mls-core` parser fuzz targets, relay parsing fuzz/property tests, native/relay lifecycle journeys, and scheduled relay-decision mutation testing; it does not cover every integration state or replace independent review.
 
-- Chat, shared Codex activity, and attachments travel through RFC 9420 MLS encryption via `mls-rs` in the native Rust boundary; multAIplayer's integration layer is unaudited.
-- The relay coordinates rooms and membership. It is designed not to receive plaintext chat, attachment contents, project files, host-local project paths, Codex model configuration, terminal output, or Codex/OpenAI credentials.
-- GitHub sign-in requests `read:user repo` so repository workflows can work with both public and private repositories the user can access. The native app keeps the token in macOS Keychain and calls GitHub directly for pull requests and Actions; the relay observes it only during sign-in identity verification and immediately discards it. Local Git uses the host's existing credentials.
-- Invite links contain a private, single-use bearer capability in the URL fragment. Share the complete link only through a private channel; never paste it into an issue, log, diagnostic, or support request.
-- This is alpha software. Its encryption and host-authority boundaries have extensive automated test coverage, but they have not received an independent professional security audit.
-
-Read the [threat model](docs/threat-model.md), [cryptography architecture](docs/cryptography.md), [alpha limitations](docs/alpha-limitations.md), and [security policy](SECURITY.md) before using private projects.
+Read the [cryptography mechanism guide](docs/cryptography.md), [alpha limitations](docs/alpha-limitations.md), [security policy](SECURITY.md), and [external review packet](docs/external-review-packet.md) before using private projects.
 
 ## The free alpha
 
@@ -107,7 +101,7 @@ npm test
 npm run verify
 ```
 
-`npm run verify` runs the TypeScript, UI, relay, package, Rust, and native verification layers. More expensive mutation, fuzzing, supply-chain, and reproducibility jobs run on their documented CI schedules. See [the CI policy](docs/external-review-packet.md#continuous-integration-policy) for exact evidence boundaries.
+`npm run verify` runs the TypeScript, UI, relay, package, Rust, and native verification layers. More expensive mutation, fuzzing, supply-chain, and reproducibility jobs run on their documented CI schedules. See [the CI policy](CONTRIBUTING.md#continuous-integration-policy) for exact evidence boundaries.
 
 Development is AI-accelerated. Fuzzing, focused mutation testing, cross-language contract tests, and end-to-end security journeys are compensating controls for that velocity: they make important failures observable, but do not replace maintainer review or an independent security audit.
 
@@ -132,10 +126,10 @@ The supported Codex app-server range is 0.133.0–0.144.0. Newer versions are ma
 
 Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [architecture walkthrough](docs/product-architecture.md#architecture-walkthrough), then choose an open issue whose scope is clear and unclaimed.
 
-Protocol and cryptography reviewers can use the [external review packet](docs/external-review-packet.md), which maps the security claims to implementation and test evidence. Report exploitable findings privately through the process in [SECURITY.md](SECURITY.md).
+Protocol and cryptography reviewers can use the [external review packet](docs/external-review-packet.md), which defines the narrow first engagement and maps canonical threat-model claims to implementation evidence. Report exploitable findings privately through the process in [SECURITY.md](SECURITY.md).
 
 ## Release integrity
 
-Supported public artifacts are Apple-silicon-only, Developer ID signed, notarized, and published by the tagged release workflow. The workflow verifies the macOS 11 deployment target, bundled Mach-O architectures, live universal-link associations, entitlements, code signatures, stapled tickets, Gatekeeper acceptance, checksums, SBOM, provenance, and Sigstore signatures before publication. Local and ordinary CI packages are development evidence, not supported downloads.
+The alpha deliberately uses manual downloads from [GitHub Releases](https://github.com/maddiedreese/multAIplayer/releases); it has no in-app downloader or Tauri updater. Supported public artifacts are Apple-silicon-only, Developer ID signed, notarized, and published by the tagged release workflow. Verify the checksum manifest and keyless Sigstore bundle using [the release verification instructions](docs/reproducible-builds.md) before installation. Local and ordinary CI packages are development evidence, not supported downloads.
 
 Apache-2.0 licensed. Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

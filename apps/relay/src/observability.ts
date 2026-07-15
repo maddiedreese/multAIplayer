@@ -5,6 +5,10 @@ export interface RelayMetricsSnapshot {
   activeSockets: number;
   liveAttachmentBlobCount?: number;
   liveAttachmentBlobBytes?: number;
+  sqliteDatabaseBytes?: number;
+  sqliteWalBytes?: number;
+  sqliteFilesystemAvailableBytes?: number;
+  sqliteBackupLastSuccessTimestampSeconds?: number;
   envelopesPublishedTotal: number;
   attachmentBlobUploadsTotal: number;
   attachmentBlobUploadBytesTotal: number;
@@ -13,6 +17,8 @@ export interface RelayMetricsSnapshot {
   quotaRejectionsByType: Record<string, number>;
   rateLimitRejectionsTotal: number;
   rateLimitRejectionsByBucket: Record<string, number>;
+  rateLimitAllowedTotal: number;
+  rateLimitAllowedByBucket: Record<string, number>;
   webSocketConnectionAttemptsTotal: number;
   webSocketConnectionsAcceptedTotal: number;
   webSocketConnectionRejectionsByReason: Record<string, number>;
@@ -35,6 +41,7 @@ export interface RelayMetrics {
   recordAttachmentBlobUploadRejection(reason: string): void;
   recordQuotaRejection(type: string): void;
   recordRateLimitRejection(bucket?: string): void;
+  recordRateLimitAllowed(bucket?: string): void;
   recordWebSocketConnectionAttempt(): void;
   recordWebSocketConnectionAccepted(): void;
   recordWebSocketConnectionRejection(reason: string): void;
@@ -47,6 +54,10 @@ export interface RelayMetrics {
 export interface RelayMetricsSnapshotGauges {
   liveAttachmentBlobCount?: number;
   liveAttachmentBlobBytes?: number;
+  sqliteDatabaseBytes?: number;
+  sqliteWalBytes?: number;
+  sqliteFilesystemAvailableBytes?: number;
+  sqliteBackupLastSuccessTimestampSeconds?: number;
 }
 
 export function relayMetricsToPrometheus(snapshot: RelayMetricsSnapshot): string {
@@ -91,6 +102,30 @@ export function relayMetricsToPrometheus(snapshot: RelayMetricsSnapshot): string
     "gauge",
     "Bytes currently retained by non-expired attachment blobs.",
     snapshot.liveAttachmentBlobBytes ?? 0
+  );
+  metric(
+    "multaiplayer_relay_sqlite_database_bytes",
+    "gauge",
+    "Bytes occupied by the primary SQLite database file.",
+    snapshot.sqliteDatabaseBytes ?? 0
+  );
+  metric(
+    "multaiplayer_relay_sqlite_wal_bytes",
+    "gauge",
+    "Bytes occupied by the active SQLite write-ahead log.",
+    snapshot.sqliteWalBytes ?? 0
+  );
+  metric(
+    "multaiplayer_relay_sqlite_filesystem_available_bytes",
+    "gauge",
+    "Bytes available on the filesystem containing the SQLite database.",
+    snapshot.sqliteFilesystemAvailableBytes ?? 0
+  );
+  metric(
+    "multaiplayer_relay_sqlite_backup_last_success_timestamp_seconds",
+    "gauge",
+    "Unix timestamp of the last independently verified SQLite backup and restore drill.",
+    snapshot.sqliteBackupLastSuccessTimestampSeconds ?? 0
   );
   metric(
     "multaiplayer_relay_envelopes_published_total",
@@ -139,6 +174,18 @@ export function relayMetricsToPrometheus(snapshot: RelayMetricsSnapshot): string
     "Rate-limit rejections by bucket.",
     "bucket",
     snapshot.rateLimitRejectionsByBucket
+  );
+  metric(
+    "multaiplayer_relay_rate_limit_allowed_total",
+    "counter",
+    "Requests admitted by configured rate-limit buckets.",
+    snapshot.rateLimitAllowedTotal ?? 0
+  );
+  labeled(
+    "multaiplayer_relay_rate_limit_allowed_by_bucket_total",
+    "Admitted requests by rate-limit bucket, providing an adoption denominator for rejection alerts.",
+    "bucket",
+    snapshot.rateLimitAllowedByBucket ?? {}
   );
   metric(
     "multaiplayer_relay_websocket_connection_attempts_total",
@@ -221,6 +268,8 @@ export function createRelayMetrics(now = () => Date.now()): RelayMetrics {
   const quotaRejectionsByType = new Map<string, number>();
   let rateLimitRejectionsTotal = 0;
   const rateLimitRejectionsByBucket = new Map<string, number>();
+  let rateLimitAllowedTotal = 0;
+  const rateLimitAllowedByBucket = new Map<string, number>();
   let webSocketConnectionAttemptsTotal = 0;
   let webSocketConnectionsAcceptedTotal = 0;
   const webSocketConnectionRejectionsByReason = new Map<string, number>();
@@ -247,6 +296,10 @@ export function createRelayMetrics(now = () => Date.now()): RelayMetrics {
     recordRateLimitRejection(bucket = "unknown") {
       rateLimitRejectionsTotal += 1;
       incrementMap(rateLimitRejectionsByBucket, normalizeMetricType(bucket));
+    },
+    recordRateLimitAllowed(bucket = "unknown") {
+      rateLimitAllowedTotal += 1;
+      incrementMap(rateLimitAllowedByBucket, normalizeMetricType(bucket));
     },
     recordWebSocketConnectionAttempt() {
       webSocketConnectionAttemptsTotal += 1;
@@ -278,6 +331,8 @@ export function createRelayMetrics(now = () => Date.now()): RelayMetrics {
         quotaRejectionsByType: Object.fromEntries(quotaRejectionsByType),
         rateLimitRejectionsTotal,
         rateLimitRejectionsByBucket: Object.fromEntries(rateLimitRejectionsByBucket),
+        rateLimitAllowedTotal,
+        rateLimitAllowedByBucket: Object.fromEntries(rateLimitAllowedByBucket),
         webSocketConnectionAttemptsTotal,
         webSocketConnectionsAcceptedTotal,
         webSocketConnectionRejectionsByReason: Object.fromEntries(webSocketConnectionRejectionsByReason),

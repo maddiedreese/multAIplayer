@@ -2,7 +2,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const requiredDomPurifyVersion = "3.4.12";
 const requiredMonacoVersion = "0.55.1";
 const rootPackage = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8"));

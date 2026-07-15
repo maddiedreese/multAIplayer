@@ -64,6 +64,7 @@ export default tseslint.config(
       "desktop/layer-boundaries": "error",
       "desktop/no-flat-lib-module": "error",
       "desktop/zustand-slice-boundaries": "error",
+      "desktop/zustand-reducer-only": "error",
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "error"
     }

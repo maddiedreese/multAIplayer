@@ -3,6 +3,7 @@
 mod browser;
 mod codex;
 mod codex_account;
+mod codex_authorization;
 mod codex_catalog;
 mod codex_goal;
 mod codex_request_projection;
@@ -34,6 +35,7 @@ mod workspace;
 use browser::*;
 use codex::*;
 use codex_account::*;
+use codex_authorization::*;
 use codex_catalog::*;
 use codex_goal::*;
 use codex_requests::CodexRpcState;
@@ -65,6 +67,7 @@ pub fn run() {
         .manage(ShellAuthorizationState::default())
         .manage(LocalPreviewState::default())
         .manage(CodexRpcState::default())
+        .manage(CodexAuthorizationState::default())
         .manage(CodexHostState::default())
         .manage(GitHubState::default())
         .manage(MlsNativeState::default())

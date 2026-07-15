@@ -35,7 +35,7 @@ import {
   recoverInviteApproval,
   type PendingInviteApproval
 } from "../../lib/invite/inviteApprovalRecovery";
-import { publishRoomConfigSnapshot } from "../mls/roomConfigSnapshot";
+import { publishRoomConfigSnapshot, resolveRoomConfigForPublish } from "../mls/roomConfigSnapshot";
 
 type InviteRelayActionOptions = Pick<UseInviteActionsOptions, "relayRef" | "seenEnvelopeIds" | "selectedRoomIdRef">;
 const inviteDecisionsInFlight = new Set<string>();
@@ -66,6 +66,19 @@ type InviteRelayStore = Pick<
   AppStoreState,
   "appendInviteRequest" | "setInviteMessageForRoom" | "updateInviteRequestStatus"
 >;
+
+export async function publishInviteAdmissionArtifacts(operations: {
+  publishConfig: () => Promise<void>;
+  publishWelcome: () => Promise<void>;
+  markWelcomePublished: () => Promise<void>;
+}): Promise<void> {
+  // A Welcome must never become durable at the relay unless the new epoch's
+  // encrypted configuration is already durable there. An offline joiner can
+  // then consume Welcome and immediately recover the member-only snapshot.
+  await operations.publishConfig();
+  await operations.publishWelcome();
+  await operations.markWelcomePublished();
+}
 
 export function createInviteRelayActions(
   options: InviteRelayActionOptions,
@@ -199,6 +212,9 @@ export function createInviteRelayActions(
     context: NonNullable<ReturnType<typeof currentSelectedRoomContext>>
   ) {
     const { room, deviceId } = context;
+    // Fail before consuming the relay KeyPackage or creating an MLS Add if the
+    // host cannot recover the complete member-only configuration.
+    const configRoom = await resolveRoomConfigForPublish(room);
     const { approval, epoch } = await loadOrCreateInviteApproval(request, validated, room, deviceId);
     const outbox = await listMlsOutbox();
     const commit = outbox.find((item) => item.id === approval!.commitOutboxId);
@@ -241,30 +257,35 @@ export function createInviteRelayActions(
     } else if ((await currentMlsEpoch(room.id)) < approval.epoch) {
       throw new Error("Native MLS invite commit is missing before its Welcome was delivered.");
     }
-    await retryAfterDeviceSessionExpiry(
-      getRelayHttpUrl(),
-      deviceId,
-      () =>
-        publishDirectedInviteResponse(request.inviteId, {
-          hostDeviceId: deviceId,
-          requestId: request.id,
-          status: "approved",
-          responseBinding: approval.responseBinding as never,
-          responseMac: approval.responseMac,
-          welcome: welcome.payload
-        }),
-      (session) => useAppStore.getState().replaceDeviceSessionToken(session.token)
-    );
-    await markMlsPublishSucceeded(room.id, welcome.id);
-    const configRelay = relayRef.current;
-    if (!configRelay) throw new Error("Relay is unavailable for the encrypted room configuration snapshot.");
-    await publishRoomConfigSnapshot({
-      client: configRelay,
-      room,
-      senderUserId: context.localUser.id,
-      senderDeviceId: deviceId,
-      seenEnvelopeIds: seenEnvelopeIds.current,
-      incrementRevision: true
+    await publishInviteAdmissionArtifacts({
+      publishConfig: async () => {
+        const configRelay = relayRef.current;
+        if (!configRelay) throw new Error("Relay is unavailable for the encrypted room configuration snapshot.");
+        await publishRoomConfigSnapshot({
+          client: configRelay,
+          room: configRoom,
+          senderUserId: context.localUser.id,
+          senderDeviceId: deviceId,
+          seenEnvelopeIds: seenEnvelopeIds.current,
+          incrementRevision: true
+        });
+      },
+      publishWelcome: () =>
+        retryAfterDeviceSessionExpiry(
+          getRelayHttpUrl(),
+          deviceId,
+          () =>
+            publishDirectedInviteResponse(request.inviteId, {
+              hostDeviceId: deviceId,
+              requestId: request.id,
+              status: "approved",
+              responseBinding: approval.responseBinding as never,
+              responseMac: approval.responseMac,
+              welcome: welcome.payload
+            }),
+          (session) => useAppStore.getState().replaceDeviceSessionToken(session.token)
+        ),
+      markWelcomePublished: () => markMlsPublishSucceeded(room.id, welcome.id).then(() => undefined)
     });
     approvedInviteOutboxes.delete(request.id);
     validatedRequests.delete(request.id);

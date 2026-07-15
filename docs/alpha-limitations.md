@@ -1,5 +1,7 @@
 # Alpha Limitations
 
+This list routes users to current product constraints; the [threat model](threat-model.md) is normative for all security properties, audit status, and residual risks.
+
 multAIplayer is a Public Alpha. It is useful for local and trusted-team testing, but it is not production security software yet.
 
 ## Release And Installation
@@ -21,7 +23,7 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 
 ## Privacy And Encryption
 
-- Protocol v2 uses RFC 9420 MLS through `mls-rs`; the application integration, host-authority policy, HPKE invite flow, and storage boundary remain unaudited. End-to-end encryption is design intent backed by tests, not an independently verified guarantee.
+- Protocol v2 uses RFC 9420 MLS through `mls-rs`; see the canonical threat model for the current audit status, intended properties, evidence limits, and residual risks.
 - Room chat and local history are encrypted, and the relay should not store plaintext transcripts or attachments.
 - The relay sees routing metadata such as team names, room names, host labels, device ids, invite ids, epoch hints, opaque MLS-message sizes, and attachment filename/MIME/declared-size/epoch/expiry metadata. Attachment contents are encrypted; those metadata fields are not.
 - Invite links contain a private single-use bearer capability and public host HPKE binding, never an MLS group secret. Anyone who obtains a complete link can submit a device-bound KeyPackage request, so links must be shared privately; the active host validates the requester before creating an Add and Welcome.

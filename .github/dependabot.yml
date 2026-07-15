@@ -4,7 +4,8 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
+      day: monday
     open-pull-requests-limit: 10
     ignore:
       # Keep compiler and platform types aligned with typescript-eslint and the Node 22 runtime.
@@ -30,7 +31,8 @@ updates:
   - package-ecosystem: cargo
     directory: /apps/desktop/src-tauri
     schedule:
-      interval: monthly
+      interval: weekly
+      day: monday
     open-pull-requests-limit: 10
     groups:
       cargo-compatible-updates:
@@ -48,7 +50,8 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
+      day: monday
     open-pull-requests-limit: 10
     groups:
       github-actions-update-batch:
@@ -58,5 +61,6 @@ updates:
   - package-ecosystem: docker
     directory: /apps/relay
     schedule:
-      interval: monthly
+      interval: weekly
+      day: monday
     open-pull-requests-limit: 5

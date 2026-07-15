@@ -3,9 +3,34 @@
     "src/authz.ts": {
       "minimumScore": 100,
       "maximumSurvived": 0
+    },
+    "src/auth/session.ts": {
+      "minimumScore": 60,
+      "maximumSurvived": 200
+    },
+    "src/ws/connection-admission.ts": {
+      "minimumScore": 60,
+      "maximumSurvived": 100
+    },
+    "src/http/room-create-route.ts": {
+      "minimumScore": 60,
+      "maximumSurvived": 200
+    },
+    "src/http/room-host-route.ts": {
+      "minimumScore": 60,
+      "maximumSurvived": 100
+    },
+    "src/http/room-lifecycle-route.ts": {
+      "minimumScore": 60,
+      "maximumSurvived": 100
+    },
+    "src/http/room-settings-route.ts": {
+      "minimumScore": 60,
+      "maximumSurvived": 200
+    },
+    "src/http/room-validation.ts": {
+      "minimumScore": 60,
+      "maximumSurvived": 100
     }
-  },
-  "allowedTimeouts": [],
-  "allowedIgnored": [],
-  "regions": []
+  }
 }

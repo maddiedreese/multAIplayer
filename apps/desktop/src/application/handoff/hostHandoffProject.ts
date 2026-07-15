@@ -6,12 +6,12 @@ import {
   getGitRemoteOrigin,
   type GitApplyPatchResult,
   type GitCloneResult
-} from "../lib/platform/localBackend";
-import { formatCodexModel } from "../lib/formatting/appFormatters";
-import { handoffRepoIdentity, hostHandoffDetail, sameHandoffRepo } from "../lib/handoff/hostHandoff";
-import { parseGitHubRemoteUrl } from "../lib/git/gitWorkflowDraft";
-import { reportExpectedFailure } from "../lib/core/nonFatalReporting";
-import type { HostHandoffRecord, QueuedCodexTurn } from "../types";
+} from "../../lib/platform/localBackend";
+import { formatCodexModel } from "../../lib/formatting/appFormatters";
+import { handoffRepoIdentity, hostHandoffDetail, sameHandoffRepo } from "../../lib/handoff/hostHandoff";
+import { parseGitHubRemoteUrl } from "../../lib/git/gitWorkflowDraft";
+import { reportExpectedFailure } from "../../lib/core/nonFatalReporting";
+import type { HostHandoffRecord, QueuedCodexTurn } from "../../types";
 
 export interface HandoffProject {
   path: string;

@@ -95,6 +95,7 @@ impl CodexServerSession {
             cancelled: Some(cancelled),
             proposed_by: None,
             context_summary: None,
+            approved_project_root: Some(std::path::Path::new(cwd)),
         };
         let mut pending_guard = PendingSessionGuard::new(rpc_state.clone(), session_id);
         cleanup_on_error(
@@ -171,6 +172,7 @@ impl CodexServerSession {
             cancelled: Some(cancelled.clone()),
             proposed_by,
             context_summary,
+            approved_project_root: Some(std::path::Path::new(cwd)),
         };
         let thread_request_id = self.allocate_id();
         cleanup_on_error(

@@ -1,12 +1,14 @@
 # Protocol
 
-multAIplayer protocol v2 uses RFC 9420 MLS via `mls-rs` for native encrypted rooms; multAIplayer's integration layer is unaudited. The relay routes opaque MLS messages and public/bounded metadata; it never receives room plaintext, MLS private state, exporter output, or history secrets.
+This is a mechanism/interoperability reference. The [threat model](threat-model.md) is the sole normative source for security claims, trust assumptions, audit status, and residual risks; if wording here conflicts, the threat model controls.
+
+multAIplayer protocol v2 uses RFC 9420 MLS via `mls-rs` for native encrypted rooms. The relay wire/store formats route opaque MLS messages and public/bounded metadata rather than fields for room plaintext, MLS private state, exporter output, or history secrets. Current assurance and audit status are stated only in the threat model.
 
 Protocol v2 is a clean break. Pre-v2 rooms and invite links are invalid and there is no legacy envelope or room-key migration path.
 
 ## Locked MLS profile
 
-- Implementation: `mls-rs` in the Rust/Tauri boundary; multAIplayer's integration layer is unaudited.
+- Implementation: `mls-rs` in the Rust/Tauri boundary.
 - Ciphersuite: only `0x0002`, `MLS_128_DHKEMP256_AES128GCM_SHA256_P256`.
 - Credential: MLS BasicCredential binding GitHub user id and device id.
 - Fingerprint: full SHA-256 digest of the MLS signature public key.
@@ -77,6 +79,6 @@ The relay can deny service, withhold or replay retained opaque messages within a
 
 HTTP, WebSocket, KeyPackage, MLS-message, sealed-request, Welcome, metadata, backlog, blob, and rate limits are enforced independently. The old cryptographic nonce budget and room-key rotation counter do not exist in v2; MLS derives per-message keys and nonces from its key schedule.
 
-Shared Zod schemas in `packages/protocol` are authoritative for live wire and domain shapes. Relay persistence is a second, intentionally distinct trust boundary: SQLite/JSON rows can be stale, partially migrated, relationally inconsistent, or edited outside the process. Store decoding therefore starts with the shared schema when the stored shape matches it, then applies relay-only byte ceilings, canonical-encoding checks, expiry and cross-record constraints, plus narrowly scoped legacy defaults. Relay-owned row shapes live in `store-codec-schemas.ts`; document-version handling is explicit in `store-codec-migrations.ts`, so a future store version cannot be interpreted accidentally by permissive row readers. Store decoders return `null` and discard an invalid row or item instead of throwing and quarantining an otherwise recoverable store; request decoders reject invalid input to the caller. Primitive text/id normalization remains centralized in `apps/relay/src/limits.ts` and is reused by both paths. New validation rules should extend the shared schema when they describe the protocol shape, and should stay in the store codec only when they depend on persistence recovery or current relay state.
+Shared Zod schemas in `packages/protocol` are authoritative for live wire and domain shapes. Relay persistence is a second, intentionally distinct trust boundary: SQLite rows can be stale, partially migrated, relationally inconsistent, or edited outside the process. `store-codec.ts` coordinates encoding/decoding, `store-codec-normalizers.ts` colocates each persistence-only schema with its entity normalizer and recovery constraints, and `store-codec-migrations.ts` handles document versions explicitly. Store decoding applies relay-only byte ceilings, canonical-encoding checks, expiry and cross-record constraints, plus narrowly scoped legacy defaults; invalid rows are discarded independently rather than quarantining an otherwise recoverable store. Primitive text/id normalization remains centralized in `apps/relay/src/limits.ts`. New validation rules belong in the shared schema when they describe a live protocol shape and beside the persistence normalizer only when they depend on recovery or current relay state.
 
 Unknown ciphersuites and malformed MLS/public records are rejected. There is no v1 envelope reader, v2/v3 AAD selection, custom room-secret wrap, rotation envelope, or direct room-secret delivery.

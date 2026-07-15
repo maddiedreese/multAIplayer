@@ -8,6 +8,7 @@ import type { useLocalIdentity } from "./useLocalIdentity";
 import type { createRoomSettingsActor } from "../application/workspace/roomSettingsActor";
 import { useHostHandoffActions } from "./useHostHandoffActions";
 import { useAppStore } from "../store/appStore";
+import { isLocalUserActiveHostForRoom } from "../lib/access/roomHost";
 
 type AppRefs = ReturnType<typeof useAppRefs>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
@@ -82,6 +83,16 @@ export function useAppHostHandoffActions({
     setCustomCodexModelForRoom,
     resetFileContextForRoom,
     resetCodexApprovalForRoom,
-    appendHostHandoff
+    appendHostHandoff,
+    getHostHandoffSnapshot: () => {
+      const state = useAppStore.getState();
+      const room = state.rooms.find((candidate) => candidate.id === state.selectedRoomId) ?? null;
+      return {
+        selectedRoomId: state.selectedRoomId,
+        room,
+        isActiveHost: room ? isLocalUserActiveHostForRoom(room, localIdentity.localUser) : false,
+        hostHandoffs: room ? (state.codexRuntimeByRoom[room.id]?.hostHandoffs ?? []) : []
+      };
+    }
   });
 }

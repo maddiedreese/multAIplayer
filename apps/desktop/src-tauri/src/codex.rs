@@ -8,7 +8,11 @@ use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::Emitter;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
+use crate::codex_authorization::{
+    CodexAuthorizationState, CodexConfirmationBinding, ProjectRootAuthorization,
+};
 use crate::codex_catalog::{normalize_reasoning_effort, normalize_service_tier};
 use crate::codex_requests::{
     wait_for_response, wait_for_response_message, CodexRpcState, CodexServerRequestEvent,
@@ -113,10 +117,11 @@ static CODEX_SESSIONS: OnceLock<Mutex<HashMap<CodexServerKey, CodexServerSession
 const CODEX_SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(20 * 60);
 
 #[tauri::command]
-pub(crate) fn run_codex_turn(
+pub(crate) async fn run_codex_turn(
     request: CodexTurnRequest,
     app: tauri::AppHandle,
     rpc_state: tauri::State<'_, CodexRpcState>,
+    authorization_state: tauri::State<'_, CodexAuthorizationState>,
 ) -> crate::command_error::CommandResult<CodexTurnResult> {
     let lifecycle_room_id = request.room_id.as_deref().unwrap_or("__legacy_room");
     ensure_room_id(lifecycle_room_id)?;
@@ -131,9 +136,72 @@ pub(crate) fn run_codex_turn(
     let service_tier =
         normalize_service_tier(request.service_tier.as_deref(), request.speed.as_deref())?;
     let sandbox_config = codex_sandbox_config(request.sandbox_level.as_deref())?;
+    let canonical_cwd = match authorization_state.classify_project_root(
+        lifecycle_room_id,
+        &request.cwd,
+        &sandbox_config.sandbox_mode,
+        sandbox_config.network_access,
+    )? {
+        ProjectRootAuthorization::AlreadyAuthorized(root) => root,
+        ProjectRootAuthorization::RequiresConfirmation(root) => {
+            let binding = CodexConfirmationBinding::ProjectRoot {
+                room_id: lifecycle_room_id.to_string(),
+                canonical_root: root.clone(),
+                sandbox_mode: sandbox_config.sandbox_mode.clone(),
+                network_access: sandbox_config.network_access,
+            };
+            authorization_state.begin_confirmation(binding.clone())?;
+            let app_for_dialog = app.clone();
+            let room_for_dialog = lifecycle_room_id.to_string();
+            let root_for_dialog = root.to_string_lossy().to_string();
+            let sandbox_for_dialog = sandbox_config.sandbox_mode.clone();
+            let network_for_dialog = sandbox_config.network_access;
+            let dialog_result = tauri::async_runtime::spawn_blocking(move || {
+                app_for_dialog
+                    .dialog()
+                    .message(format!(
+                        "Room: {room_for_dialog}\n\nCanonical project root:\n{root_for_dialog}\n\nSandbox: {sandbox_for_dialog}\nNetwork access: {network_for_dialog}\n\nAllow Codex to use this project root and execution profile for this room? Changing either or shutting down the room requires confirmation again."
+                    ))
+                    .title("Allow Codex project access?")
+                    .kind(MessageDialogKind::Warning)
+                    .buttons(MessageDialogButtons::OkCancelCustom(
+                        "Allow project".to_string(),
+                        "Cancel".to_string(),
+                    ))
+                    .blocking_show()
+            })
+            .await;
+            authorization_state.finish_confirmation(&binding)?;
+            let approved = dialog_result
+                .map_err(|error| format!("Native Codex project confirmation failed: {error}"))?;
+            if !approved {
+                return Err(crate::command_error::CommandError::unauthorized(
+                    "Codex project access was denied in the native confirmation dialog",
+                ));
+            }
+            let canonical = authorization_state.authorize_project_root(
+                lifecycle_room_id,
+                &root,
+                &sandbox_config.sandbox_mode,
+                sandbox_config.network_access,
+            )?;
+            // A changed root invalidates any dormant app-server process and its
+            // pending approvals before a process can start under the new grant.
+            rpc_state.cancel_room(
+                lifecycle_room_id,
+                "Codex project-root authorization changed",
+            );
+            shutdown_codex_room_sessions(lifecycle_room_id);
+            canonical
+        }
+    };
+    let canonical_cwd = canonical_cwd
+        .into_os_string()
+        .into_string()
+        .map_err(|_| "Codex project root must be valid UTF-8".to_string())?;
     let key = codex_server_key(
         request.room_id.as_deref(),
-        &request.cwd,
+        &canonical_cwd,
         &model,
         &reasoning_effort,
         &service_tier,
@@ -152,7 +220,7 @@ pub(crate) fn run_codex_turn(
     )?;
     let client_turn_id = bounded_codex_identifier(request.client_turn_id.as_deref(), "turn");
     let result = session.run_turn(
-        &request.cwd,
+        &canonical_cwd,
         &request.input,
         &model,
         &reasoning_effort,
@@ -183,9 +251,11 @@ pub(crate) fn run_codex_turn(
 pub(crate) fn shutdown_codex_room(
     request: CodexRoomShutdownRequest,
     rpc_state: tauri::State<'_, CodexRpcState>,
+    authorization_state: tauri::State<'_, CodexAuthorizationState>,
 ) -> crate::command_error::CommandResult<usize> {
     ensure_room_id(&request.room_id)?;
     rpc_state.cancel_room(&request.room_id, "Codex room shut down");
+    authorization_state.revoke_project_root(&request.room_id)?;
     let active = cancel_codex_turns_for_room(&request.room_id);
     Ok(active.saturating_add(shutdown_codex_room_sessions(&request.room_id)))
 }
@@ -198,11 +268,40 @@ pub(crate) fn list_codex_server_requests(
 }
 
 #[tauri::command]
-pub(crate) fn respond_codex_server_request(
+pub(crate) async fn respond_codex_server_request(
     request: RespondCodexServerRequest,
+    app: tauri::AppHandle,
     rpc_state: tauri::State<'_, CodexRpcState>,
+    authorization_state: tauri::State<'_, CodexAuthorizationState>,
 ) -> crate::command_error::CommandResult<()> {
-    Ok(rpc_state.respond(request)?)
+    let prepared = rpc_state.prepare_response(request)?;
+    if let (Some(binding), Some(message)) = (
+        prepared.confirmation.clone(),
+        prepared.confirmation_message.clone(),
+    ) {
+        authorization_state.begin_confirmation(binding.clone())?;
+        let dialog_result = tauri::async_runtime::spawn_blocking(move || {
+            app.dialog()
+                .message(message)
+                .title("Approve Codex native authority?")
+                .kind(MessageDialogKind::Warning)
+                .buttons(MessageDialogButtons::OkCancelCustom(
+                    "Approve request".to_string(),
+                    "Cancel".to_string(),
+                ))
+                .blocking_show()
+        })
+        .await;
+        authorization_state.finish_confirmation(&binding)?;
+        let approved = dialog_result
+            .map_err(|error| format!("Native Codex request confirmation failed: {error}"))?;
+        if !approved {
+            return Err(crate::command_error::CommandError::unauthorized(
+                "Codex request was not approved in the native confirmation dialog",
+            ));
+        }
+    }
+    Ok(rpc_state.finish_response(prepared)?)
 }
 
 pub(crate) fn codex_sandbox_config(value: Option<&str>) -> Result<CodexSandboxConfig, String> {

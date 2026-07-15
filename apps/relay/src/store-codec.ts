@@ -28,7 +28,7 @@ import {
   applyStoredAccountQuotaRecords,
   normalizeAccountRestriction,
   normalizeDeletionLedgerEntry
-} from "./store-codec-account-normalizers.js";
+} from "./store-codec-normalizers.js";
 import { migrateStoredRelayDocument } from "./store-codec-migrations.js";
 
 export interface StoredRelayState {
@@ -75,17 +75,13 @@ export interface RelayStoreCodecOptions {
   maxAttachmentBlobIdChars: number;
   maxAttachmentBlobNameChars: number;
   maxAttachmentBlobTypeChars: number;
-  maxCodexModelChars: number;
   maxDeviceIdChars: number;
-  maxDisplayNameChars: number;
   maxEnvelopeIdChars: number;
   maxHostNameChars: number;
   maxMlsMessageChars: number;
-  maxPublicKeyFingerprintChars: number;
   maxPublicKeyJwkChars: number;
   maxRoomIdChars: number;
   maxRoomNameChars: number;
-  maxRoomProjectPathChars: number;
   maxTeamIdChars: number;
   maxTeamNameChars: number;
   maxUserIdChars: number;

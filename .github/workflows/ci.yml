@@ -29,6 +29,21 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Keep security-journey evidence linked to canonical claims
+        shell: bash
+        run: |
+          for marker in \
+            'MLS-PLAINTEXT-MUST-NEVER-REACH-RELAY' \
+            'MLS-REMOVED-MEMBER-MUST-NOT-DECRYPT' \
+            'ghp_GITHUB_TOKEN_MUST_NEVER_REACH_RELAY_STORAGE_OR_ROOM_WIRE' \
+            '/Users/sentinel/PROJECT-PATH-MUST-NEVER-REACH-RELAY' \
+            'sentinel-model-MUST-NEVER-REACH-RELAY'
+          do
+            grep -Fq "$marker" docs/threat-model.md || {
+              echo "Missing canonical threat-model reference for journey marker: $marker" >&2
+              exit 1
+            }
+          done
       - name: Verify web, relay, and packages
         run: npm run lint && npm run format:check && npm run check:tauri-command-errors && npm run build:packages && npm run test:harness && npm run test:workspaces && npm run build:apps
       - name: Measure package coverage and the relay authorization floor
@@ -71,6 +86,7 @@ jobs:
             apps/desktop/coverage
             apps/desktop/coverage-critical
             apps/desktop/coverage-host-actions
+            apps/desktop/coverage-host-handoff
           if-no-files-found: error
           retention-days: 14
 

@@ -62,6 +62,7 @@ export function admitRelayWebSocketConnection(
     socket.close(1008, "WebSocket connection rate limit exceeded");
     return null;
   }
+  options.metrics.recordRateLimitAllowed?.("websocketConnect");
 
   const session: ClientSession = {
     socket,

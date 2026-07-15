@@ -17,8 +17,8 @@
     "test:soak": "tsx --test test/soak/relay-chaos.test.ts",
     "test:coverage": "c8 --all --src src --include src/authz.ts --reporter=text --reporter=json-summary --reporter=lcov --check-coverage --lines=90 --functions=90 --branches=90 --statements=90 tsx --test test/security-units.test.ts",
     "test:mutation:run": "stryker run",
-    "test:mutation:summary": "node ../../scripts/summarize-mutation-report.mjs reports/mutation/mutation.json --output reports/mutation/summary.json",
-    "test:mutation:policy": "node ../../scripts/check-mutation-policy.mjs reports/mutation/summary.json mutation-policy.json",
+    "test:mutation:summary": "node ../../tools/mutation/report.mjs summarize reports/mutation/mutation.json reports/mutation/summary.json",
+    "test:mutation:policy": "node ../../tools/mutation/report.mjs check reports/mutation/summary.json mutation-policy.json",
     "test:mutation": "npm run test:mutation:run && npm run test:mutation:summary && npm run test:mutation:policy"
   },
   "dependencies": {

@@ -50,6 +50,10 @@ export function EncryptedInvitePanel<T extends InviteRequestDisplay>({
         Invite links do not contain the room key, but they do contain a private single-use capability. Share them
         privately; the active host approves each device.
       </div>
+      <div className="security-boundary-warning" role="note" aria-label="Unaudited cryptography warning">
+        <strong>Cryptographic integration is unaudited.</strong> Treat this alpha invite flow as security-sensitive and
+        independently verify the person and device before approval.
+      </div>
       <label>
         <span>Join from invite</span>
         <textarea

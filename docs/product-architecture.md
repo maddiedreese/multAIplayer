@@ -7,6 +7,8 @@ Desktop stack: Tauri
 Repository: monorepo at `github.com/maddiedreese/multAIplayer`  
 Public posture: Public Alpha
 
+This document describes product and implementation structure. The [threat model](threat-model.md) is the sole normative source for security claims, trust assumptions, audit status, and residual risks.
+
 ## Architecture walkthrough
 
 This is the durable script for a 20-minute contributor walkthrough. A maintainer can record it with any screen recorder; the repository remains the source of truth, while the recording gives first-time contributors a human route through it.
@@ -37,7 +39,7 @@ Show the root workspaces:
 - `e2e`: deployed desktop journeys; and
 - `scripts`: repository policy and verification gates.
 
-Point out that imports are intentionally directional and `scripts/eslint-boundaries.test.mjs` guards those boundaries.
+Point out that imports are intentionally directional and the repository ESLint architecture rules under `tools/eslint/` guard those boundaries.
 For the native boundary, also show `apps/desktop/src-tauri/src/mls_native.rs`: its identity, crypto, history, group-command, store-support, `types`, and `invites` child modules preserve one Tauri command API while keeping responsibilities independently reviewable. Reviewability comes from domain splits and semantic tests rather than a physical-line threshold.
 
 Before moving on, trace one invitation transport without exposing a real link. Start at `inviteLinkActions.ts`, where the app creates an HTTPS `open.multaiplayer.com/invite` URL whose entire payload is a fragment. Then show `invite_link.rs` and `nativeInviteIntake.ts`: macOS associated-domain delivery is parsed again in Rust, retained in one one-shot memory slot, announced by a content-free event, and delegated to the existing MLS join action. Contrast that with the website landing, which scrubs the fragment before hydration and uses an in-memory cross-host retry rather than storage or a custom scheme. Finally show `trusted_auth.rs` and `authExternalUrl.ts` as the independent Rust/TypeScript validation pair for opening GitHub or ChatGPT in the system browser.
@@ -69,7 +71,7 @@ npm run test -w @multaiplayer/protocol
 npm run test -w @multaiplayer/desktop
 ```
 
-Explain the progression from focused workspace tests to the single `npm run verify` pull-request gate. Point to `docs/external-review-packet.md#continuous-integration-policy` for which GitHub jobs block merges and which scheduled security jobs should be investigated separately.
+Explain the progression from focused workspace tests to the single `npm run verify` pull-request gate. Point to `CONTRIBUTING.md#continuous-integration-policy` for which GitHub jobs block merges and which scheduled security jobs should be investigated separately.
 
 ### 18:00 — First contribution
 
@@ -157,7 +159,7 @@ Room-level settings include:
 - local notification mute state;
 - visibility/secrets warning acknowledgement.
 
-The active project folder is a host-local path. The macOS app can attach it with a native folder picker or a pasted path. The active host shares the path and Codex configuration with members through an RFC 9420 MLS-encrypted `room.config` snapshot via `mls-rs`; multAIplayer's integration layer is unaudited, and neither value is stored in relay room metadata. Project tree, file preview, diff, and Git status visibility is likewise shared through encrypted room-scoped app state. Terminal commands, Git mutations, file saves, browser opens, and Codex turns execute from the active host's local desktop app after host approval.
+The active project folder is a host-local path. The macOS app can attach it with a native folder picker or a pasted path. The active host shares the path and Codex configuration with members through an RFC 9420 MLS-encrypted `room.config` snapshot via `mls-rs`; neither value has a field in relay room metadata. Project tree, file preview, diff, and Git status visibility is likewise shared through encrypted room-scoped app state. Terminal commands, Git mutations, file saves, browser opens, and Codex turns execute from the active host's local desktop app after host approval.
 
 Native project file access is confined to the selected project root and rejects parent-directory or symlink escapes. File previews are read with a byte cap, and native diff output is bounded to 200,000 characters with an explicit truncation marker so generated files or large diffs do not overwhelm the desktop UI or copied context.
 
@@ -205,7 +207,7 @@ Codex approval distinguishes inline attachment content from encrypted blob refer
 
 Composer text and attachment drafts are scoped per room. If a user switches rooms, unfinished message text stays with its original room. If a large encrypted attachment blob finishes uploading after a switch, the finished attachment remains queued only for the room where the upload began.
 
-Room goals use Codex thread Goal mode. After a room has an approved Codex thread, `/goal <objective>` calls Codex app-server's thread goal API. Pause, resume, edit, and clear controls update the active thread's goal. Runtime state and newly encrypted local history store only the normalized thread graph and active selection. An old flat thread id is accepted solely by a one-way history migration and is never written back; its removal condition is tracked in the [compatibility inventory](external-review-packet.md#compatibility-inventory).
+Room goals use Codex thread Goal mode. After a room has an approved Codex thread, `/goal <objective>` calls Codex app-server's thread goal API. Pause, resume, edit, and clear controls update the active thread's goal. Runtime state and newly encrypted local history store only the normalized thread graph and active selection. An old flat thread id is accepted solely by a one-way history migration and is never written back; its removal condition is tracked in the [compatibility inventory](../CONTRIBUTING.md#compatibility-inventory).
 
 Project file previews and encrypted attachment blob opens are also tied to the originating room. If a room switch happens while a file read or blob decrypt is in flight, the completed read is ignored rather than rendered into the newly selected room's inspector. Attachment previews are blocked while a room is locally locked after forget or relay membership revocation.
 
@@ -373,7 +375,7 @@ E2EE is required from day one.
 
 This means cryptography, not cryptocurrency. No blockchain, tokens, wallets, or coins are involved.
 
-The native implementation uses RFC 9420 MLS through `mls-rs`, the pinned P-256/AES-128-GCM/SHA-256 suite, and RFC 9180 HPKE for pairwise invite requests; multAIplayer's integration layer is unaudited.
+The native implementation uses RFC 9420 MLS through `mls-rs`, the pinned P-256/AES-128-GCM/SHA-256 suite, and RFC 9180 HPKE for pairwise invite requests. Current assurance and audit status are maintained in the threat model.
 
 E2EE model:
 
@@ -642,7 +644,7 @@ docs/
 
 ## 10. Alpha Scope And Limits
 
-- E2EE uses RFC 9420 MLS via `mls-rs` through the native Rust core, one pinned ciphersuite, canonical authenticated application metadata, exporter-derived encrypted history, and RFC 9180 HPKE capability requests; multAIplayer's integration layer is unaudited.
+- E2EE mechanism uses RFC 9420 MLS via `mls-rs` through the native Rust core, one pinned ciphersuite, canonical authenticated application metadata, exporter-derived encrypted history, and RFC 9180 HPKE capability requests; the threat model owns the corresponding claims and audit status.
 - Desktop coding surfaces use Monaco Editor for file editing, xterm.js with a Rust PTY layer for terminals, and Tauri/Wry WebViews for room browser tabs.
 - Invite links carry a random capability and exact host public binding, never a group secret; approval consumes the requester's exact KeyPackage and returns an MLS Welcome.
 - Official invite transport is an HTTPS universal link with all invite material in the fragment. Live AASA association and a correctly signed app are required for OS dispatch; there is no custom-scheme or persisted browser handoff fallback.

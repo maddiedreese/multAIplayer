@@ -14,3 +14,4 @@ List the focused checks you ran and any scheduled/advisory evidence reviewers sh
 
 - [ ] I kept the change cohesive and removed superseded code, tests, policy, and documentation.
 - [ ] Any new blocking check deletes or demotes an existing blocking check.
+- [ ] During a declared stabilization window, this change is a fix, deletion, documentation correction, dependency/security update, or release operation—not a feature.

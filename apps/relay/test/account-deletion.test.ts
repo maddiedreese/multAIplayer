@@ -1,11 +1,14 @@
 import test from "node:test";
+import Database from "better-sqlite3";
+import { copyFile, rm } from "node:fs/promises";
+import { join } from "node:path";
 import {
   deleteAccountOwnedRelayData,
   deleteAccountOwnedRelayDataAtomically,
   findAccountDeletionBlockers
 } from "../src/auth/account-deletion.js";
 import { createRelayStore } from "../src/state.js";
-import { assert } from "./support/relay.js";
+import { assert, createDebugSession, startRelay, waitForStoredState } from "./support/relay.js";
 
 test("account deletion removes identity-owned records while preserving shared encrypted history", () => {
   const store = createRelayStore();
@@ -202,6 +205,42 @@ test("account deletion rollback preserves the session and concurrent unrelated m
   assert.equal(store.accountQuotaRecords.has(`daily_room_creations:${userId}`), false);
   assert.equal(store.authSessions.has("session-concurrent"), true);
   assert.equal(store.teams.has("team-concurrent"), true);
+});
+
+test("restoring a pre-deletion SQLite backup cannot restore the deleted identity's session", async () => {
+  const userId = "github:tester";
+  const first = await startRelay();
+  const backupPath = join(first.tempDir, "pre-deletion.sqlite");
+  let restored: Awaited<ReturnType<typeof startRelay>> | undefined;
+  try {
+    const cookie = await createDebugSession(first.baseUrl, userId, "tester");
+    await waitForStoredState(
+      first.dataPath,
+      (state) => Array.isArray(state.authSessions) && state.authSessions.length > 0
+    );
+    const source = new Database(first.dataPath, { readonly: true });
+    await source.backup(backupPath);
+    source.close();
+
+    const deleted = await fetch(`${first.baseUrl}/auth/account`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ confirmation: "delete my account" })
+    });
+    assert.equal(deleted.status, 200);
+    await first.close({ preserveData: true });
+
+    await copyFile(backupPath, first.dataPath);
+    await Promise.all([rm(`${first.dataPath}-wal`, { force: true }), rm(`${first.dataPath}-shm`, { force: true })]);
+    restored = await startRelay({}, undefined, first.dataPath);
+
+    const rejected = await fetch(`${restored.baseUrl}/auth/me`, { headers: { cookie } });
+    assert.equal(rejected.status, 401);
+    assert.equal(((await rejected.json()) as { code?: string }).code, "authentication_required");
+  } finally {
+    await restored?.close();
+    if (!restored) await first.close().catch(() => undefined);
+  }
 });
 
 function room(id: string, hostUserId: string, trustedApproverUserIds: string[]) {
