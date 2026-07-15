@@ -26,7 +26,7 @@ age = { version = "=0.11.1", default-features = false }
 base64 = "=0.22.1"
 chrono = { version = "=0.4.45", default-features = false, features = ["clock", "std"] }
 codex-activity-projection = { path = "crates/codex-activity-projection" }
-keyring = "=4.1.4"
+keyring = "=4.1.5"
 libc = "=0.2.186"
 minisign-verify = "=0.2.5"
 mls-core = { path = "crates/mls-core" }
@@ -50,4 +50,4 @@ uuid = { version = "=1.23.5", features = ["v4"] }
 
 [dev-dependencies]
 proptest = "=1.11.0"
-tempfile = "=3.24.0"
+tempfile = "=3.27.0"
