@@ -63,10 +63,10 @@ export async function cloneGitRepository(
   return nativeGitUnavailable();
 }
 
-export async function applyGitPatch(cwd: string, patch: string): Promise<GitApplyPatchResult> {
+export async function applyGitPatch(projectRoot: string, cwd: string, patch: string): Promise<GitApplyPatchResult> {
   if (isTauriRuntime()) {
     return invokeNative<GitApplyPatchResult>("git_apply_patch", {
-      request: { cwd, patch }
+      request: { projectRoot, cwd, patch }
     });
   }
 

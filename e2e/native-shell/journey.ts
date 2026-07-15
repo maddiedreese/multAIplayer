@@ -244,7 +244,8 @@ async function sendAndReceive(sender: Browser, receiver: Browser, text: string) 
 async function handoff(host: Browser, guest: Browser) {
   await (await visible(host, "button=Handoff")).click();
   const available = await visible(guest, ".handoff-row.available", 60_000);
-  await (await available.$("button=Request handoff")).click();
+  const requestButton = await available.$("button=Request handoff");
+  await requestButton.click();
   await visible(guest, ".handoff-row.requested", 60_000);
   const requested = await visible(host, ".handoff-row.requested", 60_000);
   await (await requested.$("button=Approve candidate")).click();

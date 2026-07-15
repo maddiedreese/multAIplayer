@@ -50,7 +50,7 @@ multAIplayer puts the collaboration surfaces around Codex beside the conversatio
 - **Codex work you can follow.** See bounded, structured activity for commands, file changes, tools, web work, images, and subagents. Steer an active turn, queue the next proposal, set a thread goal, or inspect and fork the Codex thread graph.
 - **Git and GitHub in context.** Review the current working tree, copy project and diff summaries, create a branch, commit, push, open a draft pull request, and follow GitHub Actions from the room. The **Changed files** list is the current Git working-tree status—not a list of everything merged since the last PR; [the user guide explains the exact comparison](docs/using-the-app.md#project-files-and-diffs).
 - **Encrypted room portability.** Export a room's display history to a passphrase-encrypted, interoperable age archive, then import it later as a read-only library—even while signed out or disconnected. Archives deliberately omit MLS keys, device credentials, pending approvals, host authority, and other live capabilities; see [Encrypted room archives](docs/room-archives.md).
-- **Private team continuity.** Chat, attachments, approvals, activity, and host handoff travel as MLS-encrypted room events. One active host supplies the current checkout, tools, credentials, and Codex account, and can hand that role to another verified member.
+- **Private team continuity.** Chat, attachments, approvals, activity, and host handoff travel as RFC 9420 MLS-encrypted room events via `mls-rs`; multAIplayer's integration layer is unaudited. One active host supplies the current checkout, tools, credentials, and Codex account, and can hand that role to another verified member.
 
 ## How a room works
 
@@ -68,7 +68,7 @@ Alongside chat and Codex, the room brings together project files and diffs, term
 
 A room is for people you trust to collaborate on the active host's project. Members can see the context the host shares and can request actions involving the project, terminal, Git, GitHub, and Codex session. The active host stays responsible for reviewing approvals and choosing the access Codex receives.
 
-- Chat, shared Codex activity, and attachments travel through RFC 9420 MLS encryption owned by the native Rust boundary.
+- Chat, shared Codex activity, and attachments travel through RFC 9420 MLS encryption via `mls-rs` in the native Rust boundary; multAIplayer's integration layer is unaudited.
 - The relay coordinates rooms and membership. It is designed not to receive plaintext chat, attachment contents, project files, host-local project paths, Codex model configuration, terminal output, or Codex/OpenAI credentials.
 - GitHub sign-in requests `read:user repo` so repository workflows can work with both public and private repositories the user can access. The native app keeps the token in macOS Keychain and calls GitHub directly for pull requests and Actions; the relay observes it only during sign-in identity verification and immediately discards it. Local Git uses the host's existing credentials.
 - Invite links contain a private, single-use bearer capability in the URL fragment. Share the complete link only through a private channel; never paste it into an issue, log, diagnostic, or support request.
@@ -93,7 +93,7 @@ Prerequisites are Node.js 22, npm, Rust/Cargo, Xcode command-line tools, and Cod
 ```sh
 npm ci
 cp .env.example .env
-npm run doctor
+node scripts/doctor.mjs
 npm run tauri:dev
 ```
 
@@ -107,7 +107,11 @@ npm test
 npm run verify
 ```
 
-`npm run verify` runs the TypeScript, UI, relay, package, Rust, and native verification layers. More expensive mutation, fuzzing, supply-chain, and reproducibility jobs run on their documented CI schedules. See [the CI policy](docs/ci-policy.md) for exact evidence boundaries.
+`npm run verify` runs the TypeScript, UI, relay, package, Rust, and native verification layers. More expensive mutation, fuzzing, supply-chain, and reproducibility jobs run on their documented CI schedules. See [the CI policy](docs/engineering-practices.md#continuous-integration-policy) for exact evidence boundaries.
+
+Development is AI-accelerated. Fuzzing, focused mutation testing, cross-language contract tests, and end-to-end security journeys are compensating controls for that velocity: they make important failures observable, but do not replace maintainer review or an independent security audit.
+
+SQLite is the only supported hosted relay backend. The JSON snapshot backend remains only for local development/test compatibility, while SQLite imports legacy snapshots during migration.
 
 ## Repository map
 
@@ -126,7 +130,7 @@ The supported Codex app-server range is 0.133.0–0.144.0. Newer versions are ma
 
 ## Contributing and review
 
-Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), the [architecture walkthrough](docs/architecture-walkthrough.md), and the small issues in [`.github/good-first-issues`](.github/good-first-issues). Commits require a Developer Certificate of Origin sign-off.
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [architecture walkthrough](docs/product-architecture.md#architecture-walkthrough), then choose an open issue whose scope is clear and unclaimed.
 
 Protocol and cryptography reviewers can use the [external review packet](docs/external-review-packet.md), which maps the security claims to implementation and test evidence. Report exploitable findings privately through the process in [SECURITY.md](SECURITY.md).
 

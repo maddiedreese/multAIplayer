@@ -61,11 +61,11 @@ The relay does see operational metadata needed to route the room:
 - plaintext attachment routing and descriptive metadata such as filename, MIME type, declared size, room id, epoch, and expiry; attachment contents remain exporter-encrypted;
 - GitHub OAuth session identity metadata when sign-in is enabled.
 
-GitHub access tokens are stored in the operating-system credential store behind the native Rust boundary. The relay observes a token only during verify-then-discard identity bootstrap; native code calls GitHub directly for draft PR creation and Actions reads. Host-local project paths and Codex model/tuning configuration are sent to room members only as MLS-encrypted snapshots.
+GitHub access tokens are stored in the operating-system credential store behind the native Rust boundary. The relay observes a token only during verify-then-discard identity bootstrap; native code calls GitHub directly for draft PR creation and Actions reads. Host-local project paths and Codex model/tuning configuration are sent to room members only as RFC 9420 MLS-encrypted snapshots via `mls-rs`; multAIplayer's integration layer is unaudited.
 
 ## Host Handoff
 
-If a host runs out of Codex usage or needs to step away, they can create a handoff. The new host gets the room context and inherited room settings, then attaches their own local project folder. If they have access to the same GitHub repository, they can continue from the same branch or recreate the work locally.
+If a host runs out of Codex usage or needs to step away, they can create a handoff. The new host gets the room context and inherited room settings, then uses their own local project folder. The app reuses an already-attached project only when its GitHub remote matches the handoff repository; otherwise, the new host explicitly selects a matching clone or a destination for cloning. The outgoing host's path is context, not filesystem authority.
 
 The alpha sends the available room context to the new host's Codex invocation when accepting a usage-limit handoff. Codex-native compaction is not part of the public alpha contract.
 

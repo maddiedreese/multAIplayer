@@ -20,34 +20,58 @@ export interface HandoffProject {
   patchResult?: GitApplyPatchResult;
 }
 
-export async function resolveHandoffProject(handoff: HostHandoffRecord, fallbackPath: string): Promise<HandoffProject> {
+const resolvedHandoffProjects = new Map<string, HandoffProject>();
+
+function rememberHandoffProject(handoffId: string, project: HandoffProject): HandoffProject {
+  resolvedHandoffProjects.delete(handoffId);
+  resolvedHandoffProjects.set(handoffId, project);
+  while (resolvedHandoffProjects.size > 32) {
+    const oldest = resolvedHandoffProjects.keys().next().value;
+    if (oldest === undefined) break;
+    resolvedHandoffProjects.delete(oldest);
+  }
+  return project;
+}
+
+export async function resolveHandoffProject(
+  handoff: HostHandoffRecord,
+  approvedProjectPath?: string
+): Promise<HandoffProject> {
   const expectedRepo = handoffRepoIdentity(handoff);
-  async function pathMatches(path: string): Promise<boolean> {
-    if (!expectedRepo) return true;
+  async function repoAtPath(path: string) {
     const remote = await getGitRemoteOrigin(path).catch(() => {
       reportExpectedFailure("Git remote was unavailable while resolving a host handoff project");
       return { originUrl: null };
     });
-    const actualRepo = remote.originUrl ? parseGitHubRemoteUrl(remote.originUrl) : null;
-    return sameHandoffRepo(expectedRepo, actualRepo);
+    return remote.originUrl ? parseGitHubRemoteUrl(remote.originUrl) : null;
   }
-  if (await pathMatches(fallbackPath)) return { path: fallbackPath, source: "existing" };
-  if (handoff.gitRemoteUrl && expectedRepo) {
-    const parentDir = defaultProjectPath.slice(0, defaultProjectPath.lastIndexOf("/")) || defaultProjectPath;
-    const cloneResult = await cloneGitRepository(handoff.gitRemoteUrl, parentDir, handoff.gitBranch);
-    if (cloneResult.status === 0 && (await pathMatches(cloneResult.path)))
-      return { path: cloneResult.path, source: "cloned", cloneResult };
+  const resolved = resolvedHandoffProjects.get(handoff.id);
+  if (resolved && (!expectedRepo || sameHandoffRepo(expectedRepo, await repoAtPath(resolved.path)))) return resolved;
+
+  if (approvedProjectPath && (!expectedRepo || sameHandoffRepo(expectedRepo, await repoAtPath(approvedProjectPath)))) {
+    return rememberHandoffProject(handoff.id, { path: approvedProjectPath, source: "existing" });
+  }
+
+  const selected = await chooseProjectFolder(defaultProjectPath);
+  if (!selected) throw new Error(`${hostHandoffDetail(handoff)} No local project folder was selected.`);
+  if (!expectedRepo) return rememberHandoffProject(handoff.id, { path: selected, source: "selected" });
+
+  const selectedRepo = await repoAtPath(selected);
+  if (sameHandoffRepo(expectedRepo, selectedRepo)) {
+    return rememberHandoffProject(handoff.id, { path: selected, source: "selected" });
+  }
+  if (selectedRepo) {
+    throw new Error(`Selected folder is not a clone of ${expectedRepo.owner}/${expectedRepo.repo}.`);
+  }
+  if (handoff.gitRemoteUrl) {
+    const cloneResult = await cloneGitRepository(handoff.gitRemoteUrl, selected, handoff.gitBranch);
+    if (cloneResult.status === 0 && sameHandoffRepo(expectedRepo, await repoAtPath(cloneResult.path)))
+      return rememberHandoffProject(handoff.id, { path: cloneResult.path, source: "cloned", cloneResult });
     throw new Error(
       `Could not clone ${expectedRepo.owner}/${expectedRepo.repo}: ${cloneResult.stderr || cloneResult.stdout || "git clone failed"}`
     );
   }
-  const selected = await chooseProjectFolder(defaultProjectPath);
-  if (!selected) throw new Error(`${hostHandoffDetail(handoff)} No local project folder was selected.`);
-  if (!(await pathMatches(selected))) {
-    const repoLabel = expectedRepo ? `${expectedRepo.owner}/${expectedRepo.repo}` : "the handoff repository";
-    throw new Error(`Selected folder is not a clone of ${repoLabel}. Choose a local clone or continue from GitHub.`);
-  }
-  return { path: selected, source: "selected" };
+  throw new Error(`Selected folder is not a clone of ${expectedRepo.owner}/${expectedRepo.repo}.`);
 }
 
 export function buildAcceptedHandoffMessage(

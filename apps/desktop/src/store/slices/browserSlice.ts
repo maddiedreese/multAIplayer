@@ -241,10 +241,7 @@ export const createBrowserSlice: StateCreator<AppStoreState, [], [], BrowserSlic
 
 function createBrowserTab(url: string): BrowserTab {
   return {
-    id:
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `browser-tab-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    id: crypto.randomUUID(),
     url,
     title: browserTabTitle(url),
     openedAt: new Date().toISOString()

@@ -89,13 +89,13 @@ The Codex sandbox controls the local Codex app-server request:
 
 Reasoning and speed controls are passed to supported Codex models. A custom model id can be entered when the target local Codex installation supports it.
 
-Model, reasoning, and speed/service-tier controls can be automatic or pinned. Automatic choices follow the active host's local app-server catalog. Pinned choices are used when supported; otherwise the app shows the catalog fallback selected for that host. The supported compatibility range is Codex 0.133.0 through 0.144.0, with generated-schema fixtures at 0.133.0, 0.143.0, and 0.144.0. Older versions must be updated before hosting, while newer versions show an unverified-version warning and keep contract-sensitive features fail closed. `npm run doctor` reports the installed Codex version against this range; no installed Codex CLI is an optional setup result, while an installed too-old or unreadable version fails the development setup check.
+Model, reasoning, and speed/service-tier controls can be automatic or pinned. Automatic choices follow the active host's local app-server catalog. Pinned choices are used when supported; otherwise the app shows the catalog fallback selected for that host. The supported compatibility range is Codex 0.133.0 through 0.144.0, with generated-schema fixtures at 0.133.0, 0.143.0, and 0.144.0. Older versions must be updated before hosting, while newer versions show an unverified-version warning and keep contract-sensitive features fail closed. `node scripts/doctor.mjs` reports the installed Codex version against this range; no installed Codex CLI is an optional setup result, while an installed too-old or unreadable version fails the development setup check.
 
 Codex can pause a running turn to ask the active host for a command, file, permission, tool-input, MCP, or authentication decision. These requests are room-scoped and bidirectional; answering the proposal card is separate from answering later app-server requests. A pending app-server request expires after 15 minutes of human wait.
 
 The Codex work disclosure appears in chat as a collapsible “Codex is working” or “Codex worked” group. Each typed step has its own disclosure for the information Codex reported: reasoning summaries; command text, bounded output, exit status, and duration; changed paths and bounded diffs; tool name, bounded input/result/error; web action, query, page, or find pattern; image-generation prompt; and subagent prompt, model, reasoning effort, state, and normalized spawn/send/resume/wait/close relationships. The adjacent agent visualization uses those normalized relationships so room members can see subagent spawning and progress without confusing it with the Codex conversation branch graph.
 
-“Thinking” shows provider-supplied reasoning summaries by default. The active host can enable an off-by-default, per-room setting to share provider-supplied raw reasoning when the selected provider, model, and app-server build make it available. Enabling the setting does not guarantee that a turn will produce raw reasoning. When present, raw reasoning appears behind its own disclosure and is treated like other room activity: it is bounded, MLS-encrypted before relay transport, visible to room members, and retained in their encrypted local history according to the room retention window. Turning sharing off prevents raw reasoning from being included in later projected activity; it does not retract copies already delivered or retained by members.
+“Thinking” shows provider-supplied reasoning summaries by default. The active host can enable an off-by-default, per-room setting to share provider-supplied raw reasoning when the selected provider, model, and app-server build make it available. Enabling the setting does not guarantee that a turn will produce raw reasoning. When present, raw reasoning appears behind its own disclosure and is treated like other room activity: it is bounded, RFC 9420 MLS-encrypted via `mls-rs` before relay transport, visible to room members, and retained in their encrypted local history according to the room retention window; multAIplayer's integration layer is unaudited. Turning sharing off prevents raw reasoning from being included in later projected activity; it does not retract copies already delivered or retained by members.
 
 These structured details are schema-validated, but they are not a secret scrubber: reasoning, commands, output, diffs, tool data, URLs, prompts, and Codex-reported paths can contain sensitive project information. The activity history retains at most 160 records per room. Raw upstream notification JSON, unknown fields, environment/account/authentication state, token refreshes, token deltas, and streaming output deltas are not copied wholesale into room activity.
 
@@ -105,7 +105,7 @@ After a thread exists, the thread graph can refresh the active session tree, swi
 
 Host handoff lets the active host pass continuity to another eligible member, including when the host hits Codex usage limits or needs to step away.
 
-A handoff package can include recent-message counts, queued Codex turns, attachment names, terminal names, model, project path, Git repository metadata, dirty-file names, and an encrypted patch when small enough. The replacement host uses their own Codex access and attaches their own local project folder.
+A handoff package can include recent-message counts, queued Codex turns, attachment names, terminal names, model, project path, Git repository metadata, dirty-file names, and an encrypted patch when small enough. The replacement host uses their own Codex access and local project folder. If their already-attached project has the expected GitHub remote, the app reuses that locally approved path; otherwise, the replacement host must explicitly select a matching clone or a destination for cloning.
 
 ## Project Files And Diffs
 
@@ -186,3 +186,31 @@ Open **Room settings → Encrypted room archives** to export the selected room. 
 ## Updates
 
 The app checks `https://multaiplayer.com/releases/latest.json` when the app shell mounts and shows an in-app banner when the manifest contains a newer version. A manifest with `security: true` is labelled **Security update available**. The banner opens the manifest's HTTPS download URL; the alpha does not download, install, or restart automatically. When a supported public build is available, it will be signed and notarized, published through GitHub Releases, and installed manually by the user. No supported public build has been published yet.
+
+## Accessibility and localization
+
+### Current support
+
+The alpha UI is English-only. User-facing strings live alongside React components; there is no translation catalog or right-to-left layout guarantee. Do not describe the application as localized until those foundations and at least one non-English locale are tested.
+
+Accessibility is a release quality requirement even before formal conformance certification. Required Playwright journeys run exact-pinned axe-core WCAG 2.0, 2.1, and 2.2 A/AA rules against the production-component chat, onboarding, and invite scenarios in addition to exercising semantic roles and accessible names. The desktop runner also includes both `.test.ts` and `.test.tsx` component suites. These automated checks catch regressions but do not establish conformance or replace the release audit below.
+
+The first-run setup uses one heading and native buttons, links, inputs, forms, details, lists, status regions, alerts, and progressbar semantics. Moving between setup surfaces transfers focus to the new heading without trapping focus. Readiness is communicated with text as well as icons and color; blocking states disable forward progress and expose a named recovery action. Async invite, folder, and workspace outcomes use status or alert regions rather than relying on a transient visual change.
+
+Authentication keeps the GitHub user code selectable and copyable, states its expiry in text, and provides named Open, Copy, Cancel, and retry actions. GitHub and ChatGPT/Codex are labeled as different accounts and purposes. A failed system-browser launch becomes an alert with a copy-link fallback instead of an inaccessible silent failure. Native invitation activation announces that an invitation is ready without placing the bearer capability in an accessibility name, notification, or persistent region.
+
+Create and join are peers in the reading and tab order. Back, Save and close, Explore, checklist dismissal, and Help-based reopen/restart controls make the flow skippable and resumable without requiring pointer input. Starter prompts are buttons that populate the composer only, so keyboard and assistive-technology users retain the same explicit send and approval boundaries as pointer users.
+
+The setup surface reflows to a single narrow column. Progress transitions are removed under `prefers-reduced-motion`. Text labels remain visible for icon-only controls through accessible names. Copy should stay sentence-cased and plain-language; readiness and recovery text must not interpolate raw paths, tokens, account responses, or upstream errors.
+
+### Release audit
+
+Before a public release, record an audit issue covering keyboard operation and focus; VoiceOver on the supported macOS version for sign-in, invite acceptance, host handoff, Codex approval, messaging, settings, and recovery; 200% text zoom, narrow-window reflow, reduced motion, and contrast; axe checks plus manual review; labels, status announcements, validation, dialogs, and icon-only controls; and WCAG 2.2 AA color contrast.
+
+Record the commit, OS/browser versions, assistive technology, findings, severity, owner, and remediation status. A finding that prevents a security approval, sign-in, messaging, or recovery flow blocks release.
+
+### Localization-ready changes
+
+Avoid concatenated sentence fragments, text embedded in images, assumed English word order, and color-only meaning. Use platform internationalization APIs for dates, times, numbers, and plurals, and tolerate longer labels. A future localization change should add typed message identifiers, extraction, fallback tests, and pseudo-localization before accepting translations.
+
+Authentication expiry, remaining-time, and retry copy must use localized date/duration and plural rules rather than English string concatenation. Provider names, security terms, invite fragments, and user codes should remain separate interpolation values so translations cannot accidentally change their parsing or copy behavior.

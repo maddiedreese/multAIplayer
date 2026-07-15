@@ -107,7 +107,7 @@ If a link leaks, do not approve an unexpected request. Invalidate the invite and
 
 No. The cryptographic protocol and implementation have not received an independent professional security audit.
 
-The repository includes documented protocol boundaries, generated MLS membership/host-transition tests, adversarial Commit ordering/replay tests, RFC 9180 HPKE known-answer evidence, lifecycle and persistence tests, relay commit-ordering and KeyPackage-consumption tests, production-path parser fuzzing, focused invite-authenticator mutation testing, and a public threat-model changelog. There is also a curated [External review packet](external-review-packet.md) that identifies the protocol, implementation boundaries, invariants, test commands, and areas where review would be most useful.
+The repository includes documented protocol boundaries, generated MLS membership/host-transition tests, adversarial Commit ordering/replay tests, RFC 9180 HPKE known-answer evidence, lifecycle and persistence tests, relay commit-ordering and KeyPackage-consumption tests, scheduled production-path parser fuzzing, focused relay-authorization mutation testing, and public threat-model history. There is also a curated [External review packet](external-review-packet.md) that identifies the protocol, implementation boundaries, invariants, test commands, and areas where review would be most useful.
 
 Those controls improve reviewability and catch regressions. They do not replace an independent audit or establish that the system is secure against every real-world attack.
 

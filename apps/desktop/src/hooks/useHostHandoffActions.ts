@@ -20,7 +20,7 @@ import { applyGitPatch, createGitPatch, getGitRemoteOrigin } from "../lib/platfo
 import { updateRoomHost } from "../application/workspace/workspaceClient";
 import { buildCodexTurnSummary } from "../lib/codex/codexTurn";
 import { codexUsageLimitMessage } from "../lib/codex/codexFailure";
-import { createHandoffSettingsPatch, findRoomHostHandoff, roomHostHandoffMessage } from "../lib/handoff/hostHandoff";
+import { findRoomHostHandoff, roomHostHandoffMessage } from "../lib/handoff/hostHandoff";
 import { parseGitHubRemoteUrl } from "../lib/git/gitWorkflowDraft";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/room/roomScopedUi";
 import { roomLockMessage } from "../application/runtime/appRuntime";
@@ -182,9 +182,8 @@ export function useHostHandoffActions({
     if (reportRoomHostMutationInFlight(roomId)) return;
     setHostBusyForRoom(roomId, true);
     try {
-      const patch = createHandoffSettingsPatch(handoff);
-      const project = await resolveHandoffProject(handoff, patch.projectPath);
-      const result = await applyGitPatch(project.path, handoff.gitPatch!);
+      const project = await resolveHandoffProject(handoff, selectedRoom.projectPath);
+      const result = await applyGitPatch(project.path, project.path, handoff.gitPatch!);
       if (result.status !== 0) throw new Error(result.stderr || result.stdout || "git apply failed");
       markHostHandoffPatchAppliedForRoom(roomId, handoff.id);
       setCodexContinuationForRoom(
@@ -298,8 +297,7 @@ export function useHostHandoffActions({
     };
   }
   async function requestHostAuthority(handoff: HostHandoffRecord) {
-    const patch = createHandoffSettingsPatch(handoff);
-    await resolveHandoffProject(handoff, patch.projectPath);
+    await resolveHandoffProject(handoff, selectedRoom.projectPath);
     const group = await mlsGroupState(selectedRoom.id);
     const self = group.roster.find((member) => member.leaf === group.selfLeaf);
     if (!self || self.githubUserId !== localUser.id || self.deviceId !== deviceId)

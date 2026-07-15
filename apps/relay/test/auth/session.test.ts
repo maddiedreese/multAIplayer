@@ -320,7 +320,7 @@ test("hosted account deletion removes identity-owned relay data durably and reta
 
 test(
   "hosted account deletion denies authentication after the ledger commits even when primary persistence fails",
-  { skip: process.platform === "win32" },
+  { skip: process.platform === "win32" || process.geteuid?.() === 0 },
   async () => {
     const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
     const cookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
@@ -343,7 +343,7 @@ test(
 
 test(
   "hosted account deletion leaves identity data and authentication intact when the external ledger fails",
-  { skip: process.platform === "win32" },
+  { skip: process.platform === "win32" || process.geteuid?.() === 0 },
   async () => {
     const ledgerPath = join(tmpdir(), `multaiplayer-unwritable-ledger-${randomUUID()}`);
     await mkdir(ledgerPath, { recursive: true });

@@ -28,8 +28,15 @@ export async function establishDeviceSession(relayHttpUrl: string, deviceId: str
   const scopeKey = deviceSessionScopeKey(relayHttpUrl, deviceId);
   activeScopeKey = scopeKey;
   if (currentSession?.scopeKey !== scopeKey) currentSession = null;
+  if (currentSession && Date.parse(currentSession.expiresAt) > Date.now()) return currentSession;
+  const existing = renewals.get(scopeKey);
+  if (existing) return existing;
   const generation = ++establishmentGeneration;
-  return establishDeviceSessionForScope(relayHttpUrl, deviceId, scopeKey, generation);
+  const establishment = establishDeviceSessionForScope(relayHttpUrl, deviceId, scopeKey, generation).finally(() => {
+    if (renewals.get(scopeKey) === establishment) renewals.delete(scopeKey);
+  });
+  renewals.set(scopeKey, establishment);
+  return establishment;
 }
 
 async function establishDeviceSessionForScope(

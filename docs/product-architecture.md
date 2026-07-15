@@ -7,6 +7,76 @@ Desktop stack: Tauri
 Repository: monorepo at `github.com/maddiedreese/multAIplayer`  
 Public posture: Public Alpha
 
+## Architecture walkthrough
+
+This is the durable script for a 20-minute contributor walkthrough. A maintainer can record it with any screen recorder; the repository remains the source of truth, while the recording gives first-time contributors a human route through it.
+
+### Recording recipe
+
+1. Check out a clean `main`, run `npm ci`, and open the repository root in an editor.
+2. Record at 1080p with the editor text at a readable size. Do not open `.env`, logs, local databases, private repositories, or signed-in browser content.
+3. Follow the chapters below and show the named files. Keep the terminal visible only for the listed safe commands.
+4. Turn on captions, export an MP4, and publish it somewhere maintainers can replace without changing repository history.
+5. If a recording is published, add its URL and date below. Re-record when the architecture or contributor commands materially change; small file moves only require updating this script.
+
+Recording: _not published yet_. The script is complete and can be followed without a video.
+
+### 0:00 — Product and trust boundary
+
+Open `docs/product-architecture.md`, then `docs/threat-model.md`. Explain that the relay transports encrypted room records and metadata, while project files, Codex, terminals, Git, and browser capabilities stay on the active host. The client and host boundaries—not the relay—are where plaintext exists.
+
+### 3:00 — Repository map
+
+Show the root workspaces:
+
+- `packages/protocol`: shared records and runtime guards;
+- `apps/desktop/src-tauri/crates/mls-core`: MLS lifecycle orchestration in `engine.rs` and its focused child modules, automatic staged-write cleanup and encrypted persistence in `storage.rs` and `storage/`, invite-v3 authentication, HPKE sealing, credentials, and exporter use;
+- `packages/codex`, `packages/git`, and `packages/github`: host-side adapters;
+- `apps/relay`: HTTP/WebSocket transport, authorization, persistence, and limits;
+- `apps/desktop`: React state/UI plus the Tauri Rust boundary;
+- `e2e`: deployed desktop journeys; and
+- `scripts`: repository policy and verification gates.
+
+Point out that imports are intentionally directional and `scripts/eslint-boundaries.test.mjs` guards those boundaries.
+For the native boundary, also show `apps/desktop/src-tauri/src/mls_native.rs`: its identity, crypto, history, group-command, store-support, `types`, and `invites` child modules preserve one Tauri command API while keeping responsibilities independently reviewable. Reviewability comes from domain splits and semantic tests rather than a physical-line threshold.
+
+Before moving on, trace one invitation transport without exposing a real link. Start at `inviteLinkActions.ts`, where the app creates an HTTPS `open.multaiplayer.com/invite` URL whose entire payload is a fragment. Then show `invite_link.rs` and `nativeInviteIntake.ts`: macOS associated-domain delivery is parsed again in Rust, retained in one one-shot memory slot, announced by a content-free event, and delegated to the existing MLS join action. Contrast that with the website landing, which scrubs the fragment before hydration and uses an in-memory cross-host retry rather than storage or a custom scheme. Finally show `trusted_auth.rs` and `authExternalUrl.ts` as the independent Rust/TypeScript validation pair for opening GitHub or ChatGPT in the system browser.
+
+### 6:00 — One encrypted message
+
+Follow `docs/message-lifecycles.md` from a desktop intent through Rust MLS encryption, opaque relay persistence/broadcast, and Rust MLS decryption. Show that the relay stores an opaque MLS message rather than chat plaintext. Mention that group cryptography belongs in the Rust MLS core, not React components or relay handlers.
+
+### 9:00 — One privileged host action
+
+Use `docs/codex-hosting.md` to trace a Codex request. Show the approval UI in the desktop, the TypeScript command adapter, and the Rust authorization boundary. Emphasize that command text classification is review assistance; structured permissions and explicit user approval are the enforcing controls.
+
+### 12:00 — State and UI boundaries
+
+Open the desktop store modules and one component test. Then show the three desktop code layers:
+
+- `apps/desktop/src/lib/<domain>` contains pure domain and platform modules; direct files at the `lib` root are forbidden;
+- `apps/desktop/src/application/<domain>` owns store-aware workflows and use cases; and
+- `apps/desktop/src/presentation/<domain>` owns component-facing projections and view models.
+
+Components render state and dispatch actions, while protocol, crypto, transport, and native capabilities remain behind adapters. The ESLint desktop-architecture rules enforce the layer boundaries and the measured acyclic dependency matrix between `lib` domains. New contributors should extend the narrowest existing domain rather than add a flat helper or cross-cutting import.
+
+### 15:00 — Verification ladder
+
+Run:
+
+```bash
+npm run test:scripts
+npm run test -w @multaiplayer/desktop
+```
+
+Explain the progression from focused workspace tests to the single `npm run verify` pull-request gate. Point to `docs/engineering-practices.md#continuous-integration-policy` for which GitHub jobs block merges and which scheduled security jobs should be investigated separately.
+
+### 18:00 — First contribution
+
+Open the issue tracker and `CONTRIBUTING.md`. Explain the branch/PR workflow and why a focused first PR should avoid unrelated formatting or security-policy changes.
+
+Finish with this rule of thumb: put behavior in the narrowest owning layer, test it there, and use integration or end-to-end coverage only to prove the layers compose.
+
 ## 1. Product Thesis
 
 multAIplayer helps teams build with Codex together.
@@ -87,7 +157,7 @@ Room-level settings include:
 - local notification mute state;
 - visibility/secrets warning acknowledgement.
 
-The active project folder is a host-local path. The macOS app can attach it with a native folder picker or a pasted path. The active host shares the path and Codex configuration with members through an MLS-encrypted `room.config` snapshot; neither value is stored in relay room metadata. Project tree, file preview, diff, and Git status visibility is likewise shared through encrypted room-scoped app state. Terminal commands, Git mutations, file saves, browser opens, and Codex turns execute from the active host's local desktop app after host approval.
+The active project folder is a host-local path. The macOS app can attach it with a native folder picker or a pasted path. The active host shares the path and Codex configuration with members through an RFC 9420 MLS-encrypted `room.config` snapshot via `mls-rs`; multAIplayer's integration layer is unaudited, and neither value is stored in relay room metadata. Project tree, file preview, diff, and Git status visibility is likewise shared through encrypted room-scoped app state. Terminal commands, Git mutations, file saves, browser opens, and Codex turns execute from the active host's local desktop app after host approval.
 
 Native project file access is confined to the selected project root and rejects parent-directory or symlink escapes. File previews are read with a byte cap, and native diff output is bounded to 200,000 characters with an explicit truncation marker so generated files or large diffs do not overwhelm the desktop UI or copied context.
 
@@ -135,7 +205,7 @@ Codex approval distinguishes inline attachment content from encrypted blob refer
 
 Composer text and attachment drafts are scoped per room. If a user switches rooms, unfinished message text stays with its original room. If a large encrypted attachment blob finishes uploading after a switch, the finished attachment remains queued only for the room where the upload began.
 
-Room goals use Codex thread Goal mode. After a room has an approved Codex thread, `/goal <objective>` calls Codex app-server's thread goal API. Pause, resume, edit, and clear controls update the active thread's goal. Runtime state and newly encrypted local history store only the normalized thread graph and active selection. An old flat thread id is accepted solely by a one-way history migration and is never written back; its removal condition is tracked in the [compatibility inventory](compatibility-inventory.md).
+Room goals use Codex thread Goal mode. After a room has an approved Codex thread, `/goal <objective>` calls Codex app-server's thread goal API. Pause, resume, edit, and clear controls update the active thread's goal. Runtime state and newly encrypted local history store only the normalized thread graph and active selection. An old flat thread id is accepted solely by a one-way history migration and is never written back; its removal condition is tracked in the [compatibility inventory](engineering-practices.md#compatibility-inventory).
 
 Project file previews and encrypted attachment blob opens are also tied to the originating room. If a room switch happens while a file read or blob decrypt is in flight, the completed read is ignored rather than rendered into the newly selected room's inspector. Attachment previews are blocked while a room is locally locked after forget or relay membership revocation.
 
@@ -246,7 +316,7 @@ When a room has an attached local project with a GitHub `origin` remote, the des
 
 Before a host can approve a workflow that pushes and opens a draft PR, the desktop performs a GitHub readiness check. On the official hosted relay, GitHub sign-in is required for identity and GitHub workflows. Local-only branch and commit workflows without GitHub sign-in may exist only for local/LAN or self-hosted relays configured without GitHub auth. Push/PR workflows require a signed-in GitHub session, a relay with GitHub OAuth configured, PR-capable OAuth scopes (`public_repo` for public repos or `repo` for private repos), and normalized owner/repo/base/head values. The app shows any blocker before approval so a host does not run local git steps and only then discover that the PR cannot be created.
 
-The open-source repo includes a GitHub Actions CI workflow. It checks, tests, and builds all TypeScript workspaces on Ubuntu; on the pinned `macos-15` runner it runs native formatting, lints, and tests, builds the desktop prerequisites, executes the real two-process native-core/relay/validator composition journey, then builds an ad-hoc-signed Apple silicon desktop app and uploads the `.app` and `.dmg` artifacts for inspection. Both CI and release build `aarch64-apple-darwin` explicitly and reject a package unless its executable is arm64-only and its `LSMinimumSystemVersion` is 11.0. The ad-hoc (`-`) identity uses no Apple account or Developer ID certificate and exists so CI can inspect the assembled entitlement; these artifacts are not trusted distribution builds and do not prove universal-link dispatch. Intel Macs, Windows, and Linux are outside the supported alpha release surface. The repo requires Node.js 22 or newer through package metadata, provides `.nvmrc` for the CI major, and provides `npm run doctor` as a read-only local setup check for Node/npm/Rust/Cargo and macOS packaging prerequisites.
+The open-source repo includes a GitHub Actions CI workflow. It checks, tests, and builds all TypeScript workspaces on Ubuntu; on the pinned `macos-15` runner it runs native formatting, lints, and tests, builds the desktop prerequisites, executes the real two-process native-core/relay/validator composition journey, then builds an ad-hoc-signed Apple silicon desktop app and uploads the `.app` and `.dmg` artifacts for inspection. Both CI and release build `aarch64-apple-darwin` explicitly and reject a package unless its executable is arm64-only and its `LSMinimumSystemVersion` is 11.0. The ad-hoc (`-`) identity uses no Apple account or Developer ID certificate and exists so CI can inspect the assembled entitlement; these artifacts are not trusted distribution builds and do not prove universal-link dispatch. Intel Macs, Windows, and Linux are outside the supported alpha release surface. The repo requires Node.js 22 or newer through package metadata, provides `.nvmrc` for the CI major, and provides `node scripts/doctor.mjs` as a read-only local setup check for Node/npm/Rust/Cargo and macOS packaging prerequisites.
 
 Example approval:
 
@@ -303,7 +373,7 @@ E2EE is required from day one.
 
 This means cryptography, not cryptocurrency. No blockchain, tokens, wallets, or coins are involved.
 
-The native implementation uses RFC 9420 MLS through `mls-rs`, the pinned P-256/AES-128-GCM/SHA-256 suite, and RFC 9180 HPKE for pairwise invite requests.
+The native implementation uses RFC 9420 MLS through `mls-rs`, the pinned P-256/AES-128-GCM/SHA-256 suite, and RFC 9180 HPKE for pairwise invite requests; multAIplayer's integration layer is unaudited.
 
 E2EE model:
 
@@ -572,7 +642,7 @@ docs/
 
 ## 10. Alpha Scope And Limits
 
-- E2EE uses RFC 9420 MLS through the native Rust core, one pinned ciphersuite, canonical authenticated application metadata, exporter-derived encrypted history, and RFC 9180 HPKE capability requests.
+- E2EE uses RFC 9420 MLS via `mls-rs` through the native Rust core, one pinned ciphersuite, canonical authenticated application metadata, exporter-derived encrypted history, and RFC 9180 HPKE capability requests; multAIplayer's integration layer is unaudited.
 - Desktop coding surfaces use Monaco Editor for file editing, xterm.js with a Rust PTY layer for terminals, and Tauri/Wry WebViews for room browser tabs.
 - Invite links carry a random capability and exact host public binding, never a group secret; approval consumes the requester's exact KeyPackage and returns an MLS Welcome.
 - Official invite transport is an HTTPS universal link with all invite material in the fragment. Live AASA association and a correctly signed app are required for OS dispatch; there is no custom-scheme or persisted browser handoff fallback.

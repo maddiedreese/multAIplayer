@@ -60,7 +60,7 @@ async function finalize(
   setContinuation: (roomId: string, handoff: HostHandoffRecord | null) => void
 ): Promise<void> {
   const patch = createHandoffSettingsPatch(handoff);
-  const project = await resolveHandoffProject(handoff, patch.projectPath);
+  const project = await resolveHandoffProject(handoff, options.room.projectPath);
   const updated = await updateRoomSettings(options.room.id, {
     ...options.roomSettingsActor(),
     ...patch,

@@ -17,3 +17,13 @@ pub(crate) fn canonical_project_root(cwd: &str) -> Result<PathBuf, String> {
     ensure_project_path(cwd)?;
     fs::canonicalize(cwd).map_err(|error| format!("Failed to resolve project path: {error}"))
 }
+
+pub(crate) fn ensure_within_project_root(project_root: &str, cwd: &str) -> Result<PathBuf, String> {
+    let root = canonical_project_root(project_root)?;
+    let requested = canonical_project_root(cwd)?;
+    if requested.starts_with(&root) {
+        Ok(requested)
+    } else {
+        Err("Requested working directory is outside the approved project root".to_string())
+    }
+}
