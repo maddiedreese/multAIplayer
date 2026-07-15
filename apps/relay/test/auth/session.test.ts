@@ -1,16 +1,19 @@
 import { test } from "node:test";
-import { chmod } from "node:fs/promises";
+import { chmod, mkdir, rm } from "node:fs/promises";
 import {
   WebSocket,
   assert,
   createDebugSession,
   maxSessionCiphertextNonceChars,
+  join,
+  randomUUID,
   onceOpen,
   patchHostStatus,
   patchRoomSettings,
   postJsonStatus,
   readFile,
   startRelay,
+  tmpdir,
   waitForError,
   waitForStoredState,
   writeFile,
@@ -325,8 +328,7 @@ test("hosted account deletion removes identity-owned relay data durably and reta
     );
     const newCookie = await createDebugSession(restarted.baseUrl, "github:tester", "tester");
     const workspace = await fetch(`${restarted.baseUrl}/teams`, { headers: { cookie: newCookie } });
-    assert.equal(workspace.status, 200);
-    assert.deepEqual(await workspace.json(), { teams: [], rooms: [] });
+    assert.equal(workspace.status, 401);
   } finally {
     if (restarted) await restarted.close();
     else await relay.close();
@@ -334,7 +336,7 @@ test("hosted account deletion removes identity-owned relay data durably and reta
 });
 
 test(
-  "hosted account deletion keeps authentication and data retryable after a real persistence failure",
+  "hosted account deletion denies authentication after the ledger commits even when primary persistence fails",
   { skip: process.platform === "win32" },
   async () => {
     const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
@@ -346,27 +348,41 @@ test(
         headers: { "content-type": "application/json", cookie },
         body: JSON.stringify({ confirmation: "delete my account" })
       });
-      assert.equal(failed.status, 503);
-      assert.equal((await failed.json()).code, "persistence_unavailable");
-      assert.equal((await fetch(`${relay.baseUrl}/auth/me`, { headers: { cookie } })).status, 200);
-      const workspace = await fetch(`${relay.baseUrl}/teams`, { headers: { cookie } });
-      assert.equal(workspace.status, 200);
-      assert.equal(
-        ((await workspace.json()) as { teams: Array<{ id: string }> }).teams.some((team) => team.id === "team-core"),
-        true
-      );
-
-      await chmod(relay.tempDir, 0o700);
-      const retried = await fetch(`${relay.baseUrl}/auth/account`, {
-        method: "DELETE",
-        headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ confirmation: "delete my account" })
-      });
-      assert.equal(retried.status, 200);
+      assert.equal(failed.status, 202);
+      assert.equal((await failed.json()).status, "pending");
       assert.equal((await fetch(`${relay.baseUrl}/auth/me`, { headers: { cookie } })).status, 401);
     } finally {
       await chmod(relay.tempDir, 0o700).catch(() => undefined);
       await relay.close();
+    }
+  }
+);
+
+test(
+  "hosted account deletion leaves identity data and authentication intact when the external ledger fails",
+  { skip: process.platform === "win32" },
+  async () => {
+    const ledgerPath = join(tmpdir(), `multaiplayer-unwritable-ledger-${randomUUID()}`);
+    await mkdir(ledgerPath, { recursive: true });
+    const relay = await startRelay({
+      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+      MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH: ledgerPath
+    });
+    const cookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
+    try {
+      await chmod(ledgerPath, 0o500);
+      const failed = await fetch(`${relay.baseUrl}/auth/account`, {
+        method: "DELETE",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ confirmation: "delete my account" })
+      });
+      assert.equal(failed.status, 503);
+      assert.equal((await failed.json()).code, "persistence_unavailable");
+      assert.equal((await fetch(`${relay.baseUrl}/auth/me`, { headers: { cookie } })).status, 200);
+    } finally {
+      await chmod(ledgerPath, 0o700).catch(() => undefined);
+      await relay.close();
+      await rm(ledgerPath, { recursive: true, force: true });
     }
   }
 );

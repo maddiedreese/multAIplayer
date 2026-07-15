@@ -26,6 +26,7 @@ export type RelayStoreMutationEntity =
   | "devices"
   | "keyPackages"
   | "attachmentBlobs"
+  | "appliedDeletionLedgerEntries"
   | "teamMembers"
   | "mlsBacklog";
 
@@ -110,6 +111,10 @@ export interface InviteAckReceipt {
   acknowledgedAt: string;
   expiresAt: string;
 }
+export interface AppliedDeletionLedgerEntry {
+  entryId: string;
+  appliedAt: string;
+}
 
 export interface RelayStore {
   sessions: Map<WebSocket, ClientSession>;
@@ -136,6 +141,7 @@ export interface RelayStore {
   attachmentBlobUploadByteCounts: Map<string, ByteQuotaRecord>;
   deviceChallenges: Map<string, DeviceChallengeRecord>;
   deviceSessions: Map<string, DeviceSessionRecord>;
+  appliedDeletionLedgerEntries: Map<string, AppliedDeletionLedgerEntry>;
   allTeams(): TeamRecord[];
   getTeam(teamId: string): TeamRecord | undefined;
   hasTeam(teamId: string): boolean;
@@ -194,6 +200,9 @@ export class InMemoryRelayStore implements RelayStore {
   readonly attachmentBlobUploadByteCounts = new Map<string, ByteQuotaRecord>();
   readonly deviceChallenges = new Map<string, DeviceChallengeRecord>();
   readonly deviceSessions = new Map<string, DeviceSessionRecord>();
+  readonly appliedDeletionLedgerEntries = this.trackedMap<string, AppliedDeletionLedgerEntry>(
+    "appliedDeletionLedgerEntries"
+  );
 
   allTeams(): TeamRecord[] {
     return Array.from(this.teams.values());

@@ -69,6 +69,12 @@ export function ProfileDrawerPanel({
       if (result.status === "deleted") {
         setDeletionConfirmation("");
         onHostedAccountDeleted();
+      } else if (result.status === "pending") {
+        setDeletionConfirmation("");
+        setDeletionStatus(
+          "The relay durably accepted the deletion request and signed this identity out. Primary cleanup is pending and will be retried before the relay next accepts traffic."
+        );
+        onHostedAccountDeleted();
       } else if (result.status === "indeterminate") {
         setDeletionStatus(
           "The configured relay reports this session as signed out after the deletion response was lost. Deletion may have completed, but an expired session can look the same; sign in again to inspect or delete any remaining hosted data."
@@ -233,6 +239,11 @@ export function ProfileDrawerPanel({
           {deletionResult?.status === "deleted" && (
             <div className="workflow-message" role="status">
               Hosted account data deleted. This app has cleared its signed-in workspace state.
+            </div>
+          )}
+          {deletionResult?.status === "pending" && (
+            <div className="workflow-message" role="status">
+              Deletion request protected and pending primary cleanup. This identity has been signed out.
             </div>
           )}
         </section>

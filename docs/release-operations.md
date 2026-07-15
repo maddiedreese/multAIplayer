@@ -60,6 +60,15 @@ RAILWAY_RUN_UID=0
 GITHUB_CLIENT_ID=...
 GITHUB_OAUTH_SCOPES="read:user repo"
 MULTAIPLAYER_RELAY_SESSION_SECRET=...
+MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT=https://t3.storageapi.dev
+MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET=...
+MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION=auto
+MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID=...
+MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY=...
+MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE=virtual-host
+MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_PREFIX=relay-deletions/v1
+MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY=...
+MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS=7776000
 MULTAIPLAYER_RELAY_STORAGE=sqlite
 MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
 MULTAIPLAYER_MLS_VALIDATOR_PATH=/app/bin/mls-keypackage-validator
@@ -89,14 +98,21 @@ The doctor must pass before the endpoint is advertised. Also verify:
 - a staged drain rejects new HTTP/WS work, closes sockets with `1012`, and flushes storage;
 - `/metrics` contains bounded counters and publish, WebSocket-send, and SQLite-write latency histograms rather than room content;
 - SQLite is mounted persistently outside `/tmp` and a staged backup restores successfully;
+- the Railway Bucket deletion ledger is outside the SQLite volume/backup set, startup reconciliation succeeds, and a staged pre-deletion backup cannot resurrect the deleted identity;
 - rate and quota failures are observable without plaintext payloads; and
 - relay storage and traffic contain no plaintext transcripts, attachments, repo files, terminal output, Codex/OpenAI credentials, or plaintext GitHub tokens.
 
 Trust proxy headers only when a documented reverse proxy strips client-supplied forwarding headers and writes its own. Railway documents `X-Real-IP` as the client address supplied by its public edge, so the official Railway deployment sets both proxy variables true. Other deployments must keep both false unless their proxy provides an equivalent guarantee.
 
+### Backup restore and deletion replay
+
+Never restore directly into the public service. Create an isolated Railway service/environment with no public domain, attach the restored SQLite copy, and inject the same deletion-ledger bucket plus HMAC key. Run `npm run build -w @multaiplayer/relay` and then `npm run deletions:reconcile -w @multaiplayer/relay`. The command must exit zero before any domain or traffic is attached. It authenticates every active tombstone, compares all primary-state identities regardless of local applied markers, reapplies deletion, and commits the resulting state. A blocker means the restored snapshot predates required ownership transfer or host handoff; keep it isolated and use a safe snapshot or resolve ownership before retrying. Record the Railway snapshot id, SQLite integrity result, tombstone/pending/deleted/pruned counts, and operator. Start normally and verify readiness only after that evidence is retained.
+
+The production snapshot maximum is 7,689,600 seconds (89 days); every tombstone uses a 7,776,000-second (90-day) protection horizon to provide scheduling/clock margin. A delayed reconciliation appends a fresh tombstone before primary cleanup, extending coverage from the time data is actually removed rather than relying on the original request date. Startup deletes each external tombstone and its matching primary applied marker only after that object's `protectUntil`. Until the newest object expires, the deleted GitHub identity cannot sign back in. Do not reduce the horizon below the longest backup retention or rotate/lose the HMAC key while protected backups exist.
+
 ### Relay rollback
 
-Keep the previous artifact and a pre-deploy SQLite backup. If authentication, storage, or WebSocket routing fails, remove the official relay from public copy and direct users to self-hosting. If plaintext leakage is suspected, stop the relay, preserve evidence privately, and follow `SECURITY.md` instead of opening a public issue.
+Keep the previous artifact and a pre-deploy SQLite backup. A rollback that restores SQLite must follow the isolated deletion-replay procedure above before traffic resumes; restoring SQLite alone is prohibited because it can resurrect deleted identity data. If authentication, storage, or WebSocket routing fails, remove the official relay from public copy and direct users to self-hosting. If plaintext leakage is suspected, stop the relay, preserve evidence privately, and follow `SECURITY.md` instead of opening a public issue.
 
 ## Signing, provenance, and publication
 

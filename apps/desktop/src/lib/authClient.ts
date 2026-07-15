@@ -134,6 +134,7 @@ export type HostedAccountDeletionResult =
       retainedSharedData: string[];
     }
   | { status: "blocked"; blockers: HostedAccountDeletionBlockers }
+  | { status: "pending"; retainedSharedData: string[] }
   | { status: "indeterminate"; signedOut: true };
 
 export async function deleteHostedAccount(
@@ -162,9 +163,13 @@ export async function deleteHostedAccount(
   try {
     const body = await readJsonResponse<{
       ok: true;
-      deleted: HostedAccountDeletionSummary;
+      status?: "pending";
+      deleted: HostedAccountDeletionSummary | null;
       retainedSharedData: string[];
     }>(response, "Failed to delete hosted account data");
+    if (response.status === 202 && body.status === "pending" && body.deleted === null) {
+      return { status: "pending", retainedSharedData: body.retainedSharedData };
+    }
     return {
       status: "deleted",
       deleted: body.deleted,

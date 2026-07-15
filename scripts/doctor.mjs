@@ -159,6 +159,17 @@ function checkOptionalEnv(name, detail) {
 function checkProductionRelayEnv() {
   const githubClientId = envValue("GITHUB_CLIENT_ID");
   const sessionSecret = envValue("MULTAIPLAYER_RELAY_SESSION_SECRET");
+  const deletionLedgerEndpoint = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT");
+  const deletionLedgerBucket = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET");
+  const deletionLedgerRegion = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION");
+  const deletionLedgerAccessKey = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID");
+  const deletionLedgerSecretKey = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY");
+  const deletionLedgerHmacKey = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY");
+  const deletionLedgerUrlStyle = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE");
+  const deletionLedgerProtectionSeconds = envInteger(
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS",
+    7_776_000
+  );
   const allowedOrigins = envValue("MULTAIPLAYER_RELAY_ALLOWED_ORIGINS");
   const requireAuth = envBoolean("MULTAIPLAYER_RELAY_REQUIRE_AUTH", true);
   const debug = envBoolean("MULTAIPLAYER_RELAY_DEBUG", false);
@@ -188,6 +199,36 @@ function checkProductionRelayEnv() {
       sessionSecret.length >= 32
         ? "configured with at least 32 characters"
         : "required: use a stable high-entropy value of at least 32 characters"
+  });
+  const deletionLedgerEndpointIsHttps = (() => {
+    try {
+      return new URL(deletionLedgerEndpoint).protocol === "https:";
+    } catch {
+      return false;
+    }
+  })();
+  checks.push({
+    ok:
+      deletionLedgerEndpointIsHttps &&
+      Boolean(deletionLedgerBucket) &&
+      Boolean(deletionLedgerRegion) &&
+      Boolean(deletionLedgerAccessKey) &&
+      deletionLedgerSecretKey.length >= 32 &&
+      deletionLedgerHmacKey.length >= 32 &&
+      ["path", "virtual-host"].includes(deletionLedgerUrlStyle) &&
+      deletionLedgerProtectionSeconds >= 7_776_000,
+    label: "production external deletion ledger",
+    detail:
+      deletionLedgerEndpointIsHttps &&
+      deletionLedgerBucket &&
+      deletionLedgerRegion &&
+      deletionLedgerAccessKey &&
+      deletionLedgerSecretKey.length >= 32 &&
+      deletionLedgerHmacKey.length >= 32 &&
+      ["path", "virtual-host"].includes(deletionLedgerUrlStyle) &&
+      deletionLedgerProtectionSeconds >= 7_776_000
+        ? "S3-compatible ledger configured with a protection horizon of at least 90 days"
+        : "required: complete HTTPS S3 ledger credentials, separate 32-character HMAC key, explicit URL style, and protection horizon >= 7776000 seconds"
   });
   checks.push({
     ok: Boolean(allowedOrigins) && allowedOriginErrors.length === 0,

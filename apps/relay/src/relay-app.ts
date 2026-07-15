@@ -4,6 +4,8 @@ import express from "express";
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { createRelayAuthSessionManager, createRelayAuthSessionPersistence } from "./auth/session.js";
+import { FileDeletionLedger, S3DeletionLedger } from "./auth/deletion-ledger.js";
+import { reconcileDeletionLedger } from "./auth/deletion-reconciliation.js";
 import {
   maxAccessTokenChars,
   maxAttachmentBlobIdChars,
@@ -32,7 +34,7 @@ import { createRelayOriginPolicy } from "./http/origin-policy.js";
 import { teamRecordForUser } from "./http/teams.js";
 import { createRelayLifecycle } from "./lifecycle.js";
 import { createRelayLimits } from "./limits.js";
-import { createRelayMetrics, requestLoggingMiddleware } from "./observability.js";
+import { createRelayMetrics, logRelayEvent, requestLoggingMiddleware } from "./observability.js";
 import { createRelayPersistence } from "./persistence.js";
 import {
   createMlsBacklogPruner,
@@ -79,6 +81,15 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     shutdown: shutdownConfig
   } = relayConfig;
   const relayMetrics = createRelayMetrics();
+  const deletionLedger = relayConfig.deletionLedger
+    ? relayConfig.deletionLedger.backend === "s3"
+      ? new S3DeletionLedger(relayConfig.deletionLedger)
+      : new FileDeletionLedger(
+          relayConfig.deletionLedger.path,
+          relayConfig.deletionLedger.hmacKey,
+          relayConfig.deletionLedger.protectionSeconds
+        )
+    : null;
   const relayPersistence = createRelayPersistence({
     backend: storageBackend,
     dataPath,
@@ -141,7 +152,8 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     mutationsRequireAuth,
     nodeEnv,
     normalizeSessionId: normalizeAuthSessionId,
-    scheduleStoreSave
+    scheduleStoreSave,
+    isDeletedIdentity: (userId) => deletionLedger?.isProtected(userId) ?? false
   });
   const { authSessionMaxAgeMs, getAuthSession } = authSessionManager;
   const authSessionPersistence = createRelayAuthSessionPersistence({
@@ -264,7 +276,8 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     scheduleStoreSave,
     addTeamMember,
     revokeTeamInvites: teamMutations.revokeTeamInvites,
-    requesterFromRequest
+    requesterFromRequest,
+    deletionLedger
   });
   app.use(relayJsonBodyErrorMiddleware);
   registerRelayWebSocketAdapter({
@@ -281,6 +294,16 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
   });
 
   await relayStorePersistence.loadRelayStore();
+  const deletionReconciliation = deletionLedger
+    ? await reconcileDeletionLedger({
+        ledger: deletionLedger,
+        store: relayStore,
+        persist: () => relayStorePersistence.saveRelayStore()
+      })
+    : { entries: 0, pending: 0, identitiesDeleted: 0, markersPruned: 0 };
+  if (deletionLedger) {
+    logRelayEvent("info", "deletion_ledger_reconciled", deletionReconciliation);
+  }
 
   const runtime = createRelayRuntimeControl({
     server,
@@ -296,6 +319,7 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     server,
     wss,
     config: relayConfig,
+    deletionReconciliation,
     ...runtime
   };
 }

@@ -108,6 +108,13 @@ export async function startRelay(
         // into SQLite or omit this override directly.
         MULTAIPLAYER_RELAY_STORAGE: storageBackend,
         MULTAIPLAYER_RELAY_DATA_PATH: dataPath,
+        MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH:
+          extraEnv.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH ?? join(tempDir, "external-deletion-ledger"),
+        MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY:
+          extraEnv.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY ??
+          "relay-test-deletion-ledger-hmac-key-at-least-32-characters",
+        MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS:
+          extraEnv.MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS ?? "7776000",
         ...(initialState && storageBackend === "sqlite"
           ? { MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH: initialStatePath }
           : {})

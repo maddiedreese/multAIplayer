@@ -21,6 +21,7 @@ export function openRelayDatabase(dataPath: string): Database.Database {
     create table if not exists relay_team_members (team_id text primary key, data_json text not null);
     create table if not exists relay_auth_sessions (session_id text primary key, data_json text not null);
     create table if not exists relay_attachment_blobs (id text primary key, data_json text not null);
+    create table if not exists relay_applied_deletion_ledger_entries (id text primary key, data_json text not null);
     create table if not exists relay_mls_messages (
       room_key text not null,
       message_id text not null,

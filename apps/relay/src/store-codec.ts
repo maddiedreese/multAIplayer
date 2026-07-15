@@ -5,7 +5,8 @@ import {
   type InviteRecord as InviteRecordType,
   type KeyPackageRecord as KeyPackageRecordType,
   type RoomRecord,
-  type TeamRecord
+  type TeamRecord,
+  isRecord
 } from "@multaiplayer/protocol";
 import type { NormalizedStoredAuthSession, StoredAuthSession } from "./auth/session.js";
 import type { AcceptedMessageReceipt, AuthSession, RelayStore, RoomKey } from "./state.js";
@@ -35,6 +36,7 @@ export interface StoredRelayState {
     userIds?: string[];
   }>;
   authSessions?: StoredAuthSession[];
+  appliedDeletionLedgerEntries?: Array<{ entryId: string; appliedAt: string }>;
   attachmentBlobs?: AttachmentBlobRecordType[];
   mlsBacklog: Array<{
     key: RoomKey;
@@ -160,6 +162,20 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
         const normalized = options.normalizeStoredAuthSession(storedSession);
         if (normalized) store.authSessions.set(normalized.sessionId, normalized.session);
       }
+      for (const entry of storedArray(stored.appliedDeletionLedgerEntries)) {
+        if (
+          isRecord(entry) &&
+          typeof entry.entryId === "string" &&
+          entry.entryId.length <= 512 &&
+          typeof entry.appliedAt === "string" &&
+          !Number.isNaN(Date.parse(entry.appliedAt))
+        ) {
+          store.appliedDeletionLedgerEntries.set(entry.entryId, {
+            entryId: entry.entryId,
+            appliedAt: entry.appliedAt
+          });
+        }
+      }
       for (const item of storedArray(stored.mlsBacklog)) {
         const normalized = normalizeStoredBacklog(item);
         if (normalized) store.mlsBacklog.set(normalized.key, normalized.messages);
@@ -245,6 +261,7 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
           userIds: Array.from(members.keys())
         })),
         authSessions: options.storedAuthSessions(store.authSessions),
+        appliedDeletionLedgerEntries: Array.from(store.appliedDeletionLedgerEntries.values()),
         attachmentBlobs: Array.from(store.attachmentBlobs.values()).filter((blob) => !isExpiredAttachmentBlob(blob)),
         mlsBacklog: Array.from(store.mlsBacklog.entries())
           .map(([key, messages]) => ({

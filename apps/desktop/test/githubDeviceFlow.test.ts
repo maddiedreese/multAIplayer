@@ -132,6 +132,28 @@ test("hosted account deletion sends exact confirmation and preserves typed block
   }
 });
 
+test("hosted account deletion preserves an accepted pending primary-cleanup result", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          status: "pending",
+          deleted: null,
+          retainedSharedData: ["team_and_room_records"]
+        }),
+        { status: 202, headers: { "content-type": "application/json" } }
+      );
+    assert.deepEqual(await deleteHostedAccount(), {
+      status: "pending",
+      retainedSharedData: ["team_and_room_records"]
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("hosted account deletion treats a lost response plus signed-out session as indeterminate", async () => {
   const originalFetch = globalThis.fetch;
   let calls = 0;

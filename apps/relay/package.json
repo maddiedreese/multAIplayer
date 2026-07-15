@@ -8,6 +8,7 @@
     "test:security-journey": "tsx --test --test-reporter=junit test/process-security-journey.test.ts test/live-native-relay-journey.test.ts",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "deletions:reconcile": "node dist/reconcile-deletions.js",
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts test/*/*.test.ts",

@@ -22,6 +22,26 @@ export interface RelayConfig {
   jsonBodyLimitBytes: number;
   mlsMessageMaxBytes: number;
   sessionPersistenceSecret: string | null;
+  deletionLedger:
+    | {
+        backend: "file";
+        path: string;
+        hmacKey: string;
+        protectionSeconds: number;
+      }
+    | {
+        backend: "s3";
+        endpoint: string;
+        bucket: string;
+        region: string;
+        accessKeyId: string;
+        secretAccessKey: string;
+        prefix: string;
+        urlStyle: "path" | "virtual-host";
+        hmacKey: string;
+        protectionSeconds: number;
+      }
+    | null;
   metricsToken: string | null;
   debugEndpointsEnabled: boolean;
   allowedCorsOrigins: string[];
@@ -68,6 +88,14 @@ export function loadRelayConfig(): RelayConfig {
     50_000_000
   );
   const jsonBodyLimitBytes = Math.ceil(Math.max(1_000_000, attachmentBlobMaxBytes * 1.5 + 100_000));
+
+  const deletionLedger = parseDeletionLedgerConfig();
+  if (nodeEnv === "production" && !deletionLedger) {
+    throw new Error("Production relay requires a complete external deletion ledger configuration.");
+  }
+  if (nodeEnv === "production" && deletionLedger && deletionLedger.protectionSeconds < 7_776_000) {
+    throw new Error("Production deletion ledger protection must be at least 7776000 seconds (90 days).");
+  }
 
   return {
     nodeEnv,
@@ -118,6 +146,7 @@ export function loadRelayConfig(): RelayConfig {
       5_000_000
     ),
     sessionPersistenceSecret: normalizeSessionPersistenceSecret(process.env.MULTAIPLAYER_RELAY_SESSION_SECRET),
+    deletionLedger,
     metricsToken: normalizeMetricsToken(process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN),
     debugEndpointsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_DEBUG, false),
     allowedCorsOrigins: parseAllowedOriginEnv(process.env.MULTAIPLAYER_RELAY_ALLOWED_ORIGINS),
@@ -149,6 +178,48 @@ export function loadRelayConfig(): RelayConfig {
       roomsPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP, 100, 0, 100_000)
     },
     totalRoomCapPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER, 500, 1, 100_000)
+  };
+}
+
+function parseDeletionLedgerConfig(): RelayConfig["deletionLedger"] {
+  const filePath = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH?.trim() ?? "";
+  const endpoint = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT?.trim() ?? "";
+  const bucket = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET?.trim() ?? "";
+  const region = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION?.trim() ?? "";
+  const accessKeyId = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID?.trim() ?? "";
+  const secretAccessKey = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY?.trim() ?? "";
+  const hmacKey = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY?.trim() ?? "";
+  const urlStyle = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE?.trim() || "path";
+  const protectionSeconds = parseIntegerEnv(
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS,
+    7_776_000,
+    86_400,
+    31_536_000
+  );
+  const configured = [endpoint, bucket, region, accessKeyId, secretAccessKey, hmacKey].filter(Boolean).length;
+  if (filePath && configured > 1) throw new Error("Configure exactly one deletion ledger backend.");
+  if (filePath) {
+    if (hmacKey.length < 32) throw new Error("Deletion ledger HMAC key must contain at least 32 characters.");
+    return { backend: "file", path: resolve(filePath), hmacKey, protectionSeconds };
+  }
+  if (configured === 0) return null;
+  if (configured !== 6 || secretAccessKey.length < 32 || hmacKey.length < 32) {
+    throw new Error("Deletion ledger configuration is incomplete or uses a key shorter than 32 characters.");
+  }
+  if (urlStyle !== "path" && urlStyle !== "virtual-host") {
+    throw new Error("Deletion ledger S3 URL style must be path or virtual-host.");
+  }
+  return {
+    backend: "s3",
+    endpoint,
+    bucket,
+    region,
+    accessKeyId,
+    secretAccessKey,
+    prefix: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_PREFIX?.trim() || "relay-deletions/v1",
+    urlStyle,
+    hmacKey,
+    protectionSeconds
   };
 }
 

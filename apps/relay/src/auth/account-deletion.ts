@@ -10,6 +10,7 @@ import type {
 } from "@multaiplayer/protocol";
 import type {
   AuthSession,
+  AppliedDeletionLedgerEntry,
   ByteQuotaRecord,
   DeviceChallengeRecord,
   DeviceSessionRecord,
@@ -55,17 +56,23 @@ interface AccountDeletionStateSnapshot {
   attachmentBlobUploadByteCounts: Map<string, ByteQuotaRecord>;
   rateLimitStore: Map<string, RateLimitRecord>;
   deviceChallenges: Map<string, DeviceChallengeRecord>;
+  appliedDeletionLedgerEntries: Map<string, AppliedDeletionLedgerEntry>;
 }
 
 export async function deleteAccountOwnedRelayDataAtomically(
   store: RelayStore,
   userId: string,
-  persist: () => Promise<void>
+  persist: () => Promise<void>,
+  ledgerEntryIds: string[] = []
 ): Promise<AccountDeletionSummary> {
   const snapshot = snapshotAccountDeletionState(store, userId);
   let deletedState: AccountDeletionStateSnapshot | null = null;
   try {
     const summary = deleteAccountOwnedRelayData(store, userId);
+    const appliedAt = new Date().toISOString();
+    for (const entryId of ledgerEntryIds) {
+      store.appliedDeletionLedgerEntries.set(entryId, { entryId, appliedAt });
+    }
     deletedState = snapshotAccountDeletionState(store, userId, snapshot);
     await persist();
     return summary;
@@ -247,7 +254,8 @@ function snapshotAccountDeletionState(
     rateLimitStore: select(store.rateLimitStore, (key) =>
       Array.from(sessionIds).some((sessionId) => key.endsWith(`:session:${sessionId}`))
     ),
-    deviceChallenges: select(store.deviceChallenges, (_key, challenge) => challenge.userId === userId)
+    deviceChallenges: select(store.deviceChallenges, (_key, challenge) => challenge.userId === userId),
+    appliedDeletionLedgerEntries: new Map(store.appliedDeletionLedgerEntries)
   };
 }
 
@@ -309,6 +317,11 @@ function restoreAccountDeletionState(
   );
   restoreChangedEntries(store.rateLimitStore, before.rateLimitStore, after.rateLimitStore);
   restoreChangedEntries(store.deviceChallenges, before.deviceChallenges, after.deviceChallenges);
+  restoreChangedEntries(
+    store.appliedDeletionLedgerEntries,
+    before.appliedDeletionLedgerEntries,
+    after.appliedDeletionLedgerEntries
+  );
 }
 
 function restoreChangedEntries<Key, Value>(

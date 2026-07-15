@@ -9,6 +9,7 @@ import {
   findAccountDeletionBlockers
 } from "./account-deletion.js";
 import type { RelayStore } from "../state.js";
+import type { DeletionLedger } from "./deletion-ledger.js";
 
 export interface RegisterGitHubAuthRoutesOptions {
   app: Express;
@@ -19,6 +20,7 @@ export interface RegisterGitHubAuthRoutesOptions {
   sessionPersistenceSecret: string | null;
   authSessions: Map<string, AuthSession>;
   store: RelayStore;
+  deletionLedger: DeletionLedger | null;
   authSessionMaxAgeMs: number;
   authCookieOptions: (maxAge?: number) => CookieOptions;
   getAuthSession: (sessionId: unknown) => AuthSession | null;
@@ -43,6 +45,7 @@ export function registerGitHubAuthRoutes({
   sessionPersistenceSecret,
   authSessions,
   store,
+  deletionLedger,
   authSessionMaxAgeMs,
   authCookieOptions,
   getAuthSession,
@@ -64,7 +67,8 @@ export function registerGitHubAuthRoutes({
       scopes: githubOAuthScopes,
       mutationsRequireAuth,
       allowedOrigins: allowedCorsOrigins,
-      sessionPersistence: sessionPersistenceSecret ? "encrypted" : "memory_only"
+      sessionPersistence: sessionPersistenceSecret ? "encrypted" : "memory_only",
+      accountDeletion: deletionLedger ? "external_ledger_protected" : "unavailable"
     });
   });
 
@@ -186,6 +190,29 @@ export function registerGitHubAuthRoutes({
       sendRelayError(res, 502, "upstream_unavailable", "GitHub returned an oversized access token");
       return;
     }
+    if (deletionLedger) {
+      let deletedSubjects;
+      try {
+        deletedSubjects = new Set((await deletionLedger.list()).map((entry) => entry.subject));
+      } catch {
+        sendRelayError(
+          res,
+          503,
+          "persistence_unavailable",
+          "GitHub sign-in is temporarily unavailable because deletion safety could not be verified."
+        );
+        return;
+      }
+      if (deletedSubjects.has(deletionLedger.subjectFor(normalizedUserId))) {
+        sendRelayError(
+          res,
+          403,
+          "forbidden",
+          "This GitHub identity was deleted from the hosted alpha and cannot sign in while protected backups remain."
+        );
+        return;
+      }
+    }
 
     const sessionId = nanoid(32);
     const session: AuthSession = {
@@ -250,16 +277,50 @@ export function registerGitHubAuthRoutes({
     const memberTeamIds = Array.from(store.teamMembers.entries())
       .filter(([, members]) => members.has(userId))
       .map(([teamId]) => teamId);
-    let deleted;
+    if (!deletionLedger) {
+      sendRelayError(
+        res,
+        503,
+        "persistence_unavailable",
+        "Hosted account deletion is unavailable until the operator configures its external deletion ledger."
+      );
+      return;
+    }
+    let ledgerEntry;
     try {
-      deleted = await deleteAccountOwnedRelayDataAtomically(store, userId, saveRelayStore);
+      ledgerEntry = await deletionLedger.record(userId);
     } catch {
       sendRelayError(
         res,
         503,
         "persistence_unavailable",
-        "Hosted account deletion could not be committed. Your session remains active; retry when storage is available."
+        "Hosted account deletion was not started because its external deletion record could not be committed."
       );
+      return;
+    }
+    let deleted;
+    try {
+      deleted = await deleteAccountOwnedRelayDataAtomically(store, userId, saveRelayStore, [ledgerEntry.id]);
+    } catch {
+      for (const teamId of memberTeamIds) revokeTeamMemberSessions(teamId, userId);
+      revokeUserPresence(userId);
+      for (const client of store.sessions.values()) {
+        if (client.authSession?.user.id === userId || client.userId === userId) {
+          client.socket.close(1008, "Hosted account deletion pending");
+        }
+      }
+      res.clearCookie("multaiplayer_session", authCookieOptions());
+      res.status(202).json({
+        ok: true,
+        status: "pending",
+        deleted: null,
+        retainedSharedData: [
+          "team_and_room_records",
+          "mls_ciphertext_and_routing_metadata",
+          "encrypted_attachment_blobs",
+          "accepted_message_receipts"
+        ]
+      });
       return;
     }
     for (const teamId of memberTeamIds) revokeTeamMemberSessions(teamId, userId);

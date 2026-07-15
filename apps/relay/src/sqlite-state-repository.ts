@@ -24,6 +24,7 @@ export function loadNormalizedRelayState(db: Database.Database): unknown | null 
     teamMembers: loadJsonRows(db, "relay_team_members", "team_id"),
     authSessions: loadJsonRows(db, "relay_auth_sessions", "session_id"),
     attachmentBlobs: loadJsonRows(db, "relay_attachment_blobs", "id"),
+    appliedDeletionLedgerEntries: loadJsonRows(db, "relay_applied_deletion_ledger_entries", "id"),
     mlsBacklog: loadMlsBacklogRows(db)
   };
 }
@@ -43,7 +44,8 @@ const relayEntityTables: Record<
   acceptedMessageReceipts: { table: "relay_accepted_message_receipts", keyColumn: "id" },
   teamMembers: { table: "relay_team_members", keyColumn: "team_id" },
   authSessions: { table: "relay_auth_sessions", keyColumn: "session_id" },
-  attachmentBlobs: { table: "relay_attachment_blobs", keyColumn: "id" }
+  attachmentBlobs: { table: "relay_attachment_blobs", keyColumn: "id" },
+  appliedDeletionLedgerEntries: { table: "relay_applied_deletion_ledger_entries", keyColumn: "id" }
 };
 
 export function applyStoredRelayMutations(db: Database.Database, changes: StoredRelayMutation[]) {
@@ -157,6 +159,9 @@ export function saveNormalizedRelayState(db: Database.Database, state: unknown, 
     saveJsonRows(db, "relay_team_members", "team_id", state.teamMembers, (item) => relayId(item, "teamId"));
     saveJsonRows(db, "relay_auth_sessions", "session_id", state.authSessions, (item) => relayId(item, "sessionId"));
     saveJsonRows(db, "relay_attachment_blobs", "id", state.attachmentBlobs, (item) => relayId(item, "id"));
+    saveJsonRows(db, "relay_applied_deletion_ledger_entries", "id", state.appliedDeletionLedgerEntries, (item) =>
+      relayId(item, "entryId")
+    );
     pruneMlsMessageRows(db, state.mlsBacklog);
   })();
 }
@@ -175,7 +180,8 @@ function clearNormalizedRelayTables(db: Database.Database) {
     "relay_accepted_message_receipts",
     "relay_team_members",
     "relay_auth_sessions",
-    "relay_attachment_blobs"
+    "relay_attachment_blobs",
+    "relay_applied_deletion_ledger_entries"
   ]) {
     db.prepare(`delete from ${table}`).run();
   }

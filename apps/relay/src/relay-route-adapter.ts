@@ -20,6 +20,7 @@ import {
   maxUserIdChars
 } from "@multaiplayer/protocol";
 import type { createRelayAuthSessionManager } from "./auth/session.js";
+import type { DeletionLedger } from "./auth/deletion-ledger.js";
 import type { createRelayAuthz } from "./authz.js";
 import type { loadRelayConfig } from "./config.js";
 import { registerRelayRoutes } from "./http/register-routes.js";
@@ -62,6 +63,7 @@ interface RegisterRelayRouteAdapterOptions {
   addTeamMember: (teamId: string, userId: string, role?: "owner" | "admin" | "member") => void;
   revokeTeamInvites: (teamId: string) => void;
   requesterFromRequest: (body: unknown, sessionId: unknown) => { id: string; name: string };
+  deletionLedger: DeletionLedger | null;
 }
 
 export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOptions) {
@@ -76,6 +78,7 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     allowedCorsOrigins: config.allowedCorsOrigins,
     sessionPersistenceSecret: config.sessionPersistenceSecret,
     authSessions: store.authSessions,
+    deletionLedger: options.deletionLedger,
     authSessionMaxAgeMs: auth.authSessionMaxAgeMs,
     authCookieOptions: auth.authCookieOptions,
     getAuthSession: auth.getAuthSession,
