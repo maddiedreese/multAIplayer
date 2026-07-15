@@ -22,14 +22,10 @@ export async function reconcileDeletionLedger(options: {
   persist: () => Promise<void>;
   now?: () => Date;
 }): Promise<{ entries: number; pending: number; identitiesDeleted: number; markersPruned: number }> {
-  await options.ledger.purgeExpired();
+  // Authenticate and reconcile the complete ledger before expiry collection.
+  // An expired entry can still represent a deletion whose primary commit never
+  // succeeded; purging it first would resurrect that identity permanently.
   const entries = await options.ledger.list();
-  const activeEntryIds = new Set(entries.map((entry) => entry.id));
-  let markersPruned = 0;
-  for (const entryId of options.store.appliedDeletionLedgerEntries.keys()) {
-    if (activeEntryIds.has(entryId)) continue;
-    if (options.store.appliedDeletionLedgerEntries.delete(entryId)) markersPruned += 1;
-  }
   const pending = entries.filter((entry) => !options.store.appliedDeletionLedgerEntries.has(entry.id));
   const entriesBySubject = groupBySubject(entries);
   const entriesApplied = [...entries];
@@ -49,14 +45,24 @@ export async function reconcileDeletionLedger(options: {
     identitiesDeleted += 1;
   }
 
-  if (pending.length === 0 && identitiesDeleted === 0 && markersPruned === 0) {
-    return { entries: entries.length, pending: 0, identitiesDeleted: 0, markersPruned: 0 };
+  if (pending.length > 0 || identitiesDeleted > 0) {
+    const appliedAt = (options.now ?? (() => new Date()))().toISOString();
+    for (const entry of entriesApplied) {
+      options.store.appliedDeletionLedgerEntries.set(entry.id, { entryId: entry.id, appliedAt });
+    }
+    // Persist primary deletion before an expired external entry can be removed.
+    await options.persist();
   }
-  const appliedAt = (options.now ?? (() => new Date()))().toISOString();
-  for (const entry of entriesApplied) {
-    options.store.appliedDeletionLedgerEntries.set(entry.id, { entryId: entry.id, appliedAt });
+
+  await options.ledger.purgeExpired();
+  const activeEntryIds = new Set((await options.ledger.list()).map((entry) => entry.id));
+  let markersPruned = 0;
+  for (const entryId of options.store.appliedDeletionLedgerEntries.keys()) {
+    if (activeEntryIds.has(entryId)) continue;
+    if (options.store.appliedDeletionLedgerEntries.delete(entryId)) markersPruned += 1;
   }
-  await options.persist();
+  if (markersPruned > 0) await options.persist();
+
   return { entries: entriesApplied.length, pending: pending.length, identitiesDeleted, markersPruned };
 }
 

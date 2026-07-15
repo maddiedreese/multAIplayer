@@ -379,6 +379,7 @@ function parseDeletionLedgerEntry(hmacKey: string, body: string, idFromKey: stri
 
 function entryMac(hmacKey: string, entry: Omit<DeletionLedgerEntry, "mac">): string {
   return createHmac("sha256", hmacKey)
+    .update("multaiplayer-deletion-ledger-entry-v1\0")
     .update(JSON.stringify([entry.version, entry.id, entry.subject, entry.requestedAt, entry.protectUntil]))
     .digest("hex");
 }

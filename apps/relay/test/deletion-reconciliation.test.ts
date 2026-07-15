@@ -122,3 +122,45 @@ test("delayed primary cleanup appends protection for 90 days from the cleanup at
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("restart after the original horizon deletes the identity before purging and extends protection", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "deletion-reconciliation-expired-"));
+  let current = new Date("2026-07-01T00:00:00.000Z");
+  const ledger = new FileDeletionLedger(directory, key, 7_776_000, () => current);
+  const userId = "github:expired-but-pending";
+  try {
+    const original = await ledger.record(userId);
+    const store = createRelayStore();
+    store.authSessions.set("pending-session", {
+      accessToken: "secret",
+      user: { id: userId, login: "expired-but-pending" },
+      expiresAt: Date.now() + 60_000
+    });
+
+    current = new Date("2026-10-01T00:00:00.000Z");
+    let persistCalls = 0;
+    const result = await reconcileDeletionLedger({
+      ledger,
+      store,
+      persist: async () => {
+        persistCalls += 1;
+        if (persistCalls !== 1) return;
+        assert.equal(store.authSessions.size, 0, "primary identity data is deleted before expiry collection");
+        assert.equal((await ledger.list()).length, 2, "old and freshly extended entries still exist at commit time");
+      }
+    });
+
+    const remaining = await ledger.list();
+    assert.equal(result.identitiesDeleted, 1);
+    assert.equal(result.markersPruned, 1);
+    assert.equal(persistCalls, 2);
+    assert.equal(remaining.length, 1);
+    assert.notEqual(remaining[0]?.id, original.id);
+    assert.equal(remaining[0]?.protectUntil, "2026-12-30T00:00:00.000Z");
+    assert.equal(store.appliedDeletionLedgerEntries.has(original.id), false);
+    assert.equal(store.appliedDeletionLedgerEntries.has(remaining[0]!.id), true);
+    assert.equal(ledger.isProtected(userId), true);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
