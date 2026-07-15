@@ -1,7 +1,7 @@
 import React from "react";
 import { defaultCodexSandboxLevel, type RoomRecord } from "@multaiplayer/protocol";
 import { CodexApprovalCard } from "../../../apps/desktop/src/components/CodexApprovalCard";
-import { formatCodexSandboxLevel } from "../../../apps/desktop/src/presentation/formatting/appFormatters";
+import { formatCodexSandboxLevel } from "../../../apps/desktop/src/lib/formatting/appFormatters";
 import { canApproveCodexTurn } from "../../../apps/desktop/src/lib/codex/codexApproval";
 import {
   formatApprovalAttachments,
