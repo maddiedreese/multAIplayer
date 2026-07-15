@@ -262,16 +262,18 @@ for _ in $(seq 1 100); do
       # manager, which would reparent the WRY app windows and break WebDriver's
       # native coordinate mapping under Xvfb.
       xdotool windowfocus --sync "$current_window"
-      xdotool key --window "$current_window" --clearmodifiers ctrl+l
+      # Once focused, omit --window so xdotool uses XTest input. GTK rejects
+      # the XSendEvent path used by targeted key events under this portal.
+      xdotool key --clearmodifiers ctrl+l
       sleep 0.2
-      xdotool type --window "$current_window" --clearmodifiers --delay 1 -- "$HANDOFF_PROJECT_ROOT"
-      xdotool key --window "$current_window" --clearmodifiers Return
+      xdotool type --clearmodifiers --delay 1 -- "$HANDOFF_PROJECT_ROOT"
+      xdotool key --clearmodifiers Return
       sleep 0.5
       # GTK labels this confirmation action Select or Open depending on the
       # available portal. Exercise its mnemonic instead of relying on focus.
-      xdotool key --window "$current_window" --clearmodifiers alt+s 2>/dev/null || true
+      xdotool key --clearmodifiers alt+s 2>/dev/null || true
       sleep 0.3
-      xdotool key --window "$current_window" --clearmodifiers alt+o 2>/dev/null || true
+      xdotool key --clearmodifiers alt+o 2>/dev/null || true
       for _ in $(seq 1 20); do
         if ! xdotool getwindowname "$current_window" >/dev/null 2>&1; then
           echo "native handoff folder chooser closed"
