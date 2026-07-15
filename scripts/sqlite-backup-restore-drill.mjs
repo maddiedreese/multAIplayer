@@ -8,6 +8,25 @@ const args = new Set(process.argv.slice(2));
 const fixtureMode = args.has("--fixture");
 const dataPathArg = process.argv.find((arg) => arg.startsWith("--data-path="));
 const dataPath = dataPathArg?.slice("--data-path=".length) ?? process.env.MULTAIPLAYER_RELAY_DATA_PATH;
+const requiredRelayTables = [
+  "relay_snapshots",
+  "relay_meta",
+  "relay_teams",
+  "relay_rooms",
+  "relay_invites",
+  "relay_devices",
+  "relay_key_packages",
+  "relay_invite_requests",
+  "relay_invite_responses",
+  "relay_invite_ack_receipts",
+  "relay_accepted_message_receipts",
+  "relay_team_members",
+  "relay_auth_sessions",
+  "relay_attachment_blobs",
+  "relay_applied_deletion_ledger_entries",
+  "relay_mls_messages",
+  "relay_room_epochs"
+];
 
 let tempDir = null;
 let sourcePath = dataPath;
@@ -50,23 +69,30 @@ function createFixtureRelayStore(path) {
   const db = new Database(path);
   db.pragma("journal_mode = WAL");
   db.exec(`
+    create table relay_snapshots (id text primary key, state_json text not null, saved_at text not null);
     create table relay_meta (key text primary key, value text not null);
     create table relay_teams (id text primary key, data_json text not null);
     create table relay_rooms (id text primary key, data_json text not null);
     create table relay_invites (id text primary key, data_json text not null);
     create table relay_devices (key text primary key, data_json text not null);
+    create table relay_key_packages (id text primary key, data_json text not null);
+    create table relay_invite_requests (id text primary key, data_json text not null);
+    create table relay_invite_responses (id text primary key, data_json text not null);
+    create table relay_invite_ack_receipts (id text primary key, data_json text not null);
+    create table relay_accepted_message_receipts (id text primary key, data_json text not null);
     create table relay_team_members (team_id text primary key, data_json text not null);
     create table relay_auth_sessions (session_id text primary key, data_json text not null);
     create table relay_attachment_blobs (id text primary key, data_json text not null);
-    create table relay_encrypted_backlog (room_key text primary key, data_json text not null);
-    create table relay_encrypted_envelopes (
+    create table relay_applied_deletion_ledger_entries (id text primary key, data_json text not null);
+    create table relay_mls_messages (
       room_key text not null,
-      envelope_id text not null,
+      message_id text not null,
       sort_order integer not null,
       created_at text not null,
       data_json text not null,
-      primary key (room_key, envelope_id)
+      primary key (room_key, message_id)
     );
+    create table relay_room_epochs (room_key text primary key, accepted_epoch integer not null);
   `);
   db.prepare("insert into relay_meta (key, value) values (?, ?)").run("version", "1");
   db.prepare("insert into relay_meta (key, value) values (?, ?)").run("savedAt", "2026-07-08T00:00:00.000Z");
@@ -83,7 +109,7 @@ function createFixtureRelayStore(path) {
     JSON.stringify({ teamId: "team-alpha", members: [] })
   );
   db.prepare(
-    "insert into relay_encrypted_envelopes (room_key, envelope_id, sort_order, created_at, data_json) values (?, ?, ?, ?, ?)"
+    "insert into relay_mls_messages (room_key, message_id, sort_order, created_at, data_json) values (?, ?, ?, ?, ?)"
   ).run(
     "team-alpha:room-alpha",
     "env-alpha",
@@ -91,6 +117,7 @@ function createFixtureRelayStore(path) {
     "2026-07-08T00:00:00.000Z",
     JSON.stringify({ id: "env-alpha", kind: "chat.message" })
   );
+  db.prepare("insert into relay_room_epochs (room_key, accepted_epoch) values (?, ?)").run("team-alpha:room-alpha", 0);
   db.close();
 }
 
@@ -101,9 +128,14 @@ function assertIntegrity(db, label) {
 
 function assertRelayTables(db) {
   const tables = new Set(db.prepare("select name from sqlite_master where type = 'table'").pluck().all());
-  for (const table of ["relay_meta", "relay_teams", "relay_rooms", "relay_team_members", "relay_encrypted_envelopes"]) {
+  for (const table of requiredRelayTables) {
     if (!tables.has(table)) throw new Error(`backup is missing relay table ${table}`);
   }
   const version = db.prepare("select value from relay_meta where key = ?").pluck().get("version");
-  if (version !== "1") throw new Error(`backup has unexpected relay store version: ${String(version)}`);
+  if (version === "1") return;
+  const storedRows = requiredRelayTables
+    .filter((table) => table !== "relay_meta")
+    .reduce((total, table) => total + Number(db.prepare(`select count(*) from ${table}`).pluck().get()), 0);
+  if (version === undefined && storedRows === 0) return;
+  throw new Error(`backup has unexpected relay store version: ${String(version)}`);
 }

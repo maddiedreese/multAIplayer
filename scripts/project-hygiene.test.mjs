@@ -36,6 +36,16 @@ function readJsonPathValue(value, jsonpath) {
 
 const withoutFencedCode = (source) => source.replace(/^\s*(```|~~~)[\s\S]*?^\s*\1.*$/gm, "");
 
+test("backup restore drill validates the complete current relay schema", () => {
+  const schema = readFileSync("apps/relay/src/sqlite-schema.ts", "utf8");
+  const drill = readFileSync("scripts/sqlite-backup-restore-drill.mjs", "utf8");
+  const schemaTables = Array.from(schema.matchAll(/create table if not exists (relay_[a-z_]+)/g), ([, name]) => name);
+  const requiredBlock = drill.match(/const requiredRelayTables = \[([\s\S]*?)\n\];/)?.[1] ?? "";
+  const drillTables = Array.from(requiredBlock.matchAll(/"(relay_[a-z_]+)"/g), ([, name]) => name);
+
+  assert.deepEqual(drillTables, schemaTables);
+});
+
 test("tracked Markdown links resolve to repository files", () => {
   const repositoryRoot = resolve(".");
 
