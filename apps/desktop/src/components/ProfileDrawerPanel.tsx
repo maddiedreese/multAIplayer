@@ -1,6 +1,7 @@
 import { ClipboardList, ExternalLink, X } from "lucide-react";
 import { GitHubIcon } from "./GitHubIcon";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import type { DeviceIdentity } from "../lib/deviceIdentity";
 import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
 import { saveNativeDiagnosticBundle } from "../lib/diagnostics";
@@ -24,6 +25,7 @@ export function ProfileDrawerPanel({
   deviceIdentity,
   deviceIdentityMessage,
   relaySessionPersistence,
+  codexAccountPanel = <CodexAccountPanel />,
   onRotateDeviceIdentity,
   onHostedAccountDeleted,
   onSignIn,
@@ -38,6 +40,7 @@ export function ProfileDrawerPanel({
   deviceIdentity: DeviceIdentity | null;
   deviceIdentityMessage: string | null;
   relaySessionPersistence: string;
+  codexAccountPanel?: ReactNode;
   onRotateDeviceIdentity: () => void;
   onHostedAccountDeleted: () => void;
   onSignIn: () => void;
@@ -150,7 +153,7 @@ export function ProfileDrawerPanel({
       </button>
       {diagnosticsMessage && <div className="workflow-message">{diagnosticsMessage}</div>}
 
-      <CodexAccountPanel />
+      {codexAccountPanel}
 
       {currentUser ? (
         <button className="ghost-wide" onClick={onSignOut}>
