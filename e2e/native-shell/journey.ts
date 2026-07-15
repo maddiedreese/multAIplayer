@@ -270,7 +270,7 @@ for _ in $(seq 1 100); do
       xdotool key --clearmodifiers Return
       sleep 0.5
       eval "$(xdotool getwindowgeometry --shell "$current_window")"
-      echo "native handoff folder chooser geometry: ${WIDTH}x${HEIGHT}"
+      echo "native handoff folder chooser geometry: \${WIDTH}x\${HEIGHT}"
       # GTK's affirmative Select/Open button is the rightmost control in the
       # bottom action row. Move relative to the dialog and use a real XTest
       # pointer event; GTK rejects targeted synthetic key events under Xvfb.
