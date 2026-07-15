@@ -13,6 +13,19 @@ body {
   padding: 24px;
 }
 
+.e2e-harness-shell.readme-presentation {
+  display: grid;
+  align-content: center;
+  padding: 32px;
+  background:
+    radial-gradient(circle at 15% 10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 36%),
+    var(--bg);
+}
+
+.readme-presentation .e2e-chat-parity {
+  height: min(760px, calc(100vh - 64px));
+}
+
 .e2e-harness-boundary {
   display: flex;
   flex-direction: column;

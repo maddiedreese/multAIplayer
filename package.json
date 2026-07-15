@@ -31,6 +31,7 @@
     "audit:npm": "npm audit --audit-level=high",
     "test": "npm run build:packages && npm run test:scripts && npm run test:harness && npm run test:workspaces",
     "test:e2e": "node scripts/run-e2e.mjs",
+    "docs:screenshots": "node scripts/capture-readme-screens.mjs",
     "test:e2e:native": "node --import tsx e2e/native-shell/journey.ts",
     "test:e2e:native:macos-smoke": "wdio run e2e/native-macos/wdio.conf.mjs",
     "test:security-journey": "npm run build:packages && npm run test:security-journey -w @multaiplayer/relay",

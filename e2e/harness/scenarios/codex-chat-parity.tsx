@@ -17,9 +17,9 @@ const now = "2026-07-13T18:00:00.000Z";
 const messages: RoomChatMessageDisplay[] = [
   {
     id: "human-code",
-    author: "Maddie",
+    author: "Avery",
     role: "human",
-    body: "Please preserve `roomId`.\n\n```ts\nconst roomId = 'encrypted-room';\n```",
+    body: "Please keep the release gate explicit.\n\n```ts\nconst releaseReady = checks.every(Boolean);\n```",
     time: "11:00",
     selected: false,
     attachments: [],
@@ -27,9 +27,9 @@ const messages: RoomChatMessageDisplay[] = [
   },
   {
     id: "codex-image",
-    author: "Codex via Maddie",
+    author: "Codex via Avery",
     role: "codex",
-    body: "Implemented and generated the preview.\n\n```rust\nlet shared = true;\n```",
+    body: "Implemented the release check and generated the preview.\n\n```rust\nlet notarized = receipt.is_some();\n```",
     time: "11:01",
     selected: false,
     attachments: [
@@ -65,8 +65,8 @@ function activity(
     ...(agent ? { agent } : {}),
     startedAt: now,
     updatedAt: now,
-    host: "Maddie",
-    hostUserId: "github:maddie"
+    host: "Avery",
+    hostUserId: "github:avery"
   };
 }
 
@@ -78,7 +78,7 @@ const activities: CodexActivity[] = [
   }),
   activity("edit", "file_change", "File change", {
     type: "file_change",
-    changes: [{ path: "src/chat.tsx", action: "update", diff: "+ renderGeneratedImage();" }]
+    changes: [{ path: "src/release-check.ts", action: "update", diff: "+ verifyNotarizationReceipt();" }]
   }),
   activity("tool", "tool", "Tool call", {
     type: "tool",

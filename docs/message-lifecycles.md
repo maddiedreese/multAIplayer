@@ -1,6 +1,6 @@
 # Message lifecycles
 
-These traces describe the native protocol-v2 path. Seeded browser demo rooms stop at local state and never join an encrypted relay room.
+These traces describe the native protocol-v2 path. A normal browser receives only a native-app notice; it cannot create a room, initialize identity or MLS state, or connect to the relay.
 
 ## Life of first-run setup state
 
@@ -17,7 +17,7 @@ These traces describe the native protocol-v2 path. Seeded browser demo rooms sto
 1. The host creates an HTTPS `open.multaiplayer.com/invite` link. The relay invite id, capability/host binding, and approval mode are all fragment fields.
 2. If the installed signed app receives the universal link, Rust validates one exact URL, replaces its one pending in-memory slot, emits a payload-free availability event, and focuses the main window. The frontend subscribes before taking the slot once.
 3. If the website receives the navigation instead, its pre-hydration script scrubs every fragment synchronously. A bounded candidate survives only in page memory until full validation. The page renders no invite value and sends none to storage, cookies, analytics, telemetry, or clipboard.
-4. With no installed app, the page offers the official DMG. **Open multAIplayer** navigates to the alternate associated host only after an explicit click. Refresh, navigation, or closing the page loses the candidate, so the user returns to the original private message after installation.
+4. With no installed app, the page offers a download only when the release manifest identifies a supported signed DMG. **Open multAIplayer** navigates to the alternate associated host only after an explicit click. Refresh, navigation, or closing the page loses the candidate, so the user returns to the original private message after installation.
 5. React displays only an invitation-received action. Accept delegates the values to the normal join adapter and clears them. Error, denial, cancellation, supersession, or process exit also clears them.
 6. The ordinary invite lifecycle below remains authoritative. Universal-link receipt alone creates no team membership, MLS state, or room access.
 

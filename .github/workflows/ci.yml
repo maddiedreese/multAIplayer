@@ -301,7 +301,7 @@ jobs:
           retention-days: 30
 
   web-shell-e2e:
-    name: Web shell journeys
+    name: UI contract journeys
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -320,7 +320,7 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run web shell journeys
+      - name: Run UI contract journeys
         run: npm run test:e2e
 
       - name: Upload journey failure artifacts

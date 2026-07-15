@@ -44,7 +44,10 @@ test("browser build directs users to the native product without rendering a work
 
 test("browser build exposes no room, relay, or private MLS material", () => {
   render(createElement(App));
-  assert.match(screen.getByText(/There is no browser preview/).textContent ?? "", /supported signed release/);
+  assert.match(
+    screen.getByText(/This browser page does not contain a workspace/).textContent ?? "",
+    /supported signed alpha/
+  );
   assert.equal(document.querySelector("[data-relay-room]"), null);
   assert.equal(localStorage.length, 0);
 });

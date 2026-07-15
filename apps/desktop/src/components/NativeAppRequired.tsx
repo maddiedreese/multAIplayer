@@ -12,8 +12,8 @@ export function NativeAppRequired() {
         <p className="native-required-eyebrow">Native desktop app required</p>
         <h1>multAIplayer runs on Apple silicon Macs.</h1>
         <p>
-          There is no browser preview or browser workspace. Once the supported signed release is published, install its
-          native app on macOS 11 or later to create or join a room.
+          This browser page does not contain a workspace. Use the native app on macOS 11 or later to create or join a
+          room. The first supported signed alpha will be announced on the product website.
         </p>
         <nav aria-label="Product and legal links">
           <a href={PRODUCT_SITE_URL} target="_blank" rel="noreferrer noopener">

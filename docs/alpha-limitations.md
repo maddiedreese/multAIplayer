@@ -4,7 +4,7 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 
 ## Release And Installation
 
-- The supported public alpha must be Developer ID signed and notarized. The existing scaffold download and local development builds are not supported release artifacts and may be unsigned.
+- No supported public build has been published yet. The first supported alpha must be Developer ID signed and notarized; local development and ordinary CI builds are not release artifacts.
 - Public packages support Apple silicon Macs running macOS 11 or later. Intel Macs, Windows, and Linux are not supported release targets.
 - Release checksums help verify artifact integrity, but they do not replace signing.
 - Public releases should come from GitHub Actions, not ad hoc local builds.
@@ -15,9 +15,8 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 
 - GitHub sign-in requires a GitHub OAuth app configured on the relay.
 - GitHub Device Flow identifies workspace members and authorizes relay/repository workflows. ChatGPT login separately authorizes the local Codex process. Joining requires relay and GitHub readiness but does not require Codex, a ChatGPT login, or a project folder until that device hosts Codex work.
-- A hosted production relay requires real domain, TLS, secrets, persistent storage, and operator monitoring.
-- The official free-alpha relay is planned for Railway and will use GitHub identity for hosted access. It is not live until DNS, persistent storage, secrets, TLS/WSS routing, monitoring, and backup/restore checks pass, and it carries no uptime or support guarantee.
-- The relay Dockerfile and SQLite storage are available. Multi-instance production hosting needs external/shared rate limiting, backup/restore drills, and operational monitoring.
+- The official free-alpha relay is live on Railway at `relay.multaiplayer.com`. It requires GitHub identity, TLS/WSS, encrypted persistent sessions, persistent SQLite storage, monitoring, backups, and a tested restore procedure. It carries no uptime, recovery, or support guarantee.
+- The relay Dockerfile and SQLite storage are available for self-hosting. Multi-instance production hosting still needs shared persistence/attachment coordination and external or shared rate limiting; the official alpha remains a single-instance deployment.
 - SQLite opaque MLS messages use an incremental append/delete path, but the normalized non-message relay state rewrites teams, rooms, invites, devices, members, and sessions on each debounced flush. That is acceptable for alpha-scale trusted teams, but larger hosted relays should plan an incremental or shared-store rewrite before rooms and membership counts grow enough for whole-store rewrites to become a scaling ceiling.
 
 ## Privacy And Encryption
@@ -51,8 +50,8 @@ multAIplayer is a Public Alpha. It is useful for local and trusted-team testing,
 
 ## Known Product Gaps
 
-- Real multi-device, multi-account dogfooding is required before a public alpha is promoted broadly.
-- Official relay hosting decisions, domains, secrets, and GitHub device-code OAuth configuration require maintainer input.
+- Real multi-device, multi-account dogfooding is required before the first supported build is promoted broadly.
+- Release signing, notarization, cold/warm universal-link dispatch, and the complete two-device acceptance run remain maintainer-operated release gates.
 - Independently branded or self-hosted builds cannot inherit the official universal-link association. They need their own HTTPS domains, AASA files, Apple Team ID, bundle id, associated-domain entitlement, signing, and matching native allowlists; otherwise recipients can paste the complete private invitation into the app.
 - The visual design should continue to be reviewed in the native app on real screens, especially resizable columns and embedded browser behavior.
 - A room intentionally has one primary repository binding. Multi-repository rooms are deferred until app-server exposes a stable multi-root execution and sandbox contract; use separate rooms meanwhile. See [the accepted ADR](decisions/multi-repository-rooms.md).

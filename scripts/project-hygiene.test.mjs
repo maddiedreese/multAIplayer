@@ -79,6 +79,37 @@ test("tracked Markdown links resolve to repository files", () => {
   }
 });
 
+test("public entry points stay native-only, release-accurate, and backed by current UI captures", () => {
+  const readme = readFileSync("README.md", "utf8");
+  const captureScript = readFileSync("scripts/capture-readme-screens.mjs", "utf8");
+  const currentGuides = [
+    "README.md",
+    "CONTRIBUTING.md",
+    ...trackedMarkdownFiles().filter(
+      (path) =>
+        path.startsWith("docs/") && path !== "docs/threat-model-changelog.md" && !path.startsWith("docs/decisions/")
+    )
+  ]
+    .map((path) => readFileSync(path, "utf8"))
+    .join("\n");
+
+  assert.match(readme, /apps\/desktop\/src\/assets\/multaiplayer-icon\.png/);
+  for (const image of ["onboarding.png", "safe-defaults.png", "codex-room.png"]) {
+    assert.ok(existsSync(`docs/assets/screens/${image}`), `missing README UI capture ${image}`);
+    assert.match(readme, new RegExp(`docs/assets/screens/${image.replace(".", "\\.")}`));
+  }
+  assert.equal(rootPackage.scripts["docs:screenshots"], "node scripts/capture-readme-screens.mjs");
+  assert.match(captureScript, /capture\(page, "onboarding"/);
+  assert.match(captureScript, /scenarioUrl\("codex-chat-parity"\)/);
+  assert.match(captureScript, /reducedMotion: "reduce"/);
+  assert.match(currentGuides, /official free-alpha relay is live on Railway/i);
+  assert.match(currentGuides, /read:user repo/);
+  assert.doesNotMatch(
+    currentGuides,
+    /planned for Railway|not currently live|seeded browser demo|seeded-room mode|placeholder download|existing scaffold download/i
+  );
+});
+
 test("documented npm scripts and project environment names stay implemented", () => {
   const scriptNames = new Set(
     ["package.json", ...workspaceManifestPaths].flatMap((path) => Object.keys(readJson(path).scripts ?? {}))
