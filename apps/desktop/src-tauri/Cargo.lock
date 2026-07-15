@@ -1036,6 +1036,7 @@ version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce6e4c961d6cd6c9a86db418387425e8bdeaf05b3c8bc1411e6dca4c252f1453"
 dependencies = [
+ "getrandom 0.4.3",
  "hybrid-array 0.4.13",
  "rand_core 0.10.1",
 ]
@@ -3329,7 +3330,7 @@ dependencies = [
 name = "mls-core"
 version = "0.1.0"
 dependencies = [
- "aes-gcm 0.10.3",
+ "aes-gcm 0.11.0",
  "base64 0.22.1",
  "hmac 0.12.1",
  "hpke 0.14.0",
